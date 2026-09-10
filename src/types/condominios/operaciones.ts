@@ -685,7 +685,10 @@ export interface ChecklistArea {
   id: string
   company_id: string
   project_id: string
+  /** Snapshot del nombre del área al vincular (o texto libre legado). */
   area: string
+  /** Área del catálogo (`areas_condominio`). NULL = legado ambiguo. */
+  area_id?: string | null
   fecha: string
   inspector?: string | null
   items: ChecklistItem[]
@@ -858,7 +861,10 @@ export interface TareaCondominio {
   estado: EstadoTarea
   asignado_a?: string | null
   reportado_por?: string | null
+  /** Snapshot del nombre del área al vincular (o texto libre legado). */
   area?: string | null
+  /** Área del catálogo (`areas_condominio`). NULL = sin área o legado ambiguo. */
+  area_id?: string | null
   fecha_limite?: string | null
   fecha_inicio?: string | null
   fecha_cierre?: string | null

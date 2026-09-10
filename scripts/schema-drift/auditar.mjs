@@ -81,6 +81,31 @@ export const RUTA_FINGERPRINT_PSQL = join(AQUI, 'fingerprint.psql')
  * vigilarlo —la barata de vitest y la de `--prueba-portabilidad`— no puedan
  * discrepar.
  */
+/**
+ * Una tabla cuyo grupo `tabla:<x>/policies` esté DECLARADO en la baseline y que
+ * exista en la reconstrucción, para que la prueba negativa pueda inyectarle una
+ * policy y comprobar que el auditor la reporta como DRIFT AGRAVADO.
+ *
+ * Se elige de la baseline en vez de fijarse en el código porque las entradas se
+ * retiran cuando producción converge: la anterior era `security_logs`, y al
+ * cerrarse su drift el 2026-09-10 la prueba negativa empezó a fallar sin que el
+ * mensaje explicara que el problema era el ESCENARIO y no el auditor.
+ *
+ * Determinista —orden alfabético— para que dos corridas elijan lo mismo.
+ */
+export function tablaConPoliciesEnBaseline(baseline, db) {
+  const existentes = new Set(
+    db.psql(['-tAq', '-c', "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"],
+      { stdio: 'pipe' })
+      .split('\n').map(l => l.trim()).filter(Boolean),
+  )
+  for (const clave of Object.keys(baseline?.grupos ?? {}).sort()) {
+    const m = /^tabla:([^/]+)\/policies$/.exec(clave)
+    if (m && existentes.has(m[1])) return m[1]
+  }
+  return null
+}
+
 export function esInvocacionDeFingerprint(linea) {
   if (/SIN-BANDERA-A-PROPOSITO/.test(linea)) return false
   if (/^\s*(\*|\/\/|--)/.test(linea)) return false
@@ -3075,14 +3100,32 @@ async function principal() {
     // definición de una migración— y la prueba dejaría de probar lo que dice.
     // Inyectada en ambos, M == R y el objeto queda como «uno que el PR no
     // toca»: exactamente el caso donde el trinquete estricto tiene que romper.
+    //
+    // La tabla donde va la POLICY no puede estar clavada en el código. Tiene
+    // que ser una cuyo grupo `/policies` YA esté en la baseline: es lo que
+    // convierte la inyección en DRIFT AGRAVADO en vez de DRIFT NUEVO, y por
+    // tanto lo que prueba que un grupo baselineado no sirve de escondite.
+    // Acá decía `security_logs`, y cuando esa entrada se retiró —producción
+    // convergió el 2026-09-10— la prueba negativa se cayó sin decir por qué:
+    // el auditor seguía detectando la policy, sólo que en la otra categoría.
+    // Elegirla de la baseline en tiempo de ejecución hace que retirar
+    // cualquier entrada no vuelva a romperla.
+    const tablaBaselineada = pruebaNegativa ? tablaConPoliciesEnBaseline(baseline, db) : null
+    if (pruebaNegativa && !tablaBaselineada) {
+      console.error('✗ prueba negativa: la baseline no declara ningún grupo `tabla:<x>/policies` ' +
+                    'cuya tabla exista en la reconstrucción, así que no hay dónde inyectar una ' +
+                    'policy que quede DENTRO de un grupo ya declarado. Sin eso, la prueba no ' +
+                    'distingue DRIFT AGRAVADO de DRIFT NUEVO y deja de probar lo que dice.')
+      process.exit(1)
+    }
     const INYECCIONES = [
       'ALTER TABLE public.clientes ADD COLUMN auditor_columna_inesperada text;',
-      'CREATE POLICY auditor_policy_inesperada ON public.security_logs FOR SELECT TO anon USING (true);',
+      `CREATE POLICY auditor_policy_inesperada ON public.${tablaBaselineada} FOR SELECT TO anon USING (true);`,
     ]
     if (pruebaNegativa) {
       for (const sql of INYECCIONES) db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', sql], { stdio: 'pipe' })
       console.error('· prueba negativa: inyectadas clientes.auditor_columna_inesperada y ' +
-                    'security_logs/auditor_policy_inesperada en AMBOS clústeres (M y R)')
+                    `${tablaBaselineada}/auditor_policy_inesperada en AMBOS clústeres (M y R)`)
     }
 
     const R = parsearHuella(huella(db.psql))

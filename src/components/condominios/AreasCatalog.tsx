@@ -1,10 +1,12 @@
 // Catálogo compartido de áreas del condominio (`areas_condominio`).
 //
-// Extraído de RutasRondaTab (donde vivía embebido) para que Limpieza y
-// cualquier otro consumidor administren EL MISMO catálogo sin duplicar
-// formularios, validaciones ni mutaciones. Los permisos los decide el tab
-// anfitrión (rutas_ronda en Rondas, prog_limpieza en Limpieza) y se reciben
-// por props; la BD los respalda con las policies de 20260904000100.
+// Extraído de RutasRondaTab (donde vivía embebido) y, desde 20260910000000,
+// montado en UN SOLO anfitrión: el tab "Áreas" (AreasCondominioTab). Los tabs
+// que consumen el catálogo lo muestran en solo lectura (AreasResumen), porque
+// dos puertas de alta sobre la misma tabla es como se fabricaron los duplicados
+// que 20260907000000 tuvo que fusionar. Los permisos los decide el tab
+// anfitrión (areas_config) y se reciben por props; la BD los respalda con las
+// policies de 20260904000100, ensanchadas en 20260910000000.
 //
 // Diferencias deliberadas con el CRUD original:
 //   · el insert manda `activo` (antes dependía del DEFAULT y el form lo perdía),
@@ -104,7 +106,7 @@ export function AreasCatalog({ areas, proyectoId, companyId, canCreate, canEdit,
   async function handleDelete(a: AreaCondominio) {
     const r = await confirm({
       title: '¿Eliminar área?',
-      text: `${a.nombre} — solo se puede eliminar si ninguna ruta, plantilla, tarea o programación la usa. Si está en uso, desactívala.`,
+      text: `${a.nombre} — solo se puede eliminar si ninguna ruta, plantilla, tarea, programación o inspección la usa. Si está en uso, desactívala.`,
       icon: 'warning', variant: 'danger', confirmText: 'Eliminar',
     })
     if (!r.isConfirmed) return
@@ -113,7 +115,7 @@ export function AreasCatalog({ areas, proyectoId, companyId, canCreate, canEdit,
       notify({
         variant: 'error', title: 'El área está en uso',
         text: error.code === '23503'
-          ? 'Tiene rutas, plantillas, tareas o programaciones vinculadas. Desactívala en su lugar: los registros históricos la siguen mostrando.'
+          ? 'Tiene rutas, plantillas, tareas, programaciones o inspecciones vinculadas. Desactívala en su lugar: los registros históricos la siguen mostrando.'
           : error.message,
       })
       return

@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 import {
   evaluateAppendOnly,
   parseNameStatus,
+  renombrePorColision,
   resolveRange,
 } from '../migrations-append-only.mjs'
 
@@ -43,10 +44,11 @@ describe('parseNameStatus', () => {
       { status: 'T', path: `${MIG}/20260420000001_condominios_mvp.sql` },
       {
         status: 'R',
+        score: 100,
         oldPath: `${MIG}/20260713100000_viejo.sql`,
         path: `${MIG}/20260713100001_viejo.sql`,
       },
-      { status: 'C', oldPath: 'src/a.ts', path: 'src/b.ts' },
+      { status: 'C', score: 75, oldPath: 'src/a.ts', path: 'src/b.ts' },
     ])
   })
 
@@ -140,6 +142,72 @@ describe('evaluateAppendOnly — lo prohibido', () => {
     expect(out.map((v) => `${v.kind}:${v.path}`)).toEqual([
       `modificada:${MIG}/20260318000000_enable_rls.sql`,
       `eliminada:${MIG}/20260420000001_condominios_mvp.sql`,
+    ])
+  })
+})
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// La única excepción al renombre: desempatar dos migraciones que ya comparten
+// versión en la base. Lo que estas pruebas fijan no es que la excepción
+// FUNCIONE —eso es una línea— sino que NO abra nada más: cada condición se
+// quita de a una y el renombre tiene que volver a ser una violación.
+// ════════════════════════════════════════════════════════════════════════════
+describe('evaluateAppendOnly — renombre por colisión de versión', () => {
+  // La base tal como quedó `main` el 2026-09-10: dos migraciones distintas
+  // compartiendo `20260910000000` porque #845 y #846 salieron del mismo commit.
+  const BASE_COLISIONADA = [
+    `${MIG}/20260729000300_security_logs_rls.sql`,
+    `${MIG}/20260910000000_areas.sql`,
+    `${MIG}/20260910000000_security_logs.sql`,
+  ]
+  const desempate = (score = 100, desde = '20260910000000_security_logs.sql', hacia = '20260910000001_security_logs.sql') => ({
+    status: 'R',
+    score,
+    oldPath: `${MIG}/${desde}`,
+    path: `${MIG}/${hacia}`,
+  })
+
+  it('permite el desempate: versión colisionada, nueva libre, mismo nombre, contenido intacto', () => {
+    expect(renombrePorColision(desempate(), BASE_COLISIONADA)).toBe(true)
+    expect(evaluateAppendOnly([desempate()], { migracionesEnLaBase: BASE_COLISIONADA })).toEqual([])
+  })
+
+  it('PROHÍBE renombrar cuando la versión vieja NO colisionaba: es un renombre común', () => {
+    const base = [`${MIG}/20260910000000_security_logs.sql`]
+    expect(renombrePorColision(desempate(), base)).toBe(false)
+    expect(evaluateAppendOnly([desempate()], { migracionesEnLaBase: base })).toHaveLength(1)
+  })
+
+  it('PROHÍBE aterrizar sobre una versión OCUPADA: cambiaría una colisión por otra', () => {
+    const base = [...BASE_COLISIONADA, `${MIG}/20260910000001_otra.sql`]
+    expect(renombrePorColision(desempate(), base)).toBe(false)
+    expect(evaluateAppendOnly([desempate()], { migracionesEnLaBase: base })).toHaveLength(1)
+  })
+
+  it('PROHÍBE cambiar el nombre además del timestamp: sería suplantar a otra migración', () => {
+    const entrada = desempate(100, '20260910000000_security_logs.sql', '20260910000001_areas.sql')
+    expect(renombrePorColision(entrada, BASE_COLISIONADA)).toBe(false)
+    expect(evaluateAppendOnly([entrada], { migracionesEnLaBase: BASE_COLISIONADA })).toHaveLength(1)
+  })
+
+  it('PROHÍBE el renombre que además EDITA el SQL (score < 100)', () => {
+    expect(renombrePorColision(desempate(98), BASE_COLISIONADA)).toBe(false)
+    expect(evaluateAppendOnly([desempate(98)], { migracionesEnLaBase: BASE_COLISIONADA })).toHaveLength(1)
+  })
+
+  it('PROHÍBE el desempate si no se sabe qué había en la base', () => {
+    expect(renombrePorColision(desempate(), undefined)).toBe(false)
+    expect(evaluateAppendOnly([desempate()])).toHaveLength(1)
+  })
+
+  it('no cambia nada para MODIFICADA ni ELIMINADA, colisión o no', () => {
+    const entries = parseNameStatus(
+      [`M\t${MIG}/20260910000000_areas.sql`, `D\t${MIG}/20260910000000_security_logs.sql`].join('\n'),
+    )
+    expect(evaluateAppendOnly(entries, { migracionesEnLaBase: BASE_COLISIONADA })).toEqual([
+      { kind: 'modificada', path: `${MIG}/20260910000000_areas.sql` },
+      { kind: 'eliminada', path: `${MIG}/20260910000000_security_logs.sql` },
     ])
   })
 })

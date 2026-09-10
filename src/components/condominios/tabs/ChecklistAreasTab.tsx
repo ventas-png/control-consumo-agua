@@ -1,16 +1,37 @@
+// Tab Checklist de áreas — inspección área por área.
+//
+// El área se ELIGE del catálogo canónico (`areas_condominio`, que se administra
+// en el tab Áreas): era el último texto libre de área del módulo, y con él
+// "Piscina", " piscina " y "PISCINA" eran tres áreas distintas que no se podían
+// cruzar con lo que la limpieza programa ni con lo que la ronda recorre.
+// Desde 20260910000100 la fila guarda `area_id` y conserva `area` como SNAPSHOT
+// del nombre; lo legado que el backfill no pudo vincular (nombres ambiguos) se
+// sigue mostrando con su texto, marcado como lo que es.
+//
+// Los ÍTEMS del checklist siguen siendo texto libre a propósito: son líneas
+// dentro del jsonb de su fila, sin identidad ni nada que las referencie.
+// ITEMS_PREDEFINIDOS es una lista de SUGERENCIAS para no teclear las quince de
+// siempre — no un catálogo. Meterlas en el de actividades (que carga cargo,
+// servicio, duración, insumos y herramientas) les daría un peso que no piden.
 import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import type { ChecklistArea, ChecklistItem } from '../../../types'
+import { nombreAreaDe } from '../../../domain/condominios/areas'
+import type { AreaCondominio, ChecklistArea, ChecklistItem } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
 
 interface Props {
   checklists: ChecklistArea[]
+  /** Catálogo compartido: la inspección ELIGE de aquí, nunca escribe el nombre. */
+  areas: AreaCondominio[]
   proyectoId: string
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Visibilidad del tab Áreas: decide si se ofrece el atajo para configurarlas. */
+  puedeConfigurarAreas: boolean
+  onIrATab: (tabId: 'areas_config') => void
   onRefresh: () => void
 }
 
@@ -42,27 +63,47 @@ function calcEstado(items: ChecklistItem[]): ChecklistArea['estado'] {
   return 'pendiente'
 }
 
-export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function ChecklistAreasTab({ checklists, areas, proyectoId, companyId, canCreate, canEdit, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
   const [selected, setSelected] = useState<ChecklistArea | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
-  const [formArea, setFormArea] = useState('')
+  const [formAreaId, setFormAreaId] = useState('')
+  /**
+   * Texto del área de la fila que se está editando cuando NO tiene area_id.
+   * Sin esto, editar un checklist legado solo para marcar un ítem obligaría a
+   * elegir área (o perdería el texto, y `area` es NOT NULL). Se conserva tal
+   * cual hasta que alguien lo vincule a propósito.
+   */
+  const [formAreaLegado, setFormAreaLegado] = useState('')
   const [formFecha, setFormFecha] = useState(hoyLocalISO())
   const [formInspector, setFormInspector] = useState('')
   const [formNotas, setFormNotas] = useState('')
   const [formItems, setFormItems] = useState<ChecklistItem[]>([])
   const [filterEstado, setFilterEstado] = useState('')
-  const [searchArea, setSearchArea] = useState('')
+  const [filterArea, setFilterArea] = useState('')
   const [saving, setSaving] = useState(false)
   const [predefinidoSel, setPredefinidoSel] = useState('')
 
+  // Solo las activas se ofrecen al capturar; las inactivas siguen renderizándose
+  // en las inspecciones que ya las usan.
+  const areasActivas = [...areas]
+    .filter(a => a.activo)
+    .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
+  /** Inspecciones anteriores al catálogo que quedaron sin vincular. */
+  const hayLegadas = checklists.some(c => !c.area_id)
+  const nombreArea = (c: ChecklistArea) => nombreAreaDe(c.area_id, areas, c.area)
+  const iconoArea = (c: ChecklistArea) =>
+    (c.area_id && areas.find(a => a.id === c.area_id)?.icono) || '🗒️'
+
   const openNew = () => {
-    setFormArea(''); setFormFecha(hoyLocalISO())
+    setFormAreaId(''); setFormAreaLegado(''); setFormFecha(hoyLocalISO())
     setFormInspector(''); setFormNotas(''); setFormItems([])
     setEditId(null); setShowForm(true); setSelected(null)
   }
   const openEdit = (c: ChecklistArea) => {
-    setFormArea(c.area); setFormFecha(c.fecha)
+    setFormAreaId(c.area_id ?? '')
+    setFormAreaLegado(c.area_id ? '' : c.area)
+    setFormFecha(c.fecha)
     setFormInspector(c.inspector ?? ''); setFormNotas(c.notas ?? '')
     setFormItems(c.items.map(i => ({ ...i })))
     setEditId(c.id); setShowForm(true)
@@ -79,12 +120,25 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
     setFormItems(prev => prev.map((it, idx) => idx === i ? { ...it, [field]: val } : it))
 
   const handleSave = async () => {
-    if (!formArea.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'El área es obligatoria.' })
+    const areaSel = formAreaId ? areas.find(a => a.id === formAreaId) : undefined
+    // Un checklist nuevo SIEMPRE sale del catálogo. Uno legado puede guardarse
+    // sin vincular (conservando su texto): así se corrigen ítems sin obligar a
+    // resolver ahí mismo un nombre que quizá ni exista todavía en el catálogo.
+    if (!areaSel && !formAreaLegado.trim()) {
+      return notify({
+        variant: 'warning', title: 'Campo requerido',
+        text: 'Selecciona el área del catálogo. Si no existe, créala en el tab "Áreas".',
+      })
+    }
     setSaving(true)
     const estado = calcEstado(formItems)
     const payload = {
       company_id: companyId, project_id: proyectoId,
-      area: formArea.trim(), fecha: formFecha,
+      // `area` es NOT NULL y es el snapshot del nombre al vincular; el legado
+      // sin vincular conserva su texto original intacto.
+      area_id: areaSel?.id ?? null,
+      area: areaSel ? areaSel.nombre.trim() : formAreaLegado.trim(),
+      fecha: formFecha,
       inspector: formInspector || null, notas: formNotas || null,
       items: formItems, estado,
     }
@@ -106,7 +160,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
   }
 
   const handleDelete = async (c: ChecklistArea) => {
-    const r = await confirm({ title: '¿Eliminar checklist?', text: `${c.area} · ${c.fecha}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
+    const r = await confirm({ title: '¿Eliminar checklist?', text: `${nombreArea(c)} · ${c.fecha}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('checklist_areas', c.id)
     if (selected?.id === c.id) setSelected(null)
@@ -115,7 +169,8 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
 
   const filtered = checklists.filter(c =>
     (!filterEstado || c.estado === filterEstado) &&
-    (!searchArea || c.area.toLowerCase().includes(searchArea.toLowerCase()))
+    // 'sin_vincular' agrupa lo legado: tiene texto de área pero no catálogo.
+    (!filterArea || (filterArea === 'sin_vincular' ? !c.area_id : c.area_id === filterArea))
   )
 
   const kpiCounts = Object.keys(ESTADO_STYLE).map(k => ({ key: k, count: checklists.filter(c => c.estado === k).length }))
@@ -142,7 +197,11 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
             </button>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <input value={searchArea} onChange={e => setSearchArea(e.target.value)} placeholder="Buscar área..." style={inputStyle} />
+            <select aria-label="Filtrar por área" value={filterArea} onChange={e => setFilterArea(e.target.value)} style={inputStyle}>
+              <option value="">Todas las áreas</option>
+              {areasActivas.map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
+              {hayLegadas && <option value="sin_vincular">⚠ Sin vincular al catálogo</option>}
+            </select>
             <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)} style={inputStyle}>
               <option value="">Todos los estados</option>
               {Object.entries(ESTADO_STYLE).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
@@ -159,7 +218,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
                 style={{ padding: '12px 14px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === c.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', borderLeft: selected?.id === c.id ? '3px solid var(--at-primary)' : '3px solid transparent' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{c.area}</div>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{iconoArea(c)} {nombreArea(c)}</div>
                     <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{c.fecha}{c.inspector ? ` · ${c.inspector}` : ''}</div>
                     {c.items.length > 0 && (
                       <div style={{ marginTop: '4px' }}>
@@ -186,7 +245,30 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Área *</label>
-                <input style={inputStyle} value={formArea} onChange={e => setFormArea(e.target.value)} placeholder="Ej. Lobby, Piscina, Gimnasio" autoFocus />
+                <select aria-label="Área" style={inputStyle} value={formAreaId} onChange={e => setFormAreaId(e.target.value)} autoFocus>
+                  <option value="">
+                    {formAreaLegado ? '— Sin vincular (registro anterior) —' : '— Selecciona un área —'}
+                  </option>
+                  {areasActivas.map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
+                </select>
+                {formAreaLegado && !formAreaId && (
+                  <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', marginTop: '4px' }}>
+                    ⚠ Registro anterior con texto libre: “{formAreaLegado}”. Elegí el área del catálogo para vincularlo.
+                  </div>
+                )}
+                {areasActivas.length === 0 && (
+                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
+                    Sin áreas activas.{' '}
+                    {puedeConfigurarAreas
+                      ? (
+                        <button type="button" onClick={() => onIrATab('areas_config')}
+                          style={{ background: 'none', border: 'none', padding: 0, color: 'var(--at-accent)', fontWeight: 600, fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}>
+                          Crearlas en el tab Áreas
+                        </button>
+                      )
+                      : 'Se dan de alta en el tab Áreas.'}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha</label>
@@ -242,8 +324,12 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700 }}>🗒️ {selected.area}</h2>
+                    <h2 data-testid="checklist-area" style={{ margin: 0, fontSize: '17px', fontWeight: 700 }}>{iconoArea(selected)} {nombreArea(selected)}</h2>
                     <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 700, background: s.bg, color: s.color }}>{s.icon} {s.label}</span>
+                    {!selected.area_id && (
+                      <span title="Texto libre anterior al catálogo: edita el checklist y elige el área para vincularlo."
+                        style={{ fontSize: '12px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>⚠ sin vincular</span>
+                    )}
                   </div>
                   <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>{selected.fecha}{selected.inspector ? ` · Inspector: ${selected.inspector}` : ''}</p>
                 </div>

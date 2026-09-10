@@ -3,8 +3,9 @@
 //   Áreas       programaciones + a quién le toca cada área (persona, o perfil
 //               turno+cargo), con asignación en bloque. Desde 20260904000100
 //               el área se elige del catálogo canónico (`areas_condominio`).
-//   Catálogo    el catálogo compartido de áreas (el mismo CRUD que usa Rondas
-//               en seguridad), para dar de alta/baja áreas sin salir del tab.
+//   Catálogo    el catálogo compartido de áreas, EN SOLO LECTURA: desde que
+//               existe el tab “Áreas” el alta vive ahí y en ningún otro lado,
+//               para que nadie cree dos veces la misma área sin saberlo.
 //   Actividades el catálogo compartido de actividades (ActividadesCatalog, el
 //               mismo componente del tab Plantillas), filtrado de entrada por
 //               servicio = limpieza y en modo consulta: la administración vive
@@ -28,7 +29,7 @@ import type {
   AreaCondominio, EjecucionLimpieza, ItemInventario, PersonalCondominio,
   PlantillaTareaCargo, ProgramacionLimpieza, SuministroCondominio,
 } from '../../../types'
-import { AreasCatalog } from '../AreasCatalog'
+import { AreasResumen } from '../AreasResumen'
 import { ActividadesCatalog } from '../ActividadesCatalog'
 import { VistaAreas } from './limpieza/VistaAreas'
 import { VistaRutinas } from './limpieza/VistaRutinas'
@@ -52,6 +53,9 @@ interface Props {
   canCreate: boolean
   canEdit: boolean
   canDelete: boolean
+  /** Visibilidad del tab Áreas: decide si se ofrece el atajo para configurarlas. */
+  puedeConfigurarAreas: boolean
+  onIrATab: (tabId: 'areas_config') => void
   onRefresh: () => void
 }
 
@@ -59,7 +63,7 @@ type Vista = 'areas' | 'catalogo' | 'actividades' | 'rutinas' | 'ruta' | 'noveda
 
 const VISTAS: { id: Vista; label: string; icon: string }[] = [
   { id: 'areas',       label: 'Áreas',     icon: '🧹' },
-  { id: 'catalogo',    label: 'Catálogo de áreas', icon: '📍' },
+  { id: 'catalogo',    label: 'Áreas del catálogo', icon: '📍' },
   { id: 'actividades', label: 'Actividades', icon: '📋' },
   { id: 'rutinas',     label: 'Rutinas',     icon: '🧭' },
   { id: 'ruta',        label: 'Ruta del día', icon: '🗓️' },
@@ -68,7 +72,7 @@ const VISTAS: { id: Vista; label: string; icon: string }[] = [
 
 export function ProgramacionLimpiezaTab({
   programaciones, ejecuciones, personal, areas, plantillas, suministros, inventario,
-  proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh,
+  proyectoId, companyId, canCreate, canEdit, canDelete, puedeConfigurarAreas, onIrATab, onRefresh,
 }: Props) {
   const [vista, setVista] = useState<Vista>('areas')
 
@@ -195,17 +199,13 @@ export function ProgramacionLimpiezaTab({
         />
       )}
       {vista === 'catalogo' && (
-        // El mismo componente que usa Rondas: un solo catálogo, un solo CRUD.
-        // Los permisos son los del tab anfitrión (prog_limpieza); la BD acepta
-        // la escritura desde este tab desde 20260904000100.
-        <AreasCatalog
+        // Solo lectura: el alta de áreas vive en el tab Áreas y en ningún otro
+        // lado. Aquí se muestra para saber qué se puede programar sin salir del
+        // tab, con el atajo a la configuración para quien tenga ese permiso.
+        <AreasResumen
           areas={areas}
-          proyectoId={proyectoId}
-          companyId={companyId}
-          canCreate={canCreate}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          onRefresh={onRefresh}
+          uso="las programaciones y la ruta del día"
+          onConfigurar={puedeConfigurarAreas ? () => onIrATab('areas_config') : undefined}
         />
       )}
       {vista === 'ruta' && (

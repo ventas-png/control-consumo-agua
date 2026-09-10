@@ -1,5 +1,6 @@
-import type { CategoriaTareaCondominio, PrioridadTarea, EstadoTarea } from '../../types'
+import type { AreaCondominio, CategoriaTareaCondominio, PrioridadTarea, EstadoTarea } from '../../types'
 import { createTareasCondominio } from '../../domain/condominios/mutations'
+import { normalizarNombreArea } from '../../domain/condominios/areas'
 import { sanitizeInput } from '../../lib/validation'
 import { ImportModal, type ImportColumn, type RowValidationResult } from '../shared'
 
@@ -72,6 +73,8 @@ const COLUMNS: ImportColumn[] = [
   { key: 'titulo',         width: 30, exampleValues: ['Revisar bomba de cisterna', 'Limpieza de áreas verdes', 'Inspección de extintores'] },
   { key: 'categoria',      width: 16, exampleValues: ['mantenimiento', 'limpieza', 'seguridad'] },
   { key: 'prioridad',      width: 12, exampleValues: ['alta', 'media', 'urgente'] },
+  // El texto se vincula al catálogo por nombre normalizado (sin acentos,
+  // mayúsculas ni espacios): "PISCINA " y "piscina" caen en la misma área.
   { key: 'area',           width: 18, exampleValues: ['Cuarto de máquinas', 'Jardín principal', 'Todo el edificio'] },
   { key: 'asignado_a',     width: 20, exampleValues: ['Juan Pérez', 'Cuadrilla jardinería', 'Empresa XYZ'] },
   { key: 'reportado_por',  width: 20, exampleValues: ['Administración', 'Residente 4B', ''] },
@@ -137,13 +140,29 @@ function validateRow(row: Record<string, unknown>): RowValidationResult<TareaRow
 }
 
 interface Props {
+  /** Catálogo del proyecto, para vincular el texto de la columna `area`. */
+  areas: AreaCondominio[]
   proyectoId: string
   companyId: string
   onClose: () => void
   onImportado: () => void
 }
 
-export function ImportTareasModal({ proyectoId, companyId, onClose, onImportado }: Props) {
+export function ImportTareasModal({ areas, proyectoId, companyId, onClose, onImportado }: Props) {
+  /**
+   * Índice nombre normalizado → id, saltándose los nombres que aparecen en más
+   * de un área. Un nombre ambiguo se deja SIN vincular (area_id null, texto
+   * conservado): es el mismo criterio del backfill de 20260910000000 — atar al
+   * área equivocada es peor que no atar. El import no crea áreas: el alta es
+   * del tab Áreas y de nadie más.
+   */
+  const areaPorNombre = new Map<string, string | null>()
+  for (const a of areas) {
+    const norm = normalizarNombreArea(a.nombre)
+    if (!norm) continue
+    areaPorNombre.set(norm, areaPorNombre.has(norm) ? null : a.id)
+  }
+
   return (
     <ImportModal<TareaRow>
       entityLabel="tarea"
@@ -153,11 +172,16 @@ export function ImportTareasModal({ proyectoId, companyId, onClose, onImportado 
       columns={COLUMNS}
       validateRow={validateRow}
       onInsertBatch={async (batch) => {
-        const payload = batch.map(t => ({
-          ...t,
-          project_id: proyectoId,
-          company_id: companyId,
-        }))
+        const payload = batch.map(t => {
+          const norm = normalizarNombreArea(t.area)
+          const areaId = norm ? areaPorNombre.get(norm) ?? null : null
+          return {
+            ...t,
+            area_id: areaId,
+            project_id: proyectoId,
+            company_id: companyId,
+          }
+        })
         const { error } = await createTareasCondominio(payload)
         return error
           ? { ok: 0, error }

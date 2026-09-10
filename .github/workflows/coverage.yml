@@ -436,6 +436,21 @@ jobs:
           PGPORT_TEST: 55495
         run: supabase/tests/balance_jornada/run.sh
 
+      # `security_logs` es el log de auditoría: producción tenía tres policies
+      # que el repositorio no declara —entre ellas un INSERT abierto a `anon` y
+      # un SELECT que dejaba al `admin` de un tenant leer los eventos de todos,
+      # porque la tabla es global y no tiene company_id—. Debajo, los grants por
+      # defecto de Supabase le daban a `anon` y `authenticated` los siete
+      # privilegios de tabla: retirar sólo las policies dejaba el INSERT
+      # concedido. La prueba no lee el catálogo para darlo por bueno: INTENTA
+      # cada operación con `SET LOCAL ROLE` puesto, y empieza reproduciendo el
+      # agujero abierto — si dejara de reproducirse, el escenario ya no vale.
+      - name: security_logs — quién escribe el log de auditoría y quién lo lee
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55494
+        run: supabase/tests/security_logs_acceso/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
