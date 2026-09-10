@@ -357,7 +357,7 @@ ALTER TABLE public.bloques_turno
   ADD COLUMN IF NOT EXISTS politica jsonb;
 
 COMMENT ON COLUMN public.bloques_turno.politica IS
-  'Foto CONGELADA de lo que la jornada esperaba el día que se materializó este bloque. La sella un trigger desde plantillas_horario; lo que mande el cliente se ignora. NULL = el bloque no tiene jornada, o se planificó antes de que existiera la vara (20260909000100) — no se rellena hacia atrás, porque aplicarle la política de hoy a un mes cerrado es justo lo que congelarla evita.';
+  'Foto CONGELADA de lo que la jornada esperaba el día que se materializó este bloque. La sella un trigger desde plantillas_horario; lo que mande el cliente se ignora. NULL = el bloque no tiene jornada, o se planificó antes de que existiera la vara (20260910000200) — no se rellena hacia atrás, porque aplicarle la política de hoy a un mes cerrado es justo lo que congelarla evita.';
 
 -- Mismo criterio que `turnos_sellar_horas` con `horas_planificadas`: la columna
 -- es DERIVADA y lo que llegue en ella se descarta. Va en un trigger propio y no

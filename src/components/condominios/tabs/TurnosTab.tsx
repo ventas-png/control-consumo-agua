@@ -77,7 +77,7 @@ const formJornadaVacio = {
   nombre: '', codigo: '', turno: 'manana' as TurnoTipo,
   hora_inicio: '06:00', hora_fin: '14:00', minutos_descanso: '0',
   tolerancia_entrada_min: '10', color: COLORES[0], notas: '',
-  // ── La vara (20260909000100). Declarada, todavía sin efectos.
+  // ── La vara (20260910000200). Declarada, todavía sin efectos.
   tolerancia_salida_min: '0',
   // 0 = no hay tramo compensable: la demora pasa directo a débito al salir de
   // la tolerancia. El número lo pone quien decide la política, no este default.
