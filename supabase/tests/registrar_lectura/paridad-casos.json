@@ -2,7 +2,7 @@
   "_comentario": [
     "Casos de PARIDAD entre el cálculo del importe en TypeScript (calcularCostoTarifa",
     "+ redondear2, src/lib/business.ts) y el autoritativo en SQL (agua_costo_tarifa,",
-    "20260910000000). Los `esperado` NO los generó ninguna de las dos: están puestos",
+    "20260910000001). Los `esperado` NO los generó ninguna de las dos: están puestos",
     "a mano, así que si las dos implementaciones se equivocaran igual, el test lo",
     "vería. Los consume src/lib/__tests__/paridad-costo-tarifa.test.ts (vitest) y",
     "supabase/tests/registrar_lectura/assert.sql (psql), sobre el MISMO fichero."

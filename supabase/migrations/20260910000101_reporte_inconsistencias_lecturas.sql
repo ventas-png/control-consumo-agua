@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- Qué dejó atrás el cálculo en el navegador: reporte de SÓLO LECTURA
 -- ════════════════════════════════════════════════════════════════════════════
--- 20260910000000 cierra la puerta hacia adelante: desde ahora el consumo, la
+-- 20260910000001 cierra la puerta hacia adelante: desde ahora el consumo, la
 -- tarifa y el importe los decide el servidor. Lo que ya está escrito sigue
 -- estando escrito, y una parte de ello está mal: cadenas de lectura rotas por
 -- el desempate al azar de `getUltimaLectura`, consumos que no son la resta de

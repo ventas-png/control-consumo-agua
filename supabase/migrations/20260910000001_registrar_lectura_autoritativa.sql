@@ -68,8 +68,8 @@
 --
 -- LO QUE ESTA MIGRACIÓN NO HACE. No toca ninguna fila existente, no reescribe
 -- importes históricos y no cambia las policies de `registros`. El inventario de
--- lo que ya está mal se publica como REPORTE de sólo lectura en la migración
--- siguiente (20260910000100), para que la corrección sea una decisión humana.
+-- lo que ya está mal se publica como REPORTE de sólo lectura en
+-- 20260910000101, para que la corrección sea una decisión humana.
 --
 -- REVERSIÓN
 --   DROP TRIGGER   IF EXISTS trg_agua_lectura_autoritativa ON public.registros;
@@ -117,7 +117,7 @@ COMMENT ON COLUMN public.registros.es_reset IS
 COMMENT ON COLUMN public.registros.lectura_final_retirada IS
   'Última lectura del medidor RETIRADO, capturada por el operador en un reset. consumo = (lectura_final_retirada − lectura_anterior) + lectura_actual.';
 COMMENT ON COLUMN public.registros.secuencia IS
-  'Posición de la lectura en la cadena de SU contador, asignada bajo el bloqueo. Es el orden total de verdad: `fecha` empata (dos lecturas del mismo día caen ambas al mediodía) y `created_at` también, porque es now() y vale lo mismo para todo lo que entre en la misma transacción. NULL en las filas anteriores a 20260910000000, que se ordenan como se pueda (por eso existe el reporte de inconsistencias).';
+  'Posición de la lectura en la cadena de SU contador, asignada bajo el bloqueo. Es el orden total de verdad: `fecha` empata (dos lecturas del mismo día caen ambas al mediodía) y `created_at` también, porque es now() y vale lo mismo para todo lo que entre en la misma transacción. NULL en las filas anteriores a 20260910000001, que se ordenan como se pueda (por eso existe el reporte de inconsistencias).';
 
 -- Dos lecturas no pueden ocupar el mismo lugar de la cadena. El bloqueo por
 -- contador ya lo impide; este índice es la red por debajo, la que sigue puesta
@@ -758,7 +758,7 @@ GRANT  EXECUTE ON FUNCTION public.registrar_lectura(uuid, numeric, date, text, t
 -- problema— y varias de esas escrituras son históricas por definición (una
 -- migración de datos inserta lecturas del año pasado, que la regla de
 -- retroactividad rechazaría). Lo que escriba por ahí no queda sin vigilancia:
--- el reporte de 20260910000100 lo audita igual, sin importar el origen.
+-- el reporte de 20260910000101 lo audita igual, sin importar el origen.
 CREATE OR REPLACE FUNCTION public.agua_tg_lectura_autoritativa()
 RETURNS trigger
 LANGUAGE plpgsql

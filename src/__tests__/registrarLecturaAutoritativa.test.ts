@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-// Guards ESTÁTICOS de la captura autoritativa de lecturas (20260910000000 y
-// 20260910000100).
+// Guards ESTÁTICOS de la captura autoritativa de lecturas (20260910000001 y
+// 20260910000101).
 //
 // ALCANCE Y LÍMITE. Esto lee el SQL del repositorio; la verificación CONDUCTUAL
 // —que el importe se recalcule, que la retroactiva se rechace, que el bloqueo
@@ -11,8 +11,8 @@ import { resolve } from 'node:path'
 // supabase/tests/registrar_lectura/. Lo de aquí es lo que aquello no puede ver
 // desde un PR sin base de datos: que la regla siga ESCRITA como debe, y sobre
 // todo que nadie le agregue a la RPC el parámetro que la vaciaría de sentido.
-const RPC = resolve('supabase/migrations/20260910000000_registrar_lectura_autoritativa.sql')
-const REPORTE = resolve('supabase/migrations/20260910000100_reporte_inconsistencias_lecturas.sql')
+const RPC = resolve('supabase/migrations/20260910000001_registrar_lectura_autoritativa.sql')
+const REPORTE = resolve('supabase/migrations/20260910000101_reporte_inconsistencias_lecturas.sql')
 
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
 function soloCodigo(texto: string): string {

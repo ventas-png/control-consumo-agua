@@ -85,7 +85,7 @@ export interface Registro {
    */
   creado_por?: string | null;
   /**
-   * Captura autoritativa (migración 20260910000000). `secuencia` es el lugar de
+   * Captura autoritativa (migración 20260910000001). `secuencia` es el lugar de
    * la lectura en la cadena de su contador, asignado por la base bajo bloqueo:
    * es el orden total del que salen `lectura_anterior` y el consumo. `origen`
    * dice por qué camino entró la fila. `es_reset` / `lectura_final_retirada`

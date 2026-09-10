@@ -1,7 +1,7 @@
 # Captura autoritativa de lecturas de agua
 
-> Migraciones `20260910000000_registrar_lectura_autoritativa.sql` y
-> `20260910000100_reporte_inconsistencias_lecturas.sql`.
+> Migraciones `20260910000001_registrar_lectura_autoritativa.sql` y
+> `20260910000101_reporte_inconsistencias_lecturas.sql`.
 
 ## El problema que cierra
 

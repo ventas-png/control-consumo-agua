@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20260910000000 + 20260910000100: la lectura de
+# Verificación EJECUTABLE de 20260910000001 + 20260910000101: la lectura de
 # agua deja de ser un dato que el navegador declara.
 #
 # POR QUÉ EXISTE
@@ -54,8 +54,8 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
-MIG_RPC="$RAIZ/supabase/migrations/20260910000000_registrar_lectura_autoritativa.sql"
-MIG_REP="$RAIZ/supabase/migrations/20260910000100_reporte_inconsistencias_lecturas.sql"
+MIG_RPC="$RAIZ/supabase/migrations/20260910000001_registrar_lectura_autoritativa.sql"
+MIG_REP="$RAIZ/supabase/migrations/20260910000101_reporte_inconsistencias_lecturas.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH

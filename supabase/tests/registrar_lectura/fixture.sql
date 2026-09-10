@@ -1,4 +1,4 @@
--- Fixture mínimo para EJECUTAR 20260910000000 + 20260910000100 contra un
+-- Fixture mínimo para EJECUTAR 20260910000001 + 20260910000101 contra un
 -- Postgres de verdad. Reproduce sólo lo que la captura autoritativa de lecturas
 -- toca: dos empresas, dos proyectos, tarifas (plana, escalonada y dada de
 -- baja), contadores, y la RLS real de `registros` para el INSERT.

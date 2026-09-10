@@ -412,7 +412,7 @@ jobs:
 
       # La lectura de agua la declaraba el navegador: consumo, tarifa, canon,
       # importe, proyecto y hasta el estado de cobro viajaban en el INSERT, y la
-      # RLS sólo miraba el proyecto. 20260910000000 lo mueve entero al servidor.
+      # RLS sólo miraba el proyecto. 20260910000001 lo mueve entero al servidor.
       # Casi nada de eso se ve leyendo el SQL: que un payload con `monto 0` y
       # `estado pagado` acabe escrito con otros números, que tres lecturas del
       # mismo día encadenen en orden, que quien captura SIN poder leer la tabla
