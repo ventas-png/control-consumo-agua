@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- `bloques_turno`: el repositorio describe otras columnas que producción
+-- `bloques_turno`: el repositorio describe otra tabla que producción
 -- ════════════════════════════════════════════════════════════════════════════
 --
 -- QUÉ CIERRA. La entrada `tabla:bloques_turno/columnas` de la baseline del
@@ -102,3 +102,95 @@ COMMENT ON COLUMN public.bloques_turno.turno IS
   'Franja del bloque (manana/tarde/noche). SIN valor por omisión a propósito: es NOT NULL, y un default haría que un bloque nocturno mal enviado se guardara callado como de mañana. Quien inserta lo dice.';
 COMMENT ON COLUMN public.bloques_turno.created_at IS
   'Cuándo se creó el bloque. NOT NULL con DEFAULT now(): una marca de creación que puede faltar no sirve ni para ordenar ni para auditar.';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- SEGUNDA PARTE · los CONSTRAINTS
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- Misma tabla, mismo origen, otra entrada de la baseline:
+-- `tabla:bloques_turno/constraints`. Se leyó `pg_get_constraintdef` de los dos
+-- lados. Los dos tienen NUEVE constraints, pero no los mismos:
+--
+--   nombre                              producción            repositorio
+--   ───────────────────────────────────────────────────────────────────────
+--   bloques_turno_company_id_fkey       AUSENTE               FK → companies(id)
+--   bloques_turno_estado_check          CHECK del dominio     AUSENTE
+--   bloques_turno_personal_id_fkey      ON DELETE CASCADE     sin acción
+--   bloques_turno_project_id_fkey       ON DELETE CASCADE     sin acción
+--   (los otros cinco coinciden exactamente)
+--
+-- LAS CUATRO SE RECONCILIAN HACIA PRODUCCIÓN, y las cuatro son NO-OP allá. Tres
+-- de ellas porque producción ya tiene la forma correcta y sólo hay que traerla
+-- al repositorio:
+--
+--   · `estado_check` VALIDA el dominio de `estado` (pendiente / en_curso /
+--     completado / cancelado). El repositorio no lo tenía: cualquier entorno
+--     reconstruido aceptaba un estado inventado que producción rechaza.
+--   · `personal_id` y `project_id` con ON DELETE CASCADE. Sin la acción, borrar
+--     un condominio o dar de baja a una persona fallaba con un error de FK en
+--     vez de llevarse sus bloques. Producción hace lo segundo desde siempre.
+--
+-- Y LA CUARTA ES UNA DECISIÓN, QUE CONVIENE LEER DESPACIO. La FK de `company_id`
+-- existe SÓLO en el repositorio. Producción nunca la tuvo. Hay dos formas de
+-- cerrar esa diferencia y hacen cosas muy distintas:
+--
+--   (a) agregarla a producción — mejora la integridad de verdad, y es barata:
+--       son 24 filas, 144 kB y CERO huérfanos, medido el 2026-09-10. Pero es
+--       una ESCRITURA en producción, necesita autorización, y hasta que se
+--       despliegue y se refresque la huella deja las tres vías distintas: este
+--       PR se pondría ambiguo, y con él #844.
+--   (b) quitarla del repositorio — no cambia nada en producción, porque allá
+--       nunca estuvo, y hace que el repositorio DEJE DE AFIRMAR una garantía
+--       que el sistema vivo no da. Es lo que este auditor existe para lograr.
+--
+-- Se elige (b), y no por comodidad: (a) no aumenta la seguridad de producción
+-- ni un día antes de desplegarse, y mientras tanto bloquea todo lo demás. Con
+-- (b) el repositorio dice la verdad hoy, y agregar la FK A LOS DOS LADOS pasa a
+-- ser un cambio deliberado y trivial —24 filas, sin huérfanos— que el auditor
+-- clasificará como CAMBIO PLANIFICADO y dejará pasar limpio. Queda anotado como
+-- lo que es: un seguimiento pendiente, no un problema resuelto.
+--
+-- Lo que NO se pierde por quitarla: `project_id` sigue con su FK, y un proyecto
+-- pertenece a una empresa; la RLS de `bloques_turno` exige
+-- `company_id = get_my_company_id()`; y la FK compuesta que agrega #844 ancla la
+-- terna entera cuando el bloque tiene jornada.
+
+DO $$
+DECLARE v_def text;
+BEGIN
+  -- (1) El CHECK del dominio de `estado`, que producción sí valida.
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'bloques_turno_estado_check'
+                    AND conrelid = 'public.bloques_turno'::regclass) THEN
+    ALTER TABLE public.bloques_turno
+      ADD CONSTRAINT bloques_turno_estado_check
+      CHECK (estado = ANY (ARRAY['pendiente'::text, 'en_curso'::text,
+                                 'completado'::text, 'cancelado'::text]));
+  END IF;
+
+  -- (2) La FK de company_id, que sólo existe en el repositorio. Ver arriba.
+  ALTER TABLE public.bloques_turno DROP CONSTRAINT IF EXISTS bloques_turno_company_id_fkey;
+
+  -- (3) y (4) Las dos FK que en producción sí borran en cascada. Se comparan
+  -- por definición y no por presencia: existen en los dos lados, y lo que
+  -- difiere es la acción. Donde ya coincide —producción— esto no hace nada.
+  SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
+   WHERE conname = 'bloques_turno_personal_id_fkey'
+     AND conrelid = 'public.bloques_turno'::regclass;
+  IF v_def IS DISTINCT FROM 'FOREIGN KEY (personal_id) REFERENCES personal_condominio(id) ON DELETE CASCADE' THEN
+    ALTER TABLE public.bloques_turno DROP CONSTRAINT IF EXISTS bloques_turno_personal_id_fkey;
+    ALTER TABLE public.bloques_turno
+      ADD CONSTRAINT bloques_turno_personal_id_fkey
+      FOREIGN KEY (personal_id) REFERENCES public.personal_condominio(id) ON DELETE CASCADE;
+  END IF;
+
+  SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
+   WHERE conname = 'bloques_turno_project_id_fkey'
+     AND conrelid = 'public.bloques_turno'::regclass;
+  IF v_def IS DISTINCT FROM 'FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE' THEN
+    ALTER TABLE public.bloques_turno DROP CONSTRAINT IF EXISTS bloques_turno_project_id_fkey;
+    ALTER TABLE public.bloques_turno
+      ADD CONSTRAINT bloques_turno_project_id_fkey
+      FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE;
+  END IF;
+END $$;

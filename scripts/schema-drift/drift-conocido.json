@@ -330,12 +330,6 @@
       "produccion": "c9302d57e128cc26de9a4881374c4cba2b8ee8fa663e04645a8aadf818fe5342:5",
       "repo": "3b546487ade729859f869fa67e01c1d59a97e4039ed1751abe4ec05e12603dbd:5"
     },
-    "tabla:bloques_turno/constraints": {
-      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
-      "desde": "2026-09-01",
-      "produccion": "2923b929f0a3533aba1b2dddce72eaddd7676555e90c96887ce3dd8193c34f20:9",
-      "repo": "5ff1608e564662cfab575d5a2ddc44b7f6dd6baa406af04344815fa3989911e3:9"
-    },
     "tabla:bloques_turno/indices": {
       "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
       "desde": "2026-09-01",
