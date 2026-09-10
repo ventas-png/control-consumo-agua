@@ -3,7 +3,7 @@
 \pset format unaligned
 
 -- Invariantes del control de asignación de turnos
--- (20260820000000 · 000100 · 000200 · 000300 · 20260910000200).
+-- (20260820000000 · 000100 · 000200 · 000300 · 20260910000600).
 -- Cada bloque RAISE EXCEPTION si algo no se cumple.
 
 DO $$
@@ -151,7 +151,7 @@ BEGIN
   RAISE NOTICE 'OK 11 unica y fechas específicas caen solo donde deben';
 
   -- ── 11b. «Los días del mes que elijas» ──────────────────────────────────
-  -- El gemelo mensual de 'semanal' (20260910000200). Los mismos casos que
+  -- El gemelo mensual de 'semanal' (20260910000600). Los mismos casos que
   -- prueba reglaAplicaEn() en el lado TypeScript.
   IF NOT public.turnos_regla_aplica('mensual_dias', DATE '2026-09-01', '[]', NULL, NULL, NULL,
         '[]', DATE '2026-10-15', '[1,15,30]') THEN
@@ -318,7 +318,7 @@ BEGIN
   RAISE NOTICE 'OK 21 un empleado inactivo no recibe turnos generados';
 
   -- ── 21b. Un día quitado a mano no vuelve al re-generar ──────────────────
-  -- Es la razón de ser de `excepciones_turno` (20260910000200): el generador
+  -- Es la razón de ser de `excepciones_turno` (20260910000600): el generador
   -- solo suma, así que borrar el bloque duraba hasta la siguiente pasada.
   SELECT generados INTO n FROM public.generar_bloques_turno(PR, DATE '2026-11-09', DATE '2026-11-13');
   DELETE FROM public.bloques_turno

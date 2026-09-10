@@ -346,7 +346,7 @@ export interface AsignacionTurno {
 
 /**
  * El NEGATIVO de una regla: esta persona no trabaja este día, aunque una regla
- * activa lo cubra (20260910000200). Existe porque `generar_bloques_turno()`
+ * activa lo cubra (20260910000600). Existe porque `generar_bloques_turno()`
  * solo suma: sin la excepción, borrar el bloque del jueves dura hasta la
  * siguiente generación.
  */

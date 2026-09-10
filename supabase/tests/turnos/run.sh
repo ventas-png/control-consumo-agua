@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
 # Verificación EJECUTABLE del control de asignación de turnos
-# (20260820000000 · 000100 · 000200 · 000300 · 20260910000200).
+# (20260820000000 · 000100 · 000200 · 000300 · 20260910000600).
 #
 # POR QUÉ EXISTE
 # Nada de lo que hacen estas migraciones se puede validar leyéndolas. Un
@@ -54,7 +54,7 @@ MIG_HRS="$RAIZ/supabase/migrations/20260820000300_horas_personal_calculo.sql"
 # turnos_regla_aplica() que crea MIG_GEN y la reemplaza por la de 9. Si se
 # aplicara antes, MIG_GEN volvería a crear la vieja y toda llamada de 8
 # argumentos quedaría ambigua.
-MIG_DIAS="$RAIZ/supabase/migrations/20260910000200_turnos_dias_del_mes_y_excepciones.sql"
+MIG_DIAS="$RAIZ/supabase/migrations/20260910000600_turnos_dias_del_mes_y_excepciones.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
