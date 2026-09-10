@@ -40,7 +40,7 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
-MIGRACION="$RAIZ/supabase/migrations/20260910000000_security_logs_cerrar_drift_policies_y_grants.sql"
+MIGRACION="$RAIZ/supabase/migrations/20260910000001_security_logs_cerrar_drift_policies_y_grants.sql"
 
 for d in ${PGBIN:-} /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
