@@ -413,3 +413,130 @@ describe('editar una jornada exige saber qué cupos tiene', () => {
     expect((screen.getByLabelText('Cupo de Almuerzo') as HTMLInputElement).value).toBe('45')
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA CARRERA DE LAS DOS CONSULTAS
+//
+// `fetchCuposDePlantillas` se dispara al montar, al cambiar la lista de
+// jornadas y después de cada guardado, así que dos en vuelo es lo normal, no lo
+// raro. Sin un contador de generación gana la que conteste ÚLTIMA, que no es lo
+// mismo que la última que se pidió.
+//
+// Y acá eso no es un parpadeo: `cuposEstado` es lo que autoriza a guardar, y
+// guardar manda el juego COMPLETO de cupos y la RPC reemplaza el que había. Una
+// respuesta vieja que llegue tarde y ponga `listo` desbloquea el guardado con
+// datos que ya no valen — y ese guardado BORRA los cupos reales.
+//
+// Las tres pruebas resuelven las promesas EN ORDEN INVERSO al que se pidieron.
+function diferida<T>() {
+  let resolver!: (v: T) => void
+  let rechazar!: (e: unknown) => void
+  const promesa = new Promise<T>((res, rej) => { resolver = res; rechazar = rej })
+  return { promesa, resolver, rechazar }
+}
+
+type RespuestaCupos = { cupos: CupoPausa[]; error: string | null }
+
+const cupo = (minutos: number): CupoPausa => ({
+  id: 'c1', company_id: 'c1', project_id: 'p1',
+  plantilla_horario_id: 'ph1', tipo: 'almuerzo', minutos,
+} as CupoPausa)
+
+const otraPlantilla: PlantillaHorario = { ...plantilla, id: 'ph2', nombre: 'Diurno', codigo: 'D' }
+
+/** Monta el tab y provoca una SEGUNDA consulta cambiando la lista de jornadas. */
+function dosConsultas() {
+  const vieja = diferida<RespuestaCupos>()
+  const nueva = diferida<RespuestaCupos>()
+  mocks.fetchCuposDePlantillas
+    .mockReturnValueOnce(vieja.promesa)
+    .mockReturnValueOnce(nueva.promesa)
+
+  const vista = renderTab()
+  vista.rerender(
+    <TurnosTab
+      plantillas={[plantilla, otraPlantilla]}
+      asignaciones={[regla()]}
+      bloques={[] as BloqueTurno[]}
+      ausencias={[] as AusenciaPersonal[]}
+      diasNoLaborables={[] as DiaNoLaborable[]}
+      personal={[empleado]}
+      proyectoId="p1"
+      companyId="c1"
+      canCreate
+      canEdit
+      onRefresh={() => {}}
+    />,
+  )
+  expect(mocks.fetchCuposDePlantillas).toHaveBeenCalledTimes(2)
+  return { vieja, nueva }
+}
+
+async function abrirEdicion() {
+  fireEvent.click(screen.getByText(/^Jornadas/))
+  fireEvent.click((await screen.findAllByText('Editar'))[0])
+}
+
+describe('gana la última consulta pedida, no la última en contestar', () => {
+  it('una respuesta vieja no reemplaza los cupos ya leídos', async () => {
+    const { vieja, nueva } = dosConsultas()
+
+    nueva.resolver({ cupos: [cupo(45)], error: null })
+    await waitFor(() => expect(mocks.fetchCuposDePlantillas).toHaveBeenCalledTimes(2))
+    // Y AHORA contesta la vieja, con otro número. Si ganara, el formulario
+    // mostraría 15 y guardar escribiría 15 sobre los 45 reales.
+    vieja.resolver({ cupos: [cupo(15)], error: null })
+    await Promise.resolve()
+
+    await abrirEdicion()
+    await screen.findByText('Lo que esta jornada espera')
+    expect((screen.getByLabelText('Cupo de Almuerzo') as HTMLInputElement).value).toBe('45')
+  })
+
+  it('una respuesta vieja no desbloquea el guardado mientras la nueva sigue en vuelo', async () => {
+    // El caso peligroso de verdad: la consulta buena no ha contestado, así que
+    // no se sabe qué cupos tiene la jornada. Si la vieja pusiera `listo`,
+    // editar abriría el formulario vacío y guardar BORRARÍA los cupos reales.
+    const { vieja } = dosConsultas()
+
+    vieja.resolver({ cupos: [cupo(15)], error: null })
+    await waitFor(() => expect(mocks.fetchCuposDePlantillas).toHaveBeenCalledTimes(2))
+
+    await abrirEdicion()
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Un momento' }),
+    ))
+    expect(screen.queryByText('Lo que esta jornada espera')).toBeNull()
+    expect(mocks.guardarJornadaConCupos).not.toHaveBeenCalled()
+  })
+
+  it('un fallo viejo no bloquea la edición después de una lectura buena', async () => {
+    const { vieja, nueva } = dosConsultas()
+
+    nueva.resolver({ cupos: [cupo(45)], error: null })
+    await waitFor(() => expect(mocks.fetchCuposDePlantillas).toHaveBeenCalledTimes(2))
+    vieja.resolver({ cupos: [], error: 'boom' })
+    await Promise.resolve()
+
+    await abrirEdicion()
+    expect(await screen.findByText('Lo que esta jornada espera')).toBeTruthy()
+    expect(mocks.notify).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'No se pudieron leer los descansos' }),
+    )
+  })
+
+  it('un rechazo de la promesa se cuenta como error de lectura, no como espera eterna', async () => {
+    // Sin `.catch`, `cuposEstado` se quedaba en 'cargando' para siempre: la
+    // pantalla decía «un momento» y ese momento no terminaba nunca.
+    const caida = diferida<RespuestaCupos>()
+    mocks.fetchCuposDePlantillas.mockReturnValueOnce(caida.promesa)
+    renderTab()
+    caida.rechazar(new Error('la red se cayó'))
+
+    await abrirEdicion()
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'error', title: 'No se pudieron leer los descansos' }),
+    ))
+    expect(mocks.guardarJornadaConCupos).not.toHaveBeenCalled()
+  })
+})

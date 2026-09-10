@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   createCondominioRow,
   deleteCondominioRow,
@@ -145,16 +145,41 @@ export default function TurnosTab({
     return () => { vivo = false }
   }, [])
 
+  // LA ÚLTIMA PREGUNTA MANDA. Esta consulta se dispara al montar, al cambiar la
+  // lista de jornadas y después de cada guardado, así que es normal que haya
+  // dos en vuelo. Sin este contador, la que contestara ÚLTIMA ganaba, que no es
+  // lo mismo: una respuesta vieja podía pisar a una nueva.
+  //
+  // Y acá eso no es un parpadeo cosmético. `cuposEstado` es lo que autoriza a
+  // editar y guardar, y guardar manda el juego COMPLETO de cupos. Una respuesta
+  // vieja llegando tarde podía (a) reemplazar los cupos recién leídos por los
+  // de antes, (b) poner `listo` mientras la consulta buena seguía en vuelo y
+  // desbloquear el guardado con datos que ya no valen —y ese guardado BORRA los
+  // cupos reales—, o (c) marcar `error` por un fallo ya superado y bloquear la
+  // edición sin motivo. El contador descarta las tres.
+  const generacionCupos = useRef(0)
   const idsPlantilla = useMemo(() => plantillas.map(p => p.id).join(','), [plantillas])
   const recargarCupos = useCallback(() => {
+    // Se incrementa ANTES de pedir nada: cualquier respuesta en vuelo queda
+    // vieja desde este mismo instante, incluso en el camino corto de abajo.
+    const generacion = ++generacionCupos.current
     const ids = idsPlantilla ? idsPlantilla.split(',') : []
     if (ids.length === 0) { setCupos([]); setCuposEstado('listo'); return }
     setCuposEstado('cargando')
-    void fetchCuposDePlantillas(ids).then(({ cupos: c, error }) => {
-      if (error) { setCuposEstado('error'); return }
-      setCupos(c)
-      setCuposEstado('listo')
-    })
+    void fetchCuposDePlantillas(ids)
+      .then(({ cupos: c, error }) => {
+        if (generacion !== generacionCupos.current) return
+        if (error) { setCuposEstado('error'); return }
+        setCupos(c)
+        setCuposEstado('listo')
+      })
+      // Un rechazo —la red se cayó, el cliente lanzó— no puede quedar sin
+      // manejar: dejaría `cuposEstado` en 'cargando' para siempre, que se lee
+      // como «esperá» y nunca deja de esperar. Es un error de lectura y se dice.
+      .catch(() => {
+        if (generacion !== generacionCupos.current) return
+        setCuposEstado('error')
+      })
   }, [idsPlantilla])
   useEffect(() => { recargarCupos() }, [recargarCupos])
 
