@@ -353,7 +353,13 @@ BEGIN
   IF NOT has_function_privilege('authenticated', 'public.presencia_balance_dia(uuid, date, date)', 'EXECUTE') THEN
     RAISE EXCEPTION 'INVARIANTE 14: authenticated no puede leer el balance';
   END IF;
-  RAISE NOTICE 'OK 14 anon no; authenticated sí, y el permiso lo decide la función';
+  -- service_role TAMPOCO, y es deliberado: no hay ningún llamador de backend
+  -- —el único es el frontend como authenticated— y una entrada por la que el
+  -- control de proyecto no puede decidir nada es superficie que nadie ejerce.
+  IF has_function_privilege('service_role', 'public.presencia_balance_dia(uuid, date, date)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'INVARIANTE 14: service_role conserva una entrada que se retiró a propósito';
+  END IF;
+  RAISE NOTICE 'OK 14 anon no, service_role tampoco; authenticated sí, y el permiso lo decide la función';
 END $$;
 
 -- ── 15 · Sin permiso del tab no hay balance ────────────────────────────────
@@ -833,4 +839,107 @@ BEGIN
   END IF;
   IF b.cumple THEN RAISE EXCEPTION 'INVARIANTE 22b: cumple con una jornada abierta'; END IF;
   RAISE NOTICE 'OK 22b un solo marcaje sin salida deja el día abierto, aunque otro ya haya cerrado';
+END $$;
+
+-- ── 23 · La empresa no es el alcance: el proyecto también se comprueba ──────
+--
+-- Esta es la invariante que descubre el agujero, y por eso los cuatro casos van
+-- juntos: separados, cada uno pasaría por razones distintas y ninguno probaría
+-- la regla.
+--
+-- Sandra y «Sin Ficha» tienen EXACTAMENTE el mismo permiso del tab y son de la
+-- MISMA empresa. Lo único que los distingue es el condominio. Si el balance sólo
+-- mirara `assert_company_scope` —que era el caso—, los dos leerían los dos
+-- condominios con sólo cambiar el uuid del argumento, y la función es SECURITY
+-- DEFINER, así que ninguna policy estaría ahí para impedirlo.
+--
+-- Todo se ejerce COMO `authenticated`, que es el rol con el que llega el
+-- frontend. Ejercerlo como el dueño de la función mediría otra cosa.
+DO $$
+DECLARE v_n int;
+BEGIN
+  -- (a) El supervisor del condominio 1 lee el condominio 1. Sin esto, las tres
+  --     negaciones de abajo podrían estar pasando porque la función niega
+  --     SIEMPRE, que es la forma más fácil de fingir que un control funciona.
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000003', true);
+  SET LOCAL ROLE authenticated;
+  SELECT count(*) INTO v_n FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 30, CURRENT_DATE);
+  RESET ROLE;
+  IF v_n = 0 THEN
+    RAISE EXCEPTION 'INVARIANTE 23a: el supervisor no vio NADA de su propio condominio';
+  END IF;
+
+  -- (b) El mismo usuario, el mismo permiso, la misma empresa, otro condominio.
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000003', true);
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    PERFORM count(*) FROM public.presencia_balance_dia(
+      '11111111-0000-0000-0000-000000000002'::uuid, CURRENT_DATE - 30, CURRENT_DATE);
+    RESET ROLE;
+    RAISE EXCEPTION 'INVARIANTE 23b: leyó el balance de un condominio que no administra';
+  EXCEPTION WHEN sqlstate '42501' THEN
+    RESET ROLE;
+  END;
+
+  -- Y el simétrico, para que no se lea como «el condominio 2 no se puede leer»:
+  -- Sandra sí lo lee, porque es el suyo.
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000006', true);
+  SET LOCAL ROLE authenticated;
+  PERFORM count(*) FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000002'::uuid, CURRENT_DATE - 30, CURRENT_DATE);
+  RESET ROLE;
+
+  -- (c) Otra empresa. Lo cubría `assert_company_scope` y tiene que seguir
+  --     cubriéndolo: agregar una puerta no puede aflojar la anterior.
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000003', true);
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    PERFORM count(*) FROM public.presencia_balance_dia(
+      '22222222-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 30, CURRENT_DATE);
+    RESET ROLE;
+    RAISE EXCEPTION 'INVARIANTE 23c: leyó el balance de otra empresa';
+  EXCEPTION WHEN sqlstate '42501' THEN
+    RESET ROLE;
+  END;
+
+  -- (d) super_admin conserva lo previsto: los dos condominios de la empresa A
+  --     —incluido el que no es «suyo», porque no tiene ninguno— y también el de
+  --     la empresa B. Susana no tiene NINGÚN permiso de tab: si pasa, pasa por
+  --     `is_super_admin()`, que es justo lo que hay que conservar.
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000007', true);
+  SET LOCAL ROLE authenticated;
+  SELECT count(*) INTO v_n FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 30, CURRENT_DATE);
+  PERFORM count(*) FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000002'::uuid, CURRENT_DATE - 30, CURRENT_DATE);
+  PERFORM count(*) FROM public.presencia_balance_dia(
+    '22222222-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 30, CURRENT_DATE);
+  RESET ROLE;
+  IF v_n = 0 THEN
+    RAISE EXCEPTION 'INVARIANTE 23d: super_admin dejó de ver el balance';
+  END IF;
+
+  RAISE NOTICE 'OK 23 mismo permiso y misma empresa no alcanzan: el condominio ajeno se niega con 42501, y super_admin sigue pasando';
+END $$;
+
+-- ── 24 · Un proyecto inexistente no se confunde con uno ajeno ───────────────
+-- 42704 y no 42501, para que quien depure sepa si el uuid está mal o si el
+-- permiso falta. Y sobre todo: NULL no puede colarse. `can_access_project`
+-- devuelve `true` ante NULL a propósito —fila ambigua, no ajena— y si esa
+-- puerta quedara alcanzable aquí, pasar NULL sería la forma de saltarse el
+-- control que acaba de agregarse.
+DO $$
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000003', true);
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    PERFORM count(*) FROM public.presencia_balance_dia(
+      NULL::uuid, CURRENT_DATE - 30, CURRENT_DATE);
+    RESET ROLE;
+    RAISE EXCEPTION 'INVARIANTE 24: un proyecto NULL atravesó el control de alcance';
+  EXCEPTION WHEN sqlstate '42704' THEN
+    RESET ROLE;
+  END;
+  RAISE NOTICE 'OK 24 sin proyecto no hay balance: 42704, y NULL no es una puerta';
 END $$;

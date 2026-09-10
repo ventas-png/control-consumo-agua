@@ -17,8 +17,8 @@
 #     tarde; una resta a pelo da −1290 (invariante 8), que es la familia de
 #     error de #839.
 #
-# QUÉ COMPRUEBA (15 invariantes)
-#   1      consultar el balance no mueve el cómputo de horas
+# QUÉ COMPRUEBA (28 invariantes)
+#   0-1    el escenario, y que consultar el balance no mueva el cómputo de horas
 #   2-5    un día que cumple; los tres tramos de la demora; llegar antes no es
 #          desvío; la salida temprana respeta su tolerancia
 #   6-7    el exceso de descanso, tipo a tipo, y que un tipo sin cupo declarado
@@ -27,7 +27,16 @@
 #   9-11   sin vara no se juzga, el día planificado sin cubrir aparece, y la
 #          jornada abierta no sale como cumplida
 #   12-13  la extra se SEÑALA sin reconocerse, y lo anulado no se juzga
-#   14-15  la ACL y el permiso del tab
+#   14-15  la ACL —anon no, service_role tampoco— y el permiso del tab
+#   16-17b el turno nocturno con fecha, el partido que suma sus bloques, y dos
+#          varas distintas que no son una vara
+#   18     `cumple` ⇔ sin hallazgos, comprobado sobre TODAS las filas
+#   19-21  21:50 en un turno de las 22:00 es llegar temprano; el manual que no
+#          se puede ubicar se dice ambiguo; con instante exacto no se deduce
+#   22-22b varios marcajes el mismo día se agregan, y basta uno abierto
+#   23-24  el ALCANCE POR PROYECTO: el mismo permiso en la misma empresa no abre
+#          el condominio ajeno (42501), super_admin conserva lo previsto, y un
+#          proyecto inexistente o NULL da 42704 en vez de colarse
 #
 # USO
 #   supabase/tests/balance_jornada/run.sh

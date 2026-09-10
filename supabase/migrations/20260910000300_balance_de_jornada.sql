@@ -287,6 +287,28 @@ BEGIN
 
   PERFORM public.assert_company_scope(v_company);
 
+  -- LA EMPRESA NO ES EL ALCANCE. Dentro de una empresa hay proyectos, y desde
+  -- 20260815000000 el alcance por proyecto es la puerta real: un `admin` con
+  -- asignaciones explícitas ve los suyos y no los ajenos. Faltando esta línea,
+  -- cualquiera con el permiso del tab leía el balance de CUALQUIER condominio
+  -- de su empresa con sólo cambiar el uuid del argumento — y esta función es
+  -- SECURITY DEFINER, así que la RLS de `bloques_turno` y `personal_presencia`
+  -- no estaba ahí para atajarlo.
+  --
+  -- `can_access_project` ya deja pasar a super_admin, superadmin y
+  -- company_owner por `user_is_project_exempt()`; se nombra igualmente a
+  -- `is_super_admin()` aparte para que ese caso quede escrito aquí y no dependa
+  -- de la implementación de otro helper.
+  --
+  -- p_project_id NULL no llega hasta acá: sin proyecto no hay `v_company` y ya
+  -- salió por 42704 más arriba. Importa decirlo porque `can_access_project`
+  -- devuelve `true` ante NULL a propósito (fila ambigua, no ajena), y esa
+  -- puerta no debe quedar abierta por descuido en una función que sí exige
+  -- proyecto.
+  IF NOT (public.is_super_admin() OR public.can_access_project(p_project_id)) THEN
+    RAISE EXCEPTION 'no autorizado' USING ERRCODE = '42501';
+  END IF;
+
   -- Quien administra la asistencia ve el balance de su condominio: es la misma
   -- información que ya ve en la lista del día, leída. Turnos y horas extra
   -- también, porque es su insumo natural.
@@ -569,5 +591,17 @@ $$;
 COMMENT ON FUNCTION public.presencia_balance_dia(uuid, date, date) IS
   'Lo esperado contra lo ocurrido, por persona y día: horas planificadas vs estadía/descanso/laborales, minutos de demora con su tramo, salida temprana, exceso de descanso por tipo y horas sobre la jornada. NO persiste nada y NO cambia ningún número de planilla — es la lectura previa a decidir consecuencias (fase 4). Mide contra la vara CONGELADA en el bloque y ancla las horas a la ventana real del turno, así que la medianoche no se adivina. Un día con varios bloques suma sus horas y sale como turno_partido: sin un marcaje por bloque no se puede repartir la presencia, y no se afirma que cumple.';
 
-REVOKE EXECUTE ON FUNCTION public.presencia_balance_dia(uuid, date, date) FROM PUBLIC, anon;
-GRANT  EXECUTE ON FUNCTION public.presencia_balance_dia(uuid, date, date) TO authenticated, service_role;
+-- SIN service_role, Y A PROPÓSITO. Se midió: el único llamador es el frontend
+-- como `authenticated` (`src/domain/condominios/balanceJornada.ts`); ninguna
+-- Edge Function la invoca, y toda la familia `presencia_*` de 20260908000200 y
+-- 20260908000300 está concedida sólo a `authenticated`. La excepción de esa
+-- familia, `calcular_horas_personal`, la tiene porque la nómina sí la llama.
+--
+-- Conceder a service_role no habría añadido nada —service_role ya lee esas
+-- tablas directamente, saltándose la RLS— pero sí habría abierto una entrada
+-- SECURITY DEFINER que nadie ejerce y por la que el control de proyecto de
+-- arriba no puede decidir nada, porque service_role no tiene proyecto asignado.
+-- Un consumidor futuro falla en la puerta, con 42501 y en voz alta, en vez de
+-- entrar saltándose el alcance.
+REVOKE EXECUTE ON FUNCTION public.presencia_balance_dia(uuid, date, date) FROM PUBLIC, anon, service_role;
+GRANT  EXECUTE ON FUNCTION public.presencia_balance_dia(uuid, date, date) TO authenticated;

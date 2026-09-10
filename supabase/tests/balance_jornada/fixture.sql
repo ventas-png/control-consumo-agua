@@ -353,3 +353,40 @@ INSERT INTO public.test_permisos (user_id, permission_key) VALUES
   -- —el guardia— sigue sin ninguno de los dos, que es lo que permite comprobar
   -- que la vara no queda abierta a quien solo ficha.
   ('e0000000-0000-0000-0000-000000000003', 'condominios.tab.turnos');
+
+-- ── Alcance por PROYECTO: los actores que lo hacen visible ──────────────────
+-- El balance es SECURITY DEFINER, así que la RLS de `bloques_turno` y
+-- `personal_presencia` no está ahí para atajar nada: lo único que separa un
+-- condominio de otro es lo que la función compruebe. Con una sola empresa y un
+-- solo administrador eso no se ve, porque `assert_company_scope` deja pasar todo
+-- lo de la empresa propia. Hacen falta dos ejes:
+--
+--   · SANDRA supervisa SÓLO el condominio 2, con el mismo permiso del tab que
+--     «Sin Ficha» tiene sobre el 1. Es el caso que descubre el agujero: mismo
+--     permiso, misma empresa, otro proyecto.
+--   · La empresa B con su condominio, para el eje que `assert_company_scope` ya
+--     cubría y que debe seguir cubriendo.
+--   · SUSANA es super_admin: tiene que atravesar los dos ejes, como siempre.
+INSERT INTO public.companies (id, timezone) VALUES
+  ('bbbbbbbb-0000-0000-0000-00000000000b', 'America/Guatemala');
+
+INSERT INTO public.projects (id, company_id) VALUES
+  ('22222222-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-00000000000b');
+
+INSERT INTO auth.users (id, email) VALUES
+  ('e0000000-0000-0000-0000-000000000006', 'sandra@empresa-a.com'),
+  ('e0000000-0000-0000-0000-000000000007', 'susana@plataforma.com');
+
+INSERT INTO public.app_users (id, full_name, role, activo, company_id, project_id) VALUES
+  -- Misma empresa que Ada y «Sin Ficha»; su condominio es el 2.
+  ('e0000000-0000-0000-0000-000000000006', 'Sandra Supervisora', 'operator',    true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000002'),
+  -- super_admin de la plataforma: sin proyecto, y su empresa da igual.
+  ('e0000000-0000-0000-0000-000000000007', 'Susana Superadmin',  'super_admin', true, 'aaaaaaaa-0000-0000-0000-00000000000a', NULL);
+
+-- Sandra tiene EXACTAMENTE el mismo permiso del tab que «Sin Ficha». Que se le
+-- niegue el condominio 1 no puede venir del permiso: tiene que venir del
+-- proyecto. Susana no recibe ninguno, para que su paso lo conceda `is_super_admin()`
+-- y no un permiso escondido.
+INSERT INTO public.test_permisos (user_id, permission_key) VALUES
+  ('e0000000-0000-0000-0000-000000000006', 'condominios.tab.presencia'),
+  ('e0000000-0000-0000-0000-000000000006', 'condominios.tab.turnos');
