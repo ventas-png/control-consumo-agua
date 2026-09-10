@@ -28,6 +28,8 @@ const PERM_LIMPIEZA = 'condominios.tab.prog_limpieza'
 const PERM_PLANTILLAS = 'condominios.tab.plantillas_cargo'
 const PERM_TAREAS = 'condominios.tab.tareas_personal'
 const PERM_AREAS_MANAGE = 'condominios.areas.manage'
+/** Tab de ADMINISTRACIÓN del catálogo (20260910000000), no un consumidor. */
+const PERM_AREAS_TAB = 'condominios.tab.areas_config'
 
 interface Policy { nombre: string; cuerpo: string; archivo: string }
 
@@ -96,7 +98,7 @@ describe('policies de areas_condominio tras el ensanche', () => {
 
   it('el SELECT sigue abierto a la empresa (catálogo transversal, sin gate de permiso)', () => {
     const cuerpo = vigentes.get('areas_condominio_select')!.cuerpo
-    expect(cuerpo).toMatch(/company_id = public\.get_my_company_id\(\)/)
+    expect(cuerpo).toMatch(/company_id = \(?\s*(?:SELECT\s+)?public\.get_my_company_id\(\)/)
     expect(cuerpo).not.toMatch(/user_has_permission/)
   })
 
@@ -108,9 +110,15 @@ describe('policies de areas_condominio tras el ensanche', () => {
       const cuerpo = vigentes.get(nombre)!.cuerpo
       expect(cuerpo).toContain(PERM_CHECKLIST)
       expect(cuerpo).toContain(PERM_AREAS_MANAGE)
+      // El tab dedicado ES autorización específica: administra el catálogo, no
+      // lo consume. Ver rutas_ronda o prog_limpieza sigue sin bastar.
+      expect(cuerpo).toContain(PERM_AREAS_TAB)
       expect(cuerpo).not.toContain(PERM_RONDAS)
       expect(cuerpo).not.toContain(PERM_LIMPIEZA)
-      expect(cuerpo).toMatch(/company_id = public\.get_my_company_id\(\)/)
+      // El helper puede ir desnudo o envuelto en (SELECT …) — desde
+      // 20260906000100 lo segundo es lo exigido; el invariante de esta prueba
+      // es el acote a la empresa, no la forma.
+      expect(cuerpo).toMatch(/company_id = \(?\s*(?:SELECT\s+)?public\.get_my_company_id\(\)/)
     })
   }
 
