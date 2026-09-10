@@ -193,3 +193,37 @@ node scripts/reporte-lecturas-inconsistencias.mjs --csv /tmp/lecturas.csv
 - `src/__tests__/registrarLecturaAutoritativa.test.ts` — guards estáticos sobre
   el SQL, para que nadie le agregue a la RPC el parámetro que la vaciaría de
   sentido.
+
+## Despliegue
+
+Las dos migraciones tienen que estar aplicadas **antes** de que llegue un
+cliente que llame a `registrar_lectura`, y ese cliente es el propio despliegue
+de pruebas: la suite E2E corre contra el sandbox fijo que declara
+`E2E_EXPECTED_SUPABASE_REF`, no contra la preview branch del PR. Sin la RPC en
+esa base, `POST /rest/v1/rpc/registrar_lectura` responde **404** y las tres
+pruebas que capturan una lectura fallan.
+
+Ese 404 no es ruido de infraestructura ajeno al cambio: **es exactamente lo que
+este PR despliega**. El orden es el mismo que para cualquier RPC en el camino de
+dinero:
+
+1. Aplicar `20260910000200` y después `20260910000300` (la segunda usa
+   `agua_costo_tarifa`, que crea la primera) al sandbox de E2E.
+2. Comprobar que la función existe con su firma exacta y su ACL:
+
+   ```sql
+   SELECT p.oid::regprocedure::text            AS firma,
+          p.prosecdef                          AS es_security_definer,
+          has_function_privilege('authenticated', p.oid, 'EXECUTE') AS la_ejecuta_authenticated,
+          has_function_privilege('anon',          p.oid, 'EXECUTE') AS la_ejecuta_anon
+     FROM pg_proc p
+     JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'registrar_lectura';
+   ```
+
+   Lo esperado es `es_security_definer = false` (la autorización sigue siendo
+   la policy `registros_insert`), `authenticated = true` y `anon = false`.
+3. Recién entonces exigir la suite completa: **25 de 25**, sin omisiones.
+
+A producción llegan por `apply-migrations-prod.yml` con el push a `main`, como
+cualquier otra migración.
