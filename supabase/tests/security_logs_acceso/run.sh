@@ -40,7 +40,7 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGRACION="$RAIZ/supabase/migrations/20260910000000_security_logs_cerrar_drift_policies_y_grants.sql"
 
-for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
+for d in ${PGBIN:-} /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
 command -v initdb >/dev/null || { echo "❌ falta initdb (instalá PostgreSQL)"; exit 1; }
 [ -f "$MIGRACION" ] || { echo "❌ no está la migración: $MIGRACION"; exit 1; }
@@ -48,7 +48,7 @@ command -v initdb >/dev/null || { echo "❌ falta initdb (instalá PostgreSQL)";
 # El socket unix tiene un tope de 107 bytes: rutas cortas a propósito.
 DATA=$(mktemp -d /tmp/seclogdata.XXXX)
 SOCK=$(mktemp -d /tmp/seclogsock.XXXX)
-PUERTO=${PGPORT_TEST:-55441}
+PUERTO=${PGPORT_TEST:-55494}
 
 limpiar() {
   pg_ctl -D "$DATA" stop -m immediate >/dev/null 2>&1 || true
