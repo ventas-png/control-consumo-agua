@@ -410,9 +410,24 @@ jobs:
           PGPORT_TEST: 55493
         run: supabase/tests/rbac_recursos_humanos/run.sh
 
+      # `security_logs` es el log de auditoría: producción tenía tres policies
+      # que el repositorio no declara —entre ellas un INSERT abierto a `anon` y
+      # un SELECT que dejaba al `admin` de un tenant leer los eventos de todos,
+      # porque la tabla es global y no tiene company_id—. Debajo, los grants por
+      # defecto de Supabase le daban a `anon` y `authenticated` los siete
+      # privilegios de tabla: retirar sólo las policies dejaba el INSERT
+      # concedido. La prueba no lee el catálogo para darlo por bueno: INTENTA
+      # cada operación con `SET LOCAL ROLE` puesto, y empieza reproduciendo el
+      # agujero abierto — si dejara de reproducirse, el escenario ya no vale.
+      - name: security_logs — quién escribe el log de auditoría y quién lo lee
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55494
+        run: supabase/tests/security_logs_acceso/run.sh
+
       # La lectura de agua la declaraba el navegador: consumo, tarifa, canon,
       # importe, proyecto y hasta el estado de cobro viajaban en el INSERT, y la
-      # RLS sólo miraba el proyecto. 20260910000001 lo mueve entero al servidor.
+      # RLS sólo miraba el proyecto. 20260910000200 lo mueve entero al servidor.
       # Casi nada de eso se ve leyendo el SQL: que un payload con `monto 0` y
       # `estado pagado` acabe escrito con otros números, que tres lecturas del
       # mismo día encadenen en orden, que quien captura SIN poder leer la tabla
@@ -424,7 +439,7 @@ jobs:
       - name: Lectura de agua autoritativa — el importe no es un parámetro
         env:
           PGBIN: ${{ steps.pg.outputs.bin }}
-          PGPORT_TEST: 55494
+          PGPORT_TEST: 55495
         run: supabase/tests/registrar_lectura/run.sh
 
   rls-harness:

@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // Paridad entre el cálculo del importe en TypeScript y el AUTORITATIVO en SQL.
 //
-// Desde 20260910000001 el importe de una lectura lo calcula la base
+// Desde 20260910000200 el importe de una lectura lo calcula la base
 // (`agua_costo_tarifa`), no el navegador. `calcularCostoTarifa` sigue viva —
 // alimenta la previsualización mientras el lecturista teclea— y por eso las dos
 // tienen que dar EXACTAMENTE lo mismo: si la pantalla dijera un número y el

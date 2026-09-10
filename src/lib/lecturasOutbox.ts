@@ -4,7 +4,7 @@
 // encolamos la CAPTURA en localStorage cuando el guardado no puede salir, y la
 // sincronizamos después de forma IDEMPOTENTE.
 //
-// QUÉ CAMBIÓ Y POR QUÉ (migración 20260910000001). La idempotencia era
+// QUÉ CAMBIÓ Y POR QUÉ (migración 20260910000200). La idempotencia era
 // «check-then-insert» sobre la CLAVE NATURAL (contador · lectura · fecha):
 // antes de sincronizar se preguntaba si esa lectura ya existía. Tenía dos
 // agujeros, y los dos importan:
@@ -69,7 +69,7 @@ export function nuevaClaveIdempotencia(): string {
   return `cap-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 }
 
-/** Forma en que la cola guardaba las lecturas ANTES de 20260910000001. */
+/** Forma en que la cola guardaba las lecturas ANTES de 20260910000200. */
 interface PendienteLegado {
   clave?: unknown
   encoladaEn?: unknown

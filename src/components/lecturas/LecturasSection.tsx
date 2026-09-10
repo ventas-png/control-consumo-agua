@@ -53,7 +53,7 @@ export function LecturasSection({
   // Cambio físico de medidor: lo último que marcaba el medidor RETIRADO. Es el
   // dato sin el cual el consumo del reset no se puede saber, y el que hace que
   // el agua consumida por el medidor viejo desde su última lectura se cobre en
-  // vez de regalarse. Lo exige el servidor (20260910000001).
+  // vez de regalarse. Lo exige el servidor (20260910000200).
   const [lecturaFinalRetirada, setLecturaFinalRetirada] = useState('')
   // E4/D5: fecha LOCAL (el patrón toISOString() daba la fecha UTC — de noche en
   // GMT-6 pre-llenaba "mañana" y la lectura caía al ciclo siguiente).
@@ -166,7 +166,7 @@ export function LecturasSection({
   const contadorSeleccionado = contadores.find(c => c.id === selectedContadorId) ?? null
 
   // El `project_id` de la lectura ya NO lo deriva el navegador: lo resuelve el
-  // servidor desde el contador (20260910000001). Derivarlo aquí era, además de
+  // servidor desde el contador (20260910000200). Derivarlo aquí era, además de
   // redundante, la puerta por la que una lectura podía acabar contabilizada en
   // otro condominio si la unidad y el contador discrepaban.
   const tarifaDelContador = contadorSeleccionado?.tarifa_id
@@ -175,7 +175,7 @@ export function LecturasSection({
   const tarifaExpirada = tarifaDelContador !== null && !tarifaDelContador.activa
   const sinTarifa = contadorSeleccionado !== null && !tarifaDelContador
 
-  // PREVISUALIZACIÓN, no decisión. Desde 20260910000001 la lectura anterior —y
+  // PREVISUALIZACIÓN, no decisión. Desde 20260910000200 la lectura anterior —y
   // con ella el consumo y el importe— la resuelve `registrar_lectura` dentro de
   // su transacción, con la lista COMPLETA y bajo bloqueo. Esto sólo alimenta lo
   // que se le enseña al lecturista mientras teclea.
@@ -838,7 +838,7 @@ export function LecturasSection({
                       lectura como pagada al guardarla era fabricar un recibo
                       cobrado sin pago, sin fecha y sin rastro; ahora toda
                       lectura nace PENDIENTE por decisión del servidor
-                      (20260910000001) y cobrarla es otro acto, con su permiso.
+                      (20260910000200) y cobrarla es otro acto, con su permiso.
                       Se cobra desde Cobros. */}
                   <div style={{ gridColumn: '1/-1' }}>
                     <label htmlFor="lectura-observaciones" style={labelStyle}>Observaciones</label>

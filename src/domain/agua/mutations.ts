@@ -28,7 +28,7 @@ export async function uploadRegistroFoto(
  * Lo ÚNICO que el operador aporta al registrar una lectura. Todo lo que decide
  * el cobro —lectura anterior, consumo, tarifa, canon, exceso, importe, tipo de
  * cobro, proyecto, cliente y estado inicial— lo resuelve el servidor dentro de
- * `registrar_lectura` (migración 20260910000001). Este tipo es la frontera: si
+ * `registrar_lectura` (migración 20260910000200). Este tipo es la frontera: si
  * un campo no está aquí, el navegador no puede decidirlo.
  */
 export interface LecturaCaptura {

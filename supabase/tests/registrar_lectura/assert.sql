@@ -9,7 +9,7 @@ SELECT set_config('app.conn',  :'conn',  false);
 SELECT set_config('app.casos', :'casos', false);
 
 -- ════════════════════════════════════════════════════════════════════════════
--- Invariantes de la lectura autoritativa (20260910000001 / 20260910000101).
+-- Invariantes de la lectura autoritativa (20260910000200 / 20260910000300).
 --
 --    1-3   el servidor calcula: nada de lo que decide el importe es parámetro
 --    4-6   varias lecturas el mismo día: se encadenan, con orden total

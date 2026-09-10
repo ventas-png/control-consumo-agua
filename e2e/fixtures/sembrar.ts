@@ -129,7 +129,7 @@ export async function crearCuotaPendiente(page: Page, monto = '250'): Promise<vo
  * guardar, así que basarse en él es basarse en el estado real y no en una
  * suposición sobre el reloj.
  *
- * OJO: SIGUE SIENDO UNA COTA INFERIOR. Desde 20260910000001 el empate del mismo
+ * OJO: SIGUE SIENDO UNA COTA INFERIOR. Desde 20260910000200 el empate del mismo
  * día ya no se resuelve al azar —`secuencia` da el orden total y la pantalla lo
  * espeja—, pero la lista que ve el navegador está RECORTADA (`limit(5000)`, la
  * RLS del rol, el filtro de proyecto): si la última lectura del contador no
