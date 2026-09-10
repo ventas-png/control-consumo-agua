@@ -130,6 +130,14 @@ export default function TurnosTab({
   const [tiposPausa, setTiposPausa] = useState<TipoPausa[]>([])
   const [cupos, setCupos] = useState<CupoPausa[]>([])
   const [formCupos, setFormCupos] = useState<Record<string, string>>({})
+  // POR QUÉ ESTO ES UN ESTADO Y NO UN ARREGLO VACÍO. `guardarJornadaConCupos`
+  // manda el juego COMPLETO de cupos y la RPC reemplaza el que había. Mientras
+  // `cupos` arrancaba en `[]` y el error de lectura se ignoraba, abrir una
+  // jornada con la consulta todavía en vuelo —o fallada— pintaba el formulario
+  // sin cupos, y pulsar «Guardar» los borraba todos. Una lectura que falla no
+  // puede significar «esta jornada no da descanso»: significa que no sabemos
+  // qué da, y sobre eso no se escribe.
+  const [cuposEstado, setCuposEstado] = useState<'cargando' | 'listo' | 'error'>('cargando')
 
   useEffect(() => {
     let vivo = true
@@ -140,7 +148,13 @@ export default function TurnosTab({
   const idsPlantilla = useMemo(() => plantillas.map(p => p.id).join(','), [plantillas])
   const recargarCupos = useCallback(() => {
     const ids = idsPlantilla ? idsPlantilla.split(',') : []
-    void fetchCuposDePlantillas(ids).then(({ cupos: c }) => setCupos(c))
+    if (ids.length === 0) { setCupos([]); setCuposEstado('listo'); return }
+    setCuposEstado('cargando')
+    void fetchCuposDePlantillas(ids).then(({ cupos: c, error }) => {
+      if (error) { setCuposEstado('error'); return }
+      setCupos(c)
+      setCuposEstado('listo')
+    })
   }, [idsPlantilla])
   useEffect(() => { recargarCupos() }, [recargarCupos])
 
@@ -187,6 +201,15 @@ export default function TurnosTab({
   // ── Jornadas ──────────────────────────────────────────────────────────────
 
   function abrirJornada(p: PlantillaHorario | 'nueva') {
+    // Una jornada NUEVA no tiene cupos que perder, así que se puede crear
+    // aunque la consulta esté en vuelo. Editar una que ya existe, no.
+    if (p !== 'nueva' && cuposEstado !== 'listo') {
+      notify(cuposEstado === 'cargando'
+        ? { variant: 'info', title: 'Un momento', text: 'Todavía se están cargando los descansos de esta jornada' }
+        : { variant: 'error', title: 'No se pudieron leer los descansos',
+            text: 'Editar la jornada ahora borraría los cupos que ya tiene. Recargá la página e intentá de nuevo.' })
+      return
+    }
     setFormJornada(p === 'nueva' ? formJornadaVacio : {
       nombre: p.nombre, codigo: p.codigo ?? '', turno: p.turno,
       hora_inicio: p.hora_inicio.slice(0, 5), hora_fin: p.hora_fin.slice(0, 5),
@@ -204,6 +227,14 @@ export default function TurnosTab({
   }
 
   async function guardarJornada() {
+    // Segundo cerrojo, por si el estado cambió con el formulario ya abierto:
+    // guardar reemplaza el juego entero de cupos, y hacerlo sin saber cuál era
+    // el juego anterior es borrarlo.
+    if (modalJornada !== 'nueva' && cuposEstado !== 'listo') {
+      notify({ variant: 'error', title: 'No se puede guardar',
+               text: 'No se pudieron leer los descansos de esta jornada; guardar ahora los borraría.' })
+      return
+    }
     if (!formJornada.nombre.trim()) {
       notify({ variant: 'warning', title: 'Faltan datos', text: 'La jornada necesita un nombre' }); return
     }

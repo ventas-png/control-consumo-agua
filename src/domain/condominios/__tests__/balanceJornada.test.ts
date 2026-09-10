@@ -16,7 +16,8 @@ function dia(over: Partial<BalanceDia> = {}): BalanceDia {
     personal_id: 'p1', nombre: 'Ada', cargo: 'Guardia', fecha: '2026-09-01',
     bloque_id: 'b1', bloques: 1, turno_inicio: '06:00:00', turno_fin: '14:00:00',
     horas_planificadas: 7.25, tiene_vara: true,
-    registro_id: 'r1', hora_entrada: '06:00:00', hora_salida: '14:00:00',
+    registro_id: 'r1', registro_ids: ['r1'], registros: 1,
+    hora_entrada: '06:00:00', hora_salida: '14:00:00',
     horas_estadia: 8, horas_descanso: 0.75, horas_laborales: 7.25,
     minutos_tarde: 0, tramo_demora: null, minutos_salida_temprana: 0,
     minutos_exceso_descanso: 0, horas_sobre_jornada: 0,
@@ -144,5 +145,38 @@ describe('los hallazgos que nacieron del turno partido', () => {
     expect(hallazgosEnPalabras(dia({
       tiene_vara: false, cumple: false, hallazgos: ['politica_ambigua'],
     }))).toEqual(['los bloques del día esperan cosas distintas'])
+  })
+})
+
+describe('los días que no se pueden juzgar quedan fuera del recuento', () => {
+  it('varios marcajes el mismo día no cuentan ni como cumplido ni como falta', () => {
+    // Las horas SÍ se suman —el balance y la planilla coinciden— pero repartir
+    // la presencia entre los bloques no se puede, así que el día no se juzga.
+    const r = resumirBalance([
+      dia({
+        registros: 2, registro_ids: ['r1', 'r2'],
+        cumple: false, hallazgos: ['marcajes_multiples'], horas_sobre_jornada: null,
+      }),
+      dia({ fecha: '2026-09-02' }),
+    ])
+    expect(r.dias).toBe(2)
+    expect(r.juzgables).toBe(1)
+    expect(r.cumplen).toBe(1)
+  })
+
+  it('un marcaje que no se pudo ubicar en el día tampoco', () => {
+    const r = resumirBalance([
+      dia({ cumple: false, hallazgos: ['marcaje_ambiguo'] }),
+      dia({ fecha: '2026-09-02' }),
+    ])
+    expect(r.juzgables).toBe(1)
+    expect(r.cumplen).toBe(1)
+  })
+
+  it('las dos frases dicen POR QUÉ no se juzga, sin acusar de nada', () => {
+    expect(hallazgosEnPalabras(dia({ cumple: false, hallazgos: ['marcajes_multiples'] }))[0])
+      .toContain('las horas se suman')
+    expect(hallazgosEnPalabras(dia({ cumple: false, hallazgos: ['marcaje_ambiguo'] }))[0])
+      .toContain('no se puede ubicar')
   })
 })

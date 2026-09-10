@@ -134,9 +134,20 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
   }, [proyectoId, fechaFiltro, registros])
 
   /** El balance de cada marcaje, por el id del registro que lo produjo. */
+  /**
+   * El balance de cada marcaje, por el id del registro.
+   *
+   * Se indexa por TODOS los ids del día, no por el primero: cuando hay varios
+   * marcajes manuales el balance es uno solo —las horas se suman— y el hallazgo
+   * tiene que verse en las dos filas. Enseñarlo sólo en una dejaría a la otra
+   * con aspecto de normal.
+   */
   const balanceDe = useMemo(() => {
     const mapa = new Map<string, BalanceDia>()
-    for (const d of balance) if (d.registro_id) mapa.set(d.registro_id, d)
+    for (const d of balance) {
+      for (const id of d.registro_ids ?? []) mapa.set(id, d)
+      if (d.registro_id) mapa.set(d.registro_id, d)
+    }
     return mapa
   }, [balance])
 

@@ -132,6 +132,11 @@ CREATE TABLE public.presencia_personal (
   fecha         date NOT NULL DEFAULT CURRENT_DATE,
   hora_entrada  time,
   hora_salida   time,
+  -- El instante EXACTO que pone el servidor al fichar (20260908000000). Cuando
+  -- está, el balance no tiene que decidir nada sobre a qué día pertenece la
+  -- hora; el sandbox lo trae para poder probar ese camino y el manual.
+  entrada_marcada_en timestamptz,
+  salida_marcada_en  timestamptz,
   estado        text NOT NULL DEFAULT 'presente',
   observaciones text,
   created_at    timestamptz NOT NULL DEFAULT now()

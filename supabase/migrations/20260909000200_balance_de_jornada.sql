@@ -95,40 +95,113 @@
 -- firma vieja de `turnos_minutos_desvio` (cambió de (time,time) a timestamps).
 -- ════════════════════════════════════════════════════════════════════════════
 
--- ── 1. Dónde cae una hora del reloj dentro de la ventana del turno ──────────
+-- ── 1. Dónde cae un marcaje dentro de la ventana del turno ──────────────────
+--
+-- TRES CASOS, Y SÓLO UNO NECESITA CRITERIO:
+--
+--   a) Hay instante EXACTO (`entrada_marcada_en` / `salida_marcada_en`, que
+--      pone el servidor al fichar). No hay nada que decidir: se convierte a la
+--      hora local del tenant y se acabó. Es el camino del autoservicio, o sea
+--      el de casi todos los marcajes.
+--
+--   b) Marcaje manual en un turno que NO cruza. La ventana entera vive en un
+--      día, así que `fecha + hora` es la única lectura posible. Una hora menor
+--      que la de entrada es «llegó antes», no «llegó mañana».
+--
+--   c) Marcaje manual en un turno que SÍ cruza. Acá, y sólo acá, una hora del
+--      reloj tiene DOS lecturas posibles, y hay que elegir.
+--
+-- EL ERROR QUE ESTO CORRIGE. La versión anterior mandaba al día siguiente TODA
+-- hora menor que la de inicio. Con turno 22:00–06:00, una entrada a las 21:50
+-- —diez minutos ANTES, la persona llegó temprano— se leía como las 21:50 del
+-- día siguiente: 1 430 minutos tarde. Una llegada puntual convertida en la
+-- tardanza más grande que el sistema puede producir.
+--
+-- LA REGLA PARA EL CASO (c), dicha entera:
+--   · Se calculan las dos lecturas (día del turno y día siguiente) y la
+--     DISTANCIA de cada una a la ventana [inicio, fin]. Dentro de la ventana la
+--     distancia es cero.
+--   · Gana la más cercana. Dentro de la ventana eso es exacto y no hay margen
+--     que discutir: las 00:30 caen dentro del turno del día siguiente y las
+--     23:00 dentro del turno del día de inicio.
+--   · Fuera de la ventana —el hueco entre el fin de un turno y el inicio del
+--     siguiente— se acepta la más cercana SÓLO si queda a menos de dos horas
+--     del borde. 21:50 son diez minutos antes de entrar y 07:00 una hora
+--     después de salir: las dos son lecturas evidentes. En cambio las 14:00
+--     están a ocho horas de los dos bordes: ahí no hay una respuesta, hay dos
+--     igual de malas.
+--   · Si ninguna lectura entra en ese margen, o si las dos empatan, la función
+--     devuelve NULL y el balance lo reporta como `marcaje_ambiguo`. NO se
+--     inventa una tardanza.
+--
+-- Las dos horas no son una corazonada escondida: es un margen DECLARADO, con
+-- pruebas a los dos lados, que produce un hallazgo explícito cuando se excede.
+-- La alternativa —resolver siempre por cercanía— leería un marcaje manual a las
+-- 13:59 como «llegó ocho horas antes» y le fabricaría ocho horas de jornada
+-- extra a alguien. La otra —no resolver nunca fuera de la ventana— volvería
+-- ambiguo a quien llega cinco minutos temprano, que es la mayoría de los turnos
+-- de noche bien marcados.
 CREATE OR REPLACE FUNCTION public.turnos_instante_turno(
   p_fecha  date,
   p_inicio time,
+  p_fin    time,
   p_cruza  boolean,
-  p_hora   time
+  p_hora   time,
+  p_exacto timestamptz DEFAULT NULL,
+  p_tz     text        DEFAULT 'UTC'
 )
 RETURNS timestamp
 LANGUAGE sql
 IMMUTABLE
 SET search_path = ''
 AS $$
+  WITH candidatos AS (
+    SELECT
+      -- (a) El instante que puso el servidor gana siempre.
+      CASE WHEN p_exacto IS NOT NULL
+           THEN (p_exacto AT TIME ZONE COALESCE(p_tz, 'UTC')) END AS exacto,
+      (p_fecha + p_hora)::timestamp                    AS cand_0,
+      (p_fecha + p_hora)::timestamp + interval '1 day' AS cand_1,
+      (p_fecha + p_inicio)::timestamp                  AS ini_ts,
+      (p_fecha + p_fin)::timestamp
+        + CASE WHEN COALESCE(p_cruza, false) THEN interval '1 day' ELSE interval '0' END AS fin_ts
+  ),
+  distancias AS (
+    SELECT
+      c.*,
+      -- Distancia a la ventana, en segundos. Cero = dentro.
+      GREATEST(0,
+        EXTRACT(EPOCH FROM (c.ini_ts - c.cand_0)),
+        EXTRACT(EPOCH FROM (c.cand_0 - c.fin_ts))) AS dist_0,
+      GREATEST(0,
+        EXTRACT(EPOCH FROM (c.ini_ts - c.cand_1)),
+        EXTRACT(EPOCH FROM (c.cand_1 - c.fin_ts))) AS dist_1
+    FROM candidatos c
+  )
   SELECT CASE
-    WHEN p_fecha IS NULL OR p_hora IS NULL THEN NULL
-    ELSE (p_fecha + p_hora)::timestamp
-       + CASE
-           -- Sólo un turno que cruza puede tener horas del día siguiente, y
-           -- dentro de él son exactamente las anteriores a su hora de inicio:
-           -- la ventana es [inicio, inicio + duración) y no se solapa consigo
-           -- misma. Sin cruce, todo cae en el día del turno — una hora menor
-           -- que la de entrada es «llegó antes», no «llegó mañana».
-           WHEN COALESCE(p_cruza, false) AND p_inicio IS NOT NULL AND p_hora < p_inicio
-             THEN interval '1 day'
-           ELSE interval '0'
-         END
+    WHEN p_fecha IS NULL THEN NULL
+    WHEN q.exacto IS NOT NULL THEN q.exacto
+    WHEN p_hora IS NULL THEN NULL
+    -- (b) Sin cruce hay una sola lectura posible.
+    WHEN NOT COALESCE(p_cruza, false) OR p_inicio IS NULL OR p_fin IS NULL THEN q.cand_0
+    -- (c) Con cruce, gana la más cercana a la ventana…
+    WHEN q.dist_0 < q.dist_1 AND q.dist_0 <= 7200 THEN q.cand_0
+    WHEN q.dist_1 < q.dist_0 AND q.dist_1 <= 7200 THEN q.cand_1
+    -- …y si empatan, o si las dos quedan lejos, no hay lectura: NULL.
+    ELSE NULL
   END
+  FROM distancias q
 $$;
 
-COMMENT ON FUNCTION public.turnos_instante_turno(date, time, boolean, time) IS
-  'El instante real de una hora del reloj dentro de la ventana de un turno: en un turno que cruza la medianoche, las horas anteriores a la de inicio pertenecen al día siguiente. Reemplaza la heurística de ±12 h, que no podía distinguir «cruzó el día» de «se fue temprano» porque le faltaba la fecha.';
+COMMENT ON FUNCTION public.turnos_instante_turno(date, time, time, boolean, time, timestamptz, text) IS
+  'El instante real de un marcaje dentro de la ventana de un turno. Con instante exacto del servidor (entrada_marcada_en) no decide nada: lo convierte a hora local. Con marcaje manual y turno que cruza la medianoche, elige la lectura más cercana a la ventana y sólo si queda a menos de dos horas del borde; si no devuelve NULL, y el balance lo reporta como marcaje_ambiguo en vez de inventar una tardanza.';
 
-REVOKE EXECUTE ON FUNCTION public.turnos_instante_turno(date, time, boolean, time) FROM PUBLIC, anon;
-GRANT  EXECUTE ON FUNCTION public.turnos_instante_turno(date, time, boolean, time) TO authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.turnos_instante_turno(date, time, time, boolean, time, timestamptz, text) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.turnos_instante_turno(date, time, time, boolean, time, timestamptz, text) TO authenticated, service_role;
 
+-- La firma vieja tomaba (fecha, inicio, cruza, hora) y no podía distinguir
+-- «llegó diez minutos antes» de «llegó casi un día tarde». Se retira.
+DROP FUNCTION IF EXISTS public.turnos_instante_turno(date, time, boolean, time);
 -- ── 2. La diferencia entre lo esperado y lo real, ya sin ambigüedad ─────────
 -- La firma vieja tomaba dos `time` y adivinaba el día. Se retira: dejarla
 -- disponible sería dejar disponible el error.
@@ -177,6 +250,8 @@ RETURNS TABLE (
   tiene_vara           boolean,
   -- Lo ocurrido (del marcaje y sus pausas)
   registro_id      uuid,
+  registro_ids     uuid[],
+  registros        int,
   hora_entrada     time,
   hora_salida      time,
   horas_estadia    numeric,
@@ -237,8 +312,13 @@ BEGIN
       b.cruza_medianoche,
       b.horas_planificadas,
       b.politica,
-      public.turnos_instante_turno(b.fecha, b.hora_inicio, b.cruza_medianoche, b.hora_inicio) AS ini_ts,
-      public.turnos_instante_turno(b.fecha, b.hora_inicio, b.cruza_medianoche, b.hora_fin)    AS fin_ts
+      -- La ventana del bloque es un dato del PLAN, no un marcaje: se arma
+      -- directo y no pasa por la resolución de ambigüedad, que existe sólo para
+      -- horas capturadas a mano.
+      (b.fecha + b.hora_inicio)::timestamp AS ini_ts,
+      (b.fecha + b.hora_fin)::timestamp
+        + CASE WHEN COALESCE(b.cruza_medianoche, false)
+               THEN interval '1 day' ELSE interval '0' END AS fin_ts
     FROM public.bloques_turno b
     WHERE b.project_id = p_project_id
       AND b.company_id = v_company
@@ -269,17 +349,45 @@ BEGIN
     GROUP BY bq.pid, bq.fecha
   ),
   marcaje AS (
-    -- La fila vigente del día. Las anuladas no se juzgan: ya no cuentan.
-    SELECT DISTINCT ON (pp.personal_id, pp.fecha)
-      pp.personal_id AS pid, pp.fecha, pp.id AS registro_id,
-      pp.hora_entrada, pp.hora_salida
+    -- TODOS los marcajes vigentes del día, no el primero. `presencia_personal`
+    -- permite varias filas manuales para la misma persona y fecha —el turno que
+    -- se parte, la cobertura que se agrega a media tarde— y
+    -- `calcular_horas_personal` las SUMA todas. El primer borrador tomaba
+    -- `DISTINCT ON (personal_id, fecha)` ordenado por `created_at`: se quedaba
+    -- con una y tiraba el resto, así que el balance y la planilla contaban
+    -- horas distintas para el mismo día sin que nada lo dijera.
+    --
+    -- Ahora se agregan con el MISMO criterio que la planilla: la estadía se
+    -- suma fila por fila, no se mide de la primera entrada a la última salida
+    -- (entre las dos puede haber un hueco que nadie trabajó).
+    --
+    -- Lo que NO se puede agregar es el juicio: con dos marcajes no se sabe cuál
+    -- corresponde a qué tramo del turno, así que el día sale como
+    -- `marcajes_multiples` y no se afirma que cumple. Los ids viajan todos,
+    -- para que la pantalla pueda señalar las filas involucradas y no sólo una.
+    SELECT
+      pp.personal_id AS pid,
+      pp.fecha,
+      count(*)::int                                       AS registros,
+      array_agg(pp.id ORDER BY pp.created_at)             AS registro_ids,
+      (array_agg(pp.id ORDER BY pp.created_at))[1]        AS registro_id,
+      MIN(pp.hora_entrada)                                AS hora_entrada,
+      MAX(pp.hora_salida)                                 AS hora_salida,
+      MIN(pp.entrada_marcada_en)                          AS entrada_exacta,
+      MAX(pp.salida_marcada_en)                           AS salida_exacta,
+      count(*) FILTER (WHERE pp.hora_salida IS NULL)::int AS abiertos,
+      SUM(public.turnos_horas_jornada(pp.hora_entrada, pp.hora_salida, false, 0)) AS h_estadia,
+      SUM(mp.total)                                       AS min_pausa,
+      SUM(mp.descontables)                                AS min_pausa_desc
     FROM public.presencia_personal pp
+    LEFT JOIN LATERAL public.presencia_minutos_pausa(pp.id, v_tz) mp ON true
     WHERE pp.project_id = p_project_id
       AND pp.company_id = v_company
       AND pp.fecha BETWEEN p_desde AND p_hasta
       AND pp.personal_id IS NOT NULL
+      -- Las anuladas no se juzgan: ya no cuentan.
       AND pp.anulado_en IS NULL
-    ORDER BY pp.personal_id, pp.fecha, pp.created_at
+    GROUP BY pp.personal_id, pp.fecha
   ),
   dias AS (
     -- FULL OUTER, igual que en calcular_horas_personal: importa tanto el día
@@ -290,7 +398,9 @@ BEGIN
       pl.bloque_id, pl.bloques, pl.hora_inicio, pl.hora_fin, pl.cruza,
       pl.ini_ts, pl.fin_ts, pl.horas_planificadas,
       pl.varas, pl.sin_politica, pl.politica,
-      ma.registro_id, ma.hora_entrada, ma.hora_salida
+      ma.registro_id, ma.registro_ids, ma.registros, ma.abiertos,
+      ma.hora_entrada, ma.hora_salida, ma.entrada_exacta, ma.salida_exacta,
+      ma.h_estadia, ma.min_pausa, ma.min_pausa_desc
     FROM plan pl
     FULL OUTER JOIN marcaje ma ON ma.pid = pl.pid AND ma.fecha = pl.fecha
   ),
@@ -301,33 +411,37 @@ BEGIN
       -- con LA MISMA.
       (d.bloques IS NOT NULL AND d.sin_politica = 0 AND d.varas = 1) AS vara_unica,
       (d.bloques IS NOT NULL AND d.bloques > 1)                      AS partido,
-      mp.total        AS min_pausa,
-      mp.descontables AS min_pausa_desc,
-      public.turnos_horas_jornada(d.hora_entrada, d.hora_salida, false, 0) AS h_estadia,
-      GREATEST(0,
-        COALESCE(public.turnos_horas_jornada(d.hora_entrada, d.hora_salida, false, 0), 0)
-        - mp.descontables / 60.0) AS h_laborales,
-      -- El instante real de la entrada, anclado en la ventana del turno.
-      public.turnos_instante_turno(d.fecha, d.hora_inicio, d.cruza, d.hora_entrada) AS entrada_ts
+      (COALESCE(d.registros, 0) > 1)                                 AS multiple,
+      GREATEST(0, COALESCE(d.h_estadia, 0)
+                  - COALESCE(d.min_pausa_desc, 0) / 60.0)            AS h_laborales,
+      -- El instante real de la entrada. Con `entrada_marcada_en` no hay nada
+      -- que decidir; sin él, lo resuelve la ventana del turno o devuelve NULL.
+      public.turnos_instante_turno(
+        d.fecha, d.hora_inicio, d.hora_fin, d.cruza,
+        d.hora_entrada, d.entrada_exacta, v_tz)                      AS entrada_ts
     FROM dias d
-    LEFT JOIN LATERAL public.presencia_minutos_pausa(d.registro_id, v_tz) mp ON true
   ),
   anclado AS (
     SELECT
       m.*,
-      -- La salida se ancla igual, con una corrección que no necesita umbrales:
-      -- nadie sale antes de entrar. Cubre el turno que NO declara cruce y sin
-      -- embargo terminó pasada la medianoche.
-      CASE
-        WHEN m.hora_salida IS NULL THEN NULL
-        ELSE public.turnos_instante_turno(m.fecha, m.hora_inicio, m.cruza, m.hora_salida)
-           + CASE
-               WHEN m.entrada_ts IS NOT NULL
-                AND public.turnos_instante_turno(m.fecha, m.hora_inicio, m.cruza, m.hora_salida) < m.entrada_ts
-                 THEN interval '1 day' ELSE interval '0'
-             END
-      END AS salida_ts
+      public.turnos_instante_turno(
+        m.fecha, m.hora_inicio, m.hora_fin, m.cruza,
+        m.hora_salida, m.salida_exacta, v_tz) AS salida_cruda
     FROM medido m
+  ),
+  anclado2 AS (
+    SELECT
+      a.*,
+      -- «Nadie sale antes de entrar» sigue puesto para el turno que NO declara
+      -- cruce y sin embargo terminó pasada la medianoche. Con instantes exactos
+      -- no puede dispararse: los pone el servidor, y en orden.
+      CASE
+        WHEN a.salida_cruda IS NULL THEN NULL
+        WHEN a.entrada_ts IS NOT NULL AND a.salida_cruda < a.entrada_ts
+          THEN a.salida_cruda + interval '1 day'
+        ELSE a.salida_cruda
+      END AS salida_ts
+    FROM anclado a
   ),
   comparado AS (
     SELECT
@@ -339,7 +453,7 @@ BEGIN
       CASE WHEN a.vara_unica THEN a.politica->'cupos' END                                AS cupos,
       public.turnos_minutos_desvio(a.ini_ts, a.entrada_ts) AS desvio_entrada,
       public.turnos_minutos_desvio(a.fin_ts, a.salida_ts)  AS desvio_salida
-    FROM anclado a
+    FROM anclado2 a
   ),
   contado AS (
     SELECT
@@ -350,7 +464,7 @@ BEGIN
       COALESCE((
         SELECT SUM(GREATEST(0, pa.minutos - COALESCE((c.cupos->>pa.tipo)::int, pa.minutos)))
         FROM public.presencia_pausas pa
-        WHERE pa.registro_id = c.registro_id
+        WHERE pa.registro_id = ANY(c.registro_ids)
           AND pa.anulado_en IS NULL
           AND pa.minutos IS NOT NULL
       ), 0) AS exceso_descanso,
@@ -361,8 +475,11 @@ BEGIN
       -- NULL en un día partido: con un marcaje y dos bloques, el hueco entre
       -- ellos no está registrado y repartirlo sería inventarlo. NULL se lee «no
       -- se puede saber»; un cero se leería «no hubo», que es una afirmación.
+      --
+      -- NULL también con VARIOS marcajes, por lo mismo: la suma de horas es
+      -- correcta, pero atribuir el exceso a un tramo del turno no se puede.
       CASE
-        WHEN c.partido THEN NULL
+        WHEN c.partido OR c.multiple THEN NULL
         ELSE GREATEST(0, ROUND(COALESCE(c.h_laborales, 0) - COALESCE(c.horas_planificadas, 0), 2))
       END AS extra
     FROM comparado c
@@ -376,12 +493,19 @@ BEGIN
                                                   THEN 'politica_ambigua' END,
         CASE WHEN k.bloques IS NULL               THEN 'sin_planificar' END,
         CASE WHEN k.partido                       THEN 'turno_partido' END,
+        CASE WHEN k.multiple                      THEN 'marcajes_multiples' END,
         CASE WHEN k.registro_id IS NULL           THEN 'sin_marcaje' END,
-        CASE WHEN k.registro_id IS NOT NULL AND k.hora_salida IS NULL
-                                                  THEN 'jornada_abierta' END,
-        CASE WHEN k.vara_unica AND k.desvio_entrada > COALESCE(k.tol_entrada, 0)
+        -- Con varios marcajes basta UNO sin salida para que el día siga
+        -- abierto: mirar sólo el último los dejaría cerrados a todos.
+        CASE WHEN COALESCE(k.abiertos, 0) > 0     THEN 'jornada_abierta' END,
+        -- El marcaje manual que no se pudo ubicar en el día se DICE, no se
+        -- convierte en una tardanza de veintitrés horas.
+        CASE WHEN (k.hora_entrada IS NOT NULL AND k.entrada_ts IS NULL)
+                  OR (k.hora_salida IS NOT NULL AND k.salida_ts IS NULL)
+                                                  THEN 'marcaje_ambiguo' END,
+        CASE WHEN k.vara_unica AND NOT k.multiple AND k.desvio_entrada > COALESCE(k.tol_entrada, 0)
                                                   THEN 'demora' END,
-        CASE WHEN k.vara_unica AND -k.desvio_salida > COALESCE(k.tol_salida, 0)
+        CASE WHEN k.vara_unica AND NOT k.multiple AND -k.desvio_salida > COALESCE(k.tol_salida, 0)
                                                   THEN 'salida_temprana' END,
         CASE WHEN k.exceso_descanso > 0           THEN 'exceso_descanso' END,
         CASE WHEN COALESCE(k.extra, 0) > 0.01 AND COALESCE(k.extra_autoriza, false)
@@ -401,6 +525,8 @@ BEGIN
     ROUND(COALESCE(j.horas_planificadas, 0), 2),
     j.vara_unica,
     j.registro_id,
+    COALESCE(j.registro_ids, ARRAY[]::uuid[]),
+    COALESCE(j.registros, 0),
     j.hora_entrada,
     j.hora_salida,
     ROUND(COALESCE(j.h_estadia, 0), 2),
@@ -409,7 +535,7 @@ BEGIN
     -- Solo la demora cuenta: llegar antes no es un desvío que reportar.
     CASE WHEN j.desvio_entrada > 0 THEN ROUND(j.desvio_entrada, 0) ELSE 0 END,
     CASE
-      WHEN NOT j.vara_unica OR j.desvio_entrada IS NULL THEN NULL
+      WHEN NOT j.vara_unica OR j.multiple OR j.desvio_entrada IS NULL THEN NULL
       WHEN j.desvio_entrada <= COALESCE(j.tol_entrada, 0) THEN 'sin_consecuencia'
       WHEN COALESCE(j.compensable, 0) > COALESCE(j.tol_entrada, 0)
            AND j.desvio_entrada <= j.compensable THEN 'compensable'
@@ -430,7 +556,7 @@ BEGIN
     -- existir un día que «cumple» con un hallazgo encima.
     j.vara_unica
       AND j.registro_id IS NOT NULL
-      AND j.hora_salida IS NOT NULL
+      AND COALESCE(j.abiertos, 0) = 0
       AND cardinality(j.hallazgos) = 0,
     j.hallazgos
   FROM juzgado j

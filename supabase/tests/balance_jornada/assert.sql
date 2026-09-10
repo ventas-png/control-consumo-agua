@@ -595,3 +595,242 @@ BEGIN
   END IF;
   RAISE NOTICE 'OK 18 cumple ⇔ no hay hallazgos: la regla se comprueba sobre todas las filas, no sobre un caso';
 END $$;
+
+-- ── 19 · 21:50 en un turno de las 22:00 es llegar TEMPRANO ─────────────────
+--
+-- El fallo que esto fija: la regla anterior mandaba al día siguiente toda hora
+-- menor que la de inicio, así que diez minutos de anticipación se leían como
+-- 1 430 minutos de tardanza. La tardanza más grande que el sistema puede
+-- producir, sobre alguien que llegó puntual.
+DO $$
+DECLARE
+  v_plant uuid;
+  v_pid   uuid := '9e000000-0000-0000-0000-000000000005';
+  b       record;
+  caso    record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Nocturna 22-06';
+
+  FOR caso IN
+    SELECT * FROM (VALUES
+      -- fecha,            entrada,      min tarde esperados
+      (CURRENT_DATE - 39, time '21:50',   0),   -- diez minutos ANTES
+      (CURRENT_DATE - 38, time '20:30',   0),   -- hora y media antes, aún legible
+      (CURRENT_DATE - 37, time '22:00',   0),   -- en punto
+      (CURRENT_DATE - 36, time '00:30', 150)    -- dentro de la ventana, tarde
+    ) AS t(fecha, entrada, esperado)
+  LOOP
+    INSERT INTO public.bloques_turno
+      (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin,
+       cruza_medianoche, horas_planificadas)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+            v_pid, caso.fecha, v_plant, '22:00', '06:00', true, 8);
+    INSERT INTO public.presencia_personal
+      (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+            v_pid, 'Luz Jardinera', caso.fecha, caso.entrada, '06:00', 'presente');
+
+    SELECT * INTO b FROM public.presencia_balance_dia(
+      '11111111-0000-0000-0000-000000000001'::uuid, caso.fecha, caso.fecha)
+    WHERE personal_id = v_pid;
+
+    IF b.minutos_tarde <> caso.esperado THEN
+      RAISE EXCEPTION 'INVARIANTE 19: entrada % dio % min tarde (esperado %)',
+        caso.entrada, b.minutos_tarde, caso.esperado;
+    END IF;
+    IF 'marcaje_ambiguo' = ANY(b.hallazgos) THEN
+      RAISE EXCEPTION 'INVARIANTE 19: entrada % se declaró ambigua y no lo es', caso.entrada;
+    END IF;
+  END LOOP;
+  RAISE NOTICE 'OK 19 nocturno 22–06: 21:50 y 20:30 son llegar antes (0 tarde); 00:30 sigue siendo 150 tarde';
+END $$;
+
+-- ── 20 · El marcaje manual que no se puede ubicar se DICE ──────────────────
+--
+-- Las 14:00 en un turno 22:00–06:00 están a ocho horas del inicio y a ocho del
+-- fin: las dos lecturas posibles son igual de malas. No hay respuesta correcta,
+-- así que no se da ninguna — y sobre todo no se fabrica una tardanza.
+DO $$
+DECLARE
+  v_plant uuid;
+  v_pid   uuid := '9e000000-0000-0000-0000-000000000005';
+  b       record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Nocturna 22-06';
+
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin,
+     cruza_medianoche, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, CURRENT_DATE - 35, v_plant, '22:00', '06:00', true, 8);
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, 'Luz Jardinera', CURRENT_DATE - 35, '14:00', '06:00', 'presente');
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 35, CURRENT_DATE - 35)
+  WHERE personal_id = v_pid;
+
+  IF NOT ('marcaje_ambiguo' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 20: las 14:00 se resolvieron a algo (%), y no se puede', b.hallazgos;
+  END IF;
+  IF b.minutos_tarde <> 0 THEN
+    RAISE EXCEPTION 'INVARIANTE 20: se inventaron % minutos de tardanza sobre un marcaje ilegible', b.minutos_tarde;
+  END IF;
+  IF b.tramo_demora IS NOT NULL THEN
+    RAISE EXCEPTION 'INVARIANTE 20: se le puso tramo (%) a una demora que no se pudo medir', b.tramo_demora;
+  END IF;
+  IF b.cumple THEN RAISE EXCEPTION 'INVARIANTE 20: cumple con un marcaje ilegible'; END IF;
+  RAISE NOTICE 'OK 20 un marcaje manual que no se puede ubicar en el día se reporta ambiguo, no se convierte en tardanza';
+END $$;
+
+-- ── 21 · Con instante EXACTO no hay nada que resolver ──────────────────────
+--
+-- `entrada_marcada_en` lo pone el servidor al fichar, así que el día no se
+-- deduce: se sabe. Esta invariante entra por el caso que la regla de cercanía
+-- NO resolvería —una entrada a las 14:00— y comprueba que con el instante
+-- puesto deja de ser ambigua y se mide de verdad.
+DO $$
+DECLARE
+  v_plant uuid;
+  v_pid   uuid := '9e000000-0000-0000-0000-000000000005';
+  b       record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Nocturna 22-06';
+
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin,
+     cruza_medianoche, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, CURRENT_DATE - 34, v_plant, '22:00', '06:00', true, 8);
+  -- Mismas horas del reloj que la invariante 20, pero con los instantes reales:
+  -- entró a las 14:00 del DÍA DEL TURNO, ocho horas antes de las 22:00.
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado,
+     entrada_marcada_en, salida_marcada_en)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, 'Luz Jardinera', CURRENT_DATE - 34, '14:00', '06:00', 'presente',
+          ((CURRENT_DATE - 34) + time '14:00') AT TIME ZONE 'America/Guatemala',
+          ((CURRENT_DATE - 33) + time '06:00') AT TIME ZONE 'America/Guatemala');
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 34, CURRENT_DATE - 34)
+  WHERE personal_id = v_pid;
+
+  IF 'marcaje_ambiguo' = ANY(b.hallazgos) THEN
+    RAISE EXCEPTION 'INVARIANTE 21: con instante exacto se declaró ambiguo (%)', b.hallazgos;
+  END IF;
+  IF b.minutos_tarde <> 0 THEN
+    RAISE EXCEPTION 'INVARIANTE 21: entrar ocho horas ANTES dio % min tarde', b.minutos_tarde;
+  END IF;
+  IF b.minutos_salida_temprana <> 0 THEN
+    RAISE EXCEPTION 'INVARIANTE 21: salir a las 06:00 dio % min anticipados', b.minutos_salida_temprana;
+  END IF;
+  RAISE NOTICE 'OK 21 con entrada_marcada_en el día no se deduce: se sabe, y la ambigüedad desaparece';
+END $$;
+
+-- ── 22 · Dos marcajes manuales el mismo día ────────────────────────────────
+--
+-- `presencia_personal` permite varias filas manuales para la misma persona y
+-- fecha, y `calcular_horas_personal` las SUMA. El primer borrador del balance
+-- tomaba `DISTINCT ON` y se quedaba con una: el balance y la planilla contaban
+-- horas distintas para el mismo día, en silencio.
+DO $$
+DECLARE
+  v_plant uuid;
+  v_pid   uuid := '9e000000-0000-0000-0000-000000000003';
+  v_fecha date := CURRENT_DATE - 33;
+  b       record;
+  h       record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Diurna 6-14';
+
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, v_fecha, v_plant, '06:00', '14:00', 7.25);
+
+  -- Dos tramos capturados a mano: 06:00–10:00 y 12:00–16:00. Ocho horas de
+  -- estadía en total, con un hueco de dos horas que nadie trabajó.
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+  VALUES
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_pid, 'Ana sin cuenta', v_fecha, '06:00', '10:00', 'presente'),
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_pid, 'Ana sin cuenta', v_fecha, '12:00', '16:00', 'presente');
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, v_fecha, v_fecha)
+  WHERE personal_id = v_pid;
+
+  IF b.registros <> 2 THEN
+    RAISE EXCEPTION 'INVARIANTE 22: el día trajo % marcaje(s); se descartó uno', b.registros;
+  END IF;
+  IF cardinality(b.registro_ids) <> 2 THEN
+    RAISE EXCEPTION 'INVARIANTE 22: viajaron % ids y la pantalla necesita los dos', cardinality(b.registro_ids);
+  END IF;
+
+  -- LO QUE IMPORTA: el balance y la planilla tienen que decir lo mismo.
+  SELECT * INTO h FROM public.calcular_horas_personal(
+    '11111111-0000-0000-0000-000000000001'::uuid, v_fecha, v_fecha)
+  WHERE personal_id = v_pid;
+  IF ROUND(b.horas_estadia, 2) <> ROUND(h.horas_estadia, 2) THEN
+    RAISE EXCEPTION 'INVARIANTE 22: el balance dice % h de estadía y la planilla % h',
+      b.horas_estadia, h.horas_estadia;
+  END IF;
+  IF b.horas_estadia <> 8 THEN
+    RAISE EXCEPTION 'INVARIANTE 22: 4 h + 4 h dieron % (medir de 06:00 a 16:00 daría 10)', b.horas_estadia;
+  END IF;
+
+  IF NOT ('marcajes_multiples' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 22: no se dijo que el día tiene varios marcajes (%)', b.hallazgos;
+  END IF;
+  IF b.horas_sobre_jornada IS NOT NULL THEN
+    RAISE EXCEPTION 'INVARIANTE 22: se afirmaron % h de extra sin poder atribuir la presencia',
+      b.horas_sobre_jornada;
+  END IF;
+  IF b.cumple THEN
+    RAISE EXCEPTION 'INVARIANTE 22: se afirmó que cumple un día que no se puede juzgar';
+  END IF;
+  RAISE NOTICE 'OK 22 dos marcajes el mismo día: se SUMAN como en la planilla (8 h), los dos ids viajan, y el día no se juzga';
+END $$;
+
+-- ── 22b · Uno de los dos marcajes sigue abierto ────────────────────────────
+DO $$
+DECLARE
+  v_plant uuid;
+  v_pid   uuid := '9e000000-0000-0000-0000-000000000003';
+  v_fecha date := CURRENT_DATE - 32;
+  b       record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Diurna 6-14';
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, v_fecha, v_plant, '06:00', '14:00', 7.25);
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+  VALUES
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_pid, 'Ana sin cuenta', v_fecha, '06:00', '10:00', 'presente'),
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_pid, 'Ana sin cuenta', v_fecha, '12:00', NULL, 'presente');
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, v_fecha, v_fecha)
+  WHERE personal_id = v_pid;
+
+  -- Mirar sólo el último marcaje daría el día por cerrado. Basta UNO abierto.
+  IF NOT ('jornada_abierta' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 22b: con un marcaje sin salida el día se dio por cerrado (%)', b.hallazgos;
+  END IF;
+  IF b.cumple THEN RAISE EXCEPTION 'INVARIANTE 22b: cumple con una jornada abierta'; END IF;
+  RAISE NOTICE 'OK 22b un solo marcaje sin salida deja el día abierto, aunque otro ya haya cerrado';
+END $$;

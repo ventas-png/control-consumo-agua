@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import type {
-  AsignacionTurno, AusenciaPersonal, BloqueTurno, DiaNoLaborable,
+  AsignacionTurno, AusenciaPersonal, BloqueTurno, CupoPausa, DiaNoLaborable,
   PersonalCondominio, PlantillaHorario,
 } from '../../../../types'
 
@@ -21,7 +21,9 @@ const mocks = vi.hoisted(() => ({
   createCondominioRowReturning: vi.fn<
     () => Promise<{ data: { id: string } | null; error: { message: string } | null }>
   >(async () => ({ data: { id: 'ph-nueva' }, error: null })),
-  fetchCuposDePlantillas: vi.fn(async () => ({ cupos: [], error: null })),
+  fetchCuposDePlantillas: vi.fn<
+    () => Promise<{ cupos: CupoPausa[]; error: string | null }>
+  >(async () => ({ cupos: [], error: null })),
   guardarJornadaConCupos: vi.fn<
     () => Promise<{ id: string | null; error: string | null }>
   >(async () => ({ id: 'ph-nueva', error: null })),
@@ -346,5 +348,68 @@ describe('la vara de la jornada', () => {
     await abrirJornadaNueva()
     expect(screen.getByText(/congela/)).toBeTruthy()
     expect(screen.getByText(/todavía no/i)).toBeTruthy()
+  })
+})
+
+// ── Los cupos no se pueden borrar por una lectura que no llegó ──────────────
+//
+// El fallo concreto: `cupos` arrancaba en `[]` y el error de
+// `fetchCuposDePlantillas` se ignoraba. Abrir una jornada con la consulta en
+// vuelo —o fallada— pintaba el formulario sin cupos, y como el guardado manda
+// el juego COMPLETO y la RPC reemplaza el que había, pulsar «Guardar» los
+// borraba todos. Una lectura que falla no significa «esta jornada no da
+// descanso»: significa que no sabemos qué da.
+describe('editar una jornada exige saber qué cupos tiene', () => {
+  it('con la consulta en vuelo no se abre el formulario de una jornada existente', async () => {
+    // La promesa nunca resuelve: es exactamente «todavía cargando».
+    mocks.fetchCuposDePlantillas.mockReturnValueOnce(new Promise(() => {}))
+    renderTab()
+    fireEvent.click(screen.getByText(/^Jornadas/))
+    fireEvent.click(await screen.findByText('Editar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Un momento' }),
+    ))
+    expect(screen.queryByText('Lo que esta jornada espera')).toBeNull()
+    expect(mocks.guardarJornadaConCupos).not.toHaveBeenCalled()
+  })
+
+  it('si la lectura falla, editar se niega y lo dice', async () => {
+    mocks.fetchCuposDePlantillas.mockResolvedValueOnce({ cupos: [], error: 'boom' })
+    renderTab()
+    fireEvent.click(screen.getByText(/^Jornadas/))
+    fireEvent.click(await screen.findByText('Editar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'error', title: 'No se pudieron leer los descansos' }),
+    ))
+    expect(screen.queryByText('Lo que esta jornada espera')).toBeNull()
+    // Lo que esta prueba protege de verdad: NADA se escribió.
+    expect(mocks.guardarJornadaConCupos).not.toHaveBeenCalled()
+  })
+
+  it('una jornada NUEVA sí se puede crear aunque los cupos no hayan cargado', async () => {
+    // No tiene cupos que perder, así que la lectura no la bloquea: sería
+    // castigar la creación por un problema que sólo afecta a la edición.
+    mocks.fetchCuposDePlantillas.mockReturnValueOnce(new Promise(() => {}))
+    renderTab()
+    fireEvent.click(screen.getByText(/^Jornadas/))
+    fireEvent.click(screen.getByText('+ Nueva jornada'))
+    expect(await screen.findByText('Lo que esta jornada espera')).toBeTruthy()
+  })
+
+  it('con los cupos ya cargados, editar abre el formulario con lo que la jornada da', async () => {
+    mocks.fetchCuposDePlantillas.mockResolvedValueOnce({
+      cupos: [{
+        id: 'c1', company_id: 'c1', project_id: 'p1',
+        plantilla_horario_id: 'ph1', tipo: 'almuerzo', minutos: 45,
+      }],
+      error: null,
+    })
+    renderTab()
+    fireEvent.click(screen.getByText(/^Jornadas/))
+    fireEvent.click(await screen.findByText('Editar'))
+    await screen.findByText('Lo que esta jornada espera')
+    expect((screen.getByLabelText('Cupo de Almuerzo') as HTMLInputElement).value).toBe('45')
   })
 })

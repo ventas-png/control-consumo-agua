@@ -871,3 +871,35 @@ describe('el balance contra la jornada', () => {
     expect(screen.queryByText('Turnos planificados sin marcaje')).toBeNull()
   })
 })
+
+describe('el balance de un día con varios marcajes', () => {
+  it('señala TODAS las filas del día, no sólo la primera', async () => {
+    // El balance de un día es UNO aunque haya dos marcajes: las horas se suman.
+    // Si el hallazgo se pintara sólo sobre el registro «principal», la otra fila
+    // quedaría con aspecto de normal — y es la mitad del mismo problema.
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [{
+        personal_id: 'per-1', nombre: 'Marco Sical', cargo: 'guardia', fecha: HOY,
+        bloque_id: 'blq-1', bloques: 1, turno_inicio: '06:00:00', turno_fin: '14:00:00',
+        horas_planificadas: 7.25, tiene_vara: true,
+        registro_id: 'r1', registro_ids: ['r1', 'r2'], registros: 2,
+        hora_entrada: '06:00:00', hora_salida: '16:00:00',
+        horas_estadia: 8, horas_descanso: 0, horas_laborales: 8,
+        minutos_tarde: 0, tramo_demora: null, minutos_salida_temprana: 0,
+        minutos_exceso_descanso: 0, horas_sobre_jornada: null,
+        extra_requiere_autorizacion: true, cumple: false,
+        hallazgos: ['marcajes_multiples'],
+      }],
+      error: null,
+    })
+    montar([
+      filaDelDia({ id: 'r1', hora_entrada: '06:00:00', hora_salida: '10:00:00' }),
+      filaDelDia({ id: 'r2', hora_entrada: '12:00:00', hora_salida: '16:00:00' }),
+    ])
+
+    const lineas = await screen.findAllByText(/Contra la jornada/)
+    expect(lineas).toHaveLength(2)
+    for (const l of lineas) expect(l.textContent).toContain('las horas se suman')
+  })
+})

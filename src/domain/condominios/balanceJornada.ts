@@ -31,6 +31,8 @@ export type HallazgoBalance =
   | 'sin_planificar'
   | 'turno_partido'
   | 'sin_marcaje'
+  | 'marcajes_multiples'
+  | 'marcaje_ambiguo'
   | 'jornada_abierta'
   | 'demora'
   | 'salida_temprana'
@@ -53,6 +55,9 @@ export interface BalanceDia {
   tiene_vara: boolean
   // Lo ocurrido
   registro_id: string | null
+  /** TODOS los marcajes vigentes del día. La pantalla marca cada uno. */
+  registro_ids: string[]
+  registros: number
   hora_entrada: string | null
   hora_salida: string | null
   horas_estadia: number | null
@@ -97,6 +102,8 @@ const FRASES: Record<HallazgoBalance, string> = {
   turno_partido: 'turno partido: no se puede repartir la presencia entre los bloques',
   sin_planificar: 'no había turno planificado',
   sin_marcaje: 'el turno no se cubrió',
+  marcajes_multiples: 'varios marcajes en el mismo día: las horas se suman, pero no se pueden repartir entre los bloques',
+  marcaje_ambiguo: 'una hora capturada a mano no se puede ubicar en el día del turno',
   jornada_abierta: 'la jornada quedó abierta',
   demora: 'entró tarde',
   salida_temprana: 'salió antes',
@@ -162,7 +169,9 @@ export function resumirBalance(dias: BalanceDia[]): ResumenBalance {
     d.tiene_vara &&
     !d.hallazgos.includes('sin_marcaje') &&
     !d.hallazgos.includes('jornada_abierta') &&
-    !d.hallazgos.includes('turno_partido')
+    !d.hallazgos.includes('turno_partido') &&
+    !d.hallazgos.includes('marcajes_multiples') &&
+    !d.hallazgos.includes('marcaje_ambiguo')
   // `cumple` YA sale de la base como «no hay ni un hallazgo», y esta condición
   // lo vuelve a exigir acá. No es desconfianza en el SQL: es que este recuento
   // es lo que alguien va a mirar para decir «el equipo cumplió», y una fila con
