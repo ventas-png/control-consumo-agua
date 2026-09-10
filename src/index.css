@@ -313,6 +313,145 @@ button:focus:not(:focus-visible) {
   }
 }
 
+/* ─── Calendario de asignación de turnos ────────────────────────────────
+ * (TurnosTab, vista Calendario)
+ *
+ * POR QUÉ NO ES UNA SOLA GRILLA. La versión anterior ponía el nombre del
+ * empleado y los 35 días del mes como hermanos de un `grid-template-columns:
+ * 150px repeat(7, 1fr)`. El nombre ocupaba UNA celda de la primera fila, así
+ * que la segunda semana empezaba en la columna 1 en vez de la 2 y el mes salía
+ * corrido en diagonal: el lunes bajo «Dom», y a partir de ahí ningún día caía
+ * bajo su encabezado.
+ *
+ * Aquí la fila es un flex de dos piezas —la persona y una grilla de SIETE
+ * columnas con sus días—, de modo que ninguna semana puede desplazar a la
+ * siguiente. El encabezado usa la misma estructura, con un hueco del ancho de
+ * la columna de nombres, y por eso queda alineado por construcción.
+ *
+ * En móvil la grilla no se comprime: mantiene un ancho mínimo legible y
+ * scrollea en horizontal dentro de .table-scroll-wrapper, con la columna de
+ * nombres pegada a la izquierda para no perder de vista de quién es la fila. */
+.turnos-scroll {
+  padding-bottom: 4px;
+}
+
+.turnos-grid {
+  min-width: 680px;
+}
+
+.turnos-fila {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.turnos-fila-encabezado {
+  margin-bottom: 4px;
+}
+
+.turnos-persona {
+  flex: 0 0 150px;
+  width: 150px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--at-surface-2);
+  /* Pegada al borde mientras se scrollea el mes en horizontal. */
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.turnos-persona-hueco {
+  background: transparent;
+  padding: 0;
+}
+
+.turnos-dias {
+  flex: 1 1 auto;
+  display: grid;
+  /* minmax(0, 1fr) y no 1fr: sin el mínimo en cero, una celda con contenido
+   * ancho ensancha su columna y desalinea la semana. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.turnos-encabezado-dia {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--at-ink-3);
+  padding: 4px 0;
+}
+
+.turnos-celda {
+  min-height: 38px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px;
+  font: inherit;
+}
+
+.turnos-celda-hueca {
+  border: none;
+  background: transparent;
+}
+
+.turnos-celda-editable {
+  cursor: pointer;
+  /* El botón hereda el color del contenido: los spans traen el suyo. */
+  color: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.turnos-celda-editable:hover {
+  filter: brightness(1.08);
+}
+
+.turnos-celda-editable:focus-visible {
+  outline: 2px solid var(--at-accent);
+  outline-offset: 1px;
+}
+
+.turnos-celda-dia {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.turnos-celda-marca {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* Selector de días del mes (modal de regla): siete columnas, como la semana. */
+.turnos-dias-mes {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+@media (max-width: 640px) {
+  /* La columna de nombres cede ancho antes que los días: con menos de ~74px
+   * por día el número y el código de jornada dejan de leerse. */
+  .turnos-grid {
+    min-width: 600px;
+  }
+  .turnos-persona {
+    flex-basis: 104px;
+    width: 104px;
+  }
+  .turnos-dias-mes {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
 /* ─── Responsive Tables ─────────────────────────────────────────────────── */
 
 /* Wrapper for horizontal-scrollable tables on mobile */

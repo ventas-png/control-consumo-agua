@@ -16,7 +16,7 @@ import type {
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
   AreaCondominio, RutaRonda, PuntoControlRuta, VisitaControl,
   PlantillaTareaCargo, BloqueTurno, TareaBloque, RevisionTarea,
-  PlantillaHorario, AsignacionTurno, DiaNoLaborable, AusenciaPersonal,
+  PlantillaHorario, AsignacionTurno, DiaNoLaborable, AusenciaPersonal, ExcepcionTurno,
   Asamblea, ContratoProveedor, ObjetoPerdido, AgendaItem,
   ItemInventario, PolizaSeguro, InspeccionNormativa, PersonalCondominio,
   ContactoEmergencia, DocumentoCondominio, RegistroResiduo,
@@ -233,6 +233,7 @@ export interface CondominiosTabContext {
   asignacionesTurno: AsignacionTurno[]
   diasNoLaborables: DiaNoLaborable[]
   ausenciasPersonal: AusenciaPersonal[]
+  excepcionesTurno: ExcepcionTurno[]
   suministros: SuministroCondominio[]
   movimientosSuministro: MovimientoSuministro[]
   tareasCond: TareaCondominio[]
@@ -681,7 +682,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'presencia', label: 'Presencia', icon: '📋', render: (ctx) =>
     <PresenciaPersonalTab registros={ctx.presenciaPersonal} personal={ctx.personal} bloques={ctx.bloquesTurno} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('presencia')} canEdit={ctx.canEdit('presencia')} canDelete={ctx.canDelete('presencia')} onRefresh={ctx.onRefresh} /> },
   { id: 'turnos', label: 'Asignación turnos', icon: '🗓️', render: (ctx) =>
-    <TurnosTab plantillas={ctx.plantillasHorario} asignaciones={ctx.asignacionesTurno} bloques={ctx.bloquesTurno} ausencias={ctx.ausenciasPersonal} diasNoLaborables={ctx.diasNoLaborables} personal={ctx.personal} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('turnos')} canEdit={ctx.canEdit('turnos')} onRefresh={ctx.onRefresh} /> },
+    <TurnosTab plantillas={ctx.plantillasHorario} asignaciones={ctx.asignacionesTurno} bloques={ctx.bloquesTurno} ausencias={ctx.ausenciasPersonal} diasNoLaborables={ctx.diasNoLaborables} excepciones={ctx.excepcionesTurno} personal={ctx.personal} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('turnos')} canEdit={ctx.canEdit('turnos')} onRefresh={ctx.onRefresh} /> },
   { id: 'ausencias', label: 'Ausencias', icon: '🌴', render: (ctx) =>
     <AusenciasTab ausencias={ctx.ausenciasPersonal} diasNoLaborables={ctx.diasNoLaborables} personal={ctx.personal} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('ausencias')} canEdit={ctx.canEdit('ausencias')} onRefresh={ctx.onRefresh} /> },
   { id: 'horas_extra', label: 'Horas y extras', icon: '⏱️', render: (ctx) =>

@@ -322,7 +322,31 @@ export async function fetchCondominiosTurnosData(pid: string, cid: string) {
     supabase.from('asignaciones_turno').select('*, personal_condominio(nombre, cargo), plantillas_horario(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     supabase.from('dias_no_laborables').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
     supabase.from('ausencias_personal').select('*, personal_condominio(nombre, cargo)').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }).limit(500),
+    supabase.from('excepciones_turno').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(1000),
   ])
+}
+
+/**
+ * Bloques de turno de UN RANGO de fechas, con el nombre del empleado.
+ *
+ * Existe aparte de `fetchCondominiosTareasData` porque aquélla trae los 200
+ * bloques de fecha más reciente del proyecto entero: suficiente para la bandeja
+ * de "Tareas por turno" (que mira hoy), y muy corto para el calendario mensual,
+ * donde veinte empleados por treinta días son seiscientas filas y el mes puede
+ * ser cualquiera. Sin esto, generar un mes completo dejaba media grilla pintada
+ * como "previsto (sin generar)" para siempre.
+ */
+export async function fetchBloquesTurnoRango(
+  pid: string, cid: string, desde: string, hasta: string,
+) {
+  return supabase
+    .from('bloques_turno')
+    .select('*')
+    .eq('project_id', pid)
+    .eq('company_id', cid)
+    .gte('fecha', desde)
+    .lte('fecha', hasta)
+    .order('fecha')
 }
 
 /** Tareas + revisiones de un conjunto de bloques de turno. */

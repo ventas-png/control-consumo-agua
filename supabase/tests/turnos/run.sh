@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
 # Verificación EJECUTABLE del control de asignación de turnos
-# (20260820000000 · 000100 · 000200 · 000300).
+# (20260820000000 · 000100 · 000200 · 000300 · 20260910000200).
 #
 # POR QUÉ EXISTE
 # Nada de lo que hacen estas migraciones se puede validar leyéndolas. Un
@@ -12,20 +12,21 @@
 # convierte en un pago. La aritmética de "cada bimestre, el día 31, saltando
 # festivos" no se revisa a ojo.
 #
-# QUÉ COMPRUEBA (36 invariantes)
+# QUÉ COMPRUEBA (38 invariantes)
 #   A · JORNADA       que 22:00→06:00 cuenta 8 h y no -960 minutos (el bug vivo
 #                     de PresenciaPersonalTab), con y sin bandera de cruce, que
 #                     el descanso se descuenta y que la franja nocturna
 #                     20:00–06:00 se mide bien.
-#   B · PERIODICIDAD  las diez frecuencias, incluidas las cuatro largas que no
-#                     existían en el repo, y el día 31 en febrero.
+#   B · PERIODICIDAD  las once frecuencias —las cuatro largas que no existían
+#                     en el repo y «los días del mes que elijas»— y el día 31
+#                     en febrero.
 #   C · BACKFILL      que el marcaje histórico se ata al empleado por nombre
 #                     normalizado y que quien no está en plantilla no se ata a
 #                     nadie por error.
 #   D · GENERACIÓN    que materializa los días correctos, que re-generar no
 #                     duplica, que no pisa un bloque puesto a mano, y que se
-#                     salta ausencias aprobadas y festivos (salvo la regla que
-#                     declara cubrirlos).
+#                     salta ausencias aprobadas, festivos (salvo la regla que
+#                     declara cubrirlos) y los días quitados a mano.
 #   E · EXPEDIENTE    que aprobar vacaciones marca al empleado —y por tanto la
 #                     ruta de limpieza deja de asignarle áreas—, que cancelarlas
 #                     lo devuelve, y que 'inactivo' nunca se resucita.
@@ -49,6 +50,11 @@ MIG_BASE="$RAIZ/supabase/migrations/20260820000000_turnos_plantillas_y_asignacio
 MIG_CAL="$RAIZ/supabase/migrations/20260820000100_calendario_laboral_y_ausencias.sql"
 MIG_GEN="$RAIZ/supabase/migrations/20260820000200_generar_bloques_turno_rpc.sql"
 MIG_HRS="$RAIZ/supabase/migrations/20260820000300_horas_personal_calculo.sql"
+# Va la última a propósito: dropea la firma de 8 parámetros de
+# turnos_regla_aplica() que crea MIG_GEN y la reemplaza por la de 9. Si se
+# aplicara antes, MIG_GEN volvería a crear la vieja y toda llamada de 8
+# argumentos quedaría ambigua.
+MIG_DIAS="$RAIZ/supabase/migrations/20260910000200_turnos_dias_del_mes_y_excepciones.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -88,8 +94,8 @@ echo "── 1/4 · fixture (padrón + helpers + personal tal como está en prod
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$AQUI/fixture.sql" >/dev/null
 echo "  OK    fixture cargado"
 
-echo "── 2/4 · aplicar las cuatro migraciones ────────────────────────────────"
-for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS"; do
+echo "── 2/4 · aplicar las cinco migraciones ─────────────────────────────────"
+for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_DIAS"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$m" >/dev/null
   echo "  OK    $(basename "$m")"
 done
@@ -114,12 +120,12 @@ if echo "$SALIDA" | grep -q 'WARNING:'; then
 fi
 
 echo
-echo "── 4/4 · idempotencia (re-aplicar las cuatro) ──────────────────────────"
-for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS"; do
+echo "── 4/4 · idempotencia (re-aplicar las cinco) ───────────────────────────"
+for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_DIAS"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$m" >/dev/null
 done
-echo "  OK    las cuatro migraciones se pueden volver a aplicar"
+echo "  OK    las cinco migraciones se pueden volver a aplicar"
 
 echo
-echo "✅ turnos: 36 invariantes (jornada, periodicidad, backfill, generación,"
+echo "✅ turnos: 38 invariantes (jornada, periodicidad, backfill, generación,"
 echo "   expediente, horas y RLS), migraciones idempotentes."
