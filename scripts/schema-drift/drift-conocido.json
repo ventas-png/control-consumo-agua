@@ -588,12 +588,6 @@
       "produccion": "a80d46ec3faac453965d00c0fd52149f5435ed53eeb8f8b06fbdfca1bd930a32:4",
       "repo": "8806326157796f10864e2a036ea8ef781f74a0645c44ae8380392edaabbbad00:1"
     },
-    "tabla:security_logs/policies": {
-      "motivo": "SEGURIDAD · ALTA. Producción tiene tres policies que el repositorio no declara: `security_logs_insert_anon` (INSERT a anon, CHECK sólo `user_id IS NULL`), `security_logs_insert_authenticated` y `security_logs_select_by_role` (SELECT a public con `current_user_role() = 'admin'`, sin filtro por company_id). Los dos únicos escritores reales —log-security-event y create-cliente-account— usan service_role, que ignora la RLS, así que ninguna de las tres hace falta. El repositorio es el lado correcto. Sigue en #826.",
-      "desde": "2026-09-01",
-      "produccion": "c52e0e7b7f15593b93c1b61b13a8b750620d61637e4639802242407ef8bb0584:4",
-      "repo": "4b697a62c5d08be84cee65f9d1da5b31c6589eb67bdae498774bfb61395e1170:1"
-    },
     "tabla:solicitudes_concierge/indices": {
       "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
       "desde": "2026-09-01",
