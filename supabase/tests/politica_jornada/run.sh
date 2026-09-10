@@ -13,7 +13,7 @@
 # bloque. Cambiar la jornada mañana no puede reescribir contra qué se midió un
 # mes ya cerrado, y eso no se lee en el SQL — hay que cambiarla y mirar.
 #
-# QUÉ COMPRUEBA (14 invariantes)
+# QUÉ COMPRUEBA (24 invariantes)
 #   1      declarar la vara no mueve ni un número del cómputo
 #   2-4    el bloque congela los tres tramos, los cupos y la autorización; la
 #          jornada cambia sin tocarlos, y el bloque nuevo sí toma la vigente
@@ -23,6 +23,16 @@
 #          la vara la escribe el servidor, no el cliente
 #   11-14  la gobierna el permiso del tab de turnos, las funciones internas no
 #          se le conceden a nadie, y el cupo deja rastro en la bitácora
+#   15-16  el cupo no cruza de empresa ni de condominio, y la foto de la vara
+#          empareja por la terna completa
+#   17-18c privilegios declarados; la jornada y sus cupos se guardan juntos o no
+#          se guarda nada, y la RPC no puede más que quien la llama
+#   19     la OCURRENCIA también queda anclada: un bloque no puede tomar la
+#          jornada de otra empresa ni la de otro condominio, y la de su terna sí
+#   19b    borrar una jornada DESVINCULA la historia y le deja su vara: ni
+#          company_id en NULL ni meses de bloques sin contra qué medirse
+#   20     el DML real de `authenticated` dispara su propio trigger pese al
+#          REVOKE del helper que ese trigger consulta
 #
 # USO
 #   supabase/tests/politica_jornada/run.sh
@@ -106,7 +116,13 @@ for _ in 1 2; do aplicar "$MIGRACION_4"; done
 # de un grant: authenticated recibe los mismos privilegios que le da Supabase.
 psql -q -d politica -c "
   GRANT SELECT, INSERT, UPDATE, DELETE ON public.plantilla_cupos_pausa TO authenticated;
-  GRANT SELECT ON public.plantillas_horario, public.bloques_turno TO authenticated;
+  GRANT SELECT ON public.plantillas_horario TO authenticated;
+  -- bloques_turno con el CRUD entero, como se lo da Supabase por defecto en
+  -- producción: es lo que hace que las policies bloques_turno_insert/update de
+  -- 20260820000000 signifiquen algo. Sin este grant, la invariante que ejerce el
+  -- trigger COMO authenticated moriría en la puerta de la tabla y no llegaría a
+  -- probar lo que tiene que probar.
+  GRANT SELECT, INSERT, UPDATE, DELETE ON public.bloques_turno TO authenticated;
 " >/dev/null
 echo "  OK    re-aplicar la migración nueva no falla"
 

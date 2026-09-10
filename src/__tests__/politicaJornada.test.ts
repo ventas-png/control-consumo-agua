@@ -92,7 +92,7 @@ describe('quién puede fijar la vara', () => {
   })
 
   it('las funciones internas no se le conceden a authenticated', () => {
-    for (const fn of ['turnos_politica_efectiva\\(uuid\\)', 'turnos_sellar_politica\\(\\)']) {
+    for (const fn of ['turnos_politica_efectiva\\(uuid, uuid, uuid\\)', 'turnos_sellar_politica\\(\\)']) {
       expect(codigo, `${fn} quedó expuesta`)
         .toMatch(new RegExp(`REVOKE EXECUTE ON FUNCTION public\\.${fn} FROM PUBLIC, anon, authenticated`))
     }
@@ -121,6 +121,61 @@ describe('el cupo no puede cruzar de inquilino', () => {
       expect(p, `una policy de cupos no consulta la jornada:\n${p}`)
         .toMatch(/turnos_puede_administrar_jornada\s*\(\s*plantilla_horario_id\s*\)/)
     }
+  })
+
+  it('la OCURRENCIA también queda anclada a la terna', () => {
+    // La FK de plantilla_cupos_pausa cierra la definición; ésta cierra el
+    // bloque. Sin ella, un bloque con el company_id correcto podía nombrar la
+    // jornada de otra empresa — y la vara ajena terminaba congelada dentro.
+    expect(codigo).toMatch(
+      /ADD CONSTRAINT bloques_turno_horario_fk\s+FOREIGN KEY\s*\(\s*plantilla_horario_id\s*,\s*company_id\s*,\s*project_id\s*\)\s*REFERENCES\s+public\.plantillas_horario\s*\(\s*id\s*,\s*company_id\s*,\s*project_id\s*\)/i,
+    )
+  })
+
+  it('el ON DELETE nombra la única columna que puede quedar en NULL', () => {
+    // `ON DELETE SET NULL` a secas sobre una FK compuesta intentaría vaciar
+    // también company_id y project_id, que son NOT NULL: reventaría al borrar
+    // una jornada, en producción y con la transacción a medias.
+    // Acotado a la SENTENCIA, no al archivo: los COMMENT ON la nombran en
+    // prosa y son literales SQL, así que sobreviven al borrado de comentarios.
+    const i = codigo.indexOf('ADD CONSTRAINT bloques_turno_horario_fk')
+    expect(i, 'no está la FK compuesta de bloques_turno').toBeGreaterThan(-1)
+    const sentencia = codigo.slice(i, codigo.indexOf(';', i))
+    expect(sentencia).toMatch(/ON DELETE SET NULL\s*\(\s*plantilla_horario_id\s*\)/i)
+    // Y ningún SET NULL sin lista: el `\s*` va DENTRO del lookahead, o la
+    // aserción se satisface a sí misma retrocediendo a cero espacios.
+    expect(sentencia, 'un SET NULL sin columnas alcanzaría a company_id')
+      .not.toMatch(/ON DELETE SET NULL(?!\s*\()/i)
+  })
+
+  it('el trigger resuelve la jornada por la terna de NEW, no por el uuid', () => {
+    const i = codigo.indexOf('FUNCTION public.turnos_sellar_politica(')
+    const cuerpo = codigo.slice(i, codigo.indexOf('$$;', i))
+    expect(cuerpo).toMatch(
+      /turnos_politica_efectiva\(\s*NEW\.plantilla_horario_id\s*,\s*NEW\.company_id\s*,\s*NEW\.project_id\s*\)/,
+    )
+  })
+
+  it('el trigger es SECURITY DEFINER, o el DML de authenticated no puede dispararlo', () => {
+    // turnos_politica_efectiva tiene EXECUTE revocado a authenticated. Una
+    // función de trigger sin SECURITY DEFINER corre con los privilegios de
+    // quien dispara el trigger, así que un INSERT legítimo moría con
+    // «permission denied for function turnos_politica_efectiva».
+    const i = codigo.indexOf('FUNCTION public.turnos_sellar_politica(')
+    const cabecera = codigo.slice(i, codigo.indexOf('AS $$', i))
+    expect(cabecera).toMatch(/SECURITY DEFINER/)
+    expect(cabecera, 'un SECURITY DEFINER sin search_path fijado es superficie')
+      .toMatch(/SET search_path = ''/)
+  })
+
+  it('desvincular la jornada CONSERVA la vara congelada', () => {
+    // Es el camino que recorre ON DELETE SET NULL al borrar una jornada.
+    // Recalcular ahí pondría `politica` en NULL en todos los bloques que esa
+    // jornada rigió: meses de historia sin contra qué medirse.
+    const i = codigo.indexOf('FUNCTION public.turnos_sellar_politica(')
+    const cuerpo = codigo.slice(i, codigo.indexOf('$$;', i))
+    expect(cuerpo).toMatch(/NEW\.plantilla_horario_id IS NOT NULL\s*\n?\s*AND NEW\.plantilla_horario_id IS DISTINCT FROM OLD\.plantilla_horario_id/)
+    expect(cuerpo).toMatch(/NEW\.politica\s*:=\s*OLD\.politica/)
   })
 
   it('la foto de la vara empareja cupos por la terna completa', () => {

@@ -121,7 +121,13 @@ for _ in 1 2; do aplicar "$MIGRACION_5"; done
 # de un grant: authenticated recibe los mismos privilegios que le da Supabase.
 psql -q -d balance -c "
   GRANT SELECT, INSERT, UPDATE, DELETE ON public.plantilla_cupos_pausa TO authenticated;
-  GRANT SELECT ON public.plantillas_horario, public.bloques_turno TO authenticated;
+  GRANT SELECT ON public.plantillas_horario TO authenticated;
+  -- bloques_turno con el CRUD entero, como se lo da Supabase por defecto en
+  -- producción: es lo que hace que las policies bloques_turno_insert/update de
+  -- 20260820000000 signifiquen algo. Sin este grant, la invariante que ejerce el
+  -- trigger COMO authenticated moriría en la puerta de la tabla y no llegaría a
+  -- probar lo que tiene que probar.
+  GRANT SELECT, INSERT, UPDATE, DELETE ON public.bloques_turno TO authenticated;
 " >/dev/null
 echo "  OK    re-aplicar la migración nueva no falla"
 

@@ -313,8 +313,8 @@ END $$;
 -- ── 13 · La ACL de las funciones internas ──────────────────────────────────
 DO $$
 BEGIN
-  IF has_function_privilege('authenticated', 'public.turnos_politica_efectiva(uuid)', 'EXECUTE')
-     OR has_function_privilege('anon', 'public.turnos_politica_efectiva(uuid)', 'EXECUTE') THEN
+  IF has_function_privilege('authenticated', 'public.turnos_politica_efectiva(uuid, uuid, uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.turnos_politica_efectiva(uuid, uuid, uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'INVARIANTE 13: turnos_politica_efectiva quedó expuesta';
   END IF;
   IF has_function_privilege('anon', 'public.turnos_sellar_politica()', 'EXECUTE') THEN
@@ -411,7 +411,13 @@ BEGIN
           v_ajena, 'almuerzo', 999);
   SET session_replication_role = origin;
 
-  v_pol := public.turnos_politica_efectiva(v_ajena);
+  -- Se pregunta por la jornada de B con la TERNA de B: la respuesta correcta
+  -- es su política sin el cupo de la A que se acaba de colar a la fuerza.
+  v_pol := public.turnos_politica_efectiva(
+             v_ajena, 'bbbbbbbb-0000-0000-0000-00000000000b', '22222222-0000-0000-0000-000000000001');
+  IF v_pol IS NULL THEN
+    RAISE EXCEPTION 'INVARIANTE 16: la jornada de B no se resolvió con su propia terna';
+  END IF;
   IF v_pol->'cupos' ? 'almuerzo' THEN
     RAISE EXCEPTION 'INVARIANTE 16: la vara de la empresa B recogió el cupo de la A (%)', v_pol;
   END IF;
@@ -557,4 +563,181 @@ BEGIN
     RAISE EXCEPTION 'INVARIANTE 18c: la jornada ajena cambió de nombre';
   END IF;
   RAISE NOTICE 'OK 18c SECURITY INVOKER: la RPC no puede más que quien la llama';
+END $$;
+
+-- ── 19 · La terna se cierra también en la OCURRENCIA ────────────────────────
+--
+-- La invariante 15 cierra la DEFINICIÓN: un cupo no cuelga de la jornada de
+-- otro. Ésta cierra la OCURRENCIA, que quedaba abierta: `bloques_turno`
+-- apuntaba a `plantillas_horario(id)` a secas, y un uuid dice QUÉ fila es, no
+-- DE QUIÉN. Un bloque con el company_id y el project_id correctos —los que la
+-- policy exige— podía nombrar la jornada de otra empresa, y a partir de la
+-- sección 5 esa vara ajena se CONGELABA dentro del bloque.
+DO $$
+DECLARE
+  v_ajena uuid;
+  v_mia   uuid;
+  v_pol   jsonb;
+BEGIN
+  SELECT id INTO v_ajena FROM public.plantillas_horario WHERE nombre = 'Jornada de la empresa B';
+  SELECT id INTO v_mia   FROM public.plantillas_horario WHERE nombre = 'Diurna 6-14';
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+
+  -- (a) Bloque propio + jornada de OTRA EMPRESA.
+  BEGIN
+    INSERT INTO public.bloques_turno
+      (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+            '9e000000-0000-0000-0000-000000000003', CURRENT_DATE + 40, v_ajena, '06:00', '14:00', 7.5);
+    RAISE EXCEPTION 'INVARIANTE 19a: un bloque de la empresa A tomó la jornada de la B';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- (b) Bloque propio + jornada de OTRO CONDOMINIO de la misma empresa. Es el
+  --     caso que `company_id` solo no distingue, y el que más se parece a un
+  --     error honesto de la aplicación.
+  BEGIN
+    INSERT INTO public.bloques_turno
+      (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000002',
+            '9e000000-0000-0000-0000-000000000003', CURRENT_DATE + 41, v_mia, '06:00', '14:00', 7.5);
+    RAISE EXCEPTION 'INVARIANTE 19b: un bloque del condominio 2 tomó la jornada del 1';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- (c) NADA de política ajena quedó escrita. No basta con que el INSERT
+  --     fallara: lo que había que impedir era que la vara de otro tenant
+  --     terminara congelada en una fila.
+  IF EXISTS (SELECT 1 FROM public.bloques_turno WHERE plantilla_horario_id = v_ajena) THEN
+    RAISE EXCEPTION 'INVARIANTE 19c: quedó un bloque colgado de la jornada ajena';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.bloques_turno b
+              WHERE b.plantilla_horario_id IS NOT NULL
+                AND NOT EXISTS (SELECT 1 FROM public.plantillas_horario ph
+                                 WHERE ph.id = b.plantilla_horario_id
+                                   AND ph.company_id = b.company_id
+                                   AND ph.project_id = b.project_id)) THEN
+    RAISE EXCEPTION 'INVARIANTE 19c: hay bloques cuya jornada no es de su terna';
+  END IF;
+
+  -- (d) Y el segundo candado, por separado: aunque alguien afloje la FK, la
+  --     función no sirve la vara ajena. Se pregunta por la jornada de B con la
+  --     terna de A, que es exactamente lo que el trigger le pasaría.
+  v_pol := public.turnos_politica_efectiva(
+             v_ajena, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001');
+  IF v_pol IS NOT NULL THEN
+    RAISE EXCEPTION 'INVARIANTE 19d: la vara de la empresa B se sirvió con la terna de la A (%)', v_pol;
+  END IF;
+
+  -- (e) La misma terna sí entra, y con su vara. Sin esto, todo lo anterior
+  --     podría estar pasando porque la FK rechaza SIEMPRE.
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          '9e000000-0000-0000-0000-000000000003', CURRENT_DATE + 42, v_mia, '06:00', '14:00', 7.5)
+  RETURNING politica INTO v_pol;
+  IF v_pol IS NULL OR NOT (v_pol ? 'tolerancia_entrada_min') THEN
+    RAISE EXCEPTION 'INVARIANTE 19e: el bloque de la terna correcta nació sin vara (%)', v_pol;
+  END IF;
+
+  RAISE NOTICE 'OK 19 el bloque no puede tomar la jornada de otra empresa ni de otro condominio, y la de su terna sí';
+END $$;
+
+-- ── 19b · Borrar la jornada desvincula la historia; no la borra ─────────────
+--
+-- `ON DELETE SET NULL (plantilla_horario_id)` nombra UNA columna a propósito.
+-- Un `SET NULL` a secas sobre una FK compuesta intentaría vaciar también
+-- `company_id` y `project_id`, que son NOT NULL, y reventaría al borrar una
+-- jornada — en producción y con la transacción a medias. Y la alternativa
+-- fácil, RESTRICT, habría cambiado la conducta que ya existía: dejaría de
+-- poderse borrar una jornada que alguna vez se usó.
+--
+-- Lo que sí tiene que sobrevivir es la VARA: para eso se congeló.
+DO $$
+DECLARE
+  v_tmp  uuid;
+  v_bloq uuid;
+  v_pol  jsonb;
+  v_comp uuid;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  INSERT INTO public.plantillas_horario
+    (company_id, project_id, nombre, hora_inicio, hora_fin, minutos_descanso, tolerancia_entrada_min)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          'Jornada efímera', '07:00', '15:00', 30, 12)
+  RETURNING id INTO v_tmp;
+
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          '9e000000-0000-0000-0000-000000000003', CURRENT_DATE + 43, v_tmp, '07:00', '15:00', 7.5)
+  RETURNING id INTO v_bloq;
+
+  DELETE FROM public.plantillas_horario WHERE id = v_tmp;
+
+  SELECT plantilla_horario_id, politica, company_id INTO v_bloq, v_pol, v_comp
+  FROM public.bloques_turno WHERE fecha = CURRENT_DATE + 43;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'INVARIANTE 19b: borrar la jornada se llevó el bloque por delante';
+  END IF;
+  IF v_bloq IS NOT NULL THEN
+    RAISE EXCEPTION 'INVARIANTE 19b: el bloque quedó apuntando a una jornada borrada';
+  END IF;
+  IF v_comp IS NULL THEN
+    RAISE EXCEPTION 'INVARIANTE 19b: el SET NULL alcanzó a company_id';
+  END IF;
+  IF v_pol IS NULL OR (v_pol->>'tolerancia_entrada_min')::int <> 12 THEN
+    RAISE EXCEPTION 'INVARIANTE 19b: la vara congelada se perdió al borrar la jornada (%)', v_pol;
+  END IF;
+  RAISE NOTICE 'OK 19b borrar la jornada desvincula el bloque y le deja su vara: ni company_id en NULL ni historia perdida';
+END $$;
+
+-- ── 20 · El DML real de `authenticated` puede disparar su propio trigger ────
+--
+-- ESTO ES LO QUE ROMPÍA. `turnos_sellar_politica` no era SECURITY DEFINER, así
+-- que corría con los privilegios de quien dispara el trigger, y llama a
+-- `turnos_politica_efectiva`, que tiene EXECUTE revocado a `authenticated` (lo
+-- comprueba la invariante 13). Resultado: un INSERT de `authenticated` en
+-- `bloques_turno` —que la policy `bloques_turno_insert` permite— moría con
+-- «permission denied for function turnos_politica_efectiva». El REVOKE cerraba
+-- la puerta de la calle y también la del pasillo.
+--
+-- No se prueba con el dueño de las funciones, porque el dueño no tropieza con
+-- ningún REVOKE: se prueba COMO `authenticated`, que es quien llega de verdad.
+DO $$
+DECLARE
+  v_mia uuid;
+  v_pol jsonb;
+BEGIN
+  SELECT id INTO v_mia FROM public.plantillas_horario WHERE nombre = 'Diurna 6-14';
+  -- Ada administra: tiene el permiso del tab que la policy exige.
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+
+  SET LOCAL ROLE authenticated;
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          '9e000000-0000-0000-0000-000000000003', CURRENT_DATE + 44, v_mia, '06:00', '14:00', 7.5);
+  RESET ROLE;
+
+  SELECT politica INTO v_pol FROM public.bloques_turno WHERE fecha = CURRENT_DATE + 44;
+  IF v_pol IS NULL OR NOT (v_pol ? 'tolerancia_entrada_min') THEN
+    RAISE EXCEPTION 'INVARIANTE 20: authenticated insertó, pero el bloque nació sin vara (%)', v_pol;
+  END IF;
+
+  -- Y el UPDATE que CAMBIA de jornada, que es el otro camino que llama al
+  -- helper. El resto de los UPDATE toman la rama que conserva la foto y nunca
+  -- lo llamaban, y por eso el fallo podía tardar en aparecer.
+  SELECT id INTO v_mia FROM public.plantillas_horario WHERE nombre = 'Nocturna 18-06';
+  SET LOCAL ROLE authenticated;
+  UPDATE public.bloques_turno SET plantilla_horario_id = v_mia WHERE fecha = CURRENT_DATE + 44;
+  RESET ROLE;
+
+  SELECT politica INTO v_pol FROM public.bloques_turno WHERE fecha = CURRENT_DATE + 44;
+  IF (v_pol->>'tolerancia_entrada_min')::int <> 20 THEN
+    RAISE EXCEPTION 'INVARIANTE 20: el cambio de jornada no reselló la vara (%)', v_pol;
+  END IF;
+
+  RAISE NOTICE 'OK 20 authenticated inserta y cambia de jornada: el trigger corre pese al REVOKE del helper';
 END $$;

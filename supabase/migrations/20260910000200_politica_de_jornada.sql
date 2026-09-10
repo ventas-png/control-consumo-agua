@@ -59,7 +59,11 @@
 --
 -- REVERSIÓN
 --   DROP FUNCTION IF EXISTS public.turnos_sellar_politica();
---   DROP FUNCTION IF EXISTS public.turnos_politica_efectiva(uuid);
+--   DROP FUNCTION IF EXISTS public.turnos_politica_efectiva(uuid, uuid, uuid);
+--   ALTER TABLE public.bloques_turno DROP CONSTRAINT IF EXISTS bloques_turno_horario_fk;
+--   ALTER TABLE public.bloques_turno
+--     ADD CONSTRAINT bloques_turno_plantilla_horario_id_fkey
+--     FOREIGN KEY (plantilla_horario_id) REFERENCES public.plantillas_horario(id) ON DELETE SET NULL;
 --   DROP TABLE IF EXISTS public.plantilla_cupos_pausa;
 --   ALTER TABLE public.bloques_turno DROP COLUMN IF EXISTS politica;
 --   ALTER TABLE public.plantillas_horario
@@ -308,7 +312,17 @@ CREATE POLICY "plantilla_cupos_pausa_delete" ON public.plantilla_cupos_pausa
 -- sellado del bloque y cualquier lectura futura no pueden divergir. Devuelve
 -- NULL si la plantilla no existe: un bloque sin jornada no tiene vara, y eso se
 -- dice con NULL en vez de con una vara inventada.
-CREATE OR REPLACE FUNCTION public.turnos_politica_efectiva(p_plantilla_id uuid)
+-- La firma cambió de (uuid) a la TERNA: hay que retirar la vieja antes, porque
+-- CREATE OR REPLACE no puede cambiar el número de argumentos. En producción no
+-- existe ninguna de las dos todavía; el DROP es para los entornos donde ya se
+-- aplicó un borrador de este mismo PR.
+DROP FUNCTION IF EXISTS public.turnos_politica_efectiva(uuid);
+
+CREATE OR REPLACE FUNCTION public.turnos_politica_efectiva(
+  p_plantilla_id uuid,
+  p_company_id   uuid,
+  p_project_id   uuid
+)
 RETURNS jsonb
 LANGUAGE sql
 STABLE
@@ -341,18 +355,134 @@ AS $$
   )
   FROM public.plantillas_horario ph
   WHERE ph.id = p_plantilla_id
+    -- LA JORNADA SE RESUELVE POR LA TERNA, NO POR EL UUID. Un uuid identifica
+    -- una fila; no dice de quién es. Resolviendo solo por id, quien pudiera
+    -- poner `plantilla_horario_id` en un bloque suyo recibía la vara de la
+    -- jornada de otra empresa —tolerancias, tramo compensable, cupos— y la
+    -- recibía CONGELADA en su propio bloque, sin rastro de que fuera ajena.
+    -- Con la terna, una plantilla que no es del tenant no aparece: el SELECT
+    -- no devuelve fila y la función devuelve NULL, que es lo mismo que dice
+    -- para un bloque sin jornada. No hay vara ajena que copiar.
+    AND ph.company_id = p_company_id
+    AND ph.project_id = p_project_id
 $$;
 
-COMMENT ON FUNCTION public.turnos_politica_efectiva(uuid) IS
-  'Foto de lo que una jornada espera: tolerancias, el tramo compensable de la demora, si la extra necesita autorización, y el cupo de descanso por tipo. Fuente ÚNICA de esa foto, para que el sellado del bloque y las lecturas futuras no puedan divergir. NULL = la plantilla no existe.';
+COMMENT ON FUNCTION public.turnos_politica_efectiva(uuid, uuid, uuid) IS
+  'Foto de lo que una jornada espera: tolerancias, el tramo compensable de la demora, si la extra necesita autorización, y el cupo de descanso por tipo. Fuente ÚNICA de esa foto, para que el sellado del bloque y las lecturas futuras no puedan divergir. Se resuelve por la TERNA (id, company_id, project_id): NULL = la plantilla no existe O no es de ese tenant, que para quien pregunta es lo mismo.';
 
 -- Sin grant a `authenticated`: su único llamador es el trigger de sellado, que
 -- corre como el dueño. La pantalla arma su vista previa con los valores que ya
 -- tiene en el formulario — no necesita preguntarle a la base lo que acaba de
 -- teclear. Es el remedio que prescribe scripts/migrations-guard.allowlist.json.
-REVOKE EXECUTE ON FUNCTION public.turnos_politica_efectiva(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.turnos_politica_efectiva(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
 
--- ── 4. La vara se congela en el bloque ──────────────────────────────────────
+-- ── 4. La terna se cierra también en bloques_turno ──────────────────────────
+--
+-- POR QUÉ FALTABA. La FK compuesta de `plantilla_cupos_pausa` (sección 2) cierra
+-- el lado de la DEFINICIÓN: un cupo no puede colgar de la jornada de otro
+-- tenant. Pero la OCURRENCIA quedaba abierta. `bloques_turno.plantilla_horario_id`
+-- apunta a `plantillas_horario(id)` a secas desde 20260820000000, y un uuid dice
+-- QUÉ fila es, no DE QUIÉN. Un bloque con el `company_id` y el `project_id`
+-- correctos —los que la policy exige— podía nombrar la jornada de otra empresa.
+--
+-- Y ese hueco no era teórico a partir de la sección 4: la vara de esa jornada
+-- ajena se CONGELABA dentro del bloque. Tolerancias, tramo compensable de la
+-- demora, cupos de descanso, todo copiado y sin rastro de su origen, para juzgar
+-- después a una persona con la regla de otra empresa.
+--
+-- MATCH SIMPLE, QUE ES EL QUE HACE FALTA. Por defecto una FK compuesta se
+-- satisface si CUALQUIERA de sus columnas es NULL. Aquí es justo lo que se
+-- quiere: `plantilla_horario_id` es nullable —los bloques anteriores a
+-- 20260820000000 no tenían jornada— y `company_id`/`project_id` son NOT NULL.
+-- Bloque sin jornada: no se comprueba nada. Bloque con jornada: los tres tienen
+-- que casar.
+--
+-- ON DELETE, EXPLÍCITO. `ON DELETE SET NULL` a secas intentaría poner NULL en
+-- las TRES columnas y reventaría contra el NOT NULL de `company_id` en el peor
+-- momento posible: al borrar una jornada, en producción, con la transacción a
+-- medias. `SET NULL (plantilla_horario_id)` nombra la única columna que puede
+-- quedar en NULL y conserva la conducta que ya tenía la FK simple: borrar una
+-- jornada NO borra la historia, la desvincula. El bloque conserva su
+-- `politica` congelada, que es exactamente para lo que se congeló.
+-- (La lista de columnas en SET NULL existe desde PostgreSQL 15; producción va
+-- por 17.6.1 y el sandbox de CI por 16.)
+--
+-- ANTES DE CREARLA, SE MIDE. Si en producción ya hubiera bloques apuntando a la
+-- jornada de otro tenant, la FK fallaría con un mensaje de catálogo que no dice
+-- cuántos son ni cuáles. Se cuentan primero y se aborta con el número: son datos
+-- que hay que mirar, no que arreglar a ciegas desde una migración.
+--
+-- NOT VALID + VALIDATE, con lo que eso SÍ y NO da acá. Cada archivo de
+-- migración se aplica dentro de UNA transacción, así que el lock fuerte que
+-- toma el ADD no se suelta hasta el commit: hoy el escaneo bloquea igual, y
+-- decir lo contrario sería vender una garantía que no está. Lo que el par sí
+-- deja es el escaneo como un paso APARTE y con nombre — si algún día
+-- `bloques_turno` crece hasta que ese minuto importe, se saca esa línea a su
+-- propia migración y el problema se resuelve sin rediseñar nada. Con un ADD a
+-- secas no habría dónde cortar.
+DO $$
+DECLARE v_malos int;
+BEGIN
+  SELECT count(*) INTO v_malos
+  FROM public.bloques_turno b
+  WHERE b.plantilla_horario_id IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM public.plantillas_horario ph
+      WHERE ph.id         = b.plantilla_horario_id
+        AND ph.company_id = b.company_id
+        AND ph.project_id = b.project_id
+    );
+  IF v_malos > 0 THEN
+    RAISE EXCEPTION
+      'ABORTADO: % bloque(s) de turno apuntan a una jornada de otro tenant. '
+      'Revisarlos antes de cerrar la terna: SELECT b.id, b.company_id, b.project_id, '
+      'b.plantilla_horario_id FROM public.bloques_turno b LEFT JOIN public.plantillas_horario ph '
+      'ON ph.id = b.plantilla_horario_id AND ph.company_id = b.company_id AND ph.project_id = b.project_id '
+      'WHERE b.plantilla_horario_id IS NOT NULL AND ph.id IS NULL;', v_malos;
+  END IF;
+END $$;
+
+DO $$
+DECLARE v_simple text;
+BEGIN
+  -- La FK SIMPLE se retira: comprueba que la jornada exista, pero no de quién
+  -- es —el mismo agujero que ya se cerró en `plantilla_cupos_pausa`—, y la
+  -- compuesta cubre además la existencia. Se busca por CATÁLOGO y no por
+  -- nombre: `bloques_turno` es una de las tablas con drift declarado contra
+  -- producción (#826), y su constraint podría llamarse de otra forma allá.
+  SELECT c.conname INTO v_simple
+  FROM pg_constraint c
+  WHERE c.contype  = 'f'
+    AND c.conrelid  = 'public.bloques_turno'::regclass
+    AND c.confrelid = 'public.plantillas_horario'::regclass
+    AND array_length(c.conkey, 1) = 1
+    AND c.conkey[1] = (SELECT a.attnum FROM pg_attribute a
+                       WHERE a.attrelid = 'public.bloques_turno'::regclass
+                         AND a.attname  = 'plantilla_horario_id');
+  IF v_simple IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.bloques_turno DROP CONSTRAINT %I', v_simple);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname  = 'bloques_turno_horario_fk'
+                    AND conrelid = 'public.bloques_turno'::regclass) THEN
+    ALTER TABLE public.bloques_turno
+      ADD CONSTRAINT bloques_turno_horario_fk
+      FOREIGN KEY (plantilla_horario_id, company_id, project_id)
+      REFERENCES public.plantillas_horario(id, company_id, project_id)
+      ON DELETE SET NULL (plantilla_horario_id)
+      NOT VALID;
+  END IF;
+END $$;
+
+-- Fuera del DO: VALIDATE no puede correr dentro del mismo bloque que la crea si
+-- se quiere que el lock fuerte del ADD se suelte antes del escaneo.
+ALTER TABLE public.bloques_turno VALIDATE CONSTRAINT bloques_turno_horario_fk;
+
+COMMENT ON CONSTRAINT bloques_turno_horario_fk ON public.bloques_turno IS
+  'Ancla la jornada del bloque a su TERNA: una plantilla de otra empresa o de otro condominio no se puede nombrar aquí, ni siquiera con el company_id correcto en la fila. Sin ella, la vara ajena terminaba CONGELADA en bloques_turno.politica. ON DELETE SET NULL sólo sobre plantilla_horario_id: borrar una jornada desvincula la historia, no la borra.';
+
+-- ── 5. La vara se congela en el bloque ──────────────────────────────────────
 ALTER TABLE public.bloques_turno
   ADD COLUMN IF NOT EXISTS politica jsonb;
 
@@ -363,21 +493,67 @@ COMMENT ON COLUMN public.bloques_turno.politica IS
 -- es DERIVADA y lo que llegue en ella se descarta. Va en un trigger propio y no
 -- dentro del que ya existe porque aquél es compartido con `plantillas_horario`,
 -- que no tiene ni puede tener esta columna.
+-- SECURITY DEFINER, Y NO ES OPCIONAL. Una función de trigger sin `SECURITY
+-- DEFINER` corre con los privilegios de QUIEN DISPARA el trigger. Ésta llama a
+-- `turnos_politica_efectiva`, que tiene EXECUTE revocado a `authenticated` a
+-- propósito. Sin esta línea, un INSERT de `authenticated` en `bloques_turno`
+-- —que la policy `bloques_turno_insert` permite— moría con «permission denied
+-- for function turnos_politica_efectiva», y lo mismo un UPDATE que cambiara de
+-- jornada. El REVOKE del helper cerraba la puerta de la calle y la del pasillo.
+--
+-- Elevar el trigger es lo correcto y no lo contrario: el helper sigue sin ser
+-- invocable por nadie desde fuera, y lo único que esta función hace con el
+-- privilegio es escribir `NEW.politica` a partir de la TERNA de NEW —cuyo
+-- `company_id` ya lo obliga la policy y ahora también la FK compuesta—. No
+-- ejecuta DML, no lee nada que el llamador no pueda ver, y no acepta ningún
+-- argumento del cliente.
+--
+-- `search_path = ''` en lugar de `public, pg_temp`: con SECURITY DEFINER el
+-- search_path deja de ser una comodidad y pasa a ser superficie. Todo lo que
+-- se nombra aquí ya iba calificado.
 CREATE OR REPLACE FUNCTION public.turnos_sellar_politica()
 RETURNS TRIGGER
 LANGUAGE plpgsql
-SET search_path = public, pg_temp
+SECURITY DEFINER
+SET search_path = ''
 AS $$
 BEGIN
-  -- Solo al crear el bloque, o si CAMBIA de jornada. Un UPDATE cualquiera
-  -- —cerrar el turno, corregir una nota— no puede refrescar la foto: sería la
-  -- reescritura silenciosa que congelarla existe para impedir.
-  IF TG_OP = 'INSERT'
-     OR NEW.plantilla_horario_id IS DISTINCT FROM OLD.plantilla_horario_id THEN
+  -- TRES CAMINOS, y el tercero es el que no se ve venir.
+  --
+  --   · INSERT: se sella lo que la jornada espera hoy. Sin jornada, NULL: un
+  --     bloque sin vara lo dice, no se inventa una.
+  --
+  --   · UPDATE que pasa a OTRA jornada: se vuelve a sellar con la de esa. El
+  --     bloque cambió de regla, y eso es un cambio de plan, no una reescritura
+  --     del pasado.
+  --
+  --   · UPDATE que DESVINCULA (la jornada pasa a NULL): se CONSERVA la foto.
+  --     Y acá está el filo, porque este camino casi nunca lo recorre una
+  --     persona: lo recorre `ON DELETE SET NULL` cuando alguien borra una
+  --     jornada. Recalcular ahí habría puesto `politica` en NULL en TODOS los
+  --     bloques que esa jornada rigió —meses de historia sin contra qué
+  --     medirse— por un borrado hecho hoy. Es exactamente la reescritura
+  --     silenciosa que congelar la vara existe para impedir, con el agravante
+  --     de que la dispara el motor y no un UPDATE que alguien pueda revisar.
+  --     La jornada se va; lo que ese día se esperaba, no.
+  --
+  --   · Cualquier otro UPDATE —cerrar el turno, corregir una nota— conserva.
+  IF TG_OP = 'INSERT' THEN
+    -- La TERNA de NEW, no el uuid a secas. Es la línea que impide que un bloque
+    -- se selle con la vara de otro tenant: si la jornada no es de este
+    -- company_id y este project_id, la función devuelve NULL en vez de la foto
+    -- ajena. La FK compuesta rechaza además la fila entera; esto es el segundo
+    -- candado, para que la respuesta correcta no dependa de que el primero
+    -- exista.
     NEW.politica := CASE
       WHEN NEW.plantilla_horario_id IS NULL THEN NULL
-      ELSE public.turnos_politica_efectiva(NEW.plantilla_horario_id)
+      ELSE public.turnos_politica_efectiva(
+             NEW.plantilla_horario_id, NEW.company_id, NEW.project_id)
     END;
+  ELSIF NEW.plantilla_horario_id IS NOT NULL
+        AND NEW.plantilla_horario_id IS DISTINCT FROM OLD.plantilla_horario_id THEN
+    NEW.politica := public.turnos_politica_efectiva(
+                      NEW.plantilla_horario_id, NEW.company_id, NEW.project_id);
   ELSE
     NEW.politica := OLD.politica;
   END IF;
@@ -386,7 +562,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.turnos_sellar_politica() IS
-  'Trigger BEFORE INSERT/UPDATE de bloques_turno: congela en `politica` lo que la jornada esperaba, al crear el bloque o si cambia de jornada. Nunca en otro UPDATE — refrescar la foto sería reescribir contra qué se midió un día ya pasado.';
+  'Trigger BEFORE INSERT/UPDATE de bloques_turno: congela en `politica` lo que la jornada esperaba, al crear el bloque o si pasa a OTRA jornada, resolviéndola por la TERNA de NEW. Desvincular la jornada (pasar a NULL, que es lo que hace ON DELETE SET NULL al borrarla) CONSERVA la foto: si no, borrar una jornada dejaría sin vara toda la historia que rigió. Nunca en otro UPDATE — refrescar la foto sería reescribir contra qué se midió un día ya pasado. SECURITY DEFINER porque el helper que consulta está revocado a authenticated: sin eso, el DML legítimo de authenticated no podría disparar su propio trigger.';
 
 -- No es invocable como función normal (Postgres rechaza llamar una función de
 -- trigger), pero se revoca igual: una superficie que no existe es más barata de
