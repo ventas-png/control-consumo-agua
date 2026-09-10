@@ -97,21 +97,34 @@ ALTER TABLE public.registros
   ADD COLUMN IF NOT EXISTS lectura_final_retirada numeric,
   ADD COLUMN IF NOT EXISTS secuencia              bigint;
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'registros_origen_check' AND conrelid = 'public.registros'::regclass
-  ) THEN
-    ALTER TABLE public.registros
-      ADD CONSTRAINT registros_origen_check CHECK (origen IN ('directo', 'rpc'));
-  END IF;
-END $$;
+-- SIN `CHECK (origen IN ('directo','rpc'))`, Y NO POR OLVIDO.
+--
+-- `tabla:registros/constraints` es uno de los grupos con drift DECLARADO en
+-- scripts/schema-drift/drift-conocido.json: producción y el repositorio ya
+-- describen constraints distintas en esta tabla desde #826 («la creó una
+-- migración huérfana con otra forma»), y la baseline fija EL PAR de huellas, no
+-- sólo la clave — precisamente para que un grupo ya declarado «no se trague
+-- cualquier cambio posterior». Añadir aquí una constraint mueve el lado del
+-- repositorio, el auditor en tres vías pasa a ver tres valores distintos
+-- (producción, base y PR) y lo cierra en falso, como debe. Y su trinquete
+-- prohíbe que un PR re-fije la baseline para acallarlo.
+--
+-- Qué se pierde y por qué es asumible: `origen` no es un dato de entrada. Lo
+-- escribe SIEMPRE el trigger de más abajo, en sus tres ramas, así que en el
+-- INSERT no se puede falsificar; y no es una entrada de autorización — nada
+-- decide nada a partir de él, es la MÉTRICA que dice cuándo se puede cerrar el
+-- INSERT directo. Lo que queda sin red es un UPDATE que lo reescriba, que hoy
+-- no hace ningún flujo de la aplicación.
+--
+-- Si se quiere esa red, la forma que NO toca este grupo es un trigger BEFORE
+-- UPDATE que fije la columna (como `sellar_actor` hace con `creado_por`). Se
+-- deja fuera a propósito: dispararía en cada actualización de cobros, que es
+-- un camino caliente, a cambio de blindar un contador de diagnóstico.
 
 COMMENT ON COLUMN public.registros.idempotency_key IS
   'Llave de la OPERACIÓN de captura, generada por el cliente al guardar y conservada en el outbox offline. Es lo que distingue un reintento de una captura nueva: (contador, lectura, fecha) no puede — dos lecturas legítimas del mismo día con el mismo valor son indistinguibles de un reenvío. Única en toda la tabla.';
 COMMENT ON COLUMN public.registros.origen IS
-  '"rpc" = la fila la calculó registrar_lectura; "directo" = entró por INSERT y sus valores los RECALCULÓ trg_agua_lectura_autoritativa. Es la métrica que dice cuándo se puede cerrar el INSERT directo.';
+  'Sólo dos valores: "rpc" = la fila la calculó registrar_lectura; "directo" = entró por INSERT y sus valores los RECALCULÓ trg_agua_lectura_autoritativa. Los escribe siempre ese trigger, no el cliente. Es la métrica que dice cuándo se puede cerrar el INSERT directo. Sin CHECK a propósito: ver la cabecera de 20260910000200.';
 COMMENT ON COLUMN public.registros.es_reset IS
   'La lectura corresponde a un cambio físico / reset del medidor: lectura_actual arranca por debajo de la anterior y el consumo se compone con lectura_final_retirada.';
 COMMENT ON COLUMN public.registros.lectura_final_retirada IS

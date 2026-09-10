@@ -330,6 +330,21 @@ BEGIN
     RAISE EXCEPTION '27: la fila del INSERT directo no quedó marcada como tal'; END IF;
   RAISE NOTICE 'OK 27  estado, proyecto y cliente del INSERT directo los reescribe el servidor';
 
+  -- ── 27b · `origen` sólo toma sus dos valores, y sin CHECK que lo imponga ──
+  -- La columna no lleva constraint a propósito (no se puede tocar el grupo
+  -- `registros/constraints`, con drift ya fijado en la baseline del auditor).
+  -- Lo que sostiene la invariante es el trigger, que la escribe en sus tres
+  -- ramas: si alguien le añade una cuarta y se olvida de `origen`, aquí se ve.
+  SELECT count(*) INTO n FROM public.registros r
+   WHERE r.origen IS NULL OR r.origen NOT IN ('rpc', 'directo');
+  IF n <> 0 THEN
+    RAISE EXCEPTION '27b: % fila(s) con un origen que no es ni "rpc" ni "directo"', n; END IF;
+  SELECT count(*) INTO n FROM public.registros r WHERE r.origen = 'rpc';
+  IF n = 0 THEN RAISE EXCEPTION '27b: ninguna fila quedó marcada como "rpc"'; END IF;
+  SELECT count(*) INTO n FROM public.registros r WHERE r.origen = 'directo';
+  IF n = 0 THEN RAISE EXCEPTION '27b: ninguna fila quedó marcada como "directo"'; END IF;
+  RAISE NOTICE 'OK 27b el trigger escribe siempre un origen válido, en las dos vías';
+
   -- ── 28 · Quien captura pero NO puede leer la tabla ───────────────────────
   -- Beto tiene agua.lecturas.create y NO agua.lecturas.view. Si la lectura
   -- vigente se resolviera con sus privilegios, vería cero filas, el servidor
