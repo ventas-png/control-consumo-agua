@@ -18,8 +18,8 @@ BEGIN
     'anon NO puede leer, y lo deniega el GRANT (no la RLS): no le queda ni SELECT');
 
   -- ── 2 · authenticated normal: ni escribe ni lee ──────────────────────────
-  PERFORM public.chk(public.puede_insertar('authenticated', 'viewer')::int, 0,
-    'authenticated normal NO puede insertar');
+  PERFORM public.chk(public.puede_insertar('authenticated', 'viewer', '11111111-1111-4111-8111-111111111111'::uuid)::int, 0,
+    'authenticated normal NO puede insertar, ni siquiera a su propio nombre');
   PERFORM public.chk(public.filas_visibles('authenticated', 'viewer'), 0,
     'authenticated normal NO lee ninguna fila (conserva el SELECT de tabla; lo deniega la RLS)');
 

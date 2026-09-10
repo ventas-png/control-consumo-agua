@@ -18,8 +18,10 @@
 #
 # QUÉ COMPRUEBA
 #   1/4  ANTES: el fixture reproduce el hallazgo — anon inserta, cualquier
-#        authenticated inserta, y un admin de tenant lee los logs globales.
-#        Si esto no falla como falla producción, el resto no prueba nada.
+#        authenticated fabrica eventos a su nombre, y un admin de tenant lee
+#        los logs globales. Las policies están copiadas VERBATIM de la salida
+#        de `pg_policies` en producción (2026-09-10), predicados incluidos: si
+#        esto no falla como falla producción, el resto no prueba nada.
 #   2/4  DESPUÉS: anon no escribe ni lee (se lo deniega el GRANT, no la RLS);
 #        authenticated normal no escribe ni lee; admin y company_owner de un
 #        tenant no leen; super_admin sí lee y no escribe; service_role escribe.

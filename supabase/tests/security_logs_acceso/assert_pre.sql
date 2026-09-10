@@ -16,9 +16,19 @@ BEGIN
   PERFORM public.chk(public.puede_insertar('anon')::int, 1,
     'ANTES · anon PUEDE insertar (policy security_logs_insert_anon + grant por defecto)');
 
-  -- (2) Cualquier usuario con sesión, de cualquier tenant, también.
-  PERFORM public.chk(public.puede_insertar('authenticated', 'viewer')::int, 1,
-    'ANTES · authenticated PUEDE insertar (security_logs_insert_authenticated)');
+  -- (2) Cualquier usuario con sesión, de cualquier tenant, también — firmando
+  --     la fila a su nombre, que es lo único que le exige el WITH CHECK real
+  --     (`user_id = auth.uid()`). Puede fabricar eventos de seguridad propios.
+  PERFORM public.chk(public.puede_insertar('authenticated', 'viewer', '11111111-1111-4111-8111-111111111111'::uuid)::int, 1,
+    'ANTES · authenticated PUEDE insertar eventos a su nombre (security_logs_insert_authenticated)');
+
+  --     Y NO puede firmarlos a nombre de otro: el WITH CHECK sí contiene eso.
+  --     Se comprueba para no exagerar el hallazgo — el agujero es fabricar los
+  --     propios, no suplantar a un tercero.
+  PERFORM public.chk(public.puede_insertar('authenticated', 'viewer',
+                       '22222222-2222-4222-8222-222222222222'::uuid,
+                       '11111111-1111-4111-8111-111111111111'::uuid)::int, 0,
+    'ANTES · authenticated NO puede firmar un evento a nombre de otro usuario');
 
   -- (3) LA FUGA ENTRE TENANTS. `security_logs_select_by_role` concede SELECT a
   --     `public` con `current_user_role() = ''admin''` y sin filtro por empresa

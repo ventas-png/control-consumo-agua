@@ -11,14 +11,21 @@
 --
 -- El auditor de drift (#827) declara `tabla:security_logs/policies` como
 -- SEGURIDAD · ALTA desde el 2026-09-01. Producción tiene CUATRO policies y el
--- repositorio declara UNA. Las tres que sobran:
+-- repositorio declara UNA. CONFIRMADO EN VIVO el 2026-09-10 con `pg_policies` y
+-- `role_table_grants` sobre el proyecto de producción: las tres que sobran son
+-- exactamente éstas, con estos predicados.
 --
 --   · `security_logs_insert_anon` — INSERT a `anon`, con CHECK que sólo exige
 --     `user_id IS NULL`. Un visitante SIN SESIÓN puede escribir en el log de
 --     auditoría: inundarlo, o peor, FABRICAR entradas que después alguien lee
 --     como evidencia. Un log al que puede escribir cualquiera no es un log.
---   · `security_logs_insert_authenticated` — lo mismo para cualquier usuario
---     con sesión, de cualquier tenant.
+--   · `security_logs_insert_authenticated` — INSERT a `authenticated`, con
+--     `WITH CHECK (user_id = (SELECT auth.uid()))`. El predicado suena a
+--     contención y no lo es: impide firmar un evento a nombre de OTRO, pero
+--     deja que cualquier usuario, de cualquier tenant, FABRIQUE eventos a su
+--     propio nombre — un `password_changed` que nunca ocurrió, o ruido
+--     suficiente para enterrar un incidente real. Nadie con sesión debería
+--     poder escribir en el log que audita sus propias acciones.
 --   · `security_logs_select_by_role` — SELECT a `public` con
 --     `current_user_role() = 'admin'` y SIN filtro por company_id. Como la
 --     tabla es global, el admin de UN tenant lee los eventos de seguridad de
@@ -35,7 +42,8 @@
 -- Los GRANTS de tabla. `anon` y `authenticated` tienen los SIETE privilegios
 -- (`arwdDxt`) sobre `security_logs`, en producción Y en el repositorio — es el
 -- grant por defecto que Supabase da a los tres roles sobre `public`, y ninguna
--- migración lo tocó. Hoy la RLS los contiene: sin policy de INSERT, el INSERT
+-- migración lo tocó. La lectura en vivo del 2026-09-10 devuelve 28 filas:
+-- `anon`, `authenticated`, `postgres` y `service_role`, los siete cada uno. Hoy la RLS los contiene: sin policy de INSERT, el INSERT
 -- se deniega aunque el grant esté.
 --
 -- Pero eso es UNA sola capa, y es exactamente la capa que falló en producción:

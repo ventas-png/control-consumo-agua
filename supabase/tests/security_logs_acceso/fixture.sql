@@ -48,7 +48,9 @@ ALTER TABLE public.security_logs ENABLE ROW LEVEL SECURITY;
 
 -- Los grants POR DEFECTO de Supabase sobre `public`: los siete privilegios a
 -- los tres roles. Es lo que hay hoy en producción y en la reconstrucción
--- (grupo `tabla:security_logs/grants` = f96a9d92…:28, idéntico en ambos lados).
+-- (grupo `tabla:security_logs/grants` = f96a9d92…:28, idéntico en ambos lados),
+-- y lo confirma la lectura de `role_table_grants` del 2026-09-10: 28 filas,
+-- `anon`/`authenticated`/`postgres`/`service_role` con los siete cada uno.
 GRANT ALL ON public.security_logs TO anon, authenticated, service_role;
 
 -- ── Los helpers de rol, stubbeados por GUC ─────────────────────────────────
@@ -62,6 +64,15 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public
 AS $$ SELECT coalesce(current_setting('prueba.rol', true), 'viewer') = 'super_admin' $$;
 
+-- `auth.uid()` — el usuario de la sesión, que es lo que mira la policy REAL de
+-- producción. También por GUC: `prueba.uid` vacío significa «sin sesión».
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE OR REPLACE FUNCTION auth.uid()
+RETURNS uuid LANGUAGE sql STABLE
+AS $$ SELECT nullif(current_setting('prueba.uid', true), '')::uuid $$;
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
+
 GRANT EXECUTE ON FUNCTION public.current_user_role(), public.is_super_admin()
   TO anon, authenticated, service_role;
 
@@ -73,16 +84,24 @@ CREATE POLICY "security_logs_select_superadmin" ON public.security_logs
   USING (is_super_admin());
 
 -- ── Las TRES que sólo existen en producción ────────────────────────────────
--- Copiadas de la descripción del auditor en drift-conocido.json.
+-- Copiadas VERBATIM de `pg_policies` sobre el proyecto de producción, leído el
+-- 2026-09-10. No de la descripción de la baseline: ésta decía «INSERT para
+-- authenticated» sin el predicado, y el predicado real —`user_id = auth.uid()`—
+-- cambia lo que hay que medir.
 CREATE POLICY "security_logs_insert_anon" ON public.security_logs
   FOR INSERT
   TO anon
   WITH CHECK (user_id IS NULL);
 
+-- Copiada VERBATIM de la salida de `pg_policies` en producción (2026-09-10).
+-- Ojo con ésta: no es `WITH CHECK (true)`. Exige que la fila se atribuya al
+-- propio usuario, lo que suena a contención pero no lo es — cualquiera puede
+-- FABRICAR eventos a su nombre (un `password_changed` que nunca ocurrió, o
+-- ruido suficiente para enterrar un incidente real en el log).
 CREATE POLICY "security_logs_insert_authenticated" ON public.security_logs
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (user_id = (SELECT auth.uid() AS uid));
 
 CREATE POLICY "security_logs_select_by_role" ON public.security_logs
   FOR SELECT
@@ -113,14 +132,23 @@ END $$;
 -- intento exitoso dejaba una fila y los conteos de las aserciones siguientes
 -- dependían del ORDEN en que se hubieran corrido — una prueba que se mide a sí
 -- misma en vez de medir la migración.
-CREATE OR REPLACE FUNCTION public.puede_insertar(p_rol text, p_como text DEFAULT 'viewer')
+-- `p_uid` es el `user_id` que lleva la FILA; `p_sesion` es el `auth.uid()` de
+-- quien la escribe, y por defecto son el mismo (el caso normal: firmo un evento
+-- a mi nombre). Hacen falta separados porque la policy real de producción exige
+-- `user_id = auth.uid()`: con un solo parámetro no se podría distinguir «puede
+-- fabricar eventos propios» —que es el hallazgo— de «puede suplantar a otro»
+-- —que no lo es—. NULL en los dos = sin sesión, que es el caso de `anon`.
+CREATE OR REPLACE FUNCTION public.puede_insertar(p_rol text, p_como text DEFAULT 'viewer',
+                                                 p_uid uuid DEFAULT NULL,
+                                                 p_sesion uuid DEFAULT NULL)
 RETURNS boolean LANGUAGE plpgsql AS $$
 BEGIN
   BEGIN
     EXECUTE format('SET LOCAL ROLE %I', p_rol);
     PERFORM set_config('prueba.rol', p_como, true);
-    INSERT INTO public.security_logs (event_type, metadata)
-      VALUES ('prueba_' || p_rol, '{"origen":"prueba"}'::jsonb);
+    PERFORM set_config('prueba.uid', coalesce(coalesce(p_sesion, p_uid)::text, ''), true);
+    INSERT INTO public.security_logs (user_id, event_type, metadata)
+      VALUES (p_uid, 'prueba_' || p_rol, '{"origen":"prueba"}'::jsonb);
     -- Si se llegó hasta acá, el INSERT entró: se deshace y se responde «sí».
     RAISE EXCEPTION 'DESHACER_PRUEBA' USING ERRCODE = 'P0001';
   EXCEPTION
