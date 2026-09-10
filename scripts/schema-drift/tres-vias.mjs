@@ -99,9 +99,21 @@ export function versionDe(nombre) {
 export function diffMigraciones(base, head) {
   const nb = [...base.keys()]
   const nh = [...head.keys()]
-  const agregadas = nh.filter(n => !base.has(n)).sort()
-  const eliminadas = nb.filter(n => !head.has(n)).sort()
+  const agregadasCrudas = nh.filter(n => !base.has(n)).sort()
+  const eliminadasCrudas = nb.filter(n => !head.has(n)).sort()
   const modificadas = nh.filter(n => base.has(n) && base.get(n) !== head.get(n)).sort()
+
+  // Desempatar dos migraciones que YA comparten versión en la base es el único
+  // renombre tolerado. Misma excepción —y las mismas cuatro condiciones— que
+  // `renombrePorColision` en scripts/migrations-append-only.mjs; si se cambia
+  // una hay que cambiar la otra, porque las dos guardan la misma puerta.
+  // Acá la cuarta condición se comprueba MEJOR que allá: no con el score de
+  // similitud de git sino con el hash del blob, que es identidad exacta.
+  const renombradas = renombresPorColision(base, head, agregadasCrudas, eliminadasCrudas)
+  const viejos = new Set(renombradas.map(r => r.desde))
+  const nuevosNombres = new Set(renombradas.map(r => r.hacia))
+  const agregadas = agregadasCrudas.filter(n => !nuevosNombres.has(n))
+  const eliminadas = eliminadasCrudas.filter(n => !viejos.has(n))
 
   // Append-only de verdad: toda migración nueva va DESPUÉS de la última que ya
   // existía. Una versión intercalada se aplicaría antes que migraciones ya
@@ -115,9 +127,48 @@ export function diffMigraciones(base, head) {
     eliminadas,
     modificadas,
     desordenadas,
+    renombradas,
     maxBase,
     apendiceLimpio: eliminadas.length === 0 && modificadas.length === 0 && desordenadas.length === 0,
   }
+}
+
+/** El nombre después de la versión: `20260910000001_security_logs.sql` → `security_logs.sql`. */
+function nombreDe(archivo) {
+  const i = String(archivo).indexOf('_')
+  return i === -1 ? '' : String(archivo).slice(i + 1)
+}
+
+/**
+ * Los renombres que SÓLO desempatan una colisión de versión preexistente.
+ *
+ * Dos PRs que salen de la misma base pueden elegir el mismo timestamp sin
+ * verse —los nombres de archivo difieren, así que git los fusiona sin
+ * conflicto— y la colisión sólo aparece cuando ya son históricas. Ahí la regla
+ * (d) de migrations-guard exige renombrar y esta guarda lo prohíbe: sin una
+ * puerta, el repositorio se queda en rojo para siempre.
+ *
+ * Las CUATRO condiciones, y ninguna es opcional:
+ *   1. La versión vieja ya colisionaba EN LA BASE. Es la llave.
+ *   2. La versión nueva no existe en la base.
+ *   3. El nombre después de la versión es idéntico.
+ *   4. El blob es el mismo: el contenido no cambió, sólo el nombre.
+ */
+export function renombresPorColision(base, head, agregadas, eliminadas) {
+  const versionesBase = [...base.keys()].map(versionDe)
+  const cuenta = (v) => versionesBase.filter(x => x === v).length
+  const pares = []
+  for (const desde of eliminadas) {
+    if (cuenta(versionDe(desde)) < 2) continue // (1)
+    for (const hacia of agregadas) {
+      if (versionesBase.includes(versionDe(hacia))) continue // (2)
+      if (nombreDe(desde) === '' || nombreDe(desde) !== nombreDe(hacia)) continue // (3)
+      if (base.get(desde) !== head.get(hacia)) continue // (4)
+      pares.push({ desde, hacia })
+      break
+    }
+  }
+  return pares
 }
 
 // ── el veredicto ────────────────────────────────────────────────────────────
@@ -203,6 +254,16 @@ export function informe(v) {
   if ((m.agregadas?.length ?? 0) > 0) {
     l.push(`\n  migraciones nuevas en el PR: ${m.agregadas.length}`)
     for (const n of m.agregadas) l.push(`    + ${n}`)
+  }
+
+  // Un renombre tolerado no puede desaparecer del informe: el apply lo
+  // descompone en D+A y REAPLICA la migración una vez.
+  if ((m.renombradas?.length ?? 0) > 0) {
+    l.push(`\n⚠️  RENOMBRE TOLERADO — ${m.renombradas.length}: desempata una colisión de versión`)
+    l.push('   que ya existía en la base (regla (d) de migrations-guard). Mismo contenido:')
+    for (const r of m.renombradas) l.push(`    ↦ ${r.desde}\n      → ${r.hacia}`)
+    l.push('   El apply a producción la REAPLICA una vez y la registra con su versión propia.')
+    l.push('   Sólo es seguro si la migración es idempotente.')
   }
 
   if (v.esperado.length > 0) {

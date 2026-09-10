@@ -78,7 +78,16 @@ export function parseNameStatus(text) {
     const status = fields[0].trim()
     const letter = status[0]
     if (letter === 'R' || letter === 'C') {
-      entries.push({ status: letter, oldPath: fields[1], path: fields[2] })
+      // El score importa: `R100` es git diciendo que el contenido NO cambió.
+      // Es la diferencia entre mover un archivo y reescribirlo mientras se
+      // mueve, y la excepción de abajo sólo tolera lo primero.
+      const score = Number.parseInt(status.slice(1), 10)
+      entries.push({
+        status: letter,
+        score: Number.isNaN(score) ? null : score,
+        oldPath: fields[1],
+        path: fields[2],
+      })
     } else {
       entries.push({ status: letter, path: fields[1] })
     }
@@ -88,8 +97,64 @@ export function parseNameStatus(text) {
 
 const esMigracion = (p) => p !== undefined && p.startsWith(MIG_DIR) && p.endsWith('.sql')
 
+// `supabase/migrations/20260910000000_lo_que_sea.sql` → `20260910000000`
+export const versionDe = (p) => (p ?? '').split('/').pop()?.split('_')[0] ?? ''
+// … → `lo_que_sea.sql`. Es la identidad legible de la migración: si cambia, no
+// es el mismo archivo movido de sitio.
+const nombreDe = (p) => {
+  const base = (p ?? '').split('/').pop() ?? ''
+  const i = base.indexOf('_')
+  return i === -1 ? '' : base.slice(i + 1)
+}
+
+// ── LA ÚNICA EXCEPCIÓN AL RENOMBRE ─────────────────────────────────────────
+//
+// Dos PRs que salen de la misma base pueden elegir el MISMO timestamp sin
+// verse: los nombres de archivo difieren, así que git fusiona los dos sin
+// conflicto y la colisión sólo aparece cuando ya son históricas. Pasó el
+// 2026-09-10 con #845 y #846, las dos en `20260910000000`.
+//
+// Ahí las dos guardas del repositorio se contradicen: la regla (d) de
+// migrations-guard exige RENOMBRAR —y dice, con razón, que no es
+// allowlisteable—, y ésta prohíbe renombrar una histórica. Sin salida, `main`
+// se queda en rojo y con él TODO PR posterior, porque la regla (d) mira el
+// contenido del repo y no el diff.
+//
+// Esta excepción abre exactamente esa puerta y ninguna otra. Exige LAS CUATRO:
+//
+//   1. La versión vieja YA colisionaba en la base. Es la llave: si el
+//      repositorio no está en el estado que la regla (d) rechaza, no hay
+//      excepción que aplicar.
+//   2. La versión nueva NO existe en la base. Renombrar encima de otra
+//      migración cambiaría una colisión por otra.
+//   3. El nombre después del timestamp es idéntico. Renombrar `A` a la versión
+//      de `B` con el nombre de `B` sería una suplantación, no un desempate.
+//   4. `R100`: git confirma que el contenido no cambió. Un renombre que además
+//      edita el SQL es una migración histórica modificada con otro disfraz.
+//
+// LO QUE SIGUE COSTANDO, y por eso no es gratis: el apply a producción
+// descompone el renombre en D+A (`--no-renames`), así que la migración se
+// REAPLICA una vez y se registra con su versión propia. Para una migración
+// idempotente eso es justo la reparación que hace falta —el historial pasa a
+// nombrarla— pero para una que mueva datos sería el incidente 2026-08-03 otra
+// vez. Quien use esta excepción tiene que haber comprobado la idempotencia del
+// archivo que renombra, y el resumen del apply deja el rastro.
+export function renombrePorColision(entrada, migracionesEnLaBase) {
+  if (!Array.isArray(migracionesEnLaBase)) return false
+  const { oldPath, path, score } = entrada
+  if (score !== 100) return false
+  if (nombreDe(oldPath) === '' || nombreDe(oldPath) !== nombreDe(path)) return false
+  const versionVieja = versionDe(oldPath)
+  const versionNueva = versionDe(path)
+  if (versionVieja === '' || versionNueva === '' || versionVieja === versionNueva) return false
+  const versionesBase = migracionesEnLaBase.map(versionDe)
+  const colisionaba = versionesBase.filter((v) => v === versionVieja).length >= 2
+  const nuevaLibre = !versionesBase.includes(versionNueva)
+  return colisionaba && nuevaLibre
+}
+
 // Devuelve las violaciones append-only de un conjunto de entradas name-status.
-export function evaluateAppendOnly(entries) {
+export function evaluateAppendOnly(entries, { migracionesEnLaBase } = {}) {
   const violations = []
   for (const e of entries) {
     if (e.status === 'A' || e.status === 'C') continue // añadir es lo permitido
@@ -98,6 +163,7 @@ export function evaluateAppendOnly(entries) {
       // remoto (indexado por versión) y para el apply (#681). Un rename que
       // ENTRA a la carpeta desde fuera es, a efectos de migraciones, un alta.
       if (esMigracion(e.oldPath)) {
+        if (renombrePorColision(e, migracionesEnLaBase)) continue
         violations.push({
           kind: 'renombrada',
           path: e.oldPath,
@@ -200,14 +266,36 @@ async function main() {
   const diffText = git(['diff', '--name-status', '-M', desde, range.head, '--', MIG_DIR])
   const descripcion = `${desde.slice(0, 12)}..${range.head} (${range.mode})`
 
+  // Las migraciones tal como estaban EN LA BASE. Es lo que decide si una
+  // versión ya colisionaba antes de este cambio, que es la llave de la única
+  // excepción al renombre (ver `renombrePorColision`).
+  const migracionesEnLaBase = git(['ls-tree', '-r', '--name-only', desde, '--', MIG_DIR])
+    .split('\n')
+    .filter((p) => esMigracion(p))
+
   const entries = parseNameStatus(diffText)
-  const violations = evaluateAppendOnly(entries)
+  const violations = evaluateAppendOnly(entries, { migracionesEnLaBase })
   const nuevas = entries.filter((e) => (e.status === 'A' || e.status === 'C') && esMigracion(e.path))
+  const desempates = entries.filter(
+    (e) => e.status === 'R' && esMigracion(e.oldPath) && renombrePorColision(e, migracionesEnLaBase),
+  )
 
   console.log(`🔎 Migrations append-only — rango: ${descripcion}`)
   console.log(
     `   migraciones nuevas: ${nuevas.length} · violaciones del histórico: ${violations.length}`,
   )
+
+  // Un renombre tolerado NO pasa en silencio: reaplica contra producción.
+  for (const e of desempates) {
+    console.log(
+      `   ⚠️  ${e.oldPath} → ${e.path} — renombre TOLERADO: la versión ${versionDe(e.oldPath)} ya` +
+        ' colisionaba en la base (regla (d) de migrations-guard) y el contenido no cambia.',
+    )
+    console.log(
+      '      El apply a producción la descompone en D+A y la REAPLICA una vez, registrándola' +
+        ' con su versión propia. Sólo es seguro si la migración es idempotente.',
+    )
+  }
 
   if (violations.length > 0) {
     console.error('')
