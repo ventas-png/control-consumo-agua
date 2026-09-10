@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-// Guards ESTÁTICOS de la vara de la jornada (20260910000200).
+// Guards ESTÁTICOS de la vara de la jornada (20260910000700).
 //
 // ALCANCE, igual que en presenciaPausas.test.ts. La conducta —que la vara se
 // congele, que no mueva el cómputo— la prueba supabase/tests/politica_jornada
@@ -12,7 +12,7 @@ import { resolve } from 'node:path'
 // Es lo más importante que se puede afirmar de ella. Se anuncia como inerte, y
 // una migración inerte que toca una función de cómputo mueve la planilla sin
 // que nadie lo note hasta que alguien cobra de menos.
-const RUTA = 'supabase/migrations/20260910000200_politica_de_jornada.sql'
+const RUTA = 'supabase/migrations/20260910000700_politica_de_jornada.sql'
 const SQL = readFileSync(resolve(RUTA), 'utf8')
 
 /** SQL sin comentarios: lo que la BD ejecuta, no lo que explicamos. */

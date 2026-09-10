@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Invariantes de 20260910000200 · la vara de la jornada (Fase 1)
+-- Invariantes de 20260910000700 · la vara de la jornada (Fase 1)
 -- ════════════════════════════════════════════════════════════════════════════
 -- La más importante es la 1: que declarar la vara NO cambie ni un número del
 -- cómputo de horas. Todo lo demás de esta migración es inerte por diseño, y una

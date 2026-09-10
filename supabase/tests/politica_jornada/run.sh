@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20260910000200: la vara de la jornada (Fase 1).
+# Verificación EJECUTABLE de 20260910000700: la vara de la jornada (Fase 1).
 #
 # POR QUÉ EXISTE
 # Esta migración es INERTE por diseño: declara qué se espera de cada jornada y
@@ -48,7 +48,7 @@ MIGRACION_2="$RAIZ/supabase/migrations/20260908000200_presencia_correccion_y_anu
 MIGRACION_3="$RAIZ/supabase/migrations/20260908000300_presencia_pausas.sql"
 # Las tres de presencia van antes porque la invariante 1 mide con
 # `calcular_horas_personal` en su versión vigente, la que ya descuenta pausas.
-MIGRACION_4="$RAIZ/supabase/migrations/20260910000200_politica_de_jornada.sql"
+MIGRACION_4="$RAIZ/supabase/migrations/20260910000700_politica_de_jornada.sql"
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done

@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- El balance del día: lo esperado contra lo ocurrido (Fase 2)
 -- ════════════════════════════════════════════════════════════════════════════
--- La fase 1 (20260910000200) declaró QUÉ espera cada jornada y lo congeló en
+-- La fase 1 (20260910000700) declaró QUÉ espera cada jornada y lo congeló en
 -- cada bloque. Ya existía QUÉ pasó: entrada, salida y pausas por tipo con su
 -- duración real. Faltaba ponerlos uno al lado del otro.
 --

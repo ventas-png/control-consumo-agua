@@ -156,7 +156,7 @@ export interface BloqueTurno {
   horas_planificadas?: number | null
   origen?: OrigenBloqueTurno | null
   /** Foto CONGELADA de lo que la jornada esperaba el día que se materializó este
-   *  bloque (20260910000200). `null` = el bloque no tiene jornada, o se planificó
+   *  bloque (20260910000700). `null` = el bloque no tiene jornada, o se planificó
    *  antes de que la vara existiera. No se rellena hacia atrás. */
   politica?: PoliticaJornada | null
   // joins
@@ -310,7 +310,7 @@ export interface PlantillaHorario {
   /** Primer tramo de la demora: hasta aquí no pasa nada. Es la MISMA vara que
    *  usa `presencia_marcar` para marcar la tardanza — no hay una segunda. */
   tolerancia_entrada_min: number
-  // ── La vara de la jornada (20260910000200). Declarada, todavía sin efectos:
+  // ── La vara de la jornada (20260910000700). Declarada, todavía sin efectos:
   //    medir contra ella es la fase 2 y aplicarla la fase 4.
   /** Minutos que se puede salir antes del fin sin que cuente como salida temprana. */
   tolerancia_salida_min: number
@@ -326,7 +326,7 @@ export interface PlantillaHorario {
   created_at: string
 }
 
-/** Cuánto descanso da UNA jornada de UN tipo de pausa (20260910000200). */
+/** Cuánto descanso da UNA jornada de UN tipo de pausa (20260910000700). */
 export interface CupoPausa {
   id: string
   company_id: string
