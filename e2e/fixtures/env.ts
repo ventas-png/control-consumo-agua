@@ -54,10 +54,20 @@ export const RESTRICTED = {
 }
 export const hasRestrictedCreds = Boolean(RESTRICTED.email && RESTRICTED.password)
 
+// Usuario de rol CLIENTE (residente/cliente final) para el portal del cliente —
+// fuera del shell administrativo. Idealmente sembrado con un cargo pendiente
+// y pago en línea (Stripe) activo — si falta, el spec se skipea en runtime.
+export const PORTAL = {
+  email: env('E2E_PORTAL_EMAIL'),
+  password: env('E2E_PORTAL_PASSWORD'),
+}
+export const hasPortalCreds = Boolean(PORTAL.email && PORTAL.password)
+
 // Helpers de gating para usar en `test.skip(...)`.
 export const reasons = {
   baseUrl: 'define E2E_BASE_URL (preview/sandbox) — ver e2e/README.md',
   login: 'define E2E_LOGIN_EMAIL / E2E_LOGIN_PASSWORD — ver e2e/README.md',
   supabaseApi: 'define E2E_SUPABASE_URL / E2E_SUPABASE_PUBLISHABLE_KEY — ver e2e/README.md',
   restricted: 'define E2E_RESTRICTED_EMAIL / E2E_RESTRICTED_PASSWORD (rol viewer/operator) — ver e2e/README.md',
+  portal: 'define E2E_PORTAL_EMAIL / E2E_PORTAL_PASSWORD (usuario rol cliente) — ver e2e/README.md',
 }

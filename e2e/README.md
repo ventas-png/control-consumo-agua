@@ -14,6 +14,8 @@ Tests end-to-end de los flujos **críticos de dinero y autenticación**, contra 
 | `condominios-cuota.e2e.ts` | Emitir cuota → registrar pago (condominios) |
 | `fiscal-timbrar.e2e.ts` | Timbrar comprobante FEL/CFDI contra **Sandbox** |
 | `contabilidad-ledger.e2e.ts` | Selector de contabilidad: la empresa y cada proyecto llevan libros propios |
+| `billing-upgrade.e2e.ts` | Cobro del SaaS a la empresa: modal "Ampliar plan" (tarifas) + checkout de cambio de plan (redirección a Stripe o 503 "Stripe no configurado") |
+| `portal-pago.e2e.ts` | Portal del cliente final: tab "Mis Pagos" → modal de checkout Stripe de un cargo pendiente (**sin pagar**) |
 
 > Los specs usan extensión `*.e2e.ts` (no `*.spec.ts`) a propósito: así el glob por
 > defecto de Vitest (`**/*.{test,spec}.ts`) no los recoge. Sólo Playwright los corre.
@@ -416,9 +418,13 @@ npx playwright test --config e2e/playwright.config.ts
 | `E2E_VERCEL_BYPASS_TOKEN` | bypass oficial de la Deployment Protection de Vercel | obligatoria |
 | `E2E_SUPABASE_URL` | API del sandbox, para preparar y limpiar el dato propio de cada spec | obligatoria |
 | `E2E_SUPABASE_PUBLISHABLE_KEY` | publishable key de ese proyecto — **nunca** una secret key | obligatoria |
+| `E2E_PORTAL_EMAIL` / `E2E_PORTAL_PASSWORD` | usuario rol `cliente` (portal del cliente final), idealmente con un cargo pendiente y Stripe activo | opcional (sin ella, `portal-pago` se omite) |
 
 `E2E_INVITE_TOKEN` y `E2E_FISCAL_SANDBOX_READY` fueron retiradas: no quedan
-variables condicionales ni specs que se omitan.
+variables condicionales ni specs que se omitan, **con una excepción declarada**:
+`portal-pago` requiere un usuario rol `cliente` (`E2E_PORTAL_*`) que el sembrado
+actual aún no fabrica — hasta que lo haga, ese spec conserva el gate por
+credenciales y se omite sin la variable.
 
 ## CI
 
