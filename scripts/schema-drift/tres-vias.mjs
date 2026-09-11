@@ -44,6 +44,11 @@
 // situaciones obligatorias se prueban en `npm test` sin levantar un Postgres.
 
 import { AUSENTE, clavesDeBaseline, evaluar } from './auditar.mjs'
+// Una sola fuente de verdad para la excepción de reparación de replay: la
+// define el guard append-only y aquí se CONSUME. Duplicar la constante sería
+// pedir que las dos puertas se desincronicen. (Ese módulo sólo importa
+// builtins y su main() está guardado, así que importarlo no ejecuta nada.)
+import { REPARACION_REPLAY } from '../migrations-append-only.mjs'
 
 /** Valor comparable de un grupo en una huella: `<sha256>:<n>` o `AUSENTE`. */
 export function valorDe(mapa, clave) {
@@ -101,7 +106,25 @@ export function diffMigraciones(base, head) {
   const nh = [...head.keys()]
   const agregadasCrudas = nh.filter(n => !base.has(n)).sort()
   const eliminadasCrudas = nb.filter(n => !head.has(n)).sort()
-  const modificadas = nh.filter(n => base.has(n) && base.get(n) !== head.get(n)).sort()
+  const modificadasCrudas = nh.filter(n => base.has(n) && base.get(n) !== head.get(n)).sort()
+
+  // LA ÚNICA MODIFICACIÓN HISTÓRICA TOLERADA, con las mismas cuatro llaves que
+  // usa `migrations-append-only`: el archivo exacto, el hash exacto de antes, el
+  // exacto de después, y la migración forward-only compañera presente en HEAD.
+  // Aquí la comprobación es idéntica pero se apoya en el hash del blob, que ya
+  // está a mano. Existe porque el replay MUERE en esa migración: en una
+  // reconstrucción limpia nunca se llega a una posterior, así que repararla con
+  // una forward-only sola es imposible. Ver la cabecera de la excepción allá.
+  const soloNombre = (ruta) => String(ruta).split('/').pop()
+  const archivoReparado = soloNombre(REPARACION_REPLAY.archivo)
+  const compañeraRequerida = soloNombre(REPARACION_REPLAY.requiere)
+  const esReparacionDeReplay = (n) =>
+    n === archivoReparado &&
+    base.get(n) === REPARACION_REPLAY.hashAntes &&
+    head.get(n) === REPARACION_REPLAY.hashDespues &&
+    head.has(compañeraRequerida)
+  const reparadas = modificadasCrudas.filter(esReparacionDeReplay)
+  const modificadas = modificadasCrudas.filter(n => !esReparacionDeReplay(n))
 
   // Desempatar dos migraciones que YA comparten versión en la base es el único
   // renombre tolerado. Misma excepción —y las mismas cuatro condiciones— que
@@ -126,6 +149,7 @@ export function diffMigraciones(base, head) {
     agregadas,
     eliminadas,
     modificadas,
+    reparadas,
     desordenadas,
     renombradas,
     maxBase,
@@ -317,6 +341,13 @@ export function informe(v) {
     l.push(`\n✗ MIGRACIONES ELIMINADAS — ${m.eliminadas.length}:`)
     for (const n of m.eliminadas) l.push(`    − ${n}`)
     l.push('\n   El historial es append-only: producción ya las aplicó.')
+  }
+  if ((m.reparadas?.length ?? 0) > 0) {
+    l.push(`\n⚠️  REPARACIÓN DE REPLAY TOLERADA — ${m.reparadas.length} histórica(s) modificada(s):`)
+    for (const n of m.reparadas) l.push(`    ~ ${n}`)
+    l.push('\n   Es la excepción de una sola vez definida en migrations-append-only:')
+    l.push('   archivo exacto, hash exacto de antes y de después, y la migración')
+    l.push('   forward-only compañera presente. El apply la REAPLICA contra producción.')
   }
   if ((m.modificadas?.length ?? 0) > 0) {
     l.push(`\n✗ MIGRACIONES HISTÓRICAS MODIFICADAS — ${m.modificadas.length}:`)
