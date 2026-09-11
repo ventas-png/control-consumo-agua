@@ -425,6 +425,21 @@ jobs:
           PGPORT_TEST: 55494
         run: supabase/tests/security_logs_acceso/run.sh
 
+      # `20260909000000` revoca EXECUTE de PUBLIC/anon sobre 15 helpers de RLS
+      # dando por hecho un GRANT a `authenticated` que NINGUNA migración
+      # concede: lo aparentaba el `ALTER DEFAULT PRIVILEGES … ON FUNCTIONS` de
+      # bootstrap.sql, que una Supabase Branch real no tiene. Con él puesto la
+      # reconstrucción pasaba y el fallo sólo salía en una branch de verdad
+      # (#847, 2026-09-11). Esta prueba reconstruye la cadena ENTERA con
+      # `bootstrap-branch.sql` —sin ese regalo—: primero reproduce el abort y
+      # después demuestra que desaparece, y comprueba la matriz de ACL celda
+      # por celda con has_function_privilege. No lleva PGBIN ni PGPORT_TEST:
+      # reconstruir.mjs localiza el binario por su cuenta (pg_config o
+      # /usr/lib/postgresql/*/bin, que es donde lo deja el paso `pg` de arriba)
+      # y elige su propio puerto y socket. Sólo usa módulos de node.
+      - name: Replay desde cero con privilegios de Supabase Branch (ACL de helpers RLS)
+        run: node supabase/tests/replay_acl_helpers/run.mjs
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
