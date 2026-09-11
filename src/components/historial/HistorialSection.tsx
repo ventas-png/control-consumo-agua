@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
-import { updateRegistro, deleteRegistro } from '../../domain/agua/mutations'
+import { cambiarEstadoRegistro, deleteRegistro, type EstadoSeguimiento } from '../../domain/agua/mutations'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
 import { DataTable, type DataTableColumn, Icon, PhotoLightbox } from '../shared'
@@ -64,7 +64,7 @@ export function HistorialSection({
   const [filtroTipoAgua, setFiltroTipoAgua] = useState('')
   const [filtroFechaInicio, setFiltroFechaInicio] = useState('')
   const [filtroFechaFin, setFiltroFechaFin] = useState('')
-  const [editModal, setEditModal] = useState<{ registroId: string; estado: Registro['estado'] } | null>(null)
+  const [editModal, setEditModal] = useState<{ registroId: string; estado: EstadoSeguimiento } | null>(null)
   // Lectura cuya foto se está viendo en el lightbox (la foto se baja bajo demanda
   // por id; nunca viaja en el listado — ver domain/agua/queries.ts).
   const [photoModal, setPhotoModal] = useState<{ registroId: string; label: string } | null>(null)
@@ -170,7 +170,7 @@ export function HistorialSection({
   async function updateEstado() {
     if (!editModal) return
     setSavingEstado(true)
-    const { error } = await updateRegistro(editModal.registroId, { estado: editModal.estado })
+    const { error } = await cambiarEstadoRegistro(editModal.registroId, editModal.estado)
     if (!error) {
       onEstadoUpdated(editModal.registroId, editModal.estado)
       setEditModal(null)
@@ -293,7 +293,7 @@ export function HistorialSection({
         <div style={{ display: 'flex', gap: 5 }}>
           {canEdit && (
             <button
-              onClick={() => setEditModal({ registroId: r.id, estado: r.estado })}
+              onClick={() => setEditModal({ registroId: r.id, estado: r.estado === 'mora' ? 'mora' : 'pendiente' })}
               aria-label="Editar estado"
               style={btnEditStyle}
             >✏️ Editar</button>
@@ -472,7 +472,7 @@ export function HistorialSection({
                   <span style={pillStyle(p)}>{p.icon} {r.estado}</span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {canEdit && (
-                      <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} aria-label="Editar estado" style={{ padding: '6px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
+                      <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado === 'mora' ? 'mora' : 'pendiente' })} aria-label="Editar estado" style={{ padding: '6px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                     )}
                     <button onClick={() => setPhotoModal({ registroId: r.id, label: fotoLabel(r) })} aria-label="Ver imagen de la lectura" title="Ver imagen de la lectura" style={{ padding: '6px 10px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>🖼️</button>
                     <button onClick={() => enviarWhatsApp(r)} aria-label="Enviar por WhatsApp" style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>💬</button>
@@ -551,13 +551,20 @@ export function HistorialSection({
               <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>Nuevo Estado</label>
               <select
                 value={editModal.estado}
-                onChange={e => setEditModal(prev => prev ? { ...prev, estado: e.target.value as Registro['estado'] } : null)}
+                onChange={e => setEditModal(prev => prev ? { ...prev, estado: e.target.value as EstadoSeguimiento } : null)}
                 style={{ width: '100%', padding: 12, border: '2px solid var(--at-line)', borderRadius: 10, fontSize: 15 }}
               >
                 <option value="pendiente">⏳ Pendiente</option>
-                <option value="pagado">✓ Pagado</option>
                 <option value="mora">⚠️ Mora</option>
               </select>
+              {/* "Pagado" ya NO está aquí: marcar cobrado un recibo sin monto,
+                  sin fecha y sin rastro es el hallazgo `pagada_sin_pago` del
+                  reporte de inconsistencias, y era esta pantalla la que lo
+                  producía. Se cobra registrando el pago, que exige el monto. */}
+              <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--at-muted)' }}>
+                Para marcar un recibo como pagado, registrá el pago desde Cobros: el
+                abono queda con su monto y su fecha.
+              </p>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
               <button

@@ -1,9 +1,7 @@
 // T7/PR3 — Contrato de las mutaciones de agua (registros): fila + mapeo de error.
 import { describe, it, expect, vi } from 'vitest'
 
-const insertSelect = vi.fn()
-const updateEq = vi.fn()
-const updateIn = vi.fn()
+const rpc = vi.fn()
 // E2: deleteRegistro es soft delete — va por softDelete() (update + match + is).
 const softDeleteIs = vi.fn()
 const storageUpload = vi.fn()
@@ -11,49 +9,109 @@ vi.mock('../../../lib/supabase', () => {
   // `db` es la MISMA instancia que `supabase` (cast tipado) — el mock replica eso.
   const client = {
     from: () => ({
-      insert: () => ({ select: insertSelect }),
-      update: () => ({ eq: updateEq, in: updateIn, match: () => ({ is: softDeleteIs }) }),
+      update: () => ({ match: () => ({ is: softDeleteIs }) }),
     }),
+    // Envuelto en una flecha (y no `rpc,` a secas) porque vi.mock se iza por
+    // encima de la declaración del spy: la referencia tiene que resolverse al
+    // LLAMAR, no al construir el objeto.
+    rpc: (nombre: string, args: unknown) => rpc(nombre, args),
     storage: { from: () => ({ upload: storageUpload }) },
     auth: { getUser: () => Promise.resolve({ data: { user: { id: 'u1' } } }) },
   }
   return { supabase: client, db: client }
 })
 
-import { createRegistro, updateRegistro, deleteRegistro, marcarRegistrosMora, uploadRegistroFoto } from '../mutations'
+import {
+  registrarLectura, cambiarEstadoRegistro, registrarPagoRegistro,
+  deleteRegistro, marcarRegistrosMora, uploadRegistroFoto,
+} from '../mutations'
+import type { LecturaCaptura } from '../mutations'
 
-describe('createRegistro', () => {
-  it('éxito → devuelve la primera fila', async () => {
-    insertSelect.mockResolvedValueOnce({ data: [{ id: 'reg1' }], error: null })
-    expect(await createRegistro({})).toEqual({ data: { id: 'reg1' }, error: null, duplicado: false })
+const captura: LecturaCaptura = {
+  contadorId: 'c1',
+  lecturaActual: 130,
+  fecha: '2026-09-10',
+  idempotencyKey: 'op-1234567890',
+}
+
+describe('registrarLectura', () => {
+  it('éxito → devuelve la fila que construyó el servidor', async () => {
+    rpc.mockResolvedValueOnce({ data: { id: 'reg1', consumo: 30 }, error: null })
+    expect(await registrarLectura(captura)).toEqual({
+      data: { id: 'reg1', consumo: 30 }, error: null, duplicado: false,
+    })
+  })
+
+  it('manda SÓLO lo que capturó el operador: nada que decida el cobro', async () => {
+    // Es el contrato entero de este PR. Si alguien vuelve a colar `consumo`,
+    // `monto_calculado`, `tarifa_aplicada`, `project_id` o `estado` en la
+    // llamada, la RPC los ignoraría, pero esta prueba lo dice antes.
+    rpc.mockResolvedValueOnce({ data: { id: 'reg1' }, error: null })
+    await registrarLectura({ ...captura, notas: 'nota', gps: { lat: 1, lng: 2 } })
+    const [nombre, args] = rpc.mock.calls.at(-1)!
+    expect(nombre).toBe('registrar_lectura')
+    expect(Object.keys(args as object).sort()).toEqual([
+      'p_contador_id', 'p_fecha', 'p_fecha_inicio_servicio', 'p_foto', 'p_gps',
+      'p_idempotency_key', 'p_lectura_actual', 'p_lectura_final_retirada',
+      'p_notas', 'p_reset_medidor',
+    ])
   })
 
   it('error → { data: null, error: mensaje }', async () => {
-    insertSelect.mockResolvedValueOnce({ data: null, error: { message: 'bad insert' } })
-    expect(await createRegistro({})).toEqual({ data: null, error: 'bad insert', duplicado: false })
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'lectura retroactiva' } })
+    expect(await registrarLectura(captura)).toEqual({
+      data: null, error: 'lectura retroactiva', duplicado: false,
+    })
   })
 
-  it('E1: 23505 (llave natural) → duplicado true con mensaje amigable', async () => {
-    insertSelect.mockResolvedValueOnce({
+  it('23505 (llave natural) → duplicado true con mensaje amigable', async () => {
+    rpc.mockResolvedValueOnce({
       data: null,
       error: { code: '23505', message: 'duplicate key value violates unique constraint "uq_registros_llave_natural"' },
     })
-    const r = await createRegistro({})
+    const r = await registrarLectura(captura)
     expect(r.duplicado).toBe(true)
     expect(r.data).toBeNull()
     expect(r.error).toContain('ya está registrada')
   })
 })
 
-describe('updateRegistro', () => {
-  it('éxito → { error: null }', async () => {
-    updateEq.mockResolvedValueOnce({ error: null })
-    expect(await updateRegistro('reg1', { estado: 'pagado' })).toEqual({ error: null })
+describe('cambiarEstadoRegistro', () => {
+  it('va por la RPC, no por un UPDATE de la columna', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: null })
+    expect(await cambiarEstadoRegistro('reg1', 'mora')).toEqual({ error: null })
+    expect(rpc.mock.calls.at(-1)).toEqual([
+      'agua_registro_cambiar_estado', { p_registro_id: 'reg1', p_estado: 'mora' },
+    ])
+  })
+
+  it('el tipo no admite "pagado": se cobra registrando el pago', () => {
+    // @ts-expect-error — 'pagado' no es un estado de seguimiento fijable a mano.
+    void (() => cambiarEstadoRegistro('reg1', 'pagado'))
   })
 
   it('error → mensaje legible', async () => {
-    updateEq.mockResolvedValueOnce({ error: { message: 'denied' } })
-    expect(await updateRegistro('reg1', {})).toEqual({ error: 'denied' })
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'denied' } })
+    expect(await cambiarEstadoRegistro('reg1', 'pendiente')).toEqual({ error: 'denied' })
+  })
+})
+
+describe('registrarPagoRegistro', () => {
+  it('manda SÓLO el monto: el abonado y el estado los pone el servidor', async () => {
+    rpc.mockResolvedValueOnce({ data: { id: 'reg1', monto_pagado: 156.8, estado: 'pagado' }, error: null })
+    const res = await registrarPagoRegistro('reg1', 100)
+    expect(res.error).toBeNull()
+    expect(res.data).toEqual({ id: 'reg1', monto_pagado: 156.8, estado: 'pagado' })
+    const [nombre, args] = rpc.mock.calls.at(-1)!
+    expect(nombre).toBe('agua_factura_registrar_pago')
+    expect(Object.keys(args as object).sort()).toEqual(
+      ['p_fecha_pago', 'p_monto', 'p_registro_id'],
+    )
+  })
+
+  it('error → mensaje legible', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'excede el saldo' } })
+    expect((await registrarPagoRegistro('reg1', 999)).error).toBe('excede el saldo')
   })
 })
 
@@ -76,13 +134,22 @@ describe('deleteRegistro (soft delete, E2)', () => {
 })
 
 describe('marcarRegistrosMora', () => {
-  it('éxito → { error: null }', async () => {
-    updateIn.mockResolvedValueOnce({ error: null })
+  it('va por la RPC (alcance por fila y auditoría), no por un UPDATE ... IN', async () => {
+    rpc.mockResolvedValueOnce({ data: 2, error: null })
     expect(await marcarRegistrosMora(['a', 'b'])).toEqual({ error: null })
+    expect(rpc.mock.calls.at(-1)).toEqual([
+      'agua_registro_marcar_mora', { p_registro_ids: ['a', 'b'] },
+    ])
+  })
+
+  it('lista vacía → no viaja', async () => {
+    const antes = rpc.mock.calls.length
+    expect(await marcarRegistrosMora([])).toEqual({ error: null })
+    expect(rpc.mock.calls.length).toBe(antes)
   })
 
   it('error → mensaje legible', async () => {
-    updateIn.mockResolvedValueOnce({ error: { message: 'rls' } })
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'rls' } })
     expect(await marcarRegistrosMora(['a'])).toEqual({ error: 'rls' })
   })
 })
