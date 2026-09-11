@@ -16,6 +16,7 @@ import {
   SIN_CAMBIO, PLANIFICADO, RESUELTO, AMBIGUO,
 } from '../tres-vias.mjs'
 import { AUSENTE } from '../auditar.mjs'
+import { REPARACION_REPLAY } from '../../migrations-append-only.mjs'
 
 const sha = (t) => createHash('sha256').update(t, 'utf8').digest('hex')
 
@@ -114,6 +115,70 @@ describe('diffMigraciones', () => {
 // que no abra nada más: cada condición se quita de a una y el renombre vuelve
 // a contar como migración eliminada.
 // ══════════════════════════════════════════════════════════════════════════
+describe('diffMigraciones — reparación de replay (excepción de una sola vez)', () => {
+  // La misma puerta que guarda migrations-append-only, comprobada aquí también:
+  // si sólo una de las dos la abriera, el PR quedaría bloqueado por la otra.
+  const ARCH = REPARACION_REPLAY.archivo.split('/').pop()
+  const COMP = REPARACION_REPLAY.requiere.split('/').pop()
+  const base = () => new Map([[ARCH, REPARACION_REPLAY.hashAntes]])
+  const head = (over = {}) =>
+    new Map(Object.entries({
+      [ARCH]: REPARACION_REPLAY.hashDespues,
+      [COMP]: 'nueva',
+      ...over,
+    }))
+
+  it('con las cuatro condiciones: sale de `modificadas` y entra en `reparadas`', () => {
+    const d = diffMigraciones(base(), head())
+    expect(d.modificadas).toEqual([])
+    expect(d.reparadas).toEqual([ARCH])
+    expect(d.apendiceLimpio).toBe(true)
+  })
+
+  it('sin la compañera forward-only: sigue siendo modificación histórica', () => {
+    const d = diffMigraciones(base(), new Map([[ARCH, REPARACION_REPLAY.hashDespues]]))
+    expect(d.modificadas).toEqual([ARCH])
+    expect(d.reparadas).toEqual([])
+    expect(d.apendiceLimpio).toBe(false)
+  })
+
+  it('con OTRO contenido de destino: sigue siendo modificación histórica', () => {
+    const d = diffMigraciones(base(), head({ [ARCH]: 'otro-contenido' }))
+    expect(d.modificadas).toEqual([ARCH])
+    expect(d.reparadas).toEqual([])
+  })
+
+  it('partiendo de OTRA base: no se puede reutilizar una segunda vez', () => {
+    const d = diffMigraciones(
+      new Map([[ARCH, REPARACION_REPLAY.hashDespues]]),
+      head({ [ARCH]: 'tercer-contenido' }),
+    )
+    expect(d.modificadas).toEqual([ARCH])
+    expect(d.reparadas).toEqual([])
+  })
+
+  it('OTRO archivo histórico con los mismos hashes: sigue rechazado', () => {
+    const otro = '20260318000000_enable_rls.sql'
+    const d = diffMigraciones(
+      new Map([[otro, REPARACION_REPLAY.hashAntes]]),
+      new Map([[otro, REPARACION_REPLAY.hashDespues], [COMP, 'nueva']]),
+    )
+    expect(d.modificadas).toEqual([otro])
+    expect(d.reparadas).toEqual([])
+  })
+
+  it('tolerarla no amnistía a otra histórica modificada en el mismo PR', () => {
+    const otro = '20260318000000_enable_rls.sql'
+    const d = diffMigraciones(
+      new Map([[ARCH, REPARACION_REPLAY.hashAntes], [otro, 'antes']]),
+      head({ [otro]: 'después' }),
+    )
+    expect(d.reparadas).toEqual([ARCH])
+    expect(d.modificadas).toEqual([otro])
+    expect(d.apendiceLimpio).toBe(false)
+  })
+})
+
 describe('diffMigraciones — renombre por colisión de versión', () => {
   // `main` el 2026-09-10: #845 y #846 salieron del mismo commit y las dos
   // migraciones quedaron en 20260910000000.
