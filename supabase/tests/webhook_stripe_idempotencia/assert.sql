@@ -68,6 +68,35 @@ BEGIN
   IF (r ->> 'reclamado')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION '4: un `procesando` RANCIO quedó bloqueado para siempre (%)', r; END IF;
   RAISE NOTICE 'OK 4   el `procesando` fresco no se pisa, y el rancio se retoma';
+
+  -- 4b · `completado` SIN `processed_at` no cuenta como terminado.
+  --
+  -- Es quien CONFIRMA que el evento acabó, y el `estado` a solas no basta: son
+  -- dos columnas y pueden divergir (una reparación a mano, un backfill, un
+  -- error futuro). Si divergen, la lectura segura es «no consta que terminara»,
+  -- porque responder 200 aquí es exactamente cómo se pierde un cobro.
+  PERFORM public.stripe_webhook_evento_reclamar('evt_4b', 'payment_intent.succeeded', false, '{}'::jsonb);
+  PERFORM public.stripe_webhook_evento_cerrar('evt_4b', true, NULL);
+  UPDATE public.stripe_webhook_events SET processed_at = NULL WHERE event_id = 'evt_4b';
+
+  r := public.stripe_webhook_evento_reclamar('evt_4b', 'payment_intent.succeeded', false, '{}'::jsonb);
+  IF (r ->> 'ya_completado')::boolean IS NOT FALSE THEN
+    RAISE EXCEPTION '4b: sin processed_at se dio por completado — el edge respondería 200 a un cobro sin constancia'; END IF;
+  IF (r ->> 'reclamado')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION '4b: sin processed_at el evento quedó bloqueado en vez de reintentable (%)', r; END IF;
+  RAISE NOTICE 'OK 4b  `completado` sin processed_at NO es already_processed: se reintenta';
+
+  -- 4c · Cerrar un evento que no existe es un fallo, no un no-op silencioso.
+  -- Si el edge pierde el hilo, callarlo dejaría el resultado sin sellar.
+  DECLARE ok boolean := false;
+  BEGIN
+    BEGIN
+      PERFORM public.stripe_webhook_evento_cerrar('evt_que_no_existe', true, NULL);
+    EXCEPTION WHEN no_data_found OR sqlstate 'P0002' THEN ok := true; END;
+    IF NOT ok THEN
+      RAISE EXCEPTION '4c: cerrar un evento inexistente no falló'; END IF;
+  END;
+  RAISE NOTICE 'OK 4c  cerrar un evento que no existe falla en vez de callar';
 END $$;
 
 -- ── 5 · Dos entregas SIMULTÁNEAS del mismo evento ──────────────────────────

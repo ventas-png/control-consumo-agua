@@ -120,3 +120,29 @@ export function decidirCruceDeEmpresa(
     body: { received: false, retryable: false, error: 'la solicitud de cobro es de otra empresa' },
   }
 }
+
+/**
+ * Tras sellar el resultado del evento. Si el sello no se pudo escribir, la
+ * respuesta pasa a ser reintentable AUNQUE el procesamiento haya salido bien.
+ *
+ * Parece contraintuitivo devolver 500 después de acreditar correctamente, pero
+ * las dos alternativas son peores. Un 200 con el evento sin sellar deja a Stripe
+ * sin traerlo más y a la tabla sin constancia de que terminó: nadie sabría
+ * distinguirlo de un cobro perdido. Reintentar, en cambio, es barato — la
+ * conciliación responde `ya_conciliado` y el sello se vuelve a intentar.
+ */
+export function decidirTrasSellar(
+  sellado: boolean,
+  decision: Decision,
+): Decision {
+  if (sellado) return decision
+  return {
+    accion: 'responder',
+    status: 500,
+    body: {
+      received: false,
+      retryable: true,
+      error: 'el evento se procesó pero no se pudo sellar su resultado',
+    },
+  }
+}

@@ -8,6 +8,7 @@ import {
   decidirCruceDeEmpresa,
   decidirTrasConciliar,
   decidirTrasReclamo,
+  decidirTrasSellar,
   type Conciliacion,
   type Decision,
   type Reclamo,
@@ -194,11 +195,35 @@ Deno.serve(async (req) => {
     // A partir de aquí el evento es NUESTRO y hay que cerrarlo pase lo que pase:
     // dejarlo en `procesando` lo convierte en un evento que nadie retoma hasta
     // que vence el umbral de rancio.
-    const cerrar = async (ok: boolean, motivo?: string) => {
+    //
+    // Devuelve si el sello quedó escrito. Antes esto sólo lo registraba en el
+    // log y seguía: si la conciliación salía bien pero marcar el evento
+    // `completado` fallaba, el handler respondía 200 con el evento atascado en
+    // `procesando` — Stripe dejaba de traerlo y quedaba un cobro acreditado sin
+    // constancia de haberse terminado. Un 200 sólo se emite cuando TODO quedó
+    // escrito, incluido el sello.
+    const cerrar = async (ok: boolean, motivo?: string): Promise<boolean> => {
       const { error } = await adminClient.rpc('stripe_webhook_evento_cerrar', {
         p_event_id: event.id, p_ok: ok, p_error: motivo ?? null,
       })
-      if (error) console.error('[stripe-webhook] no se pudo cerrar el evento:', error.message)
+      if (error) {
+        console.error('[stripe-webhook] no se pudo cerrar el evento:', error.message)
+        return false
+      }
+      return true
+    }
+
+    /**
+     * Cierra y responde. Si el cierre falla, la respuesta pasa a ser
+     * reintentable pase lo que pase: reintentar es barato —la conciliación
+     * responde `ya_conciliado`— y dar por bueno lo que no se pudo sellar no lo
+     * es.
+     */
+    const cerrarYResponder = async (
+      ok: boolean, decision: Extract<Decision, { accion: 'responder' }>, motivo?: string,
+    ) => {
+      const tras = decidirTrasSellar(await cerrar(ok, motivo), decision)
+      return responder(tras as Extract<Decision, { accion: 'responder' }>)
     }
 
     try {
@@ -217,11 +242,10 @@ Deno.serve(async (req) => {
           .maybeSingle()
 
         if (prErr) {
-          await cerrar(false, `lectura de payment_requests: ${prErr.message}`)
-          return responder({
+          return await cerrarYResponder(false, {
             accion: 'responder', status: 500,
             body: { received: false, retryable: true, error: prErr.message },
-          })
+          }, `lectura de payment_requests: ${prErr.message}`)
         }
 
         if (!pr) {
@@ -229,8 +253,7 @@ Deno.serve(async (req) => {
           // reintentarlo daría lo mismo: se cierra como completado para que
           // Stripe no insista, y queda el rastro en la tabla.
           console.warn(`[stripe-webhook] sin payment_request para ${paymentIntent.id}`)
-          await cerrar(true)
-          return responder({
+          return await cerrarYResponder(true, {
             accion: 'responder', status: 200,
             body: { received: true, sin_solicitud: true },
           })
@@ -239,8 +262,8 @@ Deno.serve(async (req) => {
         const cruce = decidirCruceDeEmpresa(companyId, pr.company_id)
         if (cruce.accion === 'responder') {
           console.error('[stripe-webhook] la solicitud de cobro es de otra empresa')
-          await cerrar(false, 'cruce de empresa entre el secreto verificado y la solicitud')
-          return responder(cruce)
+          return await cerrarYResponder(
+            false, cruce, 'cruce de empresa entre el secreto verificado y la solicitud')
         }
 
         // UNA transacción: inserta el pago (idempotente por UNIQUE sobre
@@ -261,8 +284,7 @@ Deno.serve(async (req) => {
           (conciliado ?? null) as Conciliacion | null,
           conciliarErr,
         )
-        await cerrar(!conciliarErr, conciliarErr?.message)
-        return responder(decision)
+        return await cerrarYResponder(!conciliarErr, decision, conciliarErr?.message)
       }
 
       if (event.type === 'payment_intent.payment_failed') {
@@ -274,20 +296,18 @@ Deno.serve(async (req) => {
           .eq('company_id', companyId)
 
         if (updErr) {
-          await cerrar(false, `marcar failed: ${updErr.message}`)
-          return responder({
+          return await cerrarYResponder(false, {
             accion: 'responder', status: 500,
             body: { received: false, retryable: true, error: updErr.message },
-          })
+          }, `marcar failed: ${updErr.message}`)
         }
-        await cerrar(true)
-        return responder({ accion: 'responder', status: 200, body: { received: true } })
+        return await cerrarYResponder(
+          true, { accion: 'responder', status: 200, body: { received: true } })
       }
 
       // Un tipo de evento que no manejamos ES un procesamiento terminado: no
       // hay nada que hacer con él y reintentarlo no cambiaría nada.
-      await cerrar(true)
-      return responder({
+      return await cerrarYResponder(true, {
         accion: 'responder', status: 200,
         body: { received: true, ignorado: event.type },
       })

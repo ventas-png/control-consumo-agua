@@ -26,7 +26,9 @@
 --     que un check-then-insert deja pasar, y es el mismo fallo que
 --     20260911042839 cerró en la conciliación.
 --   · `stripe_webhook_evento_cerrar()` — sella el resultado, con su error si lo
---     hubo.
+--     hubo. `processed_at` SÓLO se escribe cuando terminó bien, y es esa columna
+--     —no el `estado` a solas— la que autoriza a responderle 200 a un
+--     reintento.
 --   · Procedencia de la verificación en `conciliar_pago_externo`, ver abajo.
 --
 -- ── «verificado» Y «aplicado» SON DOS HECHOS, NO DOS NOMBRES DEL MISMO ──────
@@ -146,7 +148,14 @@ BEGIN
   ON CONFLICT (event_id) DO UPDATE
     SET estado   = 'procesando',
         intentos = e.intentos + 1
-    WHERE e.estado <> 'completado'
+    -- «Terminado» exige LAS DOS cosas: `estado = 'completado'` Y un
+    -- `processed_at` que lo confirme. No es redundancia: son dos columnas, y
+    -- dos columnas pueden divergir —una reparación a mano, un backfill, un
+    -- error futuro—. Si divergen, la lectura segura es «no consta que
+    -- terminara», porque el coste de re-procesar es que la conciliación
+    -- responda `ya_conciliado` (inofensivo) y el de darlo por hecho sin serlo
+    -- es un cobro que nadie acredita nunca.
+    WHERE NOT (e.estado = 'completado' AND e.processed_at IS NOT NULL)
       AND (e.estado <> 'procesando' OR e.received_at < now() - interval '15 minutes')
   RETURNING * INTO v_fila;
 
@@ -163,7 +172,10 @@ BEGIN
 
   RETURN jsonb_build_object(
     'reclamado', false,
-    'ya_completado', COALESCE(v_previo.estado, '') = 'completado',
+    -- Mismo criterio que el WHERE de arriba: sin `processed_at` no hay
+    -- constancia de que terminara, y el edge NO debe responder 200.
+    'ya_completado', (COALESCE(v_previo.estado, '') = 'completado'
+                      AND v_previo.processed_at IS NOT NULL),
     'estado_previo', v_previo.estado,
     'intentos', COALESCE(v_previo.intentos, 0));
 END;
@@ -196,6 +208,13 @@ BEGIN
   IF v_rol <> 'service_role' AND current_user <> 'service_role' THEN
     RAISE EXCEPTION 'stripe_webhook_evento_cerrar es del webhook, no de un usuario'
       USING ERRCODE = '42501';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.stripe_webhook_events WHERE event_id = p_event_id) THEN
+    -- Cerrar un evento que no está reclamado significa que el edge perdió el
+    -- hilo. Callarlo dejaría el resultado sin sellar y el evento retomable por
+    -- el umbral de rancio, que es tarde.
+    RAISE EXCEPTION 'no hay evento % que cerrar', p_event_id USING ERRCODE = 'P0002';
   END IF;
 
   UPDATE public.stripe_webhook_events

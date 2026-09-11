@@ -18,6 +18,7 @@ import {
   decidirCruceDeEmpresa,
   decidirTrasConciliar,
   decidirTrasReclamo,
+  decidirTrasSellar,
 } from '../logic.ts'
 
 describe('decidirTrasReclamo', () => {
@@ -110,5 +111,43 @@ describe('decidirCruceDeEmpresa', () => {
     const d = decidirCruceDeEmpresa('co-1', 'co-2')
     expect(d).toMatchObject({ accion: 'responder', status: 400 })
     expect(d.accion === 'responder' && d.body.retryable).toBe(false)
+  })
+})
+
+describe('decidirTrasSellar', () => {
+  it('sello escrito: se respeta la decisión del procesamiento', () => {
+    const d = { accion: 'responder', status: 200, body: { received: true } } as const
+    expect(decidirTrasSellar(true, d)).toBe(d)
+  })
+
+  it('sello FALLIDO tras un procesamiento correcto: 500 reintentable, no 200', () => {
+    // Es la segunda mitad de «no devuelvas 200 si falla la actualización de
+    // estado». Un 200 con el evento sin sellar deja a Stripe sin traerlo más y
+    // a la tabla sin constancia de que terminó: indistinguible de un cobro
+    // perdido. Reintentar es barato — la conciliación responde ya_conciliado.
+    const d = { accion: 'responder', status: 200, body: { received: true } } as const
+    const r = decidirTrasSellar(false, d)
+    expect(r).toMatchObject({ accion: 'responder', status: 500 })
+    expect(r.accion === 'responder' && r.body.retryable).toBe(true)
+  })
+
+  it('sello fallido tras un fallo: sigue siendo 500 reintentable', () => {
+    const d = {
+      accion: 'responder', status: 500, body: { received: false, retryable: true },
+    } as const
+    expect(decidirTrasSellar(false, d)).toMatchObject({ status: 500 })
+  })
+})
+
+describe('decidirTrasReclamo · processed_at es quien confirma', () => {
+  it('estado completado SIN processed_at no es already_processed', () => {
+    // La RPC ya no marca `ya_completado` cuando falta `processed_at`, así que
+    // al edge le llega false y responde 409 reintentable. Son dos columnas y
+    // pueden divergir; sin la confirmación, la lectura segura es «no consta».
+    const d = decidirTrasReclamo({
+      reclamado: false, ya_completado: false, estado_previo: 'completado',
+    })
+    expect(d).toMatchObject({ accion: 'responder', status: 409 })
+    expect(d.accion === 'responder' && d.body.already_processed).toBeUndefined()
   })
 })
