@@ -11,14 +11,16 @@ import { resolve } from 'node:path'
 // agujero. Lo de aquí es lo que aquello no puede ver desde un PR sin base de
 // datos: que la lista de columnas protegidas siga completa, y que nadie le
 // agregue a las RPC de cobro el parámetro que las vaciaría de sentido.
-// Dos migraciones: 20260910235732 puso el guard y las RPC; 20260911031701 le
+// Tres migraciones: 20260910235732 puso el guard y las RPC; 20260911031701 le
 // quitó la exención de `postgres` (que eximía a cualquier SECURITY DEFINER,
 // porque corre como el dueño), serializó las transiciones con FOR UPDATE y sacó
-// el plazo de vencimiento de la firma pública. Los guards leen el ESTADO FINAL:
-// la segunda re-declara lo que toca, así que gana la última.
+// el plazo de vencimiento de la firma pública; 20260911042839 movió la
+// conciliación del payfac a UNA transacción. Los guards leen el ESTADO FINAL:
+// las posteriores re-declaran lo que toca, así que gana la última.
 const MIGS = [
   'supabase/migrations/20260910235732_proteger_update_registros_y_cobro_autoritativo.sql',
   'supabase/migrations/20260911031701_cerrar_exencion_definer_y_serializar_cobro.sql',
+  'supabase/migrations/20260911042839_conciliar_pago_externo_transaccional.sql',
 ].map((f) => resolve(f))
 
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
@@ -245,5 +247,65 @@ describe('el reporte exige la autorización de registros_select', () => {
 
   it('sigue siendo STABLE: un reporte que escribe no es un reporte', () => {
     expect(reporte).toMatch(/LANGUAGE sql\s*\nSTABLE/)
+  })
+})
+
+describe('la conciliación del payfac ocurre en UNA transacción', () => {
+  const rpc = ultimaDeclaracion('conciliar_pago_externo')
+
+  it('existe y recibe SÓLO el id de la solicitud', () => {
+    expect(rpc, 'no se encontró conciliar_pago_externo').not.toBe('')
+    const firma = rpc.slice(0, rpc.indexOf(')'))
+    expect(firma).toContain('p_payment_request_id uuid')
+    // Un segundo parámetro sería una vía para que el edge dictara el monto, el
+    // ítem o la referencia — que es justo lo que esta RPC existe para impedir.
+    expect(firma.match(/p_[a-z_]+\s+[a-z]/g) ?? []).toHaveLength(1)
+  })
+
+  it('bloquea la solicitud antes de mirarla', () => {
+    expect(rpc).toMatch(/FROM public\.payment_requests[\s\S]*?FOR UPDATE/)
+  })
+
+  it('bloquea también el ítem que acredita', () => {
+    expect(rpc).toMatch(/FROM public\.registros[\s\S]*?FOR UPDATE/)
+    expect(rpc).toMatch(/FROM public\.cuotas_condominio[\s\S]*?FOR UPDATE/)
+  })
+
+  it('una solicitud ya conciliada sale sin acreditar', () => {
+    expect(rpc).toContain("v_pr.estado = 'succeeded'")
+    expect(rpc).toContain("'ya_conciliado', true")
+  })
+
+  it('la idempotencia es un UNIQUE, no una consulta previa', () => {
+    expect(codigo).toMatch(
+      /CREATE UNIQUE INDEX IF NOT EXISTS uq_pagos_payment_request\s*\n?\s*ON public\.pagos \(payment_request_id\)/,
+    )
+    expect(rpc).toContain('ON CONFLICT (payment_request_id) DO NOTHING')
+  })
+
+  it('y el conflicto CORTA: no puede tragarse el duplicado y seguir acreditando', () => {
+    // Medido por mutación: dejando que el conflicto siguiera de largo, dos
+    // confirmaciones concurrentes acreditaban DOS veces (invariante 34). El
+    // índice único no sirve de nada si el código ignora lo que significa.
+    const trasConflicto = rpc.slice(rpc.indexOf('ON CONFLICT (payment_request_id)'))
+    const cierre = trasConflicto.indexOf("'ya_conciliado', true")
+    const acredita = trasConflicto.indexOf('agua_registro_acreditar_pago_externo')
+    expect(cierre, 'tras el conflicto no hay salida temprana').toBeGreaterThan(-1)
+    expect(cierre, 'el conflicto sigue de largo hasta acreditar').toBeLessThan(acredita)
+  })
+
+  it('acredita el recibo por la RPC autoritativa, no con un UPDATE propio', () => {
+    expect(rpc).toContain('public.agua_registro_acreditar_pago_externo(')
+    expect(rpc).not.toMatch(/UPDATE public\.registros\b/)
+  })
+
+  it('sólo service_role, y con chequeo de rol efectivo', () => {
+    expect(codigo).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.conciliar_pago_externo\([^)]*\)\s*\n?\s*FROM PUBLIC, anon, authenticated/,
+    )
+    expect(codigo).toMatch(
+      /GRANT\s+EXECUTE ON FUNCTION public\.conciliar_pago_externo\([^)]*\)\s*\n?\s*TO service_role/,
+    )
+    expect(rpc).toContain("v_rol <> 'service_role'")
   })
 })

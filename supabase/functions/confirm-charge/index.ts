@@ -4,11 +4,15 @@
 // Por qué server-side: los params que el payfac devuelve al navegador tras el
 // checkout NO son confiables (spoofeables). La única confirmación válida es
 // preguntarle al provider (consultarEstado) desde el servidor. Aquí, si el
-// provider reporta 'aprobado', insertamos el `pagos` y —si el saldo llega a 0—
-// liquidamos el ítem. Habilita ABONOS parciales.
+// provider reporta 'aprobado', se llama a `conciliar_pago_externo`, que en UNA
+// transacción inserta el `pagos`, acredita el ítem y cierra la solicitud.
+// Habilita ABONOS parciales.
 //
 // Idempotente: reintentos (retorno del portal + cron de reconciliación) no
-// duplican el pago (guard por provider_ref) ni re-liquidan el ítem.
+// duplican el pago ni re-liquidan el ítem. La idempotencia NO es un `SELECT`
+// previo —dos confirmaciones simultáneas lo pasaban las dos— sino un UNIQUE
+// sobre `pagos.payment_request_id`, más el bloqueo de la solicitud dentro de
+// la RPC (migración 20260911042839).
 //
 // Auth: service_role (cron), usuario de tenant, o RESIDENTE (rol cliente)
 // dueño del ítem. verify_jwt=false en config.toml.
@@ -36,7 +40,6 @@ import {
   type ConfigPagoEmpresa,
   type ConfigPagoLocacion,
 } from '../_shared/payments/index.ts'
-import { planPagoCuota, round2 } from '../_shared/payments/reconcile.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -147,45 +150,34 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'La solicitud no tiene referencia del proveedor para confirmar.' }, 409)
     }
 
-    // ── 2b) Cargar el ítem (cuota o registro): project_id (override del payfac),
-    //    montos (plan de conciliación) y —en registro— el estado de la factura. ──
+    // ── 2b) Del ítem (cuota o registro) aquí sólo hace falta el `project_id`:
+    //    es el override del payfac por locación, que se necesita ANTES de
+    //    preguntarle al proveedor. Los montos, el abonado y la decisión de
+    //    liquidar ya no se leen aquí — los calcula `conciliar_pago_externo`
+    //    con la fila bloqueada. Leerlos en el edge era justo el paso que
+    //    permitía que dos confirmaciones partieran del mismo estado. ──
     let itemProjectId: string | null = null
-    let planTotal = 0 // total a pagar del ítem (con mora/IVA si aplica)
-    let abonosPrevios = 0 // ya pagado
 
     if (esCuota) {
       const { data: cuotaRow, error: cuErr } = await admin
         .from('cuotas_condominio')
-        .select('project_id, monto, total_a_pagar, deleted_at')
+        .select('project_id, deleted_at')
         .eq('id', pr.cuota_id)
         .maybeSingle()
       if (cuErr) return json({ error: cuErr.message }, 500)
-      const cuota = cuotaRow as {
-        project_id: string | null; monto: number; total_a_pagar: number | null; deleted_at: string | null
-      } | null
+      const cuota = cuotaRow as { project_id: string | null; deleted_at: string | null } | null
       if (!cuota || cuota.deleted_at) return json({ error: 'Cuota no encontrada' }, 404)
       itemProjectId = cuota.project_id
-      planTotal = Number(cuota.total_a_pagar ?? cuota.monto)
-      // Acumulador de cuota = suma de pagos no borrados (no hay columna monto_pagado).
-      const { data: pagosPrevios } = await admin
-        .from('pagos').select('monto').eq('cuota_id', pr.cuota_id).is('deleted_at', null)
-      abonosPrevios = ((pagosPrevios as { monto: number }[] | null) ?? []).reduce((s, p) => s + Number(p.monto), 0)
     } else {
       const { data: regRow, error: regErr } = await admin
         .from('registros')
-        .select('project_id, monto_calculado, total_a_pagar, monto_pagado, deleted_at')
+        .select('project_id, deleted_at')
         .eq('id', pr.registro_id)
         .maybeSingle()
       if (regErr) return json({ error: regErr.message }, 500)
-      const reg = regRow as {
-        project_id: string | null; monto_calculado: number | null; total_a_pagar: number | null
-        monto_pagado: number | null; deleted_at: string | null
-      } | null
+      const reg = regRow as { project_id: string | null; deleted_at: string | null } | null
       if (!reg || reg.deleted_at) return json({ error: 'Recibo no encontrado' }, 404)
       itemProjectId = reg.project_id
-      planTotal = Number(reg.total_a_pagar ?? reg.monto_calculado ?? 0)
-      // Acumulador de registro = columna monto_pagado (la fila lleva el total pagado).
-      abonosPrevios = Number(reg.monto_pagado ?? 0)
     }
 
     // ── 3) Resolver payfac + credenciales (por la empresa/proyecto del ítem) ──
@@ -241,95 +233,48 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, estado: resultado.estado, conciliado: false })
     }
 
-    // ── 5) Aprobado → conciliar (idempotente por provider_ref) ──
-    // ¿Ya existe un pago para esta referencia + ítem? (retorno + cron no duplican).
-    let idemQuery = admin.from('pagos').select('id').eq('referencia', pr.provider_ref).is('deleted_at', null)
-    idemQuery = esCuota ? idemQuery.eq('cuota_id', pr.cuota_id) : idemQuery.eq('registro_id', pr.registro_id)
-    const { data: pagoExistente } = await idemQuery.maybeSingle()
-    if (pagoExistente) {
-      await admin.from('payment_requests').update({ estado: 'succeeded' }).eq('id', pr.id)
-      return json({ ok: true, estado: 'aprobado', already: true })
+    // ── 5) Aprobado → conciliar, en UNA transacción y del lado de la base ──
+    // Esto eran cuatro pasos sueltos, cada uno en su propia transacción:
+    // un `SELECT` de idempotencia por `referencia`, el INSERT del pago, la
+    // acreditación del ítem y el cierre de la solicitud. Dos confirmaciones
+    // simultáneas —el retorno del portal y el cron de reconciliación— pasaban
+    // las dos el `SELECT` antes de que ninguna insertara: dos pagos y doble
+    // acreditación. Y una rotura entre el INSERT y la acreditación dejaba el
+    // pago registrado con el recibo sin acreditar, que el reintento ya no
+    // arreglaba porque encontraba el pago y salía por «already».
+    //
+    // `conciliar_pago_externo` hace los cuatro pasos con la solicitud
+    // bloqueada y en una sola transacción (migración 20260911042839), y la
+    // idempotencia ya no es una consulta sino un UNIQUE sobre
+    // `pagos.payment_request_id`. El edge sólo aporta el id: el monto, el
+    // ítem, el método y la referencia salen de la fila bloqueada.
+    const { data: conciliado, error: conciliarErr } = await admin.rpc(
+      'conciliar_pago_externo', { p_payment_request_id: pr.id },
+    )
+    if (conciliarErr) {
+      // El proveedor ya cobró y NADA quedó escrito: la transacción revirtió
+      // entera. El cron lo reintenta y esta vez sí cuadra.
+      return json({
+        ok: false, estado: 'error',
+        error: `Pago cobrado pero no conciliado: ${conciliarErr.message}`,
+      }, 500)
     }
-
-    const plan = planPagoCuota(planTotal, abonosPrevios, Number(pr.monto))
-    // Para la cuota, el plan calculado arriba es la verdad. Para el registro lo
-    // es la fila que devuelve la RPC, que suma DESPUÉS de bloquear.
-    let liquidado = plan.liquida
-    let saldoRestante = plan.saldoRestante
-
-    const { data: nuevoPago, error: pagoErr } = await admin
-      .from('pagos')
-      .insert({
-        cliente_id: pr.cliente_id,
-        project_id: itemProjectId,
-        monto: pr.monto,
-        // Sello anti-confusión (auditoría C1): un pago aprobado por el
-        // proveedor SIMULADO se marca 'sandbox' — identificable y filtrable
-        // en conciliación/EEFF, nunca indistinguible de dinero real.
-        metodo: provider.nombre === 'sandbox' ? 'sandbox' : 'tarjeta_credito',
-        estado: 'aplicado',
-        verification_status: 'aplicado',
-        tipo_aplicacion: plan.tipoAplicacion,
-        referencia: pr.provider_ref,
-        ...(esCuota ? { cuota_id: pr.cuota_id } : { registro_id: pr.registro_id }),
-      })
-      .select('id')
-      .maybeSingle()
-    if (pagoErr) return json({ ok: false, estado: 'error', error: `No se pudo registrar el pago: ${pagoErr.message}` }, 500)
-    const pagoId = (nuevoPago as { id?: string } | null)?.id ?? null
-
-    if (esCuota) {
-      // Liquidada → transicionar la cuota a 'pagada' (misma forma que el pago manual).
-      if (plan.liquida) {
-        const ahora = new Date().toISOString()
-        await admin.from('cuotas_condominio').update({
-          cuota_estado: 'pagada',
-          pagada_at: ahora,
-          estado: 'pagado',
-          fecha_pago: ahora.slice(0, 10),
-          metodo_pago: `en_linea:${provider.nombre}`,
-          referencia_pago: pr.provider_ref,
-          pago_id: pagoId,
-        }).eq('id', pr.cuota_id)
-      }
-    } else {
-      // Registro: el acumulador vive en la fila. Esto era un `.update()` que
-      // sumaba en JavaScript sobre `abonosPrevios`, leído decenas de líneas más
-      // arriba y sin bloquear la fila: el retorno del portal y el cron de
-      // reconciliación confirmando dos `payment_requests` del mismo recibo a la
-      // vez partían del mismo previo y el segundo abono se perdía. La suma, la
-      // decisión de liquidar y la transición de factura viven ahora dentro de
-      // `agua_registro_acreditar_pago_externo`, que bloquea con FOR UPDATE
-      // (migración 20260911031701). Es también la última escritura de columnas
-      // de cobro fuera de las RPC: `registros` ya no acepta un PATCH genérico.
-      const { data: regAcreditado, error: acreditarErr } = await admin.rpc(
-        'agua_registro_acreditar_pago_externo',
-        { p_registro_id: pr.registro_id, p_monto: pr.monto, p_referencia: pr.provider_ref },
-      )
-      if (acreditarErr) {
-        // El proveedor ya cobró: el `pagos` de arriba queda insertado y esto se
-        // reintenta por el cron. Fallar en silencio sería perder el abono.
-        return json({
-          ok: false, estado: 'error',
-          error: `Pago cobrado pero no acreditado al recibo: ${acreditarErr.message}`,
-        }, 500)
-      }
-      const fila = regAcreditado as
-        { estado?: string | null; monto_pagado?: number | null } | null
-      liquidado = fila?.estado === 'pagado'
-      saldoRestante = round2(Math.max(planTotal - Number(fila?.monto_pagado ?? 0), 0))
+    const res = (conciliado ?? {}) as {
+      pago_id?: string | null
+      liquidado?: boolean
+      saldo_restante?: number
+      ya_conciliado?: boolean
     }
-
-    await admin.from('payment_requests').update({ estado: 'succeeded' }).eq('id', pr.id)
 
     return json({
       ok: true,
       estado: 'aprobado',
       conciliado: true,
-      liquidado,
-      cuota_liquidada: liquidado, // alias legacy (F1) — el frontend nuevo lee `liquidado`.
-      saldo_restante: saldoRestante,
-      pago_id: pagoId,
+      ...(res.ya_conciliado ? { already: true } : {}),
+      liquidado: res.liquidado === true,
+      cuota_liquidada: res.liquidado === true, // alias legacy (F1) — el frontend nuevo lee `liquidado`.
+      saldo_restante: res.saldo_restante ?? 0,
+      pago_id: res.pago_id ?? null,
     })
   } catch (e) {
     await captureEdgeException(e, { function: 'confirm-charge' })

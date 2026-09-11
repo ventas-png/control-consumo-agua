@@ -930,3 +930,259 @@ BEGIN
     RAISE EXCEPTION '33: la acreditación del proveedor dejó % rastros (esperado 2)', n; END IF;
   RAISE NOTICE 'OK 33  service_role acredita, suma sobre lo abonado, liquida y queda auditado';
 END $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 34-39 · La conciliación del payfac, en UNA transacción
+-- ════════════════════════════════════════════════════════════════════════════
+-- `confirm-charge` conciliaba en cuatro transacciones sueltas: un SELECT de
+-- idempotencia por `referencia`, el INSERT del pago, la acreditación del ítem y
+-- el cierre de la solicitud. Lo que sigue ejerce los tres fallos que eso dejaba
+-- abiertos, con dos conexiones y con una rotura provocada de verdad.
+--
+-- La preparación va en su PROPIO bloque para que CONFIRME: la otra conexión no
+-- puede ver filas que esta transacción todavía no escribió.
+DO $$
+DECLARE
+  M1    constant uuid := 'c0000000-0000-0000-0000-000000000001';
+  LUCIA constant uuid := 'e0000000-0000-0000-0000-000000000001';
+  CLI   constant uuid := 'c1000000-0000-0000-0000-000000000001';
+  ACME  constant uuid := 'aaaaaaaa-0000-0000-0000-00000000000a';
+  HOY   date := (now() AT TIME ZONE 'America/Guatemala')::date;
+  reg   public.registros;
+  fac   public.registros;
+  pr1   uuid;
+  pr2   uuid;
+  tercio numeric;
+BEGIN
+  PERFORM set_config('app.uid', LUCIA::text, false);
+
+  -- Un recibo emitido, y DOS solicitudes de cobro de un tercio cada una: la
+  -- primera para la carrera de la misma solicitud, la segunda para la carrera
+  -- de dos solicitudes distintas sobre el mismo recibo.
+  SELECT * INTO reg FROM public.registrar_lectura(
+    M1, 600, HOY, 'idem-conc-0001', 'Para la conciliación', NULL, NULL);
+  SELECT * INTO fac FROM public.agua_factura_emitir(reg.id);
+  tercio := round(fac.total_a_pagar / 3, 2);
+
+  INSERT INTO public.payment_requests (cliente_id, registro_id, company_id, monto, provider, estado, provider_ref)
+  VALUES (CLI, reg.id, ACME, tercio, 'sandbox', 'pending', 'ref-conc-1') RETURNING id INTO pr1;
+  INSERT INTO public.payment_requests (cliente_id, registro_id, company_id, monto, provider, estado, provider_ref)
+  VALUES (CLI, reg.id, ACME, tercio, 'sandbox', 'pending', 'ref-conc-2') RETURNING id INTO pr2;
+
+  PERFORM set_config('app.conc_registro', reg.id::text, false);
+  PERFORM set_config('app.conc_total',    fac.total_a_pagar::text, false);
+  PERFORM set_config('app.conc_tercio',   tercio::text, false);
+  PERFORM set_config('app.conc_pr1',      pr1::text, false);
+  PERFORM set_config('app.conc_pr2',      pr2::text, false);
+
+  -- Y un tercer recibo con su solicitud, para la rotura provocada.
+  SELECT * INTO reg FROM public.registrar_lectura(
+    M1, 610, HOY, 'idem-conc-0002', 'Para la rotura provocada', NULL, NULL);
+  SELECT * INTO fac FROM public.agua_factura_emitir(reg.id);
+  INSERT INTO public.payment_requests (cliente_id, registro_id, company_id, monto, provider, estado, provider_ref)
+  VALUES (CLI, reg.id, ACME, round(fac.total_a_pagar / 2, 2), 'sandbox', 'pending', 'ref-conc-3')
+  RETURNING id INTO pr1;
+  PERFORM set_config('app.conc_roto_reg', reg.id::text, false);
+  PERFORM set_config('app.conc_roto_pr',  pr1::text, false);
+END $$;
+
+-- ── 34 · DOS CONFIRMACIONES CONCURRENTES DE LA MISMA SOLICITUD ─────────────
+DO $$
+DECLARE
+  v_conn  text    := current_setting('app.conn');
+  v_reg   uuid    := current_setting('app.conc_registro')::uuid;
+  v_pr    uuid    := current_setting('app.conc_pr1')::uuid;
+  tercio  numeric := current_setting('app.conc_tercio')::numeric;
+  remoto  jsonb;
+  fila    public.registros;
+  n       bigint;
+  pr_est  text;
+BEGIN
+  -- El solapamiento se reproduce igual que en la invariante 26: esta sesión
+  -- concilia y NO confirma, la otra dispara su conciliación y se queda en el
+  -- bloqueo de `payment_requests`, esta confirma y la otra despierta. Con el
+  -- guard viejo —un SELECT de idempotencia en JavaScript— las dos habrían
+  -- pasado el chequeo antes de que ninguna insertara: dos pagos y doble
+  -- acreditación.
+  PERFORM public.dblink_connect('conciliacion', v_conn);
+
+  PERFORM public.test_conciliar_como_payfac(v_pr);   -- local, SIN confirmar
+
+  PERFORM public.dblink_send_query('conciliacion',
+    format('SELECT public.test_conciliar_como_payfac(%L)', v_pr));
+  PERFORM pg_sleep(0.5);
+
+  COMMIT;
+
+  SELECT t.x INTO remoto FROM public.dblink_get_result('conciliacion') AS t(x jsonb);
+  -- Drenar: una consulta asíncrona no termina hasta que `dblink_get_result`
+  -- devuelve cero filas. Sin esto la conexión queda «ocupada» y la siguiente
+  -- invariante no puede usarla.
+  PERFORM public.dblink_get_result('conciliacion');
+  PERFORM public.dblink_disconnect('conciliacion');
+
+  IF (remoto ->> 'ya_conciliado') IS DISTINCT FROM 'true' THEN
+    RAISE EXCEPTION '34: la segunda confirmación volvió a conciliar (%)', remoto; END IF;
+
+  SELECT count(*) INTO n FROM public.pagos p WHERE p.payment_request_id = v_pr;
+  IF n <> 1 THEN
+    RAISE EXCEPTION '34: la solicitud dejó % pagos (esperado 1)', n; END IF;
+
+  SELECT * INTO fila FROM public.registros WHERE id = v_reg;
+  IF fila.monto_pagado <> tercio THEN
+    RAISE EXCEPTION '34: se acreditó % (esperado %) — doble acreditación',
+      fila.monto_pagado, tercio; END IF;
+
+  SELECT pr.estado INTO pr_est FROM public.payment_requests pr WHERE pr.id = v_pr;
+  IF pr_est <> 'succeeded' THEN
+    RAISE EXCEPTION '34: la solicitud quedó en % y no en succeeded', pr_est; END IF;
+
+  RAISE NOTICE 'OK 34  dos confirmaciones concurrentes de la misma solicitud: un pago, una acreditación';
+END $$;
+
+-- ── 35 · ROTURA ENTRE EL INSERT DEL PAGO Y LA ACREDITACIÓN ─────────────────
+DO $$
+DECLARE
+  v_reg  uuid := current_setting('app.conc_roto_reg')::uuid;
+  v_pr   uuid := current_setting('app.conc_roto_pr')::uuid;
+  fila   public.registros;
+  n      bigint;
+  pr_est text;
+  ok     boolean := false;
+  res    jsonb;
+BEGIN
+  -- El trigger de prueba revienta el `UPDATE` del recibo, que es lo PRIMERO
+  -- que ocurre después de insertar el pago. Si la conciliación no fuera
+  -- atómica, el pago quedaría escrito y el recibo sin acreditar — y el
+  -- reintento, encontrándose ese pago, saldría por «ya conciliado» y NUNCA
+  -- acreditaría. Eso es exactamente lo que pasaba con los cuatro pasos sueltos.
+  PERFORM set_config('test.romper_acreditacion', 'on', false);
+  BEGIN
+    PERFORM public.test_conciliar_como_payfac(v_pr);
+  EXCEPTION WHEN OTHERS THEN
+    ok := SQLERRM LIKE '%fallo provocado%';
+  END;
+  PERFORM set_config('test.romper_acreditacion', 'off', false);
+
+  IF NOT ok THEN
+    RAISE EXCEPTION '35: la rotura provocada no se disparó — la prueba no aplica'; END IF;
+
+  SELECT count(*) INTO n FROM public.pagos p WHERE p.payment_request_id = v_pr;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '35: quedaron % pagos huérfanos tras la rotura', n; END IF;
+
+  SELECT pr.estado INTO pr_est FROM public.payment_requests pr WHERE pr.id = v_pr;
+  IF pr_est <> 'pending' THEN
+    RAISE EXCEPTION '35: la solicitud quedó en % tras revertir', pr_est; END IF;
+
+  SELECT * INTO fila FROM public.registros WHERE id = v_reg;
+  IF COALESCE(fila.monto_pagado, 0) <> 0 THEN
+    RAISE EXCEPTION '35: el recibo quedó con % acreditado tras revertir', fila.monto_pagado; END IF;
+
+  -- Y el reintento, ya sin la rotura, cuadra.
+  res := public.test_conciliar_como_payfac(v_pr);
+  IF (res ->> 'ya_conciliado') <> 'false' THEN
+    RAISE EXCEPTION '35: el reintento se creyó que ya estaba conciliado (%)', res; END IF;
+
+  SELECT count(*) INTO n FROM public.pagos p WHERE p.payment_request_id = v_pr;
+  SELECT * INTO fila FROM public.registros WHERE id = v_reg;
+  IF n <> 1 OR COALESCE(fila.monto_pagado, 0) <= 0 THEN
+    RAISE EXCEPTION '35: el reintento dejó % pagos y % acreditado', n, fila.monto_pagado; END IF;
+
+  RAISE NOTICE 'OK 35  un fallo entre el INSERT y la acreditación revierte TODO, y el reintento cuadra';
+END $$;
+
+-- ── 36 · DOS SOLICITUDES DISTINTAS DEL MISMO RECIBO, A LA VEZ ──────────────
+DO $$
+DECLARE
+  v_conn text    := current_setting('app.conn');
+  v_reg  uuid    := current_setting('app.conc_registro')::uuid;
+  v_pr2  uuid    := current_setting('app.conc_pr2')::uuid;
+  tercio numeric := current_setting('app.conc_tercio')::numeric;
+  total  numeric := current_setting('app.conc_total')::numeric;
+  remoto jsonb;
+  fila   public.registros;
+  n      bigint;
+BEGIN
+  -- El bloqueo de `payment_requests` NO cubre este caso: son filas distintas.
+  -- Lo que lo cubre es el bloqueo del RECIBO, tomado siempre después y siempre
+  -- en el mismo orden. Aquí la solicitud 2 entra mientras la 1 (invariante 34)
+  -- ya está conciliada, y se comprueba que los DOS abonos suman.
+  PERFORM public.dblink_connect('conciliacion', v_conn);
+  PERFORM public.dblink_send_query('conciliacion',
+    format('SELECT public.test_conciliar_como_payfac(%L)', v_pr2));
+  PERFORM pg_sleep(0.3);
+  SELECT t.x INTO remoto FROM public.dblink_get_result('conciliacion') AS t(x jsonb);
+  PERFORM public.dblink_get_result('conciliacion');
+  PERFORM public.dblink_disconnect('conciliacion');
+
+  IF (remoto ->> 'ok') IS DISTINCT FROM 'true' THEN
+    RAISE EXCEPTION '36: la segunda solicitud no concilió (%)', remoto; END IF;
+
+  SELECT count(*) INTO n FROM public.pagos p
+   WHERE p.registro_id = v_reg AND p.deleted_at IS NULL;
+  IF n <> 2 THEN
+    RAISE EXCEPTION '36: el recibo quedó con % pagos (esperado 2)', n; END IF;
+
+  SELECT * INTO fila FROM public.registros WHERE id = v_reg;
+  IF fila.monto_pagado <> round(tercio * 2, 2) THEN
+    RAISE EXCEPTION '36: los dos abonos suman % (esperado %)',
+      fila.monto_pagado, round(tercio * 2, 2); END IF;
+  IF fila.monto_pagado > total + 0.005 THEN
+    RAISE EXCEPTION '36: los dos abonos juntos se pasaron del saldo'; END IF;
+
+  RAISE NOTICE 'OK 36  dos solicitudes distintas del mismo recibo suman los dos abonos';
+END $$;
+
+-- ── 37-39 · No-op, y quién NO puede llamarla ───────────────────────────────
+DO $$
+DECLARE
+  v_reg  uuid := current_setting('app.conc_registro')::uuid;
+  v_pr   uuid := current_setting('app.conc_pr1')::uuid;
+  antes  numeric;
+  fila   public.registros;
+  n      bigint;
+  res    jsonb;
+  ok     boolean;
+BEGIN
+  SELECT r.monto_pagado INTO antes FROM public.registros r WHERE r.id = v_reg;
+
+  -- 37 · Repetir una ya conciliada: devuelve lo que hay y no acredita de nuevo.
+  res := public.test_conciliar_como_payfac(v_pr);
+  IF (res ->> 'ya_conciliado') <> 'true' OR (res ->> 'pago_id') IS NULL THEN
+    RAISE EXCEPTION '37: repetir una conciliada no devolvió el resultado existente (%)', res; END IF;
+
+  SELECT count(*) INTO n FROM public.pagos p WHERE p.payment_request_id = v_pr;
+  SELECT * INTO fila FROM public.registros WHERE id = v_reg;
+  IF n <> 1 OR fila.monto_pagado <> antes THEN
+    RAISE EXCEPTION '37: el no-op escribió: % pagos, abonado % (antes %)',
+      n, fila.monto_pagado, antes; END IF;
+  RAISE NOTICE 'OK 37  repetir una solicitud ya conciliada es un no-op que devuelve lo que hay';
+
+  -- El claim que puso `test_conciliar_como_payfac` es transaccional, y este
+  -- bloque es UNA transacción: hay que quitarlo antes de comprobar quién NO
+  -- puede llamarla, o la 39 pasaría por arrastre y no probaría nada.
+  PERFORM set_config('request.jwt.claims', '', true);
+
+  -- 38 · `authenticated` no la tiene.
+  ok := false;
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    PERFORM public.conciliar_pago_externo(v_pr);
+  EXCEPTION WHEN insufficient_privilege THEN ok := true; END;
+  RESET ROLE;
+  IF NOT ok THEN
+    RAISE EXCEPTION '38: authenticated pudo conciliar un cobro'; END IF;
+  RAISE NOTICE 'OK 38  conciliar_pago_externo está revocada de authenticated: 42501';
+
+  -- 39 · Ni por la puerta de atrás de una SECURITY DEFINER suya.
+  ok := false;
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    PERFORM public.test_definer_concilia(v_pr);
+  EXCEPTION WHEN insufficient_privilege THEN ok := true; END;
+  RESET ROLE;
+  IF NOT ok THEN
+    RAISE EXCEPTION '39: una DEFINER de authenticated alcanzó la conciliación'; END IF;
+  RAISE NOTICE 'OK 39  ni desde una SECURITY DEFINER: el chequeo de rol efectivo la para';
+END $$;

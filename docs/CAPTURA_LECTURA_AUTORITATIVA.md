@@ -388,9 +388,50 @@ seguro del servidor (30). Una excepción manual, si operación llega a necesitar
 es otra RPC con su permiso, sus límites, su motivo obligatorio y su auditoría; no
 un argumento más de la emisión.
 
+## La conciliación del payfac era un check-then-insert
+
+`confirm-charge`, tras preguntarle al proveedor si el cobro se aprobó, hacía
+cuatro pasos **cada uno en su propia transacción**: un `SELECT` de idempotencia
+por `referencia`, el `INSERT` del pago, el `UPDATE` del ítem y el cierre de la
+solicitud. El retorno del portal y el cron de reconciliación confirman la misma
+solicitud a la vez, así que los cuatro fallos son de todos los días:
+
+| Momento | Qué queda |
+| --- | --- |
+| dos confirmaciones pasan el `SELECT` antes de que ninguna inserte | **dos pagos y doble acreditación** — no había UNIQUE que lo impidiera |
+| rotura entre el `INSERT` y el `UPDATE` | pago escrito, recibo sin acreditar; y el reintento encuentra el pago y sale por «already», así que **nunca** acredita |
+| rotura entre el `UPDATE` y el cierre | la solicitud queda `pending` para siempre |
+| el guard miraba la `referencia`, no la solicitud | dos `payment_requests` con la misma referencia se tapaban entre sí |
+
+`conciliar_pago_externo(p_payment_request_id)` (migración `20260911042839`) hace
+los cuatro pasos en **una** transacción: bloquea la solicitud con `FOR UPDATE`,
+sale si ya está `succeeded`, inserta el pago, bloquea el recibo o la cuota,
+acredita y cierra. **Recibe sólo el id**: el monto, el ítem, el método y la
+referencia salen de la fila bloqueada, así que el edge no tiene dónde mentir. Y
+el orden de bloqueos —solicitud, después ítem— es siempre el mismo, así que dos
+solicitudes distintas del mismo recibo no pueden interbloquearse.
+
+### Dos defensas, y las dos hacen falta
+
+La idempotencia deja de ser una consulta para ser una **restricción**:
+`pagos.payment_request_id` con `UNIQUE`. Una consulta se puede correr dos veces
+a la vez; un índice único, no.
+
+Medido por mutación sobre la invariante 34:
+
+| Mutante | Resultado |
+| --- | --- |
+| sin `FOR UPDATE`, con el conflicto **cortando** | correcto igual — el índice lo sostiene |
+| sin `FOR UPDATE`, con el conflicto **tragado** | **doble acreditación** |
+
+La segunda fila es la lección, y salió de equivocarse: no basta con que el
+`INSERT` no duplique el pago. Al chocar con la llave hay que **salir**, porque
+el choque significa «esto ya se acreditó». Seguir de largo deja el pago sin
+duplicar y el importe sumado dos veces — peor que fallar.
+
 ### Verificación
 
-`supabase/tests/proteger_update_registros/run.sh` — **33 invariantes** contra un
+`supabase/tests/proteger_update_registros/run.sh` — **39 invariantes** contra un
 Postgres real, en `coverage.yml`: el agujero ejercido y cerrado, las 18 columnas
 de la lectura y las 16 del cobro una por una (exigiendo el mensaje del guard, no
 un rechazo cualquiera), el ciclo emitir → pagar → anular con sus números, la
@@ -413,10 +454,18 @@ A esas se suman, por los tres agujeros de arriba:
 - **31-33** — la RPC del payfac: revocada de `authenticated`, cerrada también a
   una `SECURITY DEFINER` suya (el `GRANT` no basta; el chequeo de rol sí), y
   sumando, liquidando y auditando cuando la llama quien debe.
+- **34-39** — la conciliación transaccional: dos confirmaciones **concurrentes**
+  de la misma solicitud dejan un pago y una acreditación; un fallo **provocado**
+  entre el `INSERT` y la acreditación (un trigger de prueba que revienta el
+  `UPDATE` del recibo) revierte todo y el reintento cuadra; dos solicitudes
+  distintas del mismo recibo suman los dos abonos; repetir una ya conciliada es
+  un no-op; y ni `authenticated` ni una `DEFINER` suya la alcanzan.
 
-Las invariantes 26 y 32 están comprobadas **por mutación**: quitar el `FOR
-UPDATE` hace fallar la 26 («se perdió uno»), y quitar el chequeo de rol hace
-fallar la 32. Una prueba que pasa con y sin el arreglo no prueba nada.
+Las invariantes 26, 32 y 34 están comprobadas **por mutación**: quitar el `FOR
+UPDATE` hace fallar la 26 («se perdió uno»), quitar el chequeo de rol hace
+fallar la 32, y tragarse el conflicto de la llave única hace fallar la 34 («la
+segunda confirmación volvió a conciliar»). Una prueba que pasa con y sin el
+arreglo no prueba nada.
 
 `src/__tests__/protegerUpdateRegistros.test.ts` — guards estáticos sobre el SQL:
 la lista de columnas protegidas y las firmas de las RPC, para que nadie les

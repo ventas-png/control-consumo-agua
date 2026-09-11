@@ -1,11 +1,15 @@
 // Tests del HANDLER completo de confirm-charge (P2: camino de dinero sin tests
 // de handler). Mismo harness que create-charge: Deno stubbeado, supabase-js
-// remoto mockeado con el fake compartido, payfacs mockeados; cors y reconcile
-// (planPagoCuota / facturaTransicionaAPagada) corren REALES.
+// remoto mockeado con el fake compartido, payfacs mockeados; cors corre REAL.
 //
-// Foco: ownership del payment_request, idempotencia (estado succeeded y pago
-// existente por provider_ref), y la conciliación de CUOTA — inserta el pago,
-// liquida (o no) según el plan REAL de reconcile.ts y sella payment_requests.
+// Foco: ownership del payment_request, idempotencia, y que la conciliación sea
+// UNA llamada a `conciliar_pago_externo`. Lo que el edge hacía antes —el
+// `SELECT` de idempotencia, el INSERT del pago, el UPDATE del ítem y el cierre
+// de la solicitud, cada uno en su transacción— vive ahora dentro de esa RPC
+// (migración 20260911042839), así que aquí se comprueba lo que le toca al
+// edge: que pregunte al proveedor, que llame a la RPC con el id de la
+// solicitud y NADA más, y que no escriba por su cuenta en `pagos`, en el ítem
+// ni en `payment_requests`.
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { emptyState, type FakeSupabaseState, type FakeWriteCall } from '../../_shared/__tests__/fakeSupabase.ts'
 
@@ -58,7 +62,7 @@ function fixture(state: FakeSupabaseState, overrides: {
   pr?: Record<string, unknown>
   caller?: { company_id?: string | null; cliente_id?: string | null }
   cuota?: Record<string, unknown>
-  pagoExistente?: { id: string } | null
+  conciliar?: { data?: unknown; error?: { message: string } | null }
 } = {}) {
   state.auth = { data: { user: { id: 'user-1' } }, error: null }
   state.byTable.app_users = { data: { company_id: null, cliente_id: 'inq1', ...overrides.caller }, error: null }
@@ -70,21 +74,23 @@ function fixture(state: FakeSupabaseState, overrides: {
     },
     error: null,
   }
+  // Del ítem, el edge sólo necesita ya el `project_id` (override del payfac
+  // por locación): los montos los lee la RPC de la fila bloqueada.
   state.byTable.cuotas_condominio = {
-    data: { project_id: 'pj1', monto: 100, total_a_pagar: 100, deleted_at: null, ...overrides.cuota },
+    data: { project_id: 'pj1', deleted_at: null, ...overrides.cuota },
     error: null,
   }
-  // `pagos` se lee DOS veces: (1) lista de abonos previos, (2) chequeo de
-  // idempotencia por provider_ref (maybeSingle) — cola en ese orden.
-  state.readQueues.pagos = [
-    { data: [], error: null },
-    { data: overrides.pagoExistente ?? null, error: null },
-  ]
   state.byTable.companies = { data: { proveedor_pago: 'sandbox', default_currency: 'GTQ' }, error: null }
   state.byTable.projects = { data: { proveedor_pago: null }, error: null }
   state.byTable.payfac_secrets = { data: [], error: null }
-  state.writes.pagos = { data: { id: 'pago-1' }, error: null }
+  state.rpcs.conciliar_pago_externo = overrides.conciliar ?? {
+    data: { ok: true, ya_conciliado: false, pago_id: 'pago-1', liquidado: true, saldo_restante: 0 },
+    error: null,
+  }
 }
+
+const rpcsConciliar = (state: FakeSupabaseState) =>
+  state.rpcCalls.filter((c) => c.fn === 'conciliar_pago_externo')
 
 const callsDe = (calls: FakeWriteCall[], table: string, op: FakeWriteCall['op']) =>
   calls.filter((c) => c.table === table && c.op === op)
@@ -142,42 +148,68 @@ describe('confirm-charge · idempotencia', () => {
     expect(h.state.calls.length).toBe(0)
   })
 
-  it('pago ya registrado con el mismo provider_ref → already, sin insert duplicado', async () => {
-    fixture(h.state, { pagoExistente: { id: 'pago-previo' } })
+  it('la RPC contesta ya_conciliado → already, y el edge no escribe nada por su cuenta', async () => {
+    // Este es el caso del cron reintentando lo que el retorno del portal ya
+    // concilió. Antes lo resolvía un `SELECT` en el edge, que dos
+    // confirmaciones simultáneas pasaban las dos; ahora lo resuelve la RPC con
+    // la solicitud bloqueada, y el edge se limita a reflejar la respuesta.
+    fixture(h.state, {
+      conciliar: {
+        data: { ok: true, ya_conciliado: true, pago_id: 'pago-previo', liquidado: true, saldo_restante: 0 },
+        error: null,
+      },
+    })
     const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
-    expect(await res.json()).toMatchObject({ ok: true, already: true })
+    expect(await res.json()).toMatchObject({ ok: true, already: true, pago_id: 'pago-previo' })
     expect(callsDe(h.state.calls, 'pagos', 'insert').length).toBe(0)
-    // Solo sella la solicitud como succeeded.
-    expect(callsDe(h.state.calls, 'payment_requests', 'update').length).toBe(1)
+    expect(callsDe(h.state.calls, 'payment_requests', 'update').length).toBe(0)
   })
 })
 
-describe('confirm-charge · conciliación de cuota', () => {
-  it('aprobado + pago total → inserta pago, liquida la cuota y sella la solicitud', async () => {
+describe('confirm-charge · la conciliación es UNA llamada transaccional', () => {
+  it('aprobado → llama a conciliar_pago_externo con SÓLO el id de la solicitud', async () => {
     fixture(h.state)
     const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
     expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body).toMatchObject({ ok: true, estado: 'aprobado', conciliado: true, liquidado: true, saldo_restante: 0 })
+    expect(await res.json()).toMatchObject({
+      ok: true, estado: 'aprobado', conciliado: true, liquidado: true, saldo_restante: 0, pago_id: 'pago-1',
+    })
 
-    const pago = callsDe(h.state.calls, 'pagos', 'insert')[0].payload as Record<string, unknown>
-    // metodo 'sandbox': el provider mockeado es el simulado — el sello C1
-    // garantiza que un pago demo nunca se confunde con tarjeta real.
-    expect(pago).toMatchObject({ cliente_id: 'inq1', cuota_id: 'c1', monto: 100, tipo_aplicacion: 'pago_total', referencia: 'ref-1', metodo: 'sandbox' })
-
-    const cuotaUpd = callsDe(h.state.calls, 'cuotas_condominio', 'update')[0].payload as Record<string, unknown>
-    expect(cuotaUpd).toMatchObject({ cuota_estado: 'pagada', estado: 'pagado', pago_id: 'pago-1' })
-
-    expect(callsDe(h.state.calls, 'payment_requests', 'update')[0].payload).toMatchObject({ estado: 'succeeded' })
+    const llamadas = rpcsConciliar(h.state)
+    expect(llamadas.length).toBe(1)
+    // El id, y nada más: el monto, el ítem, el método y la referencia los lee
+    // la RPC de la fila bloqueada, así que el edge no puede equivocarse ni
+    // mentir sobre ellos.
+    expect(llamadas[0].args).toEqual({ p_payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' })
   })
 
-  it('aprobado + abono parcial → NO liquida la cuota (sin update de cuota)', async () => {
-    fixture(h.state, { pr: { monto: 40 } })
-    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
-    const body = await res.json()
-    expect(body).toMatchObject({ conciliado: true, liquidado: false, saldo_restante: 60 })
-    expect((callsDe(h.state.calls, 'pagos', 'insert')[0].payload as Record<string, unknown>).tipo_aplicacion).toBe('abono')
+  it('el edge ya no inserta pagos, ni toca el ítem, ni sella la solicitud', async () => {
+    fixture(h.state)
+    await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(callsDe(h.state.calls, 'pagos', 'insert').length).toBe(0)
     expect(callsDe(h.state.calls, 'cuotas_condominio', 'update').length).toBe(0)
+    expect(callsDe(h.state.calls, 'registros', 'update').length).toBe(0)
+    expect(callsDe(h.state.calls, 'payment_requests', 'update').length).toBe(0)
+  })
+
+  it('abono parcial: el saldo que informa es el que devuelve la RPC, no uno calculado aquí', async () => {
+    fixture(h.state, {
+      pr: { monto: 40 },
+      conciliar: {
+        data: { ok: true, ya_conciliado: false, pago_id: 'pago-1', liquidado: false, saldo_restante: 60 },
+        error: null,
+      },
+    })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(await res.json()).toMatchObject({ conciliado: true, liquidado: false, saldo_restante: 60 })
+  })
+
+  it('si la RPC falla, revirtió entera: 500 y nada escrito', async () => {
+    fixture(h.state, { conciliar: { data: null, error: { message: 'recibo no encontrado' } } })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(500)
+    expect(await res.json()).toMatchObject({ ok: false, estado: 'error' })
+    expect(callsDe(h.state.calls, 'payment_requests', 'update').length).toBe(0)
   })
 
   it('provider NO aprobado → refleja estado sin conciliar', async () => {
@@ -185,7 +217,7 @@ describe('confirm-charge · conciliación de cuota', () => {
     h.consulta = { ok: true, estado: 'pendiente' }
     const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
     expect(await res.json()).toMatchObject({ ok: true, estado: 'pendiente', conciliado: false })
-    expect(callsDe(h.state.calls, 'pagos', 'insert').length).toBe(0)
+    expect(rpcsConciliar(h.state).length).toBe(0)
     expect(callsDe(h.state.calls, 'payment_requests', 'update')[0].payload).toMatchObject({ estado: 'pending' })
   })
 })
