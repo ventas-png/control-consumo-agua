@@ -1,26 +1,33 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20260910235732: el `UPDATE` de `registros` deja de
-# ser una puerta abierta al importe.
+# Verificación EJECUTABLE de 20260911201500: el webhook de Stripe ACREDITA el
+# recibo, y «lo vi» deja de valer por «lo terminé».
 #
 # POR QUÉ EXISTE
-# 20260910000200 movió al servidor la CREACIÓN de la lectura, pero su trigger es
-# BEFORE **INSERT**. La policy `registros_update` autoriza por FILA, no mira ni
-# una columna y no tiene `WITH CHECK`, así que lo que no se podía escribir al
-# crear se podía escribir un milisegundo después con un PATCH. Esto NO se ve
-# leyendo el SQL: hay que ejercerlo.
+# El handler insertaba la fila de `pagos` a mano y marcaba la solicitud
+# `succeeded`. Ahí se paraba: no tocaba `monto_pagado`, `estado` ni
+# `factura_estado`. Un cobro con tarjeta quedaba registrado y el recibo seguía
+# debiendo el total.
 #
-# Por eso la prueba empieza DEMOSTRANDO el agujero: desactiva el trigger nuevo,
-# hace el PATCH COMO `authenticated` con la RLS puesta, y comprueba que la fila
-# queda en consumo 0, monto 0, "pagado" con 999999 abonados y en otro proyecto.
-# Después lo reactiva y comprueba que el mismo PATCH se rechaza. Si algún día el
-# agujero dejara de reproducirse, la invariante 1 falla y avisa de que la
-# demostración —y con ella el motivo de esta migración— ya no aplica.
+# El segundo agujero es peor. El evento se reclamaba ANTES de procesarlo y
+# cualquier duplicado recibía `200 already_processed`, aunque el intento previo
+# hubiera muerto a medias. Stripe reintenta ante cualquier respuesta que no sea
+# 2xx, así que un 200 significa «no me lo traigas más» — y esa frase sólo es
+# verdad cuando el evento se procesó ENTERO. Un 200 prematuro es la forma de
+# perder un cobro sin que salte nada.
 #
-# QUÉ COMPRUEBA (12 invariantes)
+# Nada de esto se ve leyendo el SQL: hay que ejercerlo contra un Postgres real,
+# con dos conexiones de verdad y con el fallo inyectado ENTRE el reclamo y la
+# acreditación.
+#
+# QUÉ COMPRUEBA (14 invariantes)
 #   1-4   el reclamo del evento: se reclama una vez, el COMPLETADO no se
 #         re-reclama nunca, el FALLIDO sí de inmediato, y el `procesando`
 #         rancio también (una invocación que murió sin cerrar)
+#   4b    `completado` SIN `processed_at` no cuenta como terminado: son dos
+#         columnas y pueden divergir; sin la constancia, se reintenta
+#   4c    cerrar un evento inexistente FALLA en vez de callar (si el sello no
+#         se escribe, la respuesta no puede ser 200)
 #   5     DOS entregas simultáneas del mismo evento: una sola lo reclama
 #   6     el camino feliz: el pago queda `aplicado` Y con verified_by
 #   7     un fallo entre el reclamo y la acreditación deja el evento FALLIDO,
