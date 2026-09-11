@@ -3,10 +3,9 @@
 // componentes hacia la capa domain.
 // P2 tipos: los writes a `registros` van por el cliente TIPADO `db`; `supabase`
 // queda solo para Storage (los buckets no están en el esquema generado).
-import { db, supabase } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { softDelete } from '../../lib/softDelete'
 import type { GPS, Registro } from '../../types'
-import type { TablesUpdate } from '../../types/database.types'
 
 /**
  * Sube la foto de un registro al bucket `registro-fotos` (path bare; el display
@@ -104,18 +103,53 @@ export async function registrarLectura(
 }
 
 /**
- * Actualiza un registro por id (payload ya armado por la UI: monto_pagado, estado,
- * fecha_pago, factura_estado…). La lógica de negocio (saldos, transición de
- * Factura) se queda en la UI; aquí solo baja la escritura. Usado por el flujo de
- * cobros (aplicar/verificar pago).
+ * Los únicos estados de seguimiento que se pueden fijar a mano. `'pagado'` no
+ * está, y no es un olvido: ver `cambiarEstadoRegistro`.
  */
-export async function updateRegistro(
+export type EstadoSeguimiento = 'pendiente' | 'mora'
+
+/**
+ * Cambia el estado de SEGUIMIENTO de una lectura ('pendiente' | 'mora').
+ *
+ * Antes era un `UPDATE` de una columna y aceptaba también 'pagado': un recibo
+ * marcado como cobrado sin monto, sin fecha y sin rastro — el hallazgo
+ * `pagada_sin_pago` del reporte de 20260910000300, y la vía por la que se
+ * fabricaba. Marcar pagado pasa a ser competencia de `registrarPagoRegistro`,
+ * que exige un monto; el servidor rechaza 'pagado' por esta puerta.
+ */
+export async function cambiarEstadoRegistro(
   id: string,
-  payload: Record<string, unknown>,
+  estado: EstadoSeguimiento,
 ): Promise<{ error: string | null }> {
-  // El parche lo arma la UI como objeto libre; el contrato real es el del esquema.
-  const { error } = await db.from('registros').update(payload as TablesUpdate<'registros'>).eq('id', id)
+  // `supabase` y no `db`: los tipos se generan contra producción, donde estas
+  // RPC todavía no existen. Es el mismo camino que usa registrarLectura().
+  const { error } = await supabase.rpc('agua_registro_cambiar_estado', {
+    p_registro_id: id,
+    p_estado: estado,
+  })
   return { error: error?.message ?? null }
+}
+
+/**
+ * Registra un pago o abono sobre una lectura y devuelve la fila resultante.
+ *
+ * El único dato que viaja es el MONTO. El abonado acumulado, si liquida, la fecha
+ * de pago (en la zona del tenant) y la transición de la factura los resuelve
+ * `agua_factura_registrar_pago`. Calcularlo en el navegador es lo que permitía
+ * mandar `monto_pagado: 999999` y `estado: 'pagado'` con un PATCH.
+ */
+export async function registrarPagoRegistro(
+  id: string,
+  monto: number,
+  fechaPago?: string | null,
+): Promise<{ data: Registro | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('agua_factura_registrar_pago', {
+    p_registro_id: id,
+    p_monto: monto,
+    p_fecha_pago: fechaPago ?? null,
+  })
+  const fila = (Array.isArray(data) ? data[0] : data) as Registro | null
+  return { data: fila ?? null, error: error?.message ?? null }
 }
 
 /**
@@ -135,8 +169,13 @@ export async function deleteRegistro(
 /**
  * Marca un conjunto de registros como 'mora' (para seguimiento del cobrador).
  * Usado al marcar mora en lote y al crear un convenio.
+ *
+ * Por la RPC, no por un `UPDATE ... IN (ids)`: el alcance se comprueba POR FILA
+ * en el servidor y cada marca deja su rastro en `security_logs`. Un lote no es
+ * una excusa para saltarse el permiso de una de ellas.
  */
 export async function marcarRegistrosMora(ids: string[]): Promise<{ error: string | null }> {
-  const { error } = await db.from('registros').update({ estado: 'mora' }).in('id', ids)
+  if (ids.length === 0) return { error: null }
+  const { error } = await supabase.rpc('agua_registro_marcar_mora', { p_registro_ids: ids })
   return { error: error?.message ?? null }
 }

@@ -227,3 +227,107 @@ dinero:
 
 A producción llegan por `apply-migrations-prod.yml` con el push a `main`, como
 cualquier otra migración.
+
+
+## El otro lado de la puerta: el `UPDATE`
+
+> Migración `20260910235732_proteger_update_registros_y_cobro_autoritativo.sql`.
+
+`20260910000200` cerró la CREACIÓN de la lectura, pero su trigger es BEFORE
+**INSERT**. La policy `registros_update` autoriza por FILA y no mira ni una
+columna, así que lo que no se podía escribir al crear se podía escribir un
+milisegundo después:
+
+```
+PATCH /rest/v1/registros?id=eq.<uuid>
+{ "monto_calculado": 0, "consumo": 0, "estado": "pagado",
+  "monto_pagado": 999999, "factura_estado": "pagada" }
+```
+
+Y no es una hipótesis: `supabase/tests/proteger_update_registros/` **desactiva el
+trigger nuevo, hace ese PATCH como `authenticated` con la RLS puesta y comprueba
+que entra**; después lo reactiva y comprueba que deja de entrar. Si algún día el
+agujero dejara de reproducirse, la invariante 1 falla y avisa.
+
+### Qué paraba ya la RLS, y qué no
+
+Conviene ser exacto. `registros_update` no declara `WITH CHECK`; cuando falta,
+Postgres reutiliza el `USING` sobre la fila nueva, y además aplica la policy de
+SELECT al resultado. Entre las dos, **`project_id` no se puede mover a un
+proyecto que la cuenta no vea**. Eso es todo lo que paraban: dentro del alcance
+que la cuenta ya tiene, la lectura entera se reescribía —incluido el `contador_id`,
+que reasigna la lectura al medidor de otra unidad y otro cliente— y el cobro se
+fabricaba entero.
+
+### Las tres clases de columna
+
+| Clase | Columnas | Quién puede |
+| --- | --- | --- |
+| **Inmutables** | contador, proyecto, cliente, fecha, lecturas, consumo, tarifas, canon, importe, tipo de cobro, secuencia, llave de idempotencia, origen, reset, mes, creación | **Nadie** por `UPDATE`. Para corregir una lectura se anula y se vuelve a capturar: eso deja rastro |
+| **De cobro** | estado, factura_estado, abonado, fecha de pago, vencimiento, IVA, totales, mora, sellos de emisión/pago/anulación | Sólo con la llave `agua.cobro_autoritativo`, que encienden las RPC de abajo |
+| **Libres** | notas, foto, gps, borrado lógico | `UPDATE` normal: no fabrican un cobro |
+
+El trigger es **SECURITY INVOKER** a propósito, y la primera versión no lo era:
+dentro de una función DEFINER `current_user` es el DUEÑO, así que la lista de
+roles exentos se cumplía siempre y el guard no paraba nada. Lo cazó la
+invariante 2. (El mismo detalle hace que la comprobación `current_user =
+'service_role'` de `20260910000200` sea inalcanzable; allí la exención funciona
+por el claim del JWT, que es lo que manda Supabase.)
+
+La exención es una **allowlist cerrada** —`service_role`, `postgres`,
+`supabase_admin`—, así que un rol nuevo nace protegido. Lo que queda fuera está
+enumerado en la cabecera de la migración: timbrado fiscal, purga de fotos, cron
+de mora y de cierre de ciclo, y los backfills.
+
+### El camino autorizado
+
+Una RPC por transición real, todas con permiso explícito y **auditoría** en
+`security_logs`:
+
+| RPC | Permiso | Qué calcula el servidor |
+| --- | --- | --- |
+| `agua_factura_emitir` | `agua.cobros.change_status` | tasa de IVA (de `companies`), días de vencimiento (regla de mora activa), IVA, total |
+| `agua_factura_anular` | `agua.cobros.change_status` | la transición y su sello |
+| `agua_factura_registrar_pago` | `agua.cobros.create` | abonado acumulado, si liquida, fecha de pago (zona del tenant) y la transición de la factura |
+| `agua_registro_marcar_mora` | `agua.cobros.change_status` | el alcance se comprueba **por fila**, no por lote |
+| `agua_registro_cambiar_estado` | `agua.lecturas.change_status` | sólo `pendiente` \| `mora` |
+
+**`'pagado'` a mano se rechaza.** El modal de Historial lo ofrecía y era un
+`UPDATE` de una columna: un recibo cobrado sin monto, sin fecha y sin rastro —el
+hallazgo `pagada_sin_pago` del reporte, y la vía por la que se producía. Ahora se
+cobra registrando el pago, que exige el monto.
+
+La auditoría entra por `agua_cobro_auditar`, que es SECURITY DEFINER porque
+`authenticated` dejó de escribir en `security_logs` (20260910000001) —con razón:
+un log en el que cualquiera escribe no es un log—. No lo reabre: exige la llave
+de capacidad, así que llamarla suelta desde la API no escribe nada.
+
+### El reporte dejaba ver el proyecto entero
+
+`agua_lecturas_inconsistencias` es SECURITY DEFINER y autorizaba con
+`company_id` + `can_access_project`. Ninguna de las dos mira si la cuenta tiene
+permiso de LECTURA sobre agua. Una cuenta de campo asignada al proyecto —con
+`agua.lecturas.create` como único permiso, que no puede leer ni una fila de
+`registros`— recibía el informe completo del condominio: consumos, importes,
+nombres de cliente y quién debe. Un residente también.
+
+Ahora exige lo mismo que la rama interna de `registros_select`: uno de los cinco
+permisos de lectura de agua, empresa resuelta, proyecto de esa empresa y acceso
+al proyecto; y el rol `cliente` queda fuera explícitamente. Sigue siendo
+SECURITY DEFINER porque cruza `contadores`, `tarifas` y `companies` para
+recalcular: con los privilegios del invocante el informe saldría a medias y en
+silencio, que en un artefacto de auditoría es peor que no salir.
+
+### Verificación
+
+`supabase/tests/proteger_update_registros/run.sh` — **22 invariantes** contra un
+Postgres real, en `coverage.yml`: el agujero ejercido y cerrado, las 18 columnas
+de la lectura y las 16 del cobro una por una (exigiendo el mensaje del guard, no
+un rechazo cualquiera), el ciclo emitir → pagar → anular con sus números, la
+mora, el `'pagado'` rechazado, la auditoría, la cuenta sin permiso, el otro
+tenant, la ACL, la excepción de `service_role`, los cuatro perfiles contra el
+reporte, y el camino completo ejercido COMO `authenticated`.
+
+`src/__tests__/protegerUpdateRegistros.test.ts` — guards estáticos sobre el SQL:
+la lista de columnas protegidas y las firmas de las RPC, para que nadie les
+agregue el parámetro que las vaciaría de sentido.

@@ -442,6 +442,16 @@ jobs:
           PGPORT_TEST: 55495
         run: supabase/tests/registrar_lectura/run.sh
 
+      # El otro lado de la misma puerta: la lectura no se crea con el importe
+      # puesto, pero se podía REESCRIBIR con un PATCH. La prueba empieza
+      # DEMOSTRANDO el agujero (desactiva el trigger nuevo y lo ejerce como
+      # `authenticated`) y sigue con el camino autorizado de cobro.
+      - name: UPDATE de registros — el PATCH ya no fabrica un cobro
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55496
+        run: supabase/tests/proteger_update_registros/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

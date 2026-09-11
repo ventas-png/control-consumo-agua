@@ -2,25 +2,34 @@
 //
 // Orquesta las transiciones de la máquina de estados de la Factura (emitir /
 // anular / registrar pago) y la configuración de facturación del tenant (tasa de
-// IVA por defecto + CRUD de reglas de mora). La FUENTE DE VERDAD de la máquina de
-// estados y de los cálculos (IVA/mora/total) es `src/lib/business.ts` (puro): aquí
-// solo validamos con esas funciones, construimos el parche a persistir y, tras el
-// write, invalidamos las query keys de facturación. NO se duplica la lógica.
+// IVA por defecto + CRUD de reglas de mora).
+//
+// LA FUENTE DE VERDAD DE LA TRANSICIÓN Y DEL IMPORTE ES EL SERVIDOR. Hasta
+// 20260910235732 estas mutaciones construían el parche aquí —estado, snapshot de
+// IVA, total, vencimiento, abonado— y lo mandaban como un `UPDATE` a `registros`.
+// Eso hacía del navegador el autor del cobro: bastaba un PATCH con
+// `total_a_pagar: 0` o `monto_pagado: 999999` para fabricar un recibo, porque la
+// policy `registros_update` autoriza por FILA y no mira ni una columna. Ahora cada
+// transición es una RPC (`agua_factura_emitir` / `_anular` / `_registrar_pago`)
+// que valida el permiso, calcula el importe y deja rastro en `security_logs`; el
+// `UPDATE` directo de esas columnas lo rechaza un trigger.
+//
+// Lo que queda aquí es lo que sigue siendo del cliente: el GATE de la UI (que la
+// acción no se ofrezca cuando la transición no aplica, vía `business.ts`) y la
+// invalidación de las query keys. La validación de la UI no es la autorización:
+// es cortesía, y el servidor la repite.
 //
 // La Factura no es una tabla nueva: son columnas de estado/IVA/mora sobre
-// `registros` (migración 20260604160000). Por eso los writes apuntan a `registros`
-// y las invalidaciones tocan las keys de `useFacturasQuery`/`useFacturasPorProyectoQuery`.
+// `registros` (migración 20260604160000). Por eso las invalidaciones tocan las
+// keys de `useFacturasQuery`/`useFacturasPorProyectoQuery`.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { db } from '../../lib/supabase'
-import type { TablesUpdate } from '../../types/database.types'
+import { db, supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { facturacionKeys } from './keys'
 import type { ReglaMoraConfig } from './queries'
 import {
-  aplicarTransicionFactura,
   puedeTransicionarFactura,
-  calcularTotalFactura,
   type AccionFactura,
 } from '../../lib/business'
 
@@ -37,17 +46,6 @@ export interface FacturaTransicionInput {
   monto_calculado?: number | null
   /** Recargo de mora ya calculado por el cron/regla (0 si no aplica). */
   mora_monto?: number | null
-}
-
-/** Parche que la mutación de emitir persiste sobre `registros`. */
-export interface EmitirFacturaPatch {
-  factura_estado: string
-  emitida_at: string
-  fecha_vencimiento: string
-  iva_tasa: number
-  iva_monto: number
-  monto_con_iva: number
-  total_a_pagar: number
 }
 
 /**
@@ -67,54 +65,6 @@ export function particionarEmitibles<T extends { factura_estado?: string | null 
     else omitidas.push(f)
   }
   return { emitibles, omitidas }
-}
-
-/**
- * Suma `dias` días a una fecha base ISO y devuelve la fecha (YYYY-MM-DD).
- * Defensa: una base no parseable cae a "ahora". Días no finitos → 0.
- */
-export function calcularFechaVencimiento(baseISO: string, dias: number): string {
-  const base = new Date(baseISO)
-  const ms = Number.isNaN(base.getTime()) ? Date.now() : base.getTime()
-  const d = Number.isFinite(dias) ? Math.trunc(dias) : 0
-  const venc = new Date(ms + d * 86_400_000)
-  return venc.toISOString().slice(0, 10)
-}
-
-/**
- * Construye el parche de EMITIR: valida la transición vía business.ts, calcula el
- * snapshot de IVA/total con `calcularTotalFactura` (mismo cálculo que persiste la
- * migración) y fija `fecha_vencimiento = emisión + diasVencimiento`.
- *
- * @param ivaTasa           Tasa del tenant (companies.iva_tasa_default). null → default GT.
- * @param diasVencimiento   Días tras la emisión para el vencimiento (de la regla de mora).
- * @param ahora             ISO de emisión (parametrizado para tests deterministas).
- *
- * Lanza si la transición es inválida (mismo contrato que aplicarTransicionFactura).
- */
-export function buildEmitirFacturaPatch(
-  factura: FacturaTransicionInput,
-  ivaTasa?: number | null,
-  diasVencimiento = 30,
-  ahora: string = new Date().toISOString(),
-): EmitirFacturaPatch {
-  // 1. Validar + obtener timestamp de la transición (lanza si es inválida).
-  const transicion = aplicarTransicionFactura(factura.factura_estado, 'emitir', ahora)
-  // 2. Snapshot de IVA/total (mora ya calculada, 0 al emitir salvo que venga dada).
-  const subtotal = Number.isFinite(factura.monto_calculado as number)
-    ? (factura.monto_calculado as number)
-    : 0
-  const mora = Number.isFinite(factura.mora_monto as number) ? (factura.mora_monto as number) : 0
-  const desglose = calcularTotalFactura(subtotal, ivaTasa, mora)
-  return {
-    factura_estado: transicion.factura_estado,
-    emitida_at: transicion.emitida_at!,
-    fecha_vencimiento: calcularFechaVencimiento(ahora, diasVencimiento),
-    iva_tasa: desglose.iva_tasa,
-    iva_monto: desglose.iva_monto,
-    monto_con_iva: desglose.monto_con_iva,
-    total_a_pagar: desglose.total_a_pagar,
-  }
 }
 
 /** Error de transición lanzado ANTES de tocar la red (gating de UI defensivo). */
@@ -147,24 +97,29 @@ function useInvalidarFacturacion(companyId?: string) {
 // ────────────────────────────────────────────────────────────────────────────
 export interface EmitirFacturaVars {
   factura: FacturaTransicionInput
-  /** Tasa de IVA del tenant (companies.iva_tasa_default). */
-  ivaTasa?: number | null
-  /** Días de vencimiento (de la regla de mora aplicable). Default 30. */
+  /**
+   * Días de vencimiento. OPCIONAL y, cuando no se manda, lo resuelve el servidor
+   * desde la regla de mora activa del proyecto (?? 30). La tasa de IVA ya no
+   * viaja: la lee el servidor de `companies.iva_tasa_default`, porque un cliente
+   * que elige su propia tasa elige su propio impuesto.
+   */
   diasVencimiento?: number
 }
 
 export function useEmitirFacturaMutation(companyId?: string) {
   const invalidar = useInvalidarFacturacion(companyId)
   return useMutation({
-    mutationFn: async ({ factura, ivaTasa, diasVencimiento = 30 }: EmitirFacturaVars) => {
-      // Gate defensivo: la UI ya oculta la acción, pero validamos antes del write.
+    mutationFn: async ({ factura, diasVencimiento }: EmitirFacturaVars) => {
+      // Gate de UI: la acción ya está oculta cuando no aplica; esto evita el
+      // viaje. La autorización y la máquina de estados las repite el servidor.
       const check = puedeTransicionarFactura(factura.factura_estado, 'emitir')
       if (!check.ok) throw new TransicionInvalidaError(factura.factura_estado, 'emitir', check.error)
-      const patch = buildEmitirFacturaPatch(factura, ivaTasa, diasVencimiento)
-      await runQuery((signal) =>
-        db.from('registros').update(patch).eq('id', factura.id).abortSignal(signal),
-      )
-      return patch
+      const { data, error } = await supabase.rpc('agua_factura_emitir', {
+        p_registro_id: factura.id,
+        p_dias_vencimiento: diasVencimiento ?? null,
+      })
+      if (error) throw new Error(error.message)
+      return data
     },
     onSuccess: (_data, vars) => {
       // Funnel de monetización (PostHog). Solo ids/flags, sin PII.
@@ -225,15 +180,15 @@ export interface AnularFacturaVars {
 export function useAnularFacturaMutation(companyId?: string) {
   const invalidar = useInvalidarFacturacion(companyId)
   return useMutation({
-    mutationFn: async ({ factura }: AnularFacturaVars) => {
+    mutationFn: async ({ factura, motivo }: AnularFacturaVars) => {
       const check = puedeTransicionarFactura(factura.factura_estado, 'anular')
       if (!check.ok) throw new TransicionInvalidaError(factura.factura_estado, 'anular', check.error)
-      // Parche = estado + anulada_at (business.ts es la fuente del timestamp).
-      const patch = aplicarTransicionFactura(factura.factura_estado, 'anular')
-      await runQuery((signal) =>
-        db.from('registros').update(patch).eq('id', factura.id).abortSignal(signal),
-      )
-      return patch
+      const { data, error } = await supabase.rpc('agua_factura_anular', {
+        p_registro_id: factura.id,
+        p_motivo: motivo ?? null,
+      })
+      if (error) throw new Error(error.message)
+      return data
     },
     onSuccess: invalidar,
   })
@@ -245,12 +200,10 @@ export function useAnularFacturaMutation(companyId?: string) {
 // ────────────────────────────────────────────────────────────────────────────
 export interface RegistrarPagoFacturaVars {
   factura: FacturaTransicionInput
-  /** Monto del pago/abono a registrar. */
+  /** Monto del pago/abono a registrar. Es el ÚNICO número que viaja. */
   monto: number
-  /** Abonado previo (registros.monto_pagado). Default 0. */
-  abonadoPrevio?: number
-  /** Total a cobrar (registros.total_a_pagar ?? monto_calculado). */
-  totalACobrar: number
+  /** Fecha del pago (YYYY-MM-DD). Sin ella, la pone el servidor en la zona del tenant. */
+  fechaPago?: string | null
 }
 
 /** Resultado de registrar un pago: si liquidó la factura y el nuevo abonado. */
@@ -261,40 +214,38 @@ export interface RegistrarPagoResult {
   factura_estado: string | null
 }
 
+/**
+ * Registra un pago o abono. El abonado resultante, si liquida, la fecha de pago y
+ * la transición de la Factura los decide `agua_factura_registrar_pago`: aquí ya no
+ * se calcula el saldo, porque calcularlo en el cliente era justo lo que permitía
+ * mandar `monto_pagado` inventado y `factura_estado: 'pagada'` sin que existiera
+ * un pago. El servidor además rechaza montos <= 0 y los que exceden el saldo.
+ */
 export function useRegistrarPagoFacturaMutation(companyId?: string) {
   const invalidar = useInvalidarFacturacion(companyId)
   return useMutation({
     mutationFn: async ({
       factura,
       monto,
-      abonadoPrevio = 0,
-      totalACobrar,
+      fechaPago,
     }: RegistrarPagoFacturaVars): Promise<RegistrarPagoResult> => {
-      // Solo se puede pagar una factura que esté emitida o vencida.
+      // Gate de UI: sólo se cobra una factura emitida o vencida.
       const check = puedeTransicionarFactura(factura.factura_estado, 'pagar')
       if (!check.ok) throw new TransicionInvalidaError(factura.factura_estado, 'pagar', check.error)
 
-      const pago = Number.isFinite(monto) && monto > 0 ? monto : 0
-      const previo = Number.isFinite(abonadoPrevio) && abonadoPrevio > 0 ? abonadoPrevio : 0
-      const nuevoAbonado = previo + pago
-      const liquidada = nuevoAbonado >= totalACobrar
-
-      // El estado solo transiciona si el pago liquida el total; un abono parcial
-      // deja la factura en su estado actual (emitida/vencida) con más abonado.
-      // El parche se tipa contra el esquema generado (P2 tipos).
-      const patch: TablesUpdate<'registros'> = { monto_pagado: nuevoAbonado }
-      if (liquidada) {
-        const transicion = aplicarTransicionFactura(factura.factura_estado, 'pagar')
-        patch.factura_estado = transicion.factura_estado
-        patch.pagada_at = transicion.pagada_at
-      }
-      await runQuery((signal) =>
-        db.from('registros').update(patch).eq('id', factura.id).abortSignal(signal),
-      )
+      const { data, error } = await supabase.rpc('agua_factura_registrar_pago', {
+        p_registro_id: factura.id,
+        p_monto: monto,
+        p_fecha_pago: fechaPago ?? null,
+      })
+      if (error) throw new Error(error.message)
+      const fila = (Array.isArray(data) ? data[0] : data) as
+        | { monto_pagado?: number | null; factura_estado?: string | null }
+        | null
       return {
-        liquidada,
-        nuevoAbonado,
-        factura_estado: liquidada ? (patch.factura_estado as string) : (factura.factura_estado ?? null),
+        liquidada: fila?.factura_estado === 'pagada',
+        nuevoAbonado: Number(fila?.monto_pagado ?? 0),
+        factura_estado: fila?.factura_estado ?? null,
       }
     },
     onSuccess: (data, vars) => {
