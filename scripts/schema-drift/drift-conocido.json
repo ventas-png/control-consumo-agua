@@ -18,12 +18,6 @@
       "produccion": "f7f0f6e079714564b753c8d9ec785a3744a516e4b1a79326979c816e886948de:1",
       "repo": "302fdca5af4f21de21a1f36712b3ecc3dcdca949647aaac0de19b77ec36fa36f:1"
     },
-    "funcion:buscar_cliente_para_onboarding(p_cui_dui text, p_fecha_nac date, p_email text)/grants": {
-      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
-      "desde": "2026-09-01",
-      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
-      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
-    },
     "funcion:calcular_cumplimiento_calidad(p_tipo_agua text, p_parametros jsonb)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
@@ -42,12 +36,6 @@
       "produccion": "ccbd27453c6df8a6d6b7a366229fba5d18370c9e99494d2874a3ea5168ab986b:1",
       "repo": "80a617746978a3fa2168975f1ae6691ba41d653793afc0a5d5ae214d0e43e281:1"
     },
-    "funcion:create_default_conversation_access_rules(p_company_id uuid)/grants": {
-      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
-      "desde": "2026-09-01",
-      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
-      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
-    },
     "funcion:dispatch_scheduled_reports(p_schedule_kind text)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
@@ -65,18 +53,6 @@
       "desde": "2026-09-01",
       "produccion": "1a9a88605d24d7d1d216a34ae9463fba996820acfd8b00d062e23561268acb0b:1",
       "repo": "382d2bd78c1381d2ec7227d9c599557a1b621db71c47362868ca5d9db6a15c13:1"
-    },
-    "funcion:fill_company_id_from_user()/grants": {
-      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
-      "desde": "2026-09-01",
-      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
-      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
-    },
-    "funcion:fn_set_recipient_company_id()/grants": {
-      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
-      "desde": "2026-09-01",
-      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
-      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
     },
     "funcion:generar_ocurrencias_rutas(p_dias_adelante integer)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
@@ -168,12 +144,6 @@
       "produccion": "ff24afbacb3de16e71c98bd75f80b85ecf00e79333f61246deca8485a470f9b4:1",
       "repo": "8cf93787e474a476e0b5a6449a2cc46f03b61f037261f527e6bed89d73009d0c:1"
     },
-    "funcion:migrate_custom_auth_to_supabase_unconfirmed()/grants": {
-      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
-      "desde": "2026-09-01",
-      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
-      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
-    },
     "funcion:notification_channel_enabled(p_user_id uuid, p_channel text)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
@@ -227,12 +197,6 @@
       "desde": "2026-09-01",
       "produccion": "a8e92d8b7d268e537ebdbd16b16ced6d3af8962fb80b8db48a684870d154e79d:1",
       "repo": "5f43a5b3312f9453d09244d9fab57d8216594515d1f699536476cd246928dad1:1"
-    },
-    "funcion:set_updated_at()/grants": {
-      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
-      "desde": "2026-09-01",
-      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
-      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
     },
     "funcion:sync_contador_project_from_unidad()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
