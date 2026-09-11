@@ -17,7 +17,7 @@
 # agujero dejara de reproducirse, la invariante 1 falla y avisa de que la
 # demostración —y con ella el motivo de esta migración— ya no aplica.
 #
-# QUÉ COMPRUEBA (22 invariantes)
+# QUÉ COMPRUEBA (33 invariantes)
 #    1-2   el agujero ejercido, y cerrado
 #    3-6   el guard por grupos: 18 columnas de la lectura y 16 del cobro son
 #          inmutables por UPDATE; notas, foto, gps y el borrado lógico no
@@ -30,6 +30,19 @@
 #   17-21  el reporte: la cuenta de campo y el residente NO lo ven aunque pasen
 #          el predicado viejo; con permiso se ven sólo los proyectos permitidos
 #    22    emitir y cobrar ejercido COMO `authenticated`
+#   23-25  la exención de `postgres` cerrada: una función SECURITY DEFINER
+#          invocable por `authenticated` NO puede fabricar el cobro, y la
+#          capacidad por función (ALTER FUNCTION … SET) sí deja pasar a los dos
+#          caminos de sistema enumerados — y sólo a ellos
+#   26-27  CONCURRENCIA REAL con dos conexiones: dos abonos sobre la misma
+#          factura se serializan, se contabilizan los dos y no se pasan del
+#          saldo; y dos emisiones simultáneas no emiten dos veces
+#   28-30  las carreras pagar/anular, pagar/mora y el estado a mano sobre una
+#          factura ya pagada
+#   31-33  la ÚNICA excepción de rol que queda —`service_role`, para acreditar
+#          lo que el payfac ya cobró—: revocada de `authenticated`, cerrada
+#          también a una SECURITY DEFINER suya, y sumando bien cuando es quien
+#          debe quien la llama
 #
 # USO
 #   supabase/tests/proteger_update_registros/run.sh
@@ -44,6 +57,7 @@ MIG_DIR="$RAIZ/supabase/migrations"
 MIG_RPC="$MIG_DIR/20260910000200_registrar_lectura_autoritativa.sql"
 MIG_REP="$MIG_DIR/20260910000300_reporte_inconsistencias_lecturas.sql"
 MIG_UPD="$MIG_DIR/20260910235732_proteger_update_registros_y_cobro_autoritativo.sql"
+MIG_SER="$MIG_DIR/20260911031701_cerrar_exencion_definer_y_serializar_cobro.sql"
 # El padrón de agua es el del otro harness: una sola fuente de verdad.
 FIXTURE="$RAIZ/supabase/tests/registrar_lectura/fixture.sql"
 
@@ -83,6 +97,10 @@ psql -q -d registros -c "
   CREATE ROLE authenticated;
   CREATE ROLE service_role BYPASSRLS;
 " >/dev/null
+# La invariante de concurrencia necesita una SEGUNDA conexión de verdad: dos
+# abonos que se pisan no se reproducen dentro de una sola sesión.
+psql -q -d registros -c "CREATE EXTENSION IF NOT EXISTS dblink SCHEMA public" >/dev/null || {
+  echo "❌ falta el módulo dblink: la invariante de concurrencia no se puede ejercer"; exit 1; }
 
 aplicar() {
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d registros -f "$1" >/dev/null
@@ -101,13 +119,15 @@ psql -q -d registros -c "
 " >/dev/null
 echo "  OK    2 empresas · 3 proyectos · 7 cuentas · 7 contadores · IVA 12% · mora a 15 días"
 
-echo "── 2/3 · las tres migraciones, aplicadas DOS veces (idempotentes) ──────"
-for _ in 1 2; do aplicar "$MIG_RPC"; aplicar "$MIG_REP"; aplicar "$MIG_UPD"; done
+echo "── 2/3 · las cuatro migraciones, aplicadas DOS veces (idempotentes) ────"
+for _ in 1 2; do aplicar "$MIG_RPC"; aplicar "$MIG_REP"; aplicar "$MIG_UPD"; aplicar "$MIG_SER"; done
 echo "  OK    re-aplicar no falla"
 
 echo "── 3/3 · invariantes ───────────────────────────────────────────────────"
 CODIGO=0
-SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d registros -f "$AQUI/assert.sql" 2>&1) || CODIGO=$?
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d registros \
+  -v conn="dbname=registros host=$SOCK port=$PUERTO user=postgres" \
+  -f "$AQUI/assert.sql" 2>&1) || CODIGO=$?
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 
 if [ "$CODIGO" -ne 0 ]; then
@@ -118,4 +138,4 @@ if [ "$CODIGO" -ne 0 ]; then
 fi
 
 echo
-echo "✅ el UPDATE ya no fabrica un cobro: la lectura es inmutable, el cobro pasa por su RPC con permiso y auditoría, y el reporte exige permiso de lectura."
+echo "✅ el UPDATE ya no fabrica un cobro: ninguna SECURITY DEFINER lo elude, las transiciones financieras se serializan por registro, y el reporte exige permiso de lectura."

@@ -98,3 +98,106 @@ INSERT INTO public.test_permisos (user_id, permiso) VALUES
 -- `agua.lecturas.create` como ÚNICO permiso. Es la cuenta de campo que no
 -- puede leer ni una fila de `registros` — y a la que el reporte le enseñaba
 -- el condominio completo.
+
+-- ── Los dos caminos de sistema que reciben la llave POR FUNCIÓN ─────────────
+-- 20260911031701 hace `ALTER FUNCTION … SET "agua.cobro_autoritativo" = 'on'`
+-- sobre `agua_cerrar_ciclo_nucleo` y `aplicar_mora_facturas_vencidas`. Aquí se
+-- crean con la MISMA firma y la misma forma de escritura que las reales
+-- (SECURITY DEFINER, propietario `postgres`, UPDATE de columnas de cobro) para
+-- que ese ALTER tenga a quién aplicarse y, sobre todo, para poder COMPROBAR que
+-- la capacidad por función funciona: sin el ALTER, una DEFINER idéntica se
+-- estrella contra el guard.
+--
+-- No replican la lógica de negocio —eso lo cubre su propio dominio—: replican
+-- la ESCRITURA, que es lo que el guard juzga.
+CREATE OR REPLACE FUNCTION public.agua_cerrar_ciclo_nucleo(
+  p_project_id uuid,
+  p_periodo    text,
+  p_notificar  boolean DEFAULT true
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_n integer;
+BEGIN
+  UPDATE public.registros r
+     SET factura_estado = 'emitida',
+         emitida_at     = now(),
+         total_a_pagar  = round(COALESCE(r.monto_calculado, 0), 2)
+   WHERE r.project_id = p_project_id
+     AND r.deleted_at IS NULL
+     AND COALESCE(r.factura_estado, 'pendiente') = 'pendiente';
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  RETURN jsonb_build_object('emitidas', v_n);
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION public.agua_cerrar_ciclo_nucleo(uuid, text, boolean)
+  FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.aplicar_mora_facturas_vencidas()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  UPDATE public.registros r
+     SET mora_monto       = 25.00,
+         mora_aplicada_at = now()
+   WHERE r.deleted_at IS NULL
+     AND r.factura_estado IN ('emitida', 'vencida');
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION public.aplicar_mora_facturas_vencidas() FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.aplicar_mora_facturas_vencidas() TO service_role;
+
+-- ── La función DEFINER hostil: el caso que la exención vieja dejaba pasar ───
+-- Propietario `postgres`, ejecutable por `authenticated`, y sin llave. Con la
+-- exención de `current_user IN ('postgres', …)` esto entraba: cualquier DEFINER
+-- del esquema era una puerta. Es la prueba negativa que exige la invariante 23.
+CREATE OR REPLACE FUNCTION public.test_definer_falsifica_cobro(p_registro_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  UPDATE public.registros
+     SET monto_calculado = 0, estado = 'pagado', monto_pagado = 999999
+   WHERE id = p_registro_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.test_definer_falsifica_cobro(uuid) TO authenticated;
+
+-- La misma, pero sobre una columna INMUTABLE: ni con la llave de cobro.
+CREATE OR REPLACE FUNCTION public.test_definer_falsifica_lectura(p_registro_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  PERFORM set_config('agua.cobro_autoritativo', 'on', true);
+  UPDATE public.registros SET consumo = 0 WHERE id = p_registro_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.test_definer_falsifica_lectura(uuid) TO authenticated;
+
+-- Y una tercera: la función DEFINER que intenta colarse por la RPC del
+-- proveedor de pago. Corre como el dueño, así que tiene EXECUTE implícito
+-- sobre TODO — el GRANT no la para. Lo que la para es el chequeo de rol
+-- efectivo de dentro. Sin él, `authenticated` acreditaría pagos inventados.
+CREATE OR REPLACE FUNCTION public.test_definer_acredita_pago(p_registro_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  PERFORM public.agua_registro_acreditar_pago_externo(p_registro_id, 999999, 'inventado');
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.test_definer_acredita_pago(uuid) TO authenticated;

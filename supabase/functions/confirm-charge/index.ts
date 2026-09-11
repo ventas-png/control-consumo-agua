@@ -36,7 +36,7 @@ import {
   type ConfigPagoEmpresa,
   type ConfigPagoLocacion,
 } from '../_shared/payments/index.ts'
-import { planPagoCuota, round2, facturaTransicionaAPagada } from '../_shared/payments/reconcile.ts'
+import { planPagoCuota, round2 } from '../_shared/payments/reconcile.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -152,7 +152,6 @@ Deno.serve(async (req: Request) => {
     let itemProjectId: string | null = null
     let planTotal = 0 // total a pagar del ítem (con mora/IVA si aplica)
     let abonosPrevios = 0 // ya pagado
-    let regFacturaEstado: string | null = null
 
     if (esCuota) {
       const { data: cuotaRow, error: cuErr } = await admin
@@ -174,20 +173,19 @@ Deno.serve(async (req: Request) => {
     } else {
       const { data: regRow, error: regErr } = await admin
         .from('registros')
-        .select('project_id, monto_calculado, total_a_pagar, monto_pagado, factura_estado, deleted_at')
+        .select('project_id, monto_calculado, total_a_pagar, monto_pagado, deleted_at')
         .eq('id', pr.registro_id)
         .maybeSingle()
       if (regErr) return json({ error: regErr.message }, 500)
       const reg = regRow as {
         project_id: string | null; monto_calculado: number | null; total_a_pagar: number | null
-        monto_pagado: number | null; factura_estado: string | null; deleted_at: string | null
+        monto_pagado: number | null; deleted_at: string | null
       } | null
       if (!reg || reg.deleted_at) return json({ error: 'Recibo no encontrado' }, 404)
       itemProjectId = reg.project_id
       planTotal = Number(reg.total_a_pagar ?? reg.monto_calculado ?? 0)
       // Acumulador de registro = columna monto_pagado (la fila lleva el total pagado).
       abonosPrevios = Number(reg.monto_pagado ?? 0)
-      regFacturaEstado = reg.factura_estado
     }
 
     // ── 3) Resolver payfac + credenciales (por la empresa/proyecto del ítem) ──
@@ -254,6 +252,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const plan = planPagoCuota(planTotal, abonosPrevios, Number(pr.monto))
+    // Para la cuota, el plan calculado arriba es la verdad. Para el registro lo
+    // es la fila que devuelve la RPC, que suma DESPUÉS de bloquear.
+    let liquidado = plan.liquida
+    let saldoRestante = plan.saldoRestante
 
     const { data: nuevoPago, error: pagoErr } = await admin
       .from('pagos')
@@ -291,23 +293,31 @@ Deno.serve(async (req: Request) => {
         }).eq('id', pr.cuota_id)
       }
     } else {
-      // Registro: el acumulador vive en la fila → siempre actualiza monto_pagado.
-      // Al liquidar marca estado='pagado' + fecha_pago y —si hay factura emitida/
-      // vencida— transiciona factura_estado='pagada' (mismo guard que PagoModal).
-      const nuevoAbonado = round2(abonosPrevios + Number(pr.monto))
-      const patch: Record<string, unknown> = {
-        monto_pagado: nuevoAbonado,
-        estado: plan.liquida ? 'pagado' : 'pendiente',
+      // Registro: el acumulador vive en la fila. Esto era un `.update()` que
+      // sumaba en JavaScript sobre `abonosPrevios`, leído decenas de líneas más
+      // arriba y sin bloquear la fila: el retorno del portal y el cron de
+      // reconciliación confirmando dos `payment_requests` del mismo recibo a la
+      // vez partían del mismo previo y el segundo abono se perdía. La suma, la
+      // decisión de liquidar y la transición de factura viven ahora dentro de
+      // `agua_registro_acreditar_pago_externo`, que bloquea con FOR UPDATE
+      // (migración 20260911031701). Es también la última escritura de columnas
+      // de cobro fuera de las RPC: `registros` ya no acepta un PATCH genérico.
+      const { data: regAcreditado, error: acreditarErr } = await admin.rpc(
+        'agua_registro_acreditar_pago_externo',
+        { p_registro_id: pr.registro_id, p_monto: pr.monto, p_referencia: pr.provider_ref },
+      )
+      if (acreditarErr) {
+        // El proveedor ya cobró: el `pagos` de arriba queda insertado y esto se
+        // reintenta por el cron. Fallar en silencio sería perder el abono.
+        return json({
+          ok: false, estado: 'error',
+          error: `Pago cobrado pero no acreditado al recibo: ${acreditarErr.message}`,
+        }, 500)
       }
-      if (plan.liquida) {
-        const ahora = new Date().toISOString()
-        patch.fecha_pago = ahora.slice(0, 10)
-        if (facturaTransicionaAPagada(regFacturaEstado)) {
-          patch.factura_estado = 'pagada'
-          patch.pagada_at = ahora
-        }
-      }
-      await admin.from('registros').update(patch).eq('id', pr.registro_id)
+      const fila = regAcreditado as
+        { estado?: string | null; monto_pagado?: number | null } | null
+      liquidado = fila?.estado === 'pagado'
+      saldoRestante = round2(Math.max(planTotal - Number(fila?.monto_pagado ?? 0), 0))
     }
 
     await admin.from('payment_requests').update({ estado: 'succeeded' }).eq('id', pr.id)
@@ -316,9 +326,9 @@ Deno.serve(async (req: Request) => {
       ok: true,
       estado: 'aprobado',
       conciliado: true,
-      liquidado: plan.liquida,
-      cuota_liquidada: plan.liquida, // alias legacy (F1) — el frontend nuevo lee `liquidado`.
-      saldo_restante: plan.saldoRestante,
+      liquidado,
+      cuota_liquidada: liquidado, // alias legacy (F1) — el frontend nuevo lee `liquidado`.
+      saldo_restante: saldoRestante,
       pago_id: pagoId,
     })
   } catch (e) {

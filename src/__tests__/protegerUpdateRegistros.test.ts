@@ -11,17 +11,35 @@ import { resolve } from 'node:path'
 // agujero. Lo de aquí es lo que aquello no puede ver desde un PR sin base de
 // datos: que la lista de columnas protegidas siga completa, y que nadie le
 // agregue a las RPC de cobro el parámetro que las vaciaría de sentido.
-const MIG = resolve(
+// Dos migraciones: 20260910235732 puso el guard y las RPC; 20260911031701 le
+// quitó la exención de `postgres` (que eximía a cualquier SECURITY DEFINER,
+// porque corre como el dueño), serializó las transiciones con FOR UPDATE y sacó
+// el plazo de vencimiento de la firma pública. Los guards leen el ESTADO FINAL:
+// la segunda re-declara lo que toca, así que gana la última.
+const MIGS = [
   'supabase/migrations/20260910235732_proteger_update_registros_y_cobro_autoritativo.sql',
-)
+  'supabase/migrations/20260911031701_cerrar_exencion_definer_y_serializar_cobro.sql',
+].map((f) => resolve(f))
 
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
-const codigo = readFileSync(MIG, 'utf8').replace(/--[^\n]*/g, '')
+const porMigracion = MIGS.map((f) => readFileSync(f, 'utf8').replace(/--[^\n]*/g, ''))
+const codigo = porMigracion.join('\n')
+/**
+ * La ÚLTIMA declaración de una función en el orden de las migraciones: la que
+ * queda instalada. Buscar la primera daría la versión que la segunda migración
+ * corrigió, y los guards estarían mirando código muerto.
+ */
+function ultimaDeclaracion(nombre: string): string {
+  const re = new RegExp(
+    String.raw`CREATE OR REPLACE FUNCTION public\.${nombre}\(([\s\S]*?)\n\$\$;`,
+    'g',
+  )
+  const todas = codigo.match(re) ?? []
+  return todas.at(-1) ?? ''
+}
 
 /** El cuerpo del trigger, que es donde vive la clasificación de columnas. */
-const guard = codigo.match(
-  /CREATE OR REPLACE FUNCTION public\.agua_tg_registros_proteger_update\(\)[\s\S]*?\n\$\$;/,
-)?.[0] ?? ''
+const guard = ultimaDeclaracion('agua_tg_registros_proteger_update')
 
 describe('el UPDATE no puede reescribir la lectura', () => {
   // La lista que enumeró la auditoría, literal. Si alguien saca una de aquí,
@@ -73,23 +91,43 @@ describe('el cobro sólo cambia por su RPC', () => {
     expect(guard).not.toMatch(/SECURITY DEFINER/)
   })
 
-  it('los roles exentos son una allowlist cerrada', () => {
-    expect(guard).toContain("current_user IN ('service_role', 'postgres', 'supabase_admin')")
+  it('la ÚNICA exención por rol es service_role', () => {
+    // `postgres` y `supabase_admin` se quitaron: toda función SECURITY DEFINER
+    // corre como el DUEÑO, así que nombrarlos eximía a cualquier DEFINER del
+    // esquema — incluida una invocable por `authenticated`.
+    expect(guard).toContain("current_user = 'service_role'")
+    expect(guard).not.toContain("'postgres'")
+    expect(guard).not.toContain("'supabase_admin'")
+  })
+
+  it('la corrección del histórico tiene su propia llave, distinta de la del cobro', () => {
+    expect(guard).toContain("current_setting('agua.lectura_correccion_autorizada', true)")
+    // Y ninguna función de la aplicación la enciende: es para una migración
+    // revisada, con `SET LOCAL`, no para un camino de producto.
+    expect(codigo).not.toMatch(/set_config\('agua\.lectura_correccion_autorizada'/)
   })
 })
 
 describe('las RPC de cobro no aceptan el importe como parámetro', () => {
   /** Devuelve los nombres de los parámetros de una función del fichero. */
   function params(nombre: string): string[] {
-    const firma = codigo.match(
-      new RegExp(`CREATE OR REPLACE FUNCTION public\\.${nombre}\\(([\\s\\S]*?)\\)\\s*\\nRETURNS`),
-    )?.[1]
-    expect(firma, `no se encontró la firma de ${nombre}`).toBeTruthy()
-    return firma!.split(/,(?![^(]*\))/).map(p => p.trim().split(/\s+/)[0]).filter(Boolean)
+    const re = new RegExp(
+      String.raw`CREATE OR REPLACE FUNCTION public\.${nombre}\(([\s\S]*?)\)\s*\nRETURNS`,
+      'g',
+    )
+    const todas = [...codigo.matchAll(re)]
+    expect(todas.length, `no se encontró la firma de ${nombre}`).toBeGreaterThan(0)
+    // La última: es la que queda instalada.
+    const firma = todas.at(-1)![1]
+    return firma.split(/,(?![^(]*\))/).map(p => p.trim().split(/\s+/)[0]).filter(Boolean)
   }
 
-  it('emitir recibe el registro y, como mucho, los días de vencimiento', () => {
-    expect(params('agua_factura_emitir')).toEqual(['p_registro_id', 'p_dias_vencimiento'])
+  it('emitir recibe SÓLO el registro: el plazo de vencimiento no es del cliente', () => {
+    // El plazo decide cuándo aplica la mora, o sea cuánto se cobra de más: sale
+    // de `reglas_mora_config` o del valor seguro del servidor.
+    expect(params('agua_factura_emitir')).toEqual(['p_registro_id'])
+    // Y la firma de dos argumentos se elimina, no se deja como sobrecarga.
+    expect(codigo).toContain('DROP FUNCTION IF EXISTS public.agua_factura_emitir(uuid, integer);')
   })
 
   it('anular recibe el registro y el motivo', () => {
@@ -110,17 +148,63 @@ describe('las RPC de cobro no aceptan el importe como parámetro', () => {
     )
   })
 
-  it('cada transición pasa por el guard de permiso y deja auditoría', () => {
+  it('cada transición pasa por el guard de permiso, bloquea la fila y deja auditoría', () => {
     for (const fn of [
       'agua_factura_emitir', 'agua_factura_anular', 'agua_factura_registrar_pago',
       'agua_registro_marcar_mora', 'agua_registro_cambiar_estado',
     ]) {
-      const cuerpo = codigo.match(
-        new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}\\([\\s\\S]*?\\n\\$\\$;`),
-      )?.[0] ?? ''
+      const cuerpo = ultimaDeclaracion(fn)
+      expect(cuerpo, `${fn}: no se encontró la declaración final`).not.toBe('')
       expect(cuerpo, `${fn}: sin guard de permiso`).toContain('public.agua_cobro_guard(')
+      // El bloqueo es lo que serializa las transiciones financieras por
+      // registro: sin él, dos abonos simultáneos parten del mismo abonado
+      // previo y uno se pierde.
+      expect(cuerpo, `${fn}: no bloquea la fila`).toContain('public.agua_cobro_bloquear(')
       expect(cuerpo, `${fn}: sin auditoría`).toContain('public.agua_cobro_auditar(')
     }
+  })
+
+  it('el pago del proveedor también bloquea, y es la única excepción de rol', () => {
+    // `confirm-charge` acreditaba el abono del payfac con un UPDATE genérico
+    // que sumaba en JavaScript sobre un `monto_pagado` leído sin bloquear.
+    const cuerpo = ultimaDeclaracion('agua_registro_acreditar_pago_externo')
+    expect(cuerpo, 'no se encontró la RPC del proveedor de pago').not.toBe('')
+    expect(cuerpo).toContain('public.agua_cobro_bloquear(')
+    expect(cuerpo).toContain('public.agua_cobro_auditar(')
+    // El GRANT no basta: una SECURITY DEFINER corre como el dueño, que tiene
+    // EXECUTE implícito. Por eso comprueba además el rol efectivo.
+    expect(cuerpo).toContain("v_rol <> 'service_role'")
+    expect(codigo).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.agua_registro_acreditar_pago_externo\([^)]*\)\s*\n?\s*FROM PUBLIC, anon, authenticated/,
+    )
+    expect(codigo).toMatch(
+      /GRANT\s+EXECUTE ON FUNCTION public\.agua_registro_acreditar_pago_externo\([^)]*\)\s*\n?\s*TO service_role/,
+    )
+  })
+
+  it('el bloqueo es un FOR UPDATE de verdad, y no es API', () => {
+    expect(ultimaDeclaracion('agua_cobro_bloquear')).toContain('FOR UPDATE')
+    expect(codigo).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.agua_cobro_bloquear\([^)]*\) FROM PUBLIC, anon, authenticated/,
+    )
+  })
+
+  it('la capacidad de los caminos de sistema va por FUNCIÓN, no por rol', () => {
+    // El `SET` de una función da la llave mientras esa función corre y no un
+    // microsegundo más. Es lo que sustituye a la exención de `postgres`.
+    expect(codigo).toContain(
+      'ALTER FUNCTION public.agua_cerrar_ciclo_nucleo(uuid, text, boolean)',
+    )
+    // La mora va por una ENVOLTURA y no por un ALTER sobre la función real:
+    // esa tiene drift declarado contra producción, y ponerle proconfig desde el
+    // repositorio dejaría el auditor de tres vías en ambiguo.
+    expect(codigo).not.toContain('ALTER FUNCTION public.aplicar_mora_facturas_vencidas()')
+    expect(ultimaDeclaracion('agua_mora_cron_aplicar')).toContain(
+      'SET "agua.cobro_autoritativo" = \'on\'',
+    )
+    expect(codigo).toContain("'SELECT public.agua_mora_cron_aplicar();'")
+    const llaves = codigo.match(/SET "agua\.cobro_autoritativo" = 'on'/g) ?? []
+    expect(llaves, 'la llave por función está enumerada: dos, y sólo dos').toHaveLength(2)
   })
 
   it('ninguna de ellas queda ejecutable por anon', () => {

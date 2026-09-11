@@ -287,6 +287,7 @@ Una RPC por transición real, todas con permiso explícito y **auditoría** en
 | RPC | Permiso | Qué calcula el servidor |
 | --- | --- | --- |
 | `agua_factura_emitir` | `agua.cobros.change_status` | tasa de IVA (de `companies`), días de vencimiento (regla de mora activa), IVA, total |
+| `agua_registro_acreditar_pago_externo` | sólo `service_role` | el abono del payfac que `confirm-charge` concilia: suma, liquidación y cierre de factura |
 | `agua_factura_anular` | `agua.cobros.change_status` | la transición y su sello |
 | `agua_factura_registrar_pago` | `agua.cobros.create` | abonado acumulado, si liquida, fecha de pago (zona del tenant) y la transición de la factura |
 | `agua_registro_marcar_mora` | `agua.cobros.change_status` | el alcance se comprueba **por fila**, no por lote |
@@ -318,15 +319,104 @@ SECURITY DEFINER porque cruza `contadores`, `tarifas` y `companies` para
 recalcular: con los privilegios del invocante el informe saldría a medias y en
 silencio, que en un artefacto de auditoría es peor que no salir.
 
+## Los tres agujeros que dejó la primera versión
+
+La revisión de `20260910235732` encontró que había cerrado el `PATCH` con tres
+defectos de fondo. Los cierra `20260911031701`.
+
+### 1 · La exención de `postgres` era una puerta, no una excepción
+
+El guard eximía a `current_user IN ('service_role','postgres','supabase_admin')`.
+Pero **una función `SECURITY DEFINER` se ejecuta como su propietario**, y aquí el
+propietario es `postgres`: cualquier función DEFINER —incluida una que
+`authenticated` pueda invocar— pasaba el guard sin llave. La lista pretendía
+nombrar al cron y a la plataforma; en realidad nombraba «casi todo».
+
+Se va. Los dos caminos de sistema que de verdad escriben columnas de cobro
+reciben la llave **por función**, con `SET "agua.cobro_autoritativo" = 'on'`: la
+capacidad vive mientras esa función corre —y mientras corre lo que ella llame— y
+no un microsegundo más, y está enumerada en `pg_proc.proconfig`.
+
+La mora del cron la recibe de una **envoltura** nueva en vez de un `ALTER
+FUNCTION` sobre la función real, y no por gusto: `aplicar_mora_facturas_vencidas`
+es una de las que se editaron a mano en producción (drift declarado, inventario
+en #826). Ponerle `proconfig` desde el repositorio dejaría a producción, a `main`
+y al PR diciendo tres cosas distintas del mismo objeto, que es justo el *cambio
+ambiguo* que el auditor de tres vías cierra en falso a propósito. Cuando #826
+reconcilie la función, la envoltura se colapsa en un `ALTER FUNCTION`.
+
+El inventario completo de escritores de `public.registros` está en la cabecera de
+la migración. Resumido:
+
+| Camino | Cómo entra ahora |
+| --- | --- |
+| las 5 RPC de cobro, y la del payfac | encienden la llave ellas mismas |
+| `agua_cerrar_ciclo_nucleo` (y sus dos llamadores, uno del cron) | `ALTER FUNCTION … SET` |
+| `aplicar_mora_facturas_vencidas` | la envoltura `agua_mora_cron_aplicar`, que lleva la llave y es a la que apunta el job |
+| edge `confirm-charge` | `service_role`, vía `agua_registro_acreditar_pago_externo` |
+| purgas de `foto` (2 funciones + 1 edge) | nada: `foto` no fabrica un cobro |
+| backfills históricos | corren **antes** que el guard en el orden de migraciones |
+
+Para que quitar la exención no deje al equipo sin salida ante un histórico malo,
+existe una segunda llave explícita, `agua.lectura_correccion_autorizada`, que
+sólo un `SET LOCAL` de una migración revisada enciende. No la enciende ninguna
+función de la aplicación, un cliente no puede ponerla (los GUC no se tocan desde
+la Data API) y es greppable.
+
+### 2 · El pago no se serializaba
+
+`agua_factura_registrar_pago` leía `monto_pagado` y escribía después **sin
+bloquear la fila**: dos abonos simultáneos partían del mismo previo y el segundo
+pisaba al primero —dinero cobrado al cliente y perdido en la factura—. Ahora toda
+transición financiera relee la fila con `agua_cobro_bloquear`, que es un
+`SELECT … FOR UPDATE`, así que emitir, anular, pagar, mora y cambio de estado se
+serializan por registro.
+
+`confirm-charge` tenía el mismo defecto en JavaScript, y era peor: el retorno del
+portal y el cron de reconciliación son dos confirmaciones que llegan a la vez.
+Ya no hace `UPDATE`: llama a `agua_registro_acreditar_pago_externo`, que bloquea
+igual. **No** rechaza el sobrepago, y es a propósito: el dinero ya salió de la
+tarjeta y rechazarlo dejaría al cliente cobrado y al recibo sin acreditar; lo
+registra y lo audita.
+
+### 3 · `p_dias_vencimiento` era un parámetro de cobro
+
+Volvía a poner en el cliente una decisión que mueve dinero: el vencimiento decide
+cuándo aplica la mora. Se elimina de la firma pública —`agua_factura_emitir` sólo
+recibe `p_registro_id`— y el plazo sale de `reglas_mora_config` o del valor
+seguro del servidor (30). Una excepción manual, si operación llega a necesitarla,
+es otra RPC con su permiso, sus límites, su motivo obligatorio y su auditoría; no
+un argumento más de la emisión.
+
 ### Verificación
 
-`supabase/tests/proteger_update_registros/run.sh` — **22 invariantes** contra un
+`supabase/tests/proteger_update_registros/run.sh` — **33 invariantes** contra un
 Postgres real, en `coverage.yml`: el agujero ejercido y cerrado, las 18 columnas
 de la lectura y las 16 del cobro una por una (exigiendo el mensaje del guard, no
 un rechazo cualquiera), el ciclo emitir → pagar → anular con sus números, la
 mora, el `'pagado'` rechazado, la auditoría, la cuenta sin permiso, el otro
 tenant, la ACL, la excepción de `service_role`, los cuatro perfiles contra el
 reporte, y el camino completo ejercido COMO `authenticated`.
+
+A esas se suman, por los tres agujeros de arriba:
+
+- **23-25** — una `SECURITY DEFINER` ejecutable por `authenticated` intenta
+  cambiar `monto_calculado`/`estado` sin llave y recibe `42501`; la llave de
+  cobro no abre las columnas de la lectura; y la capacidad por función deja pasar
+  a los dos caminos de sistema enumerados **y sólo a ellos**.
+- **26-27** — concurrencia **real, con dos conexiones** (`dblink_send_query`, no
+  un `lock_timeout` que pasaría igual sin el `FOR UPDATE`): dos abonos solapados
+  se contabilizan los dos, una sola vez cada uno, y el saldo cuadra; dos
+  emisiones solapadas emiten una sola factura.
+- **28-30** — las carreras pagar/anular, pagar/mora y el estado a mano sobre una
+  factura ya pagada.
+- **31-33** — la RPC del payfac: revocada de `authenticated`, cerrada también a
+  una `SECURITY DEFINER` suya (el `GRANT` no basta; el chequeo de rol sí), y
+  sumando, liquidando y auditando cuando la llama quien debe.
+
+Las invariantes 26 y 32 están comprobadas **por mutación**: quitar el `FOR
+UPDATE` hace fallar la 26 («se perdió uno»), y quitar el chequeo de rol hace
+fallar la 32. Una prueba que pasa con y sin el arreglo no prueba nada.
 
 `src/__tests__/protegerUpdateRegistros.test.ts` — guards estáticos sobre el SQL:
 la lista de columnas protegidas y las firmas de las RPC, para que nadie les

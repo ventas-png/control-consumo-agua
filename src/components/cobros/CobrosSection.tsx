@@ -20,7 +20,7 @@ import { PagosHistorial } from './PagosHistorial'
 import { useQueryClient } from '@tanstack/react-query'
 import { FacturaEstadoBadge } from './facturaUi'
 import { TimbradoEstadoBadge } from './fiscalUi'
-import { useFacturasQuery, useReglasMoraQuery, type FacturaRow } from '../../domain/facturacion/queries'
+import { useFacturasQuery, type FacturaRow } from '../../domain/facturacion/queries'
 import { facturacionKeys } from '../../domain/facturacion/keys'
 import {
   useEmitirFacturaMutation,
@@ -110,10 +110,13 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
 
   // T4 · agua:C4 — proyección de Factura (estado/IVA/mora) sobre `registros`. La
   // tabla recibe `Registro[]` por props (sin campos de facturación); aquí leemos
-  // esos campos vía la capa de datos T4 y los cruzamos por id. Las reglas de mora
-  // del tenant dan los días de vencimiento al emitir.
+  // esos campos vía la capa de datos T4 y los cruzamos por id.
+  //
+  // Las reglas de mora ya NO se leen aquí: daban los días de vencimiento al
+  // emitir, y el plazo decide cuándo aplica la mora — es una decisión de cobro,
+  // no de pantalla. Desde 20260911031701 lo resuelve `agua_factura_emitir` con
+  // la regla activa del proyecto.
   const { data: facturas = [] } = useFacturasQuery(companyId)
-  const { data: reglasMora = [] } = useReglasMoraQuery(companyId)
   const facturaById = useMemo(() => {
     const m = new Map<string, FacturaRow>()
     for (const f of facturas) m.set(f.id, f)
@@ -165,17 +168,6 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
     }
   }
 
-  // Días de vencimiento por defecto: de la regla de mora del proyecto si existe,
-  // si no 30. (El cálculo de mora en sí lo hace el cron con la misma regla.)
-  const diasVencimientoPara = useCallback(
-    (projectId?: string | null) => {
-      const regla =
-        reglasMora.find(r => r.project_id === projectId) ?? reglasMora[0]
-      return regla?.dias_vencimiento ?? 30
-    },
-    [reglasMora],
-  )
-
   async function handleEmitir(r: Registro) {
     const factura = facturaById.get(r.id)
     setAccionFacturaId(r.id)
@@ -187,11 +179,6 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
           monto_calculado: factura?.monto_calculado ?? r.monto_calculado,
           mora_monto: factura?.mora_monto,
         },
-        // La tasa de IVA ya no viaja: la lee el servidor de
-        // `companies.iva_tasa_default`. Los días sí, porque la UI conoce la
-        // regla de mora que está mostrando; si no se mandan, el servidor
-        // resuelve la activa del proyecto.
-        diasVencimiento: diasVencimientoPara(r.project_id),
       })
       notify({ variant: 'success', title: '📤 Factura emitida', duration: 1800 })
     } catch (err) {
@@ -320,7 +307,6 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
             monto_calculado: factura?.monto_calculado ?? r.monto_calculado,
             mora_monto: factura?.mora_monto,
           },
-          diasVencimiento: diasVencimientoPara(r.project_id),
         })
         ok++
       } catch {

@@ -2,6 +2,8 @@
 \pset tuples_only on
 \pset format unaligned
 
+SELECT set_config('app.conn', :'conn', false);
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- Invariantes del guard de UPDATE y del camino autorizado de cobro
 -- (20260910235732), y de la autorización del reporte (corrige 20260910000300).
@@ -381,7 +383,7 @@ BEGIN
   IF has_function_privilege('authenticated', 'public.agua_tg_registros_proteger_update()', 'EXECUTE') THEN
     RAISE EXCEPTION '15: el cuerpo del trigger quedó ejecutable por authenticated'; END IF;
   IF NOT has_function_privilege('authenticated',
-        'public.agua_factura_emitir(uuid, integer)', 'EXECUTE') THEN
+        'public.agua_factura_emitir(uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION '15: authenticated no puede emitir'; END IF;
 
   -- Y la auditoría suelta, sin la llave de capacidad, no escribe nada.
@@ -389,7 +391,13 @@ BEGIN
   BEGIN PERFORM public.agua_cobro_auditar(reg.id, 'inventado', '{}'::jsonb);
   EXCEPTION WHEN insufficient_privilege THEN ok := true; END;
   IF NOT ok THEN RAISE EXCEPTION '15: se pudo fabricar una fila de auditoría desde fuera de una RPC'; END IF;
-  RAISE NOTICE 'OK 15  anon no ejecuta nada; el guard y el trigger no son API; la auditoría no se fabrica desde fuera';
+  -- La firma de dos argumentos se elimina, no se deja como sobrecarga: dejarla
+  -- viva sería dejar abierta la puerta que se cierra.
+  IF to_regprocedure('public.agua_factura_emitir(uuid, integer)') IS NOT NULL THEN
+    RAISE EXCEPTION '15: sigue viva agua_factura_emitir(uuid, integer) — el plazo vuelve a ser un parámetro del cliente'; END IF;
+  IF has_function_privilege('authenticated', 'public.agua_cobro_bloquear(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION '15: el bloqueo quedó ejecutable por authenticated'; END IF;
+  RAISE NOTICE 'OK 15  anon no ejecuta nada; el guard, el bloqueo y el trigger no son API; la auditoría no se fabrica desde fuera; el plazo ya no es parámetro';
 END $$;
 
 -- ── 16 · La excepción de `service_role`, enumerada ──────────────────────────
@@ -533,4 +541,392 @@ BEGIN
 
   RESET ROLE;
   RAISE NOTICE 'OK 22  una cobradora real emite y cobra por el camino autorizado, con la RLS puesta';
+END $$;
+
+-- ── 23-25 · La exención de `postgres` cerrada, y la capacidad por función ───
+DO $$
+DECLARE
+  M1    constant uuid := 'c0000000-0000-0000-0000-000000000001';
+  P1    constant uuid := '11111111-0000-0000-0000-000000000001';
+  LUCIA constant uuid := 'e0000000-0000-0000-0000-000000000001';
+  HOY   date := (now() AT TIME ZONE 'America/Guatemala')::date;
+  reg   public.registros;
+  fila  public.registros;
+  ok    boolean;
+  cfg   text[];
+BEGIN
+  PERFORM set_config('app.uid', LUCIA::text, false);
+  SELECT * INTO reg FROM public.registrar_lectura(
+    M1, 400, HOY, 'idem-upd-definer-0001', 'Para la DEFINER hostil', NULL, NULL);
+
+  -- 23 · UNA SECURITY DEFINER INVOCABLE POR `authenticated` NO PASA.
+  -- Es el agujero que dejaba la exención por `current_user`: dentro de una
+  -- DEFINER `current_user` es el DUEÑO (`postgres`), así que la lista
+  -- ('service_role','postgres','supabase_admin') eximía a CUALQUIER función
+  -- DEFINER del esquema — incluida ésta, que sólo existe para demostrarlo.
+  SET LOCAL ROLE authenticated;
+  ok := false;
+  BEGIN
+    PERFORM public.test_definer_falsifica_cobro(reg.id);
+  EXCEPTION WHEN insufficient_privilege THEN
+    -- Toca `monto_calculado` (inmutable) y `estado`/`monto_pagado` (cobro): el
+    -- guard corta en el primero que encuentra, y cualquiera de los dos mensajes
+    -- prueba que cortó el GUARD y no otra cosa.
+    ok := SQLERRM LIKE '%es inmutable%' OR SQLERRM LIKE '%el cobro no se edita%';
+  END;
+  RESET ROLE;
+  IF NOT ok THEN
+    RAISE EXCEPTION '23: una SECURITY DEFINER invocable por authenticated fabricó el cobro'; END IF;
+
+  SELECT * INTO fila FROM public.registros WHERE id = reg.id;
+  IF fila.monto_calculado <> reg.monto_calculado OR fila.estado <> 'pendiente'
+     OR COALESCE(fila.monto_pagado, 0) <> 0 THEN
+    RAISE EXCEPTION '23: la fila cambió pese al rechazo (monto %, estado %, abonado %)',
+      fila.monto_calculado, fila.estado, fila.monto_pagado; END IF;
+  RAISE NOTICE 'OK 23  una SECURITY DEFINER ejecutable por authenticated ya NO elude el guard (42501)';
+
+  -- 24 · Y con la llave DE COBRO puesta tampoco toca la lectura: son dos
+  -- capacidades distintas, y la del cobro no compra la del histórico.
+  SET LOCAL ROLE authenticated;
+  ok := false;
+  BEGIN
+    PERFORM public.test_definer_falsifica_lectura(reg.id);
+  EXCEPTION WHEN insufficient_privilege THEN
+    ok := SQLERRM LIKE '%es inmutable%';
+  END;
+  RESET ROLE;
+  IF NOT ok THEN
+    RAISE EXCEPTION '24: con la llave de cobro se pudo reescribir el consumo'; END IF;
+  RAISE NOTICE 'OK 24  la llave de cobro no abre las columnas de la lectura';
+
+  -- 25 · Los DOS caminos de sistema enumerados SÍ pasan, y por la capacidad
+  -- POR FUNCIÓN (`ALTER FUNCTION … SET`), no por su rol.
+  SELECT p.proconfig INTO cfg FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'agua_cerrar_ciclo_nucleo';
+  IF cfg IS NULL OR NOT ('agua.cobro_autoritativo=on' = ANY (cfg)) THEN
+    RAISE EXCEPTION '25: agua_cerrar_ciclo_nucleo no lleva la llave por función (%)', cfg; END IF;
+  -- La mora del cron la lleva la ENVOLTURA, no la función real: esa tiene drift
+  -- declarado contra producción y ponerle proconfig desde el repositorio dejaría
+  -- el auditor de tres vías en ambiguo.
+  SELECT p.proconfig INTO cfg FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'agua_mora_cron_aplicar';
+  IF cfg IS NULL OR NOT ('agua.cobro_autoritativo=on' = ANY (cfg)) THEN
+    RAISE EXCEPTION '25: agua_mora_cron_aplicar no lleva la llave por función (%)', cfg; END IF;
+  SELECT p.proconfig INTO cfg FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'aplicar_mora_facturas_vencidas';
+  IF cfg IS NOT NULL AND 'agua.cobro_autoritativo=on' = ANY (cfg) THEN
+    RAISE EXCEPTION '25: la función con drift recibió proconfig — eso es el ambiguo del auditor'; END IF;
+
+  -- Y funciona de verdad: el cierre de ciclo emite sobre una fila pendiente.
+  PERFORM public.agua_cerrar_ciclo_nucleo(P1, to_char(HOY, 'YYYY-MM'), false);
+  SELECT * INTO fila FROM public.registros WHERE id = reg.id;
+  IF fila.factura_estado <> 'emitida' THEN
+    RAISE EXCEPTION '25: el cierre de ciclo no pudo emitir con su llave por función (estado %)',
+      fila.factura_estado; END IF;
+
+  -- La mora, sin la envoltura, se estrella contra el guard aunque corra como el
+  -- DUEÑO: es la demostración de que la exención de `postgres` ya no existe.
+  ok := false;
+  BEGIN
+    PERFORM public.aplicar_mora_facturas_vencidas();
+  EXCEPTION WHEN insufficient_privilege THEN ok := true; END;
+  IF NOT ok THEN
+    RAISE EXCEPTION '25: la mora escribió el cobro sin llave, corriendo como postgres'; END IF;
+
+  -- Con la envoltura sí, y eso prueba lo único que hacía falta probar: que el
+  -- `SET` de la envoltura cubre la llamada ANIDADA.
+  PERFORM public.agua_mora_cron_aplicar();
+  SELECT * INTO fila FROM public.registros WHERE id = reg.id;
+  IF COALESCE(fila.mora_monto, 0) <> 25.00 THEN
+    RAISE EXCEPTION '25: la envoltura no le pasó la llave a la función anidada (mora %)',
+      fila.mora_monto; END IF;
+
+  -- Ninguna otra función del esquema la lleva puesta: la capacidad está
+  -- enumerada, no repartida.
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proconfig IS NOT NULL
+       AND 'agua.cobro_autoritativo=on' = ANY (p.proconfig)
+       AND p.proname NOT IN ('agua_cerrar_ciclo_nucleo', 'agua_mora_cron_aplicar')
+  ) THEN
+    RAISE EXCEPTION '25: alguna otra función recibió la llave por función'; END IF;
+  RAISE NOTICE 'OK 25  la capacidad va por FUNCIÓN: el cierre de ciclo la lleva, la mora la recibe de su envoltura, y nadie más';
+END $$;
+
+-- ── 26-27 · Concurrencia real: dos conexiones sobre la misma factura ────────
+-- La preparación va en su PROPIO bloque, y no es un detalle de estilo: psql
+-- envuelve cada DO en una transacción, así que una fila creada dentro del mismo
+-- bloque que abre la segunda conexión todavía no está confirmada y la otra
+-- sesión no la ve. Primero se crean y emiten las dos facturas —eso confirma—,
+-- después se corre la carrera.
+DO $$
+DECLARE
+  M1    constant uuid := 'c0000000-0000-0000-0000-000000000001';
+  LUCIA constant uuid := 'e0000000-0000-0000-0000-000000000001';
+  HOY   date := (now() AT TIME ZONE 'America/Guatemala')::date;
+  reg   public.registros;
+  fac   public.registros;
+BEGIN
+  PERFORM set_config('app.uid', LUCIA::text, false);
+
+  SELECT * INTO reg FROM public.registrar_lectura(
+    M1, 450, HOY, 'idem-upd-carrera-0001', 'Para la carrera de abonos', NULL, NULL);
+  SELECT * INTO fac FROM public.agua_factura_emitir(reg.id);
+  PERFORM set_config('app.carrera_pago', reg.id::text, false);
+  PERFORM set_config('app.carrera_total', fac.total_a_pagar::text, false);
+
+  SELECT * INTO reg FROM public.registrar_lectura(
+    M1, 460, HOY, 'idem-upd-carrera-0002', 'Para la carrera de emisión', NULL, NULL);
+  PERFORM set_config('app.carrera_emision', reg.id::text, false);
+END $$;
+
+DO $$
+DECLARE
+  LUCIA  constant uuid := 'e0000000-0000-0000-0000-000000000001';
+  v_conn text    := current_setting('app.conn');
+  v_id   uuid    := current_setting('app.carrera_pago')::uuid;
+  total  numeric := current_setting('app.carrera_total')::numeric;
+  abono  numeric;
+  remoto numeric;
+  fila   public.registros;
+  n      bigint;
+BEGIN
+  PERFORM set_config('app.uid', LUCIA::text, false);
+  abono := round(total / 3, 2);
+
+  -- 26 · DOS ABONOS QUE SE SOLAPAN DE VERDAD.
+  --
+  -- La forma obvia —abrir transacción en la otra conexión y ver que ésta se
+  -- rinde por `lock_timeout`— NO prueba nada: un `UPDATE` a secas también
+  -- bloquea la fila, así que ese test pasaría igual SIN el `FOR UPDATE` y el
+  -- abono se seguiría perdiendo. Lo que hay que reproducir es el solapamiento
+  -- exacto: que la segunda sesión LEA el abonado mientras la primera todavía no
+  -- ha confirmado.
+  --
+  -- Por eso la consulta remota va ASÍNCRONA. Esta sesión abona y NO confirma;
+  -- la otra dispara su abono y se queda esperando; esta sesión confirma; la
+  -- otra despierta. Con `FOR UPDATE`, la lectura del abonado de la segunda
+  -- estaba bloqueada y al despertar ve 1×abono y deja 2×abono. Sin él, habría
+  -- leído 0 antes de bloquearse y dejaría 1×abono: un pago cobrado al cliente
+  -- y perdido en la factura.
+  PERFORM public.dblink_connect('carrera', v_conn);
+  PERFORM t.x FROM public.dblink('carrera',
+    format('SELECT set_config(%L, %L, false)', 'app.uid', LUCIA::text)) AS t(x text);
+
+  PERFORM public.agua_factura_registrar_pago(v_id, abono);   -- local, SIN confirmar
+
+  PERFORM public.dblink_send_query('carrera',
+    format('SELECT monto_pagado FROM public.agua_factura_registrar_pago(%L, %s)', v_id, abono));
+  PERFORM pg_sleep(0.5);   -- lo justo para que la otra llegue al bloqueo
+
+  COMMIT;                  -- y aquí la otra despierta
+
+  SELECT t.x INTO remoto FROM public.dblink_get_result('carrera') AS t(x numeric);
+  PERFORM public.dblink_disconnect('carrera');
+
+  IF remoto IS DISTINCT FROM round(abono * 2, 2) THEN
+    RAISE EXCEPTION '26: el segundo abono dejó % (esperado %) — se perdió uno',
+      remoto, round(abono * 2, 2); END IF;
+
+  SELECT * INTO fila FROM public.registros WHERE id = v_id;
+  IF fila.monto_pagado <> round(abono * 2, 2) THEN
+    RAISE EXCEPTION '26: la fila quedó con % abonado (esperado %)',
+      fila.monto_pagado, round(abono * 2, 2); END IF;
+  IF fila.monto_pagado > total + 0.005 THEN
+    RAISE EXCEPTION '26: los dos abonos juntos se pasaron del saldo'; END IF;
+  IF fila.factura_estado <> 'emitida' THEN
+    RAISE EXCEPTION '26: dos tercios del total liquidaron la factura (%)', fila.factura_estado; END IF;
+
+  SELECT count(*) INTO n FROM public.security_logs
+   WHERE event_type = 'agua_cobro.registrar_pago'
+     AND (details ->> 'registro_id')::uuid = v_id;
+  IF n <> 2 THEN
+    RAISE EXCEPTION '26: % filas de auditoría para dos abonos (esperadas 2)', n; END IF;
+  RAISE NOTICE 'OK 26  dos abonos solapados de verdad: los dos se contabilizan, una sola vez cada uno, y el saldo cuadra';
+END $$;
+
+DO $$
+DECLARE
+  LUCIA  constant uuid := 'e0000000-0000-0000-0000-000000000001';
+  v_conn text := current_setting('app.conn');
+  v_id   uuid := current_setting('app.carrera_emision')::uuid;
+  ok     boolean := false;
+  n      bigint;
+  fila   public.registros;
+BEGIN
+  PERFORM set_config('app.uid', LUCIA::text, false);
+
+  -- 27 · DOS EMISIONES QUE SE SOLAPAN. Mismo solapamiento real: sin el
+  -- bloqueo, la segunda leería `factura_estado` = 'pendiente' antes de que la
+  -- primera confirmara y emitiría OTRA VEZ, pisando `emitida_at` y el total.
+  PERFORM public.dblink_connect('carrera2', v_conn);
+  PERFORM t.x FROM public.dblink('carrera2',
+    format('SELECT set_config(%L, %L, false)', 'app.uid', LUCIA::text)) AS t(x text);
+
+  PERFORM public.agua_factura_emitir(v_id);   -- local, SIN confirmar
+
+  PERFORM public.dblink_send_query('carrera2',
+    format('SELECT 1 FROM public.agua_factura_emitir(%L)', v_id));
+  PERFORM pg_sleep(0.5);
+
+  COMMIT;
+
+  BEGIN
+    PERFORM t.x FROM public.dblink_get_result('carrera2') AS t(x integer);
+  EXCEPTION WHEN OTHERS THEN
+    ok := SQLERRM LIKE '%transición inválida%';
+  END;
+  PERFORM public.dblink_disconnect('carrera2');
+
+  IF NOT ok THEN RAISE EXCEPTION '27: la segunda emisión no se rechazó'; END IF;
+
+  SELECT count(*) INTO n FROM public.security_logs
+   WHERE event_type = 'agua_cobro.emitir' AND (details ->> 'registro_id')::uuid = v_id;
+  IF n <> 1 THEN RAISE EXCEPTION '27: % emisiones auditadas (esperada 1)', n; END IF;
+
+  SELECT * INTO fila FROM public.registros WHERE id = v_id;
+  IF fila.factura_estado <> 'emitida' THEN
+    RAISE EXCEPTION '27: la factura no quedó emitida (%)', fila.factura_estado; END IF;
+  RAISE NOTICE 'OK 27  dos emisiones solapadas: emite una, la otra se encuentra la factura hecha';
+END $$;
+
+-- ── 28-30 · Las carreras pagar/anular, pagar/mora y el estado a mano ───────
+DO $$
+DECLARE
+  M1    constant uuid := 'c0000000-0000-0000-0000-000000000001';
+  LUCIA constant uuid := 'e0000000-0000-0000-0000-000000000001';
+  HOY   date := (now() AT TIME ZONE 'America/Guatemala')::date;
+  reg   public.registros;
+  fac   public.registros;
+  fila  public.registros;
+  ok    boolean;
+BEGIN
+  PERFORM set_config('app.uid', LUCIA::text, false);
+
+  -- 28 · PAGAR / ANULAR. Con el bloqueo, una de las dos llega primero. Si fue
+  -- el pago, anular borraría el rastro de un dinero que entró: se rechaza.
+  SELECT * INTO reg FROM public.registrar_lectura(
+    M1, 470, HOY, 'idem-upd-carrera-0003', 'pagar vs anular', NULL, NULL);
+  SELECT * INTO fac FROM public.agua_factura_emitir(reg.id);
+  PERFORM public.agua_factura_registrar_pago(reg.id, round(fac.total_a_pagar / 2, 2));
+  ok := false;
+  BEGIN PERFORM public.agua_factura_anular(reg.id, 'me arrepentí');
+  EXCEPTION WHEN data_exception THEN ok := true; END;
+  IF NOT ok THEN
+    RAISE EXCEPTION '28: se anuló una factura con abonos — el pago queda sin rastro'; END IF;
+  -- Y sin abonos, anular sigue funcionando.
+  SELECT * INTO reg FROM public.registrar_lectura(
+    M1, 480, HOY, 'idem-upd-carrera-0004', 'anulable', NULL, NULL);
+  SELECT * INTO fila FROM public.agua_factura_anular(reg.id, 'duplicada');
+  IF fila.factura_estado <> 'anulada' THEN
+    RAISE EXCEPTION '28: la anulación legítima dejó de funcionar'; END IF;
+  RAISE NOTICE 'OK 28  pagar/anular: con abonos no se anula; sin abonos sí';
+
+  -- 29 · PAGAR / MORA. Un abono parcial no saca de mora, y la mora no marca
+  -- morosa una factura ya pagada.
+  SELECT * INTO reg FROM public.registrar_lectura(
+    M1, 490, HOY, 'idem-upd-carrera-0005', 'pagar vs mora', NULL, NULL);
+  SELECT * INTO fac FROM public.agua_factura_emitir(reg.id);
+  PERFORM public.agua_registro_marcar_mora(ARRAY[reg.id]);
+  SELECT * INTO fila FROM public.agua_factura_registrar_pago(reg.id, round(fac.total_a_pagar / 2, 2));
+  IF fila.estado <> 'mora' THEN
+    RAISE EXCEPTION '29: un abono parcial sacó la factura de mora (estado %)', fila.estado; END IF;
+
+  SELECT * INTO fila FROM public.agua_factura_registrar_pago(
+    reg.id, fac.total_a_pagar - round(fac.total_a_pagar / 2, 2));
+  IF fila.estado <> 'pagado' THEN
+    RAISE EXCEPTION '29: el pago que liquida no salió de mora (estado %)', fila.estado; END IF;
+  IF public.agua_registro_marcar_mora(ARRAY[reg.id]) <> 0 THEN
+    RAISE EXCEPTION '29: se marcó como morosa una factura ya pagada'; END IF;
+  RAISE NOTICE 'OK 29  pagar/mora: el abono parcial no saca de mora, y lo pagado no vuelve a mora';
+
+  -- 30 · Y el estado a mano no le quita el cobrado a una factura pagada.
+  ok := false;
+  BEGIN PERFORM public.agua_registro_cambiar_estado(reg.id, 'pendiente');
+  EXCEPTION WHEN data_exception THEN ok := true; END;
+  IF NOT ok THEN
+    RAISE EXCEPTION '30: se devolvió a pendiente una factura pagada'; END IF;
+  RAISE NOTICE 'OK 30  el estado a mano no revierte un cobro: para eso hay que revertir el pago';
+END $$;
+
+-- ── 31-33 · La última excepción de service_role: la RPC del proveedor ──────
+-- `confirm-charge` acreditaba el pago del payfac con un `UPDATE` genérico que
+-- sumaba en JavaScript sobre un `monto_pagado` leído sin bloquear. Ahora pasa
+-- por `agua_registro_acreditar_pago_externo`. Aquí se comprueban las tres
+-- cosas que la hacen una excepción y no otra puerta: quién NO puede llamarla
+-- (ni siquiera desde una DEFINER), y que quien sí puede suma bien.
+DO $$
+DECLARE
+  M1    constant uuid := 'c0000000-0000-0000-0000-000000000001';
+  LUCIA constant uuid := 'e0000000-0000-0000-0000-000000000001';
+  HOY   date := (now() AT TIME ZONE 'America/Guatemala')::date;
+  reg   public.registros;
+  fac   public.registros;
+  fila  public.registros;
+  ab1   numeric;
+  ab2   numeric;
+  n     bigint;
+  ok    boolean;
+BEGIN
+  PERFORM set_config('app.uid', LUCIA::text, false);
+  SELECT * INTO reg FROM public.registrar_lectura(
+    M1, 520, HOY, 'idem-upd-payfac-0001', 'pago del proveedor', NULL, NULL);
+  SELECT * INTO fac FROM public.agua_factura_emitir(reg.id);
+
+  -- 31 · `authenticated` no la tiene. El GRANT es sólo para `service_role`.
+  ok := false;
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    PERFORM public.agua_registro_acreditar_pago_externo(reg.id, 1, 'a mano');
+  EXCEPTION WHEN insufficient_privilege THEN ok := true; END;
+  RESET ROLE;
+  IF NOT ok THEN
+    RAISE EXCEPTION '31: authenticated pudo acreditar un pago del proveedor'; END IF;
+  RAISE NOTICE 'OK 31  la RPC del payfac está revocada de authenticated: 42501';
+
+  -- 32 · Y tampoco por la puerta de atrás. Una SECURITY DEFINER corre como el
+  -- DUEÑO, que tiene EXECUTE implícito sobre todo: el GRANT no la para. La
+  -- para el chequeo de rol efectivo de dentro de la RPC.
+  ok := false;
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    PERFORM public.test_definer_acredita_pago(reg.id);
+  EXCEPTION WHEN insufficient_privilege THEN ok := true; END;
+  RESET ROLE;
+  IF NOT ok THEN
+    RAISE EXCEPTION '32: una función DEFINER de authenticated acreditó un pago inventado'; END IF;
+  SELECT r.monto_pagado INTO ab1 FROM public.registros r WHERE r.id = reg.id;
+  IF COALESCE(ab1, 0) <> 0 THEN
+    RAISE EXCEPTION '32: el intento dejó % abonados', ab1; END IF;
+  RAISE NOTICE 'OK 32  ni desde una SECURITY DEFINER: el GRANT no basta y el chequeo de rol sí';
+
+  -- 33 · Con el rol del proveedor, acredita: suma sobre lo abonado, liquida
+  -- cuando llega al total y cierra la factura. Es el camino de `confirm-charge`.
+  ab1 := round(fac.total_a_pagar / 3, 2);
+  ab2 := fac.total_a_pagar - ab1;
+  PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  SET LOCAL ROLE service_role;
+
+  SELECT * INTO fila FROM public.agua_registro_acreditar_pago_externo(reg.id, ab1, 'ref-1');
+  IF fila.monto_pagado <> ab1 OR fila.estado <> 'pendiente' THEN
+    RAISE EXCEPTION '33: el primer abono dejó % / %', fila.monto_pagado, fila.estado; END IF;
+
+  SELECT * INTO fila FROM public.agua_registro_acreditar_pago_externo(reg.id, ab2, 'ref-2');
+  IF fila.monto_pagado <> fac.total_a_pagar THEN
+    RAISE EXCEPTION '33: los dos abonos suman % y el total es %',
+      fila.monto_pagado, fac.total_a_pagar; END IF;
+  IF fila.estado <> 'pagado' OR fila.factura_estado <> 'pagada' OR fila.fecha_pago IS NULL THEN
+    RAISE EXCEPTION '33: liquidó sin cerrar: estado %, factura %, fecha %',
+      fila.estado, fila.factura_estado, fila.fecha_pago; END IF;
+
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claims', '', true);
+
+  SELECT count(*) INTO n FROM public.security_logs s
+   WHERE s.event_type = 'agua_cobro.acreditar_pago_externo'
+     AND (s.details ->> 'registro_id')::uuid = reg.id;
+  IF n <> 2 THEN
+    RAISE EXCEPTION '33: la acreditación del proveedor dejó % rastros (esperado 2)', n; END IF;
+  RAISE NOTICE 'OK 33  service_role acredita, suma sobre lo abonado, liquida y queda auditado';
 END $$;

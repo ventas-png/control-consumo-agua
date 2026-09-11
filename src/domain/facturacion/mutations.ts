@@ -97,26 +97,24 @@ function useInvalidarFacturacion(companyId?: string) {
 // ────────────────────────────────────────────────────────────────────────────
 export interface EmitirFacturaVars {
   factura: FacturaTransicionInput
-  /**
-   * Días de vencimiento. OPCIONAL y, cuando no se manda, lo resuelve el servidor
-   * desde la regla de mora activa del proyecto (?? 30). La tasa de IVA ya no
-   * viaja: la lee el servidor de `companies.iva_tasa_default`, porque un cliente
-   * que elige su propia tasa elige su propio impuesto.
-   */
-  diasVencimiento?: number
 }
 
 export function useEmitirFacturaMutation(companyId?: string) {
   const invalidar = useInvalidarFacturacion(companyId)
   return useMutation({
-    mutationFn: async ({ factura, diasVencimiento }: EmitirFacturaVars) => {
+    // NO hay más argumentos que el registro, y no es una simplificación: el
+    // plazo de vencimiento decide cuándo aplica la mora, así que es una
+    // decisión de cobro. Sale de la regla de mora activa del proyecto o del
+    // valor seguro del servidor (30) — nunca del navegador. La tasa de IVA, lo
+    // mismo: la lee el servidor de `companies.iva_tasa_default`, porque quien
+    // elige su propia tasa elige su propio impuesto.
+    mutationFn: async ({ factura }: EmitirFacturaVars) => {
       // Gate de UI: la acción ya está oculta cuando no aplica; esto evita el
       // viaje. La autorización y la máquina de estados las repite el servidor.
       const check = puedeTransicionarFactura(factura.factura_estado, 'emitir')
       if (!check.ok) throw new TransicionInvalidaError(factura.factura_estado, 'emitir', check.error)
       const { data, error } = await supabase.rpc('agua_factura_emitir', {
         p_registro_id: factura.id,
-        p_dias_vencimiento: diasVencimiento ?? null,
       })
       if (error) throw new Error(error.message)
       return data
