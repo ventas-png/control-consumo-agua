@@ -169,7 +169,7 @@ Deno.serve(async (req) => {
     // de Stripe encontraba la fila, recibía 200 y el cobro se quedaba sin
     // acreditar PARA SIEMPRE, sin nadie que lo volviera a intentar.
     //
-    // «Lo vi» y «lo terminé» son hechos distintos. 20260911201500 los separa en
+    // «Lo vi» y «lo terminé» son hechos distintos. 20260911231905 los separa en
     // cuatro estados y reclama en UNA sentencia: dos entregas simultáneas del
     // mismo evento son exactamente el caso que un check-then-insert deja pasar.
     const { data: reclamoRaw, error: reclamoErr } = await adminClient.rpc(

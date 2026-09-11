@@ -2,7 +2,7 @@
 --
 -- `stripe_webhook_events` nace en 20260528000040, que no está en la cadena de
 -- este arnés: se reproduce aquí con su forma EXACTA de entonces —sin `estado`
--- ni `intentos`— para que 20260911201500 tenga que añadirlos de verdad. Copiar
+-- ni `intentos`— para que 20260911231905 tenga que añadirlos de verdad. Copiar
 -- aquí la tabla ya migrada haría que la prueba no probara la migración.
 CREATE TABLE public.stripe_webhook_events (
   event_id      text        PRIMARY KEY,

@@ -380,7 +380,7 @@ BEGIN
   -- `estado`/`verification_status` quedan en 'aplicado' —el importe se acreditó,
   -- que es el hecho contable— y `verified_by`/`verified_at` guardan QUIÉN probó
   -- que el cobro ocurrió. Son dos hechos distintos y ninguno sustituye al otro:
-  -- ver la cabecera de 20260911201500.
+  -- ver la cabecera de 20260911231905.
   INSERT INTO public.pagos (
     payment_request_id, registro_id, cuota_id, cliente_id, project_id,
     monto, metodo, estado, verification_status, tipo_aplicacion, referencia,
@@ -485,10 +485,10 @@ BEGIN
   -- La firma vieja no puede quedar viva: dos sobrecargas con defaults harían
   -- ambigua la llamada de un argumento de `confirm-charge`.
   IF to_regprocedure('public.conciliar_pago_externo(uuid)') IS NOT NULL THEN
-    RAISE EXCEPTION '20260911201500: sigue viva conciliar_pago_externo(uuid) — la llamada de confirm-charge quedaría ambigua';
+    RAISE EXCEPTION '20260911231905: sigue viva conciliar_pago_externo(uuid) — la llamada de confirm-charge quedaría ambigua';
   END IF;
   IF to_regprocedure('public.conciliar_pago_externo(uuid, text, timestamptz)') IS NULL THEN
-    RAISE EXCEPTION '20260911201500: no se creó conciliar_pago_externo(uuid, text, timestamptz)';
+    RAISE EXCEPTION '20260911231905: no se creó conciliar_pago_externo(uuid, text, timestamptz)';
   END IF;
 
   -- Ningún rol de API alcanza las tres: son del webhook y del cron.
@@ -497,7 +497,7 @@ BEGIN
     IF has_function_privilege(v_rol, 'public.conciliar_pago_externo(uuid, text, timestamptz)'::regprocedure, 'EXECUTE')
        OR has_function_privilege(v_rol, 'public.stripe_webhook_evento_reclamar(text, text, boolean, jsonb)'::regprocedure, 'EXECUTE')
        OR has_function_privilege(v_rol, 'public.stripe_webhook_evento_cerrar(text, boolean, text)'::regprocedure, 'EXECUTE') THEN
-      RAISE EXCEPTION '20260911201500: % alcanza una RPC del webhook', v_rol USING ERRCODE = '42501';
+      RAISE EXCEPTION '20260911231905: % alcanza una RPC del webhook', v_rol USING ERRCODE = '42501';
     END IF;
   END LOOP;
 END $verif$;

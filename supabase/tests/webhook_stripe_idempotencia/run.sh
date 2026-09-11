@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20260911201500: el webhook de Stripe ACREDITA el
+# Verificación EJECUTABLE de 20260911231905: el webhook de Stripe ACREDITA el
 # recibo, y «lo vi» deja de valer por «lo terminé».
 #
 # POR QUÉ EXISTE
@@ -53,7 +53,7 @@ MIG_UPD="$MIG_DIR/20260910235732_proteger_update_registros_y_cobro_autoritativo.
 MIG_SER="$MIG_DIR/20260911031701_cerrar_exencion_definer_y_serializar_cobro.sql"
 MIG_CON="$MIG_DIR/20260911042839_conciliar_pago_externo_transaccional.sql"
 MIG_AUD="$MIG_DIR/20260911181200_revocar_execute_agua_cobro_auditar.sql"
-MIG_WHK="$MIG_DIR/20260911201500_webhook_stripe_idempotencia_real.sql"
+MIG_WHK="$MIG_DIR/20260911231905_webhook_stripe_idempotencia_real.sql"
 # El padrón de agua es el del otro harness: una sola fuente de verdad.
 FIXTURE="$RAIZ/supabase/tests/registrar_lectura/fixture.sql"
 
