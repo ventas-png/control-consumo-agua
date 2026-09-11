@@ -21,6 +21,7 @@ const MIGS = [
   'supabase/migrations/20260910235732_proteger_update_registros_y_cobro_autoritativo.sql',
   'supabase/migrations/20260911031701_cerrar_exencion_definer_y_serializar_cobro.sql',
   'supabase/migrations/20260911042839_conciliar_pago_externo_transaccional.sql',
+  'supabase/migrations/20260911181200_revocar_execute_agua_cobro_auditar.sql',
 ].map((f) => resolve(f))
 
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
@@ -209,6 +210,46 @@ describe('las RPC de cobro no aceptan el importe como parámetro', () => {
     // el auditor de tres vías en ambiguo.
     expect(codigo).not.toContain('CREATE OR REPLACE FUNCTION public.aplicar_mora_facturas_vencidas')
     expect(codigo).toContain("'SELECT public.agua_mora_cron_aplicar();'")
+  })
+
+  it('agua_cobro_auditar es un helper interno: ningún rol de API lo ejecuta', () => {
+    // 20260910235732 la creó con un `GRANT EXECUTE … TO authenticated` que no
+    // hacía falta: no es una RPC, es el escritor de security_logs que usan por
+    // dentro las seis transiciones. El asesor de seguridad de Supabase lo marcó
+    // sobre la Preview de #847 y 20260911181200 lo revoca.
+    //
+    // Que el cuerpo exija la llave `agua.cobro_autoritativo` NO lo salvaba: con
+    // el GRANT puesto y la llave encendida, `authenticated` escribía la fila —
+    // medido, es el mutante de la invariante 41. Hacen falta las dos defensas.
+    expect(codigo).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.agua_cobro_auditar\([^)]*\)\s*\n?\s*FROM PUBLIC, anon, authenticated, service_role/,
+    )
+    // Y no vuelve a concederse después. El orden importa: un GRANT posterior
+    // reabriría lo que el REVOKE cierra, y el texto se lee en orden documental.
+    const trasRevoke = codigo.slice(
+      codigo.lastIndexOf('REVOKE EXECUTE ON FUNCTION public.agua_cobro_auditar'),
+    )
+    expect(trasRevoke).not.toMatch(
+      /GRANT\s+EXECUTE ON FUNCTION public\.agua_cobro_auditar/,
+    )
+  })
+
+  it('revocar el helper no cierra las RPC públicas de cobro', () => {
+    // El contrapunto: «no queden avisos» no es el objetivo. Las RPC de cobro
+    // TIENEN que seguir siendo ejecutables por `authenticated` — son la API del
+    // módulo, y su autorización es su guard de permiso, no su ACL.
+    for (const firma of [
+      'public.agua_factura_emitir(uuid)',
+      'public.agua_factura_anular(uuid, text)',
+      'public.agua_factura_registrar_pago(uuid, numeric, date)',
+      'public.agua_registro_marcar_mora(uuid[])',
+      'public.agua_registro_cambiar_estado(uuid, text)',
+    ]) {
+      const escapada = firma.replace(/[.()[\]]/g, (c) => '\\' + c)
+      expect(codigo, `${firma} dejó de ser API`).toMatch(
+        new RegExp(`GRANT\\s+EXECUTE ON FUNCTION ${escapada} TO authenticated`),
+      )
+    }
   })
 
   it('la llave NUNCA va en proconfig: Supabase no puede aplicarlo', () => {

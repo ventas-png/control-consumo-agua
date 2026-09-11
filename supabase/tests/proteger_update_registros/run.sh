@@ -17,7 +17,7 @@
 # agujero dejara de reproducirse, la invariante 1 falla y avisa de que la
 # demostración —y con ella el motivo de esta migración— ya no aplica.
 #
-# QUÉ COMPRUEBA (39 invariantes)
+# QUÉ COMPRUEBA (43 invariantes)
 #    1-2   el agujero ejercido, y cerrado
 #    3-6   el guard por grupos: 18 columnas de la lectura y 16 del cobro son
 #          inmutables por UPDATE; notas, foto, gps y el borrado lógico no
@@ -49,6 +49,12 @@
 #          el reintento cuadra; dos solicitudes distintas del mismo recibo suman
 #          los dos abonos; repetir una ya conciliada es no-op; y ni
 #          `authenticated` ni una DEFINER suya la alcanzan
+#   40-43  `agua_cobro_auditar` como helper INTERNO: ningún rol de API lo
+#          ejecuta; con la llave de capacidad ENCENDIDA la llamada directa
+#          sigue negada (lo que para es la ACL, no el GUC); las seis
+#          transiciones siguen escribiendo su auditoría por el camino
+#          autorizado; y la capacidad no sobrevive a la RPC ni en éxito ni
+#          en error
 #
 # USO
 #   supabase/tests/proteger_update_registros/run.sh
@@ -65,6 +71,7 @@ MIG_REP="$MIG_DIR/20260910000300_reporte_inconsistencias_lecturas.sql"
 MIG_UPD="$MIG_DIR/20260910235732_proteger_update_registros_y_cobro_autoritativo.sql"
 MIG_SER="$MIG_DIR/20260911031701_cerrar_exencion_definer_y_serializar_cobro.sql"
 MIG_CON="$MIG_DIR/20260911042839_conciliar_pago_externo_transaccional.sql"
+MIG_AUD="$MIG_DIR/20260911181200_revocar_execute_agua_cobro_auditar.sql"
 # El padrón de agua es el del otro harness: una sola fuente de verdad.
 FIXTURE="$RAIZ/supabase/tests/registrar_lectura/fixture.sql"
 
@@ -129,7 +136,7 @@ psql -q -d registros -c "
 echo "  OK    2 empresas · 3 proyectos · 7 cuentas · 7 contadores · IVA 12% · mora a 15 días"
 
 echo "── 2/3 · las cinco migraciones, aplicadas DOS veces (idempotentes) ─────"
-for _ in 1 2; do aplicar "$MIG_RPC"; aplicar "$MIG_REP"; aplicar "$MIG_UPD"; aplicar "$MIG_SER"; aplicar "$MIG_CON"; done
+for _ in 1 2; do aplicar "$MIG_RPC"; aplicar "$MIG_REP"; aplicar "$MIG_UPD"; aplicar "$MIG_SER"; aplicar "$MIG_CON"; aplicar "$MIG_AUD"; done
 echo "  OK    re-aplicar no falla"
 
 echo "── 3/3 · invariantes ───────────────────────────────────────────────────"

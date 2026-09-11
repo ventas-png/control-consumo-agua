@@ -387,6 +387,10 @@ BEGIN
     RAISE EXCEPTION '15: authenticated no puede emitir'; END IF;
 
   -- Y la auditoría suelta, sin la llave de capacidad, no escribe nada.
+  -- OJO con lo que esta línea prueba y lo que NO: corre como el DUEÑO, así que
+  -- quien la para es el guard del CUERPO, no la ACL. Es la mitad de la defensa.
+  -- La otra mitad —que ningún rol de API pueda siquiera invocarla— la comprueba
+  -- la invariante 41, encendiendo la llave para dejar a la ACL sola.
   ok := false;
   BEGIN PERFORM public.agua_cobro_auditar(reg.id, 'inventado', '{}'::jsonb);
   EXCEPTION WHEN insufficient_privilege THEN ok := true; END;
@@ -1241,4 +1245,118 @@ BEGIN
   IF NOT ok THEN
     RAISE EXCEPTION '39: una DEFINER de authenticated alcanzó la conciliación'; END IF;
   RAISE NOTICE 'OK 39  ni desde una SECURITY DEFINER: el chequeo de rol efectivo la para';
+END $$;
+
+-- ── 40-43 · `agua_cobro_auditar` es un helper INTERNO ───────────────────────
+-- 20260910235732 la creó con un `GRANT EXECUTE … TO authenticated` que no hacía
+-- falta. El asesor de seguridad de Supabase lo marcó sobre la Preview de #847 y
+-- una consulta directa de ACL lo confirmó. 20260911181200 lo revoca.
+--
+-- La invariante 15 ya llamaba a la función suelta y esperaba 42501 — y pasaba,
+-- pero POR EL MOTIVO EQUIVOCADO: corre como el dueño del arnés, así que lo que
+-- la paraba era la comprobación del GUC, no la ACL. Una prueba que pasa igual
+-- con el agujero abierto y cerrado no prueba nada. Estas cuatro separan las dos
+-- defensas y exigen que cada una pare por su cuenta.
+DO $$
+DECLARE
+  M1     constant uuid := 'c0000000-0000-0000-0000-000000000001';
+  LUCIA  constant uuid := 'e0000000-0000-0000-0000-000000000001';
+  HOY    date := (now() AT TIME ZONE 'America/Guatemala')::date;
+  AUDIT  constant regprocedure := 'public.agua_cobro_auditar(uuid, text, jsonb)'::regprocedure;
+  reg    public.registros;
+  ok     boolean;
+  msj    text;
+  n      integer;
+  v_evt  text;
+BEGIN
+  -- Una lectura propia, como el resto de los bloques: así el escenario no
+  -- depende de en qué estado dejaron los recibos las invariantes anteriores.
+  PERFORM set_config('app.uid', LUCIA::text, false);
+  SELECT * INTO reg FROM public.registrar_lectura(
+    M1, 900, HOY, 'idem-auditar-acl-0001', 'Para la ACL del helper', NULL, NULL);
+
+  -- 40 · Ningún rol de API tiene EXECUTE directo. Los tres, nombrados.
+  FOREACH msj IN ARRAY ARRAY['anon', 'authenticated', 'service_role'] LOOP
+    IF has_function_privilege(msj, AUDIT, 'EXECUTE') THEN
+      RAISE EXCEPTION '40: % conserva EXECUTE sobre agua_cobro_auditar', msj; END IF;
+  END LOOP;
+  IF has_function_privilege('public', AUDIT, 'EXECUTE') THEN
+    RAISE EXCEPTION '40: PUBLIC conserva EXECUTE sobre agua_cobro_auditar'; END IF;
+  RAISE NOTICE 'OK 40  agua_cobro_auditar no es ejecutable por PUBLIC, anon, authenticated ni service_role';
+
+  -- 41 · Y falla por PERMISOS, no por el GUC. Es la parte decisiva: se ENCIENDE
+  -- la llave antes de llamar, para quitarle al guard del cuerpo la posibilidad
+  -- de ser quien para la llamada. Lo que quede en pie es la ACL y sólo la ACL.
+  PERFORM set_config('agua.cobro_autoritativo', 'on', true);
+  FOREACH msj IN ARRAY ARRAY['authenticated', 'service_role'] LOOP
+    ok := false;
+    EXECUTE format('SET LOCAL ROLE %I', msj);
+    BEGIN
+      PERFORM public.agua_cobro_auditar(reg.id, 'falsificado', '{}'::jsonb);
+    EXCEPTION WHEN insufficient_privilege THEN
+      ok := true;
+      v_evt := SQLERRM;
+    END;
+    RESET ROLE;
+    IF NOT ok THEN
+      RAISE EXCEPTION '41: % escribió una fila de auditoría con la llave encendida', msj; END IF;
+    -- El mensaje distingue las dos defensas: «permission denied for function»
+    -- es la ACL; «sólo se llama desde una RPC de cobro» es el guard del cuerpo.
+    -- Con la llave en 'on' el segundo no puede haber intervenido, así que exigir
+    -- el primero es exigir que la ACL exista de verdad.
+    IF v_evt NOT LIKE '%permi%' OR v_evt LIKE '%sólo se llama desde una RPC%' THEN
+      RAISE EXCEPTION '41: % no fue parado por la ACL sino por el GUC (%)', msj, v_evt; END IF;
+  END LOOP;
+  PERFORM set_config('agua.cobro_autoritativo', 'off', true);
+  RAISE NOTICE 'OK 41  con la llave ENCENDIDA sigue negada: lo que para la llamada directa es la ACL, no el GUC';
+
+  -- 42 · El camino autorizado sigue escribiendo. Revocar el helper no puede
+  -- haber dejado mudas a las RPC: son SECURITY DEFINER y lo llaman como dueño.
+  -- Las SEIS transiciones, cada una con su evento.
+  FOREACH v_evt IN ARRAY ARRAY[
+    'emitir', 'anular', 'registrar_pago', 'marcar_mora', 'cambiar_estado',
+    'acreditar_pago_externo'
+  ] LOOP
+    SELECT count(*) INTO n FROM public.security_logs
+     WHERE event_type = 'agua_cobro.' || v_evt;
+    IF n = 0 THEN
+      RAISE EXCEPTION '42: ninguna fila de auditoría para %, la RPC dejó de escribir', v_evt; END IF;
+  END LOOP;
+  RAISE NOTICE 'OK 42  las seis transiciones siguen dejando su rastro por el camino autorizado';
+
+  -- 43 · La capacidad no sobrevive a la RPC — ni cuando SALE BIEN ni cuando
+  -- FALLA. El camino de éxito lo apaga el cuerpo; el de error lo desapila la
+  -- subtransacción. Se comprueba ejerciendo el UPDATE, no leyendo el GUC: es la
+  -- consecuencia lo que importa.
+  --
+  -- Éxito:
+  PERFORM public.agua_factura_emitir(reg.id);
+  IF COALESCE(current_setting('agua.cobro_autoritativo', true), '') = 'on' THEN
+    RAISE EXCEPTION '43: la llave sobrevivió a una RPC que salió bien'; END IF;
+  ok := false;
+  BEGIN
+    UPDATE public.registros SET monto_pagado = 999999 WHERE id = reg.id;
+  EXCEPTION WHEN insufficient_privilege THEN ok := true; END;
+  IF NOT ok THEN
+    RAISE EXCEPTION '43: tras una RPC exitosa se pudo escribir el cobro a pelo'; END IF;
+
+  -- Error: emitir DOS VECES la misma factura revienta (la máquina de estados lo
+  -- impide), y ese es justo el camino que interesa — el que no llega a la línea
+  -- que apaga la llave.
+  BEGIN
+    PERFORM public.agua_factura_emitir(reg.id);
+    RAISE EXCEPTION '43: la segunda emisión no falló, el escenario ya no vale';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%el escenario ya no vale%' THEN RAISE; END IF;
+  END;
+  IF COALESCE(current_setting('agua.cobro_autoritativo', true), '') = 'on' THEN
+    RAISE EXCEPTION '43: la llave sobrevivió a una RPC que falló (%)',
+      current_setting('agua.cobro_autoritativo', true); END IF;
+  ok := false;
+  BEGIN
+    UPDATE public.registros SET monto_pagado = 888888 WHERE id = reg.id;
+  EXCEPTION WHEN insufficient_privilege THEN ok := true; END;
+  IF NOT ok THEN
+    RAISE EXCEPTION '43: tras una RPC que falló se pudo escribir el cobro a pelo'; END IF;
+  RAISE NOTICE 'OK 43  la capacidad no sobrevive a la RPC: ni saliendo bien ni reventando';
 END $$;

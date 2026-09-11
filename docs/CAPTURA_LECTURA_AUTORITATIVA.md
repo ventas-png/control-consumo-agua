@@ -367,6 +367,31 @@ distintas del mismo objeto, que es justo el *cambio ambiguo* que el auditor de
 tres vías cierra en falso a propósito. Cuando #826 reconcilie la función, la
 envoltura se colapsa en ella.
 
+### El helper de auditoría era ejecutable por `authenticated`
+
+`agua_cobro_auditar` es quien escribe en `security_logs` el rastro de cada
+transición. No es una RPC: la llaman por dentro las seis. Pero `20260910235732`
+la creó con un `GRANT EXECUTE … TO authenticated` que no hacía falta, y el asesor
+de seguridad de Supabase lo marcó sobre la Preview de #847.
+
+La tentación es decir que daba igual, porque el cuerpo exige la llave
+`agua.cobro_autoritativo` y aborta con `42501` sin ella. **No daba igual, y está
+medido**: con el `GRANT` puesto y la llave encendida, `authenticated` escribe la
+fila — es el mutante de la invariante 41. Lo único que separaba a un cliente de
+falsificar la bitácora era el *valor de un GUC*, y una bitácora que puede mentir
+no sirve para lo que existe.
+
+`20260911181200` lo revoca de `PUBLIC`, `anon`, `authenticated` y `service_role`,
+y no lo concede a nadie. No rompe nada porque las seis que lo llaman son
+`SECURITY DEFINER`: corren como el dueño, que es el mismo de `agua_cobro_auditar`
+y conserva su privilegio implícito. Ahora hacen falta **las dos** defensas —la ACL
+y la llave— y cada una se comprueba por separado (invariantes 40 a 43).
+
+Lo que **no** se tocó: las RPC públicas de cobro siguen concedidas a
+`authenticated`. Son la API del módulo y su autorización es su guard de permiso,
+no su ACL; cerrarlas sería romper el producto para callar un aviso. La propia
+migración lo verifica antes de terminar.
+
 El inventario completo de escritores de `public.registros` está en la cabecera de
 la migración. Resumido:
 
