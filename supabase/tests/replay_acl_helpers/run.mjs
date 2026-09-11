@@ -24,20 +24,25 @@
 // en una branch de verdad. Aquí se usa `bootstrap-branch.sql`, idéntico salvo
 // por no hacer ese regalo.
 //
-// El paso (1) se monta materializando el árbol de migraciones TAL COMO ESTABA
-// antes de este PR: el archivo histórico con su contenido original y sin la
-// migración forward-only. Si algún día el paso (1) dejara de reproducir el
-// fallo, esta prueba falla y avisa de que ya no demuestra lo que dice.
+// EL ÁRBOL «ANTES» NO SALE DE GIT, y es a propósito: el job de coverage hace un
+// checkout superficial y ahí no existe `origin/main`. Se deriva quitando el
+// bloque (0) del archivo histórico —está delimitado— y se COMPRUEBA que el
+// resultado es byte a byte el contenido que el guard tiene clavado en
+// `REPARACION_REPLAY.hashAntes`. Si la derivación fuera infiel, el hash no
+// cuadra y la prueba se detiene ahí en vez de medir un árbol inventado.
+// Y si algún día el paso (1) dejara de reproducir el fallo, esta prueba falla y
+// avisa de que ya no demuestra lo que dice.
 //
 // Uso:  node supabase/tests/replay_acl_helpers/run.mjs
 // Requiere binarios de PostgreSQL. No toca ningún proyecto remoto.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { execFileSync } from 'node:child_process'
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { reconstruir } from '../../../scripts/schema-drift/reconstruir.mjs'
+import { REPARACION_REPLAY } from '../../../scripts/migrations-append-only.mjs'
 
 const HISTORICA = '20260909000000_revoke_execute_helpers_rls_y_reset.sql'
 const FORWARD = '20260910000150_acl_helpers_rls_matriz_declarada.sql'
@@ -63,8 +68,25 @@ let fallos = 0
 const ok = (m) => console.log(`  OK    ${m}`)
 const mal = (m) => { console.error(`  ✗     ${m}`); fallos++ }
 
-function git(args) {
-  return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+/** El hash de blob de git: sha1('blob <bytes>\0' + contenido). */
+function hashDeBlob(texto) {
+  const buf = Buffer.from(texto, 'utf8')
+  return createHash('sha1')
+    .update(Buffer.concat([Buffer.from(`blob ${buf.length}\0`, 'utf8'), buf]))
+    .digest('hex')
+}
+
+/** El archivo histórico SIN el bloque (0) — es decir, como estaba antes. */
+function sinLaReparacion(texto) {
+  const ini = texto.indexOf('-- ── (0) REPARACIÓN DE REPLAY')
+  const fin = texto.indexOf('-- ── (1) Helpers de policies RLS')
+  if (ini === -1 || fin === -1 || fin < ini) {
+    throw new Error(
+      'No se encontraron los delimitadores del bloque (0) en ' + HISTORICA +
+      ' — si se reescribió la cabecera, hay que actualizar esta prueba.',
+    )
+  }
+  return texto.slice(0, ini) + texto.slice(fin)
 }
 
 // ── (1) El árbol ANTERIOR a la reparación, y su fallo ──────────────────────
@@ -74,10 +96,17 @@ const dirViejo = join(tmp, 'migrations')
 cpSync(DIR, dirViejo, { recursive: true })
 rmSync(join(dirViejo, FORWARD), { force: true })
 
-// El contenido histórico original sale de git, no de una copia a mano: si el
-// archivo de referencia cambiara, esto lo seguiría.
-const base = git(['merge-base', 'origin/main', 'HEAD']).trim()
-writeFileSync(join(dirViejo, HISTORICA), git(['show', `${base}:${DIR}/${HISTORICA}`]))
+const original = sinLaReparacion(readFileSync(join(DIR, HISTORICA), 'utf8'))
+const hash = hashDeBlob(original)
+if (hash !== REPARACION_REPLAY.hashAntes) {
+  console.error(`  ✗     el árbol «antes» derivado no coincide con el hash clavado en el guard`)
+  console.error(`        derivado: ${hash}`)
+  console.error(`        esperado: ${REPARACION_REPLAY.hashAntes}`)
+  console.error('        La prueba no puede seguir: mediría un árbol que nunca existió.')
+  process.exit(1)
+}
+ok(`el árbol «antes» reproduce el blob ${REPARACION_REPLAY.hashAntes.slice(0, 12)} que el guard tiene clavado`)
+writeFileSync(join(dirViejo, HISTORICA), original)
 
 const antes = reconstruir({ dirMigraciones: dirViejo, bootstrap: 'bootstrap-branch.sql', pararEnElPrimerFallo: true })
 try {
