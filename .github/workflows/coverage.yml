@@ -452,6 +452,20 @@ jobs:
           PGPORT_TEST: 55496
         run: supabase/tests/proteger_update_registros/run.sh
 
+      # La Preview limpia de #856 dejó SIETE SECURITY DEFINER ejecutables por
+      # `anon` porque producción las endureció a mano y las migraciones no lo
+      # registran. `20260911223000` declara esa matriz —que NO es la misma para
+      # las siete: sso_lookup_domain conserva anon a propósito y
+      # buscar_cliente_para_onboarding conserva authenticated— y esta prueba la
+      # ejerce: invocación real con SET LOCAL ROLE, triggers vivos tras la
+      # revocación, y mutación (quitar cualquiera de los siete REVOKE, o mover
+      # una celda, tiene que poner el arnés en rojo).
+      - name: ACL de las SECURITY DEFINER expuestas por anon (matriz de producción)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55497
+        run: supabase/tests/acl_definer_expuestas_anon/run.sh
+
       # `20260909000000` revoca EXECUTE de PUBLIC/anon sobre 15 helpers de RLS
       # dando por hecho un GRANT a `authenticated` que NINGUNA migración
       # concede: lo aparentaba el `ALTER DEFAULT PRIVILEGES … ON FUNCTIONS` de

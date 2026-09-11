@@ -18,6 +18,16 @@
 //          15 helpers → PUBLIC no · anon no · authenticated SÍ · service_role SÍ
 //           5 reseteo → PUBLIC no · anon no · authenticated NO · service_role SÍ
 //
+//   4. Y las SIETE SECURITY DEFINER de 20260911223000 reproducen la matriz de
+//      PRODUCCIÓN, que no es la misma para las siete (#856 las dejó a las siete
+//      abiertas a `anon` en una Preview limpia):
+//          sso_lookup_domain                 → anon SÍ · auth SÍ · service_role SÍ
+//          buscar_cliente_para_onboarding    → anon no · auth SÍ · service_role SÍ
+//          las otras cinco                   → anon no · auth no · service_role SÍ
+//      Aquí importa el bootstrap SIN el regalo de privilegios: es lo que
+//      demuestra que el `service_role` de la matriz lo concede la migración, y
+//      no el andamiaje.
+//
 // POR QUÉ NO USA `bootstrap.sql`. Ese andamiaje concede funciones a
 // `authenticated` con ALTER DEFAULT PRIVILEGES, y eso fue justo lo que ocultó
 // el defecto: con él puesto, la reconstrucción pasaba y el fallo sólo aparecía
@@ -64,6 +74,18 @@ const RESET = [
   'validate_reset_token(text)',
 ]
 
+// Las siete de 20260911223000, con la celda que declara la matriz de producción
+// (nnsqmeigtgewatameexo, leída el 2026-09-11). PUBLIC es `false` en las siete.
+const SIETE = [
+  { fn: 'sso_lookup_domain(text)',                          anon: true,  auth: true },
+  { fn: 'buscar_cliente_para_onboarding(text, date, text)', anon: false, auth: true },
+  { fn: 'migrate_custom_auth_to_supabase_unconfirmed()',    anon: false, auth: false },
+  { fn: 'create_default_conversation_access_rules(uuid)',   anon: false, auth: false },
+  { fn: 'fill_company_id_from_user()',                      anon: false, auth: false },
+  { fn: 'fn_set_recipient_company_id()',                    anon: false, auth: false },
+  { fn: 'set_updated_at()',                                 anon: false, auth: false },
+]
+
 let fallos = 0
 const ok = (m) => console.log(`  OK    ${m}`)
 const mal = (m) => { console.error(`  ✗     ${m}`); fallos++ }
@@ -90,7 +112,7 @@ function sinLaReparacion(texto) {
 }
 
 // ── (1) El árbol ANTERIOR a la reparación, y su fallo ──────────────────────
-console.log('── 1/3 · la cadena ANTES de reparar: tiene que fallar ──────────────────')
+console.log('── 1/4 · la cadena ANTES de reparar: tiene que fallar ──────────────────')
 const tmp = mkdtempSync(join(tmpdir(), 'replay-'))
 const dirViejo = join(tmp, 'migrations')
 cpSync(DIR, dirViejo, { recursive: true })
@@ -125,7 +147,7 @@ try {
 }
 
 // ── (2) El árbol reparado: tiene que aplicar entero ────────────────────────
-console.log('── 2/3 · la cadena reparada: tiene que aplicar limpia ──────────────────')
+console.log('── 2/4 · la cadena reparada: tiene que aplicar limpia ──────────────────')
 const ahora = reconstruir({ bootstrap: 'bootstrap-branch.sql' })
 try {
   if (ahora.fallos.length > 0) {
@@ -135,7 +157,7 @@ try {
   }
 
   // ── (3) La matriz, celda por celda ───────────────────────────────────────
-  console.log('── 3/3 · la matriz de ACL, con has_function_privilege ──────────────────')
+  console.log('── 3/4 · la matriz de ACL de los helpers, con has_function_privilege ──────────────────')
   const consultar = (fns) => {
     const valores = fns.map((f) => `('${f.replace(/'/g, "''")}')`).join(',')
     const sql = `
@@ -165,6 +187,27 @@ try {
 
   revisar(consultar(HELPERS), { n: 15, auth: true }, 'los 15 helpers de RLS')
   revisar(consultar(RESET), { n: 5, auth: false }, 'las 5 de reseteo')
+
+  // ── (4) Las siete de 20260911223000, celda por celda ─────────────────────
+  // No comparten matriz, así que no se pueden revisar en bloque: cada una trae
+  // la suya y se comprueban las CUATRO celdas. Mirar sólo los `no` daría por
+  // bueno revocar de más, que aquí significaría romper el login por SSO o la
+  // pantalla de onboarding.
+  console.log('── 4/4 · las siete SECURITY DEFINER de 20260911223000 ──────────────────')
+  const medidas = new Map(consultar(SIETE.map((f) => f.fn)).map((r) => [r.fn, r]))
+  for (const esperado of SIETE) {
+    const r = medidas.get(esperado.fn)
+    if (!r) {
+      mal(`${esperado.fn}: no existe en el esquema reconstruido`)
+      continue
+    }
+    if (r.publico || r.anon !== esperado.anon || r.auth !== esperado.auth || !r.srv) {
+      mal(`${esperado.fn}: PUBLIC=${r.publico} anon=${r.anon} authenticated=${r.auth} service_role=${r.srv}` +
+          ` — la matriz de producción declara PUBLIC=false anon=${esperado.anon} authenticated=${esperado.auth} service_role=true`)
+    } else {
+      ok(`${esperado.fn}: PUBLIC=false · anon=${r.anon} · authenticated=${r.auth} · service_role=true`)
+    }
+  }
 } finally {
   ahora.destruir()
 }
