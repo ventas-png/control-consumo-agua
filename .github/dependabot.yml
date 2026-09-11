@@ -30,6 +30,19 @@ updates:
           - "@types/react"
           - "@types/react-dom"
         update-types: ["major", "minor", "patch"]
+      # Mismo caso que React, y aún más estricto: `@vitest/coverage-v8` no
+      # declara un rango sobre vitest, declara la versión EXACTA
+      # (`peerDependencies: { "vitest": "5.0.0" }`). Subir sólo uno de los dos
+      # deja el otro en 4.1.11 pidiendo `vitest@4.1.11`, y `npm ci` aborta con
+      # ERESOLVE antes de compilar. En septiembre/2026 Dependabot abrió #835
+      # (vitest) y #837 (coverage-v8) por separado, cada uno la mitad de
+      # vitest 5: ninguno instalable, en ningún orden. Este grupo los une con
+      # los majors incluidos, para que el salto de vitest llegue completo.
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+        update-types: ["major", "minor", "patch"]
     labels: ["dependencies"]
     # Majors que Dependabot NO debe reabrir solo. Cada uno rompe el pipeline de
     # una forma distinta y ninguno se arregla mergeando el PR tal cual; hay que
@@ -49,6 +62,16 @@ updates:
       # este ignore junto con la migración de los schemas a la API v4.
       - dependency-name: zod
         update-types: ["version-update:semver-major"]
+      # @types/node no es una dependencia cualquiera: su major ES la versión de
+      # Node que describe. `engines` de este repo fija `node: 22.x` (y los
+      # workflows y Vercel corren 22), así que @types/node@26 describiría APIs
+      # que el runtime no tiene — `tsc --noEmit` acepta código que revienta al
+      # ejecutarse. Eso trajo #836 en septiembre/2026, saltando de 20 a 26.
+      # El tope es `<23`, NO un bloqueo de majors: 20 → 22 es justamente el
+      # major que FALTA para alinear los tipos con `engines`. Al mover
+      # `engines` a Node 24 o 26, subir este tope en el mismo PR.
+      - dependency-name: "@types/node"
+        versions: [">=23"]
 
   - package-ecosystem: github-actions
     directory: /
