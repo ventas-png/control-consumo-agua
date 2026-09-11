@@ -13,9 +13,10 @@
 --    nombraba «cualquier cosa que corra como el dueño», que es casi todo.
 --
 --    Se va. En su lugar, los DOS caminos de sistema que de verdad escriben
---    columnas de cobro reciben la llave POR FUNCIÓN, con `ALTER FUNCTION …
---    SET`: la capacidad vive mientras esa función corre y no un microsegundo
---    más. Es más estrecho que la exención que sustituye, y está enumerado.
+--    columnas de cobro reciben la llave POR FUNCIÓN: la encienden al entrar y
+--    la apagan al salir, así que la capacidad vive mientras esa función corre y
+--    no una sentencia más. Es más estrecho que la exención que sustituye, y
+--    está enumerado.
 --
 -- 2. EL PAGO NO SE SERIALIZABA. `agua_factura_registrar_pago` leía
 --    `monto_pagado` y escribía después sin bloquear la fila: dos abonos
@@ -76,14 +77,15 @@
 -- como tal.
 --
 -- REVERSIÓN
---   ALTER FUNCTION public.agua_cerrar_ciclo_nucleo(uuid, text, boolean) RESET "agua.cobro_autoritativo";
+--   -- volver a 20260717140000 para agua_cerrar_ciclo_nucleo (su cuerpo aquí es
+--   -- el de esa migración más las tres líneas de la llave);
 --   DROP FUNCTION IF EXISTS public.agua_mora_cron_aplicar();  -- y reprogramar el
 --   -- job a SELECT public.aplicar_mora_facturas_vencidas();
 --   DROP FUNCTION IF EXISTS public.agua_factura_emitir(uuid);
 --   DROP FUNCTION IF EXISTS public.agua_registro_acreditar_pago_externo(uuid, numeric, text);
 --   -- y volver a 20260910235732 para el resto.
 --
--- Idempotente: CREATE OR REPLACE, DROP … IF EXISTS y ALTER … SET repetible.
+-- Idempotente: CREATE OR REPLACE y DROP … IF EXISTS.
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ── 1. El guard, sin la puerta de `postgres` ────────────────────────────────
@@ -103,8 +105,8 @@ BEGIN
   -- LA ÚNICA EXENCIÓN POR ROL: `service_role`. Ya no están `postgres` ni
   -- `supabase_admin`, porque toda función SECURITY DEFINER corre como el dueño
   -- y los llevaba puestos de regalo. Lo que el cron y el cierre de ciclo
-  -- necesitan lo reciben por función (`ALTER FUNCTION … SET`, sección 2), que
-  -- es la capacidad acotada a esa llamada.
+  -- necesitan lo reciben por función (la llave que encienden ellas mismas,
+  -- sección 2), que es la capacidad acotada a esa llamada.
   --
   -- Qué justifica la que queda: `confirm-charge` (la confirmación del
   -- proveedor de pago, servidor a servidor, sin usuario que auditar), el
@@ -194,52 +196,306 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.agua_tg_registros_proteger_update() IS
-  'BEFORE UPDATE en registros. Las columnas de la LECTURA son inmutables salvo con agua.lectura_correccion_autorizada (una migración revisada, nunca la aplicación); las de COBRO sólo cambian con agua.cobro_autoritativo, que encienden las RPC de cobro y —por ALTER FUNCTION … SET— los dos caminos de sistema enumerados. La ÚNICA exención por rol es service_role: postgres y supabase_admin se quitaron en 20260911031701 porque toda función SECURITY DEFINER corre como el dueño y los llevaba puestos.';
+  'BEFORE UPDATE en registros. Las columnas de la LECTURA son inmutables salvo con agua.lectura_correccion_autorizada (una migración revisada, nunca la aplicación); las de COBRO sólo cambian con agua.cobro_autoritativo, que encienden las RPC de cobro y los dos caminos de sistema enumerados. La ÚNICA exención por rol es service_role: postgres y supabase_admin se quitaron en 20260911031701 porque toda función SECURITY DEFINER corre como el dueño y los llevaba puestos.';
 
 REVOKE EXECUTE ON FUNCTION public.agua_tg_registros_proteger_update() FROM PUBLIC, anon, authenticated;
 
 -- ── 2. La capacidad, por función y no por rol ───────────────────────────────
--- `SET` sobre una función fija el GUC mientras esa función corre —y mientras
--- corre lo que ella llame— y lo restaura al salir: es exactamente «esta función
--- puede tocar el cobro», sin darle la capacidad a nada más. Las dos vías están
--- fuera del alcance de la API (`agua_cerrar_ciclo_nucleo` revocada de todos los
--- roles; `aplicar_mora_facturas_vencidas` sólo para `service_role`), así que
--- nadie las usa de trampolín.
+-- La primera versión de esta sección ponía la llave con `ALTER FUNCTION … SET`,
+-- que es la forma limpia de decir «esta función puede tocar el cobro»: el GUC
+-- vive en `proconfig`, se enciende al entrar, cubre lo que la función llame y
+-- se restaura al salir, pase lo que pase.
+--
+-- No se puede. `agua.cobro_autoritativo` es un GUC de clase PERSONALIZADA: no
+-- lo define ninguna extensión, así que para Postgres es un «placeholder», y
+-- meter un placeholder en un array de configuración (`proconfig`, `rolconfig`,
+-- `datconfig`) está reservado al SUPERUSUARIO — `validate_option_array_item()`
+-- lo corta con `42501 permission denied to set parameter`. El razonamiento de
+-- Postgres es sensato: cuando el placeholder se resuelva puede resultar ser una
+-- variable SUSET, y en ese momento ya sería tarde para comprobar el permiso.
+--
+-- En una Supabase gestionada el rol que aplica las migraciones (`postgres`) NO
+-- es superusuario, así que el `ALTER FUNCTION` aborta la migración entera. Se
+-- vio en la Supabase Preview de #847 el 2026-09-11, y NO se vio antes porque el
+-- Postgres del arnés de pruebas se levanta con `initdb` y ahí `postgres` SÍ es
+-- superusuario: el mismo patrón de #855 —el entorno de prueba regalando un
+-- privilegio que el entorno real no da— sólo que al revés.
+--
+-- La llave se enciende entonces DENTRO del cuerpo, con `set_config(…, true)`,
+-- que es lo que ya hacían las seis RPC de cobro de 20260910235732 y de la
+-- sección 3 de aquí, y el cuerpo la apaga antes de devolver.
+--
+-- Ese apagado explícito es, hoy, un cinturón sobre tirantes: las dos funciones
+-- llevan cláusula `SET` (`search_path`), y una cláusula `SET` hace que Postgres
+-- les abra un NIVEL de GUC propio, de modo que TODO lo que cambien dentro se
+-- desapila al salir —no sólo lo que figure en `proconfig`—. Se deja escrito
+-- igualmente porque la propiedad que importa («la capacidad no sobrevive a la
+-- función») no debe depender de que nadie quite nunca ese `SET search_path`:
+-- sin cláusula `SET` no hay nivel propio, y un `set_config` local vive hasta el
+-- final de la TRANSACCIÓN, no de la función. El cron, por ejemplo, sigue
+-- trabajando en la misma transacción después de que el núcleo devuelve. En el
+-- camino de error no hace falta apagar nada: la excepción aborta la transacción
+-- o la subtransacción y el GUC se desapila solo.
+--
+-- (Al desapilarse no vuelve a 'off' sino a la cadena VACÍA, que es el valor de
+-- reposo de un GUC de clase personalizada. Da igual: el guard abre con 'on' y
+-- con nada más.)
 --
 -- El núcleo, y no sus llamadores: el `UPDATE` vive ahí, y así quedan cubiertos
 -- de una vez `agua_cerrar_ciclo` (guard de permiso propio) y
--- `run_cierres_ciclo_automaticos` (cron).
-ALTER FUNCTION public.agua_cerrar_ciclo_nucleo(uuid, text, boolean)
-  SET "agua.cobro_autoritativo" = 'on';
+-- `run_cierres_ciclo_automaticos` (cron). El cuerpo es el de 20260717140000
+-- palabra por palabra; lo único que se le agrega son las tres líneas de la
+-- llave. Sigue fuera del alcance de la API (revocada de PUBLIC, `anon` y
+-- `authenticated` allí mismo), así que nadie la usa de trampolín.
+CREATE OR REPLACE FUNCTION public.agua_cerrar_ciclo_nucleo(
+  p_project_id uuid,
+  p_periodo    text,
+  p_notificar  boolean DEFAULT true
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $fn$
+DECLARE
+  v_now      timestamptz := now();
+  v_company  uuid;
+  v_dias     integer;
+  v_iva_tasa numeric;
+  v_tz       text;
+  v_desde    timestamptz;
+  v_hasta    timestamptz;
+  v_emitidas integer := 0;
+  v_avisos   integer := 0;
+  v_emails   integer := 0;
+  -- La llave de cobro que este cuerpo necesita, y su valor previo para
+  -- devolverlo al salir. Ver la nota de la sección 2.
+  v_llave_previa text;
+BEGIN
+  v_llave_previa := COALESCE(current_setting('agua.cobro_autoritativo', true), 'off');
+  PERFORM set_config('agua.cobro_autoritativo', 'on', true);
+  SELECT p.company_id INTO v_company FROM public.projects p WHERE p.id = p_project_id;
+  IF v_company IS NULL THEN
+    RAISE EXCEPTION 'proyecto no encontrado' USING ERRCODE = 'P0002';
+  END IF;
+  IF p_periodo IS NULL OR p_periodo !~ '^\d{4}-(0[1-9]|1[0-2])$' THEN
+    RAISE EXCEPTION 'periodo inválido (esperado YYYY-MM)' USING ERRCODE = '22023';
+  END IF;
 
--- La mora del cron NO se toca con `ALTER FUNCTION`, y la razón es de higiene,
--- no de gusto: `aplicar_mora_facturas_vencidas` es una de las funciones que se
+  -- E4/D5: ventana del período a MEDIANOCHE LOCAL del tenant. Zona inválida →
+  -- fallback (el cierre jamás debe morir por un typo en configuración).
+  SELECT COALESCE(c.timezone, 'America/Guatemala') INTO v_tz
+  FROM public.companies c WHERE c.id = v_company;
+  BEGIN
+    PERFORM v_now AT TIME ZONE v_tz;
+  EXCEPTION WHEN OTHERS THEN
+    v_tz := 'America/Guatemala';
+  END;
+  v_desde := ((p_periodo || '-01')::timestamp) AT TIME ZONE v_tz;
+  v_hasta := (((p_periodo || '-01')::date + interval '1 month')::timestamp) AT TIME ZONE v_tz;
+
+  -- Días de vencimiento: regla de mora ACTIVA del proyecto (igual que la UI) ?? 30.
+  SELECT rmc.dias_vencimiento INTO v_dias
+  FROM public.reglas_mora_config rmc
+  WHERE rmc.project_id = p_project_id AND rmc.activa = true
+  ORDER BY rmc.created_at DESC
+  LIMIT 1;
+  v_dias := COALESCE(v_dias, 30);
+
+  -- Tasa de IVA del tenant (companies.iva_tasa_default), acotada a [0,1] igual que
+  -- calcularIVA: NULL → 0.12 (GT); negativa → 0; > 1 → 1; un 0 explícito es exento.
+  SELECT c.iva_tasa_default INTO v_iva_tasa FROM public.companies c WHERE c.id = v_company;
+  v_iva_tasa := CASE
+                  WHEN v_iva_tasa IS NULL THEN 0.12
+                  WHEN v_iva_tasa < 0     THEN 0
+                  WHEN v_iva_tasa > 1     THEN 1
+                  ELSE v_iva_tasa
+                END;
+
+  -- Emisión set-based de todas las emitibles del período (una sola pasada).
+  WITH emitibles AS (
+    SELECT r.id,
+           (CASE WHEN COALESCE(r.monto_calculado, 0) > 0
+                 THEN round(r.monto_calculado::numeric, 2) ELSE 0 END) AS base,
+           (CASE WHEN COALESCE(r.mora_monto, 0) > 0
+                 THEN round(r.mora_monto::numeric, 2) ELSE 0 END)      AS mora
+    FROM public.registros r
+    WHERE r.project_id = p_project_id
+      AND r.deleted_at IS NULL
+      AND r.fecha >= v_desde
+      AND r.fecha <  v_hasta
+      AND (CASE
+             WHEN COALESCE(r.factura_estado, r.estado) IN ('pendiente','emitida','pagada','vencida','anulada')
+               THEN COALESCE(r.factura_estado, r.estado)
+             WHEN COALESCE(r.factura_estado, r.estado) = 'pagado' THEN 'pagada'
+             WHEN COALESCE(r.factura_estado, r.estado) = 'mora'   THEN 'vencida'
+             ELSE 'pendiente'
+           END) = 'pendiente'
+    FOR UPDATE
+  ),
+  calc AS (
+    SELECT e.id, e.mora,
+           round(e.base * v_iva_tasa, 2)                        AS iva_monto,
+           round(e.base + round(e.base * v_iva_tasa, 2), 2)     AS monto_con_iva
+    FROM emitibles e
+  ),
+  upd AS (
+    UPDATE public.registros cu
+    SET factura_estado    = 'emitida',
+        emitida_at        = v_now,
+        fecha_vencimiento = (v_now + make_interval(days => v_dias))::date,
+        iva_tasa          = v_iva_tasa,
+        iva_monto         = c.iva_monto,
+        monto_con_iva     = c.monto_con_iva,
+        total_a_pagar     = round(c.monto_con_iva + c.mora, 2)
+    FROM calc c
+    WHERE cu.id = c.id
+    RETURNING cu.id
+  )
+  SELECT count(*) INTO v_emitidas FROM upd;
+
+  -- Aviso al cliente del recibo (outbox). Identificamos lo recién emitido por
+  -- emitida_at = v_now (misma transacción).
+  IF p_notificar AND v_emitidas > 0 THEN
+    -- (a) in_app — la campana siempre recibe. Sin ruta_id (registro no es ruta).
+    WITH recien AS (
+      SELECT r.id AS registro_id, r.cliente_id, r.fecha_vencimiento,
+             COALESCE(r.total_a_pagar, r.monto_calculado) AS monto,
+             COALESCE(p.moneda, '') AS moneda
+      FROM public.registros r
+      LEFT JOIN public.projects p ON p.id = r.project_id
+      WHERE r.project_id = p_project_id
+        AND r.emitida_at = v_now
+        AND r.cliente_id IS NOT NULL
+    ),
+    destinatarios AS (
+      SELECT DISTINCT r.registro_id, r.fecha_vencimiento, r.monto, r.moneda,
+             au.id AS user_id, cli.email AS email
+      FROM recien r
+      JOIN public.app_users au ON au.cliente_id = r.cliente_id AND au.activo = true
+      LEFT JOIN public.clientes cli ON cli.id = r.cliente_id
+    )
+    SELECT count(public.enqueue_notification(
+      'in_app',
+      d.user_id::text,
+      jsonb_build_object(
+        'tipo', 'recibo_agua_emitido',
+        'titulo', 'Nuevo recibo de agua',
+        'cuerpo',
+          'Se emitió tu recibo de agua del período ' || p_periodo || ' por '
+          || (CASE WHEN d.moneda <> '' THEN d.moneda || ' ' ELSE '' END)
+          || to_char(d.monto, 'FM999999990.00')
+          || ' — vence el ' || to_char(d.fecha_vencimiento, 'DD/MM/YYYY') || '.',
+        'seccion', 'cobros',
+        'registro_id', d.registro_id,
+        'periodo', p_periodo,
+        'hito', 'emitida'
+      ),
+      v_company,
+      NULL::text,
+      v_now
+    ))::integer
+    INTO v_avisos
+    FROM destinatarios d;
+
+    -- (b) email — al correo del cliente, si lo tiene. `user_id` habilita el opt-out
+    -- del canal (notification_channel_enabled). Inerte si el tenant no tiene Gmail.
+    WITH recien AS (
+      SELECT r.id AS registro_id, r.cliente_id, r.fecha_vencimiento,
+             COALESCE(r.total_a_pagar, r.monto_calculado) AS monto,
+             COALESCE(p.moneda, '') AS moneda
+      FROM public.registros r
+      LEFT JOIN public.projects p ON p.id = r.project_id
+      WHERE r.project_id = p_project_id
+        AND r.emitida_at = v_now
+        AND r.cliente_id IS NOT NULL
+    ),
+    destinatarios AS (
+      SELECT DISTINCT r.registro_id, r.fecha_vencimiento, r.monto, r.moneda,
+             au.id AS user_id, cli.email AS email
+      FROM recien r
+      JOIN public.app_users au ON au.cliente_id = r.cliente_id AND au.activo = true
+      LEFT JOIN public.clientes cli ON cli.id = r.cliente_id
+    )
+    SELECT count(public.enqueue_notification(
+      'email',
+      d.email,
+      jsonb_build_object(
+        'to_email', d.email,
+        'user_id', d.user_id,
+        'tipo', 'recibo_agua_emitido',
+        'subject', 'Nuevo recibo de agua — período ' || p_periodo,
+        'html_body',
+          '<p>Se emitió tu recibo de agua del período <strong>' || p_periodo
+          || '</strong> por '
+          || (CASE WHEN d.moneda <> '' THEN d.moneda || ' ' ELSE '' END)
+          || to_char(d.monto, 'FM999999990.00')
+          || '.</p><p>Vence el <strong>'
+          || to_char(d.fecha_vencimiento, 'DD/MM/YYYY') || '</strong>.</p>',
+        'seccion', 'cobros',
+        'registro_id', d.registro_id,
+        'periodo', p_periodo,
+        'hito', 'emitida'
+      ),
+      v_company,
+      NULL::text,
+      v_now
+    ))::integer
+    INTO v_emails
+    FROM destinatarios d
+    WHERE d.email IS NOT NULL AND d.email <> '';
+  END IF;
+
+  -- La capacidad se apaga ANTES de devolver: lo que siga en esta misma
+  -- transacción (el cron encola avisos, actualiza cierre_ciclo_config)
+  -- vuelve a estar sujeto al guard.
+  PERFORM set_config('agua.cobro_autoritativo', v_llave_previa, true);
+
+  RETURN jsonb_build_object(
+    'emitidas', v_emitidas,
+    'avisos', COALESCE(v_avisos, 0),
+    'emails', COALESCE(v_emails, 0),
+    'dias_vencimiento', v_dias,
+    'iva_tasa', v_iva_tasa,
+    'timezone', v_tz
+  );
+END
+$fn$;
+
+-- La mora del cron NO se toca, y la razón es de higiene además de la de arriba:
+-- `aplicar_mora_facturas_vencidas` es una de las funciones que se
 -- editaron A MANO en producción (drift declarado en `drift-conocido.json`,
--- inventario en #826). Ponerle `proconfig` desde aquí dejaría a producción, a
--- main y a este PR diciendo tres cosas distintas del mismo objeto, que es
+-- inventario en #826). Reescribirle el cuerpo desde aquí dejaría a producción,
+-- a main y a este PR diciendo tres cosas distintas del mismo objeto, que es
 -- exactamente lo que el auditor de tres vías cierra en falso a propósito —y
 -- tendría razón: nadie puede decidir desde el repositorio si eso arregla o
 -- empeora el drift.
 --
 -- Así que la llave se le da DESDE FUERA, con una envoltura nueva que sí es del
--- repositorio. `SET` sobre ella cubre la llamada anidada, que es lo único que
--- hacía falta; el cuerpo con drift se queda intacto y el auditor lo ve como lo
--- que es: un objeto nuevo. Cuando #826 reconcilie la función, esto se puede
--- colapsar en un `ALTER FUNCTION` y quitar la envoltura.
+-- repositorio. Encenderla en la envoltura cubre la llamada anidada, que es lo
+-- único que hacía falta; el cuerpo con drift se queda intacto y el auditor lo ve
+-- como lo que es: un objeto nuevo. Cuando #826 reconcilie la función, esto se
+-- puede colapsar en la propia función y quitar la envoltura.
 CREATE OR REPLACE FUNCTION public.agua_mora_cron_aplicar()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-SET "agua.cobro_autoritativo" = 'on'
 AS $$
+DECLARE
+  v_llave_previa text;
 BEGIN
+  -- Misma razón que en el núcleo: la llave no puede ir en `proconfig` (placeholder
+  -- + `postgres` sin superusuario), así que se enciende aquí y se apaga al salir.
+  v_llave_previa := COALESCE(current_setting('agua.cobro_autoritativo', true), 'off');
+  PERFORM set_config('agua.cobro_autoritativo', 'on', true);
   PERFORM public.aplicar_mora_facturas_vencidas();
+  PERFORM set_config('agua.cobro_autoritativo', v_llave_previa, true);
 END;
 $$;
 
 COMMENT ON FUNCTION public.agua_mora_cron_aplicar() IS
-  'Envoltura del job de mora de agua: lo único que agrega es la llave agua.cobro_autoritativo, que cubre la llamada anidada a aplicar_mora_facturas_vencidas. Existe como envoltura —y no como un ALTER FUNCTION sobre la función real— porque esa función tiene drift declarado contra producción y ponerle proconfig desde el repositorio dejaría el auditor de tres vías en ambiguo.';
+  'Envoltura del job de mora de agua: lo único que agrega es la llave agua.cobro_autoritativo, que cubre la llamada anidada a aplicar_mora_facturas_vencidas. Existe como envoltura —y no reescribiendo la función real— porque esa función tiene drift declarado contra producción y tocarla desde el repositorio dejaría el auditor de tres vías en ambiguo. La llave va en el cuerpo y no en proconfig: agua.cobro_autoritativo es un GUC placeholder y sólo un superusuario puede meterlo en proconfig, cosa que el postgres de una Supabase gestionada no es.';
 
 REVOKE EXECUTE ON FUNCTION public.agua_mora_cron_aplicar() FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.agua_mora_cron_aplicar() TO service_role;

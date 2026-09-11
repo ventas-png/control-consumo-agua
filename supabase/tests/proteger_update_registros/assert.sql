@@ -600,22 +600,46 @@ BEGIN
   RAISE NOTICE 'OK 24  la llave de cobro no abre las columnas de la lectura';
 
   -- 25 · Los DOS caminos de sistema enumerados SÍ pasan, y por la capacidad
-  -- POR FUNCIÓN (`ALTER FUNCTION … SET`), no por su rol.
-  SELECT p.proconfig INTO cfg FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-   WHERE n.nspname = 'public' AND p.proname = 'agua_cerrar_ciclo_nucleo';
-  IF cfg IS NULL OR NOT ('agua.cobro_autoritativo=on' = ANY (cfg)) THEN
-    RAISE EXCEPTION '25: agua_cerrar_ciclo_nucleo no lleva la llave por función (%)', cfg; END IF;
+  -- POR FUNCIÓN, no por su rol.
+  --
+  -- La llave va en el CUERPO, no en `proconfig`. No es una preferencia: meter un
+  -- GUC de clase personalizada en `proconfig` está reservado al superusuario
+  -- (`validate_option_array_item` → `42501 permission denied to set parameter`)
+  -- y el `postgres` de una Supabase gestionada no lo es. Con `ALTER FUNCTION …
+  -- SET` la migración abortaba la cadena entera; se vio en la Supabase Preview
+  -- de #847 el 2026-09-11. Aquí no se veía porque este arnés levanta Postgres
+  -- con `initdb` y ahí `postgres` SÍ es superusuario — por eso esta invariante
+  -- ahora exige lo contrario: que NADIE la lleve en proconfig.
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proconfig IS NOT NULL
+       AND 'agua.cobro_autoritativo=on' = ANY (p.proconfig)
+  ) THEN
+    RAISE EXCEPTION '25: alguna función lleva la llave en proconfig — eso no lo puede aplicar Supabase (42501)'; END IF;
+
+  -- Y la llevan en el cuerpo, las dos y sólo las dos.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = 'agua_cerrar_ciclo_nucleo'
+       AND p.prosrc LIKE '%set_config(''agua.cobro_autoritativo'', ''on'', true)%'
+  ) THEN
+    RAISE EXCEPTION '25: agua_cerrar_ciclo_nucleo no enciende la llave en su cuerpo'; END IF;
   -- La mora del cron la lleva la ENVOLTURA, no la función real: esa tiene drift
-  -- declarado contra producción y ponerle proconfig desde el repositorio dejaría
-  -- el auditor de tres vías en ambiguo.
-  SELECT p.proconfig INTO cfg FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-   WHERE n.nspname = 'public' AND p.proname = 'agua_mora_cron_aplicar';
-  IF cfg IS NULL OR NOT ('agua.cobro_autoritativo=on' = ANY (cfg)) THEN
-    RAISE EXCEPTION '25: agua_mora_cron_aplicar no lleva la llave por función (%)', cfg; END IF;
-  SELECT p.proconfig INTO cfg FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-   WHERE n.nspname = 'public' AND p.proname = 'aplicar_mora_facturas_vencidas';
-  IF cfg IS NOT NULL AND 'agua.cobro_autoritativo=on' = ANY (cfg) THEN
-    RAISE EXCEPTION '25: la función con drift recibió proconfig — eso es el ambiguo del auditor'; END IF;
+  -- declarado contra producción y tocarla desde el repositorio dejaría el
+  -- auditor de tres vías en ambiguo.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = 'agua_mora_cron_aplicar'
+       AND p.prosrc LIKE '%set_config(''agua.cobro_autoritativo'', ''on'', true)%'
+  ) THEN
+    RAISE EXCEPTION '25: agua_mora_cron_aplicar no enciende la llave en su cuerpo'; END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = 'aplicar_mora_facturas_vencidas'
+       AND p.prosrc LIKE '%agua.cobro_autoritativo%'
+  ) THEN
+    RAISE EXCEPTION '25: la función con drift recibió la llave — eso es el ambiguo del auditor'; END IF;
 
   -- Y funciona de verdad: el cierre de ciclo emite sobre una fila pendiente.
   PERFORM public.agua_cerrar_ciclo_nucleo(P1, to_char(HOY, 'YYYY-MM'), false);
@@ -641,17 +665,49 @@ BEGIN
     RAISE EXCEPTION '25: la envoltura no le pasó la llave a la función anidada (mora %)',
       fila.mora_monto; END IF;
 
-  -- Ninguna otra función del esquema la lleva puesta: la capacidad está
-  -- enumerada, no repartida.
+  -- Ninguna otra función del esquema la enciende: la capacidad está enumerada,
+  -- no repartida. La lista son las dos vías de sistema y las RPC de cobro, que
+  -- la encienden tras validar el permiso.
   IF EXISTS (
     SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
-       AND p.proconfig IS NOT NULL
-       AND 'agua.cobro_autoritativo=on' = ANY (p.proconfig)
-       AND p.proname NOT IN ('agua_cerrar_ciclo_nucleo', 'agua_mora_cron_aplicar')
+       AND p.prosrc LIKE '%set_config(''agua.cobro_autoritativo'', ''on''%'
+       AND p.proname NOT IN (
+         'agua_cerrar_ciclo_nucleo', 'agua_mora_cron_aplicar',
+         'agua_factura_emitir', 'agua_factura_anular', 'agua_factura_registrar_pago',
+         'agua_registro_marcar_mora', 'agua_registro_cambiar_estado',
+         'agua_registro_acreditar_pago_externo',
+         -- La DEFINER hostil del fixture: la enciende a propósito, es el ataque
+         -- que la invariante 24 ejerce. Nombrada, no filtrada por prefijo, para
+         -- que un fixture nuevo que la encienda tenga que declararse aquí.
+         'test_definer_falsifica_lectura'
+       )
   ) THEN
-    RAISE EXCEPTION '25: alguna otra función recibió la llave por función'; END IF;
-  RAISE NOTICE 'OK 25  la capacidad va por FUNCIÓN: el cierre de ciclo la lleva, la mora la recibe de su envoltura, y nadie más';
+    RAISE EXCEPTION '25: alguna otra función enciende la llave de cobro'; END IF;
+  RAISE NOTICE 'OK 25  la capacidad va por FUNCIÓN: el cierre de ciclo la enciende, la mora la recibe de su envoltura, y nadie más';
+
+  -- 25b · La llave NO sobrevive a la función que la encendió.
+  --
+  -- Es la propiedad que `proconfig` daba de regalo y que `set_config(…, true)`
+  -- NO da: un SET local vive hasta el final de la TRANSACCIÓN, no de la función.
+  -- Si el núcleo no la apagara al salir, el resto de esta misma transacción
+  -- —el cron actualiza cierre_ciclo_config y encola avisos después de que el
+  -- núcleo devuelve— quedaría con la capacidad puesta. Se comprueba de las dos
+  -- formas: leyendo el GUC y, sobre todo, EJERCIENDO el UPDATE que debe fallar.
+  --
+  -- «Apagada» NO es literalmente 'off': el valor de reposo de un GUC de clase
+  -- personalizada es la cadena VACÍA, y ahí vuelve cuando se desapila. El guard
+  -- exige 'on' para abrir, así que lo que se comprueba es que NO esté en 'on'.
+  IF COALESCE(current_setting('agua.cobro_autoritativo', true), '') = 'on' THEN
+    RAISE EXCEPTION '25b: la llave sobrevivió al cierre de ciclo (%)',
+      current_setting('agua.cobro_autoritativo', true); END IF;
+  ok := false;
+  BEGIN
+    UPDATE public.registros SET monto_pagado = 999999 WHERE id = reg.id;
+  EXCEPTION WHEN insufficient_privilege THEN ok := true; END;
+  IF NOT ok THEN
+    RAISE EXCEPTION '25b: tras el cierre de ciclo se pudo escribir el cobro a pelo en la misma transacción'; END IF;
+  RAISE NOTICE 'OK 25b la llave se apaga al salir: la transacción que llamó al cierre no la hereda';
 END $$;
 
 -- ── 26-27 · Concurrencia real: dos conexiones sobre la misma factura ────────

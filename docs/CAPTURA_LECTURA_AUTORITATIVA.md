@@ -333,17 +333,39 @@ propietario es `postgres`: cualquier función DEFINER —incluida una que
 nombrar al cron y a la plataforma; en realidad nombraba «casi todo».
 
 Se va. Los dos caminos de sistema que de verdad escriben columnas de cobro
-reciben la llave **por función**, con `SET "agua.cobro_autoritativo" = 'on'`: la
-capacidad vive mientras esa función corre —y mientras corre lo que ella llame— y
-no un microsegundo más, y está enumerada en `pg_proc.proconfig`.
+reciben la llave **por función**: la encienden al entrar con
+`set_config('agua.cobro_autoritativo', 'on', true)` y la apagan antes de salir,
+así que la capacidad vive mientras esa función corre —y mientras corre lo que
+ella llame— y no una sentencia más, y está enumerada.
 
-La mora del cron la recibe de una **envoltura** nueva en vez de un `ALTER
-FUNCTION` sobre la función real, y no por gusto: `aplicar_mora_facturas_vencidas`
-es una de las que se editaron a mano en producción (drift declarado, inventario
-en #826). Ponerle `proconfig` desde el repositorio dejaría a producción, a `main`
-y al PR diciendo tres cosas distintas del mismo objeto, que es justo el *cambio
-ambiguo* que el auditor de tres vías cierra en falso a propósito. Cuando #826
-reconcilie la función, la envoltura se colapsa en un `ALTER FUNCTION`.
+### Por qué en el cuerpo y no en `proconfig`
+
+La primera versión la ponía con `ALTER FUNCTION … SET`, que es la forma limpia de
+decirlo: el par vive en `pg_proc.proconfig`, se enciende al entrar y se restaura
+al salir pase lo que pase. **No se puede.** `agua.cobro_autoritativo` es un GUC de
+clase personalizada —ninguna extensión lo define, así que para Postgres es un
+*placeholder*— y meter un placeholder en un array de configuración está reservado
+al **superusuario**: `validate_option_array_item()` responde
+`42501 permission denied to set parameter`. El razonamiento de Postgres es bueno:
+al resolverse, el placeholder podría resultar ser una variable `SUSET`, y
+entonces ya sería tarde para comprobar el permiso.
+
+En una Supabase gestionada el rol que aplica las migraciones (`postgres`) no es
+superusuario, así que esa cláusula **aborta la migración y toda la cadena detrás
+de ella**. Se vio en la Supabase Preview de #847 el 2026-09-11, y no se había
+visto antes porque el arnés de pruebas levanta Postgres con `initdb`, donde
+`postgres` sí es superusuario — el mismo par «pasa en local, falla en la branch»
+de #855, sólo que al revés. La regla (f) de `migrations-guard` lo caza ahora
+estáticamente, y la invariante 25 del arnés exige que **nadie** lo lleve en
+`proconfig`.
+
+La mora del cron la recibe de una **envoltura** nueva en vez de tocar la función
+real, y no por gusto: `aplicar_mora_facturas_vencidas` es una de las que se
+editaron a mano en producción (drift declarado, inventario en #826). Reescribirla
+desde el repositorio dejaría a producción, a `main` y al PR diciendo tres cosas
+distintas del mismo objeto, que es justo el *cambio ambiguo* que el auditor de
+tres vías cierra en falso a propósito. Cuando #826 reconcilie la función, la
+envoltura se colapsa en ella.
 
 El inventario completo de escritores de `public.registros` está en la cabecera de
 la migración. Resumido:
@@ -351,7 +373,7 @@ la migración. Resumido:
 | Camino | Cómo entra ahora |
 | --- | --- |
 | las 5 RPC de cobro, y la del payfac | encienden la llave ellas mismas |
-| `agua_cerrar_ciclo_nucleo` (y sus dos llamadores, uno del cron) | `ALTER FUNCTION … SET` |
+| `agua_cerrar_ciclo_nucleo` (y sus dos llamadores, uno del cron) | enciende la llave en su cuerpo y la apaga al salir |
 | `aplicar_mora_facturas_vencidas` | la envoltura `agua_mora_cron_aplicar`, que lleva la llave y es a la que apunta el job |
 | edge `confirm-charge` | `service_role`, vía `agua_registro_acreditar_pago_externo` |
 | purgas de `foto` (2 funciones + 1 edge) | nada: `foto` no fabrica un cobro |

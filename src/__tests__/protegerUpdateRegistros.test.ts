@@ -192,21 +192,34 @@ describe('las RPC de cobro no aceptan el importe como parámetro', () => {
   })
 
   it('la capacidad de los caminos de sistema va por FUNCIÓN, no por rol', () => {
-    // El `SET` de una función da la llave mientras esa función corre y no un
-    // microsegundo más. Es lo que sustituye a la exención de `postgres`.
-    expect(codigo).toContain(
-      'ALTER FUNCTION public.agua_cerrar_ciclo_nucleo(uuid, text, boolean)',
-    )
-    // La mora va por una ENVOLTURA y no por un ALTER sobre la función real:
-    // esa tiene drift declarado contra producción, y ponerle proconfig desde el
-    // repositorio dejaría el auditor de tres vías en ambiguo.
-    expect(codigo).not.toContain('ALTER FUNCTION public.aplicar_mora_facturas_vencidas()')
-    expect(ultimaDeclaracion('agua_mora_cron_aplicar')).toContain(
-      'SET "agua.cobro_autoritativo" = \'on\'',
-    )
+    // La llave se enciende al entrar y se apaga al salir: vive mientras esa
+    // función corre y no una sentencia más. Es lo que sustituye a la exención
+    // de `postgres`.
+    for (const fn of ['agua_cerrar_ciclo_nucleo', 'agua_mora_cron_aplicar']) {
+      const cuerpo = ultimaDeclaracion(fn)
+      expect(cuerpo, `${fn} enciende la llave`).toContain(
+        "set_config('agua.cobro_autoritativo', 'on', true)",
+      )
+      expect(cuerpo, `${fn} la apaga al salir`).toContain(
+        "set_config('agua.cobro_autoritativo', v_llave_previa, true)",
+      )
+    }
+    // La mora va por una ENVOLTURA y no reescribiendo la función real: esa tiene
+    // drift declarado contra producción, y tocarla desde el repositorio dejaría
+    // el auditor de tres vías en ambiguo.
+    expect(codigo).not.toContain('CREATE OR REPLACE FUNCTION public.aplicar_mora_facturas_vencidas')
     expect(codigo).toContain("'SELECT public.agua_mora_cron_aplicar();'")
-    const llaves = codigo.match(/SET "agua\.cobro_autoritativo" = 'on'/g) ?? []
-    expect(llaves, 'la llave por función está enumerada: dos, y sólo dos').toHaveLength(2)
+  })
+
+  it('la llave NUNCA va en proconfig: Supabase no puede aplicarlo', () => {
+    // `ALTER FUNCTION … SET "agua.cobro_autoritativo"` (y la cláusula `SET` de
+    // un `CREATE FUNCTION`) guardan el par en `proconfig`. Para un GUC de clase
+    // personalizada —un placeholder— eso exige SUPERUSUARIO, y el `postgres` de
+    // una Supabase gestionada no lo es: la migración aborta con
+    // `42501 permission denied to set parameter` y se lleva por delante toda la
+    // cadena detrás. Pasó en la Supabase Preview de #847 el 2026-09-11. El
+    // arnés de SQL no lo veía porque su Postgres de `initdb` sí es superusuario.
+    expect(codigo).not.toMatch(/SET\s+"agua\.[\w]+"\s*(=|TO)/)
   })
 
   it('ninguna de ellas queda ejecutable por anon', () => {
