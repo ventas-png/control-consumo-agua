@@ -452,6 +452,19 @@ jobs:
           PGPORT_TEST: 55496
         run: supabase/tests/proteger_update_registros/run.sh
 
+      # El webhook de Stripe insertaba el `pagos` y marcaba la solicitud
+      # `succeeded` SIN acreditar el ítem: el recibo quedaba con el saldo
+      # íntegro. Y reclamaba el evento ANTES de procesarlo, así que un fallo a
+      # media función lo dejaba marcado como visto para siempre — Stripe recibía
+      # 200 y el cobro no se acreditaba nunca. Estas 12 invariantes separan «lo
+      # vi» de «lo terminé» y ejercen el fallo provocado entre el reclamo y la
+      # acreditación, con dos conexiones reales para la carrera del reclamo.
+      - name: Webhook de Stripe — «lo vi» no es «lo terminé»
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55497
+        run: supabase/tests/webhook_stripe_idempotencia/run.sh
+
       # `20260909000000` revoca EXECUTE de PUBLIC/anon sobre 15 helpers de RLS
       # dando por hecho un GRANT a `authenticated` que NINGUNA migración
       # concede: lo aparentaba el `ALTER DEFAULT PRIVILEGES … ON FUNCTIONS` de

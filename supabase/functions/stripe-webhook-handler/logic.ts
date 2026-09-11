@@ -1,47 +1,122 @@
-// Lógica pura de stripe-webhook-handler, extraída del handler para poder
-// testearla en aislamiento (infra:I22 · Track T8/T5). Sin Deno, supabase-js ni
-// stripe → corre directo en vitest. El handler (index.ts) importa estos símbolos:
-// el comportamiento no cambia, solo se mueve la definición a un archivo importable.
+// Lógica PURA de stripe-webhook-handler: qué responderle a Stripe. Sin Deno,
+// sin supabase-js y sin el SDK de Stripe → corre directo en vitest.
+//
+// Antes este módulo exportaba `buildPagoRow`, que armaba a mano la fila de
+// `pagos`. Ya no existe: el pago lo inserta `conciliar_pago_externo` dentro de
+// la transacción que además ACREDITA el recibo. Construirla aquí era justo el
+// problema — dejaba el cobro registrado y el recibo con el saldo íntegro.
+//
+// Lo que sí es decisión del edge, y por tanto lo que vive aquí, es el CÓDIGO
+// HTTP. Y no es cosmético: Stripe reintenta ante cualquier respuesta que no sea
+// 2xx, así que devolver 200 equivale a decir «no lo traigas más». Esa frase sólo
+// es verdad cuando el evento se procesó ENTERO.
 
-// Fila de payment_requests que el webhook necesita para armar el pago. Tipo
-// estructural mínimo (el handler hace select('*'); aquí declaramos solo lo usado),
-// mismo estilo que billingSync.ts para no importar supabase-js.
-export interface PaymentRequestRow {
-  id: string
-  registro_id: string | null
-  cliente_id: string
-  company_id: string
-  monto: number
+/** Lo que devuelve `stripe_webhook_evento_reclamar`. */
+export interface Reclamo {
+  reclamado: boolean
+  ya_completado: boolean
+  estado_previo?: string | null
+  intentos?: number
+}
+
+/** Lo que devuelve `conciliar_pago_externo`. */
+export interface Conciliacion {
+  ok?: boolean
+  pago_id?: string | null
+  liquidado?: boolean
+  saldo_restante?: number
+  ya_conciliado?: boolean
+}
+
+export type Decision =
+  | { accion: 'procesar' }
+  | { accion: 'responder'; status: number; body: Record<string, unknown> }
+
+/**
+ * Tras intentar reclamar el evento. Tres salidas, y la diferencia entre las dos
+ * últimas es la que este PR viene a arreglar:
+ *
+ *   · reclamado          → es nuestro, hay que procesar.
+ *   · ya completado      → 200. Otro lo terminó de punta a punta; reaplicarlo
+ *                          duplicaría el abono, y pedirle a Stripe que lo
+ *                          reintente sería pedirle que insista para siempre.
+ *   · NO completado      → 409. Otro lo tiene en vuelo. Es un duplicado, sí,
+ *                          pero NO hay constancia de que el cobro se haya
+ *                          acreditado: responder 200 aquí es la forma de perder
+ *                          un pago en silencio. Que Stripe lo vuelva a traer.
+ */
+export function decidirTrasReclamo(r: Reclamo): Decision {
+  if (r.reclamado) return { accion: 'procesar' }
+
+  if (r.ya_completado) {
+    return {
+      accion: 'responder',
+      status: 200,
+      body: { received: true, already_processed: true },
+    }
+  }
+
+  return {
+    accion: 'responder',
+    status: 409,
+    body: {
+      received: false,
+      retryable: true,
+      error: 'evento en proceso por otra entrega; reintentar',
+      estado_previo: r.estado_previo ?? null,
+    },
+  }
 }
 
 /**
- * Construye la fila de `pagos` que se inserta cuando Stripe confirma un
- * payment_intent.succeeded. Nace AUTO-VERIFICADA (estado y verification_status
- * 'verificado', verified_by 'stripe_webhook') porque la autenticidad ya quedó
- * probada por la firma del webhook — no hay revisión manual. `nowIso` es
- * inyectable para que el test sea determinista; el default es "ahora", igual que
- * el `new Date().toISOString()` inline del handler original.
+ * Tras conciliar. Un fallo aquí es SIEMPRE reintentable: el dinero ya salió de
+ * la tarjeta y la transacción revirtió entera, así que no hay nada escrito a
+ * medias — sólo un cobro sin acreditar que el siguiente intento cuadra.
  */
-export function buildPagoRow(
-  paymentRequest: PaymentRequestRow,
-  paymentIntentId: string,
-  nowIso: string = new Date().toISOString(),
-) {
+export function decidirTrasConciliar(
+  res: Conciliacion | null | undefined,
+  error: { message: string } | null | undefined,
+): Decision {
+  if (error) {
+    return {
+      accion: 'responder',
+      status: 500,
+      body: {
+        received: false,
+        retryable: true,
+        error: `cobro verificado pero NO conciliado: ${error.message}`,
+      },
+    }
+  }
+
+  const r = res ?? {}
   return {
-    registro_id: paymentRequest.registro_id,
-    cliente_id: paymentRequest.cliente_id,
-    project_id: null,
-    monto: paymentRequest.monto,
-    metodo: 'tarjeta_credito', // Stripe is credit card
-    tipo_aplicacion: 'pago_total',
-    verification_status: 'verificado',
-    estado: 'verificado',
-    stripe_payment_intent_id: paymentIntentId,
-    comprobante_url: null,
-    comprobante_tipo: null,
-    verified_at: nowIso,
-    verified_by: 'stripe_webhook',
-    notas: `Pago automático de Stripe - ${paymentIntentId}`,
-    created_by: null,
+    accion: 'responder',
+    status: 200,
+    body: {
+      received: true,
+      conciliado: true,
+      ...(r.ya_conciliado ? { already_processed: true } : {}),
+      pago_id: r.pago_id ?? null,
+      liquidado: r.liquidado === true,
+      saldo_restante: r.saldo_restante ?? 0,
+    },
+  }
+}
+
+/**
+ * La empresa del webhook verificado tiene que ser la de la solicitud. Sin esto,
+ * el secreto de la empresa A serviría para conciliar un cobro de la empresa B.
+ * No es reintentable: reenviarlo daría el mismo resultado.
+ */
+export function decidirCruceDeEmpresa(
+  companyIdVerificado: string,
+  companyIdSolicitud: string,
+): Decision {
+  if (companyIdVerificado === companyIdSolicitud) return { accion: 'procesar' }
+  return {
+    accion: 'responder',
+    status: 400,
+    body: { received: false, retryable: false, error: 'la solicitud de cobro es de otra empresa' },
   }
 }
