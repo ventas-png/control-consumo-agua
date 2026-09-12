@@ -96,7 +96,7 @@ export interface DatosJornada {
  * apagada en silencio.
  *
  * Ahora es una sola llamada y una sola transacción (`turnos_guardar_jornada`,
- * 20260912000300). La autorización no cambia: la RPC es SECURITY INVOKER y la
+ * 20260912020300). La autorización no cambia: la RPC es SECURITY INVOKER y la
  * siguen decidiendo las policies de las dos tablas.
  *
  * Se manda el estado completo deseado, no un delta, por lo mismo que en

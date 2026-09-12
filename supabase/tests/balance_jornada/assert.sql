@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Invariantes de 20260912000400 · el balance del día (Fase 2)
+-- Invariantes de 20260912020400 · el balance del día (Fase 2)
 -- ════════════════════════════════════════════════════════════════════════════
 -- La 1 vuelve a ser la más importante, por la misma razón que en la fase 1:
 -- esta migración se anuncia como LECTURA y no debe mover ni un número de la

@@ -409,7 +409,7 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55493
         run: supabase/tests/rbac_recursos_humanos/run.sh
-      # 20260912000300 DECLARA la vara de cada jornada y la congela en el bloque.
+      # 20260912020300 DECLARA la vara de cada jornada y la congela en el bloque.
       # Su afirmación central —«esto no mueve ni un número del cómputo»— no se
       # comprueba leyendo el SQL: la invariante 1 compara la fila entera de
       # `calcular_horas_personal` antes y después de declararla completa. Las
@@ -423,7 +423,7 @@ jobs:
           PGPORT_TEST: 55494
         run: supabase/tests/politica_jornada/run.sh
 
-      # 20260912000400 COMPARA, y sigue sin tocar la planilla: su invariante 1 es
+      # 20260912020400 COMPARA, y sigue sin tocar la planilla: su invariante 1 es
       # que consultar el balance no mueva el cómputo. Lo que hay que ver correr
       # es la aritmética que en TypeScript divergiría: entrar 00:30 a un turno de
       # las 22:00 son 150 min tarde y no −1290, el exceso de descanso se mide

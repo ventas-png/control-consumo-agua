@@ -1,4 +1,4 @@
--- Fixture para EJECUTAR 20260912000400 (el balance del día) contra un Postgres
+-- Fixture para EJECUTAR 20260912020400 (el balance del día) contra un Postgres
 -- de verdad. Hereda el de `politica_jornada` —y por debajo el de las pausas—
 -- porque el balance cruza TODA la cadena: el bloque planificado con su vara
 -- congelada, el marcaje, las pausas por tipo y la aritmética de jornada. Con
