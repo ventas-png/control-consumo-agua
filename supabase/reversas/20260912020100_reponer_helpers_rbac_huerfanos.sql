@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- REVERSA de 20260912000100_retirar_helpers_rbac_huerfanos.sql
+-- REVERSA de 20260912020100_retirar_helpers_rbac_huerfanos.sql
 -- ════════════════════════════════════════════════════════════════════════════
 --
 -- Repone las tres funciones que aquella migración retira:
@@ -66,7 +66,7 @@
 -- NO SE APLICA SOLO. Vive fuera de `supabase/migrations/` a propósito; ver
 -- `supabase/reversas/README.md`.
 --
---   psql "$CADENA" -v ON_ERROR_STOP=1 -f supabase/reversas/20260912000100_reponer_helpers_rbac_huerfanos.sql
+--   psql "$CADENA" -v ON_ERROR_STOP=1 -f supabase/reversas/20260912020100_reponer_helpers_rbac_huerfanos.sql
 -- ════════════════════════════════════════════════════════════════════════════
 
 BEGIN;
