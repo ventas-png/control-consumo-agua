@@ -153,8 +153,63 @@ export function renombrePorColision(entrada, migracionesEnLaBase) {
   return colisionaba && nuevaLibre
 }
 
+// ── LA ÚNICA EXCEPCIÓN A LA MODIFICACIÓN ───────────────────────────────────
+//
+// Una migración histórica se puede editar EXACTAMENTE UNA VEZ, y sólo la que se
+// nombra aquí, con los dos hashes exactos, y sólo si el PR trae además la
+// migración forward-only que repara los entornos ya existentes.
+//
+// POR QUÉ HIZO FALTA ABRIRLA. `20260909000000_revoke_execute_helpers_rls_y_reset`
+// revoca EXECUTE de PUBLIC/anon sobre 15 helpers de RLS dando por hecho que
+// `authenticated` ya tiene un GRANT explícito. No lo tiene: ninguna migración
+// del repositorio se lo concede. Lo que lo aparentaba era el andamiaje del
+// auditor de drift (`bootstrap.sql`, ALTER DEFAULT PRIVILEGES … ON FUNCTIONS),
+// que una Supabase Branch de verdad NO tiene. Al reconstruir desde cero, la
+// verificación de esa misma migración aborta:
+//
+//     ERROR: authenticated NO puede ejecutar public.current_user_role()
+//            — las policies que lo evalúan dejarían de leer (SQLSTATE P0001)
+//
+// Y AQUÍ ESTÁ LA RAZÓN DE QUE UNA MIGRACIÓN POSTERIOR NO BASTE: el replay MUERE
+// en esa migración. Nunca se llega a la siguiente. La reparación de la
+// reconstrucción tiene que ocurrir DENTRO del archivo histórico; la de los
+// entornos vivos, en la migración nueva. Se exigen las dos.
+//
+// LO QUE SIGUE COSTANDO: el apply a producción selecciona con `--diff-filter=AM`,
+// así que reaplica el archivo modificado. Es seguro AQUÍ porque ese archivo sólo
+// hace GRANT/REVOKE sobre funciones existentes —idempotente, sin tocar datos— y
+// en producción las ACL ya son las declaradas. No sería seguro para una
+// migración que mueva datos: el incidente 2026-08-03 fue justo eso.
+export const REPARACION_REPLAY = Object.freeze({
+  archivo: 'supabase/migrations/20260909000000_revoke_execute_helpers_rls_y_reset.sql',
+  hashAntes: 'f466b896164e818a1b159a3565e413be98f3f985',
+  hashDespues: '955f2de8e6a1ad5a29d2e95e6f981aa8dcdb4780',
+  requiere: 'supabase/migrations/20260910000150_acl_helpers_rls_matriz_declarada.sql',
+})
+
+/**
+ * ¿Es ESTA entrada la reparación de replay autorizada? Exige LAS CUATRO:
+ *   1. el archivo exacto (ningún otro histórico entra por aquí);
+ *   2. el hash del contenido ANTES, exacto — si la base ya no es ese archivo,
+ *      la excepción no aplica y no se puede reutilizar más adelante;
+ *   3. el hash del contenido DESPUÉS, exacto — clava la edición permitida a un
+ *      contenido concreto y revisado, no a «cualquier cambio en ese archivo»;
+ *   4. que el PR traiga la migración forward-only de reparación, sin la cual
+ *      los entornos existentes se quedarían sin el arreglo.
+ * Cualquier otro archivo, o cualquier otro contenido, sigue siendo violación.
+ */
+export function reparacionDeReplay(entrada, { hashes, migracionesEnHead } = {}) {
+  if (!entrada || (entrada.status !== 'M' && entrada.status !== 'T')) return false
+  if (entrada.path !== REPARACION_REPLAY.archivo) return false
+  const h = hashes?.[entrada.path]
+  if (!h || h.antes !== REPARACION_REPLAY.hashAntes) return false
+  if (h.despues !== REPARACION_REPLAY.hashDespues) return false
+  if (!Array.isArray(migracionesEnHead)) return false
+  return migracionesEnHead.includes(REPARACION_REPLAY.requiere)
+}
+
 // Devuelve las violaciones append-only de un conjunto de entradas name-status.
-export function evaluateAppendOnly(entries, { migracionesEnLaBase } = {}) {
+export function evaluateAppendOnly(entries, { migracionesEnLaBase, hashes, migracionesEnHead } = {}) {
   const violations = []
   for (const e of entries) {
     if (e.status === 'A' || e.status === 'C') continue // añadir es lo permitido
@@ -174,6 +229,7 @@ export function evaluateAppendOnly(entries, { migracionesEnLaBase } = {}) {
     }
     if (!esMigracion(e.path)) continue
     if (e.status === 'M' || e.status === 'T') {
+      if (reparacionDeReplay(e, { hashes, migracionesEnHead })) continue
       violations.push({ kind: 'modificada', path: e.path })
     } else if (e.status === 'D') {
       violations.push({ kind: 'eliminada', path: e.path })
@@ -273,8 +329,31 @@ async function main() {
     .split('\n')
     .filter((p) => esMigracion(p))
 
+  // Las migraciones tal como quedan EN HEAD: es lo que decide si el PR trae la
+  // migración forward-only que la reparación de replay exige como compañera.
+  const migracionesEnHead = git(['ls-tree', '-r', '--name-only', range.head, '--', MIG_DIR])
+    .split('\n')
+    .filter((p) => esMigracion(p))
+
   const entries = parseNameStatus(diffText)
-  const violations = evaluateAppendOnly(entries, { migracionesEnLaBase })
+
+  // Hashes de blob de los archivos MODIFICADOS, antes y después. Es lo que
+  // clava la excepción de reparación a un contenido exacto y no a un nombre.
+  const hashes = {}
+  for (const e of entries) {
+    if ((e.status !== 'M' && e.status !== 'T') || !esMigracion(e.path)) continue
+    const blob = (ref) => {
+      try {
+        return git(['rev-parse', `${ref}:${e.path}`]).trim()
+      } catch {
+        return null
+      }
+    }
+    hashes[e.path] = { antes: blob(desde), despues: blob(range.head) }
+  }
+
+  const violations = evaluateAppendOnly(entries, { migracionesEnLaBase, hashes, migracionesEnHead })
+  const reparaciones = entries.filter((e) => reparacionDeReplay(e, { hashes, migracionesEnHead }))
   const nuevas = entries.filter((e) => (e.status === 'A' || e.status === 'C') && esMigracion(e.path))
   const desempates = entries.filter(
     (e) => e.status === 'R' && esMigracion(e.oldPath) && renombrePorColision(e, migracionesEnLaBase),
@@ -284,6 +363,21 @@ async function main() {
   console.log(
     `   migraciones nuevas: ${nuevas.length} · violaciones del histórico: ${violations.length}`,
   )
+
+  // Una reparación de replay tolerada NO pasa en silencio: reaplica en producción.
+  for (const e of reparaciones) {
+    console.log(
+      `   ⚠️  ${e.path} — MODIFICACIÓN HISTÓRICA TOLERADA por la excepción de una sola vez` +
+        ` (hash ${REPARACION_REPLAY.hashAntes.slice(0, 12)} → ${REPARACION_REPLAY.hashDespues.slice(0, 12)}).`,
+    )
+    console.log(
+      `      Exige la compañera forward-only ${REPARACION_REPLAY.requiere.split('/').pop()}, que está presente.`,
+    )
+    console.log(
+      '      El apply la REAPLICA contra producción (--diff-filter=AM). Sólo es seguro porque' +
+        ' este archivo hace GRANT/REVOKE idempotentes y no toca datos.',
+    )
+  }
 
   // Un renombre tolerado NO pasa en silencio: reaplica contra producción.
   for (const e of desempates) {

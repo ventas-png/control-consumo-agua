@@ -6,7 +6,7 @@ import { openPromptDialog } from '../shared/PromptDialog'
 import { configurarCierreAutomatico } from '../shared/cierreAutomaticoDialog'
 import { fetchPagosYConvenios } from '../../domain/cobros/queries'
 import { verifyPago, rejectPago, setConvenioEstado } from '../../domain/cobros/mutations'
-import { updateRegistro, marcarRegistrosMora } from '../../domain/agua/mutations'
+import { registrarPagoRegistro, marcarRegistrosMora } from '../../domain/agua/mutations'
 import type { Registro, Cliente, Pago, ConvenioPago, FormaPago, Proyecto } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
@@ -20,12 +20,11 @@ import { PagosHistorial } from './PagosHistorial'
 import { useQueryClient } from '@tanstack/react-query'
 import { FacturaEstadoBadge } from './facturaUi'
 import { TimbradoEstadoBadge } from './fiscalUi'
-import { useFacturasQuery, useReglasMoraQuery, type FacturaRow } from '../../domain/facturacion/queries'
+import { useFacturasQuery, type FacturaRow } from '../../domain/facturacion/queries'
 import { facturacionKeys } from '../../domain/facturacion/keys'
 import {
   useEmitirFacturaMutation,
   useAnularFacturaMutation,
-  useIvaTasaDefaultQuery,
   particionarEmitibles,
   cerrarCicloAgua,
 } from '../../domain/facturacion/mutations'
@@ -111,12 +110,13 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
 
   // T4 · agua:C4 — proyección de Factura (estado/IVA/mora) sobre `registros`. La
   // tabla recibe `Registro[]` por props (sin campos de facturación); aquí leemos
-  // esos campos vía la capa de datos T4 y los cruzamos por id. Las reglas de mora
-  // del tenant dan los días de vencimiento al emitir.
+  // esos campos vía la capa de datos T4 y los cruzamos por id.
+  //
+  // Las reglas de mora ya NO se leen aquí: daban los días de vencimiento al
+  // emitir, y el plazo decide cuándo aplica la mora — es una decisión de cobro,
+  // no de pantalla. Desde 20260911031701 lo resuelve `agua_factura_emitir` con
+  // la regla activa del proyecto.
   const { data: facturas = [] } = useFacturasQuery(companyId)
-  const { data: reglasMora = [] } = useReglasMoraQuery(companyId)
-  // Tasa de IVA del tenant (companies.iva_tasa_default) para el snapshot al emitir.
-  const { data: ivaTasaDefault } = useIvaTasaDefaultQuery(companyId)
   const facturaById = useMemo(() => {
     const m = new Map<string, FacturaRow>()
     for (const f of facturas) m.set(f.id, f)
@@ -168,17 +168,6 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
     }
   }
 
-  // Días de vencimiento por defecto: de la regla de mora del proyecto si existe,
-  // si no 30. (El cálculo de mora en sí lo hace el cron con la misma regla.)
-  const diasVencimientoPara = useCallback(
-    (projectId?: string | null) => {
-      const regla =
-        reglasMora.find(r => r.project_id === projectId) ?? reglasMora[0]
-      return regla?.dias_vencimiento ?? 30
-    },
-    [reglasMora],
-  )
-
   async function handleEmitir(r: Registro) {
     const factura = facturaById.get(r.id)
     setAccionFacturaId(r.id)
@@ -190,9 +179,6 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
           monto_calculado: factura?.monto_calculado ?? r.monto_calculado,
           mora_monto: factura?.mora_monto,
         },
-        // Snapshot ya persistido > tasa del tenant > default GT (en business.ts).
-        ivaTasa: factura?.iva_tasa ?? ivaTasaDefault,
-        diasVencimiento: diasVencimientoPara(r.project_id),
       })
       notify({ variant: 'success', title: '📤 Factura emitida', duration: 1800 })
     } catch (err) {
@@ -321,8 +307,6 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
             monto_calculado: factura?.monto_calculado ?? r.monto_calculado,
             mora_monto: factura?.mora_monto,
           },
-          ivaTasa: factura?.iva_tasa ?? ivaTasaDefault,
-          diasVencimiento: diasVencimientoPara(r.project_id),
         })
         ok++
       } catch {
@@ -468,32 +452,22 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
 
         if (error) throw new Error(error)
 
-        // Update the registro monto_pagado if needed
+        // Aplicar el pago sobre la lectura. El saldo, el estado resultante y la
+        // transición de la factura los calcula `agua_factura_registrar_pago`:
+        // medirlos aquí y mandarlos como PATCH era lo que permitía inventar el
+        // abonado. La UI sólo aporta el monto y refleja lo que devuelve.
         if (pago.registro_id) {
-          const registro = registros.find(r => r.id === pago.registro_id)
-          if (registro) {
-            const nuevoMontoPagado = (registro.monto_pagado ?? 0) + pago.monto
-            // El saldo se mide contra el TOTAL de la factura (incluye IVA + mora),
-            // no contra monto_calculado (subtotal). Si no hay factura emitida, se
-            // cae al subtotal como antes. Tolerancia de medio centavo por floats.
-            const total = facturaById.get(pago.registro_id)?.total_a_pagar ?? registro.monto_calculado ?? 0
-            const saldo = total - nuevoMontoPagado
-            const nuevoEstado: Registro['estado'] = saldo <= 0.005 ? 'pagado' : 'pendiente'
+          const { data: fila, error: pagoError } = await registrarPagoRegistro(
+            pago.registro_id,
+            pago.monto,
+          )
+          if (pagoError) throw new Error(pagoError)
 
-            // Update registro state and status
-            const { error: updateError } = await updateRegistro(pago.registro_id, {
-              monto_pagado: nuevoMontoPagado,
-              estado: nuevoEstado,
+          if (onRegistroUpdated && fila) {
+            onRegistroUpdated(pago.registro_id, {
+              monto_pagado: fila.monto_pagado ?? undefined,
+              estado: fila.estado,
             })
-
-            if (updateError) throw new Error(updateError)
-
-            if (onRegistroUpdated) {
-              onRegistroUpdated(pago.registro_id, {
-                monto_pagado: nuevoMontoPagado,
-                estado: nuevoEstado,
-              })
-            }
           }
         }
 

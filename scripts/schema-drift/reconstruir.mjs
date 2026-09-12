@@ -113,11 +113,26 @@ export function listarMigraciones(dir = DIR_MIGRACIONES) {
  *
  * `dirMigraciones` permite reconstruir OTRO árbol de migraciones que el del
  * repositorio — así se obtiene M, la reconstrucción de la rama base, sin
- * cambiar de checkout. `bootstrap.sql` y `fingerprint.sql` salen siempre de
- * HEAD: si M y R se hashearan con serializaciones distintas, la comparación
- * mediría el cambio del auditor y no el del esquema.
+ * cambiar de checkout. `fingerprint.sql` sale siempre de HEAD: si M y R se
+ * hashearan con serializaciones distintas, la comparación mediría el cambio del
+ * auditor y no el del esquema.
+ *
+ * `bootstrap` permite cambiar el ANDAMIAJE DE PLATAFORMA, y existe por una
+ * razón concreta: el `bootstrap.sql` por defecto concede funciones a
+ * `authenticated` con `ALTER DEFAULT PRIVILEGES`, y eso OCULTÓ durante semanas
+ * que `20260909000000` dependía de un GRANT que el repositorio nunca escribió
+ * (se vio al recrear una preview branch de verdad, 2026-09-11). Para el
+ * auditor de drift el default es el correcto —reproduce producción—; para la
+ * prueba de replay hace falta `bootstrap-branch.sql`, que NO lo concede.
+ * Toda comparación de huellas tiene que usar el MISMO bootstrap en sus dos
+ * lados, o mediría el andamiaje.
  */
-export function reconstruir({ log = () => {}, dirMigraciones = DIR_MIGRACIONES } = {}) {
+export function reconstruir({
+  log = () => {},
+  dirMigraciones = DIR_MIGRACIONES,
+  bootstrap = 'bootstrap.sql',
+  pararEnElPrimerFallo = false,
+} = {}) {
   const bin = binarios()
   instalarShims(bin)
 
@@ -154,7 +169,7 @@ export function reconstruir({ log = () => {}, dirMigraciones = DIR_MIGRACIONES }
     if (!listo) throw new Error('El servidor no aceptó conexiones en 60 s. Revisá pg.log.')
 
     log('· bootstrap')
-    psql(['-v', 'ON_ERROR_STOP=1', '-q', '-f', join(AQUI, 'bootstrap.sql')], { stdio: 'pipe' })
+    psql(['-v', 'ON_ERROR_STOP=1', '-q', '-f', join(AQUI, bootstrap)], { stdio: 'pipe' })
 
     const migraciones = listarMigraciones(dirMigraciones)
     log(`· aplicando ${migraciones.length} migraciones`)
@@ -164,6 +179,9 @@ export function reconstruir({ log = () => {}, dirMigraciones = DIR_MIGRACIONES }
         psql(['-v', 'ON_ERROR_STOP=1', '-q', '-1', '-f', join(dirMigraciones, m)], { stdio: 'pipe' })
       } catch (err) {
         fallos.push({ migracion: m, error: String(err.stderr ?? err.message).trim().split('\n').slice(-3).join('\n') })
+        // El replay real de Supabase se DETIENE en el primer error; seguir
+        // aplicando mediría un esquema que allí nunca llega a existir.
+        if (pararEnElPrimerFallo) break
       }
     }
     return { psql, destruir, migraciones, fallos, entorno, dirMigraciones }
