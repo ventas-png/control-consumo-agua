@@ -366,12 +366,6 @@
       "produccion": "ed2099e041f8efbca40fc5c5b127a3bed3d3815fb1b7bcfa1cd1ed1b595fca73:5",
       "repo": "5cea41f8566e4575443966a5d93868a11268aaf495db770e5dc5443ad86a9d66:1"
     },
-    "tabla:fuentes_agua/triggers": {
-      "motivo": "Difieren los triggers de la tabla. Cambian comportamiento en escritura, así que no es cosmético. Inventario en #826.",
-      "desde": "2026-09-01",
-      "produccion": "ff139129f73e9ed863c20f9567dab9191bcd4e65561fef66c7eec8bc873c2102:2",
-      "repo": "61915cf53c070338759187e0b08cd5fba4c5e6e83dd16fc1ed725c21a12f2dc4:1"
-    },
     "tabla:infracciones_condominio/columnas": {
       "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
       "desde": "2026-09-01",
@@ -491,12 +485,6 @@
       "desde": "2026-09-01",
       "produccion": "c70e3f9bec941db083b90e7340f399bb335fa4989dd10a3715db2226693903f5:14",
       "repo": "72ee911e4aa4d98b9c872e9c7fc4d676b06990acd7f488b80bfe0767a29784f5:13"
-    },
-    "tabla:registros_calidad/triggers": {
-      "motivo": "Difieren los triggers de la tabla. Cambian comportamiento en escritura, así que no es cosmético. Inventario en #826.",
-      "desde": "2026-09-01",
-      "produccion": "63e84147ff14b464afb5a2fc01d544c239bc5c9abf24f04846f0c7db2b3f058f:4",
-      "repo": "ffa24b1ef0f841ee317a510585b464e3b6a662aa1651355f0fa852e68d067a77:3"
     },
     "tabla:reservas_amenidades/columnas": {
       "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
