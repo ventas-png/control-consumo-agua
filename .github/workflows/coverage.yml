@@ -410,6 +410,22 @@ jobs:
           PGPORT_TEST: 55493
         run: supabase/tests/rbac_recursos_humanos/run.sh
 
+      # 20260912020100 RETIRA tres funciones, y una migración que borra algo no
+      # es reversible por sí sola. La reversa vive en `supabase/reversas/`, fuera
+      # de `supabase/migrations/` para que nada la aplique sola. Este paso es lo
+      # que impide que ese archivo se vuelva decorativo: no comprueba que exista
+      # —eso lo haría un grep— sino que se EJECUTA contra un Postgres real y que
+      # lo repuesto produce las SEIS huellas que la baseline declara para
+      # producción, las tres definiciones y sus tres grants. Incluye el REVOKE a
+      # PUBLIC: `CREATE OR REPLACE` sobre una función ausente la crea con la ACL
+      # por defecto, que incluye a PUBLIC y por tanto a `anon`, así que una
+      # reversa sin ese REVOKE repondría tres SECURITY DEFINER abiertas.
+      - name: La reversa de los helpers RBAC repone exactamente lo que se retiró
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55496
+        run: supabase/tests/reversa_helpers_rbac/run.sh
+
       # `security_logs` es el log de auditoría: producción tenía tres policies
       # que el repositorio no declara —entre ellas un INSERT abierto a `anon` y
       # un SELECT que dejaba al `admin` de un tenant leer los eventos de todos,
