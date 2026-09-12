@@ -466,6 +466,29 @@ jobs:
           PGPORT_TEST: 55497
         run: supabase/tests/acl_definer_expuestas_anon/run.sh
 
+      # Producción tiene dos triggers de fill_company_id_from_user() —sobre
+      # fuentes_agua y registros_calidad— que NINGUNA migración declaraba: una
+      # reconstrucción nacía sin ellos (la Preview de #858 trajo 3 de los 5).
+      # `20260912015504` los declara decidiendo con pg_catalog (crea si falta,
+      # no-op si está exacto, aborta si hay un homónimo con otra definición) y
+      # esta prueba lo ejerce: celda por celda, inserciones reales como
+      # `authenticated` sin EXECUTE sobre la función, idempotencia con OIDs,
+      # no-op sobre preexistentes, los siete abortos y mutación.
+      - name: Triggers de fill_company_id_from_user — declarados, no-op, abortos y mutación
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55499
+        run: supabase/tests/declarar_triggers_fill_company_id/run.sh
+
+      # Y la prueba de que la migración puede CREARLOS de verdad —lo que una
+      # Preview, donde ya existen, no demuestra—: la cadena entera desde cero
+      # con privilegios de Supabase Branch, los dos triggers en pg_catalog
+      # iguales a producción, re-aplicación no-op y las mismas inserciones como
+      # `authenticated` contra las policies REALES. Sin PGBIN ni PGPORT_TEST:
+      # reconstruir.mjs localiza el binario y elige puerto y socket.
+      - name: Replay desde cero — los dos triggers de fill_company_id_from_user
+        run: node supabase/tests/declarar_triggers_fill_company_id/replay.mjs
+
       # El webhook de Stripe insertaba el `pagos` y marcaba la solicitud
       # `succeeded` SIN acreditar el ítem: el recibo quedaba con el saldo
       # íntegro. Y reclamaba el evento ANTES de procesarlo, así que un fallo a
