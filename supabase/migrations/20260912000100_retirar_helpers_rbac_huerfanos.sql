@@ -45,7 +45,7 @@
 --
 -- REVERSA. Hay DDL EJECUTABLE, y está acá:
 --
---     supabase/reversas/20260910000400_reponer_helpers_rbac_huerfanos.sql
+--     supabase/reversas/20260912000100_reponer_helpers_rbac_huerfanos.sql
 --
 -- Sale de `pg_get_functiondef()` sobre el catálogo vivo de producción, leído el
 -- 2026-09-10, con los cuerpos copiados verbatim y con lo que una función
@@ -65,7 +65,7 @@
 -- exige que las SEIS huellas resultantes —tres definiciones y tres grants—
 -- coincidan con las que la baseline declara para producción.
 --
--- ANTES DE FUSIONAR, REVALIDAR. `supabase/reversas/20260910000400_revalidar_antes_de_fusionar.sql`
+-- ANTES DE FUSIONAR, REVALIDAR. `supabase/reversas/20260912000100_revalidar_antes_de_fusionar.sql`
 -- es de sólo lectura y devuelve `SEGUIR` o `PARAR`. La evidencia de acá abajo se
 -- tomó el 2026-09-10; entre esa fecha y el despliegue alguien puede cablear una
 -- de estas funciones a una policy nueva.

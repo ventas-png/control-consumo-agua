@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Revalidación de 20260910000400 · CORRER INMEDIATAMENTE ANTES DE FUSIONAR
+-- Revalidación de 20260912000100 · CORRER INMEDIATAMENTE ANTES DE FUSIONAR
 -- ════════════════════════════════════════════════════════════════════════════
 --
 -- SÓLO LECTURA. Ni un INSERT, ni un UPDATE, ni un DDL. Se pega en el SQL Editor

@@ -410,7 +410,7 @@ jobs:
           PGPORT_TEST: 55493
         run: supabase/tests/rbac_recursos_humanos/run.sh
 
-      # 20260910000400 RETIRA tres funciones, y una migración que borra algo no
+      # 20260912000100 RETIRA tres funciones, y una migración que borra algo no
       # es reversible por sí sola. La reversa vive en `supabase/reversas/`, fuera
       # de `supabase/migrations/` para que nada la aplique sola. Este paso es lo
       # que impide que ese archivo se vuelva decorativo: no comprueba que exista

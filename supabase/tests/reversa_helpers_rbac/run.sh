@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# La reversa de 20260910000400 es DDL ejecutable, y repone lo que había.
+# La reversa de 20260912000100 es DDL ejecutable, y repone lo que había.
 #
 # POR QUÉ EXISTE
-# 20260910000400 retira tres funciones que sólo viven en producción. Una
+# 20260912000100 retira tres funciones que sólo viven en producción. Una
 # migración que borra algo no es reversible por sí sola, y la primera versión de
 # ese PR afirmaba que la definición «no se pierde» porque su HUELLA está en
 # `drift-conocido.json`. Era falso: una huella es un sha256 y de un sha256 no
@@ -33,7 +33,7 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
-REVERSA="$RAIZ/supabase/reversas/20260910000400_reponer_helpers_rbac_huerfanos.sql"
+REVERSA="$RAIZ/supabase/reversas/20260912000100_reponer_helpers_rbac_huerfanos.sql"
 FINGERPRINT="$RAIZ/scripts/schema-drift/fingerprint.sql"
 BASELINE="$RAIZ/scripts/schema-drift/drift-conocido.json"
 
