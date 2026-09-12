@@ -55,8 +55,8 @@ test.describe('FISCAL · timbrar (Sandbox)', () => {
     await login(page)
 
     // 1 · El cargo. No se busca uno existente: se crea, y se espera la
-    //     respuesta real del INSERT (capturarLectura exige el 2xx y devuelve el
-    //     id de la fila que el propio POST devolvió).
+    //     respuesta real de `registrar_lectura` (capturarLectura exige el 2xx y
+    //     devuelve el id de la fila que la propia RPC devolvió).
     await gotoSection(page, '/lecturas')
     const id = await capturarLectura(page)
     expect(
@@ -69,12 +69,21 @@ test.describe('FISCAL · timbrar (Sandbox)', () => {
     await gotoSection(page, '/cobros')
     const fila = await esperarCargoEnCobros(page, id!)
 
-    // 3 · Emitir ESA factura, esperando el PATCH de ESE registro con 2xx.
+    // 3 · Emitir ESA factura, esperando la RPC de ESE registro con 2xx.
+    //
+    // YA NO ES UN `PATCH /rest/v1/registros`. Emitir dejó de ser un `UPDATE`
+    // desde 20260910235732: el IVA, el total y el vencimiento los calcula
+    // `agua_factura_emitir` en el servidor, y el `PATCH` de esas columnas lo
+    // rechaza un trigger. El id viaja ahora en el CUERPO, no en la query
+    // string, así que la pertenencia a ESTA factura se afirma sobre el body —
+    // sigue sin valer «cualquier emisión que pase por ahí».
     const emitir = fila.locator('button[title^="Emitir factura"]')
     await expect(emitir, 'el cargo recién creado debería ser emitible').toHaveCount(1)
     const [respEmitir] = await Promise.all([
       page.waitForResponse(
-        r => r.request().method() === 'PATCH' && r.url().includes(`/rest/v1/registros`) && r.url().includes(id!),
+        r => r.request().method() === 'POST'
+          && /\/rest\/v1\/rpc\/agua_factura_emitir(\?|$)/.test(r.url())
+          && (r.request().postData() ?? '').includes(id!),
         { timeout: 30_000 },
       ),
       emitir.click(),

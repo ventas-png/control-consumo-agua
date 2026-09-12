@@ -7,7 +7,7 @@ import type { Registro, Contador } from '../../../types'
 // el cual lanza sin env vars) y los diálogos. Mockeamos ambos: el detalle de
 // lectura es UI pura y no dispara red.
 vi.mock('../../../domain/agua/mutations', () => ({
-  updateRegistro: vi.fn(async () => ({ error: null })),
+  cambiarEstadoRegistro: vi.fn(async () => ({ error: null })),
   deleteRegistro: vi.fn(async () => ({ error: null, count: 1 })),
 }))
 vi.mock('../../shared/Dialog', () => ({

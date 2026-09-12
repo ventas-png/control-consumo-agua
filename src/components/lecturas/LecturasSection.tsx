@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, type CSSProperties, type ChangeEvent} from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto } from '../../types'
+import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad } from '../../types'
 import { usePermissionsContext } from '../shared/PermissionsContext'
-import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
-import { registroExiste } from '../../domain/agua/queries'
+import { registrarLectura, uploadRegistroFoto, type LecturaCaptura } from '../../domain/agua/mutations'
 import { hoyLocalISO, formatFechaCalendario } from '../../lib/format'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
 import { calcularCostoTarifa, validarLectura } from '../../lib/business'
@@ -13,6 +12,7 @@ import {
   leerPendientes,
   encolarLectura,
   sincronizarPendientes,
+  nuevaClaveIdempotencia,
 } from '../../lib/lecturasOutbox'
 import { APP_CONFIG } from '../../lib/config'
 import { watchLocation } from '../../lib/nativeGeo'
@@ -24,7 +24,6 @@ interface Props {
   contadores: Contador[]
   registros: Registro[]
   tarifas: Tarifa[]
-  proyectos?: Proyecto[]
   moneda?: string
   onRegistroAdded: (registro: Registro) => void
   rutaActiva?: Ruta | null
@@ -38,7 +37,6 @@ export function LecturasSection({
   contadores,
   registros,
   tarifas,
-  proyectos = [],
   moneda = 'Q',
   onRegistroAdded,
   rutaActiva,
@@ -47,13 +45,16 @@ export function LecturasSection({
 }: Props) {
   const canCreate = usePermissionsContext().canCreate('lecturas')
   // Derive project_id from selected unidad/contador, then fall back to single-project context
-  const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
   const [selectedContadorId, setSelectedContadorId] = useState('')
   const [lecturaActual, setLecturaActual] = useState('')
   // P1 (quick win): confirmación de reset del medidor para el caso lectura↓ legítima.
   const [resetContador, setResetContador] = useState(false)
-  const [estado, setEstado] = useState<Registro['estado']>('pendiente')
+  // Cambio físico de medidor: lo último que marcaba el medidor RETIRADO. Es el
+  // dato sin el cual el consumo del reset no se puede saber, y el que hace que
+  // el agua consumida por el medidor viejo desde su última lectura se cobre en
+  // vez de regalarse. Lo exige el servidor (20260910000200).
+  const [lecturaFinalRetirada, setLecturaFinalRetirada] = useState('')
   // E4/D5: fecha LOCAL (el patrón toISOString() daba la fecha UTC — de noche en
   // GMT-6 pre-llenaba "mañana" y la lectura caía al ciclo siguiente).
   const [fechaLecturaActual, setFechaLecturaActual] = useState(() => hoyLocalISO())
@@ -126,7 +127,7 @@ export function LecturasSection({
   }, [selectedUnidadId])
 
   // El flag "medidor reseteado" es por-lectura: limpiarlo al cambiar de contexto.
-  useEffect(() => { setResetContador(false) }, [selectedUnidadId, selectedContadorId])
+  useEffect(() => { setResetContador(false); setLecturaFinalRetirada('') }, [selectedUnidadId, selectedContadorId])
 
   // GPS automático. En web usa navigator.geolocation; en la app nativa usa
   // @capacitor/geolocation (pide permiso del SO y funciona en iOS WKWebView,
@@ -164,22 +165,37 @@ export function LecturasSection({
 
   const contadorSeleccionado = contadores.find(c => c.id === selectedContadorId) ?? null
 
-  // Resolve project_id: prefer from selected unidad, then contador, then single-project fallback
-  const projectId: string | null =
-    unidadSeleccionada?.project_id ??
-    contadorSeleccionado?.project_id ??
-    defaultProjectId
+  // El `project_id` de la lectura ya NO lo deriva el navegador: lo resuelve el
+  // servidor desde el contador (20260910000200). Derivarlo aquí era, además de
+  // redundante, la puerta por la que una lectura podía acabar contabilizada en
+  // otro condominio si la unidad y el contador discrepaban.
   const tarifaDelContador = contadorSeleccionado?.tarifa_id
     ? tarifas.find(t => t.id === contadorSeleccionado.tarifa_id) ?? null
     : null
   const tarifaExpirada = tarifaDelContador !== null && !tarifaDelContador.activa
   const sinTarifa = contadorSeleccionado !== null && !tarifaDelContador
 
+  // PREVISUALIZACIÓN, no decisión. Desde 20260910000200 la lectura anterior —y
+  // con ella el consumo y el importe— la resuelve `registrar_lectura` dentro de
+  // su transacción, con la lista COMPLETA y bajo bloqueo. Esto sólo alimenta lo
+  // que se le enseña al lecturista mientras teclea.
+  //
+  // Aun así el orden espeja EXACTAMENTE el del servidor
+  // (secuencia, fecha, created_at, id), y no por gusto: si la pantalla dijera
+  // un número y la base guardara otro, el operador no tendría forma de saber
+  // cuál es el bueno. Ordenar sólo por `fecha` —lo que se hacía antes— empata
+  // en cuanto hay dos lecturas del mismo día (las dos al mediodía) y el
+  // desempate lo decidía el motor de JS.
   function getUltimaLectura(contadorId: string): { lectura: number; fecha: string | null; esPrimera: boolean } {
     const contador = contadores.find(c => c.id === contadorId)
     const historial = registros
-      .filter(r => r.contador_id === contadorId)
-      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+      .filter(r => r.contador_id === contadorId && !r.deleted_at)
+      .sort((a, b) =>
+        (b.secuencia ?? 0) - (a.secuencia ?? 0) ||
+        new Date(b.fecha).getTime() - new Date(a.fecha).getTime() ||
+        String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')) ||
+        b.id.localeCompare(a.id),
+      )
     if (historial.length > 0) {
       return { lectura: historial[0].lectura_actual, fecha: historial[0].fecha, esPrimera: false }
     }
@@ -210,9 +226,23 @@ export function LecturasSection({
   const validacion = !isNaN(lecturaNum)
     ? validarLectura(ultimaLectura, lecturaNum, { resetContador, promedioHistorico })
     : null
-  // Consumo efectivo a guardar: 0 en reset, el delta si es válido, o el crudo
-  // (negativo) para el display de error cuando no es válido.
-  const consumoEfectivo = validacion?.valid ? (validacion.consumo ?? 0) : consumo
+  // Lo que el reset cobra de verdad: lo que le faltaba por facturar al medidor
+  // RETIRADO más lo que ya marca el nuevo. Es la misma fórmula que aplica el
+  // servidor; aquí sólo se previsualiza.
+  const finalRetiradaNum = parseFloat(lecturaFinalRetirada)
+  const consumoReset =
+    resetContador && !isNaN(finalRetiradaNum) && !isNaN(lecturaNum) && finalRetiradaNum >= ultimaLectura
+      ? (finalRetiradaNum - ultimaLectura) + lecturaNum
+      : null
+  // Consumo efectivo a mostrar: el del reset cuando lo hay, el delta si la
+  // lectura es válida, o el crudo (negativo) para el display de error.
+  const consumoEfectivo = resetContador
+    ? consumoReset
+    : validacion?.valid ? (validacion.consumo ?? 0) : consumo
+  // Lo que el servidor va a exigir para aceptar el reset. Se comprueba aquí
+  // para decirlo antes del viaje de red, no para decidir nada.
+  const resetIncompleto =
+    resetContador && (consumoReset === null || notas.trim().length < 10)
   const calculo =
     consumoEfectivo !== null && consumoEfectivo >= 0 && tarifaDelContador
       ? calcularCostoTarifa(consumoEfectivo, tarifaDelContador, contadorSeleccionado?.cantidad_derecho_servicio_m3 ?? null)
@@ -257,7 +287,8 @@ export function LecturasSection({
   function limpiarFormulario() {
     setSelectedContadorId('')
     setLecturaActual('')
-    setEstado('pendiente')
+    setResetContador(false)
+    setLecturaFinalRetirada('')
     setFechaLecturaActual(hoyLocalISO())
     setFechaAnteriorManual('')
     setNotas('')
@@ -265,19 +296,19 @@ export function LecturasSection({
     setFotoFile(null)
   }
 
-  // Sincroniza la cola offline (manual, controlado por el operador). Idempotente:
-  // una lectura que ya está en la BD (por clave natural) se descarta sin duplicar.
-  // Las insertadas se agregan a la lista; las que fallan quedan para reintentar.
+  // Sincroniza la cola offline (manual, controlado por el operador). Cada
+  // pendiente lleva SU llave de idempotencia: si esa operación ya entró, la RPC
+  // devuelve la misma fila en vez de crear otra. Ya no hay pre-consulta ni,
+  // por tanto, ventana entre "¿existe?" y "insertar".
   async function sincronizar() {
     if (sincronizando || pendientes.length === 0) return
     setSincronizando(true)
     try {
       const res = await sincronizarPendientes(outbox, {
-        existe: (r) => registroExiste(r.contador_id as string, r.lectura_actual as number, r.fecha as string),
-        insertar: async (r) => {
-          const { data, error, duplicado } = await createRegistro(r)
-          // E1: la llave natural la rechazó (otro dispositivo ganó la carrera
-          // TOCTOU) → se descarta de la cola como "ya existía", no se reintenta.
+        registrar: async (captura) => {
+          const { data, error, duplicado } = await registrarLectura(captura)
+          // La llave natural la rechazó: esa lectura ya está por OTRA
+          // operación → se descarta de la cola, no se reintenta para siempre.
           if (duplicado) return 'duplicado'
           if (!error && data) onRegistroAdded(data)
           return error
@@ -295,6 +326,16 @@ export function LecturasSection({
     }
   }
 
+  /**
+   * ¿El guardado falló por falta de red y no porque el servidor dijera que no?
+   * Un rechazo de negocio (retroactiva, tarifa vencida, sin permisos) NO debe
+   * encolarse: reintentarlo mil veces daría siempre lo mismo. Un corte de red
+   * sí, porque la lectura de campo no se puede volver a tomar.
+   */
+  function esFalloDeRed(mensaje: string): boolean {
+    return /failed to fetch|network|networkerror|load failed|timeout|abort/i.test(mensaje)
+  }
+
   async function handleGuardar() {
     if (!unidadSeleccionada) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione una unidad primero' })
     if (!contadorSeleccionado) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione un contador' })
@@ -310,63 +351,72 @@ export function LecturasSection({
       })
       return
     }
-    // validarLectura es la fuente única: bloquea retroceso sin reset y lecturas
-    // no numéricas; permite reset (consumo→0) y solo avisa ante salto anómalo.
-    if (!validacion || !validacion.valid) {
+    // validarLectura sigue aquí como AVISO INMEDIATO al lecturista (retroceso
+    // sin reset, salto anómalo). Ya no es "la fuente única": la fuente es la
+    // RPC, que valida lo mismo contra la lectura vigente real y bajo bloqueo.
+    // Esto sólo evita el viaje de red cuando el número ya se ve mal.
+    if (!resetContador && (!validacion || !validacion.valid)) {
       return notify({ variant: 'error', title: 'Lectura inválida', text: validacion?.error ?? 'Datos de lectura inválidos' })
     }
-    const consumoGuardar = validacion.consumo ?? 0
-
-    const resultadoCobro = calcularCostoTarifa(consumoGuardar, tarifaDelContador!, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
-
-    if (!projectId) {
-      notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar el proyecto del usuario' })
-      return
+    if (isNaN(lecturaNum) || lecturaNum < 0) {
+      return notify({ variant: 'error', title: 'Lectura inválida', text: 'La lectura actual debe ser un número ≥ 0.' })
+    }
+    if (resetContador) {
+      if (consumoReset === null) {
+        return notify({
+          variant: 'error',
+          title: 'Falta la lectura del medidor retirado',
+          text: `Para registrar el cambio de medidor, anotá lo último que marcaba el medidor retirado (no puede ser menor que ${ultimaLectura}).`,
+        })
+      }
+      if (notas.trim().length < 10) {
+        return notify({
+          variant: 'error',
+          title: 'Falta el motivo del cambio',
+          text: 'Un cambio de medidor mueve dinero: escribí en Observaciones por qué se cambió (mínimo 10 caracteres).',
+        })
+      }
     }
 
-    // Subir la foto a Storage (igual que AdminNewReading) y guardar SOLO el path
-    // (scopeado por carpeta-de-cliente para la RLS del bucket). Nunca base64 en BD.
+    // La foto se sube a Storage y se guarda SOLO el path, scopeado por
+    // carpeta-de-cliente para la RLS del bucket (infra:I14). Nunca base64 en BD.
     const clienteIdRegistro = unidadSeleccionada.cliente_id ?? null
 
-    // Builder del payload de la lectura. La foto se resuelve aparte (online = path
-    // subido; offline = null: se conserva el dato crítico y la foto se recaptura).
-    const construirRegistro = (fotoPath: string | null) => ({
-      // El cliente se toma de la unidad (siempre cargada), no de la lista `clientes`
-      // en memoria: un operador puede no tenerla por RLS y se perdía el cliente_id.
-      cliente_id: clienteIdRegistro,
-      cliente_nombre: clienteDeUnidad?.nombre ?? unidadSeleccionada.nombre,
-      contador_id: contadorSeleccionado.id,
-      project_id: projectId,
-      fecha: new Date(fechaLecturaActual + 'T12:00:00').toISOString(),
-      lectura_anterior: ultimaLectura,
-      lectura_actual: lecturaNum,
-      consumo: consumoGuardar,
-      tarifa_aplicada: tarifaDelContador!.precio_m3,
-      tarifa_exceso_aplicada: tarifaDelContador!.precio_m3_exceso ?? 0,
-      canon_aplicado: tarifaDelContador!.canon_fijo,
-      monto_calculado: resultadoCobro.total,
-      tipo_cobro: resultadoCobro.tipo_cobro,
-      estado,
-      fecha_lectura_anterior: fechaLecturaAnterior,
-      dias_servicio: diasServicio,
-      notas,
+    // La IDENTIDAD DE ESTA OPERACIÓN. Se genera una sola vez y acompaña a la
+    // lectura hasta que entra: si la respuesta se pierde y el operador reintenta
+    // —o la cola offline la reenvía— el servidor reconoce que es el mismo acto y
+    // devuelve la fila que ya creó, en vez de duplicar el cargo.
+    const idempotencyKey = nuevaClaveIdempotencia()
+
+    // Lo ÚNICO que aporta el navegador. No hay consumo, ni tarifa, ni importe,
+    // ni proyecto, ni estado: los resuelve `registrar_lectura` en el servidor.
+    const construirCaptura = (fotoPath: string | null): LecturaCaptura => ({
+      contadorId: contadorSeleccionado.id,
+      lecturaActual: lecturaNum,
+      fecha: fechaLecturaActual,
+      idempotencyKey,
+      notas: notas.trim() || null,
+      fotoPath,
       gps,
-      foto: fotoPath,
+      resetMedidor: resetContador,
+      lecturaFinalRetirada: resetContador ? finalRetiradaNum : null,
+      // Sólo tiene sentido en la primera lectura del contador; el servidor lo
+      // ignora en cualquier otra.
+      fechaInicioServicio: esPrimeraLectura && fechaAnteriorManual ? fechaAnteriorManual : null,
     })
 
-    // Captura OFFLINE: sin conexión encolamos la lectura (sin foto) en la cola local
-    // y salimos; se sincroniza luego de forma idempotente. Evita perder la lectura.
+    const etiquetaPendiente =
+      `${clienteDeUnidad?.nombre ?? unidadSeleccionada.nombre} · ${contadorSeleccionado.numero_serie}`
+
+    // Captura OFFLINE: sin conexión encolamos la captura (sin foto) en la cola
+    // local y salimos; se sincroniza luego con la MISMA llave, sin duplicar.
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      const reg = construirRegistro(null)
-      const etiqueta = `${reg.cliente_nombre ?? 'Cliente'} · ${contadorSeleccionado.numero_serie}`
-      setPendientes(encolarLectura(outbox, reg, etiqueta, Date.now()))
+      setPendientes(encolarLectura(outbox, construirCaptura(null), etiquetaPendiente, Date.now()))
       notify({ variant: 'info', title: '📴 Guardada sin conexión', text: 'La lectura quedó en la cola local; sincronizala cuando recuperes señal.' })
       limpiarFormulario()
       return
     }
 
-    // Subir la foto a Storage (igual que AdminNewReading) y guardar SOLO el path
-    // (scopeado por carpeta-de-cliente para la RLS del bucket). Nunca base64 en BD.
     setSaving(true)
     let fotoPath: string | null = null
     if (fotoFile && clienteIdRegistro) {
@@ -381,14 +431,23 @@ export function LecturasSection({
       notify({ variant: 'warning', title: 'Foto no guardada', text: 'La unidad no tiene cliente asociado; la lectura se guardará sin foto.' })
     }
 
-    const registro = construirRegistro(fotoPath)
-
-    const { data, error } = await createRegistro(registro)
+    const captura = construirCaptura(fotoPath)
+    const { data, error } = await registrarLectura(captura)
     setSaving(false)
 
     if (error || !data) {
-      console.error('Error inserting registro:', error)
-      notify({ variant: 'error', title: 'Error', text: error || 'No se pudo guardar en la base de datos' })
+      const mensaje = error || 'No se pudo guardar en la base de datos'
+      // Si se cayó la red DESPUÉS de teclear la lectura, la lectura no se
+      // pierde: pasa a la cola con la misma llave. Un rechazo de negocio, en
+      // cambio, se le dice al operador para que lo corrija.
+      if (esFalloDeRed(mensaje)) {
+        setPendientes(encolarLectura(outbox, construirCaptura(fotoPath), etiquetaPendiente, Date.now()))
+        notify({ variant: 'info', title: '📴 Guardada en la cola', text: 'No hubo conexión al guardar; la lectura quedó pendiente de sincronizar.' })
+        limpiarFormulario()
+        return
+      }
+      console.error('Error registrando lectura:', mensaje)
+      notify({ variant: 'error', title: 'Error', text: mensaje })
       return
     }
 
@@ -694,8 +753,33 @@ export function LecturasSection({
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
                         <input type="checkbox" checked={resetContador} onChange={e => setResetContador(e.target.checked)} />
-                        El medidor fue reemplazado/reseteado (la lectura bajó). Registrá el motivo en Observaciones.
+                        El medidor fue reemplazado/reseteado (la lectura bajó).
                       </label>
+                    </div>
+                  )}
+                  {resetContador && (
+                    <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 10 }}>
+                      <div>
+                        <label htmlFor="lectura-final-retirada" style={labelStyle}>
+                          Última lectura del medidor RETIRADO
+                        </label>
+                        <input
+                          id="lectura-final-retirada"
+                          type="number"
+                          step="0.01"
+                          value={lecturaFinalRetirada}
+                          onChange={e => setLecturaFinalRetirada(e.target.value)}
+                          placeholder={`No puede ser menor que ${ultimaLectura}`}
+                          style={{ ...inputStyle, borderColor: consumoReset === null ? 'var(--at-warning)' : 'var(--at-line)' }}
+                        />
+                      </div>
+                      <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', color: 'var(--at-warning-strong)', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
+                        El agua que pasó por el medidor viejo desde su última lectura
+                        {consumoReset !== null
+                          ? ` se cobra: ${(finalRetiradaNum - ultimaLectura).toFixed(2)} m³ del retirado + ${lecturaNum.toFixed(2)} m³ del nuevo.`
+                          : ' se cobra también, por eso hace falta su lectura final.'}
+                        {' '}Escribí el motivo del cambio en Observaciones (mínimo 10 caracteres).
+                      </div>
                     </div>
                   )}
                   {validacion?.warning && (
@@ -709,7 +793,7 @@ export function LecturasSection({
                       <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', color: 'var(--at-success-strong)' }}>
                         {calculo.desglose.tramo === 1 && (
                           <>
-                            <div>Consumo <strong>{consumo?.toFixed(2)} m³</strong> ≤ mínimo <strong>{tarifaDelContador?.consumo_minimo ?? 0} m³</strong> → Solo canon fijo</div>
+                            <div>Consumo <strong>{consumoEfectivo?.toFixed(2)} m³</strong> ≤ mínimo <strong>{tarifaDelContador?.consumo_minimo ?? 0} m³</strong> → Solo canon fijo</div>
                             <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700 }}>Total: {moneda}{calculo.total.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--at-success)' }}>({calculo.tipo_cobro})</span></div>
                           </>
                         )}
@@ -750,14 +834,12 @@ export function LecturasSection({
                     <label htmlFor="lectura-dias-servicio" style={labelStyle}>Días de Servicio</label>
                     <input id="lectura-dias-servicio" type="text" readOnly value={diasServicio !== null ? `${diasServicio} días` : '—'} style={{ ...inputStyle, fontWeight: 'bold', color: diasServicio !== null ? 'var(--at-primary)' : 'var(--at-ink-3)', background: 'var(--at-surface-2)' }} />
                   </div>
-                  <div>
-                    <label htmlFor="lectura-estado-pago" style={labelStyle}>Estado Pago</label>
-                    <select id="lectura-estado-pago" value={estado} onChange={e => setEstado(e.target.value as Registro['estado'])} style={inputStyle}>
-                      <option value="pendiente">Pendiente</option>
-                      <option value="pagado">Pagado</option>
-                      <option value="mora">Mora</option>
-                    </select>
-                  </div>
+                  {/* El «Estado Pago» de la captura ya no existe. Marcar una
+                      lectura como pagada al guardarla era fabricar un recibo
+                      cobrado sin pago, sin fecha y sin rastro; ahora toda
+                      lectura nace PENDIENTE por decisión del servidor
+                      (20260910000200) y cobrarla es otro acto, con su permiso.
+                      Se cobra desde Cobros. */}
                   <div style={{ gridColumn: '1/-1' }}>
                     <label htmlFor="lectura-observaciones" style={labelStyle}>Observaciones</label>
                     <input id="lectura-observaciones" type="text" value={notas} onChange={e => setNotas(e.target.value)} placeholder="Opcional" style={inputStyle} />
@@ -806,7 +888,7 @@ export function LecturasSection({
 
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={handleGuardar} disabled={saving || tarifaExpirada || sinTarifa} style={{ padding: '12px 24px', background: (saving || tarifaExpirada || sinTarifa) ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada || sinTarifa) ? 'not-allowed' : 'pointer' }}>
+                    <button onClick={handleGuardar} disabled={saving || tarifaExpirada || sinTarifa || resetIncompleto} style={{ padding: '12px 24px', background: (saving || tarifaExpirada || sinTarifa || resetIncompleto) ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada || sinTarifa || resetIncompleto) ? 'not-allowed' : 'pointer' }}>
                       {saving ? 'Guardando...' : enModoRuta ? `💾 Guardar y Avanzar (${rutaIndex + 1}/${unidadesOrdenadas.length})` : '💾 Guardar Lectura'}
                     </button>
                     <button onClick={limpiarFormulario} style={{ padding: '12px 24px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>

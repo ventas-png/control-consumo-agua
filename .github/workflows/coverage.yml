@@ -451,6 +451,75 @@ jobs:
           PGPORT_TEST: 55494
         run: supabase/tests/security_logs_acceso/run.sh
 
+      # La lectura de agua la declaraba el navegador: consumo, tarifa, canon,
+      # importe, proyecto y hasta el estado de cobro viajaban en el INSERT, y la
+      # RLS sólo miraba el proyecto. 20260910000200 lo mueve entero al servidor.
+      # Casi nada de eso se ve leyendo el SQL: que un payload con `monto 0` y
+      # `estado pagado` acabe escrito con otros números, que tres lecturas del
+      # mismo día encadenen en orden, que quien captura SIN poder leer la tabla
+      # obtenga igual la lectura anterior correcta, y que el bloqueo por
+      # contador serialice de verdad (dos conexiones, sobre un contador sin
+      # lecturas, que es donde un lock de fila no tendría nada que bloquear).
+      # Incluye la paridad del importe contra el mismo fichero de casos que
+      # ejercita el test de TypeScript.
+      - name: Lectura de agua autoritativa — el importe no es un parámetro
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55495
+        run: supabase/tests/registrar_lectura/run.sh
+
+      # El otro lado de la misma puerta: la lectura no se crea con el importe
+      # puesto, pero se podía REESCRIBIR con un PATCH. La prueba empieza
+      # DEMOSTRANDO el agujero (desactiva el trigger nuevo y lo ejerce como
+      # `authenticated`) y sigue con el camino autorizado de cobro.
+      - name: UPDATE de registros — el PATCH ya no fabrica un cobro
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55496
+        run: supabase/tests/proteger_update_registros/run.sh
+
+      # La Preview limpia de #856 dejó SIETE SECURITY DEFINER ejecutables por
+      # `anon` porque producción las endureció a mano y las migraciones no lo
+      # registran. `20260911223000` declara esa matriz —que NO es la misma para
+      # las siete: sso_lookup_domain conserva anon a propósito y
+      # buscar_cliente_para_onboarding conserva authenticated— y esta prueba la
+      # ejerce: invocación real con SET LOCAL ROLE, triggers vivos tras la
+      # revocación, y mutación (quitar cualquiera de los siete REVOKE, o mover
+      # una celda, tiene que poner el arnés en rojo).
+      - name: ACL de las SECURITY DEFINER expuestas por anon (matriz de producción)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55497
+        run: supabase/tests/acl_definer_expuestas_anon/run.sh
+
+      # El webhook de Stripe insertaba el `pagos` y marcaba la solicitud
+      # `succeeded` SIN acreditar el ítem: el recibo quedaba con el saldo
+      # íntegro. Y reclamaba el evento ANTES de procesarlo, así que un fallo a
+      # media función lo dejaba marcado como visto para siempre — Stripe recibía
+      # 200 y el cobro no se acreditaba nunca. Estas 12 invariantes separan «lo
+      # vi» de «lo terminé» y ejercen el fallo provocado entre el reclamo y la
+      # acreditación, con dos conexiones reales para la carrera del reclamo.
+      - name: Webhook de Stripe — «lo vi» no es «lo terminé»
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55498
+        run: supabase/tests/webhook_stripe_idempotencia/run.sh
+
+      # `20260909000000` revoca EXECUTE de PUBLIC/anon sobre 15 helpers de RLS
+      # dando por hecho un GRANT a `authenticated` que NINGUNA migración
+      # concede: lo aparentaba el `ALTER DEFAULT PRIVILEGES … ON FUNCTIONS` de
+      # bootstrap.sql, que una Supabase Branch real no tiene. Con él puesto la
+      # reconstrucción pasaba y el fallo sólo salía en una branch de verdad
+      # (#847, 2026-09-11). Esta prueba reconstruye la cadena ENTERA con
+      # `bootstrap-branch.sql` —sin ese regalo—: primero reproduce el abort y
+      # después demuestra que desaparece, y comprueba la matriz de ACL celda
+      # por celda con has_function_privilege. No lleva PGBIN ni PGPORT_TEST:
+      # reconstruir.mjs localiza el binario por su cuenta (pg_config o
+      # /usr/lib/postgresql/*/bin, que es donde lo deja el paso `pg` de arriba)
+      # y elige su propio puerto y socket. Sólo usa módulos de node.
+      - name: Replay desde cero con privilegios de Supabase Branch (ACL de helpers RLS)
+        run: node supabase/tests/replay_acl_helpers/run.mjs
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

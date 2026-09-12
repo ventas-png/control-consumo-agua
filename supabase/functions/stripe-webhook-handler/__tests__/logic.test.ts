@@ -1,68 +1,153 @@
-// Tests de la lógica pura de stripe-webhook-handler (infra:I22 · Track T8/T5).
-// Como el resto de tests de edge fns, corre bajo vitest (no Deno) tratando el
-// módulo como TS normal. Cubre la construcción de la fila de `pagos` que nace de
-// un payment_intent.succeeded: defaults de auto-verificación (el webhook YA
-// autenticó por firma), passthrough del monto (en unidades, NO centavos: espeja
-// payment_requests.monto) y trazabilidad hacia el payment intent de Stripe.
+// Tests de la lógica pura de stripe-webhook-handler. Corre bajo vitest (no
+// Deno), tratando el módulo como TS normal.
+//
+// ANTES estas pruebas cubrían `buildPagoRow`: qué fila de `pagos` armaba el
+// webhook a mano. Esa función ya no existe, y su desaparición es el arreglo —
+// construir el pago aquí dejaba el cobro registrado y el recibo con el saldo
+// íntegro, porque nadie acreditaba nada. Ahora eso lo hace
+// `conciliar_pago_externo` en una sola transacción.
+//
+// Lo que queda para el edge, y es lo que se prueba, es EL CÓDIGO HTTP. No es
+// cosmético: Stripe reintenta ante cualquier respuesta que no sea 2xx, así que
+// un 200 significa «no me lo traigas más». Esa frase sólo es cierta cuando el
+// evento se procesó entero, y distinguir eso de «alguien lo tiene en vuelo» es
+// justo lo que separaba un reintento sano de un cobro perdido en silencio.
 
 import { describe, it, expect } from 'vitest'
-import { buildPagoRow, type PaymentRequestRow } from '../logic.ts'
+import {
+  decidirCruceDeEmpresa,
+  decidirTrasConciliar,
+  decidirTrasReclamo,
+  decidirTrasSellar,
+} from '../logic.ts'
 
-function requestEjemplo(over: Partial<PaymentRequestRow> = {}): PaymentRequestRow {
-  return {
-    id: 'pr-1',
-    registro_id: 'reg-1',
-    cliente_id: 'cli-1',
-    company_id: 'co-1',
-    monto: 150.5,
-    ...over,
-  }
-}
-
-describe('stripe-webhook-handler/buildPagoRow', () => {
-  it('nace AUTO-VERIFICADO: estado y verification_status "verificado", verified_by "stripe_webhook"', () => {
-    const row = buildPagoRow(requestEjemplo(), 'pi_123')
-    expect(row.estado).toBe('verificado')
-    expect(row.verification_status).toBe('verificado')
-    expect(row.verified_by).toBe('stripe_webhook')
+describe('decidirTrasReclamo', () => {
+  it('si el evento se reclamó, hay que procesarlo', () => {
+    expect(decidirTrasReclamo({ reclamado: true, ya_completado: false }))
+      .toEqual({ accion: 'procesar' })
   })
 
-  it('método y aplicación fijos del flujo Stripe: tarjeta_credito / pago_total', () => {
-    const row = buildPagoRow(requestEjemplo(), 'pi_123')
-    expect(row.metodo).toBe('tarjeta_credito')
-    expect(row.tipo_aplicacion).toBe('pago_total')
+  it('duplicado de un evento YA COMPLETADO: 200 y no se re-aplica', () => {
+    const d = decidirTrasReclamo({ reclamado: false, ya_completado: true })
+    expect(d).toMatchObject({ accion: 'responder', status: 200 })
+    expect(d.accion === 'responder' && d.body.already_processed).toBe(true)
   })
 
-  it('el monto pasa TAL CUAL desde payment_requests (unidades, no centavos)', () => {
-    expect(buildPagoRow(requestEjemplo({ monto: 150.5 }), 'pi_1').monto).toBe(150.5)
-    expect(buildPagoRow(requestEjemplo({ monto: 0.01 }), 'pi_1').monto).toBe(0.01)
+  it('duplicado de un evento SIN completar: 409 reintentable, NO 200', () => {
+    // Es la invariante de este PR. El handler viejo respondía 200 a cualquier
+    // duplicado, así que un evento reclamado y luego caído quedaba marcado como
+    // visto para siempre: Stripe dejaba de reintentarlo y el cobro nunca se
+    // acreditaba. Un 200 aquí es la forma de perder un pago sin que salte nada.
+    const d = decidirTrasReclamo({
+      reclamado: false, ya_completado: false, estado_previo: 'procesando',
+    })
+    expect(d).toMatchObject({ accion: 'responder', status: 409 })
+    expect(d.accion === 'responder' && d.body.retryable).toBe(true)
+    expect(d.accion === 'responder' && d.body.already_processed).toBeUndefined()
   })
 
-  it('traza el payment intent en stripe_payment_intent_id Y en las notas', () => {
-    const row = buildPagoRow(requestEjemplo(), 'pi_abc999')
-    expect(row.stripe_payment_intent_id).toBe('pi_abc999')
-    expect(row.notas).toBe('Pago automático de Stripe - pi_abc999')
+  it('un estado previo "fallido" que no se pudo re-reclamar tampoco da 200', () => {
+    const d = decidirTrasReclamo({
+      reclamado: false, ya_completado: false, estado_previo: 'fallido',
+    })
+    expect(d).toMatchObject({ accion: 'responder', status: 409 })
+  })
+})
+
+describe('decidirTrasConciliar', () => {
+  it('conciliación correcta: 200 con el pago, si liquidó y el saldo', () => {
+    const d = decidirTrasConciliar(
+      { ok: true, pago_id: 'pago-1', liquidado: true, saldo_restante: 0 }, null,
+    )
+    expect(d).toMatchObject({ accion: 'responder', status: 200 })
+    expect(d.accion === 'responder' && d.body).toMatchObject({
+      received: true, conciliado: true, pago_id: 'pago-1', liquidado: true, saldo_restante: 0,
+    })
   })
 
-  it('copia registro_id/cliente_id del payment_request (incluye registro_id null)', () => {
-    const row = buildPagoRow(requestEjemplo({ registro_id: null, cliente_id: 'cli-9' }), 'pi_1')
-    expect(row.registro_id).toBeNull()
-    expect(row.cliente_id).toBe('cli-9')
+  it('abono parcial: liquidado false y el saldo que queda', () => {
+    const d = decidirTrasConciliar(
+      { ok: true, pago_id: 'pago-2', liquidado: false, saldo_restante: 45.5 }, null,
+    )
+    expect(d.accion === 'responder' && d.body).toMatchObject({
+      liquidado: false, saldo_restante: 45.5,
+    })
   })
 
-  it('sin comprobante ni autor humano: comprobante_* / created_by / project_id en null', () => {
-    const row = buildPagoRow(requestEjemplo(), 'pi_1')
-    expect(row.comprobante_url).toBeNull()
-    expect(row.comprobante_tipo).toBeNull()
-    expect(row.created_by).toBeNull()
-    expect(row.project_id).toBeNull()
+  it('la RPC dice ya_conciliado: 200 y se marca already_processed', () => {
+    const d = decidirTrasConciliar(
+      { ok: true, ya_conciliado: true, pago_id: 'pago-3', liquidado: true, saldo_restante: 0 }, null,
+    )
+    expect(d).toMatchObject({ accion: 'responder', status: 200 })
+    expect(d.accion === 'responder' && d.body.already_processed).toBe(true)
   })
 
-  it('verified_at usa el now inyectado (determinista) y por default un ISO parseable', () => {
-    const row = buildPagoRow(requestEjemplo(), 'pi_1', '2026-07-09T12:00:00.000Z')
-    expect(row.verified_at).toBe('2026-07-09T12:00:00.000Z')
-    const antes = Date.now()
-    const porDefecto = buildPagoRow(requestEjemplo(), 'pi_1')
-    expect(Date.parse(porDefecto.verified_at)).toBeGreaterThanOrEqual(antes - 1000)
+  it('fallo al conciliar: 500 REINTENTABLE, nunca 200', () => {
+    // El dinero ya salió de la tarjeta y la transacción revirtió entera: no hay
+    // nada escrito a medias, sólo un cobro sin acreditar. Que Stripe lo traiga
+    // de nuevo es exactamente lo que se quiere.
+    const d = decidirTrasConciliar(null, { message: 'deadlock detected' })
+    expect(d).toMatchObject({ accion: 'responder', status: 500 })
+    expect(d.accion === 'responder' && d.body.retryable).toBe(true)
+    expect(d.accion === 'responder' && String(d.body.error)).toContain('deadlock detected')
+  })
+
+  it('un cuerpo vacío de la RPC no se lee como liquidado', () => {
+    const d = decidirTrasConciliar(null, null)
+    expect(d.accion === 'responder' && d.body).toMatchObject({
+      liquidado: false, saldo_restante: 0, pago_id: null,
+    })
+  })
+})
+
+describe('decidirCruceDeEmpresa', () => {
+  it('misma empresa: se procesa', () => {
+    expect(decidirCruceDeEmpresa('co-1', 'co-1')).toEqual({ accion: 'procesar' })
+  })
+
+  it('empresa distinta: 400 y NO reintentable', () => {
+    // Sin esto, el secreto de webhook de la empresa A serviría para conciliar
+    // un cobro de la empresa B. Y no es reintentable: reenviarlo daría igual.
+    const d = decidirCruceDeEmpresa('co-1', 'co-2')
+    expect(d).toMatchObject({ accion: 'responder', status: 400 })
+    expect(d.accion === 'responder' && d.body.retryable).toBe(false)
+  })
+})
+
+describe('decidirTrasSellar', () => {
+  it('sello escrito: se respeta la decisión del procesamiento', () => {
+    const d = { accion: 'responder', status: 200, body: { received: true } } as const
+    expect(decidirTrasSellar(true, d)).toBe(d)
+  })
+
+  it('sello FALLIDO tras un procesamiento correcto: 500 reintentable, no 200', () => {
+    // Es la segunda mitad de «no devuelvas 200 si falla la actualización de
+    // estado». Un 200 con el evento sin sellar deja a Stripe sin traerlo más y
+    // a la tabla sin constancia de que terminó: indistinguible de un cobro
+    // perdido. Reintentar es barato — la conciliación responde ya_conciliado.
+    const d = { accion: 'responder', status: 200, body: { received: true } } as const
+    const r = decidirTrasSellar(false, d)
+    expect(r).toMatchObject({ accion: 'responder', status: 500 })
+    expect(r.accion === 'responder' && r.body.retryable).toBe(true)
+  })
+
+  it('sello fallido tras un fallo: sigue siendo 500 reintentable', () => {
+    const d = {
+      accion: 'responder', status: 500, body: { received: false, retryable: true },
+    } as const
+    expect(decidirTrasSellar(false, d)).toMatchObject({ status: 500 })
+  })
+})
+
+describe('decidirTrasReclamo · processed_at es quien confirma', () => {
+  it('estado completado SIN processed_at no es already_processed', () => {
+    // La RPC ya no marca `ya_completado` cuando falta `processed_at`, así que
+    // al edge le llega false y responde 409 reintentable. Son dos columnas y
+    // pueden divergir; sin la confirmación, la lectura segura es «no consta».
+    const d = decidirTrasReclamo({
+      reclamado: false, ya_completado: false, estado_previo: 'completado',
+    })
+    expect(d).toMatchObject({ accion: 'responder', status: 409 })
+    expect(d.accion === 'responder' && d.body.already_processed).toBeUndefined()
   })
 })

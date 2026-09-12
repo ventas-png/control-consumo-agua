@@ -1,8 +1,18 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { decryptSecret } from '../_shared/secretsCrypto.ts'
-// Construcción de la fila de `pagos` (lógica pura) extraída a ./logic.ts para
-// poder testearla en vitest (infra:I22).
-import { buildPagoRow } from './logic.ts'
+// Decisión de la respuesta HTTP (lógica pura) en ./logic.ts, testeable en
+// vitest. Antes aquí se importaba `buildPagoRow`, que armaba la fila de `pagos`
+// a mano: ya no existe — el pago lo inserta `conciliar_pago_externo` en la misma
+// transacción que acredita el recibo.
+import {
+  decidirCruceDeEmpresa,
+  decidirTrasConciliar,
+  decidirTrasReclamo,
+  decidirTrasSellar,
+  type Conciliacion,
+  type Decision,
+  type Reclamo,
+} from './logic.ts'
 
 // CORS utilities
 
@@ -38,6 +48,18 @@ const stripeVerifier = new Stripe('sk_webhook_signature_verification_only', {
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
   const corsHeaders = getCorsHeaders(origin)
+
+  /**
+   * Única salida con cuerpo. Que el status venga de `Decision` y no de un
+   * literal repartido por el archivo es deliberado: el status ES la semántica
+   * frente a Stripe —2xx significa «no me lo traigas más»— y así se decide en
+   * un módulo puro con pruebas, no a ojo en cada rama.
+   */
+  const responder = (d: Extract<Decision, { accion: 'responder' }>) =>
+    new Response(JSON.stringify(d.body), {
+      status: d.status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -138,116 +160,169 @@ Deno.serve(async (req) => {
       })
     }
 
-    // ── Idempotencia ────────────────────────────────────────────────────────
-    // Stripe reentrega el mismo evento ante timeouts o 5xx, y su ventana de
-    // tolerancia de firma (300 s por defecto) permite reenviar una captura
-    // válida. Mismo patrón que stripe-platform-webhook:324-339 — el PK de
-    // `stripe_webhook_events` es la barrera.
+    // ── Idempotencia REAL ───────────────────────────────────────────────────
+    // Antes esto era un INSERT a secas en `stripe_webhook_events`, y un choque
+    // de PK respondía 200 `already_processed`. El problema no era el INSERT sino
+    // lo que significaba: reclamaba el evento ANTES de procesarlo, y la tabla
+    // —que desde 20260528000040 tiene `processed_at` y `error_message`— nunca
+    // se cerraba. Si el procesamiento se caía después de reclamar, el reintento
+    // de Stripe encontraba la fila, recibía 200 y el cobro se quedaba sin
+    // acreditar PARA SIEMPRE, sin nadie que lo volviera a intentar.
     //
-    // `pagos.stripe_payment_intent_id` es UNIQUE
-    // (20260317000000_baseline_legacy_tables_phase1.sql:195), así que un replay
-    // tampoco duplicaría el cobro; pero sin esto devolvería 500 y Stripe seguiría
-    // reintentando un evento ya aplicado.
-    const { error: dedupeErr } = await adminClient
-      .from('stripe_webhook_events')
-      .insert({
-        event_id: event.id,
-        event_type: event.type,
-        livemode: event.livemode,
-        payload: event as unknown as Record<string, unknown>,
-      })
-    if (dedupeErr) {
-      if (dedupeErr.code === '23505') {
-        return new Response(JSON.stringify({ received: true, already_processed: true }), {
-          status: 200, headers: { 'Content-Type': 'application/json' },
-        })
-      }
-      console.error('[stripe-webhook] error insertando evento:', dedupeErr.message)
-      return new Response(JSON.stringify({ error: 'DB error' }), {
-        status: 500, headers: { 'Content-Type': 'application/json' },
+    // «Lo vi» y «lo terminé» son hechos distintos. 20260911231905 los separa en
+    // cuatro estados y reclama en UNA sentencia: dos entregas simultáneas del
+    // mismo evento son exactamente el caso que un check-then-insert deja pasar.
+    const { data: reclamoRaw, error: reclamoErr } = await adminClient.rpc(
+      'stripe_webhook_evento_reclamar',
+      {
+        p_event_id: event.id,
+        p_event_type: event.type,
+        p_livemode: event.livemode,
+        p_payload: event as unknown as Record<string, unknown>,
+      },
+    )
+    if (reclamoErr) {
+      console.error('[stripe-webhook] no se pudo reclamar el evento:', reclamoErr.message)
+      return responder({
+        accion: 'responder', status: 500,
+        body: { received: false, retryable: true, error: 'no se pudo registrar el evento' },
       })
     }
 
-    console.log(`Processing webhook event: ${event.type}`)
+    const trasReclamo = decidirTrasReclamo((reclamoRaw ?? {}) as Reclamo)
+    if (trasReclamo.accion === 'responder') return responder(trasReclamo)
 
-    // Handle different event types
-    if (event.type === 'payment_intent.succeeded') {
-      const paymentIntent = event.data.object as any
-
-      // Find the payment request
-      const { data: paymentRequest } = await adminClient
-        .from('payment_requests')
-        .select('*')
-        .eq('stripe_payment_intent', paymentIntent.id)
-        .single()
-
-      if (paymentRequest) {
-        // SECURITY: Validate company ownership to prevent cross-company pago creation
-        if (paymentRequest.company_id !== companyId) {
-          console.error('Company mismatch in webhook: payment_requests.company_id != verified webhook company_id')
-          return new Response(JSON.stringify({ error: 'Company validation failed' }), {
-            status: 400, headers: { 'Content-Type': 'application/json' },
-          })
-        }
-
-        // Create pago record with 'verificado' status (auto-verified via webhook)
-        const { error: pagoError } = await adminClient
-          .from('pagos')
-          .insert(buildPagoRow(paymentRequest, paymentIntent.id))
-
-        if (pagoError) {
-          // 23505 sobre `pagos.stripe_payment_intent_id` (UNIQUE) = el pago ya
-          // estaba registrado. Es éxito, no fallo: devolver 500 haría que Stripe
-          // reintentara para siempre un evento ya aplicado.
-          if (pagoError.code === '23505') {
-            console.log(`[stripe-webhook] pago ya registrado para ${paymentIntent.id}`)
-            return new Response(JSON.stringify({ received: true, already_processed: true }), {
-              status: 200, headers: { 'Content-Type': 'application/json' },
-            })
-          }
-          console.error('Error creating pago from webhook:', pagoError)
-          return new Response(JSON.stringify({ error: 'Failed to create pago' }), {
-            status: 500, headers: { 'Content-Type': 'application/json' },
-          })
-        }
-
-        // Update payment_requests status
-        const { error: updateError } = await adminClient
-          .from('payment_requests')
-          .update({ estado: 'succeeded' })
-          .eq('id', paymentRequest.id)
-
-        if (updateError) {
-          console.error('Error updating payment request:', updateError)
-        }
+    // A partir de aquí el evento es NUESTRO y hay que cerrarlo pase lo que pase:
+    // dejarlo en `procesando` lo convierte en un evento que nadie retoma hasta
+    // que vence el umbral de rancio.
+    //
+    // Devuelve si el sello quedó escrito. Antes esto sólo lo registraba en el
+    // log y seguía: si la conciliación salía bien pero marcar el evento
+    // `completado` fallaba, el handler respondía 200 con el evento atascado en
+    // `procesando` — Stripe dejaba de traerlo y quedaba un cobro acreditado sin
+    // constancia de haberse terminado. Un 200 sólo se emite cuando TODO quedó
+    // escrito, incluido el sello.
+    const cerrar = async (ok: boolean, motivo?: string): Promise<boolean> => {
+      const { error } = await adminClient.rpc('stripe_webhook_evento_cerrar', {
+        p_event_id: event.id, p_ok: ok, p_error: motivo ?? null,
+      })
+      if (error) {
+        console.error('[stripe-webhook] no se pudo cerrar el evento:', error.message)
+        return false
       }
-    } else if (event.type === 'payment_intent.payment_failed') {
-      const paymentIntent = event.data.object as any
-
-      const { data: paymentRequest } = await adminClient
-        .from('payment_requests')
-        .select('*')
-        .eq('stripe_payment_intent', paymentIntent.id)
-        .single()
-
-      if (paymentRequest) {
-        // Update payment_requests status
-        const { error: updateError } = await adminClient
-          .from('payment_requests')
-          .update({
-            estado: 'failed',
-          })
-          .eq('id', paymentRequest.id)
-
-        if (updateError) {
-          console.error('Error updating payment request on failure:', updateError)
-        }
-      }
+      return true
     }
 
-    return new Response(JSON.stringify({ received: true }), {
-      status: 200, headers: { 'Content-Type': 'application/json' },
-    })
+    /**
+     * Cierra y responde. Si el cierre falla, la respuesta pasa a ser
+     * reintentable pase lo que pase: reintentar es barato —la conciliación
+     * responde `ya_conciliado`— y dar por bueno lo que no se pudo sellar no lo
+     * es.
+     */
+    const cerrarYResponder = async (
+      ok: boolean, decision: Extract<Decision, { accion: 'responder' }>, motivo?: string,
+    ) => {
+      const tras = decidirTrasSellar(await cerrar(ok, motivo), decision)
+      return responder(tras as Extract<Decision, { accion: 'responder' }>)
+    }
+
+    try {
+      console.log(`Processing webhook event: ${event.type}`)
+
+      if (event.type === 'payment_intent.succeeded') {
+        const paymentIntent = event.data.object as { id: string }
+
+        // El monto, la empresa y el ítem salen de `payment_requests`, NUNCA del
+        // payload de Stripe: lo que se concilia es la solicitud que este sistema
+        // creó, no lo que venga en el evento.
+        const { data: pr, error: prErr } = await adminClient
+          .from('payment_requests')
+          .select('id, company_id')
+          .eq('stripe_payment_intent', paymentIntent.id)
+          .maybeSingle()
+
+        if (prErr) {
+          return await cerrarYResponder(false, {
+            accion: 'responder', status: 500,
+            body: { received: false, retryable: true, error: prErr.message },
+          }, `lectura de payment_requests: ${prErr.message}`)
+        }
+
+        if (!pr) {
+          // No hay solicitud para este intent. No es un fallo nuestro y
+          // reintentarlo daría lo mismo: se cierra como completado para que
+          // Stripe no insista, y queda el rastro en la tabla.
+          console.warn(`[stripe-webhook] sin payment_request para ${paymentIntent.id}`)
+          return await cerrarYResponder(true, {
+            accion: 'responder', status: 200,
+            body: { received: true, sin_solicitud: true },
+          })
+        }
+
+        const cruce = decidirCruceDeEmpresa(companyId, pr.company_id)
+        if (cruce.accion === 'responder') {
+          console.error('[stripe-webhook] la solicitud de cobro es de otra empresa')
+          return await cerrarYResponder(
+            false, cruce, 'cruce de empresa entre el secreto verificado y la solicitud')
+        }
+
+        // UNA transacción: inserta el pago (idempotente por UNIQUE sobre
+        // payment_request_id), acredita el recibo o la cuota y cierra la
+        // solicitud. La procedencia de la verificación viaja con ella: el pago
+        // queda `aplicado` —el hecho contable— y conserva quién probó que el
+        // cobro ocurrió, que es la firma de Stripe.
+        const { data: conciliado, error: conciliarErr } = await adminClient.rpc(
+          'conciliar_pago_externo',
+          {
+            p_payment_request_id: pr.id,
+            p_verificado_por: 'stripe_webhook',
+            p_verificado_en: new Date(event.created * 1000).toISOString(),
+          },
+        )
+
+        const decision = decidirTrasConciliar(
+          (conciliado ?? null) as Conciliacion | null,
+          conciliarErr,
+        )
+        return await cerrarYResponder(!conciliarErr, decision, conciliarErr?.message)
+      }
+
+      if (event.type === 'payment_intent.payment_failed') {
+        const paymentIntent = event.data.object as { id: string }
+        const { error: updErr } = await adminClient
+          .from('payment_requests')
+          .update({ estado: 'failed' })
+          .eq('stripe_payment_intent', paymentIntent.id)
+          .eq('company_id', companyId)
+
+        if (updErr) {
+          return await cerrarYResponder(false, {
+            accion: 'responder', status: 500,
+            body: { received: false, retryable: true, error: updErr.message },
+          }, `marcar failed: ${updErr.message}`)
+        }
+        return await cerrarYResponder(
+          true, { accion: 'responder', status: 200, body: { received: true } })
+      }
+
+      // Un tipo de evento que no manejamos ES un procesamiento terminado: no
+      // hay nada que hacer con él y reintentarlo no cambiaría nada.
+      return await cerrarYResponder(true, {
+        accion: 'responder', status: 200,
+        body: { received: true, ignorado: event.type },
+      })
+    } catch (e) {
+      // El evento quedó reclamado: cerrarlo como fallido es lo que permite que
+      // el reintento de Stripe lo retome de inmediato en vez de esperar al
+      // umbral de rancio.
+      const motivo = e instanceof Error ? e.message : String(e)
+      await cerrar(false, motivo)
+      console.error('[stripe-webhook] fallo procesando el evento:', motivo)
+      return responder({
+        accion: 'responder', status: 500,
+        body: { received: false, retryable: true, error: 'fallo procesando el evento' },
+      })
+    }
 
   } catch (err) {
     console.error('Webhook error:', err)
