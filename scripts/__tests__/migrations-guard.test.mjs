@@ -17,6 +17,7 @@ import {
   applyAclEvents,
   evaluateSecdefRule,
   extractAclEvents,
+  findProconfigPlaceholders,
   fnKey,
   normalizeArgs,
   stripComments,
@@ -255,5 +256,69 @@ describe('regla (e) — allowlist', () => {
 
   it('…o con el nombre pelado (compatibilidad con el formato original)', () => {
     expect(violaciones([[V, sql]], { allowSet: new Set(['sso_nueva']) })).toEqual([])
+  })
+})
+
+// ── Regla (f): GUC personalizado en proconfig ────────────────────────────────
+// El fallo que la motiva es real y caro: la Supabase Preview de #847 abortó con
+// `42501 permission denied to set parameter "agua.cobro_autoritativo"` en la
+// tercera sentencia de 20260911031701, y la cadena entera se quedó sin aplicar.
+// En local no se veía porque el arnés levanta Postgres con `initdb` y ahí
+// `postgres` es superusuario; el `postgres` de una Supabase gestionada no lo es.
+describe('migrations-guard (f): GUC de clase personalizada en proconfig', () => {
+  it('caza la cláusula de ALTER FUNCTION que rompió la preview', () => {
+    const sql = `ALTER FUNCTION public.agua_cerrar_ciclo_nucleo(uuid, text, boolean)
+      SET "agua.cobro_autoritativo" = 'on';`
+    expect(findProconfigPlaceholders(sql)).toEqual(['agua.cobro_autoritativo'])
+  })
+
+  it('caza también la cláusula SET de un CREATE FUNCTION', () => {
+    const sql = `CREATE OR REPLACE FUNCTION public.agua_mora_cron_aplicar()
+      RETURNS void LANGUAGE plpgsql SECURITY DEFINER
+      SET search_path = ''
+      SET "agua.cobro_autoritativo" = 'on'
+      AS $$ BEGIN PERFORM public.aplicar_mora_facturas_vencidas(); END; $$;`
+    expect(findProconfigPlaceholders(sql)).toEqual(['agua.cobro_autoritativo'])
+  })
+
+  it('acepta la forma TO además de la forma =', () => {
+    expect(findProconfigPlaceholders(`ALTER FUNCTION f() SET "app.x" TO 'y';`)).toEqual(['app.x'])
+  })
+
+  it('NO marca los GUC de verdad, que sí tienen permisos definidos', () => {
+    const sql = `CREATE FUNCTION f() RETURNS void LANGUAGE plpgsql
+      SET search_path = ''
+      SET search_path TO 'public'
+      SET statement_timeout = '5s'
+      SET role = 'postgres'
+      AS $$ BEGIN END; $$;`
+    expect(findProconfigPlaceholders(sql)).toEqual([])
+  })
+
+  it('NO marca la salida correcta: set_config en el cuerpo', () => {
+    const sql = `CREATE FUNCTION f() RETURNS void LANGUAGE plpgsql AS $$
+      BEGIN
+        PERFORM set_config('agua.cobro_autoritativo', 'on', true);
+        PERFORM set_config('agua.cobro_autoritativo', 'off', true);
+      END; $$;`
+    expect(findProconfigPlaceholders(sql)).toEqual([])
+  })
+
+  it('NO marca un SET LOCAL de sesión dentro de una migración', () => {
+    expect(findProconfigPlaceholders(`SET LOCAL "agua.lectura_correccion_autorizada" = 'on';`))
+      .toEqual([])
+  })
+
+  it('las migraciones del repo no tienen ninguna', async () => {
+    const { readdir, readFile } = await import('node:fs/promises')
+    const { join, dirname } = await import('node:path')
+    const { fileURLToPath } = await import('node:url')
+    const dir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'supabase', 'migrations')
+    const hallados = []
+    for (const f of (await readdir(dir)).filter((f) => f.endsWith('.sql'))) {
+      const sql = stripComments(await readFile(join(dir, f), 'utf8'))
+      for (const guc of findProconfigPlaceholders(sql)) hallados.push(`${f}: ${guc}`)
+    }
+    expect(hallados).toEqual([])
   })
 })
