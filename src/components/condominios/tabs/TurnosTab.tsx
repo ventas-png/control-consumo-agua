@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   createCondominioRow,
   deleteCondominioRow,
@@ -17,6 +17,10 @@ import {
   horasDeCelda,
   horasJornada,
 } from '../../../domain/condominios/turnos'
+import {
+  fetchCuposDePlantillas, guardarJornadaConCupos, minutosCupoQueDescuentan, tramosDemora,
+} from '../../../domain/condominios/politicaJornada'
+import { fetchTiposPausa } from '../../../domain/condominios/pausasPresencia'
 import { DIAS_SEMANA_CORTOS, MESES, fechaISO, gridMes, moverMes, rangoMes } from '../../../lib/calendario'
 import { hoyLocalISO } from '../../../lib/format'
 import { confirm, notify } from '../../shared/Dialog'
@@ -28,8 +32,10 @@ import type {
   BloqueTurno,
   DiaNoLaborable,
   FrecuenciaTurno,
+  CupoPausa,
   PersonalCondominio,
   PlantillaHorario,
+  TipoPausa,
   TurnoTipo,
 } from '../../../types'
 
@@ -71,6 +77,12 @@ const formJornadaVacio = {
   nombre: '', codigo: '', turno: 'manana' as TurnoTipo,
   hora_inicio: '06:00', hora_fin: '14:00', minutos_descanso: '0',
   tolerancia_entrada_min: '10', color: COLORES[0], notas: '',
+  // ── La vara (20260912020300). Declarada, todavía sin efectos.
+  tolerancia_salida_min: '0',
+  // 0 = no hay tramo compensable: la demora pasa directo a débito al salir de
+  // la tolerancia. El número lo pone quien decide la política, no este default.
+  demora_compensable_hasta_min: '0',
+  extra_requiere_autorizacion: true,
 }
 
 const formReglaVacio = {
@@ -111,6 +123,70 @@ export default function TurnosTab({
   const [modalRegla, setModalRegla] = useState<AsignacionTurno | 'nueva' | null>(null)
   const [formJornada, setFormJornada] = useState(formJornadaVacio)
   const [formRegla, setFormRegla] = useState(formReglaVacio)
+  // El catálogo de tipos de pausa de la EMPRESA (presencia_tipos_pausa) decide
+  // QUÉ tipos existen; la jornada decide CUÁNTO da de cada uno. Si el catálogo
+  // no carga, la sección de cupos simplemente no aparece: no puede impedir
+  // configurar el horario, que es lo principal de esta pantalla.
+  const [tiposPausa, setTiposPausa] = useState<TipoPausa[]>([])
+  const [cupos, setCupos] = useState<CupoPausa[]>([])
+  const [formCupos, setFormCupos] = useState<Record<string, string>>({})
+  // POR QUÉ ESTO ES UN ESTADO Y NO UN ARREGLO VACÍO. `guardarJornadaConCupos`
+  // manda el juego COMPLETO de cupos y la RPC reemplaza el que había. Mientras
+  // `cupos` arrancaba en `[]` y el error de lectura se ignoraba, abrir una
+  // jornada con la consulta todavía en vuelo —o fallada— pintaba el formulario
+  // sin cupos, y pulsar «Guardar» los borraba todos. Una lectura que falla no
+  // puede significar «esta jornada no da descanso»: significa que no sabemos
+  // qué da, y sobre eso no se escribe.
+  const [cuposEstado, setCuposEstado] = useState<'cargando' | 'listo' | 'error'>('cargando')
+
+  useEffect(() => {
+    let vivo = true
+    void fetchTiposPausa().then(({ tipos }) => { if (vivo) setTiposPausa(tipos) })
+    return () => { vivo = false }
+  }, [])
+
+  // LA ÚLTIMA PREGUNTA MANDA. Esta consulta se dispara al montar, al cambiar la
+  // lista de jornadas y después de cada guardado, así que es normal que haya
+  // dos en vuelo. Sin este contador, la que contestara ÚLTIMA ganaba, que no es
+  // lo mismo: una respuesta vieja podía pisar a una nueva.
+  //
+  // Y acá eso no es un parpadeo cosmético. `cuposEstado` es lo que autoriza a
+  // editar y guardar, y guardar manda el juego COMPLETO de cupos. Una respuesta
+  // vieja llegando tarde podía (a) reemplazar los cupos recién leídos por los
+  // de antes, (b) poner `listo` mientras la consulta buena seguía en vuelo y
+  // desbloquear el guardado con datos que ya no valen —y ese guardado BORRA los
+  // cupos reales—, o (c) marcar `error` por un fallo ya superado y bloquear la
+  // edición sin motivo. El contador descarta las tres.
+  const generacionCupos = useRef(0)
+  const idsPlantilla = useMemo(() => plantillas.map(p => p.id).join(','), [plantillas])
+  const recargarCupos = useCallback(() => {
+    // Se incrementa ANTES de pedir nada: cualquier respuesta en vuelo queda
+    // vieja desde este mismo instante, incluso en el camino corto de abajo.
+    const generacion = ++generacionCupos.current
+    const ids = idsPlantilla ? idsPlantilla.split(',') : []
+    if (ids.length === 0) { setCupos([]); setCuposEstado('listo'); return }
+    setCuposEstado('cargando')
+    void fetchCuposDePlantillas(ids)
+      .then(({ cupos: c, error }) => {
+        if (generacion !== generacionCupos.current) return
+        if (error) { setCuposEstado('error'); return }
+        setCupos(c)
+        setCuposEstado('listo')
+      })
+      // Un rechazo —la red se cayó, el cliente lanzó— no puede quedar sin
+      // manejar: dejaría `cuposEstado` en 'cargando' para siempre, que se lee
+      // como «esperá» y nunca deja de esperar. Es un error de lectura y se dice.
+      .catch(() => {
+        if (generacion !== generacionCupos.current) return
+        setCuposEstado('error')
+      })
+  }, [idsPlantilla])
+  useEffect(() => { recargarCupos() }, [recargarCupos])
+
+  const cuposDe = useCallback(
+    (plantillaId: string) => cupos.filter(c => c.plantilla_horario_id === plantillaId),
+    [cupos],
+  )
 
   const empleados = useMemo(() => asignables(personal), [personal])
   const rango = useMemo(() => rangoMes(cursor.year, cursor.month), [cursor])
@@ -150,17 +226,40 @@ export default function TurnosTab({
   // ── Jornadas ──────────────────────────────────────────────────────────────
 
   function abrirJornada(p: PlantillaHorario | 'nueva') {
+    // Una jornada NUEVA no tiene cupos que perder, así que se puede crear
+    // aunque la consulta esté en vuelo. Editar una que ya existe, no.
+    if (p !== 'nueva' && cuposEstado !== 'listo') {
+      notify(cuposEstado === 'cargando'
+        ? { variant: 'info', title: 'Un momento', text: 'Todavía se están cargando los descansos de esta jornada' }
+        : { variant: 'error', title: 'No se pudieron leer los descansos',
+            text: 'Editar la jornada ahora borraría los cupos que ya tiene. Recargá la página e intentá de nuevo.' })
+      return
+    }
     setFormJornada(p === 'nueva' ? formJornadaVacio : {
       nombre: p.nombre, codigo: p.codigo ?? '', turno: p.turno,
       hora_inicio: p.hora_inicio.slice(0, 5), hora_fin: p.hora_fin.slice(0, 5),
       minutos_descanso: String(p.minutos_descanso),
       tolerancia_entrada_min: String(p.tolerancia_entrada_min),
       color: p.color ?? COLORES[0], notas: p.notas ?? '',
+      tolerancia_salida_min: String(p.tolerancia_salida_min ?? 0),
+      demora_compensable_hasta_min: String(p.demora_compensable_hasta_min ?? 0),
+      extra_requiere_autorizacion: p.extra_requiere_autorizacion ?? true,
     })
+    setFormCupos(p === 'nueva'
+      ? {}
+      : Object.fromEntries(cuposDe(p.id).map(c => [c.tipo, String(c.minutos)])))
     setModalJornada(p)
   }
 
   async function guardarJornada() {
+    // Segundo cerrojo, por si el estado cambió con el formulario ya abierto:
+    // guardar reemplaza el juego entero de cupos, y hacerlo sin saber cuál era
+    // el juego anterior es borrarlo.
+    if (modalJornada !== 'nueva' && cuposEstado !== 'listo') {
+      notify({ variant: 'error', title: 'No se puede guardar',
+               text: 'No se pudieron leer los descansos de esta jornada; guardar ahora los borraría.' })
+      return
+    }
     if (!formJornada.nombre.trim()) {
       notify({ variant: 'warning', title: 'Faltan datos', text: 'La jornada necesita un nombre' }); return
     }
@@ -183,15 +282,32 @@ export default function TurnosTab({
       cruza_medianoche: formJornada.hora_fin <= formJornada.hora_inicio,
       minutos_descanso: Number(formJornada.minutos_descanso) || 0,
       tolerancia_entrada_min: Number(formJornada.tolerancia_entrada_min) || 0,
+      tolerancia_salida_min: Number(formJornada.tolerancia_salida_min) || 0,
+      demora_compensable_hasta_min: Number(formJornada.demora_compensable_hasta_min) || 0,
+      extra_requiere_autorizacion: formJornada.extra_requiere_autorizacion,
       color: formJornada.color,
       notas: formJornada.notas.trim() || null,
     }
-    const { error } = modalJornada === 'nueva'
-      ? await createCondominioRow('plantillas_horario', { company_id: companyId, project_id: proyectoId, ...payload })
-      : await updateCondominioRow('plantillas_horario', (modalJornada as PlantillaHorario).id, payload)
+    // UNA llamada, UNA transacción. La jornada y sus cupos se guardan juntos o
+    // no se guarda nada: antes eran tres viajes y un fallo en el tercero dejaba
+    // la jornada SIN cupos, que la fase 2 lee como «este descanso no se juzga».
+    const creada = modalJornada === 'nueva'
+    const { error } = await guardarJornadaConCupos({
+      companyId,
+      projectId: proyectoId,
+      plantillaId: creada ? null : (modalJornada as PlantillaHorario).id,
+      datos: payload,
+      cupos: Object.fromEntries(
+        Object.entries(formCupos).map(([tipo, v]) => [tipo, v === '' ? null : Number(v)]),
+      ),
+    })
+    if (error) {
+      setSaving(false)
+      notify({ variant: 'error', title: 'Error', text: error }); return
+    }
     setSaving(false)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setModalJornada(null)
+    recargarCupos()
     onRefresh()
   }
 
@@ -671,6 +787,105 @@ export default function TurnosTab({
                 <input id="jornada-tolerancia" type="number" min={0} style={inp} value={formJornada.tolerancia_entrada_min}
                   onChange={e => setFormJornada(p => ({ ...p, tolerancia_entrada_min: e.target.value }))} />
               </div>
+            </div>
+
+            {/* ══ LA VARA DE ESTA JORNADA ═════════════════════════════════════
+                Qué se espera, más allá de las horas. Se DECLARA aquí y todavía
+                no tiene efectos: medir contra ella y aplicarla son pasos
+                siguientes, a propósito — antes de que un número cambie lo que
+                se paga hay que poder mirar un mes real de comparaciones. */}
+            <div style={{ borderTop: '1px solid var(--at-line)', paddingTop: 12, marginTop: 2 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>Lo que esta jornada espera</div>
+              <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)', marginBottom: 10, lineHeight: 1.5 }}>
+                Se guarda con la jornada y se <strong>congela</strong> en cada día que se genere a partir de
+                ahora. Cambiarlo mañana no reescribe contra qué se midió un mes ya cerrado. Todavía no
+                descuenta ni acredita nada: por ahora solo queda declarado.
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div>
+                  <label style={lbl} htmlFor="jornada-tol-salida">Tolerancia de salida (min)</label>
+                  <input id="jornada-tol-salida" type="number" min={0} style={inp}
+                    value={formJornada.tolerancia_salida_min}
+                    onChange={e => setFormJornada(p => ({ ...p, tolerancia_salida_min: e.target.value }))} />
+                  <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)', marginTop: 3 }}>
+                    Salir antes de esto no cuenta como salida temprana.
+                  </div>
+                </div>
+                <div>
+                  <label style={lbl} htmlFor="jornada-compensable">Demora compensable hasta (min)</label>
+                  <input id="jornada-compensable" type="number" min={0} style={inp}
+                    value={formJornada.demora_compensable_hasta_min}
+                    onChange={e => setFormJornada(p => ({ ...p, demora_compensable_hasta_min: e.target.value }))} />
+                  <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)', marginTop: 3 }}>
+                    0 = la demora pasa directo a débito.
+                  </div>
+                </div>
+              </div>
+
+              {/* La política, en la frase que va a regir. Dos números sueltos hay
+                  que traducirlos mentalmente cada vez; la frase no. */}
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '9px 12px', fontSize: 12, marginBottom: 10 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Si alguien llega tarde a esta jornada</div>
+                {(() => {
+                  const t = tramosDemora(
+                    Number(formJornada.tolerancia_entrada_min) || 0,
+                    Number(formJornada.demora_compensable_hasta_min) || 0,
+                  )
+                  return (
+                    <ul style={{ margin: 0, paddingLeft: 16, color: 'var(--at-ink-2)', lineHeight: 1.6 }}>
+                      <li>{t.sinConsecuencia}</li>
+                      {t.compensable && <li>{t.compensable}</li>}
+                      <li>{t.debitada}</li>
+                    </ul>
+                  )
+                })()}
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer', marginBottom: 10 }}>
+                <input type="checkbox" checked={formJornada.extra_requiere_autorizacion}
+                  onChange={e => setFormJornada(p => ({ ...p, extra_requiere_autorizacion: e.target.checked }))} />
+                <span>Las horas extra necesitan autorización previa</span>
+              </label>
+
+              {tiposPausa.length > 0 && (
+                <>
+                  <label style={lbl}>Cupo de descanso por tipo (min)</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+                    {tiposPausa.map(t => (
+                      <div key={t.codigo}>
+                        <input
+                          type="number" min={0} style={inp} placeholder="—"
+                          aria-label={`Cupo de ${t.etiqueta}`}
+                          value={formCupos[t.codigo] ?? ''}
+                          onChange={e => setFormCupos(c => ({ ...c, [t.codigo]: e.target.value }))} />
+                        <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)', marginTop: 3 }}>
+                          {t.etiqueta}{t.descuenta ? ' · descuenta' : ''}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Se SEÑALA el desacuerdo, no se arregla solo: cambiar el
+                      descanso de la jornada por detrás movería las horas
+                      planificadas de todos los días futuros sin que nadie lo
+                      pidiera. */}
+                  {(() => {
+                    const suma = minutosCupoQueDescuentan(
+                      Object.fromEntries(Object.entries(formCupos).map(([k, v]) => [k, v === '' ? null : Number(v)])),
+                      tiposPausa,
+                    )
+                    const declarado = Number(formJornada.minutos_descanso) || 0
+                    if (suma === declarado) return null
+                    return (
+                      <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--at-warning)', lineHeight: 1.5 }}>
+                        Los cupos que descuentan suman <strong>{suma} min</strong>, pero esta jornada resta{' '}
+                        <strong>{declarado} min</strong> de sus horas planificadas. No es un error —quizá sea a
+                        propósito— pero son dos respuestas distintas a la misma pregunta.
+                      </div>
+                    )
+                  })()}
+                </>
+              )}
             </div>
             <div>
               <span style={lbl}>Color en el calendario</span>

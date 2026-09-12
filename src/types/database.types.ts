@@ -1645,6 +1645,7 @@ export type Database = {
           origen: string
           personal_id: string
           plantilla_horario_id: string | null
+          politica: Json | null
           project_id: string
           puntaje_completitud: number | null
           turno: string
@@ -1667,6 +1668,7 @@ export type Database = {
           origen?: string
           personal_id: string
           plantilla_horario_id?: string | null
+          politica?: Json | null
           project_id: string
           puntaje_completitud?: number | null
           turno: string
@@ -1689,6 +1691,7 @@ export type Database = {
           origen?: string
           personal_id?: string
           plantilla_horario_id?: string | null
+          politica?: Json | null
           project_id?: string
           puntaje_completitud?: number | null
           turno?: string
@@ -12420,6 +12423,8 @@ export type Database = {
           creado_por: string | null
           created_at: string
           cruza_medianoche: boolean
+          demora_compensable_hasta_min: number
+          extra_requiere_autorizacion: boolean
           hora_fin: string
           hora_inicio: string
           horas_jornada: number | null
@@ -12429,6 +12434,7 @@ export type Database = {
           notas: string | null
           project_id: string
           tolerancia_entrada_min: number
+          tolerancia_salida_min: number
           turno: string
         }
         Insert: {
@@ -12439,6 +12445,8 @@ export type Database = {
           creado_por?: string | null
           created_at?: string
           cruza_medianoche?: boolean
+          demora_compensable_hasta_min?: number
+          extra_requiere_autorizacion?: boolean
           hora_fin: string
           hora_inicio: string
           horas_jornada?: number | null
@@ -12448,6 +12456,7 @@ export type Database = {
           notas?: string | null
           project_id: string
           tolerancia_entrada_min?: number
+          tolerancia_salida_min?: number
           turno?: string
         }
         Update: {
@@ -12458,6 +12467,8 @@ export type Database = {
           creado_por?: string | null
           created_at?: string
           cruza_medianoche?: boolean
+          demora_compensable_hasta_min?: number
+          extra_requiere_autorizacion?: boolean
           hora_fin?: string
           hora_inicio?: string
           horas_jornada?: number | null
@@ -12467,6 +12478,7 @@ export type Database = {
           notas?: string | null
           project_id?: string
           tolerancia_entrada_min?: number
+          tolerancia_salida_min?: number
           turno?: string
         }
         Relationships: [

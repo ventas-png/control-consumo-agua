@@ -155,6 +155,10 @@ export interface BloqueTurno {
   cruza_medianoche?: boolean | null
   horas_planificadas?: number | null
   origen?: OrigenBloqueTurno | null
+  /** Foto CONGELADA de lo que la jornada esperaba el día que se materializó este
+   *  bloque (20260912020300). `null` = el bloque no tiene jornada, o se planificó
+   *  antes de que la vara existiera. No se rellena hacia atrás. */
+  politica?: PoliticaJornada | null
   // joins
   personal_nombre?: string
   personal_cargo?: string
@@ -303,12 +307,50 @@ export interface PlantillaHorario {
   minutos_descanso: number
   /** Derivada: la sella la BD (trg_turnos_sellar_horas). No la escribe la UI. */
   horas_jornada?: number | null
+  /** Primer tramo de la demora: hasta aquí no pasa nada. Es la MISMA vara que
+   *  usa `presencia_marcar` para marcar la tardanza — no hay una segunda. */
   tolerancia_entrada_min: number
+  // ── La vara de la jornada (20260912020300). Declarada, todavía sin efectos:
+  //    medir contra ella es la fase 2 y aplicarla la fase 4.
+  /** Minutos que se puede salir antes del fin sin que cuente como salida temprana. */
+  tolerancia_salida_min: number
+  /** Fin del tramo COMPENSABLE de la demora. 0 = no hay tramo compensable: al
+   *  salir de la tolerancia la demora pasa directo a débito. */
+  demora_compensable_hasta_min: number
+  /** true = las horas por encima de la jornada no se reconocen sin autorización previa. */
+  extra_requiere_autorizacion: boolean
   color?: string | null
   activo: boolean
   notas?: string | null
   creado_por?: string | null
   created_at: string
+}
+
+/** Cuánto descanso da UNA jornada de UN tipo de pausa (20260912020300). */
+export interface CupoPausa {
+  id: string
+  company_id: string
+  /** Condominio de la jornada. Lo impone una FK compuesta, no el cliente. */
+  project_id: string
+  plantilla_horario_id: string
+  /** Código de `presencia_tipos_pausa`. Sin FK: ese catálogo cae a defaults. */
+  tipo: string
+  minutos: number
+}
+
+/**
+ * Foto CONGELADA de lo que la jornada esperaba, guardada en el bloque el día que
+ * se materializó. `null` = el bloque no tiene jornada, o se planificó antes de
+ * que la vara existiera — no se rellena hacia atrás.
+ */
+export interface PoliticaJornada {
+  tolerancia_entrada_min: number
+  tolerancia_salida_min: number
+  demora_compensable_hasta_min: number
+  extra_requiere_autorizacion: boolean
+  minutos_descanso: number
+  /** Cupo en minutos por código de tipo de pausa. */
+  cupos: Record<string, number>
 }
 
 export interface AsignacionTurno {
