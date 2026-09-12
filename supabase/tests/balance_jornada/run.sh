@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20260910000800: el balance del día (Fase 2).
+# Verificación EJECUTABLE de 20260912000400: el balance del día (Fase 2).
 #
 # POR QUÉ EXISTE
 # La invariante 1 vuelve a ser la que justifica el test entero: esta migración
@@ -50,9 +50,9 @@ RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGRACION_1="$RAIZ/supabase/migrations/20260908000000_presencia_marcaje_autoservicio.sql"
 MIGRACION_2="$RAIZ/supabase/migrations/20260908000200_presencia_correccion_y_anulacion.sql"
 MIGRACION_3="$RAIZ/supabase/migrations/20260908000300_presencia_pausas.sql"
-MIGRACION_4="$RAIZ/supabase/migrations/20260910000700_politica_de_jornada.sql"
+MIGRACION_4="$RAIZ/supabase/migrations/20260912000300_politica_de_jornada.sql"
 # El balance cruza toda la cadena, así que las cuatro anteriores van antes.
-MIGRACION_5="$RAIZ/supabase/migrations/20260910000800_balance_de_jornada.sql"
+MIGRACION_5="$RAIZ/supabase/migrations/20260912000400_balance_de_jornada.sql"
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done

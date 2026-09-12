@@ -255,7 +255,7 @@ describe('TurnosTab — asignación de turnos', () => {
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// La vara de la jornada (20260910000700)
+// La vara de la jornada (20260912000300)
 // ════════════════════════════════════════════════════════════════════════════
 // Lo que se cubre es lo que el sandbox SQL no ve: que quien configura la jornada
 // LEA la política que está declarando. Un tramo mal descrito no rompe ninguna

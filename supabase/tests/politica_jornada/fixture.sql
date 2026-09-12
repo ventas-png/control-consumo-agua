@@ -1,4 +1,4 @@
--- Fixture para EJECUTAR 20260910000700 (la vara de la jornada) contra un
+-- Fixture para EJECUTAR 20260912000300 (la vara de la jornada) contra un
 -- Postgres de verdad. Hereda el de `presencia_pausas` —mismas cuentas, mismos
 -- expedientes, la aritmética de jornada REAL y la cadena completa de presencia—
 -- porque la invariante más importante de este test es que el cómputo de horas
