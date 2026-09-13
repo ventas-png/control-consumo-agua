@@ -41,6 +41,54 @@ CREATE FUNCTION public.current_user_role()
 RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
 $$ SELECT role FROM public.app_users WHERE id = auth.uid() $$;
 
+-- RBAC real (20260518000008 / 20260320000006): las policies de agua no miran
+-- sólo el rol, también `user_has_permission`. Es lo que separa a un `operator`
+-- —que PUEDE escribir por su rol— de alguien que además puede LEER fuentes.
+CREATE TABLE public.roles (id uuid PRIMARY KEY, nombre text NOT NULL);
+CREATE TABLE public.user_roles (
+  user_id    uuid NOT NULL,
+  role_id    uuid NOT NULL REFERENCES public.roles(id),
+  expires_at timestamptz
+);
+CREATE TABLE public.role_permissions (
+  role_id        uuid NOT NULL REFERENCES public.roles(id),
+  permission_key text NOT NULL,
+  effect         text NOT NULL DEFAULT 'allow'
+);
+
+CREATE FUNCTION public.is_super_admin()
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
+$$ SELECT public.current_user_role() IN ('super_admin', 'superadmin') $$;
+
+-- Cuerpo de 20260518000008: admin/owner/super_admin tienen TODO; el resto
+-- necesita una fila explícita en user_roles + role_permissions.
+CREATE FUNCTION public.user_has_permission(perm_key text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
+$$
+  WITH me AS (SELECT role FROM public.app_users WHERE id = auth.uid())
+  SELECT CASE
+    WHEN auth.uid() IS NULL THEN false
+    WHEN (SELECT role FROM me) IN ('super_admin', 'superadmin', 'company_owner', 'admin') THEN true
+    WHEN EXISTS (
+      SELECT 1 FROM public.user_roles ur
+       JOIN public.role_permissions rp ON rp.role_id = ur.role_id
+      WHERE ur.user_id = auth.uid() AND rp.permission_key = perm_key AND rp.effect = 'deny'
+        AND (ur.expires_at IS NULL OR ur.expires_at > now())
+    ) THEN false
+    ELSE EXISTS (
+      SELECT 1 FROM public.user_roles ur
+       JOIN public.role_permissions rp ON rp.role_id = ur.role_id
+      WHERE ur.user_id = auth.uid() AND rp.permission_key = perm_key AND rp.effect = 'allow'
+        AND (ur.expires_at IS NULL OR ur.expires_at > now())
+    )
+  END
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.is_super_admin() FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.is_super_admin() TO authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.user_has_permission(text) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.user_has_permission(text) TO authenticated, service_role;
+
 REVOKE EXECUTE ON FUNCTION public.get_my_company_id() FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION public.get_my_company_id() TO authenticated, service_role;
 REVOKE EXECUTE ON FUNCTION public.current_user_role() FROM PUBLIC, anon;
@@ -90,23 +138,54 @@ CREATE TRIGGER registros_calidad_fill_company_id BEFORE INSERT ON public.registr
 -- del aislamiento que la función nueva respeta (y explota) al ser INVOKER.
 ALTER TABLE public.fuentes_agua      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.registros_calidad ENABLE ROW LEVEL SECURITY;
+
+-- Las policies REALES de producción, con su ASIMETRÍA intacta: escribir se
+-- concede POR ROL (operator incluido) y leer exige `agua.calidad.view`. Ésa es
+-- la asimetría que hace fallar un trigger que resuelva la fuente con un SELECT
+-- amplio sobre fuentes_agua, y la razón de agua_fuente_de_mi_empresa(uuid).
 CREATE POLICY fuentes_agua_select ON public.fuentes_agua
-  FOR SELECT TO authenticated USING (company_id = (SELECT public.get_my_company_id()));
+  FOR SELECT TO authenticated USING (
+    public.is_super_admin()
+    OR ((company_id = (SELECT public.get_my_company_id()))
+        AND (SELECT public.user_has_permission('agua.calidad.view'))));
 CREATE POLICY fuentes_agua_insert ON public.fuentes_agua
-  FOR INSERT TO authenticated WITH CHECK (company_id = (SELECT public.get_my_company_id()));
+  FOR INSERT TO authenticated WITH CHECK (
+    (public.current_user_role() = ANY (ARRAY['super_admin', 'superadmin']))
+    OR ((public.current_user_role() = ANY (ARRAY['company_owner', 'admin', 'operator', 'operador']))
+        AND company_id = public.get_my_company_id())
+    OR ((company_id = (SELECT public.get_my_company_id()))
+        AND (SELECT public.user_has_permission('agua.calidad.create'))));
+
 CREATE POLICY registros_calidad_select ON public.registros_calidad
-  FOR SELECT TO authenticated USING (company_id = (SELECT public.get_my_company_id()));
+  FOR SELECT TO authenticated USING (
+    public.is_super_admin()
+    OR ((company_id = (SELECT public.get_my_company_id()))
+        AND (SELECT public.user_has_permission('agua.calidad.view'))));
 CREATE POLICY registros_calidad_insert ON public.registros_calidad
-  FOR INSERT TO authenticated WITH CHECK (company_id = (SELECT public.get_my_company_id()));
+  FOR INSERT TO authenticated WITH CHECK (
+    (public.current_user_role() = ANY (ARRAY['super_admin', 'superadmin']))
+    OR ((public.current_user_role() = ANY (ARRAY['company_owner', 'admin', 'operator', 'operador']))
+        AND company_id = public.get_my_company_id())
+    OR ((company_id = (SELECT public.get_my_company_id()))
+        AND (SELECT public.user_has_permission('agua.calidad.create'))));
 CREATE POLICY registros_calidad_update ON public.registros_calidad
   FOR UPDATE TO authenticated
-  USING (company_id = (SELECT public.get_my_company_id()))
-  WITH CHECK (company_id = (SELECT public.get_my_company_id()));
+  USING (
+    (public.current_user_role() = ANY (ARRAY['super_admin', 'superadmin']))
+    OR ((public.current_user_role() = ANY (ARRAY['company_owner', 'admin', 'operator', 'operador']))
+        AND company_id = public.get_my_company_id())
+    OR ((company_id = (SELECT public.get_my_company_id()))
+        AND (SELECT public.user_has_permission('agua.calidad.edit'))))
+  WITH CHECK (
+    (public.current_user_role() = ANY (ARRAY['super_admin', 'superadmin']))
+    OR ((public.current_user_role() = ANY (ARRAY['company_owner', 'admin', 'operator', 'operador']))
+        AND company_id = public.get_my_company_id())
+    OR ((company_id = (SELECT public.get_my_company_id()))
+        AND (SELECT public.user_has_permission('agua.calidad.edit'))));
 
--- Grants de tabla como en producción (anon, authenticated y service_role
--- tienen TODO sobre las tablas de public; la RLS es lo que separa).
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON public.fuentes_agua, public.registros_calidad, public.companies, public.app_users
+GRANT ALL ON public.fuentes_agua, public.registros_calidad, public.companies, public.app_users,
+             public.roles, public.user_roles, public.role_permissions
   TO anon, authenticated, service_role;
 
 -- ── Helpers de aserción (patrón de la casa) ─────────────────────────────────

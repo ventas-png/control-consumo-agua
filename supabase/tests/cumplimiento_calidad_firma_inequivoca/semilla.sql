@@ -34,3 +34,21 @@ INSERT INTO public.calidad_tipologias (tipo_agua, company_id, label, parametros,
 -- de public; la RLS es lo que separa). S23 no los escribe porque los da por
 -- hechos; aquí se reproducen para la tabla que S23 acaba de crear.
 GRANT ALL ON public.calidad_tipologias TO anon, authenticated, service_role;
+
+-- ── Usuarios NO administrativos de la empresa A ─────────────────────────────
+-- `operator` es el caso del hallazgo: la policy de INSERT le deja escribir POR
+-- SU ROL, pero `user_has_permission('agua.calidad.view')` le da false, así que
+-- NO ve fuentes_agua. Se siembran dos para que la prueba distinga «el RBAC del
+-- fixture es real» de «siempre false»:
+--   · a2a2… operador SIN agua.calidad.view  → el caso del hallazgo.
+--   · a3a3… operador CON agua.calidad.view  → control: sí ve la fuente.
+INSERT INTO public.app_users (id, role, company_id) VALUES
+  ('a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2', 'operator', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  ('a3a3a3a3-a3a3-a3a3-a3a3-a3a3a3a3a3a3', 'operator', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+
+INSERT INTO public.roles (id, nombre)
+VALUES ('c0c0c0c0-0000-4000-8000-00000000c001', 'lector_calidad');
+INSERT INTO public.role_permissions (role_id, permission_key, effect)
+VALUES ('c0c0c0c0-0000-4000-8000-00000000c001', 'agua.calidad.view', 'allow');
+INSERT INTO public.user_roles (user_id, role_id)
+VALUES ('a3a3a3a3-a3a3-a3a3-a3a3-a3a3a3a3a3a3', 'c0c0c0c0-0000-4000-8000-00000000c001');

@@ -68,7 +68,7 @@ BEGIN
   v_estado := public.intentar($q$ INSERT INTO public.registros_calidad (fuente_id, parametros)
     VALUES ('fb0f0f0f-0000-4000-8000-00000000b001', '{"pH": 7.5}'::jsonb) $q$);
   PERFORM public.chk_txt(left(v_estado, 5), '42501', '5 · fuente de otra empresa: rechazada con 42501: ' || v_estado);
-  PERFORM public.chk(v_estado LIKE '%no es visible%', true, '5 · fuente de otra empresa: la rechaza la función de trigger, no la RLS de la tabla');
+  PERFORM public.chk(v_estado LIKE '%no pertenece a la empresa%', true, '5 · fuente de otra empresa: la rechaza la función acotada por tenant, no la RLS de la tabla');
   -- 5 · company_id de OTRA empresa con fuente propia: lo rechaza la RLS.
   v_estado := public.intentar($q$ INSERT INTO public.registros_calidad (fuente_id, parametros, company_id)
     VALUES ('fa0f0f0f-0000-4000-8000-00000000a001', '{"pH": 7.5}'::jsonb, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb') $q$);

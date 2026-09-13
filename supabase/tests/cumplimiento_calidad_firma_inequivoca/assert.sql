@@ -105,3 +105,41 @@ BEGIN
     (public.calcular_cumplimiento_calidad('potable'::text, '{"pH": 7.5}'::jsonb, NULL::uuid) ->> 'cumple_total'),
     'true', 'calcular_cumplimiento_calidad(text, jsonb, uuid) resuelve sin 42725 y calcula con el catálogo global');
 END $$;
+
+-- ── La función acotada que resuelve la fuente (el contrato de RBAC) ──────────
+DO $$
+DECLARE
+  v_fuente oid := to_regprocedure('public.agua_fuente_de_mi_empresa(uuid)')::oid;
+  v_nueva  oid := to_regprocedure('public.trg_registros_calidad_cumplimiento_catalogo()')::oid;
+BEGIN
+  PERFORM public.chk(v_fuente IS NOT NULL, true, 'existe agua_fuente_de_mi_empresa(uuid)');
+  PERFORM public.chk((SELECT prosecdef FROM pg_proc WHERE oid = v_fuente), true,
+    'agua_fuente_de_mi_empresa(uuid) es SECURITY DEFINER (tiene que responder sin agua.calidad.view)');
+  PERFORM public.chk_txt((SELECT array_to_string(proconfig, ';') FROM pg_proc WHERE oid = v_fuente), 'search_path=""',
+    'agua_fuente_de_mi_empresa(uuid) · search_path bloqueado a ''''');
+  PERFORM public.chk_txt((SELECT provolatile::text FROM pg_proc WHERE oid = v_fuente), 's',
+    'agua_fuente_de_mi_empresa(uuid) · STABLE');
+  PERFORM public.chk_txt((SELECT pg_get_function_result(v_fuente)), 'TABLE(tipo_agua text, company_id uuid)',
+    'agua_fuente_de_mi_empresa(uuid) · devuelve sólo (tipo_agua, company_id)');
+  PERFORM public.chk_txt((SELECT pg_get_function_identity_arguments(v_fuente)), 'p_fuente_id uuid',
+    'agua_fuente_de_mi_empresa(uuid) · no acepta company_id del cliente');
+  PERFORM public.chk(has_function_privilege('public',        v_fuente, 'EXECUTE'), false, 'PUBLIC        NO ejecuta agua_fuente_de_mi_empresa(uuid)');
+  PERFORM public.chk(has_function_privilege('anon',          v_fuente, 'EXECUTE'), false, 'anon          NO ejecuta agua_fuente_de_mi_empresa(uuid)');
+  PERFORM public.chk(has_function_privilege('authenticated', v_fuente, 'EXECUTE'), true,  'authenticated SÍ ejecuta agua_fuente_de_mi_empresa(uuid)');
+  PERFORM public.chk(has_function_privilege('service_role',  v_fuente, 'EXECUTE'), true,  'service_role  SÍ ejecuta agua_fuente_de_mi_empresa(uuid)');
+
+  -- El aislamiento está EN EL CUERPO de la acotada, no sólo en la RLS.
+  PERFORM public.chk((SELECT prosrc LIKE '%get_my_company_id%' FROM pg_proc WHERE oid = v_fuente), true,
+    'agua_fuente_de_mi_empresa(uuid) filtra por get_my_company_id() en su propio WHERE');
+
+  -- Y el trigger NO lee fuentes_agua directamente: ésa es la corrección.
+  PERFORM public.chk((SELECT prosrc LIKE '%agua_fuente_de_mi_empresa%' FROM pg_proc WHERE oid = v_nueva), true,
+    'el trigger resuelve la fuente con la función acotada');
+  PERFORM public.chk((SELECT prosrc LIKE '%FROM public.fuentes_agua%' FROM pg_proc WHERE oid = v_nueva), false,
+    'el trigger NO hace un SELECT amplio sobre fuentes_agua');
+
+  -- Las policies de fuentes_agua no se han tocado: nada de USING (true).
+  PERFORM public.chk((SELECT count(*) FROM pg_policies
+    WHERE tablename = 'fuentes_agua' AND cmd = 'SELECT' AND qual LIKE '%user_has_permission%'), 1,
+    'fuentes_agua_select sigue exigiendo agua.calidad.view (no se abrió la tabla)');
+END $$;
