@@ -489,6 +489,30 @@ jobs:
       - name: Replay desde cero — los dos triggers de fill_company_id_from_user
         run: node supabase/tests/declarar_triggers_fill_company_id/replay.mjs
 
+      # Desde 20260605160000 conviven dos sobrecargas de
+      # calcular_cumplimiento_calidad —(text, jsonb) y (text, jsonb, uuid
+      # DEFAULT NULL)— y la llamada de dos argumentos del trigger de
+      # registros_calidad es ambigua: TODO INSERT y todo UPDATE de parametros
+      # moría con 42725, también en producción. `20260913032502` re-apunta el
+      # trigger (mismo nombre, mismo OID) a una función nueva que llama a la
+      # firma de tres argumentos con el company_id de la fuente, y concede
+      # EXECUTE sobre esa firma sólo a authenticated. Esta prueba lo ejerce
+      # sobre los archivos REALES de S22/S23: reproduce el 42725, celda por
+      # celda, comportamiento real como authenticated (override de empresa,
+      # fallback global, fuente y company_id ajenos rechazados, anon sin RPC
+      # nueva), idempotencia con OIDs, abortos y mutación.
+      - name: Cálculo de calidad — llamada inequívoca, override por empresa y mutación
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55500
+        run: supabase/tests/cumplimiento_calidad_firma_inequivoca/run.sh
+
+      # Y sobre la cadena entera desde cero con privilegios de Supabase Branch:
+      # el trigger re-apuntado en pg_catalog, re-aplicación no-op, y las mismas
+      # pruebas como `authenticated` contra las policies REALES.
+      - name: Replay desde cero — cálculo de calidad con la firma inequívoca
+        run: node supabase/tests/cumplimiento_calidad_firma_inequivoca/replay.mjs
+
       # El webhook de Stripe insertaba el `pagos` y marcaba la solicitud
       # `succeeded` SIN acreditar el ítem: el recibo quedaba con el saldo
       # íntegro. Y reclamaba el evento ANTES de procesarlo, así que un fallo a
