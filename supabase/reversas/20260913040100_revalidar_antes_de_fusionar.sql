@@ -26,7 +26,7 @@
 -- `none` en este proyecto, así que el catálogo no lleva contador de ejecuciones
 -- y no hay forma de saber por SQL si alguien las llamó. Eso se mira aparte, en
 -- los registros del gateway (`/rest/v1/rpc/`), y la última lectura —24 h al
--- 2026-09-10, 28 endpoints distintos— no encontró ninguna de las tres.
+-- 2026-09-14, 18 endpoints distintos— no encontró ninguna de las tres.
 -- ════════════════════════════════════════════════════════════════════════════
 
 WITH objetivo AS (
