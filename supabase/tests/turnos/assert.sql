@@ -3,7 +3,7 @@
 \pset format unaligned
 
 -- Invariantes del control de asignación de turnos
--- (20260820000000 · 000100 · 000200 · 000300).
+-- (20260820000000 · 000100 · 000200 · 000300 · 20260910000600).
 -- Cada bloque RAISE EXCEPTION si algo no se cumple.
 
 DO $$
@@ -149,6 +149,26 @@ BEGIN
         '["2026-09-14","2026-12-24"]', DATE '2026-12-24') THEN
     RAISE EXCEPTION '11c: la fecha suelta del 24 debía caer'; END IF;
   RAISE NOTICE 'OK 11 unica y fechas específicas caen solo donde deben';
+
+  -- ── 11b. «Los días del mes que elijas» ──────────────────────────────────
+  -- El gemelo mensual de 'semanal' (20260910000600). Los mismos casos que
+  -- prueba reglaAplicaEn() en el lado TypeScript.
+  IF NOT public.turnos_regla_aplica('mensual_dias', DATE '2026-09-01', '[]', NULL, NULL, NULL,
+        '[]', DATE '2026-10-15', '[1,15,30]') THEN
+    RAISE EXCEPTION '11d: el 15 de octubre debía caer'; END IF;
+  IF public.turnos_regla_aplica('mensual_dias', DATE '2026-09-01', '[]', NULL, NULL, NULL,
+        '[]', DATE '2026-10-16', '[1,15,30]') THEN
+    RAISE EXCEPTION '11e: el 16 NO debía caer'; END IF;
+  -- El 30 se recorta al 28 en febrero, igual que el día fijo de la 10.
+  IF NOT public.turnos_regla_aplica('mensual_dias', DATE '2026-09-01', '[]', NULL, NULL, NULL,
+        '[]', DATE '2027-02-28', '[1,15,30]') THEN
+    RAISE EXCEPTION '11f: el 30 debía recortarse al 28 de febrero'; END IF;
+  -- Sin lista se cae de vuelta en dia_mes: una regla que no cae nunca sería
+  -- peor que una que cae una vez al mes.
+  IF NOT public.turnos_regla_aplica('mensual_dias', DATE '2026-09-01', '[]', NULL, 7, NULL,
+        '[]', DATE '2026-10-07', '[]') THEN
+    RAISE EXCEPTION '11g: sin dias_mes debía caer en dia_mes'; END IF;
+  RAISE NOTICE 'OK 11b mensual_dias cae en los días marcados y recorta el mes corto';
 
   -- ── 12. Nada cae antes de que empiece la regla ───────────────────────────
   IF public.turnos_regla_aplica('diaria', DATE '2026-09-10', '[]', NULL, NULL, NULL, '[]', DATE '2026-09-09') THEN
@@ -296,6 +316,35 @@ BEGIN
     RAISE EXCEPTION '21: se generaron % turnos a un empleado inactivo', n; END IF;
   UPDATE public.personal_condominio SET estado = 'activo' WHERE id = MARIO;
   RAISE NOTICE 'OK 21 un empleado inactivo no recibe turnos generados';
+
+  -- ── 21b. Un día quitado a mano no vuelve al re-generar ──────────────────
+  -- Es la razón de ser de `excepciones_turno` (20260910000600): el generador
+  -- solo suma, así que borrar el bloque duraba hasta la siguiente pasada.
+  SELECT generados INTO n FROM public.generar_bloques_turno(PR, DATE '2026-11-09', DATE '2026-11-13');
+  DELETE FROM public.bloques_turno
+   WHERE personal_id = MARIO AND fecha = DATE '2026-11-11';
+  INSERT INTO public.excepciones_turno (company_id, project_id, personal_id, fecha, motivo)
+    VALUES (CO, PR, MARIO, DATE '2026-11-11', 'cambio con Pérez');
+
+  SELECT generados INTO n FROM public.generar_bloques_turno(PR, DATE '2026-11-09', DATE '2026-11-13');
+  SELECT count(*) INTO n FROM public.bloques_turno
+   WHERE personal_id = MARIO AND fecha = DATE '2026-11-11';
+  IF n <> 0 THEN
+    RAISE EXCEPTION '21b: la excepción no impidió que el día volviera (% bloques)', n; END IF;
+  -- Y solo ese día: los vecinos siguen cubiertos.
+  SELECT count(*) INTO n FROM public.bloques_turno
+   WHERE personal_id = MARIO AND fecha IN (DATE '2026-11-10', DATE '2026-11-12');
+  IF n <> 2 THEN
+    RAISE EXCEPTION '21c: la excepción se comió días vecinos (quedaron %)', n; END IF;
+
+  -- Quitar la excepción devuelve el día a su regla.
+  DELETE FROM public.excepciones_turno WHERE personal_id = MARIO AND fecha = DATE '2026-11-11';
+  PERFORM public.generar_bloques_turno(PR, DATE '2026-11-11', DATE '2026-11-11');
+  SELECT count(*) INTO n FROM public.bloques_turno
+   WHERE personal_id = MARIO AND fecha = DATE '2026-11-11';
+  IF n <> 1 THEN
+    RAISE EXCEPTION '21d: al borrar la excepción el día debía volver, quedaron %', n; END IF;
+  RAISE NOTICE 'OK 21b la excepción quita el día del generador, y borrarla lo devuelve';
 
   -- ══ E. Estado del expediente derivado de la ausencia ══════════════════════
 

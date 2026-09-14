@@ -28,6 +28,7 @@ import type {
   AusenciaPersonal,
   BloqueTurno,
   DiaNoLaborable,
+  ExcepcionTurno,
   FrecuenciaTurno,
   PersonalCondominio,
   PlantillaHorario,
@@ -38,12 +39,13 @@ import { diaISOSemana } from '../../lib/calendario'
 
 // ── Catálogos para la UI ────────────────────────────────────────────────────
 
-/** Las diez periodicidades, con la etiqueta que ve el administrador. */
+/** Las once periodicidades, con la etiqueta que ve el administrador. */
 export const FRECUENCIAS: { value: FrecuenciaTurno; label: string; ayuda: string }[] = [
   { value: 'unica',      label: 'Única',       ayuda: 'Un solo día' },
   { value: 'diaria',     label: 'Diaria',      ayuda: 'Todos los días, o cada N días' },
   { value: 'semanal',    label: 'Semanal',     ayuda: 'Los días de la semana que elijas' },
   { value: 'quincenal',  label: 'Quincenal',   ayuda: 'Esos mismos días, semana de por medio' },
+  { value: 'mensual_dias', label: 'Días del mes', ayuda: 'Los días del mes que elijas, todos los meses' },
   { value: 'mensual',    label: 'Mensual',     ayuda: 'Un día fijo de cada mes' },
   { value: 'bimestral',  label: 'Bimestral',   ayuda: 'Un día fijo cada 2 meses' },
   { value: 'trimestral', label: 'Trimestral',  ayuda: 'Un día fijo cada 3 meses' },
@@ -65,6 +67,12 @@ export const DIAS_ISO: { value: number; label: string; corto: string }[] = [
 
 /** Frecuencias que usan `dias_semana`; el resto ignora ese campo. */
 export const FRECUENCIAS_POR_DIA_SEMANA: FrecuenciaTurno[] = ['semanal', 'quincenal']
+
+/** Frecuencias que usan `dias_mes` (el gemelo mensual de `dias_semana`). */
+export const FRECUENCIAS_POR_DIAS_MES: FrecuenciaTurno[] = ['mensual_dias']
+
+/** Días del mes para el selector de `mensual_dias`. */
+export const DIAS_DEL_MES: number[] = Array.from({ length: 31 }, (_, i) => i + 1)
 
 /** Frecuencias que usan `dia_mes` / `mes_ancla`. */
 export const FRECUENCIAS_POR_MES: FrecuenciaTurno[] = [
@@ -201,7 +209,7 @@ export function reglaAplicaEn(
     AsignacionTurno,
     'frecuencia' | 'fecha_inicio' | 'dias_semana' | 'intervalo_dias'
     | 'dia_mes' | 'mes_ancla' | 'fechas_especificas'
-  >,
+  > & Partial<Pick<AsignacionTurno, 'dias_mes'>>,
   fecha: string,
 ): boolean {
   if (!fecha || !regla.fecha_inicio || fecha < regla.fecha_inicio) return false
@@ -226,6 +234,20 @@ export function reglaAplicaEn(
       // no por día es lo que hace que "lunes y jueves cada quince días" caiga en
       // las dos semanas alternas correctas.
       return encajaDia && Math.floor(diasEntre(regla.fecha_inicio, fecha) / 7) % 2 === 0
+
+    case 'mensual_dias': {
+      // El gemelo mensual de 'semanal': los días del mes marcados, todos los
+      // meses. Un día que ese mes no existe (31 en febrero) se recorta al
+      // último real, igual que las periodicidades de día fijo. Sin lista se cae
+      // de vuelta en `dia_mes`, para no producir una regla que no cae nunca.
+      const ultimo = ultimoDiaDelMes(fecha)
+      const dia = partes(fecha).d
+      const marcados = regla.dias_mes ?? []
+      if (marcados.length === 0) {
+        return dia === Math.min(regla.dia_mes ?? partes(regla.fecha_inicio).d, ultimo)
+      }
+      return marcados.some(d => Math.min(d, ultimo) === dia)
+    }
 
     case 'fechas':
       return (regla.fechas_especificas ?? []).includes(fecha)
@@ -285,6 +307,12 @@ export function describirRegla(regla: AsignacionTurno): string {
     const cada = regla.intervalo_dias && regla.intervalo_dias > 1
     return cada ? `Cada ${regla.intervalo_dias} días` : 'Todos los días'
   }
+  if (regla.frecuencia === 'mensual_dias') {
+    const marcados = (regla.dias_mes ?? []).slice().sort((a, b) => a - b)
+    return marcados.length
+      ? `Días del mes · ${marcados.join(', ')}`
+      : `Días del mes · ${regla.dia_mes ?? partes(regla.fecha_inicio).d}`
+  }
   if (FRECUENCIAS_POR_DIA_SEMANA.includes(regla.frecuencia)) {
     const nombres = dias.length
       ? dias.slice().sort((a, b) => a - b).map(d => DIAS_ISO.find(x => x.value === d)?.corto ?? '?').join('·')
@@ -320,6 +348,21 @@ export function ausenciaEn(
   )
 }
 
+/**
+ * La excepción que quita el turno de esa persona ese día, si existe.
+ *
+ * Es por (persona, fecha) y no por regla a propósito: lo que el administrador
+ * decidió al pulsar «Quitar» es que esa persona no viene ese día, y cambiar de
+ * regla después no debería resucitar el turno.
+ */
+export function excepcionEn(
+  excepciones: ExcepcionTurno[],
+  personalId: string,
+  fecha: string,
+): ExcepcionTurno | undefined {
+  return excepciones.find(e => e.personal_id === personalId && e.fecha === fecha)
+}
+
 /** Días naturales que abarca una ausencia (inclusive en ambos extremos). */
 export function diasDeAusencia(a: Pick<AusenciaPersonal, 'fecha_inicio' | 'fecha_fin'>): number {
   return diasEntre(a.fecha_inicio, a.fecha_fin) + 1
@@ -352,6 +395,8 @@ export interface CeldaTurno {
   plantilla?: PlantillaHorario
   ausencia?: AusenciaPersonal
   noLaborable?: DiaNoLaborable
+  /** Día que un administrador quitó a mano: la regla no manda aquí. */
+  excepcion?: ExcepcionTurno
   /**
    * El turno está programado pero la persona no puede cubrirlo (ausencia
    * aprobada, o festivo que la regla no declara cubrir). El generador nunca
@@ -375,13 +420,19 @@ export function celdaDe(
     plantillas: PlantillaHorario[]
     ausencias: AusenciaPersonal[]
     noLaborables: DiaNoLaborable[]
+    excepciones?: ExcepcionTurno[]
   },
 ): CeldaTurno {
   const bloque = fuentes.bloques.find(b => b.personal_id === personalId && b.fecha === fecha)
-  const regla = bloque?.asignacion_id
+  const excepcion = excepcionEn(fuentes.excepciones ?? [], personalId, fecha)
+  // Una excepción SIN bloque deja el día vacío: la regla ya no predice nada
+  // ahí. Con bloque manda el bloque —quien reasignó el día después de quitarlo
+  // decidió lo contrario— y la excepción solo queda como rastro.
+  const reglaVigente = bloque?.asignacion_id
     ? fuentes.reglas.find(r => r.id === bloque.asignacion_id)
     : fuentes.reglas.find(r => r.personal_id === personalId && reglaAplicaEn(r, fecha)
         && r.activa && r.fecha_inicio <= fecha && (!r.fecha_fin || r.fecha_fin >= fecha))
+  const regla = !bloque && excepcion ? undefined : reglaVigente
 
   const plantillaId = bloque?.plantilla_horario_id ?? regla?.plantilla_horario_id
   const plantilla = plantillaId ? fuentes.plantillas.find(p => p.id === plantillaId) : undefined
@@ -399,8 +450,37 @@ export function celdaDe(
     plantilla,
     ausencia,
     noLaborable,
+    excepcion,
     enConflicto: hayTurno && (Boolean(ausencia) || chocaConFestivo),
   }
+}
+
+/**
+ * ¿Se puede tocar este día desde el calendario?
+ *
+ * Dos candados, y ninguno es el permiso RBAC (ese lo pone el tab aparte):
+ *   · LO PASADO NO SE EDITA. El calendario programa el futuro; corregir lo que
+ *     ya ocurrió es trabajo de Presencia y de las correcciones de marcaje
+ *     (20260908000200), que dejan rastro de quién cambió qué.
+ *   · LO YA EMPEZADO TAMPOCO. Un bloque en curso, completado o incompleto
+ *     arrastra su checklist de `tareas_bloque` y sus revisiones; moverle la
+ *     jornada por debajo dejaría el checklist hablando de otro turno.
+ *
+ * El día de hoy SÍ se edita: a las 6 de la mañana todavía se puede decidir
+ * quién cubre la noche.
+ */
+export function celdaEditable(celda: CeldaTurno, hoy: string): boolean {
+  if (celda.fecha < hoy) return false
+  return !celda.bloque || celda.bloque.estado === 'pendiente'
+}
+
+/** Por qué no se puede editar esta celda. `null` = sí se puede. */
+export function motivoNoEditable(celda: CeldaTurno, hoy: string): string | null {
+  if (celda.fecha < hoy) return 'Ese día ya pasó: el calendario solo programa de hoy en adelante.'
+  if (celda.bloque && celda.bloque.estado !== 'pendiente') {
+    return 'El turno ya arrancó y tiene tareas asociadas: se corrige desde Presencia, no aquí.'
+  }
+  return null
 }
 
 /** Horas que una celda representa: las del bloque si existe, si no las de la jornada. */

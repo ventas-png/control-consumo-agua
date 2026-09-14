@@ -853,6 +853,7 @@ export type Database = {
           created_at: string
           cubre_dias_no_laborables: boolean
           dia_mes: number | null
+          dias_mes: Json
           dias_semana: Json
           fecha_fin: string | null
           fecha_inicio: string
@@ -874,6 +875,7 @@ export type Database = {
           created_at?: string
           cubre_dias_no_laborables?: boolean
           dia_mes?: number | null
+          dias_mes?: Json
           dias_semana?: Json
           fecha_fin?: string | null
           fecha_inicio: string
@@ -895,6 +897,7 @@ export type Database = {
           created_at?: string
           cubre_dias_no_laborables?: boolean
           dia_mes?: number | null
+          dias_mes?: Json
           dias_semana?: Json
           fecha_fin?: string | null
           fecha_inicio?: string
@@ -7069,6 +7072,71 @@ export type Database = {
           },
           {
             foreignKeyName: "eventos_comunidad_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      excepciones_turno: {
+        Row: {
+          asignacion_id: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          fecha: string
+          id: string
+          motivo: string | null
+          personal_id: string
+          project_id: string
+        }
+        Insert: {
+          asignacion_id?: string | null
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          fecha: string
+          id?: string
+          motivo?: string | null
+          personal_id: string
+          project_id: string
+        }
+        Update: {
+          asignacion_id?: string | null
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          fecha?: string
+          id?: string
+          motivo?: string | null
+          personal_id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "excepciones_turno_asignacion_id_fkey"
+            columns: ["asignacion_id"]
+            isOneToOne: false
+            referencedRelation: "asignaciones_turno"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "excepciones_turno_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "excepciones_turno_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "excepciones_turno_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
