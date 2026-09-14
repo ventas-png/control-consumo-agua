@@ -65,21 +65,21 @@ sleep 2
 export PGHOST="$SOCK" PGPORT="$PUERTO" PGUSER=postgres
 psql -q -d postgres -c "CREATE DATABASE reversa" >/dev/null
 
-echo "── 1/4 · dependencias y roles ──────────────────────────────────────────"
+echo "── 1/5 · dependencias y roles ──────────────────────────────────────────"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d reversa -f "$AQUI/fixture.sql" >/dev/null
 echo "  OK    current_user_role(), get_my_company_id() y los tres roles"
 
-echo "── 2/4 · la premisa: las tres NO están ─────────────────────────────────"
+echo "── 2/5 · la premisa: las tres NO están ─────────────────────────────────"
 ANTES=$(psql -tAd reversa -c "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
   WHERE n.nspname='public' AND p.proname IN ('has_role_any','has_super_or_owner_access','is_user_in_company_with_role')")
 if [ "$ANTES" != "0" ]; then echo "❌ la premisa falla: ya existen ($ANTES)"; exit 1; fi
 echo "  OK    0 de 3 presentes antes de la reversa"
 
-echo "── 3/4 · la reversa se ejecuta ─────────────────────────────────────────"
+echo "── 3/5 · la reversa se ejecuta ─────────────────────────────────────────"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d reversa -f "$REVERSA" >/dev/null
 echo "  OK    aplicada, y su propia postcondición pasó"
 
-echo "── 4/4 · ¿repuso lo que había? ─────────────────────────────────────────"
+echo "── 4/5 · ¿repuso lo que había? ─────────────────────────────────────────"
 HUELLA=$(psql -tAF $'\t' -v ON_ERROR_STOP=1 -d reversa -f "$FINGERPRINT")
 echo "$HUELLA" | node -e '
 const fs = require("node:fs")
@@ -112,6 +112,42 @@ PUB=$(psql -tAd reversa -c "SELECT count(*) FROM pg_proc p JOIN pg_namespace n O
     AND a.privilege_type='EXECUTE' AND a.grantee = 0")
 if [ "$PUB" != "0" ]; then echo "❌ PUBLIC conserva EXECUTE en $PUB: la reversa abriría tres SECURITY DEFINER a anon"; exit 1; fi
 echo "  OK    PUBLIC sin EXECUTE en las tres"
+
+# ── 5/5 · el PROPIETARIO, y por qué hace falta una base aparte ──────────────
+# El owner NO viaja en la huella: fingerprint.sql serializa
+# returns|lang|secdef|volatility|leakproof|config|sha256(prosrc). Las seis
+# huellas de arriba coincidirían igual con un dueño distinto — y de él dependen
+# los privilegios efectivos de una SECURITY DEFINER, que es justo lo que estas
+# tres son. Restaurarlas con el dueño equivocado las deja corriendo con los
+# permisos de otro.
+#
+# Comprobarlo en la base de arriba sería un ADORNO: ahí psql conecta como
+# postgres, así que CREATE ya las deja con ese dueño y el ALTER del archivo no
+# se ejercita. El caso real es el contrario —quien restaura no es postgres— así
+# que se repite la reversa en una base limpia bajo OTRO rol. Si alguien borra
+# los `ALTER FUNCTION … OWNER TO postgres`, las tres quedan de `restaurador` y
+# esto falla; con ellos, pasan.
+echo "── 5/5 · ¿repuso también el dueño? ─────────────────────────────────────"
+psql -q -d postgres -c "CREATE DATABASE reversa_owner" >/dev/null
+psql -q -v ON_ERROR_STOP=1 -d reversa_owner -c "
+  DO \$\$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='restaurador') THEN
+      CREATE ROLE restaurador LOGIN IN ROLE postgres;
+    END IF;
+  END \$\$;
+  GRANT ALL ON SCHEMA public TO restaurador;" >/dev/null
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d reversa_owner -f "$AQUI/fixture.sql" >/dev/null
+PGOPTIONS="-c client_min_messages=warning" PGUSER=restaurador \
+  psql -q -v ON_ERROR_STOP=1 -d reversa_owner -f "$REVERSA" >/dev/null
+
+AJENAS=$(psql -tAd reversa_owner -c "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+  WHERE n.nspname='public' AND p.proname IN ('has_role_any','has_super_or_owner_access','is_user_in_company_with_role')
+    AND pg_get_userbyid(p.proowner) <> 'postgres'")
+CREADAS=$(psql -tAd reversa_owner -c "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+  WHERE n.nspname='public' AND p.proname IN ('has_role_any','has_super_or_owner_access','is_user_in_company_with_role')")
+if [ "$CREADAS" != "3" ]; then echo "❌ la reversa bajo otro rol creó $CREADAS de 3"; exit 1; fi
+if [ "$AJENAS" != "0" ]; then echo "❌ $AJENAS función(es) quedaron con un dueño distinto de postgres: una SECURITY DEFINER corre con los privilegios de SU dueño"; exit 1; fi
+echo "  OK    restauradas por 'restaurador' y trasladadas a postgres por el ALTER"
 
 echo
 echo "✅ reversa_helpers_rbac: el archivo de reversa se ejecuta y repone las tres funciones con las SEIS huellas exactas de producción."

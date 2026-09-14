@@ -49,24 +49,24 @@ por_nombre AS (
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname NOT IN ('pg_catalog','information_schema')
     AND p.proname NOT IN ('has_role_any','has_super_or_owner_access','is_user_in_company_with_role')
-    AND p.prosrc ~ '\mhas_role_any|has_super_or_owner_access|is_user_in_company_with_role\M'
+    AND p.prosrc ~ '\m(has_role_any|has_super_or_owner_access|is_user_in_company_with_role)\M'
   UNION ALL
   SELECT 'policy: ' || schemaname || '.' || tablename || '.' || policyname
   FROM pg_policies
   WHERE COALESCE(qual,'') || COALESCE(with_check,'')
-        ~ '\mhas_role_any|has_super_or_owner_access|is_user_in_company_with_role\M'
+        ~ '\m(has_role_any|has_super_or_owner_access|is_user_in_company_with_role)\M'
   UNION ALL
   SELECT 'vista: ' || table_schema || '.' || table_name
   FROM information_schema.views
   WHERE table_schema NOT IN ('pg_catalog','information_schema')
-    AND view_definition ~ '\mhas_role_any|has_super_or_owner_access|is_user_in_company_with_role\M'
+    AND view_definition ~ '\m(has_role_any|has_super_or_owner_access|is_user_in_company_with_role)\M'
   UNION ALL
   SELECT 'default de columna: ' || c.relname || '.' || a.attname
   FROM pg_attrdef d
   JOIN pg_class c ON c.oid = d.adrelid
   JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
   WHERE pg_get_expr(d.adbin, d.adrelid)
-        ~ '\mhas_role_any|has_super_or_owner_access|is_user_in_company_with_role\M'
+        ~ '\m(has_role_any|has_super_or_owner_access|is_user_in_company_with_role)\M'
 ),
 todo AS (SELECT hallazgo FROM dependencias UNION ALL SELECT hallazgo FROM por_nombre)
 SELECT

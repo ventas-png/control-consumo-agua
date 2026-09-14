@@ -105,17 +105,17 @@ BEGIN
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname NOT IN ('pg_catalog','information_schema')
       AND p.proname NOT IN ('has_role_any','has_super_or_owner_access','is_user_in_company_with_role')
-      AND p.prosrc ~ '\mhas_role_any|has_super_or_owner_access|is_user_in_company_with_role\M'
+      AND p.prosrc ~ '\m(has_role_any|has_super_or_owner_access|is_user_in_company_with_role)\M'
     UNION ALL
     SELECT 'policy ' || schemaname || '.' || tablename || '.' || policyname
     FROM pg_policies
     WHERE COALESCE(qual,'') || COALESCE(with_check,'')
-          ~ '\mhas_role_any|has_super_or_owner_access|is_user_in_company_with_role\M'
+          ~ '\m(has_role_any|has_super_or_owner_access|is_user_in_company_with_role)\M'
     UNION ALL
     SELECT 'vista ' || table_schema || '.' || table_name
     FROM information_schema.views
     WHERE table_schema NOT IN ('pg_catalog','information_schema')
-      AND view_definition ~ '\mhas_role_any|has_super_or_owner_access|is_user_in_company_with_role\M'
+      AND view_definition ~ '\m(has_role_any|has_super_or_owner_access|is_user_in_company_with_role)\M'
   LOOP
     v_lista := v_lista || ' · referencia: ' || v_obj;
   END LOOP;
