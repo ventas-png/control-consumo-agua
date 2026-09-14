@@ -4,35 +4,45 @@
 # autoritativo de calidad de agua (SQLSTATE 42725) y el contrato de RBAC.
 #
 # QUÉ COMPRUEBA
-#   1/12  el fixture, construido con los archivos REALES de S22 (20260603140000)
+#   1/14  el fixture, construido con los archivos REALES de S22 (20260603140000)
 #         y S23 (20260605160000) y con las policies REALES de producción,
 #         reproduce el defecto: INSERT y UPDATE de parametros mueren con 42725
-#   2/12  tras la migración, el catálogo celda por celda: el trigger re-apuntado
+#   2/14  tras la migración, el catálogo celda por celda: el trigger re-apuntado
 #         (mismo nombre y OID, tgtype 23, tgenabled O, UPDATE OF con las cuatro
 #         columnas, pg_get_triggerdef exacto), la función nueva INVOKER con
 #         search_path '', la acotada DEFINER con su ACL, la ACL de la firma de
 #         tres argumentos, y que la sobrecarga vieja y la función de S22 no
 #         cambiaron (cuerpo, ACL, volatilidad, dueño)
-#   3/12  comportamiento REAL como administrativo: INSERT, UPDATE, pisado de lo
+#   3/14  comportamiento REAL como administrativo: INSERT, UPDATE, pisado de lo
 #         que manda el cliente, override de empresa, fallback global, fuente y
 #         company_id ajenos rechazados, anon sin RPC nueva
-#   4/12  EL HALLAZGO, reproducido: con un SELECT AMPLIO sobre fuentes_agua, un
+#   4/14  EL HALLAZGO, reproducido: con un SELECT AMPLIO sobre fuentes_agua, un
 #         `operator` SIN agua.calidad.view al que la policy de INSERT SÍ
 #         autoriza recibe 42501 desde dentro del trigger
-#   5/12  EL CONTRATO, con lo que se entrega: ese mismo operador guarda y edita
+#   5/14  EL CONTRATO, con lo que se entrega: ese mismo operador guarda y edita
 #         su análisis, con el cálculo real; la fuente de otra empresa se sigue
 #         rechazando; no gana ni una lectura nueva
-#   6/12  IDEMPOTENCIA: aplicar dos veces no falla, conserva OIDs y estado
-#   7/12  ABORTO ante un mundo ajeno: homónimo en otra tabla, trigger con otra
+#   6/14  EL CONTRATO PRIVILEGIADO: INSERT y UPDATE REALES con fuente_id no
+#         nula como sesión administrativa (postgres) y como service_role, sin
+#         JWT; la fuente inexistente da 23503 y no 42501; service_role no tiene
+#         EXECUTE sobre la acotada porque su camino no es ése
+#   7/14  IDEMPOTENCIA: aplicar dos veces no falla, conserva OIDs y estado
+#   8/14  ABORTO ante un mundo ajeno: homónimo en otra tabla, trigger con otra
 #         definición, y la firma de tres argumentos convertida en DEFINER
-#   8/12  FAIL-CLOSED · el trigger DESHABILITADO o con otro UPDATE OF aborta la
+#   9/14  FAIL-CLOSED · el trigger DESHABILITADO o con otro UPDATE OF aborta la
 #         migración sin crear nada
-#   9/12  FAIL-CLOSED · una función homónima ya existente con otro cuerpo, otra
+#  10/14  FAIL-CLOSED · una función homónima ya existente con otro cuerpo, otra
 #         ACL o otro dueño aborta la reaplicación sin tocar nada
-#  10/12  MUTACIÓN · restaurar la llamada ambigua → 42725 otra vez
-#  11/12  MUTACIÓN · quitar el EXECUTE de authenticated → 42501; abrir la
+#  11/14  FAIL-CLOSED · ANTES de conceder EXECUTE sobre la firma de tres
+#         argumentos se valida entera (lenguaje, STABLE, INVOKER, search_path,
+#         dueño, argumentos, retorno, cuerpo permitido y ACL previa) y se exige
+#         la RLS de calidad_tipologias con su policy de SELECT: once mutantes
+#         instalados ANTES de aplicar la migración la hacen abortar sin tocar
+#         trigger, funciones, ACL ni RLS
+#  12/14  MUTACIÓN · restaurar la llamada ambigua → 42725 otra vez
+#  13/14  MUTACIÓN · quitar el EXECUTE de authenticated → 42501; abrir la
 #         acotada o la RLS de calidad_tipologias → el arnés lo detecta
-#  12/12  MUTACIÓN · mutilar la migración (sin GRANT, sin re-apuntar, sin el
+#  14/14  MUTACIÓN · mutilar la migración (sin GRANT, sin re-apuntar, sin el
 #         cheque de tenant, con el SELECT amplio) → rojo
 #
 # USO
@@ -94,6 +104,10 @@ oid_ac()  { psql -tAq -d "$1" -c "SELECT coalesce(to_regprocedure('public.agua_f
 fn_trg()  { psql -tAq -d "$1" -c "SELECT tgfoid::regprocedure::text || ' ' || tgenabled::text || ' ' || coalesce((SELECT string_agg(a.attname, ',' ORDER BY a.attname) FROM unnest(tgattr::int2[]) k JOIN pg_attribute a ON a.attrelid = tgrelid AND a.attnum = k), '(todas)') FROM pg_trigger WHERE tgname = 'registros_calidad_cumplimiento' AND NOT tgisinternal"; }
 # Cuerpo + ACL + volatilidad + dueño de TODO lo que la migración no debe tocar.
 intactos() { psql -tAq -d "$1" -c "SET search_path = public; SELECT proname || '(' || pg_get_function_identity_arguments(oid) || ') ' || md5(prosrc) || ' ' || coalesce(proacl::text,'<default>') || ' ' || provolatile::text || ' ' || prosecdef::text || ' ' || pg_get_userbyid(proowner) FROM pg_proc WHERE oid IN (to_regprocedure('public.calcular_cumplimiento_calidad(text, jsonb)'), to_regprocedure('public.trg_registros_calidad_cumplimiento()')) ORDER BY 1"; }
+# ACL de la firma de tres argumentos: lo que la migración NO debe conceder si aborta.
+fn3acl() { psql -tAq -d "$1" -c "SELECT coalesce(proacl::text,'<default>') || ' ' || prosecdef::text || ' ' || provolatile::text || ' ' || coalesce(array_to_string(proconfig,';'),'-') || ' ' || pg_get_userbyid(proowner) || ' ' || md5(prosrc) FROM pg_proc WHERE oid = to_regprocedure('public.calcular_cumplimiento_calidad(text, jsonb, uuid)')"; }
+# Estado de la RLS de calidad_tipologias, de la que depende el aislamiento INVOKER.
+tipacl() { psql -tAq -d "$1" -c "SELECT (SELECT relrowsecurity FROM pg_class WHERE oid='public.calidad_tipologias'::regclass)::text || ' ' || coalesce((SELECT polcmd::text || array_to_string(polroles,',') || coalesce(pg_get_expr(polqual,polrelid),'-') FROM pg_policy WHERE polrelid='public.calidad_tipologias'::regclass AND polname='calidad_tipologias_select'),'(sin policy)')"; }
 # Estado EXACTO de las dos funciones que la migración crea (para los mutantes).
 nuevas() { psql -tAq -d "$1" -c "SET search_path = public; SELECT proname || ' ' || md5(prosrc) || ' ' || coalesce(proacl::text,'<default>') || ' ' || pg_get_userbyid(proowner) || ' ' || prosecdef::text FROM pg_proc WHERE proname IN ('trg_registros_calidad_cumplimiento_catalogo','agua_fuente_de_mi_empresa') ORDER BY 1"; }
 
@@ -124,10 +138,10 @@ debe_fallar_con() { # db archivo texto descripcion
 
 preparar cal
 
-echo "── 1/12 · el fixture (S22 + S23 reales, policies reales) reproduce el 42725 ─"
+echo "── 1/14 · el fixture (S22 + S23 reales, policies reales) reproduce el 42725 ─"
 notas cal "$AQUI/assert_pre.sql"
 
-echo "── 2/12 · la migración y el catálogo, celda por celda ──────────────────────"
+echo "── 2/14 · la migración y el catálogo, celda por celda ──────────────────────"
 ANTES_INTACTOS=$(intactos cal); OID_TRG_ANTES=$(oid_trg cal)
 migrar cal
 notas cal "$AQUI/assert.sql"
@@ -136,16 +150,19 @@ notas cal "$AQUI/assert.sql"
 [ "$(oid_trg cal)" = "$OID_TRG_ANTES" ] && ok "el trigger conserva su OID ($OID_TRG_ANTES): CREATE OR REPLACE TRIGGER no hizo DROP/CREATE" \
   || mal "el OID del trigger cambió ($OID_TRG_ANTES → $(oid_trg cal)): hubo DROP/CREATE"
 
-echo "── 3/12 · comportamiento real como administrativo (y anon) ─────────────────"
+echo "── 3/14 · comportamiento real como administrativo (y anon) ─────────────────"
 notas cal "$AQUI/inserts.sql"
 
-echo "── 4/12 · EL HALLAZGO · operator sin agua.calidad.view + SELECT amplio ─────"
+echo "── 4/14 · EL HALLAZGO · operator sin agua.calidad.view + SELECT amplio ─────"
 notas cal "$AQUI/demo_select_amplio.sql"
 
-echo "── 5/12 · EL CONTRATO · ese operador escribe, y sigue sin leer de más ──────"
+echo "── 5/14 · EL CONTRATO · ese operador escribe, y sigue sin leer de más ──────"
 notas cal "$AQUI/rbac_operador.sql"
 
-echo "── 6/12 · idempotencia: re-aplicar conserva OIDs y estado ──────────────────"
+echo "── 6/14 · EL CONTRATO PRIVILEGIADO · postgres y service_role, sin JWT ──────"
+notas cal "$AQUI/privilegiados.sql"
+
+echo "── 7/14 · idempotencia: re-aplicar conserva OIDs y estado ──────────────────"
 T1=$(oid_trg cal); F1=$(oid_fn cal); A1=$(oid_ac cal)
 migrar cal
 T2=$(oid_trg cal); F2=$(oid_fn cal); A2=$(oid_ac cal)
@@ -155,15 +172,17 @@ T2=$(oid_trg cal); F2=$(oid_fn cal); A2=$(oid_ac cal)
 psql -q -v ON_ERROR_STOP=1 -d cal -f "$AQUI/assert.sql"         >/dev/null 2>&1 && ok "re-aplicar deja exactamente el mismo catálogo" || mal "el assert falla tras re-aplicar"
 psql -q -v ON_ERROR_STOP=1 -d cal -f "$AQUI/inserts.sql"        >/dev/null 2>&1 && ok "re-aplicar deja el mismo comportamiento"       || mal "inserts.sql falla tras re-aplicar"
 psql -q -v ON_ERROR_STOP=1 -d cal -f "$AQUI/rbac_operador.sql"  >/dev/null 2>&1 && ok "re-aplicar deja el mismo contrato de RBAC"      || mal "rbac_operador.sql falla tras re-aplicar"
+psql -q -v ON_ERROR_STOP=1 -d cal -f "$AQUI/privilegiados.sql" >/dev/null 2>&1 && ok "re-aplicar deja el mismo contrato privilegiado"  || mal "privilegiados.sql falla tras re-aplicar"
 [ "$(intactos cal)" = "$ANTES_INTACTOS" ] && ok "los objetos intactos siguen intactos" || mal "re-aplicar tocó los objetos intactos"
 
-echo "── 7/12 · aborto sin tocar nada ante un mundo distinto ─────────────────────"
+echo "── 8/14 · aborto sin tocar nada ante un mundo distinto ─────────────────────"
 abortar() { # nombre sql_previo texto_error descripcion [ya_migrada]
   preparar "$1"
   [ "${5:-no}" = "migrada" ] && migrar "$1" >/dev/null
   psql -q -v ON_ERROR_STOP=1 -d "$1" -c "$2" >/dev/null
-  local antes_fn antes_intactos antes_nuevas
+  local antes_fn antes_intactos antes_nuevas antes_fn3 antes_tip
   antes_fn=$(fn_trg "$1"); antes_intactos=$(intactos "$1"); antes_nuevas=$(nuevas "$1")
+  antes_fn3=$(fn3acl "$1"); antes_tip=$(tipacl "$1")
   debe_fallar_con "$1" "$MIGRACION" "$3" "$4"
   if [ "${5:-no}" = "migrada" ]; then
     [ "$(nuevas "$1")" = "$antes_nuevas" ] && ok "      … y no tocó las funciones nuevas (cuerpo, ACL, dueño)" || mal "      … pero cambió alguna función nueva"
@@ -171,6 +190,8 @@ abortar() { # nombre sql_previo texto_error descripcion [ya_migrada]
     [ "$(oid_fn "$1")" = "AUSENTE" ] && [ "$(oid_ac "$1")" = "AUSENTE" ] && ok "      … y no creó ninguna función nueva" || mal "      … pero creó alguna función nueva"
   fi
   [ "$(fn_trg "$1")" = "$antes_fn" ] && [ "$(intactos "$1")" = "$antes_intactos" ] && ok "      … y no tocó el trigger ni los objetos intactos" || mal "      … pero tocó el trigger o los objetos intactos"
+  [ "$(fn3acl "$1")" = "$antes_fn3" ] && ok "      … y NO concedió nada sobre la firma de tres argumentos" || mal "      … pero cambió la ACL o la definición de la firma de tres argumentos"
+  [ "$(tipacl "$1")" = "$antes_tip" ] && ok "      … y dejó la RLS de calidad_tipologias como estaba" || mal "      … pero tocó la RLS de calidad_tipologias"
 }
 abortar ab1 "CREATE TABLE public.otra (id int PRIMARY KEY, parametros jsonb, fuente_id uuid, cumplimiento jsonb, cumple_total boolean);
              CREATE TRIGGER registros_calidad_cumplimiento BEFORE INSERT ON public.otra FOR EACH ROW EXECUTE FUNCTION public.trg_registros_calidad_cumplimiento();" \
@@ -186,7 +207,7 @@ abortar ab4 "ALTER FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uu
 abortar ab5 "DROP TRIGGER registros_calidad_cumplimiento ON public.registros_calidad;" \
   "no existe el trigger" "el trigger de S22 borrado (no se crea a ciegas)"
 
-echo "── 8/12 · fail-closed · tgenabled y UPDATE OF, en los dos estados ──────────"
+echo "── 9/14 · fail-closed · tgenabled y UPDATE OF, en los dos estados ──────────"
 abortar fc1 "ALTER TABLE public.registros_calidad DISABLE TRIGGER registros_calidad_cumplimiento;" \
   "enabled=D" "trigger DESHABILITADO (estado viejo)"
 abortar fc2 "DROP TRIGGER registros_calidad_cumplimiento ON public.registros_calidad;
@@ -198,7 +219,7 @@ abortar fc4 "DROP TRIGGER registros_calidad_cumplimiento ON public.registros_cal
              CREATE TRIGGER registros_calidad_cumplimiento BEFORE INSERT OR UPDATE OF parametros, fuente_id, cumplimiento ON public.registros_calidad FOR EACH ROW EXECUTE FUNCTION public.trg_registros_calidad_cumplimiento_catalogo();" \
   "UPDATE OF=cumplimiento,fuente_id,parametros" "UPDATE OF alterado (estado nuevo, ya migrado)" migrada
 
-echo "── 9/12 · fail-closed · función homónima con otro cuerpo, ACL o dueño ──────"
+echo "── 10/14 · fail-closed · función homónima con otro cuerpo, ACL o dueño ──────"
 abortar fn1 "CREATE OR REPLACE FUNCTION public.trg_registros_calidad_cumplimiento_catalogo() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS \$mut\$ BEGIN RETURN NEW; END \$mut\$;" \
   "OTRA definición" "función de trigger homónima con OTRO cuerpo" migrada
 abortar fn2 "GRANT EXECUTE ON FUNCTION public.trg_registros_calidad_cumplimiento_catalogo() TO authenticated;" \
@@ -212,7 +233,39 @@ abortar fn5 "REVOKE EXECUTE ON FUNCTION public.agua_fuente_de_mi_empresa(uuid) F
 abortar fn6 "ALTER FUNCTION public.agua_fuente_de_mi_empresa(uuid) SECURITY INVOKER;" \
   "OTRA definición" "acotada homónima convertida en INVOKER" migrada
 
-echo "── 10/12 · mutación: restaurar la llamada ambigua → vuelve el 42725 ────────"
+echo "── 11/14 · fail-closed · la firma de tres args y la RLS de calidad_tipologias"
+# Todos estos mutantes se instalan ANTES de aplicar la migración: la migración
+# tiene que abortar sin crear funciones, sin re-apuntar el trigger y —sobre
+# todo— SIN conceder EXECUTE sobre una función que ya no es la que validó.
+abortar g1 "CREATE OR REPLACE FUNCTION public.calcular_cumplimiento_calidad(p_tipo_agua text, p_parametros jsonb, p_company_id uuid DEFAULT NULL) RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = '' AS \$mut\$ BEGIN RETURN jsonb_build_object('cumplimiento', '{}'::jsonb, 'cumple_total', true); END \$mut\$;" \
+  "no es ninguna de las dos variantes autorizadas" "cuerpo DISTINTO de las dos variantes conocidas"
+abortar g2 "ALTER FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) VOLATILE;" \
+  "no es la función que esta migración sabe exponer" "la firma de tres argumentos pasada a VOLATILE"
+abortar g3 "ALTER FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) RESET search_path;" \
+  "no es la función que esta migración sabe exponer" "la firma de tres argumentos sin search_path fijado"
+abortar g4 "ALTER FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) OWNER TO otro_dueno;" \
+  "no es la función que esta migración sabe exponer" "la firma de tres argumentos con OTRO dueño"
+abortar g5 "DROP FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid);
+            CREATE FUNCTION public.calcular_cumplimiento_calidad(p_tipo text, p_params jsonb, p_empresa uuid DEFAULT NULL) RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = '' AS \$mut\$ BEGIN RETURN '{}'::jsonb; END \$mut\$;
+            REVOKE EXECUTE ON FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) FROM PUBLIC;
+            GRANT EXECUTE ON FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) TO service_role;" \
+  "no es la función que esta migración sabe exponer" "la firma de tres argumentos con OTROS nombres de argumento"
+abortar g6 "GRANT EXECUTE ON FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) TO anon;" \
+  "la ACL previa" "ACL previa con anon: la migración no bendice un EXECUTE que no puso ella"
+abortar g7 "REVOKE EXECUTE ON FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) FROM service_role;" \
+  "la ACL previa" "ACL previa sin service_role: tampoco es un estado conocido"
+abortar g8 "ALTER TABLE public.calidad_tipologias DISABLE ROW LEVEL SECURITY;" \
+  "no tiene ENABLE ROW LEVEL SECURITY" "calidad_tipologias sin RLS (el aislamiento de la INVOKER depende de ella)"
+abortar g9 "DROP POLICY calidad_tipologias_select ON public.calidad_tipologias;" \
+  "no es la esperada" "calidad_tipologias sin su policy de SELECT"
+abortar g10 "DROP POLICY calidad_tipologias_select ON public.calidad_tipologias;
+             CREATE POLICY calidad_tipologias_select ON public.calidad_tipologias FOR SELECT TO authenticated USING (true);" \
+  "no es la esperada" "calidad_tipologias_select abierta con USING (true)"
+abortar g11 "DROP POLICY calidad_tipologias_select ON public.calidad_tipologias;
+             CREATE POLICY calidad_tipologias_select ON public.calidad_tipologias FOR SELECT TO anon, authenticated USING (company_id IS NULL OR company_id = get_my_company_id());" \
+  "no es la esperada" "calidad_tipologias_select ampliada también a anon"
+
+echo "── 12/14 · mutación: restaurar la llamada ambigua → vuelve el 42725 ────────"
 preparar m1; migrar m1 >/dev/null
 psql -q -v ON_ERROR_STOP=1 -d m1 -c "CREATE OR REPLACE TRIGGER registros_calidad_cumplimiento BEFORE INSERT OR UPDATE OF parametros, fuente_id ON public.registros_calidad FOR EACH ROW EXECUTE FUNCTION public.trg_registros_calidad_cumplimiento();" >/dev/null
 debe_fallar_con m1 "$AQUI/inserts.sql" "42725" "re-apuntar el trigger a la función vieja de S22"
@@ -226,7 +279,7 @@ psql -q -v ON_ERROR_STOP=1 -d m2 -c "CREATE OR REPLACE FUNCTION public.trg_regis
   END \$mut\$;" >/dev/null
 debe_fallar_con m2 "$AQUI/inserts.sql" "42725" "volver a la llamada de DOS argumentos dentro de la función nueva"
 
-echo "── 11/12 · mutación: sin EXECUTE, sin acotada o sin aislamiento → rojo ─────"
+echo "── 13/14 · mutación: sin EXECUTE, sin acotada o sin aislamiento → rojo ─────"
 preparar m3; migrar m3 >/dev/null
 psql -q -v ON_ERROR_STOP=1 -d m3 -c "REVOKE EXECUTE ON FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) FROM authenticated;" >/dev/null
 debe_fallar_con m3 "$AQUI/inserts.sql" "42501" "revocar el EXECUTE de authenticated sobre la firma de tres argumentos"
@@ -245,7 +298,7 @@ preparar m7; migrar m7 >/dev/null
 psql -q -v ON_ERROR_STOP=1 -d m7 -c "DROP POLICY fuentes_agua_select ON public.fuentes_agua; CREATE POLICY fuentes_agua_select ON public.fuentes_agua FOR SELECT TO authenticated USING (true);" >/dev/null
 debe_fallar_con m7 "$AQUI/assert.sql" "no se abrió la tabla" "abrir la policy de SELECT de fuentes_agua con USING (true)"
 
-echo "── 12/12 · mutación: mutilar la migración → rojo ───────────────────────────"
+echo "── 14/14 · mutación: mutilar la migración → rojo ───────────────────────────"
 # (a) sin el GRANT a authenticated sobre la firma de tres argumentos.
 grep -v "^GRANT  EXECUTE ON FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) TO authenticated, service_role;" "$MIGRACION" > "$TRABAJO/sin_grant.sql"
 preparar m8
@@ -256,9 +309,13 @@ grep -q "^CREATE OR REPLACE TRIGGER" "$TRABAJO/sin_trigger.sql" && mal "la mutac
 preparar m9
 debe_fallar_con m9 "$TRABAJO/sin_trigger.sql" "no quedó como se declaró" "sin re-apuntar el trigger: la postcondición de la migración aborta"
 debe_fallar_con m9 "$AQUI/inserts.sql" "42725" "… y el 42725 sigue ahí"
-# (c) sin el cheque de tenant dentro del trigger: la fuente ajena entra.
-sed '/^    IF NOT FOUND THEN$/,/^    END IF;$/d' "$MIGRACION" > "$TRABAJO/sin_cheque.sql"
+# (c) sin el cheque de tenant dentro del trigger: la fuente ajena entra. Se
+#     recorta EXACTAMENTE el bloque de la rama de usuario (sed -z, el archivo
+#     entero como una sola cadena), no el de la rama privilegiada.
+sed -z "s|      IF NOT FOUND THEN\n        RAISE EXCEPTION 'registros_calidad: la fuente % no existe o no pertenece a la empresa del usuario actual', NEW.fuente_id\n          USING ERRCODE = 'insufficient_privilege',\n                HINT = 'Solo se pueden registrar analisis de fuentes de la propia empresa.';\n      END IF;\n||" "$MIGRACION" > "$TRABAJO/sin_cheque.sql"
 grep -q "no pertenece a la empresa" "$TRABAJO/sin_cheque.sql" && mal "la mutación (c) no quitó el cheque de tenant" || true
+grep -q "la fuente % no existe'" "$TRABAJO/sin_cheque.sql" || mal "la mutación (c) se llevó por delante la rama privilegiada"
+
 preparar m10; migrar m10 "$TRABAJO/sin_cheque.sql" >/dev/null
 debe_fallar_con m10 "$AQUI/inserts.sql" "fuente de otra empresa" "sin el cheque de tenant: la fuente ajena entra y el arnés lo detecta"
 # (d) con el SELECT amplio en vez de la acotada: el operador vuelve a romperse.

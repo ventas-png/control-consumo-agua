@@ -62,6 +62,50 @@
 -- El trigger sigue siendo SECURITY INVOKER: `fuentes_agua` NO se abre y
 -- `calidad_tipologias` se sigue leyendo bajo la RLS del usuario.
 --
+-- ════════════════════════════════════════════════════════════════════════════
+-- EL CONTRATO PRIVILEGIADO: postgres, service_role y supabase_admin
+-- ════════════════════════════════════════════════════════════════════════════
+-- La función acotada responde «¿esta fuente es de MI empresa?», y «mi empresa»
+-- sale del JWT: `get_my_company_id()` e `is_super_admin()` dependen de
+-- `auth.uid()`. Un actor sin JWT —una sesión SQL administrativa, un backfill,
+-- una Edge Function con la service key— no tiene empresa, así que la acotada no
+-- le devolvería NINGUNA fuente y todo INSERT/UPDATE con `fuente_id` no nula
+-- moriría con 42501. Eso NO es aceptable: rompería seeds, backfills y cualquier
+-- operación de servicio, que antes de este PR funcionaban.
+--
+-- Por eso el trigger tiene DOS caminos, y la decisión se toma donde se puede
+-- tomar con seguridad:
+--
+--   · La pregunta «¿a quien está insertando le aplica la RLS?» se resuelve
+--     DENTRO de la función de trigger, que es SECURITY INVOKER. Ahí, y sólo
+--     ahí, `CURRENT_USER` es de verdad el rol que ejecuta la sentencia. Dentro
+--     de la acotada —SECURITY DEFINER— `CURRENT_USER` sería el DUEÑO de la
+--     función, así que preguntárselo allí no identificaría al invocador: sería
+--     un bypass disfrazado. Por eso el cheque NO vive en la DEFINER.
+--   · El predicado es `rolsuper OR rolbypassrls` sobre `pg_catalog.pg_roles`,
+--     que es exactamente el que usa Postgres para saltarse la RLS, y que NO se
+--     hereda por pertenencia a otro rol. En producción: `postgres` y
+--     `service_role` lo cumplen (rolbypassrls), `supabase_admin` también
+--     (rolsuper); `anon` y `authenticated` no lo cumplen. Un usuario de la API
+--     no puede fabricárselo: tendría que ser miembro de uno de esos roles.
+--   · Quien lo cumple resuelve la fuente con un SELECT sobre `fuentes_agua`
+--     bajo SUS PROPIOS permisos. No es una concesión: a quien la RLS no le
+--     aplica, la acotada no le protegía nada que no pudiera leer ya con un
+--     SELECT directo sobre la tabla. Una `fuente_id` inexistente se rechaza con
+--     23503 (foreign_key_violation), no con 42501: para él no hay nada oculto.
+--   · Quien NO lo cumple (anon, authenticated) va por la acotada, con el
+--     aislamiento por empresa intacto.
+--
+-- Consecuencia de ACL: `service_role` se queda SIN EXECUTE sobre la acotada.
+-- No es un recorte de soporte, es lo contrario: para él la acotada siempre
+-- devolvería cero filas, y dejarle el GRANT anunciaría un camino que no
+-- funciona. Su camino es el privilegiado, y no necesita esa función.
+--
+-- NOTA para operaciones administrativas: el trigger `registros_calidad_fill_
+-- company_id` (20260911223000) rellena `company_id` desde `auth.uid()`, que
+-- tampoco existe sin JWT. Un backfill como postgres o service_role tiene que
+-- pasar `company_id` explícitamente, igual que antes de este PR.
+--
 -- EDITAR, EN CAMBIO, SÍ EXIGE HOY `agua.calidad.view`, Y NO POR ESTE PR.
 -- PostgreSQL aplica las policies de SELECT a un `UPDATE … WHERE` porque la
 -- cláusula lee columnas de la tabla. Como `registros_calidad_select` exige
@@ -78,7 +122,8 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- QUÉ HACE (append-only; ninguna migración histórica se toca)
 -- ════════════════════════════════════════════════════════════════════════════
---   1. Crea `public.agua_fuente_de_mi_empresa(uuid)` (arriba).
+--   1. Crea `public.agua_fuente_de_mi_empresa(uuid)` (arriba), el camino de
+--      anon/authenticated. Sin EXECUTE para PUBLIC, anon ni service_role.
 --   2. Crea `trg_registros_calidad_cumplimiento_catalogo()`, SECURITY INVOKER y
 --      `search_path = ''` como la de S22, que llama a la firma de TRES
 --      argumentos —inequívoca— pasando el `company_id` de la fuente, para que el
@@ -131,6 +176,26 @@
 --     con otro cuerpo o con otra ACL aborta en vez de que CREATE OR REPLACE lo
 --     pise (que además conservaría la ACL y el dueño ajenos en silencio).
 --
+--   · ANTES de concederle EXECUTE a `authenticated`, se valida ENTERA la firma
+--     `calcular_cumplimiento_calidad(text, jsonb, uuid)`: lenguaje plpgsql,
+--     STABLE, SECURITY INVOKER, `search_path = ''`, propietario, argumentos
+--     exactos, retorno `jsonb`, no SETOF, 3 argumentos con 1 DEFAULT, y la ACL
+--     PREVIA (la de S23, o la que deja esta misma migración al reaplicarse).
+--     Conceder EXECUTE sobre una función que no se ha mirado es firmar en
+--     blanco.
+--     El CUERPO sólo puede ser una de DOS variantes exactas, por md5: la de
+--     producción y la de 20260605160000 (difieren; es drift declarado en #826).
+--     Además se comprueba de qué están hechas: las dos leen
+--     public.calidad_tipologias y ninguna otra relación de public, ninguna
+--     escribe y ninguna usa SQL dinámico. Si el cuerpo cambia, hay que mirarlo
+--     y declarar su md5 en una migración posterior.
+--   · Y se comprueba la RLS de la que depende su aislamiento: como la función
+--     es SECURITY INVOKER, lo único que impide que `authenticated` vea el
+--     override de otra empresa es la RLS de `calidad_tipologias` y su policy
+--     `calidad_tipologias_select`. Se exige `relrowsecurity` y esa policy
+--     exacta (FOR SELECT TO authenticated USING (company_id IS NULL OR
+--     company_id = get_my_company_id())). Sin eso, el GRANT no se hace.
+--
 -- Los cuerpos viven UNA sola vez, en las constantes del bloque, y se instalan
 -- con EXECUTE format(..., %L): lo que se compara es literalmente lo que se
 -- instala, sin una segunda copia que se pueda desincronizar.
@@ -165,6 +230,13 @@
 --      recorta permisos vigentes de los operadores. Ver EL CONTRATO DE RBAC.
 --   e) Calcular en el propio trigger sin llamar a la función: duplica la
 --      lógica del catálogo, que es lo que S23 vino a unificar.
+--   f) Detectar al actor privilegiado DENTRO de la acotada (SECURITY DEFINER)
+--      mirando `current_user`: allí `current_user` es el dueño de la función,
+--      no el invocador, así que el cheque daría true SIEMPRE y convertiría la
+--      acotada en un lector sin filtro de fuentes_agua para cualquiera.
+--   g) Quitar los GRANT y declarar no soportados a service_role y a las
+--      sesiones administrativas: rompe seeds, backfills y Edge Functions con la
+--      service key, que hoy funcionan.
 --
 -- REVERTIR (vuelve el 42725; sólo como marcha atrás de emergencia):
 --   CREATE OR REPLACE TRIGGER registros_calidad_cumplimiento
@@ -195,19 +267,46 @@ DECLARE
   v_tipo_agua  text;
   v_company_id uuid;
   v_result     jsonb;
+  v_sin_rls    boolean;
 BEGIN
-  -- La fuente se resuelve con la función acotada, no con un SELECT sobre
-  -- fuentes_agua: así un `operator` sin `agua.calidad.view` —que la policy de
-  -- INSERT sí autoriza a escribir— puede guardar su análisis, y una fuente de
-  -- otra empresa sigue siendo invisible (la función no devuelve fila).
   IF NEW.fuente_id IS NOT NULL THEN
-    SELECT f.tipo_agua, f.company_id
-      INTO v_tipo_agua, v_company_id
-      FROM public.agua_fuente_de_mi_empresa(NEW.fuente_id) f;
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'registros_calidad: la fuente % no existe o no pertenece a la empresa del usuario actual', NEW.fuente_id
-        USING ERRCODE = 'insufficient_privilege',
-              HINT = 'Solo se pueden registrar analisis de fuentes de la propia empresa.';
+    -- ¿A quien esta insertando le aplica la RLS? La pregunta se resuelve AQUI,
+    -- dentro de una funcion SECURITY INVOKER, que es el unico sitio donde
+    -- CURRENT_USER es de verdad el rol que ejecuta la sentencia. Dentro de una
+    -- SECURITY DEFINER (la acotada) CURRENT_USER seria el DUENO de la funcion y
+    -- preguntarselo ahi seria un bypass, no una identificacion.
+    -- rolsuper / rolbypassrls no se heredan por pertenencia: es exactamente el
+    -- mismo predicado que usa el planificador para saltarse la RLS.
+    SELECT (r.rolsuper OR r.rolbypassrls) INTO v_sin_rls
+      FROM pg_catalog.pg_roles r WHERE r.rolname = CURRENT_USER;
+
+    IF COALESCE(v_sin_rls, false) THEN
+      -- CONTRATO PRIVILEGIADO: postgres, service_role y supabase_admin. No hay
+      -- JWT del que derivar la empresa, asi que get_my_company_id() seria NULL y
+      -- la acotada no devolveria ninguna fuente. Leen fuentes_agua con sus
+      -- propios permisos: la RLS no les aplica, de modo que la acotada no
+      -- protegeria de ellos nada que no puedan ver ya con un SELECT directo.
+      SELECT fa.tipo_agua, fa.company_id
+        INTO v_tipo_agua, v_company_id
+        FROM public.fuentes_agua fa WHERE fa.id = NEW.fuente_id;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'registros_calidad: la fuente % no existe', NEW.fuente_id
+          USING ERRCODE = 'foreign_key_violation';
+      END IF;
+    ELSE
+      -- CONTRATO DE USUARIO (anon/authenticated): la fuente se resuelve con la
+      -- funcion acotada, no con un SELECT sobre fuentes_agua, para que un
+      -- `operator` sin `agua.calidad.view` —que la policy de INSERT si autoriza
+      -- a escribir— pueda guardar su analisis; una fuente de otra empresa sigue
+      -- siendo invisible, porque la acotada no devuelve fila.
+      SELECT f.tipo_agua, f.company_id
+        INTO v_tipo_agua, v_company_id
+        FROM public.agua_fuente_de_mi_empresa(NEW.fuente_id) f;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'registros_calidad: la fuente % no existe o no pertenece a la empresa del usuario actual', NEW.fuente_id
+          USING ERRCODE = 'insufficient_privilege',
+                HINT = 'Solo se pueden registrar analisis de fuentes de la propia empresa.';
+      END IF;
     END IF;
   END IF;
 
@@ -230,6 +329,19 @@ BEGIN
 END;
 $cuerpo_trg$;
 
+  -- Los DOS unicos cuerpos aceptados de calcular_cumplimiento_calidad(text,
+  -- jsonb, uuid). Produccion y la cadena del repo difieren (drift declarado en
+  -- #826, grupo «funcion:calcular_cumplimiento_calidad(..., p_company_id uuid)»),
+  -- asi que se listan las dos variantes exactas y ninguna mas.
+  c_md5_fn3 constant text[] := ARRAY[
+    'd5c8752a1fab4f6d740b5b92e8f243e0',  -- produccion nnsqmeigtgewatameexo (1618 bytes)
+    '892fa2f9e3702fee72b280434fb3aad8'   -- 20260605160000 del repo: Preview, replay y arnes (2321 bytes)
+  ];
+  c_args_fn3 constant text := 'p_tipo_agua text, p_parametros jsonb, p_company_id uuid';
+  -- La policy de SELECT de calidad_tipologias, identica en produccion y en el
+  -- repo. El aislamiento de la firma INVOKER depende de ella.
+  c_qual_tip constant text := '((company_id IS NULL) OR (company_id = get_my_company_id()))';
+
   v_tabla   oid := to_regclass('public.registros_calidad')::oid;
   v_fn3     oid := to_regprocedure('public.calcular_cumplimiento_calidad(text, jsonb, uuid)')::oid;
   v_fn2     oid := to_regprocedure('public.calcular_cumplimiento_calidad(text, jsonb)')::oid;
@@ -242,6 +354,10 @@ $cuerpo_trg$;
   v_p       record;
   v_acl     text[];
   v_esp     text[];
+  v_src     text;
+  v_pol     record;
+  v_n1      int;
+  v_n2      int;
 BEGIN
   -- ── 0.1 · El mundo mínimo que S22 y S23 dejaron ───────────────────────────
   IF v_tabla IS NULL THEN
@@ -272,7 +388,94 @@ BEGIN
     RAISE NOTICE 'la sobrecarga (text, jsonb) no existe: la llamada ya no sería ambigua, pero se re-apunta igual a la firma de tres argumentos';
   END IF;
 
-  -- ── 0.2 · El trigger: homónimo en otra tabla ──────────────────────────────
+  -- ── 0.2 · La firma de TRES argumentos, ENTERA, antes de concederle EXECUTE ─
+  -- El bloque 2 le da EXECUTE a `authenticated`. Conceder EXECUTE sobre una
+  -- funcion cuya definicion no se ha mirado es firmar en blanco: aqui se
+  -- comprueba TODO lo que hace que ese GRANT sea seguro y, si algo no cuadra, la
+  -- migracion aborta sin crear funciones, sin re-apuntar el trigger y sin
+  -- conceder nada.
+  SELECT p.prosrc, p.prosecdef, p.provolatile::text AS volatil, p.proconfig,
+         pg_get_userbyid(p.proowner) AS dueno, l.lanname, p.proretset,
+         p.pronargs, p.pronargdefaults,
+         pg_get_function_identity_arguments(p.oid) AS args,
+         pg_get_function_result(p.oid) AS retorno
+    INTO v_p FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang WHERE p.oid = v_fn3;
+
+  IF v_p.lanname <> 'plpgsql' OR v_p.volatil <> 's' OR v_p.prosecdef
+     OR v_p.proconfig IS DISTINCT FROM ARRAY['search_path=""']
+     OR v_p.dueno <> v_dueno
+     OR v_p.args <> c_args_fn3 OR v_p.retorno <> 'jsonb'
+     OR v_p.proretset OR v_p.pronargs <> 3 OR v_p.pronargdefaults <> 1
+  THEN
+    RAISE EXCEPTION 'calcular_cumplimiento_calidad(text, jsonb, uuid) no es la función que esta migración sabe exponer (lenguaje=%, volatilidad=%, definer=%, search_path=%, dueño=%, args=%, retorno=%, setof=%, nargs=%, defaults=%); no se concede EXECUTE ni se toca nada',
+      v_p.lanname, v_p.volatil, v_p.prosecdef,
+      coalesce(array_to_string(v_p.proconfig, ','), '(ninguno)'), v_p.dueno,
+      v_p.args, v_p.retorno, v_p.proretset, v_p.pronargs, v_p.pronargdefaults
+      USING ERRCODE = 'invalid_function_definition',
+            HINT = 'Se espera plpgsql, STABLE, SECURITY INVOKER, search_path vacío, del mismo dueño que aplica la migración, (text, jsonb, uuid DEFAULT NULL) → jsonb.';
+  END IF;
+
+  -- Cuerpo: sólo las dos variantes conocidas, y además se comprueba DE QUÉ están
+  -- hechas. Las dos leen public.calidad_tipologias y ninguna otra relación de
+  -- public; ninguna escribe y ninguna usa SQL dinámico. Eso es lo que hace que
+  -- exponerla a `authenticated` bajo RLS sea seguro.
+  v_src := v_p.prosrc;
+  v_n1 := (length(v_src) - length(replace(v_src, 'public.', ''))) / length('public.');
+  v_n2 := (length(v_src) - length(replace(v_src, 'public.calidad_tipologias', ''))) / length('public.calidad_tipologias');
+  IF NOT (md5(v_src) = ANY (c_md5_fn3)) OR v_n2 = 0 OR v_n1 <> v_n2
+     OR v_src ~* '\m(execute|insert|update|delete|truncate|create|drop|alter|grant|revoke|copy|dblink|pg_read)\M'
+  THEN
+    RAISE EXCEPTION 'el cuerpo de calcular_cumplimiento_calidad(text, jsonb, uuid) no es ninguna de las dos variantes autorizadas (md5=%, referencias a public.=%, de ellas a calidad_tipologias=%); no se concede EXECUTE ni se toca nada',
+      md5(v_src), v_n1, v_n2
+      USING ERRCODE = 'invalid_function_definition',
+            HINT = 'Autorizadas: la variante de producción y la de 20260605160000. Si el cuerpo cambió a propósito, hay que revisarlo y declarar su md5 en una migración posterior.';
+  END IF;
+
+  -- ACL ANTERIOR: la de S23 (dueño + service_role) o la que deja esta misma
+  -- migración al reaplicarse (+ authenticated). Ninguna otra: si alguien ya le
+  -- hubiera dado EXECUTE a anon o a PUBLIC, esta migración no lo bendice.
+  SELECT array_agg(x ORDER BY x) INTO v_acl FROM (
+    SELECT DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS x
+      FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+     WHERE p.oid = v_fn3 AND a.privilege_type = 'EXECUTE') s;
+  SELECT array_agg(x ORDER BY x) INTO v_esp FROM unnest(ARRAY[v_dueno, 'service_role']) x;
+  IF v_acl IS DISTINCT FROM v_esp THEN
+    SELECT array_agg(x ORDER BY x) INTO v_esp FROM unnest(ARRAY[v_dueno, 'authenticated', 'service_role']) x;
+    IF v_acl IS DISTINCT FROM v_esp THEN
+      RAISE EXCEPTION 'la ACL previa de calcular_cumplimiento_calidad(text, jsonb, uuid) es {%} y no una de las dos esperadas ({%} antes de esta migración, {%} al reaplicarla); no se concede EXECUTE ni se toca nada',
+        coalesce(array_to_string(v_acl, ','), 'vacía'),
+        v_dueno || ',service_role', v_dueno || ',authenticated,service_role'
+        USING ERRCODE = 'invalid_grant_operation';
+    END IF;
+  END IF;
+
+  -- El aislamiento de una función INVOKER es la RLS de lo que lee. Sin la RLS de
+  -- calidad_tipologias, o con otra policy de SELECT, `authenticated` pasaría a
+  -- ver por esta función los overrides de otras empresas.
+  IF NOT (SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.calidad_tipologias')) THEN
+    RAISE EXCEPTION 'public.calidad_tipologias no tiene ENABLE ROW LEVEL SECURITY; el aislamiento de la firma de tres argumentos (SECURITY INVOKER) depende de esa RLS'
+      USING ERRCODE = 'invalid_table_definition';
+  END IF;
+  SELECT pol.polcmd::text AS cmd, pol.polpermissive,
+         replace(pg_get_expr(pol.polqual, pol.polrelid), 'public.', '') AS qual,
+         (SELECT array_agg(r.rolname::text ORDER BY r.rolname)
+            FROM unnest(pol.polroles) rr JOIN pg_roles r ON r.oid = rr) AS roles
+    INTO v_pol
+    FROM pg_policy pol
+   WHERE pol.polrelid = to_regclass('public.calidad_tipologias')
+     AND pol.polname = 'calidad_tipologias_select';
+  IF NOT FOUND OR v_pol.cmd <> 'r' OR NOT v_pol.polpermissive
+     OR v_pol.qual IS DISTINCT FROM c_qual_tip
+     OR v_pol.roles IS DISTINCT FROM ARRAY['authenticated']
+  THEN
+    RAISE EXCEPTION 'la policy calidad_tipologias_select no es la esperada (cmd=%, permisiva=%, roles={%}, USING=%); no se concede EXECUTE ni se toca nada',
+      coalesce(v_pol.cmd, '(no existe)'), v_pol.polpermissive,
+      coalesce(array_to_string(v_pol.roles, ','), 'ninguno'), coalesce(v_pol.qual, '(ninguna)')
+      USING ERRCODE = 'invalid_table_definition',
+            HINT = 'Se espera FOR SELECT TO authenticated USING (company_id IS NULL OR company_id = get_my_company_id()), la de 20260605160000.';
+  END IF;
+
+  -- ── 0.3 · El trigger: homónimo en otra tabla ──────────────────────────────
   FOR v_trg IN
     SELECT c.relname, n.nspname
       FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -282,7 +485,7 @@ BEGIN
       v_trg.nspname, v_trg.relname USING ERRCODE = 'duplicate_object';
   END LOOP;
 
-  -- ── 0.3 · El trigger sobre la tabla: uno de DOS estados exactos ───────────
+  -- ── 0.4 · El trigger sobre la tabla: uno de DOS estados exactos ───────────
   -- Se leen TODAS las celdas, tgenabled y tgattr incluidos. Un trigger
   -- deshabilitado ('D', 'R' o 'A') o con otro UPDATE OF no es ninguno de los
   -- dos estados que esta migración sabe leer: aborta sin tocar nada.
@@ -316,7 +519,7 @@ BEGIN
             HINT = 'Se esperaba el trigger de 20260603140000 (UPDATE OF fuente_id, parametros) o el de esta migración, habilitado (tgenabled = O).';
   END IF;
 
-  -- ── 0.4 · Las funciones que esta migración crea: o no existen, o son EXACTAS
+  -- ── 0.5 · Las funciones que esta migración crea: o no existen, o son EXACTAS
   IF v_fuente IS NOT NULL THEN
     SELECT p.prosrc, p.prosecdef, p.provolatile::text AS volatil, p.proconfig,
            pg_get_userbyid(p.proowner) AS dueno, l.lanname,
@@ -327,7 +530,7 @@ BEGIN
       SELECT DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS x
         FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
        WHERE p.oid = v_fuente AND a.privilege_type = 'EXECUTE') s;
-    SELECT array_agg(x ORDER BY x) INTO v_esp FROM unnest(ARRAY[v_dueno, 'authenticated', 'service_role']) x;
+    SELECT array_agg(x ORDER BY x) INTO v_esp FROM unnest(ARRAY[v_dueno, 'authenticated']) x;
     IF v_p.prosrc IS DISTINCT FROM c_cuerpo_fuente OR NOT v_p.prosecdef OR v_p.volatil <> 's'
        OR v_p.lanname <> 'sql' OR v_p.proconfig IS DISTINCT FROM ARRAY['search_path=""']
        OR v_p.dueno <> v_dueno OR v_acl IS DISTINCT FROM v_esp
@@ -367,7 +570,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- ── 0.5 · Instalación (lo que se instala es lo que se acaba de comparar) ──
+  -- ── 0.6 · Instalación (lo que se instala es lo que se acaba de comparar) ──
   EXECUTE format(
     'CREATE OR REPLACE FUNCTION public.agua_fuente_de_mi_empresa(p_fuente_id uuid) '
     'RETURNS TABLE(tipo_agua text, company_id uuid) LANGUAGE sql STABLE SECURITY DEFINER '
@@ -378,9 +581,14 @@ BEGIN
     'SET search_path = %L AS %L', '', c_cuerpo_trg);
 
   -- La acotada la invoca el trigger INVOKER, o sea el usuario que inserta: hace
-  -- falta EXECUTE para `authenticated`. Nunca para PUBLIC ni anon.
-  REVOKE EXECUTE ON FUNCTION public.agua_fuente_de_mi_empresa(uuid) FROM PUBLIC, anon;
-  GRANT  EXECUTE ON FUNCTION public.agua_fuente_de_mi_empresa(uuid) TO authenticated, service_role;
+  -- falta EXECUTE para `authenticated`. Nunca para PUBLIC ni anon. Y TAMPOCO
+  -- para service_role: la acotada responde «mi empresa», que se deriva del JWT,
+  -- y service_role no tiene JWT, asi que para el siempre devolveria cero filas.
+  -- Los actores privilegiados no pasan por aqui: el trigger los manda por la
+  -- rama que lee fuentes_agua con sus propios permisos. Dejarle el GRANT seria
+  -- anunciar un soporte que no existe.
+  REVOKE EXECUTE ON FUNCTION public.agua_fuente_de_mi_empresa(uuid) FROM PUBLIC, anon, service_role;
+  GRANT  EXECUTE ON FUNCTION public.agua_fuente_de_mi_empresa(uuid) TO authenticated;
   -- Una función de trigger no se invoca directamente (sólo la dispara Postgres,
   -- que comprueba el EXECUTE en CREATE TRIGGER y no en cada disparo). Misma ACL
   -- que sellar_actor(): sin PUBLIC, anon ni authenticated.
@@ -423,6 +631,8 @@ DECLARE
   v_cols   text[];
   v_n      int;
   v_rol    text;
+  v_aclp   text[];
+  v_espp   text[];
 BEGIN
   IF v_nueva IS NULL OR v_fuente IS NULL THEN
     RAISE EXCEPTION 'postcondición: falta trg_registros_calidad_cumplimiento_catalogo() o agua_fuente_de_mi_empresa(uuid)';
@@ -501,10 +711,31 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
     IF NOT has_function_privilege('service_role', v_fn3, 'EXECUTE')
-       OR NOT has_function_privilege('service_role', v_nueva, 'EXECUTE')
-       OR NOT has_function_privilege('service_role', v_fuente, 'EXECUTE') THEN
-      RAISE EXCEPTION 'postcondición: service_role NO puede ejecutar alguna de las funciones declaradas';
+       OR NOT has_function_privilege('service_role', v_nueva, 'EXECUTE') THEN
+      RAISE EXCEPTION 'postcondición: service_role NO puede ejecutar calcular_cumplimiento_calidad(text, jsonb, uuid) o la función de trigger';
     END IF;
+    IF has_function_privilege('service_role', v_fuente, 'EXECUTE') THEN
+      RAISE EXCEPTION 'postcondición: service_role conserva EXECUTE sobre agua_fuente_de_mi_empresa(uuid); para él siempre devolvería cero filas y no es su camino';
+    END IF;
+  END IF;
+
+  -- ACL POSTERIOR de la firma de tres argumentos: el conjunto exacto de quienes
+  -- pueden ejecutarla, ni uno más.
+  SELECT array_agg(x ORDER BY x) INTO v_aclp FROM (
+    SELECT DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS x
+      FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+     WHERE p.oid = v_fn3 AND a.privilege_type = 'EXECUTE') s;
+  SELECT array_agg(x ORDER BY x) INTO v_espp
+    FROM unnest(ARRAY[(SELECT pg_get_userbyid(proowner) FROM pg_proc WHERE oid = v_fn3),
+                      'authenticated', 'service_role']) x;
+  IF v_aclp IS DISTINCT FROM v_espp THEN
+    RAISE EXCEPTION 'postcondición: la ACL de calcular_cumplimiento_calidad(text, jsonb, uuid) quedó en {%} y debía ser {%}',
+      coalesce(array_to_string(v_aclp, ','), 'vacía'), array_to_string(v_espp, ',');
+  END IF;
+
+  -- Y la RLS de la que depende su aislamiento sigue en pie.
+  IF NOT (SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.calidad_tipologias')) THEN
+    RAISE EXCEPTION 'postcondición: public.calidad_tipologias se quedó sin RLS';
   END IF;
 
   -- La forma exacta de la llamada que hace el trigger resuelve sin 42725.

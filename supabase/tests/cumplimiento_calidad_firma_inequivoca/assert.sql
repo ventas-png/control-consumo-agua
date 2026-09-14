@@ -126,7 +126,7 @@ BEGIN
   PERFORM public.chk(has_function_privilege('public',        v_fuente, 'EXECUTE'), false, 'PUBLIC        NO ejecuta agua_fuente_de_mi_empresa(uuid)');
   PERFORM public.chk(has_function_privilege('anon',          v_fuente, 'EXECUTE'), false, 'anon          NO ejecuta agua_fuente_de_mi_empresa(uuid)');
   PERFORM public.chk(has_function_privilege('authenticated', v_fuente, 'EXECUTE'), true,  'authenticated SÍ ejecuta agua_fuente_de_mi_empresa(uuid)');
-  PERFORM public.chk(has_function_privilege('service_role',  v_fuente, 'EXECUTE'), true,  'service_role  SÍ ejecuta agua_fuente_de_mi_empresa(uuid)');
+  PERFORM public.chk(has_function_privilege('service_role',  v_fuente, 'EXECUTE'), false, 'service_role  NO ejecuta agua_fuente_de_mi_empresa(uuid): sin JWT siempre daría cero filas, su camino es el privilegiado');
 
   -- El aislamiento está EN EL CUERPO de la acotada, no sólo en la RLS.
   PERFORM public.chk((SELECT prosrc LIKE '%get_my_company_id%' FROM pg_proc WHERE oid = v_fuente), true,
@@ -135,11 +135,98 @@ BEGIN
   -- Y el trigger NO lee fuentes_agua directamente: ésa es la corrección.
   PERFORM public.chk((SELECT prosrc LIKE '%agua_fuente_de_mi_empresa%' FROM pg_proc WHERE oid = v_nueva), true,
     'el trigger resuelve la fuente con la función acotada');
-  PERFORM public.chk((SELECT prosrc LIKE '%FROM public.fuentes_agua%' FROM pg_proc WHERE oid = v_nueva), false,
-    'el trigger NO hace un SELECT amplio sobre fuentes_agua');
+  -- El SELECT sobre fuentes_agua existe, pero SÓLO detrás del cheque de la rama
+  -- privilegiada: el camino de anon/authenticated no pasa por ahí.
+  PERFORM public.chk((SELECT (length(prosrc) - length(replace(prosrc, 'FROM public.fuentes_agua', '')))
+                             / length('FROM public.fuentes_agua') FROM pg_proc WHERE oid = v_nueva), 1,
+    'el trigger lee fuentes_agua en UN solo sitio');
+  PERFORM public.chk((SELECT position('rolbypassrls' in prosrc) > 0
+                        AND position('rolbypassrls' in prosrc) < position('FROM public.fuentes_agua' in prosrc)
+                       FROM pg_proc WHERE oid = v_nueva), true,
+    'y ese SELECT va DESPUÉS del cheque de rolsuper/rolbypassrls: es la rama privilegiada');
+  PERFORM public.chk((SELECT position('FROM public.fuentes_agua' in prosrc) < position('agua_fuente_de_mi_empresa(NEW.fuente_id)' in prosrc)
+                       FROM pg_proc WHERE oid = v_nueva), true,
+    'la rama de usuario es la otra, y resuelve por la función acotada');
 
   -- Las policies de fuentes_agua no se han tocado: nada de USING (true).
   PERFORM public.chk((SELECT count(*) FROM pg_policies
     WHERE tablename = 'fuentes_agua' AND cmd = 'SELECT' AND qual LIKE '%user_has_permission%'), 1,
     'fuentes_agua_select sigue exigiendo agua.calidad.view (no se abrió la tabla)');
+END $$;
+
+
+-- ── La rama privilegiada y lo que la migración exigió antes de conceder ──────
+DO $$
+DECLARE
+  v_fn3    oid := to_regprocedure('public.calcular_cumplimiento_calidad(text, jsonb, uuid)')::oid;
+  v_nueva  oid := to_regprocedure('public.trg_registros_calidad_cumplimiento_catalogo()')::oid;
+  v_fuente oid := to_regprocedure('public.agua_fuente_de_mi_empresa(uuid)')::oid;
+  v_src    text;
+  v_acl    text[];
+  v_pol    record;
+BEGIN
+  -- El predicado del contrato privilegiado vive en la función de trigger, que
+  -- es SECURITY INVOKER: es el único sitio donde CURRENT_USER es el invocador.
+  v_src := (SELECT prosrc FROM pg_proc WHERE oid = v_nueva);
+  PERFORM public.chk(v_src LIKE '%pg_catalog.pg_roles%' AND v_src LIKE '%rolbypassrls%', true,
+    'el trigger decide la rama privilegiada con rolsuper/rolbypassrls sobre pg_catalog.pg_roles');
+  PERFORM public.chk(v_src LIKE '%CURRENT_USER%', true,
+    'y lo hace sobre CURRENT_USER, en una función SECURITY INVOKER');
+  PERFORM public.chk(v_src LIKE '%FROM public.fuentes_agua fa%', true,
+    'la rama privilegiada lee fuentes_agua con los permisos del propio invocador');
+  PERFORM public.chk(v_src LIKE '%agua_fuente_de_mi_empresa%', true,
+    'y la rama de usuario sigue pasando por la función acotada');
+  -- La acotada NO mira current_user: allí sería el dueño y el cheque sería un bypass.
+  PERFORM public.chk((SELECT prosrc ILIKE '%current_user%' FROM pg_proc WHERE oid = v_fuente), false,
+    'la SECURITY DEFINER no mira current_user (allí es el dueño, no el invocador)');
+
+  -- La firma de tres argumentos, tal como la migración exige verla ANTES de
+  -- concederle EXECUTE a authenticated.
+  PERFORM public.chk_txt((SELECT l.lanname FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang WHERE p.oid = v_fn3),
+    'plpgsql', 'calcular_cumplimiento_calidad(text, jsonb, uuid) · plpgsql');
+  PERFORM public.chk_txt((SELECT provolatile::text FROM pg_proc WHERE oid = v_fn3), 's',
+    'calcular_cumplimiento_calidad(text, jsonb, uuid) · STABLE');
+  PERFORM public.chk((SELECT prosecdef FROM pg_proc WHERE oid = v_fn3), false,
+    'calcular_cumplimiento_calidad(text, jsonb, uuid) · SECURITY INVOKER');
+  PERFORM public.chk_txt((SELECT array_to_string(proconfig, ';') FROM pg_proc WHERE oid = v_fn3), 'search_path=""',
+    'calcular_cumplimiento_calidad(text, jsonb, uuid) · search_path = ''''');
+  PERFORM public.chk_txt((SELECT pg_get_function_identity_arguments(v_fn3)),
+    'p_tipo_agua text, p_parametros jsonb, p_company_id uuid',
+    'calcular_cumplimiento_calidad(text, jsonb, uuid) · argumentos exactos');
+  PERFORM public.chk_txt((SELECT pg_get_function_result(v_fn3)), 'jsonb',
+    'calcular_cumplimiento_calidad(text, jsonb, uuid) · devuelve jsonb, no SETOF');
+  PERFORM public.chk((SELECT pronargs::bigint FROM pg_proc WHERE oid = v_fn3), 3,
+    'calcular_cumplimiento_calidad(text, jsonb, uuid) · 3 argumentos');
+  PERFORM public.chk((SELECT pronargdefaults::bigint FROM pg_proc WHERE oid = v_fn3), 1,
+    'calcular_cumplimiento_calidad(text, jsonb, uuid) · 1 DEFAULT (el que causaba el 42725)');
+  -- Cuerpo: sólo lee calidad_tipologias, y nada más de public.
+  v_src := (SELECT prosrc FROM pg_proc WHERE oid = v_fn3);
+  PERFORM public.chk(
+    ((length(v_src) - length(replace(v_src, 'public.', ''))) / length('public.'))
+      = ((length(v_src) - length(replace(v_src, 'public.calidad_tipologias', ''))) / length('public.calidad_tipologias')),
+    true, 'su cuerpo no referencia ninguna relación de public salvo calidad_tipologias');
+  PERFORM public.chk(v_src ~* '\m(execute|insert|update|delete|truncate|create|drop|alter|grant|revoke|copy|dblink|pg_read)\M',
+    false, 'su cuerpo no escribe ni usa SQL dinámico');
+
+  -- ACL posterior: el conjunto exacto.
+  SELECT array_agg(x ORDER BY x) INTO v_acl FROM (
+    SELECT DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS x
+      FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+     WHERE p.oid = v_fn3 AND a.privilege_type = 'EXECUTE') s;
+  PERFORM public.chk_txt(array_to_string(v_acl, ','), 'authenticated,postgres,service_role',
+    'la ACL de calcular_cumplimiento_calidad(text, jsonb, uuid) es exactamente {authenticated, postgres, service_role}');
+
+  -- Y la RLS de la que depende su aislamiento.
+  PERFORM public.chk((SELECT relrowsecurity FROM pg_class WHERE oid = 'public.calidad_tipologias'::regclass), true,
+    'calidad_tipologias conserva la RLS: sin ella la firma INVOKER filtraría overrides ajenos');
+  SELECT pol.polcmd::text AS cmd, pol.polpermissive,
+         replace(pg_get_expr(pol.polqual, pol.polrelid), 'public.', '') AS qual,
+         (SELECT array_agg(r.rolname::text ORDER BY r.rolname) FROM unnest(pol.polroles) rr JOIN pg_roles r ON r.oid = rr) AS roles
+    INTO v_pol FROM pg_policy pol
+   WHERE pol.polrelid = 'public.calidad_tipologias'::regclass AND pol.polname = 'calidad_tipologias_select';
+  PERFORM public.chk_txt(v_pol.cmd, 'r', 'calidad_tipologias_select sigue siendo la policy de SELECT');
+  PERFORM public.chk(v_pol.polpermissive, true, 'calidad_tipologias_select sigue siendo permisiva');
+  PERFORM public.chk_txt(array_to_string(v_pol.roles, ','), 'authenticated', 'calidad_tipologias_select sigue siendo TO authenticated');
+  PERFORM public.chk_txt(v_pol.qual, '((company_id IS NULL) OR (company_id = get_my_company_id()))',
+    'calidad_tipologias_select conserva su USING exacto');
 END $$;

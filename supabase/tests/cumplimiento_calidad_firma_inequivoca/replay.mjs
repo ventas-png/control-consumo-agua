@@ -25,7 +25,7 @@
 //      real, porque la fuente la resuelve agua_fuente_de_mi_empresa(uuid) y no
 //      un SELECT amplio sobre la tabla. La fuente de otra empresa le sigue
 //      dando 42501 y LEER registros_calidad le sigue estando vedado.
-//   6. FAIL-CLOSED: siete mutantes del estado previo (trigger deshabilitado,
+//   6. FAIL-CLOSED: doce mutantes del estado previo (trigger deshabilitado,
 //      UPDATE OF alterado, función homónima con otro cuerpo, con otra ACL, la
 //      acotada con otra ACL, en SECURITY INVOKER o sin search_path) hacen que
 //      la migración ABORTE sin modificar una sola celda del esquema.
@@ -56,7 +56,7 @@ let fallos = 0
 const ok = (m) => console.log(`  OK    ${m}`)
 const mal = (m) => { console.error(`  ✗     ${m}`); fallos++ }
 
-console.log('── 1/8 · la cadena completa desde cero, con privilegios de Supabase Branch ──')
+console.log('── 1/9 · la cadena completa desde cero, con privilegios de Supabase Branch ──')
 const db = reconstruir({ bootstrap: 'bootstrap-branch.sql' })
 try {
   if (db.fallos.length > 0) {
@@ -69,7 +69,7 @@ try {
   const sql = (q) => db.psql(['-qtAF', '|', '-v', 'ON_ERROR_STOP=1', '-c', q], { stdio: 'pipe' }).trim()
   const ejecutar = (q) => db.psql(['-q', '-v', 'ON_ERROR_STOP=1', '-c', q], { stdio: 'pipe' })
 
-  console.log('── 2/8 · el trigger y la ACL, celda por celda, en pg_catalog ───────────')
+  console.log('── 2/9 · el trigger y la ACL, celda por celda, en pg_catalog ───────────')
   const celdas = () => sql(`
     SET search_path = public;
     SELECT count(*) OVER (), t.oid, t.tgrelid::regclass, t.tgfoid::regprocedure, t.tgfoid, t.tgtype, t.tgenabled, t.tgnargs,
@@ -114,13 +114,40 @@ try {
   // aquí (DEFINER, STABLE, search_path '', sin PUBLIC ni anon) y su cuerpo en
   // assert.sql (filtra por get_my_company_id(), no acepta company_id del cliente).
   const aclFuente = acl('public.agua_fuente_de_mi_empresa(uuid)')
-  if (aclFuente === 't|s|f|f|t|t') ok('agua_fuente_de_mi_empresa(uuid): DEFINER · STABLE · PUBLIC=false · anon=false · authenticated=true · service_role=true')
-  else mal(`agua_fuente_de_mi_empresa(uuid): ${aclFuente} (esperado t|s|f|f|t|t)`)
+  if (aclFuente === 't|s|f|f|t|f') ok('agua_fuente_de_mi_empresa(uuid): DEFINER · STABLE · PUBLIC=false · anon=false · authenticated=true · service_role=false (sin JWT siempre daría cero filas)')
+  else mal(`agua_fuente_de_mi_empresa(uuid): ${aclFuente} (esperado t|s|f|f|t|f)`)
+  // La firma de tres argumentos, tal como la migración exige verla ANTES de
+  // concederle EXECUTE a authenticated.
+  const fn3 = sql(`
+    SELECT l.lanname || '|' || p.provolatile::text || '|' || p.prosecdef::text || '|' || array_to_string(p.proconfig, ';')
+        || '|' || pg_get_function_identity_arguments(p.oid) || '|' || pg_get_function_result(p.oid)
+        || '|' || p.proretset::text || '|' || p.pronargs || '|' || p.pronargdefaults
+      FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
+     WHERE p.oid = 'public.calcular_cumplimiento_calidad(text, jsonb, uuid)'::regprocedure`)
+  const fn3esp = 'plpgsql|s|false|search_path=""|p_tipo_agua text, p_parametros jsonb, p_company_id uuid|jsonb|false|3|1'
+  if (fn3 === fn3esp) ok('calcular_cumplimiento_calidad(text, jsonb, uuid): plpgsql · STABLE · INVOKER · search_path=\'\' · args y retorno exactos · 3 argumentos con 1 DEFAULT')
+  else mal(`calcular_cumplimiento_calidad(text, jsonb, uuid): ${fn3}\n        esperado ${fn3esp}`)
+  const cuerpoFn3 = sql(`
+    SELECT ((length(prosrc) - length(replace(prosrc, 'public.', ''))) / length('public.'))
+        || '|' || ((length(prosrc) - length(replace(prosrc, 'public.calidad_tipologias', ''))) / length('public.calidad_tipologias'))
+        || '|' || (prosrc ~* '\\m(execute|insert|update|delete|truncate|create|drop|alter|grant|revoke|copy|dblink|pg_read)\\M')::text
+      FROM pg_proc WHERE oid = 'public.calcular_cumplimiento_calidad(text, jsonb, uuid)'::regprocedure`)
+  if (cuerpoFn3 === '3|3|false') ok('su cuerpo sólo lee public.calidad_tipologias (3 referencias, ninguna otra relación) y no escribe ni usa SQL dinámico')
+  else mal(`el cuerpo de la firma de tres argumentos no es el esperado (public.=|calidad_tipologias=|prohibidas = ${cuerpoFn3}, esperado 3|3|false)`)
+  const tip = sql(`
+    SELECT (SELECT c.relrowsecurity::text FROM pg_class c WHERE c.oid = 'public.calidad_tipologias'::regclass)
+        || '|' || coalesce((SELECT pol.polcmd::text || '|' || pol.polpermissive::text
+             || '|' || (SELECT string_agg(r.rolname, ',' ORDER BY r.rolname) FROM unnest(pol.polroles) rr JOIN pg_roles r ON r.oid = rr)
+             || '|' || replace(pg_get_expr(pol.polqual, pol.polrelid), 'public.', '')
+             FROM pg_policy pol WHERE pol.polrelid = 'public.calidad_tipologias'::regclass AND pol.polname = 'calidad_tipologias_select'), '(sin policy)')`)
+  const tipEsp = 'true|r|true|authenticated|((company_id IS NULL) OR (company_id = get_my_company_id()))'
+  if (tip === tipEsp) ok('calidad_tipologias conserva RLS y su policy de SELECT exacta: es de lo que depende el aislamiento de la INVOKER')
+  else mal(`calidad_tipologias: ${tip}\n        esperado ${tipEsp}`)
   const fuenteConf = sql(`SELECT array_to_string(proconfig, ';') || '|' || pg_get_function_result(oid) || '|' || pg_get_function_identity_arguments(oid)
       FROM pg_proc WHERE oid = 'public.agua_fuente_de_mi_empresa(uuid)'::regprocedure`)
   if (fuenteConf === 'search_path=""|TABLE(tipo_agua text, company_id uuid)|p_fuente_id uuid') ok('agua_fuente_de_mi_empresa(uuid): search_path=\'\' · devuelve sólo (tipo_agua, company_id) · toma sólo la fuente, nunca un company_id del cliente')
   else mal(`agua_fuente_de_mi_empresa(uuid): proconfig|result|args = ${fuenteConf}`)
-  console.log('── 3/8 · re-aplicar la migración sobre el esquema reconstruido: no-op ──')
+  console.log('── 3/9 · re-aplicar la migración sobre el esquema reconstruido: no-op ──')
   const aplicarMigracion = () => spawnSync(join(binarios(), 'psql'), ['-v', 'ON_ERROR_STOP=1', '-q', '-1', '-f', MIGRACION],
     { encoding: 'utf8', env: { ...db.entorno, PGOPTIONS: '-c client_min_messages=warning' } })
   const oidsFn = () => sql(`SELECT to_regprocedure('public.trg_registros_calidad_cumplimiento_catalogo()')::oid || '|' || to_regprocedure('public.agua_fuente_de_mi_empresa(uuid)')::oid`)
@@ -136,7 +163,7 @@ try {
   if (oidsFn() === oidsAntes) ok(`mismos OIDs de las dos funciones nuevas tras re-aplicar (${oidsAntes})`)
   else mal(`los OIDs de las funciones nuevas cambiaron (${oidsAntes} → ${oidsFn()})`)
 
-  console.log('── 4/8 · comportamiento real como authenticated administrativo ─────────')
+  console.log('── 4/9 · comportamiento real como authenticated administrativo ─────────')
   // Dos tenants y un admin de cada uno, dentro de la MISMA transacción que las
   // pruebas; al final ROLLBACK. Los usuarios existen en auth.users porque
   // trg_sellar_creado_por sella created_by = auth.uid() con FK a auth.users.
@@ -228,7 +255,7 @@ try {
   esperaPrefijo('r_anon_fuente', '42501', 'anon · tampoco puede llamar a agua_fuente_de_mi_empresa(uuid): la DEFINER no se regala')
   espera('restantes', '0', 'la transacción se revirtió: no queda ninguna fila')
 
-  console.log('── 5/8 · EL CONTRATO: operator de la empresa SIN agua.calidad.view ─────')
+  console.log('── 5/9 · EL CONTRATO: operator de la empresa SIN agua.calidad.view ─────')
   // Con el RBAC REAL de la cadena. `operator` no es administrativo, así que
   // user_has_permission('agua.calidad.view') sólo le da true si tiene una fila
   // en user_roles → role_permissions. Se siembran dos: el del hallazgo (sin el
@@ -308,7 +335,56 @@ try {
   espera('ctl_fila', 'false', 'control · el servidor le recalculó pH 9.5 → false al editar')
   espera('op_restantes', '0', 'la transacción de RBAC se revirtió')
 
-  console.log('── 6/8 · FAIL-CLOSED: siete mutantes abortan sin tocar nada ────────────')
+  console.log('── 6/9 · EL CONTRATO PRIVILEGIADO: postgres y service_role, sin JWT ────')
+  // Sin JWT, get_my_company_id() e is_super_admin() son NULL y la acotada no
+  // devolvería ninguna fuente: sin la rama privilegiada, todo INSERT/UPDATE con
+  // fuente_id no nula de un backfill o de la service key moriría con 42501.
+  const priv = `
+    BEGIN;
+    INSERT INTO public.companies (id, nombre) VALUES ('${A}', 'Empresa A'), ('${B}', 'Empresa B');
+    INSERT INTO public.fuentes_agua (id, identificador, nombre, tipo_agua, company_id) VALUES
+      ('${FA}', 'FA_POT', 'Tanque potable A', 'potable', '${A}'),
+      ('${FB}', 'FB_POT', 'Tanque potable B', 'potable', '${B}');
+    INSERT INTO public.calidad_tipologias (tipo_agua, company_id, label, parametros, activo) VALUES
+      ('potable', '${B}', 'Potable (B)', '[{"key":"pH","label":"pH","unidad":"","min":7.0,"max":7.2}]'::jsonb, true);
+    SELECT 'pred=' || (SELECT string_agg(rolname || ':' || (rolsuper OR rolbypassrls)::text, ' ' ORDER BY rolname)
+      FROM pg_catalog.pg_roles WHERE rolname IN ('postgres', 'service_role', 'authenticated', 'anon'));
+
+    ${caso('pg_insert', `INSERT INTO public.registros_calidad (id, fuente_id, parametros, company_id, cumplimiento, cumple_total)
+      VALUES ('${RA}', '${FA}', '{"pH": 7.5, "turbiedad": 2}'::jsonb, '${A}', '{"pH": false}'::jsonb, false);`)}
+    SELECT 'pg_fila=' || coalesce((SELECT cumple_total::text || ' ' || (cumplimiento ->> 'pH') || ' ' || (SELECT count(*) FROM jsonb_object_keys(cumplimiento))::text
+      FROM public.registros_calidad WHERE id = '${RA}'), 'sin-fila');
+    ${caso('pg_update', `UPDATE public.registros_calidad SET parametros = '{"pH": 9.5}'::jsonb WHERE id = '${RA}';`)}
+    SELECT 'pg_tras_update=' || coalesce((SELECT cumple_total::text || ' ' || (cumplimiento ->> 'pH') FROM public.registros_calidad WHERE id = '${RA}'), 'sin-fila');
+    ${caso('pg_inexistente', `INSERT INTO public.registros_calidad (fuente_id, parametros, company_id)
+      VALUES ('00000000-0000-4000-8000-000000000000', '{}'::jsonb, '${A}');`)}
+
+    RESET ROLE; SET LOCAL ROLE service_role;
+    SELECT 'sr_super=' || (SELECT rolsuper::text FROM pg_catalog.pg_roles WHERE rolname = CURRENT_USER);
+    ${caso('sr_insert', `INSERT INTO public.registros_calidad (id, fuente_id, parametros, company_id)
+      VALUES ('${RB}', '${FB}', '{"pH": 7.5}'::jsonb, '${B}');`)}
+    ${caso('sr_acotada', `PERFORM * FROM public.agua_fuente_de_mi_empresa('${FB}');`)}
+    RESET ROLE;
+    SELECT 'sr_fila=' || coalesce((SELECT cumple_total::text || ' ' || (SELECT count(*) FROM jsonb_object_keys(cumplimiento))::text
+      FROM public.registros_calidad WHERE id = '${RB}'), 'sin-fila');
+    ${volcar(['pg_insert', 'pg_update', 'pg_inexistente', 'sr_insert', 'sr_acotada'])}
+    ROLLBACK;
+    SELECT 'priv_restantes=' || ((SELECT count(*) FROM public.registros_calidad) + (SELECT count(*) FROM public.fuentes_agua));`
+  correr(priv, 'la transacción del contrato privilegiado')
+  espera('pred', 'anon:false authenticated:false postgres:true service_role:true',
+    'el predicado rolsuper/rolbypassrls separa a los privilegiados de los roles de la API')
+  espera('r_pg_insert', 'OK', 'sesión administrativa · INSERT con fuente_id no nula (antes de esta corrección: 42501)')
+  espera('pg_fila', 'true true 11', 'sesión administrativa · con el cálculo REAL (11 claves del global) y pisando el pH=false del cliente')
+  espera('r_pg_update', 'OK', 'sesión administrativa · UPDATE de parametros')
+  espera('pg_tras_update', 'false false', 'sesión administrativa · y el servidor recalcula: pH 9.5 → false')
+  esperaPrefijo('r_pg_inexistente', '23503 registros_calidad: la fuente', 'sesión administrativa · fuente inexistente → 23503, no 42501: para ella no hay nada oculto')
+  espera('sr_super', 'false', 'service_role NO es superusuario: la rama la abre rolbypassrls, como en producción')
+  espera('r_sr_insert', 'OK', 'service_role · INSERT con la fuente de OTRA empresa, legítimo para un actor de servicio')
+  espera('sr_fila', 'false 1', 'service_role · con el override de la empresa DE LA FUENTE (la única clave de B), no las 11 del global')
+  esperaPrefijo('r_sr_acotada', '42501', 'service_role · no tiene EXECUTE sobre la acotada: su camino no es ése')
+  espera('priv_restantes', '0', 'la transacción del contrato privilegiado se revirtió')
+
+  console.log('── 7/9 · FAIL-CLOSED: doce mutantes abortan sin tocar nada ────────────')
   // La huella cubre lo que la precondición promete mirar: cuerpo, ACL, dueño y
   // SECURITY de las dos funciones nuevas, y la definición y el estado del
   // trigger. Si la migración abortara «a medias», esta huella cambiaría.
@@ -317,7 +393,12 @@ try {
              FROM pg_proc p WHERE p.oid = to_regprocedure('public.trg_registros_calidad_cumplimiento_catalogo()')), 'sin-fn')
         || ' ~ ' || coalesce((SELECT md5(p.prosrc) || ' ' || coalesce(array_to_string(p.proacl::text[], ','), '-') || ' ' || pg_get_userbyid(p.proowner) || ' ' || p.prosecdef::text || ' ' || coalesce(array_to_string(p.proconfig, ';'), '-')
              FROM pg_proc p WHERE p.oid = to_regprocedure('public.agua_fuente_de_mi_empresa(uuid)')), 'sin-acotada')
-        || ' ~ ' || coalesce((SELECT pg_get_triggerdef(t.oid) || ' ' || t.tgenabled::text FROM pg_trigger t WHERE t.tgname = 'registros_calidad_cumplimiento' AND NOT t.tgisinternal), 'sin-trigger')`)
+        || ' ~ ' || coalesce((SELECT pg_get_triggerdef(t.oid) || ' ' || t.tgenabled::text FROM pg_trigger t WHERE t.tgname = 'registros_calidad_cumplimiento' AND NOT t.tgisinternal), 'sin-trigger')
+        || ' ~ ' || coalesce((SELECT md5(p.prosrc) || ' ' || coalesce(p.proacl::text, '-') || ' ' || p.provolatile::text || ' ' || p.prosecdef::text || ' ' || coalesce(array_to_string(p.proconfig, ';'), '-') || ' ' || pg_get_userbyid(p.proowner)
+             FROM pg_proc p WHERE p.oid = to_regprocedure('public.calcular_cumplimiento_calidad(text, jsonb, uuid)')), 'sin-fn3')
+        || ' ~ ' || (SELECT c.relrowsecurity::text FROM pg_class c WHERE c.oid = 'public.calidad_tipologias'::regclass)
+        || ' ' || coalesce((SELECT pol.polcmd::text || pg_get_expr(pol.polqual, pol.polrelid)
+             FROM pg_policy pol WHERE pol.polrelid = 'public.calidad_tipologias'::regclass AND pol.polname = 'calidad_tipologias_select'), 'sin-policy')`)
   const intacta = huella()
   const failClosed = (nombre, mutar, restaurar, fragmento) => {
     try { ejecutar(mutar) } catch (err) { mal(`${nombre}: no se pudo instalar el mutante:\n        ${String(err.stderr ?? err.message).trim().split('\n').slice(-2).join('\n')}`); return }
@@ -368,12 +449,38 @@ try {
     'ALTER FUNCTION public.agua_fuente_de_mi_empresa(uuid) RESET search_path;',
     `ALTER FUNCTION public.agua_fuente_de_mi_empresa(uuid) SET search_path = '';`,
     'ya existe public.agua_fuente_de_mi_empresa(uuid) con OTRA definición')
-  const tras = aplicarMigracion()
-  if (tras.status !== 0) mal(`tras los siete mutantes la migración ya no aplica:\n${String(tras.stderr ?? '').trim().split('\n').slice(-3).join('\n')}`)
-  else if (huella() !== intacta) mal('tras los siete mutantes el esquema no volvió al original')
-  else ok('tras los siete mutantes el esquema es idéntico y la migración vuelve a aplicar como no-op')
+  // Y los que atacan justo lo que la migración valida ANTES de conceder EXECUTE.
+  failClosed('mutante 8 · la firma de tres argumentos con OTRO cuerpo',
+    `CREATE TABLE public._respaldo_fn3 AS SELECT prosrc FROM pg_proc WHERE oid = 'public.calcular_cumplimiento_calidad(text, jsonb, uuid)'::regprocedure;
+     CREATE OR REPLACE FUNCTION public.calcular_cumplimiento_calidad(p_tipo_agua text, p_parametros jsonb, p_company_id uuid DEFAULT NULL)
+     RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = '' AS $impostor$
+     BEGIN RETURN jsonb_build_object('cumplimiento', '{}'::jsonb, 'cumple_total', true); END $impostor$;`,
+    `DO $rest$ BEGIN EXECUTE format('CREATE OR REPLACE FUNCTION public.calcular_cumplimiento_calidad(p_tipo_agua text, p_parametros jsonb, p_company_id uuid DEFAULT NULL) RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = %L AS %L', '', (SELECT prosrc FROM public._respaldo_fn3)); END $rest$;
+     DROP TABLE public._respaldo_fn3;`,
+    'no es ninguna de las dos variantes autorizadas')
+  failClosed('mutante 9 · la firma de tres argumentos pasada a VOLATILE',
+    'ALTER FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) VOLATILE;',
+    'ALTER FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) STABLE;',
+    'no es la función que esta migración sabe exponer')
+  failClosed('mutante 10 · ACL previa de la firma de tres argumentos con anon',
+    'GRANT EXECUTE ON FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) TO anon;',
+    'REVOKE EXECUTE ON FUNCTION public.calcular_cumplimiento_calidad(text, jsonb, uuid) FROM anon;',
+    'la ACL previa')
+  failClosed('mutante 11 · calidad_tipologias sin RLS',
+    'ALTER TABLE public.calidad_tipologias DISABLE ROW LEVEL SECURITY;',
+    'ALTER TABLE public.calidad_tipologias ENABLE ROW LEVEL SECURITY;',
+    'no tiene ENABLE ROW LEVEL SECURITY')
+  failClosed('mutante 12 · calidad_tipologias_select abierta con USING (true)',
+    'ALTER POLICY calidad_tipologias_select ON public.calidad_tipologias USING (true);',
+    'ALTER POLICY calidad_tipologias_select ON public.calidad_tipologias USING (company_id IS NULL OR company_id = public.get_my_company_id());',
+    'no es la esperada')
 
-  console.log('── 7/8 · restaurar la llamada ambigua devuelve el 42725 ───────────────')
+  const tras = aplicarMigracion()
+  if (tras.status !== 0) mal(`tras los doce mutantes la migración ya no aplica:\n${String(tras.stderr ?? '').trim().split('\n').slice(-3).join('\n')}`)
+  else if (huella() !== intacta) mal('tras los doce mutantes el esquema no volvió al original')
+  else ok('tras los doce mutantes el esquema es idéntico y la migración vuelve a aplicar como no-op')
+
+  console.log('── 8/9 · restaurar la llamada ambigua devuelve el 42725 ───────────────')
   const mut = `
     BEGIN;
     CREATE OR REPLACE TRIGGER registros_calidad_cumplimiento BEFORE INSERT OR UPDATE OF parametros, fuente_id
@@ -388,7 +495,7 @@ try {
   esperaPrefijo('mut', '42725', 'con el trigger apuntando a la función de S22, el INSERT vuelve a morir')
   espera('fn_tras_rollback', 'trg_registros_calidad_cumplimiento_catalogo()', 'la mutación se revirtió: el trigger sigue apuntando a la función nueva')
 
-  console.log('── 8/8 · lo que no debía moverse ─────────────────────────────────────')
+  console.log('── 9/9 · lo que no debía moverse ─────────────────────────────────────')
   const acl2 = acl('public.calcular_cumplimiento_calidad(text, jsonb)')
   if (acl2 === 'f|i|t|t|t|t') ok('calcular_cumplimiento_calidad(text, jsonb) sigue: INVOKER · IMMUTABLE · ACL de S22 (PUBLIC)')
   else mal(`calcular_cumplimiento_calidad(text, jsonb): ${acl2} (esperado f|i|t|t|t|t)`)
@@ -406,4 +513,4 @@ try {
 }
 
 if (fallos > 0) { console.error(`\n❌ replay: ${fallos} fallo(s)`); process.exit(1) }
-console.log('\n✅ replay: la cadena completa, el trigger re-apuntado, el operator sin view escribiendo y los siete mutantes fail-closed')
+console.log('\n✅ replay: la cadena completa, el trigger re-apuntado, el operator sin view y los actores privilegiados escribiendo, y los doce mutantes fail-closed')
