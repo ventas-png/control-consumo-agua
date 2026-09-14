@@ -124,33 +124,13 @@ try {
     SELECT set_config('request.jwt.claim.role', 'authenticated', true);
     SELECT 'auth_execute=' || has_function_privilege('authenticated', 'public.fill_company_id_from_user()'::regprocedure, 'EXECUTE');
 
-    -- CONTROL de un defecto PREEXISTENTE y AJENO a este PR. En una
-    -- reconstrucción limpia, CUALQUIER INSERT en registros_calidad —con
-    -- cualquier rol— muere dentro de trg_registros_calidad_cumplimiento:
-    --   function public.calcular_cumplimiento_calidad(text, jsonb) is not unique
-    -- porque el repositorio declara dos sobrecargas, (text, jsonb) en
-    -- 20260603140000 y (text, jsonb, uuid DEFAULT NULL) en 20260605160000, y
-    -- la llamada de dos argumentos del trigger es ambigua (SQLSTATE 42725).
-    -- NO es sólo de la reconstrucción: producción tiene las mismas dos
-    -- sobrecargas y el mismo SELECT de dos argumentos falla allí con 42725
-    -- (medido el 2026-09-12). Corregirlo es otro PR. Aquí se comprueba que el
-    -- defecto SIGUE AHÍ, como postgres y ANTES de cambiar de rol, y sólo
-    -- entonces se apaga ESE trigger —dentro de esta transacción, que se
-    -- revierte— para poder medir el de fill_company_id. El día que el defecto
-    -- se corrija, este control deja de fallar y la prueba avisa: hay que
-    -- retirar el DISABLE TRIGGER de abajo.
-    DO $control$
-    BEGIN
-      INSERT INTO public.fuentes_agua (id, identificador, nombre, tipo_agua, company_id)
-        VALUES ('77777777-7777-7777-7777-777777777777', 'F-CONTROL', 'Pozo control', 'pozo', '44444444-4444-4444-4444-444444444444');
-      INSERT INTO public.registros_calidad (id, fuente_id, parametros, company_id)
-        VALUES ('88888888-8888-8888-8888-888888888888', '77777777-7777-7777-7777-777777777777', '{}'::jsonb, '44444444-4444-4444-4444-444444444444');
-      PERFORM set_config('replay.control', 'ya-no-falla', true);
-    EXCEPTION WHEN ambiguous_function THEN
-      PERFORM set_config('replay.control', 'ambiguo', true);
-    END $control$;
-    SELECT 'control=' || coalesce(current_setting('replay.control', true), 'sin-dato');
-    ALTER TABLE public.registros_calidad DISABLE TRIGGER registros_calidad_cumplimiento;
+    -- Hasta 20260913032502, CUALQUIER INSERT en registros_calidad moría dentro
+    -- de trg_registros_calidad_cumplimiento con 42725 (llamada ambigua a
+    -- calcular_cumplimiento_calidad) y esta prueba tenía que apagar ese
+    -- trigger dentro de la transacción para poder medir el de fill_company_id.
+    -- Ya no: el trigger apunta a trg_registros_calidad_cumplimiento_catalogo()
+    -- y la inserción pasa por él tal cual (tipo 'pozo' no está en el catálogo →
+    -- cumplimiento {} y cumple_total false, como S22 definía).
 
     SET LOCAL ROLE authenticated;
     INSERT INTO public.fuentes_agua (id, identificador, nombre, tipo_agua)
@@ -160,6 +140,8 @@ try {
     RESET ROLE;
     SELECT 'fuentes_agua=' || coalesce(company_id::text, 'NULL') FROM public.fuentes_agua WHERE id = '55555555-5555-5555-5555-555555555555';
     SELECT 'registros_calidad=' || coalesce(company_id::text, 'NULL') FROM public.registros_calidad WHERE id = '66666666-6666-6666-6666-666666666666';
+    SELECT 'cumplimiento=' || cumplimiento::text || ' ' || cumple_total::text || ' ' || (SELECT tgfoid::regprocedure::text FROM pg_trigger WHERE tgname = 'registros_calidad_cumplimiento' AND NOT tgisinternal)
+      FROM public.registros_calidad WHERE id = '66666666-6666-6666-6666-666666666666';
     ROLLBACK;
     SELECT 'restantes=' || ((SELECT count(*) FROM public.fuentes_agua) + (SELECT count(*) FROM public.registros_calidad));`
   let lineas = []
@@ -171,12 +153,10 @@ try {
   const valor = (k) => (lineas.find((l) => l.startsWith(k + '=')) ?? '').slice(k.length + 1)
   if (valor('auth_execute') === 'false') ok('authenticated NO tiene EXECUTE sobre fill_company_id_from_user() (ACL de 20260911223000)')
   else mal(`authenticated tiene EXECUTE=${valor('auth_execute')}; la prueba no demostraría nada`)
-  if (valor('control') === 'ambiguo') {
-    ok('control: el defecto PREEXISTENTE sigue ahí (calcular_cumplimiento_calidad(text, jsonb) es ambigua, 42725,')
-    ok('      también en producción; ajeno a este PR) — registros_calidad_cumplimiento se apaga sólo dentro de esta transacción')
+  if (valor('cumplimiento') === '{} false trg_registros_calidad_cumplimiento_catalogo()') {
+    ok('registros_calidad_cumplimiento (20260913032502) corrió en la misma inserción: tipo «pozo» sin catálogo → {} y cumple_total=false')
   } else {
-    mal(`control: el INSERT de control en registros_calidad terminó en «${valor('control')}» y se esperaba el fallo ` +
-        'preexistente por ambigüedad (42725). Si ese defecto ya se corrigió, retirá el DISABLE TRIGGER de esta prueba.')
+    mal(`registros_calidad_cumplimiento: «${valor('cumplimiento')}» y se esperaba «{} false trg_registros_calidad_cumplimiento_catalogo()»`)
   }
   for (const t of ['fuentes_agua', 'registros_calidad']) {
     if (valor(t) === '44444444-4444-4444-4444-444444444444') ok(`authenticated insertó en ${t} sin company_id y el trigger lo rellenó con el del usuario`)
