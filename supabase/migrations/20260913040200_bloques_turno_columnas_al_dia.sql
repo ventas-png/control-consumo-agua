@@ -11,8 +11,10 @@
 --
 -- QUÉ DIFIERE, EXACTAMENTE. Se leyó el catálogo de producción el 2026-09-10 y
 -- se comparó campo a campo —nombre, tipo, NOT NULL, default, identidad,
--- generación y collation— contra la reconstrucción de las 459 migraciones del
--- repositorio. Las 20 columnas están en las dos, con el mismo tipo. Difieren
+-- generación y collation— contra la reconstrucción de las migraciones del
+-- repositorio, que hoy son 472 contando ésta. Revalidado sin cambios el
+-- 2026-09-15 contra la huella refrescada por #864 (2532 grupos): producción
+-- sigue exactamente como se describe acá. Las 20 columnas están en las dos, con el mismo tipo. Difieren
 -- DOS atributos, y ninguno más:
 --
 --   columna       producción              repositorio
@@ -63,18 +65,21 @@
 -- iría, porque M seguiría sin la corrección. Sólo se cierra si M pasa a valer lo
 -- que vale P, y para eso esto tiene que estar en main primero.
 --
--- LA BASELINE ENCOGE, Y ES OBLIGATORIO. Este PR quita la entrada
--- `tabla:bloques_turno/columnas` de `drift-conocido.json`. No es aflojar el
--- auditor: es lo contrario. El auditor ROMPE si una entrada declarada deja de
--- corresponder a un drift real («resuelto» en su veredicto), justamente para
--- forzar la poda en el mismo PR que lo arregla. Las otras dos entradas de esta
--- tabla —`/constraints` y `/indices`— siguen declaradas y sin tocar: esta
--- migración no las cambia.
+-- LA BASELINE ENCOGE, Y ES OBLIGATORIO. Este PR quita DOS entradas de
+-- `drift-conocido.json`: `tabla:bloques_turno/columnas` y
+-- `tabla:bloques_turno/constraints` —una por cada parte de esta migración—, y
+-- la deja en 93 grupos. Venía de 95, que es donde #864 la dejó al retirar las
+-- seis de los helpers de RBAC tras desplegar #851; esas seis NO se restauran.
+-- No es aflojar el auditor: es lo contrario. El auditor ROMPE si una entrada
+-- declarada deja de corresponder a un drift real («resuelto» en su veredicto),
+-- justamente para forzar la poda en el mismo PR que lo arregla. La tercera
+-- entrada de esta tabla, `/indices`, sigue declarada y sin tocar: esta
+-- migración no cambia índices.
 --
 -- REVERSIÓN
 --   ALTER TABLE public.bloques_turno ALTER COLUMN turno SET DEFAULT 'manana'::text;
 --   ALTER TABLE public.bloques_turno ALTER COLUMN created_at DROP NOT NULL;
---   (y reponer la entrada de la baseline desde el histórico de git)
+--   (y reponer las dos entradas de la baseline desde el histórico de git)
 --
 -- IDEMPOTENTE: las dos sentencias son declarativas —fijan un estado, no lo
 -- incrementan— así que repetirlas no hace nada.
@@ -135,7 +140,8 @@ COMMENT ON COLUMN public.bloques_turno.created_at IS
 -- cerrar esa diferencia y hacen cosas muy distintas:
 --
 --   (a) agregarla a producción — mejora la integridad de verdad, y es barata:
---       son 24 filas, 144 kB y CERO huérfanos, medido el 2026-09-10. Pero es
+--       son 24 filas, 144 kB y CERO huérfanos, medido el 2026-09-10 y
+--       reconfirmado el 2026-09-15. Pero es
 --       una ESCRITURA en producción, necesita autorización, y hasta que se
 --       despliegue y se refresque la huella deja las tres vías distintas: este
 --       PR se pondría ambiguo, y con él #844.
