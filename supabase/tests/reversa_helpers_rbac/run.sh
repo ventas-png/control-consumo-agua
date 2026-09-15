@@ -15,8 +15,13 @@
 #   1. las tres funciones NO están antes (la premisa del PR: no están en el repo);
 #   2. el archivo se EJECUTA sin error contra un Postgres real, con sólo sus
 #      dependencias declaradas presentes;
-#   3. lo repuesto produce las SEIS huellas que la baseline declara para
-#      producción —las tres definiciones y sus tres grants—, byte por byte;
+#   3. lo repuesto produce las SEIS huellas que producción tenía —las tres
+#      definiciones y sus tres grants—, byte por byte. Hasta el despliegue de
+#      #851 esas huellas se leían de `drift-conocido.json`, porque las tres
+#      funciones eran drift declarado; al aplicarse la migración dejaron de
+#      serlo y la baseline las soltó. Viven ahora en `huellas-esperadas.json`,
+#      acá al lado: son un hecho histórico del catálogo, no drift vigente, y
+#      sin ellas esta comprobación se quedaría sin contra qué comparar;
 #   4. PUBLIC no queda con EXECUTE. `CREATE OR REPLACE` sobre una función que no
 #      existe la crea con la ACL por defecto, que incluye a PUBLIC y por tanto a
 #      `anon`: una reversa sin el REVOKE repondría tres SECURITY DEFINER
@@ -35,7 +40,7 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 REVERSA="$RAIZ/supabase/reversas/20260913040100_reponer_helpers_rbac_huerfanos.sql"
 FINGERPRINT="$RAIZ/scripts/schema-drift/fingerprint.sql"
-BASELINE="$RAIZ/scripts/schema-drift/drift-conocido.json"
+ESPERADAS="$AQUI/huellas-esperadas.json"
 
 for d in ${PGBIN:-} /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -83,7 +88,7 @@ echo "── 4/5 · ¿repuso lo que había? ────────────
 HUELLA=$(psql -tAF $'\t' -v ON_ERROR_STOP=1 -d reversa -f "$FINGERPRINT")
 echo "$HUELLA" | node -e '
 const fs = require("node:fs")
-const baseline = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).grupos
+const esperadas = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).grupos
 const medido = new Map(fs.readFileSync(0, "utf8").split("\n").filter(Boolean)
   .map(l => { const [c, h, n] = l.split("\t"); return [c, `${h}:${n}`] }))
 const claves = [
@@ -93,9 +98,9 @@ const claves = [
 ]
 let malas = 0
 for (const base of claves) for (const clave of [base, base + "/grants"]) {
-  const esperado = baseline[clave]?.produccion
+  const esperado = esperadas[clave]
   const obtenido = medido.get(clave)
-  if (!esperado) { console.log(`  ✗ ${clave}: no está declarada en la baseline`); malas++; continue }
+  if (!esperado) { console.log(`  ✗ ${clave}: no está declarada en huellas-esperadas.json`); malas++; continue }
   if (esperado !== obtenido) {
     console.log(`  ✗ ${clave}\n      producción declarada : ${esperado}\n      repuesto por reversa : ${obtenido ?? "(no se creó)"}`)
     malas++
@@ -104,7 +109,7 @@ for (const base of claves) for (const clave of [base, base + "/grants"]) {
   }
 }
 process.exit(malas === 0 ? 0 : 1)
-' "$BASELINE"
+' "$ESPERADAS"
 
 PUB=$(psql -tAd reversa -c "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace,
   LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
