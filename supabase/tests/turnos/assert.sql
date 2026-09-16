@@ -515,8 +515,14 @@ INSERT INTO public.role_permissions (role_id, permission_key, effect) VALUES
   ('cccccccc-0000-0000-0000-000000000003', 'platform.condominios.view',         'allow'),
   ('cccccccc-0000-0000-0000-000000000003', 'platform.condominios.create',       'allow'),
   ('cccccccc-0000-0000-0000-000000000003', 'platform.condominios.edit',         'allow');
+--
+-- Fede lleva el MISMO rol que Beto —visibilidad y acciones de Turnos— pero está
+-- asignado al OTRO condominio. Tener el permiso y no alcanzar el proyecto es
+-- justo el caso que separa «alcance por empresa» de «alcance por proyecto»
+-- (invariantes 66-68).
 INSERT INTO public.user_roles (user_id, role_id) VALUES
   ('e0000000-0000-0000-0000-00000000000b', 'cccccccc-0000-0000-0000-000000000001'),
+  ('e0000000-0000-0000-0000-00000000000f', 'cccccccc-0000-0000-0000-000000000001'),
   ('e0000000-0000-0000-0000-000000000010', 'cccccccc-0000-0000-0000-000000000002'),
   ('e0000000-0000-0000-0000-000000000011', 'cccccccc-0000-0000-0000-000000000003');
 
@@ -613,6 +619,7 @@ DECLARE
   SAM      uuid := 'e0000000-0000-0000-0000-00000000000e';  -- super_admin
   FEDE     uuid := 'e0000000-0000-0000-0000-00000000000f';  -- otro condominio, misma empresa
   v_b      uuid;
+  v_b2     uuid;
   v_t      uuid;
   n        bigint;
 BEGIN
@@ -704,22 +711,35 @@ BEGIN
   RAISE NOTICE 'OK 39 ningún rol borra un bloque con tareas, y el rechazo deja las hijas intactas';
 
   -- ── 40. …ni uno con REVISIÓN ───────────────────────────────────────────
+  -- LA REVISIÓN VA SOBRE OTRO BLOQUE, uno SIN tareas propias. Colgarla del
+  -- mismo bloque que ya tiene checklist no probaría nada: saltaría antes la
+  -- comprobación de tareas y la de revisiones quedaría sin ejercitar. Lo
+  -- descubrió la prueba de mutación —retirar la condición dejaba el arnés en
+  -- verde— y por eso la revisión apunta a la tarea de `v_b` pero declara
+  -- `bloque_id` del bloque nuevo, que es la única forma en que esta condición
+  -- es la que decide. El esquema lo permite: `tarea_id` y `bloque_id` son dos
+  -- FKs independientes, y esa discrepancia es justo contra lo que protege.
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, turno, fecha, estado)
+    VALUES (CO, PR, PEDRO, 'tarde', CURRENT_DATE + 12, 'pendiente') RETURNING id INTO v_b2;
   INSERT INTO public.revisiones_tarea (tarea_id, bloque_id, revisado_por, estado)
-    VALUES (v_t, v_b, ANA, 'aprobado');
+    VALUES (v_t, v_b2, ANA, 'aprobado');
+  SELECT count(*) INTO n FROM public.tareas_bloque WHERE bloque_id = v_b2;
+  IF n <> 0 THEN RAISE EXCEPTION '40a: el bloque de la prueba debía estar SIN tareas propias'; END IF;
   SET LOCAL ROLE turnos_tester;
   PERFORM set_config('app.uid', OLGA::text, true);
   BEGIN
-    DELETE FROM public.bloques_turno WHERE id = v_b;
-    RAISE EXCEPTION '40a: se borró un bloque con revisión';
+    DELETE FROM public.bloques_turno WHERE id = v_b2;
+    RAISE EXCEPTION '40b: se borró un bloque con revisión';
   EXCEPTION WHEN restrict_violation THEN NULL;
   END;
   RESET ROLE;
-  SELECT count(*) INTO n FROM public.revisiones_tarea WHERE bloque_id = v_b;
-  IF n <> 1 THEN RAISE EXCEPTION '40b: la revisión desapareció'; END IF;
+  SELECT count(*) INTO n FROM public.revisiones_tarea WHERE bloque_id = v_b2;
+  IF n <> 1 THEN RAISE EXCEPTION '40c: la revisión desapareció'; END IF;
   -- Se limpia por el camino que SÍ corresponde: primero las hijas.
-  DELETE FROM public.revisiones_tarea WHERE bloque_id = v_b;
+  DELETE FROM public.revisiones_tarea WHERE bloque_id = v_b2;
+  DELETE FROM public.bloques_turno    WHERE id = v_b2;
   DELETE FROM public.tareas_bloque    WHERE bloque_id = v_b;
-  RAISE NOTICE 'OK 40 un bloque con revisión no se borra, y la revisión sobrevive al intento';
+  RAISE NOTICE 'OK 40 un bloque con revisión (y sin tareas propias) no se borra, y la revisión sobrevive';
 
   -- ── 41. …ni uno con MARCAJE de presencia ───────────────────────────────
   INSERT INTO public.presencia_personal (company_id, project_id, nombre, fecha, bloque_id)
@@ -1252,5 +1272,363 @@ BEGIN
   RAISE NOTICE 'OK 65 las RPC validan proyecto y empleado: un UUID ajeno no basta';
 
   RAISE NOTICE '── 5 invariantes de edición atómica del día OK ──';
+END;
+$$;
+
+-- ══ L. El alcance es por PROYECTO, no por empresa ══════════════════════════
+-- Una empresa puede tener varios condominios y el acceso se concede por
+-- proyecto. Hasta 20260916232549, `bloques_turno_insert` y `_update`
+-- comprobaban `company_id` y el permiso de acción pero NO
+-- `can_access_project`: quien administraba el condominio 1 podía escribirle la
+-- agenda al personal del condominio 3 de la misma empresa. El SELECT y el
+-- DELETE sí lo comprobaban; el alta y el cambio, no.
+DO $$
+DECLARE
+  CO      uuid := 'aaaaaaaa-0000-0000-0000-000000000001';
+  PR_A    uuid := '11111111-0000-0000-0000-000000000001';  -- el de Beto
+  PR_B    uuid := '11111111-0000-0000-0000-000000000003';  -- el de Fede
+  PEDRO   uuid := '50000000-0000-0000-0000-000000000001';  -- de PR_A
+  NORA    uuid := '50000000-0000-0000-0000-000000000004';  -- de PR_B
+  BETO    uuid := 'e0000000-0000-0000-0000-00000000000b';  -- turnos.edit en PR_A
+  FEDE    uuid := 'e0000000-0000-0000-0000-00000000000f';  -- turnos.edit en PR_B
+  v_ph_a  uuid;
+  v_ph_b  uuid;
+  v_b_a   uuid;
+  v_b_b   uuid;
+  n       bigint;
+  afectadas integer;
+BEGIN
+  SELECT ph.id INTO v_ph_a FROM public.plantillas_horario ph WHERE ph.project_id = PR_A LIMIT 1;
+  INSERT INTO public.plantillas_horario (company_id, project_id, nombre, turno, hora_inicio, hora_fin)
+    VALUES (CO, PR_B, 'Diurno del otro condo', 'manana', TIME '06:00', TIME '14:00')
+    RETURNING id INTO v_ph_b;
+
+  -- Un bloque limpio en cada condominio, puestos por el dueño de las tablas.
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR_A, PEDRO, v_ph_a, 'manana', CURRENT_DATE + 80, 'pendiente')
+    RETURNING id INTO v_b_a;
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR_B, NORA, v_ph_b, 'manana', CURRENT_DATE + 80, 'pendiente')
+    RETURNING id INTO v_b_b;
+
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+
+  -- ── 66. No puede DAR DE ALTA en el condominio que no administra ─────────
+  BEGIN
+    INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                      turno, fecha, estado)
+      VALUES (CO, PR_B, NORA, v_ph_b, 'tarde', CURRENT_DATE + 81, 'pendiente');
+    RAISE EXCEPTION '66: creó un bloque en un condominio que no tiene asignado';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  RAISE NOTICE 'OK 66 con turnos.edit pero sin el proyecto, no se da de alta (42501)';
+
+  -- ── 67. Ni CAMBIAR uno de allí ─────────────────────────────────────────
+  UPDATE public.bloques_turno SET notas = 'pirateado' WHERE id = v_b_b;
+  GET DIAGNOSTICS afectadas = ROW_COUNT;
+  IF afectadas <> 0 THEN
+    RAISE EXCEPTION '67: actualizó % bloques de otro condominio', afectadas; END IF;
+  RAISE NOTICE 'OK 67 con turnos.edit pero sin el proyecto, no se actualiza (0 filas)';
+
+  -- ── 68. Ni MOVER el suyo al condominio de al lado ───────────────────────
+  -- Ésta es la puerta de atrás, y se cierra distinto que las otras dos: el
+  -- USING SÍ deja tocar la fila —es del proyecto de Beto— así que no hay
+  -- filtrado silencioso. Quien la rechaza es el WITH CHECK, evaluado sobre la
+  -- fila NUEVA, y un WITH CHECK que falla LANZA (42501) en vez de afectar 0
+  -- filas. Esa diferencia es la prueba de que el bloqueo viene de la mitad que
+  -- faltaba, no del USING.
+  BEGIN
+    UPDATE public.bloques_turno SET project_id = PR_B, personal_id = NORA WHERE id = v_b_a;
+    RAISE EXCEPTION '68a: movió el bloque a otro condominio';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b_a AND project_id = PR_A;
+  IF n <> 1 THEN RAISE EXCEPTION '68b: el bloque no se quedó en su condominio'; END IF;
+  RAISE NOTICE 'OK 68 el WITH CHECK impide mover un bloque a otro condominio';
+
+  -- ── 69. Y quien SÍ administra ese condominio escribe con normalidad ─────
+  -- Mismo rol RBAC que Beto; lo único distinto es a qué proyecto está asignado.
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', FEDE::text, true);
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR_B, NORA, v_ph_b, 'tarde', CURRENT_DATE + 82, 'pendiente');
+  UPDATE public.bloques_turno SET notas = 'legítimo' WHERE id = v_b_b;
+  GET DIAGNOSTICS afectadas = ROW_COUNT;
+  RESET ROLE;
+  IF afectadas <> 1 THEN
+    RAISE EXCEPTION '69: quien administra el condominio no pudo actualizar (% filas)', afectadas; END IF;
+  SELECT count(*) INTO n FROM public.bloques_turno
+   WHERE project_id = PR_B AND fecha = CURRENT_DATE + 82;
+  IF n <> 1 THEN RAISE EXCEPTION '69b: quien administra el condominio no pudo dar de alta'; END IF;
+  RAISE NOTICE 'OK 69 con el proyecto asignado, el mismo rol escribe con normalidad';
+
+  RAISE NOTICE '── 4 invariantes de alcance por proyecto OK ──';
+END;
+$$;
+
+-- ══ M. Re-planificar un día exige lo mismo que borrarlo ════════════════════
+--
+-- «La UI no es una frontera de seguridad». `turnos_guardar_dia` dejaba
+-- cambiarle la jornada a un bloque pasado, iniciado, cerrado, no pendiente o
+-- con dependencias: el calendario no ofrece el botón, pero la RPC estaba
+-- publicada a `authenticated` y una llamada directa se saltaba el filtro.
+--
+-- CADA INVARIANTE AÍSLA UNA CONDICIÓN. El bloque de cada prueba está limpio en
+-- todo lo demás, así que retirar esa condición de
+-- `turnos_asegurar_bloque_libre` hace fallar ESA prueba y sólo ésa. Es lo que
+-- las vuelve mutantes decisivos en vez de un paquete que pasa por accidente.
+DO $$
+DECLARE
+  CO      uuid := 'aaaaaaaa-0000-0000-0000-000000000001';
+  PR      uuid := '11111111-0000-0000-0000-000000000001';
+  MARIO   uuid := '50000000-0000-0000-0000-000000000003';
+  BETO    uuid := 'e0000000-0000-0000-0000-00000000000b';
+  v_ph    uuid;
+  v_otra  uuid;
+  v_b     uuid;
+  v_b2    uuid;
+  v_t     uuid;
+  v_ex    uuid;
+  n       bigint;
+  afectadas integer;
+BEGIN
+  SELECT ph.id INTO v_ph   FROM public.plantillas_horario ph WHERE ph.project_id = PR ORDER BY ph.nombre LIMIT 1;
+  SELECT ph.id INTO v_otra FROM public.plantillas_horario ph WHERE ph.project_id = PR AND ph.id <> v_ph LIMIT 1;
+  IF v_otra IS NULL THEN
+    INSERT INTO public.plantillas_horario (company_id, project_id, nombre, turno, hora_inicio, hora_fin)
+      VALUES (CO, PR, 'Vespertino de prueba', 'tarde', TIME '14:00', TIME '22:00')
+      RETURNING id INTO v_otra;
+  END IF;
+
+  -- ── 70. Guardar un día PASADO: la RPC lo rechaza ───────────────────────
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    PERFORM public.turnos_guardar_dia(PR, MARIO, CURRENT_DATE - 1, v_ph);
+    RAISE EXCEPTION '70: guardó un día pasado';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.bloques_turno
+   WHERE personal_id = MARIO AND fecha = CURRENT_DATE - 1;
+  IF n <> 0 THEN RAISE EXCEPTION '70b: el rechazo dejó un bloque creado'; END IF;
+  RAISE NOTICE 'OK 70 guardar una fecha pasada falla y no deja nada creado';
+
+  -- ── 71. Quitar un día PASADO ───────────────────────────────────────────
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    PERFORM public.turnos_quitar_dia(PR, MARIO, CURRENT_DATE - 2);
+    RAISE EXCEPTION '71: quitó un día pasado';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.excepciones_turno
+   WHERE personal_id = MARIO AND fecha = CURRENT_DATE - 2;
+  IF n <> 0 THEN RAISE EXCEPTION '71b: el rechazo dejó una excepción creada'; END IF;
+  RAISE NOTICE 'OK 71 quitar una fecha pasada falla y no deja excepción';
+
+  -- ── 72. Restaurar un día PASADO ────────────────────────────────────────
+  INSERT INTO public.excepciones_turno (company_id, project_id, personal_id, fecha, motivo)
+    VALUES (CO, PR, MARIO, CURRENT_DATE - 3, 'histórica') RETURNING id INTO v_ex;
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    PERFORM public.turnos_restaurar_dia(PR, MARIO, CURRENT_DATE - 3);
+    RAISE EXCEPTION '72: restauró un día pasado';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.excepciones_turno WHERE id = v_ex;
+  IF n <> 1 THEN RAISE EXCEPTION '72b: el rechazo borró la excepción histórica'; END IF;
+  RAISE NOTICE 'OK 72 restaurar una fecha pasada falla y la excepción sigue intacta';
+
+  -- ── 73. Cambiar la jornada de un bloque INICIADO ───────────────────────
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado, iniciado_en)
+    VALUES (CO, PR, MARIO, v_ph, 'manana', CURRENT_DATE + 90, 'pendiente', now())
+    RETURNING id INTO v_b;
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    PERFORM public.turnos_guardar_dia(PR, MARIO, CURRENT_DATE + 90, v_otra);
+    RAISE EXCEPTION '73a: cambió la jornada de un bloque iniciado';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  -- Y por la puerta directa, sin pasar por la RPC.
+  BEGIN
+    UPDATE public.bloques_turno SET plantilla_horario_id = v_otra WHERE id = v_b;
+    RAISE EXCEPTION '73b: el UPDATE directo cambió la jornada de un bloque iniciado';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b AND plantilla_horario_id = v_ph;
+  IF n <> 1 THEN RAISE EXCEPTION '73c: el bloque iniciado cambió de jornada'; END IF;
+  RAISE NOTICE 'OK 73 un bloque iniciado no cambia de jornada, ni por RPC ni por UPDATE';
+
+  -- ── 74. …ni uno CERRADO ────────────────────────────────────────────────
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado, cerrado_en)
+    VALUES (CO, PR, MARIO, v_ph, 'tarde', CURRENT_DATE + 91, 'pendiente', now())
+    RETURNING id INTO v_b;
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    UPDATE public.bloques_turno SET plantilla_horario_id = v_otra WHERE id = v_b;
+    RAISE EXCEPTION '74a: cambió la jornada de un bloque cerrado';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b AND plantilla_horario_id = v_ph;
+  IF n <> 1 THEN RAISE EXCEPTION '74b: el bloque cerrado cambió de jornada'; END IF;
+  RAISE NOTICE 'OK 74 un bloque cerrado no cambia de jornada';
+
+  -- ── 75. …ni uno que no está PENDIENTE ──────────────────────────────────
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR, MARIO, v_ph, 'noche', CURRENT_DATE + 92, 'incompleto')
+    RETURNING id INTO v_b;
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    UPDATE public.bloques_turno SET plantilla_horario_id = v_otra WHERE id = v_b;
+    RAISE EXCEPTION '75a: cambió la jornada de un bloque en estado incompleto';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b AND plantilla_horario_id = v_ph;
+  IF n <> 1 THEN RAISE EXCEPTION '75b: el bloque no pendiente cambió de jornada'; END IF;
+  RAISE NOTICE 'OK 75 un bloque fuera de pendiente no cambia de jornada';
+
+  -- ── 76. …ni uno con TAREA, y la tarea sobrevive ────────────────────────
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR, MARIO, v_ph, 'manana', CURRENT_DATE + 93, 'pendiente')
+    RETURNING id INTO v_b;
+  INSERT INTO public.tareas_bloque (bloque_id, titulo) VALUES (v_b, 'Podar setos')
+    RETURNING id INTO v_t;
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    PERFORM public.turnos_guardar_dia(PR, MARIO, CURRENT_DATE + 93, v_otra);
+    RAISE EXCEPTION '76a: cambió la jornada de un bloque con checklist';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b AND plantilla_horario_id = v_ph;
+  IF n <> 1 THEN RAISE EXCEPTION '76b: el bloque con checklist cambió de jornada'; END IF;
+  SELECT count(*) INTO n FROM public.tareas_bloque WHERE id = v_t;
+  IF n <> 1 THEN RAISE EXCEPTION '76c: la tarea no sobrevivió al intento'; END IF;
+  RAISE NOTICE 'OK 76 un bloque con checklist no cambia de jornada, y la tarea sigue';
+
+  -- ── 77. …ni uno con REVISIÓN ───────────────────────────────────────────
+  -- Bloque NUEVO y sin tareas propias, por el mismo motivo que la invariante
+  -- 40: sobre un bloque que ya tiene checklist saltaría antes la comprobación
+  -- de tareas y ésta no se ejercitaría. La revisión apunta a la tarea de
+  -- `v_b` y declara `bloque_id` del bloque nuevo.
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR, MARIO, v_ph, 'noche', CURRENT_DATE + 96, 'pendiente')
+    RETURNING id INTO v_b2;
+  INSERT INTO public.revisiones_tarea (tarea_id, bloque_id, revisado_por, estado)
+    VALUES (v_t, v_b2, 'e0000000-0000-0000-0000-00000000000a', 'aprobado');
+  SELECT count(*) INTO n FROM public.tareas_bloque WHERE bloque_id = v_b2;
+  IF n <> 0 THEN RAISE EXCEPTION '77a: el bloque de la prueba debía estar SIN tareas propias'; END IF;
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    UPDATE public.bloques_turno SET plantilla_horario_id = v_otra WHERE id = v_b2;
+    RAISE EXCEPTION '77b: cambió la jornada de un bloque con revisión';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.revisiones_tarea WHERE bloque_id = v_b2;
+  IF n <> 1 THEN RAISE EXCEPTION '77c: la revisión no sobrevivió al intento'; END IF;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b2 AND plantilla_horario_id = v_ph;
+  IF n <> 1 THEN RAISE EXCEPTION '77d: el bloque con revisión cambió de jornada'; END IF;
+  RAISE NOTICE 'OK 77 un bloque con revisión (y sin tareas propias) no cambia de jornada';
+
+  -- ── 78. …ni uno con MARCAJE de presencia ───────────────────────────────
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR, MARIO, v_ph, 'tarde', CURRENT_DATE + 94, 'pendiente')
+    RETURNING id INTO v_b;
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, estado, bloque_id)
+    VALUES (CO, PR, MARIO, 'Mario Jardinero', CURRENT_DATE + 94, TIME '06:00', 'presente', v_b);
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    UPDATE public.bloques_turno SET plantilla_horario_id = v_otra WHERE id = v_b;
+    RAISE EXCEPTION '78a: cambió la jornada de un bloque con marcaje';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.presencia_personal WHERE bloque_id = v_b;
+  IF n <> 1 THEN RAISE EXCEPTION '78b: el marcaje no sobrevivió al intento'; END IF;
+  RAISE NOTICE 'OK 78 un bloque con marcaje no cambia de jornada, y el marcaje sigue';
+
+  -- ── 79. Lo limpio de hoy y del futuro SIGUE funcionando ────────────────
+  -- Sin esto, las ocho de arriba se satisfarían con un trigger que lo bloquea
+  -- todo, que es el fallo contrario y tan malo como el original.
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  PERFORM public.turnos_guardar_dia(PR, MARIO, CURRENT_DATE, v_ph);
+  PERFORM public.turnos_guardar_dia(PR, MARIO, CURRENT_DATE, v_otra);   -- y cambiarla
+  PERFORM public.turnos_guardar_dia(PR, MARIO, CURRENT_DATE + 95, v_ph);
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.bloques_turno
+   WHERE personal_id = MARIO AND fecha = CURRENT_DATE AND plantilla_horario_id = v_otra;
+  IF n <> 1 THEN RAISE EXCEPTION '79a: hoy, limpio y pendiente, debía poder cambiar de jornada'; END IF;
+  SELECT count(*) INTO n FROM public.bloques_turno
+   WHERE personal_id = MARIO AND fecha = CURRENT_DATE + 95;
+  IF n <> 1 THEN RAISE EXCEPTION '79b: el futuro limpio debía poder asignarse'; END IF;
+  RAISE NOTICE 'OK 79 hoy y el futuro, pendientes y sin dependencias, siguen editándose';
+
+  -- ── 80. Y el CICLO DE VIDA del turno no se toca ────────────────────────
+  -- Iniciar, cerrar, puntuar y anotar son UPDATE legítimos sobre bloques
+  -- pasados y en curso: es lo que hace «Tareas por turno» todos los días. Un
+  -- trigger que los bloqueara rompería la operación diaria.
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR, MARIO, v_ph, 'manana', CURRENT_DATE - 10, 'pendiente')
+    RETURNING id INTO v_b;
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  UPDATE public.bloques_turno SET estado = 'en_curso', iniciado_en = now() WHERE id = v_b;
+  GET DIAGNOSTICS afectadas = ROW_COUNT;
+  IF afectadas <> 1 THEN RAISE EXCEPTION '80a: no se pudo INICIAR un bloque pasado'; END IF;
+  UPDATE public.bloques_turno
+     SET estado = 'completado', cerrado_en = now(), puntaje_completitud = 100, notas = 'sin novedad'
+   WHERE id = v_b;
+  GET DIAGNOSTICS afectadas = ROW_COUNT;
+  IF afectadas <> 1 THEN RAISE EXCEPTION '80b: no se pudo CERRAR un bloque pasado'; END IF;
+  RESET ROLE;
+  RAISE NOTICE 'OK 80 iniciar, cerrar, puntuar y anotar siguen permitidos, también en el pasado';
+
+  -- ── 81. Desvincular la jornada tampoco es re-planificar ────────────────
+  -- `plantilla_horario_id` cuelga con ON DELETE SET NULL: borrar una jornada
+  -- pone NULL en los bloques históricos y CONSERVA la foto de `politica`
+  -- (20260913040300). Si el trigger lo tratara como re-planificación, borrar
+  -- una jornada sería imposible en cuanto tuviera un solo día pasado.
+  INSERT INTO public.plantillas_horario (company_id, project_id, nombre, turno, hora_inicio, hora_fin)
+    VALUES (CO, PR, 'Efímera', 'noche', TIME '22:00', TIME '06:00')
+    RETURNING id INTO v_otra;
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado, iniciado_en, cerrado_en)
+    VALUES (CO, PR, MARIO, v_otra, 'noche', CURRENT_DATE - 20, 'completado', now(), now())
+    RETURNING id INTO v_b;
+  DELETE FROM public.plantillas_horario WHERE id = v_otra;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b AND plantilla_horario_id IS NULL;
+  IF n <> 1 THEN
+    RAISE EXCEPTION '81: borrar una jornada debía desvincular el bloque histórico, no fallar'; END IF;
+  RAISE NOTICE 'OK 81 borrar una jornada desvincula el histórico sin chocar con el trigger';
+
+  RAISE NOTICE '── 12 invariantes de re-planificación segura OK ──';
 END;
 $$;

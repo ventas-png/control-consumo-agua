@@ -394,7 +394,11 @@ INSERT INTO public.user_project_assignments (user_id, project_id) VALUES
 INSERT INTO public.personal_condominio (id, company_id, project_id, nombre, cargo, turno) VALUES
   ('50000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Pedro Guardia',   'guardia',  'nocturno'),
   ('50000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Lucía Conserje',  'conserje', 'diurno'),
-  ('50000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Mario Jardinero', 'jardinero','diurno');
+  ('50000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Mario Jardinero', 'jardinero','diurno'),
+  -- Nora trabaja en el OTRO condominio de la MISMA empresa. Es la que permite
+  -- probar que el alcance se concede por proyecto y no por empresa: quien
+  -- administra el condominio 1 no puede escribirle la agenda a ella.
+  ('50000000-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000003', 'Nora OtroCondo',  'conserje', 'diurno');
 
 -- Marcaje histórico SIN personal_id: alimenta el backfill por nombre.
 -- "Pedro Guardia" casa exacto; "Empleado Externo" no está en plantilla y debe

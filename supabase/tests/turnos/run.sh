@@ -12,7 +12,7 @@
 # convierte en un pago. La aritmética de "cada bimestre, el día 31, saltando
 # festivos" no se revisa a ojo.
 #
-# QUÉ COMPRUEBA (65 invariantes)
+# QUÉ COMPRUEBA (81 invariantes)
 #   A · JORNADA       que 22:00→06:00 cuenta 8 h y no -960 minutos (el bug vivo
 #                     de PresenciaPersonalTab), con y sin bandera de cruce, que
 #                     el descanso se descuenta y que la franja nocturna
@@ -60,6 +60,18 @@
 #                     trigger rechaza el borrado NO queda excepción huérfana y
 #                     sube su mensaje intacto, que repetir es idempotente, y que
 #                     un UUID ajeno no abre la puerta a otro inquilino.
+#   L · PROYECTO      que el alcance se concede por PROYECTO y no por empresa:
+#                     con turnos.edit pero sin el condominio asignado no se da
+#                     de alta, no se actualiza y no se puede MOVER un bloque al
+#                     condominio de al lado; y que quien sí lo administra
+#                     escribe con normalidad.
+#   M · REPLANIFICAR  que cambiarle la jornada a un día exige lo mismo que
+#                     borrarlo —futuro, pendiente, sin iniciar, sin cerrar, sin
+#                     tareas, revisiones ni marcajes— también por UPDATE
+#                     directo; que cada condición se prueba aislada, así que
+#                     retirarla rompe exactamente una invariante; y que NO se
+#                     rompe el ciclo de vida (iniciar, cerrar, puntuar, anotar)
+#                     ni el ON DELETE SET NULL al borrar una jornada.
 #
 # USO
 #   supabase/tests/turnos/run.sh
@@ -81,6 +93,9 @@ MIG_NUEVA="$RAIZ/supabase/migrations/20260916171325_turnos_dias_del_mes_excepcio
 # Y la última: reemplaza las policies de escritura y la RPC de generación para
 # que autoricen por ACCIÓN, y añade las tres RPC transaccionales del día.
 MIG_ACCION="$RAIZ/supabase/migrations/20260916221839_turnos_autorizacion_por_accion_y_dia_atomico.sql"
+# Y la última: añade can_access_project a la escritura de bloques y somete la
+# re-planificación de un día a las mismas invariantes que el borrado.
+MIG_ALCANCE="$RAIZ/supabase/migrations/20260916232549_turnos_alcance_proyecto_y_replanificacion_segura.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -120,8 +135,8 @@ echo "── 1/4 · fixture (padrón + helpers + personal tal como está en prod
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$AQUI/fixture.sql" >/dev/null
 echo "  OK    fixture cargado"
 
-echo "── 2/4 · aplicar las seis migraciones ──────────────────────────────────"
-for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA" "$MIG_ACCION"; do
+echo "── 2/4 · aplicar las siete migraciones ─────────────────────────────────"
+for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA" "$MIG_ACCION" "$MIG_ALCANCE"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$m" >/dev/null
   echo "  OK    $(basename "$m")"
 done
@@ -146,13 +161,14 @@ if echo "$SALIDA" | grep -q 'WARNING:'; then
 fi
 
 echo
-echo "── 4/4 · idempotencia (re-aplicar las seis) ────────────────────────────"
-for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA" "$MIG_ACCION"; do
+echo "── 4/4 · idempotencia (re-aplicar las siete) ───────────────────────────"
+for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA" "$MIG_ACCION" "$MIG_ALCANCE"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$m" >/dev/null
 done
-echo "  OK    las seis migraciones se pueden volver a aplicar"
+echo "  OK    las siete migraciones se pueden volver a aplicar"
 
 echo
-echo "✅ turnos: 65 invariantes (jornada, periodicidad, backfill, generación,"
+echo "✅ turnos: 81 invariantes (jornada, periodicidad, backfill, generación,"
 echo "   expediente, horas, RLS, borrado seguro, excepciones, autorización por"
-echo "   acción y edición atómica del día), migraciones idempotentes."
+echo "   acción, edición atómica del día, alcance por proyecto y re-planificación"
+echo "   segura), migraciones idempotentes."
