@@ -27,6 +27,15 @@ const mocks = vi.hoisted(() => ({
   createCondominioRowReturning: vi.fn<
     () => Promise<{ data: { id: string } | null; error: { message: string } | null }>
   >(async () => ({ data: { id: 'ph-nueva' }, error: null })),
+  guardarDiaTurno: vi.fn<
+    () => Promise<{ data: string | null; error: { message: string } | null }>
+  >(async () => ({ data: 'b-nuevo', error: null })),
+  quitarDiaTurno: vi.fn<
+    () => Promise<{ data: string | null; error: { message: string } | null }>
+  >(async () => ({ data: 'x-nueva', error: null })),
+  restaurarDiaTurno: vi.fn<
+    () => Promise<{ data: number | null; error: { message: string } | null }>
+  >(async () => ({ data: 1, error: null })),
   fetchCuposDePlantillas: vi.fn<
     () => Promise<{ cupos: CupoPausa[]; error: string | null }>
   >(async () => ({ cupos: [], error: null })),
@@ -57,6 +66,9 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
   generarBloquesTurno: mocks.generarBloquesTurno,
+  guardarDiaTurno: mocks.guardarDiaTurno,
+  quitarDiaTurno: mocks.quitarDiaTurno,
+  restaurarDiaTurno: mocks.restaurarDiaTurno,
 }))
 // `tramosDemora` y `minutosCupoQueDescuentan` NO se mockean: son aritmética pura
 // y lo que se comprueba abajo es justo lo que producen en pantalla.
@@ -144,6 +156,9 @@ beforeEach(() => {
   mocks.createCondominioRow.mockResolvedValue({ error: null })
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
   mocks.deleteCondominioRow.mockResolvedValue({ error: null })
+  mocks.guardarDiaTurno.mockResolvedValue({ data: 'b-nuevo', error: null })
+  mocks.quitarDiaTurno.mockResolvedValue({ data: 'x-nueva', error: null })
+  mocks.restaurarDiaTurno.mockResolvedValue({ data: 1, error: null })
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
   mocks.generarBloquesTurno.mockResolvedValue({
     data: { generados: 22, omitidos_ausencia: 0, omitidos_no_laborable: 0, omitidos_existente: 0 },
@@ -784,81 +799,42 @@ describe('editar un día del calendario', () => {
     expect(screen.getByText(/Turno generado · Nocturno/)).toBeTruthy()
   })
 
-  it('cambiar la jornada de un día toca ESE bloque y nada más', async () => {
+  it('cambiar la jornada de un día es UNA llamada, no dos escrituras sueltas', async () => {
     await calendarioConBloque()
     fireEvent.click(casilla('18'))
     await screen.findByLabelText('Jornada de este día')
     fireEvent.click(screen.getByText('Guardar'))
 
-    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1))
-    const [tabla, id, patch] = mocks.updateCondominioRow.mock.calls[0] as unknown as
-      [string, string, Record<string, unknown>]
-    expect(tabla).toBe('bloques_turno')
-    expect(id).toBe('b1')
-    expect(patch.plantilla_horario_id).toBe('ph1')
-    // Derivadas: las sellan sus triggers. Mandarlas sería inventar contra qué
-    // se va a medir el turno.
-    expect(patch).not.toHaveProperty('horas_planificadas')
-    expect(patch).not.toHaveProperty('politica')
-  })
-
-  it('asignar un día con ausencia aprobada avisa antes de crear el conflicto', async () => {
-    // Se permite —a veces hay que cubrir— pero no en silencio: el generador
-    // nunca crea estos y el calendario los pinta en rojo.
-    const ausencia: AusenciaPersonal = {
-      id: 'a1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
-      tipo: 'vacaciones', fecha_inicio: '2026-09-19', fecha_fin: '2026-09-22',
-      goce_salario: true, estado: 'aprobada', created_at: '',
-    }
-    renderTab({ ausencias: [ausencia] })
-    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
-    fireEvent.click(casilla('20'))
-    await screen.findByLabelText('Jornada de este día')
-    fireEvent.change(screen.getByLabelText('Jornada de este día'), { target: { value: 'ph1' } })
-    fireEvent.click(screen.getByText('Guardar'))
-
-    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
-      title: 'Esa persona tiene ausencia aprobada ese día',
-    })))
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
-  })
-
-  it('y si se dice que no, no se crea nada', async () => {
-    const ausencia: AusenciaPersonal = {
-      id: 'a1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
-      tipo: 'vacaciones', fecha_inicio: '2026-09-19', fecha_fin: '2026-09-22',
-      goce_salario: true, estado: 'aprobada', created_at: '',
-    }
-    mocks.confirm.mockResolvedValueOnce({ isConfirmed: false })
-    renderTab({ ausencias: [ausencia] })
-    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
-    fireEvent.click(casilla('20'))
-    await screen.findByLabelText('Jornada de este día')
-    fireEvent.change(screen.getByLabelText('Jornada de este día'), { target: { value: 'ph1' } })
-    fireEvent.click(screen.getByText('Guardar'))
-
-    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mocks.guardarDiaTurno).toHaveBeenCalledTimes(1))
+    const [args] = mocks.guardarDiaTurno.mock.calls[0] as unknown as [Record<string, unknown>]
+    expect(args.projectId).toBe('p1')
+    expect(args.personalId).toBe('emp1')
+    expect(args.fecha).toBe('2026-09-18')
+    expect(args.plantillaHorarioId).toBe('ph1')
+    // El bloque y la excepción los resuelve la RPC en un commit: la UI ya no
+    // encadena escrituras sueltas ni compensa a mano.
+    expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
     expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+    expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
   })
 
-  it('una ausencia SOLICITADA no dispara el aviso: sólo bloquea la aprobada', async () => {
-    const ausencia: AusenciaPersonal = {
-      id: 'a1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
-      tipo: 'vacaciones', fecha_inicio: '2026-09-19', fecha_fin: '2026-09-22',
-      goce_salario: true, estado: 'solicitada', created_at: '',
-    }
-    renderTab({ ausencias: [ausencia] })
-    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
-    fireEvent.click(casilla('20'))
+  it('si la RPC de guardar falla, no se cierra el editor ni se dice que quedó hecho', async () => {
+    await calendarioConBloque()
+    mocks.guardarDiaTurno.mockResolvedValueOnce({
+      data: null, error: { message: 'no autorizado: se necesita permiso de editar en Asignación de turnos' },
+    })
+    fireEvent.click(casilla('18'))
     await screen.findByLabelText('Jornada de este día')
-    fireEvent.change(screen.getByLabelText('Jornada de este día'), { target: { value: 'ph1' } })
     fireEvent.click(screen.getByText('Guardar'))
 
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
-    expect(mocks.confirm).not.toHaveBeenCalled()
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', text: 'no autorizado: se necesita permiso de editar en Asignación de turnos',
+    })))
+    // El editor sigue abierto: nada se guardó y no se anuncia lo contrario.
+    expect(screen.getByLabelText('Jornada de este día')).toBeTruthy()
   })
 
-  it('asignar un día vacío crea un bloque manual, no una regla', async () => {
+  it('asignar un día vacío también es una sola llamada, con la regla que lo preveía', async () => {
     // El 20 es domingo: la regla es L-V, así que no hay ni bloque ni previsión.
     renderTab()
     await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
@@ -867,14 +843,11 @@ describe('editar un día del calendario', () => {
     fireEvent.change(screen.getByLabelText('Jornada de este día'), { target: { value: 'ph1' } })
     fireEvent.click(screen.getByText('Guardar'))
 
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
-    const [tabla, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as
-      [string, Record<string, unknown>]
-    expect(tabla).toBe('bloques_turno')
-    expect(payload.fecha).toBe('2026-09-20')
-    expect(payload.personal_id).toBe('emp1')
-    expect(payload.origen).toBe('manual')
-    expect(payload.estado).toBe('pendiente')
+    await waitFor(() => expect(mocks.guardarDiaTurno).toHaveBeenCalledTimes(1))
+    const [args] = mocks.guardarDiaTurno.mock.calls[0] as unknown as [Record<string, unknown>]
+    expect(args.fecha).toBe('2026-09-20')
+    expect(args.plantillaHorarioId).toBe('ph1')
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
   })
 })
 
@@ -882,81 +855,59 @@ describe('editar un día del calendario', () => {
 // Quitar un día, y que se quede quitado.
 //
 // El generador SÓLO agrega: borrar el bloque no quita el día, porque el
-// siguiente «Generar» lo vuelve a crear. Lo que lo quita es la excepción.
+// siguiente «Generar» lo vuelve a crear. Lo que lo quita es la excepción — y
+// las dos escrituras van juntas o no va ninguna, en la base, no aquí.
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('quitar un día', () => {
-  it('deja la excepción ANTES de borrar el bloque, para que no reaparezca al generar', async () => {
+  it('es UNA llamada: la excepción y el borrado los ata la base, no la UI', async () => {
     await calendarioConBloque()
     fireEvent.click(casilla('18'))
     fireEvent.click(await screen.findByText('Quitar el día'))
 
-    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledTimes(1))
-    expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1)
-    const [tablaExc, payload] = mocks.createCondominioRowReturning.mock.calls[0] as unknown as
-      [string, Record<string, unknown>]
-    expect(tablaExc).toBe('excepciones_turno')
-    expect(payload.fecha).toBe('2026-09-18')
-    expect(payload.personal_id).toBe('emp1')
-    expect(payload.company_id).toBe('c1')
-    expect(payload.project_id).toBe('p1')
-    // `creado_por` lo sella la BD y es inmutable: la UI no lo manda.
-    expect(payload).not.toHaveProperty('creado_por')
-
-    const [tablaBloque, id] = mocks.deleteCondominioRow.mock.calls[0] as unknown as [string, string]
-    expect(tablaBloque).toBe('bloques_turno')
-    expect(id).toBe('b1')
-  })
-
-  it('si la BD rechaza el borrado, deshace la excepción y muestra SU mensaje', async () => {
-    // Es el caso que importa: la base rechaza los bloques con checklist,
-    // empezados o cerrados, pase quien pase. Si la excepción se quedara, el día
-    // se vería quitado mientras el turno sigue existiendo.
-    await calendarioConBloque()
-    mocks.createCondominioRowReturning.mockResolvedValueOnce({ data: { id: 'x-nueva' }, error: null })
-    mocks.deleteCondominioRow.mockResolvedValueOnce({
-      error: { message: 'no se puede borrar un bloque con tareas asignadas' },
-    })
-    fireEvent.click(casilla('18'))
-    fireEvent.click(await screen.findByText('Quitar el día'))
-
-    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
-      variant: 'error', text: 'no se puede borrar un bloque con tareas asignadas',
-    })))
-    // Dos borrados: el del bloque, que falló, y el de la excepción que se acaba
-    // de crear. El día queda exactamente como estaba.
-    expect(mocks.deleteCondominioRow).toHaveBeenCalledTimes(2)
-    const [tabla, id] = mocks.deleteCondominioRow.mock.calls[1] as unknown as [string, string]
-    expect(tabla).toBe('excepciones_turno')
-    expect(id).toBe('x-nueva')
-  })
-
-  it('si la excepción no se puede crear, el bloque NI SE TOCA', async () => {
-    await calendarioConBloque()
-    mocks.createCondominioRowReturning.mockResolvedValueOnce({
-      data: null, error: { message: 'permiso denegado' },
-    })
-    fireEvent.click(casilla('18'))
-    fireEvent.click(await screen.findByText('Quitar el día'))
-
-    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
-      variant: 'error', text: 'permiso denegado',
-    })))
+    await waitFor(() => expect(mocks.quitarDiaTurno).toHaveBeenCalledTimes(1))
+    const [args] = mocks.quitarDiaTurno.mock.calls[0] as unknown as [Record<string, unknown>]
+    expect(args.projectId).toBe('p1')
+    expect(args.personalId).toBe('emp1')
+    expect(args.fecha).toBe('2026-09-18')
+    // Ni creación de excepción por separado, ni borrado por separado, ni el
+    // «deshacer» que antes hacía falta cuando el segundo paso fallaba.
+    expect(mocks.createCondominioRowReturning).not.toHaveBeenCalled()
     expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
   })
 
-  it('quitar un día SÓLO previsto no borra ningún bloque: no hay ninguno', async () => {
+  it('si la base rechaza el borrado, muestra SU mensaje y no anuncia éxito parcial', async () => {
+    // Es el caso que importa: la base rechaza los bloques con checklist,
+    // empezados o cerrados, pase quien pase. Al ser una transacción, la
+    // excepción se revierte con el rechazo y no queda nada que compensar.
+    await calendarioConBloque()
+    mocks.quitarDiaTurno.mockResolvedValueOnce({
+      data: null, error: { message: 'no se puede borrar un bloque con 1 tarea(s) asociada(s)' },
+    })
+    fireEvent.click(casilla('18'))
+    fireEvent.click(await screen.findByText('Quitar el día'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', text: 'no se puede borrar un bloque con 1 tarea(s) asociada(s)',
+    })))
+    expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
+    // El editor sigue abierto y el día no se dio por quitado.
+    expect(screen.getByText('Quitar el día')).toBeTruthy()
+  })
+
+  it('quitar un día SÓLO previsto usa la misma llamada', async () => {
     // El 17 es jueves y la regla lo cubre, pero nadie generó el mes.
     renderTab()
     await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
     fireEvent.click(casilla('17'))
     fireEvent.click(await screen.findByText('Quitar el día'))
 
-    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
-    expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
+    await waitFor(() => expect(mocks.quitarDiaTurno).toHaveBeenCalledTimes(1))
+    const [args] = mocks.quitarDiaTurno.mock.calls[0] as unknown as [Record<string, unknown>]
+    expect(args.fecha).toBe('2026-09-17')
   })
 
-  it('un día quitado se marca en el calendario y ofrece restaurarlo', async () => {
+  it('un día quitado se marca en el calendario y se restaura con una llamada', async () => {
     const excepcion: ExcepcionTurno = {
       id: 'x1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
       fecha: '2026-09-17', asignacion_id: 'r1', created_at: '',
@@ -969,10 +920,30 @@ describe('quitar un día', () => {
 
     fireEvent.click(casilla('17'))
     fireEvent.click(await screen.findByText('Restaurar el día'))
-    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledTimes(1))
-    const [tabla, id] = mocks.deleteCondominioRow.mock.calls[0] as unknown as [string, string]
-    expect(tabla).toBe('excepciones_turno')
-    expect(id).toBe('x1')
+    await waitFor(() => expect(mocks.restaurarDiaTurno).toHaveBeenCalledTimes(1))
+    const [args] = mocks.restaurarDiaTurno.mock.calls[0] as unknown as [Record<string, unknown>]
+    expect(args.fecha).toBe('2026-09-17')
+    expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
+  })
+
+  it('si restaurar falla, lo dice y no cierra el editor', async () => {
+    const excepcion: ExcepcionTurno = {
+      id: 'x1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+      fecha: '2026-09-17', asignacion_id: 'r1', created_at: '',
+    }
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: [], error: null }, { data: [excepcion], error: null },
+    ])
+    mocks.restaurarDiaTurno.mockResolvedValueOnce({ data: null, error: { message: 'no autorizado' } })
+    renderTab()
+    await waitFor(() => expect(casilla('17').getAttribute('title')).toMatch(/quitado a mano/i))
+
+    fireEvent.click(casilla('17'))
+    fireEvent.click(await screen.findByText('Restaurar el día'))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', text: 'no autorizado',
+    })))
+    expect(screen.getByText('Restaurar el día')).toBeTruthy()
   })
 })
 

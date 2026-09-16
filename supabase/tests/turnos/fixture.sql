@@ -370,7 +370,14 @@ INSERT INTO public.app_users (id, project_id, full_name, company_id, role) VALUE
   ('e0000000-0000-0000-0000-00000000000c', '11111111-0000-0000-0000-000000000002', 'Caro Vecina',        'aaaaaaaa-0000-0000-0000-000000000002', 'admin'),
   ('e0000000-0000-0000-0000-00000000000d', '11111111-0000-0000-0000-000000000001', 'Olga Dueña',         'aaaaaaaa-0000-0000-0000-000000000001', 'company_owner'),
   ('e0000000-0000-0000-0000-00000000000e', NULL,                                   'Sam Super',          'aaaaaaaa-0000-0000-0000-000000000001', 'super_admin'),
-  ('e0000000-0000-0000-0000-00000000000f', '11111111-0000-0000-0000-000000000003', 'Fede OtroCondo',     'aaaaaaaa-0000-0000-0000-000000000001', 'operator');
+  ('e0000000-0000-0000-0000-00000000000f', '11111111-0000-0000-0000-000000000003', 'Fede OtroCondo',     'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
+  -- Tino sólo MIRA. Tiene la clave de visibilidad del tab de turnos y ninguna
+  -- de acción: es el rol con el que se comprueba que ver el calendario no
+  -- autoriza a escribir en él (invariantes 53-58).
+  ('e0000000-0000-0000-0000-000000000010', '11111111-0000-0000-0000-000000000001', 'Tino Mirón',         'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
+  -- Lola llega por el camino VIEJO: sin claves de acción por tab, pero con el
+  -- par legado de módulo completo que `canActInCondominiosTab` sigue aceptando.
+  ('e0000000-0000-0000-0000-000000000011', '11111111-0000-0000-0000-000000000001', 'Lola Legada',        'aaaaaaaa-0000-0000-0000-000000000001', 'operator');
 
 -- Ana y Fede quedan ASIGNADOS a su condominio. La asignación es lo que hace que
 -- `user_is_project_exempt()` deje de eximir al rol admin: sin ella, un admin ve
@@ -379,7 +386,9 @@ INSERT INTO public.app_users (id, project_id, full_name, company_id, role) VALUE
 INSERT INTO public.user_project_assignments (user_id, project_id) VALUES
   ('e0000000-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001'),
   ('e0000000-0000-0000-0000-00000000000b', '11111111-0000-0000-0000-000000000001'),
-  ('e0000000-0000-0000-0000-00000000000f', '11111111-0000-0000-0000-000000000003');
+  ('e0000000-0000-0000-0000-00000000000f', '11111111-0000-0000-0000-000000000003'),
+  ('e0000000-0000-0000-0000-000000000010', '11111111-0000-0000-0000-000000000001'),
+  ('e0000000-0000-0000-0000-000000000011', '11111111-0000-0000-0000-000000000001');
 
 -- Empleados del condominio 1.
 INSERT INTO public.personal_condominio (id, company_id, project_id, nombre, cargo, turno) VALUES

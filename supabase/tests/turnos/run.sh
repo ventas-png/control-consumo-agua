@@ -12,7 +12,7 @@
 # convierte en un pago. La aritmética de "cada bimestre, el día 31, saltando
 # festivos" no se revisa a ojo.
 #
-# QUÉ COMPRUEBA (52 invariantes)
+# QUÉ COMPRUEBA (65 invariantes)
 #   A · JORNADA       que 22:00→06:00 cuenta 8 h y no -960 minutos (el bug vivo
 #                     de PresenciaPersonalTab), con y sin bandera de cruce, que
 #                     el descanso se descuenta y que la franja nocturna
@@ -49,6 +49,17 @@
 #                     que las cuatro operaciones respetan empresa y proyecto,
 #                     y que el ACL de la tabla es el declarado y no el que
 #                     Supabase concede por defecto (TRUNCATE no pasa por RLS).
+#   J · AUTORIZACIÓN  que la clave de VISIBILIDAD del tab (3 segmentos) deja
+#                     leer el calendario y NO deja escribirlo: ni excepciones,
+#                     ni bloques, ni generar el mes, ni las RPC del día; que con
+#                     el permiso de acción las mismas operaciones pasan; y que
+#                     el fallback legado platform.condominios.view + acción
+#                     sigue valiendo.
+#   K · ATOMICIDAD    que guardar un día retira su excepción en el mismo commit,
+#                     que quitarlo borra su bloque en el mismo commit, que si el
+#                     trigger rechaza el borrado NO queda excepción huérfana y
+#                     sube su mensaje intacto, que repetir es idempotente, y que
+#                     un UUID ajeno no abre la puerta a otro inquilino.
 #
 # USO
 #   supabase/tests/turnos/run.sh
@@ -67,6 +78,9 @@ MIG_HRS="$RAIZ/supabase/migrations/20260820000300_horas_personal_calculo.sql"
 # MIG_GEN y la reemplaza por la de 9. Si se aplicara antes, MIG_GEN volvería a
 # crear la vieja y toda llamada de 8 argumentos quedaría ambigua.
 MIG_NUEVA="$RAIZ/supabase/migrations/20260916171325_turnos_dias_del_mes_excepciones_y_borrado_seguro.sql"
+# Y la última: reemplaza las policies de escritura y la RPC de generación para
+# que autoricen por ACCIÓN, y añade las tres RPC transaccionales del día.
+MIG_ACCION="$RAIZ/supabase/migrations/20260916221839_turnos_autorizacion_por_accion_y_dia_atomico.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -106,8 +120,8 @@ echo "── 1/4 · fixture (padrón + helpers + personal tal como está en prod
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$AQUI/fixture.sql" >/dev/null
 echo "  OK    fixture cargado"
 
-echo "── 2/4 · aplicar las cinco migraciones ─────────────────────────────────"
-for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA"; do
+echo "── 2/4 · aplicar las seis migraciones ──────────────────────────────────"
+for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA" "$MIG_ACCION"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$m" >/dev/null
   echo "  OK    $(basename "$m")"
 done
@@ -132,13 +146,13 @@ if echo "$SALIDA" | grep -q 'WARNING:'; then
 fi
 
 echo
-echo "── 4/4 · idempotencia (re-aplicar las cinco) ───────────────────────────"
-for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA"; do
+echo "── 4/4 · idempotencia (re-aplicar las seis) ────────────────────────────"
+for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA" "$MIG_ACCION"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$m" >/dev/null
 done
-echo "  OK    las cinco migraciones se pueden volver a aplicar"
+echo "  OK    las seis migraciones se pueden volver a aplicar"
 
 echo
-echo "✅ turnos: 52 invariantes (jornada, periodicidad, backfill, generación,"
-echo "   expediente, horas, RLS, borrado seguro y excepciones),"
-echo "   migraciones idempotentes."
+echo "✅ turnos: 65 invariantes (jornada, periodicidad, backfill, generación,"
+echo "   expediente, horas, RLS, borrado seguro, excepciones, autorización por"
+echo "   acción y edición atómica del día), migraciones idempotentes."

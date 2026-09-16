@@ -347,15 +347,36 @@ export async function fetchCondominiosTurnosData(pid: string, cid: string) {
 export async function fetchTurnosDelMes(
   pid: string, cid: string, desde: string, hasta: string,
 ) {
+  // PAGINADO, no «una consulta y a ver qué llega». Acotar por fecha reduce el
+  // conjunto pero no lo acota: PostgREST corta en ~1000 filas por defecto y no
+  // lo dice, así que un condominio de cuarenta empleados con turnos partidos
+  // pierde el final del mes EN SILENCIO — y en este calendario «no está» y «no
+  // llegó» se pintan igual, como día libre.
+  //
+  // El orden tiene que ser TOTAL, no sólo por fecha: con `fecha` sola, dos
+  // filas del mismo día pueden repartirse entre dos ventanas en cualquier
+  // orden y `.range()` duplicaría una y se saltaría otra. `id` de desempate lo
+  // cierra.
   const enRango = <T extends 'bloques_turno' | 'excepciones_turno'>(tabla: T) =>
-    supabase
-      .from(tabla)
-      .select('*')
-      .eq('project_id', pid)
-      .eq('company_id', cid)
-      .gte('fecha', desde)
-      .lte('fecha', hasta)
-      .order('fecha')
+    fetchAllRows((from, to) =>
+      supabase
+        .from(tabla)
+        .select('*')
+        .eq('project_id', pid)
+        .eq('company_id', cid)
+        .gte('fecha', desde)
+        .lte('fecha', hasta)
+        .order('fecha', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    ).then(({ data, error, truncated }) => {
+      if (truncated) {
+        console.warn(`[condominios] ${tabla} del mes cortada en el techo de seguridad (${data.length}) — el calendario puede estar incompleto`)
+      }
+      // Mismo shape { data, error } que el resto del módulo, para que el
+      // «las dos o ninguna» del tab siga leyéndose igual.
+      return { data: error ? null : data, error: error ? { message: error } : null }
+    })
 
   return Promise.all([enRango('bloques_turno'), enRango('excepciones_turno')])
 }

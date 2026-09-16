@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   createCondominioRow,
-  createCondominioRowReturning,
   deleteCondominioRow,
   generarBloquesTurno,
+  guardarDiaTurno,
+  quitarDiaTurno,
+  restaurarDiaTurno,
   updateCondominioRow,
 } from '../../../domain/condominios/tabMutations'
 import {
@@ -547,7 +549,6 @@ export default function TurnosTab({
     // permite —a veces hay que cubrir y la decisión es de quien administra—
     // pero no en silencio: el generador nunca crea estos, el calendario los
     // pinta en rojo como conflicto, y el balance de jornada los mide aparte.
-    // Quien lo haga tiene que saber que está creando esa fila.
     const ausencia = celdaAbierta.ausencia
     if (ausencia && !celdaAbierta.bloque) {
       const { isConfirmed } = await confirm({
@@ -558,38 +559,20 @@ export default function TurnosTab({
       if (!isConfirmed) return
     }
     setSaving(true)
-    // `horas_planificadas` y `politica` NO se mandan: las sellan sus triggers
-    // (trg_turnos_sellar_horas, trg_turnos_sellar_politica). Mandarlas desde el
-    // cliente sería inventar contra qué se va a medir el turno.
-    const horario = {
-      plantilla_horario_id: plantilla.id,
-      turno: plantilla.turno,
-      hora_inicio: plantilla.hora_inicio,
-      hora_fin: plantilla.hora_fin,
-      cruza_medianoche: plantilla.cruza_medianoche,
-    }
-    const { error } = celdaAbierta.bloque
-      ? await updateCondominioRow('bloques_turno', celdaAbierta.bloque.id, horario)
-      : await createCondominioRow('bloques_turno', {
-        company_id: companyId,
-        project_id: proyectoId,
-        personal_id: modalDia.personalId,
-        fecha: modalDia.fecha,
-        asignacion_id: celdaAbierta.regla?.id ?? null,
-        origen: 'manual',
-        estado: 'pendiente',
-        ...horario,
-      })
+    // UNA llamada. La RPC escribe el bloque y retira la excepción que lo tenía
+    // quitado en el MISMO commit: antes eran dos peticiones y, entre una y
+    // otra, el día podía quedar asignado y marcado como quitado a la vez.
+    const { error } = await guardarDiaTurno({
+      projectId: proyectoId,
+      personalId: modalDia.personalId,
+      fecha: modalDia.fecha,
+      plantillaHorarioId: plantilla.id,
+      asignacionId: celdaAbierta.regla?.id ?? null,
+    })
+    setSaving(false)
     if (error) {
-      setSaving(false)
       notify({ variant: 'error', title: 'No se pudo guardar el día', text: error.message }); return
     }
-    // Asignar un día que estaba quitado lo deshace: dejar la excepción encima
-    // de un bloque real sería decir «este día no va» mientras el día va.
-    if (celdaAbierta.excepcion) {
-      await deleteCondominioRow('excepciones_turno', celdaAbierta.excepcion.id)
-    }
-    setSaving(false)
     setModalDia(null)
     refrescar()
   }
@@ -603,45 +586,24 @@ export default function TurnosTab({
     })
     if (!isConfirmed) return
     setSaving(true)
-    // ORDEN A PROPÓSITO: primero la excepción, después el bloque.
+    // UNA llamada, y por tanto una transacción. La excepción y el borrado del
+    // bloque confirman o revierten juntos: si la base rechaza el borrado
+    // —arrancó, se cerró, tiene checklist— no queda una excepción huérfana
+    // diciendo que el día está quitado mientras el turno sigue vivo.
     //
-    // Borrar el bloque sin dejar la excepción no quita nada: el siguiente
-    // «Generar» lo vuelve a crear, porque el generador solo agrega y no tiene
-    // cómo saber que ese día se quitó a mano. Y si se hiciera al revés y
-    // fallara la excepción, el día habría desaparecido para volver solo.
-    //
-    // Al derecho, en cambio, un fallo al borrar el bloque —la base rechaza los
-    // empezados, cerrados o con checklist, sea quien sea el que borre— deshace
-    // la excepción y el día queda exactamente como estaba.
-    let excepcionCreada: string | null = null
-    if (!celdaAbierta.excepcion) {
-      const { data, error } = await createCondominioRowReturning('excepciones_turno', {
-        company_id: companyId,
-        project_id: proyectoId,
-        personal_id: modalDia.personalId,
-        fecha: modalDia.fecha,
-        // Informativa: deja dicho qué regla cubría el día cuando se quitó.
-        asignacion_id: celdaAbierta.regla?.id ?? null,
-        motivo: 'Quitado desde el calendario',
-      }, 'id')
-      if (error) {
-        setSaving(false)
-        notify({ variant: 'error', title: 'No se pudo quitar el día', text: error.message }); return
-      }
-      excepcionCreada = (data?.id as string | undefined) ?? null
-    }
-    if (celdaAbierta.bloque) {
-      const { error } = await deleteCondominioRow('bloques_turno', celdaAbierta.bloque.id)
-      if (error) {
-        if (excepcionCreada) await deleteCondominioRow('excepciones_turno', excepcionCreada)
-        setSaving(false)
-        // El mensaje de la base se muestra tal cual porque dice CUÁL de las
-        // condiciones falló (ya empezó, tiene tareas, la fecha ya pasó…), que
-        // es justo lo que hay que saber para decidir qué hacer.
-        notify({ variant: 'error', title: 'No se pudo quitar el turno', text: error.message }); return
-      }
-    }
+    // El mensaje se muestra tal cual porque es el del trigger, y dice CUÁL de
+    // las condiciones falló.
+    const { error } = await quitarDiaTurno({
+      projectId: proyectoId,
+      personalId: modalDia.personalId,
+      fecha: modalDia.fecha,
+      asignacionId: celdaAbierta.regla?.id ?? null,
+      motivo: 'Quitado desde el calendario',
+    })
     setSaving(false)
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo quitar el turno', text: error.message }); return
+    }
     setModalDia(null)
     refrescar()
   }
@@ -649,7 +611,11 @@ export default function TurnosTab({
   async function restaurarDia() {
     if (!modalDia || !celdaAbierta?.excepcion) return
     setSaving(true)
-    const { error } = await deleteCondominioRow('excepciones_turno', celdaAbierta.excepcion.id)
+    const { error } = await restaurarDiaTurno({
+      projectId: proyectoId,
+      personalId: modalDia.personalId,
+      fecha: modalDia.fecha,
+    })
     setSaving(false)
     if (error) {
       notify({ variant: 'error', title: 'No se pudo restaurar', text: error.message }); return
