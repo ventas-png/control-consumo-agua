@@ -34,9 +34,12 @@ const mocks = vi.hoisted(() => ({
     () => Promise<{ id: string | null; error: string | null }>
   >(async () => ({ id: 'ph-nueva', error: null })),
   fetchTiposPausa: vi.fn(async () => ({ tipos: TIPOS_PAUSA, error: null })),
-  fetchBloquesTurnoRango: vi.fn<
-    () => Promise<{ data: BloqueTurno[] | null; error: { message: string } | null }>
-  >(async () => ({ data: [], error: null })),
+  fetchTurnosDelMes: vi.fn<
+    () => Promise<[
+      { data: BloqueTurno[] | null; error: { message: string } | null },
+      { data: ExcepcionTurno[] | null; error: { message: string } | null },
+    ]>
+  >(async () => [{ data: [], error: null }, { data: [], error: null }]),
 }))
 
 const TIPOS_PAUSA = [
@@ -69,7 +72,7 @@ vi.mock('../../../../domain/condominios/pausasPresencia', () => ({
 // del proyecto entero). Sin este mock la consulta entra al cliente falso de
 // arriba, que no tiene `.select`, y el tab revienta al montar.
 vi.mock('../../../../domain/condominios/sectionData', () => ({
-  fetchBloquesTurnoRango: mocks.fetchBloquesTurnoRango,
+  fetchTurnosDelMes: mocks.fetchTurnosDelMes,
 }))
 // «Hoy» fijo. La mitad de lo que se prueba abajo —qué casilla se puede tocar y
 // cuál no— depende de la fecha, y una prueba que cambia de resultado según el
@@ -137,7 +140,7 @@ beforeEach(() => {
   // `mockClear` sólo borra el historial de llamadas: lo que un test haya dejado
   // puesto con `mockResolvedValue` sigue puesto. Estos cuatro se reponen a mano
   // para que el orden de los tests no cambie el resultado.
-  mocks.fetchBloquesTurnoRango.mockResolvedValue({ data: [], error: null })
+  mocks.fetchTurnosDelMes.mockResolvedValue([{ data: [], error: null }, { data: [], error: null }])
   mocks.createCondominioRow.mockResolvedValue({ error: null })
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
   mocks.deleteCondominioRow.mockResolvedValue({ error: null })
@@ -653,8 +656,8 @@ describe('la cuadrícula no se corre', () => {
 describe('el calendario consulta SU mes', () => {
   it('pide el rango del mes visible, no los últimos 200 del proyecto', async () => {
     renderTab()
-    await waitFor(() => expect(mocks.fetchBloquesTurnoRango).toHaveBeenCalledTimes(1))
-    const [pid, cid, desde, hasta] = mocks.fetchBloquesTurnoRango.mock.calls[0] as unknown as string[]
+    await waitFor(() => expect(mocks.fetchTurnosDelMes).toHaveBeenCalledTimes(1))
+    const [pid, cid, desde, hasta] = mocks.fetchTurnosDelMes.mock.calls[0] as unknown as string[]
     expect(pid).toBe('p1')
     expect(cid).toBe('c1')
     expect(desde).toBe('2026-09-01')
@@ -663,25 +666,52 @@ describe('el calendario consulta SU mes', () => {
 
   it('vuelve a pedirlo al cambiar de mes', async () => {
     renderTab()
-    await waitFor(() => expect(mocks.fetchBloquesTurnoRango).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mocks.fetchTurnosDelMes).toHaveBeenCalledTimes(1))
     fireEvent.click(screen.getByLabelText('Mes siguiente'))
-    await waitFor(() => expect(mocks.fetchBloquesTurnoRango).toHaveBeenCalledTimes(2))
-    const [, , desde, hasta] = mocks.fetchBloquesTurnoRango.mock.calls[1] as unknown as string[]
+    await waitFor(() => expect(mocks.fetchTurnosDelMes).toHaveBeenCalledTimes(2))
+    const [, , desde, hasta] = mocks.fetchTurnosDelMes.mock.calls[1] as unknown as string[]
     expect(desde).toBe('2026-10-01')
     expect(hasta).toBe('2026-10-31')
   })
 
   it('si la consulta falla lo dice, en vez de enseñar un mes incompleto en silencio', async () => {
-    mocks.fetchBloquesTurnoRango.mockResolvedValue({ data: null, error: { message: 'timeout' } })
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: null, error: { message: 'timeout' } }, { data: [], error: null },
+    ])
     renderTab()
     const aviso = await screen.findByRole('alert')
     expect(aviso.textContent).toMatch(/no se pudieron leer los turnos/i)
   })
 
-  it('un rechazo de la promesa también se cuenta como error, no como espera eterna', async () => {
-    mocks.fetchBloquesTurnoRango.mockRejectedValue(new Error('red caída'))
+  it('si fallan SÓLO las excepciones también es error: el día quitado reaparecería', async () => {
+    // Quedarse con los bloques y no con las excepciones es peor que no
+    // refrescar: los días quitados se repintarían como previstos y parecería
+    // que «Quitar» no hizo nada.
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: [], error: null }, { data: null, error: { message: 'timeout' } },
+    ])
     renderTab()
     expect(await screen.findByRole('alert')).toBeTruthy()
+  })
+
+  it('un rechazo de la promesa también se cuenta como error, no como espera eterna', async () => {
+    mocks.fetchTurnosDelMes.mockRejectedValue(new Error('red caída'))
+    renderTab()
+    expect(await screen.findByRole('alert')).toBeTruthy()
+  })
+
+  it('las excepciones del mes ganan a las que llegaron por props', async () => {
+    // El prop trae un tope del proyecto entero; la consulta del mes trae el mes
+    // completo. Si mandara el prop, un día quitado hace dos años volvería.
+    const delMes: ExcepcionTurno = {
+      id: 'x-mes', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+      fecha: '2026-09-17', asignacion_id: 'r1', created_at: '',
+    }
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: [], error: null }, { data: [delMes], error: null },
+    ])
+    renderTab()
+    await waitFor(() => expect(casilla('17').getAttribute('title')).toMatch(/quitado a mano/i))
   })
 })
 
@@ -703,9 +733,11 @@ function bloque(over: Partial<BloqueTurno> = {}): BloqueTurno {
 }
 
 async function calendarioConBloque(over: Partial<BloqueTurno> = {}) {
-  mocks.fetchBloquesTurnoRango.mockResolvedValue({ data: [bloque(over)], error: null })
+  mocks.fetchTurnosDelMes.mockResolvedValue([
+    { data: [bloque(over)], error: null }, { data: [], error: null },
+  ])
   renderTab()
-  await waitFor(() => expect(mocks.fetchBloquesTurnoRango).toHaveBeenCalledTimes(1))
+  await waitFor(() => expect(mocks.fetchTurnosDelMes).toHaveBeenCalledTimes(1))
   await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
 }
 
@@ -734,7 +766,9 @@ describe('editar un día del calendario', () => {
   })
 
   it('sin permiso de edición ninguna casilla es pulsable', async () => {
-    mocks.fetchBloquesTurnoRango.mockResolvedValue({ data: [bloque()], error: null })
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: [bloque()], error: null }, { data: [], error: null },
+    ])
     renderTab({ canEdit: false })
     await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
     expect(casilla('18').tagName).toBe('DIV')
@@ -766,6 +800,62 @@ describe('editar un día del calendario', () => {
     // se va a medir el turno.
     expect(patch).not.toHaveProperty('horas_planificadas')
     expect(patch).not.toHaveProperty('politica')
+  })
+
+  it('asignar un día con ausencia aprobada avisa antes de crear el conflicto', async () => {
+    // Se permite —a veces hay que cubrir— pero no en silencio: el generador
+    // nunca crea estos y el calendario los pinta en rojo.
+    const ausencia: AusenciaPersonal = {
+      id: 'a1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+      tipo: 'vacaciones', fecha_inicio: '2026-09-19', fecha_fin: '2026-09-22',
+      goce_salario: true, estado: 'aprobada', created_at: '',
+    }
+    renderTab({ ausencias: [ausencia] })
+    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
+    fireEvent.click(casilla('20'))
+    await screen.findByLabelText('Jornada de este día')
+    fireEvent.change(screen.getByLabelText('Jornada de este día'), { target: { value: 'ph1' } })
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Esa persona tiene ausencia aprobada ese día',
+    })))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+  })
+
+  it('y si se dice que no, no se crea nada', async () => {
+    const ausencia: AusenciaPersonal = {
+      id: 'a1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+      tipo: 'vacaciones', fecha_inicio: '2026-09-19', fecha_fin: '2026-09-22',
+      goce_salario: true, estado: 'aprobada', created_at: '',
+    }
+    mocks.confirm.mockResolvedValueOnce({ isConfirmed: false })
+    renderTab({ ausencias: [ausencia] })
+    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
+    fireEvent.click(casilla('20'))
+    await screen.findByLabelText('Jornada de este día')
+    fireEvent.change(screen.getByLabelText('Jornada de este día'), { target: { value: 'ph1' } })
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1))
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+  })
+
+  it('una ausencia SOLICITADA no dispara el aviso: sólo bloquea la aprobada', async () => {
+    const ausencia: AusenciaPersonal = {
+      id: 'a1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+      tipo: 'vacaciones', fecha_inicio: '2026-09-19', fecha_fin: '2026-09-22',
+      goce_salario: true, estado: 'solicitada', created_at: '',
+    }
+    renderTab({ ausencias: [ausencia] })
+    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
+    fireEvent.click(casilla('20'))
+    await screen.findByLabelText('Jornada de este día')
+    fireEvent.change(screen.getByLabelText('Jornada de este día'), { target: { value: 'ph1' } })
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    expect(mocks.confirm).not.toHaveBeenCalled()
   })
 
   it('asignar un día vacío crea un bloque manual, no una regla', async () => {
@@ -871,9 +961,11 @@ describe('quitar un día', () => {
       id: 'x1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
       fecha: '2026-09-17', asignacion_id: 'r1', created_at: '',
     }
-    renderTab({ excepciones: [excepcion] })
-    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
-    expect(casilla('17').getAttribute('title')).toMatch(/quitado a mano/i)
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: [], error: null }, { data: [excepcion], error: null },
+    ])
+    renderTab()
+    await waitFor(() => expect(casilla('17').getAttribute('title')).toMatch(/quitado a mano/i))
 
     fireEvent.click(casilla('17'))
     fireEvent.click(await screen.findByText('Restaurar el día'))

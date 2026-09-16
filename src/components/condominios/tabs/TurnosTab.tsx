@@ -23,7 +23,7 @@ import {
   motivoNoEditable,
   type CeldaTurno,
 } from '../../../domain/condominios/turnos'
-import { fetchBloquesTurnoRango } from '../../../domain/condominios/sectionData'
+import { fetchTurnosDelMes } from '../../../domain/condominios/sectionData'
 import {
   fetchCuposDePlantillas, guardarJornadaConCupos, minutosCupoQueDescuentan, tramosDemora,
 } from '../../../domain/condominios/politicaJornada'
@@ -207,18 +207,23 @@ export default function TurnosTab({
   const rango = useMemo(() => rangoMes(cursor.year, cursor.month), [cursor])
   const celdas = useMemo(() => gridMes(cursor.year, cursor.month), [cursor])
 
-  // ── Los bloques DEL MES QUE SE ESTÁ MIRANDO ───────────────────────────────
-  // El prop `bloques` trae los 200 de fecha más reciente del PROYECTO ENTERO:
-  // le alcanza a la bandeja de «Tareas por turno», que mira hoy, y se queda
-  // cortísimo acá, donde veinte empleados por treinta días son seiscientas
-  // filas y el mes puede ser cualquiera. Con el tope, generar un mes completo
-  // dejaba media grilla pintada como «previsto (sin generar)» para siempre:
-  // los bloques existían, pero no entraban en la consulta.
+  // ── Lo del MES QUE SE ESTÁ MIRANDO ────────────────────────────────────────
+  // Los props llegan acotados por TAMAÑO, no por fecha: `bloques` son los 200
+  // de fecha más reciente del PROYECTO ENTERO —le alcanza a la bandeja de
+  // «Tareas por turno», que mira hoy— y `excepciones` traen su propio tope. Acá
+  // hace falta lo contrario: veinte empleados por treinta días son seiscientas
+  // filas y el mes puede ser cualquiera, incluido uno de hace dos años.
   //
-  // Así que el calendario pide SU rango. Mientras esa consulta está en vuelo
-  // —o si falló— se sigue pintando con el prop, incompleto pero mejor que una
-  // grilla en blanco, y el aviso de arriba dice que puede estarlo.
+  // Los dos síntomas del tope se ven igual en pantalla y son distintos: sin los
+  // bloques del mes, generarlo entero lo dejaba pintado como «previsto (sin
+  // generar)» para siempre; sin las excepciones del mes, un día quitado a mano
+  // reaparecía como previsto, que es justo lo que se había dicho que no.
+  //
+  // Así que el calendario pide SU rango. Mientras la consulta está en vuelo —o
+  // si falló— se sigue pintando con los props, incompletos pero mejor que una
+  // grilla en blanco, y el aviso de arriba dice que pueden estarlo.
   const [bloquesMes, setBloquesMes] = useState<BloqueTurno[] | null>(null)
+  const [excepcionesMes, setExcepcionesMes] = useState<ExcepcionTurno[] | null>(null)
   const [estadoMes, setEstadoMes] = useState<'cargando' | 'listo' | 'error'>('cargando')
   // Mismo contador que en los cupos: al pasar meses rápido quedan varias
   // consultas en vuelo y la que conteste ÚLTIMA no es necesariamente la del
@@ -228,16 +233,22 @@ export default function TurnosTab({
   const recargarMes = useCallback(() => {
     const generacion = ++generacionMes.current
     setEstadoMes('cargando')
-    void fetchBloquesTurnoRango(proyectoId, companyId, rango.desde, rango.hasta)
-      .then(({ data, error }) => {
+    void fetchTurnosDelMes(proyectoId, companyId, rango.desde, rango.hasta)
+      .then(([bloquesRes, excepcionesRes]) => {
         if (generacion !== generacionMes.current) return
-        if (error) { setBloquesMes(null); setEstadoMes('error'); return }
-        setBloquesMes((data ?? []) as unknown as BloqueTurno[])
+        // Las dos o ninguna. Quedarse con los bloques y no con las excepciones
+        // sería peor que no refrescar: los días quitados volverían a pintarse
+        // como previstos y el administrador creería que su «Quitar» no funcionó.
+        if (bloquesRes.error || excepcionesRes.error) {
+          setBloquesMes(null); setExcepcionesMes(null); setEstadoMes('error'); return
+        }
+        setBloquesMes((bloquesRes.data ?? []) as unknown as BloqueTurno[])
+        setExcepcionesMes((excepcionesRes.data ?? []) as unknown as ExcepcionTurno[])
         setEstadoMes('listo')
       })
       .catch(() => {
         if (generacion !== generacionMes.current) return
-        setBloquesMes(null); setEstadoMes('error')
+        setBloquesMes(null); setExcepcionesMes(null); setEstadoMes('error')
       })
   }, [proyectoId, companyId, rango.desde, rango.hasta])
   useEffect(() => { recargarMes() }, [recargarMes])
@@ -253,13 +264,14 @@ export default function TurnosTab({
   const refrescar = useCallback(() => { recargarMes(); onRefresh() }, [recargarMes, onRefresh])
 
   const bloquesVisibles = bloquesMes ?? bloques
+  const excepcionesVisibles = excepcionesMes ?? excepciones
 
   const fuentes = useMemo(
     () => ({
       bloques: bloquesVisibles, reglas: asignaciones, plantillas,
-      ausencias, noLaborables: diasNoLaborables, excepciones,
+      ausencias, noLaborables: diasNoLaborables, excepciones: excepcionesVisibles,
     }),
-    [bloquesVisibles, asignaciones, plantillas, ausencias, diasNoLaborables, excepciones],
+    [bloquesVisibles, asignaciones, plantillas, ausencias, diasNoLaborables, excepcionesVisibles],
   )
 
   /** Estado de cada empleado en cada día del mes visible. */
@@ -530,6 +542,20 @@ export default function TurnosTab({
     const plantilla = plantillas.find(p => p.id === jornadaDia)
     if (!plantilla) {
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Elegí la jornada de este día' }); return
+    }
+    // Asignarle un turno a alguien que ese día tiene ausencia APROBADA se
+    // permite —a veces hay que cubrir y la decisión es de quien administra—
+    // pero no en silencio: el generador nunca crea estos, el calendario los
+    // pinta en rojo como conflicto, y el balance de jornada los mide aparte.
+    // Quien lo haga tiene que saber que está creando esa fila.
+    const ausencia = celdaAbierta.ausencia
+    if (ausencia && !celdaAbierta.bloque) {
+      const { isConfirmed } = await confirm({
+        title: 'Esa persona tiene ausencia aprobada ese día',
+        text: `Está de ${ausencia.tipo.replace(/_/g, ' ')} del ${ausencia.fecha_inicio} al ${ausencia.fecha_fin}. Si le asignás el turno igual, el día queda marcado en conflicto en el calendario.`,
+        variant: 'danger', confirmText: 'Asignarlo igual',
+      })
+      if (!isConfirmed) return
     }
     setSaving(true)
     // `horas_planificadas` y `politica` NO se mandan: las sellan sus triggers

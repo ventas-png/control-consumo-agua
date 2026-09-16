@@ -327,27 +327,37 @@ export async function fetchCondominiosTurnosData(pid: string, cid: string) {
 }
 
 /**
- * Bloques de turno de UN RANGO de fechas.
+ * Lo que el calendario de turnos necesita de UN RANGO de fechas: los bloques
+ * materializados y los días quitados a mano.
  *
- * Existe aparte de `fetchCondominiosTareasData` porque aquélla trae los 200
- * bloques de fecha más reciente del PROYECTO ENTERO: suficiente para la bandeja
- * de «Tareas por turno», que mira hoy, y muy corto para el calendario mensual,
- * donde veinte empleados por treinta días son seiscientas filas y el mes puede
- * ser cualquiera. Sin esto, generar un mes completo dejaba media grilla pintada
- * como «previsto (sin generar)» para siempre, porque los bloques reales no
- * entraban en el tope.
+ * Existe aparte de las consultas del panel porque aquéllas están acotadas por
+ * tamaño, no por fecha: `fetchCondominiosTareasData` trae los 200 bloques de
+ * fecha más reciente del PROYECTO ENTERO —suficiente para la bandeja de «Tareas
+ * por turno», que mira hoy— y las excepciones vienen con su propio tope. El
+ * calendario mensual necesita lo contrario: veinte empleados por treinta días
+ * son seiscientas filas, y el mes puede ser cualquiera, incluido uno de hace
+ * dos años.
+ *
+ * Los dos síntomas del tope, que se ven idénticos en pantalla y son distintos:
+ * con los bloques fuera de rango, generar un mes completo lo dejaba pintado
+ * como «previsto (sin generar)» para siempre; con las excepciones fuera de
+ * rango, un día quitado a mano volvía a aparecer como previsto, que es
+ * exactamente lo que el administrador había dicho que no.
  */
-export async function fetchBloquesTurnoRango(
+export async function fetchTurnosDelMes(
   pid: string, cid: string, desde: string, hasta: string,
 ) {
-  return supabase
-    .from('bloques_turno')
-    .select('*')
-    .eq('project_id', pid)
-    .eq('company_id', cid)
-    .gte('fecha', desde)
-    .lte('fecha', hasta)
-    .order('fecha')
+  const enRango = <T extends 'bloques_turno' | 'excepciones_turno'>(tabla: T) =>
+    supabase
+      .from(tabla)
+      .select('*')
+      .eq('project_id', pid)
+      .eq('company_id', cid)
+      .gte('fecha', desde)
+      .lte('fecha', hasta)
+      .order('fecha')
+
+  return Promise.all([enRango('bloques_turno'), enRango('excepciones_turno')])
 }
 
 /** Tareas + revisiones de un conjunto de bloques de turno. */
