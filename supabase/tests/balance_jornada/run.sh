@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20260913040400: el balance del día (Fase 2).
+# Verificación EJECUTABLE de 20260913040400 (el balance del día, Fase 2) y de
+# 20260916013717, que corrige tres lecturas equivocadas suyas.
 #
 # POR QUÉ EXISTE
 # La invariante 1 vuelve a ser la que justifica el test entero: esta migración
@@ -17,7 +18,7 @@
 #     tarde; una resta a pelo da −1290 (invariante 8), que es la familia de
 #     error de #839.
 #
-# QUÉ COMPRUEBA (28 invariantes)
+# QUÉ COMPRUEBA (31 invariantes, más el escenario de la 0)
 #   0-1    el escenario, y que consultar el balance no mueva el cómputo de horas
 #   2-5    un día que cumple; los tres tramos de la demora; llegar antes no es
 #          desvío; la salida temprana respeta su tolerancia
@@ -37,6 +38,14 @@
 #   23-24  el ALCANCE POR PROYECTO: el mismo permiso en la misma empresa no abre
 #          el condominio ajeno (42501), super_admin conserva lo previsto, y un
 #          proyecto inexistente o NULL da 42704 en vez de colarse
+#   25-27b las tres de la revisión de #844, que corrige 20260916013717:
+#          25     la fila corregida por `presencia_corregir` se juzga por su hora
+#                 CORREGIDA y no por el sello, que queda como evidencia
+#          26-26b el cupo se compara contra el TOTAL del tipo en el día: dos
+#                 almuerzos de 30 contra un cupo de 45 son 15 de exceso, no cero,
+#                 y con tres tipos a la vez la cuenta sigue siendo tipo a tipo
+#          27-27b ausente, permiso y vacaciones son días SIN marcaje y nunca
+#                 jornadas abiertas; la entrada real sin salida sí lo sigue siendo
 #
 # USO
 #   supabase/tests/balance_jornada/run.sh
@@ -53,6 +62,9 @@ MIGRACION_3="$RAIZ/supabase/migrations/20260908000300_presencia_pausas.sql"
 MIGRACION_4="$RAIZ/supabase/migrations/20260913040300_politica_de_jornada.sql"
 # El balance cruza toda la cadena, así que las cuatro anteriores van antes.
 MIGRACION_5="$RAIZ/supabase/migrations/20260913040400_balance_de_jornada.sql"
+# La corrección de las tres lecturas equivocadas que salieron de la revisión de
+# #844. Va última y es la que tiene que ser idempotente.
+MIGRACION_6="$RAIZ/supabase/migrations/20260916013717_corregir_balance_jornada.sql"
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -115,7 +127,8 @@ aplicar "$MIGRACION_1"
 aplicar "$MIGRACION_2"
 aplicar "$MIGRACION_3"
 aplicar "$MIGRACION_4"
-for _ in 1 2; do aplicar "$MIGRACION_5"; done
+aplicar "$MIGRACION_5"
+for _ in 1 2; do aplicar "$MIGRACION_6"; done
 # Los grants de TABLA van aquí porque antes las tablas no existen. Las
 # invariantes 11 y 12 comprueban que el CUPO lo gobierne la POLICY y no la falta
 # de un grant: authenticated recibe los mismos privilegios que le da Supabase.
@@ -147,4 +160,4 @@ if [ "$CODIGO" -ne 0 ]; then
 fi
 
 echo
-echo "✅ balance_jornada: lo esperado y lo ocurrido, uno al lado del otro —demora por tramos, exceso de descanso tipo a tipo y la medianoche resuelta— sin mover ni un número de la planilla."
+echo "✅ balance_jornada: lo esperado y lo ocurrido, uno al lado del otro —demora por tramos contra la hora CORREGIDA, exceso de descanso por el total de cada tipo, la medianoche resuelta y la ausencia distinguida de la jornada abierta— sin mover ni un número de la planilla."
