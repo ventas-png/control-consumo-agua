@@ -12,7 +12,7 @@
 # convierte en un pago. La aritmética de "cada bimestre, el día 31, saltando
 # festivos" no se revisa a ojo.
 #
-# QUÉ COMPRUEBA (51 invariantes)
+# QUÉ COMPRUEBA (52 invariantes)
 #   A · JORNADA       que 22:00→06:00 cuenta 8 h y no -960 minutos (el bug vivo
 #                     de PresenciaPersonalTab), con y sin bandera de cruce, que
 #                     el descanso se descuenta y que la franja nocturna
@@ -46,7 +46,9 @@
 #   I · EXCEPCIONES   que el día quitado no vuelve al re-generar (N veces),
 #                     que retirarlo lo devuelve, que las FKs compuestas cierran
 #                     la referencia cruzada, que creado_por no se falsifica y
-#                     que las cuatro operaciones respetan empresa y proyecto.
+#                     que las cuatro operaciones respetan empresa y proyecto,
+#                     y que el ACL de la tabla es el declarado y no el que
+#                     Supabase concede por defecto (TRUNCATE no pasa por RLS).
 #
 # USO
 #   supabase/tests/turnos/run.sh
@@ -137,6 +139,6 @@ done
 echo "  OK    las cinco migraciones se pueden volver a aplicar"
 
 echo
-echo "✅ turnos: 51 invariantes (jornada, periodicidad, backfill, generación,"
+echo "✅ turnos: 52 invariantes (jornada, periodicidad, backfill, generación,"
 echo "   expediente, horas, RLS, borrado seguro y excepciones),"
 echo "   migraciones idempotentes."

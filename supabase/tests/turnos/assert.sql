@@ -932,6 +932,33 @@ BEGIN
   IF n <> 0 THEN RAISE EXCEPTION '51b: el dueño del tab no pudo borrar su excepción'; END IF;
   RAISE NOTICE 'OK 51 sin sesión no se lee ninguna excepción; con el permiso sí se borra';
 
-  RAISE NOTICE '── 7 invariantes de excepciones_turno OK ──';
+  -- ── 52. El ACL de la tabla es el declarado, no el heredado ─────────────
+  -- En Supabase, `ALTER DEFAULT PRIVILEGES` concede TODO sobre cada tabla nueva
+  -- de `public` a anon y authenticated. La migración lo revoca y vuelve a
+  -- conceder sólo el DML; esto comprueba el resultado.
+  --
+  -- TRUNCATE es el que no puede quedarse: **no pasa por RLS**. Con él, un solo
+  -- TRUNCATE por cualquier vía SECURITY INVOKER vacía las excepciones de TODAS
+  -- las empresas con las cuatro policies intactas y sin dejar rastro.
+  IF has_table_privilege('authenticated', 'public.excepciones_turno', 'TRUNCATE')
+     OR has_table_privilege('authenticated', 'public.excepciones_turno', 'REFERENCES')
+     OR has_table_privilege('authenticated', 'public.excepciones_turno', 'TRIGGER') THEN
+    RAISE EXCEPTION '52a: authenticated conserva TRUNCATE/REFERENCES/TRIGGER sobre excepciones_turno';
+  END IF;
+
+  IF NOT (has_table_privilege('authenticated', 'public.excepciones_turno', 'SELECT')
+      AND has_table_privilege('authenticated', 'public.excepciones_turno', 'INSERT')
+      AND has_table_privilege('authenticated', 'public.excepciones_turno', 'UPDATE')
+      AND has_table_privilege('authenticated', 'public.excepciones_turno', 'DELETE')) THEN
+    RAISE EXCEPTION '52b: authenticated perdió alguno de los cuatro privilegios de DML';
+  END IF;
+
+  IF has_table_privilege('anon', 'public.excepciones_turno', 'SELECT')
+     OR has_table_privilege('anon', 'public.excepciones_turno', 'TRUNCATE') THEN
+    RAISE EXCEPTION '52c: anon conserva privilegios sobre excepciones_turno';
+  END IF;
+  RAISE NOTICE 'OK 52 el ACL de excepciones_turno es el declarado: DML y nada más';
+
+  RAISE NOTICE '── 8 invariantes de excepciones_turno OK ──';
 END;
 $$;

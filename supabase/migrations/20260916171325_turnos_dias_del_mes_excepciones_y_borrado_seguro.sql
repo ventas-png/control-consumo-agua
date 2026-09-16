@@ -254,10 +254,21 @@ CREATE TRIGGER trg_sellar_creado_por
 ALTER TABLE public.excepciones_turno ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.excepciones_turno FORCE  ROW LEVEL SECURITY;
 
--- Mínimo privilegio declarado a mano: una tabla nueva no hereda nada útil y
--- `anon` no tiene por qué verla ni de lejos.
+-- Mínimo privilegio declarado a mano. Y «a mano» incluye a `authenticated`:
+-- una tabla nueva de este proyecto NO nace desnuda. Supabase deja puesto un
+-- ALTER DEFAULT PRIVILEGES que le concede TODO sobre cada tabla que aparezca en
+-- `public`, así que sin el REVOKE de abajo `authenticated` se quedaba además
+-- con TRUNCATE, REFERENCES y TRIGGER.
+--
+-- TRUNCATE es el que importa, y no es cosmético: **TRUNCATE no pasa por RLS**.
+-- Un sólo TRUNCATE por cualquier vía SECURITY INVOKER —una RPC, un helper—
+-- vaciaría las excepciones de TODAS las empresas de golpe, con las cuatro
+-- policies de abajo intactas y sin enterarse nadie. Por eso se revoca todo y se
+-- vuelve a conceder sólo el DML, en vez de confiar en lo que la tabla hereda.
+-- La aserción de la sección 7 comprueba que quedó exactamente así.
 REVOKE ALL ON public.excepciones_turno FROM PUBLIC;
 REVOKE ALL ON public.excepciones_turno FROM anon;
+REVOKE ALL ON public.excepciones_turno FROM authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.excepciones_turno TO authenticated;
 GRANT ALL ON public.excepciones_turno TO service_role;
 
@@ -825,8 +836,26 @@ BEGIN
   IF has_table_privilege('anon', 'public.excepciones_turno', 'SELECT')
      OR has_table_privilege('anon', 'public.excepciones_turno', 'INSERT')
      OR has_table_privilege('anon', 'public.excepciones_turno', 'UPDATE')
-     OR has_table_privilege('anon', 'public.excepciones_turno', 'DELETE') THEN
+     OR has_table_privilege('anon', 'public.excepciones_turno', 'DELETE')
+     OR has_table_privilege('anon', 'public.excepciones_turno', 'TRUNCATE') THEN
     RAISE EXCEPTION 'anon no debe tener ningún privilegio sobre excepciones_turno';
+  END IF;
+
+  -- Y `authenticated` tiene el DML, y SÓLO el DML. Lo que sobra aquí no es
+  -- ruido: TRUNCATE **no pasa por RLS**, así que heredarlo del ALTER DEFAULT
+  -- PRIVILEGES de Supabase sería dejar una vía para vaciar las excepciones de
+  -- todas las empresas con las cuatro policies intactas.
+  IF has_table_privilege('authenticated', 'public.excepciones_turno', 'TRUNCATE')
+     OR has_table_privilege('authenticated', 'public.excepciones_turno', 'REFERENCES')
+     OR has_table_privilege('authenticated', 'public.excepciones_turno', 'TRIGGER') THEN
+    RAISE EXCEPTION 'authenticated no debe tener TRUNCATE, REFERENCES ni TRIGGER sobre excepciones_turno';
+  END IF;
+
+  IF NOT (has_table_privilege('authenticated', 'public.excepciones_turno', 'SELECT')
+      AND has_table_privilege('authenticated', 'public.excepciones_turno', 'INSERT')
+      AND has_table_privilege('authenticated', 'public.excepciones_turno', 'UPDATE')
+      AND has_table_privilege('authenticated', 'public.excepciones_turno', 'DELETE')) THEN
+    RAISE EXCEPTION 'authenticated necesita SELECT/INSERT/UPDATE/DELETE sobre excepciones_turno';
   END IF;
 
   RAISE NOTICE 'turnos: días del mes, excepciones y borrado seguro — autoverificación OK';
