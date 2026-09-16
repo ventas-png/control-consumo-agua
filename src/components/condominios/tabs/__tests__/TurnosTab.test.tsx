@@ -637,7 +637,7 @@ describe('la cuadrícula no se corre', () => {
     renderTab()
     const nombre = document.querySelector<HTMLElement>('.turnos-fila .turnos-nombre')
     expect(nombre).toBeTruthy()
-    expect(document.querySelector('.table-scroll-wrapper')).toBeTruthy()
+    expect(document.querySelector('.turnos-scroll')).toBeTruthy()
     expect(document.querySelector('.turnos-grid')).toBeTruthy()
   })
 })

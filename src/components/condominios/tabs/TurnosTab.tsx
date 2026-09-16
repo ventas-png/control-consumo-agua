@@ -732,7 +732,7 @@ export default function TurnosTab({
               description="Registrá al personal en la pestaña Personal para poder asignarle turnos."
             />
           ) : (
-            <div className="table-scroll-wrapper">
+            <div className="turnos-scroll">
               <div className="turnos-grid">
                 {/* Encabezado de días. Vive en la MISMA estructura que las filas
                     —columna de nombre + cuadrícula de siete— porque es lo único

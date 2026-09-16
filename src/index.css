@@ -754,6 +754,17 @@ button:focus:not(:focus-visible) {
  * nombre es un hermano flex y los días viven en su PROPIA cuadrícula de siete
  * columnas exactas, que es la única que tiene que cuadrar con los rótulos.
  */
+/* El contenedor que scrollea. NO reusa `.table-scroll-wrapper`: aquél pinta un
+ * degradado `::after` en el borde derecho para avisar de que hay más tabla, y
+ * como es `position: absolute` dentro de un contenedor que scrollea, viaja con
+ * el contenido y acaba en mitad de la cuadrícula, borrando media columna de
+ * días. Acá el aviso de que hay más mes ya lo da la columna de nombres fija. */
+.turnos-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .turnos-grid {
   /* Siete columnas legibles más la de nombres. Por debajo de esto el
    * contenedor scrollea en horizontal en vez de apretar los días hasta
@@ -778,6 +789,9 @@ button:focus:not(:focus-visible) {
   z-index: 2;
   background: var(--at-surface-2);
   border-radius: 6px;
+  /* La misma sombra que `.table-col-sticky`: sin ella el nombre parece flotar
+   * sobre los días en vez de leerse como columna anclada. */
+  box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.08);
 }
 
 .turnos-dias {
