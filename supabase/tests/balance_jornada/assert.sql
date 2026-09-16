@@ -1263,3 +1263,158 @@ BEGIN
   END IF;
   RAISE NOTICE 'OK 27b entró y no salió: eso sí es una jornada abierta, y se sigue diciendo';
 END $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 28 · Mientras la jornada siga ABIERTA, no hay horas sobre la jornada
+-- ════════════════════════════════════════════════════════════════════════════
+-- El residuo de #844 que 20260916013717 no tocó. `horas_sobre_jornada` ya daba
+-- NULL en los dos casos donde el exceso no se puede atribuir —turno partido y
+-- marcajes múltiples— y faltaba el tercero, que es el más frecuente: la persona
+-- que entró y todavía no salió.
+--
+-- Sin salida, `turnos_horas_jornada` devuelve NULL, el COALESCE lo vuelve 0 y
+-- `GREATEST(0, 0 − 7.25)` daba CERO: el balance afirmaba que no hubo horas de
+-- más de alguien que en ese momento SIGUE trabajando. Un cero es una
+-- afirmación; acá la verdad es que todavía no se sabe.
+
+-- ── 28 · Entrada sin salida: NULL, no cero ─────────────────────────────────
+DO $$
+DECLARE b record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  PERFORM pg_temp.sembrar_dia(CURRENT_DATE - 47, '06:00', NULL);
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 47, CURRENT_DATE - 47);
+
+  -- Lo que ya valía y no puede moverse.
+  IF NOT ('jornada_abierta' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 28: la jornada abierta dejó de reportarse (%)', b.hallazgos;
+  END IF;
+  IF b.cumple THEN
+    RAISE EXCEPTION 'INVARIANTE 28: una jornada abierta salió como cumplida';
+  END IF;
+
+  -- Lo nuevo. `IS DISTINCT FROM NULL` no sirve acá: se quiere exactamente NULL,
+  -- y un 0 tiene que romper esta línea.
+  IF b.horas_sobre_jornada IS NOT NULL THEN
+    RAISE EXCEPTION
+      'INVARIANTE 28: con la jornada abierta se afirmaron % h sobre la jornada; las horas finales todavía no existen',
+      b.horas_sobre_jornada;
+  END IF;
+
+  -- Y no se exige autorización por una extra que aún no ocurrió. Sale solo, sin
+  -- tocar la lista: `COALESCE(extra, 0) > 0.01` es falso con extra en NULL.
+  IF 'extra_sin_autorizar' = ANY(b.hallazgos) THEN
+    RAISE EXCEPTION
+      'INVARIANTE 28: se señaló extra sin autorizar sobre una jornada que sigue abierta (%)', b.hallazgos;
+  END IF;
+  -- La vara SÍ sigue diciendo que la pide: lo que desaparece es el hallazgo, no
+  -- la política.
+  IF NOT b.extra_requiere_autorizacion THEN
+    RAISE EXCEPTION 'INVARIANTE 28: la vara pedía autorización y dejó de viajar';
+  END IF;
+
+  RAISE NOTICE 'OK 28 entrada sin salida: horas_sobre_jornada es NULL, no 0, y no hay extra que autorizar';
+END $$;
+
+-- ── 28b · Varios marcajes y al menos uno abierto ───────────────────────────
+DO $$
+DECLARE
+  v_plant uuid;
+  v_pid   uuid := '9e000000-0000-0000-0000-000000000003';
+  v_fecha date := CURRENT_DATE - 48;
+  b       record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Diurna 6-14';
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, v_fecha, v_plant, '06:00', '14:00', 7.25);
+  -- 06:00–16:00 ya son 10 h contra 7.25 planificadas: si el exceso se calculara,
+  -- daría un número grande. El segundo marcaje sigue abierto, así que no.
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+  VALUES
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_pid, 'Ana sin cuenta', v_fecha, '06:00', '16:00', 'presente'),
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_pid, 'Ana sin cuenta', v_fecha, '18:00', NULL, 'presente');
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, v_fecha, v_fecha)
+  WHERE personal_id = v_pid;
+
+  IF NOT ('jornada_abierta' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 28b: con un marcaje sin salida el día se dio por cerrado (%)', b.hallazgos;
+  END IF;
+  IF b.horas_sobre_jornada IS NOT NULL THEN
+    RAISE EXCEPTION 'INVARIANTE 28b: se afirmaron % h sobre la jornada con un marcaje todavía abierto',
+      b.horas_sobre_jornada;
+  END IF;
+  IF 'extra_sin_autorizar' = ANY(b.hallazgos) THEN
+    RAISE EXCEPTION 'INVARIANTE 28b: extra sin autorizar sobre un día que no terminó (%)', b.hallazgos;
+  END IF;
+  RAISE NOTICE 'OK 28b varios marcajes con uno abierto: el día sigue abierto y no se afirma exceso';
+END $$;
+
+-- ── 28c · La jornada CERRADA sin horas de más sigue diciendo 0 ─────────────
+--
+-- La contracara: el NULL nuevo no puede tragarse el cero que sí es una
+-- afirmación correcta. Se cerró el día y no hubo exceso — eso se sabe, y se
+-- dice. Dos casos: por debajo de lo previsto y exactamente en lo previsto.
+DO $$
+DECLARE
+  b_menos record;
+  b_justo record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+
+  -- 06:00–13:00 son 7 h contra 7.25 planificadas: por debajo.
+  PERFORM pg_temp.sembrar_dia(CURRENT_DATE - 49, '06:00', '13:00');
+  SELECT * INTO b_menos FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 49, CURRENT_DATE - 49);
+
+  -- 06:00–14:00 con 45 min de almuerzo son 7.25 h exactas: justo la vara.
+  PERFORM pg_temp.sembrar_dia(CURRENT_DATE - 50, '06:00', '14:00', 'almuerzo', 45);
+  SELECT * INTO b_justo FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 50, CURRENT_DATE - 50);
+
+  IF 'jornada_abierta' = ANY(b_menos.hallazgos) OR 'jornada_abierta' = ANY(b_justo.hallazgos) THEN
+    RAISE EXCEPTION 'INVARIANTE 28c: un día cerrado salió como jornada abierta';
+  END IF;
+  IF b_menos.horas_sobre_jornada IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'INVARIANTE 28c: 7 h contra 7.25 dieron % (esperado 0)', b_menos.horas_sobre_jornada;
+  END IF;
+  IF b_justo.horas_sobre_jornada IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'INVARIANTE 28c: 7.25 h exactas dieron % (esperado 0)', b_justo.horas_sobre_jornada;
+  END IF;
+  IF 'extra_sin_autorizar' = ANY(b_menos.hallazgos) OR 'extra_sin_autorizar' = ANY(b_justo.hallazgos) THEN
+    RAISE EXCEPTION 'INVARIANTE 28c: un día sin exceso pidió autorización de extra';
+  END IF;
+  RAISE NOTICE 'OK 28c jornada cerrada por debajo (7 h) y exacta (7.25 h): 0, que es una afirmación correcta';
+END $$;
+
+-- ── 28d · La jornada CERRADA con sobrejornada conserva su valor ────────────
+DO $$
+DECLARE b record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  PERFORM pg_temp.sembrar_dia(CURRENT_DATE - 51, '06:00', '17:00');  -- 11 h contra 7.25
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 51, CURRENT_DATE - 51);
+
+  IF 'jornada_abierta' = ANY(b.hallazgos) THEN
+    RAISE EXCEPTION 'INVARIANTE 28d: un día cerrado salió como jornada abierta (%)', b.hallazgos;
+  END IF;
+  IF b.horas_sobre_jornada IS DISTINCT FROM 3.75 THEN
+    RAISE EXCEPTION 'INVARIANTE 28d: sobre la jornada = % (esperado 3.75)', b.horas_sobre_jornada;
+  END IF;
+  IF NOT ('extra_sin_autorizar' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 28d: la señalización de la extra se perdió (%)', b.hallazgos;
+  END IF;
+  IF b.cumple THEN
+    RAISE EXCEPTION 'INVARIANTE 28d: un día con extra sin autorizar dijo que cumple';
+  END IF;
+  RAISE NOTICE 'OK 28d jornada cerrada con sobrejornada: 3.75 h y su extra_sin_autorizar, intactas';
+END $$;

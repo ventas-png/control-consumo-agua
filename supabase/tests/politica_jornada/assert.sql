@@ -741,3 +741,79 @@ BEGIN
 
   RAISE NOTICE 'OK 20 authenticated inserta y cambia de jornada: el trigger corre pese al REVOKE del helper';
 END $$;
+
+-- ── 21 · UNA sola FK simple de project_id, y la compuesta en su lugar ───────
+--
+-- 20260913040300 declara la FK de `project_id` DOS veces: una implícita en el
+-- `REFERENCES` del CREATE TABLE —que PostgreSQL nombra
+-- `plantilla_cupos_pausa_project_id_fkey`— y otra explícita en el bloque de
+-- reparación, `plantilla_cupos_pausa_project_fk`. En un replay desde cero las
+-- dos quedaban. 20260916124800 elimina la automática y conserva la nombrada.
+--
+-- Esta invariante es de CATÁLOGO: no mira el SQL de la migración, mira lo que
+-- quedó en `pg_constraint`. Y mira las dos cosas a la vez, porque la que
+-- importa de verdad es la segunda: la FK COMPUESTA por tenant no se toca.
+-- Quedarse con una sola FK simple y sin la compuesta sería exactamente el
+-- agujero que la sección 2 de 20260913040300 vino a cerrar.
+DO $$
+DECLARE
+  v_tabla    CONSTANT regclass := 'public.plantilla_cupos_pausa'::regclass;
+  v_projects CONSTANT regclass := 'public.projects'::regclass;
+  v_attnum   smallint;
+  v_n        int;
+  r          record;
+BEGIN
+  SELECT a.attnum INTO v_attnum
+    FROM pg_attribute a
+   WHERE a.attrelid = v_tabla AND a.attname = 'project_id' AND NOT a.attisdropped;
+
+  SELECT count(*) INTO v_n
+    FROM pg_constraint c
+   WHERE c.conrelid = v_tabla AND c.contype = 'f'
+     AND c.confrelid = v_projects
+     AND c.conkey = ARRAY[v_attnum];
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION
+      'INVARIANTE 21: % FK simple(s) de project_id → projects(id); se esperaba exactamente 1', v_n;
+  END IF;
+
+  -- Y que la que quedó sea la NOMBRADA, con la acción de borrado intacta.
+  SELECT c.conname, pg_get_constraintdef(c.oid) AS def, c.confdeltype, c.confupdtype,
+         c.confkey, c.convalidated
+    INTO r
+    FROM pg_constraint c
+   WHERE c.conrelid = v_tabla AND c.contype = 'f'
+     AND c.confrelid = v_projects
+     AND c.conkey = ARRAY[v_attnum];
+
+  IF r.conname <> 'plantilla_cupos_pausa_project_fk' THEN
+    RAISE EXCEPTION 'INVARIANTE 21: la FK que quedó se llama «%», no la canónica', r.conname;
+  END IF;
+  IF r.confdeltype <> 'c' THEN
+    RAISE EXCEPTION 'INVARIANTE 21: el borrado dejó de ser CASCADE (%)', r.def;
+  END IF;
+  IF r.confkey <> ARRAY[(SELECT a.attnum FROM pg_attribute a
+                          WHERE a.attrelid = v_projects AND a.attname = 'id'
+                            AND NOT a.attisdropped)] THEN
+    RAISE EXCEPTION 'INVARIANTE 21: la FK ya no apunta a projects(id) (%)', r.def;
+  END IF;
+  IF NOT r.convalidated THEN
+    RAISE EXCEPTION 'INVARIANTE 21: la FK quedó NOT VALID (%)', r.def;
+  END IF;
+
+  -- La compuesta por tenant, intacta: las tres columnas y el CASCADE.
+  SELECT c.conname, pg_get_constraintdef(c.oid) AS def, c.confdeltype, c.convalidated
+    INTO r
+    FROM pg_constraint c
+   WHERE c.conrelid = v_tabla AND c.contype = 'f'
+     AND c.conname = 'plantilla_cupos_pausa_horario_fk';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'INVARIANTE 21: plantilla_cupos_pausa_horario_fk desapareció';
+  END IF;
+  IF r.def NOT LIKE 'FOREIGN KEY (plantilla_horario_id, company_id, project_id) REFERENCES %plantillas_horario(id, company_id, project_id) ON DELETE CASCADE'
+  THEN
+    RAISE EXCEPTION 'INVARIANTE 21: la FK compuesta cambió de forma (%)', r.def;
+  END IF;
+
+  RAISE NOTICE 'OK 21 una sola FK simple de project_id → projects(id) ON DELETE CASCADE, y la compuesta por tenant intacta';
+END $$;
