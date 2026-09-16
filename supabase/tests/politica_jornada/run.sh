@@ -13,7 +13,7 @@
 # bloque. Cambiar la jornada mañana no puede reescribir contra qué se midió un
 # mes ya cerrado, y eso no se lee en el SQL — hay que cambiarla y mirar.
 #
-# QUÉ COMPRUEBA (24 invariantes)
+# QUÉ COMPRUEBA (25 invariantes)
 #   1      declarar la vara no mueve ni un número del cómputo
 #   2-4    el bloque congela los tres tramos, los cupos y la autorización; la
 #          jornada cambia sin tocarlos, y el bloque nuevo sí toma la vigente
@@ -33,6 +33,9 @@
 #          company_id en NULL ni meses de bloques sin contra qué medirse
 #   20     el DML real de `authenticated` dispara su propio trigger pese al
 #          REVOKE del helper que ese trigger consulta
+#   21     CATÁLOGO · queda UNA sola FK simple de project_id → projects(id) con
+#          ON DELETE CASCADE, es la nombrada, y la compuesta por tenant sigue
+#          entera (20260916124800)
 #
 # USO
 #   supabase/tests/politica_jornada/run.sh
@@ -49,6 +52,13 @@ MIGRACION_3="$RAIZ/supabase/migrations/20260908000300_presencia_pausas.sql"
 # Las tres de presencia van antes porque la invariante 1 mide con
 # `calcular_horas_personal` en su versión vigente, la que ya descuenta pausas.
 MIGRACION_4="$RAIZ/supabase/migrations/20260913040300_politica_de_jornada.sql"
+# Los dos residuos de #844. Acá importa su parte A: la FK simple de `project_id`
+# que 20260913040300 deja declarada DOS veces —implícita en el CREATE TABLE y
+# explícita en el bloque de reparación— y que la invariante 21 cuenta en el
+# catálogo. Su parte B reemplaza el cuerpo de `presencia_balance_dia`, que este
+# sandbox no ejerce: esa mitad la comprueba `supabase/tests/balance_jornada/`,
+# que sí aplica toda la cadena del balance.
+MIGRACION_5="$RAIZ/supabase/migrations/20260916124800_corregir_residuos_jornada.sql"
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -111,6 +121,10 @@ aplicar "$MIGRACION_1"
 aplicar "$MIGRACION_2"
 aplicar "$MIGRACION_3"
 for _ in 1 2; do aplicar "$MIGRACION_4"; done
+# La dedup de la FK va DESPUÉS, y también dos veces: la segunda pasada ya no
+# encuentra la restricción redundante y tiene que seguir igual, que es la mitad
+# de lo que «ser segura si ya no existe» significa.
+for _ in 1 2; do aplicar "$MIGRACION_5"; done
 # Los grants de TABLA van aquí porque antes las tablas no existen. Las
 # invariantes 11 y 12 comprueban que el CUPO lo gobierne la POLICY y no la falta
 # de un grant: authenticated recibe los mismos privilegios que le da Supabase.

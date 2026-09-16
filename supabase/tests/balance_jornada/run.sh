@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20260913040400 (el balance del día, Fase 2) y de
-# 20260916013717, que corrige tres lecturas equivocadas suyas.
+# Verificación EJECUTABLE de 20260913040400 (el balance del día, Fase 2), de
+# 20260916013717, que corrige tres lecturas equivocadas suyas, y de
+# 20260916124800, que cierra el cuarto residuo: la jornada todavía abierta.
 #
 # POR QUÉ EXISTE
 # La invariante 1 vuelve a ser la que justifica el test entero: esta migración
@@ -18,7 +19,7 @@
 #     tarde; una resta a pelo da −1290 (invariante 8), que es la familia de
 #     error de #839.
 #
-# QUÉ COMPRUEBA (31 invariantes, más el escenario de la 0)
+# QUÉ COMPRUEBA (35 invariantes, más el escenario de la 0 y una prueba de mutación)
 #   0-1    el escenario, y que consultar el balance no mueva el cómputo de horas
 #   2-5    un día que cumple; los tres tramos de la demora; llegar antes no es
 #          desvío; la salida temprana respeta su tolerancia
@@ -46,6 +47,19 @@
 #                 y con tres tipos a la vez la cuenta sigue siendo tipo a tipo
 #          27-27b ausente, permiso y vacaciones son días SIN marcaje y nunca
 #                 jornadas abiertas; la entrada real sin salida sí lo sigue siendo
+#   28-28d el residuo de #844 que 20260916013717 no tocó, y que corrige
+#          20260916124800: mientras la jornada siga ABIERTA no hay horas sobre
+#          la jornada que afirmar
+#          28     entrada sin salida → NULL (no 0), jornada_abierta puesto,
+#                 cumple en false y sin extra_sin_autorizar
+#          28b    varios marcajes con uno abierto → NULL, aunque lo cerrado ya
+#                 sume 10 h contra 7.25
+#          28c    la jornada CERRADA por debajo y exactamente en la vara sigue
+#                 diciendo 0, que ahí sí es una afirmación correcta
+#          28d    la jornada CERRADA con sobrejornada conserva sus 3.75 h y su
+#                 extra_sin_autorizar
+#   MUT    y la prueba de la prueba: quitarle `c.abiertos > 0` al caso
+#          indeterminado hace caer la 28 (paso 4/4)
 #
 # USO
 #   supabase/tests/balance_jornada/run.sh
@@ -65,6 +79,11 @@ MIGRACION_5="$RAIZ/supabase/migrations/20260913040400_balance_de_jornada.sql"
 # La corrección de las tres lecturas equivocadas que salieron de la revisión de
 # #844. Va última y es la que tiene que ser idempotente.
 MIGRACION_6="$RAIZ/supabase/migrations/20260916013717_corregir_balance_jornada.sql"
+# Los dos residuos de #844: la FK simple duplicada de `plantilla_cupos_pausa`
+# (parte A, que comprueba `supabase/tests/politica_jornada/`) y el NULL de la
+# jornada abierta (parte B, que es lo que se ejerce acá). Va última y es la que
+# tiene que ser idempotente.
+MIGRACION_7="$RAIZ/supabase/migrations/20260916124800_corregir_residuos_jornada.sql"
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -76,6 +95,7 @@ command -v initdb >/dev/null || { echo "❌ falta initdb (instalá PostgreSQL)";
 # El socket unix tiene un tope de 107 bytes: se usa una ruta corta a propósito.
 DATA=$(mktemp -d /tmp/baldata.XXXX)
 SOCK=$(mktemp -d /tmp/balsock.XXXX)
+TRABAJO=$(mktemp -d /tmp/balmut.XXXX)
 PUERTO=${PGPORT_TEST:-55455}
 
 COMO=""
@@ -87,11 +107,11 @@ correr() { if [ -n "$COMO" ]; then su postgres -c "PATH=$PATH $*"; else eval "$*
 
 limpiar() {
   correr "pg_ctl -D $DATA stop -m immediate" >/dev/null 2>&1 || true
-  rm -rf "$DATA" "$SOCK"
+  rm -rf "$DATA" "$SOCK" "$TRABAJO"
 }
 trap limpiar EXIT
 
-if [ -n "$COMO" ]; then chown -R postgres "$DATA" "$SOCK"; fi
+if [ -n "$COMO" ]; then chown -R postgres "$DATA" "$SOCK" "$TRABAJO"; fi
 
 correr "initdb -D $DATA -U postgres --auth=trust" >/dev/null
 correr "pg_ctl -D $DATA -o '-p $PUERTO -k $SOCK' -l $DATA/pg.log start" >/dev/null
@@ -108,7 +128,7 @@ aplicar() {
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d balance -f "$1" >/dev/null
 }
 
-echo "── 1/3 · fixture: esquema, cuentas y expedientes ───────────────────────"
+echo "── 1/4 · fixture: esquema, cuentas y expedientes ───────────────────────"
 aplicar "$AQUI/fixture.sql"
 psql -q -d balance -c "
   GRANT USAGE ON SCHEMA public, auth, storage TO authenticated, anon;
@@ -118,7 +138,7 @@ psql -q -d balance -c "
 " >/dev/null
 echo "  OK    stubs + 6 cuentas + 2 condominios + 5 expedientes"
 
-echo "── 2/3 · las migraciones (la nueva, DOS veces: idempotente) ───────────"
+echo "── 2/4 · las migraciones (la nueva, DOS veces: idempotente) ───────────"
 # Las dos anteriores se aplican UNA vez, como en producción: ya están
 # desplegadas, y sus `CREATE OR REPLACE` de presencia_mi_ficha declaran menos
 # columnas OUT que la nueva — re-aplicarlas DESPUÉS fallaría, y ese fallo sería
@@ -128,7 +148,8 @@ aplicar "$MIGRACION_2"
 aplicar "$MIGRACION_3"
 aplicar "$MIGRACION_4"
 aplicar "$MIGRACION_5"
-for _ in 1 2; do aplicar "$MIGRACION_6"; done
+aplicar "$MIGRACION_6"
+for _ in 1 2; do aplicar "$MIGRACION_7"; done
 # Los grants de TABLA van aquí porque antes las tablas no existen. Las
 # invariantes 11 y 12 comprueban que el CUPO lo gobierne la POLICY y no la falta
 # de un grant: authenticated recibe los mismos privilegios que le da Supabase.
@@ -144,7 +165,7 @@ psql -q -d balance -c "
 " >/dev/null
 echo "  OK    re-aplicar la migración nueva no falla"
 
-echo "── 3/3 · invariantes ───────────────────────────────────────────────────"
+echo "── 3/4 · invariantes ───────────────────────────────────────────────────"
 # `|| CODIGO=$?` en vez de dejar que `set -e` mate el script: si psql falla y no
 # se captura, el harness muere ANTES de imprimir nada y el fallo se ve como una
 # salida vacía.
@@ -160,4 +181,42 @@ if [ "$CODIGO" -ne 0 ]; then
 fi
 
 echo
-echo "✅ balance_jornada: lo esperado y lo ocurrido, uno al lado del otro —demora por tramos contra la hora CORREGIDA, exceso de descanso por el total de cada tipo, la medianoche resuelta y la ausencia distinguida de la jornada abierta— sin mover ni un número de la planilla."
+echo "── 4/4 · MUTACIÓN · sin la condición de jornada abierta, la 28 debe caer ─"
+# Una invariante que pasa con y sin el arreglo no prueba nada. Se corre la
+# afirmación decisiva tres veces: contra la función real (verde), contra un
+# mutante al que se le quitó la condición (tiene que ROMPER), y contra la real
+# otra vez (verde de nuevo, para dejar la base como estaba).
+MUTANTE="$TRABAJO/sin_abiertos.sql"
+sed 's/WHEN c.partido OR c.multiple OR COALESCE(c.abiertos, 0) > 0 THEN NULL/WHEN c.partido OR c.multiple THEN NULL/' \
+  "$MIGRACION_7" > "$MUTANTE"
+if ! grep -q "WHEN c.partido OR c.multiple THEN NULL" "$MUTANTE"; then
+  echo "❌ la mutación no pudo quitar la condición de jornada abierta"; exit 1
+fi
+if grep -q "COALESCE(c.abiertos, 0) > 0 THEN NULL" "$MUTANTE"; then
+  echo "❌ la mutación dejó la condición puesta: no probaría nada"; exit 1
+fi
+
+if ! psql -q -v ON_ERROR_STOP=1 -d balance -f "$AQUI/mutacion.sql" >/dev/null 2>&1; then
+  echo "❌ la prueba de mutación no pasa contra la función REAL"; exit 1
+fi
+echo "  OK    contra la función real, la afirmación decisiva pasa"
+
+# El mutante sólo reemplaza el cuerpo de la función: su parte A es idempotente y
+# vuelve a no encontrar la FK redundante.
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d balance -f "$MUTANTE" >/dev/null
+if psql -q -v ON_ERROR_STOP=1 -d balance -f "$AQUI/mutacion.sql" >/dev/null 2>&1; then
+  echo "❌ MUTACIÓN: quitar COALESCE(c.abiertos, 0) > 0 NO hizo caer la prueba de jornada abierta"
+  echo "   La invariante 28 estaría pasando por otra razón y no probaría el arreglo."
+  exit 1
+fi
+echo "  OK    sin la condición, la jornada abierta vuelve a afirmar 0 y la prueba CAE"
+
+# Se restaura la función real para que la base quede como la dejó el arnés.
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d balance -f "$MIGRACION_7" >/dev/null
+if ! psql -q -v ON_ERROR_STOP=1 -d balance -f "$AQUI/mutacion.sql" >/dev/null 2>&1; then
+  echo "❌ re-aplicar la migración no devolvió la función correcta"; exit 1
+fi
+echo "  OK    re-aplicada la migración, vuelve a NULL"
+
+echo
+echo "✅ balance_jornada: lo esperado y lo ocurrido, uno al lado del otro —demora por tramos contra la hora CORREGIDA, exceso de descanso por el total de cada tipo, la medianoche resuelta, la ausencia distinguida de la jornada abierta y la jornada abierta sin horas de más que afirmar— sin mover ni un número de la planilla."
