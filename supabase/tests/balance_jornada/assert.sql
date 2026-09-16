@@ -943,3 +943,323 @@ BEGIN
   END;
   RAISE NOTICE 'OK 24 sin proyecto no hay balance: 42704, y NULL no es una puerta';
 END $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Las tres de la revisión de #844 (20260916013717)
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── 25 · La hora CORREGIDA es la que se juzga ──────────────────────────────
+--
+-- `presencia_corregir` reescribe `hora_entrada`/`hora_salida` y CONSERVA los
+-- sellos de marcaje como evidencia. El balance los tomaba como el instante a
+-- juzgar, así que seguía midiendo contra el horario ANTERIOR a la corrección
+-- mientras la planilla ya usaba el nuevo. Se corrige por la RPC REAL, no con un
+-- UPDATE a mano: lo que se prueba es la conducta del producto, no la de un
+-- atajo del test.
+DO $$
+DECLARE
+  v_plant   uuid;
+  v_pid     uuid := '9e000000-0000-0000-0000-000000000003';
+  v_fecha   date := CURRENT_DATE - 40;
+  v_reg     uuid;
+  v_sello_e timestamptz;
+  v_sello_s timestamptz;
+  v_fila    public.presencia_personal%ROWTYPE;
+  b         record;
+  h         record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Diurna 6-14';
+
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id,
+     hora_inicio, hora_fin, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, v_fecha, v_plant, '06:00', '14:00', 7.25);
+
+  -- Marcaje de AUTOSERVICIO: el servidor sella el instante exacto de cada toque.
+  v_sello_e := (v_fecha + time '06:00') AT TIME ZONE 'America/Guatemala';
+  v_sello_s := (v_fecha + time '14:00') AT TIME ZONE 'America/Guatemala';
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida,
+     entrada_marcada_en, salida_marcada_en, estado)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, 'Ana sin cuenta', v_fecha, '06:00', '14:00',
+          v_sello_e, v_sello_s, 'presente')
+  RETURNING id INTO v_reg;
+
+  -- Quien corrige es quien tiene `condominios.tab.presencia.edit`.
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000003', true);
+  PERFORM public.presencia_corregir(
+    v_reg, '07:00'::time, '13:00'::time, 'presente',
+    'Llegó tarde y se fue antes: el reloj de la garita estaba adelantado');
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+
+  -- LA EVIDENCIA NO SE TOCA. Si esto falla, la corrección borró el rastro y el
+  -- resto del test estaría midiendo otra cosa.
+  SELECT * INTO v_fila FROM public.presencia_personal WHERE id = v_reg;
+  IF v_fila.entrada_marcada_en IS DISTINCT FROM v_sello_e
+     OR v_fila.salida_marcada_en IS DISTINCT FROM v_sello_s THEN
+    RAISE EXCEPTION 'INVARIANTE 25: la corrección pisó los sellos originales (% / %)',
+      v_fila.entrada_marcada_en, v_fila.salida_marcada_en;
+  END IF;
+  IF v_fila.corregido_en IS NULL THEN
+    RAISE EXCEPTION 'INVARIANTE 25: la fila no quedó marcada como corregida';
+  END IF;
+  IF v_fila.hora_entrada <> '07:00' OR v_fila.hora_salida <> '13:00' THEN
+    RAISE EXCEPTION 'INVARIANTE 25: la RPC no dejó las horas corregidas (% – %)',
+      v_fila.hora_entrada, v_fila.hora_salida;
+  END IF;
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, v_fecha, v_fecha)
+  WHERE personal_id = v_pid;
+
+  -- 07:00 contra un turno de las 06:00 son 60 min, fuera del tramo compensable
+  -- (30). Con los sellos mandando, esto daba 0 y el día pasaba como cumplido.
+  IF b.minutos_tarde <> 60 THEN
+    RAISE EXCEPTION 'INVARIANTE 25: la demora se midió contra el sello viejo (% min, esperado 60)',
+      b.minutos_tarde;
+  END IF;
+  IF b.tramo_demora <> 'debitada' THEN
+    RAISE EXCEPTION 'INVARIANTE 25: tramo = % (esperado debitada)', b.tramo_demora;
+  END IF;
+  IF b.minutos_salida_temprana <> 60 THEN
+    RAISE EXCEPTION 'INVARIANTE 25: salida temprana = % min (esperado 60)',
+      b.minutos_salida_temprana;
+  END IF;
+  IF NOT ('demora' = ANY(b.hallazgos)) OR NOT ('salida_temprana' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 25: no se reportan los desvíos de la hora corregida (%)', b.hallazgos;
+  END IF;
+  IF b.cumple THEN
+    RAISE EXCEPTION 'INVARIANTE 25: un día con 60 min de demora salió como cumplido';
+  END IF;
+
+  -- Y la planilla y el balance tienen que estar contando las MISMAS horas.
+  SELECT * INTO h FROM public.calcular_horas_personal(
+    '11111111-0000-0000-0000-000000000001'::uuid, v_fecha, v_fecha)
+  WHERE personal_id = v_pid;
+  IF ROUND(b.horas_estadia, 2) <> ROUND(h.horas_estadia, 2) THEN
+    RAISE EXCEPTION 'INVARIANTE 25: el balance dice % h y la planilla % h',
+      b.horas_estadia, h.horas_estadia;
+  END IF;
+  IF b.horas_estadia <> 6 THEN
+    RAISE EXCEPTION 'INVARIANTE 25: 07:00–13:00 dieron % h de estadía', b.horas_estadia;
+  END IF;
+  IF b.hora_entrada <> '07:00' OR b.hora_salida <> '13:00' THEN
+    RAISE EXCEPTION 'INVARIANTE 25: el balance muestra % – %', b.hora_entrada, b.hora_salida;
+  END IF;
+
+  RAISE NOTICE 'OK 25 la fila corregida se juzga por su hora CORREGIDA, y el sello queda intacto como evidencia';
+END $$;
+
+-- ── 26 · El cupo se compara contra el TOTAL del tipo, no contra cada pausa ──
+--
+-- Dos almuerzos de 30 min contra un cupo de 45 son 60 minutos tomados y 15 de
+-- exceso. Restando el cupo fila por fila daban cero: partir la pausa en dos
+-- alcanzaba para que el cupo dejara de existir.
+DO $$
+DECLARE
+  v_plant uuid;
+  v_pid   uuid := '9e000000-0000-0000-0000-000000000003';
+  v_fecha date := CURRENT_DATE - 41;
+  v_reg   uuid;
+  b       record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Diurna 6-14';
+
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id,
+     hora_inicio, hora_fin, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, v_fecha, v_plant, '06:00', '14:00', 7.25);
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, 'Ana sin cuenta', v_fecha, '06:00', '14:00', 'presente')
+  RETURNING id INTO v_reg;
+
+  INSERT INTO public.presencia_pausas
+    (company_id, project_id, registro_id, personal_id, tipo, etiqueta, descuenta,
+     inicio_en, fin_en, origen)
+  VALUES
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_reg, v_pid, 'almuerzo', 'almuerzo', true,
+     (v_fecha + time '11:00') AT TIME ZONE 'America/Guatemala',
+     (v_fecha + time '11:30') AT TIME ZONE 'America/Guatemala', 'autoservicio'),
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_reg, v_pid, 'almuerzo', 'almuerzo', true,
+     (v_fecha + time '12:30') AT TIME ZONE 'America/Guatemala',
+     (v_fecha + time '13:00') AT TIME ZONE 'America/Guatemala', 'autoservicio');
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, v_fecha, v_fecha)
+  WHERE personal_id = v_pid;
+
+  IF b.horas_descanso <> 1 THEN
+    RAISE EXCEPTION 'INVARIANTE 26: el día tomó % h de descanso (30+30 son 1)', b.horas_descanso;
+  END IF;
+  IF b.minutos_exceso_descanso <> 15 THEN
+    RAISE EXCEPTION 'INVARIANTE 26: exceso = % min; el cupo se aplicó a cada pausa (esperado 15)',
+      b.minutos_exceso_descanso;
+  END IF;
+  IF NOT ('exceso_descanso' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 26: partir el almuerzo en dos borró el hallazgo (%)', b.hallazgos;
+  END IF;
+  IF b.cumple THEN
+    RAISE EXCEPTION 'INVARIANTE 26: un día con 15 min de exceso salió como cumplido';
+  END IF;
+  RAISE NOTICE 'OK 26 dos almuerzos de 30 contra un cupo de 45 son 15 de exceso, no cero';
+END $$;
+
+-- ── 26b · Y sigue siendo TIPO A TIPO, con varias pausas de cada uno ─────────
+--
+-- Agrupar por tipo no puede degenerar en «sumar todo y comparar contra la suma
+-- de cupos»: eso le regalaría a quien se pasa en el almuerzo la refacción que
+-- no se tomó. Tres tipos a la vez, cada uno con dos pausas, y cada uno con su
+-- propia cuenta: almuerzo 60 vs 45 → 15; refacción 20 vs 15 → 5; cena 80 sin
+-- cupo declarado → 0, porque no declarar no es declarar cero. Total 20.
+DO $$
+DECLARE
+  v_plant uuid;
+  v_pid   uuid := '9e000000-0000-0000-0000-000000000003';
+  v_fecha date := CURRENT_DATE - 42;
+  v_reg   uuid;
+  b       record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Diurna 6-14';
+
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id,
+     hora_inicio, hora_fin, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, v_fecha, v_plant, '06:00', '14:00', 7.25);
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, 'Ana sin cuenta', v_fecha, '06:00', '14:00', 'presente')
+  RETURNING id INTO v_reg;
+
+  INSERT INTO public.presencia_pausas
+    (company_id, project_id, registro_id, personal_id, tipo, etiqueta, descuenta,
+     inicio_en, fin_en, origen)
+  SELECT 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+         v_reg, v_pid, d.tipo, d.tipo, true,
+         (v_fecha + d.desde) AT TIME ZONE 'America/Guatemala',
+         (v_fecha + d.hasta) AT TIME ZONE 'America/Guatemala', 'autoservicio'
+  FROM (VALUES
+    ('almuerzo',  time '09:00', time '09:30'),   -- 30 ┐ 60 contra un cupo de 45
+    ('almuerzo',  time '09:40', time '10:10'),   -- 30 ┘ → 15 de exceso
+    ('refaccion', time '10:20', time '10:30'),   -- 10 ┐ 20 contra un cupo de 15
+    ('refaccion', time '10:40', time '10:50'),   -- 10 ┘ → 5 de exceso
+    ('cena',      time '11:00', time '11:40'),   -- 40 ┐ 80 SIN cupo declarado
+    ('cena',      time '12:00', time '12:40')    -- 40 ┘ → 0, no se inventa
+  ) AS d(tipo, desde, hasta);
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, v_fecha, v_fecha)
+  WHERE personal_id = v_pid;
+
+  IF b.minutos_exceso_descanso <> 20 THEN
+    RAISE EXCEPTION 'INVARIANTE 26b: exceso = % min (15 de almuerzo + 5 de refacción + 0 de cena = 20)',
+      b.minutos_exceso_descanso;
+  END IF;
+  RAISE NOTICE 'OK 26b con varias pausas de tres tipos la cuenta sigue siendo tipo a tipo: 15 + 5 + 0';
+END $$;
+
+-- ── 27 · Ausencia, permiso y vacaciones NO son una jornada abierta ─────────
+--
+-- La pantalla guarda esos tres estados SIN horas, que es lo correcto: no hubo
+-- entrada que registrar. `hora_salida IS NULL` a secas los contaba como días en
+-- los que alguien quedó fichado adentro, y `sin_marcaje` no se disparaba porque
+-- sí existía la fila. El día se reportaba con lo contrario de lo que pasó.
+DO $$
+DECLARE
+  v_plant  uuid;
+  v_pid    uuid := '9e000000-0000-0000-0000-000000000003';
+  v_estado text;
+  v_fecha  date;
+  v_i      int := 0;
+  b        record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Diurna 6-14';
+
+  FOREACH v_estado IN ARRAY ARRAY['ausente', 'permiso', 'vacaciones'] LOOP
+    v_i := v_i + 1;
+    v_fecha := CURRENT_DATE - 42 - v_i;
+
+    INSERT INTO public.bloques_turno
+      (company_id, project_id, personal_id, fecha, plantilla_horario_id,
+       hora_inicio, hora_fin, horas_planificadas)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+            v_pid, v_fecha, v_plant, '06:00', '14:00', 7.25);
+    -- Sin entrada y sin salida: es lo que guarda la pantalla, y no se le
+    -- inventan horas aquí ni en ningún lado.
+    INSERT INTO public.presencia_personal
+      (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+            v_pid, 'Ana sin cuenta', v_fecha, NULL, NULL, v_estado);
+
+    SELECT * INTO b FROM public.presencia_balance_dia(
+      '11111111-0000-0000-0000-000000000001'::uuid, v_fecha, v_fecha)
+    WHERE personal_id = v_pid;
+
+    IF 'jornada_abierta' = ANY(b.hallazgos) THEN
+      RAISE EXCEPTION 'INVARIANTE 27: «%» salió como jornada abierta (%)', v_estado, b.hallazgos;
+    END IF;
+    IF NOT ('sin_marcaje' = ANY(b.hallazgos)) THEN
+      RAISE EXCEPTION 'INVARIANTE 27: «%» no se reporta sin marcaje (%)', v_estado, b.hallazgos;
+    END IF;
+    IF b.cumple THEN
+      RAISE EXCEPTION 'INVARIANTE 27: «%» salió como día cumplido', v_estado;
+    END IF;
+    IF b.hora_entrada IS NOT NULL OR b.hora_salida IS NOT NULL THEN
+      RAISE EXCEPTION 'INVARIANTE 27: a «%» se le inventaron horas (% – %)',
+        v_estado, b.hora_entrada, b.hora_salida;
+    END IF;
+  END LOOP;
+  RAISE NOTICE 'OK 27 ausente, permiso y vacaciones son días SIN marcaje, no jornadas abiertas';
+END $$;
+
+-- ── 27b · Y la entrada de verdad sin salida SIGUE siendo jornada abierta ───
+--
+-- La contracara de la 27: el arreglo no puede apagar el hallazgo que sí
+-- importa. Quien fichó la entrada y no fichó la salida dejó el día abierto.
+DO $$
+DECLARE
+  v_plant uuid;
+  v_pid   uuid := '9e000000-0000-0000-0000-000000000003';
+  v_fecha date := CURRENT_DATE - 46;
+  b       record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Diurna 6-14';
+
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id,
+     hora_inicio, hora_fin, horas_planificadas)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, v_fecha, v_plant, '06:00', '14:00', 7.25);
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, 'Ana sin cuenta', v_fecha, '06:00', NULL, 'presente');
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, v_fecha, v_fecha)
+  WHERE personal_id = v_pid;
+
+  IF NOT ('jornada_abierta' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 27b: la entrada sin salida dejó de reportarse abierta (%)', b.hallazgos;
+  END IF;
+  IF 'sin_marcaje' = ANY(b.hallazgos) THEN
+    RAISE EXCEPTION 'INVARIANTE 27b: un día con entrada se declaró sin marcaje (%)', b.hallazgos;
+  END IF;
+  IF b.cumple THEN
+    RAISE EXCEPTION 'INVARIANTE 27b: una jornada abierta salió como cumplida';
+  END IF;
+  RAISE NOTICE 'OK 27b entró y no salió: eso sí es una jornada abierta, y se sigue diciendo';
+END $$;
