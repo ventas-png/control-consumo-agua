@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
 # Verificación EJECUTABLE del control de asignación de turnos
-# (20260820000000 · 000100 · 000200 · 000300).
+# (20260820000000 · 000100 · 000200 · 000300 · 20260916171325).
 #
 # POR QUÉ EXISTE
 # Nada de lo que hacen estas migraciones se puede validar leyéndolas. Un
@@ -12,13 +12,16 @@
 # convierte en un pago. La aritmética de "cada bimestre, el día 31, saltando
 # festivos" no se revisa a ojo.
 #
-# QUÉ COMPRUEBA (36 invariantes)
+# QUÉ COMPRUEBA (51 invariantes)
 #   A · JORNADA       que 22:00→06:00 cuenta 8 h y no -960 minutos (el bug vivo
 #                     de PresenciaPersonalTab), con y sin bandera de cruce, que
 #                     el descanso se descuenta y que la franja nocturna
 #                     20:00–06:00 se mide bien.
-#   B · PERIODICIDAD  las diez frecuencias, incluidas las cuatro largas que no
-#                     existían en el repo, y el día 31 en febrero.
+#   B · PERIODICIDAD  las once frecuencias —las cuatro largas que no existían en
+#                     el repo y «los días del mes que elijas»—, el día 31 en
+#                     febrero, y el 28/29/30/31 con febrero bisiesto y no
+#                     bisiesto, incluida la convergencia de varios en el último
+#                     día del mes.
 #   C · BACKFILL      que el marcaje histórico se ata al empleado por nombre
 #                     normalizado y que quien no está en plantilla no se ata a
 #                     nadie por error.
@@ -35,6 +38,15 @@
 #   G · RLS           que el permiso del tab abre la lectura, que leer turnos no
 #                     habilita a aprobar ausencias, y que la empresa vecina no
 #                     lee, no genera y no computa.
+#   H · BORRADO       que NINGÚN rol de aplicación —ni company_owner, ni admin,
+#                     ni super_admin, ni el permiso del tab— borra un bloque
+#                     pasado, iniciado, cerrado, o con tareas, revisiones o
+#                     marcajes; que el rechazo deja las filas hijas intactas; y
+#                     que uno limpio de hoy o del futuro sí se borra.
+#   I · EXCEPCIONES   que el día quitado no vuelve al re-generar (N veces),
+#                     que retirarlo lo devuelve, que las FKs compuestas cierran
+#                     la referencia cruzada, que creado_por no se falsifica y
+#                     que las cuatro operaciones respetan empresa y proyecto.
 #
 # USO
 #   supabase/tests/turnos/run.sh
@@ -49,6 +61,10 @@ MIG_BASE="$RAIZ/supabase/migrations/20260820000000_turnos_plantillas_y_asignacio
 MIG_CAL="$RAIZ/supabase/migrations/20260820000100_calendario_laboral_y_ausencias.sql"
 MIG_GEN="$RAIZ/supabase/migrations/20260820000200_generar_bloques_turno_rpc.sql"
 MIG_HRS="$RAIZ/supabase/migrations/20260820000300_horas_personal_calculo.sql"
+# Va la última: dropea la firma de 8 parámetros de turnos_regla_aplica que crea
+# MIG_GEN y la reemplaza por la de 9. Si se aplicara antes, MIG_GEN volvería a
+# crear la vieja y toda llamada de 8 argumentos quedaría ambigua.
+MIG_NUEVA="$RAIZ/supabase/migrations/20260916171325_turnos_dias_del_mes_excepciones_y_borrado_seguro.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -88,8 +104,8 @@ echo "── 1/4 · fixture (padrón + helpers + personal tal como está en prod
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$AQUI/fixture.sql" >/dev/null
 echo "  OK    fixture cargado"
 
-echo "── 2/4 · aplicar las cuatro migraciones ────────────────────────────────"
-for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS"; do
+echo "── 2/4 · aplicar las cinco migraciones ─────────────────────────────────"
+for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$m" >/dev/null
   echo "  OK    $(basename "$m")"
 done
@@ -114,12 +130,13 @@ if echo "$SALIDA" | grep -q 'WARNING:'; then
 fi
 
 echo
-echo "── 4/4 · idempotencia (re-aplicar las cuatro) ──────────────────────────"
-for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS"; do
+echo "── 4/4 · idempotencia (re-aplicar las cinco) ───────────────────────────"
+for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$m" >/dev/null
 done
-echo "  OK    las cuatro migraciones se pueden volver a aplicar"
+echo "  OK    las cinco migraciones se pueden volver a aplicar"
 
 echo
-echo "✅ turnos: 36 invariantes (jornada, periodicidad, backfill, generación,"
-echo "   expediente, horas y RLS), migraciones idempotentes."
+echo "✅ turnos: 51 invariantes (jornada, periodicidad, backfill, generación,"
+echo "   expediente, horas, RLS, borrado seguro y excepciones),"
+echo "   migraciones idempotentes."
