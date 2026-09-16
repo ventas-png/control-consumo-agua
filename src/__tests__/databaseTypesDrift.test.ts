@@ -50,6 +50,7 @@ const TABLAS_VIGILADAS = [
   // Motor de turnos (destino de la materialización de rutinas)
   'plantillas_horario',
   'asignaciones_turno',
+  'excepciones_turno',
   'bloques_turno',
   'tareas_bloque',
   'revisiones_tarea',

@@ -113,10 +113,33 @@ export function TareasPersonalTab({
     onRefresh()
   }
 
+  /**
+   * Borrar un bloque de turno.
+   *
+   * YA NO BORRA EN CASCADA, y el texto tampoco lo promete. Desde
+   * 20260916171325 la base sólo deja borrar un bloque LIMPIO —de hoy en
+   * adelante en la zona de la empresa, pendiente, sin iniciar, sin cerrar, sin
+   * tareas, sin revisiones y sin marcajes— y lo exige por trigger, así que vale
+   * para CUALQUIER rol: dueño de la empresa, administrador y super_admin
+   * incluidos. Un turno con checklist es historia operativa y no se tira por un
+   * clic.
+   *
+   * Por eso el error se MUESTRA en vez de ignorarse, como hacía antes: el
+   * mensaje del trigger dice cuál de esas condiciones falló, y sin él la
+   * pantalla se refrescaba idéntica y parecía que el borrado no hacía nada.
+   */
   async function deleteBloque(id: string) {
-    const r = await confirm({ title: '¿Eliminar bloque?', text: 'Se eliminan también las tareas asociadas.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
+    const r = await confirm({
+      title: '¿Eliminar bloque?',
+      text: 'Sólo se pueden eliminar turnos de hoy en adelante que todavía no arrancaron y no tienen tareas. Si ya tiene checklist o registro de presencia, la base lo va a rechazar.',
+      icon: 'warning', variant: 'danger', confirmText: 'Eliminar',
+    })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('bloques_turno', id)
+    const { error } = await deleteCondominioRow('bloques_turno', id)
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo eliminar el bloque', text: error.message })
+      return
+    }
     if (bloqueAbierto === id) setBloqueAbierto(null)
     onRefresh()
   }
