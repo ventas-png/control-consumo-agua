@@ -235,6 +235,7 @@ describe('celdaDe — lo materializado y lo que la regla predice', () => {
     id: 'ph1', company_id: 'c1', project_id: 'p1', nombre: 'Nocturno',
     turno: 'noche', hora_inicio: '22:00', hora_fin: '06:00',
     cruza_medianoche: true, minutos_descanso: 0, horas_jornada: 8,
+    tolerancia_salida_min: 0, demora_compensable_hasta_min: 0, extra_requiere_autorizacion: true,
     tolerancia_entrada_min: 10, activo: true, created_at: '',
   }
   const fuentesBase = {

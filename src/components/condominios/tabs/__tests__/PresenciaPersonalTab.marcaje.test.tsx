@@ -63,6 +63,7 @@ const mocks = vi.hoisted(() => ({
   ajustarPausa: vi.fn(),
   anularPausa: vi.fn(),
   guardarTipoPausa: vi.fn(),
+  fetchBalanceDias: vi.fn(),
   // Espía en vez de un stub mudo: la foto vive en un bucket privado y se firma
   // al render, así que en jsdom nunca hay un <img>. Sin contar las llamadas, un
   // «no se renderizó la foto» pasaría igual si SÍ se hubiera intentado.
@@ -90,6 +91,13 @@ vi.mock('../../../../domain/condominios/pausasPresencia', async (original) => ({
   ajustarPausa: mocks.ajustarPausa,
   anularPausa: mocks.anularPausa,
   guardarTipoPausa: mocks.guardarTipoPausa,
+}))
+// El balance (fase 2) solo LEE, pero lee por red. Se intercepta la consulta y
+// no la lectura de los hallazgos: esa es aritmética de presentación y vale la
+// pena que estas pruebas la ejerzan de verdad.
+vi.mock('../../../../domain/condominios/balanceJornada', async (original) => ({
+  ...(await original<typeof import('../../../../domain/condominios/balanceJornada')>()),
+  fetchBalanceDias: mocks.fetchBalanceDias,
 }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
@@ -176,6 +184,7 @@ beforeEach(() => {
   mocks.ajustarPausa.mockResolvedValue({ error: null })
   mocks.anularPausa.mockResolvedValue({ error: null })
   mocks.guardarTipoPausa.mockResolvedValue({ error: null })
+  mocks.fetchBalanceDias.mockResolvedValue({ dias: [], error: null, fallo: null })
   mocks.obtenerUbicacion.mockResolvedValue({
     coords: { lat: 14.60271, lng: -90.51328, exactitud_m: 12 }, error: null,
   })
@@ -772,5 +781,168 @@ describe('la configuración de qué descuenta', () => {
     montar([filaDelDia()], [], { canEdit: false })
     await screen.findByText('Marco Sical')
     expect(screen.queryByTitle('Qué pausas descuentan de las horas que se pagan')).toBeNull()
+  })
+})
+
+// ── El balance del día (fase 2) ─────────────────────────────────────────────
+//
+// Lo que estas pruebas protegen no es la aritmética —esa vive en SQL y tiene su
+// sandbox— sino el criterio de qué se le dice a quien mira la lista: que el día
+// que cumple no diga nada, que el que todavía no se puede juzgar no se acuse, y
+// sobre todo que el turno planificado que NADIE marcó aparezca, porque sin
+// marcaje no hay fila donde apareciera solo.
+describe('el balance contra la jornada', () => {
+  function balance(over: Record<string, unknown> = {}) {
+    return {
+      personal_id: 'per-1', nombre: 'Marco Sical', cargo: 'guardia', fecha: HOY,
+      bloque_id: 'blq-1', turno_inicio: '06:00:00', turno_fin: '14:00:00',
+      horas_planificadas: 7.25, tiene_vara: true,
+      registro_id: 'r1', hora_entrada: '06:00:00', hora_salida: '14:00:00',
+      horas_estadia: 8, horas_descanso: 0.75, horas_laborales: 7.25,
+      minutos_tarde: 0, tramo_demora: null, minutos_salida_temprana: 0,
+      minutos_exceso_descanso: 0, horas_sobre_jornada: 0,
+      extra_requiere_autorizacion: true, cumple: true, hallazgos: [] as string[],
+      ...over,
+    }
+  }
+
+  it('el día que cumple no agrega ni una palabra a su fila', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({ dias: [balance()], error: null, fallo: null })
+    montar([filaDelDia()])
+    await screen.findByText('Marco Sical')
+    expect(screen.queryByText(/Contra la jornada/)).toBeNull()
+  })
+
+  it('la demora se enseña con su tramo, junto al marcaje que la produjo', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [balance({ cumple: false, hallazgos: ['demora'], minutos_tarde: 25, tramo_demora: 'compensable' })],
+      error: null, fallo: null,
+    })
+    montar([filaDelDia()])
+    expect(await screen.findByText(/entró 25 min tarde \(se compensa\)/)).toBeTruthy()
+  })
+
+  it('la jornada abierta se marca en espera, no como incumplimiento', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [balance({ hora_salida: null, cumple: false, hallazgos: ['jornada_abierta'] })],
+      error: null, fallo: null,
+    })
+    montar([filaDelDia({ hora_salida: null })])
+    const linea = await screen.findByText(/Contra la jornada/)
+    expect(linea.textContent).toContain('la jornada quedó abierta')
+    expect(linea.textContent).toContain('⏳')
+  })
+
+  it('el turno que nadie cubrió se enseña aunque no tenga fila', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [balance({
+        registro_id: null, hora_entrada: null, hora_salida: null,
+        horas_estadia: null, horas_laborales: null,
+        cumple: false, hallazgos: ['sin_marcaje'],
+      })],
+      error: null, fallo: null,
+    })
+    montar([])
+    expect(await screen.findByText('Turnos planificados sin marcaje')).toBeTruthy()
+    expect(screen.getByText(/06:00–14:00/)).toBeTruthy()
+  })
+
+  it('sobre una fila anulada no se juzga nada: ese día, para la vara, no existe', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [balance({ cumple: false, hallazgos: ['demora'], minutos_tarde: 25, tramo_demora: 'compensable' })],
+      error: null, fallo: null,
+    })
+    montar([filaDelDia({ anulado_en: '2026-09-08T20:00:00Z' })])
+    await screen.findByText('Marco Sical')
+    expect(screen.queryByText(/Contra la jornada/)).toBeNull()
+  })
+
+  it('si la cuenta no tiene el permiso, el balance calla y el marcaje sigue', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({ dias: [], error: 'no autorizado', fallo: 'sin_permiso' })
+    montar([filaDelDia()])
+    expect(await screen.findByText('Marco Sical')).toBeTruthy()
+    expect(screen.queryByText(/Contra la jornada/)).toBeNull()
+    expect(screen.queryByText('Turnos planificados sin marcaje')).toBeNull()
+    // Y NINGUNA advertencia: el candado cerró bien, no hay nada que avisar.
+    expect(screen.queryByText(/No se pudo calcular el balance/)).toBeNull()
+  })
+})
+
+// ── Un error de lectura no puede leerse como «sin hallazgos» ────────────────
+//
+// Sin balance, ninguna fila lleva su línea «Contra la jornada» — que es
+// exactamente el aspecto de un día en orden. La ausencia de balance no es
+// neutra: se parece al verde. Estas tres pruebas separan las tres razones por
+// las que puede faltar, porque para quien mira no significan lo mismo.
+describe('la falta de balance dice POR QUÉ falta', () => {
+  it('mientras se calcula lo dice, en vez de fingir que no hay nada que decir', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    // La promesa nunca resuelve: es exactamente «todavía calculando».
+    mocks.fetchBalanceDias.mockReturnValue(new Promise(() => {}))
+    montar([filaDelDia()])
+    expect(await screen.findByText(/Calculando el balance contra la jornada/)).toBeTruthy()
+    expect(screen.queryByText(/No se pudo calcular el balance/)).toBeNull()
+  })
+
+  it('un error operacional avisa, y no rompe nada de lo que ya funciona', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [], error: 'fetch failed', fallo: 'operacional',
+    })
+    montar([filaDelDia()])
+    const aviso = await screen.findByText(/No se pudo calcular el balance del día/)
+    expect(aviso).toBeTruthy()
+    // NO DESTRUCTIVO: la lista sigue ahí y se sigue pudiendo trabajar con ella.
+    expect(screen.getByText('Marco Sical')).toBeTruthy()
+    expect(aviso.closest('[role="status"]')?.textContent)
+      .toContain('se siguen pudiendo registrar y corregir')
+    // Y sobre todo: no se pinta un día sin hallazgos que nadie calculó.
+    expect(screen.queryByText(/Contra la jornada/)).toBeNull()
+  })
+
+  it('un rechazo de la promesa también avisa, en vez de calcular para siempre', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockRejectedValue(new Error('la red se cayó'))
+    montar([filaDelDia()])
+    expect(await screen.findByText(/No se pudo calcular el balance del día/)).toBeTruthy()
+    expect(screen.queryByText(/Calculando el balance/)).toBeNull()
+  })
+})
+
+describe('el balance de un día con varios marcajes', () => {
+  it('señala TODAS las filas del día, no sólo la primera', async () => {
+    // El balance de un día es UNO aunque haya dos marcajes: las horas se suman.
+    // Si el hallazgo se pintara sólo sobre el registro «principal», la otra fila
+    // quedaría con aspecto de normal — y es la mitad del mismo problema.
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [{
+        personal_id: 'per-1', nombre: 'Marco Sical', cargo: 'guardia', fecha: HOY,
+        bloque_id: 'blq-1', bloques: 1, turno_inicio: '06:00:00', turno_fin: '14:00:00',
+        horas_planificadas: 7.25, tiene_vara: true,
+        registro_id: 'r1', registro_ids: ['r1', 'r2'], registros: 2,
+        hora_entrada: '06:00:00', hora_salida: '16:00:00',
+        horas_estadia: 8, horas_descanso: 0, horas_laborales: 8,
+        minutos_tarde: 0, tramo_demora: null, minutos_salida_temprana: 0,
+        minutos_exceso_descanso: 0, horas_sobre_jornada: null,
+        extra_requiere_autorizacion: true, cumple: false,
+        hallazgos: ['marcajes_multiples'],
+      }],
+      error: null, fallo: null,
+    })
+    montar([
+      filaDelDia({ id: 'r1', hora_entrada: '06:00:00', hora_salida: '10:00:00' }),
+      filaDelDia({ id: 'r2', hora_entrada: '12:00:00', hora_salida: '16:00:00' }),
+    ])
+
+    const lineas = await screen.findAllByText(/Contra la jornada/)
+    expect(lineas).toHaveLength(2)
+    for (const l of lineas) expect(l.textContent).toContain('las horas se suman')
   })
 })
