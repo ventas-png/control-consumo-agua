@@ -1280,8 +1280,12 @@ $$;
 -- proyecto. Hasta 20260916232549, `bloques_turno_insert` y `_update`
 -- comprobaban `company_id` y el permiso de acción pero NO
 -- `can_access_project`: quien administraba el condominio 1 podía escribirle la
--- agenda al personal del condominio 3 de la misma empresa. El SELECT y el
--- DELETE sí lo comprobaban; el alta y el cambio, no.
+-- agenda al personal del condominio 3 de la misma empresa.
+--
+-- CORRECCIÓN (20260917000825): esta cabecera decía que «el SELECT y el DELETE
+-- sí lo comprobaban». Del DELETE es cierto; del SELECT era FALSO —seguía siendo
+-- la policy de 20260907000100, con empresa y visibilidad y nada más—. Lo cierra
+-- la sección N, que es donde se prueba.
 DO $$
 DECLARE
   CO      uuid := 'aaaaaaaa-0000-0000-0000-000000000001';
@@ -1396,7 +1400,16 @@ DECLARE
   v_ex    uuid;
   n       bigint;
   afectadas integer;
+  v_hoy   date;
 BEGIN
+  -- «HOY» ES EL DE LA EMPRESA, NO EL DE UTC. Es lo que miran
+  -- `turnos_asegurar_bloque_libre` y `turnos_asegurar_dia_futuro`, y usar
+  -- CURRENT_DATE aquí hacía que estas pruebas dependieran de la hora a la que
+  -- se corriera el arnés: entre las 18:00 de Guatemala y la medianoche UTC,
+  -- v_hoy - 1 es HOY para la empresa y el rechazo que se espera no
+  -- llega. La invariante 94 es la que fija que la zona sea la de la empresa;
+  -- éstas fijan que el pasado se rechace, y para eso el pasado tiene que serlo.
+  v_hoy := (now() AT TIME ZONE public.presencia_zona_horaria(CO))::date;
   SELECT ph.id INTO v_ph   FROM public.plantillas_horario ph WHERE ph.project_id = PR ORDER BY ph.nombre LIMIT 1;
   SELECT ph.id INTO v_otra FROM public.plantillas_horario ph WHERE ph.project_id = PR AND ph.id <> v_ph LIMIT 1;
   IF v_otra IS NULL THEN
@@ -1409,13 +1422,13 @@ BEGIN
   SET LOCAL ROLE turnos_tester;
   PERFORM set_config('app.uid', BETO::text, true);
   BEGIN
-    PERFORM public.turnos_guardar_dia(PR, MARIO, CURRENT_DATE - 1, v_ph);
+    PERFORM public.turnos_guardar_dia(PR, MARIO, v_hoy - 1, v_ph);
     RAISE EXCEPTION '70: guardó un día pasado';
   EXCEPTION WHEN restrict_violation THEN NULL;
   END;
   RESET ROLE;
   SELECT count(*) INTO n FROM public.bloques_turno
-   WHERE personal_id = MARIO AND fecha = CURRENT_DATE - 1;
+   WHERE personal_id = MARIO AND fecha = v_hoy - 1;
   IF n <> 0 THEN RAISE EXCEPTION '70b: el rechazo dejó un bloque creado'; END IF;
   RAISE NOTICE 'OK 70 guardar una fecha pasada falla y no deja nada creado';
 
@@ -1423,23 +1436,23 @@ BEGIN
   SET LOCAL ROLE turnos_tester;
   PERFORM set_config('app.uid', BETO::text, true);
   BEGIN
-    PERFORM public.turnos_quitar_dia(PR, MARIO, CURRENT_DATE - 2);
+    PERFORM public.turnos_quitar_dia(PR, MARIO, v_hoy - 2);
     RAISE EXCEPTION '71: quitó un día pasado';
   EXCEPTION WHEN restrict_violation THEN NULL;
   END;
   RESET ROLE;
   SELECT count(*) INTO n FROM public.excepciones_turno
-   WHERE personal_id = MARIO AND fecha = CURRENT_DATE - 2;
+   WHERE personal_id = MARIO AND fecha = v_hoy - 2;
   IF n <> 0 THEN RAISE EXCEPTION '71b: el rechazo dejó una excepción creada'; END IF;
   RAISE NOTICE 'OK 71 quitar una fecha pasada falla y no deja excepción';
 
   -- ── 72. Restaurar un día PASADO ────────────────────────────────────────
   INSERT INTO public.excepciones_turno (company_id, project_id, personal_id, fecha, motivo)
-    VALUES (CO, PR, MARIO, CURRENT_DATE - 3, 'histórica') RETURNING id INTO v_ex;
+    VALUES (CO, PR, MARIO, v_hoy - 3, 'histórica') RETURNING id INTO v_ex;
   SET LOCAL ROLE turnos_tester;
   PERFORM set_config('app.uid', BETO::text, true);
   BEGIN
-    PERFORM public.turnos_restaurar_dia(PR, MARIO, CURRENT_DATE - 3);
+    PERFORM public.turnos_restaurar_dia(PR, MARIO, v_hoy - 3);
     RAISE EXCEPTION '72: restauró un día pasado';
   EXCEPTION WHEN restrict_violation THEN NULL;
   END;
@@ -1578,12 +1591,12 @@ BEGIN
   -- todo, que es el fallo contrario y tan malo como el original.
   SET LOCAL ROLE turnos_tester;
   PERFORM set_config('app.uid', BETO::text, true);
-  PERFORM public.turnos_guardar_dia(PR, MARIO, CURRENT_DATE, v_ph);
-  PERFORM public.turnos_guardar_dia(PR, MARIO, CURRENT_DATE, v_otra);   -- y cambiarla
+  PERFORM public.turnos_guardar_dia(PR, MARIO, v_hoy, v_ph);
+  PERFORM public.turnos_guardar_dia(PR, MARIO, v_hoy, v_otra);   -- y cambiarla
   PERFORM public.turnos_guardar_dia(PR, MARIO, CURRENT_DATE + 95, v_ph);
   RESET ROLE;
   SELECT count(*) INTO n FROM public.bloques_turno
-   WHERE personal_id = MARIO AND fecha = CURRENT_DATE AND plantilla_horario_id = v_otra;
+   WHERE personal_id = MARIO AND fecha = v_hoy AND plantilla_horario_id = v_otra;
   IF n <> 1 THEN RAISE EXCEPTION '79a: hoy, limpio y pendiente, debía poder cambiar de jornada'; END IF;
   SELECT count(*) INTO n FROM public.bloques_turno
    WHERE personal_id = MARIO AND fecha = CURRENT_DATE + 95;
@@ -1596,7 +1609,7 @@ BEGIN
   -- trigger que los bloqueara rompería la operación diaria.
   INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
                                     turno, fecha, estado)
-    VALUES (CO, PR, MARIO, v_ph, 'manana', CURRENT_DATE - 10, 'pendiente')
+    VALUES (CO, PR, MARIO, v_ph, 'manana', v_hoy - 10, 'pendiente')
     RETURNING id INTO v_b;
   SET LOCAL ROLE turnos_tester;
   PERFORM set_config('app.uid', BETO::text, true);
@@ -1621,7 +1634,7 @@ BEGIN
     RETURNING id INTO v_otra;
   INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
                                     turno, fecha, estado, iniciado_en, cerrado_en)
-    VALUES (CO, PR, MARIO, v_otra, 'noche', CURRENT_DATE - 20, 'completado', now(), now())
+    VALUES (CO, PR, MARIO, v_otra, 'noche', v_hoy - 20, 'completado', now(), now())
     RETURNING id INTO v_b;
   DELETE FROM public.plantillas_horario WHERE id = v_otra;
   SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b AND plantilla_horario_id IS NULL;
@@ -1630,5 +1643,391 @@ BEGIN
   RAISE NOTICE 'OK 81 borrar una jornada desvincula el histórico sin chocar con el trigger';
 
   RAISE NOTICE '── 12 invariantes de re-planificación segura OK ──';
+END;
+$$;
+
+-- ══ N. La LECTURA también es por proyecto ══════════════════════════════════
+--
+-- 20260916232549 cerró el alta y el cambio por proyecto y dio por hecho que el
+-- SELECT ya lo comprobaba. No lo comprobaba: `bloques_turno_select` seguía
+-- siendo la de 20260907000100, con `company_id` + visibilidad del tab y nada
+-- más. Con `condominios.tab.turnos` se leía la agenda de TODOS los condominios
+-- de la empresa.
+--
+-- Y no sólo ésta: `tareas_bloque_select` y `revisiones_tarea_select` derivan su
+-- inquilino con un EXISTS sobre el bloque padre, y ese EXISTS pasa por la RLS
+-- de `bloques_turno`. El padre abierto las dejaba abiertas a las tres.
+DO $$
+DECLARE
+  CO    uuid := 'aaaaaaaa-0000-0000-0000-000000000001';
+  PR_A  uuid := '11111111-0000-0000-0000-000000000001';
+  PR_B  uuid := '11111111-0000-0000-0000-000000000003';
+  PEDRO uuid := '50000000-0000-0000-0000-000000000001';
+  NORA  uuid := '50000000-0000-0000-0000-000000000004';
+  BETO  uuid := 'e0000000-0000-0000-0000-00000000000b';
+  FEDE  uuid := 'e0000000-0000-0000-0000-00000000000f';
+  OLGA  uuid := 'e0000000-0000-0000-0000-00000000000d';  -- dueña: exenta de proyecto
+  v_ph_a uuid;
+  v_ph_b uuid;
+  v_b_a  uuid;
+  v_b_b  uuid;
+  v_t_b  uuid;
+  n      bigint;
+BEGIN
+  SELECT ph.id INTO v_ph_a FROM public.plantillas_horario ph WHERE ph.project_id = PR_A LIMIT 1;
+  SELECT ph.id INTO v_ph_b FROM public.plantillas_horario ph WHERE ph.project_id = PR_B LIMIT 1;
+
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR_A, PEDRO, v_ph_a, 'manana', CURRENT_DATE + 120, 'pendiente')
+    RETURNING id INTO v_b_a;
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR_B, NORA, v_ph_b, 'manana', CURRENT_DATE + 120, 'pendiente')
+    RETURNING id INTO v_b_b;
+
+  -- El checklist y la revisión viven en el bloque del condominio B: son el
+  -- cebo para comprobar que el EXISTS no los filtra al vecino.
+  INSERT INTO public.tareas_bloque (bloque_id, titulo) VALUES (v_b_b, 'Barrer el lobby de B')
+    RETURNING id INTO v_t_b;
+  INSERT INTO public.revisiones_tarea (tarea_id, bloque_id, revisado_por, estado)
+    VALUES (v_t_b, v_b_b, 'e0000000-0000-0000-0000-00000000000a', 'aprobado');
+
+  -- ── 82. Beto, asignado sólo al A, no ve los bloques del B ───────────────
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b_b;
+  RESET ROLE;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '82: quien administra el condominio A leyó % bloque(s) del B', n; END IF;
+  RAISE NOTICE 'OK 82 con turnos.edit en el condominio A, los bloques del B no se leen';
+
+  -- ── 83. Y Fede, asignado sólo al B, no ve los del A ─────────────────────
+  -- El espejo importa: una policy que sólo cerrara una dirección sería un
+  -- accidente del fixture, no una regla.
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', FEDE::text, true);
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b_a;
+  RESET ROLE;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '83: quien administra el condominio B leyó % bloque(s) del A', n; END IF;
+  RAISE NOTICE 'OK 83 y al revés: desde el condominio B no se leen los bloques del A';
+
+  -- ── 84. Cada uno SÍ ve el suyo, y la dueña ve los dos ───────────────────
+  -- Sin esto, una policy que devolviera cero filas siempre pasaría las dos
+  -- anteriores. Y `can_access_project` no puede cerrarle la empresa a quien la
+  -- administra entera: los roles con alcance de empresa son exentos.
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b_a;
+  RESET ROLE;
+  IF n <> 1 THEN RAISE EXCEPTION '84a: Beto no ve su propio bloque'; END IF;
+
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', FEDE::text, true);
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_b_b;
+  RESET ROLE;
+  IF n <> 1 THEN RAISE EXCEPTION '84b: Fede no ve su propio bloque'; END IF;
+
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', OLGA::text, true);
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id IN (v_b_a, v_b_b);
+  RESET ROLE;
+  IF n <> 2 THEN
+    RAISE EXCEPTION '84c: la dueña de la empresa debía ver los dos condominios, vio %', n; END IF;
+  RAISE NOTICE 'OK 84 cada quien lee su condominio, y quien administra la empresa lee los dos';
+
+  -- ── 85. Las hijas tampoco se filtran por el EXISTS del padre ────────────
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  SELECT count(*) INTO n FROM public.tareas_bloque WHERE bloque_id = v_b_b;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '85a: se leyeron % tarea(s) de un bloque de otro condominio', n; END IF;
+  SELECT count(*) INTO n FROM public.revisiones_tarea WHERE bloque_id = v_b_b;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '85b: se leyeron % revisión(es) de un bloque de otro condominio', n; END IF;
+  RESET ROLE;
+
+  -- Y quien sí administra ese condominio las lee: el cierre no las borra.
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', FEDE::text, true);
+  SELECT count(*) INTO n FROM public.tareas_bloque WHERE bloque_id = v_b_b;
+  RESET ROLE;
+  IF n <> 1 THEN RAISE EXCEPTION '85c: Fede no ve el checklist de su propio bloque'; END IF;
+  RAISE NOTICE 'OK 85 tareas y revisiones heredan el alcance por proyecto del bloque padre';
+
+  RAISE NOTICE '── 4 invariantes de lectura por proyecto OK ──';
+END;
+$$;
+
+-- ══ O. Las referencias arrastran la TERNA del inquilino ════════════════════
+--
+-- `personal_id` y `asignacion_id` colgaban de FKs SIMPLES: comprobaban que la
+-- fila existiera, no de quién era. Un bloque del condominio A con un empleado
+-- del B es una fila que TODAS las policies aceptan —su project_id es el
+-- correcto— y que corrompe cualquier agrupación por empleado.
+DO $$
+DECLARE
+  CO    uuid := 'aaaaaaaa-0000-0000-0000-000000000001';
+  PR_A  uuid := '11111111-0000-0000-0000-000000000001';
+  PR_B  uuid := '11111111-0000-0000-0000-000000000003';
+  PEDRO uuid := '50000000-0000-0000-0000-000000000001';
+  NORA  uuid := '50000000-0000-0000-0000-000000000004';
+  v_ph_a uuid;
+  v_ph_b uuid;
+  v_reg_a uuid;
+  v_reg_b uuid;
+  v_efimero uuid;
+  v_b    uuid;
+  v_hist uuid;
+  n      bigint;
+  v_fecha date;
+  v_estado text;
+BEGIN
+  SELECT ph.id INTO v_ph_a FROM public.plantillas_horario ph WHERE ph.project_id = PR_A LIMIT 1;
+  SELECT ph.id INTO v_ph_b FROM public.plantillas_horario ph WHERE ph.project_id = PR_B LIMIT 1;
+
+  INSERT INTO public.asignaciones_turno
+    (company_id, project_id, personal_id, plantilla_horario_id, nombre, frecuencia, fecha_inicio)
+    VALUES (CO, PR_A, PEDRO, v_ph_a, 'Regla del condo A', 'diaria', CURRENT_DATE)
+    RETURNING id INTO v_reg_a;
+  INSERT INTO public.asignaciones_turno
+    (company_id, project_id, personal_id, plantilla_horario_id, nombre, frecuencia, fecha_inicio)
+    VALUES (CO, PR_B, NORA, v_ph_b, 'Regla del condo B', 'diaria', CURRENT_DATE)
+    RETURNING id INTO v_reg_b;
+
+  -- ── 86. Proyecto A + personal de B se rechaza ──────────────────────────
+  -- No es un rechazo de policy: lo firma la FK, así que vale para el dueño de
+  -- las tablas y para `service_role`, que salta la RLS.
+  BEGIN
+    INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                      turno, fecha, estado)
+      VALUES (CO, PR_A, NORA, v_ph_a, 'manana', CURRENT_DATE + 130, 'pendiente');
+    RAISE EXCEPTION '86: aceptó un bloque del condominio A con personal del B';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+  RAISE NOTICE 'OK 86 un bloque no puede nombrar personal de otro condominio (FK compuesta)';
+
+  -- ── 87. Proyecto A + regla de B, lo mismo ──────────────────────────────
+  BEGIN
+    INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                      asignacion_id, turno, fecha, estado)
+      VALUES (CO, PR_A, PEDRO, v_ph_a, v_reg_b, 'manana', CURRENT_DATE + 131, 'pendiente');
+    RAISE EXCEPTION '87: aceptó un bloque del condominio A colgado de una regla del B';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+  RAISE NOTICE 'OK 87 un bloque no puede colgar de una regla de otro condominio';
+
+  -- ── 88. Las combinaciones correctas siguen entrando ────────────────────
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    asignacion_id, turno, fecha, estado)
+    VALUES (CO, PR_A, PEDRO, v_ph_a, v_reg_a, 'manana', CURRENT_DATE + 132, 'pendiente')
+    RETURNING id INTO v_b;
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    asignacion_id, turno, fecha, estado)
+    VALUES (CO, PR_B, NORA, v_ph_b, v_reg_b, 'manana', CURRENT_DATE + 132, 'pendiente');
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE fecha = CURRENT_DATE + 132;
+  IF n <> 2 THEN RAISE EXCEPTION '88: la terna correcta debía entrar, entraron %', n; END IF;
+  RAISE NOTICE 'OK 88 con empleado y regla del mismo condominio, el bloque entra';
+
+  -- ── 89. Dar de baja al empleado sigue arrastrando sus turnos (CASCADE) ──
+  -- El bloque se crea LIMPIO y en el futuro a propósito: el CASCADE dispara
+  -- `trg_turnos_bloque_borrable`, que sigue mandando sobre cada fila que se
+  -- lleva por delante. Esa interacción es de 20260916171325 y no cambia aquí.
+  INSERT INTO public.personal_condominio (id, company_id, project_id, nombre, cargo, turno)
+    VALUES (gen_random_uuid(), CO, PR_A, 'Efímero Temporal', 'jardinero', 'diurno')
+    RETURNING id INTO v_efimero;
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    turno, fecha, estado)
+    VALUES (CO, PR_A, v_efimero, v_ph_a, 'manana', CURRENT_DATE + 133, 'pendiente');
+  DELETE FROM public.personal_condominio WHERE id = v_efimero;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE personal_id = v_efimero;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '89: la terna rompió el ON DELETE CASCADE: quedaron % bloque(s)', n; END IF;
+  RAISE NOTICE 'OK 89 dar de baja al empleado sigue llevándose sus turnos (CASCADE intacto)';
+
+  -- ── 90. Borrar una regla desvincula el histórico y no lo toca ──────────
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    asignacion_id, turno, fecha, estado, iniciado_en, cerrado_en)
+    VALUES (CO, PR_A, PEDRO, v_ph_a, v_reg_a, 'manana', CURRENT_DATE - 40, 'completado', now(), now())
+    RETURNING id INTO v_hist;
+  DELETE FROM public.asignaciones_turno WHERE id = v_reg_a;
+  SELECT count(*) INTO n FROM public.bloques_turno
+   WHERE id = v_hist AND asignacion_id IS NULL
+     AND company_id = CO AND project_id = PR_A AND personal_id = PEDRO;
+  IF n <> 1 THEN
+    RAISE EXCEPTION '90a: borrar la regla debía dejar asignacion_id en NULL y el resto intacto'; END IF;
+  SELECT fecha, estado INTO v_fecha, v_estado FROM public.bloques_turno WHERE id = v_hist;
+  IF v_fecha <> CURRENT_DATE - 40 OR v_estado <> 'completado' THEN
+    RAISE EXCEPTION '90b: el histórico cambió al desvincularlo (% / %)', v_fecha, v_estado; END IF;
+  RAISE NOTICE 'OK 90 borrar una regla pone asignacion_id en NULL sin borrar ni alterar el histórico';
+
+  RAISE NOTICE '── 5 invariantes de terna de referencias OK ──';
+END;
+$$;
+
+-- ══ P. Re-apuntar la REGLA también es re-planificar ════════════════════════
+--
+-- El trigger de 20260916232549 miraba `plantilla_horario_id` pero no
+-- `asignacion_id`. Cambiar de qué regla cuelga un turno ya trabajado reescribe
+-- por qué se planificó, y quedaba abierto. X→Y pasa por las seis condiciones;
+-- X→NULL no, porque eso es lo que hace el ON DELETE SET NULL al borrar la regla.
+DO $$
+DECLARE
+  CO    uuid := 'aaaaaaaa-0000-0000-0000-000000000001';
+  PR    uuid := '11111111-0000-0000-0000-000000000001';
+  MARIO uuid := '50000000-0000-0000-0000-000000000003';
+  BETO  uuid := 'e0000000-0000-0000-0000-00000000000b';
+  v_ph  uuid;
+  v_x   uuid;
+  v_y   uuid;
+  v_pas uuid;
+  v_fut uuid;
+  v_tar uuid;
+  v_hist uuid;
+  n     bigint;
+  v_hoy date;
+BEGIN
+  v_hoy := (now() AT TIME ZONE public.presencia_zona_horaria(CO))::date;
+  SELECT ph.id INTO v_ph FROM public.plantillas_horario ph WHERE ph.project_id = PR LIMIT 1;
+
+  INSERT INTO public.asignaciones_turno
+    (company_id, project_id, personal_id, plantilla_horario_id, nombre, frecuencia, fecha_inicio)
+    VALUES (CO, PR, MARIO, v_ph, 'Regla X', 'diaria', v_hoy) RETURNING id INTO v_x;
+  INSERT INTO public.asignaciones_turno
+    (company_id, project_id, personal_id, plantilla_horario_id, nombre, frecuencia, fecha_inicio)
+    VALUES (CO, PR, MARIO, v_ph, 'Regla Y', 'diaria', v_hoy) RETURNING id INTO v_y;
+
+  -- ── 91. X→Y sobre un bloque PASADO y cerrado se rechaza ────────────────
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    asignacion_id, turno, fecha, estado, iniciado_en, cerrado_en)
+    VALUES (CO, PR, MARIO, v_ph, v_x, 'manana', v_hoy - 30, 'completado', now(), now())
+    RETURNING id INTO v_pas;
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    UPDATE public.bloques_turno SET asignacion_id = v_y WHERE id = v_pas;
+    RAISE EXCEPTION '91a: re-apuntó la regla de un bloque pasado y cerrado';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_pas AND asignacion_id = v_x;
+  IF n <> 1 THEN RAISE EXCEPTION '91b: el bloque histórico cambió de regla'; END IF;
+
+  -- Y sobre uno FUTURO y limpio pero con checklist: la dependencia manda.
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    asignacion_id, turno, fecha, estado)
+    VALUES (CO, PR, MARIO, v_ph, v_x, 'tarde', CURRENT_DATE + 140, 'pendiente')
+    RETURNING id INTO v_fut;
+  INSERT INTO public.tareas_bloque (bloque_id, titulo) VALUES (v_fut, 'Regar') RETURNING id INTO v_tar;
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  BEGIN
+    UPDATE public.bloques_turno SET asignacion_id = v_y WHERE id = v_fut;
+    RAISE EXCEPTION '91c: re-apuntó la regla de un bloque con checklist';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_fut AND asignacion_id = v_x;
+  IF n <> 1 THEN RAISE EXCEPTION '91d: el bloque con checklist cambió de regla'; END IF;
+  RAISE NOTICE 'OK 91 re-apuntar la regla exige las mismas seis condiciones (pasado, cerrado, con tareas)';
+
+  -- ── 92. X→Y sobre uno limpio de hoy o del futuro SÍ ────────────────────
+  -- El contrapeso: sin esto, un trigger que bloqueara todo cambio de regla
+  -- pasaría la 91 y rompería la operación.
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    asignacion_id, turno, fecha, estado)
+    VALUES (CO, PR, MARIO, v_ph, v_x, 'noche', CURRENT_DATE + 141, 'pendiente')
+    RETURNING id INTO v_fut;
+  SET LOCAL ROLE turnos_tester;
+  PERFORM set_config('app.uid', BETO::text, true);
+  UPDATE public.bloques_turno SET asignacion_id = v_y WHERE id = v_fut;
+  RESET ROLE;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_fut AND asignacion_id = v_y;
+  IF n <> 1 THEN RAISE EXCEPTION '92: un bloque limpio y futuro debía poder cambiar de regla'; END IF;
+  RAISE NOTICE 'OK 92 un bloque limpio de hoy o del futuro sí cambia de regla';
+
+  -- ── 93. X→NULL sobre el histórico sigue permitido ──────────────────────
+  -- Aislado del borrado de la regla a propósito: lo que se prueba es que el
+  -- TRIGGER deja pasar el paso a NULL, no que la FK lo produzca. Si lo
+  -- bloqueara, el ON DELETE SET NULL de la sección 3 sería inaplicable y una
+  -- regla con un solo día pasado quedaría imborrable para siempre.
+  UPDATE public.bloques_turno SET asignacion_id = NULL WHERE id = v_pas;
+  SELECT count(*) INTO n FROM public.bloques_turno WHERE id = v_pas AND asignacion_id IS NULL;
+  IF n <> 1 THEN RAISE EXCEPTION '93a: desvincular la regla de un histórico no debía fallar'; END IF;
+
+  -- Y el camino de vuelta NO es simétrico, a propósito: volver a apuntar un
+  -- histórico a una regla (NULL→X) SÍ es re-planificar y se rechaza. Que la
+  -- ida sea libre y la vuelta no es justo la asimetría que pide el
+  -- ON DELETE SET NULL.
+  BEGIN
+    UPDATE public.bloques_turno SET asignacion_id = v_x WHERE id = v_pas;
+    RAISE EXCEPTION '93b: NULL→X sobre un histórico debía rechazarse';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+
+  -- Y por la vía real: borrar la regla, que es el mismo UPDATE a NULL pero en
+  -- cascada. El bloque nace ya colgado de X —un INSERT no pasa por el trigger
+  -- de UPDATE— para no necesitar el re-apuntado que la 93b acaba de prohibir.
+  INSERT INTO public.bloques_turno (company_id, project_id, personal_id, plantilla_horario_id,
+                                    asignacion_id, turno, fecha, estado, iniciado_en, cerrado_en)
+    VALUES (CO, PR, MARIO, v_ph, v_x, 'tarde', v_hoy - 31, 'completado', now(), now())
+    RETURNING id INTO v_hist;
+  DELETE FROM public.asignaciones_turno WHERE id = v_x;
+  SELECT count(*) INTO n FROM public.bloques_turno
+   WHERE id = v_hist AND asignacion_id IS NULL AND fecha = v_hoy - 31 AND estado = 'completado';
+  IF n <> 1 THEN
+    RAISE EXCEPTION '93c: borrar la regla debía desvincular el histórico sin chocar con el trigger'; END IF;
+  RAISE NOTICE 'OK 93 pasar la regla a NULL sigue libre (y volver a apuntarla, no), también en cascada';
+
+  RAISE NOTICE '── 3 invariantes de re-apuntar la regla OK ──';
+END;
+$$;
+
+-- ══ Q. «Hoy» es el de la EMPRESA, no el de UTC ═════════════════════════════
+--
+-- Toda la familia de guards decide con
+-- `(now() AT TIME ZONE presencia_zona_horaria(company_id))::date`, y ninguna
+-- prueba fijaba esa parte: con CURRENT_DATE habrían pasado igual mientras el
+-- arnés corriera en la ventana horaria correcta. Se descubrió al revés —la
+-- invariante 70 empezó a fallar pasada la medianoche UTC— que es como se
+-- descubren estas cosas.
+--
+-- DOS HUSOS A 25 HORAS. Kiritimati va en UTC+14 y Niue en UTC−11, así que la
+-- fecha local de la primera SIEMPRE es posterior a la de la segunda. La misma
+-- fecha del calendario es, a cualquier hora del día: HOY para Niue y PASADO
+-- para Kiritimati. Un guard que mirara CURRENT_DATE fallaría una de las dos
+-- mitades siempre, a la hora que sea.
+DO $$
+DECLARE
+  ADELANTADA uuid := 'aaaaaaaa-0000-0000-0000-0000000000f1';  -- UTC+14
+  ATRASADA   uuid := 'aaaaaaaa-0000-0000-0000-0000000000f2';  -- UTC−11
+  v_fecha date;
+  v_d_ade date;
+  v_d_atr date;
+BEGIN
+  INSERT INTO public.companies (id, timezone) VALUES
+    (ADELANTADA, 'Pacific/Kiritimati'),
+    (ATRASADA,   'Pacific/Niue')
+  ON CONFLICT (id) DO UPDATE SET timezone = EXCLUDED.timezone;
+
+  v_d_ade := (now() AT TIME ZONE public.presencia_zona_horaria(ADELANTADA))::date;
+  v_d_atr := (now() AT TIME ZONE public.presencia_zona_horaria(ATRASADA))::date;
+  IF v_d_ade <= v_d_atr THEN
+    RAISE EXCEPTION '94a: las dos zonas debían dar fechas distintas (% vs %)', v_d_ade, v_d_atr; END IF;
+
+  -- Para la empresa ATRASADA esa fecha es HOY: se acepta.
+  v_fecha := v_d_atr;
+  PERFORM public.turnos_asegurar_dia_futuro(ATRASADA, v_fecha);
+
+  -- Para la ADELANTADA la MISMA fecha ya pasó: se rechaza.
+  BEGIN
+    PERFORM public.turnos_asegurar_dia_futuro(ADELANTADA, v_fecha);
+    RAISE EXCEPTION '94b: la misma fecha debía estar en el pasado para la empresa adelantada';
+  EXCEPTION WHEN restrict_violation THEN NULL;
+  END;
+
+  RAISE NOTICE 'OK 94 el guard usa la zona de CADA empresa: % es hoy en una y pasado en la otra', v_fecha;
+  RAISE NOTICE '── 1 invariante de zona horaria del inquilino OK ──';
 END;
 $$;

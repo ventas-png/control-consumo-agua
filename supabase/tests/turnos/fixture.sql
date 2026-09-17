@@ -326,6 +326,42 @@ CREATE TABLE public.revisiones_tarea (
   revisado_en  timestamptz DEFAULT now()
 );
 
+-- Sus policies de SELECT, literales de 20260907000100:201 y :278. El arnés no
+-- aplica esa migración —no es de turnos— pero SIN ellas estas dos tablas se
+-- leerían enteras aquí y la invariante 85 no probaría nada: lo que se comprueba
+-- es justamente que su EXISTS sobre el bloque padre HEREDA el alcance por
+-- proyecto que 20260917000825 le pone al padre, sin tocar estas dos policies.
+ALTER TABLE public.tareas_bloque    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.revisiones_tarea ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "tareas_bloque_select" ON public.tareas_bloque
+  FOR SELECT TO authenticated
+  USING (
+    (SELECT public.is_super_admin()) OR EXISTS (
+      SELECT 1 FROM public.bloques_turno b
+      WHERE b.id = tareas_bloque.bloque_id
+        AND b.company_id = (SELECT public.get_my_company_id())
+        AND (SELECT public.user_has_permission('condominios.tab.tareas_personal')
+             OR public.user_has_permission('condominios.tab.turnos')
+             OR public.user_has_permission('condominios.tab.revision_tareas')
+             OR public.user_has_permission('condominios.tab.desempeno_personal')
+             OR public.user_has_permission('condominios.tab.prog_limpieza'))
+    )
+  );
+
+CREATE POLICY "revisiones_tarea_select" ON public.revisiones_tarea
+  FOR SELECT TO authenticated
+  USING (
+    (SELECT public.is_super_admin()) OR EXISTS (
+      SELECT 1 FROM public.bloques_turno b
+      WHERE b.id = revisiones_tarea.bloque_id
+        AND b.company_id = (SELECT public.get_my_company_id())
+        AND (SELECT public.user_has_permission('condominios.tab.revision_tareas')
+             OR public.user_has_permission('condominios.tab.desempeno_personal')
+             OR public.user_has_permission('condominios.tab.tareas_personal'))
+    )
+  );
+
 -- presencia_personal: 20260420000020:85. SIN personal_id ni bloque_id.
 CREATE TABLE public.presencia_personal (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),

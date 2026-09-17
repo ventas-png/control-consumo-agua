@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
 # Verificación EJECUTABLE del control de asignación de turnos
-# (20260820000000 · 000100 · 000200 · 000300 · 20260916171325).
+# (20260820000000 · 000100 · 000200 · 000300 · 20260916171325 · 221839 ·
+# 232549 · 20260917000825).
 #
 # POR QUÉ EXISTE
 # Nada de lo que hacen estas migraciones se puede validar leyéndolas. Un
@@ -12,7 +13,7 @@
 # convierte en un pago. La aritmética de "cada bimestre, el día 31, saltando
 # festivos" no se revisa a ojo.
 #
-# QUÉ COMPRUEBA (81 invariantes)
+# QUÉ COMPRUEBA (94 invariantes)
 #   A · JORNADA       que 22:00→06:00 cuenta 8 h y no -960 minutos (el bug vivo
 #                     de PresenciaPersonalTab), con y sin bandera de cruce, que
 #                     el descanso se descuenta y que la franja nocturna
@@ -72,6 +73,26 @@
 #                     retirarla rompe exactamente una invariante; y que NO se
 #                     rompe el ciclo de vida (iniciar, cerrar, puntuar, anotar)
 #                     ni el ON DELETE SET NULL al borrar una jornada.
+#   N · LECTURA      que leer la agenda también exige el PROYECTO y no sólo la
+#                     empresa —lo que 20260916232549 dio por hecho sin que fuera
+#                     cierto—, en las dos direcciones; que quien administra la
+#                     empresa entera sigue leyendo sus condominios; y que
+#                     `tareas_bloque` y `revisiones_tarea` heredan ese alcance
+#                     por el EXISTS sobre el bloque padre, sin tocar sus policies.
+#   O · TERNA        que `personal_id` y `asignacion_id` arrastran
+#                     (id, company_id, project_id): un bloque no puede nombrar
+#                     personal ni regla de otro condominio aunque su propio
+#                     project_id sea el correcto; que el ON DELETE CASCADE del
+#                     empleado sigue vivo; y que borrar una regla desvincula el
+#                     histórico sin borrarlo ni sacarlo de su inquilino.
+#   P · REGLA        que re-apuntar `asignacion_id` de X a Y es re-planificar y
+#                     exige las seis condiciones, que X→NULL no lo es (si no, el
+#                     ON DELETE SET NULL sería inaplicable) y que NULL→X sobre un
+#                     histórico tampoco pasa.
+#   Q · ZONA         que «hoy» es el de la EMPRESA y no el de UTC: la misma fecha
+#                     es hoy para un inquilino en UTC−11 y pasado para uno en
+#                     UTC+14, a cualquier hora del día. Es lo que ninguna prueba
+#                     fijaba, y por eso la 70 se caía pasada la medianoche UTC.
 #
 # USO
 #   supabase/tests/turnos/run.sh
@@ -96,6 +117,10 @@ MIG_ACCION="$RAIZ/supabase/migrations/20260916221839_turnos_autorizacion_por_acc
 # Y la última: añade can_access_project a la escritura de bloques y somete la
 # re-planificación de un día a las mismas invariantes que el borrado.
 MIG_ALCANCE="$RAIZ/supabase/migrations/20260916232549_turnos_alcance_proyecto_y_replanificacion_segura.sql"
+# Y la última: cierra la LECTURA por proyecto —que las anteriores daban por
+# cerrada y no lo estaba—, cambia las dos FKs simples por ternas de inquilino y
+# somete `asignacion_id` a las invariantes de re-planificación.
+MIG_TERNA="$RAIZ/supabase/migrations/20260917000825_turnos_lectura_por_proyecto_y_terna_de_referencias.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -135,8 +160,8 @@ echo "── 1/4 · fixture (padrón + helpers + personal tal como está en prod
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$AQUI/fixture.sql" >/dev/null
 echo "  OK    fixture cargado"
 
-echo "── 2/4 · aplicar las siete migraciones ─────────────────────────────────"
-for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA" "$MIG_ACCION" "$MIG_ALCANCE"; do
+echo "── 2/4 · aplicar las ocho migraciones ──────────────────────────────────"
+for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA" "$MIG_ACCION" "$MIG_ALCANCE" "$MIG_TERNA"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$m" >/dev/null
   echo "  OK    $(basename "$m")"
 done
@@ -161,14 +186,15 @@ if echo "$SALIDA" | grep -q 'WARNING:'; then
 fi
 
 echo
-echo "── 4/4 · idempotencia (re-aplicar las siete) ───────────────────────────"
-for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA" "$MIG_ACCION" "$MIG_ALCANCE"; do
+echo "── 4/4 · idempotencia (re-aplicar las ocho) ────────────────────────────"
+for m in "$MIG_BASE" "$MIG_CAL" "$MIG_GEN" "$MIG_HRS" "$MIG_NUEVA" "$MIG_ACCION" "$MIG_ALCANCE" "$MIG_TERNA"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d turnos -f "$m" >/dev/null
 done
-echo "  OK    las siete migraciones se pueden volver a aplicar"
+echo "  OK    las ocho migraciones se pueden volver a aplicar"
 
 echo
-echo "✅ turnos: 81 invariantes (jornada, periodicidad, backfill, generación,"
+echo "✅ turnos: 94 invariantes (jornada, periodicidad, backfill, generación,"
 echo "   expediente, horas, RLS, borrado seguro, excepciones, autorización por"
-echo "   acción, edición atómica del día, alcance por proyecto y re-planificación"
-echo "   segura), migraciones idempotentes."
+echo "   acción, edición atómica del día, alcance por proyecto, re-planificación"
+echo "   segura, lectura por proyecto, terna de referencias, re-apuntar la regla"
+echo "   y zona horaria del inquilino), migraciones idempotentes."
