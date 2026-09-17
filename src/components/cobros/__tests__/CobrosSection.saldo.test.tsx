@@ -29,7 +29,7 @@ vi.mock('../../../domain/cobros/mutations', () => ({
   verifyPago: vi.fn(), rejectPago: vi.fn(), setConvenioEstado: vi.fn(),
 }))
 vi.mock('../../../domain/agua/mutations', () => ({
-  updateRegistro: vi.fn(async () => ({ error: null })),
+  registrarPagoRegistro: vi.fn(async () => ({ data: null, error: null })),
   marcarRegistrosMora: vi.fn(async () => ({ error: null })),
 }))
 vi.mock('../../shared/Dialog', () => ({

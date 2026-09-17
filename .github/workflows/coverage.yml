@@ -409,6 +409,48 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55493
         run: supabase/tests/rbac_recursos_humanos/run.sh
+      # 20260913040300 DECLARA la vara de cada jornada y la congela en el bloque.
+      # Su afirmación central —«esto no mueve ni un número del cómputo»— no se
+      # comprueba leyendo el SQL: la invariante 1 compara la fila entera de
+      # `calcular_horas_personal` antes y después de declararla completa. Las
+      # otras dos que importan: que cambiar la jornada mañana NO reescriba
+      # contra qué se midió un día ya planificado, y que un tope compensable por
+      # debajo de la tolerancia se rechace — vaciaría el tramo del medio y
+      # degradaría la política a «todo se debita» sin que nadie lo decidiera.
+      - name: La vara de la jornada — se declara, se congela y no mueve el cómputo
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55494
+        run: supabase/tests/politica_jornada/run.sh
+
+      # 20260913040400 COMPARA, y sigue sin tocar la planilla: su invariante 1 es
+      # que consultar el balance no mueva el cómputo. Lo que hay que ver correr
+      # es la aritmética que en TypeScript divergiría: entrar 00:30 a un turno de
+      # las 22:00 son 150 min tarde y no −1290, el exceso de descanso se mide
+      # TIPO A TIPO (90 de almuerzo contra un cupo de 45 son 45, aunque sobre
+      # refacción sin usar) y un tipo sin cupo declarado no produce exceso —
+      # tratar «no declarado» como cero inventaría faltas por toda la planilla.
+      - name: Balance del día — lo esperado contra lo ocurrido, sin mover la planilla
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55495
+        run: supabase/tests/balance_jornada/run.sh
+
+      # 20260913040100 RETIRA tres funciones, y una migración que borra algo no
+      # es reversible por sí sola. La reversa vive en `supabase/reversas/`, fuera
+      # de `supabase/migrations/` para que nada la aplique sola. Este paso es lo
+      # que impide que ese archivo se vuelva decorativo: no comprueba que exista
+      # —eso lo haría un grep— sino que se EJECUTA contra un Postgres real y que
+      # lo repuesto produce las SEIS huellas que la baseline declara para
+      # producción, las tres definiciones y sus tres grants. Incluye el REVOKE a
+      # PUBLIC: `CREATE OR REPLACE` sobre una función ausente la crea con la ACL
+      # por defecto, que incluye a PUBLIC y por tanto a `anon`, así que una
+      # reversa sin ese REVOKE repondría tres SECURITY DEFINER abiertas.
+      - name: La reversa de los helpers RBAC repone exactamente lo que se retiró
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55496
+        run: supabase/tests/reversa_helpers_rbac/run.sh
 
       # `security_logs` es el log de auditoría: producción tenía tres policies
       # que el repositorio no declara —entre ellas un INSERT abierto a `anon` y
@@ -424,6 +466,122 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55494
         run: supabase/tests/security_logs_acceso/run.sh
+
+      # La lectura de agua la declaraba el navegador: consumo, tarifa, canon,
+      # importe, proyecto y hasta el estado de cobro viajaban en el INSERT, y la
+      # RLS sólo miraba el proyecto. 20260910000200 lo mueve entero al servidor.
+      # Casi nada de eso se ve leyendo el SQL: que un payload con `monto 0` y
+      # `estado pagado` acabe escrito con otros números, que tres lecturas del
+      # mismo día encadenen en orden, que quien captura SIN poder leer la tabla
+      # obtenga igual la lectura anterior correcta, y que el bloqueo por
+      # contador serialice de verdad (dos conexiones, sobre un contador sin
+      # lecturas, que es donde un lock de fila no tendría nada que bloquear).
+      # Incluye la paridad del importe contra el mismo fichero de casos que
+      # ejercita el test de TypeScript.
+      - name: Lectura de agua autoritativa — el importe no es un parámetro
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55495
+        run: supabase/tests/registrar_lectura/run.sh
+
+      # El otro lado de la misma puerta: la lectura no se crea con el importe
+      # puesto, pero se podía REESCRIBIR con un PATCH. La prueba empieza
+      # DEMOSTRANDO el agujero (desactiva el trigger nuevo y lo ejerce como
+      # `authenticated`) y sigue con el camino autorizado de cobro.
+      - name: UPDATE de registros — el PATCH ya no fabrica un cobro
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55496
+        run: supabase/tests/proteger_update_registros/run.sh
+
+      # La Preview limpia de #856 dejó SIETE SECURITY DEFINER ejecutables por
+      # `anon` porque producción las endureció a mano y las migraciones no lo
+      # registran. `20260911223000` declara esa matriz —que NO es la misma para
+      # las siete: sso_lookup_domain conserva anon a propósito y
+      # buscar_cliente_para_onboarding conserva authenticated— y esta prueba la
+      # ejerce: invocación real con SET LOCAL ROLE, triggers vivos tras la
+      # revocación, y mutación (quitar cualquiera de los siete REVOKE, o mover
+      # una celda, tiene que poner el arnés en rojo).
+      - name: ACL de las SECURITY DEFINER expuestas por anon (matriz de producción)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55497
+        run: supabase/tests/acl_definer_expuestas_anon/run.sh
+
+      # Producción tiene dos triggers de fill_company_id_from_user() —sobre
+      # fuentes_agua y registros_calidad— que NINGUNA migración declaraba: una
+      # reconstrucción nacía sin ellos (la Preview de #858 trajo 3 de los 5).
+      # `20260912015504` los declara decidiendo con pg_catalog (crea si falta,
+      # no-op si está exacto, aborta si hay un homónimo con otra definición) y
+      # esta prueba lo ejerce: celda por celda, inserciones reales como
+      # `authenticated` sin EXECUTE sobre la función, idempotencia con OIDs,
+      # no-op sobre preexistentes, los siete abortos y mutación.
+      - name: Triggers de fill_company_id_from_user — declarados, no-op, abortos y mutación
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55499
+        run: supabase/tests/declarar_triggers_fill_company_id/run.sh
+
+      # Y la prueba de que la migración puede CREARLOS de verdad —lo que una
+      # Preview, donde ya existen, no demuestra—: la cadena entera desde cero
+      # con privilegios de Supabase Branch, los dos triggers en pg_catalog
+      # iguales a producción, re-aplicación no-op y las mismas inserciones como
+      # `authenticated` contra las policies REALES. Sin PGBIN ni PGPORT_TEST:
+      # reconstruir.mjs localiza el binario y elige puerto y socket.
+      - name: Replay desde cero — los dos triggers de fill_company_id_from_user
+        run: node supabase/tests/declarar_triggers_fill_company_id/replay.mjs
+
+      # Desde 20260605160000 conviven dos sobrecargas de
+      # calcular_cumplimiento_calidad —(text, jsonb) y (text, jsonb, uuid
+      # DEFAULT NULL)— y la llamada de dos argumentos del trigger de
+      # registros_calidad es ambigua: TODO INSERT y todo UPDATE de parametros
+      # moría con 42725, también en producción. `20260913032502` re-apunta el
+      # trigger (mismo nombre, mismo OID) a una función nueva que llama a la
+      # firma de tres argumentos con el company_id de la fuente, y concede
+      # EXECUTE sobre esa firma sólo a authenticated. Esta prueba lo ejerce
+      # sobre los archivos REALES de S22/S23: reproduce el 42725, celda por
+      # celda, comportamiento real como authenticated (override de empresa,
+      # fallback global, fuente y company_id ajenos rechazados, anon sin RPC
+      # nueva), idempotencia con OIDs, abortos y mutación.
+      - name: Cálculo de calidad — llamada inequívoca, override por empresa y mutación
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55500
+        run: supabase/tests/cumplimiento_calidad_firma_inequivoca/run.sh
+
+      # Y sobre la cadena entera desde cero con privilegios de Supabase Branch:
+      # el trigger re-apuntado en pg_catalog, re-aplicación no-op, y las mismas
+      # pruebas como `authenticated` contra las policies REALES.
+      - name: Replay desde cero — cálculo de calidad con la firma inequívoca
+        run: node supabase/tests/cumplimiento_calidad_firma_inequivoca/replay.mjs
+
+      # El webhook de Stripe insertaba el `pagos` y marcaba la solicitud
+      # `succeeded` SIN acreditar el ítem: el recibo quedaba con el saldo
+      # íntegro. Y reclamaba el evento ANTES de procesarlo, así que un fallo a
+      # media función lo dejaba marcado como visto para siempre — Stripe recibía
+      # 200 y el cobro no se acreditaba nunca. Estas 12 invariantes separan «lo
+      # vi» de «lo terminé» y ejercen el fallo provocado entre el reclamo y la
+      # acreditación, con dos conexiones reales para la carrera del reclamo.
+      - name: Webhook de Stripe — «lo vi» no es «lo terminé»
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55498
+        run: supabase/tests/webhook_stripe_idempotencia/run.sh
+
+      # `20260909000000` revoca EXECUTE de PUBLIC/anon sobre 15 helpers de RLS
+      # dando por hecho un GRANT a `authenticated` que NINGUNA migración
+      # concede: lo aparentaba el `ALTER DEFAULT PRIVILEGES … ON FUNCTIONS` de
+      # bootstrap.sql, que una Supabase Branch real no tiene. Con él puesto la
+      # reconstrucción pasaba y el fallo sólo salía en una branch de verdad
+      # (#847, 2026-09-11). Esta prueba reconstruye la cadena ENTERA con
+      # `bootstrap-branch.sql` —sin ese regalo—: primero reproduce el abort y
+      # después demuestra que desaparece, y comprueba la matriz de ACL celda
+      # por celda con has_function_privilege. No lleva PGBIN ni PGPORT_TEST:
+      # reconstruir.mjs localiza el binario por su cuenta (pg_config o
+      # /usr/lib/postgresql/*/bin, que es donde lo deja el paso `pg` de arriba)
+      # y elige su propio puerto y socket. Sólo usa módulos de node.
+      - name: Replay desde cero con privilegios de Supabase Branch (ACL de helpers RLS)
+        run: node supabase/tests/replay_acl_helpers/run.mjs
 
   rls-harness:
     name: RLS harness (server-side)

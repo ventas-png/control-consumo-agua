@@ -1,0 +1,93 @@
+{
+  "_comentario": [
+    "Casos de PARIDAD entre el cálculo del importe en TypeScript (calcularCostoTarifa",
+    "+ redondear2, src/lib/business.ts) y el autoritativo en SQL (agua_costo_tarifa,",
+    "20260910000200). Los `esperado` NO los generó ninguna de las dos: están puestos",
+    "a mano, así que si las dos implementaciones se equivocaran igual, el test lo",
+    "vería. Los consume src/lib/__tests__/paridad-costo-tarifa.test.ts (vitest) y",
+    "supabase/tests/registrar_lectura/assert.sql (psql), sobre el MISMO fichero."
+  ],
+  "casos": [
+    { "nombre": "plana · consumo 0 cae en el mínimo → sólo canon",
+      "consumo": 0, "precio_m3": 3.75, "precio_m3_exceso": 6.5, "canon_fijo": 20, "consumo_minimo": 5, "tramos": null, "derecho_m3": 20,
+      "esperado": { "total": 20, "tipo_cobro": "Canon Fijo" } },
+
+    { "nombre": "plana · consumo justo en el mínimo → sólo canon",
+      "consumo": 5, "precio_m3": 3.75, "precio_m3_exceso": 6.5, "canon_fijo": 20, "consumo_minimo": 5, "tramos": null, "derecho_m3": 20,
+      "esperado": { "total": 20, "tipo_cobro": "Canon Fijo" } },
+
+    { "nombre": "plana · medio céntimo redondea alejándose del cero (20.625 → 20.63)",
+      "consumo": 5.5, "precio_m3": 3.75, "precio_m3_exceso": 6.5, "canon_fijo": 20, "consumo_minimo": 5, "tramos": null, "derecho_m3": 20,
+      "esperado": { "total": 20.63, "tipo_cobro": "Consumo Normal" } },
+
+    { "nombre": "plana · consumo justo en el derecho de servicio → sin exceso",
+      "consumo": 20, "precio_m3": 3.75, "precio_m3_exceso": 6.5, "canon_fijo": 20, "consumo_minimo": 5, "tramos": null, "derecho_m3": 20,
+      "esperado": { "total": 75, "tipo_cobro": "Consumo Normal" } },
+
+    { "nombre": "plana · por encima del derecho → base + exceso",
+      "consumo": 25, "precio_m3": 3.75, "precio_m3_exceso": 6.5, "canon_fijo": 20, "consumo_minimo": 5, "tramos": null, "derecho_m3": 20,
+      "esperado": { "total": 107.5, "tipo_cobro": "Consumo con Exceso" } },
+
+    { "nombre": "plana · tres decimales del consumo se cortan a dos (46.29375 → 46.29)",
+      "consumo": 12.345, "precio_m3": 3.75, "precio_m3_exceso": 6.5, "canon_fijo": 20, "consumo_minimo": 5, "tramos": null, "derecho_m3": 20,
+      "esperado": { "total": 46.29, "tipo_cobro": "Consumo Normal" } },
+
+    { "nombre": "plana · sin derecho de servicio configurado → nunca hay exceso",
+      "consumo": 30, "precio_m3": 3.75, "precio_m3_exceso": 6.5, "canon_fijo": 20, "consumo_minimo": 5, "tramos": null, "derecho_m3": null,
+      "esperado": { "total": 112.5, "tipo_cobro": "Consumo Normal" } },
+
+    { "nombre": "plana · derecho configurado pero sin precio de exceso → tarifa normal",
+      "consumo": 30, "precio_m3": 3.75, "precio_m3_exceso": 0, "canon_fijo": 20, "consumo_minimo": 5, "tramos": null, "derecho_m3": 20,
+      "esperado": { "total": 112.5, "tipo_cobro": "Consumo Normal" } },
+
+    { "nombre": "plana · sin mínimo, consumo cero → canon igual",
+      "consumo": 0, "precio_m3": 3.75, "precio_m3_exceso": 0, "canon_fijo": 20, "consumo_minimo": 0, "tramos": null, "derecho_m3": null,
+      "esperado": { "total": 20, "tipo_cobro": "Canon Fijo" } },
+
+    { "nombre": "plana · medio céntimo exacto sin canon (2.125 → 2.13)",
+      "consumo": 4.25, "precio_m3": 0.5, "precio_m3_exceso": 0, "canon_fijo": 0, "consumo_minimo": 0, "tramos": null, "derecho_m3": null,
+      "esperado": { "total": 2.13, "tipo_cobro": "Consumo Normal" } },
+
+    { "nombre": "escalonada · dentro del mínimo → canon, no bloques",
+      "consumo": 3, "precio_m3": 0, "precio_m3_exceso": 0, "canon_fijo": 15, "consumo_minimo": 3,
+      "tramos": [{"desde_m3":0,"hasta_m3":10,"precio_m3":2.5},{"desde_m3":10,"hasta_m3":30,"precio_m3":4.25},{"desde_m3":30,"hasta_m3":null,"precio_m3":9}],
+      "derecho_m3": null,
+      "esperado": { "total": 15, "tipo_cobro": "Canon Fijo" } },
+
+    { "nombre": "escalonada · justo el tope del primer bloque",
+      "consumo": 10, "precio_m3": 0, "precio_m3_exceso": 0, "canon_fijo": 15, "consumo_minimo": 3,
+      "tramos": [{"desde_m3":0,"hasta_m3":10,"precio_m3":2.5},{"desde_m3":10,"hasta_m3":30,"precio_m3":4.25},{"desde_m3":30,"hasta_m3":null,"precio_m3":9}],
+      "derecho_m3": null,
+      "esperado": { "total": 25, "tipo_cobro": "Consumo Escalonado" } },
+
+    { "nombre": "escalonada · dos bloques",
+      "consumo": 12, "precio_m3": 0, "precio_m3_exceso": 0, "canon_fijo": 15, "consumo_minimo": 3,
+      "tramos": [{"desde_m3":0,"hasta_m3":10,"precio_m3":2.5},{"desde_m3":10,"hasta_m3":30,"precio_m3":4.25},{"desde_m3":30,"hasta_m3":null,"precio_m3":9}],
+      "derecho_m3": null,
+      "esperado": { "total": 33.5, "tipo_cobro": "Consumo Escalonado" } },
+
+    { "nombre": "escalonada · el último bloque sin tope (hasta_m3 null = infinito)",
+      "consumo": 45, "precio_m3": 0, "precio_m3_exceso": 0, "canon_fijo": 15, "consumo_minimo": 3,
+      "tramos": [{"desde_m3":0,"hasta_m3":10,"precio_m3":2.5},{"desde_m3":10,"hasta_m3":30,"precio_m3":4.25},{"desde_m3":30,"hasta_m3":null,"precio_m3":9}],
+      "derecho_m3": null,
+      "esperado": { "total": 245, "tipo_cobro": "Consumo Escalonado" } },
+
+    { "nombre": "escalonada · el derecho de servicio no aplica al modelo por bloques",
+      "consumo": 45, "precio_m3": 3.75, "precio_m3_exceso": 6.5, "canon_fijo": 15, "consumo_minimo": 3,
+      "tramos": [{"desde_m3":0,"hasta_m3":10,"precio_m3":2.5},{"desde_m3":10,"hasta_m3":30,"precio_m3":4.25},{"desde_m3":30,"hasta_m3":null,"precio_m3":9}],
+      "derecho_m3": 20,
+      "esperado": { "total": 245, "tipo_cobro": "Consumo Escalonado" } },
+
+    { "nombre": "escalonada · bloques desordenados en la tarifa dan lo mismo",
+      "consumo": 45, "precio_m3": 0, "precio_m3_exceso": 0, "canon_fijo": 15, "consumo_minimo": 3,
+      "tramos": [{"desde_m3":30,"hasta_m3":null,"precio_m3":9},{"desde_m3":0,"hasta_m3":10,"precio_m3":2.5},{"desde_m3":10,"hasta_m3":30,"precio_m3":4.25}],
+      "derecho_m3": null,
+      "esperado": { "total": 245, "tipo_cobro": "Consumo Escalonado" } },
+
+    { "nombre": "escalonada · consumo fraccionario dentro del primer bloque",
+      "consumo": 3.5, "precio_m3": 0, "precio_m3_exceso": 0, "canon_fijo": 15, "consumo_minimo": 3,
+      "tramos": [{"desde_m3":0,"hasta_m3":10,"precio_m3":2.5},{"desde_m3":10,"hasta_m3":30,"precio_m3":4.25},{"desde_m3":30,"hasta_m3":null,"precio_m3":9}],
+      "derecho_m3": null,
+      "esperado": { "total": 8.75, "tipo_cobro": "Consumo Escalonado" } }
+  ]
+}

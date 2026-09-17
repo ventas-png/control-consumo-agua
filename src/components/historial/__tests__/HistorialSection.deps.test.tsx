@@ -15,7 +15,7 @@ import type { Registro, Cliente, Contador } from '../../../types'
 const h = vi.hoisted(() => ({ deleteRegistro: vi.fn(async () => ({ error: null, count: 1 })) }))
 
 vi.mock('../../../domain/agua/mutations', () => ({
-  updateRegistro: vi.fn(async () => ({ error: null })),
+  cambiarEstadoRegistro: vi.fn(async () => ({ error: null })),
   deleteRegistro: h.deleteRegistro,
 }))
 vi.mock('../../shared/Dialog', () => ({

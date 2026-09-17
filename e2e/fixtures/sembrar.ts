@@ -129,17 +129,17 @@ export async function crearCuotaPendiente(page: Page, monto = '250'): Promise<vo
  * guardar, así que basarse en él es basarse en el estado real y no en una
  * suposición sobre el reloj.
  *
- * OJO: ES UNA COTA INFERIOR, NO EL MÁXIMO. `getUltimaLectura` ordena el
- * historial SÓLO por `fecha` descendente, y `fecha` se graba como el mediodía
- * del día capturado (`new Date(fechaLecturaActual + 'T12:00:00')`), así que
- * TODAS las lecturas del mismo día empatan. El empate lo rompe el orden en que
- * vienen los registros —`useRegistrosQuery` pide `fecha desc, id asc`—, o sea
- * el UUID más chico del día, que no es la lectura más alta ni la más reciente.
- * Con dos capturas el mismo día, la segunda puede ver el valor de la primera…
- * o el de cualquier otra. Por eso el valor a escribir NO sale de aquí sino de
- * `maxLecturaDeContador`, que lo mide contra la base; esto se conserva sólo
- * como piso (y como la única fuente cuando no hay API configurada, corriendo en
- * local) y porque su ausencia delata que no hay contador seleccionado.
+ * OJO: SIGUE SIENDO UNA COTA INFERIOR. Desde 20260910000200 el empate del mismo
+ * día ya no se resuelve al azar —`secuencia` da el orden total y la pantalla lo
+ * espeja—, pero la lista que ve el navegador está RECORTADA (`limit(5000)`, la
+ * RLS del rol, el filtro de proyecto): si la última lectura del contador no
+ * bajó, la pantalla enseña una anterior. Por eso el valor a escribir sale de
+ * `maxLecturaDeContador`, que lo mide contra la base; esto se conserva como
+ * piso (y como única fuente cuando no hay API configurada, corriendo en local)
+ * y porque su ausencia delata que no hay contador seleccionado.
+ *
+ * Lo que la app guarde como `lectura_anterior` ya no depende de este número en
+ * absoluto: lo resuelve el servidor dentro de `registrar_lectura`.
  *
  * Un contador sin historial muestra 0 —`getUltimaLectura` devuelve
  * `{ lectura: 0, esPrimera: true }`—, así que la primera captura escribe 1.
@@ -196,13 +196,18 @@ async function maxLecturaConocida(page: Page, contadorId: string): Promise<numbe
  * cuando el botón «Guardar Lectura» desaparecía. Desaparece porque
  * `limpiarFormulario()` borra el contador seleccionado y desmonta el bloque —
  * es un efecto de la UI, no la confirmación de que la fila entró. Entre el clic
- * y el desmontaje sigue viva la petición: si el INSERT era rechazado (llave
+ * y el desmontaje sigue viva la petición: si la escritura era rechazada (llave
  * natural repetida, RLS, tarifa faltante) la pantalla podía haberse limpiado
  * igual, y la prueba seguía adelante para caerse más tarde, en otro sitio y con
  * un síntoma que no nombraba la causa. Ahora se espera la RESPUESTA del POST a
- * /rest/v1/registros, se exige 2xx, y el id sale de la fila que la propia
- * respuesta devuelve (crearRegistro hace insert().select()): que la fila vuelva
- * ES la confirmación de que el registro existe.
+ * /rest/v1/rpc/registrar_lectura, se exige 2xx, y el id sale de la fila que la
+ * propia respuesta devuelve (la RPC hace RETURNS public.registros): que la fila
+ * vuelva ES la confirmación de que el registro existe.
+ *
+ * EL DESTINO CAMBIÓ, Y NO ES COSMÉTICO. Ya no se POSTea a /rest/v1/registros:
+ * ese INSERT dejaba que el navegador declarase consumo, tarifa e importe. Si
+ * alguien vuelve a apuntar la captura a la tabla, esta espera no se cumple y
+ * la prueba lo dice.
  *
  * @returns el id del registro creado, o null si el tenant no tiene unidad o
  *          contador que permitan capturar — el caller decide si eso es un skip
@@ -251,7 +256,8 @@ export async function capturarLectura(page: Page): Promise<string | null> {
     await campo.fill(String(valor))
     const [r] = await Promise.all([
       page.waitForResponse(
-        req => req.request().method() === 'POST' && /\/rest\/v1\/registros(\?|$)/.test(req.url()),
+        req => req.request().method() === 'POST'
+          && /\/rest\/v1\/rpc\/registrar_lectura(\?|$)/.test(req.url()),
         { timeout: 30_000 },
       ),
       guardar.click(),
@@ -261,13 +267,16 @@ export async function capturarLectura(page: Page): Promise<string | null> {
 
   expect(
     respuesta.status(),
-    `el INSERT de la lectura tiene que responder 2xx; si no, el cargo no existe ` +
+    `registrar_lectura tiene que responder 2xx; si no, el cargo no existe ` +
     `(se probaron ${intentos} valores consecutivos desde ${desde})`,
   ).toBeLessThan(300)
 
-  const filas = (await respuesta.json()) as Array<{ id?: string }>
-  const id = Array.isArray(filas) ? filas[0]?.id : undefined
-  expect(id, 'el INSERT devolvió 2xx pero sin la fila creada').toBeTruthy()
+  // La RPC devuelve LA fila (RETURNS public.registros), no un array como hacía
+  // el insert().select(). Se acepta cualquiera de las dos formas para no atar
+  // la prueba a un detalle de serialización de PostgREST.
+  const cuerpo = (await respuesta.json()) as { id?: string } | Array<{ id?: string }>
+  const id = Array.isArray(cuerpo) ? cuerpo[0]?.id : cuerpo?.id
+  expect(id, 'registrar_lectura devolvió 2xx pero sin la fila creada').toBeTruthy()
 
   // Y recién ahora el desmontaje del formulario, que sigue siendo una señal
   // útil —un rechazo de validación lo deja en pantalla— pero ya no es LA señal.

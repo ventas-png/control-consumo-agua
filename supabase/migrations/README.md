@@ -15,6 +15,19 @@ Ejemplos:
 
 El timestamp determina el orden de aplicación. Una migración con timestamp anterior a otra que ya está en `main` rompe el orden cronológico, así que **nunca se debe insertar una migración con timestamp anterior al último mergeado** salvo en casos excepcionales como `infra:I39` (baseline de tablas legacy) que explícitamente se inyecta antes del primer `ENABLE RLS` para que la cadena de migrations sea aplicable desde cero.
 
+### Elegir el número: por encima del máximo de `main`, no simplemente uno libre
+
+Un número *libre* no basta, y la diferencia cuesta un renumerado por cada vez que se ignora. Hay dos guardas y **no** piden lo mismo:
+
+| Guarda | Qué prohíbe |
+| --- | --- |
+| `scripts/migrations-guard.mjs`, regla (d) | que dos ficheros compartan versión |
+| `scripts/schema-drift/auditar.mjs` | además, que una versión nueva sea `<=` la última que ya existe en la base (*intercalada*) |
+
+Con `main` en `20260910000100`, un `20260910000001` pasa la primera y falla la segunda: es único, pero va por debajo. La regla práctica es tomar el máximo de `main` **en el momento de abrir el PR** y dejar holgura por delante (`…000200`, no `…000101`), porque `main` puede avanzar mientras el PR está en vuelo.
+
+Y renumerar no es gratis: la preview branch de Supabase aplica migraciones en cada push, así que las versiones viejas se quedan en su historial remoto y el siguiente push falla con `Remote migration versions not found in local migrations directory` hasta que la branch se recree.
+
 ## Convenciones de contenido
 
 ### 1. Toda tabla nueva nace de una migración
@@ -72,4 +85,43 @@ El SQL describe el "qué". El comentario al inicio del archivo o en bloques debe
 | 2    | 11 tablas (`empresa`, `security_logs`, `user_sessions`, `fuentes_agua`, `clientes`, `registros`, `registros_calidad`, `convenios_pago`, `payment_requests`, `password_reset_tokens`, `empresa_pagos_config`) + 7 funciones legacy + FKs cross-fase de la fase 1 | ✅ `20260317000001_baseline_legacy_tables_phase2.sql` |
 | 3+   | Objetos adicionales (triggers, vistas, secuencias) que aparezcan en errores subsiguientes | Iterativo, según se detecten |
 
-Una vez completas las fases 1 y 2 (y eventuales fases 3+ si surgen), Supabase Branching debería levantar branches limpias sin errores y `supabase db reset` debería aplicar todas las migraciones de extremo a extremo.
+La intención de las fases era que Supabase Branching levantara branches limpias y
+que `supabase db reset` aplicara la cadena de extremo a extremo. Sobre eso hay
+dos hechos medidos, y conviene no confundirlos.
+
+**La cadena del repositorio SÍ reconstruye el esquema desde vacío.** Medido con
+el propio auditor de drift, que es quien lo hace en cada PR:
+
+```
+node scripts/schema-drift/reconstruir.mjs > /dev/null
+# · aplicando 463 migraciones
+# ✓ 463/463 migraciones aplicadas   → 262 tablas en `public`
+```
+
+Y lo mismo con el árbol de `origin/main` (459 migraciones, 2484 grupos de
+huella). Lo único que hace falta además de las migraciones es
+`scripts/schema-drift/bootstrap.sql`: el **andamiaje de plataforma** —los roles
+`anon`/`authenticated`/`service_role`, los esquemas `auth`/`storage`/`vault`/
+`net`/`cron`, `auth.uid()`, `auth.users`, las extensiones— que las migraciones dan
+por dado porque en Supabase viene de fábrica. Un Postgres recién inicializado no
+lo tiene; una branch de Supabase sí.
+
+**Y aun así, una branch creada a mano falla.** Una creada desde cero
+(`create_branch` por API, `with_data: false`) quedó en `MIGRATIONS_FAILED` con el
+esquema `public` vacío, y `reset_branch` sobre una branch con el esquema entero
+muere con `out of shared memory (SQLSTATE 53200)` —el bloque de limpieza toma un
+lock por objeto en una sola transacción—.
+
+Las dos cosas juntas dicen que **la causa del fallo de la branch no está en la
+cadena de migraciones**, que aplica limpia. Está en el ambiente de la branch o en
+el orden en que el runner de Supabase la siembra, y nombrarla exige leer el error
+que la API guarda para esa branch. Este repositorio no puede hacerlo: hace falta
+el token de la integración.
+
+Lo que **sí** funciona hoy, y es lo que usa el PR normal, son las branches que
+crea la integración de GitHub: clonan el esquema del proyecto padre y aplican
+**sólo las migraciones nuevas** («*only new migration files are pushed*»). De ahí
+que una branch de PR llegue al día y una creada a mano no.
+
+Consecuencia práctica: una preview branch **no se recrea a mano**. Se recrea con
+un push que toque `supabase/**`, que es lo que dispara a la integración.

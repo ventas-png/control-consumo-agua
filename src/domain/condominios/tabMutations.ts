@@ -258,6 +258,70 @@ export async function generarBloquesTurno(
   return { data: (fila as ResultadoGeneracionTurnos | null) ?? null, error }
 }
 
+// ── Un día del calendario: UNA llamada, UNA transacción ─────────────────────
+//
+// POR QUÉ NO SON DOS `deleteCondominioRow` ENCADENADOS. Quitar un día es crear
+// la excepción y borrar el bloque; reasignarlo es escribir el bloque y retirar
+// la excepción. Encadenar dos peticiones desde el navegador deja una ventana en
+// la que la base se contradice —un día quitado con su turno vivo, o al revés— y
+// el «deshacer» cuando falla la segunda es una TERCERA petición que también
+// puede perderse. Las RPC de 20260916221839 las meten en un commit: o las dos,
+// o ninguna, y no hay nada que compensar a mano.
+//
+// El error sube tal cual: cuando `trg_turnos_bloque_borrable` rechaza, su
+// mensaje dice CUÁL de las condiciones falló (ya arrancó, ya se cerró, tiene
+// checklist), y eso es justo lo que hay que enseñar.
+
+/** Asigna o cambia la jornada de un día, y retira su excepción si la tenía. */
+export async function guardarDiaTurno(args: {
+  projectId: string
+  personalId: string
+  fecha: string
+  plantillaHorarioId: string
+  asignacionId?: string | null
+}): Promise<{ data: string | null; error: RowError }> {
+  const { data, error } = await supabase.rpc('turnos_guardar_dia', {
+    p_project_id: args.projectId,
+    p_personal_id: args.personalId,
+    p_fecha: args.fecha,
+    p_plantilla_horario_id: args.plantillaHorarioId,
+    p_asignacion_id: args.asignacionId ?? null,
+  })
+  return { data: (data as string | null) ?? null, error }
+}
+
+/** Quita un día: deja la excepción y borra el bloque, o no hace ninguna de las dos. */
+export async function quitarDiaTurno(args: {
+  projectId: string
+  personalId: string
+  fecha: string
+  asignacionId?: string | null
+  motivo?: string | null
+}): Promise<{ data: string | null; error: RowError }> {
+  const { data, error } = await supabase.rpc('turnos_quitar_dia', {
+    p_project_id: args.projectId,
+    p_personal_id: args.personalId,
+    p_fecha: args.fecha,
+    p_asignacion_id: args.asignacionId ?? null,
+    p_motivo: args.motivo ?? null,
+  })
+  return { data: (data as string | null) ?? null, error }
+}
+
+/** Devuelve un día a su regla retirando la excepción que lo quitaba. */
+export async function restaurarDiaTurno(args: {
+  projectId: string
+  personalId: string
+  fecha: string
+}): Promise<{ data: number | null; error: RowError }> {
+  const { data, error } = await supabase.rpc('turnos_restaurar_dia', {
+    p_project_id: args.projectId,
+    p_personal_id: args.personalId,
+    p_fecha: args.fecha,
+  })
+  return { data: (data as number | null) ?? null, error }
+}
+
 /**
  * Convierte las rutinas activas del proyecto en tareas de `tareas_bloque` para
  * el rango dado (RPC `materializar_rutinas_turno`, 20260907000300). Empareja por

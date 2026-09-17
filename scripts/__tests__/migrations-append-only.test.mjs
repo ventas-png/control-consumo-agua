@@ -12,9 +12,11 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  REPARACION_REPLAY,
   evaluateAppendOnly,
   parseNameStatus,
   renombrePorColision,
+  reparacionDeReplay,
   resolveRange,
 } from '../migrations-append-only.mjs'
 
@@ -153,6 +155,106 @@ describe('evaluateAppendOnly — lo prohibido', () => {
 // FUNCIONE —eso es una línea— sino que NO abra nada más: cada condición se
 // quita de a una y el renombre tiene que volver a ser una violación.
 // ════════════════════════════════════════════════════════════════════════════
+describe('evaluateAppendOnly — reparación de replay (excepción de una sola vez)', () => {
+  // El caso real: `20260909000000` revoca PUBLIC/anon sobre los helpers de RLS
+  // dando por hecho un GRANT a `authenticated` que ninguna migración concede.
+  // En una Supabase Branch nueva su propia verificación aborta, y como el replay
+  // MUERE ahí, una migración posterior no puede repararlo: nunca se llega. La
+  // excepción abre exactamente ese archivo, con esos dos hashes, y sólo si el PR
+  // trae la compañera forward-only.
+  const entrada = (over = {}) => ({ status: 'M', path: REPARACION_REPLAY.archivo, ...over })
+  const ctx = (over = {}) => ({
+    hashes: {
+      [REPARACION_REPLAY.archivo]: {
+        antes: REPARACION_REPLAY.hashAntes,
+        despues: REPARACION_REPLAY.hashDespues,
+      },
+    },
+    migracionesEnHead: [REPARACION_REPLAY.archivo, REPARACION_REPLAY.requiere],
+    ...over,
+  })
+
+  it('con las cuatro condiciones: tolerada', () => {
+    expect(reparacionDeReplay(entrada(), ctx())).toBe(true)
+    expect(evaluateAppendOnly([entrada()], ctx())).toEqual([])
+  })
+
+  it('OTRO archivo histórico con los mismos hashes: sigue rechazado', () => {
+    const otro = entrada({ path: `${MIG}/20260318000000_enable_rls.sql` })
+    const contexto = ctx({
+      hashes: {
+        [otro.path]: {
+          antes: REPARACION_REPLAY.hashAntes,
+          despues: REPARACION_REPLAY.hashDespues,
+        },
+      },
+    })
+    expect(reparacionDeReplay(otro, contexto)).toBe(false)
+    expect(evaluateAppendOnly([otro], contexto)).toEqual([
+      { kind: 'modificada', path: otro.path },
+    ])
+  })
+
+  it('el archivo correcto pero con OTRO contenido de destino: rechazado', () => {
+    const contexto = ctx({
+      hashes: {
+        [REPARACION_REPLAY.archivo]: {
+          antes: REPARACION_REPLAY.hashAntes,
+          despues: 'ffffffffffffffffffffffffffffffffffffffff',
+        },
+      },
+    })
+    expect(reparacionDeReplay(entrada(), contexto)).toBe(false)
+    expect(evaluateAppendOnly([entrada()], contexto)).toHaveLength(1)
+  })
+
+  it('el archivo correcto pero partiendo de OTRA base: rechazado (no se reutiliza)', () => {
+    // Esto es lo que impide que la excepción sirva una segunda vez: una vez
+    // aplicada, el contenido de base ya no es `hashAntes`.
+    const contexto = ctx({
+      hashes: {
+        [REPARACION_REPLAY.archivo]: {
+          antes: REPARACION_REPLAY.hashDespues,
+          despues: 'ffffffffffffffffffffffffffffffffffffffff',
+        },
+      },
+    })
+    expect(reparacionDeReplay(entrada(), contexto)).toBe(false)
+    expect(evaluateAppendOnly([entrada()], contexto)).toHaveLength(1)
+  })
+
+  it('sin la migración forward-only compañera: rechazado', () => {
+    const contexto = ctx({ migracionesEnHead: [REPARACION_REPLAY.archivo] })
+    expect(reparacionDeReplay(entrada(), contexto)).toBe(false)
+    expect(evaluateAppendOnly([entrada()], contexto)).toHaveLength(1)
+  })
+
+  it('sin hashes en el contexto: rechazado (fail-closed)', () => {
+    expect(reparacionDeReplay(entrada(), { migracionesEnHead: [REPARACION_REPLAY.requiere] })).toBe(false)
+    expect(evaluateAppendOnly([entrada()])).toHaveLength(1)
+  })
+
+  it('la excepción NO cubre borrar ni renombrar ese archivo', () => {
+    expect(evaluateAppendOnly([{ status: 'D', path: REPARACION_REPLAY.archivo }], ctx())).toEqual([
+      { kind: 'eliminada', path: REPARACION_REPLAY.archivo },
+    ])
+    const renombre = {
+      status: 'R',
+      score: 100,
+      oldPath: REPARACION_REPLAY.archivo,
+      path: `${MIG}/20260909000009_revoke_execute_helpers_rls_y_reset.sql`,
+    }
+    expect(evaluateAppendOnly([renombre], ctx())).toHaveLength(1)
+  })
+
+  it('tolerar la reparación no amnistía a las demás modificaciones del mismo PR', () => {
+    const otra = { status: 'M', path: `${MIG}/20260318000000_enable_rls.sql` }
+    expect(evaluateAppendOnly([entrada(), otra], ctx())).toEqual([
+      { kind: 'modificada', path: otra.path },
+    ])
+  })
+})
+
 describe('evaluateAppendOnly — renombre por colisión de versión', () => {
   // La base tal como quedó `main` el 2026-09-10: dos migraciones distintas
   // compartiendo `20260910000000` porque #845 y #846 salieron del mismo commit.

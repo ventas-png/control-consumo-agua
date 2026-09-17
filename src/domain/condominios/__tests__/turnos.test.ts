@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import type { AsignacionTurno, AusenciaPersonal, BloqueTurno, DiaNoLaborable, PlantillaHorario } from '../../../types'
+import type { ExcepcionTurno } from '../../../types'
 import {
   ausenciaEn,
   celdaDe,
+  celdaEditable,
   describirRegla,
+  excepcionEn,
+  motivoNoEditable,
   diasDeAusencia,
   diasHabilesDeAusencia,
   fechasDeRegla,
@@ -28,7 +32,7 @@ function regla(over: Partial<AsignacionTurno> = {}): AsignacionTurno {
   return {
     id: 'r1', company_id: 'c1', project_id: 'p1',
     personal_id: 'emp1', plantilla_horario_id: 'ph1',
-    frecuencia: 'semanal', dias_semana: [], fechas_especificas: [],
+    frecuencia: 'semanal', dias_semana: [], dias_mes: [], fechas_especificas: [],
     fecha_inicio: '2026-09-01', cubre_dias_no_laborables: false,
     activa: true, created_at: '2026-08-01T00:00:00.000Z',
     ...over,
@@ -167,6 +171,65 @@ describe('reglaAplicaEn — las diez periodicidades', () => {
   })
 })
 
+describe('reglaAplicaEn — mensual_dias, el gemelo mensual de la semanal', () => {
+  // Los mismos casos que las invariantes 11b-11d de
+  // supabase/tests/turnos/assert.sql. Si divergen, el calendario enseña un día
+  // que la BD luego no genera.
+  const r = regla({ frecuencia: 'mensual_dias', dias_mes: [1, 15, 28], fecha_inicio: '2026-01-01' })
+
+  it('cae en los días marcados y en ningún otro', () => {
+    expect(reglaAplicaEn(r, '2026-09-01')).toBe(true)
+    expect(reglaAplicaEn(r, '2026-09-15')).toBe(true)
+    expect(reglaAplicaEn(r, '2026-09-28')).toBe(true)
+    expect(reglaAplicaEn(r, '2026-09-14')).toBe(false)
+    expect(reglaAplicaEn(r, '2026-09-30')).toBe(false)
+  })
+
+  it('se repite mes a mes sin que haya que volver a tocarla', () => {
+    for (const mes of ['01', '02', '03', '10', '12']) {
+      expect(reglaAplicaEn(r, `2026-${mes}-15`)).toBe(true)
+    }
+  })
+
+  it('un día que el mes no tiene se corre al último real', () => {
+    // Febrero de 2026 no es bisiesto: el 29, el 30 y el 31 caen en el 28.
+    const finDeMes = regla({ frecuencia: 'mensual_dias', dias_mes: [31], fecha_inicio: '2026-01-01' })
+    expect(reglaAplicaEn(finDeMes, '2026-02-28')).toBe(true)
+    expect(reglaAplicaEn(finDeMes, '2026-02-27')).toBe(false)
+    expect(reglaAplicaEn(finDeMes, '2026-04-30')).toBe(true)
+    expect(reglaAplicaEn(finDeMes, '2026-01-31')).toBe(true)
+  })
+
+  it('en febrero bisiesto el 29 SÍ existe y el 30 y el 31 se corren a él', () => {
+    const mk = (d: number) => regla({ frecuencia: 'mensual_dias', dias_mes: [d], fecha_inicio: '2020-01-01' })
+    expect(reglaAplicaEn(mk(29), '2028-02-29')).toBe(true)
+    expect(reglaAplicaEn(mk(30), '2028-02-29')).toBe(true)
+    expect(reglaAplicaEn(mk(31), '2028-02-29')).toBe(true)
+    expect(reglaAplicaEn(mk(29), '2028-02-28')).toBe(false)
+  })
+
+  it('el 29, el 30 y el 31 juntos dan UN día de febrero, no tres', () => {
+    // Esto es lo que evita que el generador cree tres bloques el 28: la regla
+    // se evalúa POR FECHA, así que converger no multiplica nada. Es un `some`
+    // sobre la lista, no un elemento por día marcado.
+    const tresFines = regla({ frecuencia: 'mensual_dias', dias_mes: [29, 30, 31], fecha_inicio: '2026-01-01' })
+    const feb = ['2026-02-26', '2026-02-27', '2026-02-28']
+    expect(feb.filter(f => reglaAplicaEn(tresFines, f))).toEqual(['2026-02-28'])
+  })
+
+  it('sin lista marcada cae de vuelta en dia_mes, no en nunca', () => {
+    const sinLista = regla({ frecuencia: 'mensual_dias', dias_mes: [], dia_mes: 10, fecha_inicio: '2026-01-01' })
+    expect(reglaAplicaEn(sinLista, '2026-09-10')).toBe(true)
+    expect(reglaAplicaEn(sinLista, '2026-09-11')).toBe(false)
+  })
+
+  it('no se adelanta a la vigencia', () => {
+    const desdeOctubre = regla({ frecuencia: 'mensual_dias', dias_mes: [15], fecha_inicio: '2026-10-01' })
+    expect(reglaAplicaEn(desdeOctubre, '2026-09-15')).toBe(false)
+    expect(reglaAplicaEn(desdeOctubre, '2026-10-15')).toBe(true)
+  })
+})
+
 describe('fechasDeRegla — expansión acotada a la vigencia', () => {
   it('septiembre 2026 tiene 22 días hábiles', () => {
     // El mismo número que verifica la invariante 14 de la suite SQL.
@@ -235,6 +298,7 @@ describe('celdaDe — lo materializado y lo que la regla predice', () => {
     id: 'ph1', company_id: 'c1', project_id: 'p1', nombre: 'Nocturno',
     turno: 'noche', hora_inicio: '22:00', hora_fin: '06:00',
     cruza_medianoche: true, minutos_descanso: 0, horas_jornada: 8,
+    tolerancia_salida_min: 0, demora_compensable_hasta_min: 0, extra_requiere_autorizacion: true,
     tolerancia_entrada_min: 10, activo: true, created_at: '',
   }
   const fuentesBase = {
@@ -309,6 +373,151 @@ describe('describirRegla — el resumen de la tarjeta', () => {
   it('dice el día del mes en las periodicidades largas', () => {
     expect(describirRegla(regla({ frecuencia: 'trimestral', dia_mes: 15 })))
       .toBe('Trimestral · día 15')
+  })
+
+  it('lista los días marcados de una mensual_dias, ordenados', () => {
+    expect(describirRegla(regla({ frecuencia: 'mensual_dias', dias_mes: [28, 1, 15] })))
+      .toBe('Días del mes · 1, 15, 28')
+  })
+
+  it('sin lista, la mensual_dias se describe por su dia_mes', () => {
+    expect(describirRegla(regla({ frecuencia: 'mensual_dias', dias_mes: [], dia_mes: 7 })))
+      .toBe('Días del mes · 7')
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Quitar un día y volver a ponerlo.
+//
+// El generador SÓLO agrega: borrar el bloque de un día no lo quita, porque el
+// siguiente «Generar» lo vuelve a crear. Lo que lo quita de verdad es la fila
+// en `excepciones_turno`, y estas pruebas fijan cómo la lee el calendario.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('excepciones de turno', () => {
+  const plantilla: PlantillaHorario = {
+    id: 'ph1', company_id: 'c1', project_id: 'p1', nombre: 'Nocturno',
+    turno: 'noche', hora_inicio: '22:00', hora_fin: '06:00',
+    cruza_medianoche: true, minutos_descanso: 0, horas_jornada: 8,
+    tolerancia_salida_min: 0, demora_compensable_hasta_min: 0, extra_requiere_autorizacion: true,
+    tolerancia_entrada_min: 10, activo: true, created_at: '',
+  }
+  function excepcion(over: Partial<ExcepcionTurno> = {}): ExcepcionTurno {
+    return {
+      id: 'x1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+      fecha: '2027-03-01', asignacion_id: 'r1', created_at: '', ...over,
+    }
+  }
+  const fuentes = {
+    bloques: [] as BloqueTurno[],
+    reglas: [regla({ frecuencia: 'semanal', dias_semana: [1, 2, 3, 4, 5] })],
+    plantillas: [plantilla],
+    ausencias: [] as AusenciaPersonal[],
+    noLaborables: [] as DiaNoLaborable[],
+  }
+
+  it('excepcionEn encuentra la de esa persona ese día y no la de otra', () => {
+    const todas = [excepcion(), excepcion({ id: 'x2', personal_id: 'emp2' })]
+    expect(excepcionEn(todas, 'emp1', '2027-03-01')?.id).toBe('x1')
+    expect(excepcionEn(todas, 'emp2', '2027-03-01')?.id).toBe('x2')
+    expect(excepcionEn(todas, 'emp3', '2027-03-01')).toBeUndefined()
+    expect(excepcionEn(todas, 'emp1', '2027-03-02')).toBeUndefined()
+  })
+
+  it('un día quitado deja de predecir turno aunque la regla lo cubra', () => {
+    // 2027-03-01 es lunes y la regla es L-V: sin excepción habría turno.
+    expect(celdaDe('2027-03-01', 'emp1', fuentes).regla?.id).toBe('r1')
+    const conExcepcion = { ...fuentes, excepciones: [excepcion()] }
+    const celda = celdaDe('2027-03-01', 'emp1', conExcepcion)
+    expect(celda.regla).toBeUndefined()
+    expect(celda.excepcion?.id).toBe('x1')
+    expect(horasDeCelda(celda)).toBeNull()
+  })
+
+  it('no toca los demás días del mes', () => {
+    const conExcepcion = { ...fuentes, excepciones: [excepcion()] }
+    expect(celdaDe('2027-03-02', 'emp1', conExcepcion).regla?.id).toBe('r1')
+  })
+
+  it('si el día se reasignó a mano, manda el bloque y la excepción queda como rastro', () => {
+    const bloque = {
+      id: 'b1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+      turno: 'noche', fecha: '2027-03-01', estado: 'pendiente', created_at: '',
+      horas_planificadas: 8, origen: 'manual', asignacion_id: 'r1', plantilla_horario_id: 'ph1',
+    } as BloqueTurno
+    const celda = celdaDe('2027-03-01', 'emp1', { ...fuentes, bloques: [bloque], excepciones: [excepcion()] })
+    expect(celda.bloque?.id).toBe('b1')
+    expect(celda.regla?.id).toBe('r1')
+    expect(celda.excepcion?.id).toBe('x1')
+  })
+
+  it('sin la lista de excepciones el calendario se comporta como siempre', () => {
+    // `excepciones` es opcional: los callers que no la pasan (tests viejos,
+    // otras pantallas) no pueden cambiar de comportamiento.
+    expect(celdaDe('2027-03-01', 'emp1', fuentes).regla?.id).toBe('r1')
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Qué se puede tocar desde el calendario.
+//
+// ESTO NO ES LA AUTORIDAD: la autoridad es el trigger
+// `trg_turnos_bloque_borrable` (20260916171325), que exige lo mismo y más
+// —sin tareas, sin revisiones, sin marcajes— para CUALQUIER rol. Acá sólo se
+// filtra lo que la UI puede saber, para no ofrecer un botón que la BD rechaza.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('celdaEditable / motivoNoEditable', () => {
+  const HOY = '2026-09-16'
+  function celda(over: Partial<BloqueTurno> | null, fecha = HOY) {
+    return {
+      fecha,
+      personalId: 'emp1',
+      bloque: over ? ({
+        id: 'b1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+        turno: 'noche', fecha, estado: 'pendiente', created_at: '', ...over,
+      } as BloqueTurno) : undefined,
+      enConflicto: false,
+    }
+  }
+
+  it('lo que ya pasó no se edita', () => {
+    expect(celdaEditable(celda(null, '2026-09-15'), HOY)).toBe(false)
+    expect(motivoNoEditable(celda(null, '2026-09-15'), HOY))
+      .toMatch(/ya pasó/)
+  })
+
+  it('hoy SÍ se edita: a las 6 de la mañana todavía se decide quién cubre la noche', () => {
+    expect(celdaEditable(celda(null, HOY), HOY)).toBe(true)
+    expect(motivoNoEditable(celda(null, HOY), HOY)).toBeNull()
+  })
+
+  it('un día futuro sin bloque se edita: es asignarlo por primera vez', () => {
+    expect(celdaEditable(celda(null, '2026-12-25'), HOY)).toBe(true)
+  })
+
+  it('un bloque ya iniciado no se toca desde acá', () => {
+    const c = celda({ estado: 'en_curso', iniciado_en: '2026-09-16T22:00:00Z' })
+    expect(celdaEditable(c, HOY)).toBe(false)
+    expect(motivoNoEditable(c, HOY)).toMatch(/ya arrancó/)
+  })
+
+  it('un bloque cerrado tampoco', () => {
+    const c = celda({ estado: 'completado', cerrado_en: '2026-09-17T06:00:00Z' })
+    expect(celdaEditable(c, HOY)).toBe(false)
+    expect(motivoNoEditable(c, HOY)).toMatch(/ya se cerró/)
+  })
+
+  it('un bloque que no está pendiente tampoco, aunque no tenga marcas de tiempo', () => {
+    const c = celda({ estado: 'incompleto' })
+    expect(celdaEditable(c, HOY)).toBe(false)
+    expect(motivoNoEditable(c, HOY)).toMatch(/incompleto/)
+  })
+
+  it('un bloque futuro, pendiente y sin empezar sí se edita', () => {
+    const c = celda({ estado: 'pendiente' }, '2026-10-01')
+    expect(celdaEditable(c, HOY)).toBe(true)
+    expect(motivoNoEditable(c, HOY)).toBeNull()
   })
 })
 

@@ -18,13 +18,19 @@ LANGUAGE sql STABLE AS $$
   SELECT NULLIF(current_setting('app.uid', true), '')::uuid
 $$;
 
-CREATE TABLE public.companies (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+-- companies.timezone lo añade 20260717110000: la zona del inquilino con la que
+-- se fecha todo lo operativo.
+CREATE TABLE public.companies (
+  id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  timezone text NOT NULL DEFAULT 'America/Guatemala'
+);
 CREATE TABLE public.projects (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE
 );
 CREATE TABLE public.app_users (
   id         uuid PRIMARY KEY,
+  project_id uuid,
   full_name  text,
   company_id uuid REFERENCES public.companies(id) ON DELETE CASCADE,
   role       text NOT NULL DEFAULT 'operador',
@@ -180,6 +186,80 @@ BEGIN
 END;
 $$;
 
+-- ── Scope por proyecto (copia literal de 20260815000000 / 20260327000003) ───
+-- `can_access_project` es lo que separa dos condominios de la MISMA empresa.
+CREATE TABLE public.user_project_assignments (
+  user_id    uuid NOT NULL,
+  project_id uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, project_id)
+);
+
+CREATE OR REPLACE FUNCTION public.user_has_project_access(p_project_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    EXISTS (
+      SELECT 1 FROM public.app_users
+      WHERE id = auth.uid() AND project_id = p_project_id
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.user_project_assignments
+      WHERE user_id = auth.uid() AND project_id = p_project_id
+    )
+$$;
+
+CREATE OR REPLACE FUNCTION public.user_is_project_exempt()
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    public.current_user_role() = ANY (ARRAY['super_admin', 'superadmin', 'company_owner'])
+    OR (
+      public.current_user_role() = 'admin'
+      AND NOT EXISTS (
+        SELECT 1 FROM public.user_project_assignments upa
+        WHERE upa.user_id = (SELECT auth.uid())
+      )
+    )
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_access_project(p_project_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    p_project_id IS NULL
+    OR public.user_is_project_exempt()
+    OR public.user_has_project_access(p_project_id)
+$$;
+GRANT EXECUTE ON FUNCTION public.can_access_project(uuid) TO authenticated;
+
+-- ── La zona del inquilino (copia literal de 20260908000000:130) ─────────────
+-- El trigger de borrado la usa para decidir qué es «hoy»: CURRENT_DATE es UTC y
+-- a las 18:00 de Guatemala ya sería mañana.
+CREATE OR REPLACE FUNCTION public.presencia_zona_horaria(p_company_id uuid)
+RETURNS text
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_tz text;
+BEGIN
+  SELECT COALESCE(c.timezone, 'America/Guatemala') INTO v_tz
+  FROM public.companies c WHERE c.id = p_company_id;
+  v_tz := COALESCE(v_tz, 'America/Guatemala');
+  BEGIN
+    PERFORM now() AT TIME ZONE v_tz;
+  EXCEPTION WHEN OTHERS THEN
+    v_tz := 'America/Guatemala';
+  END;
+  RETURN v_tz;
+END;
+$$;
+
 -- ── Tablas de personal TAL COMO ESTÁN EN PROD hoy ──────────────────────────
 -- personal_condominio: 20260420000004:144 (+ campos de 20260520000001, que no
 -- intervienen aquí).
@@ -221,6 +301,67 @@ CREATE POLICY "company_rw_bloques_turno" ON public.bloques_turno
   USING (company_id = public.get_my_company_id())
   WITH CHECK (company_id = public.get_my_company_id());
 
+-- tareas_bloque y revisiones_tarea: 20260424000060:35 y :53, literales.
+-- Son las dos dependencias que hacen que borrar un bloque destruya historial:
+-- la primera cuelga con ON DELETE CASCADE y la segunda sin acción declarada.
+CREATE TABLE public.tareas_bloque (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bloque_id       uuid NOT NULL REFERENCES public.bloques_turno(id) ON DELETE CASCADE,
+  titulo          text NOT NULL,
+  orden           int  NOT NULL DEFAULT 0,
+  requiere_foto   boolean NOT NULL DEFAULT false,
+  estado          text NOT NULL DEFAULT 'pendiente',
+  completada_en   timestamptz,
+  foto_urls       jsonb NOT NULL DEFAULT '[]',
+  created_at      timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.revisiones_tarea (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tarea_id     uuid NOT NULL REFERENCES public.tareas_bloque(id) ON DELETE CASCADE,
+  bloque_id    uuid NOT NULL REFERENCES public.bloques_turno(id),
+  revisado_por uuid NOT NULL REFERENCES public.app_users(id),
+  estado       text NOT NULL DEFAULT 'pendiente',
+  comentario   text,
+  revisado_en  timestamptz DEFAULT now()
+);
+
+-- Sus policies de SELECT, literales de 20260907000100:201 y :278. El arnés no
+-- aplica esa migración —no es de turnos— pero SIN ellas estas dos tablas se
+-- leerían enteras aquí y la invariante 85 no probaría nada: lo que se comprueba
+-- es justamente que su EXISTS sobre el bloque padre HEREDA el alcance por
+-- proyecto que 20260917000825 le pone al padre, sin tocar estas dos policies.
+ALTER TABLE public.tareas_bloque    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.revisiones_tarea ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "tareas_bloque_select" ON public.tareas_bloque
+  FOR SELECT TO authenticated
+  USING (
+    (SELECT public.is_super_admin()) OR EXISTS (
+      SELECT 1 FROM public.bloques_turno b
+      WHERE b.id = tareas_bloque.bloque_id
+        AND b.company_id = (SELECT public.get_my_company_id())
+        AND (SELECT public.user_has_permission('condominios.tab.tareas_personal')
+             OR public.user_has_permission('condominios.tab.turnos')
+             OR public.user_has_permission('condominios.tab.revision_tareas')
+             OR public.user_has_permission('condominios.tab.desempeno_personal')
+             OR public.user_has_permission('condominios.tab.prog_limpieza'))
+    )
+  );
+
+CREATE POLICY "revisiones_tarea_select" ON public.revisiones_tarea
+  FOR SELECT TO authenticated
+  USING (
+    (SELECT public.is_super_admin()) OR EXISTS (
+      SELECT 1 FROM public.bloques_turno b
+      WHERE b.id = revisiones_tarea.bloque_id
+        AND b.company_id = (SELECT public.get_my_company_id())
+        AND (SELECT public.user_has_permission('condominios.tab.revision_tareas')
+             OR public.user_has_permission('condominios.tab.desempeno_personal')
+             OR public.user_has_permission('condominios.tab.tareas_personal'))
+    )
+  );
+
 -- presencia_personal: 20260420000020:85. SIN personal_id ni bloque_id.
 CREATE TABLE public.presencia_personal (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -233,6 +374,9 @@ CREATE TABLE public.presencia_personal (
   hora_salida   time,
   estado        text NOT NULL DEFAULT 'presente',
   observaciones text,
+  -- bloque_id lo añade 20260820000100 con ON DELETE SET NULL: el marcaje
+  -- sobrevive al borrado del bloque pero pierde contra qué se comparaba.
+  bloque_id     uuid REFERENCES public.bloques_turno(id) ON DELETE SET NULL,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
@@ -243,23 +387,54 @@ INSERT INTO public.companies (id) VALUES
 
 INSERT INTO public.projects (id, company_id) VALUES
   ('11111111-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001'),
-  ('11111111-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000002');
+  ('11111111-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000002'),
+  -- Segundo condominio de la MISMA empresa: el aislamiento que company_id solo
+  -- no cubre.
+  ('11111111-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000001');
 
 INSERT INTO auth.users (id) VALUES
   ('e0000000-0000-0000-0000-00000000000a'),   -- admin del condominio
   ('e0000000-0000-0000-0000-00000000000b'),   -- guardia con rol RBAC acotado
-  ('e0000000-0000-0000-0000-00000000000c');   -- admin de la empresa vecina
+  ('e0000000-0000-0000-0000-00000000000c'),   -- admin de la empresa vecina
+  ('e0000000-0000-0000-0000-00000000000d'),   -- DUEÑA de la empresa 1
+  ('e0000000-0000-0000-0000-00000000000e'),   -- super_admin
+  ('e0000000-0000-0000-0000-00000000000f');   -- admin del OTRO condominio de la empresa 1
 
-INSERT INTO public.app_users (id, full_name, company_id, role) VALUES
-  ('e0000000-0000-0000-0000-00000000000a', 'Ana Administradora', 'aaaaaaaa-0000-0000-0000-000000000001', 'admin'),
-  ('e0000000-0000-0000-0000-00000000000b', 'Beto Guardia',       'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
-  ('e0000000-0000-0000-0000-00000000000c', 'Caro Vecina',        'aaaaaaaa-0000-0000-0000-000000000002', 'admin');
+INSERT INTO public.app_users (id, project_id, full_name, company_id, role) VALUES
+  ('e0000000-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', 'Ana Administradora', 'aaaaaaaa-0000-0000-0000-000000000001', 'admin'),
+  ('e0000000-0000-0000-0000-00000000000b', '11111111-0000-0000-0000-000000000001', 'Beto Guardia',       'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
+  ('e0000000-0000-0000-0000-00000000000c', '11111111-0000-0000-0000-000000000002', 'Caro Vecina',        'aaaaaaaa-0000-0000-0000-000000000002', 'admin'),
+  ('e0000000-0000-0000-0000-00000000000d', '11111111-0000-0000-0000-000000000001', 'Olga Dueña',         'aaaaaaaa-0000-0000-0000-000000000001', 'company_owner'),
+  ('e0000000-0000-0000-0000-00000000000e', NULL,                                   'Sam Super',          'aaaaaaaa-0000-0000-0000-000000000001', 'super_admin'),
+  ('e0000000-0000-0000-0000-00000000000f', '11111111-0000-0000-0000-000000000003', 'Fede OtroCondo',     'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
+  -- Tino sólo MIRA. Tiene la clave de visibilidad del tab de turnos y ninguna
+  -- de acción: es el rol con el que se comprueba que ver el calendario no
+  -- autoriza a escribir en él (invariantes 53-58).
+  ('e0000000-0000-0000-0000-000000000010', '11111111-0000-0000-0000-000000000001', 'Tino Mirón',         'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
+  -- Lola llega por el camino VIEJO: sin claves de acción por tab, pero con el
+  -- par legado de módulo completo que `canActInCondominiosTab` sigue aceptando.
+  ('e0000000-0000-0000-0000-000000000011', '11111111-0000-0000-0000-000000000001', 'Lola Legada',        'aaaaaaaa-0000-0000-0000-000000000001', 'operator');
+
+-- Ana y Fede quedan ASIGNADOS a su condominio. La asignación es lo que hace que
+-- `user_is_project_exempt()` deje de eximir al rol admin: sin ella, un admin ve
+-- todos los proyectos de su empresa y la prueba de aislamiento por proyecto no
+-- probaría nada.
+INSERT INTO public.user_project_assignments (user_id, project_id) VALUES
+  ('e0000000-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001'),
+  ('e0000000-0000-0000-0000-00000000000b', '11111111-0000-0000-0000-000000000001'),
+  ('e0000000-0000-0000-0000-00000000000f', '11111111-0000-0000-0000-000000000003'),
+  ('e0000000-0000-0000-0000-000000000010', '11111111-0000-0000-0000-000000000001'),
+  ('e0000000-0000-0000-0000-000000000011', '11111111-0000-0000-0000-000000000001');
 
 -- Empleados del condominio 1.
 INSERT INTO public.personal_condominio (id, company_id, project_id, nombre, cargo, turno) VALUES
   ('50000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Pedro Guardia',   'guardia',  'nocturno'),
   ('50000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Lucía Conserje',  'conserje', 'diurno'),
-  ('50000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Mario Jardinero', 'jardinero','diurno');
+  ('50000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Mario Jardinero', 'jardinero','diurno'),
+  -- Nora trabaja en el OTRO condominio de la MISMA empresa. Es la que permite
+  -- probar que el alcance se concede por proyecto y no por empresa: quien
+  -- administra el condominio 1 no puede escribirle la agenda a ella.
+  ('50000000-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000003', 'Nora OtroCondo',  'conserje', 'diurno');
 
 -- Marcaje histórico SIN personal_id: alimenta el backfill por nombre.
 -- "Pedro Guardia" casa exacto; "Empleado Externo" no está en plantilla y debe

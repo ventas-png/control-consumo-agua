@@ -62,6 +62,93 @@
 -- sólo lectura. En producción es un no-op declarativo: ya está así.
 -- ════════════════════════════════════════════════════════════════════════════
 
+-- ── (0) REPARACIÓN DE REPLAY — los GRANT que esta migración daba por hechos ──
+-- AÑADIDO EL 2026-09-11, y es una EDICIÓN DE UNA MIGRACIÓN HISTÓRICA. Se hace
+-- así, y no con una migración posterior, por una razón que no tiene vuelta:
+-- esta migración ABORTA en su propia verificación, de modo que en una
+-- reconstrucción limpia NUNCA SE LLEGA a una migración posterior. Reparar el
+-- replay exige repararlo AQUÍ. La excepción de una sola vez que lo permite está
+-- en scripts/migrations-append-only.mjs, clavada a este archivo y a estos dos
+-- hashes.
+--
+-- QUÉ SE DABA POR HECHO. La cabecera de abajo afirma que los helpers «ya tienen
+-- GRANT explícito a authenticated (se verificó en la reconstrucción: aparece
+-- authenticated=X en proacl)». Medido el 2026-09-11: NINGUNA migración de este
+-- repositorio concede ese EXECUTE. Lo que ponía ese `authenticated=X` en la
+-- reconstrucción era el andamiaje del auditor de drift —
+-- scripts/schema-drift/bootstrap.sql, `ALTER DEFAULT PRIVILEGES IN SCHEMA
+-- public GRANT ALL ON FUNCTIONS TO … authenticated`— que NO existe en una
+-- Supabase Branch de verdad.
+--
+-- CÓMO SE VIO. Al recrear la preview branch de #847 desde cero (proyecto
+-- iiohmlctjtgqdxigdtjr, 2026-09-11), la verificación de esta misma migración
+-- abortó con:
+--     ERROR: authenticated NO puede ejecutar public.current_user_role()
+--            — las policies que lo evalúan dejarían de leer (SQLSTATE P0001)
+-- El diagnóstico es correcto: sin `GRANT` explícito, revocar PUBLIC deja a
+-- `authenticated` sin EXECUTE, y toda policy que evalúe estos predicados deja
+-- de leer. La migración hacía bien en negarse a terminar.
+--
+-- LA MATRIZ, declarada aquí y verificada abajo:
+--     15 helpers de RLS → authenticated + service_role;  nunca PUBLIC ni anon
+--      5 de reseteo     → SÓLO service_role;             nunca PUBLIC, anon
+--                                                        ni authenticated
+--
+-- EN PRODUCCIÓN ES UN NO-OP. Allí las ACL ya son éstas (por eso el guard de
+-- seguridad nunca tuvo nada que reportar), y `GRANT` sobre un privilegio ya
+-- concedido no falla ni cambia nada. El apply reaplica este archivo por estar
+-- modificado —`--diff-filter=AM`— y eso es justo lo que se quiere: converge sin
+-- mover una sola fila de datos. Este archivo no toca datos: sólo ACL.
+DO $$
+DECLARE
+  fn         text;
+  v_roles    text;
+  v_hay_auth boolean := EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated');
+  v_hay_srv  boolean := EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role');
+BEGIN
+  -- Los helpers de policies: `authenticated` porque una policy se evalúa con el
+  -- rol que consulta, y `service_role` porque las edge functions y el cron los
+  -- llaman con esa clave.
+  v_roles := concat_ws(', ',
+    CASE WHEN v_hay_auth THEN 'authenticated' END,
+    CASE WHEN v_hay_srv  THEN 'service_role'  END);
+  IF v_roles <> '' THEN
+    FOREACH fn IN ARRAY ARRAY[
+      'current_user_role()',
+      'get_my_cliente_id()',
+      'get_my_company_id()',
+      'get_my_user_id()',
+      'has_admin_company_access(uuid)',
+      'has_admin_or_owner_access_in_company(uuid)',
+      'has_admin_project_access(uuid)',
+      'has_company_owner_company_access(uuid)',
+      'has_operator_project_access(uuid)',
+      'has_super_admin_access()',
+      'has_viewer_project_access(uuid)',
+      'is_company_owner()',
+      'is_super_admin()',
+      'is_user_cliente_with_id(uuid)',
+      'user_has_project_access(uuid)'
+    ] LOOP
+      EXECUTE format('GRANT EXECUTE ON FUNCTION public.%s TO %s', fn, v_roles);
+    END LOOP;
+  END IF;
+
+  -- El trío de reseteo NO lleva authenticated: es herencia del auth propio
+  -- anterior a Supabase Auth y hoy no lo llama nadie desde la aplicación.
+  IF v_hay_srv THEN
+    FOREACH fn IN ARRAY ARRAY[
+      'request_password_reset(character varying, character varying, text)',
+      'request_password_reset(text, text, text)',
+      'update_user_password(character varying, character varying)',
+      'validate_reset_token(character varying)',
+      'validate_reset_token(text)'
+    ] LOOP
+      EXECUTE format('GRANT EXECUTE ON FUNCTION public.%s TO service_role', fn);
+    END LOOP;
+  END IF;
+END $$;
+
 -- ── (1) Helpers de policies RLS: cerrar PUBLIC/anon, conservar authenticated ─
 DO $$
 DECLARE fn text;

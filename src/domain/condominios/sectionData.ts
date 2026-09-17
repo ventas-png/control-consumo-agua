@@ -322,7 +322,63 @@ export async function fetchCondominiosTurnosData(pid: string, cid: string) {
     supabase.from('asignaciones_turno').select('*, personal_condominio(nombre, cargo), plantillas_horario(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     supabase.from('dias_no_laborables').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
     supabase.from('ausencias_personal').select('*, personal_condominio(nombre, cargo)').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }).limit(500),
+    supabase.from('excepciones_turno').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(1000),
   ])
+}
+
+/**
+ * Lo que el calendario de turnos necesita de UN RANGO de fechas: los bloques
+ * materializados y los días quitados a mano.
+ *
+ * Existe aparte de las consultas del panel porque aquéllas están acotadas por
+ * tamaño, no por fecha: `fetchCondominiosTareasData` trae los 200 bloques de
+ * fecha más reciente del PROYECTO ENTERO —suficiente para la bandeja de «Tareas
+ * por turno», que mira hoy— y las excepciones vienen con su propio tope. El
+ * calendario mensual necesita lo contrario: veinte empleados por treinta días
+ * son seiscientas filas, y el mes puede ser cualquiera, incluido uno de hace
+ * dos años.
+ *
+ * Los dos síntomas del tope, que se ven idénticos en pantalla y son distintos:
+ * con los bloques fuera de rango, generar un mes completo lo dejaba pintado
+ * como «previsto (sin generar)» para siempre; con las excepciones fuera de
+ * rango, un día quitado a mano volvía a aparecer como previsto, que es
+ * exactamente lo que el administrador había dicho que no.
+ */
+export async function fetchTurnosDelMes(
+  pid: string, cid: string, desde: string, hasta: string,
+) {
+  // PAGINADO, no «una consulta y a ver qué llega». Acotar por fecha reduce el
+  // conjunto pero no lo acota: PostgREST corta en ~1000 filas por defecto y no
+  // lo dice, así que un condominio de cuarenta empleados con turnos partidos
+  // pierde el final del mes EN SILENCIO — y en este calendario «no está» y «no
+  // llegó» se pintan igual, como día libre.
+  //
+  // El orden tiene que ser TOTAL, no sólo por fecha: con `fecha` sola, dos
+  // filas del mismo día pueden repartirse entre dos ventanas en cualquier
+  // orden y `.range()` duplicaría una y se saltaría otra. `id` de desempate lo
+  // cierra.
+  const enRango = <T extends 'bloques_turno' | 'excepciones_turno'>(tabla: T) =>
+    fetchAllRows((from, to) =>
+      supabase
+        .from(tabla)
+        .select('*')
+        .eq('project_id', pid)
+        .eq('company_id', cid)
+        .gte('fecha', desde)
+        .lte('fecha', hasta)
+        .order('fecha', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    ).then(({ data, error, truncated }) => {
+      if (truncated) {
+        console.warn(`[condominios] ${tabla} del mes cortada en el techo de seguridad (${data.length}) — el calendario puede estar incompleto`)
+      }
+      // Mismo shape { data, error } que el resto del módulo, para que el
+      // «las dos o ninguna» del tab siga leyéndose igual.
+      return { data: error ? null : data, error: error ? { message: error } : null }
+    })
+
+  return Promise.all([enRango('bloques_turno'), enRango('excepciones_turno')])
 }
 
 /** Tareas + revisiones de un conjunto de bloques de turno. */

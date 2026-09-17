@@ -853,6 +853,7 @@ export type Database = {
           created_at: string
           cubre_dias_no_laborables: boolean
           dia_mes: number | null
+          dias_mes: Json
           dias_semana: Json
           fecha_fin: string | null
           fecha_inicio: string
@@ -874,6 +875,7 @@ export type Database = {
           created_at?: string
           cubre_dias_no_laborables?: boolean
           dia_mes?: number | null
+          dias_mes?: Json
           dias_semana?: Json
           fecha_fin?: string | null
           fecha_inicio: string
@@ -895,6 +897,7 @@ export type Database = {
           created_at?: string
           cubre_dias_no_laborables?: boolean
           dia_mes?: number | null
+          dias_mes?: Json
           dias_semana?: Json
           fecha_fin?: string | null
           fecha_inicio?: string
@@ -1645,6 +1648,7 @@ export type Database = {
           origen: string
           personal_id: string
           plantilla_horario_id: string | null
+          politica: Json | null
           project_id: string
           puntaje_completitud: number | null
           turno: string
@@ -1667,6 +1671,7 @@ export type Database = {
           origen?: string
           personal_id: string
           plantilla_horario_id?: string | null
+          politica?: Json | null
           project_id: string
           puntaje_completitud?: number | null
           turno: string
@@ -1689,6 +1694,7 @@ export type Database = {
           origen?: string
           personal_id?: string
           plantilla_horario_id?: string | null
+          politica?: Json | null
           project_id?: string
           puntaje_completitud?: number | null
           turno?: string
@@ -7076,6 +7082,71 @@ export type Database = {
           },
         ]
       }
+      excepciones_turno: {
+        Row: {
+          asignacion_id: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          fecha: string
+          id: string
+          motivo: string | null
+          personal_id: string
+          project_id: string
+        }
+        Insert: {
+          asignacion_id?: string | null
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          fecha: string
+          id?: string
+          motivo?: string | null
+          personal_id: string
+          project_id: string
+        }
+        Update: {
+          asignacion_id?: string | null
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          fecha?: string
+          id?: string
+          motivo?: string | null
+          personal_id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "excepciones_turno_asignacion_fk"
+            columns: ["asignacion_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "asignaciones_turno"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "excepciones_turno_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "excepciones_turno_personal_fk"
+            columns: ["personal_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "excepciones_turno_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       facturas_energia: {
         Row: {
           archivo_factura_url: string | null
@@ -12420,6 +12491,8 @@ export type Database = {
           creado_por: string | null
           created_at: string
           cruza_medianoche: boolean
+          demora_compensable_hasta_min: number
+          extra_requiere_autorizacion: boolean
           hora_fin: string
           hora_inicio: string
           horas_jornada: number | null
@@ -12429,6 +12502,7 @@ export type Database = {
           notas: string | null
           project_id: string
           tolerancia_entrada_min: number
+          tolerancia_salida_min: number
           turno: string
         }
         Insert: {
@@ -12439,6 +12513,8 @@ export type Database = {
           creado_por?: string | null
           created_at?: string
           cruza_medianoche?: boolean
+          demora_compensable_hasta_min?: number
+          extra_requiere_autorizacion?: boolean
           hora_fin: string
           hora_inicio: string
           horas_jornada?: number | null
@@ -12448,6 +12524,7 @@ export type Database = {
           notas?: string | null
           project_id: string
           tolerancia_entrada_min?: number
+          tolerancia_salida_min?: number
           turno?: string
         }
         Update: {
@@ -12458,6 +12535,8 @@ export type Database = {
           creado_por?: string | null
           created_at?: string
           cruza_medianoche?: boolean
+          demora_compensable_hasta_min?: number
+          extra_requiere_autorizacion?: boolean
           hora_fin?: string
           hora_inicio?: string
           horas_jornada?: number | null
@@ -12467,6 +12546,7 @@ export type Database = {
           notas?: string | null
           project_id?: string
           tolerancia_entrada_min?: number
+          tolerancia_salida_min?: number
           turno?: string
         }
         Relationships: [

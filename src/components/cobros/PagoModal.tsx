@@ -3,10 +3,9 @@ import { notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
 import { createPago } from '../../domain/cobros/mutations'
-import { updateRegistro } from '../../domain/agua/mutations'
+import { registrarPagoRegistro } from '../../domain/agua/mutations'
 import type { Registro, Cliente, FormaPago, TipoAplicacion } from '../../types'
-import { calcularTotalPagar, puedeTransicionarFactura } from '../../lib/business'
-import { hoyLocalISO } from '../../lib/format'
+import { calcularTotalPagar } from '../../lib/business'
 import { FacturaEstadoBadge, FacturaDesglose } from './facturaUi'
 import { TimbradoEstadoBadge, TimbradoDatos } from './fiscalUi'
 import type { FacturaRow } from '../../domain/facturacion/queries'
@@ -81,25 +80,15 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
 
       if (pagoError) throw new Error(pagoError)
 
-      // Actualizar estado de registro si se pagó completo
-      const nuevoEstado: Registro['estado'] = esPagoCompleto ? 'pagado' : 'pendiente'
-      const update: Record<string, unknown> = {
-        monto_pagado: nuevoAbonado,
-        estado: nuevoEstado,
-        // E4/D5: fecha LOCAL (toISOString daba la fecha UTC — un pago nocturno
-        // quedaba fechado "mañana").
-        fecha_pago: esPagoCompleto ? hoyLocalISO() : null,
-      }
-      // T4 · agua:C4 — si el pago liquida una factura emitida/vencida, también
-      // transiciona la máquina de estados de la Factura a 'pagada'. La validez de
-      // la transición la decide business.ts (no se duplica aquí).
-      if (esPagoCompleto && factura && puedeTransicionarFactura(factura.factura_estado, 'pagar').ok) {
-        update.factura_estado = 'pagada'
-        update.pagada_at = new Date().toISOString()
-      }
-      const { error: regError } = await updateRegistro(registro.id, update)
-
+      // Aplicar el pago sobre la lectura. Lo único que viaja es el MONTO: el
+      // abonado acumulado, el estado resultante, la fecha de pago (en la zona
+      // del tenant, no la del teléfono) y la transición de la Factura los
+      // resuelve `agua_factura_registrar_pago`. Antes se calculaban aquí y se
+      // mandaban como PATCH, que es lo que permitía marcar "pagado" sin pago.
+      const { data: fila, error: regError } = await registrarPagoRegistro(registro.id, montoNum)
       if (regError) throw new Error(regError)
+
+      const nuevoEstado: Registro['estado'] = (fila?.estado as Registro['estado']) ?? 'pendiente'
 
       notify({
         variant: 'success',
@@ -108,7 +97,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
         duration: 2000,
       })
 
-      onSuccess(registro.id, nuevoEstado, nuevoAbonado)
+      onSuccess(registro.id, nuevoEstado, Number(fila?.monto_pagado ?? nuevoAbonado))
     } catch (err) {
       console.error(err)
       notify({ variant: 'error', title: 'Error', text: 'No se pudo registrar el pago' })

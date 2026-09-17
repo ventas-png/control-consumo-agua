@@ -85,9 +85,32 @@ const POLICIES_TAREAS = policiesVigentes('tareas_bloque')
 const POLICIES_REVISIONES = policiesVigentes('revisiones_tarea')
 const POLICIES_BLOQUES = policiesVigentes('bloques_turno')
 
-/** Permisos nombrados dentro del cuerpo de una policy. */
+/**
+ * Permisos nombrados dentro del cuerpo de una policy.
+ *
+ * DOS SINTAXIS, UNA PREGUNTA. Hasta 20260916171325 el gate RBAC se escribía
+ * siempre `user_has_permission('condominios.tab.<tab>')`. 20260916221839 lo
+ * cambió en las policies de ESCRITURA de bloques_turno y excepciones_turno:
+ * esa clave de tres segmentos es la VISIBILIDAD del tab, así que usarla para
+ * autorizar un INSERT dejaba escribir a cualquiera que pudiera mirar. Ahora se
+ * usa `condominios_puede_actuar('<tab>', '<accion>')`, que exige visibilidad Y
+ * acción.
+ *
+ * Este extractor reconoce las dos y devuelve el tab en ambos casos, porque lo
+ * que las aserciones de abajo preguntan —¿qué tabs nombra esta policy?— no ha
+ * cambiado. Qué exige además, lo comprueba la última aserción del archivo.
+ */
 const permisosDe = (cuerpo: string) =>
-  new Set([...cuerpo.matchAll(/user_has_permission\(\s*'([^']+)'\s*\)/g)].map(m => m[1]))
+  new Set([
+    ...[...cuerpo.matchAll(/user_has_permission\(\s*'([^']+)'\s*\)/g)].map(m => m[1]),
+    ...[...cuerpo.matchAll(/condominios_puede_actuar\(\s*'([a-z_]+)'\s*,/g)]
+      .map(m => `condominios.tab.${m[1]}`),
+  ])
+
+/** Acciones exigidas por una policy, vía `condominios_puede_actuar`. */
+const accionesDe = (cuerpo: string) =>
+  new Set([...cuerpo.matchAll(/condominios_puede_actuar\(\s*'[a-z_]+'\s*,\s*'([a-z_]+)'\s*\)/g)]
+    .map(m => m[1]))
 
 describe('20260907000100 · las legadas company_rw_* quedaron retiradas', () => {
   it.each([
@@ -152,6 +175,27 @@ describe('20260907000100 · el re-gateo nombra a los consumidores REALES', () =>
       expect(permisos.size, `${policy} sin permisos`).toBeGreaterThan(0)
       expect(permisos).toContain(PERM_REVISION)
       expect(permisos, 'revisar el trabajo ajeno no es cosa de Limpieza').not.toContain(PERM_LIMPIEZA)
+    }
+  })
+
+  // ── El hallazgo de la revisión de #870, convertido en guard ──────────────
+  // La clave de TRES segmentos es visibilidad. Usarla para autorizar escritura
+  // es dejar entrar a todo el que pueda MIRAR el tab, que es exactamente lo que
+  // hacían estas policies antes de 20260916221839. Si alguien vuelve a
+  // escribirlo así, esto lo caza.
+  it('escribir en el motor de turnos exige una ACCIÓN, nunca la visibilidad a secas', () => {
+    const deEscritura = [...POLICIES_BLOQUES.values()]
+      .filter(p => /FOR\s+(INSERT|UPDATE|DELETE)/i.test(p.cuerpo))
+    expect(deEscritura.length, 'no se encontraron policies de escritura de bloques_turno')
+      .toBeGreaterThan(0)
+
+    for (const p of deEscritura) {
+      expect(
+        [...p.cuerpo.matchAll(/user_has_permission\(\s*'(condominios\.tab\.[a-z_]+)'\s*\)/g)]
+          .map(m => m[1]),
+        `${p.nombre} autoriza escritura con una clave de visibilidad`,
+      ).toEqual([])
+      expect(accionesDe(p.cuerpo).size, `${p.nombre} no exige ninguna acción`).toBeGreaterThan(0)
     }
   })
 

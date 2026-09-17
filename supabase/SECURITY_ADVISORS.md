@@ -9,6 +9,7 @@ Registro de decisiones sobre los advisors de seguridad del proyecto `control-agu
 |---|---|---|
 | `0011` `function_search_path_mutable` | `search_path` fijo en las funciones de `public` | `20260521000001_security_harden_trigger_functions.sql`, `20260603120000_security_harden_function_grants.sql` |
 | `0028/0029` `anon … SECURITY DEFINER executable` | revocado `EXECUTE` de `anon` en 15 funciones (3 triggers + 4 de frontend + 8 de infra/worker) | `20260603120000_security_harden_function_grants.sql` (PR #324) |
+| `0028/0029` `anon … SECURITY DEFINER executable` — **sólo en reconstrucciones** | producción ya las tenía cerradas a mano, pero las migraciones no lo registraban: una Preview limpia (#856) nacía con SIETE funciones ejecutables por `anon`. Se declara la matriz de producción: `sso_lookup_domain` conserva `anon` (excepción de `security-guard.allowlist.json`), `buscar_cliente_para_onboarding` conserva `authenticated`, y las otras cinco quedan sólo para `service_role` | `20260911223000_declarar_acl_definer_expuestas_anon.sql`, verificada en `supabase/tests/acl_definer_expuestas_anon/` y en el replay de `supabase/tests/replay_acl_helpers/` |
 
 ## Excepciones aceptadas (no se accionan, con justificación)
 

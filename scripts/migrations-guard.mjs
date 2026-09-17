@@ -229,6 +229,42 @@ export function extractFunctions(sql) {
 // Corte de retroactividad: 20260825010000 cerró las 8 del P1; lo anterior está
 // saneado en prod (guard nocturno verde) y queda grandfathered. Un DROP+CREATE
 // de una función vieja en una migración nueva SÍ queda sujeto.
+// ── Regla (f): GUC de clase personalizada dentro de `proconfig` ─────────────
+// `ALTER FUNCTION … SET "agua.algo" = …` y su gemelo, la cláusula `SET` de un
+// `CREATE FUNCTION`, guardan el par en el array `proconfig` de pg_proc. Para un
+// GUC que NINGUNA extensión define —un «placeholder», que es lo que es
+// cualquier `clase.nombre` inventado por este repo— Postgres exige
+// SUPERUSUARIO: `validate_option_array_item()` responde
+// `42501 permission denied to set parameter`. La razón es buena: al resolverse,
+// el placeholder podría resultar ser una variable SUSET, y entonces ya sería
+// tarde para comprobar el permiso.
+//
+// En una Supabase gestionada el rol que aplica las migraciones (`postgres`) no
+// es superusuario, así que una migración con esa cláusula ABORTA — y aborta la
+// cadena entera detrás de ella. El arnés local no lo ve: levanta Postgres con
+// `initdb` y ahí `postgres` sí es superusuario. Es el mismo par «pasa en local,
+// falla en la branch» de #855, y se pagó dos veces (Supabase Preview de #847,
+// 2026-09-11) antes de escribir esta regla.
+//
+// `SET search_path`, `SET role`, `SET statement_timeout` y demás NO caen aquí:
+// son GUC de verdad, con permisos definidos. Sólo se marca lo cualificado con
+// punto, que es la forma sintáctica de un placeholder.
+//
+// La salida: encender el GUC DENTRO del cuerpo con
+// `PERFORM set_config('clase.nombre', 'on', true)` y apagarlo antes de devolver.
+const RE_PROCONFIG_PLACEHOLDER =
+  /\bSET\s+"([a-z_][\w]*\.[\w]+)"\s*(?:=|TO)\s*/gi
+
+export function findProconfigPlaceholders(sql) {
+  const hallados = []
+  let m
+  RE_PROCONFIG_PLACEHOLDER.lastIndex = 0
+  while ((m = RE_PROCONFIG_PLACEHOLDER.exec(sql)) !== null) {
+    hallados.push(m[1].toLowerCase())
+  }
+  return hallados
+}
+
 export const SECDEF_CUTOFF = '20260825010000'
 
 function roleFlags(rolesRaw) {
@@ -409,6 +445,8 @@ async function main() {
   const tablesWithPolicy = new Set()
   // Regla (e): ACL efectiva por FIRMA (ver extractAclEvents/applyAclEvents).
   const secdefAcl = new Map() // firma → { createdIn, createdVersion, isSecdef, publicGrant, anonGrant }
+  // Regla (f): cláusulas `SET "clase.nombre"` que van a parar a proconfig.
+  const procofigPlaceholders = []
 
   for (const file of files) {
     const raw = await readFile(join(MIGRATIONS_DIR, file), 'utf8')
@@ -446,6 +484,11 @@ async function main() {
     }
     // Regla (e): eventos por firma en orden documental.
     applyAclEvents(secdefAcl, extractAclEvents(sql), { file, version: fileVersion })
+
+    // Regla (f): GUC personalizado en proconfig (superusuario obligatorio).
+    for (const guc of findProconfigPlaceholders(sql)) {
+      procofigPlaceholders.push({ guc, file })
+    }
 
     // GRANT EXECUTE ... TO ... authenticated
     const grantRe =
@@ -578,6 +621,14 @@ async function main() {
     )
   }
   report.push(
+    `(f) GUC de clase personalizada en proconfig (exige superusuario): ${procofigPlaceholders.length}`,
+  )
+  for (const f of procofigPlaceholders) {
+    report.push(
+      `    ✗ ${f.guc}  [${f.file} — SET "${f.guc}" en ALTER/CREATE FUNCTION guarda un placeholder en proconfig y eso pide superusuario; en Supabase aborta con 42501. Enciéndelo en el cuerpo con set_config('${f.guc}', …, true)]`,
+    )
+  }
+  report.push(
     `(d) versiones de migración duplicadas o nombres no parseables: ${duplicateVersions.length + malformedNames.length}`,
   )
   for (const [version, group] of duplicateVersions) {
@@ -595,6 +646,7 @@ async function main() {
     rlsNoPolicy.length +
     missingScope.length +
     missingPublicRevoke.length +
+    procofigPlaceholders.length +
     duplicateVersions.length +
     malformedNames.length
   if (total > 0) {
@@ -603,10 +655,11 @@ async function main() {
     console.error('   intencional y revisada— documéntala en scripts/migrations-guard.allowlist.json')
     console.error('   con su `reason`. (d) NO es allowlisteable: renombra el archivo (el nombre es')
     console.error('   la identidad de la migración en el historial remoto).')
+    console.error('   (f) tampoco: ningún rol de Supabase puede aplicarla. Mueve el GUC al cuerpo.')
     process.exit(1)
   }
   console.log(
-    '✅ migrations-guard: RLS + policies declaradas, RPCs con scope y SECURITY DEFINER nuevas con REVOKE de PUBLIC.',
+    '✅ migrations-guard: RLS + policies declaradas, RPCs con scope, SECURITY DEFINER nuevas con REVOKE de PUBLIC y sin GUC personalizados en proconfig.',
   )
   process.exit(0)
 }
