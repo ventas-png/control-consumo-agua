@@ -14,7 +14,7 @@
 import { createServer } from 'node:http'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   HEADER_BYPASS,
@@ -85,6 +85,18 @@ afterAll(() => {
   otroOrigen.server.close()
 })
 
+// Los dos espías se levantan UNA vez (abrir y cerrar un servidor HTTP por
+// prueba es caro y flakea por puertos), así que `recibidas` acumula entre
+// pruebas. Sin este reset, las aserciones de conteo absoluto de abajo sólo
+// valen si las pruebas corren en el orden en que están escritas: con
+// `--sequence.shuffle` la primera fallaba al encontrar peticiones de otra.
+// El registro se vacía antes de cada prueba y cada una fabrica su propia
+// precondición, de modo que un conteo mide SÓLO lo que esa prueba provocó.
+beforeEach(() => {
+  preview.recibidas.length = 0
+  otroOrigen.recibidas.length = 0
+})
+
 describe('el token llega SOLO al origen del Preview', () => {
   it('la siembra manda los dos headers al Preview, con el token fuera de la URL', async () => {
     const req = peticionConJar()
@@ -100,7 +112,13 @@ describe('el token llega SOLO al origen del Preview', () => {
     expect(urlDeSiembra(preview.origen)).not.toContain(TOKEN)
   })
 
-  it('el segundo origen no recibió NINGUNA petición durante la siembra', () => {
+  it('el segundo origen no recibió NINGUNA petición durante la siembra', async () => {
+    // Siembra propia: el aserto tiene que medir una siembra REAL, no el hecho
+    // de que esta prueba no haya pedido nada.
+    const req = peticionConJar()
+    expect(await sembrarCookieDeBypass(req, preview.origen, TOKEN)).toBe(true)
+
+    expect(preview.recibidas).toHaveLength(1)
     expect(otroOrigen.recibidas).toHaveLength(0)
   })
 

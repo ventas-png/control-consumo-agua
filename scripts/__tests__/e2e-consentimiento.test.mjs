@@ -19,14 +19,27 @@ import { readConsent } from '../../src/lib/cookieConsent'
 const BASE = 'https://preview-abc123.vercel.app'
 const OTRO = 'https://otro-origen.example'
 
-/** readConsent() lee de localStorage; le damos uno de mentira. */
+/** readConsent() lee de localStorage; le damos uno de mentira.
+ *
+ * Se define por DESCRIPTOR, no por asignación. Desde Vitest 5 las escrituras a
+ * globalThis en el entorno jsdom se propagan al Window subyacente, y ahí
+ * `localStorage` es un accessor de sólo lectura: `globalThis.localStorage = …`
+ * lanza «Cannot set property localStorage of [object Window] which has only a
+ * getter». defineProperty instala el doble sin tocar el getter nativo, y el
+ * descriptor original se repone tal cual (o se borra la propiedad si no
+ * existía), así que la fuga entre pruebas sigue siendo imposible. */
 function conLocalStorage(valor, fn) {
-  const previo = globalThis.localStorage
-  globalThis.localStorage = { getItem: (k) => (k === CLAVE_CONSENTIMIENTO ? valor : null) }
+  const previo = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: { getItem: (k) => (k === CLAVE_CONSENTIMIENTO ? valor : null) },
+    configurable: true,
+    writable: true,
+  })
   try {
     return fn()
   } finally {
-    globalThis.localStorage = previo
+    if (previo) Object.defineProperty(globalThis, 'localStorage', previo)
+    else delete globalThis.localStorage
   }
 }
 
