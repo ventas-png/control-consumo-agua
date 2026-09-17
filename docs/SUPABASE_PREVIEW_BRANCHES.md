@@ -62,18 +62,53 @@ para la misma historia:
 
 | | Cantidad | Rango |
 | --- | --- | --- |
-| Versiones en remoto sin archivo local | ~300 | 2026-03-18 → 2026-06-10 |
-| Archivos locales sin registrar en remoto | 242 | 2026-03-18 → 2026-06-05 |
+| Versiones en remoto sin archivo local | **307** | 2026-03-18 → 2026-06-10 |
+| Archivos locales sin registrar en remoto | **0** | — |
 | **Desde 2026-06-11** | — | **coinciden 1:1, cero drift** |
+
+Las **307** huérfanas salen de la medición del 2026-09-17: producción registra
+**787** versiones y el repositorio tiene **480** archivos, todos ellos por debajo
+de la versión máxima registrada (`20260917000825`), así que 787 − 480 = 307
+versiones remotas sin archivo local y **cero archivos locales sin registrar**.
+
+Esa última fila **decía 242 y hoy es 0**: `scripts/backfill-schema-migrations.sql`
+registró como papeleo las 257 versiones ≤ `20260605230000`, y el resto se fue
+aplicando y registrando por la Management API. Lo que queda es historial
+duplicado, no esquema faltante — ninguna de las 307 huérfanas corresponde a un
+archivo que haya existido en este repositorio: de los 495 nombres de migración
+que alguna vez existieron en Git, los 480 actuales están vivos y los 15 ausentes
+sobreviven **renumerados** (14 byte a byte idénticos; los otros dos sólo cambian
+comentarios).
 
 Por eso `.github/workflows/apply-migrations-prod.yml` usa la Management API y
 **evita `db push` a propósito** (ver su cabecera). Prod se migra por ahí.
 
+### El check externo «Supabase Preview» de `main`
+
+La integración Git de Supabase publica un estado propio para la rama persistente
+`main`, y **falla por esta misma divergencia histórica**: es el `db push` de arriba
+devolviendo `Remote migration versions not found in local migrations directory`.
+
+Tres aclaraciones, porque se confunde fácil:
+
+- **No es un workflow de este repositorio.** No existe ningún
+  `.github/workflows/*.yml` llamado «Supabase Preview»; el estado lo publica
+  Supabase, y para `main` se ve en el panel como `MIGRATIONS_FAILED`.
+- **No bloquea el CI del repositorio.** Los checks propios de `main` (CI,
+  Coverage gate, Security guard, Health check) no dependen de él y pasan en verde.
+- **En los PR sí pasa**, porque una preview de PR se construye **desde cero con
+  los archivos del repo** y no hereda el historial huérfano: salió `success` en
+  #868 y #870, los dos últimos PR que tocaron `supabase/`.
+
 ### ⚠️ Cuidado con el modo *reconciliar*
 
 `apply-migrations-prod.yml` en `workflow_dispatch` **sin input** aplica toda
-migración local cuya versión no esté en el historial remoto. Hoy eso son **242
-migraciones legacy**. Aquí se leía que "el SQL es idempotente por diseño": **no
+migración local cuya versión no esté en el historial remoto. Hoy eso son **cero
+migraciones** —todas las locales están registradas—, pero **la advertencia sigue
+en pie y el botón sigue siendo peligroso**: cualquier reparación del historial
+cambia qué reaplicaría, y ese conjunto volvería a crecer en el momento en que se
+borre una fila de `schema_migrations`. Cuando se leía «242 migraciones legacy»,
+esto era un disparo masivo. Aquí se leía que "el SQL es idempotente por diseño": **no
 lo es en el efecto**, y esa suposición es la que tumbó producción el 2026-08-03
 —entre las reaplicadas iba una que empieza con
 `DROP TABLE IF EXISTS public.app_users CASCADE`, idempotente en la forma y
@@ -83,10 +118,11 @@ el nombre del botón, y no es seguro. Para una migración puntual, usa el input
 
 ### Cómo reparar el historial, si algún día se quiere
 
-**No reparar a ciegas.** Borrar las ~300 huérfanas e insertar las 242 locales
-equivale a *afirmar* "estos 242 archivos están aplicados" sin probarlo, y no hay
-correspondencia 1:1 entre ambos conjuntos. Si la afirmación es falsa en un solo
-archivo, el drift queda enterrado y sin forma de detectarlo.
+**No reparar a ciegas.** Borrar las 307 huérfanas equivale a *afirmar* que los
+archivos locales que les corresponden están aplicados sin probarlo, y **no hay
+correspondencia 1:1**: son timestamps del momento de aplicación, no de los
+archivos. Si la afirmación es falsa en un solo archivo, el drift queda enterrado
+y sin forma de detectarlo.
 
 La forma verificable usa el propio mecanismo de previews: **una rama preview se
 construye desde cero aplicando solo los archivos del repo**, o sea es "cómo se
