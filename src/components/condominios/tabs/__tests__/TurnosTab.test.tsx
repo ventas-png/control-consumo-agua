@@ -2,16 +2,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import type {
   AsignacionTurno, AusenciaPersonal, BloqueTurno, CupoPausa, DiaNoLaborable,
-  PersonalCondominio, PlantillaHorario,
+  ExcepcionTurno, PersonalCondominio, PlantillaHorario,
 } from '../../../../types'
 
 // Mismo patrón que MensajesPortalTab.test: el tab entra a Supabase solo por la
 // capa domain, así que se mockea ahí (y el cliente, importado de forma
 // transitiva) para ejercitar la UI sin red ni env vars.
 const mocks = vi.hoisted(() => ({
-  createCondominioRow: vi.fn(async () => ({ error: null })),
-  updateCondominioRow: vi.fn(async () => ({ error: null })),
-  deleteCondominioRow: vi.fn(async () => ({ error: null })),
+  createCondominioRow: vi.fn<
+    () => Promise<{ error: { message: string } | null }>
+  >(async () => ({ error: null })),
+  updateCondominioRow: vi.fn<
+    () => Promise<{ error: { message: string } | null }>
+  >(async () => ({ error: null })),
+  deleteCondominioRow: vi.fn<
+    () => Promise<{ error: { message: string } | null }>
+  >(async () => ({ error: null })),
   generarBloquesTurno: vi.fn(async () => ({
     data: { generados: 22, omitidos_ausencia: 0, omitidos_no_laborable: 0, omitidos_existente: 0 },
     error: null,
@@ -21,6 +27,15 @@ const mocks = vi.hoisted(() => ({
   createCondominioRowReturning: vi.fn<
     () => Promise<{ data: { id: string } | null; error: { message: string } | null }>
   >(async () => ({ data: { id: 'ph-nueva' }, error: null })),
+  guardarDiaTurno: vi.fn<
+    () => Promise<{ data: string | null; error: { message: string } | null }>
+  >(async () => ({ data: 'b-nuevo', error: null })),
+  quitarDiaTurno: vi.fn<
+    () => Promise<{ data: string | null; error: { message: string } | null }>
+  >(async () => ({ data: 'x-nueva', error: null })),
+  restaurarDiaTurno: vi.fn<
+    () => Promise<{ data: number | null; error: { message: string } | null }>
+  >(async () => ({ data: 1, error: null })),
   fetchCuposDePlantillas: vi.fn<
     () => Promise<{ cupos: CupoPausa[]; error: string | null }>
   >(async () => ({ cupos: [], error: null })),
@@ -28,6 +43,12 @@ const mocks = vi.hoisted(() => ({
     () => Promise<{ id: string | null; error: string | null }>
   >(async () => ({ id: 'ph-nueva', error: null })),
   fetchTiposPausa: vi.fn(async () => ({ tipos: TIPOS_PAUSA, error: null })),
+  fetchTurnosDelMes: vi.fn<
+    () => Promise<[
+      { data: BloqueTurno[] | null; error: { message: string } | null },
+      { data: ExcepcionTurno[] | null; error: { message: string } | null },
+    ]>
+  >(async () => [{ data: [], error: null }, { data: [], error: null }]),
 }))
 
 const TIPOS_PAUSA = [
@@ -45,6 +66,9 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
   generarBloquesTurno: mocks.generarBloquesTurno,
+  guardarDiaTurno: mocks.guardarDiaTurno,
+  quitarDiaTurno: mocks.quitarDiaTurno,
+  restaurarDiaTurno: mocks.restaurarDiaTurno,
 }))
 // `tramosDemora` y `minutosCupoQueDescuentan` NO se mockean: son aritmética pura
 // y lo que se comprueba abajo es justo lo que producen en pantalla.
@@ -55,6 +79,19 @@ vi.mock('../../../../domain/condominios/politicaJornada', async (original) => ({
 }))
 vi.mock('../../../../domain/condominios/pausasPresencia', () => ({
   fetchTiposPausa: mocks.fetchTiposPausa,
+}))
+// El calendario pide SUS bloques (el prop `bloques` viene topado a 200 filas
+// del proyecto entero). Sin este mock la consulta entra al cliente falso de
+// arriba, que no tiene `.select`, y el tab revienta al montar.
+vi.mock('../../../../domain/condominios/sectionData', () => ({
+  fetchTurnosDelMes: mocks.fetchTurnosDelMes,
+}))
+// «Hoy» fijo. La mitad de lo que se prueba abajo —qué casilla se puede tocar y
+// cuál no— depende de la fecha, y una prueba que cambia de resultado según el
+// día en que se corra no prueba nada. 2026-09-16 es miércoles.
+vi.mock('../../../../lib/format', async (original) => ({
+  ...(await original<typeof import('../../../../lib/format')>()),
+  hoyLocalISO: () => '2026-09-16',
 }))
 // La ruta se resuelve desde ESTE archivo, no desde el componente: sin el mock,
 // `confirm()` monta un diálogo real que necesita <DialogProvider> y su promesa
@@ -83,7 +120,7 @@ function regla(over: Partial<AsignacionTurno> = {}): AsignacionTurno {
   return {
     id: 'r1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
     plantilla_horario_id: 'ph1', nombre: 'Pedro · nocturno L-V',
-    frecuencia: 'semanal', dias_semana: [1, 2, 3, 4, 5], fechas_especificas: [],
+    frecuencia: 'semanal', dias_semana: [1, 2, 3, 4, 5], dias_mes: [], fechas_especificas: [],
     fecha_inicio: '2026-01-01', cubre_dias_no_laborables: false, activa: true,
     created_at: '2026-08-01T00:00:00.000Z', personal_nombre: 'Pedro Guardia',
     ...over,
@@ -98,6 +135,7 @@ function renderTab(props: Partial<Parameters<typeof TurnosTab>[0]> = {}) {
       bloques={[] as BloqueTurno[]}
       ausencias={[] as AusenciaPersonal[]}
       diasNoLaborables={[] as DiaNoLaborable[]}
+      excepciones={[] as ExcepcionTurno[]}
       personal={[empleado]}
       proyectoId="p1"
       companyId="c1"
@@ -111,6 +149,16 @@ function renderTab(props: Partial<Parameters<typeof TurnosTab>[0]> = {}) {
 
 beforeEach(() => {
   Object.values(mocks).forEach(m => m.mockClear())
+  // `mockClear` sólo borra el historial de llamadas: lo que un test haya dejado
+  // puesto con `mockResolvedValue` sigue puesto. Estos cuatro se reponen a mano
+  // para que el orden de los tests no cambie el resultado.
+  mocks.fetchTurnosDelMes.mockResolvedValue([{ data: [], error: null }, { data: [], error: null }])
+  mocks.createCondominioRow.mockResolvedValue({ error: null })
+  mocks.updateCondominioRow.mockResolvedValue({ error: null })
+  mocks.deleteCondominioRow.mockResolvedValue({ error: null })
+  mocks.guardarDiaTurno.mockResolvedValue({ data: 'b-nuevo', error: null })
+  mocks.quitarDiaTurno.mockResolvedValue({ data: 'x-nueva', error: null })
+  mocks.restaurarDiaTurno.mockResolvedValue({ data: 1, error: null })
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
   mocks.generarBloquesTurno.mockResolvedValue({
     data: { generados: 22, omitidos_ausencia: 0, omitidos_no_laborable: 0, omitidos_existente: 0 },
@@ -460,6 +508,7 @@ function dosConsultas() {
       bloques={[] as BloqueTurno[]}
       ausencias={[] as AusenciaPersonal[]}
       diasNoLaborables={[] as DiaNoLaborable[]}
+      excepciones={[] as ExcepcionTurno[]}
       personal={[empleado]}
       proyectoId="p1"
       companyId="c1"
@@ -538,5 +587,424 @@ describe('gana la última consulta pedida, no la última en contestar', () => {
       expect.objectContaining({ variant: 'error', title: 'No se pudieron leer los descansos' }),
     ))
     expect(mocks.guardarJornadaConCupos).not.toHaveBeenCalled()
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// La cuadrícula del mes.
+//
+// El bug que motivó todo esto: la fila de cada empleado era UNA cuadrícula de
+// `150px repeat(7, 1fr)` con el nombre como primer hijo, así que el día 8 caía
+// en la columna del nombre y a partir de ahí cada semana quedaba desplazada
+// una casilla respecto del encabezado Lun…Dom. Las pruebas de acá abajo fijan
+// la estructura que lo arregla: el nombre FUERA de la cuadrícula y los días en
+// una de siete columnas exactas.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Las cuadrículas de días: la 0 es el encabezado, la 1 el primer empleado. */
+function cuadriculas(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>('.turnos-dias'))
+}
+
+/** En qué columna (0 = lunes) cae ese día de septiembre de 2026. */
+function columnaDe(dia: string): number {
+  const celdas = Array.from(cuadriculas()[1].children)
+  const i = celdas.findIndex(c => c.getAttribute('title')?.startsWith(`2026-09-${dia.padStart(2, '0')}`))
+  expect(i).toBeGreaterThanOrEqual(0)
+  return i % 7
+}
+
+/** La casilla de ese día de septiembre de 2026, sea <button> o <div>. */
+function casilla(dia: string): HTMLElement {
+  const celdas = Array.from(cuadriculas()[1].children) as HTMLElement[]
+  const c = celdas.find(x => x.getAttribute('title')?.startsWith(`2026-09-${dia.padStart(2, '0')}`))
+  if (!c) throw new Error(`no hay casilla para el ${dia}`)
+  return c
+}
+
+describe('la cuadrícula no se corre', () => {
+  it('cada día cae bajo su día de la semana', async () => {
+    renderTab()
+    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
+    // Septiembre de 2026: el 1 es martes, el 7 lunes, el 30 miércoles.
+    expect(columnaDe('1')).toBe(1)
+    expect(columnaDe('7')).toBe(0)
+    expect(columnaDe('8')).toBe(1)
+    expect(columnaDe('30')).toBe(2)
+  })
+
+  it('el encabezado tiene exactamente siete rótulos', async () => {
+    renderTab()
+    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
+    expect(cuadriculas()[0].children.length).toBe(7)
+  })
+
+  it('el nombre del empleado NO vive dentro de la cuadrícula de días', async () => {
+    // Éste es el bug entero en una línea: mientras el nombre fuera un hijo más
+    // de la cuadrícula, ocupaba una casilla y corría todo lo que venía detrás.
+    renderTab()
+    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
+    for (const g of cuadriculas()) expect(g.textContent).not.toContain('Pedro Guardia')
+    const nombres = Array.from(document.querySelectorAll('.turnos-nombre'))
+    expect(nombres.some(n => n.textContent?.includes('Pedro Guardia'))).toBe(true)
+  })
+
+  it('la columna de nombres queda fija al scrollear el mes a lo ancho', () => {
+    // En el teléfono el mes no cabe: sin `sticky` en el nombre, al llegar al
+    // domingo ya no se sabe de quién es la fila.
+    renderTab()
+    const nombre = document.querySelector<HTMLElement>('.turnos-fila .turnos-nombre')
+    expect(nombre).toBeTruthy()
+    expect(document.querySelector('.turnos-scroll')).toBeTruthy()
+    expect(document.querySelector('.turnos-grid')).toBeTruthy()
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Los bloques del mes que se está mirando.
+//
+// El prop `bloques` viene topado a 200 filas del proyecto entero. Con el tope,
+// generar un mes completo dejaba media grilla pintada como «previsto (sin
+// generar)» para siempre: los bloques existían y no entraban en la consulta.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('el calendario consulta SU mes', () => {
+  it('pide el rango del mes visible, no los últimos 200 del proyecto', async () => {
+    renderTab()
+    await waitFor(() => expect(mocks.fetchTurnosDelMes).toHaveBeenCalledTimes(1))
+    const [pid, cid, desde, hasta] = mocks.fetchTurnosDelMes.mock.calls[0] as unknown as string[]
+    expect(pid).toBe('p1')
+    expect(cid).toBe('c1')
+    expect(desde).toBe('2026-09-01')
+    expect(hasta).toBe('2026-09-30')
+  })
+
+  it('vuelve a pedirlo al cambiar de mes', async () => {
+    renderTab()
+    await waitFor(() => expect(mocks.fetchTurnosDelMes).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByLabelText('Mes siguiente'))
+    await waitFor(() => expect(mocks.fetchTurnosDelMes).toHaveBeenCalledTimes(2))
+    const [, , desde, hasta] = mocks.fetchTurnosDelMes.mock.calls[1] as unknown as string[]
+    expect(desde).toBe('2026-10-01')
+    expect(hasta).toBe('2026-10-31')
+  })
+
+  it('si la consulta falla lo dice, en vez de enseñar un mes incompleto en silencio', async () => {
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: null, error: { message: 'timeout' } }, { data: [], error: null },
+    ])
+    renderTab()
+    const aviso = await screen.findByRole('alert')
+    expect(aviso.textContent).toMatch(/no se pudieron leer los turnos/i)
+  })
+
+  it('si fallan SÓLO las excepciones también es error: el día quitado reaparecería', async () => {
+    // Quedarse con los bloques y no con las excepciones es peor que no
+    // refrescar: los días quitados se repintarían como previstos y parecería
+    // que «Quitar» no hizo nada.
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: [], error: null }, { data: null, error: { message: 'timeout' } },
+    ])
+    renderTab()
+    expect(await screen.findByRole('alert')).toBeTruthy()
+  })
+
+  it('un rechazo de la promesa también se cuenta como error, no como espera eterna', async () => {
+    mocks.fetchTurnosDelMes.mockRejectedValue(new Error('red caída'))
+    renderTab()
+    expect(await screen.findByRole('alert')).toBeTruthy()
+  })
+
+  it('las excepciones del mes ganan a las que llegaron por props', async () => {
+    // El prop trae un tope del proyecto entero; la consulta del mes trae el mes
+    // completo. Si mandara el prop, un día quitado hace dos años volvería.
+    const delMes: ExcepcionTurno = {
+      id: 'x-mes', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+      fecha: '2026-09-17', asignacion_id: 'r1', created_at: '',
+    }
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: [], error: null }, { data: [delMes], error: null },
+    ])
+    renderTab()
+    await waitFor(() => expect(casilla('17').getAttribute('title')).toMatch(/quitado a mano/i))
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Editar un día suelto.
+//
+// «Al generar el mes no permite editar»: no había ni un manejador de clic. Y
+// lo que se puede tocar tiene límite —el pasado y lo ya empezado, no— que acá
+// sólo se refleja: la autoridad es el trigger de la BD.
+// ════════════════════════════════════════════════════════════════════════════
+
+function bloque(over: Partial<BloqueTurno> = {}): BloqueTurno {
+  return {
+    id: 'b1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+    turno: 'noche', fecha: '2026-09-18', estado: 'pendiente', created_at: '',
+    horas_planificadas: 8, origen: 'recurrencia', asignacion_id: 'r1',
+    plantilla_horario_id: 'ph1', ...over,
+  } as BloqueTurno
+}
+
+async function calendarioConBloque(over: Partial<BloqueTurno> = {}) {
+  mocks.fetchTurnosDelMes.mockResolvedValue([
+    { data: [bloque(over)], error: null }, { data: [], error: null },
+  ])
+  renderTab()
+  await waitFor(() => expect(mocks.fetchTurnosDelMes).toHaveBeenCalledTimes(1))
+  await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
+}
+
+describe('editar un día del calendario', () => {
+  it('un día que ya pasó no es pulsable', async () => {
+    await calendarioConBloque()
+    expect(casilla('10').tagName).toBe('DIV')
+  })
+
+  it('un día de hoy en adelante sí lo es', async () => {
+    await calendarioConBloque()
+    expect(casilla('16').tagName).toBe('BUTTON')
+    expect(casilla('18').tagName).toBe('BUTTON')
+  })
+
+  it('un turno ya iniciado deja de ser pulsable aunque sea futuro', async () => {
+    await calendarioConBloque({ estado: 'en_curso', iniciado_en: '2026-09-18T22:00:00Z' })
+    expect(casilla('18').tagName).toBe('DIV')
+    expect(casilla('18').getAttribute('title')).toMatch(/ya arrancó/)
+  })
+
+  it('un turno cerrado tampoco', async () => {
+    await calendarioConBloque({ estado: 'completado', cerrado_en: '2026-09-19T06:00:00Z' })
+    expect(casilla('18').tagName).toBe('DIV')
+    expect(casilla('18').getAttribute('title')).toMatch(/ya se cerró/)
+  })
+
+  it('sin permiso de edición ninguna casilla es pulsable', async () => {
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: [bloque()], error: null }, { data: [], error: null },
+    ])
+    renderTab({ canEdit: false })
+    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
+    expect(casilla('18').tagName).toBe('DIV')
+  })
+
+  it('pulsar un día abre su editor con la jornada que tiene puesta', async () => {
+    await calendarioConBloque()
+    fireEvent.click(casilla('18'))
+    const select = await screen.findByLabelText('Jornada de este día') as HTMLSelectElement
+    expect(select.value).toBe('ph1')
+    // «Turno generado» a secas es también un rótulo de la leyenda: lo que se
+    // busca acá es el estado del día, que nombra la jornada.
+    expect(screen.getByText(/Turno generado · Nocturno/)).toBeTruthy()
+  })
+
+  it('cambiar la jornada de un día es UNA llamada, no dos escrituras sueltas', async () => {
+    await calendarioConBloque()
+    fireEvent.click(casilla('18'))
+    await screen.findByLabelText('Jornada de este día')
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.guardarDiaTurno).toHaveBeenCalledTimes(1))
+    const [args] = mocks.guardarDiaTurno.mock.calls[0] as unknown as [Record<string, unknown>]
+    expect(args.projectId).toBe('p1')
+    expect(args.personalId).toBe('emp1')
+    expect(args.fecha).toBe('2026-09-18')
+    expect(args.plantillaHorarioId).toBe('ph1')
+    // El bloque y la excepción los resuelve la RPC en un commit: la UI ya no
+    // encadena escrituras sueltas ni compensa a mano.
+    expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+    expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
+  })
+
+  it('si la RPC de guardar falla, no se cierra el editor ni se dice que quedó hecho', async () => {
+    await calendarioConBloque()
+    mocks.guardarDiaTurno.mockResolvedValueOnce({
+      data: null, error: { message: 'no autorizado: se necesita permiso de editar en Asignación de turnos' },
+    })
+    fireEvent.click(casilla('18'))
+    await screen.findByLabelText('Jornada de este día')
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', text: 'no autorizado: se necesita permiso de editar en Asignación de turnos',
+    })))
+    // El editor sigue abierto: nada se guardó y no se anuncia lo contrario.
+    expect(screen.getByLabelText('Jornada de este día')).toBeTruthy()
+  })
+
+  it('asignar un día vacío también es una sola llamada, con la regla que lo preveía', async () => {
+    // El 20 es domingo: la regla es L-V, así que no hay ni bloque ni previsión.
+    renderTab()
+    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
+    fireEvent.click(casilla('20'))
+    await screen.findByLabelText('Jornada de este día')
+    fireEvent.change(screen.getByLabelText('Jornada de este día'), { target: { value: 'ph1' } })
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.guardarDiaTurno).toHaveBeenCalledTimes(1))
+    const [args] = mocks.guardarDiaTurno.mock.calls[0] as unknown as [Record<string, unknown>]
+    expect(args.fecha).toBe('2026-09-20')
+    expect(args.plantillaHorarioId).toBe('ph1')
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Quitar un día, y que se quede quitado.
+//
+// El generador SÓLO agrega: borrar el bloque no quita el día, porque el
+// siguiente «Generar» lo vuelve a crear. Lo que lo quita es la excepción — y
+// las dos escrituras van juntas o no va ninguna, en la base, no aquí.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('quitar un día', () => {
+  it('es UNA llamada: la excepción y el borrado los ata la base, no la UI', async () => {
+    await calendarioConBloque()
+    fireEvent.click(casilla('18'))
+    fireEvent.click(await screen.findByText('Quitar el día'))
+
+    await waitFor(() => expect(mocks.quitarDiaTurno).toHaveBeenCalledTimes(1))
+    const [args] = mocks.quitarDiaTurno.mock.calls[0] as unknown as [Record<string, unknown>]
+    expect(args.projectId).toBe('p1')
+    expect(args.personalId).toBe('emp1')
+    expect(args.fecha).toBe('2026-09-18')
+    // Ni creación de excepción por separado, ni borrado por separado, ni el
+    // «deshacer» que antes hacía falta cuando el segundo paso fallaba.
+    expect(mocks.createCondominioRowReturning).not.toHaveBeenCalled()
+    expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
+  })
+
+  it('si la base rechaza el borrado, muestra SU mensaje y no anuncia éxito parcial', async () => {
+    // Es el caso que importa: la base rechaza los bloques con checklist,
+    // empezados o cerrados, pase quien pase. Al ser una transacción, la
+    // excepción se revierte con el rechazo y no queda nada que compensar.
+    await calendarioConBloque()
+    mocks.quitarDiaTurno.mockResolvedValueOnce({
+      data: null, error: { message: 'no se puede borrar un bloque con 1 tarea(s) asociada(s)' },
+    })
+    fireEvent.click(casilla('18'))
+    fireEvent.click(await screen.findByText('Quitar el día'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', text: 'no se puede borrar un bloque con 1 tarea(s) asociada(s)',
+    })))
+    expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
+    // El editor sigue abierto y el día no se dio por quitado.
+    expect(screen.getByText('Quitar el día')).toBeTruthy()
+  })
+
+  it('quitar un día SÓLO previsto usa la misma llamada', async () => {
+    // El 17 es jueves y la regla lo cubre, pero nadie generó el mes.
+    renderTab()
+    await waitFor(() => expect(cuadriculas().length).toBeGreaterThan(1))
+    fireEvent.click(casilla('17'))
+    fireEvent.click(await screen.findByText('Quitar el día'))
+
+    await waitFor(() => expect(mocks.quitarDiaTurno).toHaveBeenCalledTimes(1))
+    const [args] = mocks.quitarDiaTurno.mock.calls[0] as unknown as [Record<string, unknown>]
+    expect(args.fecha).toBe('2026-09-17')
+  })
+
+  it('un día quitado se marca en el calendario y se restaura con una llamada', async () => {
+    const excepcion: ExcepcionTurno = {
+      id: 'x1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+      fecha: '2026-09-17', asignacion_id: 'r1', created_at: '',
+    }
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: [], error: null }, { data: [excepcion], error: null },
+    ])
+    renderTab()
+    await waitFor(() => expect(casilla('17').getAttribute('title')).toMatch(/quitado a mano/i))
+
+    fireEvent.click(casilla('17'))
+    fireEvent.click(await screen.findByText('Restaurar el día'))
+    await waitFor(() => expect(mocks.restaurarDiaTurno).toHaveBeenCalledTimes(1))
+    const [args] = mocks.restaurarDiaTurno.mock.calls[0] as unknown as [Record<string, unknown>]
+    expect(args.fecha).toBe('2026-09-17')
+    expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
+  })
+
+  it('si restaurar falla, lo dice y no cierra el editor', async () => {
+    const excepcion: ExcepcionTurno = {
+      id: 'x1', company_id: 'c1', project_id: 'p1', personal_id: 'emp1',
+      fecha: '2026-09-17', asignacion_id: 'r1', created_at: '',
+    }
+    mocks.fetchTurnosDelMes.mockResolvedValue([
+      { data: [], error: null }, { data: [excepcion], error: null },
+    ])
+    mocks.restaurarDiaTurno.mockResolvedValueOnce({ data: null, error: { message: 'no autorizado' } })
+    renderTab()
+    await waitFor(() => expect(casilla('17').getAttribute('title')).toMatch(/quitado a mano/i))
+
+    fireEvent.click(casilla('17'))
+    fireEvent.click(await screen.findByText('Restaurar el día'))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', text: 'no autorizado',
+    })))
+    expect(screen.getByText('Restaurar el día')).toBeTruthy()
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// La periodicidad «días del mes»: lo que pidió el usuario, el gemelo mensual
+// de la semanal.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('regla por días del mes', () => {
+  async function abrirNuevaRegla() {
+    renderTab()
+    fireEvent.click(screen.getByText(/^Reglas/))
+    fireEvent.click(screen.getByText('+ Nueva regla'))
+    fireEvent.change(screen.getByLabelText('Empleado *'), { target: { value: 'emp1' } })
+    fireEvent.change(screen.getByLabelText('Jornada *'), { target: { value: 'ph1' } })
+    fireEvent.change(screen.getByLabelText('Periodicidad'), { target: { value: 'mensual_dias' } })
+    await screen.findByLabelText('Día 1 del mes')
+  }
+
+  it('ofrece los 31 días y manda los marcados, ordenados', async () => {
+    await abrirNuevaRegla()
+    expect(screen.getByLabelText('Día 31 del mes')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Día 15 del mes'))
+    fireEvent.click(screen.getByLabelText('Día 1 del mes'))
+    expect(screen.getByLabelText('Día 15 del mes').getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    const [, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as
+      [string, Record<string, unknown>]
+    expect(payload.frecuencia).toBe('mensual_dias')
+    expect(payload.dias_mes).toEqual([1, 15])
+    // No arrastra los días de semana que traía el formulario por defecto.
+    expect(payload.dias_semana).toEqual([])
+  })
+
+  it('sin ningún día marcado no guarda: una regla que no cae nunca no es una regla', async () => {
+    await abrirNuevaRegla()
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'warning', title: 'Sin días',
+    })))
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+  })
+
+  it('avisa qué pasa en febrero con el 29, el 30 y el 31', async () => {
+    await abrirNuevaRegla()
+    expect(screen.getByText(/en febrero el 29, el 30 y el 31 caen todos en el 28/i)).toBeTruthy()
+  })
+
+  it('las otras periodicidades no mandan dias_mes', async () => {
+    renderTab()
+    fireEvent.click(screen.getByText(/^Reglas/))
+    fireEvent.click(screen.getByText('+ Nueva regla'))
+    fireEvent.change(screen.getByLabelText('Empleado *'), { target: { value: 'emp1' } })
+    fireEvent.change(screen.getByLabelText('Jornada *'), { target: { value: 'ph1' } })
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    const [, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as
+      [string, Record<string, unknown>]
+    expect(payload.dias_mes).toEqual([])
   })
 })

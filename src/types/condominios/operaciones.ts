@@ -291,7 +291,7 @@ export interface RevisionTarea {
 
 /** Periodicidad de una regla de asignación. Extiende el vocabulario de `rutas`. */
 export type FrecuenciaTurno =
-  | 'unica' | 'diaria' | 'semanal' | 'quincenal' | 'mensual'
+  | 'unica' | 'diaria' | 'semanal' | 'quincenal' | 'mensual' | 'mensual_dias'
   | 'bimestral' | 'trimestral' | 'semestral' | 'anual' | 'fechas'
 
 export interface PlantillaHorario {
@@ -365,6 +365,13 @@ export interface AsignacionTurno {
   dias_semana: number[]
   intervalo_dias?: number | null
   dia_mes?: number | null
+  /**
+   * Días del mes 1..31 para `frecuencia = 'mensual_dias'`. El gemelo mensual de
+   * `dias_semana`: [1, 15, 30] = el 1, el 15 y el 30 de cada mes. Un día que ese
+   * mes no tiene se recorta al último real, y varios que convergen ahí producen
+   * UN turno, no varios.
+   */
+  dias_mes: number[]
   mes_ancla?: number | null
   /** Fechas ISO sueltas para `frecuencia = 'fechas'`. */
   fechas_especificas: string[]
@@ -379,6 +386,26 @@ export interface AsignacionTurno {
   personal_nombre?: string
   personal_cargo?: string
   plantilla_nombre?: string
+}
+
+/**
+ * El NEGATIVO de una regla: esta persona no trabaja este día, aunque una regla
+ * activa lo cubra (20260916171325). Existe porque `generar_bloques_turno()` solo
+ * suma: sin la excepción, borrar el bloque del jueves dura hasta la siguiente
+ * generación, que lo vuelve a crear.
+ */
+export interface ExcepcionTurno {
+  id: string
+  company_id: string
+  project_id: string
+  personal_id: string
+  /** Regla que cubría el día cuando se quitó. Informativa. */
+  asignacion_id?: string | null
+  fecha: string
+  motivo?: string | null
+  /** Lo sella la BD (trg_sellar_creado_por) y es inmutable: la UI no lo manda. */
+  creado_por?: string | null
+  created_at: string
 }
 
 export type TipoDiaNoLaborable =

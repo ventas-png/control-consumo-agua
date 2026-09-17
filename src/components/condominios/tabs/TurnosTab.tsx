@@ -3,20 +3,29 @@ import {
   createCondominioRow,
   deleteCondominioRow,
   generarBloquesTurno,
+  guardarDiaTurno,
+  quitarDiaTurno,
+  restaurarDiaTurno,
   updateCondominioRow,
 } from '../../../domain/condominios/tabMutations'
 import {
+  DIAS_DEL_MES,
   DIAS_ISO,
   FRECUENCIAS,
   FRECUENCIAS_POR_DIA_SEMANA,
+  FRECUENCIAS_POR_DIAS_MES,
   FRECUENCIAS_POR_MES,
   asignables,
   celdaDe,
+  celdaEditable,
   describirRegla,
   formatHoras,
   horasDeCelda,
   horasJornada,
+  motivoNoEditable,
+  type CeldaTurno,
 } from '../../../domain/condominios/turnos'
+import { fetchTurnosDelMes } from '../../../domain/condominios/sectionData'
 import {
   fetchCuposDePlantillas, guardarJornadaConCupos, minutosCupoQueDescuentan, tramosDemora,
 } from '../../../domain/condominios/politicaJornada'
@@ -31,6 +40,7 @@ import type {
   AusenciaPersonal,
   BloqueTurno,
   DiaNoLaborable,
+  ExcepcionTurno,
   FrecuenciaTurno,
   CupoPausa,
   PersonalCondominio,
@@ -45,6 +55,7 @@ interface Props {
   bloques: BloqueTurno[]
   ausencias: AusenciaPersonal[]
   diasNoLaborables: DiaNoLaborable[]
+  excepciones: ExcepcionTurno[]
   personal: PersonalCondominio[]
   proyectoId: string
   companyId: string
@@ -89,11 +100,15 @@ const formReglaVacio = {
   personal_id: '', plantilla_horario_id: '', nombre: '',
   frecuencia: 'semanal' as FrecuenciaTurno,
   dias_semana: [1, 2, 3, 4, 5] as number[],
+  dias_mes: [] as number[],
   intervalo_dias: '1', dia_mes: '1', mes_ancla: '',
   fechas_especificas: '',
   fecha_inicio: hoyLocalISO(), fecha_fin: '',
   cubre_dias_no_laborables: false, notas: '',
 }
+
+/** Qué día del calendario se está editando. */
+interface DiaEnEdicion { fecha: string; personalId: string }
 
 /**
  * Asignación de turnos: el calendario de quién cubre qué días y con qué horario.
@@ -109,7 +124,7 @@ const formReglaVacio = {
  * año que viene sin haber generado nada.
  */
 export default function TurnosTab({
-  plantillas, asignaciones, bloques, ausencias, diasNoLaborables, personal,
+  plantillas, asignaciones, bloques, ausencias, diasNoLaborables, excepciones, personal,
   proyectoId, companyId, canCreate, canEdit, onRefresh,
 }: Props) {
   const hoy = hoyLocalISO()
@@ -121,8 +136,10 @@ export default function TurnosTab({
   const [saving, setSaving] = useState(false)
   const [modalJornada, setModalJornada] = useState<PlantillaHorario | 'nueva' | null>(null)
   const [modalRegla, setModalRegla] = useState<AsignacionTurno | 'nueva' | null>(null)
+  const [modalDia, setModalDia] = useState<DiaEnEdicion | null>(null)
   const [formJornada, setFormJornada] = useState(formJornadaVacio)
   const [formRegla, setFormRegla] = useState(formReglaVacio)
+  const [jornadaDia, setJornadaDia] = useState('')
   // El catálogo de tipos de pausa de la EMPRESA (presencia_tipos_pausa) decide
   // QUÉ tipos existen; la jornada decide CUÁNTO da de cada uno. Si el catálogo
   // no carga, la sección de cupos simplemente no aparece: no puede impedir
@@ -192,9 +209,71 @@ export default function TurnosTab({
   const rango = useMemo(() => rangoMes(cursor.year, cursor.month), [cursor])
   const celdas = useMemo(() => gridMes(cursor.year, cursor.month), [cursor])
 
+  // ── Lo del MES QUE SE ESTÁ MIRANDO ────────────────────────────────────────
+  // Los props llegan acotados por TAMAÑO, no por fecha: `bloques` son los 200
+  // de fecha más reciente del PROYECTO ENTERO —le alcanza a la bandeja de
+  // «Tareas por turno», que mira hoy— y `excepciones` traen su propio tope. Acá
+  // hace falta lo contrario: veinte empleados por treinta días son seiscientas
+  // filas y el mes puede ser cualquiera, incluido uno de hace dos años.
+  //
+  // Los dos síntomas del tope se ven igual en pantalla y son distintos: sin los
+  // bloques del mes, generarlo entero lo dejaba pintado como «previsto (sin
+  // generar)» para siempre; sin las excepciones del mes, un día quitado a mano
+  // reaparecía como previsto, que es justo lo que se había dicho que no.
+  //
+  // Así que el calendario pide SU rango. Mientras la consulta está en vuelo —o
+  // si falló— se sigue pintando con los props, incompletos pero mejor que una
+  // grilla en blanco, y el aviso de arriba dice que pueden estarlo.
+  const [bloquesMes, setBloquesMes] = useState<BloqueTurno[] | null>(null)
+  const [excepcionesMes, setExcepcionesMes] = useState<ExcepcionTurno[] | null>(null)
+  const [estadoMes, setEstadoMes] = useState<'cargando' | 'listo' | 'error'>('cargando')
+  // Mismo contador que en los cupos: al pasar meses rápido quedan varias
+  // consultas en vuelo y la que conteste ÚLTIMA no es necesariamente la del
+  // mes que se está viendo.
+  const generacionMes = useRef(0)
+
+  const recargarMes = useCallback(() => {
+    const generacion = ++generacionMes.current
+    setEstadoMes('cargando')
+    void fetchTurnosDelMes(proyectoId, companyId, rango.desde, rango.hasta)
+      .then(([bloquesRes, excepcionesRes]) => {
+        if (generacion !== generacionMes.current) return
+        // Las dos o ninguna. Quedarse con los bloques y no con las excepciones
+        // sería peor que no refrescar: los días quitados volverían a pintarse
+        // como previstos y el administrador creería que su «Quitar» no funcionó.
+        if (bloquesRes.error || excepcionesRes.error) {
+          setBloquesMes(null); setExcepcionesMes(null); setEstadoMes('error'); return
+        }
+        setBloquesMes((bloquesRes.data ?? []) as unknown as BloqueTurno[])
+        setExcepcionesMes((excepcionesRes.data ?? []) as unknown as ExcepcionTurno[])
+        setEstadoMes('listo')
+      })
+      .catch(() => {
+        if (generacion !== generacionMes.current) return
+        setBloquesMes(null); setExcepcionesMes(null); setEstadoMes('error')
+      })
+  }, [proyectoId, companyId, rango.desde, rango.hasta])
+  useEffect(() => { recargarMes() }, [recargarMes])
+
+  /**
+   * Recarga el mes Y avisa al contenedor.
+   *
+   * Las dos cosas, siempre: el contenedor refresca reglas, ausencias y
+   * excepciones; el mes refresca los bloques, que son los únicos que esta
+   * pantalla consulta por su cuenta. Quedarse con una sola deja media
+   * pantalla mostrando el estado anterior.
+   */
+  const refrescar = useCallback(() => { recargarMes(); onRefresh() }, [recargarMes, onRefresh])
+
+  const bloquesVisibles = bloquesMes ?? bloques
+  const excepcionesVisibles = excepcionesMes ?? excepciones
+
   const fuentes = useMemo(
-    () => ({ bloques, reglas: asignaciones, plantillas, ausencias, noLaborables: diasNoLaborables }),
-    [bloques, asignaciones, plantillas, ausencias, diasNoLaborables],
+    () => ({
+      bloques: bloquesVisibles, reglas: asignaciones, plantillas,
+      ausencias, noLaborables: diasNoLaborables, excepciones: excepcionesVisibles,
+    }),
+    [bloquesVisibles, asignaciones, plantillas, ausencias, diasNoLaborables, excepcionesVisibles],
   )
 
   /** Estado de cada empleado en cada día del mes visible. */
@@ -326,6 +405,7 @@ export default function TurnosTab({
         personal_id: r.personal_id, plantilla_horario_id: r.plantilla_horario_id,
         nombre: r.nombre ?? '', frecuencia: r.frecuencia,
         dias_semana: r.dias_semana ?? [],
+        dias_mes: r.dias_mes ?? [],
         intervalo_dias: String(r.intervalo_dias ?? 1),
         dia_mes: String(r.dia_mes ?? 1),
         mes_ancla: r.mes_ancla ? String(r.mes_ancla) : '',
@@ -347,6 +427,13 @@ export default function TurnosTab({
       })
       return
     }
+    if (FRECUENCIAS_POR_DIAS_MES.includes(formRegla.frecuencia) && formRegla.dias_mes.length === 0) {
+      notify({
+        variant: 'warning', title: 'Sin días',
+        text: 'Marcá al menos un día del mes, o elegí «Mensual» si es un día fijo.',
+      })
+      return
+    }
     const fechas = formRegla.fechas_especificas
       .split(',').map(f => f.trim()).filter(Boolean)
     if (formRegla.frecuencia === 'fechas' && fechas.length === 0) {
@@ -359,6 +446,11 @@ export default function TurnosTab({
       nombre: formRegla.nombre.trim() || null,
       frecuencia: formRegla.frecuencia,
       dias_semana: FRECUENCIAS_POR_DIA_SEMANA.includes(formRegla.frecuencia) ? formRegla.dias_semana : [],
+      // Se manda vacío cuando la frecuencia no lo usa: una lista huérfana de
+      // una frecuencia anterior volvería a mandar si alguien la cambia de nuevo.
+      dias_mes: FRECUENCIAS_POR_DIAS_MES.includes(formRegla.frecuencia)
+        ? formRegla.dias_mes.slice().sort((a, b) => a - b)
+        : [],
       intervalo_dias: formRegla.frecuencia === 'diaria' ? Number(formRegla.intervalo_dias) || 1 : null,
       dia_mes: FRECUENCIAS_POR_MES.includes(formRegla.frecuencia) ? Number(formRegla.dia_mes) || 1 : null,
       mes_ancla: FRECUENCIAS_POR_MES.includes(formRegla.frecuencia) && formRegla.mes_ancla
@@ -418,7 +510,118 @@ export default function TurnosTab({
         ? `Se omitieron ${omitidos}: ${data?.omitidos_existente ?? 0} ya existían, ${data?.omitidos_ausencia ?? 0} por ausencia, ${data?.omitidos_no_laborable ?? 0} por día no laborable.`
         : `${etiqueta} quedó completo.`,
     })
-    onRefresh()
+    refrescar()
+  }
+
+  // ── Un día suelto ─────────────────────────────────────────────────────────
+  //
+  // El calendario no es de solo lectura: un turno futuro se puede cambiar de
+  // jornada o quitar, que es lo que pasa cuando alguien pide un día o se cubre
+  // un cambio. Lo que NO se toca es el pasado ni lo ya empezado (ver
+  // `celdaEditable`), y la palabra final la tiene la base, no esta pantalla.
+
+  const celdaAbierta = useMemo(
+    () => (modalDia ? celdaDe(modalDia.fecha, modalDia.personalId, fuentes) : null),
+    [modalDia, fuentes],
+  )
+
+  function abrirDia(celda: CeldaTurno, personalId: string) {
+    // El motivo se dice en vez de dejar la casilla muda: «no pasa nada al
+    // hacer clic» se lee como que la pantalla está rota.
+    const motivo = motivoNoEditable(celda, hoy)
+    if (motivo) { notify({ variant: 'info', title: 'Ese día no se edita', text: motivo }); return }
+    setJornadaDia(
+      celda.bloque?.plantilla_horario_id
+      ?? celda.plantilla?.id
+      ?? plantillas.find(p => p.activo)?.id
+      ?? '',
+    )
+    setModalDia({ fecha: celda.fecha, personalId })
+  }
+
+  async function guardarDia() {
+    if (!modalDia || !celdaAbierta) return
+    const plantilla = plantillas.find(p => p.id === jornadaDia)
+    if (!plantilla) {
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Elegí la jornada de este día' }); return
+    }
+    // Asignarle un turno a alguien que ese día tiene ausencia APROBADA se
+    // permite —a veces hay que cubrir y la decisión es de quien administra—
+    // pero no en silencio: el generador nunca crea estos, el calendario los
+    // pinta en rojo como conflicto, y el balance de jornada los mide aparte.
+    const ausencia = celdaAbierta.ausencia
+    if (ausencia && !celdaAbierta.bloque) {
+      const { isConfirmed } = await confirm({
+        title: 'Esa persona tiene ausencia aprobada ese día',
+        text: `Está de ${ausencia.tipo.replace(/_/g, ' ')} del ${ausencia.fecha_inicio} al ${ausencia.fecha_fin}. Si le asignás el turno igual, el día queda marcado en conflicto en el calendario.`,
+        variant: 'danger', confirmText: 'Asignarlo igual',
+      })
+      if (!isConfirmed) return
+    }
+    setSaving(true)
+    // UNA llamada. La RPC escribe el bloque y retira la excepción que lo tenía
+    // quitado en el MISMO commit: antes eran dos peticiones y, entre una y
+    // otra, el día podía quedar asignado y marcado como quitado a la vez.
+    const { error } = await guardarDiaTurno({
+      projectId: proyectoId,
+      personalId: modalDia.personalId,
+      fecha: modalDia.fecha,
+      plantillaHorarioId: plantilla.id,
+      asignacionId: celdaAbierta.regla?.id ?? null,
+    })
+    setSaving(false)
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo guardar el día', text: error.message }); return
+    }
+    setModalDia(null)
+    refrescar()
+  }
+
+  async function quitarDia() {
+    if (!modalDia || !celdaAbierta) return
+    const { isConfirmed } = await confirm({
+      title: 'Quitar el turno de ese día',
+      text: 'Esa persona deja de tener turno ese día y el generador no lo vuelve a crear. La regla sigue igual para el resto del mes, y el día se puede restaurar después.',
+      variant: 'danger', confirmText: 'Quitar',
+    })
+    if (!isConfirmed) return
+    setSaving(true)
+    // UNA llamada, y por tanto una transacción. La excepción y el borrado del
+    // bloque confirman o revierten juntos: si la base rechaza el borrado
+    // —arrancó, se cerró, tiene checklist— no queda una excepción huérfana
+    // diciendo que el día está quitado mientras el turno sigue vivo.
+    //
+    // El mensaje se muestra tal cual porque es el del trigger, y dice CUÁL de
+    // las condiciones falló.
+    const { error } = await quitarDiaTurno({
+      projectId: proyectoId,
+      personalId: modalDia.personalId,
+      fecha: modalDia.fecha,
+      asignacionId: celdaAbierta.regla?.id ?? null,
+      motivo: 'Quitado desde el calendario',
+    })
+    setSaving(false)
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo quitar el turno', text: error.message }); return
+    }
+    setModalDia(null)
+    refrescar()
+  }
+
+  async function restaurarDia() {
+    if (!modalDia || !celdaAbierta?.excepcion) return
+    setSaving(true)
+    const { error } = await restaurarDiaTurno({
+      projectId: proyectoId,
+      personalId: modalDia.personalId,
+      fecha: modalDia.fecha,
+    })
+    setSaving(false)
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo restaurar', text: error.message }); return
+    }
+    setModalDia(null)
+    refrescar()
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -483,6 +686,31 @@ export default function TurnosTab({
             ))}
           </div>
 
+          {/* Que la consulta del mes esté en vuelo o haya fallado NO puede ser
+              silencioso: mientras tanto se pinta con el recorte que llegó por
+              props, y un turno que existe puede verse como «previsto». */}
+          {estadoMes === 'cargando' && (
+            <div role="status" style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 10 }}>
+              Cargando los turnos de {MESES[cursor.month]}…
+            </div>
+          )}
+          {estadoMes === 'error' && (
+            <div
+              role="alert"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10,
+                background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)',
+                borderRadius: 8, padding: '8px 10px', fontSize: 12, color: 'var(--at-danger)',
+              }}
+            >
+              <span>No se pudieron leer los turnos de {MESES[cursor.month]}. Lo de abajo puede estar incompleto.</span>
+              <button
+                onClick={recargarMes}
+                style={{ padding: '4px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}
+              >Reintentar</button>
+            </div>
+          )}
+
           {sinJornadas ? (
             <EmptyState
               icon="⏰"
@@ -496,35 +724,43 @@ export default function TurnosTab({
               description="Registrá al personal en la pestaña Personal para poder asignarle turnos."
             />
           ) : (
-            <div className="table-scroll-wrapper" style={{ overflowX: 'auto' }}>
-              <div style={{ minWidth: 720 }}>
-                {/* Encabezado de días */}
-                <div style={{ display: 'grid', gridTemplateColumns: '150px repeat(7, 1fr)', gap: 3, marginBottom: 3 }}>
-                  <div />
-                  {DIAS_SEMANA_CORTOS.map(d => (
-                    <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--at-ink-3)', padding: '4px 0' }}>{d}</div>
-                  ))}
+            <div className="turnos-scroll">
+              <div className="turnos-grid">
+                {/* Encabezado de días. Vive en la MISMA estructura que las filas
+                    —columna de nombre + cuadrícula de siete— porque es lo único
+                    que garantiza que Lun…Dom caigan sobre sus días. */}
+                <div className="turnos-fila" style={{ marginBottom: 3 }}>
+                  <div className="turnos-nombre" style={{ background: 'transparent' }} />
+                  <div className="turnos-dias">
+                    {DIAS_SEMANA_CORTOS.map(d => (
+                      <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--at-ink-3)', padding: '4px 0' }}>{d}</div>
+                    ))}
+                  </div>
                 </div>
 
                 {empleados.map(emp => {
                   const porFecha = Object.fromEntries((mes[emp.id] ?? []).map(c => [c.fecha, c]))
                   const horasEmp = (mes[emp.id] ?? []).reduce((a, c) => a + (horasDeCelda(c) ?? 0), 0)
                   return (
-                    <div key={emp.id} style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '150px repeat(7, 1fr)', gap: 3 }}>
-                        <div style={{ padding: '6px 8px', background: 'var(--at-surface-2)', borderRadius: 6, alignSelf: 'start' }}>
-                          <div style={{ fontWeight: 600, fontSize: 12.5, color: 'var(--at-ink)' }}>{emp.nombre}</div>
-                          <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)' }}>{emp.cargo} · {formatHoras(horasEmp)}</div>
-                        </div>
+                    <div key={emp.id} className="turnos-fila" style={{ marginBottom: 10 }}>
+                      <div className="turnos-nombre" style={{ padding: '6px 8px' }}>
+                        <div style={{ fontWeight: 600, fontSize: 12.5, color: 'var(--at-ink)' }}>{emp.nombre}</div>
+                        <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)' }}>{emp.cargo} · {formatHoras(horasEmp)}</div>
+                      </div>
+                      <div className="turnos-dias">
                         {celdas.map((dia, i) => {
                           if (dia === null) {
-                            return <div key={i} style={{ minHeight: 34 }} />
+                            return <div key={i} className="turnos-dia" style={{ visibility: 'hidden' }} />
                           }
                           const fecha = fechaISO(cursor.year, cursor.month, dia)
                           const c = porFecha[fecha]
                           const esHoy = fecha === hoy
                           const plantilla = c?.plantilla
                           const hayTurno = Boolean(c?.bloque || c?.regla)
+                          // Quitado a mano: la regla lo predecía y alguien dijo
+                          // que no. Se marca, en vez de dejarlo vacío, para que
+                          // se distinga de un día que la regla nunca cubrió.
+                          const quitado = Boolean(c?.excepcion && !c?.bloque)
 
                           let fondo = 'var(--at-surface)'
                           let borde = 'var(--at-line)'
@@ -536,6 +772,8 @@ export default function TurnosTab({
                           } else if (hayTurno) {
                             fondo = plantilla?.color ?? 'var(--at-primary)'
                             borde = 'transparent'; texto = 'var(--at-on-status)'
+                          } else if (quitado) {
+                            borde = 'var(--at-danger-border)'; texto = 'var(--at-danger)'
                           } else if (c?.noLaborable) {
                             fondo = 'var(--at-chip)'; borde = 'var(--at-line)'
                           }
@@ -544,7 +782,9 @@ export default function TurnosTab({
                             ? '🌴'
                             : hayTurno
                               ? (plantilla?.codigo || plantilla?.nombre?.[0] || '•')
-                              : c?.noLaborable ? '★' : ''
+                              : quitado ? '—' : c?.noLaborable ? '★' : ''
+
+                          const editable = canEdit && Boolean(c) && celdaEditable(c, hoy)
 
                           const titulo = [
                             `${fecha} · ${emp.nombre}`,
@@ -552,30 +792,47 @@ export default function TurnosTab({
                             c?.noLaborable && `No laborable: ${c.noLaborable.nombre}`,
                             hayTurno && plantilla && `${plantilla.nombre} ${plantilla.hora_inicio.slice(0, 5)}–${plantilla.hora_fin.slice(0, 5)}`,
                             hayTurno && !c?.bloque && 'Previsto por la regla (sin generar)',
+                            quitado && 'Quitado a mano: el generador no lo vuelve a crear',
                             c?.enConflicto && 'En conflicto: el turno está programado pero no se puede cubrir',
+                            canEdit && c && !editable && motivoNoEditable(c, hoy),
                           ].filter(Boolean).join('\n')
 
-                          return (
-                            <div
-                              key={i}
-                              title={titulo}
-                              style={{
-                                minHeight: 34, borderRadius: 6, background: fondo,
-                                border: `1px solid ${borde}`,
-                                outline: esHoy ? '2px solid var(--at-accent)' : undefined,
-                                display: 'flex', flexDirection: 'column',
-                                alignItems: 'center', justifyContent: 'center',
-                                // Lo previsto por la regla pero aún no materializado
-                                // se distingue de lo real: si no, "generar" parece
-                                // que no hace nada.
-                                opacity: hayTurno && !c?.bloque ? 0.55 : 1,
-                              }}
-                            >
+                          const caja: CSSProperties = {
+                            background: fondo,
+                            border: `1px solid ${borde}`,
+                            // `inset` y no `outline`: el outline se reserva para
+                            // el foco del teclado, que sobre el color de una
+                            // jornada cualquiera es lo único que se ve.
+                            boxShadow: esHoy ? 'inset 0 0 0 2px var(--at-accent)' : undefined,
+                            // Lo previsto por la regla pero aún no materializado
+                            // se distingue de lo real: si no, "generar" parece
+                            // que no hace nada.
+                            opacity: hayTurno && !c?.bloque ? 0.55 : 1,
+                          }
+
+                          const contenido = (
+                            <>
                               <span style={{ fontSize: 9, color: texto, lineHeight: 1 }}>{dia}</span>
                               {etiqueta && (
                                 <span style={{ fontSize: 11, fontWeight: 700, color: texto, lineHeight: 1.2 }}>{etiqueta}</span>
                               )}
-                            </div>
+                            </>
+                          )
+
+                          // Botón sólo cuando de verdad se puede editar: un
+                          // botón que no hace nada es peor que un día quieto.
+                          return editable ? (
+                            <button
+                              key={i}
+                              type="button"
+                              className="turnos-dia"
+                              style={caja}
+                              title={titulo}
+                              aria-label={titulo.replace(/\n/g, '. ')}
+                              onClick={() => abrirDia(c, emp.id)}
+                            >{contenido}</button>
+                          ) : (
+                            <div key={i} className="turnos-dia" style={caja} title={titulo}>{contenido}</div>
                           )
                         })}
                       </div>
@@ -591,8 +848,16 @@ export default function TurnosTab({
             <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-primary)', opacity: 0.55, borderRadius: 3, marginRight: 4 }} />Previsto (sin generar)</span>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 3, marginRight: 4 }} />Ausencia</span>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger)', borderRadius: 3, marginRight: 4 }} />En conflicto</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-surface)', border: '1px solid var(--at-danger-border)', borderRadius: 3, marginRight: 4 }} />— Quitado a mano</span>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 3, marginRight: 4 }} />★ No laborable</span>
           </div>
+
+          {canEdit && (
+            <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 6 }}>
+              Tocá un día de hoy en adelante para cambiarle la jornada o quitarlo. Los días que ya
+              pasaron, y los turnos que ya arrancaron o se cerraron, se corrigen desde Presencia.
+            </div>
+          )}
         </>
       )}
 
@@ -986,6 +1251,41 @@ export default function TurnosTab({
               </div>
             )}
 
+            {FRECUENCIAS_POR_DIAS_MES.includes(formRegla.frecuencia) && (
+              <div>
+                <span style={lbl}>Días del mes</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(36px, 1fr))', gap: 5 }}>
+                  {DIAS_DEL_MES.map(d => {
+                    const activo = formRegla.dias_mes.includes(d)
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        aria-pressed={activo}
+                        aria-label={`Día ${d} del mes`}
+                        onClick={() => setFormRegla(p => ({
+                          ...p,
+                          dias_mes: activo
+                            ? p.dias_mes.filter(x => x !== d)
+                            : [...p.dias_mes, d].sort((a, b) => a - b),
+                        }))}
+                        style={{
+                          padding: '6px 0', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                          background: activo ? 'var(--at-accent)' : 'var(--at-chip)',
+                          color: activo ? 'var(--at-on-status)' : 'var(--at-ink-2)',
+                          border: `1px solid ${activo ? 'var(--at-accent)' : 'var(--at-line)'}`,
+                        }}
+                      >{d}</button>
+                    )
+                  })}
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)', marginTop: 5 }}>
+                  Se repiten todos los meses. Un día que el mes no tiene se corre al último real:
+                  en febrero el 29, el 30 y el 31 caen todos en el 28 y producen UN turno, no tres.
+                </div>
+              </div>
+            )}
+
             {formRegla.frecuencia === 'diaria' && (
               <div>
                 <label style={lbl} htmlFor="regla-intervalo">Cada cuántos días</label>
@@ -1049,6 +1349,80 @@ export default function TurnosTab({
               <label style={lbl} htmlFor="regla-nombre">Nombre de la regla</label>
               <input id="regla-nombre" style={inp} placeholder="Opcional — si se deja vacío se arma solo" value={formRegla.nombre}
                 onChange={e => setFormRegla(p => ({ ...p, nombre: e.target.value }))} />
+            </div>
+          </div>
+        </EditModal>
+      )}
+
+      {/* ── Un día del calendario ── */}
+      {modalDia && celdaAbierta && (
+        <EditModal
+          title={`${modalDia.fecha} · ${empleados.find(e => e.id === modalDia.personalId)?.nombre ?? 'Empleado'}`}
+          subtitle="Cambiar la jornada de este día, o quitarlo"
+          onClose={() => setModalDia(null)}
+          size="sm"
+          footer={
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {celdaAbierta.excepcion ? (
+                  <button
+                    onClick={restaurarDia}
+                    disabled={saving}
+                    style={{ padding: '8px 16px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', color: 'var(--at-ink)' }}
+                  >Restaurar el día</button>
+                ) : (celdaAbierta.bloque || celdaAbierta.regla) && (
+                  <button
+                    onClick={quitarDia}
+                    disabled={saving}
+                    style={{ padding: '8px 16px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', color: 'var(--at-danger)' }}
+                  >Quitar el día</button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setModalDia(null)} style={{ padding: '8px 16px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', color: 'var(--at-ink)' }}>Cancelar</button>
+                <button onClick={guardarDia} disabled={saving} style={{ padding: '8px 20px', background: 'var(--at-accent)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                  {saving ? 'Guardando…' : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '9px 11px', fontSize: 12.5, color: 'var(--at-ink-2)' }}>
+              {celdaAbierta.bloque
+                ? `Turno generado · ${celdaAbierta.plantilla?.nombre ?? 'sin jornada'}`
+                : celdaAbierta.excepcion
+                  ? 'Día quitado a mano. El generador no lo vuelve a crear hasta que se restaure.'
+                  : celdaAbierta.regla
+                    ? `Previsto por «${describirRegla(celdaAbierta.regla)}», todavía sin generar.`
+                    : 'Sin turno. Elegí una jornada para asignarle el día.'}
+              {celdaAbierta.ausencia && (
+                <div style={{ marginTop: 4, color: 'var(--at-warning)' }}>
+                  Ausencia registrada: {celdaAbierta.ausencia.tipo.replace(/_/g, ' ')}
+                </div>
+              )}
+              {celdaAbierta.noLaborable && (
+                <div style={{ marginTop: 4 }}>No laborable: {celdaAbierta.noLaborable.nombre}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={lbl} htmlFor="dia-jornada">Jornada de este día</label>
+              <select id="dia-jornada" style={inp} value={jornadaDia}
+                onChange={e => setJornadaDia(e.target.value)}>
+                <option value="">Elegir…</option>
+                {/* Se incluye la jornada actual aunque esté desactivada: si no,
+                    el select arrancaría en blanco y «Guardar» la cambiaría sin
+                    que nadie lo pidiera. */}
+                {plantillas.filter(p => p.activo || p.id === jornadaDia).map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} ({p.hora_inicio.slice(0, 5)}–{p.hora_fin.slice(0, 5)})
+                  </option>
+                ))}
+              </select>
+              <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)', marginTop: 4 }}>
+                Cambia SOLO este día. La regla que lo generó sigue igual para el resto del mes.
+              </div>
             </div>
           </div>
         </EditModal>

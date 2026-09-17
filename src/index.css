@@ -742,6 +742,101 @@ button:focus:not(:focus-visible) {
   }
 }
 
+/* ─── Calendario de asignación de turnos ─────────────────────────────────
+ * POR QUÉ ESTO NO ES UNA SOLA CUADRÍCULA. La fila de cada empleado era un
+ * `grid` de `150px repeat(7, 1fr)` con el nombre como PRIMER hijo. En un mes
+ * de más de siete días eso corre todo: el día 8 cae en la columna del nombre,
+ * el 9 bajo el lunes, y de ahí en adelante cada semana queda desplazada una
+ * casilla respecto del encabezado Lun…Dom. Eso es lo que se veía como «los
+ * días no se entienden».
+ *
+ * La solución no es ajustar anchos: es sacar el nombre de la cuadrícula. El
+ * nombre es un hermano flex y los días viven en su PROPIA cuadrícula de siete
+ * columnas exactas, que es la única que tiene que cuadrar con los rótulos.
+ */
+/* El contenedor que scrollea. NO reusa `.table-scroll-wrapper`: aquél pinta un
+ * degradado `::after` en el borde derecho para avisar de que hay más tabla, y
+ * como es `position: absolute` dentro de un contenedor que scrollea, viaja con
+ * el contenido y acaba en mitad de la cuadrícula, borrando media columna de
+ * días. Acá el aviso de que hay más mes ya lo da la columna de nombres fija. */
+.turnos-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.turnos-grid {
+  /* Siete columnas legibles más la de nombres. Por debajo de esto el
+   * contenedor scrollea en horizontal en vez de apretar los días hasta
+   * volverlos ilegibles, que es lo que pasaba en el teléfono. */
+  min-width: 600px;
+}
+
+.turnos-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* La columna de nombres se queda a la vista mientras se scrollea el mes: sin
+ * esto, al llegar al domingo ya no se sabe de quién es la fila. El fondo es
+ * opaco a propósito — translúcido dejaría ver los días pasar por debajo. */
+.turnos-nombre {
+  flex: 0 0 132px;
+  width: 132px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--at-surface-2);
+  border-radius: 6px;
+  /* La misma sombra que `.table-col-sticky`: sin ella el nombre parece flotar
+   * sobre los días en vez de leerse como columna anclada. */
+  box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.08);
+}
+
+.turnos-dias {
+  flex: 1 1 auto;
+  display: grid;
+  /* `minmax(0, 1fr)` y no `1fr`: con `1fr` el contenido mínimo de una casilla
+   * puede ensanchar su columna y volver a desalinear la semana. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  min-width: 0;
+}
+
+/* Una casilla de día. Es <button> cuando se puede editar y <div> cuando no;
+ * las dos comparten caja para que la cuadrícula no se mueva entre ambas. */
+.turnos-dia {
+  min-height: 36px;
+  width: 100%;
+  padding: 0;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+}
+
+button.turnos-dia {
+  cursor: pointer;
+}
+
+/* El foco tiene que verse SOBRE el color de la jornada, que puede ser
+ * cualquiera: por eso outline con offset y no un borde. El día de hoy se
+ * marca con un box-shadow interior para no pelearse con esto. */
+.turnos-dia:focus-visible {
+  outline: 2px solid var(--at-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .turnos-nombre {
+    flex-basis: 108px;
+    width: 108px;
+  }
+}
+
 /* ─── Print Stylesheet ──────────────────────────────────────────────────── */
 @media print {
   .app-sidebar,

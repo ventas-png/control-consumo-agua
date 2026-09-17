@@ -47,7 +47,7 @@ import type {
   FondoReserva, PermisoObraUnidad, TarifaCondominio, IncidenteSeguridad,
   ChecklistArea, ProgramacionLimpieza, EjecucionLimpieza, ConsumoEnergiaArea, HistorialResidente,
   EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
-  PlantillaHorario, AsignacionTurno, DiaNoLaborable, AusenciaPersonal,
+  PlantillaHorario, AsignacionTurno, DiaNoLaborable, AusenciaPersonal, ExcepcionTurno,
   SuministroCondominio, MovimientoSuministro, TareaCondominio, GestionCobranza,
   SolicitudCertificado, VisitaFrecuente, ArticuloReglamento, ControlPlagas,
   CargoAdicionalUnidad, ProgramaActividad, RegistroAutoridad, NotaAdmin,
@@ -281,6 +281,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [asignacionesTurno, setAsignacionesTurno] = useState<AsignacionTurno[]>([])
   const [diasNoLaborables, setDiasNoLaborables] = useState<DiaNoLaborable[]>([])
   const [ausenciasPersonal, setAusenciasPersonal] = useState<AusenciaPersonal[]>([])
+  const [excepcionesTurno, setExcepcionesTurno] = useState<ExcepcionTurno[]>([])
   // Fase 21
   const [suministros, setSuministros] = useState<SuministroCondominio[]>([])
   const [movimientosSuministro, setMovimientosSuministro] = useState<MovimientoSuministro[]>([])
@@ -518,7 +519,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     // Promise.all grande por el mismo motivo que las rutas de limpieza: las
     // tablas son nuevas y, si un entorno todavía no tiene la migración
     // aplicada, el fallo se queda aquí (listas vacías) y no tumba el panel.
-    const [plantillasHorarioRes, asignacionesTurnoRes, diasNoLabRes, ausenciasRes] =
+    const [plantillasHorarioRes, asignacionesTurnoRes, diasNoLabRes, ausenciasRes, excepcionesRes] =
       await fetchCondominiosTurnosData(pid, cid)
     setPlantillasHorario((plantillasHorarioRes.data ?? []) as PlantillaHorario[])
     setAsignacionesTurno(
@@ -526,6 +527,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
         ...a,
         // Las columnas jsonb llegan como Json; el shape lo fija AsignacionTurno.
         dias_semana: (a.dias_semana as number[] | null) ?? [],
+        dias_mes: (a.dias_mes as number[] | null) ?? [],
         fechas_especificas: (a.fechas_especificas as string[] | null) ?? [],
         personal_nombre: (a.personal_condominio as { nombre: string; cargo: string } | null)?.nombre,
         personal_cargo:  (a.personal_condominio as { nombre: string; cargo: string } | null)?.cargo,
@@ -540,6 +542,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
         personal_cargo:  (a.personal_condominio as { nombre: string; cargo: string } | null)?.cargo,
       })) as AusenciaPersonal[]
     )
+    setExcepcionesTurno((excepcionesRes.data ?? []) as ExcepcionTurno[])
 
     // Rutas de limpieza (20260807130000). Va aparte del Promise.all grande
     // porque la tabla es nueva: si el entorno todavía no tiene la migración
@@ -759,7 +762,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     fondoReserva, permisosObra, tarifas, incidentes, checklistAreas,
     progLimpieza, ejecLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
-    plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal,
+    plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal, excepcionesTurno,
     tareasCond, cobranzas, certificados, visitasFrecuentes, reglamento,
     controlPlagas, cargosAdicionales, programaActividades, registroAutoridades,
     notasAdmin, controlPiscina, mantenimientoJardineria, incidenciasElevador,
@@ -793,7 +796,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     fondoReserva, permisosObra, tarifas, incidentes, checklistAreas,
     progLimpieza, ejecLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
-    plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal,
+    plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal, excepcionesTurno,
     tareasCond, cobranzas, certificados, visitasFrecuentes, reglamento,
     controlPlagas, cargosAdicionales, programaActividades, registroAutoridades,
     notasAdmin, controlPiscina, mantenimientoJardineria, incidenciasElevador,
