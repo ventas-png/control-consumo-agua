@@ -64,21 +64,67 @@ para la misma historia:
 | --- | --- | --- |
 | Versiones en remoto sin archivo local | **307** | 2026-03-18 → 2026-06-10 |
 | Archivos locales sin registrar en remoto | **0** | — |
-| **Desde 2026-06-11** | — | **coinciden 1:1, cero drift** |
+| **Desde 2026-06-11** | — | **coinciden 1:1, cero divergencia de historial de migraciones en ese tramo** |
 
-Las **307** huérfanas salen de la medición del 2026-09-17: producción registra
-**787** versiones y el repositorio tiene **480** archivos, todos ellos por debajo
-de la versión máxima registrada (`20260917000825`), así que 787 − 480 = 307
-versiones remotas sin archivo local y **cero archivos locales sin registrar**.
+### De dónde salen esas cifras
 
-Esa última fila **decía 242 y hoy es 0**: `scripts/backfill-schema-migrations.sql`
-registró como papeleo las 257 versiones ≤ `20260605230000`, y el resto se fue
-aplicando y registrando por la Management API. Lo que queda es historial
-duplicado, no esquema faltante — ninguna de las 307 huérfanas corresponde a un
-archivo que haya existido en este repositorio: de los 495 nombres de migración
-que alguna vez existieron en Git, los 480 actuales están vivos y los 15 ausentes
-sobreviven **renumerados** (14 byte a byte idénticos; los otros dos sólo cambian
-comentarios).
+La fila de **0** no es una inferencia por totales: la demuestra el workflow
+**Drift de esquema (migraciones ↔ producción)**, que consulta
+`supabase_migrations.schema_migrations` con credenciales reales y compara
+**conjunto contra conjunto**, versión por versión — `aplicadas` en
+`scripts/migraciones-vs-produccion.mjs` filtra los archivos locales por
+pertenencia al `Set` de versiones registradas, no por conteo ni por máximo.
+
+Su [run 35195425883](https://github.com/ventas-png/control-consumo-agua/actions/runs/35195425883)
+(#62, `schedule`, 2026-09-17T07:37Z, main `8bed9eec`, **success**) imprimió:
+
+```
+Migraciones locales: 480 · registradas en producción: 480 · columnas comprobadas: 3659 · constraints críticos: 1 · policies críticas: 1
+```
+
+Los **480 de 480** son la fila de 0: **cada** archivo local tiene su versión en
+el historial remoto. Ese checkout ya incluía las cuatro migraciones de #870, así
+que cubre el árbol completo de hoy.
+
+Sobre esa base sí cierra la resta: producción registra **787** versiones (medido
+el 2026-09-17, máxima `20260917000825`) y las 480 locales están todas presentes,
+luego **787 − 480 = 307** versiones sólo remotas y **0** sólo locales.
+
+La fila de locales sin registrar **decía 242 y hoy es 0**:
+`scripts/backfill-schema-migrations.sql` registró como papeleo las 257 versiones
+≤ `20260605230000`, y el resto se fue aplicando y registrando por la Management
+API.
+
+### Qué demuestra la arqueología Git, y qué no
+
+Lo que queda es historial duplicado, no esquema faltante. **Ningún archivo de
+migración se perdió**, y eso está medido sobre el historial completo
+(`git log --all --full-history`):
+
+| | |
+| --- | --- |
+| Nombres de migración que alguna vez existieron | **495** |
+| Vivos hoy | **480** |
+| Ausentes | **15**, todos **renumerados hacia adelante** |
+| De esos 15, byte a byte idénticos al archivo actual | **13** |
+| Con diferencias, ninguna de DDL | **2** — `saved_reports_email_delivery` envuelve dos `COMMENT ON POLICY` en un `DO` tolerante, y `webhook_stripe_idempotencia_real` sólo cambia el número en tres `RAISE EXCEPTION` y un comentario |
+
+Los 15 archivos tienen **14 números de versión distintos** (`20260522000001` lo
+compartían dos). De esos 14, **13 quedaron ocupados por otra migración local** —
+justamente la que causó la colisión—, así que son versiones locales registradas y
+no pueden estar entre las 307. El único número que quedó libre es
+`20260911201500`, y su archivo **nunca llegó a `main`**: se renumeró en la rama
+del PR (commit `4627f00b`, «#858 llegó a producción primero»).
+
+**Lo que la arqueología no puede decidir por sí sola** es la identidad de las 307,
+porque este repositorio no guarda su lista. No se afirma aquí que ninguna coincida
+con un nombre histórico: para descartarlo —en particular para `20260911201500`—
+hace falta enumerarlas con
+`select version from supabase_migrations.schema_migrations order by version`.
+Lo que sí está demostrado es que **ninguna migración desapareció del repositorio**,
+así que ninguna de las 307 puede corresponder a un archivo perdido; y la hipótesis
+documentada arriba —timestamps del *momento de aplicación*, como `20260318194400`
+en vez de `20260318000000`— sigue siendo la explicación registrada de su origen.
 
 Por eso `.github/workflows/apply-migrations-prod.yml` usa la Management API y
 **evita `db push` a propósito** (ver su cabecera). Prod se migra por ahí.
