@@ -172,6 +172,20 @@ Límites declarados (los cierra el PR siguiente): el seed por defecto sigue
 creando el catálogo LATAM completo; no hay catálogo vacío ni básico; no se
 convierten códigos existentes; la profundidad máxima sigue en 8 niveles.
 
+Pendiente de infraestructura: el harness RLS server-side corre contra el
+**sandbox de larga vida** (`RLS_SUPABASE_URL`), cuyo esquema se actualiza a mano
+(`supabase db push`, ver `docs/ACTIVAR_HARNESS_RLS.md` paso 2) — no contra el
+preview branch del PR. Una RPC nueva no existe ahí hasta que su migración se
+mergea y se aplica, así que las pruebas de `conta_cuentas_especiales_estado`
+(anon rechazado + `authenticated` de A pidiendo el ledger de B) **no pueden ser
+verdes en el PR que la introduce**: se declaran en `coverage.json` y se añaden
+al harness en un PR posterior, una vez el sandbox tenga la migración. Ojo con el
+falso positivo: contra una RPC inexistente el vector `anon` pasa igual, porque
+"función no encontrada" y "permiso denegado" llegan los dos como error. Mientras
+tanto, la ACL de `anon`/`authenticated`/`service_role` y la RLS de
+`conta_mapeo_cuentas` sí quedan verificadas de forma determinista, en cada
+corrida, por `supabase/tests/conta_cuentas_especiales/run.sh` (aserciones 44-60).
+
 ## Dependencias y orden
 
 ```

@@ -247,16 +247,6 @@
       ]
     },
     {
-      "nombre": "conta_cuentas_especiales_estado",
-      "dominio": "erp",
-      "porQue": "expone la configuración contable (qué cuenta usa cada proceso) de una contabilidad; leer la de otro tenant revela su plan de cuentas",
-      "garantia": "tenant",
-      "evidencias": [
-        "anon",
-        "authenticated-cross-tenant"
-      ]
-    },
-    {
       "nombre": "banco_conciliar_movimiento",
       "dominio": "erp",
       "porQue": "conciliar movimientos ajenos falsea el efectivo de otro tenant",
