@@ -8,6 +8,11 @@
 // PRIMER MÓDULO MIGRADO al cliente TIPADO `db` (P2 tipos · adopción incremental):
 // tabla, columnas, embed `clientes(...)` y el payload del insert se chequean en
 // compile-time contra el esquema generado — sin casts a Record<string, unknown>.
+//
+// El embed lleva HINT DE FK obligatorio: desde que
+// 20260825000000_portal_familiares_selfservice.sql añadió `nucleo_cliente_id`,
+// la tabla tiene DOS claves foráneas a `clientes` y PostgREST rechaza el embed
+// ambiguo. Aquí se quiere la del residente (`cliente_id`), no la del núcleo.
 import { db } from '../../lib/supabase'
 import type { UnidadResidente, TipoResidente } from '../../types'
 import type { TablesInsert } from '../../types/database.types'
@@ -23,7 +28,7 @@ export async function fetchResidentesDeUnidad(
 ): Promise<{ data: ResidenteConCliente[]; error: string | null }> {
   const { data, error } = await db
     .from('unidad_residentes')
-    .select('id, unidad_id, cliente_id, company_id, project_id, tipo, activo, created_at, updated_at, clientes(nombre, codigo)')
+    .select('id, unidad_id, cliente_id, company_id, project_id, tipo, activo, created_at, updated_at, clientes!unidad_residentes_cliente_id_fkey(nombre, codigo)')
     .eq('unidad_id', unidadId)
     .order('created_at', { ascending: true })
   const rows: ResidenteConCliente[] = (data ?? []).map(({ clientes, ...r }) => ({

@@ -4,22 +4,24 @@ import { resolve, join } from 'node:path'
 
 // Guard de DERIVA entre las migraciones y `src/types/database.types.ts`.
 //
-// POR QUÉ EXISTE. El archivo de tipos se llama "generado" pero en este repo se
-// mantiene A MANO: `supabase gen types` necesita credenciales del proyecto
-// remoto (o un stack local con Docker), así que en la práctica cada migración
-// que agrega una columna depende de que alguien se acuerde de reflejarla. No se
-// acuerda. Hoy `tareas_bloque` declara en tipos tres columnas que NO existen en
-// la base (`completado_en`, `foto_url`, `icono`) y le faltan catorce que sí, y
-// `asignaciones_turno`/`plantillas_horario` no figuran en absoluto. Eso no lo
-// atrapa `tsc`: los tipos compilan perfectamente, solo mienten — y una consulta
-// escrita contra una columna inventada revienta en producción con 42703.
+// POR QUÉ EXISTE. Durante mucho tiempo el archivo de tipos se llamaba
+// "generado" pero se mantenía A MANO: `supabase gen types` necesita credenciales
+// del proyecto remoto (o un stack local con Docker), así que cada migración que
+// agregaba una columna dependía de que alguien se acordara de reflejarla. No se
+// acordaba, y los tipos mentían sin que `tsc` dijera nada: una consulta escrita
+// contra una columna inventada compila y revienta en producción con 42703.
 //
-// ALCANCE HONESTO. La deriva es de repo entero (102 tablas con diferencias, 24
-// ausentes) y arreglarla toda exige la regeneración real. Este guard NO afirma
-// que el archivo esté al día: afirma que las tablas del motor operativo de
-// Condominios —las que esta serie de PRs toca y de las que dependerá la
-// materialización de rutinas— están alineadas, y que quien agregue una columna
-// ahí la refleje en el mismo commit. Es una cabeza de playa, no una bandera de
+// DESDE LA REGENERACIÓN REAL el archivo sale de `types-drift.yml`, o sea del
+// CATÁLOGO DE PRODUCCIÓN. Eso cambia el significado de un desajuste: ya no es
+// olvido de quien editó, es que producción y las migraciones no describen lo
+// mismo. Ese drift está medido y declarado en scripts/schema-drift/, no se
+// descubre aquí — ver DRIFT_DECLARADO más abajo.
+//
+// ALCANCE HONESTO. Este guard NO afirma que el archivo esté al día: afirma que
+// las tablas del motor operativo de Condominios —las que esta serie de PRs toca
+// y de las que dependerá la materialización de rutinas— están alineadas con las
+// migraciones salvo drift ya declarado, y que quien agregue una columna ahí la
+// refleje en el mismo commit. Es una cabeza de playa, no una bandera de
 // victoria; ampliar TABLAS_VIGILADAS es la forma de ir ganando terreno.
 //
 // LÍMITE. Compara NOMBRES de columna, no tipos ni nulabilidad: eso sí requiere
@@ -28,6 +30,24 @@ import { resolve, join } from 'node:path'
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
 const TIPOS = resolve('src/types/database.types.ts')
+const DRIFT_CONOCIDO = resolve('scripts/schema-drift/drift-conocido.json')
+
+/**
+ * Columnas que PRODUCCIÓN tiene y las migraciones NO describen, por tabla.
+ *
+ * No son columnas inventadas: el archivo de tipos las trae porque el generador
+ * las leyó del catálogo real. Su origen es el drift de las 86 migraciones
+ * huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron
+ * como archivo (inventario en #826). La lista es EXPLÍCITA a propósito: una
+ * columna excedente nueva sigue rompiendo el guard.
+ *
+ * La prueba de abajo exige además que la tabla figure en `drift-conocido.json`,
+ * así que esto no sirve para tapar drift sin declarar. Cada entrada se borra
+ * cuando la migración append-only que hace converger los dos lados se fusione.
+ */
+const DRIFT_DECLARADO: Partial<Record<(typeof TABLAS_VIGILADAS)[number], readonly string[]>> = {
+  tareas_bloque: ['foto_url', 'icono'],
+}
 
 /**
  * Tablas del motor operativo de Condominios (catálogos de limpieza, turnos y
@@ -183,6 +203,13 @@ function columnasEnTipos(): Map<string, Set<string>> {
 const DECLARADAS = columnasDeclaradas()
 const EN_TIPOS = columnasEnTipos()
 
+/** Claves `objeto/dimensión` que la baseline del auditor declara con drift. */
+const GRUPOS_CON_DRIFT = new Set(
+  Object.keys(
+    (JSON.parse(readFileSync(DRIFT_CONOCIDO, 'utf8')) as { grupos: Record<string, unknown> }).grupos,
+  ),
+)
+
 describe('database.types.ts refleja las migraciones (motor operativo)', () => {
   it('el lector de migraciones no se quedó mudo', () => {
     // Si un cambio de formato rompiera el parser, todas las tablas quedarían
@@ -221,10 +248,24 @@ describe('database.types.ts refleja las migraciones (motor operativo)', () => {
       `${tabla}: columnas migradas que faltan en los tipos (una consulta a estas ` +
         'compila pero devuelve `never`)',
     ).toEqual([])
+
+    // Sobrantes: el archivo es generado desde producción, así que una columna
+    // que las migraciones no describen es drift REAL, y sólo pasa si ya está
+    // declarado en la baseline del auditor Y enumerado aquí.
+    const declaradas = DRIFT_DECLARADO[tabla] ?? []
+    if (declaradas.length) {
+      expect(
+        GRUPOS_CON_DRIFT.has(`tabla:${tabla}/columnas`),
+        `${tabla}: DRIFT_DECLARADO la enumera pero drift-conocido.json no declara ` +
+          `\`tabla:${tabla}/columnas\`. Esta lista no sirve para tapar drift sin declarar.`,
+      ).toBe(true)
+    }
     expect(
       sobran,
-      `${tabla}: columnas que los tipos inventan y la base NO tiene (una consulta ` +
-        'a estas compila y revienta en runtime con 42703)',
-    ).toEqual([])
+      `${tabla}: columnas que los tipos traen y las migraciones NO describen. Si el ` +
+        'archivo se regeneró desde producción son drift real y van a DRIFT_DECLARADO ' +
+        '(con su grupo en drift-conocido.json); si se editó a mano, la consulta ' +
+        'compila y revienta en runtime con 42703',
+    ).toEqual([...declaradas].sort())
   })
 })
