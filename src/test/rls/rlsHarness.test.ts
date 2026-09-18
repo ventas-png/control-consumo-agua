@@ -958,6 +958,63 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     }
   })
 
+  // La configuración contable (qué cuenta usa cada proceso especial) es tan
+  // sensible como los asientos: revela el plan de cuentas del tenant. La RPC
+  // NO acepta la empresa por parámetro —la deriva de get_my_company_id()—, así
+  // que el vector cross-tenant no es "pedirle la empresa de B" sino pedirle el
+  // LEDGER de B: un project_id real de la otra empresa. La respuesta correcta
+  // es no devolver ni una cuenta suya.
+  describe('guard de la configuración contable (cuentas especiales) — garantía de TENANT', () => {
+    // PRECONDICIÓN, y no un adorno: contra una RPC que no existe, PostgREST
+    // responde PGRST202 —un error— y el vector `anon` de abajo pasaría por el
+    // motivo equivocado, porque "función no encontrada" y "permiso denegado"
+    // llegan los dos como error. Sin esta comprobación, un sandbox sin la
+    // migración 20260918121413 daba por acreditado un rechazo que nunca se
+    // midió. Aquí se exige que la función esté DESPLEGADA antes de creerle
+    // nada al resto del bloque.
+    it('precondición: la RPC existe en el sandbox (si no, el rechazo de anon no probaría nada)', async () => {
+      const { error } = await userA.rpc('conta_cuentas_especiales_estado', { p_project_id: null })
+      expect(
+        error?.code,
+        'conta_cuentas_especiales_estado no está desplegada en el sandbox: aplicá las migraciones ' +
+        '(docs/ACTIVAR_HARNESS_RLS.md, paso 2) antes de leer el resto de este bloque como evidencia',
+      ).not.toBe('PGRST202')
+      expect(error, 'un company_owner debe poder leer la configuración de SU propia contabilidad').toBeNull()
+    })
+
+    it(`${idEvidencia('conta_cuentas_especiales_estado', 'anon')} anon NO puede leer la configuración contable`, async () => {
+      const { data, error } = await anon.rpc('conta_cuentas_especiales_estado', {
+        p_project_id: B.projectId,
+      })
+      expect(error, 'anon no debe poder invocar conta_cuentas_especiales_estado').not.toBeNull()
+      // Y el rechazo tiene que ser por PERMISO, no porque la función falte.
+      expect(error?.code, 'el rechazo de anon debe venir del REVOKE, no de una RPC ausente').not.toBe('PGRST202')
+      expect(data ?? null, 'no debe devolver datos a anon').toBeNull()
+    })
+
+    it(`${idEvidencia('conta_cuentas_especiales_estado', 'authenticated-cross-tenant')} authenticated (A) NO obtiene ninguna cuenta de B al pedir el ledger de B`, async () => {
+      const { data, error } = await userA.rpc('conta_cuentas_especiales_estado', {
+        p_project_id: B.projectId,
+      })
+      // No tiene por qué fallar: la RPC está anclada a la empresa de A, así que
+      // el par (empresa de A, proyecto de B) simplemente no es ningún ledger.
+      // Lo que se exige es que NO salga ni una cuenta configurada.
+      expect(error).toBeNull()
+      const filas = (data ?? []) as Array<{
+        cuenta_id: string | null; codigo: string | null; nombre: string | null; estado: string
+      }>
+      expect(filas.length, 'la RPC debe responder el catálogo de eventos, no una lista vacía').toBeGreaterThan(0)
+      expect(filas.every((f) => f.cuenta_id === null),
+        'un ledger que no es de A no puede devolver cuentas resueltas').toBe(true)
+      expect(filas.every((f) => f.estado !== 'ok'),
+        'ninguna cuenta especial puede darse por configurada en un ledger ajeno').toBe(true)
+      // Ni los METADATOS: el arreglo de 20260918151430 es justamente que un
+      // mapeo heredado cross-company no filtre código ni nombre ajenos.
+      expect(filas.every((f) => f.codigo === null && f.nombre === null),
+        'no puede proyectar código ni nombre de una cuenta de otra contabilidad').toBe(true)
+    })
+  })
+
   describe('guard RPCs de estatus de bóvedas (#611) — garantía de TENANT', () => {
     for (const { name, args } of ESTATUS_RPCS_ANON) {
       it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {

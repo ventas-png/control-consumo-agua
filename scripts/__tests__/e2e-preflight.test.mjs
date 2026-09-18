@@ -17,9 +17,14 @@ import {
   VARIABLES_CONDICIONALES,
   VARIABLES_OBLIGATORIAS,
   decidirDestino,
+  ESPERA_DESPLIEGUE_MS,
   INTERVALO_SONDEO_MS,
+  INTERVALO_SONDEO_LARGO_MS,
+  SONDEOS_RAPIDOS,
   decidirPreflight,
+  esperarDespliegue,
   esperarUrlsPorSha,
+  inspeccionarDespliegues,
   leerMeta,
   main,
   resolverUrlsPorSha,
@@ -270,6 +275,34 @@ describe('resolverUrlsPorSha (fetch inyectado)', () => {
     const f = async () => { throw new Error('red rota') }
     expect(await resolverUrlsPorSha({ repo: 'o/r', sha: 'x', token: 't', fetchImpl: f })).toEqual([])
   })
+
+  it('inspeccionarDespliegues cuenta cuántos hay y cuántos fracasaron', async () => {
+    const f = fetchFalso([
+      ['/deployments?', { ok: true, json: async () => [{ id: 1 }, { id: 2 }, { id: 3 }] }],
+      ['/deployments/1/statuses', { ok: true, json: async () => [{ state: 'success', environment_url: 'https://ok.vercel.app' }] }],
+      ['/deployments/2/statuses', { ok: true, json: async () => [{ state: 'error' }, { state: 'pending' }] }],
+      ['/deployments/3/statuses', { ok: true, json: async () => [{ state: 'in_progress' }] }],
+    ])
+    // El estado vigente es el PRIMERO: el `pending` viejo del 2 no lo salva, y
+    // el 3 sigue construyendo, así que no cuenta como fracaso.
+    expect(await inspeccionarDespliegues({ repo: 'o/r', sha: 'x', token: 't', fetchImpl: f })).toEqual({
+      urls: ['https://ok.vercel.app'],
+      total: 3,
+      fallidos: 1,
+    })
+  })
+
+  it('una API caída deja `fallidos` por debajo de `total`: nadie corta por un fallo de red', async () => {
+    let n = 0
+    const f = async (url) => {
+      if (String(url).includes('/deployments?')) return { ok: true, json: async () => [{ id: 1 }, { id: 2 }] }
+      if ((n += 1) > 1) throw new Error('red rota')
+      return { ok: true, json: async () => [{ state: 'failure' }] }
+    }
+    const r = await inspeccionarDespliegues({ repo: 'o/r', sha: 'x', token: 't', fetchImpl: f })
+    expect(r.urls).toEqual([])
+    expect(r.fallidos).toBeLessThan(r.total)
+  })
 })
 
 // ── La carrera contra el build de Vercel ─────────────────────────────────────
@@ -357,6 +390,108 @@ describe('esperarUrlsPorSha (sondeo con reloj y espera inyectados)', () => {
     expect(await esperarUrlsPorSha(base({ repo: '', fetchImpl: f, ...reloj }))).toEqual([])
     expect(await esperarUrlsPorSha(base({ token: '', fetchImpl: f, ...reloj }))).toEqual([])
     expect(reloj.transcurrido).toBe(0)
+  })
+
+  it('espacia el sondeo pasados los primeros intentos: rápido al principio, barato después', async () => {
+    // Cuarenta minutos a 15 s serían ~160 sondeos, y cada uno gasta más de una
+    // llamada a la API: con el GITHUB_TOKEN del job eso roza el límite. Los
+    // primeros van rápido —el caso normal es que el build llegue en minutos—
+    // y de ahí en adelante se espacian.
+    const reloj = relojFalso()
+    const esperas = []
+    await esperarDespliegue(
+      base({
+        fetchImpl: listoTrasIntentos(SONDEOS_RAPIDOS + 2),
+        ahora: reloj.ahora,
+        dormir: async (ms) => { esperas.push(ms); await reloj.dormir(ms) },
+      }),
+    )
+    expect(esperas.slice(0, SONDEOS_RAPIDOS - 1)).toEqual(
+      Array(SONDEOS_RAPIDOS - 1).fill(INTERVALO_SONDEO_MS),
+    )
+    expect(esperas.slice(SONDEOS_RAPIDOS - 1)).toEqual(
+      Array(esperas.length - (SONDEOS_RAPIDOS - 1)).fill(INTERVALO_SONDEO_LARGO_MS),
+    )
+  })
+
+  // ── Build reventado ≠ build en cola ───────────────────────────────────────
+  // Antes eran indistinguibles: los dos daban "cero candidatos" y los dos se
+  // comían la ventana entera. Con la ventana en 40 min eso sería tener el
+  // runner —y el turno de la concurrency del sandbox compartido— cuarenta
+  // minutos sentado esperando a un build que ya murió.
+  it('corta en el acto si TODOS los despliegues del SHA fracasaron, y dice por qué', async () => {
+    const reloj = relojFalso()
+    const dormirProhibido = async () => { throw new Error('no debía esperar a un build muerto') }
+    const f = async (url) => {
+      const s = String(url)
+      if (s.includes('/deployments?')) return { ok: true, json: async () => [{ id: 1 }, { id: 2 }] }
+      return { ok: true, json: async () => [{ state: 'failure' }] }
+    }
+    const r = await esperarDespliegue(
+      base({ fetchImpl: f, ahora: reloj.ahora, dormir: dormirProhibido }),
+    )
+    expect(r.urls).toEqual([])
+    expect(r.motivo).toMatch(/terminaron en fracaso/)
+    expect(r.motivo).toMatch(/2 despliegue/)
+    expect(reloj.transcurrido).toBe(0)
+  })
+
+  it('un despliegue CONSTRUYENDO no es un fracaso: se sigue esperando', async () => {
+    // `pending`/`in_progress` es el build en marcha. Confundirlo con un
+    // fracaso devolvería el preflight al agujero del sondeo único.
+    const reloj = relojFalso()
+    let vuelta = 0
+    const f = async (url) => {
+      const s = String(url)
+      if (s.includes('/deployments?')) { vuelta += 1; return { ok: true, json: async () => [{ id: 1 }] } }
+      return {
+        ok: true,
+        json: async () =>
+          vuelta > 2
+            ? [{ state: 'success', environment_url: 'https://tarde.vercel.app' }]
+            : [{ state: 'in_progress' }, { state: 'pending' }],
+      }
+    }
+    const r = await esperarDespliegue(base({ fetchImpl: f, ...reloj }))
+    expect(r.urls).toEqual(['https://tarde.vercel.app'])
+    expect(r.motivo).toBeNull()
+    expect(reloj.transcurrido).toBe(2 * INTERVALO_SONDEO_MS)
+  })
+
+  it('un fracaso junto a otro que sigue construyendo NO corta: podría salir verde', async () => {
+    // Vercel registra más de un deployment por SHA. Que uno muera no dice nada
+    // del otro; cortar ahí perdería un Preview perfectamente válido.
+    const reloj = relojFalso()
+    let vuelta = 0
+    const f = async (url) => {
+      const s = String(url)
+      if (s.includes('/deployments?')) { vuelta += 1; return { ok: true, json: async () => [{ id: 1 }, { id: 2 }] } }
+      if (s.includes('/deployments/1/')) return { ok: true, json: async () => [{ state: 'failure' }] }
+      return {
+        ok: true,
+        json: async () =>
+          vuelta > 1
+            ? [{ state: 'success', environment_url: 'https://el-otro.vercel.app' }]
+            : [{ state: 'pending' }],
+      }
+    }
+    const r = await esperarDespliegue(base({ fetchImpl: f, ...reloj }))
+    expect(r.urls).toEqual(['https://el-otro.vercel.app'])
+    expect(r.motivo).toBeNull()
+  })
+
+  it('el motivo del build fracasado llega al mensaje final en vez del genérico', async () => {
+    const generico = decidirDestino([], { sha: 'abc', ref: 'r' })
+    expect(generico.motivos[0]).toMatch(/no hay ningún candidato/)
+    const concreto = decidirDestino([], { sha: 'abc', ref: 'r' }, 'el build de Vercel falló.')
+    expect(concreto.motivos).toEqual(['el build de Vercel falló.'])
+  })
+
+  it('la ventana cubre el peor caso medido el 2026-09-18 (33 min de push a Ready)', () => {
+    // No es un número redondo elegido a ojo: es el retraso real que dejó en
+    // rojo a a61e5b0a. Si alguien la baja por debajo de eso, esta prueba lo
+    // dice antes de que el rojo vuelva.
+    expect(ESPERA_DESPLIEGUE_MS).toBeGreaterThan(33 * 60_000)
   })
 
   it('el log de espera no imprime tokens ni URLs de API, sólo el sha corto y los segundos', async () => {

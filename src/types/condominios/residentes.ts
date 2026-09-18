@@ -511,6 +511,7 @@ export interface ActaReunion {
   lugar?: string | null
   quorum?: number | null
   quorum_requerido?: number | null
+  creado_por?: string | null
   asistentes: { nombre: string; unidad?: string; rol?: string }[]
   orden_del_dia: { punto: string; descripcion?: string; acuerdo?: string }[]
   acuerdos?: string | null
