@@ -42,14 +42,25 @@ En CI el verde de este job significa «la suite corrió», no «no se opuso»:
   su `environment_url`) y los valida; `E2E_BASE_URL` es opcional y entra como
   un candidato más, sometido a las mismas comprobaciones. La URL elegida es la
   que corre la suite.
-- **El preflight ESPERA al build de Vercel**: el workflow arranca con el push y
-  Vercel tarda alrededor de un minuto en construir, así que consultar la API una
-  sola vez perdía la carrera siempre. El preflight sondea cada 15 s hasta 15 min
-  (`INTERVALO_SONDEO_MS` / `ESPERA_DESPLIEGUE_MS`). Esto **no afloja el
-  fail-closed**: agotada la ventana no hay candidato y el job queda rojo. Con
-  `E2E_BASE_URL` definida no espera nada: ya hay destino que validar. Si el job
-  se queda esperando los 15 min completos, mirá en Vercel si el build de ese
-  commit falló o quedó en cola.
+- **El preflight ESPERA al build de Vercel**: el workflow arranca con el push,
+  pero el build de Vercel tiene su propia cola y no empieza a la vez, así que
+  consultar la API una sola vez perdía la carrera siempre. El preflight sondea
+  hasta **40 min** (`ESPERA_DESPLIEGUE_MS`): los primeros cinco intentos cada
+  15 s y de ahí en adelante cada 30 s (`INTERVALO_SONDEO_MS`,
+  `INTERVALO_SONDEO_LARGO_MS`, `SONDEOS_RAPIDOS`) — rápido para el caso normal,
+  barato para el lento. La ventana era de 15 min y se quedó corta dos veces
+  seguidas el 2026-09-18: en un commit Vercel no empezó a construir hasta 24 min
+  después del push, y en el siguiente el despliegue seguía en `INITIALIZING`
+  cuando venció. Los dos pasaron con un reintento manual: nunca fue la suite.
+  Esto **no afloja el fail-closed**: agotada la ventana no hay candidato y el
+  job queda rojo. Con `E2E_BASE_URL` definida no espera nada: ya hay destino que
+  validar.
+- **Un build FRACASADO no se espera**: si todos los despliegues registrados para
+  el SHA terminaron en `failure`/`error`, el sondeo corta en el acto y lo dice
+  —«el build de Vercel falló»— en vez de agotar los 40 min y reportar el
+  genérico «no hay ningún candidato». Un `pending`/`in_progress` no cuenta como
+  fracaso: ése es el build en marcha. Con varios despliegues por SHA, basta que
+  uno siga vivo para seguir esperando.
 - **Sin ejecuciones simultáneas contra el sandbox compartido**: el job usa
   `concurrency: e2e-shared-sandbox` con `cancel-in-progress: false` — las
   corridas se encolan, ninguna muere a medias.

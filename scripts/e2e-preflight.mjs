@@ -16,6 +16,11 @@
 //   fail      — TODO lo demás: falta una variable, ningún candidato validó, o
 //               el único disponible es de producción / http / SHA viejo.
 //
+// LA CARRERA CONTRA LA COLA DE VERCEL. El job arranca con el push; el build de
+// Vercel arranca cuando su cola quiere. El preflight espera (ESPERA_DESPLIEGUE_MS)
+// y sondea rápido al principio y espaciado después, y distingue "todavía no
+// está" de "reventó": ver esperarDespliegue e inspeccionarDespliegues.
+//
 // VALIDACIÓN POSITIVA, DENYLIST COMO SEGUNDA DEFENSA. Una denylist sólo veta lo
 // que alguien pensó en vetar: un alias nuevo de producción pasaría. Por eso el
 // contrato es al revés: el despliegue tiene que DEMOSTRAR que es el entorno de
@@ -219,7 +224,7 @@ export function validarMetadata(meta, { sha, ref }) {
  *
  * @returns {{ ok: true, url: string } | { ok: false, motivos: string[] }}
  */
-export function decidirDestino(candidatos, esperado) {
+export function decidirDestino(candidatos, esperado, motivoEspera = null) {
   const motivos = []
   for (const { url, meta, errorFetch } of candidatos) {
     const forma = validarBaseUrl(url)
@@ -240,10 +245,12 @@ export function decidirDestino(candidatos, esperado) {
   }
   if (candidatos.length === 0) {
     motivos.push(
-      'no hay ningún candidato de URL: la API de Deployments no registró NINGÚN despliegue ' +
-        'con status success para este SHA dentro de la ventana de espera, y E2E_BASE_URL no ' +
-        'está configurada. Revisá en Vercel si el build de este commit falló o quedó en cola ' +
-        'más tiempo del que el preflight espera.',
+      motivoEspera ??
+        'no hay ningún candidato de URL: la API de Deployments no registró NINGÚN despliegue ' +
+          'con status success para este SHA dentro de la ventana de espera, y E2E_BASE_URL no ' +
+          'está configurada. El build de este commit sigue en cola en Vercel o tarda más que la ' +
+          'ventana del preflight (ESPERA_DESPLIEGUE_MS): mirá el estado del despliegue en Vercel ' +
+          'y relanzá el job cuando esté Ready.',
     )
   }
   return { ok: false, motivos }
@@ -321,82 +328,178 @@ export function decidirPreflight(env = {}) {
  * Deployments de GitHub (los deploys de Vercel aparecen ahí con su
  * environment_url en el status "success").
  */
-export async function resolverUrlsPorSha({ repo, sha, token, fetchImpl = fetch }) {
-  if (!repo || !token) return []
+export async function resolverUrlsPorSha(opciones) {
+  return (await inspeccionarDespliegues(opciones)).urls
+}
+
+/**
+ * Estados TERMINALES de fracaso de un deployment status. Un deployment que
+ * acabó en cualquiera de ellos no va a producir una `environment_url`: seguir
+ * esperándolo es quemar la ventana entera para llegar al mismo sitio.
+ */
+export const ESTADOS_FALLIDOS = new Set(['failure', 'error'])
+
+/**
+ * Lo mismo que `resolverUrlsPorSha` pero contando además CUÁNTOS despliegues
+ * hay registrados para el SHA y cuántos terminaron en fracaso.
+ *
+ * Ese recuento es lo que separa dos situaciones que antes se veían idénticas
+ * —ambas «cero candidatos»— y piden reacciones opuestas:
+ *
+ *   · `total: 0` → Vercel ni siquiera ha registrado el deployment. Está en
+ *     cola: esperar es exactamente lo correcto.
+ *   · `total > 0` y todos fallidos → el build reventó. Esperar cuarenta
+ *     minutos a que un build muerto resucite no es rigor, es tiempo tirado;
+ *     además el motivo que se reporta pasa a ser el de verdad.
+ *
+ * `total > 0` con alguno todavía sin desenlace es el caso normal mientras
+ * Vercel construye, y ahí se sigue esperando.
+ *
+ * @returns {Promise<{ urls: string[], total: number, fallidos: number }>}
+ */
+export async function inspeccionarDespliegues({ repo, sha, token, fetchImpl = fetch }) {
+  if (!repo || !token) return { urls: [], total: 0, fallidos: 0 }
   const cab = {
     authorization: `Bearer ${token}`,
     accept: 'application/vnd.github+json',
     'user-agent': 'e2e-preflight',
   }
   const urls = []
+  let total = 0
+  let fallidos = 0
   try {
     const rDeps = await fetchImpl(`https://api.github.com/repos/${repo}/deployments?sha=${sha}&per_page=20`, { headers: cab })
-    if (!rDeps.ok) return []
+    if (!rDeps.ok) return { urls: [], total: 0, fallidos: 0 }
     const deps = await rDeps.json()
     for (const d of deps) {
+      total += 1
       const rSt = await fetchImpl(`https://api.github.com/repos/${repo}/deployments/${d.id}/statuses?per_page=10`, { headers: cab })
       if (!rSt.ok) continue
       const sts = await rSt.json()
       const exito = sts.find((s) => s.state === 'success' && s.environment_url)
-      if (exito) urls.push(exito.environment_url)
+      if (exito) {
+        urls.push(exito.environment_url)
+        continue
+      }
+      // La API devuelve los statuses del más reciente al más viejo, así que el
+      // desenlace vigente es el primero. Un `pending`/`in_progress` NO cuenta
+      // como fallido: es el build en marcha.
+      if (ESTADOS_FALLIDOS.has(sts[0]?.state)) fallidos += 1
     }
   } catch {
-    return urls
+    // Una API caída no decide nada: se devuelve lo que se alcanzó a ver y el
+    // sondeo sigue. `fallidos` queda por debajo de `total` y nadie corta.
+    return { urls: [...new Set(urls)], total, fallidos }
   }
-  return [...new Set(urls)]
+  return { urls: [...new Set(urls)], total, fallidos }
 }
 
 /**
  * Cuánto espera el preflight a que Vercel registre el despliegue del SHA.
- * El workflow arranca con el `pull_request` del push, y Vercel tarda ~1 min en
- * construir: consultar la API UNA sola vez pierde esa carrera SIEMPRE (el job
- * fallaba a los 40 s con "no hay ningún candidato" mientras el Preview quedaba
- * Ready segundos después). Esperar no afloja el fail-closed: al agotarse la
- * ventana el job sigue rojo — sólo deja de confundir "todavía no está" con
- * "no existe".
+ *
+ * El workflow arranca con el `pull_request` del push, pero el build de Vercel
+ * tiene su propia cola, que NO empieza a la vez. Consultar la API una sola vez
+ * perdía esa carrera siempre (el job moría a los 40 s con "no hay ningún
+ * candidato" y el Preview quedaba Ready segundos después), y por eso se puso
+ * una ventana de espera. Quince minutos se quedaron cortos el 2026-09-18, dos
+ * commits seguidos del mismo PR y por dos motivos distintos:
+ *
+ *   · a61e5b0a — Vercel ni siquiera EMPEZÓ el build hasta 24 min después del
+ *     push. Durante los 900 s no había ningún deployment registrado.
+ *   · db58a79e — el build arrancó a los 7 min y seguía en INITIALIZING cuando
+ *     venció la ventana; quedó Ready ocho minutos más tarde.
+ *
+ * Los dos terminaron verdes con un reintento manual, o sea que nunca fueron un
+ * fallo de la suite: eran la ventana midiendo el reloj equivocado. Se sube a 40
+ * min, que cubre con holgura el peor caso observado (33 min de push a Ready).
+ *
+ * ESPERAR MÁS NO AFLOJA NADA. Agotada la ventana no hay candidato y el job
+ * sigue rojo; lo único que cambia es dejar de confundir "todavía no está" con
+ * "no existe". Y una ventana larga ya no cuesta lo que costaba: si TODOS los
+ * despliegues del SHA fracasaron, el sondeo corta en el acto (ver
+ * `inspeccionarDespliegues`) en vez de sentarse cuarenta minutos a esperar un
+ * build muerto.
  */
-export const ESPERA_DESPLIEGUE_MS = 900_000
-export const INTERVALO_SONDEO_MS = 15_000
+export const ESPERA_DESPLIEGUE_MS = 2_400_000
 
 /**
- * Sondea `resolverUrlsPorSha` hasta que aparezca un despliegue con status
- * success para el SHA, o hasta agotar `tiempoMaxMs` (entonces devuelve []).
- * El reloj, la espera y el log entran por parámetro para poder probarla sin
- * dormir de verdad.
+ * Sondeo RÁPIDO al principio y espaciado después. El caso normal —el build ya
+ * está o llega en un par de minutos— quiere reaccionar en segundos; el caso
+ * lento no quiere 160 sondeos, que a dos o tres llamadas cada uno rozarían el
+ * límite de la API con el GITHUB_TOKEN del job. Los primeros
+ * `SONDEOS_RAPIDOS` van cada `INTERVALO_SONDEO_MS`; de ahí en adelante, cada
+ * `INTERVALO_SONDEO_LARGO_MS`.
  */
-export async function esperarUrlsPorSha({
+export const INTERVALO_SONDEO_MS = 15_000
+export const INTERVALO_SONDEO_LARGO_MS = 30_000
+export const SONDEOS_RAPIDOS = 5
+
+/**
+ * Sondea `inspeccionarDespliegues` hasta que aparezca un despliegue con status
+ * success para el SHA, hasta que se sepa que TODOS fracasaron, o hasta agotar
+ * `tiempoMaxMs`. El reloj, la espera y el log entran por parámetro para poder
+ * probarla sin dormir de verdad.
+ *
+ * @returns {Promise<{ urls: string[], motivo: string|null }>} `motivo` sólo
+ *   viene cuando se cortó por builds fracasados: es lo que se reporta en vez
+ *   del genérico "no hay ningún candidato".
+ */
+export async function esperarDespliegue({
   repo,
   sha,
   token,
   fetchImpl = fetch,
   tiempoMaxMs = ESPERA_DESPLIEGUE_MS,
   intervaloMs = INTERVALO_SONDEO_MS,
+  intervaloLargoMs = INTERVALO_SONDEO_LARGO_MS,
+  sondeosRapidos = SONDEOS_RAPIDOS,
   dormir = (ms) => new Promise((r) => setTimeout(r, ms)),
   ahora = () => Date.now(),
   registrar = console.log,
 }) {
-  // Sin repo o sin token `resolverUrlsPorSha` no puede consultar nada: sondear
-  // sería quemar la ventana entera para obtener el mismo [] del primer intento.
-  if (!repo || !token) return []
+  // Sin repo o sin token `inspeccionarDespliegues` no puede consultar nada:
+  // sondear sería quemar la ventana entera para obtener el mismo [] del primer
+  // intento.
+  if (!repo || !token) return { urls: [], motivo: null }
 
   const inicio = ahora()
   const seg = (ms) => Math.round(ms / 1000)
   for (let intento = 1; ; intento += 1) {
-    const urls = await resolverUrlsPorSha({ repo, sha, token, fetchImpl })
+    const { urls, total, fallidos } = await inspeccionarDespliegues({ repo, sha, token, fetchImpl })
     if (urls.length > 0) {
       if (intento > 1) {
         registrar(`✅ Despliegue registrado para ${sha.slice(0, 8)} tras ${seg(ahora() - inicio)}s de espera.`)
       }
-      return urls
+      return { urls, motivo: null }
+    }
+    // Todos los despliegues del SHA terminaron en fracaso: el build reventó y
+    // no va a aparecer ninguna environment_url. Cortar aquí no afloja el
+    // fail-closed —el job queda rojo igual— pero lo deja rojo en segundos y
+    // por el motivo verdadero.
+    if (total > 0 && fallidos === total) {
+      return {
+        urls: [],
+        motivo:
+          `los ${total} despliegue(s) registrados para este SHA terminaron en fracaso: el build ` +
+          'de Vercel falló. No es la cola ni la ventana de espera — revisá el log del build en ' +
+          'Vercel, arreglalo y volvé a empujar.',
+      }
     }
     const transcurrido = ahora() - inicio
-    if (transcurrido + intervaloMs > tiempoMaxMs) return []
+    const siguiente = intento < sondeosRapidos ? intervaloMs : Math.max(intervaloMs, intervaloLargoMs)
+    if (transcurrido + siguiente > tiempoMaxMs) return { urls: [], motivo: null }
     registrar(
       `⏳ Todavía no hay despliegue con status success para ${sha.slice(0, 8)} ` +
-        `(${seg(transcurrido)}s de ${seg(tiempoMaxMs)}s). Reintento en ${seg(intervaloMs)}s.`,
+        `(${total === 0 ? 'ninguno registrado aún' : `${total} registrado(s), construyendo`}; ` +
+        `${seg(transcurrido)}s de ${seg(tiempoMaxMs)}s). Reintento en ${seg(siguiente)}s.`,
     )
-    await dormir(intervaloMs)
+    await dormir(siguiente)
   }
+}
+
+/** Forma histórica de `esperarDespliegue`: sólo las URLs. */
+export async function esperarUrlsPorSha(opciones) {
+  return (await esperarDespliegue(opciones)).urls
 }
 
 /**
@@ -558,7 +661,7 @@ export async function main(env = process.env, fetchImpl = fetch) {
   // Candidatos: primero los despliegues registrados para ESTE sha, después la
   // URL estática si existe — sometida exactamente a las mismas comprobaciones.
   const esperado = { sha: env.SHA_ESPERADO, ref: env.E2E_EXPECTED_SUPABASE_REF }
-  const resueltas = await esperarUrlsPorSha({
+  const { urls: resueltas, motivo: motivoEspera } = await esperarDespliegue({
     repo: env.GITHUB_REPOSITORY,
     sha: env.SHA_ESPERADO,
     token: env.GITHUB_TOKEN,
@@ -580,7 +683,7 @@ export async function main(env = process.env, fetchImpl = fetch) {
     candidatos.push({ url, meta, errorFetch })
   }
 
-  const destino = decidirDestino(candidatos, esperado)
+  const destino = decidirDestino(candidatos, esperado, motivoEspera)
   if (!destino.ok) {
     const detalle = destino.motivos.map((m) => `  · ${m}`).join('\n')
     console.error(

@@ -95,8 +95,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # `timeout-minutes` es el tope DURO del paso. La ventana del preflight
+      # (ESPERA_DESPLIEGUE_MS, 40 min) es la que manda y termina sola en rojo;
+      # esto sólo evita que un cuelgue de red deje el paso —y con él el turno de
+      # la concurrency `e2e-shared-sandbox`— retenido hasta el timeout de seis
+      # horas del runner. Va por encima de la ventana a propósito: si salta
+      # ESTE, es un cuelgue, no una espera.
       - name: Preflight fail-closed y resolución del despliegue por SHA
         id: preflight
+        timeout-minutes: 45
         env:
           # `head.repo.fork` sólo existe en eventos pull_request; en
           # workflow_dispatch queda vacío → se trata como interno →
