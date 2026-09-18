@@ -496,3 +496,74 @@ SELECT public.chk(
     WHERE schemaname = 'public' AND tablename = 'conta_mapeo_cuentas'
       AND 'authenticated' = ANY(roles)) > 0)::int, 1,
   '60 mientras que authenticated sí tiene policy (la RLS filtra por empresa)');
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 61-67 · Un mapeo HEREDADO cross-company no filtra nada de la otra empresa
+-- ─────────────────────────────────────────────────────────────────────────────
+-- El escenario que el trigger conta_tg_mapeo_mismo_ledger NO puede cubrir: una
+-- fila que YA existía antes de él, de MI empresa, apuntando al catálogo de
+-- OTRA. Se fabrica desactivando el trigger, que es la única forma honesta de
+-- reproducir un dato heredado (escribirlo por la vía normal está prohibido, y
+-- esa prohibición ya se comprueba en la aserción 12).
+--
+-- Importa porque conta_cuentas_especiales_estado es SECURITY DEFINER: corre sin
+-- RLS, así que es justo donde un dato heredado se convierte en fuga. Clasificar
+-- la fila como 'otro_ledger' no basta si de paso se devuelve el código y el
+-- nombre de la cuenta ajena.
+ALTER TABLE public.conta_mapeo_cuentas DISABLE TRIGGER trg_conta_mapeo_mismo_ledger;
+
+-- La cuenta señuelo vive en la OTRA empresa, con nombre y código reconocibles.
+INSERT INTO public.conta_cuentas
+  (company_id, project_id, codigo, nombre, tipo, naturaleza, nivel, es_detalle, activa)
+VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL, 'SECRETO-01',
+        'Cuenta confidencial de la otra empresa', 'capital', 'acreedora', 3, true, true);
+
+-- El mapeo es de MI empresa (ACME), en su ledger de EMPRESA — mismo project_id
+-- (NULL) que la cuenta ajena, que es el caso que burlaba el filtro viejo.
+INSERT INTO public.conta_mapeo_cuentas (company_id, project_id, evento, cuenta_id)
+SELECT :'CO', NULL, 'iva_credito', id FROM public.conta_cuentas
+ WHERE company_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND codigo = 'SECRETO-01'
+ON CONFLICT (company_id, COALESCE(project_id, '00000000-0000-0000-0000-000000000000'::uuid), evento)
+DO UPDATE SET cuenta_id = EXCLUDED.cuenta_id;
+
+ALTER TABLE public.conta_mapeo_cuentas ENABLE TRIGGER trg_conta_mapeo_mismo_ledger;
+
+SELECT public.chk_txt(
+  (SELECT estado FROM public.conta_cuentas_especiales_estado(NULL)
+    WHERE evento = 'iva_credito'), 'otro_ledger',
+  '61 un mapeo heredado cross-company se clasifica como "otro_ledger"');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_cuentas_especiales_estado(NULL)
+    WHERE evento = 'iva_credito' AND cuenta_id IS NOT NULL), 0,
+  '62 y NO devuelve el cuenta_id de la cuenta ajena');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_cuentas_especiales_estado(NULL)
+    WHERE evento = 'iva_credito' AND codigo IS NOT NULL), 0,
+  '63 ni su CÓDIGO: es un dato de otro tenant, no se proyecta');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_cuentas_especiales_estado(NULL)
+    WHERE evento = 'iva_credito' AND nombre IS NOT NULL), 0,
+  '64 ni su NOMBRE');
+
+-- La comprobación que de verdad cierra el agujero: el literal no aparece en
+-- NINGUNA columna de texto de la respuesta, para ningún evento.
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_cuentas_especiales_estado(NULL) x
+    WHERE COALESCE(x.codigo, '') || COALESCE(x.nombre, '') || x.etiqueta || x.proceso
+          LIKE '%SECRETO%'), 0,
+  '65 el identificador de la cuenta ajena no aparece en ninguna columna');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_cuentas_especiales_estado(NULL) x
+    WHERE COALESCE(x.nombre, '') LIKE '%confidencial%'), 0,
+  '66 ni su nombre, por ninguna vía');
+
+-- La RPC sigue funcionando para el resto: aislar una fila envenenada no puede
+-- costar la pantalla entera.
+SELECT public.chk(
+  ((SELECT count(*) FROM public.conta_cuentas_especiales_estado(NULL)
+    WHERE estado = 'ok') > 0)::int, 1,
+  '67 y el resto de las cuentas especiales se sigue reportando con normalidad');

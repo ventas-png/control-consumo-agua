@@ -119,10 +119,13 @@ for f in "${COMPRAS[@]}"; do aplicar "$MIGS/$f.sql"; done
 echo "  OK    fixture + ${#COMPRAS[@]} migraciones de compras"
 
 echo "── 4/5 · migración bajo prueba (dos veces: idempotencia) ───────────────"
-ESPECIALES=20260918121413_conta_cuentas_especiales_semanticas
-aplicar "$MIGS/$ESPECIALES.sql"
-aplicar "$MIGS/$ESPECIALES.sql"
-echo "  OK    $ESPECIALES aplicada dos veces"
+ESPECIALES=(
+  20260918121413_conta_cuentas_especiales_semanticas
+  20260918151430_conta_estado_especiales_sin_fuga_cross_company
+)
+for f in "${ESPECIALES[@]}"; do aplicar "$MIGS/$f.sql"; done
+for f in "${ESPECIALES[@]}"; do aplicar "$MIGS/$f.sql"; done
+echo "  OK    ${#ESPECIALES[@]} migraciones aplicadas dos veces (idempotentes)"
 
 echo "── 5/5 · invariantes ───────────────────────────────────────────────────"
 CODIGO=0

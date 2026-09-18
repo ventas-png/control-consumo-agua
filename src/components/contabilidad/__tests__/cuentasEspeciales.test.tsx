@@ -23,6 +23,7 @@ const state = vi.hoisted(() => ({
   cuentas: [] as CuentaContable[],
   especiales: [] as CuentaEspecialEstado[],
   guardados: [] as Array<{ evento: string; cuentaId: string; projectId?: string | null }>,
+  quitados: [] as Array<{ evento: string; projectId?: string | null }>,
   avisos: [] as Array<{ title?: string; text?: string }>,
 }))
 
@@ -45,6 +46,12 @@ vi.mock('../../../domain/contabilidad/mutations', () => ({
   useGuardarMapeoMutation: () => ({
     mutateAsync: async (v: { evento: string; cuentaId: string; projectId?: string | null }) => {
       state.guardados.push(v)
+    },
+    isPending: false,
+  }),
+  useQuitarMapeoMutation: () => ({
+    mutateAsync: async (v: { evento: string; projectId?: string | null }) => {
+      state.quitados.push(v)
     },
     isPending: false,
   }),
@@ -95,6 +102,7 @@ beforeEach(() => {
   ]
   state.especiales = [especial('resultados_acumulados', 'ok', 'cta-res')]
   state.guardados = []
+  state.quitados = []
   state.avisos = []
 })
 afterEach(cleanup)
@@ -169,6 +177,45 @@ describe('MapeoCuentasTab · sección de cuentas especiales', () => {
     expect(state.guardados[0]).toEqual({
       evento: 'resultados_acumulados', cuentaId: 'cta-otra', projectId: 'p1',
     })
+  })
+
+  it('elegir «sin asignar» DESASIGNA en el ledger de la EMPRESA', async () => {
+    render(<MapeoCuentasTab companyId="c1" projectId={null} monedaBase="GTQ" />)
+    fireEvent.change(screen.getByLabelText('Cuenta para Resultados acumulados'), {
+      target: { value: '' },
+    })
+    await vi.waitFor(() => expect(state.quitados).toHaveLength(1))
+    expect(state.quitados[0]).toEqual({ evento: 'resultados_acumulados', projectId: null })
+    // Desasignar NO es guardar: si esto se colara como upsert, el evento
+    // quedaría apuntando a una cadena vacía en vez de quedarse sin cuenta.
+    expect(state.guardados).toHaveLength(0)
+  })
+
+  it('y DESASIGNA en el ledger de un PROYECTO, con su project_id', async () => {
+    render(<MapeoCuentasTab companyId="c1" projectId="p1" monedaBase="GTQ" />)
+    fireEvent.change(screen.getByLabelText('Cuenta para Resultados acumulados'), {
+      target: { value: '' },
+    })
+    await vi.waitFor(() => expect(state.quitados).toHaveLength(1))
+    expect(state.quitados[0]).toEqual({ evento: 'resultados_acumulados', projectId: 'p1' })
+    expect(state.guardados).toHaveLength(0)
+  })
+
+  it('la opción «sin asignar» existe y es la seleccionada cuando falta el mapeo', () => {
+    state.especiales = [especial('resultados_acumulados', 'sin_mapeo', null)]
+    render(<MapeoCuentasTab companyId="c1" projectId={null} monedaBase="GTQ" />)
+    const select = screen.getByLabelText('Cuenta para Resultados acumulados') as HTMLSelectElement
+    expect(select.value).toBe('')
+    expect([...select.options].some((o) => o.value === '')).toBe(true)
+  })
+
+  it('elegir una cuenta sigue guardando, no borrando', async () => {
+    render(<MapeoCuentasTab companyId="c1" projectId="p1" monedaBase="GTQ" />)
+    fireEvent.change(screen.getByLabelText('Cuenta para Resultados acumulados'), {
+      target: { value: 'cta-otra' },
+    })
+    await vi.waitFor(() => expect(state.guardados).toHaveLength(1))
+    expect(state.quitados).toHaveLength(0)
   })
 
   it('no duplica un evento especial en la lista de eventos de negocio', () => {

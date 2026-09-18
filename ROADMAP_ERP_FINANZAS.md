@@ -162,7 +162,24 @@ de cuentas sin romperlos:
   sólo cuando la cuenta ya existe en el ledger — sin eso, el cierre anual que hoy
   funciona pasaría a fallar por "configuración incompleta" en todos los ledgers
   existentes, que sería una regresión, no una migración.
-- **Verificación**: `supabase/tests/conta_cuentas_especiales/run.sh` — 60
+- **Sin fuga cross-company** (`20260918151430`): `conta_cuentas_especiales_estado`
+  clasificaba bien una cuenta ajena como `otro_ledger`, pero proyectaba su
+  `codigo` y su `nombre` sin condición, y su `cuenta_id` sólo comprobaba el
+  `project_id`. Con un mapeo HEREDADO cross-company —una fila de mi empresa
+  apuntando al catálogo de otra, anterior al trigger que hoy lo impide— eso
+  entregaba metadatos de otro tenant desde una función SECURITY DEFINER, que
+  corre sin RLS. Ahora `cuenta_id` exige las cuatro condiciones (misma empresa,
+  mismo proyecto, de detalle, activa) y `codigo`/`nombre` van NULL si la cuenta
+  no es de mi empresa. `estado` sigue diciendo `otro_ledger`.
+- **Desasignar de verdad**: elegir «sin asignar» borra la fila de
+  `conta_mapeo_cuentas` del ledger activo (`useQuitarMapeoMutation`). Antes el
+  handler salía con un `return` y el select rebotaba, así que no había forma de
+  deshacer un mapeo. El borrado es una mutación aparte —no un `cuentaId: ''`—
+  porque destruye configuración, y lleva siempre las tres condiciones: empresa,
+  evento y ledger, con `.is('project_id', null)` para la empresa y `.eq()` para
+  un proyecto (en PostgREST `.eq(col, null)` NO es `IS NULL`; confundirlos haría
+  que desasignar en un ledger alcanzara la fila del otro).
+- **Verificación**: `supabase/tests/conta_cuentas_especiales/run.sh` — 67
   invariantes ejecutables contra un PostgreSQL desechable. La prueba que da
   nombre a la fase **renombra** 3101/3201/3301 a `900001`/`900002`/`900003` y
   exige que cierre anual y revaluación FX sigan funcionando y descarguen contra

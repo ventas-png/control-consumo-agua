@@ -6,7 +6,11 @@ import {
   useMapeoQuery,
   useTiposCambioQuery,
 } from '../../domain/contabilidad/queries'
-import { useGuardarMapeoMutation, useGuardarTipoCambioMutation } from '../../domain/contabilidad/mutations'
+import {
+  useGuardarMapeoMutation,
+  useGuardarTipoCambioMutation,
+  useQuitarMapeoMutation,
+} from '../../domain/contabilidad/mutations'
 import { tipoCambioFormSchema } from '../../domain/contabilidad/schemas'
 import { formatDateShort, formatNumber, hoyLocalISO } from '../../lib/format'
 import {
@@ -44,6 +48,7 @@ export function MapeoCuentasTab({ companyId, projectId, monedaBase }: Props) {
   const { data: especiales = [] } = useCuentasEspecialesQuery(companyId, projectId)
   const { data: tiposCambio = [] } = useTiposCambioQuery(companyId)
   const guardarMapeo = useGuardarMapeoMutation(companyId)
+  const quitarMapeo = useQuitarMapeoMutation(companyId)
   const guardarTC = useGuardarTipoCambioMutation(companyId)
 
   const [tcForm, setTcForm] = useState({ moneda: '', fecha: hoyLocalISO(), tasa: '' })
@@ -80,13 +85,20 @@ export function MapeoCuentasTab({ companyId, projectId, monedaBase }: Props) {
   }, [eventosEspeciales])
 
   async function onCambioMapeo(evento: string, cuentaId: string) {
-    if (!cuentaId) return
+    // La opción vacía es «sin asignar», y significa DESASIGNAR: antes se salía
+    // con un `return` y el select rebotaba al valor anterior, así que no había
+    // forma de deshacer un mapeo desde la pantalla que lo configura.
     try {
-      // El ledger activo, siempre explícito: sin `projectId` la escritura caía
-      // en la contabilidad de la empresa aunque se estuviera configurando un
-      // proyecto.
-      await guardarMapeo.mutateAsync({ evento, cuentaId, projectId })
-      notify({ variant: 'success', title: 'Guardado', text: 'Mapeo actualizado.' })
+      // El ledger activo, siempre explícito —tanto al guardar como al quitar—:
+      // sin `projectId` la escritura caía en la contabilidad de la empresa
+      // aunque se estuviera configurando un proyecto.
+      if (cuentaId) {
+        await guardarMapeo.mutateAsync({ evento, cuentaId, projectId })
+        notify({ variant: 'success', title: 'Guardado', text: 'Mapeo actualizado.' })
+      } else {
+        await quitarMapeo.mutateAsync({ evento, projectId })
+        notify({ variant: 'success', title: 'Desasignado', text: 'El evento quedó sin cuenta.' })
+      }
     } catch (e) {
       notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo guardar el mapeo.' })
     }
