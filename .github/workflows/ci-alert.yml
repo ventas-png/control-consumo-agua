@@ -29,6 +29,13 @@ on:
       - "Deploy Staging (Vercel)"
       - "Deploy Supabase Edge Functions"
       - "Health check"
+      # El auditor de drift dice que el repositorio dejó de describir producción.
+      # Sin esta línea su rojo se quedaba en la pestaña Actions: nadie lo mira si
+      # no está esperándolo, y este auditor se pone rojo POR SU CUENTA —cuando el
+      # apply termina o en el run diario—, no a raíz de algo que alguien acaba de
+      # empujar. Un rojo que sólo existe donde nadie mira es el mismo silencio
+      # que había antes, movido de sitio.
+      - "Auditor de drift de esquema"
     types: [completed]
 
 permissions:

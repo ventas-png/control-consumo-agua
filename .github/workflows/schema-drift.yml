@@ -45,6 +45,45 @@ name: Auditor de drift de esquema
 # quien abre el PR; para un workflow que existe para tocar producción sería
 # regalar la llave. `pull_request` alcanza de sobra porque el job offline no
 # necesita ningún secreto.
+#
+# NO HAY DISPARADOR `push`, Y ESO ES DELIBERADO — la misma lección que
+# `drift-esquema.yml` ya aprendió, aplicada aquí con un incidente propio.
+#
+# El veredicto de este auditor depende de DOS cosas que cambian en momentos
+# distintos: el repositorio (que cambia en el push) y el catálogo de producción
+# (que cambia cuando `Apply Migrations to Production` termina, segundos o
+# minutos DESPUÉS). Disparar en el push es leer la mitad del sistema antes de
+# que la otra mitad se mueva.
+#
+# EL VERDE FALSO QUE ESTO CIERRA. Al mergear #875 el push a `main` disparó el
+# run #188 a las 15:55 y salió VERDE: la huella todavía coincidía con
+# producción, así que las dos migraciones nuevas se clasificaron como «cambio
+# planificado», que es la regla correcta aplicada al estado correcto del
+# momento. El apply a producción terminó a las 15:58. Desde ese segundo la
+# huella quedó vieja y el auditor pasó a estar en ROJO sobre `main`, pero
+# LATENTE: con `paths` acotado a `supabase/migrations/**` y
+# `scripts/schema-drift/**`, ningún run volvía a correr hasta que alguien
+# tocara justo esos directorios. El rojo existía y nadie lo veía. Lo mismo, con
+# el signo cambiado, que el rojo falso de #797 que documenta
+# `drift-esquema.yml`: las dos caras de leer producción en el instante
+# equivocado.
+#
+# Y el disparador no aportaba nada que los otros no den: el drift sólo puede
+# aparecer cuando se APLICAN migraciones. Quedan los tres que sí significan
+# algo:
+#
+#   workflow_run       justo después del apply — el único momento en que el
+#                      catálogo real pudo cambiar por una migración nuestra.
+#   schedule           para lo que se aplica FUERA DE BANDA (panel de Supabase,
+#                      MCP, a mano). No es teórico en este repositorio: las 86
+#                      migraciones huérfanas de marzo–junio 2026 entraron así, y
+#                      son el origen de casi toda la baseline de drift-conocido.
+#   workflow_dispatch  a demanda.
+#
+# En `pull_request` el `paths` SÍ se conserva: ahí la pregunta es qué cambia
+# ESTE PR, y correr el auditor —dos clústeres y todo el historial replicado— en
+# PRs que no tocan el esquema sería pagarlo en cada PR para medir lo mismo que
+# el run de `main` ya mide.
 
 on:
   pull_request:
@@ -52,16 +91,24 @@ on:
       - 'supabase/migrations/**'
       - 'scripts/schema-drift/**'
       - '.github/workflows/schema-drift.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'supabase/migrations/**'
-      - 'scripts/schema-drift/**'
+  workflow_run:
+    workflows: ['Apply Migrations to Production']
+    types: [completed]
+  schedule:
+    # 08:00 UTC diario. Media hora después de drift-esquema.yml, por su misma
+    # razón: que los rojos de los dos auditores no caigan en la misma
+    # notificación y se lean como uno solo.
+    - cron: '0 8 * * *'
   workflow_dispatch:
 
 concurrency:
   group: schema-drift-${{ github.ref }}
-  cancel-in-progress: true
+  # Sólo en PRs se cancela la corrida anterior: ahí un push nuevo deja obsoleta
+  # a la de antes. En `main` NO, porque los runs de `workflow_run` y `schedule`
+  # comparten `github.ref` con cualquier otro: un push a `main` cancelaría
+  # justo la auditoría que dispara el apply, que es la que este workflow existe
+  # para no perder.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
