@@ -115,6 +115,63 @@ La causa era estructural, no un descuido: la clave de idempotencia de los asient
 - **Aviso en la captura**: `conta_gasto_duplicado_probable` avisa al escribir el gasto —«esto ya está como factura A-4471»— con salida a **enlazar** ahí mismo. Advierte, no bloquea.
 - **Verificación**: `supabase/tests/gastos_duplicados/run.sh`, con el mismo patrón que la Fase 6. Incluye lo que de verdad mata estos reportes —que **no** marque dos pagos legítimamente distintos del mismo proveedor por el mismo monto— y la no-regresión del gasto sin factura.
 
+## Fase 8 — Cuentas especiales sin códigos fijos ✅
+
+Primer paso para que el catálogo sea **del cliente**: catálogos vacíos, catálogos
+básicos y códigos puramente numéricos con otra jerarquía. Migración
+`20260918121413_conta_cuentas_especiales_semanticas.sql`.
+
+El módulo ya resolvía por evento (`conta_mapeo_cuentas` + `conta_cuenta_para`)
+todo lo que contabiliza el generador de asientos. Pero **cuatro procesos de
+ejecución** seguían buscando su cuenta por el CÓDIGO literal del catálogo
+sembrado, y mientras eso siguiera así ningún cliente podía traer su propio plan
+de cuentas sin romperlos:
+
+| Proceso | Buscaba | Ahora resuelve por |
+|---|---|---|
+| `conta_cierre_anual(int, uuid)` | `codigo = '3201'` | `resultado_ejercicio` |
+| `conta_revaluar_fx(date, boolean, uuid)` | `codigo = '3301'` | `diferencial_cambiario` |
+| `compras_tg_recepcion_registrar()` | `'1401'` / `'1409'` / `'5107'` | `activo_fijo` / `depreciacion_acumulada` / `gasto_depreciacion` |
+| UI · apertura de saldos | `codigo === '3101'` | `resultados_acumulados` |
+
+- **Resolución estricta al ledger** (`conta_cuenta_especial`): el mapeo del
+  ledger EXACTO (`company_id` + `project_id` NULL para empresa o el valor exacto
+  para proyecto), y la cuenta tiene que estar **activa**, ser **de detalle** y
+  pertenecer a **ese mismo ledger**. Cualquier otra cosa → NULL. **Nunca** hay
+  fallback por código ni préstamo de la cuenta de otra contabilidad.
+- **Mensaje único cuando falta** (`conta_exigir_cuenta_especial`):
+  `CONTA_CONFIG_INCOMPLETA: Configuración contable incompleta — …`, que la UI
+  muestra tal cual. No se elige una cuenta "parecida" ni se contabiliza en
+  silencio.
+- **No bloquea la operación de negocio**: sólo se exige en las acciones
+  EXPLÍCITAS del usuario (cierre anual, aplicar revaluación), que ya levantaban
+  excepción. En los triggers colgados de una operación —la recepción de
+  mercadería— el hueco de configuración deja el activo sin cuenta contable y la
+  recepción se registra igual, como cuando el código no existía en el catálogo.
+- **Configuración › Cuentas especiales del sistema**: sección nueva que lista las
+  11 cuentas que el motor necesita, dice **cuáles faltan y por qué** (`sin_mapeo`
+  se arregla eligiendo una cuenta; `inactiva`, `agrupadora` y `otro_ledger` se
+  arreglan en el catálogo) y sólo ofrece cuentas activas, de detalle y del ledger
+  activo. Lo alimenta `conta_cuentas_especiales_estado(project)`, anclada a
+  `get_my_company_id()`.
+- **Escritura por ledger, corregida**: la pantalla de Configuración leía el mapeo
+  del ledger activo pero **escribía siempre sobre el de la empresa** (la mutación
+  se llamaba sin `projectId`), así que configurar un proyecto cambiaba la empresa.
+- **Sin cambios al seed del catálogo**: `conta_seed_catalogo` no se toca. Lo único
+  que se siembra es la **fila de mapeo** de las tres cuentas especiales nuevas, y
+  sólo cuando la cuenta ya existe en el ledger — sin eso, el cierre anual que hoy
+  funciona pasaría a fallar por "configuración incompleta" en todos los ledgers
+  existentes, que sería una regresión, no una migración.
+- **Verificación**: `supabase/tests/conta_cuentas_especiales/run.sh` — 60
+  invariantes ejecutables contra un PostgreSQL desechable. La prueba que da
+  nombre a la fase **renombra** 3101/3201/3301 a `900001`/`900002`/`900003` y
+  exige que cierre anual y revaluación FX sigan funcionando y descarguen contra
+  la cuenta MAPEADA.
+
+Límites declarados (los cierra el PR siguiente): el seed por defecto sigue
+creando el catálogo LATAM completo; no hay catálogo vacío ni básico; no se
+convierten códigos existentes; la profundidad máxima sigue en 8 niveles.
+
 ## Dependencias y orden
 
 ```

@@ -161,6 +161,71 @@ export const EVENTOS_MAPEO = [
 
 export type EventoMapeo = (typeof EVENTOS_MAPEO)[number]['evento']
 
+/**
+ * Cuentas ESPECIALES del sistema: las que el motor contable necesita resolver
+ * por SIGNIFICADO para poder operar (cierre anual, revaluación cambiaria,
+ * apertura de saldos, puente de compras…). Antes se buscaban por su código del
+ * catálogo sembrado ('3101', '3201', '3301', '1401'…), lo que ataba la
+ * contabilidad a ese plan de cuentas; ahora se resuelven contra
+ * `conta_mapeo_cuentas`, acotadas al ledger activo.
+ *
+ * Espeja `public.conta_eventos_especiales()` (migración 20260918121413). El
+ * orden de esta lista es el de la sección de Configuración; el estado real
+ * (qué falta y por qué) lo da `conta_cuentas_especiales_estado`.
+ */
+export const CUENTAS_ESPECIALES = [
+  { evento: 'resultados_acumulados',  label: 'Resultados acumulados',            proceso: 'Apertura de saldos' },
+  { evento: 'resultado_ejercicio',    label: 'Resultado del ejercicio',          proceso: 'Cierre anual' },
+  { evento: 'diferencial_cambiario',  label: 'Diferencial cambiario',            proceso: 'Revaluación cambiaria' },
+  { evento: 'cxp_proveedores',        label: 'Proveedores por pagar',            proceso: 'Cuentas por pagar' },
+  { evento: 'compras_por_facturar',   label: 'Bienes y servicios por facturar',  proceso: 'Recepción de compras' },
+  { evento: 'iva_credito',            label: 'IVA crédito fiscal',               proceso: 'IVA de compras' },
+  { evento: 'iva_por_pagar',          label: 'IVA por pagar',                    proceso: 'IVA de cobros' },
+  { evento: 'inventario',             label: 'Inventario de insumos',            proceso: 'Recepción a bodega' },
+  { evento: 'activo_fijo',            label: 'Activo fijo',                      proceso: 'Alta de activos' },
+  { evento: 'depreciacion_acumulada', label: 'Depreciación acumulada',           proceso: 'Alta de activos' },
+  { evento: 'gasto_depreciacion',     label: 'Gasto por depreciación',           proceso: 'Alta de activos' },
+] as const
+
+export type EventoEspecial = (typeof CUENTAS_ESPECIALES)[number]['evento']
+
+/**
+ * Por qué una cuenta especial no está disponible. Distinguirlos importa:
+ * `sin_mapeo` se arregla eligiendo una cuenta aquí mismo, mientras que
+ * `inactiva`, `agrupadora` y `otro_ledger` se arreglan en el catálogo.
+ */
+export type EstadoCuentaEspecial =
+  | 'ok'
+  | 'sin_mapeo'
+  | 'inactiva'
+  | 'agrupadora'
+  | 'otro_ledger'
+
+/** Fila de `conta_cuentas_especiales_estado(p_project_id)`. */
+export interface CuentaEspecialEstado {
+  evento: string
+  etiqueta: string
+  proceso: string
+  /** true = el proceso se detiene con "Configuración contable incompleta". */
+  bloqueante: boolean
+  /** Sólo viene con valor cuando la cuenta es USABLE (activa, detalle, del ledger). */
+  cuenta_id: string | null
+  codigo: string | null
+  nombre: string | null
+  estado: EstadoCuentaEspecial
+}
+
+export const ESTADO_CUENTA_ESPECIAL_LABELS: Record<EstadoCuentaEspecial, string> = {
+  ok: 'Configurada',
+  sin_mapeo: 'Sin asignar',
+  inactiva: 'La cuenta está inactiva',
+  agrupadora: 'La cuenta es agrupadora, no de detalle',
+  otro_ledger: 'La cuenta es de otra contabilidad',
+}
+
+/** Mensaje único de configuración incompleta (espeja CONTA_CONFIG_INCOMPLETA). */
+export const MSG_CONFIG_CONTABLE_INCOMPLETA = 'Configuración contable incompleta'
+
 export const TIPO_CUENTA_LABELS: Record<TipoCuenta, string> = {
   activo: 'Activo',
   pasivo: 'Pasivo',

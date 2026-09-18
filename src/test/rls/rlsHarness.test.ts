@@ -958,6 +958,37 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     }
   })
 
+  // La configuración contable (qué cuenta usa cada proceso especial) es tan
+  // sensible como los asientos: revela el plan de cuentas del tenant. La RPC
+  // NO acepta la empresa por parámetro —la deriva de get_my_company_id()—, así
+  // que el vector cross-tenant no es "pedirle la empresa de B" sino pedirle el
+  // LEDGER de B: un project_id real de la otra empresa. La respuesta correcta
+  // es no devolver ni una cuenta suya.
+  describe('guard de la configuración contable (cuentas especiales) — garantía de TENANT', () => {
+    it(`${idEvidencia('conta_cuentas_especiales_estado', 'anon')} anon NO puede leer la configuración contable`, async () => {
+      const { data, error } = await anon.rpc('conta_cuentas_especiales_estado', {
+        p_project_id: B.projectId,
+      })
+      expect(error, 'anon no debe poder invocar conta_cuentas_especiales_estado').not.toBeNull()
+      expect(data ?? null, 'no debe devolver datos a anon').toBeNull()
+    })
+
+    it(`${idEvidencia('conta_cuentas_especiales_estado', 'authenticated-cross-tenant')} authenticated (A) NO obtiene ninguna cuenta de B al pedir el ledger de B`, async () => {
+      const { data, error } = await userA.rpc('conta_cuentas_especiales_estado', {
+        p_project_id: B.projectId,
+      })
+      // No tiene por qué fallar: la RPC está anclada a la empresa de A, así que
+      // el par (empresa de A, proyecto de B) simplemente no es ningún ledger.
+      // Lo que se exige es que NO salga ni una cuenta configurada.
+      expect(error).toBeNull()
+      const filas = (data ?? []) as Array<{ cuenta_id: string | null; estado: string }>
+      expect(filas.every((f) => f.cuenta_id === null),
+        'un ledger que no es de A no puede devolver cuentas resueltas').toBe(true)
+      expect(filas.every((f) => f.estado !== 'ok'),
+        'ninguna cuenta especial puede darse por configurada en un ledger ajeno').toBe(true)
+    })
+  })
+
   describe('guard RPCs de estatus de bóvedas (#611) — garantía de TENANT', () => {
     for (const { name, args } of ESTATUS_RPCS_ANON) {
       it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {

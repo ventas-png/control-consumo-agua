@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { EditModal } from '../shared'
 import { notify } from '../shared/Dialog'
-import { useCuentasQuery } from '../../domain/contabilidad/queries'
+import { useCuentasEspecialesQuery, useCuentasQuery } from '../../domain/contabilidad/queries'
 import { useCrearAsientoBorradorMutation, usePublicarAsientoMutation } from '../../domain/contabilidad/mutations'
 import { convertirMontoBase, round2, type AsientoLineaFormInput } from '../../domain/contabilidad/schemas'
 import { formatCurrency, hoyLocalISO } from '../../lib/format'
+import { MSG_CONFIG_CONTABLE_INCOMPLETA } from '../../types/contabilidad'
 import { Campo, btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
@@ -18,15 +19,25 @@ interface Props {
 /**
  * Partidas de arranque: captura los saldos iniciales de las cuentas de detalle
  * a una fecha de corte y genera el asiento de APERTURA. El lado (debe/haber)
- * se deriva de la naturaleza de cada cuenta; la diferencia puede ajustarse a
- * Resultados acumulados (3101) con un clic. Solo puede existir una apertura
- * publicada por empresa+proyecto (índice único en BD).
+ * se deriva de la naturaleza de cada cuenta; la diferencia puede ajustarse con
+ * un clic contra la cuenta de RESULTADOS ACUMULADOS del ledger.
+ *
+ * Esa cuenta se resuelve por SIGNIFICADO (`resultados_acumulados` en las
+ * cuentas especiales del sistema), no por el código '3101' del catálogo
+ * sembrado: un cliente con su propio plan de cuentas no tiene por qué llamarla
+ * así. Si el mapeo falta, el botón de ajuste no aparece y se dice qué
+ * configurar — NUNCA se elige una cuenta "parecida" por código, y el resto de
+ * la apertura (capturar y registrar saldos cuadrados) sigue funcionando.
+ *
+ * Solo puede existir una apertura publicada por empresa+proyecto (índice único
+ * en BD).
  */
 export function AperturaSaldosModal({ companyId, projectId, monedaBase, onClose }: Props) {
   // El catálogo es el DEL LEDGER activo. Sin `projectId` la query cae al de la
   // empresa (`project_id IS NULL`), así que la apertura de un proyecto listaba
   // las cuentas de la empresa y armaba el asiento contra ellas.
   const { data: cuentas = [] } = useCuentasQuery(companyId, projectId)
+  const { data: especiales = [] } = useCuentasEspecialesQuery(companyId, projectId)
   const crear = useCrearAsientoBorradorMutation(companyId)
   const publicar = usePublicarAsientoMutation()
 
@@ -38,7 +49,18 @@ export function AperturaSaldosModal({ companyId, projectId, monedaBase, onClose 
     () => cuentas.filter((c) => c.es_detalle && c.activa).sort((a, b) => a.codigo.localeCompare(b.codigo, 'es')),
     [cuentas],
   )
-  const ctaResultados = useMemo(() => detalle.find((c) => c.codigo === '3101'), [detalle])
+  // Resuelta por el servidor, que ya exige activa + de detalle + del MISMO
+  // ledger; `cuenta_id` sólo viene con valor cuando la cuenta es usable.
+  const resultadosAcumulados = useMemo(
+    () => especiales.find((e) => e.evento === 'resultados_acumulados') ?? null,
+    [especiales],
+  )
+  const ctaResultados = useMemo(
+    () => (resultadosAcumulados?.cuenta_id
+      ? detalle.find((c) => c.id === resultadosAcumulados.cuenta_id)
+      : undefined),
+    [detalle, resultadosAcumulados],
+  )
 
   function montoBaseDe(cuentaId: string): number {
     const c = detalle.find((x) => x.id === cuentaId)
@@ -87,7 +109,15 @@ export function AperturaSaldosModal({ companyId, projectId, monedaBase, onClose 
       return
     }
     if (totales.diferencia !== 0) {
-      if (!ajustarDiferencia || !ctaResultados) {
+      if (!ctaResultados) {
+        notify({
+          variant: 'warning',
+          title: MSG_CONFIG_CONTABLE_INCOMPLETA,
+          text: `Diferencia de ${formatCurrency(totales.diferencia, monedaBase)}, y esta contabilidad no tiene asignada la cuenta de Resultados acumulados. Asígnala en Configuración › Cuentas especiales del sistema, o corrige los saldos para que la apertura cuadre.`,
+        })
+        return
+      }
+      if (!ajustarDiferencia) {
         notify({
           variant: 'warning',
           title: 'Apertura descuadrada',
@@ -159,6 +189,22 @@ export function AperturaSaldosModal({ companyId, projectId, monedaBase, onClose 
           </Campo>
 
         </div>
+
+        {!ctaResultados && (
+          <div
+            role="status"
+            style={{
+              padding: '8px 10px', borderRadius: 8, fontSize: 12,
+              border: '1px solid var(--at-warning)', color: 'var(--at-ink)',
+            }}
+          >
+            <strong>{MSG_CONFIG_CONTABLE_INCOMPLETA}:</strong> esta contabilidad
+            no tiene asignada la cuenta de <em>Resultados acumulados</em>, así
+            que no se puede ajustar una apertura descuadrada. Asígnala en
+            Configuración › Cuentas especiales del sistema. Registrar saldos que
+            ya cuadran sigue disponible.
+          </div>
+        )}
 
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>

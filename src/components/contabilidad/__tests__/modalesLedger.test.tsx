@@ -12,6 +12,7 @@ import type { CuentaContable } from '../../../types/contabilidad'
 
 const state = vi.hoisted(() => ({
   llamadas: [] as Array<{ companyId?: string; projectId?: string | null }>,
+  especiales: [] as Array<{ companyId?: string; projectId?: string | null }>,
   cuentas: [] as CuentaContable[],
 }))
 
@@ -26,6 +27,12 @@ vi.mock('../../../domain/contabilidad/queries', () => ({
   useCuentasQuery: (companyId?: string, projectId?: string | null) => {
     state.llamadas.push({ companyId, projectId })
     return { data: state.cuentas }
+  },
+  // Las cuentas especiales también son POR LEDGER: se registran aparte para
+  // poder exigir que la apertura las pida con el mismo projectId.
+  useCuentasEspecialesQuery: (companyId?: string, projectId?: string | null) => {
+    state.especiales.push({ companyId, projectId })
+    return { data: [] }
   },
 }))
 vi.mock('../../../domain/contabilidad/mutations', () => ({
@@ -48,6 +55,7 @@ function cuenta(id: string, codigo: string, nombre: string): CuentaContable {
 
 beforeEach(() => {
   state.llamadas = []
+  state.especiales = []
   state.cuentas = [cuenta('cta-p1', '1102-01', 'Banco del proyecto')]
 })
 afterEach(cleanup)
@@ -57,12 +65,14 @@ describe('AperturaSaldosModal', () => {
     render(<AperturaSaldosModal companyId="c1" projectId="p1" monedaBase="GTQ" onClose={() => {}} />)
     expect(state.llamadas).toContainEqual({ companyId: 'c1', projectId: 'p1' })
     expect(state.llamadas.every((l) => l.projectId === 'p1')).toBe(true)
+    expect(state.especiales).toContainEqual({ companyId: 'c1', projectId: 'p1' })
     expect(screen.getByText(/1102-01 — Banco del proyecto/)).toBeTruthy()
   })
 
   it('pide el catálogo de la EMPRESA cuando la contabilidad activa es la empresa', () => {
     render(<AperturaSaldosModal companyId="c1" projectId={null} monedaBase="GTQ" onClose={() => {}} />)
     expect(state.llamadas).toContainEqual({ companyId: 'c1', projectId: null })
+    expect(state.especiales).toContainEqual({ companyId: 'c1', projectId: null })
   })
 })
 

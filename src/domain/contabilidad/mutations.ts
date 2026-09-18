@@ -418,7 +418,11 @@ export function useGuardarMapeoMutation(companyId?: string) {
       }
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: contabilidadKeys.mapeo(companyId) })
+      // Sin prefijo de ledger: el mapeo de CUALQUIER ledger de esta empresa
+      // puede haber cambiado, y la sección de cuentas especiales se pinta desde
+      // una RPC distinta que también hay que refrescar.
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.mapeoDeEmpresa(companyId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.cuentasEspecialesDeEmpresa(companyId) })
     },
   })
 }

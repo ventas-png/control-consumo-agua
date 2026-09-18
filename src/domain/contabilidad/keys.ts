@@ -18,6 +18,16 @@ export const contabilidadKeys = {
     [...contabilidadKeys.all, 'mayor', cuentaId ?? null, desde ?? null, hasta ?? null] as const,
   mapeo: (companyId?: string, projectId?: string | null) =>
     [...contabilidadKeys.all, 'mapeo', companyId ?? null, projectId ?? null] as const,
+  cuentasEspeciales: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'cuentas-especiales', companyId ?? null, projectId ?? null] as const,
+  // Prefijos SIN el ledger, para invalidar TODOS los ledgers de la empresa de
+  // una vez. `invalidateQueries` hace match por prefijo, así que la key
+  // completa (que termina en el projectId) sólo invalida ESE ledger: guardar el
+  // mapeo de un proyecto dejaba la pantalla de la empresa con datos viejos.
+  mapeoDeEmpresa: (companyId?: string) =>
+    [...contabilidadKeys.all, 'mapeo', companyId ?? null] as const,
+  cuentasEspecialesDeEmpresa: (companyId?: string) =>
+    [...contabilidadKeys.all, 'cuentas-especiales', companyId ?? null] as const,
   tiposCambio: (companyId?: string) =>
     [...contabilidadKeys.all, 'tipos-cambio', companyId ?? null] as const,
 } as const
