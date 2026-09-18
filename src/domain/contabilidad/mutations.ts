@@ -418,7 +418,48 @@ export function useGuardarMapeoMutation(companyId?: string) {
       }
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: contabilidadKeys.mapeo(companyId) })
+      // Sin prefijo de ledger: el mapeo de CUALQUIER ledger de esta empresa
+      // puede haber cambiado, y la sección de cuentas especiales se pinta desde
+      // una RPC distinta que también hay que refrescar.
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.mapeoDeEmpresa(companyId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.cuentasEspecialesDeEmpresa(companyId) })
+    },
+  })
+}
+
+/**
+ * Desasignar un evento: BORRA la fila de mapeo del ledger activo.
+ *
+ * Es una mutación aparte y no un `cuentaId: ''` en la de arriba a propósito:
+ * esto DESTRUYE configuración, y un borrado disparado por una cadena vacía es
+ * exactamente la clase de intención implícita que termina en un `delete()` sin
+ * filtro. Aquí el borrado se pide por su nombre.
+ *
+ * El filtro del ledger es la parte delicada. `project_id` es NULLABLE, y en
+ * PostgREST `.eq('project_id', null)` NO es `IS NULL`: hay que usar `.is()`.
+ * Confundirlos haría que desasignar en la empresa borrase —o no borrase— el
+ * mapeo de un proyecto. Por eso la rama se elige explícitamente y el `delete`
+ * lleva SIEMPRE las tres condiciones (empresa + ledger exacto + evento).
+ */
+export function useQuitarMapeoMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: { evento: string; projectId?: string | null }) => {
+      if (!companyId) throw new Error('Falta companyId.')
+      let q = supabase
+        .from('conta_mapeo_cuentas')
+        .delete()
+        .eq('company_id', companyId)
+        .eq('evento', vars.evento)
+      // NULL = ledger de la EMPRESA; con valor = el de ESE proyecto. Nunca los
+      // dos: un `project_id` nulo no puede alcanzar la fila de un proyecto, ni
+      // el de un proyecto la de la empresa.
+      q = vars.projectId ? q.eq('project_id', vars.projectId) : q.is('project_id', null)
+      await runQuery((signal) => q.abortSignal(signal))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.mapeoDeEmpresa(companyId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.cuentasEspecialesDeEmpresa(companyId) })
     },
   })
 }

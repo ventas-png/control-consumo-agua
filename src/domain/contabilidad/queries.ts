@@ -12,6 +12,7 @@ import type {
   BalanzaFila,
   CuentaContable,
   MapeoCuenta,
+  CuentaEspecialEstado,
   MovimientoMayor,
   TipoCambio,
 } from '../../types/contabilidad'
@@ -161,6 +162,26 @@ export function useMapeoQuery(companyId?: string, projectId?: string | null) {
       q = projectId ? q.eq('project_id', projectId) : q.is('project_id', null)
       return (await runQuery<MapeoCuenta[]>((signal) => q.abortSignal(signal))) ?? []
     },
+  })
+}
+
+/**
+ * Estado de las cuentas ESPECIALES del sistema en el ledger activo: cuáles
+ * están resueltas y, si no, por qué (sin mapeo / inactiva / agrupadora / de
+ * otra contabilidad). Lo resuelve el servidor —anclado a `get_my_company_id()`,
+ * sin aceptar la empresa por parámetro— porque el motivo depende del estado de
+ * la cuenta, no sólo de que exista la fila de mapeo.
+ */
+export function useCuentasEspecialesQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.cuentasEspeciales(companyId, projectId),
+    enabled: !!companyId,
+    queryFn: async () =>
+      (await runQuery<CuentaEspecialEstado[]>((signal) =>
+        supabase
+          .rpc('conta_cuentas_especiales_estado', { p_project_id: projectId ?? null })
+          .abortSignal(signal),
+      )) ?? [],
   })
 }
 

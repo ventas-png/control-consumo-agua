@@ -115,6 +115,94 @@ La causa era estructural, no un descuido: la clave de idempotencia de los asient
 - **Aviso en la captura**: `conta_gasto_duplicado_probable` avisa al escribir el gasto —«esto ya está como factura A-4471»— con salida a **enlazar** ahí mismo. Advierte, no bloquea.
 - **Verificación**: `supabase/tests/gastos_duplicados/run.sh`, con el mismo patrón que la Fase 6. Incluye lo que de verdad mata estos reportes —que **no** marque dos pagos legítimamente distintos del mismo proveedor por el mismo monto— y la no-regresión del gasto sin factura.
 
+## Fase 8 — Cuentas especiales sin códigos fijos ✅
+
+Primer paso para que el catálogo sea **del cliente**: catálogos vacíos, catálogos
+básicos y códigos puramente numéricos con otra jerarquía. Migración
+`20260918121413_conta_cuentas_especiales_semanticas.sql`.
+
+El módulo ya resolvía por evento (`conta_mapeo_cuentas` + `conta_cuenta_para`)
+todo lo que contabiliza el generador de asientos. Pero **cuatro procesos de
+ejecución** seguían buscando su cuenta por el CÓDIGO literal del catálogo
+sembrado, y mientras eso siguiera así ningún cliente podía traer su propio plan
+de cuentas sin romperlos:
+
+| Proceso | Buscaba | Ahora resuelve por |
+|---|---|---|
+| `conta_cierre_anual(int, uuid)` | `codigo = '3201'` | `resultado_ejercicio` |
+| `conta_revaluar_fx(date, boolean, uuid)` | `codigo = '3301'` | `diferencial_cambiario` |
+| `compras_tg_recepcion_registrar()` | `'1401'` / `'1409'` / `'5107'` | `activo_fijo` / `depreciacion_acumulada` / `gasto_depreciacion` |
+| UI · apertura de saldos | `codigo === '3101'` | `resultados_acumulados` |
+
+- **Resolución estricta al ledger** (`conta_cuenta_especial`): el mapeo del
+  ledger EXACTO (`company_id` + `project_id` NULL para empresa o el valor exacto
+  para proyecto), y la cuenta tiene que estar **activa**, ser **de detalle** y
+  pertenecer a **ese mismo ledger**. Cualquier otra cosa → NULL. **Nunca** hay
+  fallback por código ni préstamo de la cuenta de otra contabilidad.
+- **Mensaje único cuando falta** (`conta_exigir_cuenta_especial`):
+  `CONTA_CONFIG_INCOMPLETA: Configuración contable incompleta — …`, que la UI
+  muestra tal cual. No se elige una cuenta "parecida" ni se contabiliza en
+  silencio.
+- **No bloquea la operación de negocio**: sólo se exige en las acciones
+  EXPLÍCITAS del usuario (cierre anual, aplicar revaluación), que ya levantaban
+  excepción. En los triggers colgados de una operación —la recepción de
+  mercadería— el hueco de configuración deja el activo sin cuenta contable y la
+  recepción se registra igual, como cuando el código no existía en el catálogo.
+- **Configuración › Cuentas especiales del sistema**: sección nueva que lista las
+  11 cuentas que el motor necesita, dice **cuáles faltan y por qué** (`sin_mapeo`
+  se arregla eligiendo una cuenta; `inactiva`, `agrupadora` y `otro_ledger` se
+  arreglan en el catálogo) y sólo ofrece cuentas activas, de detalle y del ledger
+  activo. Lo alimenta `conta_cuentas_especiales_estado(project)`, anclada a
+  `get_my_company_id()`.
+- **Escritura por ledger, corregida**: la pantalla de Configuración leía el mapeo
+  del ledger activo pero **escribía siempre sobre el de la empresa** (la mutación
+  se llamaba sin `projectId`), así que configurar un proyecto cambiaba la empresa.
+- **Sin cambios al seed del catálogo**: `conta_seed_catalogo` no se toca. Lo único
+  que se siembra es la **fila de mapeo** de las tres cuentas especiales nuevas, y
+  sólo cuando la cuenta ya existe en el ledger — sin eso, el cierre anual que hoy
+  funciona pasaría a fallar por "configuración incompleta" en todos los ledgers
+  existentes, que sería una regresión, no una migración.
+- **Sin fuga cross-company** (`20260918151430`): `conta_cuentas_especiales_estado`
+  clasificaba bien una cuenta ajena como `otro_ledger`, pero proyectaba su
+  `codigo` y su `nombre` sin condición, y su `cuenta_id` sólo comprobaba el
+  `project_id`. Con un mapeo HEREDADO cross-company —una fila de mi empresa
+  apuntando al catálogo de otra, anterior al trigger que hoy lo impide— eso
+  entregaba metadatos de otro tenant desde una función SECURITY DEFINER, que
+  corre sin RLS. Ahora `cuenta_id` exige las cuatro condiciones (misma empresa,
+  mismo proyecto, de detalle, activa) y `codigo`/`nombre` van NULL si la cuenta
+  no es de mi empresa. `estado` sigue diciendo `otro_ledger`.
+- **Desasignar de verdad**: elegir «sin asignar» borra la fila de
+  `conta_mapeo_cuentas` del ledger activo (`useQuitarMapeoMutation`). Antes el
+  handler salía con un `return` y el select rebotaba, así que no había forma de
+  deshacer un mapeo. El borrado es una mutación aparte —no un `cuentaId: ''`—
+  porque destruye configuración, y lleva siempre las tres condiciones: empresa,
+  evento y ledger, con `.is('project_id', null)` para la empresa y `.eq()` para
+  un proyecto (en PostgREST `.eq(col, null)` NO es `IS NULL`; confundirlos haría
+  que desasignar en un ledger alcanzara la fila del otro).
+- **Verificación**: `supabase/tests/conta_cuentas_especiales/run.sh` — 67
+  invariantes ejecutables contra un PostgreSQL desechable. La prueba que da
+  nombre a la fase **renombra** 3101/3201/3301 a `900001`/`900002`/`900003` y
+  exige que cierre anual y revaluación FX sigan funcionando y descarguen contra
+  la cuenta MAPEADA.
+
+Límites declarados (los cierra el PR siguiente): el seed por defecto sigue
+creando el catálogo LATAM completo; no hay catálogo vacío ni básico; no se
+convierten códigos existentes; la profundidad máxima sigue en 8 niveles.
+
+Pendiente de infraestructura: el harness RLS server-side corre contra el
+**sandbox de larga vida** (`RLS_SUPABASE_URL`), cuyo esquema se actualiza a mano
+(`supabase db push`, ver `docs/ACTIVAR_HARNESS_RLS.md` paso 2) — no contra el
+preview branch del PR. Una RPC nueva no existe ahí hasta que su migración se
+mergea y se aplica, así que las pruebas de `conta_cuentas_especiales_estado`
+(anon rechazado + `authenticated` de A pidiendo el ledger de B) **no pueden ser
+verdes en el PR que la introduce**: se declaran en `coverage.json` y se añaden
+al harness en un PR posterior, una vez el sandbox tenga la migración. Ojo con el
+falso positivo: contra una RPC inexistente el vector `anon` pasa igual, porque
+"función no encontrada" y "permiso denegado" llegan los dos como error. Mientras
+tanto, la ACL de `anon`/`authenticated`/`service_role` y la RLS de
+`conta_mapeo_cuentas` sí quedan verificadas de forma determinista, en cada
+corrida, por `supabase/tests/conta_cuentas_especiales/run.sh` (aserciones 44-60).
+
 ## Dependencias y orden
 
 ```
