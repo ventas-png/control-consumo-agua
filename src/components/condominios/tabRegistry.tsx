@@ -14,7 +14,7 @@ import type {
   CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento, AnuncioComunidad,
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
-  AreaCondominio, RutaRonda, PuntoControlRuta, VisitaControl,
+  AreaCondominio, RutaRonda, PuntoControlRuta, PuntoVerificacion, VisitaControl,
   PlantillaTareaCargo, BloqueTurno, TareaBloque, RevisionTarea,
   PlantillaHorario, AsignacionTurno, DiaNoLaborable, AusenciaPersonal, ExcepcionTurno,
   Asamblea, ContratoProveedor, ObjetoPerdido, AgendaItem,
@@ -149,6 +149,7 @@ export interface CondominiosTabContext {
   areas: AreaCondominio[]
   rutas: RutaRonda[]
   puntosControl: PuntoControlRuta[]
+  puntosVerificacion: PuntoVerificacion[]
   visitasControl: VisitaControl[]
   plantillasCargo: PlantillaTareaCargo[]
   bloquesTurno: BloqueTurno[]
@@ -504,11 +505,11 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'infracciones', label: 'Infracciones', icon: '⚖️', render: (ctx) =>
     <InfraccionesTab infracciones={ctx.infracciones} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} moneda={ctx.moneda} canCreate={ctx.canCreate('infracciones')} canEdit={ctx.canEdit('infracciones')} onRefresh={ctx.onRefresh} /> },
   { id: 'seguridad', label: 'Seguridad', icon: '🛡️', render: (ctx) =>
-    <SeguridadTab rondas={ctx.rondas} novedades={ctx.novedades} rutas={ctx.rutas} puntosControl={ctx.puntosControl} visitasControl={ctx.visitasControl} visitantes={ctx.visitantes} unidades={ctx.unidadesProyecto} reservasSTR={ctx.reservasSTR} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('seguridad')} canEdit={ctx.canEdit('seguridad')} onRefresh={ctx.onRefresh} /> },
+    <SeguridadTab rondas={ctx.rondas} novedades={ctx.novedades} rutas={ctx.rutas} puntosControl={ctx.puntosControl} visitasControl={ctx.visitasControl} areas={ctx.areas} visitantes={ctx.visitantes} unidades={ctx.unidadesProyecto} reservasSTR={ctx.reservasSTR} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('seguridad')} canEdit={ctx.canEdit('seguridad')} onRefresh={ctx.onRefresh} /> },
   { id: 'areas_config', label: 'Áreas', icon: '📍', render: (ctx) =>
     <AreasCondominioTab areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('areas_config')} canEdit={ctx.canEdit('areas_config')} canDelete={ctx.canDelete('areas_config')} onRefresh={ctx.onRefresh} /> },
   { id: 'rutas_ronda', label: 'Rutas Ronda', icon: '🗺️', render: (ctx) =>
-    <RutasRondaTab areas={ctx.areas} rutas={ctx.rutas} puntosControl={ctx.puntosControl} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('rutas_ronda')} canEdit={ctx.canEdit('rutas_ronda')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
+    <RutasRondaTab areas={ctx.areas} rutas={ctx.rutas} puntosControl={ctx.puntosControl} puntosVerificacion={ctx.puntosVerificacion} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('rutas_ronda')} canEdit={ctx.canEdit('rutas_ronda')} canDelete={ctx.canDelete('rutas_ronda')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'plantillas_cargo', label: 'Plantillas', icon: '📋', render: (ctx) =>
     <PlantillasCargoTab plantillas={ctx.plantillasCargo} areas={ctx.areas} suministros={ctx.suministros} inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('plantillas_cargo')} canEdit={ctx.canEdit('plantillas_cargo')} canDelete={ctx.canDelete('plantillas_cargo')} onRefresh={ctx.onRefresh} /> },
   { id: 'tareas_personal', label: 'Tareas por turno', icon: '⚙️', render: (ctx) =>

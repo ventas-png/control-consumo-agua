@@ -138,14 +138,19 @@ const sinComunicacion = (tabs: string[]) => tabs.filter(t => !COMUNICACION_SET.h
 //
 // La tanda grande vino de Seguridad: la jornada (turnos, plantillas de cargo,
 // ausencias, horas y extras, presencia, panel de turno), el trabajo asignado
-// (tareas por turno con su revisión, rutas de ronda) y la medición (desempeño).
-// Estaban ahí porque el guardia es quien más turnos tiene, no porque programar
-// una jornada sea vigilar: quien arma el rol de quien administra al personal
-// necesitaba el bloque de Seguridad entero para llegar a ellos.
+// (tareas por turno con su revisión) y la medición (desempeño). Estaban ahí
+// porque el guardia es quien más turnos tiene, no porque programar una jornada
+// sea vigilar: quien arma el rol de quien administra al personal necesitaba el
+// bloque de Seguridad entero para llegar a ellos.
+//
+// `rutas_ronda` SE DEVOLVIÓ a Seguridad (20260921000000). Vino aquí con esa
+// tanda por ser "trabajo que se asigna", pero lo que define no es una jornada:
+// es el recorrido de vigilancia y su catálogo de puntos de verificación, que se
+// arma y se ejecuta desde el mismo sitio que las rondas y sus novedades.
 const RECURSOS_HUMANOS_TABS = [
   'personal', 'capacitacion_personal',
   'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
-  'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza', 'rutas_ronda',
+  'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza',
   'desempeno_personal', 'actividad_equipo',
 ]
 const RECURSOS_HUMANOS_SET = new Set(RECURSOS_HUMANOS_TABS)

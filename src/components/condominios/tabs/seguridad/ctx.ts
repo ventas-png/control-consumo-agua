@@ -3,10 +3,21 @@
 // intacto (mismo patrón que tabs/amenidades, tabs/visitantes y rutas).
 import type { Dispatch, SetStateAction } from 'react'
 import type {
-  EstadoRonda, EstadoVisitaControl, NovedadSeguridad, PrioridadNovedad,
+  AreaCondominio, EstadoRonda, EstadoVisitaControl, NovedadSeguridad, PrioridadNovedad,
   PuntoControlRuta, ReservaSTR, RondaSeguridad, RutaRonda, TipoNovedad,
   Unidad, VisitaControl, Visitante,
 } from '../../../../types'
+
+/**
+ * La parada que se está cerrando en el modal de marcaje. `punto` va entero (no
+ * solo su id) porque el modal necesita su nombre, sus instrucciones y su
+ * exigencia de foto, que se resuelve con `puntoExigeFoto`.
+ */
+export interface MarcaPuntoState {
+  visitaId: string
+  punto: PuntoControlRuta
+  estado: Extract<EstadoVisitaControl, 'ok' | 'novedad'>
+}
 
 export interface NovedadFormState {
   tipo: TipoNovedad
@@ -32,6 +43,7 @@ export interface SeguridadCtx {
   rutas: RutaRonda[]
   puntosControl: PuntoControlRuta[]
   visitasControl: VisitaControl[]
+  areas: AreaCondominio[]
   unidades: Unidad[]
   reservasSTR: ReservaSTR[]
   proyectoId: string
@@ -50,6 +62,12 @@ export interface SeguridadCtx {
   setFotosNovedadForm: Dispatch<SetStateAction<string[]>>
   rondaForm: { notas: string; ruta_id: string }
   setRondaForm: Dispatch<SetStateAction<{ notas: string; ruta_id: string }>>
+  marcandoPunto: MarcaPuntoState | null
+  setMarcandoPunto: Dispatch<SetStateAction<MarcaPuntoState | null>>
+  notasPunto: string
+  setNotasPunto: Dispatch<SetStateAction<string>>
+  fotosPunto: string[]
+  setFotosPunto: Dispatch<SetStateAction<string[]>>
   setShowNovedadForm: Dispatch<SetStateAction<boolean>>
   setShowRondaForm: Dispatch<SetStateAction<boolean>>
 
@@ -90,8 +108,11 @@ export interface SeguridadCtx {
   // ── Acciones ──
   iniciarRonda: () => Promise<void>
   finalizarRonda: (id: string, estado: EstadoRonda) => Promise<void>
-  marcarVisita: (visitaId: string, estado: EstadoVisitaControl, notas?: string) => Promise<void>
-  marcarVisitaConNovedad: (visitaId: string) => Promise<void>
+  marcarVisita: (visitaId: string, estado: EstadoVisitaControl, notas?: string, fotos?: string[]) => Promise<void>
+  /** Abre el modal de cierre (novedad, o punto que exige imagen). */
+  abrirMarcaPunto: (visitaId: string, punto: PuntoControlRuta, estado: 'ok' | 'novedad') => void
+  /** Cierra la parada con lo capturado en el modal. */
+  confirmarMarcaPunto: () => Promise<void>
   registrarNovedad: () => Promise<void>
   eliminarNovedad: (id: string) => Promise<void>
   resetAccesos: () => void

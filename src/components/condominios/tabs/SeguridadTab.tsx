@@ -1,7 +1,6 @@
 import { hoyLocalISO, diasEntreFechasCalendario } from '../../../lib/format'
 import { useState } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
-import { openPromptDialog } from '../../shared/PromptDialog'
 import {
   createCondominioRow,
   createCondominioRowReturning,
@@ -13,16 +12,18 @@ import { validatedInsert } from '../../../lib/validatedInsert'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { calcularFotosExpiradas, progresoRonda } from '../../../lib/seguridadReglas'
 import type {
-  RondaSeguridad, NovedadSeguridad, TipoNovedad, PrioridadNovedad, EstadoRonda,
+  AreaCondominio, RondaSeguridad, NovedadSeguridad, TipoNovedad, PrioridadNovedad, EstadoRonda,
   RutaRonda, PuntoControlRuta, VisitaControl, EstadoVisitaControl,
   Visitante, Unidad, ReservaSTR,
 } from '../../../types'
-import type { NovedadFormState, RegFormState, SeguridadCtx } from './seguridad/ctx'
+import { puntoExigeFoto } from '../../../types'
+import type { MarcaPuntoState, NovedadFormState, RegFormState, SeguridadCtx } from './seguridad/ctx'
 import { PLATAFORMA_LABEL } from './seguridad/ui'
 import { RondaEnCursoBanner } from './seguridad/RondaEnCursoBanner'
 import { NovedadForm, RondaForm } from './seguridad/formularios'
 import { VistaNovedades, VistaRondas } from './seguridad/vistas'
 import { NovedadDetalleModal } from './seguridad/NovedadDetalleModal'
+import { MarcarPuntoModal } from './seguridad/MarcarPuntoModal'
 import { AccesosModal } from './seguridad/AccesosModal'
 
 interface Props {
@@ -31,6 +32,7 @@ interface Props {
   rutas: RutaRonda[]
   puntosControl: PuntoControlRuta[]
   visitasControl: VisitaControl[]
+  areas: AreaCondominio[]
   visitantes: Visitante[]
   unidades: Unidad[]
   reservasSTR: ReservaSTR[]
@@ -43,7 +45,7 @@ interface Props {
 }
 
 export function SeguridadTab({
-  rondas, novedades, rutas, puntosControl, visitasControl,
+  rondas, novedades, rutas, puntosControl, visitasControl, areas,
   visitantes: _visitantes, unidades, reservasSTR,
   proyectoId, companyId, userId, canCreate, canEdit, onRefresh,
 }: Props) {
@@ -61,6 +63,11 @@ export function SeguridadTab({
   })
   const [fotosNovedadForm, setFotosNovedadForm] = useState<string[]>([])
   const [rondaForm, setRondaForm] = useState({ notas: '', ruta_id: '' })
+
+  // Cierre de una parada de la ronda (novedad, o punto que exige imagen).
+  const [marcandoPunto, setMarcandoPunto] = useState<MarcaPuntoState | null>(null)
+  const [notasPunto, setNotasPunto] = useState('')
+  const [fotosPunto, setFotosPunto] = useState<string[]>([])
 
   // Accesos / verificación visitante
   const [modoModal, setModoModal] = useState<'dpi' | 'str'>('dpi')
@@ -129,30 +136,42 @@ export function SeguridadTab({
     onRefresh()
   }
 
-  async function marcarVisita(visitaId: string, estado: EstadoVisitaControl, notas?: string) {
-    await updateCondominioRow('visitas_control', visitaId, {
+  async function marcarVisita(visitaId: string, estado: EstadoVisitaControl, notas?: string, fotos?: string[]) {
+    const { error } = await updateCondominioRow('visitas_control', visitaId, {
       estado, notas: notas ?? null,
+      foto_urls: fotos ?? [],
       visitado_en: estado !== 'pendiente' ? new Date().toISOString() : null,
     })
+    if (error) {
+      // El trigger `trg_visitas_control_evidencia` rechaza el cierre sin foto
+      // donde el punto la exige. La UI ya lo impide, así que llegar aquí
+      // significa que el catálogo cambió mientras la ronda estaba abierta.
+      notify({ variant: 'error', title: 'No se pudo cerrar el punto', text: error.message })
+      return
+    }
     onRefresh()
   }
 
-  async function marcarVisitaConNovedad(visitaId: string) {
-    const result = await openPromptDialog({
-      title: 'Registrar novedad en este punto',
-      fields: [{
-        name: 'notas',
-        label: 'Novedad',
-        control: 'textarea',
-        rows: 4,
-        placeholder: 'Describe la novedad encontrada...',
-        required: true,
-        autoFocus: true,
-      }],
-      submitText: 'Registrar',
-    })
-    if (!result) return
-    await marcarVisita(visitaId, 'novedad', result.notas)
+  /**
+   * Abre el modal de cierre. Solo hace falta cuando hay algo que capturar: una
+   * novedad (que siempre se describe) o un punto que exige imagen. Un "ok" en un
+   * punto que no pide nada sigue siendo un clic, como siempre.
+   */
+  function abrirMarcaPunto(visitaId: string, punto: PuntoControlRuta, estado: 'ok' | 'novedad') {
+    if (estado === 'ok' && !puntoExigeFoto(punto)) { void marcarVisita(visitaId, 'ok'); return }
+    setNotasPunto(''); setFotosPunto([])
+    setMarcandoPunto({ visitaId, punto, estado })
+  }
+
+  async function confirmarMarcaPunto() {
+    if (!marcandoPunto) return
+    const { visitaId, punto, estado } = marcandoPunto
+    if (estado === 'novedad' && !notasPunto.trim()) return
+    if (puntoExigeFoto(punto) && fotosPunto.length === 0) return
+    setSaving(true)
+    await marcarVisita(visitaId, estado, notasPunto.trim() || undefined, fotosPunto)
+    setSaving(false)
+    setMarcandoPunto(null); setNotasPunto(''); setFotosPunto([])
   }
 
   async function registrarNovedad() {
@@ -297,11 +316,12 @@ export function SeguridadTab({
   }
 
   const ctx: SeguridadCtx = {
-    rondas, novedades, rutas, puntosControl, visitasControl, unidades, reservasSTR,
+    rondas, novedades, rutas, puntosControl, visitasControl, areas, unidades, reservasSTR,
     proyectoId, canCreate, canEdit,
     saving, filtroPrioridad, setFiltroPrioridad, novedadDetalle, setNovedadDetalle,
     novedadForm, setNovedadForm, fotosNovedadForm, setFotosNovedadForm,
     rondaForm, setRondaForm, setShowNovedadForm, setShowRondaForm,
+    marcandoPunto, setMarcandoPunto, notasPunto, setNotasPunto, fotosPunto, setFotosPunto,
     modoModal, strSearch, setStrSearch, dpiSearch, setDpiSearch,
     searchResult, setSearchResult, searchResultVisitantes, setSearchResultVisitantes,
     searching, showRegForm, setShowRegForm, regSaving,
@@ -310,7 +330,7 @@ export function SeguridadTab({
     strIngresados,
     rondaEnCurso, novedadesFiltradas, visitasRondaActual, puntosRondaActual,
     puntosCompletados, progreso, rutasActivas,
-    iniciarRonda, finalizarRonda, marcarVisita, marcarVisitaConNovedad,
+    iniciarRonda, finalizarRonda, marcarVisita, abrirMarcaPunto, confirmarMarcaPunto,
     registrarNovedad, eliminarNovedad, resetAccesos, cambiarModo,
     precargarDesdeSTR, buscarPorDpi, handleRegistrarAcceso,
   }
@@ -379,6 +399,9 @@ export function SeguridadTab({
 
       {/* Modal detalle de novedad */}
       {novedadDetalle && <NovedadDetalleModal ctx={ctx} />}
+
+      {/* Modal de cierre de un punto de la ronda (novedad / evidencia) */}
+      {marcandoPunto && <MarcarPuntoModal ctx={ctx} />}
 
       {/* Modal de verificación de acceso */}
       {showAccesosModal && <AccesosModal ctx={ctx} />}

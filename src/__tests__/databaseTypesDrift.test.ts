@@ -77,6 +77,8 @@ const TABLAS_VIGILADAS = [
   // Rondas y personal: comparten el catálogo de áreas
   'rutas_ronda',
   'puntos_control_ruta',
+  'puntos_verificacion',
+  'visitas_control',
   'personal_condominio',
 ] as const
 

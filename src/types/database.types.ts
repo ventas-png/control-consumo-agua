@@ -15790,6 +15790,8 @@ export type Database = {
           id: string
           instrucciones: string | null
           orden: number
+          punto_id: string | null
+          requiere_foto: boolean | null
           ruta_id: string
           tiempo_estimado_min: number | null
         }
@@ -15800,6 +15802,8 @@ export type Database = {
           id?: string
           instrucciones?: string | null
           orden?: number
+          punto_id?: string | null
+          requiere_foto?: boolean | null
           ruta_id: string
           tiempo_estimado_min?: number | null
         }
@@ -15810,6 +15814,8 @@ export type Database = {
           id?: string
           instrucciones?: string | null
           orden?: number
+          punto_id?: string | null
+          requiere_foto?: boolean | null
           ruta_id?: string
           tiempo_estimado_min?: number | null
         }
@@ -15822,10 +15828,84 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "puntos_control_ruta_punto_fkey"
+            columns: ["punto_id", "area_id"]
+            isOneToOne: false
+            referencedRelation: "puntos_verificacion"
+            referencedColumns: ["id", "area_id"]
+          },
+          {
             foreignKeyName: "puntos_control_ruta_ruta_id_fkey"
             columns: ["ruta_id"]
             isOneToOne: false
             referencedRelation: "rutas_ronda"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      puntos_verificacion: {
+        Row: {
+          activo: boolean
+          area_id: string
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          id: string
+          instrucciones: string | null
+          nombre: string
+          orden: number
+          project_id: string
+          requiere_foto: boolean
+          tiempo_estimado_min: number | null
+        }
+        Insert: {
+          activo?: boolean
+          area_id: string
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          instrucciones?: string | null
+          nombre: string
+          orden?: number
+          project_id: string
+          requiere_foto?: boolean
+          tiempo_estimado_min?: number | null
+        }
+        Update: {
+          activo?: boolean
+          area_id?: string
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          instrucciones?: string | null
+          nombre?: string
+          orden?: number
+          project_id?: string
+          requiere_foto?: boolean
+          tiempo_estimado_min?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "puntos_verificacion_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "puntos_verificacion_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "puntos_verificacion_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -21152,6 +21232,7 @@ export type Database = {
           creado_por: string | null
           created_at: string
           estado: string
+          foto_urls: Json
           id: string
           notas: string | null
           punto_id: string
@@ -21163,6 +21244,7 @@ export type Database = {
           creado_por?: string | null
           created_at?: string
           estado?: string
+          foto_urls?: Json
           id?: string
           notas?: string | null
           punto_id: string
@@ -21174,6 +21256,7 @@ export type Database = {
           creado_por?: string | null
           created_at?: string
           estado?: string
+          foto_urls?: Json
           id?: string
           notas?: string | null
           punto_id?: string

@@ -583,6 +583,20 @@ jobs:
       - name: Replay desde cero con privilegios de Supabase Branch (ACL de helpers RLS)
         run: node supabase/tests/replay_acl_helpers/run.mjs
 
+      # 20260921000100 promete RECHAZOS, y un rechazo no se comprueba leyendo el
+      # SQL. Tres filos fáciles de desafilar: que el gate de evidencia deje fuera
+      # `omitido` (si lo exigiera, un punto que el guardia no pudo visitar
+      # bloquearía el cierre de la ronda entera); que el guard de tenant corra en
+      # `UPDATE OF …` con guardia de cambio real (si validara la fila, reordenar
+      # una parada legada sería imposible); y que el override por ruta sea un
+      # COALESCE en LOS DOS SENTIDOS — si sólo apretara, `puntoExigeFoto` en
+      # cliente estaría mintiendo.
+      - name: Puntos de verificación — evidencia exigida y tenant no mezclado
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55501
+        run: supabase/tests/puntos_verificacion/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
