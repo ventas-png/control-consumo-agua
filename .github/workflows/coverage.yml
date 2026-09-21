@@ -597,6 +597,20 @@ jobs:
           PGPORT_TEST: 55501
         run: supabase/tests/puntos_verificacion/run.sh
 
+      # 20260922000000 no mueve datos: cambia QUIÉN PUEDE HACER QUÉ. Eso no se
+      # comprueba contando policies — se comprueba intentando las operaciones
+      # con un usuario que no debería poder hacerlas. El arnés primero DEMUESTRA
+      # el bypass (un operador sin `condominios.tab.rutas_ronda` leía, editaba,
+      # insertaba y borraba por la policy legada permisiva) y falla si no lo
+      # encuentra; después aplica la migración y exige las dos direcciones: que
+      # ese usuario ya no pueda nada, y que quien sí tiene permiso siga
+      # trabajando — cerrar de más también es un fallo.
+      - name: Policies de rondas — el bypass de RLS, reproducido y cerrado
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55502
+        run: supabase/tests/policies_rondas/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
