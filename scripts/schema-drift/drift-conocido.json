@@ -4,7 +4,7 @@
   "_TRINQUETE": "Esta lista SÓLO puede encoger. Si un grupo deja de mostrar drift, el auditor falla hasta que se retire la entrada — así el arreglo y la poda viajan en el mismo PR. `--trinquete-contra origin/main` rechaza además cualquier PR que agregue entradas: un drift nuevo se cierra con una migración forward-only, nunca ampliando la baseline.",
   "_COMO_SE_ARREGLA": "Para cada entrada hay que decidir qué lado es el correcto — no se presume que producción ni el repositorio lo sean — y escribir una migración append-only que haga converger al otro. Las entradas marcadas SEGURIDAD van primero. Nada de esto se hace en el PR del auditor: el auditor sólo mide.",
   "_ESTADO": "131 grupos con drift sobre 2438 comparados: 2307 coinciden exactamente. Las 449 migraciones aplican 449/449 sobre una base vacía. Las 260 tablas existen a ambos lados con el mismo estado de RLS. De los 131, DOCE son cosméticos (espaciado en cuerpos de función) y están marcados como tales.",
-  "_HISTORIA": "Sembrada el 2026-09-01 con 120 grupos usando md5 truncado a 12 hex y espacios colapsados. Dos correcciones la movieron:\n(1) md5(12) -> SHA-256 completo sobre serialización canónica: 48 bits admiten colisiones, y una colisión aquí es drift invisible.\n(2) Se ELIMINÓ la normalización de espacios. Colapsaba `regexp_replace('\\\\s+',' ')` de forma global sobre `prosrc` y sobre las definiciones de vista, así que borraba diferencias reales dentro de literales SQL (`SELECT 'a  b'` y `SELECT 'a b'` hasheaban igual), cuerpos PL/pgSQL y dollar-quoted, y vistas con literales. Un falso negativo de seguridad a cambio de 12 entradas cosméticas: mal negocio. Ahora todo se hashea en crudo y las 12 quedan declaradas.\nResultado: 120 -> 119 -> 131. La subida es sólo la deuda cosmética que antes estaba oculta; no apareció ninguna diferencia semántica nueva.",
+  "_HISTORIA": "Sembrada el 2026-09-01 con 120 grupos usando md5 truncado a 12 hex y espacios colapsados. Dos correcciones la movieron:\n(1) md5(12) -> SHA-256 completo sobre serialización canónica: 48 bits admiten colisiones, y una colisión aquí es drift invisible.\n(2) Se ELIMINÓ la normalización de espacios. Colapsaba `regexp_replace('\\\\s+',' ')` de forma global sobre `prosrc` y sobre las definiciones de vista, así que borraba diferencias reales dentro de literales SQL (`SELECT 'a  b'` y `SELECT 'a b'` hasheaban igual), cuerpos PL/pgSQL y dollar-quoted, y vistas con literales. Un falso negativo de seguridad a cambio de 12 entradas cosméticas: mal negocio. Ahora todo se hashea en crudo y las 12 quedan declaradas.\nResultado: 120 -> 119 -> 131. La subida es sólo la deuda cosmética que antes estaba oculta; no apareció ninguna diferencia semántica nueva.\n(3) 2026-09-21: se retiraron SEIS entradas — columnas, constraints e indices de puntos_control_ruta y visitas_control — porque 20260919000000 las hizo converger: el repositorio ya describe lo que produccion tiene en esos grupos. Las entradas */policies de ambas tablas SIGUEN en la lista: son RLS y se deciden en #826.",
   "grupos": {
     "funcion:aplicar_mora_cuotas_vencidas()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
@@ -408,24 +408,6 @@
       "produccion": "f165edf206f3c03404759e873cb5676dc6e6316a700b95b75d4b1f20b39a9678:4",
       "repo": "ad2060841ada820edfe9e194af83e90d86bd0fb94d086d80609147aa384ec630:3"
     },
-    "tabla:puntos_control_ruta/columnas": {
-      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
-      "desde": "2026-09-01",
-      "produccion": "ec38efdae307d2026923a20be5a9824dbe889578910a04a2f8bbc61bc8329048:8",
-      "repo": "2f322d986113a38943913b9236dc5bdd6eeb39e945ca047eb8e651d2c2d14a1c:8"
-    },
-    "tabla:puntos_control_ruta/constraints": {
-      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
-      "desde": "2026-09-01",
-      "produccion": "77def85727c981d40711321195edfb9271e495a78613df4d473d911342e05fcc:4",
-      "repo": "200c8491687748b9cba4adf389294aec05aca3029bb38990126c98d787201d21:4"
-    },
-    "tabla:puntos_control_ruta/indices": {
-      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
-      "desde": "2026-09-01",
-      "produccion": "9760c13ee6396fdf209e09d61f1f031c0822804fa2cb50cd9d462439823e242a:3",
-      "repo": "465fe75ca7a332e52d930572749befb536f8ec8ef3c7de2cb3dc5613c649a854:3"
-    },
     "tabla:puntos_control_ruta/policies": {
       "motivo": "Difieren las policies de RLS entre producción y el repositorio. Toda diferencia de RLS es seguridad hasta que alguien demuestre lo contrario: se clasifica y se resuelve en #826, no aquí.",
       "desde": "2026-09-01",
@@ -539,24 +521,6 @@
       "desde": "2026-09-01",
       "produccion": "8d899c34a10b649cbab39827278196933fb1c9e2d1451e831e1173c5d6882fd7:3",
       "repo": "a33f5bf62ae9db9b1185e05f650b32b9a5cdeae23e92ae4b59ebdb24982d1c2d:3"
-    },
-    "tabla:visitas_control/columnas": {
-      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
-      "desde": "2026-09-01",
-      "produccion": "a8759313bf9a975cb213292c21c05e7d62d0463458cbd7f3e426fe164e7c9366:9",
-      "repo": "8d0b52200a58e05f2846f95bb3645891338c1b78c05682f35f0a5610731a0841:9"
-    },
-    "tabla:visitas_control/constraints": {
-      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
-      "desde": "2026-09-01",
-      "produccion": "67f67ba82f7b634b4dc447c29055f6b2b17710bba2052ed39162bca56be379af:6",
-      "repo": "93a9a7ffbcdf8597f31ba5b45077f0e7bdbc57f10c00825c52a3ef754c50c9aa:5"
-    },
-    "tabla:visitas_control/indices": {
-      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
-      "desde": "2026-09-01",
-      "produccion": "4073f968fe99edbf9440845d724aeb3c2596f07b10a2f835565b8119181ffff5:4",
-      "repo": "c759e1c4fc4d97f5f4542c43deae9876cb6f8bf31445c695aa431f6a5afad7e9:4"
     },
     "tabla:visitas_control/policies": {
       "motivo": "Difieren las policies de RLS entre producción y el repositorio. Toda diferencia de RLS es seguridad hasta que alguien demuestre lo contrario: se clasifica y se resuelve en #826, no aquí.",
