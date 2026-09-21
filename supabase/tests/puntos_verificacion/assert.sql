@@ -297,3 +297,46 @@ BEGIN
   RAISE NOTICE 'OK 12 el área no se borra por debajo; el punto sí arrastra sus paradas';
 END;
 $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- E · EL VOCABULARIO DE `estado` (20260920000000)
+-- ════════════════════════════════════════════════════════════════════════════
+
+DO $$
+DECLARE v_def text;
+BEGIN
+  -- 14 · El CHECK admite lo que la aplicación escribe, y ya no lo que no.
+  --
+  -- Esta es LA invariante del arreglo: el fixture crea la tabla con el
+  -- vocabulario viejo ('visitado'/'con_novedad'), que es como la deja la
+  -- convergencia y como estaba en producción. Todo lo que se cerró más arriba
+  -- con 'ok' y 'novedad' ya demostró que la migración corrió; acá se comprueba
+  -- también el otro lado, que es el que se olvida: que el dominio viejo QUEDÓ
+  -- FUERA y nadie pueda volver a escribirlo.
+  SELECT pg_get_constraintdef(con.oid) INTO v_def
+  FROM pg_constraint con WHERE con.conname = 'visitas_control_estado_check';
+
+  IF v_def IS NULL THEN
+    RAISE EXCEPTION '14a: el CHECK de estado desapareció en vez de cambiar'; END IF;
+  IF v_def LIKE '%''visitado''%' OR v_def LIKE '%''con_novedad''%' THEN
+    RAISE EXCEPTION '14b: el CHECK todavía admite el vocabulario viejo: %', v_def; END IF;
+
+  -- Se usa la parada LEGADA, que ninguna invariante anterior borra. Y se
+  -- comprueba que la fila EXISTE antes de intentarlo: un UPDATE que no casa
+  -- ninguna fila no viola ningún CHECK, así que sin este guard la prueba
+  -- pasaría por vacía — que es justo como falló al escribirla (la invariante 12
+  -- se lleva en cascada la visita que usaba antes).
+  IF NOT EXISTS (SELECT 1 FROM public.visitas_control
+                 WHERE id = 'a0000000-0000-0000-0000-000000000049') THEN
+    RAISE EXCEPTION '14c: la fila de prueba ya no existe; esta invariante no probaría nada'; END IF;
+
+  BEGIN
+    UPDATE public.visitas_control SET estado = 'visitado'
+    WHERE id = 'a0000000-0000-0000-0000-000000000049';
+    RAISE EXCEPTION '14d: se pudo escribir el estado viejo "visitado"';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  RAISE NOTICE 'OK 13 el estado usa el vocabulario de la app y el viejo quedó fuera';
+END;
+$$;

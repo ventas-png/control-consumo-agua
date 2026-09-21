@@ -220,3 +220,48 @@ describe('migración 20260921000100', () => {
     expect(select).toContain("condominios.tab.seguridad")
   })
 })
+
+// ── El vocabulario de `estado` (20260920000000) ────────────────────────────
+describe('migración 20260920000000 — vocabulario de visitas_control.estado', () => {
+  const sql = readFileSync(
+    resolve('supabase/migrations/20260920000000_visitas_control_vocabulario_estado.sql'), 'utf8')
+  const codigo = sql.replace(/^[ \t]*--.*$/gm, '')
+
+  it('deja el CHECK con el vocabulario que la aplicación escribe', () => {
+    // `EstadoVisitaControl` es la fuente: si alguien le agrega un estado y no
+    // toca la BD, la app vuelve a escribir algo que el CHECK rechaza.
+    expect(codigo).toMatch(/CHECK \(estado IN \('pendiente', 'ok', 'novedad', 'omitido'\)\)/)
+  })
+
+  it('traduce el vocabulario viejo ANTES de cambiar la constraint', () => {
+    // Al revés dejaría filas que el CHECK nuevo rechaza y el ALTER fallaría.
+    const posUpdate = codigo.indexOf("SET estado = 'ok'      WHERE estado = 'visitado'")
+    const posAlter = codigo.indexOf('ADD CONSTRAINT visitas_control_estado_check')
+    expect(posUpdate).toBeGreaterThan(-1)
+    expect(posAlter).toBeGreaterThan(posUpdate)
+    expect(codigo).toMatch(/SET estado = 'novedad' WHERE estado = 'con_novedad'/)
+  })
+
+  it('es idempotente: no rehace el swap si el CHECK ya dice lo nuevo', () => {
+    expect(codigo).toMatch(/v_definicion LIKE '%''ok''%' AND v_definicion LIKE '%''novedad''%'/)
+  })
+
+  it('falla si la constraint que viene a arreglar no existe', () => {
+    expect(codigo).toMatch(/RAISE EXCEPTION[\s\S]{0,160}no existe visitas_control_estado_check/)
+  })
+
+  it('el arnés ejecutable aplica AMBAS migraciones, en orden', () => {
+    // Sin la del vocabulario, el fixture (que nace con el CHECK viejo, como lo
+    // deja la convergencia) no dejaría cerrar ni un punto con 'ok' y las trece
+    // invariantes medirían otra cosa.
+    const run = readFileSync(resolve('supabase/tests/puntos_verificacion/run.sh'), 'utf8')
+    expect(run).toContain('20260920000000_visitas_control_vocabulario_estado.sql')
+    expect(run).toContain('20260921000100_puntos_verificacion_catalogo.sql')
+    expect(run).toMatch(/for m in "\$MIG_VOCAB" "\$MIG"/)
+  })
+
+  it('el fixture parte del CHECK VIEJO (si no, no se prueba el arreglo)', () => {
+    const fixture = readFileSync(resolve('supabase/tests/puntos_verificacion/fixture.sql'), 'utf8')
+    expect(fixture).toMatch(/CHECK \(estado IN \('pendiente', 'visitado', 'con_novedad', 'omitido'\)\)/)
+  })
+})

@@ -40,6 +40,7 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
+MIG_VOCAB="$RAIZ/supabase/migrations/20260920000000_visitas_control_vocabulario_estado.sql"
 MIG="$RAIZ/supabase/migrations/20260921000100_puntos_verificacion_catalogo.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -78,9 +79,11 @@ echo "── 1/5 · fixture (esquema y padrón) ──────────�
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d pv -f "$AQUI/fixture.sql" >/dev/null
 echo "  OK    fixture cargado"
 
-echo "── 2/5 · aplicar la migración ─────────────────────────────────────────"
-PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d pv -f "$MIG" >/dev/null
-echo "  OK    $(basename "$MIG")"
+echo "── 2/5 · aplicar las migraciones ──────────────────────────────────────"
+for m in "$MIG_VOCAB" "$MIG"; do
+  PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d pv -f "$m" >/dev/null
+  echo "  OK    $(basename "$m")"
+done
 
 echo "── 3/5 · sembrar catálogo, ruta y ronda ───────────────────────────────"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d pv -f "$AQUI/seed.sql" >/dev/null
@@ -115,5 +118,5 @@ SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d pv -f "$AQUI/reassert.sql" 2>&1) || {
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 
 echo
-echo "✅ puntos_verificacion: 12 invariantes (lo que se exige, lo que no, lo que"
+echo "✅ puntos_verificacion: 13 invariantes (lo que se exige, lo que no, lo que"
 echo "   no se mezcla entre proyectos y lo que no se rompe), migración idempotente."

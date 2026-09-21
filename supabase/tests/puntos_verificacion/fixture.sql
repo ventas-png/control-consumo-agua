@@ -172,7 +172,13 @@ CREATE TABLE public.visitas_control (
   visitado_en  timestamptz,
   visitado_por uuid,
   creado_por   uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at   timestamptz NOT NULL DEFAULT now()
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  -- El CHECK con el vocabulario VIEJO, tal como lo deja 20260919000000
+  -- (convergencia): admite 'visitado'/'con_novedad' y NO lo que la aplicación
+  -- escribe. Está aquí a propósito — 20260920000000 existe para arreglarlo, y
+  -- sin este punto de partida el arnés no probaría nada.
+  CONSTRAINT visitas_control_estado_check
+    CHECK (estado IN ('pendiente', 'visitado', 'con_novedad', 'omitido'))
 );
 
 -- ── Padrón ─────────────────────────────────────────────────────────────────
