@@ -122,11 +122,18 @@ describe('la poda de la baseline viaja en el mismo PR', () => {
     }
   })
 
-  it('las entradas de RLS de esas mismas tablas SIGUEN declaradas', () => {
+  it('no toca las policies: su drift no es de esta migración', () => {
     // Control negativo de la poda: es fácil borrar por prefijo de tabla y
-    // llevarse las policies, que esta migración no toca y que son seguridad.
-    expect(baseline.grupos).toHaveProperty('tabla:puntos_control_ruta/policies')
-    expect(baseline.grupos).toHaveProperty('tabla:visitas_control/policies')
+    // llevarse las policies de paso.
+    //
+    // Cuando se escribió esto, las dos entradas */policies seguían declaradas y
+    // la prueba lo afirmaba. Ya no: `20260922000000` las resolvió retirando las
+    // policies legadas `company_rw_*`, con su propio arnés ejecutable
+    // (supabase/tests/policies_rondas). Lo que sigue siendo cierto —y es lo que
+    // este control existe para vigilar— es que NO fue esta migración: su SQL no
+    // menciona ninguna policy.
+    expect(codigo).not.toMatch(/CREATE POLICY|DROP POLICY|ALTER POLICY/)
+    expect(codigo).not.toMatch(/company_rw_/)
   })
 
   it('la historia de la baseline dice por qué encogió', () => {

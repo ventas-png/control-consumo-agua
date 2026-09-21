@@ -4,7 +4,7 @@
   "_TRINQUETE": "Esta lista SÓLO puede encoger. Si un grupo deja de mostrar drift, el auditor falla hasta que se retire la entrada — así el arreglo y la poda viajan en el mismo PR. `--trinquete-contra origin/main` rechaza además cualquier PR que agregue entradas: un drift nuevo se cierra con una migración forward-only, nunca ampliando la baseline.",
   "_COMO_SE_ARREGLA": "Para cada entrada hay que decidir qué lado es el correcto — no se presume que producción ni el repositorio lo sean — y escribir una migración append-only que haga converger al otro. Las entradas marcadas SEGURIDAD van primero. Nada de esto se hace en el PR del auditor: el auditor sólo mide.",
   "_ESTADO": "131 grupos con drift sobre 2438 comparados: 2307 coinciden exactamente. Las 449 migraciones aplican 449/449 sobre una base vacía. Las 260 tablas existen a ambos lados con el mismo estado de RLS. De los 131, DOCE son cosméticos (espaciado en cuerpos de función) y están marcados como tales.",
-  "_HISTORIA": "Sembrada el 2026-09-01 con 120 grupos usando md5 truncado a 12 hex y espacios colapsados. Dos correcciones la movieron:\n(1) md5(12) -> SHA-256 completo sobre serialización canónica: 48 bits admiten colisiones, y una colisión aquí es drift invisible.\n(2) Se ELIMINÓ la normalización de espacios. Colapsaba `regexp_replace('\\\\s+',' ')` de forma global sobre `prosrc` y sobre las definiciones de vista, así que borraba diferencias reales dentro de literales SQL (`SELECT 'a  b'` y `SELECT 'a b'` hasheaban igual), cuerpos PL/pgSQL y dollar-quoted, y vistas con literales. Un falso negativo de seguridad a cambio de 12 entradas cosméticas: mal negocio. Ahora todo se hashea en crudo y las 12 quedan declaradas.\nResultado: 120 -> 119 -> 131. La subida es sólo la deuda cosmética que antes estaba oculta; no apareció ninguna diferencia semántica nueva.\n(3) 2026-09-21: se retiraron SEIS entradas — columnas, constraints e indices de puntos_control_ruta y visitas_control — porque 20260919000000 las hizo converger: el repositorio ya describe lo que produccion tiene en esos grupos. Las entradas */policies de ambas tablas SIGUEN en la lista: son RLS y se deciden en #826.",
+  "_HISTORIA": "Sembrada el 2026-09-01 con 120 grupos usando md5 truncado a 12 hex y espacios colapsados. Dos correcciones la movieron:\n(1) md5(12) -> SHA-256 completo sobre serialización canónica: 48 bits admiten colisiones, y una colisión aquí es drift invisible.\n(2) Se ELIMINÓ la normalización de espacios. Colapsaba `regexp_replace('\\\\s+',' ')` de forma global sobre `prosrc` y sobre las definiciones de vista, así que borraba diferencias reales dentro de literales SQL (`SELECT 'a  b'` y `SELECT 'a b'` hasheaban igual), cuerpos PL/pgSQL y dollar-quoted, y vistas con literales. Un falso negativo de seguridad a cambio de 12 entradas cosméticas: mal negocio. Ahora todo se hashea en crudo y las 12 quedan declaradas.\nResultado: 120 -> 119 -> 131. La subida es sólo la deuda cosmética que antes estaba oculta; no apareció ninguna diferencia semántica nueva.\n(3) 2026-09-21: se retiraron SEIS entradas — columnas, constraints e indices de puntos_control_ruta y visitas_control — porque 20260919000000 las hizo converger: el repositorio ya describe lo que produccion tiene en esos grupos. Las entradas */policies de ambas tablas SIGUEN en la lista: son RLS y se deciden en #826.\n(4) 2026-09-21: se retiraron las DOS entradas */policies de puntos_control_ruta y visitas_control. 20260922000000 elimino las policies legadas company_rw_puntos_control y company_rw_visitas_control, que 20260424000059 creo FOR ALL / TO PUBLIC y ninguna migracion habia borrado: al ser permisivas se unian con OR al gate RBAC y volvian opcional el permiso del tab y el limite de DELETE a company_owner/admin. Produccion nunca las tuvo, asi que gana produccion y la migracion es no-op alla.",
   "grupos": {
     "funcion:aplicar_mora_cuotas_vencidas()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
@@ -408,12 +408,6 @@
       "produccion": "f165edf206f3c03404759e873cb5676dc6e6316a700b95b75d4b1f20b39a9678:4",
       "repo": "ad2060841ada820edfe9e194af83e90d86bd0fb94d086d80609147aa384ec630:3"
     },
-    "tabla:puntos_control_ruta/policies": {
-      "motivo": "Difieren las policies de RLS entre producción y el repositorio. Toda diferencia de RLS es seguridad hasta que alguien demuestre lo contrario: se clasifica y se resuelve en #826, no aquí.",
-      "desde": "2026-09-01",
-      "produccion": "27cc5824adabf4b304a0c595a2d8bb94e6e2a4aad6be9e6e9d96ccfe71a5f963:4",
-      "repo": "7f0833089d5db4faac9f9ba81231c25d7b2ddee830e12434301583e7ffa15d68:5"
-    },
     "tabla:registros/constraints": {
       "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
       "desde": "2026-09-01",
@@ -521,12 +515,6 @@
       "desde": "2026-09-01",
       "produccion": "8d899c34a10b649cbab39827278196933fb1c9e2d1451e831e1173c5d6882fd7:3",
       "repo": "a33f5bf62ae9db9b1185e05f650b32b9a5cdeae23e92ae4b59ebdb24982d1c2d:3"
-    },
-    "tabla:visitas_control/policies": {
-      "motivo": "Difieren las policies de RLS entre producción y el repositorio. Toda diferencia de RLS es seguridad hasta que alguien demuestre lo contrario: se clasifica y se resuelve en #826, no aquí.",
-      "desde": "2026-09-01",
-      "produccion": "cff45151dd87d9bb30395eadf9fc0346c15816a0ad6dda3620f1bf6777c18083:4",
-      "repo": "e85e7677e6b8327115b0270ea87f5cd576011ea9797da5b5be87c55c0f4ae902:5"
     }
   }
 }
