@@ -180,6 +180,31 @@ export interface RutaRonda {
   created_at: string
 }
 
+/**
+ * Catálogo de puntos de verificación (20260921000100): los sitios concretos que
+ * se revisan, colgados del área. Un área agrupa varios: "Estacionamiento B2" →
+ * puerta peatonal, rampa, tablero eléctrico. Se dan de alta una vez (incluso en
+ * lote) y se ASIGNAN a las rutas que los recorran.
+ */
+export interface PuntoVerificacion {
+  id: string
+  company_id: string
+  project_id: string
+  area_id: string
+  nombre: string
+  instrucciones?: string | null
+  tiempo_estimado_min?: number | null
+  /** Valor por defecto del sitio. Cada ruta puede sobreescribirlo. */
+  requiere_foto: boolean
+  orden: number
+  activo: boolean
+  created_at: string
+  // joins
+  area_nombre?: string
+  area_icono?: string
+}
+
+/** Una parada de la ruta: el punto del catálogo en su posición del recorrido. */
 export interface PuntoControlRuta {
   id: string
   ruta_id: string
@@ -188,9 +213,21 @@ export interface PuntoControlRuta {
   instrucciones?: string | null
   tiempo_estimado_min?: number | null
   created_at: string
+  // ── Catálogo de puntos (20260921000100) ─────────────────────────────────
+  /** Punto del catálogo. NULL = fila legada, anterior al catálogo. */
+  punto_id?: string | null
+  /**
+   * Override por ruta, en los dos sentidos: la ronda nocturna puede exigir foto
+   * donde el catálogo no la pide, y una ruta de paso rápido puede no pedirla.
+   * NULL = hereda el del catálogo (o false si la parada es legada, sin punto).
+   */
+  requiere_foto?: boolean | null
   // joins
   area_nombre?: string
   area_icono?: string
+  punto_nombre?: string
+  /** `requiere_foto` del punto del catálogo, para resolver la herencia. */
+  punto_requiere_foto?: boolean | null
 }
 
 export type EstadoVisitaControl = 'pendiente' | 'ok' | 'novedad' | 'omitido'
@@ -203,11 +240,26 @@ export interface VisitaControl {
   notas?: string | null
   visitado_en?: string | null
   created_at: string
+  /** Paths bare de `condominios-media`; se firman al render (SecureImage). */
+  foto_urls: string[]
   // joins
   area_nombre?: string
   area_icono?: string
   punto_orden?: number
   instrucciones?: string | null
+}
+
+/**
+ * Exigencia efectiva de evidencia de una parada: el override de la ruta si lo
+ * hay, si no el del catálogo, si no false. Espejo en cliente de
+ * `public.punto_ruta_requiere_foto(uuid)` — la BD es la que manda (el trigger
+ * `trg_visitas_control_evidencia` rechaza el cierre), esto solo evita que la UI
+ * mande a la persona contra ese rechazo.
+ */
+export function puntoExigeFoto(
+  punto: Pick<PuntoControlRuta, 'requiere_foto' | 'punto_requiere_foto'>,
+): boolean {
+  return punto.requiere_foto ?? punto.punto_requiere_foto ?? false
 }
 
 

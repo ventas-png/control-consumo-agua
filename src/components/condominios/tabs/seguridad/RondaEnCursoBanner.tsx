@@ -1,13 +1,14 @@
 // Banner de la ronda en curso con su checklist de puntos (P1 #3, extraído de
 // SeguridadTab con el JSX intacto).
 import type { SeguridadCtx } from './ctx'
+import { puntoExigeFoto } from '../../../../types'
 import { VISITA_CONFIG } from './ui'
 
 export function RondaEnCursoBanner({ ctx }: { ctx: SeguridadCtx }) {
   const {
     rondaEnCurso, rutas, canEdit, finalizarRonda,
     puntosRondaActual, visitasRondaActual, puntosCompletados, progreso,
-    marcarVisita, marcarVisitaConNovedad,
+    marcarVisita, abrirMarcaPunto,
   } = ctx
 
   if (!rondaEnCurso) return null
@@ -49,22 +50,34 @@ export function RondaEnCursoBanner({ ctx }: { ctx: SeguridadCtx }) {
             {puntosRondaActual.map((punto, idx) => {
               const visita = visitasRondaActual.find(v => v.punto_id === punto.id)
               const vc = visita ? VISITA_CONFIG[visita.estado] : VISITA_CONFIG['pendiente']
-              const area = punto.area_nombre ?? punto.area_id
+              // Con catálogo (20260921000100) la parada tiene nombre propio; sin
+              // él es una fila legada, que solo se identificaba por su área.
+              const titulo = punto.punto_nombre ?? punto.area_nombre ?? punto.area_id
               const icono = punto.area_icono ?? '📍'
+              const exigeFoto = puntoExigeFoto(punto)
               return (
                 <div key={punto.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: vc.bg, borderRadius: '9px', border: `1px solid ${visita?.estado === 'ok' ? 'var(--at-success-border)' : visita?.estado === 'novedad' ? 'var(--at-warning-border)' : 'var(--at-line)'}` }}>
                   <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--at-accent)', width: '16px', textAlign: 'center' }}>{idx + 1}</span>
                   <span style={{ fontSize: '18px' }}>{icono}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--at-ink)' }}>{area}</div>
+                    <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--at-ink)' }}>
+                      {titulo}
+                      {exigeFoto && <span title="Exige imagen para cerrarse" style={{ marginLeft: '5px' }}>📷</span>}
+                    </div>
+                    {punto.punto_nombre && punto.area_nombre && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{punto.area_nombre}</div>}
                     {punto.instrucciones && <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{punto.instrucciones}</div>}
                     {visita?.notas && <div style={{ fontSize: '11.5px', color: 'var(--at-warning)' }}>⚠ {visita.notas}</div>}
+                    {visita && visita.foto_urls.length > 0 && (
+                      <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>
+                        📷 {visita.foto_urls.length} foto{visita.foto_urls.length !== 1 ? 's' : ''}
+                      </div>
+                    )}
                   </div>
                   <span style={{ fontSize: '14px' }}>{vc.icon}</span>
                   {canEdit && visita && visita.estado === 'pendiente' && (
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button onClick={() => marcarVisita(visita.id, 'ok')} title="OK" style={{ padding: '4px 9px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>✅</button>
-                      <button onClick={() => marcarVisitaConNovedad(visita.id)} title="Novedad" style={{ padding: '4px 9px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⚠️</button>
+                      <button onClick={() => abrirMarcaPunto(visita.id, punto, 'ok')} title={exigeFoto ? 'OK (pide foto)' : 'OK'} style={{ padding: '4px 9px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>✅</button>
+                      <button onClick={() => abrirMarcaPunto(visita.id, punto, 'novedad')} title="Novedad" style={{ padding: '4px 9px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⚠️</button>
                       <button onClick={() => marcarVisita(visita.id, 'omitido')} title="Omitir" style={{ padding: '4px 9px', background: 'var(--at-accent-tint-2)', border: '1px solid var(--at-accent-soft-2)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⏭</button>
                     </div>
                   )}

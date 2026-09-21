@@ -32,14 +32,18 @@ import {
 const TABS_RRHH = [
   'personal', 'capacitacion_personal',
   'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
-  'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza', 'rutas_ronda',
+  'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza',
   'desempeno_personal', 'actividad_equipo',
 ] as const
 
-/** Los diez que vinieron de Seguridad en la segunda tanda (20260907001400). */
+/**
+ * Los que vinieron de Seguridad en la segunda tanda (20260907001400) y SIGUEN
+ * en Recursos Humanos. `rutas_ronda` viajó con ellos y 20260921000000 lo
+ * devolvió: ver el bloque "rutas_ronda vuelve a Seguridad" al final.
+ */
 const TABS_JORNADA = [
   'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia',
-  'panel_turno', 'tareas_personal', 'revision_tareas', 'rutas_ronda',
+  'panel_turno', 'tareas_personal', 'revision_tareas',
   'desempeno_personal',
 ] as const
 
@@ -216,7 +220,9 @@ describe('el riel del sidebar con 11 secciones', () => {
 
 describe('migración 20260907001400 (la jornada, desde Seguridad)', () => {
   it('nombra los diez tabs que se mudan', () => {
-    for (const tab of TABS_JORNADA) {
+    // Los diez de ENTONCES, `rutas_ronda` incluido: la migración es historia y
+    // no se reescribe porque 20260921000000 lo haya devuelto después.
+    for (const tab of [...TABS_JORNADA, 'rutas_ronda']) {
       expect(sqlJornada, tab).toContain(`'${tab}'`)
     }
   })
@@ -268,6 +274,14 @@ describe('migración 20260907001400 (la jornada, desde Seguridad)', () => {
     expect(run).toContain('entre_tandas.sql')
   })
 
+  it('rutas_ronda ya no cuenta como jornada (lo devolvió 20260921000000)', () => {
+    // Control de que la lista de arriba no se recortó por comodidad: el tab
+    // existe, está en Seguridad, y ninguna de las aserciones de esta tanda lo
+    // toca.
+    expect(TABS_JORNADA).not.toContain('rutas_ronda')
+    expect(sectionForTab('rutas_ronda')).toBe('seguridad')
+  })
+
   it('Seguridad conserva su acceso efectivo pese a la mudanza de sección', () => {
     const acceso = CONDOMINIOS_TAB_ACCESS.seguridad!
     for (const tab of TABS_JORNADA) {
@@ -283,5 +297,67 @@ describe('migración 20260907001400 (la jornada, desde Seguridad)', () => {
     // Lo que sí se queda.
     expect(seg.tabs).toContain('bitacora_guardia')
     expect(seg.tabs).toContain('visitantes')
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// rutas_ronda vuelve a Seguridad (20260921000000)
+//
+// Vino a Recursos Humanos con la tanda de la jornada bajo el rótulo de "trabajo
+// que se le asigna al personal". No aplica: una ruta de ronda no reparte horas
+// ni cubre puestos, describe QUÉ SE VIGILA y en qué orden, y su contraparte es
+// la ronda que se ejecuta en el tab Seguridad. Definirla en la otra sección
+// partía en dos un mismo circuito.
+// ════════════════════════════════════════════════════════════════════════════
+
+const MIGRACION_RONDA = resolve('supabase/migrations/20260921000000_rbac_rutas_ronda_vuelve_a_seguridad.sql')
+const sqlRonda = readFileSync(MIGRACION_RONDA, 'utf8').replace(/--[^\n]*/g, '')
+
+describe('rutas_ronda vuelve a Seguridad', () => {
+  it('vive en la sección Seguridad de la nav, y en una sola', () => {
+    const secciones = SECTIONS.filter(s => s.tabs.includes('rutas_ronda')).map(s => s.id)
+    expect(secciones).toEqual(['seguridad'])
+    expect(sectionForTab('rutas_ronda')).toBe('seguridad')
+  })
+
+  it('el editor de roles lo ofrece en Seguridad y no en Recursos Humanos', () => {
+    const grupos = CONDOMINIOS_SECTION_GROUPS.filter(g => g.tabs.includes('rutas_ronda'))
+    expect(grupos.map(g => g.key)).toEqual(['seguridad'])
+  })
+
+  it('el acceso efectivo no se movió con la sección', () => {
+    // Agrupar es presentación; CONDOMINIOS_TAB_ACCESS es autorización. El rol
+    // seguridad lo tenía antes de 20260907001400, lo conservó durante la
+    // estadía en RRHH, y lo conserva ahora.
+    expect(CONDOMINIOS_TAB_ACCESS.seguridad?.has('rutas_ronda')).toBe(true)
+    expect(CONDOMINIOS_TAB_ACCESS.administrador_general).toBeNull()
+    expect(getEffectiveTabAccess(['seguridad'])?.has('rutas_ronda')).toBe(true)
+  })
+
+  it('la migración reclasifica categoría sin renombrar claves', () => {
+    // Las policies de rutas_ronda, puntos_control_ruta y visitas_control gatean
+    // sobre `condominios.tab.rutas_ronda`: un rename las deja apuntando al vacío.
+    expect(sqlRonda).toMatch(/UPDATE public\.permissions[\s\S]{0,40}SET category = 'seguridad'/)
+    expect(sqlRonda).not.toMatch(/UPDATE public\.permissions[\s\S]{0,400}SET key/)
+    expect(sqlRonda).toContain("'condominios.tab.rutas_ronda'")
+  })
+
+  it('no usa LIKE: el guion bajo de rutas_ronda es un comodín', () => {
+    const infractores: string[] = []
+    for (const m of sqlRonda.matchAll(/LIKE\s+'([^']*)'/g)) {
+      if (/(^|[^\\])_/.test(m[1])) infractores.push(m[1])
+    }
+    expect(infractores, `patrones con comodín accidental: ${infractores.join(', ')}`).toEqual([])
+  })
+
+  it('la guarda de postcondición aborta, y la temporal no sobrevive', () => {
+    expect(sqlRonda).toMatch(/RAISE EXCEPTION/)
+    expect(sqlRonda).toContain('no existen en el catálogo')
+    expect(sqlRonda).toMatch(/category IS DISTINCT FROM 'seguridad'/)
+    expect(sqlRonda).toMatch(/DROP TABLE _ronda_a_seguridad/)
+  })
+
+  it('es idempotente (el UPDATE está acotado por la categoría destino)', () => {
+    expect(sqlRonda).toMatch(/AND p\.category IS DISTINCT FROM 'seguridad'/)
   })
 })

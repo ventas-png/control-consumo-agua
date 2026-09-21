@@ -55,6 +55,9 @@ export const SECTIONS: SectionDef[] = [
   { id: 'seguridad', label: 'Seguridad', tabs: [
     'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad',
     'paqueteria', 'objetos', 'incidentes', 'bitacora_guardia', 'emergencias',
+    // La ronda es vigilancia, no jornada: el recorrido y su catálogo de puntos
+    // de verificación se definen desde la misma sección que los ejecuta.
+    'rutas_ronda',
   ]},
   { id: 'comunidad', label: 'Comunidad', tabs: [
     'asambleas', 'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos',
@@ -79,7 +82,7 @@ export const SECTIONS: SectionDef[] = [
     // La jornada: quién cubre qué, cuándo, y quién falta
     'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
     // El trabajo que se les asigna, y quien lo revisa
-    'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza', 'rutas_ronda',
+    'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza',
     // Con qué se les mide
     'desempeno_personal', 'actividad_equipo',
   ]},

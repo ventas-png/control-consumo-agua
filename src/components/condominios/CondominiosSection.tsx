@@ -27,7 +27,7 @@ import type {
   CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento, AnuncioComunidad,
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
-  AreaCondominio, RutaRonda, PuntoControlRuta, VisitaControl,
+  AreaCondominio, RutaRonda, PuntoControlRuta, PuntoVerificacion, VisitaControl,
   PlantillaTareaCargo, BloqueTurno, TareaBloque, RevisionTarea,
   Asamblea, ContratoProveedor, ObjetoPerdido, AgendaItem,
   ItemInventario, PolizaSeguro, InspeccionNormativa, PersonalCondominio,
@@ -178,6 +178,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [areas, setAreas] = useState<AreaCondominio[]>([])
   const [rutas, setRutas] = useState<RutaRonda[]>([])
   const [puntosControl, setPuntosControl] = useState<PuntoControlRuta[]>([])
+  const [puntosVerificacion, setPuntosVerificacion] = useState<PuntoVerificacion[]>([])
   const [visitasControl, setVisitasControl] = useState<VisitaControl[]>([])
   const [plantillasCargo, setPlantillasCargo] = useState<PlantillaTareaCargo[]>([])
   const [bloquesTurno, setBloquesTurno] = useState<BloqueTurno[]>([])
@@ -452,7 +453,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     if (runSeqRef.current !== run) return // una carga más nueva ya corre
 
     // Fase 57 — Rutas de ronda (separate to avoid giant Promise.all size limit)
-    const [areasRes, rutasRes, puntosControlRes, bloqueosAmenRes] = await fetchCondominiosRondasData(pid, cid)
+    const [areasRes, rutasRes, puntosControlRes, puntosVerifRes, bloqueosAmenRes] = await fetchCondominiosRondasData(pid, cid)
     setBloqueosAmenidades(
       (bloqueosAmenRes.data ?? []).map((b: Record<string, unknown>) => ({
         ...b,
@@ -462,11 +463,23 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     setAreas((areasRes.data ?? []) as AreaCondominio[])
     setRutas((rutasRes.data ?? []) as RutaRonda[])
     setPuntosControl(
-      (puntosControlRes.data ?? []).map((p: Record<string, unknown>) => ({
+      (puntosControlRes.data ?? []).map((p: Record<string, unknown>) => {
+        const punto = p.puntos_verificacion as { nombre: string; requiere_foto: boolean } | null
+        return {
+          ...p,
+          area_nombre: (p.areas_condominio as { nombre: string; icono: string } | null)?.nombre,
+          area_icono:  (p.areas_condominio as { nombre: string; icono: string } | null)?.icono,
+          punto_nombre: punto?.nombre,
+          punto_requiere_foto: punto?.requiere_foto ?? null,
+        }
+      }) as PuntoControlRuta[]
+    )
+    setPuntosVerificacion(
+      (puntosVerifRes.data ?? []).map((p: Record<string, unknown>) => ({
         ...p,
         area_nombre: (p.areas_condominio as { nombre: string; icono: string } | null)?.nombre,
         area_icono:  (p.areas_condominio as { nombre: string; icono: string } | null)?.icono,
-      })) as PuntoControlRuta[]
+      })) as PuntoVerificacion[]
     )
 
     // Fetch visitas_control only for rondas of this project (recent 30 days)
@@ -476,6 +489,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
         const punto = v.puntos_control_ruta as { orden: number; instrucciones: string | null; areas_condominio: { nombre: string; icono: string } | null } | null
         return {
           ...v,
+          foto_urls: (v.foto_urls as string[] | null) ?? [],
           punto_orden:  punto?.orden,
           instrucciones: punto?.instrucciones,
           area_nombre:  punto?.areas_condominio?.nombre,
@@ -747,7 +761,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     unidadesProyecto, cid, uid, currentUser, moneda,
     cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, tickets, anuncios,
     parqueos, mascotas, paquetes, infracciones, rondas, novedades, areas, rutas,
-    puntosControl, visitasControl, plantillasCargo, bloquesTurno, tareasBloque,
+    puntosControl, puntosVerificacion, visitasControl, plantillasCargo, bloquesTurno, tareasBloque,
     revisionesTarea, contratos, asambleas, contratosProveedores, objetos, agenda,
     inventario, polizas, inspecciones, personal, clientesBirthday,
     contactosEmergencia, documentos, residuos, bodegas, onboardings, propuestas,
@@ -781,7 +795,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     unidadesProyecto, cid, uid, currentUser, moneda,
     cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, tickets, anuncios,
     parqueos, mascotas, paquetes, infracciones, rondas, novedades, areas, rutas,
-    puntosControl, visitasControl, plantillasCargo, bloquesTurno, tareasBloque,
+    puntosControl, puntosVerificacion, visitasControl, plantillasCargo, bloquesTurno, tareasBloque,
     revisionesTarea, contratos, asambleas, contratosProveedores, objetos, agenda,
     inventario, polizas, inspecciones, personal, clientesBirthday,
     contactosEmergencia, documentos, residuos, bodegas, onboardings, propuestas,

@@ -259,7 +259,11 @@ export async function fetchCondominiosRondasData(pid: string, cid: string) {
     // La tabla no tiene project_id NI company_id propios (se acota vía la RLS de
     // `rutas_ronda`, que es por empresa, no por proyecto), así que el embed era
     // el único filtro de proyecto que había — y no filtraba nada.
-    db.from('puntos_control_ruta').select('*, areas_condominio!inner(nombre, icono)').eq('areas_condominio.project_id', pid).order('orden'),
+    db.from('puntos_control_ruta').select('*, areas_condominio!inner(nombre, icono), puntos_verificacion(nombre, requiere_foto)').eq('areas_condominio.project_id', pid).order('orden'),
+    // Catálogo de puntos de verificación (20260921000100). A diferencia de
+    // `puntos_control_ruta`, esta tabla SÍ tiene project_id y company_id
+    // propios, así que acota como el resto del módulo.
+    db.from('puntos_verificacion').select('*, areas_condominio(nombre, icono)').eq('project_id', pid).eq('company_id', cid).order('orden').order('nombre'),
     db.from('amenidades_bloqueos').select('*, amenidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
   ])
 }
