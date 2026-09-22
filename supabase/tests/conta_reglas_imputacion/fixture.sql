@@ -97,6 +97,9 @@ INSERT INTO public.conta_cuentas
   -- omite el asiento entero y el recorrido documento → asiento no se puede
   -- medir. Es pasivo, acreedora, de detalle.
   ('c0000000-0000-0000-0000-00000000a008', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL, '2101', 'Cuentas por pagar', 'pasivo', 'acreedora', 3, true, true),
+  -- Para la ruta GR/IR: el puente de compras por facturar y el IVA crédito.
+  ('c0000000-0000-0000-0000-00000000a009', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL, '2105', 'Compras por facturar', 'pasivo', 'acreedora', 3, true, true),
+  ('c0000000-0000-0000-0000-00000000a010', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL, '1105', 'IVA crédito fiscal',   'activo', 'deudora',   3, true, true),
   -- Empresa B
   ('c0000000-0000-0000-0000-00000000b001', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', NULL, '5101', 'Gasto general (B)', 'gasto', 'deudora', 3, true, true);
 

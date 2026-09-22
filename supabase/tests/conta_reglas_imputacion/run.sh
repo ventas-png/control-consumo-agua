@@ -15,7 +15,7 @@ set -euo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-BAJO_PRUEBA=20260927000000_conta_imputacion_cableado_y_revalidacion
+BAJO_PRUEBA=20260928000000_conta_imputacion_por_linea_y_borrado
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH

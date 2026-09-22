@@ -649,4 +649,266 @@ SELECT public.chk(
       AND regla_id IS NULL AND cuenta_id IS NULL AND motivo IS NOT NULL), 1,
   '20e · y queda registrado como pendiente de configuración, con motivo');
 
+-- ════════════════════════════════════════════════════════════════════════════
+-- SEGUNDA RONDA DE REVISIÓN
+--
+-- Tres hallazgos sobre el cableado de 20260927000000. Los tres fallan contra
+-- esa migración y se arreglan en 20260928000000:
+--   21 · al reescribir el trigger se perdió la rama TG_OP = 'DELETE'. El
+--        trigger sigue declarado AFTER UPDATE OF estado OR DELETE, así que
+--        borrar una factura toca NEW —que en un DELETE no está asignado— y
+--        revienta, además de no reversar el asiento.
+--   22 · el gasto se resuelve ANTES de saber qué ruta toma el asiento, y se
+--        abandona si no resuelve. Una factura GR/IR íntegramente recibida no
+--        necesita cuenta de gasto: hoy se queda sin asiento por una cuenta
+--        que no iba a aparecer en él.
+--   23 · todas las cuentas explícitas de la factura se reducen a una sola.
+--        Dos cuentas distintas se descartan; una sola se estira sobre líneas
+--        que no la eligieron.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- 20e dejó a la empresa A sin mapeo de `gasto_otros`. Se repone: lo de abajo
+-- mide otra cosa y necesita una base configurada.
+INSERT INTO public.conta_mapeo_cuentas (company_id, project_id, evento, cuenta_id)
+VALUES (:A::uuid, NULL, 'gasto_otros', 'c0000000-0000-0000-0000-00000000a002');
+
+-- Una factura con importe e IVA a medida, y sus líneas si se piden.
+CREATE OR REPLACE FUNCTION public.factura(
+  p_id uuid, p_concepto text, p_total numeric, p_iva numeric DEFAULT 0,
+  p_oc uuid DEFAULT NULL)
+RETURNS void LANGUAGE plpgsql AS $fn$
+BEGIN
+  INSERT INTO public.facturas_proveedor
+    (id, company_id, project_id, proveedor_id, concepto, categoria,
+     monto_total, iva_monto, moneda, estado, orden_compra_id)
+  VALUES (p_id, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL,
+          'd0000000-0000-0000-0000-00000000a001', p_concepto, 'otros',
+          p_total, p_iva, 'USD', 'registrada', p_oc);
+END;
+$fn$;
+
+-- OJO: con líneas cargadas, `monto_total` e `iva_monto` de la CABECERA los
+-- recalcula 20260821000300 a partir de los renglones. El IVA de una factura
+-- con líneas se pone acá, no en la cabecera.
+CREATE OR REPLACE FUNCTION public.linea(
+  p_factura uuid, p_linea int, p_cant numeric, p_precio numeric,
+  p_cuenta uuid DEFAULT NULL, p_ocl uuid DEFAULT NULL, p_iva numeric DEFAULT 0)
+RETURNS void LANGUAGE plpgsql AS $fn$
+BEGIN
+  INSERT INTO public.factura_proveedor_lineas
+    (company_id, factura_id, linea, descripcion, cuenta_id, cantidad,
+     precio_unitario, iva_monto, total, orden_compra_linea_id)
+  VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', p_factura, p_linea,
+          'Línea ' || p_linea, p_cuenta, p_cant, p_precio, p_iva,
+          round(p_cant * p_precio, 2) + p_iva, p_ocl);
+END;
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.aprobar_id(p_id uuid)
+RETURNS void LANGUAGE plpgsql AS $fn$
+BEGIN
+  UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = p_id;
+END;
+$fn$;
+
+-- El importe cargado a una cuenta concreta en el asiento de una factura.
+CREATE OR REPLACE FUNCTION public.debe_en(p_factura uuid, p_cuenta uuid)
+RETURNS numeric LANGUAGE sql STABLE AS $fn$
+  SELECT COALESCE(SUM(l.debe), 0) FROM public.conta_asiento_lineas l
+    JOIN public.conta_asientos a ON a.id = l.asiento_id
+   WHERE a.origen_id = p_factura AND a.origen_evento = 'factura_prov_aprobada'
+     AND l.cuenta_id = p_cuenta;
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.chk_num(actual numeric, esperado numeric, msg text)
+RETURNS void LANGUAGE plpgsql AS $fn$
+BEGIN
+  IF actual IS DISTINCT FROM esperado THEN
+    RAISE EXCEPTION '% — esperado %, recibido %', msg, esperado, actual;
+  END IF;
+  RAISE NOTICE '✓ %', msg;
+END;
+$fn$;
+
+-- ── 21. Borrar una factura contabilizada reversa su asiento ─────────────────
+DELETE FROM public.conta_reglas_proveedor;
+
+SELECT public.factura('aaaa2222-0000-0000-0000-000000000001', 'Factura que se borra', 400);
+SELECT public.aprobar_id('aaaa2222-0000-0000-0000-000000000001');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_asientos
+    WHERE origen_id = 'aaaa2222-0000-0000-0000-000000000001'::uuid
+      AND origen_evento = 'factura_prov_aprobada'), 1,
+  '21 · la factura aprobada generó su asiento');
+
+-- Esto es lo que rompe: el trigger está declarado AFTER UPDATE OF estado OR
+-- DELETE, así que el DELETE lo dispara y la función toca NEW.
+DELETE FROM public.facturas_proveedor WHERE id = 'aaaa2222-0000-0000-0000-000000000001';
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_asientos
+    WHERE origen_id = 'aaaa2222-0000-0000-0000-000000000001'::uuid
+      AND origen_evento = 'factura_prov_aprobada_revertido'), 1,
+  '21 · el borrado generó el asiento de reverso');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_asientos
+    WHERE origen_id = 'aaaa2222-0000-0000-0000-000000000001'::uuid
+      AND origen_evento = 'factura_prov_aprobada'
+      AND anulado_por_id IS NOT NULL), 1,
+  '21 · y el asiento original quedó anulado por el reverso');
+
+-- ── 22. El gasto se resuelve sólo si el asiento lo necesita ─────────────────
+-- Una factura GR/IR íntegramente recibida, sin variación de precio y sin
+-- resto, NO lleva ninguna línea de gasto: liquida el puente contra CxP, con
+-- el IVA aparte. Exigirle una cuenta de gasto configurada es exigir algo que
+-- no va a aparecer en el asiento.
+INSERT INTO public.conta_mapeo_cuentas (company_id, project_id, evento, cuenta_id) VALUES
+  (:A::uuid, NULL, 'compras_por_facturar', 'c0000000-0000-0000-0000-00000000a009'),
+  (:A::uuid, NULL, 'iva_credito',          'c0000000-0000-0000-0000-00000000a010');
+
+-- Sin mapeo de gasto y sin regla: la única cuenta que falta es justo la que
+-- no hace falta.
+DELETE FROM public.conta_mapeo_cuentas
+ WHERE company_id = :A::uuid AND evento = 'gasto_otros';
+
+-- Sólo un proveedor autorizado recibe órdenes (20260821000100).
+UPDATE public.proveedores SET estado = 'autorizado'
+ WHERE id = 'd0000000-0000-0000-0000-00000000a001';
+
+INSERT INTO public.ordenes_compra
+  (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado)
+VALUES ('0c000000-0000-0000-0000-000000000001', :A::uuid, NULL,
+        'd0000000-0000-0000-0000-00000000a001', 'Proveedor A', 'Compra recibida', 'borrador');
+
+INSERT INTO public.orden_compra_lineas
+  (id, company_id, orden_compra_id, linea, descripcion, categoria,
+   cantidad, precio_unitario, cantidad_recibida)
+VALUES ('0c100000-0000-0000-0000-000000000001', :A::uuid,
+        '0c000000-0000-0000-0000-000000000001', 1, 'Material', 'otros', 10, 50, 10);
+
+-- Las líneas sólo se cargan con la orden en borrador (20260821000100); ya
+-- cargada, la orden pasa a recibida como en el riel real.
+UPDATE public.ordenes_compra SET estado = 'recibida'
+ WHERE id = '0c000000-0000-0000-0000-000000000001';
+
+-- Neto 500 = 10 × 50, exactamente lo recibido al precio de la orden: sin
+-- variación y sin resto. IVA 80 aparte.
+SELECT public.factura('aaaa2222-0000-0000-0000-000000000002', 'GR/IR íntegra', 580, 0,
+                      '0c000000-0000-0000-0000-000000000001');
+SELECT public.linea('aaaa2222-0000-0000-0000-000000000002', 1, 10, 50, NULL,
+                    '0c100000-0000-0000-0000-000000000001', 80);
+SELECT public.aprobar_id('aaaa2222-0000-0000-0000-000000000002');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_asientos
+    WHERE origen_id = 'aaaa2222-0000-0000-0000-000000000002'::uuid
+      AND origen_evento = 'factura_prov_aprobada'), 1,
+  '22 · la factura GR/IR íntegra SÍ genera asiento aunque no haya cuenta de gasto');
+
+SELECT public.chk_num(
+  public.debe_en('aaaa2222-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-00000000a009'),
+  500, '22 · liquida compras por facturar por lo recibido al precio de la orden');
+
+SELECT public.chk_num(
+  public.debe_en('aaaa2222-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-00000000a010'),
+  80, '22 · y el IVA va a su cuenta de crédito fiscal');
+
+SELECT public.chk_num(
+  (SELECT COALESCE(SUM(l.haber), 0) FROM public.conta_asiento_lineas l
+     JOIN public.conta_asientos a ON a.id = l.asiento_id
+    WHERE a.origen_id = 'aaaa2222-0000-0000-0000-000000000002'::uuid
+      AND l.cuenta_id = 'c0000000-0000-0000-0000-00000000a008'::uuid),
+  580, '22 · contra CxP por el total de la factura');
+
+-- Y no se registra como usada una cuenta que no está en el asiento.
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_resoluciones
+    WHERE origen_id = 'aaaa2222-0000-0000-0000-000000000002'::uuid
+      AND cuenta_id IS NOT NULL), 0,
+  '22 · y NO se anota en la bitácora una cuenta de gasto que el asiento no usa');
+
+-- ── 23. Las cuentas explícitas se respetan POR LÍNEA ────────────────────────
+INSERT INTO public.conta_mapeo_cuentas (company_id, project_id, evento, cuenta_id)
+VALUES (:A::uuid, NULL, 'gasto_otros', 'c0000000-0000-0000-0000-00000000a002');
+
+-- (a) DOS líneas con cuentas DISTINTAS. Ninguna se descarta.
+SELECT public.factura('aaaa3333-0000-0000-0000-000000000001', 'Dos cuentas elegidas', 300);
+SELECT public.linea('aaaa3333-0000-0000-0000-000000000001', 1, 1, 100, 'c0000000-0000-0000-0000-00000000a005');
+SELECT public.linea('aaaa3333-0000-0000-0000-000000000001', 2, 1, 200, 'c0000000-0000-0000-0000-00000000a006');
+SELECT public.aprobar_id('aaaa3333-0000-0000-0000-000000000001');
+
+SELECT public.chk_num(
+  public.debe_en('aaaa3333-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-00000000a005'),
+  100, '23a · la primera línea va a SU cuenta, por SU importe');
+SELECT public.chk_num(
+  public.debe_en('aaaa3333-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-00000000a006'),
+  200, '23a · y la segunda a la suya, por el suyo');
+SELECT public.chk_num(
+  public.debe_en('aaaa3333-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-00000000a002'),
+  0, '23a · sin que nada caiga al mapeo del evento');
+
+-- (b) Una línea con cuenta y otra SIN. La elegida no se estira sobre la otra.
+SELECT public.factura('aaaa3333-0000-0000-0000-000000000002', 'Una elegida y una no', 300);
+SELECT public.linea('aaaa3333-0000-0000-0000-000000000002', 1, 1, 100, 'c0000000-0000-0000-0000-00000000a005');
+SELECT public.linea('aaaa3333-0000-0000-0000-000000000002', 2, 1, 200, NULL);
+SELECT public.aprobar_id('aaaa3333-0000-0000-0000-000000000002');
+
+SELECT public.chk_num(
+  public.debe_en('aaaa3333-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-00000000a005'),
+  100, '23b · la línea con cuenta elegida recibe SÓLO su importe');
+SELECT public.chk_num(
+  public.debe_en('aaaa3333-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-00000000a002'),
+  200, '23b · y la línea sin cuenta resuelve por su cuenta, con el resto');
+
+-- (c) Cuenta explícita INVÁLIDA: agrupadora. No se contabiliza en otra: queda
+--     pendiente de configuración, que es lo único honesto cuando alguien
+--     eligió una cuenta y esa cuenta no sirve.
+SELECT public.factura('aaaa3333-0000-0000-0000-000000000003', 'Cuenta elegida inválida', 300);
+SELECT public.linea('aaaa3333-0000-0000-0000-000000000003', 1, 1, 300, 'c0000000-0000-0000-0000-00000000a001');
+SELECT public.aprobar_id('aaaa3333-0000-0000-0000-000000000003');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_asientos
+    WHERE origen_id = 'aaaa3333-0000-0000-0000-000000000003'::uuid
+      AND origen_evento = 'factura_prov_aprobada'), 0,
+  '23c · con una cuenta elegida inválida NO se genera asiento');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_resoluciones
+    WHERE origen_id = 'aaaa3333-0000-0000-0000-000000000003'::uuid
+      AND origen_resolucion = 'sin_resolver' AND motivo IS NOT NULL), 1,
+  '23c · y queda pendiente de configuración, con motivo');
+
+SELECT public.chk_num(
+  public.debe_en('aaaa3333-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-00000000a002'),
+  0, '23c · y NO se contabiliza en silencio contra el mapeo del evento');
+
+-- (d) Convivencia con la regla del proveedor: la línea elegida manda sobre la
+--     regla, y la línea sin cuenta usa la regla, no el mapeo.
+INSERT INTO public.conta_reglas_proveedor
+  (company_id, project_id, proveedor_id, destino, cuenta_id) VALUES
+  (:A::uuid, NULL, 'd0000000-0000-0000-0000-00000000a001'::uuid, 'gasto',
+   'c0000000-0000-0000-0000-00000000a003'::uuid);
+
+SELECT public.factura('aaaa3333-0000-0000-0000-000000000004', 'Elegida y regla', 300);
+SELECT public.linea('aaaa3333-0000-0000-0000-000000000004', 1, 1, 100, 'c0000000-0000-0000-0000-00000000a005');
+SELECT public.linea('aaaa3333-0000-0000-0000-000000000004', 2, 1, 200, NULL);
+SELECT public.aprobar_id('aaaa3333-0000-0000-0000-000000000004');
+
+SELECT public.chk_num(
+  public.debe_en('aaaa3333-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-00000000a005'),
+  100, '23d · la cuenta elegida en la línea gana a la regla del proveedor');
+SELECT public.chk_num(
+  public.debe_en('aaaa3333-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-00000000a003'),
+  200, '23d · y la línea sin cuenta usa la regla, no el mapeo del evento');
+
+-- La bitácora distingue las dos líneas, que es lo que hace auditable un
+-- asiento con más de una imputación.
+SELECT public.chk(
+  (SELECT count(DISTINCT origen_resolucion) FROM public.conta_resoluciones
+    WHERE origen_id = 'aaaa3333-0000-0000-0000-000000000004'::uuid), 2,
+  '23d · y la bitácora registra los DOS escalones que decidieron la factura');
+
 SELECT 'INVARIANTES OK' AS resultado;
