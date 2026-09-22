@@ -12,7 +12,13 @@ import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { contabilidadKeys } from './keys'
 import { planificarCatalogo } from './importCuentas'
-import type { AsientoContable, CuentaContable, RevaluacionFxFila } from '../../types/contabilidad'
+import type {
+  AsientoContable,
+  CuentaContable,
+  RevaluacionFxFila,
+  ReglaProveedor,
+  DestinoImputacion,
+} from '../../types/contabilidad'
 import type { AsientoFormInput, CuentaFormInput, TipoCambioFormInput } from './schemas'
 import type { CuentaExistenteRef, CuentaImportFila, CuentaOmitida } from './importCuentas'
 
@@ -544,3 +550,63 @@ export function useRevaluarFxMutation() {
     },
   })
 }
+
+// ── Reglas de imputación ────────────────────────────────────────────────────
+//
+// Se escriben DIRECTO vía RLS, como cuentas y mapeos: sólo company_owner/admin
+// de la empresa activa. Las validaciones duras —cuenta del mismo ledger, de
+// detalle, activa, proveedor de la empresa, unidad del proyecto— viven en
+// triggers de BD, no acá: el cliente no es el lugar donde se defiende la
+// integridad.
+//
+// La invalidación usa los prefijos SIN ledger a propósito. Guardar una regla
+// del ledger de un proyecto también cambia lo que la pantalla de la empresa
+// debe mostrar como «configuración incompleta», y una key completa sólo
+// invalidaría ese ledger.
+
+export interface ReglaProveedorInput {
+  proveedor_id: string
+  destino: DestinoImputacion
+  cuenta_id: string
+  activa?: boolean
+  notas?: string | null
+}
+
+export function useGuardarReglaProveedorMutation(companyId?: string, projectId?: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: ReglaProveedorInput & { id?: string }) => {
+      if (!companyId) throw new Error('Falta companyId.')
+      const { id, ...campos } = input
+      const fila = { ...campos, company_id: companyId, project_id: projectId ?? null }
+      const rows = id
+        ? await runQuery<ReglaProveedor[]>((signal) =>
+            supabase.from('conta_reglas_proveedor').update(fila).eq('id', id).select().abortSignal(signal))
+        : await runQuery<ReglaProveedor[]>((signal) =>
+            supabase.from('conta_reglas_proveedor').insert(fila).select().abortSignal(signal))
+      return rows?.[0] ?? null
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.reglasProveedorDeEmpresa(companyId) })
+      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'resolucion'] })
+    },
+  })
+}
+
+// Sin `projectId`: el borrado va por id y la RLS ya acota a la empresa. El
+// invalidado usa el prefijo de empresa, que cubre los dos ledgers.
+export function useEliminarReglaProveedorMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await runQuery((signal) =>
+        supabase.from('conta_reglas_proveedor').delete().eq('id', id).abortSignal(signal))
+      return id
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.reglasProveedorDeEmpresa(companyId) })
+      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'resolucion'] })
+    },
+  })
+}
+

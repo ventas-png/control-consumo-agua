@@ -22938,11 +22938,63 @@ export type Database = {
           proceso: string
         }[]
       }
+      conta_destinos_imputacion: {
+        Args: Record<string, never>
+        Returns: {
+          destino: string
+          etiqueta: string
+          descripcion: string
+          evento_fallback: string
+        }[]
+      }
       conta_inicializar_catalogo: {
         Args: { p_plantilla: string; p_project_id: string | null }
         Returns: {
           cuentas_creadas: number
           mapeos_creados: number
+        }[]
+      }
+      conta_registrar_resolucion: {
+        Args: {
+          p_origen_tabla: string
+          p_origen_id: string
+          p_project_id: string | null
+          p_destino?: string | null
+          p_proveedor_id?: string | null
+          p_cliente_id?: string | null
+          p_unidad_id?: string | null
+          p_categoria?: string | null
+          p_evento?: string | null
+          p_cuenta_explicita?: string | null
+        }
+        Returns: {
+          resolucion_id: string
+          cuenta_id: string | null
+          origen_resolucion: string
+          regla_tabla: string | null
+          regla_id: string | null
+          evento_usado: string | null
+          motivo: string | null
+        }[]
+      }
+      conta_resolver_imputacion: {
+        Args: {
+          p_project_id: string | null
+          p_destino?: string | null
+          p_proveedor_id?: string | null
+          p_cliente_id?: string | null
+          p_unidad_id?: string | null
+          p_categoria?: string | null
+          p_evento?: string | null
+          p_cuenta_explicita?: string | null
+        }
+        Returns: {
+          cuenta_id: string | null
+          origen_resolucion: string
+          regla_tabla: string | null
+          regla_id: string | null
+          evento_usado: string | null
+          motivo: string | null
         }[]
       }
       conta_estado_resultados: {

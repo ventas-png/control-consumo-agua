@@ -281,3 +281,98 @@ export const REVALUACION_RESULTADO_LABELS: Record<RevaluacionFxResultado, string
   sin_cambio: 'Sin cambio',
   sin_tasa: 'Sin tipo de cambio',
 }
+
+// ── Reglas de imputación contable ───────────────────────────────────────────
+// Espejo de 20260926000000. Los destinos NO son códigos contables: son
+// etiquetas semánticas que la BD declara en `conta_destinos_imputacion()` y
+// que cada una resuelve a un evento de `conta_mapeo_cuentas`.
+
+export const DESTINOS_IMPUTACION = [
+  { destino: 'gasto',                etiqueta: 'Gasto',                descripcion: 'Consumo del período: servicios, mantenimiento, administración' },
+  { destino: 'costo',                etiqueta: 'Costo',                descripcion: 'Costo directo imputable a un proyecto u obra' },
+  { destino: 'inventario',           etiqueta: 'Inventario',           descripcion: 'Insumos que entran a bodega y se consumen después' },
+  { destino: 'activo_fijo',          etiqueta: 'Activo fijo',          descripcion: 'Bienes capitalizables que se deprecian' },
+  { destino: 'compras_por_facturar', etiqueta: 'Compras por facturar', descripcion: 'Puente GR/IR entre la recepción y la factura' },
+] as const
+
+export type DestinoImputacion = (typeof DESTINOS_IMPUTACION)[number]['destino']
+
+/**
+ * Los destinos que HOY consulta un documento real.
+ *
+ * `conta_tg_facturas_prov()` resuelve `gasto` y ninguno más: inventario y
+ * activo fijo los decide la RECEPCIÓN de la orden de compra —por la ruta
+ * GR/IR—, no la factura, y deducirlos de la categoría del documento sería
+ * justamente la clase de suposición que estas reglas vienen a eliminar.
+ *
+ * La pantalla ofrece sólo estos. Guardar una regla para un destino que ningún
+ * documento consulta sería configurar algo que no va a cambiar ningún asiento,
+ * y no hay forma de que quien la guarda se entere.
+ */
+export const DESTINOS_CABLEADOS: readonly DestinoImputacion[] = ['gasto']
+
+/**
+ * De dónde salió la cuenta. El orden de la unión ES la prioridad, y
+ * `sin_resolver` es un resultado legítimo: significa que falta configuración y
+ * que NO se inventó una cuenta.
+ */
+export type OrigenResolucion =
+  | 'linea_explicita'
+  | 'regla_proveedor'
+  | 'regla_cargo'
+  | 'mapeo_evento'
+  | 'sin_resolver'
+
+export interface ReglaProveedor {
+  id: string
+  company_id: string
+  /** NULL = ledger de empresa; con valor = ledger de ese proyecto. */
+  project_id: string | null
+  proveedor_id: string
+  destino: DestinoImputacion
+  cuenta_id: string
+  activa: boolean
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ReglaCargo {
+  id: string
+  company_id: string
+  project_id: string | null
+  cliente_id: string | null
+  unidad_id: string | null
+  categoria: string | null
+  cuenta_id: string
+  activa: boolean
+  notas: string | null
+  /**
+   * GENERADA en la BD, nunca se escribe: 4 unidad+categoría, 3 unidad,
+   * 2 cliente+categoría, 1 cliente, 0 sólo categoría. Es lo que ordena el
+   * desempate entre reglas aplicables.
+   */
+  especificidad: number
+  created_at: string
+  updated_at: string
+}
+
+/** Lo que devuelve `conta_resolver_imputacion`: la decisión y su porqué. */
+export interface ResolucionImputacion {
+  cuenta_id: string | null
+  origen_resolucion: OrigenResolucion
+  regla_tabla: string | null
+  regla_id: string | null
+  evento_usado: string | null
+  /** Sólo viene cuando NO se pudo resolver. Dice qué falta configurar. */
+  motivo: string | null
+}
+
+/** Etiqueta legible del escalón que resolvió, para la previsualización. */
+export const ETIQUETA_ORIGEN: Record<OrigenResolucion, string> = {
+  linea_explicita: 'Cuenta elegida en el documento',
+  regla_proveedor: 'Regla del proveedor',
+  regla_cargo: 'Regla de cliente/unidad',
+  mapeo_evento: 'Mapeo general del evento',
+  sin_resolver: 'Sin resolver',
+}
