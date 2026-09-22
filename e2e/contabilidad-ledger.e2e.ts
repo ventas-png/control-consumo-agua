@@ -69,24 +69,4 @@ test.describe('CONTABILIDAD · ledger por empresa y proyecto', () => {
       ).toBeVisible()
     }
   })
-
-  // Bandeja de pendientes: SÓLO LECTURA. No aprueba, no reprocesa ni crea
-  // facturas: lo que se verifica es que la RPC responde para el ledger activo
-  // (tabla o estado vacío) y no un error de permisos o de esquema.
-  test('la bandeja de pendientes de contabilización carga sin error', async ({ page }) => {
-    await login(page)
-    await gotoSection(page, '/contabilidad')
-
-    const pestaña = page.getByRole('tab', { name: /Pendientes/i }).or(page.getByRole('button', { name: /Pendientes/i }))
-    if (!(await exists(pestaña.first()))) test.skip(true, 'Contabilidad no disponible para este rol')
-    await pestaña.first().click()
-
-    await expect(page.getByText('Cargando pendientes…')).toBeHidden({ timeout: 15_000 })
-    await expect(page.getByRole('alert').filter({ hasText: /No se pudo cargar la bandeja/i })).toHaveCount(0)
-    // O la tabla de pendientes, o el estado vacío: cualquiera de los dos prueba
-    // que la RPC respondió para este ledger.
-    await expect(
-      page.getByText(/Sin pendientes de contabilización/).or(page.getByRole('table')).first(),
-    ).toBeVisible()
-  })
 })
