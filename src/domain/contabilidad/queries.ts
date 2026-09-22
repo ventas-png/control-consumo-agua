@@ -18,6 +18,9 @@ import type {
   ReglaProveedor,
   ResolucionImputacion,
   DestinoImputacion,
+  FacturaPendiente,
+  FiltroPendiente,
+  IntentoContabilizacion,
 } from '../../types/contabilidad'
 
 /** Moneda base contable de la empresa (ISO, espejo de conta_moneda_base). */
@@ -277,5 +280,66 @@ export function useResolucionImputacionQuery(params: {
         motivo: 'La consulta de resolución no devolvió respuesta.',
       }
     },
+  })
+}
+
+// ── Pendientes de contabilización ───────────────────────────────────────────
+
+export const PENDIENTES_POR_PAGINA = 20
+
+/**
+ * Bandeja de facturas aprobadas SIN asiento, de la contabilidad activa.
+ *
+ * Filtro, búsqueda y paginación corren en SERVIDOR (`conta_facturas_pendientes`):
+ * la RPC decide qué es un pendiente —aprobada, sin asiento de devengo y con al
+ * menos un intento— y acota a la empresa de la sesión y a los proyectos del
+ * usuario. El cliente no filtra nada por su cuenta.
+ */
+export function useFacturasPendientesQuery(params: {
+  companyId?: string
+  projectId?: string | null
+  codigo?: FiltroPendiente | null
+  busqueda?: string | null
+  pagina?: number
+}) {
+  const { companyId, projectId, codigo, busqueda, pagina = 0 } = params
+  return useQuery({
+    queryKey: contabilidadKeys.pendientes(companyId, projectId, codigo, busqueda, pagina),
+    enabled: !!companyId,
+    placeholderData: (prev) => prev,
+    queryFn: async () => {
+      const filas = await runQuery<FacturaPendiente[]>((signal) =>
+        supabase
+          .rpc('conta_facturas_pendientes', {
+            p_project_id: projectId ?? null,
+            p_codigo: codigo ?? null,
+            p_busqueda: busqueda?.trim() || null,
+            p_limite: PENDIENTES_POR_PAGINA,
+            p_offset: pagina * PENDIENTES_POR_PAGINA,
+          })
+          .abortSignal(signal),
+      )
+      const lista = filas ?? []
+      return { filas: lista, total: lista[0]?.total_filas ?? 0 }
+    },
+  })
+}
+
+/** Historial de intentos de UNA factura (RLS: empresa y proyectos del usuario). */
+export function useIntentosFacturaQuery(facturaId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.intentos(facturaId),
+    enabled: !!facturaId,
+    queryFn: async () =>
+      (await runQuery<IntentoContabilizacion[]>((signal) =>
+        supabase
+          .from('conta_intentos_contabilizacion')
+          .select('*')
+          .eq('origen_tabla', 'facturas_proveedor')
+          .eq('origen_id', facturaId!)
+          .order('created_at', { ascending: false })
+          .limit(50)
+          .abortSignal(signal),
+      )) ?? [],
   })
 }

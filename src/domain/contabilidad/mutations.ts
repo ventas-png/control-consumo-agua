@@ -18,6 +18,7 @@ import type {
   RevaluacionFxFila,
   ReglaProveedor,
   DestinoImputacion,
+  RespuestaReproceso,
 } from '../../types/contabilidad'
 import type { AsientoFormInput, CuentaFormInput, TipoCambioFormInput } from './schemas'
 import type { CuentaExistenteRef, CuentaImportFila, CuentaOmitida } from './importCuentas'
@@ -610,3 +611,36 @@ export function useEliminarReglaProveedorMutation(companyId?: string) {
   })
 }
 
+
+// ── Reproceso de una factura pendiente ──────────────────────────────────────
+
+/**
+ * Reprocesa la contabilización de UNA factura.
+ *
+ * Sólo viaja el id: empresa, proyecto, estado y permisos los resuelve y valida
+ * el servidor, que además bloquea la fila para que dos clics (o dos pestañas)
+ * no generen dos asientos. Un rechazo por configuración NO es un error: vuelve
+ * como `resultado: 'pendiente'` con su motivo, y la UI lo muestra como tal.
+ */
+export function useReprocesarFacturaMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (facturaId: string): Promise<RespuestaReproceso> => {
+      const filas = await runQuery<RespuestaReproceso[]>((signal) =>
+        supabase
+          .rpc('conta_reprocesar_factura_proveedor', { p_factura_id: facturaId })
+          .abortSignal(signal),
+      )
+      const fila = filas?.[0]
+      if (!fila) throw new Error('El servidor no devolvió resultado del reproceso.')
+      return fila
+    },
+    onSettled: (_data, _err, facturaId) => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.pendientesDeEmpresa(companyId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.intentos(facturaId) })
+      // Un asiento nuevo cambia pólizas y saldos de todos los reportes.
+      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'asientos'] })
+      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'balanza'] })
+    },
+  })
+}

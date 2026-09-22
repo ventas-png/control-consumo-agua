@@ -625,6 +625,19 @@ jobs:
           PGPORT_TEST: 55503
         run: supabase/tests/policies_empresa/run.sh
 
+      # 20260929000000: bandeja de facturas aprobadas sin asiento y reproceso.
+      # Sobre la cadena ENTERA de migraciones y con asientos reales: pendiente
+      # sin configuración, reproceso que genera UN asiento balanceado,
+      # reintento sin duplicar, cuentas por línea, GR/IR, período cerrado,
+      # anuladas/borradas, acceso cruzado y permisos. La concurrencia se prueba
+      # con DOS conexiones simultáneas contra la misma factura (y reproceso
+      # contra anulación), no con una simulación.
+      - name: Contabilidad — pendientes y reproceso seguro de facturas
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55504
+        run: supabase/tests/conta_pendientes_reproceso/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

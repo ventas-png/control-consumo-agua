@@ -376,3 +376,96 @@ export const ETIQUETA_ORIGEN: Record<OrigenResolucion, string> = {
   mapeo_evento: 'Mapeo general del evento',
   sin_resolver: 'Sin resolver',
 }
+
+// ── Pendientes de contabilización y reproceso ──────────────────────────────
+// Espejo de 20260929000000. El código lo decide el SERVIDOR: la UI sólo lo
+// traduce a texto y a una pantalla donde corregirlo.
+
+/** Motivo tipificado de un intento que no dejó asiento. */
+export type CodigoPendiente =
+  | 'sin_cuenta'
+  | 'cuenta_invalida'
+  | 'configuracion_incompleta'
+  | 'reparto_lineas'
+  | 'periodo_cerrado'
+  | 'documento_anulado'
+  | 'documento_no_aprobado'
+  | 'documento_inexistente'
+  | 'asiento_reversado'
+  | 'error'
+
+/** Filtro de la bandeja: los tres motivos accionables, y el resto agrupado. */
+export type FiltroPendiente = 'sin_cuenta' | 'cuenta_invalida' | 'configuracion_incompleta' | 'otro'
+
+export const FILTROS_PENDIENTE: { value: FiltroPendiente; label: string }[] = [
+  { value: 'sin_cuenta', label: 'Sin cuenta' },
+  { value: 'cuenta_invalida', label: 'Cuenta inválida' },
+  { value: 'configuracion_incompleta', label: 'Configuración incompleta' },
+  { value: 'otro', label: 'Otros bloqueos' },
+]
+
+export const CODIGO_PENDIENTE_LABELS: Record<CodigoPendiente, string> = {
+  sin_cuenta: 'Sin cuenta',
+  cuenta_invalida: 'Cuenta inválida',
+  configuracion_incompleta: 'Configuración incompleta',
+  reparto_lineas: 'Líneas no repartibles',
+  periodo_cerrado: 'Período cerrado',
+  documento_anulado: 'Factura anulada',
+  documento_no_aprobado: 'Factura no aprobada',
+  documento_inexistente: 'Factura no encontrada',
+  asiento_reversado: 'Asiento reversado',
+  error: 'Error al generar',
+}
+
+export interface FacturaPendiente {
+  factura_id: string
+  numero_factura: string | null
+  concepto: string
+  proveedor_id: string
+  proveedor_nombre: string | null
+  fecha_emision: string
+  monto_total: number
+  moneda: string | null
+  estado: string
+  project_id: string | null
+  codigo: CodigoPendiente
+  motivo: string
+  linea_id: string | null
+  linea_numero: number | null
+  linea_descripcion: string | null
+  ultimo_intento_at: string | null
+  ultimo_disparo: 'aprobacion' | 'reproceso' | null
+  intentos: number
+  puede_reprocesar: boolean
+  total_filas: number
+}
+
+export type ResultadoReproceso = 'contabilizada' | 'ya_contabilizada' | 'pendiente' | 'bloqueada'
+
+export interface RespuestaReproceso {
+  resultado: ResultadoReproceso
+  codigo: CodigoPendiente | null
+  motivo: string | null
+  origen_linea_id: string | null
+  asiento_id: string | null
+  asiento_numero: number | null
+  asiento_estado: 'borrador' | 'publicado' | 'anulado' | null
+  intento_id: string | null
+}
+
+export interface IntentoContabilizacion {
+  id: string
+  company_id: string
+  project_id: string | null
+  origen_tabla: 'facturas_proveedor'
+  origen_id: string
+  disparo: 'aprobacion' | 'reproceso'
+  resultado: ResultadoReproceso
+  codigo: CodigoPendiente | null
+  motivo: string | null
+  origen_linea_id: string | null
+  detalle: Array<{ linea_id: string | null; linea: number | null; codigo: CodigoPendiente; motivo: string }>
+  asiento_id: string | null
+  actor: string | null
+  created_at: string
+}

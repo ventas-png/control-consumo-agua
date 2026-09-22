@@ -4778,6 +4778,57 @@ export type Database = {
           },
         ]
       }
+      conta_intentos_contabilizacion: {
+        Row: {
+          actor: string | null
+          asiento_id: string | null
+          codigo: string | null
+          company_id: string
+          created_at: string
+          detalle: Json
+          disparo: string
+          id: string
+          motivo: string | null
+          origen_id: string
+          origen_linea_id: string | null
+          origen_tabla: string
+          project_id: string | null
+          resultado: string
+        }
+        Insert: {
+          actor?: string | null
+          asiento_id?: string | null
+          codigo?: string | null
+          company_id: string
+          created_at?: string
+          detalle?: Json
+          disparo: string
+          id?: string
+          motivo?: string | null
+          origen_id: string
+          origen_linea_id?: string | null
+          origen_tabla: string
+          project_id?: string | null
+          resultado: string
+        }
+        Update: {
+          actor?: string | null
+          asiento_id?: string | null
+          codigo?: string | null
+          company_id?: string
+          created_at?: string
+          detalle?: Json
+          disparo?: string
+          id?: string
+          motivo?: string | null
+          origen_id?: string
+          origen_linea_id?: string | null
+          origen_tabla?: string
+          project_id?: string | null
+          resultado?: string
+        }
+        Relationships: []
+      }
       conta_mapeo_cuentas: {
         Row: {
           company_id: string
@@ -22947,6 +22998,37 @@ export type Database = {
           evento_fallback: string
         }[]
       }
+      conta_facturas_pendientes: {
+        Args: {
+          p_project_id?: string | null
+          p_codigo?: string | null
+          p_busqueda?: string | null
+          p_limite?: number
+          p_offset?: number
+        }
+        Returns: {
+          factura_id: string
+          numero_factura: string | null
+          concepto: string
+          proveedor_id: string
+          proveedor_nombre: string | null
+          fecha_emision: string
+          monto_total: number
+          moneda: string | null
+          estado: string
+          project_id: string | null
+          codigo: string
+          motivo: string
+          linea_id: string | null
+          linea_numero: number | null
+          linea_descripcion: string | null
+          ultimo_intento_at: string | null
+          ultimo_disparo: string | null
+          intentos: number
+          puede_reprocesar: boolean
+          total_filas: number
+        }[]
+      }
       conta_inicializar_catalogo: {
         Args: { p_plantilla: string; p_project_id: string | null }
         Returns: {
@@ -22975,6 +23057,19 @@ export type Database = {
           regla_id: string | null
           evento_usado: string | null
           motivo: string | null
+        }[]
+      }
+      conta_reprocesar_factura_proveedor: {
+        Args: { p_factura_id: string }
+        Returns: {
+          resultado: string
+          codigo: string | null
+          motivo: string | null
+          origen_linea_id: string | null
+          asiento_id: string | null
+          asiento_numero: number | null
+          asiento_estado: string | null
+          intento_id: string | null
         }[]
       }
       conta_resolver_imputacion: {

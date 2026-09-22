@@ -50,4 +50,20 @@ export const contabilidadKeys = {
   // regla de un proyecto dejaba la pantalla de la empresa con datos viejos.
   reglasProveedorDeEmpresa: (companyId?: string) =>
     [...contabilidadKeys.all, 'reglas-proveedor', companyId ?? null] as const,
+  // Bandeja de facturas aprobadas sin asiento. El filtro y la página van en la
+  // key porque se resuelven en SERVIDOR: cada combinación es otra consulta.
+  pendientes: (
+    companyId?: string,
+    projectId?: string | null,
+    codigo?: string | null,
+    busqueda?: string | null,
+    pagina?: number,
+  ) =>
+    [...contabilidadKeys.all, 'pendientes', companyId ?? null, projectId ?? null,
+      codigo ?? null, busqueda ?? null, pagina ?? 0] as const,
+  // Prefijo sin filtros: un reproceso invalida TODAS las páginas y filtros.
+  pendientesDeEmpresa: (companyId?: string) =>
+    [...contabilidadKeys.all, 'pendientes', companyId ?? null] as const,
+  intentos: (facturaId?: string | null) =>
+    [...contabilidadKeys.all, 'intentos', facturaId ?? null] as const,
 } as const
