@@ -30,4 +30,28 @@ export const contabilidadKeys = {
     [...contabilidadKeys.all, 'cuentas-especiales', companyId ?? null] as const,
   tiposCambio: (companyId?: string) =>
     [...contabilidadKeys.all, 'tipos-cambio', companyId ?? null] as const,
+  reglasProveedor: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'reglas-proveedor', companyId ?? null, projectId ?? null] as const,
+  reglasCargo: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'reglas-cargo', companyId ?? null, projectId ?? null] as const,
+  // La previsualización depende de TODAS las dimensiones: si alguna cambia, la
+  // respuesta puede cambiar de escalón. Van todas en la key.
+  resolucion: (
+    companyId?: string,
+    projectId?: string | null,
+    destino?: string | null,
+    proveedorId?: string | null,
+    clienteId?: string | null,
+    unidadId?: string | null,
+    categoria?: string | null,
+  ) =>
+    [...contabilidadKeys.all, 'resolucion', companyId ?? null, projectId ?? null,
+      destino ?? null, proveedorId ?? null, clienteId ?? null,
+      unidadId ?? null, categoria ?? null] as const,
+  // Prefijos sin ledger, por la misma razón que `mapeoDeEmpresa`: guardar una
+  // regla de un proyecto dejaba la pantalla de la empresa con datos viejos.
+  reglasProveedorDeEmpresa: (companyId?: string) =>
+    [...contabilidadKeys.all, 'reglas-proveedor', companyId ?? null] as const,
+  reglasCargoDeEmpresa: (companyId?: string) =>
+    [...contabilidadKeys.all, 'reglas-cargo', companyId ?? null] as const,
 } as const

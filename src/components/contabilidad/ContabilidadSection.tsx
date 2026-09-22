@@ -7,6 +7,7 @@ import { CatalogoCuentasTab } from './CatalogoCuentasTab'
 import { AsientosTab } from './AsientosTab'
 import { BalanzaTab } from './BalanzaTab'
 import { MapeoCuentasTab } from './MapeoCuentasTab'
+import { ReglasImputacionTab } from './ReglasImputacionTab'
 import { ProveedoresTab } from './ProveedoresTab'
 import { CuentasPorPagarTab } from './CuentasPorPagarTab'
 import { ComprasTab } from './ComprasTab'
@@ -14,7 +15,7 @@ import { PresupuestoTab } from './PresupuestoTab'
 import { BancosTab } from './BancosTab'
 import { EstadosFinancierosTab } from './EstadosFinancierosTab'
 
-type SubTab = 'polizas' | 'balanza' | 'eeff' | 'bancos' | 'compras' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'configuracion'
+type SubTab = 'polizas' | 'balanza' | 'eeff' | 'bancos' | 'compras' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'reglas' | 'configuracion'
 
 const TABS: { id: SubTab; label: string; icon: string }[] = [
   { id: 'polizas', label: 'Pólizas', icon: '📒' },
@@ -28,6 +29,7 @@ const TABS: { id: SubTab; label: string; icon: string }[] = [
   { id: 'proveedores', label: 'Proveedores', icon: '🚚' },
   { id: 'presupuesto', label: 'Presupuesto', icon: '🎯' },
   { id: 'catalogo', label: 'Catálogo de cuentas', icon: '📚' },
+  { id: 'reglas', label: 'Reglas de imputación', icon: '🧭' },
   { id: 'configuracion', label: 'Configuración', icon: '⚙️' },
 ]
 
@@ -170,6 +172,9 @@ export function ContabilidadSection() {
       )}
       {tab === 'catalogo' && (
         <CatalogoCuentasTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} proyectos={proyectos} />
+      )}
+      {tab === 'reglas' && (
+        <ReglasImputacionTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} />
       )}
       {tab === 'configuracion' && (
         <MapeoCuentasTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />

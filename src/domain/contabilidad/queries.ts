@@ -15,6 +15,10 @@ import type {
   CuentaEspecialEstado,
   MovimientoMayor,
   TipoCambio,
+  ReglaProveedor,
+  ReglaCargo,
+  ResolucionImputacion,
+  DestinoImputacion,
 } from '../../types/contabilidad'
 
 /** Moneda base contable de la empresa (ISO, espejo de conta_moneda_base). */
@@ -200,5 +204,101 @@ export function useTiposCambioQuery(companyId?: string) {
           .limit(200)
           .abortSignal(signal),
       )) ?? [],
+  })
+}
+
+// ── Reglas de imputación ────────────────────────────────────────────────────
+
+/** Reglas por proveedor del LEDGER activo (empresa si projectId es null). */
+export function useReglasProveedorQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.reglasProveedor(companyId, projectId),
+    enabled: !!companyId,
+    queryFn: async () => {
+      let q = supabase
+        .from('conta_reglas_proveedor')
+        .select('*')
+        .eq('company_id', companyId!)
+      q = projectId ? q.eq('project_id', projectId) : q.is('project_id', null)
+      return (await runQuery<ReglaProveedor[]>((signal) => q.abortSignal(signal))) ?? []
+    },
+  })
+}
+
+/**
+ * Reglas por cliente/unidad/categoría del LEDGER activo, ya ordenadas de la
+ * MÁS específica a la más general: es el mismo orden con el que el resolutor
+ * las evalúa, así que la pantalla muestra lo que la BD va a hacer.
+ */
+export function useReglasCargoQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.reglasCargo(companyId, projectId),
+    enabled: !!companyId,
+    queryFn: async () => {
+      let q = supabase
+        .from('conta_reglas_cargo')
+        .select('*')
+        .eq('company_id', companyId!)
+        .order('especificidad', { ascending: false })
+        .order('id', { ascending: true })
+      q = projectId ? q.eq('project_id', projectId) : q.is('project_id', null)
+      return (await runQuery<ReglaCargo[]>((signal) => q.abortSignal(signal))) ?? []
+    },
+  })
+}
+
+/**
+ * PREVISUALIZACIÓN: qué cuenta se elegiría y por qué, sin escribir nada.
+ *
+ * Llama a `conta_resolver_imputacion`, que es STABLE: no deja rastro en la
+ * bitácora. La resolución que sí se registra es la que hace el documento al
+ * contabilizarse, no ésta.
+ *
+ * Se habilita sólo cuando hay alguna dimensión por la que preguntar; sin
+ * ninguna, la respuesta sería siempre el mapeo del evento y la pantalla
+ * estaría mintiendo sobre lo que va a pasar con un documento real.
+ */
+export function useResolucionImputacionQuery(params: {
+  companyId?: string
+  projectId?: string | null
+  destino?: DestinoImputacion | null
+  proveedorId?: string | null
+  clienteId?: string | null
+  unidadId?: string | null
+  categoria?: string | null
+  enabled?: boolean
+}) {
+  const { companyId, projectId, destino, proveedorId, clienteId, unidadId, categoria } = params
+  const hayDimension = !!(destino || proveedorId || clienteId || unidadId || categoria)
+  return useQuery({
+    queryKey: contabilidadKeys.resolucion(
+      companyId, projectId, destino, proveedorId, clienteId, unidadId, categoria),
+    enabled: !!companyId && hayDimension && params.enabled !== false,
+    queryFn: async () => {
+      const filas = await runQuery<ResolucionImputacion[]>((signal) =>
+        supabase
+          .rpc('conta_resolver_imputacion', {
+            p_project_id: projectId ?? null,
+            p_destino: destino ?? null,
+            p_proveedor_id: proveedorId ?? null,
+            p_cliente_id: clienteId ?? null,
+            p_unidad_id: unidadId ?? null,
+            p_categoria: categoria ?? null,
+            p_evento: null,
+            p_cuenta_explicita: null,
+          })
+          .abortSignal(signal),
+      )
+      // La RPC devuelve SIEMPRE una fila. Si no llegara ninguna, tratarlo como
+      // «no resuelto» es más honesto que devolver null y que la UI decida.
+      return filas?.[0] ?? {
+        cuenta_id: null,
+        origen_resolucion: 'sin_resolver' as const,
+        regla_tabla: null,
+        regla_id: null,
+        evento_usado: null,
+        motivo: 'La consulta de resolución no devolvió respuesta.',
+      }
+    },
   })
 }
