@@ -17,7 +17,6 @@ import type {
   CuentaContable,
   RevaluacionFxFila,
   ReglaProveedor,
-  ReglaCargo,
   DestinoImputacion,
 } from '../../types/contabilidad'
 import type { AsientoFormInput, CuentaFormInput, TipoCambioFormInput } from './schemas'
@@ -611,59 +610,3 @@ export function useEliminarReglaProveedorMutation(companyId?: string) {
   })
 }
 
-export interface ReglaCargoInput {
-  cliente_id?: string | null
-  unidad_id?: string | null
-  categoria?: string | null
-  cuenta_id: string
-  activa?: boolean
-  notas?: string | null
-}
-
-export function useGuardarReglaCargoMutation(companyId?: string, projectId?: string | null) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (input: ReglaCargoInput & { id?: string }) => {
-      if (!companyId) throw new Error('Falta companyId.')
-      const { id, ...campos } = input
-      // `especificidad` NO se manda: la calcula la BD. Mandarla sería pelear
-      // con una columna generada y el INSERT fallaría.
-      const fila = {
-        cliente_id: campos.cliente_id ?? null,
-        unidad_id: campos.unidad_id ?? null,
-        categoria: campos.categoria ?? null,
-        cuenta_id: campos.cuenta_id,
-        activa: campos.activa ?? true,
-        notas: campos.notas ?? null,
-        company_id: companyId,
-        project_id: projectId ?? null,
-      }
-      const rows = id
-        ? await runQuery<ReglaCargo[]>((signal) =>
-            supabase.from('conta_reglas_cargo').update(fila).eq('id', id).select().abortSignal(signal))
-        : await runQuery<ReglaCargo[]>((signal) =>
-            supabase.from('conta_reglas_cargo').insert(fila).select().abortSignal(signal))
-      return rows?.[0] ?? null
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: contabilidadKeys.reglasCargoDeEmpresa(companyId) })
-      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'resolucion'] })
-    },
-  })
-}
-
-// Sin `projectId`, por la misma razón que el borrado de reglas de proveedor.
-export function useEliminarReglaCargoMutation(companyId?: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await runQuery((signal) =>
-        supabase.from('conta_reglas_cargo').delete().eq('id', id).abortSignal(signal))
-      return id
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: contabilidadKeys.reglasCargoDeEmpresa(companyId) })
-      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'resolucion'] })
-    },
-  })
-}

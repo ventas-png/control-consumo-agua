@@ -93,6 +93,10 @@ INSERT INTO public.conta_cuentas
   -- Ledger del PROYECTO A1: mismo código, otro ledger. Legal por el índice
   -- único por ledger, y necesario para probar que no se cruzan.
   ('c0000000-0000-0000-0000-00000000a101', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', '5101', 'Gasto general (proyecto)', 'gasto', 'deudora', 3, true, true),
+  -- La contrapartida: sin una cuenta de CxP mapeada, `conta_generar_asiento`
+  -- omite el asiento entero y el recorrido documento → asiento no se puede
+  -- medir. Es pasivo, acreedora, de detalle.
+  ('c0000000-0000-0000-0000-00000000a008', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL, '2101', 'Cuentas por pagar', 'pasivo', 'acreedora', 3, true, true),
   -- Empresa B
   ('c0000000-0000-0000-0000-00000000b001', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', NULL, '5101', 'Gasto general (B)', 'gasto', 'deudora', 3, true, true);
 
@@ -109,4 +113,19 @@ INSERT INTO public.unidades (id, company_id, project_id, nombre) VALUES
 
 -- ── Mapeo general del evento, que es el escalón 4 ───────────────────────────
 INSERT INTO public.conta_mapeo_cuentas (company_id, project_id, evento, cuenta_id) VALUES
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL, 'gasto_otros', 'c0000000-0000-0000-0000-00000000a002');
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL, 'gasto_otros',      'c0000000-0000-0000-0000-00000000a002'),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL, 'cxp_proveedores',  'c0000000-0000-0000-0000-00000000a008');
+
+-- ── Documentos reales ───────────────────────────────────────────────────────
+-- La bitácora exige que el documento EXISTA y sea de la empresa y el ledger
+-- declarados, así que las pruebas de trazabilidad no pueden inventar UUIDs.
+-- Nacen en `registrada`: el trigger contable es AFTER UPDATE OF estado, así
+-- que cargarlas acá no dispara ningún asiento.
+INSERT INTO public.facturas_proveedor
+  (id, company_id, project_id, proveedor_id, concepto, categoria, monto_total, moneda, estado) VALUES
+  ('aaaa0000-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL,
+   'd0000000-0000-0000-0000-00000000a001', 'Documento de trazabilidad 1', 'otros', 100, 'USD', 'registrada'),
+  ('aaaa0000-0000-0000-0000-000000000002', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL,
+   'd0000000-0000-0000-0000-00000000a001', 'Documento de trazabilidad 2', 'otros', 100, 'USD', 'registrada'),
+  ('aaaa0000-0000-0000-0000-000000000003', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL,
+   'd0000000-0000-0000-0000-00000000a001', 'Documento de trazabilidad 3', 'otros', 100, 'USD', 'registrada');

@@ -1,33 +1,39 @@
 // Reglas de imputación contable — pantalla del LEDGER activo.
 //
-// Tres bloques, y el orden en pantalla es el orden de la PRIORIDAD real, para
+// Dos bloques, y el orden en pantalla es el orden de la PRIORIDAD real, para
 // que la pantalla enseñe la regla del sistema en vez de pedir que se aprenda
 // de un manual:
-//   1. Reglas por proveedor y destino.
-//   2. Reglas por cliente / unidad / tipo de cargo.
-//   3. Previsualización: dada una combinación, qué cuenta sale y POR QUÉ.
+//   1. Cuenta predeterminada por proveedor.
+//   2. Previsualización: dada una combinación, qué cuenta sale y POR QUÉ.
 //
 // Lo que esta pantalla NO hace: decidir. Toda la resolución vive en
 // `conta_resolver_imputacion`, y la previsualización la LLAMA en vez de
 // reimplementarla. Si la UI calculara su propia respuesta, mostraría una
 // predicción que podría no coincidir con lo que el documento va a hacer, que
 // es exactamente el problema que estas reglas vienen a resolver.
+//
+// Lo que esta pantalla NO OFRECE, y por qué: las reglas por cliente y unidad
+// (`conta_reglas_cargo`) existen en la base, con sus triggers, su RLS y su
+// escalón en el resolutor, y el arnés las cubre. Pero NINGÚN documento las
+// consulta todavía: `cargos_adicionales_unidad` no está cableado al motor.
+// Un formulario para guardarlas sería un control que promete cambiar un
+// asiento y no cambia ninguno, así que no se ofrece hasta que el cableado
+// exista. Lo mismo con los destinos distintos de `gasto`: ver
+// `DESTINOS_CABLEADOS`.
 import { useMemo, useState } from 'react'
 import {
   useCuentasQuery,
   useReglasProveedorQuery,
-  useReglasCargoQuery,
   useResolucionImputacionQuery,
 } from '../../domain/contabilidad/queries'
 import {
   useGuardarReglaProveedorMutation,
   useEliminarReglaProveedorMutation,
-  useGuardarReglaCargoMutation,
-  useEliminarReglaCargoMutation,
 } from '../../domain/contabilidad/mutations'
 import { useProveedoresQuery } from '../../domain/cxp/queries'
 import {
   DESTINOS_IMPUTACION,
+  DESTINOS_CABLEADOS,
   ETIQUETA_ORIGEN,
   type DestinoImputacion,
 } from '../../types/contabilidad'
@@ -38,10 +44,13 @@ interface Props {
   puedeEditar?: boolean
 }
 
-/** Categorías de `cargos_adicionales_unidad`. Espejo del CHECK de la BD. */
-const CATEGORIAS_CARGO = [
-  'reparacion', 'exceso_consumo', 'dano', 'servicio', 'multa', 'otro',
-] as const
+/**
+ * Los destinos que la pantalla ofrece, con su etiqueta. Es el catálogo
+ * completo filtrado por lo que un documento consulta de verdad.
+ */
+const DESTINOS_OFRECIDOS = DESTINOS_IMPUTACION.filter((d) =>
+  DESTINOS_CABLEADOS.includes(d.destino),
+)
 
 const card: React.CSSProperties = {
   border: '1px solid var(--at-line)',
@@ -66,12 +75,9 @@ export function ReglasImputacionTab({ companyId, projectId, puedeEditar = true }
   const cuentas = useCuentasQuery(companyId, projectId)
   const proveedores = useProveedoresQuery(companyId)
   const reglasProv = useReglasProveedorQuery(companyId, projectId)
-  const reglasCargo = useReglasCargoQuery(companyId, projectId)
 
   const guardarProv = useGuardarReglaProveedorMutation(companyId, projectId)
   const borrarProv = useEliminarReglaProveedorMutation(companyId)
-  const guardarCargo = useGuardarReglaCargoMutation(companyId, projectId)
-  const borrarCargo = useEliminarReglaCargoMutation(companyId)
 
   // Sólo cuentas IMPUTABLES: de detalle y activas. Ofrecer una agrupadora
   // sería ofrecer algo que el trigger de BD va a rechazar.
@@ -109,32 +115,15 @@ export function ReglasImputacionTab({ companyId, projectId, puedeEditar = true }
     }
   }
 
-  // ── Formulario: regla de cargo ────────────────────────────────────────────
-  const [cargoCategoria, setCargoCategoria] = useState('')
-  const [cargoCuenta, setCargoCuenta] = useState('')
-
-  async function agregarReglaCargo() {
-    setError(null)
-    if (!cargoCuenta) { setError('Elige una cuenta.'); return }
-    if (!cargoCategoria) { setError('Elige al menos un tipo de cargo.'); return }
-    try {
-      await guardarCargo.mutateAsync({ categoria: cargoCategoria, cuenta_id: cargoCuenta })
-      setCargoCategoria(''); setCargoCuenta('')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar la regla.')
-    }
-  }
-
   // ── Previsualización ──────────────────────────────────────────────────────
   const [vistaProv, setVistaProv] = useState('')
   const [vistaDestino, setVistaDestino] = useState<DestinoImputacion>('gasto')
-  const [vistaCategoria, setVistaCategoria] = useState('')
   const vista = useResolucionImputacionQuery({
     companyId,
     projectId,
     destino: vistaDestino,
     proveedorId: vistaProv || null,
-    categoria: vistaCategoria || null,
+    categoria: null,
   })
 
   const sinResolver = vista.data?.origen_resolucion === 'sin_resolver'
@@ -146,9 +135,14 @@ export function ReglasImputacionTab({ companyId, projectId, puedeEditar = true }
           justamente configurarla. */}
       <p style={{ margin: 0, color: 'var(--at-ink-soft)', fontSize: 13 }}>
         La cuenta se elige en este orden: <strong>la del documento</strong>, luego{' '}
-        <strong>la regla del proveedor</strong>, luego <strong>la de cliente o unidad</strong>, y por
-        último <strong>el mapeo general del evento</strong>. Si ninguna aplica, el documento queda
+        <strong>la regla del proveedor</strong>, y por último{' '}
+        <strong>el mapeo general del evento</strong>. Si ninguna aplica, el documento queda
         pendiente de configuración y no se le inventa una cuenta.
+      </p>
+      <p style={{ margin: 0, color: 'var(--at-ink-soft)', fontSize: 13 }}>
+        Por ahora las reglas se aplican a las <strong>facturas de proveedor</strong> y al destino{' '}
+        <strong>gasto</strong>. Los cargos por cliente o unidad, y los destinos de inventario y
+        activo fijo, todavía no consultan estas reglas, así que no se pueden configurar desde acá.
       </p>
 
       {error && (
@@ -173,7 +167,7 @@ export function ReglasImputacionTab({ companyId, projectId, puedeEditar = true }
             </select>
             <select aria-label="Destino" value={provDestino}
               onChange={(e) => setProvDestino(e.target.value as DestinoImputacion)} style={inputStyle}>
-              {DESTINOS_IMPUTACION.map((d) => (
+              {DESTINOS_OFRECIDOS.map((d) => (
                 <option key={d.destino} value={d.destino}>{d.etiqueta}</option>
               ))}
             </select>
@@ -212,61 +206,7 @@ export function ReglasImputacionTab({ companyId, projectId, puedeEditar = true }
         )}
       </section>
 
-      {/* ── 2. Reglas por cliente / unidad / tipo de cargo ── */}
-      <section style={card} aria-labelledby="reglas-cargo-titulo">
-        <h3 id="reglas-cargo-titulo" style={{ margin: 0, fontSize: 15 }}>
-          Reglas por cliente, unidad y tipo de cargo
-        </h3>
-        <p style={{ margin: 0, color: 'var(--at-ink-soft)', fontSize: 13 }}>
-          Entre varias reglas aplicables gana la más específica: unidad y tipo de cargo por encima
-          de sólo unidad, y ésa por encima de cliente o de sólo tipo de cargo.
-        </p>
-
-        {puedeEditar && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <select aria-label="Tipo de cargo" value={cargoCategoria}
-              onChange={(e) => setCargoCategoria(e.target.value)} style={inputStyle}>
-              <option value="">Tipo de cargo…</option>
-              {CATEGORIAS_CARGO.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select aria-label="Cuenta del cargo" value={cargoCuenta}
-              onChange={(e) => setCargoCuenta(e.target.value)} style={inputStyle}>
-              <option value="">Cuenta…</option>
-              {cuentasImputables.map((c) => (
-                <option key={c.id} value={c.id}>{c.codigo} · {c.nombre}</option>
-              ))}
-            </select>
-            <button type="button" onClick={() => void agregarReglaCargo()} disabled={guardarCargo.isPending}>
-              Agregar regla
-            </button>
-          </div>
-        )}
-
-        {(reglasCargo.data ?? []).length === 0 ? (
-          <p style={{ margin: 0, color: 'var(--at-ink-soft)', fontSize: 13 }}>
-            Sin reglas de cargo. Los cargos usan el mapeo general del evento.
-          </p>
-        ) : (
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {(reglasCargo.data ?? []).map((r) => (
-              <li key={r.id} style={{ marginBottom: 4 }}>
-                <span title={`Especificidad ${r.especificidad}`}>
-                  {r.unidad_id ? 'Unidad' : r.cliente_id ? 'Cliente' : 'Cualquiera'}
-                  {r.categoria ? ` · ${r.categoria}` : ''}
-                </span>
-                {' → '}
-                {nombreCuenta.get(r.cuenta_id) ?? r.cuenta_id}
-                {puedeEditar && (
-                  <button type="button" style={{ marginLeft: 8 }}
-                    onClick={() => void borrarCargo.mutateAsync(r.id)}>Quitar</button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* ── 3. Previsualización ── */}
+      {/* ── 2. Previsualización ── */}
       <section style={card} aria-labelledby="vista-previa-titulo">
         <h3 id="vista-previa-titulo" style={{ margin: 0, fontSize: 15 }}>
           ¿Qué cuenta se usaría?
@@ -281,14 +221,9 @@ export function ReglasImputacionTab({ companyId, projectId, puedeEditar = true }
           </select>
           <select aria-label="Destino a previsualizar" value={vistaDestino}
             onChange={(e) => setVistaDestino(e.target.value as DestinoImputacion)} style={inputStyle}>
-            {DESTINOS_IMPUTACION.map((d) => (
+            {DESTINOS_OFRECIDOS.map((d) => (
               <option key={d.destino} value={d.destino}>{d.etiqueta}</option>
             ))}
-          </select>
-          <select aria-label="Tipo de cargo a previsualizar" value={vistaCategoria}
-            onChange={(e) => setVistaCategoria(e.target.value)} style={inputStyle}>
-            <option value="">Sin tipo de cargo</option>
-            {CATEGORIAS_CARGO.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
 

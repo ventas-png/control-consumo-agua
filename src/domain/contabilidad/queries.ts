@@ -16,7 +16,6 @@ import type {
   MovimientoMayor,
   TipoCambio,
   ReglaProveedor,
-  ReglaCargo,
   ResolucionImputacion,
   DestinoImputacion,
 } from '../../types/contabilidad'
@@ -221,28 +220,6 @@ export function useReglasProveedorQuery(companyId?: string, projectId?: string |
         .eq('company_id', companyId!)
       q = projectId ? q.eq('project_id', projectId) : q.is('project_id', null)
       return (await runQuery<ReglaProveedor[]>((signal) => q.abortSignal(signal))) ?? []
-    },
-  })
-}
-
-/**
- * Reglas por cliente/unidad/categoría del LEDGER activo, ya ordenadas de la
- * MÁS específica a la más general: es el mismo orden con el que el resolutor
- * las evalúa, así que la pantalla muestra lo que la BD va a hacer.
- */
-export function useReglasCargoQuery(companyId?: string, projectId?: string | null) {
-  return useQuery({
-    queryKey: contabilidadKeys.reglasCargo(companyId, projectId),
-    enabled: !!companyId,
-    queryFn: async () => {
-      let q = supabase
-        .from('conta_reglas_cargo')
-        .select('*')
-        .eq('company_id', companyId!)
-        .order('especificidad', { ascending: false })
-        .order('id', { ascending: true })
-      q = projectId ? q.eq('project_id', projectId) : q.is('project_id', null)
-      return (await runQuery<ReglaCargo[]>((signal) => q.abortSignal(signal))) ?? []
     },
   })
 }

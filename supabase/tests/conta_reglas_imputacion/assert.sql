@@ -424,4 +424,229 @@ SELECT public.chk(
   (SELECT count(*) FROM public.conta_destinos_imputacion() WHERE evento_fallback IS NULL), 0,
   '17 · todos nombran su evento de respaldo (sin códigos contables fijos)');
 
+
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- HALLAZGOS DE REVISIÓN
+--
+-- Todo lo de abajo FALLA contra 20260926000000 sola. Son las pruebas que
+-- reproducen los cuatro problemas antes de arreglarlos:
+--   18 · una regla cuya cuenta se desactivó DESPUÉS sigue resolviendo;
+--   19 · la bitácora acepta cualquier tabla, cualquier UUID y documentos
+--        ajenos, y `authenticated` puede escribirla a mano;
+--   20 · el resolutor existe pero NO está cableado: aprobar una factura sigue
+--        imputando por el mapeo del evento aunque haya una regla.
+-- ════════════════════════════════════════════════════════════════════════════
+
+SELECT set_config('request.jwt.claim.sub', 'a0a0a0a0-0000-0000-0000-00000000000a', false);
+
+-- ── 18. La cuenta de una regla se revalida AL RESOLVER ──────────────────────
+-- El trigger valida al ESCRIBIR la regla. Eso no alcanza: la cuenta puede
+-- desactivarse después, y entonces la regla queda apuntando a algo que ya no
+-- recibe movimientos. Devolverla igual sería imputar a una cuenta inactiva.
+INSERT INTO public.conta_reglas_proveedor
+  (company_id, project_id, proveedor_id, destino, cuenta_id) VALUES
+  (:A::uuid, NULL, 'd0000000-0000-0000-0000-00000000a001'::uuid, 'inventario',
+   'c0000000-0000-0000-0000-00000000a007'::uuid);
+
+UPDATE public.conta_cuentas SET activa = false
+ WHERE id = 'c0000000-0000-0000-0000-00000000a007'::uuid;
+
+SELECT public.chk_txt(
+  (SELECT origen_resolucion FROM public.conta_resolver_imputacion(NULL, 'inventario',
+     'd0000000-0000-0000-0000-00000000a001'::uuid)),
+  'sin_resolver',
+  '18 · regla cuya cuenta se DESACTIVÓ después no resuelve');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_resolver_imputacion(NULL, 'inventario',
+     'd0000000-0000-0000-0000-00000000a001'::uuid)
+    WHERE motivo LIKE '%inactiva%' OR motivo LIKE '%ya no%'), 1,
+  '18 · y el motivo dice que la cuenta de la regla dejó de servir');
+
+-- Y NO cae en silencio al mapeo del evento: sería imputar a otra cuenta sin
+-- que nadie se entere de que la regla configurada está rota.
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_resolver_imputacion(NULL, 'inventario',
+     'd0000000-0000-0000-0000-00000000a001'::uuid) WHERE cuenta_id IS NOT NULL), 0,
+  '18 · y NO cae en silencio a la cuenta del evento');
+
+UPDATE public.conta_cuentas SET activa = true
+ WHERE id = 'c0000000-0000-0000-0000-00000000a007'::uuid;
+DELETE FROM public.conta_reglas_proveedor WHERE destino = 'inventario';
+
+-- ── 19. La bitácora no acepta cualquier cosa ────────────────────────────────
+SELECT public.chk_falla($$
+  SELECT * FROM public.conta_registrar_resolucion(
+    'tabla_que_no_existe', gen_random_uuid(), NULL, 'gasto') $$,
+  'ORIGEN_NO_PERMITIDO', '19 · tabla de origen arbitraria rechazada');
+
+SELECT public.chk_falla($$
+  SELECT * FROM public.conta_registrar_resolucion(
+    'facturas_proveedor', '00000000-0000-0000-0000-0000deadbeef', NULL, 'gasto') $$,
+  'ORIGEN_INEXISTENTE', '19 · documento inexistente rechazado');
+
+-- Documento de la empresa B, sesión de la empresa A.
+INSERT INTO public.facturas_proveedor
+  (id, company_id, project_id, proveedor_id, concepto, categoria, monto_total, moneda, estado)
+VALUES ('bbbb0000-0000-0000-0000-0000000000b1', :B::uuid, NULL,
+        'd0000000-0000-0000-0000-00000000b001', 'Factura de B', 'otros', 100, 'USD', 'registrada');
+
+SELECT public.chk_falla($$
+  SELECT * FROM public.conta_registrar_resolucion(
+    'facturas_proveedor', 'bbbb0000-0000-0000-0000-0000000000b1', NULL, 'gasto') $$,
+  'ORIGEN_AJENO', '19 · documento de OTRA EMPRESA rechazado');
+
+SELECT public.chk(
+  (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'conta_registrar_resolucion'
+      AND has_function_privilege('authenticated', p.oid, 'EXECUTE')), 0,
+  '19 · authenticated NO puede invocar conta_registrar_resolucion a mano');
+
+-- ── 20. El recorrido real: documento → resolución → asiento → bitácora ──────
+-- Cinco facturas, cinco escalones distintos del motor, y en cada una se mira
+-- LA CUENTA QUE QUEDÓ EN EL ASIENTO. Es la única medición que prueba que el
+-- resolutor está cableado: una resolución correcta que el asiento ignora no
+-- sirve de nada, y es exactamente el hallazgo que motiva esta migración.
+
+-- Las secciones anteriores dejaron reglas puestas. El escalón que se mide acá
+-- depende de cuáles existan, así que se parte de un estado declarado.
+DELETE FROM public.conta_reglas_proveedor;
+DELETE FROM public.conta_reglas_cargo;
+
+-- Ayuda: la cuenta DEUDORA del asiento de una factura. Es la de gasto —la
+-- contrapartida (CxP) es acreedora— y por eso alcanza con filtrar por `debe`.
+CREATE OR REPLACE FUNCTION public.cuenta_gasto_de(p_factura uuid)
+RETURNS uuid LANGUAGE sql STABLE AS $fn$
+  SELECT l.cuenta_id FROM public.conta_asiento_lineas l
+    JOIN public.conta_asientos a ON a.id = l.asiento_id
+   WHERE a.origen_id = p_factura AND l.debe > 0;
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.aprobar(p_factura uuid, p_concepto text)
+RETURNS void LANGUAGE plpgsql AS $fn$
+BEGIN
+  INSERT INTO public.facturas_proveedor
+    (id, company_id, project_id, proveedor_id, concepto, categoria, monto_total, moneda, estado)
+  VALUES (p_factura, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', NULL,
+          'd0000000-0000-0000-0000-00000000a001', p_concepto, 'otros', 500, 'USD', 'registrada');
+  UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = p_factura;
+END;
+$fn$;
+
+-- (a) SIN NINGUNA REGLA. Es el comportamiento de HOY, y el cableado tiene que
+--     dejarlo intacto: la cuenta sale del mapeo del evento `gasto_otros`.
+SELECT public.aprobar('aaaa1111-0000-0000-0000-000000000001', 'Servicio sin regla');
+
+SELECT public.chk_uuid(
+  public.cuenta_gasto_de('aaaa1111-0000-0000-0000-000000000001'),
+  'c0000000-0000-0000-0000-00000000a002'::uuid,
+  '20a · SIN regla, la factura se imputa por el mapeo del evento (como hoy)');
+
+SELECT public.chk_txt(
+  (SELECT origen_resolucion FROM public.conta_resoluciones
+    WHERE origen_id = 'aaaa1111-0000-0000-0000-000000000001'::uuid),
+  'mapeo_evento', '20a · y la bitácora lo dice: resolvió el mapeo del evento');
+
+-- (b) CON REGLA DE PROVEEDOR. Es el hallazgo principal: antes de esta
+--     migración la regla existía, resolvía bien al consultarla, y el asiento
+--     la ignoraba igual.
+INSERT INTO public.conta_reglas_proveedor
+  (company_id, project_id, proveedor_id, destino, cuenta_id) VALUES
+  (:A::uuid, NULL, 'd0000000-0000-0000-0000-00000000a001'::uuid, 'gasto',
+   'c0000000-0000-0000-0000-00000000a003'::uuid);
+
+SELECT public.aprobar('aaaa1111-0000-0000-0000-000000000002', 'Servicio con regla');
+
+SELECT public.chk_uuid(
+  public.cuenta_gasto_de('aaaa1111-0000-0000-0000-000000000002'),
+  'c0000000-0000-0000-0000-00000000a003'::uuid,
+  '20b · CON regla de proveedor, el ASIENTO usa la cuenta de la regla');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_resoluciones
+    WHERE origen_tabla = 'facturas_proveedor'
+      AND origen_id = 'aaaa1111-0000-0000-0000-000000000002'::uuid
+      AND origen_resolucion = 'regla_proveedor'
+      AND regla_tabla = 'conta_reglas_proveedor'
+      AND regla_id IS NOT NULL
+      AND cuenta_id = 'c0000000-0000-0000-0000-00000000a003'::uuid), 1,
+  '20b · y la resolución queda en la bitácora, en la misma transacción');
+
+-- (c) CUENTA EXPLÍCITA EN LA LÍNEA. Escalón 1: gana a la regla del proveedor,
+--     que sigue existiendo. Es la selección manual que la PR promete conservar.
+INSERT INTO public.facturas_proveedor
+  (id, company_id, project_id, proveedor_id, concepto, categoria, monto_total, moneda, estado)
+VALUES ('aaaa1111-0000-0000-0000-000000000003', :A::uuid, NULL,
+        'd0000000-0000-0000-0000-00000000a001', 'Servicio con cuenta elegida a mano',
+        'otros', 500, 'USD', 'registrada');
+
+INSERT INTO public.factura_proveedor_lineas
+  (company_id, factura_id, linea, descripcion, cuenta_id, cantidad, precio_unitario, total)
+VALUES (:A::uuid, 'aaaa1111-0000-0000-0000-000000000003', 1, 'Línea con cuenta elegida',
+        'c0000000-0000-0000-0000-00000000a005', 1, 500, 500);
+
+UPDATE public.facturas_proveedor SET estado = 'aprobada'
+ WHERE id = 'aaaa1111-0000-0000-0000-000000000003';
+
+SELECT public.chk_uuid(
+  public.cuenta_gasto_de('aaaa1111-0000-0000-0000-000000000003'),
+  'c0000000-0000-0000-0000-00000000a005'::uuid,
+  '20c · la cuenta elegida en la línea gana a la regla del proveedor');
+
+SELECT public.chk_txt(
+  (SELECT origen_resolucion FROM public.conta_resoluciones
+    WHERE origen_id = 'aaaa1111-0000-0000-0000-000000000003'::uuid),
+  'linea_explicita', '20c · y la bitácora atribuye la decisión al documento');
+
+-- (d) REGLA INVÁLIDA (su cuenta se desactivó después). No se asienta con otra
+--     cuenta: no se asienta. Caer al mapeo del evento sería imputar a una
+--     cuenta que nadie configuró, en silencio.
+UPDATE public.conta_cuentas SET activa = false
+ WHERE id = 'c0000000-0000-0000-0000-00000000a003'::uuid;
+
+SELECT public.aprobar('aaaa1111-0000-0000-0000-000000000004', 'Servicio con regla rota');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_asientos
+    WHERE origen_id = 'aaaa1111-0000-0000-0000-000000000004'::uuid), 0,
+  '20d · con la regla rota NO se genera asiento (nada parcial, nada inventado)');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_resoluciones
+    WHERE origen_id = 'aaaa1111-0000-0000-0000-000000000004'::uuid
+      AND origen_resolucion = 'sin_resolver'
+      AND cuenta_id IS NULL
+      AND regla_tabla = 'conta_reglas_proveedor'
+      AND motivo IS NOT NULL), 1,
+  '20d · y la bitácora señala LA REGLA culpable, con motivo y sin cuenta');
+
+SELECT public.chk_txt(
+  (SELECT estado FROM public.facturas_proveedor
+    WHERE id = 'aaaa1111-0000-0000-0000-000000000004'::uuid),
+  'aprobada',
+  '20d · la factura se aprueba igual: la contabilidad no bloquea la operación');
+
+UPDATE public.conta_cuentas SET activa = true
+ WHERE id = 'c0000000-0000-0000-0000-00000000a003'::uuid;
+
+-- (e) SIN RESOLUCIÓN POSIBLE: ni regla ni mapeo. Mismo desenlace, otro motivo,
+--     y la factura queda pendiente de configuración en vez de imputada a algo.
+DELETE FROM public.conta_reglas_proveedor;
+DELETE FROM public.conta_mapeo_cuentas WHERE evento = 'gasto_otros' AND company_id = :A::uuid;
+
+SELECT public.aprobar('aaaa1111-0000-0000-0000-000000000005', 'Servicio sin nada configurado');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_asientos
+    WHERE origen_id = 'aaaa1111-0000-0000-0000-000000000005'::uuid), 0,
+  '20e · sin regla NI mapeo no se asienta');
+
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_resoluciones
+    WHERE origen_id = 'aaaa1111-0000-0000-0000-000000000005'::uuid
+      AND origen_resolucion = 'sin_resolver'
+      AND regla_id IS NULL AND cuenta_id IS NULL AND motivo IS NOT NULL), 1,
+  '20e · y queda registrado como pendiente de configuración, con motivo');
+
 SELECT 'INVARIANTES OK' AS resultado;

@@ -32,8 +32,6 @@ export const contabilidadKeys = {
     [...contabilidadKeys.all, 'tipos-cambio', companyId ?? null] as const,
   reglasProveedor: (companyId?: string, projectId?: string | null) =>
     [...contabilidadKeys.all, 'reglas-proveedor', companyId ?? null, projectId ?? null] as const,
-  reglasCargo: (companyId?: string, projectId?: string | null) =>
-    [...contabilidadKeys.all, 'reglas-cargo', companyId ?? null, projectId ?? null] as const,
   // La previsualización depende de TODAS las dimensiones: si alguna cambia, la
   // respuesta puede cambiar de escalón. Van todas en la key.
   resolucion: (
@@ -52,6 +50,4 @@ export const contabilidadKeys = {
   // regla de un proyecto dejaba la pantalla de la empresa con datos viejos.
   reglasProveedorDeEmpresa: (companyId?: string) =>
     [...contabilidadKeys.all, 'reglas-proveedor', companyId ?? null] as const,
-  reglasCargoDeEmpresa: (companyId?: string) =>
-    [...contabilidadKeys.all, 'reglas-cargo', companyId ?? null] as const,
 } as const

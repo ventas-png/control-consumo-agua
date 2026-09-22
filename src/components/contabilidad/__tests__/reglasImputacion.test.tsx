@@ -9,7 +9,11 @@
 //   · que sólo ofrezca cuentas IMPUTABLES (de detalle y activas);
 //   · que MUESTRE el porqué de la resolución, no sólo la cuenta;
 //   · que un «sin resolver» se vea como configuración incompleta y NO bloquee;
-//   · que no mande `especificidad`, que es una columna generada.
+//   · que NO ofrezca guardar reglas que ningún documento consulta todavía.
+//
+// Ese último punto es una revisión que se volvió prueba: la pantalla llegó a
+// ofrecer reglas por cliente/unidad y destinos de inventario y activo fijo que
+// nada consumía. Guardarlas no cambiaba ningún asiento y nadie se enteraba.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { CuentaContable, ResolucionImputacion } from '../../../types/contabilidad'
@@ -18,21 +22,17 @@ const state = vi.hoisted(() => ({
   cuentas: [] as CuentaContable[],
   resolucion: null as ResolucionImputacion | null,
   guardarProv: vi.fn(async (_input: Record<string, unknown>) => null),
-  guardarCargo: vi.fn(async (_input: Record<string, unknown>) => null),
 }))
 
 vi.mock('../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
 vi.mock('../../../domain/contabilidad/queries', () => ({
   useCuentasQuery: () => ({ data: state.cuentas, isLoading: false }),
   useReglasProveedorQuery: () => ({ data: [], isLoading: false }),
-  useReglasCargoQuery: () => ({ data: [], isLoading: false }),
   useResolucionImputacionQuery: () => ({ data: state.resolucion, isLoading: false }),
 }))
 vi.mock('../../../domain/contabilidad/mutations', () => ({
   useGuardarReglaProveedorMutation: () => ({ mutateAsync: state.guardarProv, isPending: false }),
   useEliminarReglaProveedorMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useGuardarReglaCargoMutation: () => ({ mutateAsync: state.guardarCargo, isPending: false }),
-  useEliminarReglaCargoMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 vi.mock('../../../domain/cxp/queries', () => ({
   useProveedoresQuery: () => ({
@@ -72,7 +72,6 @@ beforeEach(() => {
   ]
   state.resolucion = null
   state.guardarProv.mockClear()
-  state.guardarCargo.mockClear()
 })
 afterEach(cleanup)
 
@@ -97,8 +96,9 @@ describe('ReglasImputacionTab', () => {
     const intro = container.querySelector('p')?.textContent ?? ''
     expect(intro).toMatch(/la del documento/i)
     expect(intro).toMatch(/la regla del proveedor/i)
-    expect(intro).toMatch(/la de cliente o unidad/i)
     expect(intro).toMatch(/el mapeo general del evento/i)
+    // Y NO promete el escalón de cliente/unidad, que no está cableado.
+    expect(intro).not.toMatch(/cliente o unidad/i)
     expect(intro).toMatch(/no se le inventa una cuenta/i)
   })
 
@@ -135,39 +135,51 @@ describe('ReglasImputacionTab', () => {
     expect(caja.textContent).toContain('Sin resolver — falta configuración')
     expect(caja.textContent).toContain('no está mapeado')
 
-    // Y NO bloquea: los formularios siguen ahí, que es lo único que permite
+    // Y NO bloquea: el formulario sigue ahí, que es lo único que permite
     // arreglar la configuración que falta.
     expect(screen.getByLabelText('Proveedor')).toBeTruthy()
-    expect(screen.getByLabelText('Tipo de cargo')).toBeTruthy()
+    expect(screen.getByLabelText('Cuenta')).toBeTruthy()
   })
 
   it('guarda la regla de proveedor con destino y cuenta, sin inventar campos', async () => {
     render(<ReglasImputacionTab companyId="emp-1" projectId={null} />)
 
     fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: 'prov-1' } })
-    fireEvent.change(screen.getByLabelText('Destino'), { target: { value: 'inventario' } })
+    fireEvent.change(screen.getByLabelText('Destino'), { target: { value: 'gasto' } })
     fireEvent.change(screen.getByLabelText('Cuenta'), { target: { value: 'c-detalle' } })
     fireEvent.click(screen.getAllByText('Agregar regla')[0])
 
     await vi.waitFor(() => expect(state.guardarProv).toHaveBeenCalledTimes(1))
     expect(state.guardarProv).toHaveBeenCalledWith({
       proveedor_id: 'prov-1',
-      destino: 'inventario',
+      destino: 'gasto',
       cuenta_id: 'c-detalle',
     })
   })
 
-  it('la regla de cargo NO manda especificidad: es una columna generada', async () => {
+  it('NO ofrece guardar reglas por cliente o unidad: ningún documento las consulta', () => {
     render(<ReglasImputacionTab companyId="emp-1" projectId={null} />)
 
-    fireEvent.change(screen.getByLabelText('Tipo de cargo'), { target: { value: 'multa' } })
-    fireEvent.change(screen.getByLabelText('Cuenta del cargo'), { target: { value: 'c-detalle' } })
-    fireEvent.click(screen.getAllByText('Agregar regla')[1])
+    // `conta_reglas_cargo` existe en la BD y el resolutor la evalúa, pero
+    // `cargos_adicionales_unidad` todavía no llama al resolutor. Un control
+    // para guardarlas prometería cambiar un asiento sin cambiar ninguno.
+    expect(screen.queryByLabelText('Tipo de cargo')).toBeNull()
+    expect(screen.queryByLabelText('Cuenta del cargo')).toBeNull()
+    expect(screen.getAllByText('Agregar regla')).toHaveLength(1)
 
-    await vi.waitFor(() => expect(state.guardarCargo).toHaveBeenCalledTimes(1))
-    const enviado = state.guardarCargo.mock.calls[0][0]
-    expect(enviado).toEqual({ categoria: 'multa', cuenta_id: 'c-detalle' })
-    expect(enviado).not.toHaveProperty('especificidad')
+    // Y la pantalla lo DICE, en vez de dejar el hueco sin explicación.
+    expect(document.body.textContent).toMatch(/todavía no consultan estas reglas/i)
+  })
+
+  it('sólo ofrece destinos que un documento consulta de verdad', () => {
+    render(<ReglasImputacionTab companyId="emp-1" projectId={null} />)
+    const destino = screen.getByLabelText('Destino') as HTMLSelectElement
+    const valores = Array.from(destino.options).map((o) => o.value)
+
+    // `conta_tg_facturas_prov()` resuelve `gasto` y nada más. Inventario y
+    // activo fijo los decide la recepción de la orden de compra, no la
+    // factura, así que ofrecerlos acá sería dejar configurar aire.
+    expect(valores).toEqual(['gasto'])
   })
 
   it('exige elegir cuenta antes de guardar, y lo dice', async () => {

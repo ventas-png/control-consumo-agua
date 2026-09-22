@@ -298,6 +298,20 @@ export const DESTINOS_IMPUTACION = [
 export type DestinoImputacion = (typeof DESTINOS_IMPUTACION)[number]['destino']
 
 /**
+ * Los destinos que HOY consulta un documento real.
+ *
+ * `conta_tg_facturas_prov()` resuelve `gasto` y ninguno más: inventario y
+ * activo fijo los decide la RECEPCIÓN de la orden de compra —por la ruta
+ * GR/IR—, no la factura, y deducirlos de la categoría del documento sería
+ * justamente la clase de suposición que estas reglas vienen a eliminar.
+ *
+ * La pantalla ofrece sólo estos. Guardar una regla para un destino que ningún
+ * documento consulta sería configurar algo que no va a cambiar ningún asiento,
+ * y no hay forma de que quien la guarda se entere.
+ */
+export const DESTINOS_CABLEADOS: readonly DestinoImputacion[] = ['gasto']
+
+/**
  * De dónde salió la cuenta. El orden de la unión ES la prioridad, y
  * `sin_resolver` es un resultado legítimo: significa que falta configuración y
  * que NO se inventó una cuenta.
