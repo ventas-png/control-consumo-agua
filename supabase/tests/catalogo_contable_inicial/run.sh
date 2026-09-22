@@ -84,8 +84,8 @@ aplicar "$MIGS/20260918121413_conta_cuentas_especiales_semanticas.sql"
 aplicar "$MIGS/20260918151430_conta_estado_especiales_sin_fuga_cross_company.sql"
 
 echo "── 4/6 · migración bajo prueba (dos veces)"
-aplicar "$MIGS/20260922000100_catalogo_contable_inicial_configurable.sql"
-aplicar "$MIGS/20260922000100_catalogo_contable_inicial_configurable.sql"
+aplicar "$MIGS/20260924000200_catalogo_contable_inicial_configurable.sql"
+aplicar "$MIGS/20260924000200_catalogo_contable_inicial_configurable.sql"
 
 echo "── 5/6 · invariantes"
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d catalogo_inicial -f "$AQUI/assert.sql" 2>&1)
