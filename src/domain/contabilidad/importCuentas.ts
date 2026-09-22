@@ -2,14 +2,14 @@
 //
 // FORMATO DEL ARCHIVO (el de la plantilla): una COLUMNA POR NIVEL, `n_1`..`n_8`,
 // con 0 en los niveles que la cuenta no usa. La jerarquía se lee sola y el
-// código de la cuenta sale de unir los niveles con punto:
+// código de la cuenta sale de concatenar los niveles, sin separadores:
 //
 //   n_1 n_2 n_3 n_4 n_5 …  nombre                     → código   nivel  padre
 //    1   0   0   0   0      ACTIVO                       1          1     —
-//    1   1   0   0   0      NO CORRIENTE                 1.1        2     1
-//    1   1   1   0   0      PROPIEDAD PLANTA Y EQUIPO    1.1.1      3     1.1
-//    1   1   1   1   0      Vehículos                    1.1.1.1    4     1.1.1
-//    1   1   1   1   1      Pick-up Toyota 2020          1.1.1.1.1  5     1.1.1.1
+//    1   1   0   0   0      NO CORRIENTE                  11         2     1
+//    1   1   1   0   0      PROPIEDAD PLANTA Y EQUIPO     111        3     11
+//    1   1   1   1   0      Vehículos                     1111       4     111
+//    1   1   1   1   1      Pick-up Toyota 2020           11111      5     1111
 //
 // El árbol llega hasta `n_8`; las columnas que sobran se dejan en 0.
 //
@@ -45,8 +45,8 @@ export const NIVEL_MAXIMO = 8
 /** Cabeceras de las columnas por nivel, en orden. */
 export const COLUMNAS_NIVEL = ['n_1', 'n_2', 'n_3', 'n_4', 'n_5', 'n_6', 'n_7', 'n_8'] as const
 
-/** Une los niveles del código: 1 · 1 · 3 → "1.1.3". */
-export const SEPARADOR_NIVEL = '.'
+/** El formato viejo con código explícito puede seguir usando puntos. */
+const SEPARADOR_NIVEL_LEGACY = '.'
 
 /** Fila del archivo ya normalizada (aún sin ubicar en el árbol). */
 export interface CuentaImportFila {
@@ -166,8 +166,8 @@ export function inferirPadreCodigo(codigo: string): string | null {
     const padre = c.slice(0, c.lastIndexOf('-'))
     return padre || null
   }
-  if (c.includes(SEPARADOR_NIVEL)) {
-    const padre = c.slice(0, c.lastIndexOf(SEPARADOR_NIVEL))
+  if (c.includes(SEPARADOR_NIVEL_LEGACY)) {
+    const padre = c.slice(0, c.lastIndexOf(SEPARADOR_NIVEL_LEGACY))
     return padre || null
   }
   // Sin separador la convención es posicional y solo aplica a códigos numéricos;
@@ -234,7 +234,7 @@ export function jerarquiaDesdeNiveles(
   }
 
   const partes = segmentos.slice(0, ultimo + 1).map(String)
-  const codigo = partes.join(SEPARADOR_NIVEL)
+  const codigo = partes.join('')
   if (codigo.length > 20) {
     return { ok: false, errors: [`el código "${codigo}" excede los 20 caracteres`] }
   }
@@ -242,7 +242,7 @@ export function jerarquiaDesdeNiveles(
     ok: true,
     data: {
       codigo,
-      padre_codigo: ultimo > 0 ? partes.slice(0, ultimo).join(SEPARADOR_NIVEL) : null,
+      padre_codigo: ultimo > 0 ? partes.slice(0, ultimo).join('') : null,
       nivel: ultimo + 1,
     },
   }

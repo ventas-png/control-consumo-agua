@@ -133,8 +133,9 @@ export function ImportCuentasModal({ companyId, projectId, proyectos, onClose, o
       <div style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--at-ink-3)', lineHeight: 1.6 }}>
         <strong>Cómo se llena la plantilla:</strong> una columna por nivel
         (<code>n_1</code>…<code>n_{NIVEL_MAXIMO}</code>), con <strong>0</strong> en
-        los niveles que la cuenta no usa. La jerarquía sale de esos números — no
-        se escribe ningún código con guiones ni se indica la cuenta padre.
+        los niveles que la cuenta no usa. La jerarquía sale de esos números y el
+        código se concatena sin separadores (1, 1, 1 → 111): no se escriben
+        guiones ni se indica la cuenta padre.
         <div style={{ marginTop: 6, fontFamily: 'var(--at-mono, monospace)', whiteSpace: 'pre', overflowX: 'auto' }}>
           {'1 0 0 0 0  ACTIVO            → nivel 1\n'}
           {'1 1 0 0 0  NO CORRIENTE      → nivel 2, hija de la anterior\n'}

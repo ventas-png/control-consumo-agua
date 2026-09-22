@@ -18,6 +18,37 @@ import type { CuentaExistenteRef, CuentaImportFila, CuentaOmitida } from './impo
 
 // ── Catálogo de cuentas ─────────────────────────────────────────────────────
 
+export type PlantillaCatalogo = 'basico' | 'latam'
+
+/**
+ * Inicializa un ledger VACÍO con una plantilla elegida por el usuario.
+ *
+ * La RPC resuelve la empresa desde la sesión, valida que el proyecto pertenezca
+ * a ella y serializa dos clics concurrentes. No recibe companyId: éste sólo se
+ * usa aquí para invalidar las consultas correctas del cliente.
+ */
+export function useInicializarCatalogoMutation(companyId?: string, projectId?: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (plantilla: PlantillaCatalogo) => {
+      if (!companyId) throw new Error('Falta companyId.')
+      return await runQuery<Array<{ cuentas_creadas: number; mapeos_creados: number }>>((signal) =>
+        supabase
+          .rpc('conta_inicializar_catalogo', {
+            p_plantilla: plantilla,
+            p_project_id: projectId ?? null,
+          })
+          .abortSignal(signal),
+      )
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.cuentas(companyId, projectId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.mapeo(companyId, projectId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.cuentasEspeciales(companyId, projectId) })
+    },
+  })
+}
+
 export function useCrearCuentaMutation(companyId?: string, projectId?: string | null) {
   const qc = useQueryClient()
   return useMutation({

@@ -22938,6 +22938,13 @@ export type Database = {
           proceso: string
         }[]
       }
+      conta_inicializar_catalogo: {
+        Args: { p_plantilla: string; p_project_id: string | null }
+        Returns: {
+          cuentas_creadas: number
+          mapeos_creados: number
+        }[]
+      }
       conta_estado_resultados: {
         Args: {
           p_company_id: string

@@ -15,8 +15,8 @@ Punto de partida (lo que ya existe):
 
 La base de todo el ERP. Sin esto, las demás fases no tienen dónde registrar sus efectos.
 
-- **Catálogo de cuentas** (`conta_cuentas`): jerárquico hasta 8 niveles (clase → grupo → mayor → sub-cuenta → auxiliares), multi-tenant, con plantilla seed LATAM (GT/MX) adaptada a condominios/agua. Cuentas de banco/caja pueden llevar moneda propia.
-- **Carga masiva del catálogo** (Excel/CSV): la plantilla lleva **una columna por nivel** (`n_1`…`n_8`, con 0 en los niveles que la cuenta no usa) más `nombre`/`tipo`/`naturaleza`/`es_detalle`/`moneda`/`descripcion`. La jerarquía sale de esos números —el código (`1.1.1.3`) y la cuenta padre se derivan solos— porque un `codigo` con guiones lo convierte Excel en fecha (`1102-03`) y el padre escrito a mano se equivocaba. `tipo` y `naturaleza` se heredan del padre: el nivel 1 declara el tipo y la naturaleza solo se escribe donde va contra-natura (depreciación acumulada y sus hijas). Un mismo archivo se aplica a **varias contabilidades a la vez** (la de la empresa y/o la de cada proyecto), creando padres antes que hijos y omitiendo con motivo lo que ya existe, se repite, cicla o excede el nivel 8. Con la opción de actualizar, las cuentas existentes se refrescan sin moverse de rama. El formato viejo (`codigo` + `padre_codigo`) se sigue aceptando.
+- **Catálogo de cuentas** (`conta_cuentas`): jerárquico hasta 8 niveles (clase → grupo → mayor → sub-cuenta → auxiliares) y multi-tenant. Cada ledger nuevo nace vacío y el administrador elige una plantilla básica, la LATAM completa, importar su catálogo o empezar manualmente; una plantilla es editable, no una taxonomía rígida del sistema. Cuentas de banco/caja pueden llevar moneda propia.
+- **Carga masiva del catálogo** (Excel/CSV): la plantilla lleva **una columna por nivel** (`n_1`…`n_8`, con 0 en los niveles que la cuenta no usa) más `nombre`/`tipo`/`naturaleza`/`es_detalle`/`moneda`/`descripcion`. La jerarquía sale de esos números —el código (`1113`) y la cuenta padre se derivan solos, sin puntos ni guiones— porque un `codigo` con guiones lo convierte Excel en fecha (`1102-03`) y el padre escrito a mano se equivocaba. `tipo` y `naturaleza` se heredan del padre: el nivel 1 declara el tipo y la naturaleza solo se escribe donde va contra-natura (depreciación acumulada y sus hijas). Un mismo archivo se aplica a **varias contabilidades a la vez** (la de la empresa y/o la de cada proyecto), creando padres antes que hijos y omitiendo con motivo lo que ya existe, se repite, cicla o excede el nivel 8. Con la opción de actualizar, las cuentas existentes se refrescan sin moverse de rama. El formato viejo (`codigo` + `padre_codigo`) se sigue aceptando.
 - **Baja de cuentas del catálogo ✅**: se elimina una cuenta desde su fila o varias con casillas + barra de selección, sujeto al permiso de borrado del rol. Antes de borrar, la RPC `conta_cuentas_en_uso` dice qué cuentas están referenciadas y por quién —descubre las FK bloqueantes en `pg_constraint`, así que una tabla nueva que apunte a `conta_cuentas` queda cubierta sola—: así el lote borra lo que puede y explica el resto (movimientos, cuentas hijas, presupuesto, mapeos, bancos, compras) en vez de abortar entero con un error de FK. Las cuentas del seed (`es_sistema`) no se borran nunca: trigger `conta_cuenta_proteger_borrado`, se desactivan.
 - **Pólizas/asientos** (`conta_asientos` + `conta_asiento_lineas`): estados borrador → publicado → anulado (por reverso, nunca borrado); folio correlativo por empresa; validación debe = haber server-side.
 - **Asientos automáticos por triggers de Postgres** desde los flujos existentes: pago verificado/aplicado, gasto pagado, factura de agua emitida/anulada (devengo CxC + IVA), cuota de condominio emitida. Idempotentes y con reversos automáticos; nunca bloquean la operación de negocio.
@@ -188,6 +188,31 @@ de cuentas sin romperlos:
 Límites declarados (los cierra el PR siguiente): el seed por defecto sigue
 creando el catálogo LATAM completo; no hay catálogo vacío ni básico; no se
 convierten códigos existentes; la profundidad máxima sigue en 8 niveles.
+
+## Fase 9 — Catálogo inicial configurable y jerarquía sin separadores ✅
+
+Cierra los límites declarados por la Fase 8 sin reescribir contabilidades ya
+operativas:
+
+- Empresas y proyectos nuevos nacen con el ledger vacío. Un owner/admin elige
+  en el catálogo entre **básico (22 cuentas)**, **LATAM completo**, importación
+  o captura desde cero. La inicialización es atómica, por ledger y sólo se
+  permite mientras no exista ninguna cuenta.
+- Las cuentas de una plantilla dejan `es_sistema = false`: pueden renombrarse,
+  ampliarse, desactivarse y borrarse cuando no tengan referencias. Los
+  catálogos que ya existían conservan códigos, cuentas y movimientos intactos.
+- En la importación por niveles, `1 · 1 · 1 · 3` produce `1113`; la relación
+  padre/hija y la profundidad viven en `padre_id`/`nivel`, no en guiones ni en
+  una longitud fija del código. El formato histórico explícito continúa
+  aceptándose por compatibilidad.
+- Los mapeos operativos mínimos se crean con la plantilla básica; LATAM conserva
+  además las cuentas y mapeos de compras, inventario, activos y GR/IR.
+
+Siguiente ampliación funcional, separada de esta fase: reglas de imputación por
+**tipo de cargo de cliente/unidad** y cuenta contable predeterminada por
+**proveedor** (gasto, costo o activo), con prioridad y trazabilidad. No se mezcla
+con la inicialización del catálogo porque cambia el modelo de documentos y la
+automatización de asientos, no la jerarquía de cuentas.
 
 Pendiente de infraestructura: el harness RLS server-side corre contra el
 **sandbox de larga vida** (`RLS_SUPABASE_URL`), cuyo esquema se actualiza a mano

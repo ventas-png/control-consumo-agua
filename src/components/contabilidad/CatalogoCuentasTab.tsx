@@ -9,6 +9,8 @@ import {
   useActualizarCuentaMutation,
   useCrearCuentaMutation,
   useEliminarCuentasMutation,
+  useInicializarCatalogoMutation,
+  type PlantillaCatalogo,
 } from '../../domain/contabilidad/mutations'
 import { planificarBorradoCuentas, resumirBloqueadas } from '../../domain/contabilidad/borrarCuentas'
 import { useBulkSelection } from '../../hooks/useBulkSelection'
@@ -53,6 +55,7 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
   const crear = useCrearCuentaMutation(companyId, projectId)
   const actualizar = useActualizarCuentaMutation(companyId, projectId)
   const eliminarCuentas = useEliminarCuentasMutation(companyId, projectId)
+  const inicializar = useInicializarCatalogoMutation(companyId, projectId)
 
   const [form, setForm] = useState<FormState | null>(null)
   const [mostrarInactivas, setMostrarInactivas] = useState(false)
@@ -70,6 +73,36 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
 
   function abrirNueva() {
     setForm({ ...FORM_VACIO })
+  }
+
+  async function aplicarPlantilla(plantilla: PlantillaCatalogo) {
+    const esBasica = plantilla === 'basico'
+    const { isConfirmed } = await confirm({
+      title: esBasica ? '¿Usar el catálogo básico?' : '¿Usar el catálogo LATAM?',
+      text: esBasica
+        ? 'Se crearán 22 cuentas iniciales y los mapeos mínimos para operar. Después podrás renombrar, ampliar, remapear o borrar las que no estén en uso.'
+        : 'Se creará el catálogo LATAM completo con sus mapeos. Después podrás adaptarlo; esta opción contiene más cuentas que la plantilla básica.',
+      confirmText: 'Crear catálogo',
+    })
+    if (!isConfirmed) return
+
+    try {
+      const resultado = await inicializar.mutateAsync(plantilla)
+      const creadas = resultado?.[0]?.cuentas_creadas
+      notify({
+        variant: 'success',
+        title: 'Catálogo listo',
+        text: typeof creadas === 'number'
+          ? `Se crearon ${creadas} cuentas. Ya puedes personalizarlas.`
+          : 'La plantilla se aplicó correctamente.',
+      })
+    } catch (e) {
+      notify({
+        variant: 'error',
+        title: 'No se pudo crear el catálogo',
+        text: e instanceof Error ? e.message : 'Inténtalo de nuevo.',
+      })
+    }
   }
 
   function abrirEdicion(c: CuentaContable) {
@@ -270,6 +303,68 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--at-space-3)' }}>
+      {!isLoading && cuentas.length === 0 && puedeCrear && (
+        <section
+          aria-labelledby="catalogo-inicial-titulo"
+          style={{
+            border: '1px solid var(--at-line)',
+            borderRadius: 12,
+            padding: 18,
+            background: 'var(--at-surface)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 14,
+          }}
+        >
+          <div>
+            <h3 id="catalogo-inicial-titulo" style={{ margin: '0 0 4px', fontSize: 16 }}>
+              Elige cómo iniciar esta contabilidad
+            </h3>
+            <p style={{ margin: 0, color: 'var(--at-ink-soft)', fontSize: 13 }}>
+              La jerarquía se forma con la cuenta padre y admite hasta {NIVEL_MAXIMO} niveles.
+              Los códigos son tuyos: no necesitas guiones ni un formato rígido.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
+            <div style={opcionInicialStyle}>
+              <strong>Catálogo básico</strong>
+              <span style={opcionDescripcionStyle}>22 cuentas esenciales, listas para crecer y con mapeos iniciales.</span>
+              <button
+                type="button"
+                onClick={() => void aplicarPlantilla('basico')}
+                disabled={inicializar.isPending}
+                style={btnPrimario}
+              >
+                Usar básico (recomendado)
+              </button>
+            </div>
+
+            <div style={opcionInicialStyle}>
+              <strong>Catálogo LATAM</strong>
+              <span style={opcionDescripcionStyle}>La estructura completa que usaba el sistema anteriormente.</span>
+              <button
+                type="button"
+                onClick={() => void aplicarPlantilla('latam')}
+                disabled={inicializar.isPending}
+                style={btnSecundario}
+              >
+                Usar catálogo completo
+              </button>
+            </div>
+
+            <div style={opcionInicialStyle}>
+              <strong>Empezar en limpio</strong>
+              <span style={opcionDescripcionStyle}>Crea la primera cuenta o importa tu propio catálogo.</span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" onClick={abrirNueva} style={btnSecundario}>+ Primera cuenta</button>
+                <button type="button" onClick={() => setImportando(true)} style={btnSecundario}>📥 Importar</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {puedeEliminar && (
         <SelectionToolbar
           count={bulk.count}
@@ -304,7 +399,7 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
               />
               Ver inactivas
             </label>
-            {puedeCrear && (
+            {puedeCrear && cuentas.length > 0 && (
               <>
                 <button onClick={() => setImportando(true)} style={btnSecundario}>📥 Carga masiva</button>
                 <button onClick={abrirNueva} style={btnPrimario}>+ Nueva cuenta</button>
@@ -314,7 +409,9 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
         }
         emptyState={{
           title: 'Sin catálogo de cuentas',
-          description: 'El catálogo se crea automáticamente al activar la contabilidad. Si no aparece, contacta al administrador.',
+          description: puedeCrear
+            ? 'Elige una plantilla, crea tu primera cuenta o importa tu propio catálogo.'
+            : 'Un administrador debe crear o importar el catálogo antes de empezar.',
         }}
       />
 
@@ -344,7 +441,10 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Campo label="Código *">
-              <input value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} style={input} placeholder="1102-02" />
+              <input value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} style={input} placeholder="110201" />
+              <span style={{ fontWeight: 400, fontSize: 11 }}>
+                El nivel lo determina la cuenta padre; no hace falta agregar guiones.
+              </span>
             </Campo>
             <Campo label="Nombre *">
               <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} style={input} placeholder="Banco USD" />
@@ -409,3 +509,19 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
   )
 }
 
+const opcionInicialStyle = {
+  border: '1px solid var(--at-line)',
+  borderRadius: 10,
+  padding: 14,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 10,
+} as const
+
+const opcionDescripcionStyle = {
+  color: 'var(--at-ink-soft)',
+  fontSize: 12,
+  lineHeight: 1.45,
+  flex: 1,
+} as const
