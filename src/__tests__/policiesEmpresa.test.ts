@@ -15,7 +15,8 @@ import { resolve } from 'node:path'
 // empresas distintas contra un Postgres desechable. Eso es la prueba de verdad.
 // Aquí quedan las cosas que ese arnés no puede afirmar sobre sí mismo: que esté
 // cableado en CI, que conserve la forma que lo hace significar algo, y que la
-// baseline del auditor NO se pode antes de tiempo.
+// baseline del auditor se pode CUANDO CORRESPONDE: ni antes de que alguien
+// mida la convergencia, ni después de que la huella la haya demostrado.
 // ════════════════════════════════════════════════════════════════════════════
 
 const MIGRACION = resolve('supabase/migrations/20260923000000_empresa_cerrar_drift_policies_y_grants.sql')
@@ -34,6 +35,13 @@ const despues = readFileSync(resolve(`${DIR}/despues.sql`), 'utf8')
 const baseline = JSON.parse(
   readFileSync(resolve('scripts/schema-drift/drift-conocido.json'), 'utf8'),
 ) as { grupos: Record<string, { produccion: string; repo: string }> }
+
+// La instantánea del catálogo real. Es lo único que puede DEMOSTRAR que un
+// drift declarado dejó de existir: la baseline dice qué difiere, la huella dice
+// qué mide producción hoy.
+const huella = JSON.parse(
+  readFileSync(resolve('scripts/schema-drift/huella-produccion.json'), 'utf8'),
+) as { grupos: Record<string, string> }
 
 const LEGADAS = [
   'empresa_insert_by_role',
@@ -189,16 +197,26 @@ describe('el arnés prueba lo que dice probar', () => {
   })
 })
 
-describe('la baseline del auditor NO se poda en este PR', () => {
-  it('tabla:empresa/policies sigue declarada', () => {
-    // Y tiene que seguir: los DROP sólo hacen algo en PRODUCCIÓN, así que la
-    // reconstrucción del repositorio no cambia y P sigue distinto de R hasta
-    // que la migración se aplique y se recapture la huella. Retirar la entrada
-    // acá sería afirmar una convergencia que todavía nadie midió — es lo mismo
-    // que 20260910000001 dejó escrito para security_logs.
-    expect(baseline.grupos).toHaveProperty('tabla:empresa/policies')
-    const e = baseline.grupos['tabla:empresa/policies']
-    expect(e.produccion).not.toBe(e.repo)
+describe('la baseline del auditor se podó cuando la convergencia se midió', () => {
+  it('tabla:empresa/policies ya no está declarada, y la huella dice por qué', () => {
+    // Cuando se escribió la migración la entrada TENÍA que seguir: los DROP
+    // sólo hacen algo en PRODUCCIÓN, así que la reconstrucción del repositorio
+    // no cambiaba y P seguía distinto de R. Retirarla entonces habría afirmado
+    // una convergencia que nadie había medido.
+    //
+    // Ya se midió. `Apply Migrations to Production` #170 aplicó 20260923000000
+    // el 2026-09-22 a las 03:32 UTC, y la huella recapturada ese día mide
+    // producción en el MISMO hash que la entrada declaraba como `repo`. Ahí la
+    // entrada pasó a describir un mundo que ya no existe, que es la condición
+    // que la propia migración puso para retirarla.
+    //
+    // El hash va literal a propósito: es la evidencia, no un detalle. Si una
+    // migración futura vuelve a mover las policies de `empresa`, esta prueba
+    // tiene que romper para que alguien decida de nuevo.
+    expect(baseline.grupos).not.toHaveProperty('tabla:empresa/policies')
+    expect(huella.grupos['tabla:empresa/policies']).toBe(
+      '5cea41f8566e4575443966a5d93868a11268aaf495db770e5dc5443ad86a9d66:1',
+    )
   })
 
   it('la migración dice por qué no se poda', () => {
