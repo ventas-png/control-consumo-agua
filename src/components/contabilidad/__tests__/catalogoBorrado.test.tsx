@@ -20,6 +20,7 @@ vi.mock('../../../domain/contabilidad/mutations', () => ({
   useCrearCuentaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useActualizarCuentaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useEliminarCuentasMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useInicializarCatalogoMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useImportarCuentasMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   fetchCuentasEnUso: vi.fn(async () => []),
 }))

@@ -34,7 +34,7 @@ describe('jerarquiaDesdeNiveles', () => {
     const r = jerarquiaDesdeNiveles(niveles([1, 1, 1, 3, 2]))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.data).toEqual({ codigo: '1.1.1.3.2', padre_codigo: '1.1.1.3', nivel: 5 })
+    expect(r.data).toEqual({ codigo: '11132', padre_codigo: '1113', nivel: 5 })
   })
 
   it('el nivel 1 no tiene padre', () => {
@@ -44,7 +44,7 @@ describe('jerarquiaDesdeNiveles', () => {
 
   it('trata la celda vacía como 0', () => {
     const r = jerarquiaDesdeNiveles({ n_1: 2, n_2: 3, n_3: '', n_4: '', n_5: '' })
-    expect(r.ok && r.data.codigo).toBe('2.3')
+    expect(r.ok && r.data.codigo).toBe('23')
   })
 
   it('rechaza un hueco entre niveles', () => {
@@ -55,7 +55,7 @@ describe('jerarquiaDesdeNiveles', () => {
   })
 
   it('acepta las cabeceras alternativas nivel_1 y n1', () => {
-    expect(jerarquiaDesdeNiveles({ nivel_1: 4, nivel_2: 2 })).toMatchObject({ ok: true, data: { codigo: '4.2' } })
+    expect(jerarquiaDesdeNiveles({ nivel_1: 4, nivel_2: 2 })).toMatchObject({ ok: true, data: { codigo: '42' } })
     expect(jerarquiaDesdeNiveles({ n1: 5 })).toMatchObject({ ok: true, data: { codigo: '5' } })
   })
 
@@ -71,8 +71,8 @@ describe('validarFilaCuenta — formato de la plantilla (columnas por nivel)', (
     const r = validarFilaCuenta(niveles([1, 1, 1, 1, 0], { nombre: 'Vehículos' }))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.data.codigo).toBe('1.1.1.1')
-    expect(r.data.padre_codigo).toBe('1.1.1')
+    expect(r.data.codigo).toBe('1111')
+    expect(r.data.padre_codigo).toBe('111')
   })
 
   it('deja tipo y naturaleza vacíos para que se hereden del padre', () => {
