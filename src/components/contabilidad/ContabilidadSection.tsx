@@ -8,6 +8,7 @@ import { AsientosTab } from './AsientosTab'
 import { BalanzaTab } from './BalanzaTab'
 import { MapeoCuentasTab } from './MapeoCuentasTab'
 import { ReglasImputacionTab } from './ReglasImputacionTab'
+import { PendientesContabilizacionTab } from './PendientesContabilizacionTab'
 import { ProveedoresTab } from './ProveedoresTab'
 import { CuentasPorPagarTab } from './CuentasPorPagarTab'
 import { ComprasTab } from './ComprasTab'
@@ -15,10 +16,12 @@ import { PresupuestoTab } from './PresupuestoTab'
 import { BancosTab } from './BancosTab'
 import { EstadosFinancierosTab } from './EstadosFinancierosTab'
 
-type SubTab = 'polizas' | 'balanza' | 'eeff' | 'bancos' | 'compras' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'reglas' | 'configuracion'
+type SubTab = 'polizas' | 'pendientes' | 'balanza' | 'eeff' | 'bancos' | 'compras' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'reglas' | 'configuracion'
 
 const TABS: { id: SubTab; label: string; icon: string }[] = [
   { id: 'polizas', label: 'Pólizas', icon: '📒' },
+  // Junto a Pólizas: es lo que falta en ellas. Facturas aprobadas sin asiento.
+  { id: 'pendientes', label: 'Pendientes', icon: '⏳' },
   { id: 'balanza', label: 'Balanza', icon: '⚖️' },
   { id: 'eeff', label: 'Estados financieros', icon: '📊' },
   { id: 'bancos', label: 'Bancos', icon: '🏦' },
@@ -148,6 +151,15 @@ export function ContabilidadSection() {
           otra ni se aplica sobre la que no le toca. */}
       {tab === 'polizas' && (
         <AsientosTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+      )}
+      {tab === 'pendientes' && (
+        <PendientesContabilizacionTab
+          key={ledgerKeyUI}
+          companyId={companyId}
+          projectId={ledgerProjectId}
+          monedaBase={monedaBase}
+          onIrA={setTab}
+        />
       )}
       {tab === 'balanza' && (
         <BalanzaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
