@@ -46,6 +46,9 @@ const estadoCuota = z.enum(['pendiente', 'pagado', 'moroso'])
 // sin diferenciar (responsabilidad de la unidad).
 const rolResponsable = z.enum(['propietario', 'arrendatario', 'familiar', 'otro'])
 const optionalRolResponsable = z.union([rolResponsable, z.null()]).optional()
+// Tipo contable explícito de la cuota (20261001000000). NULL = sin clasificar.
+const tipoCargoCuota = z.enum(['mantenimiento', 'cuota_extraordinaria'])
+const optionalTipoCargoCuota = z.union([tipoCargoCuota, z.null()]).optional()
 
 export const cuotaInputSchema = z
   .object({
@@ -58,6 +61,7 @@ export const cuotaInputSchema = z
     fecha_vencimiento: optionalYmd,
     estado: estadoCuota,
     rol_responsable: optionalRolResponsable,
+    tipo_cargo: optionalTipoCargoCuota,
     notas: optionalString,
   })
   // passthrough: preserva campos system-side (id, created_at, etc.) que no

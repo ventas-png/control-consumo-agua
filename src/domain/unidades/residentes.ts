@@ -28,7 +28,7 @@ export async function fetchResidentesDeUnidad(
 ): Promise<{ data: ResidenteConCliente[]; error: string | null }> {
   const { data, error } = await db
     .from('unidad_residentes')
-    .select('id, unidad_id, cliente_id, company_id, project_id, tipo, activo, created_at, updated_at, clientes!unidad_residentes_cliente_id_fkey(nombre, codigo)')
+    .select('id, unidad_id, cliente_id, company_id, project_id, tipo, activo, responsable_pago, created_at, updated_at, clientes!unidad_residentes_cliente_id_fkey(nombre, codigo)')
     .eq('unidad_id', unidadId)
     .order('created_at', { ascending: true })
   const rows: ResidenteConCliente[] = (data ?? []).map(({ clientes, ...r }) => ({
@@ -53,4 +53,32 @@ export async function addResidente(
 export async function removeResidente(id: string): Promise<{ error: string | null }> {
   const { error } = await db.from('unidad_residentes').delete().eq('id', id)
   return { error: error?.message ?? null }
+}
+
+/**
+ * Designa el pagador de la unidad (o lo retira con `residenteId = null`).
+ *
+ * Dos pasos, en este orden: primero se retira al pagador actual y después se
+ * marca al nuevo. El índice único de la base admite UN pagador por unidad, así
+ * que el orden inverso fallaría. Si el segundo paso falla, la unidad queda SIN
+ * pagador —no con el equivocado—: los cargos que se emitan mientras tanto
+ * quedan «sin candidato», visibles, en vez de atribuidos a quien ya no paga.
+ * Los cargos ya emitidos no cambian en ningún caso.
+ */
+export async function setResponsablePago(
+  unidadId: string,
+  residenteId: string | null,
+): Promise<{ error: string | null }> {
+  const { error: e1 } = await db
+    .from('unidad_residentes')
+    .update({ responsable_pago: false })
+    .eq('unidad_id', unidadId)
+    .eq('responsable_pago', true)
+  if (e1) return { error: e1.message }
+  if (!residenteId) return { error: null }
+  const { error: e2 } = await db
+    .from('unidad_residentes')
+    .update({ responsable_pago: true })
+    .eq('id', residenteId)
+  return { error: e2?.message ?? null }
 }

@@ -42,6 +42,11 @@ export interface CuotaCondominio {
    * (responsabilidad de la unidad). Informativo: no altera la RLS del portal.
    */
   rol_responsable?: TipoResidente | null
+  /** mantenimiento | cuota_extraordinaria. NULL = sin clasificar (cuotas previas). */
+  tipo_cargo?: 'mantenimiento' | 'cuota_extraordinaria' | null
+  /** Responsable histórico fijado al emitir; no cambia con el titular. */
+  responsable_cliente_id?: string | null
+  responsable_origen?: 'designado' | 'rol' | 'explicito' | 'sin_candidato' | null
   pago_id?: string | null
   notas?: string | null
   created_by?: string | null

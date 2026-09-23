@@ -19,6 +19,7 @@ import type {
   ReglaProveedor,
   DestinoImputacion,
   RespuestaReproceso,
+  ConfigTipoCargoInput,
 } from '../../types/contabilidad'
 import type { AsientoFormInput, CuentaFormInput, TipoCambioFormInput } from './schemas'
 import type { CuentaExistenteRef, CuentaImportFila, CuentaOmitida } from './importCuentas'
@@ -641,6 +642,89 @@ export function useReprocesarFacturaMutation(companyId?: string) {
       // Un asiento nuevo cambia pólizas y saldos de todos los reportes.
       void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'asientos'] })
       void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'balanza'] })
+    },
+  })
+}
+
+// ── Configuración por tipo de cargo ─────────────────────────────────────────
+
+/**
+ * Guarda la configuración de UN tipo de cargo en el ledger activo.
+ *
+ * Todo lo que la hace válida —cuenta activa, de detalle, del mismo ledger, del
+ * tipo contable correcto, impuesto sólo donde hay tratamiento— lo decide el
+ * trigger `conta_tg_config_tipo_cargo`. Si lo rechaza, el error sube tal cual
+ * para que la pantalla diga qué arreglar.
+ */
+export function useGuardarConfigTipoCargoMutation(companyId?: string, projectId?: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: ConfigTipoCargoInput & { id?: string | null }) => {
+      if (!companyId) throw new Error('Falta companyId.')
+      const { id, ...campos } = input
+      if (id) {
+        // El tipo y el ledger no cambian en una edición (lo exige el trigger):
+        // sólo viajan las cuentas y el estado.
+        const { tipo_cargo: _tipo, ...editables } = campos
+        await runQuery((signal) =>
+          supabase.from('conta_config_tipo_cargo').update(editables).eq('id', id).abortSignal(signal))
+      } else {
+        await runQuery((signal) =>
+          supabase
+            .from('conta_config_tipo_cargo')
+            .insert({ ...campos, company_id: companyId, project_id: projectId ?? null })
+            .abortSignal(signal))
+      }
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.configTiposCargoDeEmpresa(companyId) })
+    },
+  })
+}
+
+export function useEliminarConfigTipoCargoMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await runQuery((signal) =>
+        supabase.from('conta_config_tipo_cargo').delete().eq('id', id).abortSignal(signal))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.configTiposCargoDeEmpresa(companyId) })
+    },
+  })
+}
+
+// ── Nomenclatura de auxiliares ──────────────────────────────────────────────
+
+/**
+ * Asigna o cambia el código de auxiliar de un cliente en la empresa.
+ *
+ * Sin código, el servidor propone el siguiente `AUX-NNNNN`. El código es sólo
+ * nomenclatura: los movimientos se enlazan por `cliente_id`, así que
+ * renombrarlo no toca ningún asiento.
+ */
+export function useGuardarAuxiliarMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { auxiliar_id: string | null; cliente_id: string; codigo: string | null }) => {
+      if (!companyId) throw new Error('Falta companyId.')
+      const codigo = input.codigo?.trim() || null
+      if (input.auxiliar_id) {
+        if (!codigo) throw new Error('El código no puede quedar vacío.')
+        await runQuery((signal) =>
+          supabase.from('conta_auxiliares').update({ codigo }).eq('id', input.auxiliar_id!).abortSignal(signal))
+      } else {
+        await runQuery((signal) =>
+          supabase
+            .from('conta_auxiliares')
+            // `codigo` vacío → el trigger asigna el siguiente AUX-NNNNN.
+            .insert({ company_id: companyId, cliente_id: input.cliente_id, codigo: codigo ?? '' })
+            .abortSignal(signal))
+      }
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.auxiliaresDeEmpresa(companyId) })
     },
   })
 }

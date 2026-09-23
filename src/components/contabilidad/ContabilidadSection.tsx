@@ -8,6 +8,8 @@ import { AsientosTab } from './AsientosTab'
 import { BalanzaTab } from './BalanzaTab'
 import { MapeoCuentasTab } from './MapeoCuentasTab'
 import { ReglasImputacionTab } from './ReglasImputacionTab'
+import { TiposCargoTab } from './TiposCargoTab'
+import { AuxiliaresTab } from './AuxiliaresTab'
 import { PendientesContabilizacionTab } from './PendientesContabilizacionTab'
 import { ProveedoresTab } from './ProveedoresTab'
 import { CuentasPorPagarTab } from './CuentasPorPagarTab'
@@ -16,7 +18,7 @@ import { PresupuestoTab } from './PresupuestoTab'
 import { BancosTab } from './BancosTab'
 import { EstadosFinancierosTab } from './EstadosFinancierosTab'
 
-type SubTab = 'polizas' | 'pendientes' | 'balanza' | 'eeff' | 'bancos' | 'compras' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'reglas' | 'configuracion'
+type SubTab = 'polizas' | 'pendientes' | 'balanza' | 'eeff' | 'bancos' | 'compras' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'reglas' | 'tiposcargo' | 'auxiliares' | 'configuracion'
 
 const TABS: { id: SubTab; label: string; icon: string }[] = [
   { id: 'polizas', label: 'Pólizas', icon: '📒' },
@@ -33,6 +35,10 @@ const TABS: { id: SubTab; label: string; icon: string }[] = [
   { id: 'presupuesto', label: 'Presupuesto', icon: '🎯' },
   { id: 'catalogo', label: 'Catálogo de cuentas', icon: '📚' },
   { id: 'reglas', label: 'Reglas de imputación', icon: '🧭' },
+  // Cuentas por cobrar e ingreso por tipo de cargo (del ledger activo) y la
+  // nomenclatura de auxiliares (de la empresa): dónde y a quién se imputa.
+  { id: 'tiposcargo', label: 'Tipos de cargo', icon: '🏷️' },
+  { id: 'auxiliares', label: 'Auxiliares', icon: '👥' },
   { id: 'configuracion', label: 'Configuración', icon: '⚙️' },
 ]
 
@@ -187,6 +193,12 @@ export function ContabilidadSection() {
       )}
       {tab === 'reglas' && (
         <ReglasImputacionTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} />
+      )}
+      {tab === 'tiposcargo' && (
+        <TiposCargoTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} />
+      )}
+      {tab === 'auxiliares' && (
+        <AuxiliaresTab key={companyId} companyId={companyId} />
       )}
       {tab === 'configuracion' && (
         <MapeoCuentasTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />

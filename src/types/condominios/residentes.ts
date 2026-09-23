@@ -19,6 +19,12 @@ export interface UnidadResidente {
   project_id: string
   tipo: TipoResidente
   activo: boolean
+  /**
+   * Pagador designado de la unidad (uno como máximo, y activo). Es a quien se
+   * le atribuyen los cargos que se emitan SIN rol responsable. Cambiarlo no
+   * afecta cargos ya emitidos: cada cargo guarda su responsable histórico.
+   */
+  responsable_pago?: boolean
   created_at: string
   updated_at: string
 }

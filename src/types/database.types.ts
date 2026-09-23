@@ -2532,6 +2532,8 @@ export type Database = {
           observaciones: string | null
           project_id: string
           referencia: string | null
+          responsable_cliente_id: string | null
+          responsable_origen: string | null
           unidad_id: string
         }
         Insert: {
@@ -2547,6 +2549,8 @@ export type Database = {
           observaciones?: string | null
           project_id: string
           referencia?: string | null
+          responsable_cliente_id?: string | null
+          responsable_origen?: string | null
           unidad_id: string
         }
         Update: {
@@ -2562,6 +2566,8 @@ export type Database = {
           observaciones?: string | null
           project_id?: string
           referencia?: string | null
+          responsable_cliente_id?: string | null
+          responsable_origen?: string | null
           unidad_id?: string
         }
         Relationships: [
@@ -4310,6 +4316,7 @@ export type Database = {
       conta_asiento_lineas: {
         Row: {
           asiento_id: string
+          auxiliar_cliente_id: string | null
           company_id: string
           cuenta_id: string
           debe: number
@@ -4320,9 +4327,12 @@ export type Database = {
           monto_origen: number | null
           orden: number
           tipo_cambio: number | null
+          tipo_cargo: string | null
+          unidad_id: string | null
         }
         Insert: {
           asiento_id: string
+          auxiliar_cliente_id?: string | null
           company_id: string
           cuenta_id: string
           debe?: number
@@ -4333,9 +4343,12 @@ export type Database = {
           monto_origen?: number | null
           orden?: number
           tipo_cambio?: number | null
+          tipo_cargo?: string | null
+          unidad_id?: string | null
         }
         Update: {
           asiento_id?: string
+          auxiliar_cliente_id?: string | null
           company_id?: string
           cuenta_id?: string
           debe?: number
@@ -4346,6 +4359,8 @@ export type Database = {
           monto_origen?: number | null
           orden?: number
           tipo_cambio?: number | null
+          tipo_cargo?: string | null
+          unidad_id?: string | null
         }
         Relationships: [
           {
@@ -4503,6 +4518,42 @@ export type Database = {
           },
         ]
       }
+      conta_auxiliares: {
+        Row: {
+          activo: boolean
+          cliente_id: string
+          codigo: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notas: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          cliente_id: string
+          codigo: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notas?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          cliente_id?: string
+          codigo?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notas?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       conta_cierres_anuales: {
         Row: {
           anio: number
@@ -4568,6 +4619,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      conta_config_tipo_cargo: {
+        Row: {
+          activa: boolean
+          company_id: string
+          created_at: string
+          created_by: string | null
+          cuenta_cxc_id: string
+          cuenta_impuesto_id: string | null
+          cuenta_ingreso_id: string
+          id: string
+          notas: string | null
+          project_id: string | null
+          tipo_cargo: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activa?: boolean
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          cuenta_cxc_id: string
+          cuenta_impuesto_id?: string | null
+          cuenta_ingreso_id: string
+          id?: string
+          notas?: string | null
+          project_id?: string | null
+          tipo_cargo: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activa?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          cuenta_cxc_id?: string
+          cuenta_impuesto_id?: string | null
+          cuenta_ingreso_id?: string
+          id?: string
+          notas?: string | null
+          project_id?: string | null
+          tipo_cargo?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       conta_cuentas: {
         Row: {
@@ -6501,8 +6600,11 @@ export type Database = {
           project_id: string
           referencia_pago: string | null
           regla_mora_id: string | null
+          responsable_cliente_id: string | null
+          responsable_origen: string | null
           rol_responsable: string | null
           rubros_detalle: Json | null
+          tipo_cargo: string | null
           total_a_pagar: number | null
           unidad_id: string | null
           vencida_at: string | null
@@ -6533,8 +6635,11 @@ export type Database = {
           project_id: string
           referencia_pago?: string | null
           regla_mora_id?: string | null
+          responsable_cliente_id?: string | null
+          responsable_origen?: string | null
           rol_responsable?: string | null
           rubros_detalle?: Json | null
+          tipo_cargo?: string | null
           total_a_pagar?: number | null
           unidad_id?: string | null
           vencida_at?: string | null
@@ -6565,8 +6670,11 @@ export type Database = {
           project_id?: string
           referencia_pago?: string | null
           regla_mora_id?: string | null
+          responsable_cliente_id?: string | null
+          responsable_origen?: string | null
           rol_responsable?: string | null
           rubros_detalle?: Json | null
+          tipo_cargo?: string | null
           total_a_pagar?: number | null
           unidad_id?: string | null
           vencida_at?: string | null
@@ -13904,6 +14012,7 @@ export type Database = {
           project_id: string
           rol_responsable: string | null
           rubros: Json | null
+          tipo_cargo: string | null
         }
         Insert: {
           activa?: boolean
@@ -13921,6 +14030,7 @@ export type Database = {
           project_id: string
           rol_responsable?: string | null
           rubros?: Json | null
+          tipo_cargo?: string | null
         }
         Update: {
           activa?: boolean
@@ -13938,6 +14048,7 @@ export type Database = {
           project_id?: string
           rol_responsable?: string | null
           rubros?: Json | null
+          tipo_cargo?: string | null
         }
         Relationships: [
           {
@@ -20412,6 +20523,7 @@ export type Database = {
           id: string
           nucleo_cliente_id: string | null
           project_id: string
+          responsable_pago: boolean
           tipo: string
           unidad_id: string
           updated_at: string
@@ -20425,6 +20537,7 @@ export type Database = {
           id?: string
           nucleo_cliente_id?: string | null
           project_id: string
+          responsable_pago?: boolean
           tipo?: string
           unidad_id: string
           updated_at?: string
@@ -20438,6 +20551,7 @@ export type Database = {
           id?: string
           nucleo_cliente_id?: string | null
           project_id?: string
+          responsable_pago?: boolean
           tipo?: string
           unidad_id?: string
           updated_at?: string
@@ -22939,6 +23053,23 @@ export type Database = {
               isSetofReturn: false
             }
           }
+      conta_config_tipos_cargo_estado: {
+        Args: {
+          p_project_id?: string | null
+        }
+        Returns: {
+          tipo_cargo: string
+          etiqueta: string
+          admite_impuesto: boolean
+          config_id: string | null
+          cuenta_cxc_id: string | null
+          cuenta_ingreso_id: string | null
+          cuenta_impuesto_id: string | null
+          activa: boolean | null
+          estado: string
+          motivo: string | null
+        }[]
+      }
       conta_consolidado: {
         Args: { p_company_id: string; p_desde: string; p_hasta: string }
         Returns: {
@@ -23338,6 +23469,16 @@ export type Database = {
       conta_tasa_vigente: {
         Args: { p_company_id: string; p_fecha: string; p_moneda: string }
         Returns: number
+      }
+      conta_tipos_cargo: {
+        Args: Record<string, never>
+        Returns: {
+          tipo_cargo: string
+          etiqueta: string
+          documentos: string[]
+          admite_impuesto: boolean
+          descripcion: string
+        }[]
       }
       correspondencia_registrar_acuse: {
         Args: {

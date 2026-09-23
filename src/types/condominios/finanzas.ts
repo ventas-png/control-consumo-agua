@@ -301,6 +301,8 @@ export interface PlantillaCuota {
    * (mismo dominio que `unidad_residentes.tipo`). NULL = sin diferenciar.
    */
   rol_responsable?: TipoResidente | null
+  /** Tipo contable que la generación estampa en cada cuota. NULL = sin clasificar. */
+  tipo_cargo?: 'mantenimiento' | 'cuota_extraordinaria' | null
 }
 
 export type AccionBitacora = 'crear' | 'editar' | 'eliminar' | 'aprobar' | 'rechazar' | 'pagar' | 'cerrar'

@@ -65,6 +65,30 @@ const ROL_RESPONSABLE_STYLE: Record<TipoResidente, RolResponsableStyle> = {
 export const ROLES_RESPONSABLE_CUOTA: { value: TipoResidente; label: string }[] =
   (['propietario', 'arrendatario', 'familiar', 'otro'] as const).map(v => ({ value: v, label: ROL_RESPONSABLE_STYLE[v].label }))
 
+/**
+ * Tipo contable de una cuota (cuotas_condominio.tipo_cargo). Es un campo
+ * EXPLÍCITO: el formulario lo precarga según el concepto elegido, pero la
+ * persona lo ve y lo puede cambiar, y las cuotas previas quedan sin clasificar.
+ */
+export type TipoCargoCuota = 'mantenimiento' | 'cuota_extraordinaria'
+
+export const TIPOS_CARGO_CUOTA: { value: TipoCargoCuota; label: string }[] = [
+  { value: 'mantenimiento', label: 'Mantenimiento' },
+  { value: 'cuota_extraordinaria', label: 'Cuota extraordinaria' },
+]
+
+/**
+ * Sugerencia de tipo para un concepto de la lista del formulario. Sólo los dos
+ * conceptos que dicen lo mismo que el tipo; el resto queda «sin clasificar»
+ * para que la persona decida.
+ */
+export function tipoCargoSugerido(concepto: string): TipoCargoCuota | '' {
+  const c = concepto.trim().toLowerCase()
+  if (c === 'mantenimiento') return 'mantenimiento'
+  if (c === 'extraordinaria') return 'cuota_extraordinaria'
+  return ''
+}
+
 /** Etiqueta legible del rol responsable ('' si no está diferenciado). */
 export function rolResponsableLabel(rol?: string | null): string {
   return rol && rol in ROL_RESPONSABLE_STYLE ? ROL_RESPONSABLE_STYLE[rol as TipoResidente].label : ''

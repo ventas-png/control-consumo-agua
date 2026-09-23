@@ -764,27 +764,27 @@ BEGIN
   FOREACH t IN ARRAY ARRAY['conta_auxiliares', 'conta_config_tipo_cargo'] LOOP
     EXECUTE format($p$
       CREATE POLICY %1$I ON public.%2$I FOR SELECT TO authenticated
-        USING (company_id = public.get_my_company_id() OR public.is_super_admin())
+        USING (company_id = (SELECT public.get_my_company_id()) OR (SELECT public.is_super_admin()))
     $p$, t || '_select', t);
     EXECUTE format($p$
       CREATE POLICY %1$I ON public.%2$I FOR INSERT TO authenticated
-        WITH CHECK (public.is_super_admin()
-                    OR (company_id = public.get_my_company_id()
+        WITH CHECK ((SELECT public.is_super_admin())
+                    OR (company_id = (SELECT public.get_my_company_id())
                         AND (SELECT public.conta_puede_escribir('create'))))
     $p$, t || '_insert', t);
     EXECUTE format($p$
       CREATE POLICY %1$I ON public.%2$I FOR UPDATE TO authenticated
-        USING (public.is_super_admin()
-               OR (company_id = public.get_my_company_id()
+        USING ((SELECT public.is_super_admin())
+               OR (company_id = (SELECT public.get_my_company_id())
                    AND (SELECT public.conta_puede_escribir('edit'))))
-        WITH CHECK (public.is_super_admin()
-                    OR (company_id = public.get_my_company_id()
+        WITH CHECK ((SELECT public.is_super_admin())
+                    OR (company_id = (SELECT public.get_my_company_id())
                         AND (SELECT public.conta_puede_escribir('edit'))))
     $p$, t || '_update', t);
     EXECUTE format($p$
       CREATE POLICY %1$I ON public.%2$I FOR DELETE TO authenticated
-        USING (public.is_super_admin()
-               OR (company_id = public.get_my_company_id()
+        USING ((SELECT public.is_super_admin())
+               OR (company_id = (SELECT public.get_my_company_id())
                    AND (SELECT public.conta_puede_escribir('delete'))))
     $p$, t || '_delete', t);
   END LOOP;
