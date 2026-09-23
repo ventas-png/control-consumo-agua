@@ -93,9 +93,10 @@ sandbox:
 Si el contenido **no** coincide, no se renombra nada: se deja fuera esa cadena
 completa y se documenta.
 
-Queda un caso del mismo tipo sin tocar: `columnas_solo_en_produccion` está
-registrada como `20260825185704` y `main` la tiene como `20260904000000`, con
-contenido idéntico.
+El mismo paso 2 se aplicó a `columnas_solo_en_produccion`, que el sandbox
+había registrado como `20260825185704` y `main` tiene como `20260904000000`,
+con contenido idéntico. Tras eso el historial del sandbox coincide con el de
+`main` versión a versión y nombre a nombre.
 
 ## Checks que dependen del sandbox
 
