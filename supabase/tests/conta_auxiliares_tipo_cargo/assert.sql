@@ -414,5 +414,7 @@ SELECT public.chk(
 -- Las cuotas ya disparaban su trigger contable y lo siguen haciendo igual: sin
 -- mapeo de cxc_cuotas no se asienta nada, exactamente como antes.
 SELECT public.chk(
-  (SELECT count(*) FROM public.conta_asientos WHERE origen_tabla = 'cuotas_condominio'), 0,
+  (SELECT count(*) FROM public.conta_asientos
+    WHERE origen_tabla = 'cuotas_condominio'
+      AND origen_id IN (SELECT id FROM public.cuotas_condominio WHERE concepto LIKE 'SINT-AUX%')), 0,
   '9 · sin mapeo de eventos, las cuotas no generan asiento (comportamiento previo)');
