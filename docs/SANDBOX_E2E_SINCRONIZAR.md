@@ -70,12 +70,32 @@ hay que repetir.
 ## Colisiones de versión
 
 Si una versión de `main` ya está registrada en el sandbox **con otro nombre o
-contenido** (pasó con `20260828000000` y `20260829000000`: el sandbox las tenía
-con migraciones de un PR anterior, y `main` las usa para la cadena de renta),
-el apply de esa versión es imposible sin reescribir el historial. No se
-resuelve con `repair`: se deja fuera **esa cadena completa**, se documenta, y
-quien administra el sandbox decide si renombrar esas filas a la numeración de
-`main` (y dónde queda constancia del cambio) antes de aplicarla.
+contenido**, el apply de esa versión es imposible sin tocar el historial. Pasó
+con `20260828000000` y `20260829000000`: el sandbox había aplicado las dos
+migraciones de recepción de #776 con esa numeración antes de que #776 las
+renumerara a `20260828000300` y `20260829000600` para dejarle los números a la
+cadena de renta de #779.
+
+No se resuelve con `repair`, que marca como aplicado algo que no corrió. Lo que
+se hizo el 2026-09-23, con autorización explícita de quien administra el
+sandbox:
+
+1. Comprobar que el SQL registrado en cada fila es el del archivo renumerado de
+   `main`: md5 del texto sin comentarios ni espacios, en los dos lados. Sólo
+   difería la versión citada dentro de dos `COMMENT`.
+2. En una transacción con guardas (la fila existe con ese contenido, el número
+   de destino está libre, la fila original está en el respaldo, la huella no
+   cambia), cambiar `version` al número de `main` y dejar constancia en
+   `respaldo_sync_20260922.renumeracion_historial`.
+3. Aplicar la cadena que esperaba esos números con el procedimiento normal,
+   huella verificada tras cada migración.
+
+Si el contenido **no** coincide, no se renombra nada: se deja fuera esa cadena
+completa y se documenta.
+
+Queda un caso del mismo tipo sin tocar: `columnas_solo_en_produccion` está
+registrada como `20260825185704` y `main` la tiene como `20260904000000`, con
+contenido idéntico.
 
 ## Checks que dependen del sandbox
 
