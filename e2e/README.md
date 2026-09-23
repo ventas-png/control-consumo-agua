@@ -464,6 +464,11 @@ Las corridas se **encolan** (`concurrency: e2e-shared-sandbox`,
 `cancel-in-progress: false`): el sandbox es compartido y una corrida cancelada
 a medias dejaría datos a medio sembrar.
 
+El sandbox **no recibe migraciones solo**: si un caso falla porque un objeto de
+`main` no existe allí, se sincroniza con
+[`docs/SANDBOX_E2E_SINCRONIZAR.md`](../docs/SANDBOX_E2E_SINCRONIZAR.md) — no
+se retira ni se relaja el caso.
+
 ## Type-check
 
 `e2e/` queda fuera del `tsconfig.json` raíz (`include: ["src"]`), así que el
