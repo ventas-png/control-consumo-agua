@@ -27,7 +27,7 @@ import {
   useAnularCuotaMutation,
 } from '../../../domain/condominios/mutations'
 import { puedeTransicionarCuota } from '../../../lib/businessCondominios'
-import { CuotaEstadoBadge, ResponsableCuotaBadge, ROLES_RESPONSABLE_CUOTA, rolResponsableLabel } from './CuotasUi'
+import { CuotaEstadoBadge, ResponsableCuotaBadge, ROLES_RESPONSABLE_CUOTA, rolResponsableLabel, TIPOS_CARGO_CUOTA, tipoCargoSugerido } from './CuotasUi'
 
 interface CSVRow {
   rawUnidad: string
@@ -83,6 +83,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
     periodo: mesLocalISO(),
     fecha_vencimiento: '',
     rol_responsable: '',
+    tipo_cargo: tipoCargoSugerido('mantenimiento') as string,
     notas: '',
   })
 
@@ -374,7 +375,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
   }
 
   function resetForm() {
-    setForm({ unidad_id: '', concepto: 'mantenimiento', monto: '', periodo: mesLocalISO(), fecha_vencimiento: '', rol_responsable: '', notas: '' })
+    setForm({ unidad_id: '', concepto: 'mantenimiento', monto: '', periodo: mesLocalISO(), fecha_vencimiento: '', rol_responsable: '', tipo_cargo: tipoCargoSugerido('mantenimiento'), notas: '' })
     setShowForm(false)
   }
 
@@ -412,6 +413,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
       periodo: form.periodo,
       fecha_vencimiento: form.fecha_vencimiento || null,
       rol_responsable: form.rol_responsable || null,
+      tipo_cargo: (form.tipo_cargo || null) as 'mantenimiento' | 'cuota_extraordinaria' | null,
       notas: form.notas || null,
       estado: 'pendiente',
     })
@@ -623,9 +625,17 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
             </div>
             <div>
               <label htmlFor="cuota-concepto" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Concepto</label>
-              <select id="cuota-concepto" value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value as ConceptoCuota }))}
+              <select id="cuota-concepto" value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value as ConceptoCuota, tipo_cargo: tipoCargoSugerido(e.target.value) }))}
                 style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 {CONCEPTOS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="cuota-tipo-cargo" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Tipo contable</label>
+              <select id="cuota-tipo-cargo" value={form.tipo_cargo} onChange={e => setForm(f => ({ ...f, tipo_cargo: e.target.value }))}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+                <option value="">Sin clasificar</option>
+                {TIPOS_CARGO_CUOTA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div>

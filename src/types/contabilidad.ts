@@ -469,3 +469,48 @@ export interface IntentoContabilizacion {
   actor: string | null
   created_at: string
 }
+
+// ── Auxiliares y configuración por tipo de cargo (20261001000000) ───────────
+//
+// El catálogo de tipos de cargo lo declara el SERVIDOR (`conta_tipos_cargo`):
+// la pantalla lo recibe en `conta_config_tipos_cargo_estado` junto con la
+// configuración y no mantiene una copia propia que pudiera desincronizarse.
+
+/** Estado de la configuración de un tipo de cargo en un ledger. */
+export type EstadoConfigTipoCargo = 'ok' | 'sin_configurar' | 'cuenta_invalida' | 'inactiva'
+
+/** Una fila de `conta_config_tipos_cargo_estado`: el tipo y su configuración. */
+export interface ConfigTipoCargoEstado {
+  tipo_cargo: string
+  etiqueta: string
+  admite_impuesto: boolean
+  config_id: string | null
+  cuenta_cxc_id: string | null
+  cuenta_ingreso_id: string | null
+  cuenta_impuesto_id: string | null
+  activa: boolean | null
+  estado: EstadoConfigTipoCargo
+  motivo: string | null
+}
+
+/** Lo que la pantalla envía al guardar una configuración. */
+export interface ConfigTipoCargoInput {
+  tipo_cargo: string
+  cuenta_cxc_id: string
+  cuenta_ingreso_id: string
+  cuenta_impuesto_id: string | null
+  activa: boolean
+}
+
+/**
+ * Un cliente de la empresa y su nomenclatura contable, si ya tiene. El cliente
+ * se identifica siempre por `cliente_id`; `codigo` es sólo nomenclatura.
+ */
+export interface AuxiliarCliente {
+  cliente_id: string
+  cliente_nombre: string
+  cliente_codigo: string | null
+  auxiliar_id: string | null
+  codigo: string | null
+  activo: boolean | null
+}

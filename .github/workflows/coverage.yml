@@ -638,6 +638,27 @@ jobs:
           PGPORT_TEST: 55504
         run: supabase/tests/conta_pendientes_reproceso/run.sh
 
+      # 20261001000000: auxiliares de clientes, responsable histórico por cargo
+      # y configuración contable por tipo de cargo. Validaciones de cuenta,
+      # aislamiento entre empresas y ledgers, y RLS con usuarios de la
+      # aplicación (contador con RBAC, visor, operador sin permiso, admin de
+      # otra empresa), nunca como superusuario.
+      - name: Contabilidad — auxiliares y configuración por tipo de cargo
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55505
+        run: supabase/tests/conta_auxiliares_tipo_cargo/run.sh
+
+      # 20261001000100: el cambio de pagador designado es UNA transacción
+      # validada y serializada por unidad. Fallo intermedio, residente de otra
+      # unidad, escrituras filtradas por RLS y concurrencia con DOS conexiones
+      # reales: dos cambios simultáneos y una cuota emitida durante el cambio.
+      - name: Pagador designado — cambio atómico y serializado
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55506
+        run: supabase/tests/conta_pagador_designado/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

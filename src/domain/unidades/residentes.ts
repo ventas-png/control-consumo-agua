@@ -28,7 +28,7 @@ export async function fetchResidentesDeUnidad(
 ): Promise<{ data: ResidenteConCliente[]; error: string | null }> {
   const { data, error } = await db
     .from('unidad_residentes')
-    .select('id, unidad_id, cliente_id, company_id, project_id, tipo, activo, created_at, updated_at, clientes!unidad_residentes_cliente_id_fkey(nombre, codigo)')
+    .select('id, unidad_id, cliente_id, company_id, project_id, tipo, activo, responsable_pago, created_at, updated_at, clientes!unidad_residentes_cliente_id_fkey(nombre, codigo)')
     .eq('unidad_id', unidadId)
     .order('created_at', { ascending: true })
   const rows: ResidenteConCliente[] = (data ?? []).map(({ clientes, ...r }) => ({
@@ -53,4 +53,29 @@ export async function addResidente(
 export async function removeResidente(id: string): Promise<{ error: string | null }> {
   const { error } = await db.from('unidad_residentes').delete().eq('id', id)
   return { error: error?.message ?? null }
+}
+
+/**
+ * Designa el pagador de la unidad (o lo retira con `residenteId = null`).
+ *
+ * Una sola llamada a la RPC `unidad_designar_pagador`, que en UNA transacción
+ * valida (usuario, unidad de la empresa activa, residente de ESA unidad y
+ * activo), serializa por unidad, quita la marca actual y pone la nueva. Si
+ * algo falla —incluida una escritura filtrada por RLS— no cambia nada y el
+ * pagador anterior se conserva. Los cargos ya emitidos no cambian nunca.
+ *
+ * Antes eran dos peticiones sueltas: si la segunda fallaba, la unidad quedaba
+ * sin pagador, y entre una y otra los cargos emitidos veían ese estado.
+ */
+export async function setResponsablePago(
+  unidadId: string,
+  residenteId: string | null,
+): Promise<{ error: string | null }> {
+  const { error } = await db.rpc('unidad_designar_pagador', {
+    p_unidad_id: unidadId,
+    p_residente_id: residenteId,
+  })
+  if (!error) return { error: null }
+  // La RPC antepone un código (PAGADOR_…) útil para pruebas, no para la persona.
+  return { error: error.message.replace(/^[A-Z_]+:\s*/, '') || 'No se pudo cambiar el pagador.' }
 }

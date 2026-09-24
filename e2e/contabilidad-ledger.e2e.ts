@@ -89,4 +89,31 @@ test.describe('CONTABILIDAD · ledger por empresa y proyecto', () => {
       page.getByText(/Sin pendientes de contabilización/).or(page.getByRole('table')).first(),
     ).toBeVisible()
   })
+
+  // Tipos de cargo y Auxiliares: SÓLO LECTURA. No guarda configuración ni
+  // asigna códigos en el sandbox compartido; verifica que la RPC
+  // `conta_config_tipos_cargo_estado` y la lista de auxiliares responden para
+  // la empresa y el ledger activos (tabla o estado vacío), sin error de
+  // permisos o de esquema. Las reglas de escritura las cubre el arnés SQL
+  // `supabase/tests/conta_auxiliares_tipo_cargo`, con roles de aplicación.
+  test('la configuración por tipo de cargo y los auxiliares cargan sin error', async ({ page }) => {
+    await login(page)
+    await gotoSection(page, '/contabilidad')
+
+    const tipos = page.getByRole('tab', { name: /Tipos de cargo/i }).or(page.getByRole('button', { name: /Tipos de cargo/i }))
+    if (!(await exists(tipos.first()))) test.skip(true, 'Contabilidad no disponible para este rol')
+    await tipos.first().click()
+
+    await expect(page.getByRole('heading', { name: 'Cuentas por tipo de cargo' })).toBeVisible()
+    // Las filas sólo se pintan si la RPC respondió: el catálogo lo declara el
+    // servidor y al menos mantenimiento aparece.
+    await expect(page.getByLabel('Cuenta por cobrar de Mantenimiento')).toBeVisible({ timeout: 15_000 })
+
+    const auxiliares = page.getByRole('tab', { name: /Auxiliares/i }).or(page.getByRole('button', { name: /Auxiliares/i }))
+    await auxiliares.first().click()
+    await expect(page.getByRole('heading', { name: 'Auxiliares de clientes' })).toBeVisible()
+    await expect(
+      page.getByText(/La empresa no tiene clientes activos/).or(page.getByRole('table')).first(),
+    ).toBeVisible({ timeout: 15_000 })
+  })
 })

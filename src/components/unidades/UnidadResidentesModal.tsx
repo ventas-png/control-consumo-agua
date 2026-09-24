@@ -3,7 +3,7 @@ import { notify, confirm } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
 import type { Unidad, Cliente, TipoResidente } from '../../types'
-import { fetchResidentesDeUnidad, addResidente, removeResidente, type ResidenteConCliente } from '../../domain/unidades/residentes'
+import { fetchResidentesDeUnidad, addResidente, removeResidente, setResponsablePago, type ResidenteConCliente } from '../../domain/unidades/residentes'
 
 const TIPOS: { value: TipoResidente; label: string }[] = [
   { value: 'propietario', label: 'Propietario' },
@@ -92,6 +92,24 @@ export function UnidadResidentesModal({ unidad, clientes, onClose }: Props) {
     void cargar()
   }
 
+  async function handlePagador(r: ResidenteConCliente) {
+    const quitar = !!r.responsable_pago
+    setSaving(true)
+    const { error } = await setResponsablePago(unidad.id, quitar ? null : r.id)
+    setSaving(false)
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo cambiar el pagador', text: error })
+    } else {
+      notify({
+        variant: 'success',
+        title: quitar ? 'La unidad quedó sin pagador designado' : 'Pagador designado',
+        text: 'Los cargos ya emitidos conservan su responsable.',
+        duration: 2200,
+      })
+    }
+    void cargar()
+  }
+
   const selectStyle = { width: '100%', padding: '10px', borderRadius: 8, border: '1.5px solid var(--at-line)', fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' as const }
 
   return (
@@ -103,7 +121,9 @@ export function UnidadResidentesModal({ unidad, clientes, onClose }: Props) {
     >
       <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--at-ink-3)' }}>
         Una unidad puede tener propietario e inquilino a la vez. Cada residente asignado ve
-        los datos de la unidad en su propio portal.
+        los datos de la unidad en su propio portal. El <strong>pagador designado</strong> es a
+        quien se le atribuyen los cargos nuevos sin rol responsable; cambiarlo no mueve cargos
+        ya emitidos.
       </p>
 
       {/* Lista de residentes */}
@@ -127,6 +147,18 @@ export function UnidadResidentesModal({ unidad, clientes, onClose }: Props) {
                 <span style={{ padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: r.tipo === 'propietario' ? 'var(--at-primary-tint)' : 'var(--at-warning-tint)', color: r.tipo === 'propietario' ? 'var(--at-primary-hover)' : 'var(--at-warning-strong)' }}>
                   {TIPO_LABEL(r.tipo)}
                 </span>
+                {r.activo && (
+                  <button
+                    type="button"
+                    onClick={() => void handlePagador(r)}
+                    disabled={saving}
+                    aria-pressed={!!r.responsable_pago}
+                    title={r.responsable_pago ? 'Quitar como pagador designado' : 'Designar como pagador de la unidad'}
+                    style={{ padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--at-line)', background: r.responsable_pago ? 'var(--at-success-tint, var(--at-primary-tint))' : 'transparent', color: 'var(--at-ink-2)' }}
+                  >
+                    {r.responsable_pago ? '💳 Pagador' : 'Designar pagador'}
+                  </button>
+                )}
                 <button onClick={() => void handleRemove(r)} title="Quitar residente" style={{ background: 'none', border: 'none', color: 'var(--at-danger)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>✕</button>
               </div>
             ))}

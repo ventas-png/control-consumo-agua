@@ -6,7 +6,7 @@ import { validatedInsertMany, esDuplicadoLlaveNatural } from '../../../lib/valid
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { CuotaCondominio, Unidad, GeneracionCuotasLog, RubroConfig, RubroDetalle } from '../../../types'
 import { RubrosBuilder } from '../RubrosBuilder'
-import { ROLES_RESPONSABLE_CUOTA } from './CuotasUi'
+import { ROLES_RESPONSABLE_CUOTA, TIPOS_CARGO_CUOTA, tipoCargoSugerido } from './CuotasUi'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -84,6 +84,8 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
   const [fechaVenc, setFechaVenc] = useState('')
   // Rol responsable estampado en cada cuota del lote ('' = sin diferenciar).
   const [rolResponsable, setRolResponsable] = useState('')
+  // Tipo contable explícito del lote; se precarga según el concepto elegido.
+  const [tipoCargo, setTipoCargo] = useState<string>(tipoCargoSugerido('Mantenimiento'))
   const [rubros, setRubros] = useState<RubroConfig[]>([
     { nombre: 'Mantenimiento general', metodo: 'fijo', valor: 0 },
   ])
@@ -218,6 +220,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
         fecha_vencimiento: fechaVenc,
         estado: 'pendiente',
         rol_responsable: rolResponsable || null,
+        tipo_cargo: (tipoCargo || null) as 'mantenimiento' | 'cuota_extraordinaria' | null,
         rubros_detalle: calc?.rubrosDetalle ?? null,
       }
     })
@@ -250,7 +253,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
     setResultado({ generadas: seleccionadas.size, total: totalSeleccionado })
     setPaso('resultado')
     onRefresh()
-  }, [seleccionadas, rubros, conceptoFinal, periodo, fechaVenc, rolResponsable, totalSeleccionado, moneda, companyId, proyectoId, calculosMapa, onRefresh])
+  }, [seleccionadas, rubros, conceptoFinal, periodo, fechaVenc, rolResponsable, tipoCargo, totalSeleccionado, moneda, companyId, proyectoId, calculosMapa, onRefresh])
 
   const cargarLogs = useCallback(async () => {
     setLoadingLogs(true)
@@ -325,7 +328,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
 
                 <div style={{ marginBottom: 12 }}>
                   <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Concepto *</label>
-                  <select value={concepto} onChange={e => setConcepto(e.target.value)}
+                  <select value={concepto} onChange={e => { setConcepto(e.target.value); setTipoCargo(tipoCargoSugerido(e.target.value)) }}
                     style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
                     {CONCEPTOS.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -340,6 +343,15 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                   <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Fecha de vencimiento *</label>
                   <input type="date" value={fechaVenc} onChange={e => setFechaVenc(e.target.value)}
                     style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Tipo contable</label>
+                  <select aria-label="Tipo contable" value={tipoCargo} onChange={e => setTipoCargo(e.target.value)}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
+                    <option value="">Sin clasificar</option>
+                    {TIPOS_CARGO_CUOTA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
                 </div>
 
                 <div style={{ marginBottom: 16 }}>

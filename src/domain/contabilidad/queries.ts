@@ -21,6 +21,8 @@ import type {
   FacturaPendiente,
   FiltroPendiente,
   IntentoContabilizacion,
+  ConfigTipoCargoEstado,
+  AuxiliarCliente,
 } from '../../types/contabilidad'
 
 /** Moneda base contable de la empresa (ISO, espejo de conta_moneda_base). */
@@ -341,5 +343,91 @@ export function useIntentosFacturaQuery(facturaId?: string | null) {
           .limit(50)
           .abortSignal(signal),
       )) ?? [],
+  })
+}
+
+/**
+ * Configuración por tipo de cargo del LEDGER activo, con su estado.
+ *
+ * Una fila por tipo del catálogo declarado en el servidor, configurado o no.
+ * El estado lo calcula `conta_config_tipos_cargo_estado` (SECURITY INVOKER,
+ * con la RLS de la sesión): una cuenta que era válida al configurar y se
+ * desactivó después aparece como `cuenta_invalida` aquí, no al contabilizar.
+ */
+export function useConfigTiposCargoQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.configTiposCargo(companyId, projectId),
+    enabled: !!companyId,
+    queryFn: async () =>
+      (await runQuery<ConfigTipoCargoEstado[]>((signal) =>
+        supabase
+          .rpc('conta_config_tipos_cargo_estado', { p_project_id: projectId ?? null })
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/** Tope de clientes por consulta: la búsqueda y el filtro corren en servidor. */
+export const AUXILIARES_LIMITE = 100
+
+/**
+ * Clientes ACTIVOS de la empresa con su nomenclatura de auxiliar, si la tienen.
+ *
+ * La búsqueda por nombre se resuelve en servidor y la lista se acota a
+ * `AUXILIARES_LIMITE`; la nomenclatura se lee sólo para los clientes de la
+ * página, por id.
+ */
+export function useAuxiliaresQuery(companyId?: string, busqueda?: string | null) {
+  const termino = (busqueda ?? '').trim()
+  return useQuery({
+    queryKey: contabilidadKeys.auxiliares(companyId, termino || null),
+    enabled: !!companyId,
+    queryFn: async (): Promise<AuxiliarCliente[]> => {
+      let q = supabase
+        .from('company_clientes')
+        .select('cliente_id, clientes!company_clientes_cliente_id_fkey!inner(nombre, codigo)')
+        .eq('company_id', companyId!)
+        .eq('activo', true)
+        .order('nombre', { referencedTable: 'clientes' })
+        .limit(AUXILIARES_LIMITE)
+      if (termino) q = q.ilike('clientes.nombre', `%${termino}%`)
+      // El cliente sin tipos infiere el embed como arreglo; PostgREST devuelve
+      // un objeto para una FK a uno. Se aceptan las dos formas.
+      type ClienteEmbed = { nombre: string; codigo: string | null }
+      const filas = (await runQuery<Array<{
+        cliente_id: string
+        clientes: ClienteEmbed | ClienteEmbed[] | null
+      }>>((signal) => q.abortSignal(signal))) ?? []
+      const clientes = filas.map((f) => ({
+        cliente_id: f.cliente_id,
+        clientes: Array.isArray(f.clientes) ? (f.clientes[0] ?? null) : f.clientes,
+      }))
+      if (clientes.length === 0) return []
+
+      const ids = clientes.map((c) => c.cliente_id)
+      const aux = (await runQuery<Array<{ id: string; cliente_id: string; codigo: string; activo: boolean }>>(
+        (signal) =>
+          supabase
+            .from('conta_auxiliares')
+            .select('id, cliente_id, codigo, activo')
+            .eq('company_id', companyId!)
+            .in('cliente_id', ids)
+            .abortSignal(signal),
+      )) ?? []
+      const porCliente = new Map(aux.map((a) => [a.cliente_id, a]))
+      return clientes
+        .map((c) => {
+          const a = porCliente.get(c.cliente_id)
+          return {
+            cliente_id: c.cliente_id,
+            cliente_nombre: c.clientes?.nombre ?? '',
+            cliente_codigo: c.clientes?.codigo ?? null,
+            auxiliar_id: a?.id ?? null,
+            codigo: a?.codigo ?? null,
+            activo: a?.activo ?? null,
+          }
+        })
+        .sort((x, y) => x.cliente_nombre.localeCompare(y.cliente_nombre, 'es'))
+    },
   })
 }
