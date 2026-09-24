@@ -24796,6 +24796,10 @@ export type Database = {
         Args: { p_fecha: string; p_personal_id: string; p_project_id: string }
         Returns: number
       }
+      unidad_designar_pagador: {
+        Args: { p_residente_id: string | null; p_unidad_id: string }
+        Returns: string | null
+      }
       update_email_attempt: {
         Args: { p_error: string; p_id: number; p_ok: boolean }
         Returns: undefined

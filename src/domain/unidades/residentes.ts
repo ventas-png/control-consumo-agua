@@ -58,27 +58,24 @@ export async function removeResidente(id: string): Promise<{ error: string | nul
 /**
  * Designa el pagador de la unidad (o lo retira con `residenteId = null`).
  *
- * Dos pasos, en este orden: primero se retira al pagador actual y después se
- * marca al nuevo. El índice único de la base admite UN pagador por unidad, así
- * que el orden inverso fallaría. Si el segundo paso falla, la unidad queda SIN
- * pagador —no con el equivocado—: los cargos que se emitan mientras tanto
- * quedan «sin candidato», visibles, en vez de atribuidos a quien ya no paga.
- * Los cargos ya emitidos no cambian en ningún caso.
+ * Una sola llamada a la RPC `unidad_designar_pagador`, que en UNA transacción
+ * valida (usuario, unidad de la empresa activa, residente de ESA unidad y
+ * activo), serializa por unidad, quita la marca actual y pone la nueva. Si
+ * algo falla —incluida una escritura filtrada por RLS— no cambia nada y el
+ * pagador anterior se conserva. Los cargos ya emitidos no cambian nunca.
+ *
+ * Antes eran dos peticiones sueltas: si la segunda fallaba, la unidad quedaba
+ * sin pagador, y entre una y otra los cargos emitidos veían ese estado.
  */
 export async function setResponsablePago(
   unidadId: string,
   residenteId: string | null,
 ): Promise<{ error: string | null }> {
-  const { error: e1 } = await db
-    .from('unidad_residentes')
-    .update({ responsable_pago: false })
-    .eq('unidad_id', unidadId)
-    .eq('responsable_pago', true)
-  if (e1) return { error: e1.message }
-  if (!residenteId) return { error: null }
-  const { error: e2 } = await db
-    .from('unidad_residentes')
-    .update({ responsable_pago: true })
-    .eq('id', residenteId)
-  return { error: e2?.message ?? null }
+  const { error } = await db.rpc('unidad_designar_pagador', {
+    p_unidad_id: unidadId,
+    p_residente_id: residenteId,
+  })
+  if (!error) return { error: null }
+  // La RPC antepone un código (PAGADOR_…) útil para pruebas, no para la persona.
+  return { error: error.message.replace(/^[A-Z_]+:\s*/, '') || 'No se pudo cambiar el pagador.' }
 }

@@ -28,6 +28,22 @@ for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
 command -v initdb >/dev/null || { echo "❌ falta initdb (instalá PostgreSQL)"; exit 1; }
 
+# Shims de pg_net/pg_cron: fuera de Supabase no existen y varias migraciones
+# hacen CREATE EXTENSION. Mismo mecanismo que conta_pendientes_reproceso y
+# scripts/schema-drift/reconstruir.mjs: un control file vacío; los objetos que
+# las migraciones usan los define bootstrap.sql.
+EXT="$(pg_config --sharedir 2>/dev/null || echo /usr/share/postgresql/$(basename "$(dirname "$(command -v initdb)")"))/extension"
+for ext in pg_net pg_cron; do
+  [ -f "$EXT/$ext.control" ] && continue
+  CTL="comment = 'shim vacío del arnés'"$'\n'"default_version = '1.0'"$'\n'"relocatable = true"
+  if [ -w "$EXT" ]; then
+    printf '%s\n' "$CTL" > "$EXT/$ext.control"; echo 'SELECT 1;' > "$EXT/$ext--1.0.sql"
+  else
+    printf '%s\n' "$CTL" | sudo -n tee "$EXT/$ext.control" >/dev/null
+    echo 'SELECT 1;' | sudo -n tee "$EXT/$ext--1.0.sql" >/dev/null
+  fi
+done
+
 DATA=$(mktemp -d /tmp/auxtipodata.XXXX)
 SOCK=$(mktemp -d /tmp/auxtiposock.XXXX)
 PUERTO=${PGPORT_TEST:-55471}
@@ -62,11 +78,13 @@ aplicar() {
 echo "── 1/5 · andamiaje de plataforma (roles, auth, extensiones)"
 aplicar "$RAIZ/scripts/schema-drift/bootstrap.sql"
 
-echo "── 2/5 · cadena de migraciones hasta la anterior a la que se prueba"
+echo "── 2/5 · cadena de migraciones ANTERIORES a la que se prueba, en orden"
+# Sólo las anteriores: las posteriores (p. ej. 20261001000100, que depende de
+# ésta) se aplican después de la bajo prueba, como en producción.
 N=0
 for f in "$MIGS"/*.sql; do
   base="$(basename "$f" .sql)"
-  [ "$base" = "$BAJO_PRUEBA" ] && continue
+  [[ "$base" < "$BAJO_PRUEBA" ]] || continue
   aplicar "$f"
   N=$((N + 1))
 done
@@ -86,6 +104,11 @@ else
     || { echo "❌ la segunda pasada falló por algo distinto de «already exists»:"; echo "$SALIDA"; exit 1; }
   echo "   ✓ segunda pasada rechazada por «already exists», como corresponde a una tabla nueva"
 fi
+
+for f in "$MIGS"/*.sql; do
+  base="$(basename "$f" .sql)"
+  [[ "$base" > "$BAJO_PRUEBA" ]] && aplicar "$f"
+done
 
 echo "── 4/5 · padrón de dos empresas y dos ledgers"
 aplicar "$AQUI/fixture.sql"
