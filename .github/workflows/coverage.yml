@@ -681,6 +681,17 @@ jobs:
           PGPORT_TEST: 55508
         run: supabase/tests/conta_cobros_cuotas/run.sh
 
+      # 20261002000200: todo camino que contabiliza un cobro bloquea y
+      # revalida la fila del pago, con orden único cuota → pagos → candado.
+      # Escenarios DETERMINISTAS con dos conexiones y una compuerta: reproceso
+      # de cuota contra rechazo, borrado suave y borrado duro, en ambos
+      # órdenes, y un escenario de orden de bloqueos que sin él es deadlock.
+      - name: Contabilidad — cobros bloquean y revalidan el pago
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55509
+        run: supabase/tests/conta_cobros_bloqueos/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
