@@ -10,6 +10,11 @@
 //     sólo filtran para no ofrecer lo que el servidor va a rechazar, y si aun
 //     así rechaza, se muestra su mensaje;
 //   · elegir cuentas por nombre ni por código: el usuario elige;
+//   · autorizar. Guardar exige crear (sin configuración) o editar (con ella);
+//     Quitar exige eliminar. Sin permiso las acciones se ocultan y los campos
+//     quedan de sólo lectura, pero quien decide sigue siendo la RLS: una
+//     escritura que no afecte exactamente una fila se trata como rechazo y el
+//     borrador se conserva;
 //   · contabilizar. Esta configuración todavía no la consume ningún documento:
 //     los cargos se contabilizarán con ella en la siguiente entrega. La
 //     pantalla lo dice, para no prometer un asiento que no ocurre.
@@ -19,6 +24,7 @@ import {
   useEliminarConfigTipoCargoMutation,
   useGuardarConfigTipoCargoMutation,
 } from '../../domain/contabilidad/mutations'
+import { usePermisosContabilidad } from './ui'
 import type {
   ConfigTipoCargoEstado,
   CuentaContable,
@@ -90,6 +96,8 @@ export function TiposCargoTab({ companyId, projectId }: Props) {
   const cuentas = useCuentasQuery(companyId, projectId)
   const guardar = useGuardarConfigTipoCargoMutation(companyId, projectId)
   const quitar = useEliminarConfigTipoCargoMutation(companyId)
+  const { puedeCrear, puedeEditar, puedeEliminar } = usePermisosContabilidad()
+  const soloLectura = !puedeCrear && !puedeEditar && !puedeEliminar
 
   // Sólo cuentas que pueden recibir el movimiento: de detalle, activas y del
   // tipo contable que cada columna exige. El servidor valida lo mismo.
@@ -165,6 +173,12 @@ export function TiposCargoTab({ companyId, projectId }: Props) {
         mapeo general de la pestaña Configuración, como hasta ahora.
       </p>
 
+      {soloLectura && (
+        <p role="note" style={{ margin: 0, color: 'var(--at-ink-soft)', fontSize: 13 }}>
+          Sólo lectura: no tienes permiso para cambiar la configuración contable.
+        </p>
+      )}
+
       {estado.isError && (
         <div role="alert" style={{ ...card, borderColor: 'var(--at-danger)', padding: 12 }}>
           {mensajeServidor(estado.error)}
@@ -195,6 +209,8 @@ export function TiposCargoTab({ companyId, projectId }: Props) {
                 {filas.map((fila) => {
                   const b = borrador(fila)
                   const error = errores[fila.tipo_cargo]
+                  // Guardar es crear si todavía no hay configuración, editar si ya existe.
+                  const puedeGuardar = fila.config_id ? puedeEditar : puedeCrear
                   return (
                     <tr key={fila.tipo_cargo} style={{ borderTop: '1px solid var(--at-line)', verticalAlign: 'top' }}>
                       <td style={{ padding: 6, fontWeight: 600 }}>{fila.etiqueta}</td>
@@ -205,7 +221,7 @@ export function TiposCargoTab({ companyId, projectId }: Props) {
                         )}
                       </td>
                       <td style={{ padding: 6 }}>
-                        <select aria-label={`Cuenta por cobrar de ${fila.etiqueta}`} value={b.cxc}
+                        <select aria-label={`Cuenta por cobrar de ${fila.etiqueta}`} disabled={!puedeGuardar} value={b.cxc}
                           onChange={(e) => editar(fila.tipo_cargo, fila, { cxc: e.target.value })} style={inputStyle}>
                           <option value="">Elegir…</option>
                           {porTipo.activo.map((c) => (
@@ -214,7 +230,7 @@ export function TiposCargoTab({ companyId, projectId }: Props) {
                         </select>
                       </td>
                       <td style={{ padding: 6 }}>
-                        <select aria-label={`Cuenta de ingreso de ${fila.etiqueta}`} value={b.ingreso}
+                        <select aria-label={`Cuenta de ingreso de ${fila.etiqueta}`} disabled={!puedeGuardar} value={b.ingreso}
                           onChange={(e) => editar(fila.tipo_cargo, fila, { ingreso: e.target.value })} style={inputStyle}>
                           <option value="">Elegir…</option>
                           {porTipo.ingreso.map((c) => (
@@ -224,7 +240,7 @@ export function TiposCargoTab({ companyId, projectId }: Props) {
                       </td>
                       <td style={{ padding: 6 }}>
                         {fila.admite_impuesto ? (
-                          <select aria-label={`Cuenta de impuesto de ${fila.etiqueta}`} value={b.impuesto}
+                          <select aria-label={`Cuenta de impuesto de ${fila.etiqueta}`} disabled={!puedeGuardar} value={b.impuesto}
                             onChange={(e) => editar(fila.tipo_cargo, fila, { impuesto: e.target.value })} style={inputStyle}>
                             <option value="">Sin impuesto</option>
                             {porTipo.pasivo.map((c) => (
@@ -236,14 +252,16 @@ export function TiposCargoTab({ companyId, projectId }: Props) {
                         )}
                       </td>
                       <td style={{ padding: 6 }}>
-                        <input type="checkbox" aria-label={`${fila.etiqueta} activa`} checked={b.activa}
+                        <input type="checkbox" aria-label={`${fila.etiqueta} activa`} checked={b.activa} disabled={!puedeGuardar}
                           onChange={(e) => editar(fila.tipo_cargo, fila, { activa: e.target.checked })} />
                       </td>
                       <td style={{ padding: 6, whiteSpace: 'nowrap' }}>
-                        <button type="button" onClick={() => void guardarFila(fila)} disabled={guardar.isPending}>
-                          Guardar
-                        </button>
-                        {fila.config_id && (
+                        {puedeGuardar && (
+                          <button type="button" onClick={() => void guardarFila(fila)} disabled={guardar.isPending}>
+                            Guardar
+                          </button>
+                        )}
+                        {fila.config_id && puedeEliminar && (
                           <button type="button" style={{ marginLeft: 6 }} onClick={() => void quitarFila(fila)}
                             disabled={quitar.isPending}>
                             Quitar

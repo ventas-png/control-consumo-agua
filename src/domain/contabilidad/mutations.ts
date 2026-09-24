@@ -649,6 +649,24 @@ export function useReprocesarFacturaMutation(companyId?: string) {
 // ── Configuración por tipo de cargo ─────────────────────────────────────────
 
 /**
+ * Error de una escritura que no afectó exactamente una fila. PostgREST no
+ * devuelve error cuando la RLS filtra un UPDATE o DELETE: devuelve «éxito» con
+ * cero filas. Sin esta comprobación la pantalla diría «guardado» y no habría
+ * cambiado nada.
+ */
+export class SinFilasAfectadasError extends Error {
+  constructor(message = 'No se guardó el cambio: no tienes permiso o el registro ya no existe. Recarga e inténtalo de nuevo.') {
+    super(message)
+    this.name = 'SinFilasAfectadasError'
+  }
+}
+
+/** Exige que una escritura con `.select('id')` haya afectado exactamente una fila. */
+export function exigirUnaFila(filas: { id: string }[] | null): void {
+  if (!filas || filas.length !== 1) throw new SinFilasAfectadasError()
+}
+
+/**
  * Guarda la configuración de UN tipo de cargo en el ledger activo.
  *
  * Todo lo que la hace válida —cuenta activa, de detalle, del mismo ledger, del
@@ -666,14 +684,15 @@ export function useGuardarConfigTipoCargoMutation(companyId?: string, projectId?
         // El tipo y el ledger no cambian en una edición (lo exige el trigger):
         // sólo viajan las cuentas y el estado.
         const { tipo_cargo: _tipo, ...editables } = campos
-        await runQuery((signal) =>
-          supabase.from('conta_config_tipo_cargo').update(editables).eq('id', id).abortSignal(signal))
+        exigirUnaFila(await runQuery((signal) =>
+          supabase.from('conta_config_tipo_cargo').update(editables).eq('id', id).select('id').abortSignal(signal)))
       } else {
-        await runQuery((signal) =>
+        exigirUnaFila(await runQuery((signal) =>
           supabase
             .from('conta_config_tipo_cargo')
             .insert({ ...campos, company_id: companyId, project_id: projectId ?? null })
-            .abortSignal(signal))
+            .select('id')
+            .abortSignal(signal)))
       }
     },
     onSuccess: () => {
@@ -686,8 +705,8 @@ export function useEliminarConfigTipoCargoMutation(companyId?: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      await runQuery((signal) =>
-        supabase.from('conta_config_tipo_cargo').delete().eq('id', id).abortSignal(signal))
+      exigirUnaFila(await runQuery((signal) =>
+        supabase.from('conta_config_tipo_cargo').delete().eq('id', id).select('id').abortSignal(signal)))
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: contabilidadKeys.configTiposCargoDeEmpresa(companyId) })
@@ -712,15 +731,16 @@ export function useGuardarAuxiliarMutation(companyId?: string) {
       const codigo = input.codigo?.trim() || null
       if (input.auxiliar_id) {
         if (!codigo) throw new Error('El código no puede quedar vacío.')
-        await runQuery((signal) =>
-          supabase.from('conta_auxiliares').update({ codigo }).eq('id', input.auxiliar_id!).abortSignal(signal))
+        exigirUnaFila(await runQuery((signal) =>
+          supabase.from('conta_auxiliares').update({ codigo }).eq('id', input.auxiliar_id!).select('id').abortSignal(signal)))
       } else {
-        await runQuery((signal) =>
+        exigirUnaFila(await runQuery((signal) =>
           supabase
             .from('conta_auxiliares')
             // `codigo` vacío → el trigger asigna el siguiente AUX-NNNNN.
             .insert({ company_id: companyId, cliente_id: input.cliente_id, codigo: codigo ?? '' })
-            .abortSignal(signal))
+            .select('id')
+            .abortSignal(signal)))
       }
     },
     onSuccess: () => {

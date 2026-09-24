@@ -7,10 +7,16 @@
 //
 // Sin código escrito, el servidor propone el siguiente `AUX-NNNNN`. La
 // búsqueda corre en servidor y la lista se acota a `AUXILIARES_LIMITE`.
+//
+// Asignar exige crear y cambiar un código exige editar; sin el permiso la
+// acción no se ofrece y el campo queda de sólo lectura. La RLS sigue siendo
+// quien decide: una escritura que no afecte exactamente una fila se trata como
+// rechazo y lo escrito se conserva.
 import { useState } from 'react'
 import { AUXILIARES_LIMITE, useAuxiliaresQuery } from '../../domain/contabilidad/queries'
 import { useGuardarAuxiliarMutation } from '../../domain/contabilidad/mutations'
 import { mensajeServidor } from './TiposCargoTab'
+import { usePermisosContabilidad } from './ui'
 import type { AuxiliarCliente } from '../../types/contabilidad'
 
 interface Props {
@@ -41,6 +47,7 @@ export function AuxiliaresTab({ companyId }: Props) {
   const [aplicada, setAplicada] = useState('')
   const lista = useAuxiliaresQuery(companyId, aplicada)
   const guardar = useGuardarAuxiliarMutation(companyId)
+  const { puedeCrear, puedeEditar } = usePermisosContabilidad()
 
   const [codigos, setCodigos] = useState<Record<string, string>>({})
   const [errores, setErrores] = useState<Record<string, string>>({})
@@ -113,7 +120,9 @@ export function AuxiliaresTab({ companyId }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {filas.map((a) => (
+                {filas.map((a) => {
+                  const puede = a.auxiliar_id ? puedeEditar : puedeCrear
+                  return (
                   <tr key={a.cliente_id} style={{ borderTop: '1px solid var(--at-line)', verticalAlign: 'top' }}>
                     <td style={{ padding: 6, fontWeight: 600 }}>{a.cliente_nombre}</td>
                     <td style={{ padding: 6, color: 'var(--at-ink-soft)' }}>{a.cliente_codigo ?? '—'}</td>
@@ -124,13 +133,16 @@ export function AuxiliaresTab({ companyId }: Props) {
                         value={codigos[a.cliente_id] ?? a.codigo ?? ''}
                         onChange={(e) => setCodigos((c) => ({ ...c, [a.cliente_id]: e.target.value }))}
                         maxLength={40}
+                        readOnly={!puede}
                         style={inputStyle}
                       />
                     </td>
                     <td style={{ padding: 6, whiteSpace: 'nowrap' }}>
-                      <button type="button" onClick={() => void guardarFila(a)} disabled={guardar.isPending}>
-                        {a.auxiliar_id ? 'Guardar' : 'Asignar'}
-                      </button>
+                      {puede && (
+                        <button type="button" onClick={() => void guardarFila(a)} disabled={guardar.isPending}>
+                          {a.auxiliar_id ? 'Guardar' : 'Asignar'}
+                        </button>
+                      )}
                       {errores[a.cliente_id] && (
                         <div role="alert" style={{ color: 'var(--at-danger)', marginTop: 4, whiteSpace: 'normal' }}>
                           {errores[a.cliente_id]}
@@ -138,7 +150,8 @@ export function AuxiliaresTab({ companyId }: Props) {
                       )}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
             {filas.length >= AUXILIARES_LIMITE && (

@@ -13,9 +13,14 @@
 //   · el estado que calcula el servidor se muestra, incluido su motivo;
 //   · un rechazo del servidor se muestra legible, sin el código técnico;
 //   · la pantalla avisa que la configuración todavía no genera asientos;
-//   · asignar un auxiliar sin código deja que el servidor proponga uno.
+//   · asignar un auxiliar sin código deja que el servidor proponga uno;
+//   · ante un rechazo —incluida una escritura que no afectó ninguna fila— lo
+//     elegido o escrito se CONSERVA, para corregir y reintentar;
+//   · sin permiso, las acciones no se ofrecen (la RLS sigue decidiendo).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import type { UserSession } from '../../../types'
 import type {
   AuxiliarCliente,
   ConfigTipoCargoEstado,
@@ -46,6 +51,29 @@ vi.mock('../../../domain/contabilidad/mutations', () => ({
 
 import { TiposCargoTab, mensajeServidor } from '../TiposCargoTab'
 import { AuxiliaresTab } from '../AuxiliaresTab'
+import { SessionProvider } from '../../shared/SessionContext'
+import { PermissionsProvider } from '../../shared/PermissionsContext'
+
+const TODAS = [
+  'platform.contabilidad.view', 'platform.contabilidad.create',
+  'platform.contabilidad.edit', 'platform.contabilidad.delete',
+]
+
+/** Monta con la sesión de un contador (rol base NO exento) y las claves RBAC dadas. */
+function montar(ui: ReactElement, permisos: string[] = TODAS) {
+  const session = {
+    user_id: 'u1', company_id: 'emp-1', role: 'operator',
+    permissions: new Set(permisos),
+  } as unknown as UserSession
+  return render(
+    <SessionProvider value={session}>
+      <PermissionsProvider>{ui}</PermissionsProvider>
+    </SessionProvider>,
+  )
+}
+
+/** Lo que lanza la mutación cuando la escritura no afectó ninguna fila. */
+const SIN_FILAS = 'No se guardó el cambio: no tienes permiso o el registro ya no existe. Recarga e inténtalo de nuevo.'
 
 function cuenta(over: Partial<CuentaContable> & { id: string }): CuentaContable {
   return {
@@ -108,7 +136,7 @@ afterEach(cleanup)
 
 describe('TiposCargoTab', () => {
   it('cada columna ofrece sólo cuentas imputables del tipo que exige', () => {
-    render(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
     const cxc = opciones(screen.getByLabelText('Cuenta por cobrar de Mantenimiento'))
     expect(cxc).toEqual(['Elegir…', 'Z-COBRAR · Por cobrar a vecinos'])
     const ingreso = opciones(screen.getByLabelText('Cuenta de ingreso de Mantenimiento'))
@@ -116,20 +144,20 @@ describe('TiposCargoTab', () => {
   })
 
   it('la cuenta de impuesto sólo aparece donde el servidor dice que aplica', () => {
-    render(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
     expect(screen.queryByLabelText('Cuenta de impuesto de Mantenimiento')).toBeNull()
     const imp = opciones(screen.getByLabelText('Cuenta de impuesto de Servicio de agua'))
     expect(imp).toEqual(['Sin impuesto', 'IVA-X · IVA por pagar'])
   })
 
   it('no elige ninguna cuenta por su cuenta: todo arranca vacío', () => {
-    render(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
     expect((screen.getByLabelText('Cuenta por cobrar de Mantenimiento') as HTMLSelectElement).value).toBe('')
     expect((screen.getByLabelText('Cuenta de ingreso de Mantenimiento') as HTMLSelectElement).value).toBe('')
   })
 
   it('guarda lo elegido y nunca envía impuesto a un tipo que no lo admite', async () => {
-    render(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
     fireEvent.change(screen.getByLabelText('Cuenta por cobrar de Mantenimiento'), { target: { value: 'cxc' } })
     fireEvent.change(screen.getByLabelText('Cuenta de ingreso de Mantenimiento'), { target: { value: 'ing' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Guardar' })[0])
@@ -145,7 +173,7 @@ describe('TiposCargoTab', () => {
   })
 
   it('no guarda sin las dos cuentas obligatorias', async () => {
-    render(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
     fireEvent.click(screen.getAllByRole('button', { name: 'Guardar' })[0])
     expect((await screen.findByRole('alert')).textContent).toContain('Elige la cuenta por cobrar y la de ingreso.')
     expect(state.guardarConfig).not.toHaveBeenCalled()
@@ -154,7 +182,7 @@ describe('TiposCargoTab', () => {
   it('muestra el rechazo del servidor sin el código técnico', async () => {
     state.guardarConfig.mockRejectedValueOnce(
       new Error('CONFIG_CUENTA_INACTIVA: la cuenta por cobrar (CXC-OLD) está desactivada.'))
-    render(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
     fireEvent.change(screen.getByLabelText('Cuenta por cobrar de Mantenimiento'), { target: { value: 'cxc' } })
     fireEvent.change(screen.getByLabelText('Cuenta de ingreso de Mantenimiento'), { target: { value: 'ing' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Guardar' })[0])
@@ -169,15 +197,85 @@ describe('TiposCargoTab', () => {
       cuenta_cxc_id: 'cxc', cuenta_ingreso_id: 'ing', activa: true,
       estado: 'cuenta_invalida', motivo: 'cuenta de ingreso (Z-VENTAS): inactiva',
     })]
-    render(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
     expect(screen.getByText('Cuenta inválida')).toBeTruthy()
     expect(screen.getByText('cuenta de ingreso (Z-VENTAS): inactiva')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Quitar' })).toBeTruthy()
   })
 
   it('avisa que la configuración todavía no genera asientos', () => {
-    render(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
     expect(screen.getByText(/todavía no genera asientos/)).toBeTruthy()
+  })
+
+  it('ante un rechazo conserva las cuentas elegidas para reintentar', async () => {
+    state.guardarConfig.mockRejectedValueOnce(
+      new Error('CONFIG_CUENTA_INACTIVA: la cuenta por cobrar (CXC-OLD) está desactivada.'))
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    fireEvent.change(screen.getByLabelText('Cuenta por cobrar de Mantenimiento'), { target: { value: 'cxc' } })
+    fireEvent.change(screen.getByLabelText('Cuenta de ingreso de Mantenimiento'), { target: { value: 'ing' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Guardar' })[0])
+    await screen.findByRole('alert')
+    expect((screen.getByLabelText('Cuenta por cobrar de Mantenimiento') as HTMLSelectElement).value).toBe('cxc')
+    expect((screen.getByLabelText('Cuenta de ingreso de Mantenimiento') as HTMLSelectElement).value).toBe('ing')
+    // Reintentar envía lo mismo, sin volver a elegir.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Guardar' })[0])
+    await waitFor(() => expect(state.guardarConfig).toHaveBeenCalledTimes(2))
+    expect(state.guardarConfig.mock.calls[1][0]).toMatchObject({ cuenta_cxc_id: 'cxc', cuenta_ingreso_id: 'ing' })
+  })
+
+  it('una escritura sin filas afectadas es un error, no un «guardado», y conserva el borrador', async () => {
+    state.estado = [tipo({
+      tipo_cargo: 'mantenimiento', etiqueta: 'Mantenimiento', config_id: 'cfg-1',
+      cuenta_cxc_id: 'cxc', cuenta_ingreso_id: 'ing', activa: true, estado: 'ok',
+    })]
+    state.guardarConfig.mockRejectedValueOnce(new Error(SIN_FILAS))
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    fireEvent.click(screen.getByLabelText('Mantenimiento activa'))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('No se guardó el cambio')
+    expect((screen.getByLabelText('Mantenimiento activa') as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('quitar sin filas afectadas muestra el error y la configuración sigue en pantalla', async () => {
+    state.estado = [tipo({
+      tipo_cargo: 'mantenimiento', etiqueta: 'Mantenimiento', config_id: 'cfg-1',
+      cuenta_cxc_id: 'cxc', cuenta_ingreso_id: 'ing', activa: true, estado: 'ok',
+    })]
+    state.quitarConfig.mockRejectedValueOnce(new Error(SIN_FILAS))
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('No se guardó el cambio')
+    expect((screen.getByLabelText('Cuenta por cobrar de Mantenimiento') as HTMLSelectElement).value).toBe('cxc')
+  })
+
+  it('sólo con permiso de ver: sin acciones y con los campos bloqueados', () => {
+    state.estado = [
+      tipo({ tipo_cargo: 'mantenimiento', etiqueta: 'Mantenimiento', config_id: 'cfg-1',
+        cuenta_cxc_id: 'cxc', cuenta_ingreso_id: 'ing', activa: true, estado: 'ok' }),
+      tipo({ tipo_cargo: 'agua', etiqueta: 'Servicio de agua', admite_impuesto: true }),
+    ]
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />, ['platform.contabilidad.view'])
+    expect(screen.queryByRole('button', { name: 'Guardar' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Quitar' })).toBeNull()
+    expect((screen.getByLabelText('Cuenta por cobrar de Mantenimiento') as HTMLSelectElement).disabled).toBe(true)
+    expect((screen.getByLabelText('Cuenta de impuesto de Servicio de agua') as HTMLSelectElement).disabled).toBe(true)
+    expect(screen.getByText(/Sólo lectura/)).toBeTruthy()
+  })
+
+  it('cada acción se gatea por su clave: editar no permite crear ni quitar', () => {
+    state.estado = [
+      tipo({ tipo_cargo: 'mantenimiento', etiqueta: 'Mantenimiento', config_id: 'cfg-1',
+        cuenta_cxc_id: 'cxc', cuenta_ingreso_id: 'ing', activa: true, estado: 'ok' }),
+      tipo({ tipo_cargo: 'agua', etiqueta: 'Servicio de agua', admite_impuesto: true }),
+    ]
+    montar(<TiposCargoTab companyId="emp-1" projectId={null} />,
+      ['platform.contabilidad.view', 'platform.contabilidad.edit'])
+    // Una sola fila guardable: la que ya tiene configuración.
+    expect(screen.getAllByRole('button', { name: 'Guardar' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Quitar' })).toBeNull()
+    expect((screen.getByLabelText('Cuenta por cobrar de Mantenimiento') as HTMLSelectElement).disabled).toBe(false)
+    expect((screen.getByLabelText('Cuenta por cobrar de Servicio de agua') as HTMLSelectElement).disabled).toBe(true)
   })
 })
 
@@ -197,24 +295,46 @@ describe('AuxiliaresTab', () => {
   })
 
   it('asignar sin escribir código deja que el servidor proponga uno', async () => {
-    render(<AuxiliaresTab companyId="emp-1" />)
+    montar(<AuxiliaresTab companyId="emp-1" />)
     fireEvent.click(screen.getByRole('button', { name: 'Asignar' }))
     await waitFor(() => expect(state.guardarAux).toHaveBeenCalledTimes(1))
     expect(state.guardarAux.mock.calls[0][0]).toEqual({ auxiliar_id: null, cliente_id: 'cli-1', codigo: null })
   })
 
   it('renombrar envía el id del auxiliar y el código nuevo', async () => {
-    render(<AuxiliaresTab companyId="emp-1" />)
+    montar(<AuxiliaresTab companyId="emp-1" />)
     fireEvent.change(screen.getByLabelText('Código de auxiliar de Cliente Dos'), { target: { value: 'TORRE1-102' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(state.guardarAux).toHaveBeenCalledTimes(1))
     expect(state.guardarAux.mock.calls[0][0]).toEqual({ auxiliar_id: 'aux-2', cliente_id: 'cli-2', codigo: 'TORRE1-102' })
   })
 
+  it('ante un rechazo conserva el código escrito', async () => {
+    state.guardarAux.mockRejectedValueOnce(new Error(SIN_FILAS))
+    montar(<AuxiliaresTab companyId="emp-1" />)
+    fireEvent.change(screen.getByLabelText('Código de auxiliar de Cliente Dos'), { target: { value: 'TORRE1-102' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('No se guardó el cambio')
+    expect((screen.getByLabelText('Código de auxiliar de Cliente Dos') as HTMLInputElement).value).toBe('TORRE1-102')
+  })
+
+  it('sólo con permiso de ver: sin Asignar ni Guardar, y el código no se edita', () => {
+    montar(<AuxiliaresTab companyId="emp-1" />, ['platform.contabilidad.view'])
+    expect(screen.queryByRole('button', { name: 'Asignar' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Guardar' })).toBeNull()
+    expect((screen.getByLabelText('Código de auxiliar de Cliente Dos') as HTMLInputElement).readOnly).toBe(true)
+  })
+
+  it('con crear pero sin editar: asigna nuevos pero no renombra', () => {
+    montar(<AuxiliaresTab companyId="emp-1" />, ['platform.contabilidad.view', 'platform.contabilidad.create'])
+    expect(screen.getByRole('button', { name: 'Asignar' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Guardar' })).toBeNull()
+  })
+
   it('un código repetido se explica en palabras', async () => {
     state.guardarAux.mockRejectedValueOnce(
       new Error('duplicate key value violates unique constraint "uq_conta_auxiliares_codigo"'))
-    render(<AuxiliaresTab companyId="emp-1" />)
+    montar(<AuxiliaresTab companyId="emp-1" />)
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
     expect((await screen.findByRole('alert')).textContent).toContain('Ese código ya lo usa otro cliente de la empresa.')
   })
