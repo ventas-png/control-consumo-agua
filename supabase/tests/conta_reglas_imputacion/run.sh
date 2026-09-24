@@ -55,11 +55,13 @@ aplicar() {
 echo "── 1/5 · andamiaje de plataforma (roles, auth, extensiones)"
 aplicar "$RAIZ/scripts/schema-drift/bootstrap.sql"
 
-echo "── 2/5 · cadena de migraciones hasta la anterior a la que se prueba"
+echo "── 2/5 · cadena de migraciones ANTERIORES a la que se prueba, en orden"
 N=0
+# Sólo las ANTERIORES: las posteriores (que pueden depender de ésta) se
+# aplican después de la bajo prueba, como en producción.
 for f in "$MIGS"/*.sql; do
   base="$(basename "$f" .sql)"
-  [ "$base" = "$BAJO_PRUEBA" ] && continue
+  [[ "$base" < "$BAJO_PRUEBA" ]] || continue
   aplicar "$f"
   N=$((N + 1))
 done
@@ -79,6 +81,10 @@ else
     || { echo "❌ la segunda pasada falló por algo distinto de «already exists»:"; echo "$SALIDA"; exit 1; }
   echo "   ✓ segunda pasada rechazada por «already exists», como corresponde a una tabla nueva"
 fi
+for f in "$MIGS"/*.sql; do
+  base="$(basename "$f" .sql)"
+  [[ "$base" > "$BAJO_PRUEBA" ]] && aplicar "$f"
+done
 
 echo "── 4/5 · padrón de dos empresas y dos ledgers"
 aplicar "$AQUI/fixture.sql"

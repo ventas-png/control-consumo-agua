@@ -470,6 +470,100 @@ export interface IntentoContabilizacion {
   created_at: string
 }
 
+// ── Pendientes de CARGOS (20261002000000) ──────────────────────────────────
+// Cuotas clasificadas y cargos adicionales cuyo evento contable no generó
+// asiento. Espejo de `conta_cargos_pendientes` / `conta_reprocesar_cargo`.
+
+export type OrigenCargo = 'cuotas_condominio' | 'cargos_adicionales_unidad' | 'pagos'
+export type EventoCargo = 'cuota_emitida' | 'cuota_mora' | 'cargo_adicional_emitido' | 'pago_contabilizado'
+
+/** Motivo tipificado de un cargo sin asiento. Lo decide el SERVIDOR. */
+export type CodigoCargoPendiente =
+  | 'sin_configuracion'
+  | 'cuenta_invalida'
+  | 'sin_responsable'
+  | 'periodo_cerrado'
+  | 'devengo_pendiente'
+  | 'excede_saldo'
+  | 'cobro_anterior_pendiente'
+  | 'sin_cuenta'
+  | 'documento_anulado'
+  | 'documento_inexistente'
+  | 'documento_anterior'
+  | 'asiento_reversado'
+  | 'error'
+
+export type FiltroCargoPendiente =
+  | 'sin_configuracion' | 'cuenta_invalida' | 'sin_responsable' | 'periodo_cerrado'
+  | 'devengo_pendiente' | 'excede_saldo' | 'otro'
+
+export const FILTROS_CARGO_PENDIENTE: { value: FiltroCargoPendiente; label: string }[] = [
+  { value: 'sin_configuracion', label: 'Sin configuración' },
+  { value: 'cuenta_invalida', label: 'Cuenta inválida' },
+  { value: 'sin_responsable', label: 'Sin responsable' },
+  { value: 'periodo_cerrado', label: 'Período cerrado' },
+  { value: 'devengo_pendiente', label: 'Cobro sin devengo' },
+  { value: 'excede_saldo', label: 'Excede el saldo' },
+  { value: 'otro', label: 'Otros bloqueos' },
+]
+
+export const CODIGO_CARGO_LABELS: Record<CodigoCargoPendiente, string> = {
+  sin_configuracion: 'Sin configuración del tipo',
+  cuenta_invalida: 'Cuenta inválida',
+  sin_responsable: 'Sin responsable',
+  periodo_cerrado: 'Período cerrado',
+  devengo_pendiente: 'Cuota sin contabilizar',
+  excede_saldo: 'Excede el saldo de la cuota',
+  cobro_anterior_pendiente: 'Espera un cobro anterior',
+  sin_cuenta: 'Falta la cuenta del método de pago',
+  documento_anulado: 'Documento anulado',
+  documento_inexistente: 'Documento no encontrado',
+  documento_anterior: 'Anterior a la contabilización',
+  asiento_reversado: 'Asiento reversado',
+  error: 'Error al generar',
+}
+
+export const EVENTO_CARGO_LABELS: Record<EventoCargo, string> = {
+  cuota_emitida: 'Cuota',
+  cuota_mora: 'Mora de cuota',
+  cargo_adicional_emitido: 'Cargo adicional',
+  pago_contabilizado: 'Cobro',
+}
+
+export interface CargoPendiente {
+  origen_tabla: OrigenCargo
+  origen_id: string
+  evento: EventoCargo
+  concepto: string
+  unidad_id: string | null
+  unidad_nombre: string | null
+  responsable_id: string | null
+  responsable_nombre: string | null
+  tipo_cargo: string | null
+  fecha: string
+  monto: number
+  project_id: string | null
+  codigo: CodigoCargoPendiente
+  motivo: string
+  ultimo_intento_at: string | null
+  ultimo_disparo: 'emision' | 'reproceso' | 'cobro' | null
+  intentos: number
+  puede_reprocesar: boolean
+  total_filas: number
+}
+
+/** Una fila por evento del documento reprocesado. */
+export interface RespuestaReprocesoCargo {
+  evento: EventoCargo | null
+  resultado: ResultadoReproceso
+  codigo: CodigoCargoPendiente | null
+  motivo: string | null
+  asiento_id: string | null
+  asiento_numero: number | null
+  asiento_estado: 'borrador' | 'publicado' | 'anulado' | null
+  intento_id: string | null
+}
+
 // ── Auxiliares y configuración por tipo de cargo (20261001000000) ───────────
 //
 // El catálogo de tipos de cargo lo declara el SERVIDOR (`conta_tipos_cargo`):

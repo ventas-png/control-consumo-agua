@@ -4620,6 +4620,45 @@ export type Database = {
           },
         ]
       }
+      conta_cobro_aplicaciones: {
+        Row: {
+          asiento_id: string
+          company_id: string
+          created_at: string
+          cuenta_id: string
+          cuota_id: string
+          evento: string
+          id: string
+          monto: number
+          pago_id: string
+          project_id: string | null
+        }
+        Insert: {
+          asiento_id: string
+          company_id: string
+          created_at?: string
+          cuenta_id: string
+          cuota_id: string
+          evento: string
+          id?: string
+          monto: number
+          pago_id: string
+          project_id?: string | null
+        }
+        Update: {
+          asiento_id?: string
+          company_id?: string
+          created_at?: string
+          cuenta_id?: string
+          cuota_id?: string
+          evento?: string
+          id?: string
+          monto?: number
+          pago_id?: string
+          project_id?: string | null
+        }
+        Relationships: []
+      }
       conta_config_tipo_cargo: {
         Row: {
           activa: boolean
@@ -4886,6 +4925,7 @@ export type Database = {
           created_at: string
           detalle: Json
           disparo: string
+          evento: string | null
           id: string
           motivo: string | null
           origen_id: string
@@ -4902,6 +4942,7 @@ export type Database = {
           created_at?: string
           detalle?: Json
           disparo: string
+          evento?: string | null
           id?: string
           motivo?: string | null
           origen_id: string
@@ -4918,6 +4959,7 @@ export type Database = {
           created_at?: string
           detalle?: Json
           disparo?: string
+          evento?: string | null
           id?: string
           motivo?: string | null
           origen_id?: string
@@ -23053,6 +23095,36 @@ export type Database = {
               isSetofReturn: false
             }
           }
+      conta_cargos_pendientes: {
+        Args: {
+          p_busqueda?: string | null
+          p_codigo?: string | null
+          p_limite?: number
+          p_offset?: number
+          p_project_id?: string | null
+        }
+        Returns: {
+          concepto: string
+          codigo: string
+          evento: string
+          fecha: string
+          intentos: number
+          monto: number
+          motivo: string
+          origen_id: string
+          origen_tabla: string
+          project_id: string | null
+          puede_reprocesar: boolean
+          responsable_id: string | null
+          responsable_nombre: string | null
+          tipo_cargo: string | null
+          total_filas: number
+          ultimo_disparo: string | null
+          ultimo_intento_at: string | null
+          unidad_id: string | null
+          unidad_nombre: string | null
+        }[]
+      }
       conta_config_tipos_cargo_estado: {
         Args: {
           p_project_id?: string | null
@@ -23188,6 +23260,19 @@ export type Database = {
           regla_id: string | null
           evento_usado: string | null
           motivo: string | null
+        }[]
+      }
+      conta_reprocesar_cargo: {
+        Args: { p_origen_id: string; p_origen_tabla: string }
+        Returns: {
+          asiento_estado: string | null
+          asiento_id: string | null
+          asiento_numero: number | null
+          codigo: string | null
+          evento: string | null
+          intento_id: string | null
+          motivo: string | null
+          resultado: string
         }[]
       }
       conta_reprocesar_factura_proveedor: {

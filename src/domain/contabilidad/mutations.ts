@@ -20,6 +20,8 @@ import type {
   DestinoImputacion,
   RespuestaReproceso,
   ConfigTipoCargoInput,
+  OrigenCargo,
+  RespuestaReprocesoCargo,
 } from '../../types/contabilidad'
 import type { AsientoFormInput, CuentaFormInput, TipoCambioFormInput } from './schemas'
 import type { CuentaExistenteRef, CuentaImportFila, CuentaOmitida } from './importCuentas'
@@ -639,6 +641,31 @@ export function useReprocesarFacturaMutation(companyId?: string) {
     onSettled: (_data, _err, facturaId) => {
       void qc.invalidateQueries({ queryKey: contabilidadKeys.pendientesDeEmpresa(companyId) })
       void qc.invalidateQueries({ queryKey: contabilidadKeys.intentos(facturaId) })
+      // Un asiento nuevo cambia pólizas y saldos de todos los reportes.
+      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'asientos'] })
+      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'balanza'] })
+    },
+  })
+}
+
+/**
+ * Reprocesa UN cargo (cuota clasificada o cargo adicional). El servidor
+ * devuelve una fila por evento del documento (emisión y, si la hubo, mora).
+ */
+export function useReprocesarCargoMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (doc: { origen_tabla: OrigenCargo; origen_id: string }): Promise<RespuestaReprocesoCargo[]> => {
+      const filas = await runQuery<RespuestaReprocesoCargo[]>((signal) =>
+        supabase
+          .rpc('conta_reprocesar_cargo', { p_origen_tabla: doc.origen_tabla, p_origen_id: doc.origen_id })
+          .abortSignal(signal),
+      )
+      if (!filas || filas.length === 0) throw new Error('El servidor no devolvió resultado del reproceso.')
+      return filas
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.cargosPendientesDeEmpresa(companyId) })
       // Un asiento nuevo cambia pólizas y saldos de todos los reportes.
       void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'asientos'] })
       void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'balanza'] })
