@@ -670,6 +670,17 @@ jobs:
           PGPORT_TEST: 55507
         run: supabase/tests/conta_contabilizacion_cargos/run.sh
 
+      # 20261002000100: cobros de cuotas por tipo. Pendiente visible sin
+      # devengo (incluido el devengo en borrador), reparto mora→principal con
+      # CxC distintas y compartidas, abonos parciales, excedente, fecha propia
+      # de la mora con períodos cerrados, y concurrencia con DOS conexiones
+      # reales (reprocesos simultáneos y dos cobros de la misma cuota a la vez).
+      - name: Contabilidad — cobros de cuotas por tipo
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55508
+        run: supabase/tests/conta_cobros_cuotas/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

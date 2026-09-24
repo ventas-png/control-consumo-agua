@@ -204,3 +204,40 @@ describe('seCorrigeEnTiposCargo', () => {
     expect(seCorrigeEnTiposCargo('periodo_cerrado')).toBe(false)
   })
 })
+
+describe('cobros pendientes (20261002000100)', () => {
+  it('un cobro sin devengo se muestra como cobro, con su motivo, y se reprocesa por su id', async () => {
+    state.consulta = {
+      data: {
+        filas: [fila({
+          origen_tabla: 'pagos', origen_id: 'pago-1', evento: 'pago_contabilizado',
+          concepto: 'Cobro efectivo — Mantenimiento 2026-10', tipo_cargo: null,
+          codigo: 'devengo_pendiente', motivo: 'Esta cuota todavía no está contabilizada.',
+        })],
+        total: 1,
+      },
+      isLoading: false, isError: false,
+    }
+    state.reprocesar.mockResolvedValueOnce([respuesta({ evento: 'pago_contabilizado', asiento_id: 'as-9', asiento_numero: 9 })])
+    montar()
+    expect(screen.getByText('Cobro')).toBeTruthy()
+    expect(screen.getByText('Cuota sin contabilizar')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Configurar tipo' })).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reprocesar' })) })
+    expect(state.reprocesar).toHaveBeenCalledWith({ origen_tabla: 'pagos', origen_id: 'pago-1' })
+  })
+
+  it('el excedente se filtra por su motivo en el servidor', () => {
+    montar()
+    fireEvent.click(screen.getByRole('radio', { name: 'Excede el saldo' }))
+    expect(state.params.at(-1)).toMatchObject({ codigo: 'excede_saldo', pagina: 0 })
+  })
+
+  it('reprocesar una cuota con su cobro: el cobro que sigue pendiente pesa más', () => {
+    const m = mensajeReprocesoCargo([
+      respuesta({ resultado: 'contabilizada' }),
+      respuesta({ evento: 'pago_contabilizado', resultado: 'pendiente', codigo: 'excede_saldo', motivo: 'El cobro supera el saldo.', asiento_id: null }),
+    ])
+    expect(m).toEqual({ variant: 'warning', title: 'Excede el saldo de la cuota', text: 'El cobro supera el saldo.' })
+  })
+})

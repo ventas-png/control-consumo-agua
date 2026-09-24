@@ -4620,6 +4620,45 @@ export type Database = {
           },
         ]
       }
+      conta_cobro_aplicaciones: {
+        Row: {
+          asiento_id: string
+          company_id: string
+          created_at: string
+          cuenta_id: string
+          cuota_id: string
+          evento: string
+          id: string
+          monto: number
+          pago_id: string
+          project_id: string | null
+        }
+        Insert: {
+          asiento_id: string
+          company_id: string
+          created_at?: string
+          cuenta_id: string
+          cuota_id: string
+          evento: string
+          id?: string
+          monto: number
+          pago_id: string
+          project_id?: string | null
+        }
+        Update: {
+          asiento_id?: string
+          company_id?: string
+          created_at?: string
+          cuenta_id?: string
+          cuota_id?: string
+          evento?: string
+          id?: string
+          monto?: number
+          pago_id?: string
+          project_id?: string | null
+        }
+        Relationships: []
+      }
       conta_config_tipo_cargo: {
         Row: {
           activa: boolean
