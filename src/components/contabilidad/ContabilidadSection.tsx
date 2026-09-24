@@ -11,6 +11,7 @@ import { ReglasImputacionTab } from './ReglasImputacionTab'
 import { TiposCargoTab } from './TiposCargoTab'
 import { AuxiliaresTab } from './AuxiliaresTab'
 import { PendientesContabilizacionTab } from './PendientesContabilizacionTab'
+import { CargosPendientesTab } from './CargosPendientesTab'
 import { ProveedoresTab } from './ProveedoresTab'
 import { CuentasPorPagarTab } from './CuentasPorPagarTab'
 import { ComprasTab } from './ComprasTab'
@@ -159,13 +160,26 @@ export function ContabilidadSection() {
         <AsientosTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
       )}
       {tab === 'pendientes' && (
-        <PendientesContabilizacionTab
-          key={ledgerKeyUI}
-          companyId={companyId}
-          projectId={ledgerProjectId}
-          monedaBase={monedaBase}
-          onIrA={setTab}
-        />
+        <div key={ledgerKeyUI} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--at-space-4)' }}>
+          <section aria-labelledby="pendientes-facturas">
+            <h3 id="pendientes-facturas" style={{ margin: '0 0 8px', fontSize: 15 }}>Facturas de proveedor</h3>
+            <PendientesContabilizacionTab
+              companyId={companyId}
+              projectId={ledgerProjectId}
+              monedaBase={monedaBase}
+              onIrA={setTab}
+            />
+          </section>
+          <section aria-labelledby="pendientes-cargos">
+            <h3 id="pendientes-cargos" style={{ margin: '0 0 8px', fontSize: 15 }}>Cargos a unidades</h3>
+            <CargosPendientesTab
+              companyId={companyId}
+              projectId={ledgerProjectId}
+              monedaBase={monedaBase}
+              onIrATiposCargo={() => setTab('tiposcargo')}
+            />
+          </section>
+        </div>
       )}
       {tab === 'balanza' && (
         <BalanzaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />

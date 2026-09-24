@@ -66,6 +66,17 @@ export const contabilidadKeys = {
     [...contabilidadKeys.all, 'pendientes', companyId ?? null] as const,
   intentos: (facturaId?: string | null) =>
     [...contabilidadKeys.all, 'intentos', facturaId ?? null] as const,
+  cargosPendientes: (
+    companyId?: string,
+    projectId?: string | null,
+    codigo?: string | null,
+    busqueda?: string | null,
+    pagina?: number,
+  ) =>
+    [...contabilidadKeys.all, 'cargosPendientes', companyId ?? null, projectId ?? null,
+      codigo ?? null, busqueda ?? null, pagina ?? 0] as const,
+  cargosPendientesDeEmpresa: (companyId?: string) =>
+    [...contabilidadKeys.all, 'cargosPendientes', companyId ?? null] as const,
   // Configuración por tipo de cargo: por ledger, con prefijo de empresa para
   // invalidar los dos ledgers a la vez (misma razón que `mapeoDeEmpresa`).
   configTiposCargo: (companyId?: string, projectId?: string | null) =>

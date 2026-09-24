@@ -659,6 +659,17 @@ jobs:
           PGPORT_TEST: 55506
         run: supabase/tests/conta_pagador_designado/run.sh
 
+      # 20261002000000: contabilización efectiva de cuotas, mora y cargos
+      # adicionales con la configuración por tipo de cargo y los auxiliares.
+      # Pendientes visibles por configuración faltante, reproceso idempotente,
+      # períodos cerrados, pagos contra la misma CxC/auxiliar, aislamiento
+      # entre empresas y proyectos, y concurrencia con DOS conexiones reales.
+      - name: Contabilidad — contabilización de cargos a unidades
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55507
+        run: supabase/tests/conta_contabilizacion_cargos/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

@@ -23,6 +23,8 @@ import type {
   IntentoContabilizacion,
   ConfigTipoCargoEstado,
   AuxiliarCliente,
+  CargoPendiente,
+  FiltroCargoPendiente,
 } from '../../types/contabilidad'
 
 /** Moneda base contable de la empresa (ISO, espejo de conta_moneda_base). */
@@ -343,6 +345,42 @@ export function useIntentosFacturaQuery(facturaId?: string | null) {
           .limit(50)
           .abortSignal(signal),
       )) ?? [],
+  })
+}
+
+/**
+ * Bandeja de CARGOS sin asiento (cuotas clasificadas, su mora y cargos
+ * adicionales) de la contabilidad activa. Igual que la de facturas: filtro,
+ * búsqueda y paginación en servidor (`conta_cargos_pendientes`), que además
+ * decide qué es pendiente y acota a la empresa y proyectos del usuario.
+ */
+export function useCargosPendientesQuery(params: {
+  companyId?: string
+  projectId?: string | null
+  codigo?: FiltroCargoPendiente | null
+  busqueda?: string | null
+  pagina?: number
+}) {
+  const { companyId, projectId, codigo, busqueda, pagina = 0 } = params
+  return useQuery({
+    queryKey: contabilidadKeys.cargosPendientes(companyId, projectId, codigo, busqueda, pagina),
+    enabled: !!companyId,
+    placeholderData: (prev) => prev,
+    queryFn: async () => {
+      const filas = await runQuery<CargoPendiente[]>((signal) =>
+        supabase
+          .rpc('conta_cargos_pendientes', {
+            p_project_id: projectId ?? null,
+            p_codigo: codigo ?? null,
+            p_busqueda: busqueda?.trim() || null,
+            p_limite: PENDIENTES_POR_PAGINA,
+            p_offset: pagina * PENDIENTES_POR_PAGINA,
+          })
+          .abortSignal(signal),
+      )
+      const lista = filas ?? []
+      return { filas: lista, total: lista[0]?.total_filas ?? 0 }
+    },
   })
 }
 
