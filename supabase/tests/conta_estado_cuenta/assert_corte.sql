@@ -300,7 +300,14 @@ INSERT INTO public.conta_config_tipo_cargo (company_id, project_id, tipo_cargo, 
   (:A, :A1, 'adicional_reparacion', '11000000-0000-0000-0000-00000000a101', '11000000-0000-0000-0000-00000000a103');
 INSERT INTO public.cargos_adicionales_unidad (id, company_id, project_id, unidad_id, concepto, categoria, monto, fecha_cargo, estado) VALUES
   ('ec700000-0000-0000-0000-000000000021', :A, :A1, :U3, 'SINT-AUX CA21', 'reparacion', 12, '2026-08-08', 'pendiente');
+-- «pagado» marcado a mano ANTES de los cobros por cargo (20261004000000):
+-- hoy el estado de un cargo por tipo se deriva de sus cobros y el guard
+-- rechaza marcarlo a mano; el dato heredado se simula sin el guard.
+RESET ROLE;
+ALTER TABLE public.cargos_adicionales_unidad DISABLE TRIGGER trg_cargo_cobros_guard;
 UPDATE public.cargos_adicionales_unidad SET estado = 'pagado' WHERE id = 'ec700000-0000-0000-0000-000000000021';
+ALTER TABLE public.cargos_adicionales_unidad ENABLE TRIGGER trg_cargo_cobros_guard;
+SET ROLE authenticated;
 
 SELECT public.chk_txt(public.ecc_limitaciones(public.ecc('2026-08-31')),
   'anulacion_sin_fecha:1:15.00,estado_actual_sin_fecha:1:12.00,rechazo_sin_fecha:1:80.00',

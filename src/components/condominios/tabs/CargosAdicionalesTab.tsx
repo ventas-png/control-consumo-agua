@@ -3,6 +3,8 @@ import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { CargoAdicionalUnidad, CategoriaCargoAdicional, EstadoCargoAdicional, Unidad } from '../../../types'
+import { useCargosCobroResumenQuery } from '../../../domain/contabilidad/cobrosCargo'
+import CobroCargoModal from './CobroCargoModal'
 
 interface Props {
   cargos: CargoAdicionalUnidad[]
@@ -35,6 +37,9 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
   const [filtroEstado, setFiltroEstado] = useState<EstadoCargoAdicional | ''>('pendiente')
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Cargos por tipo: el cobro se registra (y el estado lo deriva el servidor).
+  const resumenCobros = useCargosCobroResumenQuery(companyId, proyectoId)
+  const [cobroDe, setCobroDe] = useState<CargoAdicionalUnidad | null>(null)
 
   const [form, setForm] = useState({
     unidad_id: '', concepto: '', categoria: 'otro' as CategoriaCargoAdicional,
@@ -79,6 +84,8 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
     onRefresh()
   }
 
+  // Sólo para cargos del camino histórico (sin contabilización por tipo): en
+  // los demás, «pagado» sale de sus cobros y el servidor rechaza marcarlo.
   async function marcarPagado(c: CargoAdicionalUnidad) {
     const { error } = await updateCondominioRow('cargos_adicionales_unidad', c.id, { estado: 'pagado' as EstadoCargoAdicional })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -88,7 +95,9 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
   async function anular(c: CargoAdicionalUnidad) {
     const res = await confirm({ title: 'Anular cargo', text: '¿Confirmar anulación?', icon: 'warning', variant: 'danger', confirmText: 'Anular' })
     if (!res.isConfirmed) return
-    await updateCondominioRow('cargos_adicionales_unidad', c.id, { estado: 'anulado' as EstadoCargoAdicional })
+    // Con cobros vivos el servidor rechaza la anulación: se muestra el motivo.
+    const { error } = await updateCondominioRow('cargos_adicionales_unidad', c.id, { estado: 'anulado' as EstadoCargoAdicional })
+    if (error) { notify({ variant: 'error', title: 'No se anuló el cargo', text: error.message }); return }
     onRefresh()
   }
 
@@ -199,6 +208,8 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                   const cat = CATEGORIAS.find(k => k.value === c.categoria)
                   const est = ESTADOS.find(e => e.value === c.estado)
                   const vencido = esFechaCalendarioVencida(c.fecha_vencimiento) && c.estado === 'pendiente'
+                  const rc = resumenCobros.data?.get(c.id)
+                  const porTipo = !!rc?.por_tipo
                   return (
                     <div key={c.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencido ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
@@ -210,6 +221,12 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                           {c.fecha_cargo}
                           {c.fecha_vencimiento && <span> · Vence: <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{c.fecha_vencimiento}</span></span>}
                           {c.referencia && <span> · Ref: {c.referencia}</span>}
+                          {porTipo && c.estado === 'pendiente' && rc && (rc.aplicado > 0 || rc.en_proceso > 0) && (
+                            <span> · Cobrado {moneda} {rc.aplicado.toLocaleString()} · Saldo {moneda} {rc.saldo.toLocaleString()}
+                              {rc.en_proceso > 0 && <span style={{ color: 'var(--at-warning)' }}> · {moneda} {rc.en_proceso.toLocaleString()} pendiente de contabilizar</span>}
+                            </span>
+                          )}
+                          {rc?.pagado_sin_cobro && <span style={{ color: 'var(--at-warning)' }}> · Pagado sin cobro vinculado</span>}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -217,12 +234,20 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                           {moneda} {c.monto.toLocaleString()}
                         </span>
                         <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: est?.bg, color: est?.color }}>{est?.label}</span>
+                        {porTipo && !rc?.pagado_sin_cobro && c.estado !== 'anulado' && (canEdit || (rc?.cobros ?? 0) > 0) && (
+                          <button onClick={() => setCobroDe(c)}
+                            style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                            {canEdit && c.estado === 'pendiente' ? 'Registrar cobro' : 'Cobros'}
+                          </button>
+                        )}
                         {canEdit && c.estado === 'pendiente' && (
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <button onClick={() => marcarPagado(c)}
-                              style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
-                              ✓ Pagado
-                            </button>
+                            {!porTipo && !resumenCobros.isLoading && (
+                              <button onClick={() => marcarPagado(c)}
+                                style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                                ✓ Pagado
+                              </button>
+                            )}
                             <button onClick={() => anular(c)}
                               style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                               Anular
@@ -237,6 +262,18 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
             </div>
           )
         })
+      )}
+
+      {cobroDe && (
+        <CobroCargoModal
+          cargo={cargos.find((c) => c.id === cobroDe.id) ?? cobroDe}
+          resumen={resumenCobros.data?.get(cobroDe.id)}
+          companyId={companyId}
+          moneda={moneda}
+          canEdit={canEdit}
+          onClose={() => setCobroDe(null)}
+          onCambio={onRefresh}
+        />
       )}
     </div>
   )

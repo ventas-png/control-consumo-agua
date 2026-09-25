@@ -512,8 +512,8 @@ export const CODIGO_CARGO_LABELS: Record<CodigoCargoPendiente, string> = {
   cuenta_invalida: 'Cuenta inválida',
   sin_responsable: 'Sin responsable',
   periodo_cerrado: 'Período cerrado',
-  devengo_pendiente: 'Cuota sin contabilizar',
-  excede_saldo: 'Excede el saldo de la cuota',
+  devengo_pendiente: 'Documento sin contabilizar',
+  excede_saldo: 'Excede el saldo del documento',
   cobro_anterior_pendiente: 'Espera un cobro anterior',
   sin_cuenta: 'Falta la cuenta del método de pago',
   documento_anulado: 'Documento anulado',
@@ -647,6 +647,8 @@ export interface MovimientoEstadoCuenta {
   tipo_cargo: string | null
   componente: ComponenteMovimiento | null
   cuota_id: string | null
+  /** Cargo adicional al que se aplicó el cobro (20261004000000). */
+  cargo_adicional_id?: string | null
   cuenta_id: string
   cuenta_codigo: string
   cuenta_nombre: string

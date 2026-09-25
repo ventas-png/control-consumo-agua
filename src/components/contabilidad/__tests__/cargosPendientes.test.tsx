@@ -221,7 +221,7 @@ describe('cobros pendientes (20261002000100)', () => {
     state.reprocesar.mockResolvedValueOnce([respuesta({ evento: 'pago_contabilizado', asiento_id: 'as-9', asiento_numero: 9 })])
     montar()
     expect(screen.getByText('Cobro')).toBeTruthy()
-    expect(screen.getByText('Cuota sin contabilizar')).toBeTruthy()
+    expect(screen.getByText('Documento sin contabilizar')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Configurar tipo' })).toBeNull()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reprocesar' })) })
     expect(state.reprocesar).toHaveBeenCalledWith({ origen_tabla: 'pagos', origen_id: 'pago-1' })
@@ -238,6 +238,6 @@ describe('cobros pendientes (20261002000100)', () => {
       respuesta({ resultado: 'contabilizada' }),
       respuesta({ evento: 'pago_contabilizado', resultado: 'pendiente', codigo: 'excede_saldo', motivo: 'El cobro supera el saldo.', asiento_id: null }),
     ])
-    expect(m).toEqual({ variant: 'warning', title: 'Excede el saldo de la cuota', text: 'El cobro supera el saldo.' })
+    expect(m).toEqual({ variant: 'warning', title: 'Excede el saldo del documento', text: 'El cobro supera el saldo.' })
   })
 })

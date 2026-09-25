@@ -4623,10 +4623,11 @@ export type Database = {
       conta_cobro_aplicaciones: {
         Row: {
           asiento_id: string
+          cargo_adicional_id: string | null
           company_id: string
           created_at: string
           cuenta_id: string
-          cuota_id: string
+          cuota_id: string | null
           evento: string
           id: string
           monto: number
@@ -4635,10 +4636,11 @@ export type Database = {
         }
         Insert: {
           asiento_id: string
+          cargo_adicional_id?: string | null
           company_id: string
           created_at?: string
           cuenta_id: string
-          cuota_id: string
+          cuota_id?: string | null
           evento: string
           id?: string
           monto: number
@@ -4647,10 +4649,11 @@ export type Database = {
         }
         Update: {
           asiento_id?: string
+          cargo_adicional_id?: string | null
           company_id?: string
           created_at?: string
           cuenta_id?: string
-          cuota_id?: string
+          cuota_id?: string | null
           evento?: string
           id?: string
           monto?: number
@@ -12784,6 +12787,7 @@ export type Database = {
       pagos: {
         Row: {
           boleta_url: string | null
+          cargo_adicional_id: string | null
           cliente_id: string
           comprobante_tipo: string | null
           comprobante_url: string | null
@@ -12815,6 +12819,7 @@ export type Database = {
         }
         Insert: {
           boleta_url?: string | null
+          cargo_adicional_id?: string | null
           cliente_id: string
           comprobante_tipo?: string | null
           comprobante_url?: string | null
@@ -12846,6 +12851,7 @@ export type Database = {
         }
         Update: {
           boleta_url?: string | null
+          cargo_adicional_id?: string | null
           cliente_id?: string
           comprobante_tipo?: string | null
           comprobante_url?: string | null
@@ -12876,6 +12882,13 @@ export type Database = {
           verified_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pagos_cargo_adicional_id_fkey"
+            columns: ["cargo_adicional_id"]
+            isOneToOne: false
+            referencedRelation: "cargos_adicionales_unidad"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pagos_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -23095,6 +23108,53 @@ export type Database = {
               isSetofReturn: false
             }
           }
+      conta_anular_cobro_cargo: {
+        Args: { p_motivo: string; p_pago_id: string }
+        Returns: {
+          asiento_id: string | null
+          cobros_pendientes: number
+          estado_cargo: string
+          pago_id: string
+          resultado: string
+          reverso_id: string | null
+          reverso_numero: number | null
+        }[]
+      }
+      conta_cargo_cobros: {
+        Args: { p_cargo_id: string }
+        Returns: {
+          anulacion_motivo: string | null
+          aplicado: number
+          asiento_estado: string | null
+          asiento_id: string | null
+          asiento_numero: number | null
+          codigo: string | null
+          estado: string
+          fecha: string
+          metodo: string
+          monto: number
+          motivo: string | null
+          pago_id: string
+          referencia: string | null
+          reverso_fecha: string | null
+          reverso_id: string | null
+          reverso_numero: number | null
+        }[]
+      }
+      conta_cargos_cobro_resumen: {
+        Args: { p_project_id: string }
+        Returns: {
+          aplicado: number
+          cargo_id: string
+          cobros: number
+          devengado: number
+          devengo_estado: string | null
+          en_proceso: number
+          pagado_sin_cobro: boolean
+          por_tipo: boolean
+          saldo: number
+        }[]
+      }
       conta_cargos_pendientes: {
         Args: {
           p_busqueda?: string | null
@@ -23260,6 +23320,27 @@ export type Database = {
           regla_id: string | null
           evento_usado: string | null
           motivo: string | null
+        }[]
+      }
+      conta_registrar_cobro_cargo: {
+        Args: {
+          p_cargo_id: string
+          p_fecha: string
+          p_metodo: string
+          p_monto: number
+          p_notas?: string | null
+          p_pago_id?: string | null
+          p_referencia?: string | null
+        }
+        Returns: {
+          asiento_id: string | null
+          asiento_numero: number | null
+          codigo: string | null
+          estado_cargo: string
+          motivo: string | null
+          pago_id: string
+          repetido: boolean
+          resultado: string
         }[]
       }
       conta_reprocesar_cargo: {
