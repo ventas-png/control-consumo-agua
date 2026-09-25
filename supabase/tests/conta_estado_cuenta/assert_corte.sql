@@ -309,15 +309,32 @@ UPDATE public.cargos_adicionales_unidad SET estado = 'pagado' WHERE id = 'ec7000
 ALTER TABLE public.cargos_adicionales_unidad ENABLE TRIGGER trg_cargo_cobros_guard;
 SET ROLE authenticated;
 
+-- Desde 20261005000000 el rechazo de P22 (hoy, sin asiento) queda FECHADO por
+-- el servidor: ya no es limitación, y al corte de agosto —anterior al
+-- rechazo— el cobro figura como estaba. La anulación del cargo sin asiento y
+-- el «pagado» de hoy siguen sin fecha. (El rechazo SIN evidencia, anterior a
+-- la migración, se prueba en supabase/tests/conta_rechazo_cobros.)
 SELECT public.chk_txt(public.ecc_limitaciones(public.ecc('2026-08-31')),
-  'anulacion_sin_fecha:1:15.00,estado_actual_sin_fecha:1:12.00,rechazo_sin_fecha:1:80.00',
-  'C9 · corte de agosto: el rechazo y la anulación sin fecha, y el «pagado» de hoy, se declaran como limitación');
+  'anulacion_sin_fecha:1:15.00,estado_actual_sin_fecha:1:12.00',
+  'C9 · corte de agosto: la anulación sin fecha y el «pagado» de hoy se declaran como limitación; el rechazo fechado, no');
 SELECT public.chk_txt(public.ecc_fila('2026-08-31', 'ec700000-0000-0000-0000-000000000021', 'limite'), 'estado_actual_sin_fecha',
   'C9 · …y la fila del cargo «pagado» dice que su estado es el de hoy');
 SELECT public.chk(
   (SELECT count(*) FROM public.conta_estado_cuenta_pendientes(:A1, :C3, NULL, '2026-08-31', 500, 0)
-    WHERE origen_id IN ('ec600000-0000-0000-0000-000000000022', 'ec700000-0000-0000-0000-000000000020')), 0,
+    WHERE origen_id = 'ec700000-0000-0000-0000-000000000020'), 0,
   'C9 · lo que no se puede situar no se lista como pendiente');
+SELECT public.chk_txt(
+  public.ecc_fila('2026-08-31', 'ec600000-0000-0000-0000-000000000022', 'codigo') || '|' ||
+  public.ecc_fila('2026-08-31', 'ec600000-0000-0000-0000-000000000022', 'estado'),
+  -- P22 se inserta hoy con verified_at de agosto: su intento de
+  -- contabilización (excede_saldo) es de HOY, así que al corte de agosto no
+  -- había intento todavía.
+  'sin_intento_al_corte|rechazado',
+  'C9 · el cobro rechazado HOY estaba pendiente al corte de agosto, y se dice su estado de hoy');
+SELECT public.chk(
+  (SELECT count(*) FROM (SELECT public.ecc_fila('2026-08-31', 'ec600000-0000-0000-0000-000000000022', 'motivo') AS m) x
+    WHERE m LIKE '%El cobro se rechazó después del corte, el ' || to_char(CURRENT_DATE, 'YYYY-MM-DD') || '.'), 1,
+  'C9 · …con la fecha de su rechazo');
 SELECT public.chk_txt(public.ecc_limitaciones(public.ecc(NULL)) || '|' || public.ecc_limitaciones(public.ecc(CURRENT_DATE)), '|',
   'C9 · sin corte o al corte de hoy, el estado de hoy es el pedido: sin limitaciones');
 SELECT public.chk_txt(public.ecc_fila(NULL, 'ec700000-0000-0000-0000-000000000021', 'limite'), '-',
@@ -328,9 +345,12 @@ SELECT public.chk_txt(public.ec_resumen(public.ecc('2026-08-31')), '0.00|367.00|
   'C10 · corte de agosto');
 SELECT public.chk_txt(public.ec_resumen(public.ecc(CURRENT_DATE - 1)), '0.00|367.00|135.00|232.00|9',
   'C10 · corte de ayer: nada de lo fechado hoy');
+-- «pendiente:pagos:80.00» es P22: rechazado HOY sin asiento; desde
+-- 20261005000000 su rechazo está fechado y ayer seguía vigente (antes no se
+-- podía situar y faltaba en todos los cortes).
 SELECT public.chk_txt(public.ecc_fuera(CURRENT_DATE - 1),
-  'cobro_sin_vinculo:cargos_adicionales_unidad:12.00,contabilizado_despues:cuotas_condominio:40.00,contabilizado_despues:pagos:20.00,pendiente:cuotas_condominio:45.00,pendiente:cuotas_condominio:60.00,pendiente:cuotas_condominio:70.00',
-  'C10 · lista de ayer: lo contabilizado hoy, fuera; lo anulado hoy, vigente');
+  'cobro_sin_vinculo:cargos_adicionales_unidad:12.00,contabilizado_despues:cuotas_condominio:40.00,contabilizado_despues:pagos:20.00,pendiente:cuotas_condominio:45.00,pendiente:cuotas_condominio:60.00,pendiente:cuotas_condominio:70.00,pendiente:pagos:80.00',
+  'C10 · lista de ayer: lo contabilizado hoy, fuera; lo anulado o rechazado hoy, vigente');
 SELECT public.chk_txt(public.ec_resumen(public.ecc(CURRENT_DATE)), '0.00|437.00|255.00|182.00|13',
   'C10 · corte de hoy');
 SELECT public.chk_txt(public.ecc_fuera(CURRENT_DATE),
