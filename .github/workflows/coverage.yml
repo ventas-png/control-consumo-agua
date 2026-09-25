@@ -704,6 +704,20 @@ jobs:
           PGPORT_TEST: 55510
         run: supabase/tests/conta_estado_cuenta/run.sh
 
+      # 20261004000000: cobros de cargos adicionales. Vínculo explícito cobro →
+      # cargo validado en servidor; parciales, saldo completo con estado
+      # derivado, excedente y cobro anterior pendientes (sin reparto ni
+      # anticipo); devengo y cuenta del método faltantes; repetición
+      # idempotente; anulación con reverso y evidencia; aislamiento; estado de
+      # cuenta y conciliación con cortes antes y después de reversos; y
+      # concurrencia con sesiones reales (dos cobros, dos reprocesos,
+      # reproceso contra anulación, anulación del cargo contra alta de cobro).
+      - name: Contabilidad — cobros de cargos adicionales
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55511
+        run: supabase/tests/conta_cobros_cargos/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

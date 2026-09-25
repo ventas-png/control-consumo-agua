@@ -119,6 +119,14 @@ export const contabilidadKeys = {
   ) =>
     [...contabilidadKeys.all, 'estadoCuenta', companyId ?? null, 'conciliacion', projectId ?? null,
       sujeto ?? null, corte ?? null] as const,
+  // Cobros de cargos adicionales: prefijo por empresa para invalidar el
+  // resumen del proyecto y el detalle de cada cargo a la vez.
+  cobrosCargoDeEmpresa: (companyId?: string) =>
+    [...contabilidadKeys.all, 'cobrosCargo', companyId ?? null] as const,
+  cobrosCargoResumen: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'cobrosCargo', companyId ?? null, 'resumen', projectId ?? null] as const,
+  cobrosDeCargo: (companyId?: string, cargoId?: string | null) =>
+    [...contabilidadKeys.all, 'cobrosCargo', companyId ?? null, 'cargo', cargoId ?? null] as const,
   unidadesLedger: (companyId?: string, projectId?: string | null) =>
     [...contabilidadKeys.all, 'unidadesLedger', companyId ?? null, projectId ?? null] as const,
 } as const

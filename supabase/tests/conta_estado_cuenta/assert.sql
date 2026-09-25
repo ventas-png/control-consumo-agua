@@ -139,7 +139,14 @@ SELECT public.chk_txt(
 UPDATE public.pagos SET estado = 'rechazado' WHERE id = 'ec200000-0000-0000-0000-000000000005';
 INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
   ('ec200000-0000-0000-0000-000000000006', :C1, :A1, 'ec100000-0000-0000-0000-000000000004', 70, 'efectivo', 'verificado', '2026-06-25 12:00+00');
+-- «pagado» marcado a mano ANTES de los cobros por cargo (20261004000000):
+-- hoy el estado de un cargo por tipo se deriva de sus cobros y el guard
+-- rechaza marcarlo a mano; el dato heredado se simula sin el guard.
+RESET ROLE;
+ALTER TABLE public.cargos_adicionales_unidad DISABLE TRIGGER trg_cargo_cobros_guard;
 UPDATE public.cargos_adicionales_unidad SET estado = 'pagado' WHERE id = 'ec300000-0000-0000-0000-000000000001';
+ALTER TABLE public.cargos_adicionales_unidad ENABLE TRIGGER trg_cargo_cobros_guard;
+SET ROLE authenticated;
 SELECT public.chk_txt(public.ec_fuera(:A1, :C1, NULL), 'cobro_sin_vinculo:cargos_adicionales_unidad:25.35',
   '4 · el excedente rechazado desaparece; el cargo adicional «pagado» se informa sin inventar su abono');
 
