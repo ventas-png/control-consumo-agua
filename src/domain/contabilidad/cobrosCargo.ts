@@ -15,8 +15,9 @@
 //
 // Resultado INCIERTO: si la respuesta no llega (red, tiempo agotado) el cobro
 // pudo haberse registrado o no. La pantalla no afirma ninguna de las dos
-// cosas: conserva la clave y los datos enviados (también si se cierra el
-// formulario) para reintentar sin duplicar o reconocerlo en la lista.
+// cosas. La clave y una copia de los datos se guardan ANTES de llamar a la
+// RPC, así que sobreviven a cerrar el formulario, navegar o recargar durante
+// la petición; se borran sólo cuando se confirma el resultado de ESA clave.
 // ════════════════════════════════════════════════════════════════════════════
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -238,7 +239,7 @@ export function clasificarFalloRegistro(e: unknown): FalloRegistroCobro {
   return { tipo: 'rechazado', mensaje }
 }
 
-/** Lo que se envió en un alta cuyo resultado no se pudo confirmar. */
+/** Lo que se envió (o se está enviando) en un alta cuyo resultado no se ha confirmado. */
 export interface EnvioIncierto {
   clave: string
   datos: {
@@ -264,17 +265,29 @@ export function leerEnvioIncierto(cargoId: string): EnvioIncierto | null {
   }
 }
 
-export function guardarEnvioIncierto(cargoId: string, envio: EnvioIncierto): void {
+/**
+ * Guarda el envío ANTES de la petición. Si ya hay uno con la MISMA clave se
+ * conserva el original: sus datos son los que el servidor pudo registrar.
+ * Devuelve lo que quedó guardado.
+ */
+export function guardarEnvioIncierto(cargoId: string, envio: EnvioIncierto): EnvioIncierto {
+  const previo = leerEnvioIncierto(cargoId)
+  if (previo?.clave === envio.clave) return previo
   try {
     sessionStorage.setItem(envioInciertoKey(cargoId), JSON.stringify(envio))
   } catch {
     /* sin almacenamiento: la clave sigue en el formulario mientras esté abierto */
   }
+  return envio
 }
 
-export function olvidarEnvioIncierto(cargoId: string): void {
+/**
+ * Olvida el envío guardado sólo si es el de `clave`: la respuesta tardía de
+ * un formulario anterior no borra el envío posterior de otro.
+ */
+export function olvidarEnvioIncierto(cargoId: string, clave: string): void {
   try {
-    sessionStorage.removeItem(envioInciertoKey(cargoId))
+    if (leerEnvioIncierto(cargoId)?.clave === clave) sessionStorage.removeItem(envioInciertoKey(cargoId))
   } catch {
     /* nada que olvidar */
   }

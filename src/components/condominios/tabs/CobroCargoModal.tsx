@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ModalPortal } from '../../shared/ModalPortal'
 import { notify } from '../../shared/Dialog'
 import { openTextPrompt } from '../../shared/PromptDialog'
@@ -42,10 +42,12 @@ type DatosCobro = EnvioIncierto['datos']
  *
  * La clave de idempotencia se fija al abrir el formulario y se renueva sólo
  * tras un alta CONFIRMADA o por decisión explícita («Registrar como cobro
- * nuevo»). Si la respuesta no llega, el resultado es INCIERTO: no se afirma
- * que el cobro no se registró; la clave y los datos enviados se guardan (aun
- * cerrando el formulario) para reintentar sin duplicar, y si el cobro aparece
- * en la lista se reconoce como registrado.
+ * nuevo»). La clave y una copia de los datos se guardan ANTES de la petición:
+ * si el formulario se cierra, se navega o se recarga mientras tanto, al
+ * reabrirlo se recupera ese envío con su clave y no se genera otra hasta
+ * confirmar su resultado. Si la respuesta no llega, el resultado es INCIERTO:
+ * no se afirma que el cobro no se registró, y si aparece en la lista se
+ * reconoce como registrado. Una respuesta tardía sólo limpia SU envío.
  */
 export default function CobroCargoModal({ cargo, resumen, companyId, moneda, canEdit, onClose, onCambio }: Props) {
   const cobros = useCobrosDeCargoQuery(companyId, cargo.id)
@@ -57,6 +59,8 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
   // mismos datos.
   const [incierto, setIncierto] = useState<EnvioIncierto | null>(() => leerEnvioIncierto(cargo.id))
   const [clave, setClave] = useState(() => incierto?.clave ?? crypto.randomUUID())
+  // La clave vigente, para las respuestas que llegan después de un cambio.
+  const claveVigente = useRef(clave)
   const [form, setForm] = useState<DatosCobro>(() => incierto?.datos ?? {
     monto: saldo > 0 ? String(saldo) : '',
     metodo: 'efectivo',
@@ -70,12 +74,17 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
   const desalineado = !!resumen?.coherencia_codigo
   const puedeCobrar = canEdit && cargo.estado !== 'anulado' && !!resumen?.por_tipo && !resumen.pagado_sin_cobro && !desalineado
 
-  function nuevaClave() {
-    olvidarEnvioIncierto(cargo.id)
-    setIncierto(null)
+  /** Resultado de `k` confirmado: se olvida su envío y, si sigue vigente, se renueva la clave. */
+  function confirmada(k: string) {
+    olvidarEnvioIncierto(cargo.id, k)
+    setIncierto((i) => (i?.clave === k ? null : i))
+    if (claveVigente.current !== k) return
     setClaveReusada(false)
-    setClave(crypto.randomUUID())
+    const nueva = crypto.randomUUID()
+    claveVigente.current = nueva
+    setClave(nueva)
   }
+  const nuevaClave = () => confirmada(claveVigente.current)
 
   // Recuperar el resultado: si el cobro del envío incierto aparece entre los
   // del cargo, SÍ se registró.
@@ -87,8 +96,8 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
       title: 'El cobro anterior sí se registró',
       text: `Aparece entre los cobros del cargo (${registradoConClave.fecha}, ${fmt(registradoConClave.monto)}). No hace falta reenviarlo.`,
     })
-    nuevaClave()
     setForm((f) => ({ ...f, referencia: '', notas: '' }))
+    confirmada(registradoConClave.pago_id)
     onCambio()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al aparecer el cobro
   }, [registradoConClave?.pago_id])
@@ -99,10 +108,14 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
       notify({ variant: 'warning', title: 'Importe inválido', text: 'Indica un importe mayor que cero.' })
       return
     }
+    const k = clave
+    // Antes de la petición: si se cierra, navega o recarga, el envío se recupera.
+    const reintento = incierto?.clave === k
+    const guardado = guardarEnvioIncierto(cargo.id, { clave: k, datos })
     try {
       const r = await registrar.mutateAsync({
         cargoId: cargo.id, monto, metodo: datos.metodo, fecha: datos.fecha,
-        referencia: datos.referencia.trim() || null, notas: datos.notas.trim() || null, clave,
+        referencia: datos.referencia.trim() || null, notas: datos.notas.trim() || null, clave: k,
       })
       if (r.resultado === 'contabilizada') {
         notify({
@@ -117,15 +130,13 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
           text: r.motivo ?? 'Quedó en la bandeja de pendientes de Contabilidad.',
         })
       }
-      nuevaClave()
-      setForm((f) => ({ ...f, referencia: '', notas: '' }))
+      if (claveVigente.current === k) setForm((f) => ({ ...f, referencia: '', notas: '' }))
+      confirmada(k)
       onCambio()
     } catch (e) {
       const fallo = clasificarFalloRegistro(e)
       if (fallo.tipo === 'incierto') {
-        const envio = { clave, datos }
-        guardarEnvioIncierto(cargo.id, envio)
-        setIncierto(envio)
+        setIncierto(guardado)
         notify({
           variant: 'warning',
           title: 'No se pudo confirmar el cobro',
@@ -142,6 +153,10 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
         })
         void cobros.refetch()
       } else {
+        // El servidor respondió con un error: con esta clave no se registró
+        // nada en ESTE intento. Si era el reintento de un envío sin confirmar,
+        // ese envío sigue sin confirmar (el error pudo ser previo a mirarlo).
+        if (!reintento) olvidarEnvioIncierto(cargo.id, k)
         notify({ variant: 'error', title: 'No se registró el cobro', text: fallo.mensaje })
       }
     }
@@ -224,7 +239,7 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
           {incierto && (
             <div role="status" style={{ border: '1px solid var(--at-warning)', borderRadius: 10, padding: 10, marginBottom: 12, fontSize: 12 }}>
               <strong>Cobro sin confirmar.</strong> Se envió {moneda} {fmt(Number(incierto.datos.monto))} del {incierto.datos.fecha}
-              {incierto.datos.referencia.trim() ? ` (ref. ${incierto.datos.referencia.trim()})` : ''} y la respuesta no llegó:
+              {incierto.datos.referencia.trim() ? ` (ref. ${incierto.datos.referencia.trim()})` : ''} y su respuesta no se ha confirmado:
               pudo haberse registrado o no. Reintentarlo con los mismos datos no lo duplica.
               {canEdit && (
                 <div style={{ marginTop: 6 }}>

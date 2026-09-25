@@ -13,6 +13,9 @@
 //   · reintentar con la misma clave y OTROS datos (fecha, referencia) muestra
 //     el rechazo del servidor, nunca un éxito;
 //   · un cargo que no concuerda con su devengo no ofrece cobros y dice por qué;
+//   · el envío se guarda ANTES de la petición: cerrar, reabrir o recargar con
+//     la respuesta en vuelo recupera la misma clave (un solo cobro), y una
+//     respuesta tardía sólo limpia su propio envío;
 //   · un excedente se advierte antes de enviar y, si el servidor lo deja
 //     pendiente, se informa su motivo;
 //   · anular un cobro pide motivo y lo manda al servidor.
@@ -389,6 +392,109 @@ describe('CargosAdicionalesTab · cobros', () => {
     expect(within(dialogo).getByRole('alert').textContent).toContain('Restablece el importe del cargo a 100.00 GTQ')
     expect(within(dialogo).queryByLabelText('Importe (GTQ)')).toBeNull()
     expect(llamadasA('conta_registrar_cobro_cargo')).toHaveLength(0)
+  })
+
+  // ── Respuesta DEMORADA: el envío se guarda antes de la petición ─────────
+  // Servidor simulado: registra por clave (idempotente, como la RPC) y deja
+  // la respuesta en espera hasta que la prueba la suelta.
+  function servidorDemorado() {
+    const cobros = new Map<string, Record<string, unknown>>()
+    const enEspera: Array<() => void> = []
+    let demorar = true
+    h.respuestas.conta_registrar_cobro_cargo = (args) => {
+      const clave = args.p_pago_id as string
+      const repetido = cobros.has(clave)
+      if (!repetido) cobros.set(clave, args)
+      const respuesta = {
+        data: [{ pago_id: clave, repetido, resultado: 'contabilizada', codigo: null, motivo: null,
+          asiento_id: 'a-' + clave, asiento_numero: 40 + cobros.size, estado_cargo: 'pendiente' }], error: null,
+      }
+      if (!demorar) return respuesta
+      return new Promise((resolver) => { enEspera.push(() => resolver(respuesta)) }) as never
+    }
+    return {
+      cobros,
+      soltarSiguiente: async () => { await act(async () => { enEspera.shift()!() }) },
+      responderAlInstante: (v: boolean) => { demorar = !v },
+      pendientes: () => enEspera.length,
+    }
+  }
+  const guardado = (cargoId: string) => JSON.parse(sessionStorage.getItem(`cobro-cargo-incierto:${cargoId}`) ?? 'null')
+
+  it('abono de 25 sobre 100 con respuesta demorada: cerrar y reabrir antes de resolver conserva la clave y hay un solo cobro', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1')], error: null })
+    const srv = servidorDemorado()
+    montar([cargo('ca1', 'Vidrio')])
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar cobro' }))
+    let dialogo = await screen.findByRole('dialog')
+    fireEvent.change(within(dialogo).getByLabelText('Importe (GTQ)'), { target: { value: '25' } })
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+
+    // La petición sigue en vuelo, pero el envío YA está guardado.
+    expect(srv.pendientes()).toBe(1)
+    expect(guardado('ca1')).toMatchObject({ clave: 'clave-1', datos: { monto: '25' } })
+
+    // Se cierra y se reabre ANTES de que llegue la respuesta.
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Cerrar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar cobro' }))
+    dialogo = await screen.findByRole('dialog')
+    expect(within(dialogo).getByText(/Cobro sin confirmar/)).toBeTruthy()
+    expect((within(dialogo).getByLabelText('Importe (GTQ)') as HTMLInputElement).value).toBe('25')
+    expect(crypto.randomUUID).toHaveBeenCalledTimes(1) // no se generó otra clave
+
+    // Reintento: misma clave; el servidor lo reconoce.
+    srv.responderAlInstante(true)
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Reintentar el envío anterior' })) })
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'success', title: 'Cobro ya registrado',
+    })))
+    // Llega por fin la respuesta del primer envío.
+    await srv.soltarSiguiente()
+
+    const regs = llamadasA('conta_registrar_cobro_cargo')
+    expect(regs.map((l) => l.args.p_pago_id)).toEqual(['clave-1', 'clave-1'])
+    expect(regs[1].args).toEqual(regs[0].args)
+    expect(srv.cobros.size).toBe(1)
+    expect(guardado('ca1')).toBeNull()
+  })
+
+  it('recargar durante la petición: se recupera el envío; su respuesta tardía no borra un envío posterior', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1')], error: null })
+    const srv = servidorDemorado()
+    montar([cargo('ca1', 'Vidrio')])
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar cobro' }))
+    let dialogo = await screen.findByRole('dialog')
+    fireEvent.change(within(dialogo).getByLabelText('Importe (GTQ)'), { target: { value: '25' } })
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    expect(srv.pendientes()).toBe(1)
+
+    // «Recarga»: se desmonta todo (otra instancia, otra caché) y se vuelve.
+    cleanup()
+    montar([cargo('ca1', 'Vidrio')])
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar cobro' }))
+    dialogo = await screen.findByRole('dialog')
+    expect(within(dialogo).getByText(/Cobro sin confirmar/)).toBeTruthy()
+
+    // El reintento confirma clave-1; el formulario pasa a clave-2.
+    srv.responderAlInstante(true)
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Reintentar el envío anterior' })) })
+    await waitFor(() => expect(guardado('ca1')).toBeNull())
+
+    // Un cobro NUEVO (clave-2), también demorado.
+    srv.responderAlInstante(false)
+    fireEvent.change(within(dialogo).getByLabelText('Importe (GTQ)'), { target: { value: '10' } })
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    expect(guardado('ca1')).toMatchObject({ clave: 'clave-2', datos: { monto: '10' } })
+
+    // Llega la respuesta TARDÍA del primer formulario (clave-1): no toca el de clave-2.
+    await srv.soltarSiguiente()
+    expect(guardado('ca1')).toMatchObject({ clave: 'clave-2' })
+
+    // Y cuando se confirma clave-2, sí se limpia.
+    await srv.soltarSiguiente()
+    await waitFor(() => expect(guardado('ca1')).toBeNull())
+    expect(llamadasA('conta_registrar_cobro_cargo').map((l) => l.args.p_pago_id)).toEqual(['clave-1', 'clave-1', 'clave-2'])
+    expect(srv.cobros.size).toBe(2)
   })
 })
 
