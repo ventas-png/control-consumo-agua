@@ -48,6 +48,7 @@ const TONO: Record<CodigoCargoPendiente, 'warning' | 'danger' | 'info' | 'neutra
   devengo_pendiente: 'warning',
   excede_saldo: 'danger',
   cobro_anterior_pendiente: 'info',
+  devengo_desalineado: 'danger',
   sin_cuenta: 'warning',
   documento_anulado: 'neutral',
   documento_inexistente: 'neutral',

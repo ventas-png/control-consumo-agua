@@ -64,7 +64,19 @@ INSERT INTO public.cargos_adicionales_unidad
   ('ca000000-0000-0000-0000-000000000012', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA12 daño', 'dano', 35, '2026-07-01', 'pendiente'),
   -- CA13 / CA14: anulación del cargo contra alta de cobro (concurrencia)
   ('ca000000-0000-0000-0000-000000000013', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA13', 'reparacion', 20, '2026-06-01', 'pendiente'),
-  ('ca000000-0000-0000-0000-000000000014', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA14', 'reparacion', 20, '2026-06-01', 'pendiente');
+  ('ca000000-0000-0000-0000-000000000014', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA14', 'reparacion', 20, '2026-06-01', 'pendiente'),
+  -- 20261004000200 (assert_coherencia.sql). De JULIO: junio ya está cerrado.
+  -- CA15: importe AUMENTADO tras devengar; luego restablecido; idempotencia.
+  ('ca000000-0000-0000-0000-000000000015', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA15 aumento', 'reparacion', 100, '2026-07-01', 'pendiente'),
+  -- CA16: importe DISMINUIDO tras devengar.
+  ('ca000000-0000-0000-0000-000000000016', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA16 disminución', 'reparacion', 100, '2026-07-01', 'pendiente'),
+  -- CA17: modificado DESPUÉS de anular todos sus cobros.
+  ('ca000000-0000-0000-0000-000000000017', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA17 tras anular', 'reparacion', 100, '2026-07-01', 'pendiente'),
+  -- CA18: ledger A2; la moneda del proyecto cambia con un cobro ya registrado.
+  ('ca000000-0000-0000-0000-000000000018', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a2a2a2a2-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a201', 'SINT-AUX CA18 moneda', 'reparacion', 60, '2026-07-01', 'pendiente'),
+  -- CA19 / CA20: la misma clave a la vez (concurrencia F y G).
+  ('ca000000-0000-0000-0000-000000000019', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA19', 'reparacion', 50, '2026-07-01', 'pendiente'),
+  ('ca000000-0000-0000-0000-000000000020', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA20', 'reparacion', 50, '2026-07-01', 'pendiente');
 
 UPDATE public.cargos_adicionales_unidad SET estado = 'anulado' WHERE id = 'ca000000-0000-0000-0000-000000000011';
 
@@ -150,6 +162,25 @@ RETURNS text LANGUAGE sql VOLATILE SET search_path = '' AS $$
     FROM public.conta_registrar_cobro_cargo(p_cargo, p_monto, p_metodo, p_fecha, 'SINT-AUX ref', NULL, p_clave) r
 $$;
 
+-- Alta con TODOS los campos (referencia y notas incluidas): «resultado/código/
+-- estado_cargo[/repetido]|pago_id».
+CREATE OR REPLACE FUNCTION public.cc_cobrar_completo(p_cargo uuid, p_monto numeric, p_metodo text, p_fecha date,
+                                                    p_ref text, p_notas text, p_clave uuid)
+RETURNS text LANGUAGE sql VOLATILE SET search_path = '' AS $$
+  SELECT r.resultado || '/' || COALESCE(r.codigo, '-') || '/' || r.estado_cargo
+         || CASE WHEN r.repetido THEN '/repetido' ELSE '' END || '|' || r.pago_id::text
+    FROM public.conta_registrar_cobro_cargo(p_cargo, p_monto, p_metodo, p_fecha, p_ref, p_notas, p_clave) r
+$$;
+-- Coherencia del cargo con su devengo, vista desde el resumen de Condominios:
+-- «código|cargo moneda|devengado moneda».
+CREATE OR REPLACE FUNCTION public.cc_coherencia(p_project uuid, p_cargo uuid) RETURNS text
+LANGUAGE sql STABLE SET search_path = '' AS $$
+  SELECT COALESCE(r.coherencia_codigo, '-') || '|' || r.cargo_monto || ' ' || r.moneda
+         || '|' || r.devengado || ' ' || COALESCE(r.devengo_moneda, '-')
+    FROM public.conta_cargos_cobro_resumen(p_project) r WHERE r.cargo_id = p_cargo
+$$;
+
 GRANT EXECUTE ON FUNCTION public.cc_saldo(uuid, uuid), public.cc_aplicado(uuid), public.cc_n_aplicaciones(uuid),
   public.cc_estado(uuid), public.cc_asientos(uuid, boolean), public.cc_lineas(uuid), public.cc_intento(uuid),
-  public.cc_cobrar(uuid, numeric, text, date, uuid) TO authenticated;
+  public.cc_cobrar(uuid, numeric, text, date, uuid),
+  public.cc_cobrar_completo(uuid, numeric, text, date, text, text, uuid), public.cc_coherencia(uuid, uuid) TO authenticated;

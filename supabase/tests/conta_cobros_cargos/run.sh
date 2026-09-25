@@ -125,6 +125,15 @@ SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d cobros_cargos -f "$AQUI/assert.sql" 2>&1)
 }
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 
+echo "── 5b/6 · coherencia cargo ↔ devengo e idempotencia del contenido (20261004000200)"
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d cobros_cargos -f "$AQUI/assert_coherencia.sql" 2>&1) || {
+  echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+  echo "❌ invariante incumplida:"
+  echo "$SALIDA" | grep -E 'ERROR|FATAL' | head -5
+  exit 1
+}
+echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+
 echo "── 6/6 · concurrencia: sesiones REALES simultáneas, no una simulación"
 ADM=a0a0a0a0-0000-0000-0000-00000000000a
 CA2=ca000000-0000-0000-0000-000000000002
@@ -133,6 +142,10 @@ CA12=ca000000-0000-0000-0000-000000000012
 CA13=ca000000-0000-0000-0000-000000000013
 CA14=ca000000-0000-0000-0000-000000000014
 PC12=cc000000-0000-0000-0000-000000000012
+CA19=ca000000-0000-0000-0000-000000000019
+CA20=ca000000-0000-0000-0000-000000000020
+KF=cd000000-0000-0000-0000-0000000000a1
+KG=cd000000-0000-0000-0000-0000000000a2
 
 # Preparación: CA10 y CA12 tienen un cobro esperando su devengo (tipo sin
 # configurar); se configura el tipo y quedan listos para reprocesar.
@@ -187,7 +200,16 @@ par d "SELECT 'D1:' || public.cc_cobrar('$CA13', 20, 'efectivo', '2026-06-05', '
 par e "UPDATE public.cargos_adicionales_unidad SET estado = 'anulado' WHERE id = '$CA14'; SELECT 'E1:anulado';" \
       "SELECT 'E2:' || public.cc_cobrar('$CA14', 20, 'efectivo', '2026-06-05', 'cc000000-0000-0000-0000-0000000000e2');"
 
-cat "$SALIDAS"/[a-e][12].txt | grep -E '^[A-E][12]:' | sort | sed 's/^/   /'
+# F · la MISMA clave en dos cargos distintos, a la vez (respuesta perdida y
+#     reintento contra otro documento): una se registra, la otra es clave reusada.
+par f "SELECT 'F1:' || public.cc_cobrar('$CA19', 30, 'efectivo', '2026-07-05', '$KF');" \
+      "SELECT 'F2:' || public.cc_cobrar('$CA20', 30, 'efectivo', '2026-07-05', '$KF');"
+# G · la MISMA clave y los MISMOS datos, a la vez (doble envío): un cobro, el
+#     otro lo devuelve como repetido.
+par g "SELECT 'G1:' || public.cc_cobrar('$CA19', 10, 'efectivo', '2026-07-06', '$KG');" \
+      "SELECT 'G2:' || public.cc_cobrar('$CA19', 10, 'efectivo', '2026-07-06', '$KG');"
+
+cat "$SALIDAS"/[a-g][12].txt | grep -E '^[A-G][12]:' | sort | sed 's/^/   /'
 
 # Las que DEBEN fallar, por lo que se espera; el resto, sin errores.
 grep -q 'CARGO_CON_COBROS' "$SALIDAS/d2.txt" \
@@ -196,7 +218,12 @@ echo "   D2: $(grep -o 'CARGO_CON_COBROS[^.]*' "$SALIDAS/d2.txt" | head -1)"
 grep -q 'COBRO_CARGO_ANULADO' "$SALIDAS/e2.txt" \
   || { echo "❌ E2 debía fallar por COBRO_CARGO_ANULADO:"; cat "$SALIDAS/e2.txt"; exit 1; }
 echo "   E2: $(grep -o 'COBRO_CARGO_ANULADO[^.]*' "$SALIDAS/e2.txt" | head -1)"
-for f in a1 a2 b1 b2 c1 c2 d1 e1; do
+grep -q 'COBRO_CARGO_CLAVE_REUSADA' "$SALIDAS/f2.txt" \
+  || { echo "❌ F2 debía fallar por COBRO_CARGO_CLAVE_REUSADA:"; cat "$SALIDAS/f2.txt"; exit 1; }
+echo "   F2: $(grep -o 'COBRO_CARGO_CLAVE_REUSADA[^.]*' "$SALIDAS/f2.txt" | head -1)"
+grep -q '^G2:contabilizada/-/pendiente/repetido$' "$SALIDAS/g2.txt" \
+  || { echo "❌ G2 debía devolver el mismo cobro como repetido:"; cat "$SALIDAS/g2.txt"; exit 1; }
+for f in a1 a2 b1 b2 c1 c2 d1 e1 f1 g1 g2; do
   if grep -qE 'ERROR|FATAL' "$SALIDAS/$f.txt"; then
     echo "❌ la sesión $f falló:"; cat "$SALIDAS/$f.txt"; exit 1
   fi

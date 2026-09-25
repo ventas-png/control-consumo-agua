@@ -47,3 +47,21 @@ SELECT public.chk_txt(public.cc_aplicado(:CA13)::text, '20.00', 'D · su cobro a
 SELECT public.chk_txt(public.cc_estado(:CA14), 'anulado', 'E · el cargo quedó anulado');
 SELECT public.chk((SELECT count(*) FROM public.pagos p WHERE p.cargo_adicional_id = :CA14), 0,
   'E · ningún cobro sobre el cargo anulado');
+
+-- F · la misma clave en dos cargos a la vez: un solo cobro, en el cargo que
+--     llegó primero; el otro cargo, intacto.
+SELECT public.chk(
+  (SELECT count(*) FROM public.pagos p WHERE p.id = 'cd000000-0000-0000-0000-0000000000a1'
+      AND p.cargo_adicional_id = 'ca000000-0000-0000-0000-000000000019'), 1,
+  'F · la clave quedó en CA19');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pagos p WHERE p.cargo_adicional_id = 'ca000000-0000-0000-0000-000000000020'), 0,
+  'F · CA20 sin cobros: el reintento contra otro cargo no creó nada');
+-- G · misma clave y datos a la vez: un cobro, un asiento, aplicado una vez.
+SELECT public.chk(
+  (SELECT count(*) FROM public.pagos p WHERE p.cargo_adicional_id = 'ca000000-0000-0000-0000-000000000019'), 2,
+  'G · CA19: dos cobros (F y G), no tres');
+SELECT public.chk(public.cc_asientos('ca000000-0000-0000-0000-000000000019', false), 2,
+  'G · dos asientos de cobro');
+SELECT public.chk_txt(public.cc_aplicado('ca000000-0000-0000-0000-000000000019')::text, '40.00',
+  'G · aplicado 30 + 10, sin duplicar el doble envío');

@@ -9,11 +9,18 @@
 //
 // Idempotencia: la clave del cobro (`p_pago_id`) la genera la pantalla al
 // abrir el formulario. Un doble clic o un reintento tras un corte de red
-// devuelve el MISMO cobro, no uno nuevo.
+// devuelve el MISMO cobro, no uno nuevo, si los datos son los mismos; con
+// datos distintos el servidor lo rechaza (COBRO_CARGO_CLAVE_REUSADA) y no
+// devuelve el anterior como éxito (20261004000200).
+//
+// Resultado INCIERTO: si la respuesta no llega (red, tiempo agotado) el cobro
+// pudo haberse registrado o no. La pantalla no afirma ninguna de las dos
+// cosas: conserva la clave y los datos enviados (también si se cierra el
+// formulario) para reintentar sin duplicar o reconocerlo en la lista.
 // ════════════════════════════════════════════════════════════════════════════
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { QueryError, runQuery } from '../queryFetch'
 import { contabilidadKeys } from './keys'
 
 /** Resumen de cobro de UN cargo, como lo devuelve `conta_cargos_cobro_resumen`. */
@@ -31,6 +38,18 @@ export interface CobroCargoResumen {
   cobros: number
   /** Figura «pagado» sin ningún cobro vinculado (dato anterior a los cobros por cargo). */
   pagado_sin_cobro: boolean
+  /** Importe vigente del cargo y su moneda (la del proyecto). */
+  cargo_monto?: number
+  moneda?: string
+  /** Moneda del devengo vigente (null si todavía no hay devengo). */
+  devengo_moneda?: string | null
+  /**
+   * `devengo_desalineado` si el importe o la moneda del cargo no concuerdan con
+   * su devengo vigente: no se registran cobros ni se marca pagado hasta que se
+   * corrija. `coherencia_motivo` dice cómo.
+   */
+  coherencia_codigo?: string | null
+  coherencia_motivo?: string | null
 }
 
 /** Un cobro de un cargo, con su aplicación, asiento, reverso y motivo si está pendiente. */
@@ -94,6 +113,7 @@ export function etiquetaPendienteCobro(codigo: string | null): string {
   switch (codigo) {
     case 'excede_saldo': return 'Excede el saldo'
     case 'cobro_anterior_pendiente': return 'Espera un cobro anterior'
+    case 'devengo_desalineado': return 'Importe distinto del devengo'
     case 'devengo_pendiente': return 'Cargo sin contabilizar'
     case 'sin_cuenta': return 'Falta la cuenta del método'
     case 'periodo_cerrado': return 'Período cerrado'
@@ -190,4 +210,72 @@ export function useAnularCobroCargoMutation(companyId?: string) {
     },
     onSettled: invalidar,
   })
+}
+
+// ── Fallos del alta: rechazo, clave reusada o resultado incierto ────────────
+
+export type FalloRegistroCobro =
+  /** La respuesta no llegó: el cobro pudo registrarse o no. */
+  | { tipo: 'incierto'; mensaje: string }
+  /** La clave ya identifica un cobro con otros datos: éste no se registró. */
+  | { tipo: 'clave_reusada'; mensaje: string }
+  /** El servidor respondió con un error: no se registró nada. */
+  | { tipo: 'rechazado'; mensaje: string }
+
+/** SQLSTATE (5 caracteres) o código de PostgREST: el servidor respondió. */
+const CODIGO_DE_SERVIDOR = /^([0-9A-Z]{5}|PGRST\d+)$/
+
+/**
+ * Sólo un error CON código del servidor prueba que la llamada se ejecutó y
+ * se revirtió (o ni empezó). Sin código —fetch fallido, tiempo agotado,
+ * pasarela caída, respuesta vacía— el resultado es incierto.
+ */
+export function clasificarFalloRegistro(e: unknown): FalloRegistroCobro {
+  const mensaje = e instanceof Error ? e.message : String(e)
+  const codigo = e instanceof QueryError ? e.cause?.code : undefined
+  if (!codigo || !CODIGO_DE_SERVIDOR.test(codigo)) return { tipo: 'incierto', mensaje }
+  if (mensaje.includes('COBRO_CARGO_CLAVE_REUSADA')) return { tipo: 'clave_reusada', mensaje }
+  return { tipo: 'rechazado', mensaje }
+}
+
+/** Lo que se envió en un alta cuyo resultado no se pudo confirmar. */
+export interface EnvioIncierto {
+  clave: string
+  datos: {
+    monto: string
+    metodo: MetodoCobroCargo
+    fecha: string
+    referencia: string
+    notas: string
+  }
+}
+
+const envioInciertoKey = (cargoId: string) => `cobro-cargo-incierto:${cargoId}`
+
+/** El envío incierto de un cargo, si quedó guardado en esta pestaña. */
+export function leerEnvioIncierto(cargoId: string): EnvioIncierto | null {
+  try {
+    const raw = sessionStorage.getItem(envioInciertoKey(cargoId))
+    if (!raw) return null
+    const v = JSON.parse(raw) as EnvioIncierto
+    return typeof v?.clave === 'string' && v.datos ? v : null
+  } catch {
+    return null
+  }
+}
+
+export function guardarEnvioIncierto(cargoId: string, envio: EnvioIncierto): void {
+  try {
+    sessionStorage.setItem(envioInciertoKey(cargoId), JSON.stringify(envio))
+  } catch {
+    /* sin almacenamiento: la clave sigue en el formulario mientras esté abierto */
+  }
+}
+
+export function olvidarEnvioIncierto(cargoId: string): void {
+  try {
+    sessionStorage.removeItem(envioInciertoKey(cargoId))
+  } catch {
+    /* nada que olvidar */
+  }
 }

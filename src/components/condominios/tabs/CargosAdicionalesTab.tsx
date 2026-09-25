@@ -227,6 +227,11 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                             </span>
                           )}
                           {rc?.pagado_sin_cobro && <span style={{ color: 'var(--at-warning)' }}> · Pagado sin cobro vinculado</span>}
+                          {porTipo && c.estado !== 'anulado' && rc?.coherencia_codigo && (
+                            <span role="note" title={rc.coherencia_motivo ?? undefined} style={{ color: 'var(--at-danger)' }}>
+                              {' · '}Importe distinto del devengo ({rc.devengo_moneda ?? moneda} {rc.devengado.toLocaleString()}): no admite cobros hasta corregirlo
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -237,7 +242,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                         {porTipo && !rc?.pagado_sin_cobro && c.estado !== 'anulado' && (canEdit || (rc?.cobros ?? 0) > 0) && (
                           <button onClick={() => setCobroDe(c)}
                             style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
-                            {canEdit && c.estado === 'pendiente' ? 'Registrar cobro' : 'Cobros'}
+                            {canEdit && c.estado === 'pendiente' && !rc?.coherencia_codigo ? 'Registrar cobro' : 'Cobros'}
                           </button>
                         )}
                         {canEdit && c.estado === 'pendiente' && (

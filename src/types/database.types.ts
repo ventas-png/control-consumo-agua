@@ -23143,6 +23143,11 @@ export type Database = {
           devengado: number
           devengo_estado: string | null
           en_proceso: number
+          cargo_monto: number
+          coherencia_codigo: string | null
+          coherencia_motivo: string | null
+          devengo_moneda: string | null
+          moneda: string
           pagado_sin_cobro: boolean
           por_tipo: boolean
           saldo: number

@@ -6,7 +6,13 @@
 //   · un cargo del camino histórico conserva «✓ Pagado»;
 //   · un cargo «pagado» sin cobro vinculado no ofrece cobros (no se inventan);
 //   · la clave de idempotencia es la MISMA en el reintento de un envío fallido
-//     y cambia sólo tras un alta confirmada;
+//     y cambia sólo tras un alta confirmada o por decisión explícita;
+//   · una respuesta perdida NO se informa como «no se registró»: el resultado
+//     es incierto, la clave y los datos se conservan (también al cerrar y
+//     reabrir) y, si el cobro aparece en la lista, se reconoce como registrado;
+//   · reintentar con la misma clave y OTROS datos (fecha, referencia) muestra
+//     el rechazo del servidor, nunca un éxito;
+//   · un cargo que no concuerda con su devengo no ofrece cobros y dice por qué;
 //   · un excedente se advierte antes de enviar y, si el servidor lo deja
 //     pendiente, se informa su motivo;
 //   · anular un cobro pide motivo y lo manda al servidor.
@@ -84,6 +90,7 @@ beforeEach(() => {
   h.prompt.mockReset()
   h.update.mockReset()
   h.update.mockResolvedValue({ error: null })
+  sessionStorage.clear()
   vi.stubGlobal('crypto', { ...globalThis.crypto, randomUUID: vi.fn()
     .mockReturnValueOnce('clave-1').mockReturnValueOnce('clave-2').mockReturnValue('clave-n') })
 })
@@ -132,7 +139,12 @@ describe('CargosAdicionalesTab · cobros', () => {
     const enviar = within(dialogo).getByRole('button', { name: 'Registrar cobro' })
 
     await act(async () => { fireEvent.click(enviar) })
-    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
+    // Sin respuesta: incierto, no «no se registró».
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'warning', title: 'No se pudo confirmar el cobro',
+    })))
+    expect(h.notify).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'No se registró el cobro' }))
+    expect(within(dialogo).getByText(/Cobro sin confirmar/)).toBeTruthy()
     await act(async () => { fireEvent.click(enviar) })
     await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success', title: 'Cobro registrado' })))
 
@@ -141,6 +153,8 @@ describe('CargosAdicionalesTab · cobros', () => {
     expect(regs.map((l) => l.args.p_pago_id)).toEqual(['clave-1', 'clave-1'])
     expect(regs[1].args).toMatchObject({ p_cargo_id: 'ca1', p_monto: 30, p_metodo: 'efectivo' })
     expect(onRefresh).toHaveBeenCalled()
+    expect(within(dialogo).queryByText(/Cobro sin confirmar/)).toBeNull()
+    expect(sessionStorage.length).toBe(0)
 
     // Un alta NUEVA usa otra clave.
     await act(async () => { fireEvent.click(enviar) })
@@ -210,5 +224,186 @@ describe('CargosAdicionalesTab · cobros', () => {
     await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
       variant: 'error', title: 'No se anuló el cargo',
     })))
+  })
+
+  it('respuesta perdida y reintento con OTRA FECHA: el servidor la rechaza y no se informa éxito', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1')], error: null })
+    let intento = 0
+    h.respuestas.conta_registrar_cobro_cargo = () => {
+      intento += 1
+      if (intento === 1) return { data: null, error: { message: 'TypeError: Failed to fetch', code: '' } }
+      if (intento === 2) {
+        return { data: null, error: { code: '23505', message: 'COBRO_CARGO_CLAVE_REUSADA: esa clave ya identifica un cobro de este cargo registrado con otros datos (difiere: fecha). No se registró otro cobro ni se modificó el anterior.' } }
+      }
+      return {
+        data: [{ pago_id: 'clave-2', repetido: false, resultado: 'contabilizada', codigo: null, motivo: null,
+          asiento_id: 'a2', asiento_numero: 13, estado_cargo: 'pendiente' }], error: null,
+      }
+    }
+    montar([cargo('ca1', 'Vidrio')])
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar cobro' }))
+    const dialogo = await screen.findByRole('dialog')
+    fireEvent.change(within(dialogo).getByLabelText('Importe (GTQ)'), { target: { value: '30' } })
+    fireEvent.change(within(dialogo).getByLabelText('Fecha'), { target: { value: '2026-07-08' } })
+    const enviar = within(dialogo).getByRole('button', { name: 'Registrar cobro' })
+    await act(async () => { fireEvent.click(enviar) })
+    await within(dialogo).findByText(/Cobro sin confirmar/)
+
+    // Se cambia la fecha y se reintenta: misma clave, el servidor rechaza.
+    fireEvent.change(within(dialogo).getByLabelText('Fecha'), { target: { value: '2026-07-09' } })
+    await act(async () => { fireEvent.click(enviar) })
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', title: 'No se registró este cobro', text: expect.stringContaining('difiere: fecha'),
+    })))
+    expect(h.notify).not.toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }))
+    const regs = llamadasA('conta_registrar_cobro_cargo')
+    expect(regs.map((l) => [l.args.p_pago_id, l.args.p_fecha])).toEqual([['clave-1', '2026-07-08'], ['clave-1', '2026-07-09']])
+    expect(within(dialogo).getByText(/El envío anterior ya quedó registrado con otros datos/)).toBeTruthy()
+    // Sin una decisión explícita no se reenvía con otra clave.
+    expect((within(dialogo).getByRole('button', { name: 'Registrar cobro' }) as HTMLButtonElement).disabled).toBe(true)
+
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar como cobro nuevo' })) })
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    await waitFor(() => expect(llamadasA('conta_registrar_cobro_cargo')).toHaveLength(3))
+    expect(llamadasA('conta_registrar_cobro_cargo')[2].args.p_pago_id).toBe('clave-2')
+  })
+
+  it('respuesta perdida, cerrar y reabrir: se conserva la clave; reintentar el envío anterior no duplica', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1')], error: null })
+    let intento = 0
+    h.respuestas.conta_registrar_cobro_cargo = () => {
+      intento += 1
+      if (intento === 1) return { data: null, error: { message: 'AbortError: signal timed out', code: '' } }
+      return {
+        data: [{ pago_id: 'clave-1', repetido: true, resultado: 'contabilizada', codigo: null, motivo: null,
+          asiento_id: 'a1', asiento_numero: 12, estado_cargo: 'pendiente' }], error: null,
+      }
+    }
+    montar([cargo('ca1', 'Vidrio')])
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar cobro' }))
+    let dialogo = await screen.findByRole('dialog')
+    fireEvent.change(within(dialogo).getByLabelText('Importe (GTQ)'), { target: { value: '25' } })
+    fireEvent.change(within(dialogo).getByLabelText('Referencia'), { target: { value: 'REC-9' } })
+    fireEvent.change(within(dialogo).getByLabelText('Notas'), { target: { value: 'caja' } })
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    await within(dialogo).findByText(/Cobro sin confirmar/)
+
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar cobro' }))
+    dialogo = await screen.findByRole('dialog')
+    expect(within(dialogo).getByText(/Cobro sin confirmar/)).toBeTruthy()
+    expect((within(dialogo).getByLabelText('Referencia') as HTMLInputElement).value).toBe('REC-9')
+
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Reintentar el envío anterior' })) })
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'success', title: 'Cobro ya registrado',
+    })))
+    const regs = llamadasA('conta_registrar_cobro_cargo')
+    expect(regs).toHaveLength(2)
+    expect(regs[1].args).toEqual(regs[0].args)
+    expect(regs[1].args).toMatchObject({ p_pago_id: 'clave-1', p_monto: 25, p_referencia: 'REC-9', p_notas: 'caja' })
+    expect(sessionStorage.length).toBe(0)
+  })
+
+  it('respuesta perdida y reintento con OTRA REFERENCIA: rechazado sin éxito', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1')], error: null })
+    let intento = 0
+    h.respuestas.conta_registrar_cobro_cargo = () => {
+      intento += 1
+      if (intento === 1) return { data: null, error: { message: 'Failed to fetch' } }
+      return { data: null, error: { code: '23505', message: 'COBRO_CARGO_CLAVE_REUSADA: esa clave ya identifica un cobro de este cargo registrado con otros datos (difiere: referencia).' } }
+    }
+    montar([cargo('ca1', 'Vidrio')])
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar cobro' }))
+    const dialogo = await screen.findByRole('dialog')
+    fireEvent.change(within(dialogo).getByLabelText('Referencia'), { target: { value: 'A-1' } })
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    await within(dialogo).findByText(/Cobro sin confirmar/)
+    fireEvent.change(within(dialogo).getByLabelText('Referencia'), { target: { value: 'A-2' } })
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', title: 'No se registró este cobro', text: expect.stringContaining('difiere: referencia'),
+    })))
+    expect(h.notify).not.toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }))
+    expect(llamadasA('conta_registrar_cobro_cargo').map((l) => [l.args.p_pago_id, l.args.p_referencia]))
+      .toEqual([['clave-1', 'A-1'], ['clave-1', 'A-2']])
+  })
+
+  it('respuesta perdida pero el cobro SÍ se registró: aparece en la lista y se reconoce', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1')], error: null })
+    h.respuestas.conta_registrar_cobro_cargo = () => ({ data: null, error: { message: 'Failed to fetch' } })
+    let registrado = false
+    h.respuestas.conta_cargo_cobros = () => ({
+      data: registrado ? [{
+        pago_id: 'clave-1', fecha: '2026-07-08', monto: 30, metodo: 'efectivo', referencia: null, estado: 'verificado',
+        anulacion_motivo: null, aplicado: 30, asiento_id: 'a1', asiento_numero: 12, asiento_estado: 'publicado',
+        reverso_id: null, reverso_numero: null, reverso_fecha: null, codigo: null, motivo: null,
+      }] : [], error: null,
+    })
+    const onRefresh = montar([cargo('ca1', 'Vidrio')])
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar cobro' }))
+    const dialogo = await screen.findByRole('dialog')
+    fireEvent.change(within(dialogo).getByLabelText('Importe (GTQ)'), { target: { value: '30' } })
+    registrado = true // el servidor sí lo guardó; sólo se perdió la respuesta
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'info', title: 'El cobro anterior sí se registró',
+    })))
+    expect(within(dialogo).queryByText(/Cobro sin confirmar/)).toBeNull()
+    expect(sessionStorage.length).toBe(0)
+    expect(onRefresh).toHaveBeenCalled()
+    // Un cobro siguiente es otro: clave nueva.
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    await waitFor(() => expect(llamadasA('conta_registrar_cobro_cargo')).toHaveLength(2))
+    expect(llamadasA('conta_registrar_cobro_cargo')[1].args.p_pago_id).toBe('clave-2')
+  })
+
+  it('un rechazo con código del servidor sí es definitivo: «No se registró el cobro»', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1')], error: null })
+    h.respuestas.conta_registrar_cobro_cargo = () => ({
+      data: null, error: { code: '22023', message: 'COBRO_CARGO_FECHA: la fecha del cobro es obligatoria y no puede ser futura.' },
+    })
+    montar([cargo('ca1', 'Vidrio')])
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar cobro' }))
+    const dialogo = await screen.findByRole('dialog')
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', title: 'No se registró el cobro',
+    })))
+    expect(within(dialogo).queryByText(/Cobro sin confirmar/)).toBeNull()
+    expect(sessionStorage.length).toBe(0)
+  })
+
+  it('cargo modificado después de devengar: señala el motivo y no ofrece registrar cobros', async () => {
+    const motivo = 'El importe del cargo (150.00 GTQ) no coincide con su devengo vigente (100.00 GTQ): el cargo se modificó después de contabilizarse y el devengo no se recalcula solo. No se aplican cobros ni se marca pagado. Restablece el importe del cargo a 100.00 GTQ, o anula el cargo y emite uno nuevo por el importe correcto.'
+    h.respuestas.conta_cargos_cobro_resumen = () => ({
+      data: [resumen('ca1', { cargo_monto: 150, moneda: 'GTQ', devengo_moneda: 'GTQ',
+        coherencia_codigo: 'devengo_desalineado', coherencia_motivo: motivo })], error: null,
+    })
+    montar([cargo('ca1', 'Vidrio', 'pendiente', 150)])
+    expect(await screen.findByText(/Importe distinto del devengo \(GTQ 100\): no admite cobros hasta corregirlo/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Registrar cobro' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Cobros' }))
+    const dialogo = await screen.findByRole('dialog')
+    expect(within(dialogo).getByRole('alert').textContent).toContain('Restablece el importe del cargo a 100.00 GTQ')
+    expect(within(dialogo).queryByLabelText('Importe (GTQ)')).toBeNull()
+    expect(llamadasA('conta_registrar_cobro_cargo')).toHaveLength(0)
+  })
+})
+
+describe('clasificarFalloRegistro', () => {
+  it('sin código del servidor es incierto; con código, rechazo o clave reusada', async () => {
+    const { clasificarFalloRegistro } = await import('../../../../domain/contabilidad/cobrosCargo')
+    const { QueryError } = await import('../../../../domain/queryFetch')
+    const qe = (message: string, code?: string) =>
+      new QueryError(message, { message, code, details: '', hint: '' } as never)
+    expect(clasificarFalloRegistro(qe('TypeError: Failed to fetch', '')).tipo).toBe('incierto')
+    expect(clasificarFalloRegistro(qe('AbortError: signal timed out')).tipo).toBe('incierto')
+    expect(clasificarFalloRegistro(qe('<html>502 Bad Gateway</html>', '502')).tipo).toBe('incierto')
+    expect(clasificarFalloRegistro(new Error('El servidor no devolvió el resultado del cobro.')).tipo).toBe('incierto')
+    expect(clasificarFalloRegistro(qe('COBRO_CARGO_CLAVE_REUSADA: …', '23505')).tipo).toBe('clave_reusada')
+    expect(clasificarFalloRegistro(qe('COBRO_CARGO_DESALINEADO: …', '23514')).tipo).toBe('rechazado')
+    expect(clasificarFalloRegistro(qe('JWT expired', 'PGRST301')).tipo).toBe('rechazado')
   })
 })

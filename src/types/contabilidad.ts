@@ -486,6 +486,7 @@ export type CodigoCargoPendiente =
   | 'devengo_pendiente'
   | 'excede_saldo'
   | 'cobro_anterior_pendiente'
+  | 'devengo_desalineado'
   | 'sin_cuenta'
   | 'documento_anulado'
   | 'documento_inexistente'
@@ -515,6 +516,7 @@ export const CODIGO_CARGO_LABELS: Record<CodigoCargoPendiente, string> = {
   devengo_pendiente: 'Documento sin contabilizar',
   excede_saldo: 'Excede el saldo del documento',
   cobro_anterior_pendiente: 'Espera un cobro anterior',
+  devengo_desalineado: 'Importe distinto del devengo',
   sin_cuenta: 'Falta la cuenta del método de pago',
   documento_anulado: 'Documento anulado',
   documento_inexistente: 'Documento no encontrado',

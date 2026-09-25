@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { ModalPortal } from '../../shared/ModalPortal'
 import { notify } from '../../shared/Dialog'
 import { openTextPrompt } from '../../shared/PromptDialog'
@@ -6,11 +6,16 @@ import { hoyLocalISO } from '../../../lib/format'
 import type { CargoAdicionalUnidad } from '../../../types'
 import {
   METODOS_COBRO_CARGO,
+  clasificarFalloRegistro,
   etiquetaPendienteCobro,
+  guardarEnvioIncierto,
+  leerEnvioIncierto,
+  olvidarEnvioIncierto,
   useAnularCobroCargoMutation,
   useCobrosDeCargoQuery,
   useRegistrarCobroCargoMutation,
   type CobroCargoResumen,
+  type EnvioIncierto,
   type MetodoCobroCargo,
 } from '../../../domain/contabilidad/cobrosCargo'
 
@@ -27,12 +32,20 @@ interface Props {
 
 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+type DatosCobro = EnvioIncierto['datos']
+
 /**
  * Cobros de UN cargo adicional por tipo: registrar uno (parcial o total) y
  * anular los existentes. Todo lo decide el servidor —saldo, excedente,
- * devengo pendiente, responsable histórico—; aquí sólo se muestra su
- * respuesta. La clave de idempotencia se fija al abrir el formulario y se
- * renueva sólo tras un alta confirmada: reintentar el mismo envío no duplica.
+ * devengo pendiente, responsable histórico, coherencia con el devengo—; aquí
+ * sólo se muestra su respuesta.
+ *
+ * La clave de idempotencia se fija al abrir el formulario y se renueva sólo
+ * tras un alta CONFIRMADA o por decisión explícita («Registrar como cobro
+ * nuevo»). Si la respuesta no llega, el resultado es INCIERTO: no se afirma
+ * que el cobro no se registró; la clave y los datos enviados se guardan (aun
+ * cerrando el formulario) para reintentar sin duplicar, y si el cobro aparece
+ * en la lista se reconoce como registrado.
  */
 export default function CobroCargoModal({ cargo, resumen, companyId, moneda, canEdit, onClose, onCambio }: Props) {
   const cobros = useCobrosDeCargoQuery(companyId, cargo.id)
@@ -40,26 +53,56 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
   const anular = useAnularCobroCargoMutation(companyId)
 
   const saldo = resumen?.saldo ?? cargo.monto
-  const [clave, setClave] = useState(() => crypto.randomUUID())
-  const [form, setForm] = useState({
+  // Un envío anterior sin confirmar (de esta pestaña) manda: misma clave,
+  // mismos datos.
+  const [incierto, setIncierto] = useState<EnvioIncierto | null>(() => leerEnvioIncierto(cargo.id))
+  const [clave, setClave] = useState(() => incierto?.clave ?? crypto.randomUUID())
+  const [form, setForm] = useState<DatosCobro>(() => incierto?.datos ?? {
     monto: saldo > 0 ? String(saldo) : '',
-    metodo: 'efectivo' as MetodoCobroCargo,
+    metodo: 'efectivo',
     fecha: hoyLocalISO(),
     referencia: '',
+    notas: '',
   })
+  /** La clave ya corresponde a un cobro con otros datos: hace falta una decisión. */
+  const [claveReusada, setClaveReusada] = useState(false)
 
-  const puedeCobrar = canEdit && cargo.estado !== 'anulado' && !!resumen?.por_tipo && !resumen.pagado_sin_cobro
+  const desalineado = !!resumen?.coherencia_codigo
+  const puedeCobrar = canEdit && cargo.estado !== 'anulado' && !!resumen?.por_tipo && !resumen.pagado_sin_cobro && !desalineado
 
-  async function enviar() {
-    const monto = Number(form.monto)
+  function nuevaClave() {
+    olvidarEnvioIncierto(cargo.id)
+    setIncierto(null)
+    setClaveReusada(false)
+    setClave(crypto.randomUUID())
+  }
+
+  // Recuperar el resultado: si el cobro del envío incierto aparece entre los
+  // del cargo, SÍ se registró.
+  const registradoConClave = incierto ? (cobros.data ?? []).find((c) => c.pago_id === incierto.clave) : undefined
+  useEffect(() => {
+    if (!registradoConClave) return
+    notify({
+      variant: 'info',
+      title: 'El cobro anterior sí se registró',
+      text: `Aparece entre los cobros del cargo (${registradoConClave.fecha}, ${fmt(registradoConClave.monto)}). No hace falta reenviarlo.`,
+    })
+    nuevaClave()
+    setForm((f) => ({ ...f, referencia: '', notas: '' }))
+    onCambio()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al aparecer el cobro
+  }, [registradoConClave?.pago_id])
+
+  async function enviar(datos: DatosCobro = form) {
+    const monto = Number(datos.monto)
     if (!Number.isFinite(monto) || monto <= 0) {
       notify({ variant: 'warning', title: 'Importe inválido', text: 'Indica un importe mayor que cero.' })
       return
     }
     try {
       const r = await registrar.mutateAsync({
-        cargoId: cargo.id, monto, metodo: form.metodo, fecha: form.fecha,
-        referencia: form.referencia.trim() || null, clave,
+        cargoId: cargo.id, monto, metodo: datos.metodo, fecha: datos.fecha,
+        referencia: datos.referencia.trim() || null, notas: datos.notas.trim() || null, clave,
       })
       if (r.resultado === 'contabilizada') {
         notify({
@@ -70,15 +113,37 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
       } else {
         notify({
           variant: 'warning',
-          title: `Cobro registrado, pendiente de contabilizar (${etiquetaPendienteCobro(r.codigo)})`,
+          title: `${r.repetido ? 'Cobro ya registrado' : 'Cobro registrado'}, pendiente de contabilizar (${etiquetaPendienteCobro(r.codigo)})`,
           text: r.motivo ?? 'Quedó en la bandeja de pendientes de Contabilidad.',
         })
       }
-      setClave(crypto.randomUUID())
-      setForm((f) => ({ ...f, referencia: '' }))
+      nuevaClave()
+      setForm((f) => ({ ...f, referencia: '', notas: '' }))
       onCambio()
     } catch (e) {
-      notify({ variant: 'error', title: 'No se registró el cobro', text: e instanceof Error ? e.message : String(e) })
+      const fallo = clasificarFalloRegistro(e)
+      if (fallo.tipo === 'incierto') {
+        const envio = { clave, datos }
+        guardarEnvioIncierto(cargo.id, envio)
+        setIncierto(envio)
+        notify({
+          variant: 'warning',
+          title: 'No se pudo confirmar el cobro',
+          text: 'La respuesta del servidor no llegó: el cobro pudo haberse registrado o no. '
+            + 'Reintenta con los mismos datos (se usa la misma clave y no se duplica) o revisa los cobros del cargo.',
+        })
+        void cobros.refetch()
+      } else if (fallo.tipo === 'clave_reusada') {
+        setClaveReusada(true)
+        notify({
+          variant: 'error',
+          title: 'No se registró este cobro',
+          text: `${fallo.mensaje.replace(/^COBRO_CARGO_CLAVE_REUSADA:\s*/, '')}`,
+        })
+        void cobros.refetch()
+      } else {
+        notify({ variant: 'error', title: 'No se registró el cobro', text: fallo.mensaje })
+      }
     }
   }
 
@@ -135,6 +200,11 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
             ))}
           </dl>
 
+          {desalineado && (
+            <p role="alert" style={{ fontSize: 12, color: 'var(--at-danger)', margin: '0 0 12px' }}>
+              <strong>{etiquetaPendienteCobro(resumen?.coherencia_codigo ?? null)}.</strong> {resumen?.coherencia_motivo}
+            </p>
+          )}
           {resumen?.pagado_sin_cobro && (
             <p role="note" style={{ fontSize: 12, color: 'var(--at-warning)', margin: '0 0 12px' }}>
               Este cargo figura como pagado desde antes de los cobros por cargo, sin cobro vinculado. No se registran cobros sobre él.
@@ -149,6 +219,36 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
             <p role="note" style={{ fontSize: 12, color: 'var(--at-warning)', margin: '0 0 12px' }}>
               El cargo todavía no está contabilizado: un cobro quedará pendiente hasta que se resuelva y se reprocese el cargo.
             </p>
+          )}
+
+          {incierto && (
+            <div role="status" style={{ border: '1px solid var(--at-warning)', borderRadius: 10, padding: 10, marginBottom: 12, fontSize: 12 }}>
+              <strong>Cobro sin confirmar.</strong> Se envió {moneda} {fmt(Number(incierto.datos.monto))} del {incierto.datos.fecha}
+              {incierto.datos.referencia.trim() ? ` (ref. ${incierto.datos.referencia.trim()})` : ''} y la respuesta no llegó:
+              pudo haberse registrado o no. Reintentarlo con los mismos datos no lo duplica.
+              {canEdit && (
+                <div style={{ marginTop: 6 }}>
+                  <button onClick={() => { setForm(incierto.datos); void enviar(incierto.datos) }} disabled={registrar.isPending}
+                    style={{ padding: '4px 10px', background: 'var(--at-chip)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                    Reintentar el envío anterior
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {claveReusada && (
+            <div role="alert" style={{ border: '1px solid var(--at-danger)', borderRadius: 10, padding: 10, marginBottom: 12, fontSize: 12 }}>
+              El envío anterior ya quedó registrado con otros datos; este intento no se registró y el anterior no cambió.
+              Revisa la lista de cobros: si falta otro cobro, regístralo como un cobro nuevo.
+              {canEdit && (
+                <div style={{ marginTop: 6 }}>
+                  <button onClick={nuevaClave}
+                    style={{ padding: '4px 10px', background: 'var(--at-chip)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                    Registrar como cobro nuevo
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           {puedeCobrar && (
@@ -178,12 +278,17 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
                     onChange={(e) => setForm((f) => ({ ...f, referencia: e.target.value }))} />
                 </div>
               </div>
+              <div style={{ marginTop: 8 }}>
+                <label style={lbl} htmlFor="cc-notas">Notas</label>
+                <input id="cc-notas" style={inp} value={form.notas}
+                  onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} />
+              </div>
               {Number(form.monto) > saldo && (
                 <p role="note" style={{ fontSize: 12, color: 'var(--at-warning)', margin: '8px 0 0' }}>
                   El importe supera el saldo: el cobro quedará pendiente con su motivo. El excedente no se reparte a otros cargos ni se vuelve anticipo.
                 </p>
               )}
-              <button onClick={enviar} disabled={registrar.isPending}
+              <button onClick={() => void enviar()} disabled={registrar.isPending || claveReusada}
                 style={{ marginTop: 10, padding: '7px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {registrar.isPending ? 'Registrando…' : 'Registrar cobro'}
               </button>
