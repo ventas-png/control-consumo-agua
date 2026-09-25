@@ -99,8 +99,26 @@ SELECT public.chk_falla($$INSERT INTO public.pagos (cliente_id, project_id, carg
   'COBRO_CARGO_SOLO_RPC', '1 · un INSERT directo de cobro de cargo se rechaza');
 SELECT public.chk_falla($$INSERT INTO public.pagos (cliente_id, project_id, cargo_adicional_id, cuota_id, monto, metodo, estado)
   VALUES ('e0000000-0000-0000-0000-00000000a001', 'a1a1a1a1-0000-0000-0000-000000000001',
-          'ca000000-0000-0000-0000-000000000001', (SELECT id FROM public.cuotas_condominio LIMIT 1), 10, 'efectivo', 'pendiente')$$,
-  'pagos_cargo_adicional_exclusivo|COBRO_CARGO_SOLO_RPC', '1 · un pago no es de un cargo y de otro documento a la vez');
+          'ca000000-0000-0000-0000-000000000001', 'c9000000-0000-0000-0000-000000000001', 10, 'efectivo', 'pendiente')$$,
+  'COBRO_CARGO_SOLO_RPC', '1 · un pago no es de un cargo y de otro documento a la vez (ni siquiera se admite el alta)');
+-- Aun con la marca de la RPC (la que deja conta_registrar_cobro_cargo), la
+-- validación de conta_tg_pagos hace lo que hacían la FK y el CHECK
+-- (20261004000100): exclusividad y cargo existente del mismo proyecto.
+SELECT public.chk_falla($$SELECT set_config('conta.cobro_cargo_pago', 'cb000000-0000-0000-0000-0000000000e1', true);
+  INSERT INTO public.pagos (id, cliente_id, project_id, cargo_adicional_id, cuota_id, monto, metodo, estado)
+  VALUES ('cb000000-0000-0000-0000-0000000000e1', 'e0000000-0000-0000-0000-00000000a001', 'a1a1a1a1-0000-0000-0000-000000000001',
+          'ca000000-0000-0000-0000-000000000001', 'c9000000-0000-0000-0000-000000000001', 10, 'efectivo', 'pendiente')$$,
+  'COBRO_CARGO_EXCLUSIVO', '1 · con la marca: un cobro de cargo no es también de una cuota');
+SELECT public.chk_falla($$SELECT set_config('conta.cobro_cargo_pago', 'cb000000-0000-0000-0000-0000000000e2', true);
+  INSERT INTO public.pagos (id, cliente_id, project_id, cargo_adicional_id, monto, metodo, estado)
+  VALUES ('cb000000-0000-0000-0000-0000000000e2', 'e0000000-0000-0000-0000-00000000a001', 'a1a1a1a1-0000-0000-0000-000000000001',
+          'ca000000-0000-0000-0000-0000000000ff', 10, 'efectivo', 'pendiente')$$,
+  'COBRO_CARGO_AJENO', '1 · con la marca: un cargo inexistente se rechaza (lo que daba la FK)');
+SELECT public.chk_falla($$SELECT set_config('conta.cobro_cargo_pago', 'cb000000-0000-0000-0000-0000000000e3', true);
+  INSERT INTO public.pagos (id, cliente_id, project_id, cargo_adicional_id, monto, metodo, estado)
+  VALUES ('cb000000-0000-0000-0000-0000000000e3', 'e0000000-0000-0000-0000-00000000a002', 'a1a1a1a1-0000-0000-0000-000000000001',
+          'ca000000-0000-0000-0000-000000000001', 10, 'efectivo', 'pendiente')$$,
+  'COBRO_CARGO_AJENO', '1 · con la marca: otro cliente que no es el responsable histórico se rechaza');
 SET ROLE authenticated;
 
 -- ── 2 · cobro parcial ───────────────────────────────────────────────────────
@@ -208,6 +226,8 @@ SELECT public.chk_falla($$UPDATE public.pagos SET monto = 49 WHERE id = 'cb00000
   'COBRO_CARGO_INMUTABLE', '6 · su importe no cambia');
 SELECT public.chk_falla($$UPDATE public.pagos SET cargo_adicional_id = 'ca000000-0000-0000-0000-000000000009' WHERE id = 'cb000000-0000-0000-0000-000000000002'$$,
   'COBRO_CARGO_VINCULO_INMUTABLE', '6 · ni cambia de cargo');
+SELECT public.chk_falla($$DELETE FROM public.cargos_adicionales_unidad WHERE id = 'ca000000-0000-0000-0000-000000000001'$$,
+  'CARGO_CON_COBROS', '6 · un cargo con cobros no se borra (ni sin RLS)');
 SET ROLE authenticated;
 SELECT public.chk_falla($$DELETE FROM public.conta_cobro_aplicaciones WHERE cargo_adicional_id IS NOT NULL$$,
   'permission denied', '6 · authenticated no puede borrar aplicaciones');

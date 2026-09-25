@@ -80,6 +80,12 @@ INSERT INTO public.cargos_adicionales_unidad
   ('ca000000-0000-0000-0000-000000000006', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA6 histórico', 'reparacion', 45, '2026-01-10', 'pendiente');
 ALTER TABLE public.cargos_adicionales_unidad ENABLE TRIGGER trg_conta_cargos_adicionales;
 
+-- Una cuota cualquiera del ledger A1: sólo para probar que un cobro de cargo no
+-- puede ser también de una cuota (exclusividad, 20261004000100).
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado) VALUES
+  ('c9000000-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001',
+   'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX cuota para exclusividad', 10, '2026-06', 'pendiente');
+
 -- ── Ayudas de lectura (SECURITY DEFINER: se leen desde cualquier rol) ────────
 -- Saldo (debe − haber) de UN cargo en una cuenta: su devengo y sus cobros,
 -- sobre asientos publicados (reversos incluidos).

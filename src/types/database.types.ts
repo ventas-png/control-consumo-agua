@@ -12883,13 +12883,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "pagos_cargo_adicional_id_fkey"
-            columns: ["cargo_adicional_id"]
-            isOneToOne: false
-            referencedRelation: "cargos_adicionales_unidad"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "pagos_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
