@@ -33,23 +33,33 @@
 --        rechazo nunca se reutilice de forma ambigua.
 --
 -- 2. CORTES HISTÓRICOS (conta_ec_fuera_de_saldo, conta_ec_limitaciones).
---    Para un cobro rechazado sin reverso con rechazo FECHADO:
---      · corte anterior al rechazo: si el cobro estaba vigente (se rechazó
---        desde `verificado`/`aplicado`), figura como estaba —pendiente, sin
---        asiento— con la nota de que se rechazó después del corte; si estaba
---        pendiente de verificación, no figura, igual que cualquier cobro sin
---        verificar;
---      · corte del día del rechazo o posterior: ya estaba rechazado, no figura;
---      · no es limitación: su estado a cualquier corte se conoce.
---    La fecha del rechazo se compara como el resto de fechas de registro del
---    estado de cuenta (`anul_creado::date`, `created_at::date`): la fecha de
---    la marca de tiempo en la zona horaria de la sesión de base de datos.
---    Un cobro sin asiento no se convierte en movimiento ni mueve el saldo:
---    sólo cambia su clasificación informativa. Los cobros CON asiento y
---    reverso conservan su tratamiento (la fecha sale del reverso, como antes).
+--    Un cobro SIN asiento con eventos en la bitácora tiene su historia
+--    completa desde el primero: intervalos separados por cada rechazo y cada
+--    reactivación. Su estado a un corte sale del intervalo que lo contiene,
+--    no del último rechazo ni del estado de hoy:
+--      · antes del primer evento: el `estado_anterior` de ese evento, vigente
+--        desde su `verified_at_anterior` —la verificación que había antes de
+--        que el rechazo reescribiera `verified_at`—;
+--      · tras un rechazo (y hasta la siguiente reactivación): rechazado, no
+--        figura;
+--      · tras una reactivación: el estado al que pasó, vigente desde la
+--        reactivación (nunca desde una verificación anterior);
+--      · si figura y el intervalo termina en un rechazo posterior al corte,
+--        lleva la nota «se rechazó después del corte, el <fecha>».
+--    Un cobro sin verificar en ese intervalo no figura, igual que cualquier
+--    cobro sin verificar. La fecha de cada evento se compara como el resto de
+--    fechas de registro del estado de cuenta (`anul_creado::date`,
+--    `created_at::date`): la fecha de la marca de tiempo en la zona horaria
+--    de la sesión de base de datos. Un cobro sin asiento no se convierte en
+--    movimiento ni mueve el saldo: sólo cambia su clasificación informativa.
+--    Los cobros CON asiento conservan su tratamiento (la fecha sale del
+--    reverso, como antes), y los que nunca tuvieron eventos también.
 --    Los rechazos anteriores a esta migración no tienen evidencia: NO se
 --    rellenan con `created_at`, `updated_at`, `verified_at` ni la fecha de la
---    migración; siguen declarados en `rechazo_sin_fecha`.
+--    migración. Siguen declarados en `rechazo_sin_fecha` a todo corte en que
+--    su estado dependa de ese rechazo: si el cobro sigue rechazado sin
+--    eventos, o si su primer evento es una reactivación posterior al corte
+--    (un rechazo o reactivación registrados después no fechan el anterior).
 --
 -- CÓMO SE REVIERTE (en este orden): restaurar conta_ec_limitaciones y
 -- conta_ec_fuera_de_saldo desde 20261004000000 y conta_tg_pagos desde
@@ -71,7 +81,14 @@ CREATE TABLE public.pagos_rechazo_eventos (
   estado_nuevo     text        NOT NULL,
   motivo           text,
   actor            uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
-  ocurrido_at      timestamptz NOT NULL DEFAULT now(),
+  -- `pagos.verified_at` JUSTO ANTES del cambio de estado. Rechazar desde Agua
+  -- lo reescribe con la hora del rechazo (o con lo que mande el cliente): sin
+  -- esta copia se perdería desde cuándo estaba vigente el cobro. NULL en un
+  -- alta (no había estado anterior).
+  verified_at_anterior timestamptz,
+  -- Reloj del servidor (no el inicio de la transacción): dos cambios de
+  -- estado en la misma transacción quedan ordenados.
+  ocurrido_at      timestamptz NOT NULL DEFAULT clock_timestamp(),
   CONSTRAINT pagos_rechazo_eventos_evento_valido
     CHECK (evento IN ('rechazo', 'reactivacion')),
   CONSTRAINT pagos_rechazo_eventos_coherente
@@ -89,7 +106,7 @@ CREATE INDEX idx_pagos_rechazo_eventos_actor
   ON public.pagos_rechazo_eventos(actor) WHERE actor IS NOT NULL;
 
 COMMENT ON TABLE public.pagos_rechazo_eventos IS
-  'Evidencia de los rechazos (y reactivaciones) de cobros: hora del servidor, usuario de la sesión, motivo y estado anterior. Sólo inserción; la escribe conta_tg_pagos. Da la fecha de rechazo a los cortes históricos del estado de cuenta.';
+  'Evidencia de los rechazos (y reactivaciones) de cobros: hora del servidor, usuario de la sesión, motivo, estado anterior y la verified_at que había antes del cambio. Sólo inserción; la escribe conta_tg_pagos. Da la fecha de rechazo a los cortes históricos del estado de cuenta.';
 
 ALTER TABLE public.pagos_rechazo_eventos ENABLE ROW LEVEL SECURITY;
 
@@ -163,18 +180,21 @@ BEGIN
   IF NEW.estado = 'rechazado'
      AND (TG_OP = 'INSERT' OR OLD.estado IS DISTINCT FROM 'rechazado') THEN
     INSERT INTO public.pagos_rechazo_eventos
-      (pago_id, company_id, project_id, evento, estado_anterior, estado_nuevo, motivo, actor)
+      (pago_id, company_id, project_id, evento, estado_anterior, estado_nuevo, motivo, actor,
+       verified_at_anterior)
     VALUES
       (NEW.id, v_company, v_project, 'rechazo',
        CASE WHEN TG_OP = 'INSERT' THEN 'alta' ELSE COALESCE(OLD.estado, '-') END,
-       'rechazado', NULLIF(btrim(COALESCE(NEW.verification_notes, '')), ''), auth.uid());
+       'rechazado', NULLIF(btrim(COALESCE(NEW.verification_notes, '')), ''), auth.uid(),
+       CASE WHEN TG_OP = 'UPDATE' THEN OLD.verified_at END);
   ELSIF TG_OP = 'UPDATE' AND OLD.estado = 'rechazado'
         AND NEW.estado IS DISTINCT FROM 'rechazado' THEN
     INSERT INTO public.pagos_rechazo_eventos
-      (pago_id, company_id, project_id, evento, estado_anterior, estado_nuevo, motivo, actor)
+      (pago_id, company_id, project_id, evento, estado_anterior, estado_nuevo, motivo, actor,
+       verified_at_anterior)
     VALUES
       (NEW.id, v_company, v_project, 'reactivacion', 'rechazado', COALESCE(NEW.estado, '-'),
-       NULL, auth.uid());
+       NULL, auth.uid(), OLD.verified_at);
   END IF;
 
   -- Reverso: rechazado o soft-delete después de contabilizado.
@@ -260,9 +280,11 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.conta_tg_pagos() FROM PUBLIC, anon, authenticated;
 
 -- ── 3. Fuera del saldo al corte ─────────────────────────────────────────────
--- Cuerpo idéntico a 20261004000000 salvo: la fecha del último rechazo
--- registrado de cada cobro (o_rech_at, o_rech_prev), su uso en la vigencia al
--- corte cuando no hay reverso, y la nota «se rechazó después del corte».
+-- Cuerpo idéntico a 20261004000000 salvo, para los cobros CON HISTORIA
+-- (con eventos en la bitácora y sin asiento de cobro): su inclusión aunque hoy no estén
+-- verificados, su estado y fecha de vigencia al corte reconstruidos con la
+-- bitácora (hx), y la nota «se rechazó después del corte». Los demás
+-- documentos, y los cobros con asiento, conservan su tratamiento.
 CREATE OR REPLACE FUNCTION public.conta_ec_fuera_de_saldo(
   p_company uuid,
   p_project uuid,
@@ -325,20 +347,20 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
            c.tipo_cargo AS o_tipo, c.unidad_id AS o_unidad, c.responsable_cliente_id AS o_resp,
            c.monto AS o_monto, c.estado AS o_estado, c.por_tipo AS o_por_tipo,
            c.cancelado_at AS o_cancel, false AS o_cancel_por_reverso,
-           NULL::timestamptz AS o_rech_at, NULL::text AS o_rech_prev
+           false AS o_hist
       FROM cu c WHERE COALESCE(c.monto, 0) > 0
     UNION ALL
     SELECT 'cuotas_condominio', c.id, 'cuota_mora', 'cargo',
            public.conta_fecha_evento_cargo('cuotas_condominio', c.id, 'cuota_mora'),
            'Mora · ' || c.concepto || ' ' || c.periodo,
            'recargo_mora', c.unidad_id, c.responsable_cliente_id,
-           c.mora_monto, c.estado, c.por_tipo, c.cancelado_at, false, NULL::timestamptz, NULL::text
+           c.mora_monto, c.estado, c.por_tipo, c.cancelado_at, false, false
       FROM cu c WHERE COALESCE(c.mora_monto, 0) > 0
     UNION ALL
     SELECT 'cargos_adicionales_unidad', x.id, 'cargo_adicional_emitido', 'cargo', x.fecha_cargo, x.concepto,
            public.conta_tipo_cargo_de_documento('cargos_adicionales_unidad', x.id, 'cargo_adicional_emitido'),
            x.unidad_id, x.responsable_cliente_id, x.monto, x.estado, x.por_tipo,
-           NULL::timestamptz, x.estado = 'anulado', NULL::timestamptz, NULL::text
+           NULL::timestamptz, x.estado = 'anulado', false
       FROM ca x WHERE COALESCE(x.monto, 0) > 0
     UNION ALL
     SELECT * FROM (
@@ -349,16 +371,19 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
              c.tipo_cargo, c.unidad_id, c.responsable_cliente_id, p.monto, p.estado, c.por_tipo,
              -- el cobro de una cuota anulada deja de estar vigente con ella
              LEAST(p.deleted_at, c.cancelado_at), p.estado = 'rechazado',
-             re.ocurrido_at, re.estado_anterior
+             hs.o_hist
         FROM cu c
         JOIN public.pagos p ON (p.cuota_id = c.id OR c.pago_id = p.id)
-      -- Último rechazo registrado (20261005000000) de un cobro rechazado hoy.
-      LEFT JOIN LATERAL (
-        SELECT e.ocurrido_at, e.estado_anterior FROM public.pagos_rechazo_eventos e
-         WHERE e.pago_id = p.id AND e.evento = 'rechazo' AND p.estado = 'rechazado'
-         ORDER BY e.ocurrido_at DESC, e.id DESC LIMIT 1
-      ) re ON true
-       WHERE p.estado IN ('verificado', 'aplicado', 'rechazado')
+      CROSS JOIN LATERAL (
+        -- Con historia (20261005000000): tiene eventos en la bitácora y nunca
+        -- tuvo asiento de cobro (ningún reverso le da fecha).
+        SELECT EXISTS (SELECT 1 FROM public.pagos_rechazo_eventos r WHERE r.pago_id = p.id)
+               AND NOT EXISTS (SELECT 1 FROM public.conta_asientos a
+                                WHERE a.company_id = p_company AND a.origen = 'automatico'
+                                  AND a.origen_tabla = 'pagos' AND a.origen_id = p.id
+                                  AND a.origen_evento = 'pago_contabilizado') AS o_hist
+      ) hs
+       WHERE (p.estado IN ('verificado', 'aplicado', 'rechazado') OR hs.o_hist)
          AND p.cargo_adicional_id IS NULL
        ORDER BY p.id, c.id
     ) pg
@@ -370,16 +395,19 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
            'Pago ' || p.metodo || COALESCE(' ref. ' || NULLIF(p.referencia, ''), '') || ' · cargo ' || x.concepto,
            public.conta_tipo_cargo_de_documento('cargos_adicionales_unidad', x.id, 'cargo_adicional_emitido'),
            x.unidad_id, x.responsable_cliente_id, p.monto, p.estado, x.por_tipo,
-           p.deleted_at, p.estado = 'rechazado', re.ocurrido_at, re.estado_anterior
+           p.deleted_at, p.estado = 'rechazado', hs.o_hist
       FROM ca x
       JOIN public.pagos p ON p.cargo_adicional_id = x.id
-    -- Último rechazo registrado (20261005000000) de un cobro rechazado hoy.
-    LEFT JOIN LATERAL (
-      SELECT e.ocurrido_at, e.estado_anterior FROM public.pagos_rechazo_eventos e
-       WHERE e.pago_id = p.id AND e.evento = 'rechazo' AND p.estado = 'rechazado'
-       ORDER BY e.ocurrido_at DESC, e.id DESC LIMIT 1
-    ) re ON true
-     WHERE p.estado IN ('verificado', 'aplicado', 'rechazado')
+    CROSS JOIN LATERAL (
+        -- Con historia (20261005000000): tiene eventos en la bitácora y nunca
+        -- tuvo asiento de cobro (ningún reverso le da fecha).
+        SELECT EXISTS (SELECT 1 FROM public.pagos_rechazo_eventos r WHERE r.pago_id = p.id)
+               AND NOT EXISTS (SELECT 1 FROM public.conta_asientos a
+                                WHERE a.company_id = p_company AND a.origen = 'automatico'
+                                  AND a.origen_tabla = 'pagos' AND a.origen_id = p.id
+                                  AND a.origen_evento = 'pago_contabilizado') AS o_hist
+      ) hs
+     WHERE (p.estado IN ('verificado', 'aplicado', 'rechazado') OR hs.o_hist)
   ),
   -- Asientos del evento evaluados al corte.
   ev_a AS (
@@ -390,9 +418,45 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
            bor.id AS a_borr, bor.fecha AS a_borr_fecha,
            anu.r_creado AS anul_creado,
            ih.codigo AS ih_codigo, ih.motivo AS ih_motivo,
-           ia.motivo AS ia_motivo
+           ia.motivo AS ia_motivo,
+           -- Cobro con historia (20261005000000): su estado al corte sale de
+           -- la bitácora. `t_estado` es el estado en que quedó tras el último
+           -- evento no posterior al corte (o el anterior al primero), y
+           -- `t_desde` desde cuándo estaba vigente en ese intervalo.
+           hx.t_estado, hx.t_desde, hx.nx_evento, hx.nx_at
       FROM ev e
       CROSS JOIN par
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(nx.estado_anterior, p.estado) AS t_estado,
+               CASE
+                 -- antes del primer evento: vigente desde su verificación
+                 -- (la que había ANTES de que el rechazo la reescribiera)
+                 WHEN le.ocurrido_at IS NULL THEN
+                   COALESCE(nx.verified_at_anterior, p.created_at)::date
+                 -- reactivado directamente a vigente: desde la reactivación
+                 WHEN le.estado_nuevo IN ('verificado', 'aplicado') THEN
+                   le.ocurrido_at::date
+                 -- reactivado a otro estado y verificado después: desde esa
+                 -- verificación, nunca antes de la reactivación
+                 ELSE GREATEST(le.ocurrido_at::date,
+                        (CASE WHEN nx.ocurrido_at IS NOT NULL THEN nx.verified_at_anterior
+                              ELSE p.verified_at END)::date)
+               END AS t_desde,
+               nx.evento AS nx_evento, nx.ocurrido_at AS nx_at
+          FROM public.pagos p
+          LEFT JOIN LATERAL (
+            SELECT r.estado_nuevo, r.ocurrido_at FROM public.pagos_rechazo_eventos r
+             WHERE r.pago_id = p.id AND r.ocurrido_at::date <= par.h
+             ORDER BY r.ocurrido_at DESC, r.id DESC LIMIT 1
+          ) le ON true
+          LEFT JOIN LATERAL (
+            SELECT r.evento, r.estado_anterior, r.verified_at_anterior, r.ocurrido_at
+              FROM public.pagos_rechazo_eventos r
+             WHERE r.pago_id = p.id AND r.ocurrido_at::date > par.h
+             ORDER BY r.ocurrido_at, r.id LIMIT 1
+          ) nx ON true
+         WHERE e.o_hist AND p.id = e.o_id
+      ) hx ON true
       LEFT JOIN LATERAL (
         SELECT a.id FROM public.conta_asientos a
          WHERE a.company_id = p_company AND a.origen = 'automatico'
@@ -453,14 +517,16 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
   -- en conta_ec_limitaciones).
   vig AS (
     SELECT s.*,
-           CASE WHEN s.o_cancel IS NOT NULL AND s.o_cancel::date > s.h THEN s.o_cancel::date
+           CASE WHEN s.o_hist THEN
+                  -- lo que antes llegue: la baja del documento o el siguiente rechazo
+                  LEAST(CASE WHEN s.o_cancel::date > s.h THEN s.o_cancel::date END,
+                        CASE WHEN s.nx_evento = 'rechazo' THEN s.nx_at::date END)
+                WHEN s.o_cancel IS NOT NULL AND s.o_cancel::date > s.h THEN s.o_cancel::date
                 WHEN s.o_cancel_por_reverso AND s.anul_creado::date > s.h THEN s.anul_creado::date
-                -- Rechazo sin reverso, con fecha registrada (20261005000000).
-                WHEN s.o_cancel_por_reverso AND s.anul_creado IS NULL
-                     AND s.o_rech_prev IN ('verificado', 'aplicado')
-                     AND s.o_rech_at::date > s.h THEN s.o_rech_at::date
            END AS cancelado_despues,
-           (s.o_cancel_por_reverso AND s.anul_creado IS NULL AND s.o_rech_at IS NOT NULL) AS rechazo_fechado,
+           (s.o_hist AND s.nx_evento = 'rechazo'
+            AND (s.o_cancel IS NULL OR s.nx_at::date <= s.o_cancel::date)) AS rechazo_fechado,
+           CASE WHEN s.o_hist THEN s.t_desde ELSE s.o_fecha END AS f_fecha,
            -- Asiento del camino histórico (sin dimensiones), vivo al corte.
            (SELECT a.id FROM public.conta_asientos a
              WHERE NOT s.o_por_tipo
@@ -472,13 +538,15 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
                                 WHERE r.id = a.anulado_por_id AND r.estado = 'publicado' AND r.fecha <= s.h)
              ORDER BY a.fecha DESC, a.created_at DESC LIMIT 1) AS a_hist
       FROM ev_a s
-     WHERE s.o_fecha <= s.h
-       AND (s.o_cancel IS NULL OR s.o_cancel::date > s.h)
-       AND (NOT s.o_cancel_por_reverso OR s.anul_creado::date > s.h
-            -- Rechazado sin reverso con fecha registrada: vigente hasta esa
-            -- fecha si lo estaba (un cobro sin verificar nunca lo estuvo).
-            OR (s.anul_creado IS NULL AND s.o_rech_prev IN ('verificado', 'aplicado')
-                AND s.o_rech_at::date > s.h))
+     WHERE (s.o_cancel IS NULL OR s.o_cancel::date > s.h)
+       AND CASE WHEN s.o_hist
+                -- Con historia: vigente al corte si en ese intervalo estaba
+                -- verificado/aplicado desde una fecha no posterior al corte.
+                -- Un intervalo cuyo inicio no se conoce (NULL) no se lista.
+                THEN s.t_estado IN ('verificado', 'aplicado') AND s.t_desde <= s.h
+                ELSE s.o_fecha <= s.h
+                     AND (NOT s.o_cancel_por_reverso OR s.anul_creado::date > s.h)
+           END
   ),
   clas AS (
     SELECT v.*,
@@ -498,7 +566,7 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
         OR (v.o_tabla = 'cargos_adicionales_unidad' AND v.o_estado = 'pagado'
             AND NOT EXISTS (SELECT 1 FROM public.pagos p WHERE p.cargo_adicional_id = v.o_id))
   )
-  SELECT c.k, c.o_nat, c.o_tabla, c.o_id, c.o_evento, c.o_fecha, c.o_concepto, c.o_tipo,
+  SELECT c.k, c.o_nat, c.o_tabla, c.o_id, c.o_evento, c.f_fecha, c.o_concepto, c.o_tipo,
          c.o_unidad, c.o_resp, c.o_monto, c.o_estado,
          CASE c.k
            WHEN 'contabilizado_despues' THEN 'contabilizado_despues_del_corte'
@@ -564,8 +632,10 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.conta_ec_fuera_de_saldo(uuid, uuid, uuid, uuid, date) FROM PUBLIC, anon, authenticated;
 
 -- ── 4. Limitaciones ─────────────────────────────────────────────────────────
--- Cuerpo idéntico a 20261004000000 salvo que un rechazo registrado deja de
--- contar en `rechazo_sin_fecha`, y el texto que lo dice.
+-- Cuerpo idéntico a 20261004000000 salvo `rech`: cuenta los cobros cuyo
+-- estado al corte depende de un rechazo SIN evidencia (a/b abajo), y el
+-- texto que lo dice. Un cobro cuya historia al corte está en la bitácora
+-- deja de contar; uno con un rechazo legado ANTES del corte, no.
 CREATE OR REPLACE FUNCTION public.conta_ec_limitaciones(
   p_company uuid,
   p_project uuid,
@@ -591,19 +661,31 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
                AND (p_unidad  IS NULL OR x.unidad_id = p_unidad)
                AND (p_cliente IS NULL OR x.responsable_cliente_id = p_cliente)) d
       JOIN public.pagos p ON (p.cuota_id = d.cuota_id OR d.pago_id = p.id OR p.cargo_adicional_id = d.cargo_id)
-     WHERE p.estado = 'rechazado'
-       AND COALESCE(p.verified_at, p.created_at)::date <= p_hasta
+      -- Primer evento registrado del cobro (20261005000000), si lo hay.
+      LEFT JOIN LATERAL (
+        SELECT e.evento, e.ocurrido_at, e.verified_at_anterior FROM public.pagos_rechazo_eventos e
+         WHERE e.pago_id = p.id ORDER BY e.ocurrido_at, e.id LIMIT 1
+      ) fe ON true
+     WHERE (
+             -- (a) rechazado sin ningún evento: el rechazo es anterior a la
+             --     bitácora y no se sabe cuándo ocurrió.
+             (fe.evento IS NULL AND p.estado = 'rechazado'
+              AND COALESCE(p.verified_at, p.created_at)::date <= p_hasta)
+             -- (b) su primer evento es una REACTIVACIÓN posterior al corte:
+             --     antes hubo un rechazo sin fecha, así que al corte no se
+             --     sabe si seguía vigente o ya estaba rechazado. Un rechazo
+             --     o reactivación posterior no le devuelve la fecha. El
+             --     umbral es el mismo de (a), con la `verified_at` que tenía
+             --     el cobro al reactivarse.
+          OR (fe.evento = 'reactivacion' AND fe.ocurrido_at::date > p_hasta
+              AND COALESCE(fe.verified_at_anterior, p.created_at)::date <= p_hasta)
+           )
        AND (p.deleted_at IS NULL OR p.deleted_at::date > p_hasta)
        AND NOT EXISTS (
          SELECT 1 FROM public.conta_asientos a
           WHERE a.company_id = p_company AND a.origen = 'automatico'
             AND a.origen_tabla = 'pagos' AND a.origen_id = p.id AND a.origen_evento = 'pago_contabilizado'
             AND a.anulado_por_id IS NOT NULL)
-       -- Con el rechazo registrado (20261005000000) su estado al corte se
-       -- conoce: deja de ser limitación. Sólo quedan los anteriores.
-       AND NOT EXISTS (
-         SELECT 1 FROM public.pagos_rechazo_eventos e
-          WHERE e.pago_id = p.id AND e.evento = 'rechazo')
   ),
   anul AS (
     SELECT x.id, x.monto FROM public.cargos_adicionales_unidad x
@@ -619,7 +701,7 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
             AND a.anulado_por_id IS NOT NULL)
   )
   SELECT 'rechazo_sin_fecha'::text, count(*), sum(r.monto)::numeric(14,2),
-         'Cobros HOY rechazados que nunca tuvieron asiento y se rechazaron antes de que el sistema registrara la fecha del rechazo: no se puede saber si estaban vigentes al corte. No se listan como pendientes.'::text
+         'Cobros sin asiento que se rechazaron antes de que el sistema registrara la fecha de los rechazos: no se puede saber si al corte estaban vigentes o ya rechazados. No se listan como pendientes.'::text
     FROM rech r
    WHERE p_hasta IS NOT NULL AND p_hasta < CURRENT_DATE
   HAVING count(*) > 0

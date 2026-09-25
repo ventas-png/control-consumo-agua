@@ -37,11 +37,24 @@ UPDATE public.pagos
        verification_notes = 'SINT-RECH rechazo legado'
  WHERE id = 'd0a00000-0000-0000-0000-000000000001';
 
+-- L2: otro legado (P13, 60 sobre una cuota de 5) que después de la migración
+-- se REACTIVA y se vuelve a rechazar (assert.sql, R14): el rechazo legado
+-- sigue sin fecha aunque luego haya eventos registrados.
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, created_at) VALUES
+  ('d0c00000-0000-0000-0000-000000000013', :A, :A1, :U3, 'SINT-RECH K13-legado', 5, '2026-08', 'pendiente', 'mantenimiento', '2026-08-05 12:00+00');
+INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
+  ('d0a00000-0000-0000-0000-000000000013', :C3, :A1, 'd0c00000-0000-0000-0000-000000000013', 60, 'efectivo', 'verificado', '2026-08-07 12:00+00');
+UPDATE public.pagos
+   SET estado = 'rechazado', verification_status = 'rechazado',
+       verification_notes = 'SINT-RECH rechazo legado 2'
+ WHERE id = 'd0a00000-0000-0000-0000-000000000013';
+
 RESET ROLE;
 SELECT public.chk(
   (SELECT count(*) FROM public.conta_asientos
-    WHERE origen_tabla = 'pagos' AND origen_id = 'd0a00000-0000-0000-0000-000000000001'), 0,
-  'legado · el cobro rechazado nunca tuvo asiento');
+    WHERE origen_tabla = 'pagos' AND origen_id IN ('d0a00000-0000-0000-0000-000000000001',
+                                                   'd0a00000-0000-0000-0000-000000000013')), 0,
+  'legado · los cobros rechazados nunca tuvieron asiento');
 SELECT public.chk(
   (SELECT count(*) FROM information_schema.tables
     WHERE table_schema = 'public' AND table_name = 'pagos_rechazo_eventos'), 0,

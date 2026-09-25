@@ -12931,6 +12931,7 @@ export type Database = {
           ocurrido_at: string
           pago_id: string
           project_id: string | null
+          verified_at_anterior: string | null
         }
         Insert: {
           actor?: string | null
@@ -12943,6 +12944,7 @@ export type Database = {
           ocurrido_at?: string
           pago_id: string
           project_id?: string | null
+          verified_at_anterior?: string | null
         }
         Update: {
           actor?: string | null
@@ -12955,6 +12957,7 @@ export type Database = {
           ocurrido_at?: string
           pago_id?: string
           project_id?: string | null
+          verified_at_anterior?: string | null
         }
         Relationships: [
           {

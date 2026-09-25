@@ -28,6 +28,10 @@
 \set P7   '''d0a00000-0000-0000-0000-000000000007'''
 \set P8   '''d0a00000-0000-0000-0000-000000000008'''
 \set P9   '''d0a00000-0000-0000-0000-000000000009'''
+\set P10  '''d0a00000-0000-0000-0000-000000000010'''
+\set P11  '''d0a00000-0000-0000-0000-000000000011'''
+\set P12  '''d0a00000-0000-0000-0000-000000000012'''
+\set P13  '''d0a00000-0000-0000-0000-000000000013'''
 \set PC   '''d0a00000-0000-0000-0000-0000000000ca'''
 \set CA   '''d0b00000-0000-0000-0000-0000000000ca'''
 
@@ -43,6 +47,7 @@ CREATE OR REPLACE FUNCTION public.rc_fila(p_hasta date, p_origen uuid, p_campo t
              WHEN 'codigo' THEN f.codigo
              WHEN 'motivo' THEN f.motivo
              WHEN 'estado' THEN f.estado_actual
+             WHEN 'fecha'  THEN f.fecha::text
              WHEN 'limite' THEN COALESCE(f.limitacion, '-')
            END
       FROM public.conta_estado_cuenta_pendientes('a1a1a1a1-0000-0000-0000-000000000001',
@@ -91,8 +96,19 @@ CREATE OR REPLACE FUNCTION public.rc_fechar_intentos() RETURNS void LANGUAGE sql
     FROM public.pagos p
    WHERE i.origen_tabla = 'pagos' AND i.origen_id = p.id
      AND p.id::text LIKE 'd0a00000-%' AND p.verified_at IS NOT NULL AND i.created_at > p.verified_at
+     AND p.estado <> 'rechazado'
 $$;
 GRANT EXECUTE ON FUNCTION public.rc_fechar_intentos() TO authenticated;
+
+-- Preparación (sólo superusuario, sin grant): fija el INSTANTE de los eventos
+-- de un cobro, en su orden, para simular que ocurrieron en días distintos.
+CREATE OR REPLACE FUNCTION public.rc_fijar_eventos(p_pago uuid, p_ts timestamptz[]) RETURNS void LANGUAGE sql AS $$
+  UPDATE public.pagos_rechazo_eventos e SET ocurrido_at = p_ts[o.n]
+    FROM (SELECT id, row_number() OVER (ORDER BY ocurrido_at, id) AS n
+            FROM public.pagos_rechazo_eventos WHERE pago_id = p_pago) o
+   WHERE e.id = o.id AND o.n <= array_length(p_ts, 1)
+$$;
+REVOKE ALL ON FUNCTION public.rc_fijar_eventos(uuid, timestamptz[]) FROM PUBLIC;
 
 -- Preparación: el tipo «mantenimiento» configurado en A1, para que las
 -- cuotas se devenguen y un cobro dentro del saldo se contabilice (R5).
@@ -151,6 +167,10 @@ SELECT public.chk_txt(public.rc_resumen(CURRENT_DATE - 1), :'res_antes',
   'R3 · el saldo y los movimientos al corte anterior no cambian: no se vuelve movimiento');
 SELECT public.chk_txt(public.rc_fila(CURRENT_DATE - 1, :P2, 'limite'), '-',
   'R3 · su fila no es una limitación');
+SELECT public.chk_txt(public.rc_fila(CURRENT_DATE - 10, :P2, 'clase') || '|' || public.rc_fila(CURRENT_DATE - 9, :P2, 'clase')
+                      || '|' || public.rc_fila(CURRENT_DATE - 1, :P2, 'fecha'),
+  '-|pendiente|' || (CURRENT_DATE - 9)::text,
+  'R3 · la fecha falsa de 2020 no lo adelanta: figura desde su verificación real, no antes');
 
 -- ── R2 · rechazo repetido y evidencia inmutable ─────────────────────────────
 UPDATE public.pagos SET estado = 'rechazado', verification_status = 'rechazado' WHERE id = :P2;
@@ -184,12 +204,12 @@ SELECT public.chk_txt(public.rc_ev(:P9) || '|' ||
 
 -- ── R4 · rechazo LEGADO sin evidencia: sigue declarado como limitación ───────
 SELECT public.chk_txt(public.rc_ev(:P1), '', 'R4 · el rechazo legado no tiene evidencia (no se inventa)');
-SELECT public.chk_txt(public.rc_lim('2026-08-31'), 'rechazo_sin_fecha:1:80.00',
-  'R4 · corte de agosto: el legado sigue en rechazo_sin_fecha');
+SELECT public.chk_txt(public.rc_lim('2026-08-31'), 'rechazo_sin_fecha:2:140.00',
+  'R4 · corte de agosto: los dos legados (P1, P13) siguen en rechazo_sin_fecha');
 SELECT public.chk_txt(public.rc_fila('2026-08-31', :P1, 'clase'), '-',
   'R4 · …y no se lista como pendiente (no se puede situar)');
-SELECT public.chk_txt(public.rc_lim(CURRENT_DATE - 1), 'rechazo_sin_fecha:1:80.00',
-  'R4 · al corte de ayer sólo el legado es limitación; los rechazos fechados no');
+SELECT public.chk_txt(public.rc_lim(CURRENT_DATE - 1), 'rechazo_sin_fecha:2:140.00',
+  'R4 · al corte de ayer sólo los legados son limitación; los rechazos fechados no');
 
 -- ── R3b · un cobro rechazado ANTES de verificarse nunca estuvo vigente ───────
 INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verification_status) VALUES
@@ -199,7 +219,7 @@ UPDATE public.pagos SET estado = 'rechazado', verification_status = 'rechazado',
 SELECT public.chk_txt(public.rc_ev(:P3), 'rechazo:pendiente:SINT-RECH sin comprobante:adm',
   'R3b · se registra desde qué estado se rechazó');
 SELECT public.chk_txt(public.rc_fila(CURRENT_DATE - 1, :P3, 'clase') || '|' || public.rc_lim(CURRENT_DATE - 1),
-  '-|rechazo_sin_fecha:1:80.00',
+  '-|rechazo_sin_fecha:2:140.00',
   'R3b · al corte anterior no figura (estaba sin verificar) y no es limitación');
 
 -- ── R5 · cobro CON asiento y reverso: el tratamiento no cambia ───────────────
@@ -306,8 +326,8 @@ SELECT public.chk(
   'R7 · …con la fecha del día siguiente');
 SELECT public.chk_txt(public.rc_fila('2026-08-21', :P6, 'clase') || '|' || public.rc_fila('2026-08-21', :P7, 'clase'),
   '-|-', 'R7 · corte 08-21: ninguno');
-SELECT public.chk_txt(public.rc_lim('2026-08-31'), 'rechazo_sin_fecha:1:80.00',
-  'R7 · fechados, no son limitación: sólo el legado');
+SELECT public.chk_txt(public.rc_lim('2026-08-31'), 'rechazo_sin_fecha:2:140.00',
+  'R7 · fechados, no son limitación: sólo los legados');
 
 -- ── R10 · reactivación: se registra, no se reutiliza la fecha ────────────────
 INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
@@ -318,6 +338,145 @@ UPDATE public.pagos SET estado = 'rechazado', verification_status = 'rechazado',
 SELECT public.chk_txt(public.rc_ev(:P8),
   'rechazo:verificado:SINT-RECH primero:adm,reactivacion:rechazado:-:adm,rechazo:verificado:SINT-RECH segundo:adm',
   'R10 · reactivar y volver a rechazar deja tres eventos, en orden: ninguna fecha se reutiliza');
+
+-- ── R11 · verificado → rechazado → reactivado → rechazado, en días distintos ─
+-- Cada paso como lo haría la aplicación (el rechazo reescribe verified_at con
+-- la hora del rechazo); el arnés fija después el instante de cada evento.
+-- P10: verificado el 08-01, rechazado el 08-05, reactivado el 08-10 y
+-- rechazado otra vez el 08-15. Hoy está rechazado.
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, created_at) VALUES
+  ('d0c00000-0000-0000-0000-000000000010', :A, :A1, :U3, 'SINT-RECH K10', 5, '2026-07', 'pendiente', 'mantenimiento', '2026-07-20 12:00+00');
+INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
+  (:P10, :C3, :A1, 'd0c00000-0000-0000-0000-000000000010', 60, 'efectivo', 'verificado', '2026-08-01 12:00+00'),
+  (:P11, :C3, :A1, 'd0c00000-0000-0000-0000-000000000010', 70, 'efectivo', 'verificado', '2026-08-01 12:00+00');
+SELECT public.rc_fechar_intentos();
+UPDATE public.pagos SET estado = 'rechazado', verification_status = 'rechazado', verified_by = :ADM, verified_at = now(),
+       verification_notes = 'SINT-RECH P10 primero' WHERE id = :P10;
+UPDATE public.pagos SET estado = 'verificado', verification_status = 'verificado', verified_by = :ADM, verified_at = now() WHERE id = :P10;
+UPDATE public.pagos SET estado = 'rechazado', verification_status = 'rechazado', verified_by = :ADM, verified_at = now(),
+       verification_notes = 'SINT-RECH P10 segundo' WHERE id = :P10;
+-- P11: la misma historia sin el segundo rechazo. Hoy está REACTIVADO.
+UPDATE public.pagos SET estado = 'rechazado', verification_status = 'rechazado', verified_by = :ADM, verified_at = now(),
+       verification_notes = 'SINT-RECH P11 rechazo' WHERE id = :P11;
+UPDATE public.pagos SET estado = 'verificado', verification_status = 'verificado', verified_by = :ADM, verified_at = now() WHERE id = :P11;
+RESET ROLE;
+SELECT public.rc_fijar_eventos(:P10, ARRAY['2026-08-05 12:00+00', '2026-08-10 12:00+00', '2026-08-15 12:00+00']::timestamptz[]);
+SELECT public.rc_fijar_eventos(:P11, ARRAY['2026-08-05 12:00+00', '2026-08-10 12:00+00']::timestamptz[]);
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SET ROLE authenticated;
+
+SELECT public.chk_txt(public.rc_ev(:P10) || '|' || public.rc_asientos(:P10),
+  'rechazo:verificado:SINT-RECH P10 primero:adm,reactivacion:rechazado:-:adm,rechazo:verificado:SINT-RECH P10 segundo:adm|0/0',
+  'R11 · tres eventos, en orden, y ningún asiento');
+SELECT public.chk_txt(
+  (SELECT to_char(verified_at_anterior, 'YYYY-MM-DD HH24:MI') FROM public.pagos_rechazo_eventos
+    WHERE pago_id = :P10 ORDER BY ocurrido_at LIMIT 1),
+  '2026-08-01 12:00',
+  'R11 · el primer rechazo guarda la verificación ORIGINAL, aunque el cliente la reescribió con la hora del rechazo');
+SELECT public.chk_txt(public.rc_fila('2026-07-31', :P10, 'clase'), '-',
+  'R11 · corte ANTERIOR a su verificación: no figura');
+SELECT public.chk_txt(public.rc_fila('2026-08-03', :P10, 'clase') || '|' || public.rc_fila('2026-08-03', :P10, 'fecha')
+                      || '|' || public.rc_fila('2026-08-03', :P10, 'limite'),
+  'pendiente|2026-08-01|-',
+  'R11 · corte 08-03 (verificado, antes del primer rechazo): pendiente desde su verificación, sin limitación');
+SELECT public.chk(
+  (SELECT count(*) FROM (SELECT public.rc_fila('2026-08-03', :P10, 'motivo') AS m) x
+    WHERE m LIKE '%El cobro se rechazó después del corte, el 2026-08-05.'), 1,
+  'R11 · …y dice que se rechazó el 08-05, no el 08-15');
+SELECT public.chk_txt(public.rc_fila('2026-08-05', :P10, 'clase') || '|' || public.rc_fila('2026-08-07', :P10, 'clase')
+                      || '|' || public.rc_fila('2026-08-09', :P10, 'clase'),
+  '-|-|-',
+  'R11 · cortes 08-05, 08-07 y 08-09 (primer intervalo rechazado): no figura');
+SELECT public.chk_txt(public.rc_fila('2026-08-10', :P10, 'clase') || '|' || public.rc_fila('2026-08-12', :P10, 'clase')
+                      || '|' || public.rc_fila('2026-08-12', :P10, 'fecha'),
+  'pendiente|pendiente|2026-08-10',
+  'R11 · cortes 08-10 y 08-12 (reactivado): figura, vigente desde la reactivación');
+SELECT public.chk(
+  (SELECT count(*) FROM (SELECT public.rc_fila('2026-08-12', :P10, 'motivo') AS m) x
+    WHERE m LIKE '%El cobro se rechazó después del corte, el 2026-08-15.'), 1,
+  'R11 · …y dice que se volvió a rechazar el 08-15');
+SELECT public.chk_txt(public.rc_fila('2026-08-15', :P10, 'clase') || '|' || public.rc_fila('2026-08-20', :P10, 'clase')
+                      || '|' || public.rc_fila(CURRENT_DATE, :P10, 'clase') || '|' || public.rc_fila(NULL, :P10, 'clase'),
+  '-|-|-|-',
+  'R11 · cortes 08-15, 08-20, hoy y sin corte (segundo intervalo rechazado): no figura');
+
+-- ── R12 · el estado ACTUAL queda reactivado ─────────────────────────────────
+SELECT public.chk_txt(public.rc_asientos(:P11) || '|' ||
+  (SELECT estado FROM public.pagos WHERE id = :P11),
+  '0/0|verificado', 'R12 · reactivado, sigue sin asiento (excede su cuota)');
+SELECT public.chk_txt(public.rc_fila('2026-07-31', :P11, 'clase') || '|' || public.rc_fila('2026-08-03', :P11, 'clase')
+                      || '|' || public.rc_fila('2026-08-07', :P11, 'clase'),
+  '-|pendiente|-',
+  'R12 · su estado de hoy no lo pone en los cortes anteriores a la verificación ni en el intervalo rechazado');
+SELECT public.chk(
+  (SELECT count(*) FROM (SELECT public.rc_fila('2026-08-03', :P11, 'motivo') AS m) x
+    WHERE m LIKE '%El cobro se rechazó después del corte, el 2026-08-05.'), 1,
+  'R12 · al 08-03 lleva la nota de su rechazo del 08-05');
+SELECT public.chk_txt(public.rc_fila('2026-08-12', :P11, 'clase') || '|' || public.rc_fila('2026-08-12', :P11, 'fecha')
+                      || '|' || public.rc_fila(CURRENT_DATE - 1, :P11, 'clase') || '|' || public.rc_fila(CURRENT_DATE, :P11, 'clase')
+                      || '|' || public.rc_fila(NULL, :P11, 'clase') || '|' || public.rc_fila(NULL, :P11, 'estado'),
+  'pendiente|2026-08-10|pendiente|pendiente|pendiente|verificado',
+  'R12 · desde la reactivación (08-10) figura en todo corte, también hoy y sin corte');
+SELECT public.chk(
+  (SELECT count(*) FROM (SELECT public.rc_fila('2026-08-12', :P11, 'motivo') AS m) x
+    WHERE m LIKE '%rechazó%' OR m LIKE '%anuló%'), 0,
+  'R12 · …sin nota de rechazo: después de la reactivación no se rechazó');
+
+-- ── R13 · regresión: verificado días atrás, rechazado HOY con verified_at = now() ─
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, created_at) VALUES
+  ('d0c00000-0000-0000-0000-000000000012', :A, :A1, :U3, 'SINT-RECH K12', 5, to_char(CURRENT_DATE, 'YYYY-MM'), 'pendiente', 'mantenimiento', now() - interval '7 days');
+INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
+  (:P12, :C3, :A1, 'd0c00000-0000-0000-0000-000000000012', 60, 'efectivo', 'verificado', now() - interval '5 days');
+SELECT public.rc_fechar_intentos();
+-- Exactamente lo que manda rejectPago.
+UPDATE public.pagos SET verification_status = 'rechazado', estado = 'rechazado', verified_by = :ADM,
+       verified_at = now(), verification_notes = 'SINT-RECH P12 hoy' WHERE id = :P12;
+SELECT public.chk_txt(public.rc_asientos(:P12) || '|' ||
+  (SELECT (verified_at::date = CURRENT_DATE)::text FROM public.pagos WHERE id = :P12) || '|' ||
+  (SELECT verified_at_anterior::date::text FROM public.pagos_rechazo_eventos WHERE pago_id = :P12),
+  '0/0|true|' || (CURRENT_DATE - 5)::text,
+  'R13 · el rechazo reescribió verified_at con hoy, pero la evidencia conserva la verificación de hace 5 días');
+SELECT public.chk_txt(public.rc_fila(CURRENT_DATE - 1, :P12, 'clase') || '|' || public.rc_fila(CURRENT_DATE - 1, :P12, 'fecha'),
+  'pendiente|' || (CURRENT_DATE - 5)::text,
+  'R13 · corte de AYER: conserva el cobro pendiente, con su fecha de verificación');
+SELECT public.chk(
+  (SELECT count(*) FROM (SELECT public.rc_fila(CURRENT_DATE - 1, :P12, 'motivo') AS m) x
+    WHERE m LIKE '%El cobro se rechazó después del corte, el ' || to_char(CURRENT_DATE, 'YYYY-MM-DD') || '.'), 1,
+  'R13 · …con la nota del rechazo de hoy');
+SELECT public.chk_txt(public.rc_fila(CURRENT_DATE, :P12, 'clase') || '|' || public.rc_fila(NULL, :P12, 'clase'),
+  '-|-', 'R13 · corte de HOY y sin corte: excluido');
+SELECT public.chk_txt(public.rc_fila(CURRENT_DATE - 6, :P12, 'clase') || '|' || public.rc_fila(CURRENT_DATE - 5, :P12, 'clase'),
+  '-|pendiente', 'R13 · no aparece antes de su vigencia original (hace 6 días), sí desde ella (hace 5)');
+
+-- ── R14 · rechazo LEGADO, después reactivado y rechazado con evidencia ──────
+-- P13 (legado.sql) se rechazó antes de la migración, sin fecha. Se reactiva
+-- (el arnés lo fija el 09-01) y se vuelve a rechazar (09-03).
+UPDATE public.pagos SET estado = 'verificado', verification_status = 'verificado', verified_by = :ADM, verified_at = now() WHERE id = :P13;
+UPDATE public.pagos SET estado = 'rechazado', verification_status = 'rechazado', verified_by = :ADM, verified_at = now(),
+       verification_notes = 'SINT-RECH P13 con evidencia' WHERE id = :P13;
+RESET ROLE;
+SELECT public.rc_fijar_eventos(:P13, ARRAY['2026-09-01 12:00+00', '2026-09-03 12:00+00']::timestamptz[]);
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SET ROLE authenticated;
+SELECT public.chk_txt(public.rc_ev(:P13) || '|' || public.rc_asientos(:P13),
+  'reactivacion:rechazado:-:adm,rechazo:verificado:SINT-RECH P13 con evidencia:adm|0/0',
+  'R14 · la bitácora empieza en la reactivación: el rechazo legado no se inventa');
+SELECT public.chk_txt(public.rc_fila('2026-08-31', :P13, 'clase') || '|' || public.rc_lim('2026-08-31'),
+  '-|rechazo_sin_fecha:2:140.00',
+  'R14 · corte 08-31 (antes de la reactivación): no se lista y SIGUE siendo limitación, aunque haya rechazos posteriores registrados');
+SELECT public.chk_txt(public.rc_fila('2026-09-02', :P13, 'clase') || '|' || public.rc_fila('2026-09-02', :P13, 'fecha')
+                      || '|' || public.rc_lim('2026-09-02'),
+  'pendiente|2026-09-01|rechazo_sin_fecha:1:80.00',
+  'R14 · corte 09-02 (reactivado): figura desde la reactivación y ya no es limitación; P1 sí');
+SELECT public.chk(
+  (SELECT count(*) FROM (SELECT public.rc_fila('2026-09-02', :P13, 'motivo') AS m) x
+    WHERE m LIKE '%El cobro se rechazó después del corte, el 2026-09-03.'), 1,
+  'R14 · …con la nota del rechazo del 09-03');
+SELECT public.chk_txt(public.rc_fila('2026-09-05', :P13, 'clase') || '|' || public.rc_lim('2026-09-05'),
+  '-|rechazo_sin_fecha:1:80.00',
+  'R14 · corte 09-05 (rechazado con fecha): no figura ni es limitación');
+SELECT public.chk_txt(public.rc_lim('2026-08-12'), 'rechazo_sin_fecha:2:140.00',
+  'R11 · al corte del 08-12, P10 y P11 no son limitación: sólo los legados');
 
 RESET ROLE;
 SELECT public.chk(
