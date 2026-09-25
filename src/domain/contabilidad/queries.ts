@@ -25,6 +25,10 @@ import type {
   AuxiliarCliente,
   CargoPendiente,
   FiltroCargoPendiente,
+  ConciliacionEstadoCuenta,
+  DocumentoFueraDeSaldo,
+  EstadoCuenta,
+  SujetoEstadoCuenta,
 } from '../../types/contabilidad'
 
 /** Moneda base contable de la empresa (ISO, espejo de conta_moneda_base). */
@@ -467,5 +471,123 @@ export function useAuxiliaresQuery(companyId?: string, busqueda?: string | null)
         })
         .sort((x, y) => x.cliente_nombre.localeCompare(y.cliente_nombre, 'es'))
     },
+  })
+}
+
+// ── Estado de cuenta por auxiliar (cliente) y por unidad ─────────────────────
+
+export const ESTADO_CUENTA_POR_PAGINA = 50
+export const FUERA_DE_SALDO_POR_PAGINA = 20
+
+function argsSujeto(sujeto: SujetoEstadoCuenta) {
+  return sujeto.tipo === 'cliente'
+    ? { p_cliente_id: sujeto.id, p_unidad_id: null }
+    : { p_cliente_id: null, p_unidad_id: sujeto.id }
+}
+
+/**
+ * Estado de cuenta del sujeto en el ledger activo. El servidor valida permiso,
+ * proyecto y sujeto, y calcula saldo inicial, totales, saldo final y saldo
+ * acumulado sobre TODO el rango antes de paginar: la página sólo recorta filas.
+ */
+export function useEstadoCuentaQuery(params: {
+  companyId?: string
+  projectId: string | null
+  sujeto: SujetoEstadoCuenta | null
+  desde: string | null
+  hasta: string | null
+  pagina: number
+}) {
+  const { companyId, projectId, sujeto, desde, hasta, pagina } = params
+  return useQuery({
+    queryKey: contabilidadKeys.estadoCuenta(companyId, projectId, sujeto ? `${sujeto.tipo}:${sujeto.id}` : null, desde, hasta, pagina),
+    enabled: !!companyId && !!sujeto,
+    placeholderData: (prev) => prev,
+    queryFn: async () =>
+      (await runQuery<EstadoCuenta>((signal) =>
+        supabase
+          .rpc('conta_estado_cuenta', {
+            p_project_id: projectId,
+            ...argsSujeto(sujeto!),
+            p_desde: desde,
+            p_hasta: hasta,
+            p_limite: ESTADO_CUENTA_POR_PAGINA,
+            p_offset: pagina * ESTADO_CUENTA_POR_PAGINA,
+          })
+          .abortSignal(signal),
+      )) as EstadoCuenta,
+  })
+}
+
+/** Documentos del sujeto que NO están en su saldo contable, con su motivo. */
+export function useEstadoCuentaFueraQuery(params: {
+  companyId?: string
+  projectId: string | null
+  sujeto: SujetoEstadoCuenta | null
+  hasta: string | null
+  pagina: number
+}) {
+  const { companyId, projectId, sujeto, hasta, pagina } = params
+  return useQuery({
+    queryKey: contabilidadKeys.estadoCuentaFuera(companyId, projectId, sujeto ? `${sujeto.tipo}:${sujeto.id}` : null, hasta, pagina),
+    enabled: !!companyId && !!sujeto,
+    placeholderData: (prev) => prev,
+    queryFn: async () => {
+      const filas = (await runQuery<DocumentoFueraDeSaldo[]>((signal) =>
+        supabase
+          .rpc('conta_estado_cuenta_pendientes', {
+            p_project_id: projectId,
+            ...argsSujeto(sujeto!),
+            p_hasta: hasta,
+            p_limite: FUERA_DE_SALDO_POR_PAGINA,
+            p_offset: pagina * FUERA_DE_SALDO_POR_PAGINA,
+          })
+          .abortSignal(signal),
+      )) ?? []
+      return { filas, total: filas[0]?.total_filas ?? 0 }
+    },
+  })
+}
+
+/** Conciliación del saldo contable del sujeto con sus documentos, al corte. */
+export function useEstadoCuentaConciliacionQuery(params: {
+  companyId?: string
+  projectId: string | null
+  sujeto: SujetoEstadoCuenta | null
+  corte: string | null
+  enabled?: boolean
+}) {
+  const { companyId, projectId, sujeto, corte, enabled = true } = params
+  return useQuery({
+    queryKey: contabilidadKeys.estadoCuentaConciliacion(companyId, projectId, sujeto ? `${sujeto.tipo}:${sujeto.id}` : null, corte),
+    enabled: enabled && !!companyId && !!sujeto,
+    queryFn: async () =>
+      (await runQuery<ConciliacionEstadoCuenta>((signal) =>
+        supabase
+          .rpc('conta_estado_cuenta_conciliacion', {
+            p_project_id: projectId,
+            ...argsSujeto(sujeto!),
+            p_corte: corte,
+          })
+          .abortSignal(signal),
+      )) as ConciliacionEstadoCuenta,
+  })
+}
+
+/** Unidades del proyecto del ledger activo (el ledger de empresa no tiene). */
+export function useUnidadesLedgerQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.unidadesLedger(companyId, projectId),
+    enabled: !!companyId && !!projectId,
+    queryFn: async () =>
+      (await runQuery<Array<{ id: string; nombre: string }>>((signal) =>
+        supabase
+          .from('unidades')
+          .select('id, nombre')
+          .eq('company_id', companyId!)
+          .eq('project_id', projectId!)
+          .order('nombre', { ascending: true })
+          .abortSignal(signal),
+      )) ?? [],
   })
 }

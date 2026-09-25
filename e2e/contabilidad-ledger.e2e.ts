@@ -116,4 +116,30 @@ test.describe('CONTABILIDAD · ledger por empresa y proyecto', () => {
       page.getByText(/La empresa no tiene clientes activos/).or(page.getByRole('table')).first(),
     ).toBeVisible({ timeout: 15_000 })
   })
+
+  // Estado de cuenta: SÓLO LECTURA. Elige el primer auxiliar disponible y
+  // verifica que `conta_estado_cuenta` y `conta_estado_cuenta_pendientes`
+  // responden (resumen o estado vacío) sin error de permisos o de esquema. Los
+  // saldos, reversos, conciliación y aislamiento los cubre el arnés SQL
+  // `supabase/tests/conta_estado_cuenta` con roles de aplicación.
+  test('el estado de cuenta por auxiliar carga sin error', async ({ page }) => {
+    await login(page)
+    await gotoSection(page, '/contabilidad')
+
+    const pestaña = page.getByRole('tab', { name: /Estado de cuenta/i }).or(page.getByRole('button', { name: /Estado de cuenta/i }))
+    if (!(await exists(pestaña.first()))) test.skip(true, 'Contabilidad no disponible para este rol')
+    await pestaña.first().click()
+
+    const auxiliar = page.getByLabel('Auxiliar', { exact: true })
+    await expect(auxiliar).toBeVisible()
+    await expect.poll(async () => (await auxiliar.locator('option').count()), { timeout: 15_000 }).toBeGreaterThan(0)
+    const opciones = await auxiliar.locator('option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value).filter(Boolean))
+    test.skip(opciones.length === 0, 'la empresa no tiene clientes activos')
+    await auxiliar.selectOption(opciones[0])
+
+    await expect(page.getByText('Calculando estado de cuenta…')).toBeHidden({ timeout: 15_000 })
+    await expect(page.getByRole('alert').filter({ hasText: /No se pudo cargar el estado de cuenta/i })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Movimientos contabilizados' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Fuera del saldo contable' })).toBeVisible()
+  })
 })

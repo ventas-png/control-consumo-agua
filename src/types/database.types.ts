@@ -23308,6 +23308,58 @@ export type Database = {
           motivo: string | null
         }[]
       }
+      conta_estado_cuenta: {
+        Args: {
+          p_cliente_id?: string | null
+          p_desde?: string | null
+          p_hasta?: string | null
+          p_limite?: number
+          p_offset?: number
+          p_project_id: string | null
+          p_unidad_id?: string | null
+        }
+        Returns: Json
+      }
+      conta_estado_cuenta_conciliacion: {
+        Args: {
+          p_cliente_id?: string | null
+          p_corte?: string | null
+          p_project_id: string | null
+          p_unidad_id?: string | null
+        }
+        Returns: Json
+      }
+      conta_estado_cuenta_pendientes: {
+        Args: {
+          p_cliente_id?: string | null
+          p_hasta?: string | null
+          p_limite?: number
+          p_offset?: number
+          p_project_id: string | null
+          p_unidad_id?: string | null
+        }
+        Returns: {
+          asiento_id: string | null
+          asiento_numero: number | null
+          clase: string
+          codigo: string | null
+          concepto: string
+          estado_documento: string | null
+          evento: string
+          fecha: string
+          monto: number
+          motivo: string
+          naturaleza: string
+          origen_id: string
+          origen_tabla: string
+          responsable_id: string | null
+          responsable_nombre: string | null
+          tipo_cargo: string | null
+          total_filas: number
+          unidad_id: string | null
+          unidad_nombre: string | null
+        }[]
+      }
       conta_estado_resultados: {
         Args: {
           p_company_id: string
