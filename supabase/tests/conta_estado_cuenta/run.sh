@@ -2,7 +2,7 @@
 # ============================================================================
 # ESTADO DE CUENTA POR AUXILIAR Y UNIDAD · arnés contra un PostgreSQL REAL
 #
-# Prueba 20261003000000 sobre la cadena ENTERA de migraciones, el padrón de
+# Prueba 20261003000000 (y sus correctivas 0100 y 0200, corte histórico) sobre la cadena ENTERA de migraciones, el padrón de
 # conta_auxiliares_tipo_cargo y los fixtures de conta_contabilizacion_cargos y
 # conta_cobros_cuotas: saldos inicial y final con movimientos antes, dentro y
 # después del rango; principal y mora con CxC distintas y compartidas; cobros
@@ -76,10 +76,10 @@ aplicar() {
 SALIDAS=$(mktemp -d /tmp/ecout.XXXX)
 chmod 777 "$SALIDAS"
 
-echo "── 1/5 · andamiaje de plataforma (roles, auth, extensiones)"
+echo "── 1/6 · andamiaje de plataforma (roles, auth, extensiones)"
 aplicar "$RAIZ/scripts/schema-drift/bootstrap.sql"
 
-echo "── 2/5 · cadena de migraciones ANTERIORES a la que se prueba, en orden"
+echo "── 2/6 · cadena de migraciones ANTERIORES a la que se prueba, en orden"
 N=0
 for f in "$MIGS"/*.sql; do
   base="$(basename "$f" .sql)"
@@ -89,7 +89,7 @@ for f in "$MIGS"/*.sql; do
 done
 echo "   $N migraciones aplicadas sobre una base vacía"
 
-echo "── 3/5 · migración bajo prueba (dos veces: la segunda sólo puede fallar por «already exists»)"
+echo "── 3/6 · migración bajo prueba (dos veces: la segunda sólo puede fallar por «already exists»)"
 aplicar "$MIGS/$BAJO_PRUEBA.sql"
 if aplicar "$MIGS/$BAJO_PRUEBA.sql" 2>/dev/null; then
   echo "   ✓ segunda pasada limpia"
@@ -108,16 +108,25 @@ for f in "$MIGS"/*.sql; do
   [[ "$base" > "$BAJO_PRUEBA" ]] && aplicar "$f"
 done
 
-echo "── 4/5 · padrón de dos empresas + fixtures de cargos, de cobros y del estado de cuenta"
+echo "── 4/6 · padrón de dos empresas + fixtures de cargos, de cobros y del estado de cuenta"
 aplicar "$PADRON"
 aplicar "$CARGOS"
 aplicar "$COBROS"
 aplicar "$AQUI/fixture.sql"
 
-echo "── 5/5 · invariantes del estado de cuenta"
+echo "── 5/6 · invariantes del estado de cuenta"
 # El `|| true` es para poder IMPRIMIR el fallo: sin él, `set -e` aborta con la
 # salida todavía dentro de la variable y el error se pierde.
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d estado_cuenta -f "$AQUI/assert.sql" 2>&1) || {
+  echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+  echo "❌ invariante incumplida:"
+  echo "$SALIDA" | grep -E 'ERROR|FATAL' | head -5
+  exit 1
+}
+echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+
+echo "── 6/6 · corte histórico (20261003000200): resumen y pendientes antes y después de contabilizar y reversar"
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d estado_cuenta -f "$AQUI/assert_corte.sql" 2>&1) || {
   echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
   echo "❌ invariante incumplida:"
   echo "$SALIDA" | grep -E 'ERROR|FATAL' | head -5

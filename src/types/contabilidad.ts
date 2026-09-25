@@ -660,15 +660,25 @@ export interface MovimientoEstadoCuenta {
   reversado_por_id: string | null
   reversado_por_numero: number | null
   reversado_por_fecha: string | null
+  /** El reverso existe pero su fecha contable es POSTERIOR al corte: al corte
+   *  la fila no estaba reversada. */
+  reversado_despues_del_corte?: boolean
+  reversado_despues_fecha?: string | null
   cargo: number
   abono: number
   saldo: number
 }
 
-export type ClaseFueraDeSaldo = 'pendiente' | 'borrador' | 'fuera_del_auxiliar' | 'cobro_sin_vinculo'
+export type ClaseFueraDeSaldo =
+  | 'pendiente'
+  | 'contabilizado_despues'
+  | 'borrador'
+  | 'fuera_del_auxiliar'
+  | 'cobro_sin_vinculo'
 
 export const CLASE_FUERA_LABELS: Record<ClaseFueraDeSaldo, string> = {
   pendiente: 'Pendiente de contabilizar',
+  contabilizado_despues: 'Contabilizado después del corte',
   borrador: 'Asiento en borrador',
   fuera_del_auxiliar: 'Camino histórico (sin auxiliar)',
   cobro_sin_vinculo: 'Cobro sin vínculo',
@@ -699,6 +709,8 @@ export interface EstadoCuenta {
     documentos: number
     monto: number
   }>
+  /** Lo que NO se puede reconstruir al corte con los datos existentes. */
+  limitaciones?: LimitacionEstadoCuenta[]
   limite: number
   offset: number
   movimientos: MovimientoEstadoCuenta[]
@@ -718,12 +730,23 @@ export interface DocumentoFueraDeSaldo {
   responsable_id: string | null
   responsable_nombre: string | null
   monto: number
-  estado_documento: string | null
+  /** Estado de HOY del documento (no necesariamente el del corte). */
+  estado_actual: string | null
   codigo: string | null
   motivo: string
   asiento_id: string | null
   asiento_numero: number | null
+  asiento_fecha: string | null
+  /** La clasificación depende de un estado de hoy que no tiene fecha. */
+  limitacion: string | null
   total_filas: number
+}
+
+export interface LimitacionEstadoCuenta {
+  codigo: 'rechazo_sin_fecha' | 'anulacion_sin_fecha' | 'estado_actual_sin_fecha' | string
+  documentos: number
+  monto: number
+  descripcion: string
 }
 
 export type ClaseDiscrepancia = 'documento' | 'aplicacion' | 'sin_documento'

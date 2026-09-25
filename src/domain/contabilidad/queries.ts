@@ -1,7 +1,7 @@
 // Contabilidad — Hooks de LECTURA (TanStack Query + runQuery, patrón del repo).
 // La agregación pesada (balanza, libro mayor) corre 100% en servidor vía RPC;
 // el cliente nunca descarga líneas masivas.
-import { useQuery } from '@tanstack/react-query'
+import { hashKey, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { runQuery, runQueryAll } from '../queryFetch'
 import { contabilidadKeys } from './keys'
@@ -490,6 +490,19 @@ function argsSujeto(sujeto: SujetoEstadoCuenta) {
  * proyecto y sujeto, y calcula saldo inicial, totales, saldo final y saldo
  * acumulado sobre TODO el rango antes de paginar: la página sólo recorta filas.
  */
+/**
+ * `placeholderData` que conserva lo anterior SÓLO al paginar la MISMA consulta
+ * (misma empresa, ledger, sujeto y fechas: la clave sin su último elemento,
+ * que es la página). Con cualquier otro filtro no devuelve nada: esos datos
+ * son de otra consulta y no pueden mostrarse como vigentes mientras llega la
+ * nueva. Quien la use debe rotular `isPlaceholderData` como «actualizando».
+ */
+export function soloAlPaginar<T>(clave: readonly unknown[]) {
+  const consulta = hashKey(clave.slice(0, -1))
+  return (anterior: T | undefined, consultaAnterior?: { queryKey: readonly unknown[] }): T | undefined =>
+    consultaAnterior && hashKey(consultaAnterior.queryKey.slice(0, -1)) === consulta ? anterior : undefined
+}
+
 export function useEstadoCuentaQuery(params: {
   companyId?: string
   projectId: string | null
@@ -499,10 +512,11 @@ export function useEstadoCuentaQuery(params: {
   pagina: number
 }) {
   const { companyId, projectId, sujeto, desde, hasta, pagina } = params
+  const queryKey = contabilidadKeys.estadoCuenta(companyId, projectId, sujeto ? `${sujeto.tipo}:${sujeto.id}` : null, desde, hasta, pagina)
   return useQuery({
-    queryKey: contabilidadKeys.estadoCuenta(companyId, projectId, sujeto ? `${sujeto.tipo}:${sujeto.id}` : null, desde, hasta, pagina),
+    queryKey,
     enabled: !!companyId && !!sujeto,
-    placeholderData: (prev) => prev,
+    placeholderData: soloAlPaginar<EstadoCuenta>(queryKey),
     queryFn: async () =>
       (await runQuery<EstadoCuenta>((signal) =>
         supabase
@@ -528,10 +542,11 @@ export function useEstadoCuentaFueraQuery(params: {
   pagina: number
 }) {
   const { companyId, projectId, sujeto, hasta, pagina } = params
+  const queryKey = contabilidadKeys.estadoCuentaFuera(companyId, projectId, sujeto ? `${sujeto.tipo}:${sujeto.id}` : null, hasta, pagina)
   return useQuery({
-    queryKey: contabilidadKeys.estadoCuentaFuera(companyId, projectId, sujeto ? `${sujeto.tipo}:${sujeto.id}` : null, hasta, pagina),
+    queryKey,
     enabled: !!companyId && !!sujeto,
-    placeholderData: (prev) => prev,
+    placeholderData: soloAlPaginar<{ filas: DocumentoFueraDeSaldo[]; total: number }>(queryKey),
     queryFn: async () => {
       const filas = (await runQuery<DocumentoFueraDeSaldo[]>((signal) =>
         supabase

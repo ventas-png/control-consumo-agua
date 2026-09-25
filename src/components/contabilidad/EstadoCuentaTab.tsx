@@ -9,9 +9,17 @@
 //
 // Tres zonas, separadas a propósito:
 //   · movimientos contables PUBLICADOS (lo único que forma el saldo);
-//   · documentos fuera del saldo (pendientes, borradores, camino histórico,
-//     cargos adicionales «pagados» sin pago vinculado), que nunca se suman;
+//   · documentos fuera del saldo AL CORTE (pendientes, contabilizados después
+//     del corte, borradores, camino histórico, cargos adicionales «pagados»
+//     sin pago vinculado), que nunca se suman; el estado que se muestra de
+//     cada documento es el de HOY y así se rotula, y lo que el servidor no
+//     puede reconstruir al corte se avisa como limitación;
 //   · conciliación contra la contabilidad, a pedido.
+//
+// Datos de otra consulta NUNCA se muestran como vigentes: al cambiar sujeto o
+// fechas la página vuelve a la primera y, hasta que llega la respuesta nueva,
+// se ve «Calculando…», no el resultado anterior. Sólo al paginar la misma
+// consulta se conserva la página anterior, rotulada «Actualizando…».
 import { useEffect, useMemo, useState } from 'react'
 import { StatusBadge } from '../shared/StatusBadge'
 import {
@@ -46,6 +54,7 @@ type Modo = 'cliente' | 'unidad'
 
 const TONO_CLASE: Record<ClaseFueraDeSaldo, 'warning' | 'info' | 'neutral' | 'danger'> = {
   pendiente: 'warning',
+  contabilizado_despues: 'info',
   borrador: 'info',
   fuera_del_auxiliar: 'neutral',
   cobro_sin_vinculo: 'danger',
@@ -63,11 +72,17 @@ export function etiquetaTipoCargo(tipo: string | null): string {
 
 /** Texto de la marca de reverso de una fila, si la tiene. */
 export function marcaReverso(m: Pick<MovimientoEstadoCuenta,
-  'es_reverso' | 'reversa_de_numero' | 'reversado_por_id' | 'reversado_por_numero' | 'reversado_por_fecha'>): string | null {
+  'es_reverso' | 'reversa_de_numero' | 'reversado_por_id' | 'reversado_por_numero' | 'reversado_por_fecha'
+  | 'reversado_despues_del_corte' | 'reversado_despues_fecha'>): string | null {
   if (m.es_reverso) return `Reverso de la póliza #${m.reversa_de_numero ?? '?'}`
   if (m.reversado_por_id) {
     return `Reversado con la póliza #${m.reversado_por_numero ?? '?'}` +
       (m.reversado_por_fecha ? ` el ${formatDateShort(m.reversado_por_fecha)}` : '')
+  }
+  // Al corte todavía no estaba reversada: se avisa sin presentarlo como reverso.
+  if (m.reversado_despues_del_corte) {
+    return 'Reversado después del corte' +
+      (m.reversado_despues_fecha ? ` (${formatDateShort(m.reversado_despues_fecha)})` : '')
   }
   return null
 }
@@ -80,9 +95,6 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
   const [unidadId, setUnidadId] = useState('')
   const [desde, setDesde] = useState('')
   const [hasta, setHasta] = useState('')
-  const [pagina, setPagina] = useState(0)
-  const [paginaFuera, setPaginaFuera] = useState(0)
-  const [conciliar, setConciliar] = useState(false)
   const [asientoAbierto, setAsientoAbierto] = useState<string | null>(null)
 
   useEffect(() => {
@@ -100,13 +112,27 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
     return unidadId ? { tipo: 'unidad', id: unidadId } : null
   }, [modo, clienteId, unidadId, rangoMal])
 
-  // Cualquier cambio de sujeto o rango vuelve a la primera página y oculta la
-  // conciliación anterior (era de otro sujeto o de otro corte).
-  useEffect(() => {
-    setPagina(0)
-    setPaginaFuera(0)
-    setConciliar(false)
-  }, [sujeto?.tipo, sujeto?.id, desde, hasta])
+  // Identidad de la consulta. La página y la conciliación pedida pertenecen a
+  // UNA consulta: con otro sujeto o rango valen 0 y «sin pedir» desde el mismo
+  // render en que cambia el filtro (no un efecto después, que dejaría pasar
+  // una petición y un render con la página de la consulta anterior).
+  const consulta = JSON.stringify([companyId, projectId, sujeto?.tipo ?? null, sujeto?.id ?? null, desde, hasta])
+  const [paginas_, setPaginas_] = useState({ consulta, movs: 0, fuera: 0 })
+  const vigente = paginas_.consulta === consulta
+  const pagina = vigente ? paginas_.movs : 0
+  const paginaFuera = vigente ? paginas_.fuera : 0
+  const setPagina = (f: (p: number) => number) =>
+    setPaginas_((prev) => {
+      const mismo = prev.consulta === consulta
+      return { consulta, movs: f(mismo ? prev.movs : 0), fuera: mismo ? prev.fuera : 0 }
+    })
+  const setPaginaFuera = (f: (p: number) => number) =>
+    setPaginas_((prev) => {
+      const mismo = prev.consulta === consulta
+      return { consulta, movs: mismo ? prev.movs : 0, fuera: f(mismo ? prev.fuera : 0) }
+    })
+  const [conciliarEn, setConciliarEn] = useState<string | null>(null)
+  const conciliar = conciliarEn === consulta
 
   const estado = useEstadoCuentaQuery({
     companyId, projectId, sujeto, desde: desde || null, hasta: hasta || null, pagina,
@@ -273,12 +299,17 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
 
           <section aria-labelledby="ec-movimientos">
             <h3 id="ec-movimientos" style={{ margin: '0 0 8px', fontSize: 15 }}>Movimientos contabilizados</h3>
+            {estado.isPlaceholderData && (
+              <p role="status" style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--at-ink-soft)' }}>
+                Actualizando: se muestra la página anterior de esta misma consulta hasta que llegue la nueva.
+              </p>
+            )}
             {movimientos.length === 0 ? (
               <p role="status" style={{ margin: 0, fontSize: 13, color: 'var(--at-ink-soft)' }}>
                 Sin movimientos contabilizados en el rango.
               </p>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
+              <div style={{ overflowX: 'auto', opacity: estado.isPlaceholderData ? 0.6 : 1 }} aria-busy={estado.isPlaceholderData || undefined}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <caption style={{ textAlign: 'left', fontSize: 12, color: 'var(--at-ink-soft)', paddingBottom: 6 }}>
                     {totalMovs} movimiento{totalMovs === 1 ? '' : 's'} · saldo acumulado calculado sobre todo el rango
@@ -351,9 +382,23 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
           <section aria-labelledby="ec-fuera">
             <h3 id="ec-fuera" style={{ margin: '0 0 4px', fontSize: 15 }}>Fuera del saldo contable</h3>
             <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--at-ink-soft)' }}>
-              Documentos del {modo === 'cliente' ? 'auxiliar' : 'la unidad'} sin asiento publicado con su dimensión.
-              Se informan con su motivo y <strong>no suman</strong> al saldo de arriba.
+              Documentos del {modo === 'cliente' ? 'auxiliar' : 'la unidad'} que{' '}
+              {hasta ? <>al corte del <strong>{formatDateShort(hasta)}</strong></> : 'hoy'} no estaban en el saldo con su
+              dimensión. Se informan con su motivo y <strong>no suman</strong> al saldo de arriba. El estado de cada
+              documento es el de hoy.
             </p>
+            {(datos.limitaciones ?? []).length > 0 && (
+              <div role="note" aria-label="Limitaciones del corte" style={{ border: '1px solid var(--at-line)', borderRadius: 10, padding: 10, margin: '0 0 8px', fontSize: 12 }}>
+                <strong>No se puede reconstruir todo al corte:</strong>
+                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                  {(datos.limitaciones ?? []).map((l) => (
+                    <li key={l.codigo}>
+                      {l.descripcion} ({l.documentos} documento{l.documentos === 1 ? '' : 's'} · {dinero(l.monto)})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {datos.fuera_de_saldo.length > 0 && (
               <ul aria-label="Resumen fuera del saldo" style={{ listStyle: 'none', padding: 0, margin: '0 0 8px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {datos.fuera_de_saldo.map((f) => (
@@ -371,10 +416,15 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
               </p>
             ) : filasFuera.length === 0 ? (
               <p role="status" style={{ margin: 0, fontSize: 13, color: 'var(--at-ink-soft)' }}>
-                {fuera.isLoading ? 'Cargando…' : 'Nada fuera del saldo.'}
+                {fuera.isLoading || fuera.isFetching ? 'Cargando…' : 'Nada fuera del saldo.'}
               </p>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
+              <div style={{ overflowX: 'auto', opacity: fuera.isPlaceholderData ? 0.6 : 1 }} aria-busy={fuera.isPlaceholderData || undefined}>
+                {fuera.isPlaceholderData && (
+                  <p role="status" style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--at-ink-soft)' }}>
+                    Actualizando: página anterior de esta misma lista.
+                  </p>
+                )}
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ textAlign: 'left', color: 'var(--at-ink-soft)', fontSize: 11, borderBottom: '1px solid var(--at-line)' }}>
@@ -382,6 +432,7 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
                       <th style={{ padding: 6 }}>Documento</th>
                       <th style={{ padding: 6 }}>Clase</th>
                       <th style={{ padding: 6, textAlign: 'right' }}>Importe</th>
+                      <th style={{ padding: 6 }}>Estado hoy</th>
                       <th style={{ padding: 6 }}>Motivo</th>
                     </tr>
                   </thead>
@@ -397,6 +448,7 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
                           {f.asiento_id && (
                             <button type="button" style={btnLink} onClick={() => setAsientoAbierto(f.asiento_id)}>
                               Póliza #{f.asiento_numero ?? '—'}
+                              {f.asiento_fecha ? ` del ${formatDateShort(f.asiento_fecha)}` : ''}
                             </button>
                           )}
                         </td>
@@ -406,7 +458,15 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
                         <td style={{ padding: 6, textAlign: 'right', whiteSpace: 'nowrap' }}>
                           {f.naturaleza === 'abono' ? `−${dinero(f.monto)}` : dinero(f.monto)}
                         </td>
-                        <td style={{ padding: 6, maxWidth: 360, fontSize: 12 }}>{f.motivo}</td>
+                        <td style={{ padding: 6, fontSize: 12 }}>{f.estado_actual ?? '—'}</td>
+                        <td style={{ padding: 6, maxWidth: 360, fontSize: 12 }}>
+                          {f.motivo}
+                          {f.limitacion && (
+                            <div style={{ marginTop: 2 }}>
+                              <StatusBadge tone="warning">Estado de hoy, sin fecha: puede no ser el del corte</StatusBadge>
+                            </div>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -429,7 +489,7 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
               los cobros, al corte {hasta ? formatDateShort(hasta) : 'de hoy (sin límite)'}.
             </p>
             {!conciliar ? (
-              <button type="button" style={btnSecundario} onClick={() => setConciliar(true)}>Conciliar</button>
+              <button type="button" style={btnSecundario} onClick={() => setConciliarEn(consulta)}>Conciliar</button>
             ) : conciliacion.isError ? (
               <p role="alert" style={{ margin: 0, color: 'var(--at-danger)', fontSize: 13 }}>
                 No se pudo conciliar: {conciliacion.error instanceof Error ? conciliacion.error.message : 'error desconocido'}.

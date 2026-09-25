@@ -23343,10 +23343,12 @@ export type Database = {
           asiento_numero: number | null
           clase: string
           codigo: string | null
+          asiento_fecha: string | null
           concepto: string
-          estado_documento: string | null
+          estado_actual: string | null
           evento: string
           fecha: string
+          limitacion: string | null
           monto: number
           motivo: string
           naturaleza: string

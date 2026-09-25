@@ -102,8 +102,8 @@ function fueraFila(over: Partial<DocumentoFueraDeSaldo> = {}): DocumentoFueraDeS
     clase: 'pendiente', naturaleza: 'abono', origen_tabla: 'pagos', origen_id: 'pg-5', evento: 'pago_contabilizado',
     fecha: '2026-06-20', concepto: 'Pago efectivo · SINT K4', tipo_cargo: 'mantenimiento', unidad_id: 'u-2',
     unidad_nombre: 'Apto 102', responsable_id: 'cli-1', responsable_nombre: 'Cliente Uno', monto: 100,
-    estado_documento: 'verificado', codigo: 'excede_saldo', motivo: 'El cobro excede el saldo de la cuota.',
-    asiento_id: null, asiento_numero: null, total_filas: 1,
+    estado_actual: 'verificado', codigo: 'excede_saldo', motivo: 'El cobro excede el saldo de la cuota.',
+    asiento_id: null, asiento_numero: null, asiento_fecha: null, limitacion: null, total_filas: 1,
     ...over,
   }
 }
@@ -195,6 +195,68 @@ describe('EstadoCuentaTab', () => {
     expect(ultimo(state.pEstado).pagina).toBe(1)
   })
 
+  it('cambiar de sujeto o de corte vuelve a la página 1 en ESE mismo render (nunca pide la página vieja con el filtro nuevo)', () => {
+    montar()
+    elegirCliente()
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(ultimo(state.pEstado).pagina).toBe(1)
+    const antes = state.pEstado.length
+    elegirCliente('cli-2')
+    const conB = state.pEstado.slice(antes).filter((p) => (p.sujeto as { id: string } | null)?.id === 'cli-2')
+    expect(conB.length).toBeGreaterThan(0)
+    expect(conB.every((p) => p.pagina === 0)).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    const antes2 = state.pEstado.length
+    fireEvent.change(screen.getByLabelText('Hasta (corte)'), { target: { value: '2026-01-31' } })
+    const conCorte = state.pEstado.slice(antes2).filter((p) => p.hasta === '2026-01-31')
+    expect(conCorte.length).toBeGreaterThan(0)
+    expect(conCorte.every((p) => p.pagina === 0)).toBe(true)
+  })
+
+  it('la conciliación pedida no sobrevive a un cambio de corte', () => {
+    montar()
+    elegirCliente()
+    fireEvent.click(screen.getByRole('button', { name: 'Conciliar' }))
+    expect(ultimo(state.pConciliacion).enabled).toBe(true)
+    fireEvent.change(screen.getByLabelText('Hasta (corte)'), { target: { value: '2026-01-31' } })
+    expect(ultimo(state.pConciliacion).enabled).toBe(false)
+    expect(screen.getByRole('button', { name: 'Conciliar' })).toBeTruthy()
+  })
+
+  it('al corte: contabilizado después, estado de HOY rotulado y limitaciones visibles', () => {
+    state.estado = {
+      data: datos({
+        hasta: '2026-01-31',
+        fuera_de_saldo: [{ clase: 'contabilizado_despues', naturaleza: 'cargo', documentos: 1, monto: 100 }],
+        limitaciones: [{ codigo: 'rechazo_sin_fecha', documentos: 1, monto: 80, descripcion: 'Cobros HOY rechazados que nunca tuvieron asiento.' }],
+      }),
+      isLoading: false, isError: false,
+    }
+    state.fuera = {
+      data: {
+        filas: [
+          fueraFila({ clase: 'contabilizado_despues', naturaleza: 'cargo', origen_tabla: 'cuotas_condominio', origen_id: 'k-20',
+                      estado_actual: 'pendiente', codigo: 'contabilizado_despues_del_corte',
+                      motivo: 'Contabilizado con fecha 2026-02-03, posterior al corte.', asiento_id: 'as-20', asiento_numero: 20, asiento_fecha: '2026-02-03' }),
+          fueraFila({ clase: 'cobro_sin_vinculo', naturaleza: 'cargo', origen_tabla: 'cargos_adicionales_unidad', origen_id: 'ca-21',
+                      estado_actual: 'pagado', limitacion: 'estado_actual_sin_fecha', monto: 12 }),
+        ],
+        total: 2,
+      },
+      isLoading: false, isError: false,
+    }
+    montar()
+    elegirCliente()
+    fireEvent.change(screen.getByLabelText('Hasta (corte)'), { target: { value: '2026-01-31' } })
+    const seccion = screen.getByRole('heading', { name: 'Fuera del saldo contable' }).parentElement!
+    expect(within(seccion).getAllByText(/Contabilizado después del corte/).length).toBeGreaterThan(0)
+    expect(within(seccion).getByRole('button', { name: /Póliza #20 del/ })).toBeTruthy()
+    expect(within(seccion).getByRole('columnheader', { name: 'Estado hoy' })).toBeTruthy()
+    expect(within(seccion).getByText('pagado')).toBeTruthy()
+    expect(within(seccion).getByText(/Estado de hoy, sin fecha: puede no ser el del corte/)).toBeTruthy()
+    expect(within(seccion).getByRole('note', { name: 'Limitaciones del corte' }).textContent).toContain('Cobros HOY rechazados')
+  })
+
   it('lo de fuera del saldo se lista aparte, con su clase y motivo, y el cobro con signo menos', () => {
     montar()
     elegirCliente()
@@ -255,5 +317,7 @@ describe('ayudas puras', () => {
     expect(marcaReverso(base)).toBeNull()
     expect(marcaReverso({ ...base, es_reverso: true, reversa_de_numero: 5 })).toBe('Reverso de la póliza #5')
     expect(marcaReverso({ ...base, reversado_por_id: 'x', reversado_por_numero: 9 })).toBe('Reversado con la póliza #9')
+    // Reverso con fecha posterior al corte: no se presenta como reverso de la fila.
+    expect(marcaReverso({ ...base, reversado_despues_del_corte: true, reversado_despues_fecha: null })).toBe('Reversado después del corte')
   })
 })
