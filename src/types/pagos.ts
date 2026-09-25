@@ -26,6 +26,9 @@ export interface Pago {
   numero_documento?: string | null;
   tipo_aplicacion?: TipoAplicacion;
   convenio_id?: string | null;
+  /** Cobro de un cargo adicional (20261004000000). No es un cobro de agua:
+   *  se registra y se anula sólo desde Condominios › Cargos adicionales. */
+  cargo_adicional_id?: string | null;
   comprobante_url?: string | null;
   comprobante_tipo?: 'imagen' | 'pdf' | null;
   verification_status?: EstadoPago;

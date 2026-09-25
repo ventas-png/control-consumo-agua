@@ -24,6 +24,7 @@ vi.mock('../../../lib/supabase', () => {
 vi.mock('../../../lib/storageUrls', () => ({ useSignedUrl: () => null }))
 vi.mock('../../../domain/cobros/queries', () => ({
   fetchPagosYConvenios: vi.fn(async () => ({ pagos: [], convenios: [] })),
+  esCobroDeCargoAdicional: (p: { cargo_adicional_id?: string | null }) => p.cargo_adicional_id != null,
 }))
 vi.mock('../../../domain/cobros/mutations', () => ({
   verifyPago: vi.fn(), rejectPago: vi.fn(), setConvenioEstado: vi.fn(),
