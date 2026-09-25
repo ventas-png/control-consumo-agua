@@ -731,6 +731,19 @@ jobs:
           PGPORT_TEST: 55512
         run: supabase/tests/catalogo_contable_inicial/run.sh
 
+      # 20261005000000: fecha de rechazo de los cobros. El rechazo (Agua por
+      # UPDATE directo, cargos por su RPC) deja evidencia con la hora del
+      # servidor, el usuario de la sesión y el motivo; repetirlo no duplica y
+      # la evidencia no se reescribe. Cortes anteriores, del día y posteriores
+      # (con límites del día en UTC), rechazo legado sin fecha como
+      # limitación, cobro con asiento sin cambios, permisos y aislamiento.
+      # La concurrencia rechazo ↔ reproceso está en conta_cobros_bloqueos.
+      - name: Contabilidad — fecha de rechazo de los cobros y cortes históricos
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55513
+        run: supabase/tests/conta_rechazo_cobros/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

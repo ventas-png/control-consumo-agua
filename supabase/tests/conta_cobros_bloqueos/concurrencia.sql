@@ -49,6 +49,18 @@ SELECT public.chk(pg_temp.todos('9c000000-0000-0000-0000-0000000000c4'), 0, 'k4 
 SELECT public.chk(pg_temp.aplic_vivas('9c000000-0000-0000-0000-0000000000c4'), 0, 'k4 · …ni deja aplicación');
 SELECT public.chk(pg_temp.saldo('c3000000-0000-0000-0000-0000000000c4', '9c000000-0000-0000-0000-0000000000c4'), 50, 'k4 · la cuota se devengó y debe 50');
 
+-- ── Evidencia del rechazo (20261005000000) en los dos órdenes ───────────────
+-- Una sola fila por rechazo, desde el estado en que estaba el cobro, aunque
+-- el rechazo haya esperado al reproceso o el reproceso al rechazo.
+SELECT public.chk_txt(
+  (SELECT string_agg(evento || ':' || estado_anterior, ',') FROM public.pagos_rechazo_eventos
+    WHERE pago_id = '9c000000-0000-0000-0000-0000000000c1'),
+  'rechazo:verificado', 'k1 · reproceso → rechazo: una sola evidencia del rechazo');
+SELECT public.chk_txt(
+  (SELECT string_agg(evento || ':' || estado_anterior, ',') FROM public.pagos_rechazo_eventos
+    WHERE pago_id = '9c000000-0000-0000-0000-0000000000c4'),
+  'rechazo:verificado', 'k4 · rechazo → reproceso: una sola evidencia, y el reproceso no la duplica');
+
 SELECT public.chk(pg_temp.todos('9c000000-0000-0000-0000-0000000000c5'), 0, 'k5 · borrado suave → reproceso: nunca se contabiliza');
 SELECT public.chk(pg_temp.aplic_vivas('9c000000-0000-0000-0000-0000000000c5'), 0, 'k5 · …ni deja aplicación');
 SELECT public.chk(pg_temp.saldo('c3000000-0000-0000-0000-0000000000c5', '9c000000-0000-0000-0000-0000000000c5'), 50, 'k5 · la cuota se devengó y debe 50');

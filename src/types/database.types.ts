@@ -12919,6 +12919,63 @@ export type Database = {
           },
         ]
       }
+      pagos_rechazo_eventos: {
+        Row: {
+          actor: string | null
+          company_id: string
+          estado_anterior: string
+          estado_nuevo: string
+          evento: string
+          id: string
+          motivo: string | null
+          ocurrido_at: string
+          pago_id: string
+          project_id: string | null
+          verified_at_anterior: string | null
+        }
+        Insert: {
+          actor?: string | null
+          company_id: string
+          estado_anterior: string
+          estado_nuevo: string
+          evento: string
+          id?: string
+          motivo?: string | null
+          ocurrido_at?: string
+          pago_id: string
+          project_id?: string | null
+          verified_at_anterior?: string | null
+        }
+        Update: {
+          actor?: string | null
+          company_id?: string
+          estado_anterior?: string
+          estado_nuevo?: string
+          evento?: string
+          id?: string
+          motivo?: string | null
+          ocurrido_at?: string
+          pago_id?: string
+          project_id?: string | null
+          verified_at_anterior?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagos_rechazo_eventos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_rechazo_eventos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       paquetes_recibidos: {
         Row: {
           autorizado_documento: string | null
