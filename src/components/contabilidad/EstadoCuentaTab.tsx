@@ -166,7 +166,7 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
               />
             </Campo>
             <Campo label="Auxiliar">
-              <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} style={{ ...input, minWidth: 220 }}>
+              <select aria-label="Auxiliar" value={clienteId} onChange={(e) => setClienteId(e.target.value)} style={{ ...input, minWidth: 220 }}>
                 <option value="">Elige un auxiliar…</option>
                 {(clientes.data ?? []).map((c) => (
                   <option key={c.cliente_id} value={c.cliente_id}>
@@ -178,7 +178,7 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
           </>
         ) : (
           <Campo label="Unidad">
-            <select value={unidadId} onChange={(e) => setUnidadId(e.target.value)} style={{ ...input, minWidth: 220 }}>
+            <select aria-label="Unidad" value={unidadId} onChange={(e) => setUnidadId(e.target.value)} style={{ ...input, minWidth: 220 }}>
               <option value="">Elige una unidad…</option>
               {(unidades.data ?? []).map((u) => (
                 <option key={u.id} value={u.id}>{u.nombre}</option>
