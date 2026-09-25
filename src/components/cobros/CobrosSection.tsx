@@ -4,7 +4,7 @@ import { notify, confirm } from '../shared/Dialog'
 import { TabStrip } from '../shared/TabStrip'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { configurarCierreAutomatico } from '../shared/cierreAutomaticoDialog'
-import { fetchPagosYConvenios } from '../../domain/cobros/queries'
+import { fetchPagosYConvenios, esCobroDeCargoAdicional } from '../../domain/cobros/queries'
 import { verifyPago, rejectPago, setConvenioEstado } from '../../domain/cobros/mutations'
 import { registrarPagoRegistro, marcarRegistrosMora } from '../../domain/agua/mutations'
 import type { Registro, Cliente, Pago, ConvenioPago, FormaPago, Proyecto } from '../../types'
@@ -442,6 +442,18 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
     const pago = pagos.find(p => p.id === pagoId)
     if (!pago) {
       setVerificando(null)
+      return
+    }
+    // Un cobro de cargo adicional no se verifica ni se rechaza desde agua: se
+    // anula con motivo (y reverso de su asiento) en su propio flujo. La carga ya
+    // los excluye; esto cierra la puerta si alguno llegara por otra vía.
+    if (esCobroDeCargoAdicional(pago)) {
+      setVerificando(null)
+      notify({
+        variant: 'warning',
+        title: 'Cobro de un cargo adicional',
+        text: 'Este cobro se gestiona en Condominios › Cargos adicionales › Cobros.',
+      })
       return
     }
 

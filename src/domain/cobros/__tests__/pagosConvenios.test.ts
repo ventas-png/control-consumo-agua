@@ -6,23 +6,29 @@ import { describe, it, expect, vi } from 'vitest'
 const order = vi.fn()
 const insert = vi.fn()
 const updateEq = vi.fn()
+/** Filtros `.is(col, valor)` que recibió cada consulta, por tabla. */
+const filtrosIs: Record<string, [string, unknown][]> = {}
 vi.mock('../../../lib/supabase', () => {
   const client = {
-    from: () => ({
-      // fetchPagosYConvenios: pagos usa .select().is().order(); convenios .select().order()
-      select: () => ({
-        is: () => ({ order }),
+    from: (tabla: string) => {
+      filtrosIs[tabla] = []
+      // fetchPagosYConvenios: pagos usa .select().is().is().order(); convenios .select().order()
+      const conFiltros = {
+        is: (col: string, valor: unknown) => { filtrosIs[tabla].push([col, valor]); return conFiltros },
         order,
-      }),
-      insert,
-      update: () => ({ eq: updateEq }),
-    }),
+      }
+      return {
+        select: () => conFiltros,
+        insert,
+        update: () => ({ eq: updateEq }),
+      }
+    },
   }
   // Como en el módulo real, `db` es la MISMA instancia vista con el esquema tipado.
   return { supabase: client, db: client }
 })
 
-import { fetchPagosYConvenios } from '../queries'
+import { fetchPagosYConvenios, esCobroDeCargoAdicional } from '../queries'
 import { createPago, verifyPago, rejectPago, createConvenio, setConvenioEstado } from '../mutations'
 
 describe('fetchPagosYConvenios', () => {
@@ -42,6 +48,41 @@ describe('fetchPagosYConvenios', () => {
       .mockResolvedValueOnce({ data: null })
       .mockResolvedValueOnce({ data: null })
     expect(await fetchPagosYConvenios()).toEqual({ pagos: [], convenios: [] })
+  })
+
+  it('pide al servidor sólo pagos vivos y sin cargo adicional; convenios sin tocar', async () => {
+    order
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] })
+    await fetchPagosYConvenios()
+    expect(filtrosIs.pagos).toEqual([['deleted_at', null], ['cargo_adicional_id', null]])
+    // Ni company_id ni project_id: el aislamiento sigue siendo el de la RLS.
+    expect(filtrosIs.convenios_pago).toEqual([])
+  })
+
+  it('si un cobro de cargo llegara igual, la frontera lo descarta; agua, cuotas y convenios siguen', async () => {
+    order
+      .mockResolvedValueOnce({
+        data: [
+          { id: 'agua', registro_id: 'r1', cargo_adicional_id: null, monto: 100 },
+          { id: 'cuota', cuota_id: 'q1', cargo_adicional_id: null, monto: 50 },
+          { id: 'convenio', convenio_id: 'cv1', cargo_adicional_id: null, monto: 30 },
+          // Concepto y referencia «de agua» a propósito: se decide por el vínculo.
+          { id: 'cargo', cargo_adicional_id: 'ca1', referencia: 'Agua enero', notas: 'agua', monto: 999 },
+        ],
+      })
+      .mockResolvedValueOnce({ data: [{ id: 'c1', registro_ids: ['r1'] }] })
+    const { pagos, convenios } = await fetchPagosYConvenios()
+    expect(pagos.map(p => p.id)).toEqual(['agua', 'cuota', 'convenio'])
+    expect(convenios).toEqual([{ id: 'c1', registro_ids: ['r1'] }])
+  })
+})
+
+describe('esCobroDeCargoAdicional', () => {
+  it('sólo el vínculo explícito cuenta', () => {
+    expect(esCobroDeCargoAdicional({ cargo_adicional_id: 'ca1' })).toBe(true)
+    expect(esCobroDeCargoAdicional({ cargo_adicional_id: null })).toBe(false)
+    expect(esCobroDeCargoAdicional({})).toBe(false)
   })
 })
 

@@ -134,6 +134,15 @@ SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d cobros_cargos -f "$AQUI/assert_coherencia
 }
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 
+echo "── 5c/6 · pantalla de Cobros de agua: su predicado bajo la RLS, sin cobros de cargos"
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d cobros_cargos -f "$AQUI/assert_vista_agua.sql" 2>&1) || {
+  echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+  echo "❌ invariante incumplida:"
+  echo "$SALIDA" | grep -E 'ERROR|FATAL' | head -5
+  exit 1
+}
+echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+
 echo "── 6/6 · concurrencia: sesiones REALES simultáneas, no una simulación"
 ADM=a0a0a0a0-0000-0000-0000-00000000000a
 CA2=ca000000-0000-0000-0000-000000000002

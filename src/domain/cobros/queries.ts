@@ -21,7 +21,7 @@ import type {
 } from '../../types'
 import type { Tables } from '../../types/database.types'
 
-/** Pagos (no borrados) + convenios del tenant, más recientes primero. */
+/** Pagos de agua (no borrados) + convenios del tenant, más recientes primero. */
 export interface PagosYConvenios {
   pagos: Pago[]
   convenios: ConvenioPago[]
@@ -55,9 +55,23 @@ function mapConvenio(row: Tables<'convenios_pago'>): ConvenioPago {
 }
 
 /**
+ * ¿Es el cobro de un cargo adicional? Se decide SÓLO por el vínculo explícito
+ * `cargo_adicional_id`, nunca por concepto, referencia ni nombre.
+ */
+export function esCobroDeCargoAdicional(p: Pick<Pago, 'cargo_adicional_id'>): boolean {
+  return p.cargo_adicional_id != null
+}
+
+/**
  * Carga pagos manuales (con deleted_at null) y convenios del tenant para la
- * pantalla de cobros. Lectura imperativa (no-hook) para usarse desde un
+ * pantalla de cobros de AGUA. Lectura imperativa (no-hook) para usarse desde un
  * `useCallback` que llena estado local. Defaultea a `[]` ante datos ausentes.
+ *
+ * Los cobros de cargos adicionales quedan fuera: tienen su propio flujo
+ * (Condominios › Cargos adicionales › Cobros) y el servidor rechaza tocarlos
+ * por aquí (COBRO_CARGO_SOLO_RPC). Se excluyen en la consulta y otra vez en la
+ * frontera, para que las pestañas, los totales y los KPI de la pantalla se
+ * calculen sobre el mismo conjunto.
  */
 export async function fetchPagosYConvenios(): Promise<PagosYConvenios> {
   const [pagosRes, conveniosRes] = await Promise.all([
@@ -65,6 +79,7 @@ export async function fetchPagosYConvenios(): Promise<PagosYConvenios> {
       .from('pagos')
       .select('*')
       .is('deleted_at', null)
+      .is('cargo_adicional_id', null)
       .order('created_at', { ascending: false }),
     db
       .from('convenios_pago')
@@ -72,7 +87,7 @@ export async function fetchPagosYConvenios(): Promise<PagosYConvenios> {
       .order('created_at', { ascending: false }),
   ])
   return {
-    pagos: (pagosRes.data ?? []).map(mapPago),
+    pagos: (pagosRes.data ?? []).map(mapPago).filter(p => !esCobroDeCargoAdicional(p)),
     convenios: (conveniosRes.data ?? []).map(mapConvenio),
   }
 }
