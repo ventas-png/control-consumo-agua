@@ -88,7 +88,15 @@ aplicar "$MIGS/20260924000200_catalogo_contable_inicial_configurable.sql"
 aplicar "$MIGS/20260924000200_catalogo_contable_inicial_configurable.sql"
 
 echo "── 5/6 · invariantes"
-SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d catalogo_inicial -f "$AQUI/assert.sql" 2>&1)
+# El `|| {…}` es para poder IMPRIMIR el fallo: con `set -e`, un psql fallido
+# dentro de `$(…)` abortaba el script con la salida todavía en la variable y
+# la suite terminaba en silencio (exit 3), sin decir qué invariante ni por qué.
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d catalogo_inicial -f "$AQUI/assert.sql" 2>&1) || {
+  echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+  echo "❌ invariante incumplida:"
+  echo "$SALIDA" | grep -E 'ERROR|FATAL' | head -5
+  exit 1
+}
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 echo "── 6/6 · fin"
 echo "✅ catálogo inicial configurable verificado"
