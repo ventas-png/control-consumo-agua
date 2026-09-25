@@ -116,4 +116,60 @@ test.describe('CONTABILIDAD · ledger por empresa y proyecto', () => {
       page.getByText(/La empresa no tiene clientes activos/).or(page.getByRole('table')).first(),
     ).toBeVisible({ timeout: 15_000 })
   })
+
+  // Estado de cuenta: SÓLO LECTURA. Consulta el primer auxiliar disponible del
+  // ledger de la empresa; si la empresa del E2E no tiene clientes activos, cae a
+  // la consulta por UNIDAD en el primer proyecto que tenga unidades (la suite de
+  // condominios siembra unidades, así que el camino siempre existe). No se
+  // omite: el verificador de la suite rechaza cualquier skip. Lo que se
+  // comprueba es que `conta_estado_cuenta` y `conta_estado_cuenta_pendientes`
+  // responden (resumen o estado vacío) sin error de permisos o de esquema. Los
+  // saldos, reversos, conciliación y aislamiento los cubre el arnés SQL
+  // `supabase/tests/conta_estado_cuenta` con roles de aplicación.
+  test('el estado de cuenta por auxiliar o unidad carga sin error', async ({ page }) => {
+    await login(page)
+    await gotoSection(page, '/contabilidad')
+
+    const pestaña = page.getByRole('tab', { name: /Estado de cuenta/i }).or(page.getByRole('button', { name: /Estado de cuenta/i }))
+    if (!(await exists(pestaña.first()))) test.skip(true, 'Contabilidad no disponible para este rol')
+    await pestaña.first().click()
+
+    const valores = (select: ReturnType<typeof page.getByLabel>) =>
+      select.locator('option').evaluateAll((os) => (os as HTMLOptionElement[]).map((o) => o.value).filter(Boolean))
+
+    const auxiliar = page.getByLabel('Auxiliar', { exact: true })
+    await expect(auxiliar).toBeVisible()
+    // La lista se llena al resolver la RPC de auxiliares; se da margen antes
+    // de concluir que la empresa no tiene clientes.
+    await expect.poll(async () => (await valores(auxiliar)).length, { timeout: 10_000 }).toBeGreaterThan(0).catch(() => {})
+    const clientes = await valores(auxiliar)
+
+    if (clientes.length > 0) {
+      await auxiliar.selectOption(clientes[0])
+    } else {
+      const selector = page.getByLabel(/Seleccionar contabilidad/i)
+      const proyectos = await valores(selector)
+      let elegida = false
+      for (const proyecto of proyectos) {
+        await selector.selectOption(proyecto)
+        // Cambiar de ledger remonta la pestaña: se vuelve a elegir el modo.
+        await page.getByRole('radio', { name: 'Por unidad' }).click()
+        const unidad = page.getByLabel('Unidad', { exact: true })
+        await expect(unidad).toBeVisible()
+        await expect.poll(async () => (await valores(unidad)).length, { timeout: 10_000 }).toBeGreaterThan(0).catch(() => {})
+        const unidades = await valores(unidad)
+        if (unidades.length > 0) {
+          await unidad.selectOption(unidades[0])
+          elegida = true
+          break
+        }
+      }
+      expect(elegida, 'el E2E necesita un auxiliar en la empresa o una unidad en algún proyecto').toBe(true)
+    }
+
+    await expect(page.getByText('Calculando estado de cuenta…')).toBeHidden({ timeout: 15_000 })
+    await expect(page.getByRole('alert').filter({ hasText: /No se pudo cargar el estado de cuenta/i })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Movimientos contabilizados' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Fuera del saldo contable' })).toBeVisible()
+  })
 })

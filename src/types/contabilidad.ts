@@ -608,3 +608,171 @@ export interface AuxiliarCliente {
   codigo: string | null
   activo: boolean | null
 }
+
+// ── Estado de cuenta por auxiliar (cliente) y por unidad ─────────────────────
+// Lo calcula el servidor (conta_estado_cuenta): saldos y totales sobre el
+// conjunto completo, independientes de la página. La UI no suma importes.
+
+/** Etiquetas de los tipos de cargo declarados en `conta_tipos_cargo()`. */
+export const TIPO_CARGO_LABELS: Record<string, string> = {
+  mantenimiento: 'Mantenimiento',
+  cuota_extraordinaria: 'Cuota extraordinaria',
+  recargo_mora: 'Recargo por mora',
+  agua: 'Servicio de agua',
+  adicional_reparacion: 'Cargo adicional · reparación',
+  adicional_exceso_consumo: 'Cargo adicional · exceso de consumo',
+  adicional_dano: 'Cargo adicional · daño',
+  adicional_servicio: 'Cargo adicional · servicio',
+  adicional_multa: 'Cargo adicional · multa',
+  adicional_otro: 'Cargo adicional · otro',
+}
+
+export type SujetoEstadoCuenta = { tipo: 'cliente'; id: string } | { tipo: 'unidad'; id: string }
+
+export type ComponenteMovimiento = 'principal' | 'mora' | 'cargo'
+
+export interface MovimientoEstadoCuenta {
+  n: number
+  linea_id: string
+  asiento_id: string
+  asiento_numero: number | null
+  fecha: string
+  origen: 'manual' | 'automatico'
+  documento_tabla: 'cuotas_condominio' | 'cargos_adicionales_unidad' | 'pagos' | string | null
+  documento_id: string | null
+  evento: string | null
+  documento: string
+  concepto: string
+  descripcion: string | null
+  tipo_cargo: string | null
+  componente: ComponenteMovimiento | null
+  cuota_id: string | null
+  cuenta_id: string
+  cuenta_codigo: string
+  cuenta_nombre: string
+  unidad_id: string | null
+  unidad_nombre: string | null
+  auxiliar_id: string | null
+  auxiliar_nombre: string | null
+  es_reverso: boolean
+  reversa_de_id: string | null
+  reversa_de_numero: number | null
+  reversado_por_id: string | null
+  reversado_por_numero: number | null
+  reversado_por_fecha: string | null
+  /** El reverso existe pero su fecha contable es POSTERIOR al corte: al corte
+   *  la fila no estaba reversada. */
+  reversado_despues_del_corte?: boolean
+  reversado_despues_fecha?: string | null
+  cargo: number
+  abono: number
+  saldo: number
+}
+
+export type ClaseFueraDeSaldo =
+  | 'pendiente'
+  | 'contabilizado_despues'
+  | 'borrador'
+  | 'fuera_del_auxiliar'
+  | 'cobro_sin_vinculo'
+
+export const CLASE_FUERA_LABELS: Record<ClaseFueraDeSaldo, string> = {
+  pendiente: 'Pendiente de contabilizar',
+  contabilizado_despues: 'Contabilizado después del corte',
+  borrador: 'Asiento en borrador',
+  fuera_del_auxiliar: 'Camino histórico (sin auxiliar)',
+  cobro_sin_vinculo: 'Cobro sin vínculo',
+}
+
+export interface EstadoCuenta {
+  sujeto: { tipo: 'cliente' | 'unidad'; id: string; nombre: string; codigo_auxiliar?: string | null } | null
+  project_id: string | null
+  desde: string | null
+  hasta: string | null
+  resumen: {
+    saldo_inicial: number
+    cargos: number
+    abonos: number
+    saldo_final: number
+    movimientos: number
+  }
+  por_tipo: Array<{
+    tipo_cargo: string | null
+    saldo_inicial: number
+    cargos: number
+    abonos: number
+    saldo_final: number
+  }>
+  fuera_de_saldo: Array<{
+    clase: ClaseFueraDeSaldo
+    naturaleza: 'cargo' | 'abono'
+    documentos: number
+    monto: number
+  }>
+  /** Lo que NO se puede reconstruir al corte con los datos existentes. */
+  limitaciones?: LimitacionEstadoCuenta[]
+  limite: number
+  offset: number
+  movimientos: MovimientoEstadoCuenta[]
+}
+
+export interface DocumentoFueraDeSaldo {
+  clase: ClaseFueraDeSaldo
+  naturaleza: 'cargo' | 'abono'
+  origen_tabla: 'cuotas_condominio' | 'cargos_adicionales_unidad' | 'pagos'
+  origen_id: string
+  evento: string
+  fecha: string
+  concepto: string
+  tipo_cargo: string | null
+  unidad_id: string | null
+  unidad_nombre: string | null
+  responsable_id: string | null
+  responsable_nombre: string | null
+  monto: number
+  /** Estado de HOY del documento (no necesariamente el del corte). */
+  estado_actual: string | null
+  codigo: string | null
+  motivo: string
+  asiento_id: string | null
+  asiento_numero: number | null
+  asiento_fecha: string | null
+  /** La clasificación depende de un estado de hoy que no tiene fecha. */
+  limitacion: string | null
+  total_filas: number
+}
+
+export interface LimitacionEstadoCuenta {
+  codigo: 'rechazo_sin_fecha' | 'anulacion_sin_fecha' | 'estado_actual_sin_fecha' | string
+  documentos: number
+  monto: number
+  descripcion: string
+}
+
+export type ClaseDiscrepancia = 'documento' | 'aplicacion' | 'sin_documento'
+
+export const CLASE_DISCREPANCIA_LABELS: Record<ClaseDiscrepancia, string> = {
+  documento: 'El documento no cuadra con su saldo contable',
+  aplicacion: 'Las aplicaciones del cobro no cuadran con su asiento',
+  sin_documento: 'Movimiento contable sin documento',
+}
+
+export interface ConciliacionEstadoCuenta {
+  corte: string | null
+  saldo_contable: number
+  saldo_documentos: number
+  diferencia: number
+  cuadra: boolean
+  por_cuenta: Array<{ cuenta_id: string; codigo: string; nombre: string; saldo: number }>
+  total_discrepancias: number
+  discrepancias: Array<{
+    clase: ClaseDiscrepancia
+    origen_tabla: string | null
+    origen_id: string | null
+    asiento_id: string | null
+    asiento_numero: number | null
+    contable: number
+    documentos: number
+    diferencia: number
+  }>
+}

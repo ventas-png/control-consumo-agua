@@ -692,6 +692,18 @@ jobs:
           PGPORT_TEST: 55509
         run: supabase/tests/conta_cobros_bloqueos/run.sh
 
+      # 20261003000000: estado de cuenta por auxiliar y por unidad. Saldos
+      # inicial y final con movimientos antes, dentro y después del rango;
+      # principal y mora; pendientes y borradores fuera del saldo; reversos
+      # con corte anterior y posterior; cambio de pagador sin reasignación;
+      # totales idénticos con cualquier paginación; conciliación contra CxC y
+      # aplicaciones; aislamiento y permisos verificados en el servidor.
+      - name: Contabilidad — estado de cuenta por auxiliar y unidad
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55510
+        run: supabase/tests/conta_estado_cuenta/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

@@ -12,6 +12,7 @@ import { TiposCargoTab } from './TiposCargoTab'
 import { AuxiliaresTab } from './AuxiliaresTab'
 import { PendientesContabilizacionTab } from './PendientesContabilizacionTab'
 import { CargosPendientesTab } from './CargosPendientesTab'
+import { EstadoCuentaTab } from './EstadoCuentaTab'
 import { ProveedoresTab } from './ProveedoresTab'
 import { CuentasPorPagarTab } from './CuentasPorPagarTab'
 import { ComprasTab } from './ComprasTab'
@@ -19,12 +20,14 @@ import { PresupuestoTab } from './PresupuestoTab'
 import { BancosTab } from './BancosTab'
 import { EstadosFinancierosTab } from './EstadosFinancierosTab'
 
-type SubTab = 'polizas' | 'pendientes' | 'balanza' | 'eeff' | 'bancos' | 'compras' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'reglas' | 'tiposcargo' | 'auxiliares' | 'configuracion'
+type SubTab = 'polizas' | 'pendientes' | 'estadocuenta' | 'balanza' | 'eeff' | 'bancos' | 'compras' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'reglas' | 'tiposcargo' | 'auxiliares' | 'configuracion'
 
 const TABS: { id: SubTab; label: string; icon: string }[] = [
   { id: 'polizas', label: 'Pólizas', icon: '📒' },
   // Junto a Pólizas: es lo que falta en ellas. Facturas aprobadas sin asiento.
   { id: 'pendientes', label: 'Pendientes', icon: '⏳' },
+  // Lo que debe cada auxiliar o unidad: sale de las pólizas publicadas.
+  { id: 'estadocuenta', label: 'Estado de cuenta', icon: '📃' },
   { id: 'balanza', label: 'Balanza', icon: '⚖️' },
   { id: 'eeff', label: 'Estados financieros', icon: '📊' },
   { id: 'bancos', label: 'Bancos', icon: '🏦' },
@@ -180,6 +183,9 @@ export function ContabilidadSection() {
             />
           </section>
         </div>
+      )}
+      {tab === 'estadocuenta' && (
+        <EstadoCuentaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
       )}
       {tab === 'balanza' && (
         <BalanzaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />

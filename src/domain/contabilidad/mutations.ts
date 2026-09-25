@@ -666,6 +666,7 @@ export function useReprocesarCargoMutation(companyId?: string) {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: contabilidadKeys.cargosPendientesDeEmpresa(companyId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.estadoCuentaDeEmpresa(companyId) })
       // Un asiento nuevo cambia pólizas y saldos de todos los reportes.
       void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'asientos'] })
       void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'balanza'] })

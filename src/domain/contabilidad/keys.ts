@@ -88,4 +88,37 @@ export const contabilidadKeys = {
     [...contabilidadKeys.all, 'auxiliares', companyId ?? null, busqueda ?? null] as const,
   auxiliaresDeEmpresa: (companyId?: string) =>
     [...contabilidadKeys.all, 'auxiliares', companyId ?? null] as const,
+  // Estado de cuenta: prefijo por empresa para invalidar TODO (cualquier
+  // sujeto, rango o página) cuando se contabiliza o reprocesa algo.
+  estadoCuentaDeEmpresa: (companyId?: string) =>
+    [...contabilidadKeys.all, 'estadoCuenta', companyId ?? null] as const,
+  estadoCuenta: (
+    companyId?: string,
+    projectId?: string | null,
+    sujeto?: string | null,
+    desde?: string | null,
+    hasta?: string | null,
+    pagina?: number,
+  ) =>
+    [...contabilidadKeys.all, 'estadoCuenta', companyId ?? null, 'movimientos', projectId ?? null,
+      sujeto ?? null, desde ?? null, hasta ?? null, pagina ?? 0] as const,
+  estadoCuentaFuera: (
+    companyId?: string,
+    projectId?: string | null,
+    sujeto?: string | null,
+    hasta?: string | null,
+    pagina?: number,
+  ) =>
+    [...contabilidadKeys.all, 'estadoCuenta', companyId ?? null, 'fuera', projectId ?? null,
+      sujeto ?? null, hasta ?? null, pagina ?? 0] as const,
+  estadoCuentaConciliacion: (
+    companyId?: string,
+    projectId?: string | null,
+    sujeto?: string | null,
+    corte?: string | null,
+  ) =>
+    [...contabilidadKeys.all, 'estadoCuenta', companyId ?? null, 'conciliacion', projectId ?? null,
+      sujeto ?? null, corte ?? null] as const,
+  unidadesLedger: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'unidadesLedger', companyId ?? null, projectId ?? null] as const,
 } as const
