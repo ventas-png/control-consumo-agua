@@ -1,5 +1,13 @@
 \set ON_ERROR_STOP on
 
+-- `compras_flujo/fixture.sql` (cargado antes, en la misma base) define su
+-- propio `chk(numeric, numeric, text)`. Con los dos overloads, una llamada con
+-- `integer` es ambigua (integer → bigint y integer → numeric son implícitas
+-- las dos) y PostgreSQL aborta con «function public.chk(integer, integer,
+-- unknown) is not unique»: la suite nunca llegaba a sus últimas invariantes.
+-- En esta base desechable manda el helper de esta suite.
+DROP FUNCTION IF EXISTS public.chk(numeric, numeric, text);
+
 CREATE OR REPLACE FUNCTION public.chk(actual bigint, esperado bigint, msg text)
 RETURNS void LANGUAGE plpgsql AS $$
 BEGIN

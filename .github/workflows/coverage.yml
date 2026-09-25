@@ -718,6 +718,19 @@ jobs:
           PGPORT_TEST: 55511
         run: supabase/tests/conta_cobros_cargos/run.sh
 
+      # 20260924000200: catálogo contable inicial configurable. Empresa y
+      # proyecto nuevos nacen sin cuentas ni mapeos; plantilla básica y LATAM
+      # con jerarquía por padre_id (sin depender de guiones); una segunda
+      # inicialización no duplica y nunca completa un catálogo personalizado;
+      # aislamiento entre el ledger de la empresa y el de cada proyecto; rol
+      # sin permiso rechazado en el servidor. Se agregó al CI al corregirla:
+      # desde #882 fallaba (overload ambiguo de chk) y el runner lo ocultaba.
+      - name: Contabilidad — catálogo inicial configurable
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55512
+        run: supabase/tests/catalogo_contable_inicial/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
