@@ -49,13 +49,15 @@
 -- ── D2 · MORA SOBRE EL SALDO REAL ──────────────────────────────────────────
 -- DECISIÓN: con aplicar_sobre = 'saldo_vencido', la mora se calcula sobre el
 -- saldo PENDIENTE; con 'monto_cuota', sobre el monto completo (sin cambios).
---   · aplicar_mora_cuotas_vencidas: saldo = monto − cobros verificados vivos
---     − saldos a favor aplicados vivos (nunca negativo). Lo demás, idéntico a
---     20260604181000 (y a calcularMora de src/lib/business.ts, que ya recibía
---     el saldo por separado).
+--   · conta_aplicar_mora_cuotas (nueva; el job diario pasa a llamarla):
+--     saldo = monto − cobros verificados vivos − saldos a favor aplicados
+--     vivos (nunca negativo). Lo demás, idéntico a 20260604181000 (y a
+--     calcularMora de src/lib/business.ts, que ya recibía el saldo aparte).
+--     aplicar_mora_cuotas_vencidas NO se toca: es drift declarado (#826).
 --
--- CÓMO SE REVIERTE: restaurar aplicar_mora_cuotas_vencidas desde
--- 20260604181000 y conta_tg_asiento_sin_convertir desde 20261009000000;
+-- CÓMO SE REVIERTE: re-programar el job aplicar_mora_cuotas_vencidas_daily
+-- con `SELECT public.aplicar_mora_cuotas_vencidas();` y DROP FUNCTION
+-- conta_aplicar_mora_cuotas; restaurar conta_tg_asiento_sin_convertir desde 20261009000000;
 -- DROP TRIGGER trg_conta_asiento_diferencial y sus funciones; DROP FUNCTION de
 -- las nuevas; DROP TABLE conta_tasas_manuales y conta_diferenciales_cambiarios
 -- (los asientos de diferencial publicados se reversan, no se borran); DROP
@@ -431,8 +433,13 @@ $$;
 -- ════════════════════════════════════════════════════════════════════════════
 -- D2
 -- ════════════════════════════════════════════════════════════════════════════
--- Cuerpo idéntico a 20260604181000 salvo el cálculo del saldo.
-CREATE OR REPLACE FUNCTION public.aplicar_mora_cuotas_vencidas()
+-- Una función NUEVA y no CREATE OR REPLACE de aplicar_mora_cuotas_vencidas: ésa
+-- es drift declarado (#826, scripts/schema-drift/drift-conocido.json — en
+-- producción su cuerpo difiere del de 20260604181000) y redefinirla dejaría el
+-- objeto en tres estados distintos (producción, base y PR). Se conserva tal
+-- cual y el job diario pasa a llamar a ésta. Cuerpo idéntico a 20260604181000
+-- salvo el cálculo del saldo.
+CREATE FUNCTION public.conta_aplicar_mora_cuotas()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -567,8 +574,16 @@ BEGIN
   WHERE cu.id = f.cuota_id;
 END
 $$;
-REVOKE EXECUTE ON FUNCTION public.aplicar_mora_cuotas_vencidas() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.aplicar_mora_cuotas_vencidas() TO service_role;
+REVOKE EXECUTE ON FUNCTION public.conta_aplicar_mora_cuotas() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.conta_aplicar_mora_cuotas() TO service_role;
 
-COMMENT ON FUNCTION public.aplicar_mora_cuotas_vencidas() IS
+-- El job diario (mismo nombre y horario, 03:45 UTC) llama a la nueva.
+SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname = 'aplicar_mora_cuotas_vencidas_daily';
+SELECT cron.schedule(
+  'aplicar_mora_cuotas_vencidas_daily',
+  '45 3 * * *',
+  $$SELECT public.conta_aplicar_mora_cuotas();$$
+);
+
+COMMENT ON FUNCTION public.conta_aplicar_mora_cuotas() IS
   'Cron de mora de condominios (cond:C6): marca cuotas emitidas vencidas (emitida→vencida) y aplica el recargo replicando calcularMora; con aplicar_sobre = saldo_vencido la base es el SALDO pendiente (monto − cobros verificados vivos − saldos a favor aplicados vivos, decisión D2), con monto_cuota el monto completo. Idempotente (mora_aplicada_at + uq_recargos_mora_cuota_vivo). SECURITY DEFINER; sólo service_role / el job.';

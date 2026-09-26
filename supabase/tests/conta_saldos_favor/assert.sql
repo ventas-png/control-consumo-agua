@@ -406,7 +406,7 @@ SELECT public.chk_txt(
   (SELECT c.cuota_estado || '/' || c.estado || '/' || c.fecha_pago || '/' || c.metodo_pago FROM public.cuotas_condominio c WHERE c.id = :Q3),
   'pagada/pagado/' || CURRENT_DATE || '/saldo_a_favor', '10 · Q3 pagada por saldo a favor');
 -- Lo que antes pasaba con ella: recordatorio, mora y cobro en línea.
-SELECT public.aplicar_mora_cuotas_vencidas();
+SELECT public.conta_aplicar_mora_cuotas();
 SELECT public.chk_txt(
   (SELECT c.cuota_estado || '/' || COALESCE(c.mora_monto::text, 'sin_mora') FROM public.cuotas_condominio c WHERE c.id = :Q3),
   'pagada/sin_mora', '10 · el cron de mora no la vence ni le aplica recargo');
@@ -441,7 +441,7 @@ SELECT public.chk_txt(
   (SELECT string_agg(e.accion || ':' || e.disparo, ',' ORDER BY e.ocurrido_at, e.accion DESC) FROM public.conta_sf_cuota_estado_eventos e WHERE e.cuota_id = :Q3),
   'marcada:aplicacion,restaurada:asiento_aplicacion', '10 · eventos: marcada al aplicar, restaurada al reversar su asiento');
 -- Y sigue su curso normal: el cron la vence y le aplica la mora.
-SELECT public.aplicar_mora_cuotas_vencidas();
+SELECT public.conta_aplicar_mora_cuotas();
 SELECT public.chk_txt(
   (SELECT c.cuota_estado || '/' || c.mora_monto FROM public.cuotas_condominio c WHERE c.id = :Q3),
   'vencida/10.00', '10 · revertida, el cron la vence y aplica la mora como a cualquier cuota impaga');
@@ -509,7 +509,7 @@ SELECT public.chk_txt(public.sf_aplicar(:O_AN6, 'cuotas_condominio', :Q5, 30, :K
 INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
   (:PQ5, :UNO, :A1, :Q5, 20, 'efectivo', 'verificado', now());
 RESET ROLE;
-SELECT public.aplicar_mora_cuotas_vencidas();
+SELECT public.conta_aplicar_mora_cuotas();
 SELECT public.chk_txt(
   (SELECT c.cuota_estado || '/' || c.mora_monto || '/' || c.total_a_pagar FROM public.cuotas_condominio c WHERE c.id = :Q5),
   'vencida/5.00/105.00', '11 · saldo_vencido: 10 % del SALDO (100 − 20 cobrado − 30 de saldo a favor = 50) = 5');
@@ -521,9 +521,13 @@ SET ROLE authenticated;
 INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
   (:PQ6, :UNO, :A1, :Q6, 20, 'efectivo', 'verificado', now());
 RESET ROLE;
-SELECT public.aplicar_mora_cuotas_vencidas();
+SELECT public.conta_aplicar_mora_cuotas();
 SELECT public.chk_txt(
   (SELECT c.cuota_estado || '/' || c.mora_monto FROM public.cuotas_condominio c WHERE c.id = :Q6),
   'vencida/10.00', '11 · monto_cuota: 10 % del monto completo (sin cambios)');
 SELECT public.chk_txt((SELECT c.mora_monto::text FROM public.cuotas_condominio c WHERE c.id = :Q5), '5.00',
   '11 · el cron es idempotente: Q5 no se recarga dos veces');
+SELECT public.chk_txt(
+  (SELECT j.schedule || '|' || j.command FROM cron.job j WHERE j.jobname = 'aplicar_mora_cuotas_vencidas_daily'),
+  '45 3 * * *|SELECT public.conta_aplicar_mora_cuotas();',
+  '11 · el job diario (mismo nombre y horario) llama a la función nueva; la de drift declarado no se toca');
