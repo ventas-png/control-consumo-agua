@@ -71,6 +71,11 @@ export interface CobroDeCargo {
   reverso_fecha: string | null
   codigo: string | null
   motivo: string | null
+  /**
+   * Lo que de este cobro quedó como saldo a favor del responsable
+   * (20261007000000): recibido = aplicado + saldo_a_favor.
+   */
+  saldo_a_favor?: number
 }
 
 export interface ResultadoRegistroCobro {
@@ -112,7 +117,7 @@ export type MetodoCobroCargo = (typeof METODOS_COBRO_CARGO)[number]['value']
 /** Texto para el usuario de un código de pendiente del servidor. */
 export function etiquetaPendienteCobro(codigo: string | null): string {
   switch (codigo) {
-    case 'excede_saldo': return 'Excede el saldo'
+    case 'excede_saldo': return 'Excedente sin asignar'
     case 'cobro_anterior_pendiente': return 'Espera un cobro anterior'
     case 'devengo_desalineado': return 'Importe distinto del devengo'
     case 'devengo_pendiente': return 'Cargo sin contabilizar'

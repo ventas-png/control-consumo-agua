@@ -185,6 +185,32 @@ describe('create-charge · cuota — guards de estado y saldo', () => {
     expect(res.status).toBe(200)
     expect(insertDe(h.state.calls, 'payment_requests')!.monto).toBe(30)
   })
+
+  it('el saldo a favor aplicado a la cuota se resta: no se cobra dos veces', async () => {
+    fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, pagosPrevios: [{ monto: 20 }] })
+    h.state.rpcs.conta_cuota_saldo_favor_aplicado = { data: 50, error: null }
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
+    expect(res.status).toBe(200)
+    expect(insertDe(h.state.calls, 'payment_requests')!.monto).toBe(30)
+    expect(h.state.rpcCalls.find((c) => c.fn === 'conta_cuota_saldo_favor_aplicado')?.args)
+      .toEqual({ p_cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' })
+  })
+
+  it('409 cuota cubierta entre abonos y saldo a favor', async () => {
+    fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, pagosPrevios: [{ monto: 40 }] })
+    h.state.rpcs.conta_cuota_saldo_favor_aplicado = { data: 60, error: null }
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
+    expect(res.status).toBe(409)
+    expect(insertDe(h.state.calls, 'payment_requests')).toBeUndefined()
+  })
+
+  it('500 sin cobrar si no se puede leer el saldo a favor aplicado', async () => {
+    fixtureCuota(h.state, { caller: { cliente_id: 'duenio' } })
+    h.state.rpcs.conta_cuota_saldo_favor_aplicado = { data: null, error: { message: 'db down' } }
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
+    expect(res.status).toBe(500)
+    expect(insertDe(h.state.calls, 'payment_requests')).toBeUndefined()
+  })
 })
 
 describe('create-charge · rate limit (auditoría S6)', () => {

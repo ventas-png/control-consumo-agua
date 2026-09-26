@@ -55,6 +55,8 @@ vi.mock('../../../domain/contabilidad/queries', () => ({
     return p.enabled ? state.conciliacion : {}
   },
 }))
+// El panel de saldos a favor tiene sus propias pruebas (saldosFavor.test.tsx).
+vi.mock('../SaldosFavorPanel', () => ({ SaldosFavorPanel: () => <div data-testid="saldos-favor" /> }))
 vi.mock('../AsientoDetalleModal', () => ({
   AsientoDetalleModal: ({ asientoId }: { asientoId: string }) => <div role="dialog">Asiento {asientoId}</div>,
 }))

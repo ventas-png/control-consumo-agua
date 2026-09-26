@@ -149,6 +149,10 @@ export const EVENTOS_MAPEO = [
   { evento: 'ingreso_otros',        grupo: 'Ingresos',              label: 'Otros ingresos' },
   { evento: 'cxc_agua',             grupo: 'Cuentas por cobrar',    label: 'CxC servicio de agua' },
   { evento: 'cxc_cuotas',           grupo: 'Cuentas por cobrar',    label: 'CxC cuotas de condominio' },
+  // 20261007000000: el saldo a favor de los clientes (excedentes y anticipos).
+  // Cuenta de detalle, activa y de PASIVO del ledger; sin ella un excedente o
+  // un anticipo quedan registrados y pendientes de contabilizar.
+  { evento: 'anticipo_clientes',    grupo: 'Anticipos',             label: 'Anticipos y saldos a favor de clientes' },
   { evento: 'iva_por_pagar',        grupo: 'Impuestos',             label: 'IVA por pagar' },
   { evento: 'gasto_mantenimiento',  grupo: 'Gastos',                label: 'Mantenimiento' },
   { evento: 'gasto_servicios',      grupo: 'Gastos',                label: 'Servicios' },
@@ -633,6 +637,34 @@ export type SujetoEstadoCuenta = { tipo: 'cliente'; id: string } | { tipo: 'unid
 
 export type ComponenteMovimiento = 'principal' | 'mora' | 'cargo'
 
+/** Saldo a favor del sujeto en el estado de cuenta (20261007000000). */
+export interface SaldoFavorEstadoCuenta {
+  saldo_inicial: number
+  /** Excedentes y anticipos del período (abonos a la cuenta de anticipos). */
+  abonos: number
+  /** Aplicaciones a documentos del período (cargos a la cuenta de anticipos). */
+  aplicaciones: number
+  /** Disponible al corte, según el libro. */
+  saldo_final: number
+  /** Lo mismo, según los orígenes y aplicaciones vivos al corte. */
+  saldo_documentos: number
+  cuadra: boolean
+  total_movimientos: number
+  movimientos: Array<{
+    n: number
+    fecha: string
+    asiento_id: string
+    asiento_numero: number | null
+    tipo: 'excedente' | 'anticipo' | 'aplicacion' | 'reverso_abono' | 'reverso_aplicacion' | 'otro' | string
+    pago_id: string | null
+    aplicacion_id: string | null
+    documento: string | null
+    abono: number
+    aplicado: number
+    saldo: number
+  }>
+}
+
 export interface MovimientoEstadoCuenta {
   n: number
   linea_id: string
@@ -651,6 +683,8 @@ export interface MovimientoEstadoCuenta {
   cuota_id: string | null
   /** Cargo adicional al que se aplicó el cobro (20261004000000). */
   cargo_adicional_id?: string | null
+  /** La línea es de una aplicación de saldo a favor (20261007000000). */
+  saldo_favor_aplicacion_id?: string | null
   cuenta_id: string
   cuenta_codigo: string
   cuenta_nombre: string
@@ -718,6 +752,8 @@ export interface EstadoCuenta {
   limite: number
   offset: number
   movimientos: MovimientoEstadoCuenta[]
+  /** Saldo a favor del sujeto, aparte del saldo de CxC (20261007000000). */
+  saldo_a_favor?: SaldoFavorEstadoCuenta
 }
 
 export interface DocumentoFueraDeSaldo {
@@ -773,6 +809,8 @@ export interface ConciliacionEstadoCuenta {
   diferencia: number
   cuadra: boolean
   por_cuenta: Array<{ cuenta_id: string; codigo: string; nombre: string; saldo: number }>
+  /** Saldo a favor: libro contra orígenes y aplicaciones vivos (20261007000000). */
+  saldo_a_favor?: { contable: number; documentos: number; cuadra: boolean }
   total_discrepancias: number
   discrepancias: Array<{
     clase: ClaseDiscrepancia

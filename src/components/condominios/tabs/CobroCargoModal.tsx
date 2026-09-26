@@ -38,7 +38,9 @@ type DatosCobro = EnvioIncierto['datos']
  * Cobros de UN cargo adicional por tipo: registrar uno (parcial o total) y
  * anular los existentes. Todo lo decide el servidor —saldo, excedente,
  * devengo pendiente, responsable histórico, coherencia con el devengo—; aquí
- * sólo se muestra su respuesta.
+ * sólo se muestra su respuesta. Un excedente queda como SALDO A FAVOR del
+ * responsable (20261007000000): cada cobro muestra lo recibido, lo aplicado
+ * al cargo y lo que quedó a favor.
  *
  * La clave de idempotencia se fija al abrir el formulario y se renueva sólo
  * tras un alta CONFIRMADA o por decisión explícita («Registrar como cobro
@@ -118,10 +120,14 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
         referencia: datos.referencia.trim() || null, notas: datos.notas.trim() || null, clave: k,
       })
       if (r.resultado === 'contabilizada') {
+        const excedente = Math.max(0, Math.round((monto - saldo) * 100) / 100)
         notify({
           variant: 'success',
           title: r.repetido ? 'Cobro ya registrado' : 'Cobro registrado',
-          text: `Contabilizado${r.asiento_numero ? ` en la póliza #${r.asiento_numero}` : ''}. El cargo queda ${r.estado_cargo}.`,
+          text: `Contabilizado${r.asiento_numero ? ` en la póliza #${r.asiento_numero}` : ''}. El cargo queda ${r.estado_cargo}.`
+            + (!r.repetido && excedente > 0
+              ? ` El excedente (${moneda} ${fmt(excedente)}) quedó como saldo a favor del responsable: se aplica desde Contabilidad › Estado de cuenta.`
+              : ''),
         })
       } else {
         notify({
@@ -300,7 +306,10 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
               </div>
               {Number(form.monto) > saldo && (
                 <p role="note" style={{ fontSize: 12, color: 'var(--at-warning)', margin: '8px 0 0' }}>
-                  El importe supera el saldo: el cobro quedará pendiente con su motivo. El excedente no se reparte a otros cargos ni se vuelve anticipo.
+                  El importe supera el saldo: se aplica {moneda} {fmt(saldo)} al cargo y el excedente de {moneda}{' '}
+                  {fmt(Number(form.monto) - saldo)} queda como <strong>saldo a favor</strong> del responsable (no se reparte
+                  solo a otros cargos: se aplica después, de forma explícita). Si la contabilidad no tiene cuenta de anticipos,
+                  el cobro queda registrado y pendiente con su motivo.
                 </p>
               )}
               <button onClick={() => void enviar()} disabled={registrar.isPending || claveReusada}
@@ -322,7 +331,7 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
               <thead>
                 <tr style={{ textAlign: 'left', color: 'var(--at-ink-3)' }}>
                   <th>Fecha</th><th>Método</th><th style={{ textAlign: 'right' }}>Importe</th>
-                  <th style={{ textAlign: 'right' }}>Aplicado</th><th>Contabilidad</th><th />
+                  <th style={{ textAlign: 'right' }}>Aplicado</th><th style={{ textAlign: 'right' }}>A favor</th><th>Contabilidad</th><th />
                 </tr>
               </thead>
               <tbody>
@@ -334,6 +343,7 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
                       <td>{METODOS_COBRO_CARGO.find((m) => m.value === c.metodo)?.label ?? c.metodo}{c.referencia ? ` · ${c.referencia}` : ''}</td>
                       <td style={{ textAlign: 'right' }}>{fmt(c.monto)}</td>
                       <td style={{ textAlign: 'right' }}>{vivo ? fmt(c.aplicado) : '—'}</td>
+                      <td style={{ textAlign: 'right' }}>{vivo && c.saldo_a_favor ? fmt(c.saldo_a_favor) : '—'}</td>
                       <td>
                         {!vivo ? (
                           <span>Anulado{c.anulacion_motivo ? `: ${c.anulacion_motivo}` : ''}{c.reverso_numero ? ` · reverso #${c.reverso_numero}` : ''}</span>

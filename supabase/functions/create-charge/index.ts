@@ -208,7 +208,13 @@ Deno.serve(async (req: Request) => {
       const { data: pagosPrevios } = await admin
         .from('pagos').select('monto').eq('cuota_id', cuotaId).is('deleted_at', null)
       const abonado = ((pagosPrevios as { monto: number }[] | null) ?? []).reduce((s, p) => s + Number(p.monto), 0)
-      const saldo = Math.max(0, totalCuota - abonado)
+      // …menos lo aplicado por saldos a favor vivos (contabilidad): sin esto
+      // se cobraría otra vez la parte ya cubierta. Si no se puede leer, no se
+      // cobra (mejor un reintento que un cobro de más).
+      const { data: aplicadoSf, error: sfErr } = await admin
+        .rpc('conta_cuota_saldo_favor_aplicado', { p_cuota_id: cuotaId })
+      if (sfErr) return json({ error: 'No se pudo calcular el saldo de la cuota.' }, 500)
+      const saldo = Math.max(0, totalCuota - abonado - Number(aplicadoSf ?? 0))
       if (saldo <= 0) return json({ error: 'La cuota ya está saldada.' }, 409)
 
       // Monto: abono parcial pedido (acotado al saldo) o el saldo completo.

@@ -127,6 +127,15 @@ export const contabilidadKeys = {
     [...contabilidadKeys.all, 'cobrosCargo', companyId ?? null, 'resumen', projectId ?? null] as const,
   cobrosDeCargo: (companyId?: string, cargoId?: string | null) =>
     [...contabilidadKeys.all, 'cobrosCargo', companyId ?? null, 'cargo', cargoId ?? null] as const,
+  // Saldos a favor (20261007000000): prefijo por empresa para invalidar la
+  // lista de cualquier sujeto y los candidatos de cualquier origen a la vez.
+  saldosFavorDeEmpresa: (companyId?: string) =>
+    [...contabilidadKeys.all, 'saldosFavor', companyId ?? null] as const,
+  saldosFavor: (companyId?: string, projectId?: string | null, clienteId?: string | null, unidadId?: string | null) =>
+    [...contabilidadKeys.all, 'saldosFavor', companyId ?? null, 'lista', projectId ?? null,
+      clienteId ?? null, unidadId ?? null] as const,
+  saldoFavorDocumentos: (companyId?: string, origenId?: string | null) =>
+    [...contabilidadKeys.all, 'saldosFavor', companyId ?? null, 'documentos', origenId ?? null] as const,
   unidadesLedger: (companyId?: string, projectId?: string | null) =>
     [...contabilidadKeys.all, 'unidadesLedger', companyId ?? null, projectId ?? null] as const,
 } as const
