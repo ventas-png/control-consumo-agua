@@ -164,8 +164,8 @@ SELECT public.chk_txt(public.cc_cobrar(:CA1, 40, 'efectivo', '2026-06-12', :P3),
 SELECT public.chk(
   (SELECT count(*) FROM public.conta_intentos_contabilizacion i
     WHERE i.origen_tabla = 'pagos' AND i.origen_id = :P3
-      AND i.motivo LIKE '%no se reparte a otros documentos ni se convierte en anticipo%'), 1,
-  '4 · el motivo explica que no se reparte ni se vuelve anticipo');
+      AND i.motivo LIKE '%queda como saldo a favor, pero no hay cuenta para registrarlo%anticipo_clientes%'), 1,
+  '4 · sin cuenta de anticipos: el motivo dice que el excedente será saldo a favor y qué configurar (20261007000000)');
 SELECT public.chk_txt(public.cc_saldo(:CA1, :CXC)::text, '20.00', '4 · el excedente no reduce la CxC');
 SELECT public.chk(
   (SELECT count(*) FROM public.conta_cargos_pendientes(:A1) b

@@ -16,6 +16,11 @@
 //     puede reconstruir al corte se avisa como limitación;
 //   · conciliación contra la contabilidad, a pedido.
 //
+// El SALDO A FAVOR (20261007000000) va aparte del saldo de CxC: el remanente
+// de un cobro nunca estuvo en la CxC, y su aplicación a un documento figura
+// como un abono de ese documento. El panel de saldos a favor muestra de dónde
+// sale cada saldo y permite aplicarlo o revertirlo.
+//
 // Datos de otra consulta NUNCA se muestran como vigentes: al cambiar sujeto o
 // fechas la página vuelve a la primera y, hasta que llega la respuesta nueva,
 // se ve «Calculando…», no el resultado anterior. Sólo al paginar la misma
@@ -41,6 +46,7 @@ import {
   type SujetoEstadoCuenta,
 } from '../../types/contabilidad'
 import { AsientoDetalleModal } from './AsientoDetalleModal'
+import { SaldosFavorPanel } from './SaldosFavorPanel'
 import { Campo, btnLink, btnSecundario, input } from './ui'
 
 interface Props {
@@ -297,6 +303,33 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
             )}
           </section>
 
+          {datos.saldo_a_favor && (
+            <div role="note" aria-label="Saldo a favor al corte" style={{ fontSize: 13, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <strong>Saldo a favor {hasta ? `al ${formatDateShort(hasta)}` : 'hoy'}:</strong>
+              <span>{dinero(datos.saldo_a_favor.saldo_final)}</span>
+              <span style={{ color: 'var(--at-ink-soft)', fontSize: 12 }}>
+                (inicial {dinero(datos.saldo_a_favor.saldo_inicial)} · excedentes y anticipos {dinero(datos.saldo_a_favor.abonos)} ·
+                aplicado {dinero(datos.saldo_a_favor.aplicaciones)})
+              </span>
+              {!datos.saldo_a_favor.cuadra && (
+                <StatusBadge tone="danger">
+                  No cuadra con sus orígenes: {dinero(datos.saldo_a_favor.saldo_documentos)}
+                </StatusBadge>
+              )}
+            </div>
+          )}
+
+          {projectId && sujeto && (
+            <SaldosFavorPanel
+              companyId={companyId}
+              projectId={projectId}
+              sujeto={sujeto}
+              unidades={unidades.data ?? []}
+              clientes={clientes.data ?? []}
+              onAbrirAsiento={setAsientoAbierto}
+            />
+          )}
+
           <section aria-labelledby="ec-movimientos">
             <h3 id="ec-movimientos" style={{ margin: '0 0 8px', fontSize: 15 }}>Movimientos contabilizados</h3>
             {estado.isPlaceholderData && (
@@ -354,6 +387,11 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
                             {m.componente && m.documento_tabla === 'pagos' && (
                               <StatusBadge tone={m.componente === 'mora' ? 'warning' : 'neutral'}>
                                 {m.componente === 'mora' ? 'Aplicado a mora' : 'Aplicado a principal'}
+                              </StatusBadge>
+                            )}
+                            {m.documento_tabla === 'conta_saldo_favor_aplicaciones' && (
+                              <StatusBadge tone="info">
+                                {m.componente === 'mora' ? 'Saldo a favor aplicado a mora' : 'Saldo a favor aplicado'}
                               </StatusBadge>
                             )}
                           </td>
@@ -507,6 +545,15 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
                     diferencia {dinero(conciliacion.data.diferencia)}
                   </span>
                 </div>
+                {conciliacion.data.saldo_a_favor && (
+                  <p style={{ margin: 0, fontSize: 12 }}>
+                    Saldo a favor: libro {dinero(conciliacion.data.saldo_a_favor.contable)} · orígenes y aplicaciones{' '}
+                    {dinero(conciliacion.data.saldo_a_favor.documentos)}{' '}
+                    <StatusBadge tone={conciliacion.data.saldo_a_favor.cuadra ? 'success' : 'danger'}>
+                      {conciliacion.data.saldo_a_favor.cuadra ? 'Cuadra' : 'No cuadra'}
+                    </StatusBadge>
+                  </p>
+                )}
                 {conciliacion.data.por_cuenta.length > 0 && (
                   <p style={{ margin: 0, fontSize: 12, color: 'var(--at-ink-soft)' }}>
                     Por cuenta: {conciliacion.data.por_cuenta.map((c) => `${c.codigo} ${dinero(c.saldo)}`).join(' · ')}

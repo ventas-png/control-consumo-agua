@@ -7,6 +7,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { db } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
+import { logger } from '../../lib/logger'
 import { payfacKeys } from './keys'
 import { resolverConfigPagoEfectiva } from '../../lib/businessPagos'
 import type { ConfigPagoEfectiva, PayfacEstatus } from '../../types/pagos'
@@ -72,9 +73,16 @@ export function esCobroDeCargoAdicional(p: Pick<Pago, 'cargo_adicional_id'>): bo
  * por aquí (COBRO_CARGO_SOLO_RPC). Se excluyen en la consulta y otra vez en la
  * frontera, para que las pestañas, los totales y los KPI de la pantalla se
  * calculen sobre el mismo conjunto.
+ *
+ * Los ANTICIPOS (20261007000000) también: son saldo a favor de un titular,
+ * se registran y anulan en Contabilidad › Estado de cuenta, y el servidor
+ * rechaza cambiarlos por aquí (ANTICIPO_SOLO_RPC). Si la lista de anticipos no
+ * se puede leer, la pantalla no se cae (mismo contrato que el resto de esta
+ * función) y se deja constancia en el registro: un anticipo que se cuele no se
+ * puede verificar ni rechazar desde aquí, lo impide el servidor.
  */
 export async function fetchPagosYConvenios(): Promise<PagosYConvenios> {
-  const [pagosRes, conveniosRes] = await Promise.all([
+  const [pagosRes, conveniosRes, anticiposRes] = await Promise.all([
     db
       .from('pagos')
       .select('*')
@@ -85,9 +93,12 @@ export async function fetchPagosYConvenios(): Promise<PagosYConvenios> {
       .from('convenios_pago')
       .select('*')
       .order('created_at', { ascending: false }),
+    db.from('conta_anticipos').select('pago_id'),
   ])
+  if (anticiposRes?.error) logger.warn('fetchPagosYConvenios: no se pudieron leer los anticipos', { error: anticiposRes.error.message })
+  const anticipos = new Set(((anticiposRes?.data ?? []) as Array<{ pago_id: string }>).map((a) => a.pago_id))
   return {
-    pagos: (pagosRes.data ?? []).map(mapPago).filter(p => !esCobroDeCargoAdicional(p)),
+    pagos: (pagosRes.data ?? []).map(mapPago).filter(p => !esCobroDeCargoAdicional(p) && !anticipos.has(p.id)),
     convenios: (conveniosRes.data ?? []).map(mapConvenio),
   }
 }

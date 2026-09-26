@@ -744,6 +744,21 @@ jobs:
           PGPORT_TEST: 55513
         run: supabase/tests/conta_rechazo_cobros/run.sh
 
+      # 20261007000000: saldos a favor, anticipos y su aplicación. Cobro
+      # exacto, parcial y con excedente (cargos y cuotas), anticipo sin deuda,
+      # cuenta de anticipos faltante o inválida sin perder el cobro, pagador
+      # distinto del responsable, cobro sin verificar, aplicaciones parciales
+      # (mora primero), idempotencia, titular y moneda, fallo intermedio,
+      # permisos, aislamiento, estado de cuenta y conciliación, rechazo
+      # bloqueado con saldo aplicado y reversión con evidencia; concurrencia
+      # con sesiones reales (mismo saldo dos veces, doble envío, aplicación
+      # contra anulación en los dos órdenes, dos saldos al mismo documento).
+      - name: Contabilidad — saldos a favor, anticipos y aplicación
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55514
+        run: supabase/tests/conta_saldos_favor/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

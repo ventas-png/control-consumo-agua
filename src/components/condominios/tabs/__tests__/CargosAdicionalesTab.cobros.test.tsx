@@ -165,7 +165,7 @@ describe('CargosAdicionalesTab · cobros', () => {
     expect(llamadasA('conta_registrar_cobro_cargo')[2].args.p_pago_id).toBe('clave-2')
   })
 
-  it('excedente: se advierte antes de enviar y el pendiente del servidor se informa con su motivo', async () => {
+  it('excedente: se advierte antes de enviar (quedará a favor) y el pendiente del servidor se informa con su motivo', async () => {
     h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1', { aplicado: 80, saldo: 20 })], error: null })
     h.respuestas.conta_registrar_cobro_cargo = () => ({
       data: [{ pago_id: 'clave-1', repetido: false, resultado: 'pendiente', codigo: 'excede_saldo',
@@ -177,13 +177,43 @@ describe('CargosAdicionalesTab · cobros', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrar cobro' }))
     const dialogo = await screen.findByRole('dialog')
     fireEvent.change(within(dialogo).getByLabelText('Importe (GTQ)'), { target: { value: '40' } })
-    expect(within(dialogo).getByText(/no se reparte a otros cargos ni se vuelve anticipo/)).toBeTruthy()
+    // 20261007000000: el excedente queda como saldo a favor del responsable.
+    expect(within(dialogo).getByRole('note').textContent).toMatch(/excedente de GTQ\s*20\.00\s*queda como saldo a favor/)
     await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
     await waitFor(() => expect(h.notify).toHaveBeenCalledWith({
       variant: 'warning',
-      title: 'Cobro registrado, pendiente de contabilizar (Excede el saldo)',
+      title: 'Cobro registrado, pendiente de contabilizar (Excedente sin asignar)',
       text: 'El cobro (40) supera el saldo pendiente del cargo (20).',
     }))
+  })
+
+  it('excedente contabilizado: se informa el saldo a favor y cada cobro muestra lo aplicado y lo que quedó a favor', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1', { aplicado: 80, saldo: 20 })], error: null })
+    h.respuestas.conta_registrar_cobro_cargo = () => ({
+      data: [{ pago_id: 'clave-1', repetido: false, resultado: 'contabilizada', codigo: null, motivo: null,
+        asiento_id: 'a9', asiento_numero: 9, estado_cargo: 'pagado' }], error: null,
+    })
+    h.respuestas.conta_cargo_cobros = () => ({
+      data: [
+        { pago_id: 'p-x', fecha: '2026-06-05', monto: 50, metodo: 'efectivo', referencia: null, estado: 'verificado',
+          anulacion_motivo: null, aplicado: 20, asiento_id: 'a9', asiento_numero: 9, asiento_estado: 'publicado',
+          reverso_id: null, reverso_numero: null, reverso_fecha: null, codigo: null, motivo: null, saldo_a_favor: 30 },
+      ], error: null,
+    })
+    montar([cargo('ca1', 'Vidrio')])
+    expect(await screen.findByText(/Cobrado GTQ 80 · Saldo GTQ 20/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar cobro' }))
+    const dialogo = await screen.findByRole('dialog')
+    const fila = (await within(dialogo).findByText('50.00')).closest('tr')!
+    // Recibido 50 = aplicado 20 + a favor 30.
+    expect(within(fila).getByText('20.00')).toBeTruthy()
+    expect(within(fila).getByText('30.00')).toBeTruthy()
+    fireEvent.change(within(dialogo).getByLabelText('Importe (GTQ)'), { target: { value: '50' } })
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'success',
+      text: expect.stringMatching(/El excedente \(GTQ 30\.00\) quedó como saldo a favor del responsable/),
+    })))
   })
 
   it('anular un cobro pide motivo y lo envía; el cobro anulado se muestra con su reverso', async () => {
