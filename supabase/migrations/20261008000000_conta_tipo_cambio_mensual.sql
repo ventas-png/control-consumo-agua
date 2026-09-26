@@ -50,7 +50,8 @@
 -- se derivan tasas mensuales de ellas: elegir cuál de las diarias es «la del
 -- mes» es una decisión que no se toma en silencio. Los asientos ya
 -- publicados no cambian. Un borrador anterior que quedó «sin tipo de cambio»
--- no tiene la marca nueva: se publica como antes (lo revisa una persona).
+-- no tiene la marca nueva: 20261009000000 lo detecta y bloquea su
+-- publicación hasta que una persona le asigne el mes de su tasa (o lo anule).
 --
 -- CÓMO SE REVIERTE (en este orden): DROP TRIGGER trg_conta_asiento_tc_al_publicar
 -- ON conta_asientos y su función; restaurar conta_generar_asiento desde

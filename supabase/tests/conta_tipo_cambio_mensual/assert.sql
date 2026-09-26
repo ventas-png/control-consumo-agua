@@ -146,3 +146,100 @@ SELECT public.chk_txt(COALESCE(public.conta_tasa_entre(:CO, 'USD', 'GTQ', '2026-
   '7 · un mes sin tasa no toma la del mes anterior');
 SELECT public.chk_txt(public.conta_tasa_entre(:CO, 'EUR', 'USD', '2026-09-30')::text, round(8.5 / 7.8, 6)::text,
   '7 · entre dos extranjeras: cruzada por la base con las tasas del MISMO mes');
+
+-- ── 8 · borradores con importes SIN CONVERTIR (20261009000000) ─────────────
+-- Un borrador como los que dejaba el generador ANTERIOR: tasa 1, importes en
+-- USD tal cual, marca sin mes y SIN tipo_cambio_pendiente.
+CREATE OR REPLACE FUNCTION public.tc_borrador(p_origen text, p_concepto text, p_moneda text, p_tasa numeric, p_fecha date)
+RETURNS uuid LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v uuid;
+BEGIN
+  PERFORM set_config('conta.allow_system_write', 'on', true);
+  INSERT INTO public.conta_asientos (company_id, project_id, fecha, tipo, concepto, estado, origen,
+      origen_tabla, origen_id, origen_evento, moneda_base, total_debe, total_haber)
+  VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', p_fecha, 'diario',
+      p_concepto, 'borrador', p_origen,
+      CASE WHEN p_origen = 'automatico' THEN 'pruebas_tc' END,
+      CASE WHEN p_origen = 'automatico' THEN gen_random_uuid() END,
+      CASE WHEN p_origen = 'automatico' THEN 'documento' END,
+      'GTQ', 100, 100)
+  RETURNING id INTO v;
+  INSERT INTO public.conta_asiento_lineas (asiento_id, company_id, cuenta_id, orden, debe, haber, moneda_origen, monto_origen, tipo_cambio)
+  VALUES (v, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11000000-0000-0000-0000-00000000a101', 1, round(100 * COALESCE(p_tasa, 1), 2), 0, p_moneda, 100, p_tasa),
+         (v, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11000000-0000-0000-0000-00000000a102', 2, 0, round(100 * COALESCE(p_tasa, 1), 2), p_moneda, 100, p_tasa);
+  UPDATE public.conta_asientos SET total_debe = round(100 * COALESCE(p_tasa, 1), 2), total_haber = round(100 * COALESCE(p_tasa, 1), 2) WHERE id = v;
+  PERFORM set_config('conta.allow_system_write', 'off', true);
+  RETURN v;
+END;
+$$;
+SELECT public.tc_borrador('automatico', 'SINT-AUX documento viejo [SIN TIPO DE CAMBIO USD→GTQ]', 'USD', 1, '2026-10-05') AS b_viejo \gset
+SELECT public.tc_borrador('manual', 'SINT-AUX manual tasa 1', 'USD', 1, '2026-09-05') AS b_man_uno \gset
+SELECT public.tc_borrador('manual', 'SINT-AUX manual tasa escrita', 'USD', 7.8, '2026-09-05') AS b_man_ok \gset
+SELECT public.tc_borrador('manual', 'SINT-AUX paridad 1:1', 'PAB', 1, '2026-09-05') AS b_pab \gset
+SELECT public.chk_txt(
+  public.conta_asiento_lineas_sin_convertir(:'b_viejo') || ','
+  || public.conta_asiento_lineas_sin_convertir(:'b_man_uno') || ',' || public.conta_asiento_lineas_sin_convertir(:'b_man_ok'),
+  '2,2,0', '8 · detección: el viejo (tasa 1 con la marca) y el manual con tasa 1 sin paridad; no la tasa escrita');
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SET ROLE authenticated;
+INSERT INTO public.conta_tipos_cambio_mensual (company_id, moneda, periodo, tasa) VALUES (:CO, 'PAB', '2026-09', 1);
+RESET ROLE;
+SELECT public.chk(public.conta_asiento_lineas_sin_convertir(:'b_pab'), 0,
+  '8 · una paridad 1:1 configurada para ese mes (PAB) no se toma por falta de conversión');
+SET ROLE authenticated;
+SELECT public.chk_txt(
+  (SELECT string_agg(b.concepto || ':' || b.lineas || ':' || b.marca_antigua, ' | ' ORDER BY b.concepto)
+     FROM public.conta_borradores_sin_conversion() b WHERE b.concepto LIKE 'SINT-AUX%' AND NOT b.pendiente_nuevo),
+  'SINT-AUX documento viejo [SIN TIPO DE CAMBIO USD→GTQ]:2:true | SINT-AUX manual tasa 1:2:false',
+  '8 · la lista para revisar: los dos, con la marca antigua señalada');
+-- Validación al publicar: ninguno de los dos sale; los correctos sí.
+SELECT public.chk_falla(format('SELECT public.conta_publicar_asiento(%L)', :'b_viejo'), 'CONVERSION_PENDIENTE',
+  '8 · el borrador viejo (importes USD tal cual) NO se publica');
+SELECT public.chk_falla(format('SELECT public.conta_publicar_asiento(%L)', :'b_man_uno'), 'CONVERSION_PENDIENTE',
+  '8 · ni el manual con tasa 1 sin paridad');
+SELECT public.chk((SELECT count(*) FROM public.conta_publicar_asiento(:'b_man_ok') p WHERE p.estado = 'publicado'), 1,
+  '8 · el manual con su tasa escrita se publica');
+SELECT public.chk((SELECT count(*) FROM public.conta_publicar_asiento(:'b_pab') p WHERE p.estado = 'publicado'), 1,
+  '8 · y el de paridad 1:1 también');
+RESET ROLE;
+SELECT public.chk_txt(public.tc_resumen(:'b_viejo'), 'borrador|100.00|-|-|false', '8 · el viejo sigue borrador e intacto');
+
+-- Resolución explícita: una persona elige el MES y deja el motivo.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :VIS, false);
+SELECT public.chk_falla(format($$SELECT * FROM public.conta_borrador_tc_asignar_periodo(%L, '2026-10', 'SINT fecha del documento')$$, :'b_viejo'),
+  'No autorizado', '8 · el visor no resuelve borradores');
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_falla(format($$SELECT * FROM public.conta_borrador_tc_asignar_periodo(%L, '2026-13', 'SINT')$$, :'b_viejo'),
+  'YYYY-MM', '8 · el mes tiene que existir');
+SELECT public.chk_falla(format($$SELECT * FROM public.conta_borrador_tc_asignar_periodo(%L, '2026-10', '')$$, :'b_viejo'),
+  'Indica por qué', '8 · exige motivo');
+SELECT public.chk_falla(format($$SELECT * FROM public.conta_borrador_tc_asignar_periodo(%L, '2026-09', 'SINT manual')$$, :'b_man_uno'),
+  'BORRADOR_TC_NO_ANTIGUO', '8 · un manual no se resuelve así: se escribe su tasa');
+SELECT public.chk_txt(
+  (SELECT r.moneda || '/' || r.periodo || '/' || r.tasa_configurada
+     FROM public.conta_borrador_tc_asignar_periodo(:'b_viejo', '2026-10', 'SINT-AUX factura del 5 de octubre') r),
+  'USD/2026-10/false', '8 · asignado octubre (todavía sin tasa)');
+SELECT public.chk_falla(format($$SELECT * FROM public.conta_borrador_tc_asignar_periodo(%L, '2026-09', 'SINT otra vez')$$, :'b_viejo'),
+  'BORRADOR_TC_YA_ASIGNADO', '8 · no se reasigna');
+SELECT public.chk_falla(format('SELECT public.conta_publicar_asiento(%L)', :'b_viejo'),
+  'SIN_TIPO_CAMBIO: falta el tipo de cambio mensual USD→GTQ de 2026-10', '8 · sin la tasa de octubre sigue sin publicarse');
+INSERT INTO public.conta_tipos_cambio_mensual (company_id, moneda, periodo, tasa) VALUES (:CO, 'USD', '2026-10', 7.9);
+SELECT public.chk((SELECT count(*) FROM public.conta_publicar_asiento(:'b_viejo') p WHERE p.estado = 'publicado'), 1,
+  '8 · con la tasa de octubre, se publica');
+RESET ROLE;
+SELECT public.chk_txt(public.tc_resumen(:'b_viejo'), 'publicado|790.00|2026-10|7.900000|false',
+  '8 · convertido con la tasa del mes elegido: 100 USD = 790 GTQ');
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_borradores_tc_resoluciones r
+    WHERE r.asiento_id = :'b_viejo' AND r.periodo = '2026-10' AND r.actor = :ADM
+      AND r.motivo = 'SINT-AUX factura del 5 de octubre' AND r.fecha_asiento = '2026-10-05'), 1,
+  '8 · evidencia: mes, motivo, actor, hora del servidor y la fecha que tenía el asiento');
+SET ROLE authenticated;
+SELECT public.chk_falla(format($$SELECT * FROM public.conta_borrador_tc_asignar_periodo(%L, '2026-10', 'SINT')$$, :'b_viejo'),
+  'BORRADOR_TC_NO_BORRADOR', '8 · un asiento publicado no se toca');
+RESET ROLE;
+SELECT public.chk_falla($$UPDATE public.conta_borradores_tc_resoluciones SET motivo = 'x'$$,
+  'BITACORA_INMUTABLE: conta_borradores_tc_resoluciones', '8 · la evidencia no se reescribe');
+-- Lo publicado antes no cambia: los asientos de las secciones 1 a 5 conservan sus importes.
+SELECT public.chk_txt(public.tc_resumen(:'a_ago'), 'publicado|770.00|2026-08|7.700000|false', '8 · lo publicado sigue igual');

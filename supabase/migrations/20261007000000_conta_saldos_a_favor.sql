@@ -2755,7 +2755,8 @@ BEGIN
     (v_saldo_m + v_saldo_p - p_monto)::numeric(14,2),
     CASE WHEN v_cargo.id IS NOT NULL
          THEN (SELECT ca.estado FROM public.cargos_adicionales_unidad ca WHERE ca.id = v_cargo.id)
-         ELSE COALESCE(v_cuota.cuota_estado, v_cuota.estado) END;
+         -- Releído: la regla de 20261009000000 puede haberla marcado pagada.
+         ELSE (SELECT COALESCE(c.cuota_estado, c.estado) FROM public.cuotas_condominio c WHERE c.id = v_cuota.id) END;
 END;
 $$;
 

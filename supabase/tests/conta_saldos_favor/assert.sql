@@ -373,3 +373,119 @@ SELECT public.chk_falla($$SELECT public.sf_anticipo('f0000000-0000-0000-0000-000
   'no pertenece a la empresa', '9 · ni registra anticipos en su contabilidad');
 SELECT set_config('request.jwt.claim.sub', :ADM, false);
 RESET ROLE;
+
+-- ── 10 · estado de la cuota cubierta por saldo a favor (20261009000000) ─────
+\set AN6  '''9f5f0000-0000-0000-0000-0000000000a6'''
+\set K8   '''5a000000-0000-0000-0000-000000000008'''
+\set K9   '''5a000000-0000-0000-0000-000000000009'''
+\set K10  '''5a000000-0000-0000-0000-000000000010'''
+\set O_AN6 '(SELECT public.sf_origen_id(''9f5f0000-0000-0000-0000-0000000000a6''))'
+-- Sección 5: 30 de saldo a favor + el cobro de 80 dejaron Q4 en 0.
+SELECT public.chk_txt(
+  (SELECT c.cuota_estado || '/' || c.estado || '/' || c.metodo_pago || '/' || (c.pagada_at IS NOT NULL) || '/' || (c.pago_id IS NULL)
+     FROM public.cuotas_condominio c WHERE c.id = :Q4),
+  'pagada/pagado/saldo_a_favor/true/true', '10 · Q4 (saldo a favor + cobro, en 0): pagada por la regla, sin inventar pago_id');
+SELECT public.chk_txt(
+  (SELECT string_agg(e.accion || ':' || e.disparo || ':' || (e.valores_antes->>'cuota_estado') || ':' || (e.actor IS NOT NULL), ',')
+     FROM public.conta_sf_cuota_estado_eventos e WHERE e.cuota_id = :Q4),
+  'marcada:cobro:pendiente:true', '10 · …con evento: la marcó el cobro que completó la cobertura, con su estado anterior y actor');
+SELECT public.chk_txt((SELECT c.cuota_estado FROM public.cuotas_condominio c WHERE c.id = :Q1), 'pendiente',
+  '10 · Q1 (sin saldo a favor aplicado) no la toca la regla');
+
+-- Q3 emitida y vencida hace 30 días; un anticipo de 100 la cubre entera.
+UPDATE public.cuotas_condominio SET cuota_estado = 'emitida', emitida_at = now() - interval '40 days',
+       fecha_vencimiento = CURRENT_DATE - 30 WHERE id = :Q3;
+INSERT INTO public.reglas_mora_config (company_id, project_id, nombre, dias_vencimiento, tipo, valor, aplicar_sobre)
+  SELECT p.company_id, p.id, 'SINT-AUX mora 10%', 0, 'porcentaje', 10, 'monto_cuota' FROM public.projects p WHERE p.id = :A1;
+SET ROLE authenticated;
+SELECT public.chk_txt(public.sf_anticipo(:U1, :UNO, 100, :AN6), 'contabilizada/-/100.00', '10 · anticipo de 100 de Uno en U1');
+SELECT public.chk_txt(public.sf_aplicar(:O_AN6, 'cuotas_condominio', :Q3, 100, :K8),
+  '100.00/0.00/100.00/0.00/0.00/pagada', '10 · aplicar 100 a Q3: la cuota queda pagada (y la respuesta lo dice)');
+RESET ROLE;
+SELECT public.chk_txt(
+  (SELECT c.cuota_estado || '/' || c.estado || '/' || c.fecha_pago || '/' || c.metodo_pago FROM public.cuotas_condominio c WHERE c.id = :Q3),
+  'pagada/pagado/' || CURRENT_DATE || '/saldo_a_favor', '10 · Q3 pagada por saldo a favor');
+-- Lo que antes pasaba con ella: recordatorio, mora y cobro en línea.
+SELECT public.aplicar_mora_cuotas_vencidas();
+SELECT public.chk_txt(
+  (SELECT c.cuota_estado || '/' || COALESCE(c.mora_monto::text, 'sin_mora') FROM public.cuotas_condominio c WHERE c.id = :Q3),
+  'pagada/sin_mora', '10 · el cron de mora no la vence ni le aplica recargo');
+SELECT public.chk((SELECT count(*) FROM public.recargos_mora r WHERE r.cuota_id = :Q3), 0, '10 · …ni recargo en recargos_mora');
+SELECT public.chk(
+  (SELECT count(*) FROM public.cuotas_condominio c
+    WHERE c.id = :Q3 AND c.deleted_at IS NULL AND c.estado <> 'pagado'
+      AND (c.cuota_estado IS NULL OR c.cuota_estado NOT IN ('pagada','anulada'))), 0,
+  '10 · no es candidata del cron de recordatorios (su mismo filtro)');
+SELECT public.chk(
+  (SELECT count(*) FROM public.cuotas_condominio c WHERE c.id = :Q3 AND c.cuota_estado IN ('emitida','vencida')), 0,
+  '10 · create-charge la rechaza (sólo cobra emitida/vencida)');
+SELECT public.chk_txt(public.conta_cuota_saldo_favor_aplicado(:Q3)::text, '100.00',
+  '10 · lo aplicado por saldo a favor que resta create-charge');
+SELECT public.chk(
+  (SELECT count(*) FROM unnest(ARRAY['authenticated','anon']) r
+    WHERE has_function_privilege(r, 'public.conta_cuota_saldo_favor_aplicado(uuid)', 'EXECUTE')), 0,
+  '10 · …sólo service_role la ejecuta');
+
+-- REVERSIÓN de la aplicación: vuelve EXACTAMENTE su estado anterior.
+SET ROLE authenticated;
+SELECT public.chk_txt(
+  (SELECT r.resultado || '/' || r.estado_documento
+     FROM public.conta_revertir_aplicacion_saldo_favor(:K8, 'SINT-AUX era de otra cuota') r),
+  'revertida/emitida', '10 · revertir: la cuota vuelve a emitida');
+RESET ROLE;
+SELECT public.chk_txt(
+  (SELECT c.cuota_estado || '/' || c.estado || '/' || COALESCE(c.pagada_at::text, '-') || '/' || COALESCE(c.fecha_pago::text, '-')
+          || '/' || COALESCE(c.metodo_pago, '-') FROM public.cuotas_condominio c WHERE c.id = :Q3),
+  'emitida/pendiente/-/-/-', '10 · …con sus valores anteriores (estado legacy, fecha, método), sin inventar nada');
+SELECT public.chk_txt(
+  (SELECT string_agg(e.accion || ':' || e.disparo, ',' ORDER BY e.ocurrido_at, e.accion DESC) FROM public.conta_sf_cuota_estado_eventos e WHERE e.cuota_id = :Q3),
+  'marcada:aplicacion,restaurada:asiento_aplicacion', '10 · eventos: marcada al aplicar, restaurada al reversar su asiento');
+-- Y sigue su curso normal: el cron la vence y le aplica la mora.
+SELECT public.aplicar_mora_cuotas_vencidas();
+SELECT public.chk_txt(
+  (SELECT c.cuota_estado || '/' || c.mora_monto FROM public.cuotas_condominio c WHERE c.id = :Q3),
+  'vencida/10.00', '10 · revertida, el cron la vence y aplica la mora como a cualquier cuota impaga');
+
+-- RECHAZO del cobro que completaba la cobertura de Q4: vuelve a pendiente.
+SET ROLE authenticated;
+UPDATE public.pagos SET estado = 'rechazado', verification_status = 'rechazado', verification_notes = 'SINT-AUX sin fondos'
+ WHERE id = :PQ4;
+RESET ROLE;
+SELECT public.chk_txt(
+  (SELECT c.cuota_estado || '/' || c.estado || '/' || COALESCE(c.metodo_pago, '-') FROM public.cuotas_condominio c WHERE c.id = :Q4),
+  'pendiente/pendiente/-', '10 · rechazado el cobro de 80, Q4 vuelve a deber y a su estado anterior');
+SELECT public.chk_txt(
+  (SELECT e.disparo FROM public.conta_sf_cuota_estado_eventos e WHERE e.cuota_id = :Q4 AND e.accion = 'restaurada'),
+  'asiento_cobro', '10 · …por el reverso del asiento del cobro');
+
+-- REVERSO MANUAL desde Pólizas del asiento de una aplicación.
+SET ROLE authenticated;
+SELECT public.chk_txt(public.sf_aplicar(:O_AN6, 'cuotas_condominio', :Q4, 80, :K9),
+  '80.00/0.00/80.00/20.00/0.00/pagada', '10 · 80 del anticipo a Q4: pagada otra vez');
+SELECT public.conta_anular_asiento(
+  (SELECT x.asiento_id FROM public.conta_saldo_favor_aplicaciones x WHERE x.id = :K9), 'SINT-AUX reverso manual');
+RESET ROLE;
+SELECT public.chk_txt((SELECT c.cuota_estado FROM public.cuotas_condominio c WHERE c.id = :Q4), 'pendiente',
+  '10 · reversado a mano el asiento de la aplicación, Q4 vuelve a deber');
+SET ROLE authenticated;
+SELECT public.chk_txt(
+  (SELECT r.resultado || '/' || r.estado_documento FROM public.conta_revertir_aplicacion_saldo_favor(:K9, 'SINT-AUX sello del reverso manual') r),
+  'revertida/pendiente', '10 · sellar su reversión después no la mueve');
+
+-- Si alguien más cambió la cuota después de marcarla, la regla no la toca.
+SELECT public.chk_txt(public.sf_aplicar(:O_AN6, 'cuotas_condominio', :Q4, 80, :K10),
+  '80.00/0.00/80.00/20.00/0.00/pagada', '10 · 80 otra vez: pagada');
+RESET ROLE;
+UPDATE public.cuotas_condominio SET metodo_pago = 'transferencia', pagada_at = now() WHERE id = :Q4;
+SET ROLE authenticated;
+SELECT public.chk_txt(
+  (SELECT r.resultado || '/' || r.estado_documento FROM public.conta_revertir_aplicacion_saldo_favor(:K10, 'SINT-AUX prueba') r),
+  'revertida/pagada', '10 · revertida la aplicación, la cuota que otro marcó pagada sigue pagada (no se pisa)');
+RESET ROLE;
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_sf_cuota_estado_eventos e WHERE e.cuota_id = :Q4), 5,
+  '10 · Q4: marcada, restaurada, marcada, restaurada, marcada; la última reversión no restaura lo que cambió otro');
+SELECT public.chk_falla($$UPDATE public.conta_sf_cuota_estado_eventos SET disparo = 'x'$$,
+  'BITACORA_INMUTABLE', '10 · la bitácora no se reescribe');
+SELECT public.chk_falla($$DELETE FROM public.conta_sf_cuota_estado_eventos$$,
+  'BITACORA_INMUTABLE', '10 · ni se borra');

@@ -4611,6 +4611,45 @@ export type Database = {
         }
         Relationships: []
       }
+      conta_borradores_tc_resoluciones: {
+        Row: {
+          actor: string
+          asiento_id: string
+          company_id: string
+          fecha_asiento: string
+          id: string
+          moneda: string
+          motivo: string
+          ocurrido_at: string
+          periodo: string
+          project_id: string | null
+        }
+        Insert: {
+          actor?: string
+          asiento_id: string
+          company_id: string
+          fecha_asiento: string
+          id?: string
+          moneda: string
+          motivo: string
+          ocurrido_at?: string
+          periodo: string
+          project_id?: string | null
+        }
+        Update: {
+          actor?: string
+          asiento_id?: string
+          company_id?: string
+          fecha_asiento?: string
+          id?: string
+          moneda?: string
+          motivo?: string
+          ocurrido_at?: string
+          periodo?: string
+          project_id?: string | null
+        }
+        Relationships: []
+      }
       conta_cierres_anuales: {
         Row: {
           anio: number
@@ -5293,6 +5332,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      conta_sf_cuota_estado_eventos: {
+        Row: {
+          accion: string
+          actor: string | null
+          company_id: string
+          cuota_id: string
+          disparo: string
+          id: string
+          ocurrido_at: string
+          project_id: string | null
+          saldo: number | null
+          valores_antes: Json
+          valores_despues: Json
+        }
+        Insert: {
+          accion: string
+          actor?: string | null
+          company_id: string
+          cuota_id: string
+          disparo: string
+          id?: string
+          ocurrido_at?: string
+          project_id?: string | null
+          saldo?: number | null
+          valores_antes: Json
+          valores_despues: Json
+        }
+        Update: {
+          accion?: string
+          actor?: string | null
+          company_id?: string
+          cuota_id?: string
+          disparo?: string
+          id?: string
+          ocurrido_at?: string
+          project_id?: string | null
+          saldo?: number | null
+          valores_antes?: Json
+          valores_despues?: Json
+        }
+        Relationships: []
       }
       conta_tipos_cambio: {
         Row: {
@@ -23554,6 +23635,32 @@ export type Database = {
           reverso_numero: number | null
         }[]
       }
+      conta_borrador_tc_asignar_periodo: {
+        Args: { p_asiento_id: string; p_motivo: string; p_periodo: string }
+        Returns: {
+          asiento_id: string
+          moneda: string
+          periodo: string
+          tasa_configurada: boolean
+        }[]
+      }
+      conta_borradores_sin_conversion: {
+        Args: never
+        Returns: {
+          asiento_id: string
+          concepto: string
+          fecha: string
+          lineas: number
+          marca_antigua: boolean
+          moneda_base: string
+          moneda_origen: string | null
+          origen: string
+          origen_tabla: string | null
+          pendiente_nuevo: boolean
+          periodo_asignado: string | null
+          project_id: string | null
+        }[]
+      }
       conta_cargo_cobros: {
         Args: { p_cargo_id: string }
         Returns: {
@@ -23691,6 +23798,10 @@ export type Database = {
           nombre: string
           proceso: string
         }[]
+      }
+      conta_cuota_saldo_favor_aplicado: {
+        Args: { p_cuota_id: string }
+        Returns: number
       }
       conta_destinos_imputacion: {
         Args: Record<string, never>
