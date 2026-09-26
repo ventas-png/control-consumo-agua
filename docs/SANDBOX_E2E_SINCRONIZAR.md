@@ -12,6 +12,35 @@ pendientes de #887 hubo que retirarlo (a3a6829b) en vez de relajarlo. Este
 documento es el procedimiento con el que se puso al día el 2026-09-23 y el que
 hay que repetir.
 
+## Estado registrado (2026-09-26)
+
+**El sandbox está atrasado respecto de `main`.** Inventario de sólo lectura del
+2026-09-26 sobre `jwpmivhvlstslncrtokb`: 504 migraciones registradas, máxima
+`20261004000200`. Comparado versión a versión con `supabase/migrations/`:
+
+| Versión | Origen | En el sandbox |
+| --- | --- | --- |
+| `20261005000000_conta_cobros_rechazo_evidencia` | #901 (en `main`, aplicada en producción el 2026-09-25) | **No aplicada.** Ni la fila de historial ni `pagos_rechazo_eventos`; `conta_tg_pagos` es la de `20261004000100`. |
+| `20261006000000_conta_cobros_vigencia_sin_fecha` | #902 (PR abierto) | **No aplicada.** Depende de la anterior. |
+
+No hay versiones sólo en el sandbox ni colisiones: las dos versiones están
+libres en su historial.
+
+**Las validaciones de #901 y #902 no lo actualizaron.** Cada una aplicó las
+migraciones y un caso sintético dentro de **una** transacción que terminó en
+`RAISE EXCEPTION 'SUITE_OK_ROLLBACK …'`; después se comprobó que no quedó nada
+(504 migraciones, sin la tabla ni las funciones nuevas, `conta_tg_pagos` sin
+cambios, sin datos sintéticos). Eso prueba que las migraciones corren sobre el
+estado real del sandbox; **no** lo deja al día.
+
+Para ponerlo al día, con el procedimiento de abajo, en este orden y cada una en
+su propia transacción con verificación de huella: `20261005000000` y, cuando
+#902 esté en `main`, `20261006000000`. Ninguna toca datos existentes (crean una
+tabla vacía y redefinen funciones); no requieren renumeración ni `repair`.
+Quien administra el sandbox decide cuándo; hasta entonces, cualquier E2E que
+use `pagos_rechazo_eventos` o el estado de cuenta con cortes de cobros
+rechazados fallará contra él por desincronización, no por el código.
+
 ## Cuándo hacerlo
 
 - Un E2E falla por un objeto de esquema que existe en `main` y no en el sandbox.
