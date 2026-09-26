@@ -4447,6 +4447,10 @@ export type Database = {
       }
       conta_asientos: {
         Row: {
+          tipo_cambio_moneda: string | null
+          tipo_cambio_pendiente: boolean
+          tipo_cambio_periodo: string | null
+          tipo_cambio_tasa: number | null
           anulado_por_id: string | null
           company_id: string
           concepto: string
@@ -4471,6 +4475,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          tipo_cambio_moneda?: string | null
+          tipo_cambio_pendiente?: boolean
+          tipo_cambio_periodo?: string | null
+          tipo_cambio_tasa?: number | null
           anulado_por_id?: string | null
           company_id: string
           concepto: string
@@ -4495,6 +4503,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          tipo_cambio_moneda?: string | null
+          tipo_cambio_pendiente?: boolean
+          tipo_cambio_periodo?: string | null
+          tipo_cambio_tasa?: number | null
           anulado_por_id?: string | null
           company_id?: string
           concepto?: string
@@ -5328,6 +5340,103 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_superadmin_empresa_counts"
             referencedColumns: ["company_id"]
+          },
+        ]
+      }
+      conta_tipos_cambio_mensual: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          moneda: string
+          moneda_base: string
+          periodo: string
+          tasa: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          moneda: string
+          moneda_base: string
+          periodo: string
+          tasa: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          moneda?: string
+          moneda_base?: string
+          periodo?: string
+          tasa?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conta_tipos_cambio_mensual_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conta_tipos_cambio_mensual_historial: {
+        Row: {
+          accion: string
+          actor: string | null
+          company_id: string
+          id: string
+          moneda: string
+          moneda_base: string
+          ocurrido_at: string
+          periodo: string
+          tasa_anterior: number | null
+          tasa_nueva: number | null
+          tipo_cambio_id: string
+        }
+        Insert: {
+          accion: string
+          actor?: string | null
+          company_id: string
+          id?: string
+          moneda: string
+          moneda_base: string
+          ocurrido_at?: string
+          periodo: string
+          tasa_anterior?: number | null
+          tasa_nueva?: number | null
+          tipo_cambio_id: string
+        }
+        Update: {
+          accion?: string
+          actor?: string | null
+          company_id?: string
+          id?: string
+          moneda?: string
+          moneda_base?: string
+          ocurrido_at?: string
+          periodo?: string
+          tasa_anterior?: number | null
+          tasa_nueva?: number | null
+          tipo_cambio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conta_tipos_cambio_mensual_historial_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
         ]
       }

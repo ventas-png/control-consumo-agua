@@ -759,6 +759,18 @@ jobs:
           PGPORT_TEST: 55514
         run: supabase/tests/conta_saldos_favor/run.sh
 
+      # 20261008000000: tipo de cambio mensual. Permisos y validación de la
+      # configuración (dirección, moneda base, mes, unicidad) con auditoría;
+      # cambio de mes, moneda base, documento retroactivo sin tasa (sin usar
+      # la de otro mes: publicación bloqueada con instrucción y convertida con
+      # la tasa de SU mes al configurarla), cambio de configuración sin
+      # recalcular lo publicado y redondeo uniforme.
+      - name: Contabilidad — tipo de cambio mensual
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55515
+        run: supabase/tests/conta_tipo_cambio_mensual/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

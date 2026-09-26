@@ -2733,7 +2733,7 @@ BEGIN
   END IF;
   SELECT a.estado, a.numero INTO v_estado, v_numero FROM public.conta_asientos a WHERE a.id = v_asiento;
   IF v_estado <> 'publicado' THEN
-    RAISE EXCEPTION 'SALDO_FAVOR_SIN_TIPO_CAMBIO: falta el tipo de cambio % → moneda base para hoy; el asiento no se puede publicar. No se aplicó nada.',
+    RAISE EXCEPTION 'SALDO_FAVOR_SIN_TIPO_CAMBIO: falta el tipo de cambio de % hacia la moneda base para el mes de la aplicación; el asiento no se puede publicar. No se aplicó nada.',
       v_o.moneda USING ERRCODE = 'check_violation';
   END IF;
 
