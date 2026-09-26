@@ -489,3 +489,41 @@ SELECT public.chk_falla($$UPDATE public.conta_sf_cuota_estado_eventos SET dispar
   'BITACORA_INMUTABLE', '10 · la bitácora no se reescribe');
 SELECT public.chk_falla($$DELETE FROM public.conta_sf_cuota_estado_eventos$$,
   'BITACORA_INMUTABLE', '10 · ni se borra');
+
+-- ── 11 · D2: mora sobre el SALDO pendiente (20261010000000) ────────────────
+\set Q5  '''c5f00000-0000-0000-0000-000000000005'''
+\set Q6  '''c5f00000-0000-0000-0000-000000000006'''
+\set PQ5 '''9f5f0000-0000-0000-0000-000000000015'''
+\set PQ6 '''9f5f0000-0000-0000-0000-000000000016'''
+\set K11 '''5a000000-0000-0000-0000-000000000011'''
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo) VALUES
+  (:Q5, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', :A1, :U1, 'SINT-AUX Q5', 100, '2026-08', 'pendiente', 'mantenimiento'),
+  (:Q6, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', :A1, :U1, 'SINT-AUX Q6', 100, '2026-08', 'pendiente', 'mantenimiento');
+UPDATE public.cuotas_condominio SET cuota_estado = 'emitida', emitida_at = now() - interval '40 days',
+       fecha_vencimiento = CURRENT_DATE - 30 WHERE id IN (:Q5, :Q6);
+UPDATE public.reglas_mora_config SET aplicar_sobre = 'saldo_vencido' WHERE nombre = 'SINT-AUX mora 10%';
+-- Q5: 30 de saldo a favor + un cobro de 20 → saldo 50.
+SET ROLE authenticated;
+SELECT public.chk_txt(public.sf_aplicar(:O_AN6, 'cuotas_condominio', :Q5, 30, :K11),
+  '30.00/0.00/30.00/70.00/70.00/emitida', '11 · 30 de saldo a favor a Q5');
+INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
+  (:PQ5, :UNO, :A1, :Q5, 20, 'efectivo', 'verificado', now());
+RESET ROLE;
+SELECT public.aplicar_mora_cuotas_vencidas();
+SELECT public.chk_txt(
+  (SELECT c.cuota_estado || '/' || c.mora_monto || '/' || c.total_a_pagar FROM public.cuotas_condominio c WHERE c.id = :Q5),
+  'vencida/5.00/105.00', '11 · saldo_vencido: 10 % del SALDO (100 − 20 cobrado − 30 de saldo a favor = 50) = 5');
+SELECT public.chk_txt((SELECT r.monto_calculado::text FROM public.recargos_mora r WHERE r.cuota_id = :Q5), '5.00',
+  '11 · …el mismo recargo en recargos_mora');
+-- Q6: con monto_cuota la base sigue siendo el monto completo aunque haya abonos.
+UPDATE public.reglas_mora_config SET aplicar_sobre = 'monto_cuota' WHERE nombre = 'SINT-AUX mora 10%';
+SET ROLE authenticated;
+INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
+  (:PQ6, :UNO, :A1, :Q6, 20, 'efectivo', 'verificado', now());
+RESET ROLE;
+SELECT public.aplicar_mora_cuotas_vencidas();
+SELECT public.chk_txt(
+  (SELECT c.cuota_estado || '/' || c.mora_monto FROM public.cuotas_condominio c WHERE c.id = :Q6),
+  'vencida/10.00', '11 · monto_cuota: 10 % del monto completo (sin cambios)');
+SELECT public.chk_txt((SELECT c.mora_monto::text FROM public.cuotas_condominio c WHERE c.id = :Q5), '5.00',
+  '11 · el cron es idempotente: Q5 no se recarga dos veces');

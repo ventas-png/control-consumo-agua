@@ -1,8 +1,8 @@
 # Propuesta — Ajustes, anulaciones y extensión a portal y pasarela (funcional 3)
 
-> **Estado: PROPUESTA PARA APROBACIÓN. No hay código de este bloque en el PR.**
-> Se implementa sólo cuando se decidan los puntos marcados **[DECIDIR]**. No se
-> inventan permisos ni umbrales monetarios: donde hace falta uno, se pregunta.
+> **Estado: decisiones E1–E5 APROBADAS el 2026-09-26** (ver
+> [`DECISIONES_PENDIENTES_CONTABILIDAD.md`](DECISIONES_PENDIENTES_CONTABILIDAD.md), §E).
+> Todavía no hay código de este bloque en el PR.
 
 Este bloque se apoya en lo que ya existe (y se reutiliza, no se duplica):
 
@@ -141,7 +141,14 @@ saldos a favor), con estas reglas:
   - Pago en línea con excedente.
   - Reembolso de un cobro con saldo a favor ya aplicado.
 
-## 7. Decisiones que necesito para implementar
+## 7. Decisiones (aprobadas el 2026-09-26)
+
+Respuestas: 1) no, salvo `company_owner` o un único aprobador, con marca de
+autoaprobación; 2) sin umbral al inicio, se revisa a los tres meses; 3) no
+vencen: recordatorio a 7 días y «estancada» a 30; 4) lo solicita; 5) se
+mantiene el bloqueo.
+
+Preguntas originales:
 
 1. Autoaprobación: ¿no permitida (propuesta) o sólo el owner?
 2. ¿Hay umbral monetario? Si lo hay: monto, moneda y quién aprueba por encima.

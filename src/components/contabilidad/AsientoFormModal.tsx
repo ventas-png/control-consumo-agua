@@ -9,6 +9,7 @@ import {
   totalesLineas,
   type AsientoLineaFormInput,
 } from '../../domain/contabilidad/schemas'
+import { useMonedaEmpresaQuery, useTiposCambioMensualQuery, tasaMensualEntre } from '../../domain/contabilidad/tiposCambio'
 import { formatCurrency, hoyLocalISO } from '../../lib/format'
 import { TIPO_ASIENTO_LABELS, type TipoAsiento } from '../../types/contabilidad'
 import { Campo, btnPrimario, btnSecundario, btnLink, input } from './ui'
@@ -27,6 +28,7 @@ interface LineaForm {
   lado: 'debe' | 'haber'
   /** Monto capturado: en moneda base, o en moneda origen si la cuenta es FX. */
   monto: string
+  /** Vacío = la tasa mensual propuesta; escrita = otra tasa (pide motivo). */
   tipo_cambio: string
 }
 
@@ -46,17 +48,43 @@ export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: 
   const [concepto, setConcepto] = useState('')
   const [lineas, setLineas] = useState<LineaForm[]>([{ ...LINEA_VACIA }, { ...LINEA_VACIA, lado: 'haber' }])
   const [guardando, setGuardando] = useState(false)
+  const [motivoTasa, setMotivoTasa] = useState('')
+  // Decisión B1: la tasa mensual de la fecha se PROPONE; usar otra exige motivo.
+  const { data: tasasMensuales = [] } = useTiposCambioMensualQuery(companyId)
+  const { data: monedaEmpresa } = useMonedaEmpresaQuery(companyId)
 
   const detalle = useMemo(() => cuentas.filter((c) => c.es_detalle && c.activa), [cuentas])
   const cuentaDe = (id: string) => detalle.find((c) => c.id === id)
 
+  function tasaSugerida(l: LineaForm): number | null {
+    const cuenta = cuentaDe(l.cuenta_id)
+    if (!cuenta?.moneda || cuenta.moneda === monedaBase || !monedaEmpresa) return null
+    return tasaMensualEntre(tasasMensuales, cuenta.moneda, monedaBase, fecha.slice(0, 7), monedaEmpresa)
+  }
+
+  /** La tasa que se usará: la escrita o, si no hay, la mensual propuesta. */
+  function tasaEfectiva(l: LineaForm): number {
+    return l.tipo_cambio !== '' ? parseFloat(l.tipo_cambio) || 0 : tasaSugerida(l) ?? 0
+  }
+
+  function esFxLinea(l: LineaForm): boolean {
+    const cuenta = cuentaDe(l.cuenta_id)
+    return !!cuenta?.moneda && cuenta.moneda !== monedaBase
+  }
+
+  /** Línea en otra moneda cuya tasa no es la mensual (o no hay mensual). */
+  function tasaDistinta(l: LineaForm): boolean {
+    if (!esFxLinea(l)) return false
+    const sugerida = tasaSugerida(l)
+    return sugerida == null || Math.abs(tasaEfectiva(l) - sugerida) > 1e-9
+  }
+
+  const pideMotivo = lineas.some(tasaDistinta)
+  const motivoValido = motivoTasa.trim().length >= 5
+
   function montoBase(l: LineaForm): number {
     const monto = parseFloat(l.monto) || 0
-    const cuenta = cuentaDe(l.cuenta_id)
-    if (cuenta?.moneda && cuenta.moneda !== monedaBase) {
-      const tc = parseFloat(l.tipo_cambio) || 0
-      return convertirMontoBase(monto, tc)
-    }
+    if (esFxLinea(l)) return convertirMontoBase(monto, tasaEfectiva(l))
     return monto
   }
 
@@ -83,7 +111,7 @@ export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: 
         haber: l.lado === 'haber' ? base : 0,
         moneda_origen: esFx ? cuenta!.moneda : null,
         monto_origen: esFx ? parseFloat(l.monto) || 0 : null,
-        tipo_cambio: esFx ? parseFloat(l.tipo_cambio) || 0 : null,
+        tipo_cambio: esFx ? tasaEfectiva(l) : null,
       }
     })
   }
@@ -95,9 +123,18 @@ export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: 
       concepto,
       project_id: projectId,
       lineas: construirLineas(),
+      tipo_cambio_motivo: pideMotivo ? motivoTasa : undefined,
     })
     if (!parsed.success) {
       notify({ variant: 'warning', title: 'Atención', text: parsed.error.issues[0]?.message ?? 'Datos inválidos.' })
+      return
+    }
+    if (publicarDespues && pideMotivo && !motivoValido) {
+      notify({
+        variant: 'warning',
+        title: 'Falta el motivo',
+        text: 'Una línea en otra moneda no usa la tasa mensual. Indica por qué (al menos 5 caracteres) o usa la tasa propuesta.',
+      })
       return
     }
     setGuardando(true)
@@ -214,8 +251,17 @@ export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: 
                         step="0.000001"
                         value={l.tipo_cambio}
                         onChange={(e) => setLinea(i, { tipo_cambio: e.target.value })}
-                        style={{ ...input, width: '100%', textAlign: 'right' }}
-                        placeholder={`1 ${cuenta!.moneda} = ? ${monedaBase}`}
+                        style={{
+                          ...input,
+                          width: '100%',
+                          textAlign: 'right',
+                          borderColor: tasaDistinta(l) ? 'var(--at-warning)' : undefined,
+                        }}
+                        aria-label={`Tipo de cambio de la línea ${i + 1}`}
+                        placeholder={tasaSugerida(l) != null ? String(tasaSugerida(l)) : `1 ${cuenta!.moneda} = ? ${monedaBase}`}
+                        title={tasaSugerida(l) != null
+                          ? `Tasa mensual de ${fecha.slice(0, 7)}: ${tasaSugerida(l)}. Déjalo vacío para usarla.`
+                          : `No hay tasa mensual de ${cuenta!.moneda} para ${fecha.slice(0, 7)}: escribe la tasa y el motivo.`}
                       />
                     ) : (
                       <span style={{ color: 'var(--at-ink-soft)', fontSize: 11 }}>—</span>
@@ -236,6 +282,17 @@ export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: 
             + Agregar línea
           </button>
         </div>
+        {pideMotivo && (
+          <Campo label="Motivo de la tasa distinta de la mensual *">
+            <input
+              value={motivoTasa}
+              onChange={(e) => setMotivoTasa(e.target.value)}
+              style={input}
+              placeholder="Ej.: tasa pactada con el banco en la operación del día"
+              aria-label="Motivo de la tasa distinta de la mensual"
+            />
+          </Campo>
+        )}
       </div>
     </EditModal>
   )

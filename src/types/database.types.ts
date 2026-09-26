@@ -4448,6 +4448,7 @@ export type Database = {
       conta_asientos: {
         Row: {
           tipo_cambio_moneda: string | null
+          tipo_cambio_motivo: string | null
           tipo_cambio_pendiente: boolean
           tipo_cambio_periodo: string | null
           tipo_cambio_tasa: number | null
@@ -4476,6 +4477,7 @@ export type Database = {
         }
         Insert: {
           tipo_cambio_moneda?: string | null
+          tipo_cambio_motivo?: string | null
           tipo_cambio_pendiente?: boolean
           tipo_cambio_periodo?: string | null
           tipo_cambio_tasa?: number | null
@@ -4504,6 +4506,7 @@ export type Database = {
         }
         Update: {
           tipo_cambio_moneda?: string | null
+          tipo_cambio_motivo?: string | null
           tipo_cambio_pendiente?: boolean
           tipo_cambio_periodo?: string | null
           tipo_cambio_tasa?: number | null
@@ -4898,6 +4901,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      conta_diferenciales_cambiarios: {
+        Row: {
+          asiento_id: string | null
+          asiento_origen_id: string
+          company_id: string
+          created_at: string
+          detalle: Json
+          estado: string
+          id: string
+          moneda: string | null
+          monto_neto: number | null
+          motivo: string | null
+          orden_pago_id: string
+          project_id: string | null
+          tasa_pago: number | null
+          updated_at: string
+        }
+        Insert: {
+          asiento_id?: string | null
+          asiento_origen_id: string
+          company_id: string
+          created_at?: string
+          detalle?: Json
+          estado: string
+          id?: string
+          moneda?: string | null
+          monto_neto?: number | null
+          motivo?: string | null
+          orden_pago_id: string
+          project_id?: string | null
+          tasa_pago?: number | null
+          updated_at?: string
+        }
+        Update: {
+          asiento_id?: string | null
+          asiento_origen_id?: string
+          company_id?: string
+          created_at?: string
+          detalle?: Json
+          estado?: string
+          id?: string
+          moneda?: string | null
+          monto_neto?: number | null
+          motivo?: string | null
+          orden_pago_id?: string
+          project_id?: string | null
+          tasa_pago?: number | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       conta_duplicados_descartados: {
         Row: {
@@ -5372,6 +5426,54 @@ export type Database = {
           saldo?: number | null
           valores_antes?: Json
           valores_despues?: Json
+        }
+        Relationships: []
+      }
+      conta_tasas_manuales: {
+        Row: {
+          actor: string | null
+          asiento_id: string
+          company_id: string
+          id: string
+          linea_id: string
+          moneda: string
+          moneda_base: string
+          motivo: string
+          ocurrido_at: string
+          periodo: string
+          project_id: string | null
+          tasa_mensual: number | null
+          tasa_usada: number
+        }
+        Insert: {
+          actor?: string | null
+          asiento_id: string
+          company_id: string
+          id?: string
+          linea_id: string
+          moneda: string
+          moneda_base: string
+          motivo: string
+          ocurrido_at?: string
+          periodo: string
+          project_id?: string | null
+          tasa_mensual?: number | null
+          tasa_usada: number
+        }
+        Update: {
+          actor?: string | null
+          asiento_id?: string
+          company_id?: string
+          id?: string
+          linea_id?: string
+          moneda?: string
+          moneda_base?: string
+          motivo?: string
+          ocurrido_at?: string
+          periodo?: string
+          project_id?: string | null
+          tasa_mensual?: number | null
+          tasa_usada?: number
         }
         Relationships: []
       }
@@ -23927,6 +24029,13 @@ export type Database = {
           evento: string | null
           intento_id: string | null
           motivo: string | null
+          resultado: string
+        }[]
+      }
+      conta_reprocesar_diferenciales_cambiarios: {
+        Args: { p_project_id?: string | null }
+        Returns: {
+          orden_pago_id: string
           resultado: string
         }[]
       }

@@ -132,3 +132,27 @@ export function useGuardarTipoCambioMensualMutation(companyId?: string) {
     },
   })
 }
+
+/**
+ * Tasa mensual de `de` → `a` para un mes, como la calcula el servidor
+ * (conta_tasa_entre): vía la moneda de la EMPRESA (pivote) y con las tasas del
+ * MISMO mes, redondeada a 6 decimales. `null` si falta alguna: nunca se usa la
+ * de otro mes. Sirve para PROPONER la tasa en una póliza manual (decisión B1).
+ */
+export function tasaMensualEntre(
+  tasas: Pick<TipoCambioMensual, 'moneda' | 'periodo' | 'tasa'>[],
+  de: string,
+  a: string,
+  periodo: string,
+  monedaEmpresa: string,
+): number | null {
+  const norm = (m: string) => m.trim().toUpperCase()
+  const [d, b, piv] = [norm(de), norm(a), norm(monedaEmpresa)]
+  if (d === b) return 1
+  const tasaDe = (m: string) =>
+    m === piv ? 1 : (tasas.find((t) => norm(t.moneda) === m && t.periodo === periodo)?.tasa ?? null)
+  const vDe = tasaDe(d)
+  const vA = tasaDe(b)
+  if (vDe == null || vA == null || vA === 0) return null
+  return Math.round((vDe / vA) * 1e6) / 1e6
+}

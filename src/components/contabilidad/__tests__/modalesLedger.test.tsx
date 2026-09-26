@@ -35,6 +35,11 @@ vi.mock('../../../domain/contabilidad/queries', () => ({
     return { data: [] }
   },
 }))
+vi.mock('../../../domain/contabilidad/tiposCambio', async (orig) => ({
+  ...(await orig<typeof import('../../../domain/contabilidad/tiposCambio')>()),
+  useTiposCambioMensualQuery: () => ({ data: [] }),
+  useMonedaEmpresaQuery: () => ({ data: 'GTQ' }),
+}))
 vi.mock('../../../domain/contabilidad/mutations', () => ({
   useCrearAsientoBorradorMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   usePublicarAsientoMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
