@@ -439,7 +439,7 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
                   <tbody>
                     {filasFuera.map((f) => (
                       <tr key={`${f.origen_tabla}:${f.origen_id}:${f.evento}`} style={{ borderBottom: '1px solid var(--at-line)', verticalAlign: 'top' }}>
-                        <td style={{ padding: 6, whiteSpace: 'nowrap' }}>{formatDateShort(f.fecha)}</td>
+                        <td style={{ padding: 6, whiteSpace: 'nowrap' }}>{f.fecha ? formatDateShort(f.fecha) : 'Sin fecha'}</td>
                         <td style={{ padding: 6 }}>
                           <div style={{ fontWeight: 600 }}>{f.concepto}</div>
                           <div style={{ color: 'var(--at-ink-soft)', fontSize: 12 }}>

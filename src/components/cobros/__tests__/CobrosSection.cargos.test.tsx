@@ -172,7 +172,7 @@ describe('CobrosSection — cobros de cargos adicionales fuera de la vista de ag
     await abrirPestana(/Verificaciones Pendientes/)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Rechazar/ })) })
     expect(rejectPago).toHaveBeenCalledTimes(1)
-    expect(rejectPago).toHaveBeenCalledWith('agua-pend', 'u1', 'comprobante ilegible')
+    expect(rejectPago).toHaveBeenCalledWith('agua-pend', 'comprobante ilegible')
   })
 
   it('verificar un pago de agua sigue llamando a la verificación de agua', async () => {

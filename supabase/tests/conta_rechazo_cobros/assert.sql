@@ -32,6 +32,12 @@
 \set P11  '''d0a00000-0000-0000-0000-000000000011'''
 \set P12  '''d0a00000-0000-0000-0000-000000000012'''
 \set P13  '''d0a00000-0000-0000-0000-000000000013'''
+\set P14  '''d0a00000-0000-0000-0000-000000000014'''
+\set P15  '''d0a00000-0000-0000-0000-000000000015'''
+\set P16  '''d0a00000-0000-0000-0000-000000000016'''
+\set P17  '''d0a00000-0000-0000-0000-000000000017'''
+\set P18  '''d0a00000-0000-0000-0000-000000000018'''
+\set P19  '''d0a00000-0000-0000-0000-000000000019'''
 \set PC   '''d0a00000-0000-0000-0000-0000000000ca'''
 \set CA   '''d0b00000-0000-0000-0000-0000000000ca'''
 
@@ -63,6 +69,13 @@ CREATE OR REPLACE FUNCTION public.rc_lim(p_hasta date) RETURNS text LANGUAGE sql
   SELECT public.ecc_limitaciones_rc(public.ec('a1a1a1a1-0000-0000-0000-000000000001',
            'e0000000-0000-0000-0000-00000000a003', NULL, NULL, p_hasta))
 $$;
+-- Una sola limitación al corte como «documentos:monto» ('-' si no está).
+CREATE OR REPLACE FUNCTION public.rc_lim_cod(p_hasta date, p_codigo text) RETURNS text LANGUAGE sql AS $$
+  SELECT COALESCE((SELECT (l->>'documentos') || ':' || (l->>'monto')
+                     FROM jsonb_array_elements(public.ec('a1a1a1a1-0000-0000-0000-000000000001',
+                            'e0000000-0000-0000-0000-00000000a003', NULL, NULL, p_hasta)->'limitaciones') l
+                    WHERE l->>'codigo' = p_codigo), '-')
+$$;
 -- Resumen del saldo al corte: «saldo_inicial|cargos|abonos|saldo_final|movimientos».
 CREATE OR REPLACE FUNCTION public.rc_resumen(p_hasta date) RETURNS text LANGUAGE sql AS $$
   SELECT public.ec_resumen(public.ec('a1a1a1a1-0000-0000-0000-000000000001',
@@ -84,7 +97,7 @@ CREATE OR REPLACE FUNCTION public.rc_asientos(p_pago uuid) RETURNS text LANGUAGE
    WHERE a.origen = 'automatico' AND a.origen_tabla = 'pagos' AND a.origen_id = p_pago
      AND a.origen_evento = 'pago_contabilizado'
 $$;
-GRANT EXECUTE ON FUNCTION public.rc_fila(date, uuid, text), public.rc_lim(date), public.ecc_limitaciones_rc(jsonb),
+GRANT EXECUTE ON FUNCTION public.rc_fila(date, uuid, text), public.rc_lim(date), public.rc_lim_cod(date, text), public.ecc_limitaciones_rc(jsonb),
   public.rc_resumen(date), public.rc_ev(uuid), public.rc_asientos(uuid) TO authenticated;
 
 -- Preparación: la fecha REAL de los intentos de contabilización de los cobros
@@ -134,7 +147,7 @@ SELECT public.chk_txt(public.rc_fila(CURRENT_DATE - 1, :P2, 'codigo'), 'excede_s
   'R1 · antes del rechazo: el cobro que excede está pendiente, sin asiento');
 SELECT public.rc_resumen(CURRENT_DATE - 1) AS res_antes \gset
 
--- Igual que rejectPago, y además con un revisor (el contador) y una fecha
+-- Como el rejectPago anterior (enviaba verified_by/verified_at), y además con un revisor (el contador) y una fecha
 -- FALSOS enviados por el cliente.
 UPDATE public.pagos
    SET estado = 'rechazado', verification_status = 'rechazado',
@@ -428,7 +441,7 @@ INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, con
 INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
   (:P12, :C3, :A1, 'd0c00000-0000-0000-0000-000000000012', 60, 'efectivo', 'verificado', now() - interval '5 days');
 SELECT public.rc_fechar_intentos();
--- Exactamente lo que manda rejectPago.
+-- Exactamente lo que mandaba el rejectPago anterior (verified_at = now()): un cliente viejo en caché aún puede hacerlo.
 UPDATE public.pagos SET verification_status = 'rechazado', estado = 'rechazado', verified_by = :ADM,
        verified_at = now(), verification_notes = 'SINT-RECH P12 hoy' WHERE id = :P12;
 SELECT public.chk_txt(public.rc_asientos(:P12) || '|' ||
@@ -477,6 +490,129 @@ SELECT public.chk_txt(public.rc_fila('2026-09-05', :P13, 'clase') || '|' || publ
   'R14 · corte 09-05 (rechazado con fecha): no figura ni es limitación');
 SELECT public.chk_txt(public.rc_lim('2026-08-12'), 'rechazo_sin_fecha:2:140.00',
   'R11 · al corte del 08-12, P10 y P11 no son limitación: sólo los legados');
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 20261006000000 · reactivado a un estado NO vigente y verificado después
+-- Todos verificados el 08-01 y rechazados el 08-05 como lo hace AHORA
+-- rejectPago (sin tocar verified_at ni verified_by), reactivados a
+-- `pendiente` el 08-10. Luego, cada uno distinto.
+-- ════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, created_at) VALUES
+  ('d0c00000-0000-0000-0000-000000000014', :A, :A1, :U3, 'SINT-RECH K14', 5, '2026-07', 'pendiente', 'mantenimiento', '2026-07-20 12:00+00');
+INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at, verified_by) VALUES
+  (:P14, :C3, :A1, 'd0c00000-0000-0000-0000-000000000014', 60, 'efectivo', 'verificado', '2026-08-01 12:00+00', :ADM),
+  (:P15, :C3, :A1, 'd0c00000-0000-0000-0000-000000000014', 63, 'efectivo', 'verificado', '2026-08-01 12:00+00', :ADM),
+  (:P16, :C3, :A1, 'd0c00000-0000-0000-0000-000000000014', 61, 'efectivo', 'verificado', '2026-08-01 12:00+00', :ADM),
+  (:P17, :C3, :A1, 'd0c00000-0000-0000-0000-000000000014', 64, 'efectivo', 'verificado', '2026-08-01 12:00+00', :ADM),
+  (:P18, :C3, :A1, 'd0c00000-0000-0000-0000-000000000014', 65, 'efectivo', 'verificado', '2026-08-01 12:00+00', :ADM),
+  (:P19, :C3, :A1, 'd0c00000-0000-0000-0000-000000000014', 62, 'efectivo', 'verificado', '2026-08-01 12:00+00', :ADM);
+SELECT public.rc_fechar_intentos();
+
+-- ── R15 · el rechazo de rejectPago ya no reescribe la verificación ─────────
+-- Exactamente lo que manda ahora rejectPago: estado, verification_status y motivo.
+UPDATE public.pagos SET verification_status = 'rechazado', estado = 'rechazado', verification_notes = 'SINT-RECH vig'
+ WHERE id IN (:P14, :P15, :P16, :P17, :P18, :P19);
+SELECT public.chk_txt(
+  (SELECT string_agg(DISTINCT to_char(verified_at, 'YYYY-MM-DD HH24:MI') || ':' || (verified_by = :ADM)::text, ',')
+     FROM public.pagos WHERE id IN (:P14, :P15, :P16, :P17, :P18, :P19)),
+  '2026-08-01 12:00:true',
+  'R15 · rechazar no reescribe verified_at ni verified_by: siguen siendo los de la verificación');
+SELECT public.chk_txt(public.rc_ev(:P14), 'rechazo:verificado:SINT-RECH vig:adm',
+  'R15 · la fecha y el actor del rechazo están en la evidencia del servidor');
+-- Reintento de la misma acción (doble clic, reenvío): ya no choca con la inmutabilidad.
+UPDATE public.pagos SET verification_status = 'rechazado', estado = 'rechazado', verification_notes = 'SINT-RECH vig'
+ WHERE id = :P14;
+SELECT public.chk_txt(public.rc_ev(:P14) || '|' || public.rc_asientos(:P14), 'rechazo:verificado:SINT-RECH vig:adm|0/0',
+  'R15 · reintentar el rechazo con el mismo motivo no falla ni deja otra evidencia');
+
+-- Reactivación a PENDIENTE (08-10), como un UPDATE directo.
+UPDATE public.pagos SET estado = 'pendiente', verification_status = 'pendiente'
+ WHERE id IN (:P14, :P15, :P16, :P17, :P18, :P19);
+-- P14: verificado después con verified_at NULL.   P19: verificado sin tocar verified_at (el del 08-01).
+-- P15: verificado el 08-14 (fecha válida).        P18: sigue pendiente (estado actual reactivado).
+-- P16: verificado sin fecha y rechazado el 08-20. P17: verificado el 08-14 y rechazado el 08-20.
+UPDATE public.pagos SET estado = 'verificado', verification_status = 'verificado', verified_at = NULL WHERE id IN (:P14, :P16);
+UPDATE public.pagos SET estado = 'verificado', verification_status = 'verificado' WHERE id = :P19;
+UPDATE public.pagos SET estado = 'verificado', verification_status = 'verificado', verified_at = '2026-08-14 12:00+00' WHERE id IN (:P15, :P17);
+UPDATE public.pagos SET verification_status = 'rechazado', estado = 'rechazado', verification_notes = 'SINT-RECH vig 2'
+ WHERE id IN (:P16, :P17);
+RESET ROLE;
+SELECT public.rc_fijar_eventos(p, ARRAY['2026-08-05 12:00+00', '2026-08-10 12:00+00', '2026-08-20 12:00+00']::timestamptz[])
+  FROM unnest(ARRAY[:P14, :P15, :P16, :P17, :P18, :P19]::uuid[]) p;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SET ROLE authenticated;
+SELECT public.chk_txt(
+  (SELECT string_agg(p.id::text || '=' || p.estado || ':' || COALESCE(to_char(p.verified_at, 'MM-DD'), 'null') || ':' || public.rc_asientos(p.id), ',' ORDER BY p.id)
+     FROM public.pagos p WHERE p.id IN (:P14, :P15, :P16, :P17, :P18, :P19)),
+  'd0a00000-0000-0000-0000-000000000014=verificado:null:0/0,d0a00000-0000-0000-0000-000000000015=verificado:08-14:0/0,'
+  || 'd0a00000-0000-0000-0000-000000000016=rechazado:null:0/0,d0a00000-0000-0000-0000-000000000017=rechazado:08-14:0/0,'
+  || 'd0a00000-0000-0000-0000-000000000018=pendiente:08-01:0/0,d0a00000-0000-0000-0000-000000000019=verificado:08-01:0/0',
+  'R16 · preparación: estados y verificaciones como se describen, ninguno con asiento');
+
+-- ── R16 · verificado con verified_at NULL después de reactivar (P14) ────────
+SELECT public.chk_txt(public.rc_fila('2026-08-03', :P14, 'clase') || '|' || public.rc_fila('2026-08-03', :P14, 'fecha'),
+  'pendiente|2026-08-01', 'R16 · antes del rechazo: vigente desde su verificación original');
+SELECT public.chk_txt(public.rc_fila('2026-08-07', :P14, 'clase') || '|' || public.rc_fila('2026-08-09', :P14, 'clase'),
+  '-|-', 'R16 · rechazado (antes de reactivar): no figura');
+SELECT public.chk_txt(public.rc_fila('2026-08-12', :P14, 'clase') || '|' || public.rc_fila('2026-08-31', :P14, 'clase')
+                      || '|' || public.rc_fila(CURRENT_DATE - 1, :P14, 'clase'),
+  '-|-|-',
+  'R16 · entre la reactivación y hoy: la fecha de verificación es desconocida, NO se acredita la de la reactivación');
+SELECT public.chk_txt(public.rc_fila(CURRENT_DATE, :P14, 'clase') || '|' || public.rc_fila(CURRENT_DATE, :P14, 'limite')
+                      || '|' || public.rc_fila(NULL, :P14, 'clase') || '|' || public.rc_fila(NULL, :P14, 'limite'),
+  'pendiente|verificacion_sin_fecha|pendiente|verificacion_sin_fecha',
+  'R16 · hoy y sin corte se conoce su estado (el de hoy): figura, marcado sin fecha');
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_estado_cuenta_pendientes(:A1, :C3, NULL, CURRENT_DATE, 500, 0) f
+    WHERE f.origen_id = :P14 AND f.fecha IS NULL
+      AND f.motivo LIKE '%Se reactivó el 2026-08-10 y después se verificó sin fecha registrada%'), 1,
+  'R16 · …con fecha NULL y la nota de la reactivación, sin inventar la de la verificación');
+
+-- ── R17 · verificado sin actualizar verified_at (queda el anterior) (P19) ───
+SELECT public.chk_txt(public.rc_fila('2026-08-12', :P19, 'clase') || '|' || public.rc_fila(CURRENT_DATE - 1, :P19, 'clase')
+                      || '|' || public.rc_fila(NULL, :P19, 'limite'),
+  '-|-|verificacion_sin_fecha',
+  'R17 · un verified_at anterior a la reactivación no fecha la verificación posterior');
+
+-- ── R18 · fecha válida posterior (P15) y con otro rechazo después (P17) ─────
+SELECT public.chk_txt(public.rc_fila('2026-08-12', :P15, 'clase') || '|' || public.rc_fila('2026-08-12', :P17, 'clase'),
+  '-|-', 'R18 · entre la reactivación y la verificación: pendiente de verificar, no figura');
+SELECT public.chk_txt(public.rc_fila('2026-08-16', :P15, 'clase') || '|' || public.rc_fila('2026-08-16', :P15, 'fecha')
+                      || '|' || public.rc_fila('2026-08-16', :P15, 'limite') || '|' || public.rc_fila(NULL, :P15, 'fecha'),
+  'pendiente|2026-08-14|-|2026-08-14',
+  'R18 · después de verificar: vigente desde la verificación registrada (08-14), sin limitación');
+SELECT public.chk_txt(public.rc_fila('2026-08-16', :P17, 'clase') || '|' || public.rc_fila('2026-08-16', :P17, 'fecha'),
+  'pendiente|2026-08-14', 'R18 · con otro rechazo posterior: vigente desde el 08-14…');
+SELECT public.chk(
+  (SELECT count(*) FROM (SELECT public.rc_fila('2026-08-16', :P17, 'motivo') AS m) x
+    WHERE m LIKE '%El cobro se rechazó después del corte, el 2026-08-20.'), 1,
+  'R18 · …con la nota del rechazo del 08-20');
+SELECT public.chk_txt(public.rc_fila('2026-08-22', :P17, 'clase') || '|' || public.rc_fila(NULL, :P17, 'clase'),
+  '-|-', 'R18 · tras el segundo rechazo: no figura');
+
+-- ── R19 · verificado sin fecha y rechazado otra vez después (P16) ───────────
+SELECT public.chk_txt(public.rc_fila('2026-08-12', :P16, 'clase') || '|' || public.rc_fila('2026-08-18', :P16, 'clase')
+                      || '|' || public.rc_fila('2026-08-22', :P16, 'clase') || '|' || public.rc_fila(NULL, :P16, 'clase'),
+  '-|-|-|-',
+  'R19 · no figura en ningún corte: antes del 08-20 su vigencia es desconocida, después está rechazado');
+
+-- ── R20 · estado actual reactivado a pendiente, sin verificar (P18) ─────────
+SELECT public.chk_txt(public.rc_fila('2026-08-03', :P18, 'clase') || '|' || public.rc_fila('2026-08-12', :P18, 'clase')
+                      || '|' || public.rc_fila(CURRENT_DATE - 1, :P18, 'clase') || '|' || public.rc_fila(NULL, :P18, 'clase'),
+  'pendiente|-|-|-',
+  'R20 · vigente antes del rechazo; reactivado a pendiente no figura en ningún corte (no está verificado)');
+
+-- ── Limitación explícita donde la vigencia no se puede determinar ──────────
+SELECT public.chk_txt(public.rc_lim_cod('2026-08-03', 'verificacion_sin_fecha') || '|' || public.rc_lim_cod('2026-08-07', 'verificacion_sin_fecha'),
+  '-|-', 'R21 · antes de reactivar: no hay limitación de verificación');
+SELECT public.chk_txt(public.rc_lim_cod('2026-08-12', 'verificacion_sin_fecha') || '|' || public.rc_lim_cod('2026-08-18', 'verificacion_sin_fecha'),
+  '3:183.00|3:183.00', 'R21 · entre la reactivación y el 08-20: P14, P16 y P19 (verificados sin fecha)');
+SELECT public.chk_txt(public.rc_lim_cod('2026-08-22', 'verificacion_sin_fecha') || '|' || public.rc_lim_cod(CURRENT_DATE - 1, 'verificacion_sin_fecha'),
+  '2:122.00|2:122.00', 'R21 · tras el 08-20: P14 y P19; P16 ya está rechazado con fecha');
+SELECT public.chk_txt(public.rc_lim_cod(CURRENT_DATE, 'verificacion_sin_fecha') || '|' || public.rc_lim_cod(NULL, 'verificacion_sin_fecha'),
+  '-|-', 'R21 · hoy y sin corte no es limitación: se conoce el estado de hoy');
+SELECT public.chk_txt(public.rc_lim_cod('2026-08-12', 'rechazo_sin_fecha'), '2:140.00',
+  'R21 · las demás limitaciones no cambian');
 
 RESET ROLE;
 SELECT public.chk(

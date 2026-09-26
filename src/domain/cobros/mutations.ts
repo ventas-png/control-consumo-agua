@@ -250,10 +250,17 @@ export async function verifyPago(pagoId: string, verifiedBy: string): Promise<{ 
   return { error: error?.message ?? null }
 }
 
-/** Rechaza un pago con motivo (sella verification_status/estado + verified_by/at + notas). */
+/**
+ * Rechaza un pago con motivo (verification_status/estado + notas).
+ *
+ * NO toca `verified_by` ni `verified_at`: siguen siendo los de la verificación
+ * (el estado de cuenta los necesita para saber desde cuándo estuvo vigente).
+ * La fecha y el actor del rechazo los registra el servidor en
+ * `pagos_rechazo_eventos` (hora del servidor y `auth.uid()`, 20261005000000);
+ * los permisos siguen siendo los de la RLS de `pagos`.
+ */
 export async function rejectPago(
   pagoId: string,
-  verifiedBy: string,
   notas: string,
 ): Promise<{ error: string | null }> {
   const { error } = await db
@@ -261,8 +268,6 @@ export async function rejectPago(
     .update({
       verification_status: 'rechazado',
       estado: 'rechazado',
-      verified_by: verifiedBy,
-      verified_at: new Date().toISOString(),
       verification_notes: notas,
     })
     .eq('id', pagoId)

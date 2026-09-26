@@ -726,7 +726,12 @@ export interface DocumentoFueraDeSaldo {
   origen_tabla: 'cuotas_condominio' | 'cargos_adicionales_unidad' | 'pagos'
   origen_id: string
   evento: string
-  fecha: string
+  /**
+   * Fecha del documento; en un cobro, desde cuándo estaba vigente. NULL cuando
+   * no se conoce (cobro reactivado y verificado sin fecha registrada,
+   * `limitacion = 'verificacion_sin_fecha'`): no se inventa ninguna.
+   */
+  fecha: string | null
   concepto: string
   tipo_cargo: string | null
   unidad_id: string | null

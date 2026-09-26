@@ -507,7 +507,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
         const razon = promptResult?.razon
 
         if (razon) {
-          const { error } = await rejectPago(pagoId, currentUser.user_id, razon)
+          const { error } = await rejectPago(pagoId, razon)
 
           if (error) throw new Error(error)
 

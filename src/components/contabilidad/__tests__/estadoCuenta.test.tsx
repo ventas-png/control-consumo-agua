@@ -257,6 +257,23 @@ describe('EstadoCuentaTab', () => {
     expect(within(seccion).getByRole('note', { name: 'Limitaciones del corte' }).textContent).toContain('Cobros HOY rechazados')
   })
 
+  it('un cobro verificado sin fecha registrada se muestra «Sin fecha», rotulado, sin inventar una', () => {
+    state.fuera = {
+      data: {
+        filas: [fueraFila({ fecha: null, limitacion: 'verificacion_sin_fecha',
+                            motivo: 'Sin asiento. Se reactivó el 2026-08-10 y después se verificó sin fecha registrada: se lista por su estado de hoy.' })],
+        total: 1,
+      },
+      isLoading: false, isError: false,
+    }
+    montar()
+    elegirCliente()
+    const seccion = screen.getByRole('heading', { name: 'Fuera del saldo contable' }).parentElement!
+    const fila = within(seccion).getByText(/se verificó sin fecha registrada/).closest('tr')!
+    expect(within(fila).getByText('Sin fecha')).toBeTruthy()
+    expect(within(fila).getByText(/Estado de hoy, sin fecha: puede no ser el del corte/)).toBeTruthy()
+  })
+
   it('lo de fuera del saldo se lista aparte, con su clase y motivo, y el cobro con signo menos', () => {
     montar()
     elegirCliente()
