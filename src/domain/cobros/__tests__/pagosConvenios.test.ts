@@ -6,6 +6,8 @@ import { describe, it, expect, vi } from 'vitest'
 const order = vi.fn()
 const insert = vi.fn()
 const updateEq = vi.fn()
+/** Cuerpo de cada `.update()`, en orden. */
+const updates: unknown[] = []
 /** Filtros `.is(col, valor)` que recibió cada consulta, por tabla. */
 const filtrosIs: Record<string, [string, unknown][]> = {}
 vi.mock('../../../lib/supabase', () => {
@@ -20,7 +22,7 @@ vi.mock('../../../lib/supabase', () => {
       return {
         select: () => conFiltros,
         insert,
-        update: () => ({ eq: updateEq }),
+        update: (cuerpo: unknown) => { updates.push(cuerpo); return { eq: updateEq } },
       }
     },
   }
@@ -104,7 +106,15 @@ describe('cobros manuales — mutaciones', () => {
 
   it('rejectPago propaga el error', async () => {
     updateEq.mockResolvedValueOnce({ error: { message: 'denied' } })
-    expect(await rejectPago('pago1', 'user1', 'motivo')).toEqual({ error: 'denied' })
+    expect(await rejectPago('pago1', 'motivo')).toEqual({ error: 'denied' })
+  })
+
+  it('rejectPago no reescribe la verificación: sólo estado y motivo', async () => {
+    updates.length = 0
+    updateEq.mockResolvedValueOnce({ error: null })
+    expect(await rejectPago('pago1', 'comprobante ilegible')).toEqual({ error: null })
+    expect(updates).toEqual([{ verification_status: 'rechazado', estado: 'rechazado', verification_notes: 'comprobante ilegible' }])
+    expect(updateEq).toHaveBeenLastCalledWith('id', 'pago1')
   })
 
   it('createConvenio éxito → { error: null }', async () => {
