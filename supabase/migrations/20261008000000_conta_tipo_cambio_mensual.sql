@@ -171,20 +171,20 @@ CREATE POLICY "conta_tipos_cambio_mensual_select" ON public.conta_tipos_cambio_m
 CREATE POLICY "conta_tipos_cambio_mensual_insert" ON public.conta_tipos_cambio_mensual
   FOR INSERT TO authenticated
   WITH CHECK ((SELECT public.is_super_admin()) OR (company_id = (SELECT public.get_my_company_id())
-    AND (public.current_user_role() = ANY (ARRAY['company_owner','admin'])
+    AND ((SELECT public.current_user_role()) = ANY (ARRAY['company_owner','admin'])
          OR (SELECT public.user_has_permission('platform.contabilidad.create')))));
 CREATE POLICY "conta_tipos_cambio_mensual_update" ON public.conta_tipos_cambio_mensual
   FOR UPDATE TO authenticated
   USING ((SELECT public.is_super_admin()) OR (company_id = (SELECT public.get_my_company_id())
-    AND (public.current_user_role() = ANY (ARRAY['company_owner','admin'])
+    AND ((SELECT public.current_user_role()) = ANY (ARRAY['company_owner','admin'])
          OR (SELECT public.user_has_permission('platform.contabilidad.edit')))))
   WITH CHECK ((SELECT public.is_super_admin()) OR (company_id = (SELECT public.get_my_company_id())
-    AND (public.current_user_role() = ANY (ARRAY['company_owner','admin'])
+    AND ((SELECT public.current_user_role()) = ANY (ARRAY['company_owner','admin'])
          OR (SELECT public.user_has_permission('platform.contabilidad.edit')))));
 CREATE POLICY "conta_tipos_cambio_mensual_delete" ON public.conta_tipos_cambio_mensual
   FOR DELETE TO authenticated
   USING ((SELECT public.is_super_admin()) OR (company_id = (SELECT public.get_my_company_id())
-    AND (public.current_user_role() = ANY (ARRAY['company_owner','admin'])
+    AND ((SELECT public.current_user_role()) = ANY (ARRAY['company_owner','admin'])
          OR (SELECT public.user_has_permission('platform.contabilidad.delete')))));
 CREATE POLICY "conta_tipos_cambio_mensual_historial_select" ON public.conta_tipos_cambio_mensual_historial
   FOR SELECT TO authenticated
