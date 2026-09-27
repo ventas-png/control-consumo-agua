@@ -103,6 +103,7 @@ done
 
 echo "── 4/5 · padrón + fixture de cargos + el de saldos a favor, e invariantes de una sesión"
 aplicar "$PADRON"
+aplicar "$RAIZ/supabase/tests/conta_ajustes/helper.sql"   # anulaciones y reversos: por el flujo de solicitudes (20261011000000)
 aplicar "$CARGOS"
 aplicar "$AQUI/fixture.sql"
 # El `|| true` es para poder IMPRIMIR el fallo: sin él, `set -e` aborta con la
@@ -170,9 +171,9 @@ par i "SELECT 'I1:' || public.sf_aplicar('$OPQ1', 'cargos_adicionales_unidad', '
       "SELECT 'I2:' || public.sf_aplicar('$OPQ1', 'cargos_adicionales_unidad', '$SG', 5, '5a000000-0000-0000-0000-0000000000c1');"
 # J · aplicación del anticipo AN3 y, mientras, su anulación.
 par j "SELECT 'J1:' || public.sf_aplicar('$OAN3', 'cargos_adicionales_unidad', '$SG', 10, '5a000000-0000-0000-0000-0000000000d1');" \
-      "SELECT 'J2:' || resultado FROM public.conta_anular_anticipo('$AN3', 'SINT-AUX anulación concurrente');"
+      "SELECT 'J2:' || resultado FROM public.tst_anular_anticipo('$AN3', 'SINT-AUX anulación concurrente');"
 # J' · al revés: la anulación de AN4 primero y, mientras, su aplicación.
-par k "SELECT 'K1:' || resultado FROM public.conta_anular_anticipo('$AN4', 'SINT-AUX anulación concurrente');" \
+par k "SELECT 'K1:' || resultado FROM public.tst_anular_anticipo('$AN4', 'SINT-AUX anulación concurrente');" \
       "SELECT 'K2:' || public.sf_aplicar('$OAN4', 'cargos_adicionales_unidad', '$SG', 10, '5a000000-0000-0000-0000-0000000000e1');"
 # L · dos saldos distintos contra el MISMO cargo SH (debe 20): 15 y 15.
 par l "SELECT 'L1:' || public.sf_aplicar('$OAN5', 'cargos_adicionales_unidad', '$SH', 15, '5a000000-0000-0000-0000-0000000000f1');" \

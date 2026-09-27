@@ -83,7 +83,7 @@ SELECT public.chk_falla($$UPDATE public.cargos_adicionales_unidad SET monto = 12
   'CARGO_CON_COBROS', '14c · con el cobro vivo el importe no cambia');
 SELECT public.chk_txt(
   (SELECT r.resultado || '/' || (r.reverso_id IS NOT NULL) || '/' || r.estado_cargo
-     FROM public.conta_anular_cobro_cargo(:Q1, 'SINT-AUX se cobró de más') r),
+     FROM public.tst_anular_cobro_cargo(:Q1, 'SINT-AUX se cobró de más') r),
   'anulado/true/pendiente', '14c · anulado el único cobro: reverso y pendiente');
 UPDATE public.cargos_adicionales_unidad SET monto = 120 WHERE id = :CA17;
 SELECT public.chk_txt(public.cc_coherencia(:A1, :CA17), 'devengo_desalineado|120.00 GTQ|100.00 GTQ',
@@ -181,7 +181,7 @@ SELECT public.chk_txt(public.cc_cobrar_completo(:CA15, 70, 'efectivo', '2026-07-
 SELECT public.chk_falla($$SELECT public.cc_cobrar_completo('ca000000-0000-0000-0000-000000000015', 50, 'efectivo', '2026-07-11', NULL, NULL, 'cd000000-0000-0000-0000-000000000006')$$,
   'COBRO_CARGO_CLAVE_REUSADA: .*\(difiere: importe\)', '15 · «corregirlo» a 50 con la misma clave: rechazado (se anula y se registra otro)');
 SELECT public.chk_txt(
-  (SELECT r.resultado FROM public.conta_anular_cobro_cargo(:Q6, 'SINT-AUX excedente') r),
+  (SELECT r.resultado FROM public.tst_anular_cobro_cargo(:Q6, 'SINT-AUX excedente') r),
   'anulado', '15 · se anula el excedente');
 
 RESET ROLE;

@@ -283,7 +283,7 @@ SELECT public.chk_falla($$SELECT public.conta_estado_cuenta('a1a1a1a1-0000-0000-
 -- (Ajuste: primero se usa parte del excedente de SA.)
 SELECT public.chk_txt(public.sf_aplicar(:O_SA, 'cargos_adicionales_unidad', :SC, 10, :K4),
   '10.00/0.00/10.00/20.00/15.00/pendiente', '7 · 10 del excedente de SA a SC');
-SELECT public.chk_falla($$SELECT * FROM public.conta_anular_cobro_cargo('9f5f0000-0000-0000-0000-00000000000a', 'SINT-AUX rechazo')$$,
+SELECT public.chk_falla($$SELECT * FROM public.tst_anular_cobro_cargo('9f5f0000-0000-0000-0000-00000000000a', 'SINT-AUX rechazo')$$,
   'COBRO_SALDO_FAVOR_APLICADO', '7 · anular el cobro con saldo aplicado: rechazado');
 SELECT public.chk_falla($$UPDATE public.pagos SET estado = 'rechazado', verification_status = 'rechazado', verification_notes = 'SINT' WHERE id = '9f5f0000-0000-0000-0000-000000000011'$$,
   'COBRO_SALDO_FAVOR_APLICADO', '7 · rechazar desde Agua el cobro de la cuota con saldo aplicado: rechazado');
@@ -297,21 +297,22 @@ SELECT public.chk_txt(public.sf_origen(:PA), 'excedente:30.00:20.00', '7 · y su
 
 -- Revertir la aplicación (con motivo), después sí se anula el cobro.
 SET ROLE authenticated;
-SELECT public.chk_falla(format($$SELECT * FROM public.conta_revertir_aplicacion_saldo_favor(%L, '')$$, :K4),
+SELECT public.chk_falla(format($$SELECT * FROM public.tst_revertir_aplicacion_saldo_favor(%L, '')$$, :K4),
   'motivo', '7 · revertir exige motivo');
 SELECT public.chk_txt(
   (SELECT r.resultado || '/' || (r.reverso_id IS NOT NULL) || '/' || r.disponible_restante || '/' || r.estado_documento
-     FROM public.conta_revertir_aplicacion_saldo_favor(:K4, 'SINT-AUX se aplicó al cargo equivocado') r),
+     FROM public.tst_revertir_aplicacion_saldo_favor(:K4, 'SINT-AUX se aplicó al cargo equivocado') r),
   'revertida/true/30.00/pendiente', '7 · revertir: reverso, disponible repuesto, el cargo vuelve a deber');
-SELECT public.chk_txt(
-  (SELECT r.resultado FROM public.conta_revertir_aplicacion_saldo_favor(:K4, 'SINT-AUX otra vez') r),
-  'ya_revertida', '7 · revertir otra vez: idempotente');
+SELECT public.chk_falla(format($$SELECT * FROM public.tst_revertir_aplicacion_saldo_favor(%L, 'SINT-AUX otra vez')$$, :K4),
+  'AJUSTE_DOCUMENTO_CAMBIO.*ya está revertida', '7 · otra reversión de la aplicación revertida: falla al aprobar, nada cambia');
 RESET ROLE;
 SELECT public.chk(
   (SELECT count(*) FROM public.conta_saldo_favor_aplicaciones x
-    WHERE x.id = :K4 AND x.revertida_por = :ADM AND x.motivo_reverso = 'SINT-AUX se aplicó al cargo equivocado'
+    WHERE x.id = :K4 AND x.motivo_reverso = 'SINT-AUX se aplicó al cargo equivocado'
+      AND x.revertida_por = (SELECT u.id FROM public.app_users u WHERE u.full_name = 'SINT Aprobador de ajustes'
+                                AND u.company_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
       AND x.revertida_at IS NOT NULL AND x.asiento_reverso_id IS NOT NULL), 1,
-  '7 · evidencia: actor de la sesión, motivo, hora del servidor y reverso');
+  '7 · evidencia: actor (quien aprobó y ejecutó, 20261011000000), motivo, hora del servidor y reverso');
 SELECT public.chk_txt(public.sf_cxc_doc('cargos_adicionales_unidad', :SC)::text, '25.00',
   '7 · CxC de SC: el reverso deshace la aplicación, el original sigue a la vista');
 SELECT public.chk_falla($$UPDATE public.conta_saldo_favor_aplicaciones SET monto = 1 WHERE id = '5a000000-0000-0000-0000-000000000001'$$,
@@ -320,7 +321,7 @@ SELECT public.chk_falla($$DELETE FROM public.conta_saldo_favor_aplicaciones WHER
   'SALDO_FAVOR_INBORRABLE', '7 · ni se borra');
 SET ROLE authenticated;
 SELECT public.chk_txt(
-  (SELECT r.resultado || '/' || (r.reverso_id IS NOT NULL) FROM public.conta_anular_cobro_cargo(:PA, 'SINT-AUX se devolvió') r),
+  (SELECT r.resultado || '/' || (r.reverso_id IS NOT NULL) FROM public.tst_anular_cobro_cargo(:PA, 'SINT-AUX se devolvió') r),
   'anulado/true', '7 · sin aplicaciones vivas, el cobro se anula y se reversa');
 RESET ROLE;
 SELECT public.chk_txt(public.sf_origen(:PA), 'excedente:30.00:0.00', '7 · su saldo a favor deja de estar disponible');
@@ -342,18 +343,19 @@ SELECT public.chk_falla($$UPDATE public.pagos SET monto = 1 WHERE id = '9f5f0000
 SELECT public.chk_txt(public.sf_anticipo(:U2, :DOS, 15, :AN2), 'contabilizada/-/15.00',
   '8 · anticipo del ARRENDATARIO en U2: suyo, no del pagador');
 SELECT public.chk_txt(
-  (SELECT r.resultado || '/' || (r.reverso_id IS NOT NULL) FROM public.conta_anular_anticipo(:AN2, 'SINT-AUX error de captura') r),
+  (SELECT r.resultado || '/' || (r.reverso_id IS NOT NULL) FROM public.tst_anular_anticipo(:AN2, 'SINT-AUX error de captura') r),
   'anulado/true', '8 · anular un anticipo sin aplicaciones: reverso');
-SELECT public.chk_txt(
-  (SELECT r.resultado FROM public.conta_anular_anticipo(:AN2, 'SINT-AUX otra vez') r),
-  'ya_anulado', '8 · anular otra vez: idempotente');
+SELECT public.chk_falla(format($$SELECT * FROM public.tst_anular_anticipo(%L, 'SINT-AUX otra vez')$$, :AN2),
+  'AJUSTE_DOCUMENTO_CAMBIO.*ya está anulado', '8 · otra anulación del anticipo anulado: falla al aprobar, nada cambia');
 RESET ROLE;
 SELECT public.chk_txt(public.sf_origen(:AN2), 'anticipo:15.00:0.00', '8 · su saldo deja de estar disponible');
 SELECT public.chk_falla($$DELETE FROM public.pagos WHERE id = '9f5f0000-0000-0000-0000-0000000000a2'$$,
   'ANTICIPO_INBORRABLE', '8 · un anticipo no se borra');
 SELECT public.chk(
-  (SELECT count(*) FROM public.pagos_rechazo_eventos r WHERE r.pago_id = :AN2 AND r.evento = 'rechazo' AND r.actor = :ADM), 1,
-  '8 · la anulación deja su evidencia de rechazo (hora del servidor y actor)');
+  (SELECT count(*) FROM public.pagos_rechazo_eventos r WHERE r.pago_id = :AN2 AND r.evento = 'rechazo'
+      AND r.actor = (SELECT u.id FROM public.app_users u WHERE u.full_name = 'SINT Aprobador de ajustes'
+                        AND u.company_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')), 1,
+  '8 · la anulación deja su evidencia de rechazo (hora del servidor y actor: quien la aprobó)');
 
 -- ── 9 · lecturas y aislamiento ──────────────────────────────────────────────
 SET ROLE authenticated;
@@ -430,7 +432,7 @@ SELECT public.chk(
 SET ROLE authenticated;
 SELECT public.chk_txt(
   (SELECT r.resultado || '/' || r.estado_documento
-     FROM public.conta_revertir_aplicacion_saldo_favor(:K8, 'SINT-AUX era de otra cuota') r),
+     FROM public.tst_revertir_aplicacion_saldo_favor(:K8, 'SINT-AUX era de otra cuota') r),
   'revertida/emitida', '10 · revertir: la cuota vuelve a emitida');
 RESET ROLE;
 SELECT public.chk_txt(
@@ -469,7 +471,7 @@ SELECT public.chk_txt((SELECT c.cuota_estado FROM public.cuotas_condominio c WHE
   '10 · reversado a mano el asiento de la aplicación, Q4 vuelve a deber');
 SET ROLE authenticated;
 SELECT public.chk_txt(
-  (SELECT r.resultado || '/' || r.estado_documento FROM public.conta_revertir_aplicacion_saldo_favor(:K9, 'SINT-AUX sello del reverso manual') r),
+  (SELECT r.resultado || '/' || r.estado_documento FROM public.tst_revertir_aplicacion_saldo_favor(:K9, 'SINT-AUX sello del reverso manual') r),
   'revertida/pendiente', '10 · sellar su reversión después no la mueve');
 
 -- Si alguien más cambió la cuota después de marcarla, la regla no la toca.
@@ -479,7 +481,7 @@ RESET ROLE;
 UPDATE public.cuotas_condominio SET metodo_pago = 'transferencia', pagada_at = now() WHERE id = :Q4;
 SET ROLE authenticated;
 SELECT public.chk_txt(
-  (SELECT r.resultado || '/' || r.estado_documento FROM public.conta_revertir_aplicacion_saldo_favor(:K10, 'SINT-AUX prueba') r),
+  (SELECT r.resultado || '/' || r.estado_documento FROM public.tst_revertir_aplicacion_saldo_favor(:K10, 'SINT-AUX prueba') r),
   'revertida/pagada', '10 · revertida la aplicación, la cuota que otro marcó pagada sigue pagada (no se pisa)');
 RESET ROLE;
 SELECT public.chk(

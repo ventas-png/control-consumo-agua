@@ -156,7 +156,8 @@ SELECT public.chk(
 SELECT public.chk(public.saldo_aux('11000000-0000-0000-0000-00000000a101', 'e0000000-0000-0000-0000-00000000a001'), 100 + 500 + 80 + 15,
   '6 · antes de anular, Uno debe 695 en la CxC compartida');
 SET ROLE authenticated;
-UPDATE public.cargos_adicionales_unidad SET estado = 'anulado' WHERE id = 'ca100000-0000-0000-0000-000000000001';
+-- Desde 20261011000000, por una solicitud aprobada por otra persona.
+SELECT public.tst_anular_cargo('ca100000-0000-0000-0000-000000000001', 'SINT-AUX anulación del cargo');
 RESET ROLE;
 SELECT public.chk(public.n_vivos('cargos_adicionales_unidad', 'ca100000-0000-0000-0000-000000000001', 'cargo_adicional_emitido'), 0,
   '6 · anular el cargo reversa su asiento');

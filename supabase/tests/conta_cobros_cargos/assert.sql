@@ -177,7 +177,7 @@ SELECT public.chk_txt(public.cc_cobrar(:CA1, 20, 'efectivo', '2026-06-15', :P4),
 -- ── 5 · anular el excedente y reprocesar: saldo completo ────────────────────
 SELECT public.chk_txt(
   (SELECT r.resultado || '/' || COALESCE(r.reverso_id::text, 'sin-reverso') || '/' || r.cobros_pendientes
-     FROM public.conta_anular_cobro_cargo(:P3, 'SINT-AUX excedente, se devolvió') r),
+     FROM public.tst_anular_cobro_cargo(:P3, 'SINT-AUX excedente, se devolvió') r),
   'anulado/sin-reverso/1', '5 · anular el excedente: no tenía asiento y queda 1 cobro pendiente');
 SELECT public.chk_txt(
   (SELECT string_agg(COALESCE(r.evento, '-') || ':' || r.resultado, ',' ORDER BY r.evento)
@@ -199,7 +199,7 @@ SELECT public.chk(public.cc_asientos(:CA1, false), 3, '5 · tres asientos de cob
 -- ── 6 · anular un cobro contabilizado: reverso, evidencia y estado ──────────
 SELECT public.chk_txt(
   (SELECT r.resultado || '/' || (r.reverso_id IS NOT NULL) || '/' || r.estado_cargo
-     FROM public.conta_anular_cobro_cargo(:P1, 'SINT-AUX cheque devuelto') r),
+     FROM public.tst_anular_cobro_cargo(:P1, 'SINT-AUX cheque devuelto') r),
   'anulado/true/pendiente', '6 · anular el cobro de 30: su asiento se reversa y el cargo vuelve a pendiente');
 SELECT public.chk_txt(public.cc_saldo(:CA1, :CXC)::text, '30.00', '6 · la CxC del cargo vuelve a 30');
 SELECT public.chk_txt(public.cc_aplicado(:CA1)::text, '70.00', '6 · lo aplicado vivo baja a 70');
@@ -208,9 +208,10 @@ SELECT public.chk(
   (SELECT count(*) FROM public.pagos p WHERE p.id = :P1 AND p.estado = 'rechazado'
       AND p.verification_notes = 'SINT-AUX cheque devuelto'), 1,
   '6 · el cobro no se borra: queda rechazado con su motivo');
-SELECT public.chk_txt(
-  (SELECT r.resultado FROM public.conta_anular_cobro_cargo(:P1, 'SINT-AUX otra vez') r),
-  'ya_anulado', '6 · anular dos veces es idempotente');
+-- 20261011000000: otra solicitud sobre el cobro ya anulado falla al aprobarse
+-- (se revalida con el cobro bloqueado) y no reversa dos veces.
+SELECT public.chk_falla($$SELECT * FROM public.tst_anular_cobro_cargo('cb000000-0000-0000-0000-000000000001', 'SINT-AUX otra vez')$$,
+  'AJUSTE_DOCUMENTO_CAMBIO.*ya está anulado', '6 · pedir otra anulación del cobro anulado: falla al aprobar, nada cambia');
 SELECT public.chk_txt(
   (SELECT r.resultado || '/' || r.codigo FROM public.conta_reprocesar_cargo('pagos', :P1) r),
   'bloqueada/documento_anulado', '6 · un cobro anulado no se vuelve a contabilizar');
@@ -284,7 +285,7 @@ SELECT public.chk_falla($$SELECT * FROM public.conta_cargos_cobro_resumen('b1b1b
 SELECT set_config('request.jwt.claim.sub', :ADB, false);
 SELECT public.chk_falla($$SELECT * FROM public.conta_cargo_cobros('ca000000-0000-0000-0000-000000000001')$$,
   'no existe o no está en tu ámbito', '10 · la empresa B no ve los cobros de A');
-SELECT public.chk_falla($$SELECT * FROM public.conta_anular_cobro_cargo('cb000000-0000-0000-0000-000000000002', 'SINT-AUX intruso')$$,
+SELECT public.chk_falla($$SELECT * FROM public.tst_anular_cobro_cargo('cb000000-0000-0000-0000-000000000002', 'SINT-AUX intruso')$$,
   'no existe', '10 · ni anula un cobro de A');
 SELECT public.chk_falla($$SELECT public.cc_cobrar('ca000000-0000-0000-0000-000000000009', 1, 'efectivo', '2026-06-20', 'cb000000-0000-0000-0000-000000000002')$$,
   'no existe o no está en tu ámbito', '10 · ni reutiliza la clave de un cobro de A contra un cargo de A');
@@ -349,7 +350,7 @@ RESET ROLE;
 INSERT INTO public.cierres_mensuales (company_id, project_id, periodo, estado) VALUES (:A, :A1, '2026-06', 'cerrado');
 SET ROLE authenticated;
 SELECT public.chk_txt(
-  (SELECT r.resultado || '/' || (r.reverso_id IS NOT NULL) FROM public.conta_anular_cobro_cargo(:P7, 'SINT-AUX transferencia revertida') r),
+  (SELECT r.resultado || '/' || (r.reverso_id IS NOT NULL) FROM public.tst_anular_cobro_cargo(:P7, 'SINT-AUX transferencia revertida') r),
   'anulado/true', '13 · anular el cobro con junio cerrado');
 SELECT public.chk_txt(
   (SELECT a.fecha::text FROM public.conta_asientos a

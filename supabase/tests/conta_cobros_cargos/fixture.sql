@@ -78,7 +78,11 @@ INSERT INTO public.cargos_adicionales_unidad
   ('ca000000-0000-0000-0000-000000000019', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA19', 'reparacion', 50, '2026-07-01', 'pendiente'),
   ('ca000000-0000-0000-0000-000000000020', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT-AUX CA20', 'reparacion', 50, '2026-07-01', 'pendiente');
 
+-- CA11: anulado ANTES de 20261011000000 (dato heredado, sin evidencia): desde
+-- entonces un cargo sólo se anula por una solicitud aprobada.
+ALTER TABLE public.cargos_adicionales_unidad DISABLE TRIGGER trg_cargo_solo_por_solicitud;
 UPDATE public.cargos_adicionales_unidad SET estado = 'anulado' WHERE id = 'ca000000-0000-0000-0000-000000000011';
+ALTER TABLE public.cargos_adicionales_unidad ENABLE TRIGGER trg_cargo_solo_por_solicitud;
 
 -- CA5: «pagado» a mano ANTES de esta migración (sin el guard, como el dato heredado).
 ALTER TABLE public.cargos_adicionales_unidad DISABLE TRIGGER trg_cargo_cobros_guard;
