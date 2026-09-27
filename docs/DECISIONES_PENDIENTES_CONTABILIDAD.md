@@ -45,4 +45,12 @@ de «único aprobador», y los plazos de E2/E3 son **propuestas**, no decisiones
 | E4 | El residente **solicita** desde el portal la aplicación de su saldo a favor; contabilidad la aprueba y la ejecuta. El residente no aplica directamente. | ✅ Aprobada · implementada en `20261011000000` (`portal_solicitar_aplicacion_saldo_favor`) y en el portal. |
 | E5 | Igual que D1: se mantiene el bloqueo, sin cascada automática. Un reembolso confirmado por el proveedor **se conserva** y abre una incidencia visible de conciliación. | ✅ Aprobada · implementada en `20261011000000` (`conta_incidencias_conciliacion`). |
 
+### Decisiones pendientes del cierre del bloque 3 (2026-09-27)
+
+| # | Pregunta concreta | Estado |
+| --- | --- | --- |
+| E6 | **`ajuste_importe`** (nota de crédito/débito sobre una cuota o cargo publicado). Hace falta decidir: **(a)** contrapartida — la misma cuenta de ingreso del devengo original (reverso parcial) o una cuenta especial «descuentos y bonificaciones» / «ajustes a ingresos»; **(b)** sólo crédito (rebaja) o también débito (aumento); **(c)** tope — no más que el saldo pendiente del documento, o se admite dejar saldo a favor; **(d)** si la mora posterior se calcula sobre el importe neto; **(e)** fecha contable = la de la ejecución (propuesta). En cualquier caso el documento y su asiento original no se sobrescriben: la nota es un documento propio, vinculado, con su asiento. | ⏸️ **Sin implementar hasta decidir** (a)–(d). |
+| E7 | **Eliminar una cuota sin emitir.** Implementado en `20261012000000`: una cuota `pendiente` (sin emitir; p. ej. la tarifa de una reserva que se cancela) sin cobros ni saldo aplicado se sigue eliminando sin solicitud (su devengo lo reversa `conta_tg_cuotas`); una emitida sólo se anula por solicitud y cualquier eliminación con dependencias se rechaza. ¿Se confirma, o también la eliminación de cuotas sin emitir debe pasar por aprobación (afecta la cancelación de reservas de amenidades)? | ❓ Confirmar. |
+| E8 | **Cobro en línea en curso** de una cuota: hoy bloquea su anulación (dependencia `cobro_en_linea`). Una solicitud de cobro abandonada queda `pending` sin vencimiento, así que bloquearía indefinidamente. ¿Se acepta, o se define cuándo una solicitud de cobro abandonada deja de contar (p. ej. al consultarla al proveedor)? | ❓ Confirmar. |
+
 El detalle del bloque 3 está en [`PROPUESTA_AJUSTES_ANULACIONES_PORTAL.md`](PROPUESTA_AJUSTES_ANULACIONES_PORTAL.md).

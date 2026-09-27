@@ -142,6 +142,7 @@ export const contabilidadKeys = {
   ajustesDeEmpresa: (companyId?: string) => [...contabilidadKeys.all, 'ajustes', companyId ?? null] as const,
   ajustes: (companyId?: string, projectId?: string | null) =>
     [...contabilidadKeys.all, 'ajustes', companyId ?? null, projectId ?? null] as const,
+  respaldosAjuste: (companyId?: string) => [...contabilidadKeys.all, 'ajustes', companyId ?? null, 'respaldos'] as const,
   incidenciasDeEmpresa: (companyId?: string) => [...contabilidadKeys.all, 'incidencias', companyId ?? null] as const,
   incidencias: (companyId?: string, soloAbiertas?: boolean) =>
     [...contabilidadKeys.all, 'incidencias', companyId ?? null, soloAbiertas ?? true] as const,

@@ -25,3 +25,11 @@ export const BUCKET_EVIDENCIAS = 'recepcion-evidencias'
  * la asistencia, y no dejan sustituirla a nadie.
  */
 export const BUCKET_PRESENCIA = 'presencia-evidencias'
+
+/**
+ * Respaldo documental de las solicitudes de ajuste contable. Bucket PRIVADO
+ * (20261012000000). Ruta `<empresa>/<solicitud>/<archivo>`: sube quien pidió la
+ * solicitud (o quien crea en Contabilidad) mientras está pendiente; lo ve quien
+ * ve la solicitud. Sin UPDATE ni DELETE: un respaldo no se sustituye.
+ */
+export const BUCKET_RESPALDOS_AJUSTE = 'ajustes-respaldos'

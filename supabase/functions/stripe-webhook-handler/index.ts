@@ -7,6 +7,7 @@ import { decryptSecret } from '../_shared/secretsCrypto.ts'
 import {
   decidirCruceDeEmpresa,
   estadoDeEventoStripe,
+  reembolsoParcialDeEvento,
   decidirTrasConciliar,
   decidirTrasReclamo,
   decidirTrasSellar,
@@ -299,21 +300,28 @@ Deno.serve(async (req) => {
       // Un «failed» que llega después de un «succeeded» ya no lo pisa (el
       // estado sólo avanza; queda una incidencia). Un reembolso intenta
       // rechazar el cobro y, si está bloqueado (saldo a favor ya aplicado), el
-      // evento se CONSERVA con una incidencia abierta: nunca se descarta.
+      // evento se CONSERVA con una incidencia abierta: nunca se descarta. Un
+      // reembolso PARCIAL se registra aparte (20261012000000), sin rechazar.
       if (event.type === 'payment_intent.payment_failed' || event.type === 'charge.refunded') {
-        const obj = event.data.object as { id: string; payment_intent?: string | null; refunded?: boolean }
+        const obj = event.data.object as {
+          id: string; payment_intent?: string | null; refunded?: boolean
+          amount_refunded?: number | null; currency?: string | null
+          refunds?: { data?: Array<{ id?: string; created?: number }> } | null
+        }
         const mapeo = estadoDeEventoStripe(event.type, obj)
         const intentId = mapeo?.intentId ?? null
-        if (!mapeo) {
-          // Reembolso PARCIAL: no es un rechazo del cobro. Queda para revisión
-          // manual en Stripe; no se cambia nada aquí.
+        const parcial = mapeo ? null : reembolsoParcialDeEvento(event.type, obj)
+        if (!mapeo && !parcial) {
+          // Sin datos para registrar nada (p. ej. un reembolso sin importe):
+          // no cambia ninguna solicitud.
           return await cerrarYResponder(true, {
-            accion: 'responder', status: 200, body: { received: true, reembolso_parcial: true },
+            accion: 'responder', status: 200, body: { received: true, sin_cambio: true },
           })
         }
-        const { data: pr, error: prErr } = intentId
+        const buscarIntent = mapeo ? intentId : parcial!.intentId
+        const { data: pr, error: prErr } = buscarIntent
           ? await adminClient.from('payment_requests').select('id, company_id')
-              .eq('stripe_payment_intent', intentId).maybeSingle()
+              .eq('stripe_payment_intent', buscarIntent).maybeSingle()
           : { data: null, error: null }
         if (prErr) {
           return await cerrarYResponder(false, {
@@ -331,9 +339,36 @@ Deno.serve(async (req) => {
           return await cerrarYResponder(
             false, cruce, 'cruce de empresa entre el secreto verificado y la solicitud')
         }
+        if (parcial) {
+          // Reembolso PARCIAL (20261012000000): se conserva lo que informó el
+          // proveedor y se abre una incidencia para conciliarlo. La solicitud
+          // sigue cobrada y el cobro NO se rechaza.
+          const { data: reg, error: regErr } = await adminClient.rpc('pasarela_registrar_reembolso_parcial', {
+            p_payment_request_id: pr.id,
+            p_origen: 'webhook',
+            p_clave_evento: event.id,
+            p_importe_acumulado: parcial.acumulado,
+            p_moneda: parcial.moneda,
+            p_fecha_proveedor: new Date(event.created * 1000).toISOString(),
+            p_referencia_pago: parcial.referenciaPago,
+            p_reembolso_ref: parcial.reembolsoRef,
+            p_payload: { tipo: event.type, charge: parcial.referenciaPago, payment_intent: parcial.intentId },
+          })
+          if (regErr) {
+            return await cerrarYResponder(false, {
+              accion: 'responder', status: 500,
+              body: { received: false, retryable: true, error: regErr.message },
+            }, `registrar reembolso parcial: ${regErr.message}`)
+          }
+          const r = (reg ?? {}) as { accion?: string; incidencia_id?: string | null }
+          return await cerrarYResponder(true, {
+            accion: 'responder', status: 200,
+            body: { received: true, reembolso_parcial: true, accion: r.accion ?? null, incidencia_id: r.incidencia_id ?? null },
+          })
+        }
         const { data: registrado, error: regErr } = await adminClient.rpc('pasarela_registrar_estado', {
           p_payment_request_id: pr.id,
-          p_estado: mapeo.estado,
+          p_estado: mapeo!.estado,
           p_origen: 'webhook',
           p_clave_evento: event.id,
         })

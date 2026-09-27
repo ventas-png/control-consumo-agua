@@ -4355,6 +4355,57 @@ export type Database = {
         }
         Relationships: []
       }
+      conta_ajustes_respaldos: {
+        Row: {
+          company_id: string
+          descripcion: string | null
+          etag: string | null
+          id: string
+          mime: string | null
+          nombre_archivo: string
+          objeto_id: string
+          project_id: string
+          sha256: string | null
+          solicitud_id: string
+          storage_path: string
+          subido_at: string
+          subido_por: string
+          tamano: number | null
+        }
+        Insert: {
+          company_id: string
+          descripcion?: string | null
+          etag?: string | null
+          id: string
+          mime?: string | null
+          nombre_archivo: string
+          objeto_id: string
+          project_id: string
+          sha256?: string | null
+          solicitud_id: string
+          storage_path: string
+          subido_at?: string
+          subido_por: string
+          tamano?: number | null
+        }
+        Update: {
+          company_id?: string
+          descripcion?: string | null
+          etag?: string | null
+          id?: string
+          mime?: string | null
+          nombre_archivo?: string
+          objeto_id?: string
+          project_id?: string
+          sha256?: string | null
+          solicitud_id?: string
+          storage_path?: string
+          subido_at?: string
+          subido_por?: string
+          tamano?: number | null
+        }
+        Relationships: []
+      }
       conta_ajustes_solicitudes: {
         Row: {
           autoaprobada: boolean
@@ -4374,6 +4425,7 @@ export type Database = {
           motivo: string
           motivo_revision: string | null
           project_id: string
+          respaldos_revisados: Json | null
           resultado: Json | null
           revisado_at: string | null
           revisado_por: string | null
@@ -4402,6 +4454,7 @@ export type Database = {
           motivo: string
           motivo_revision?: string | null
           project_id: string
+          respaldos_revisados?: Json | null
           resultado?: Json | null
           revisado_at?: string | null
           revisado_por?: string | null
@@ -4430,6 +4483,7 @@ export type Database = {
           motivo?: string
           motivo_revision?: string | null
           project_id?: string
+          respaldos_revisados?: Json | null
           resultado?: Json | null
           revisado_at?: string | null
           revisado_por?: string | null
@@ -5067,6 +5121,45 @@ export type Database = {
           },
         ]
       }
+      conta_cuota_anulaciones: {
+        Row: {
+          anulado_at: string
+          anulado_por: string | null
+          company_id: string
+          cuota_id: string
+          motivo: string
+          project_id: string
+          reverso_emision_id: string | null
+          reverso_mora_id: string | null
+          solicitud_id: string
+          tenia_asiento: boolean
+        }
+        Insert: {
+          anulado_at?: string
+          anulado_por?: string | null
+          company_id: string
+          cuota_id: string
+          motivo: string
+          project_id: string
+          reverso_emision_id?: string | null
+          reverso_mora_id?: string | null
+          solicitud_id: string
+          tenia_asiento: boolean
+        }
+        Update: {
+          anulado_at?: string
+          anulado_por?: string | null
+          company_id?: string
+          cuota_id?: string
+          motivo?: string
+          project_id?: string
+          reverso_emision_id?: string | null
+          reverso_mora_id?: string | null
+          solicitud_id?: string
+          tenia_asiento?: boolean
+        }
+        Relationships: []
+      }
       conta_diferenciales_cambiarios: {
         Row: {
           asiento_id: string | null
@@ -5247,6 +5340,7 @@ export type Database = {
           pago_id: string | null
           payment_request_id: string | null
           project_id: string | null
+          reembolso_id: string | null
           resuelta_at: string | null
           resuelta_por: string | null
           tipo: string
@@ -5263,6 +5357,7 @@ export type Database = {
           pago_id?: string | null
           payment_request_id?: string | null
           project_id?: string | null
+          reembolso_id?: string | null
           resuelta_at?: string | null
           resuelta_por?: string | null
           tipo: string
@@ -5279,6 +5374,7 @@ export type Database = {
           pago_id?: string | null
           payment_request_id?: string | null
           project_id?: string | null
+          reembolso_id?: string | null
           resuelta_at?: string | null
           resuelta_por?: string | null
           tipo?: string
@@ -14009,6 +14105,57 @@ export type Database = {
           provider?: string
           recibido_at?: string
           resultado?: string | null
+        }
+        Relationships: []
+      }
+      pasarela_reembolsos: {
+        Row: {
+          acumulado: number
+          clave_evento: string
+          company_id: string
+          evento_id: string
+          fecha_proveedor: string | null
+          id: string
+          importe: number
+          moneda: string
+          pago_id: string | null
+          payment_request_id: string
+          provider: string
+          reembolso_ref: string | null
+          referencia_pago: string | null
+          registrado_at: string
+        }
+        Insert: {
+          acumulado: number
+          clave_evento: string
+          company_id: string
+          evento_id: string
+          fecha_proveedor?: string | null
+          id?: string
+          importe: number
+          moneda: string
+          pago_id?: string | null
+          payment_request_id: string
+          provider: string
+          reembolso_ref?: string | null
+          referencia_pago?: string | null
+          registrado_at?: string
+        }
+        Update: {
+          acumulado?: number
+          clave_evento?: string
+          company_id?: string
+          evento_id?: string
+          fecha_proveedor?: string | null
+          id?: string
+          importe?: number
+          moneda?: string
+          pago_id?: string | null
+          payment_request_id?: string
+          provider?: string
+          reembolso_ref?: string | null
+          referencia_pago?: string | null
+          registrado_at?: string
         }
         Relationships: []
       }
@@ -23830,8 +23977,23 @@ export type Database = {
           sin_stock: Json
         }[]
       }
+      conta_ajuste_adjuntar_respaldo: {
+        Args: {
+          p_descripcion?: string
+          p_id: string
+          p_sha256?: string
+          p_solicitud_id: string
+          p_storage_path: string
+        }
+        Returns: { repetida: boolean; respaldo_id: string }[]
+      }
       conta_ajuste_aprobar: {
-        Args: { p_confirmar_autoaprobacion?: boolean; p_id: string; p_nota?: string }
+        Args: {
+          p_confirmar_autoaprobacion?: boolean
+          p_id: string
+          p_nota?: string
+          p_respaldos_revisados?: string[]
+        }
         Returns: {
           autoaprobada: boolean
           error_ejecucion: string
@@ -23844,6 +24006,17 @@ export type Database = {
       conta_ajuste_cancelar: {
         Args: { p_id: string; p_motivo?: string }
         Returns: { estado: string; repetida: boolean; solicitud_id: string }[]
+      }
+      conta_ajuste_dependencias: {
+        Args: { p_documento_id: string; p_tipo: string }
+        Returns: {
+          como_resolver: string
+          dependencia: string
+          detalle: string
+          estado: string
+          id: string
+          monto: number
+        }[]
       }
       conta_ajuste_rechazar: {
         Args: { p_id: string; p_motivo: string }

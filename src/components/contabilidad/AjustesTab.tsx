@@ -8,7 +8,13 @@
 //
 // La pantalla sólo muestra botones según permiso; el servidor vuelve a decidir
 // todo (cuatro ojos, permiso, documento, período y saldo).
-import { useMemo, useState } from 'react'
+//
+// RESPALDO (20261012000000): quien pidió la solicitud (o quien crea en
+// Contabilidad) adjunta documentos mientras está pendiente; quien aprueba los
+// abre (enlace firmado de pocos minutos) y declara cuáles revisó. Si llegó
+// otro archivo después, el servidor no aprueba. El motivo y la bitácora no son
+// respaldo.
+import { useMemo, useRef, useState } from 'react'
 import { useSession } from '../shared/SessionContext'
 import { notify, confirm } from '../shared/Dialog'
 import { openTextPrompt } from '../shared/PromptDialog'
@@ -17,14 +23,18 @@ import {
   ETIQUETA_INCIDENCIA,
   ETIQUETA_TIPO_AJUSTE,
   accionesSolicitud,
+  urlRespaldo,
+  useAdjuntarRespaldoMutation,
   useAprobarAjusteMutation,
   useCancelarAjusteMutation,
   useIncidenciasConciliacionQuery,
   useRechazarAjusteMutation,
   useReintentarAjusteMutation,
   useResolverIncidenciaMutation,
+  useRespaldosAjusteQuery,
   useSolicitudesAjusteQuery,
   type EstadoAjuste,
+  type RespaldoAjuste,
   type SolicitudAjuste,
 } from '../../domain/contabilidad/ajustes'
 import { btnLink, btnSecundario, usePermisosContabilidad } from './ui'
@@ -52,7 +62,7 @@ function errorTexto(e: unknown): string {
 
 export function AjustesTab({ companyId, projectId }: Props) {
   const sesion = useSession()
-  const { puedeAutorizar, puedeCambiarEstado } = usePermisosContabilidad()
+  const { puedeAutorizar, puedeCambiarEstado, puedeCrear } = usePermisosContabilidad()
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number]['id']>('abiertas')
   const solicitudes = useSolicitudesAjusteQuery(companyId, projectId)
   const incidencias = useIncidenciasConciliacionQuery(companyId, true)
@@ -61,6 +71,20 @@ export function AjustesTab({ companyId, projectId }: Props) {
   const reintentar = useReintentarAjusteMutation(companyId)
   const cancelar = useCancelarAjusteMutation(companyId)
   const resolver = useResolverIncidenciaMutation(companyId)
+  const respaldos = useRespaldosAjusteQuery(companyId)
+  const adjuntar = useAdjuntarRespaldoMutation(companyId)
+  const archivoRef = useRef<HTMLInputElement>(null)
+  const [adjuntandoA, setAdjuntandoA] = useState<string | null>(null)
+
+  const respaldosPorSolicitud = useMemo(() => {
+    const m = new Map<string, RespaldoAjuste[]>()
+    for (const r of respaldos.data ?? []) {
+      const l = m.get(r.solicitud_id) ?? []
+      l.push(r)
+      m.set(r.solicitud_id, l)
+    }
+    return m
+  }, [respaldos.data])
 
   const filas = useMemo(() => {
     const todas = solicitudes.data ?? []
@@ -72,6 +96,17 @@ export function AjustesTab({ companyId, projectId }: Props) {
   const ses = { userId: sesion.user_id ?? null, rol: sesion.role ?? null, puedeAprobar: puedeAutorizar }
 
   async function onAprobar(s: SolicitudAjuste, auto: boolean) {
+    // Lo que se aprueba es lo que se revisó: se declara la lista de respaldos
+    // que la pantalla mostró; si el servidor tiene otra, no aprueba.
+    const vistos = respaldosPorSolicitud.get(s.id) ?? []
+    if (vistos.length > 0) {
+      const ok = await confirm({
+        title: 'Respaldo revisado',
+        text: `Confirmo que revisé ${vistos.length === 1 ? 'el respaldo' : `los ${vistos.length} respaldos`}: ${vistos.map((r) => r.nombre_archivo).join(', ')}.`,
+        icon: 'question', confirmText: 'Sí, los revisé',
+      })
+      if (!ok.isConfirmed) return
+    }
     if (auto) {
       const ok = await confirm({
         title: 'Aprobar tu propia solicitud',
@@ -81,7 +116,9 @@ export function AjustesTab({ companyId, projectId }: Props) {
       if (!ok.isConfirmed) return
     }
     try {
-      const r = await aprobar.mutateAsync({ id: s.id, confirmarAutoaprobacion: auto })
+      const r = await aprobar.mutateAsync({
+        id: s.id, confirmarAutoaprobacion: auto, respaldosRevisados: vistos.map((x) => x.id),
+      })
       if (r.estado === 'ejecutada') {
         notify({ variant: 'success', title: r.repetida ? 'Ya estaba ejecutada' : 'Aprobada y ejecutada', text: ETIQUETA_TIPO_AJUSTE[s.tipo] })
       } else {
@@ -129,6 +166,32 @@ export function AjustesTab({ companyId, projectId }: Props) {
     }
   }
 
+  async function onVerRespaldo(r: RespaldoAjuste) {
+    try {
+      window.open(await urlRespaldo(r.storage_path), '_blank', 'noopener')
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se abrió el respaldo', text: errorTexto(e) })
+    }
+  }
+
+  function onElegirRespaldo(s: SolicitudAjuste) {
+    setAdjuntandoA(s.id)
+    archivoRef.current?.click()
+  }
+
+  async function onArchivoElegido(archivo: File | undefined) {
+    const solicitudId = adjuntandoA
+    setAdjuntandoA(null)
+    if (archivoRef.current) archivoRef.current.value = ''
+    if (!archivo || !solicitudId) return
+    try {
+      await adjuntar.mutateAsync({ clave: crypto.randomUUID(), companyId, solicitudId, archivo })
+      notify({ variant: 'success', title: 'Respaldo adjuntado', text: archivo.name })
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se adjuntó el respaldo', text: errorTexto(e) })
+    }
+  }
+
   async function onResolver(id: string) {
     const nota = await openTextPrompt({
       title: 'Resolver incidencia', label: 'Cómo se resolvió', required: true,
@@ -143,10 +206,12 @@ export function AjustesTab({ companyId, projectId }: Props) {
     }
   }
 
-  const ocupado = aprobar.isPending || rechazar.isPending || reintentar.isPending || cancelar.isPending
+  const ocupado = aprobar.isPending || rechazar.isPending || reintentar.isPending || cancelar.isPending || adjuntar.isPending
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <input ref={archivoRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" hidden
+        data-testid="respaldo-input" onChange={(e) => void onArchivoElegido(e.target.files?.[0])} />
       {(incidencias.data?.length ?? 0) > 0 && (
         <section aria-labelledby="incidencias" style={{ border: '1px solid var(--at-warning-border)', background: 'var(--at-warning-tint)', borderRadius: 8, padding: 12 }}>
           <h3 id="incidencias" style={{ margin: '0 0 8px', fontSize: 15 }}>Incidencias de conciliación abiertas ({incidencias.data!.length})</h3>
@@ -168,7 +233,8 @@ export function AjustesTab({ companyId, projectId }: Props) {
       <section aria-labelledby="solicitudes">
         <h3 id="solicitudes" style={{ margin: '0 0 8px', fontSize: 15 }}>Solicitudes de ajuste</h3>
         <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--at-ink-3)' }}>
-          Anular cargos o cobros, anular anticipos y revertir o aplicar saldos a favor se solicitan con motivo y los ejecuta la aprobación de otra persona.
+          Anular cuotas, cargos o cobros, anular anticipos y revertir o aplicar saldos a favor se solicitan con motivo y los ejecuta la aprobación de otra persona.
+          Lo que impide una anulación (cobros, saldo aplicado) se resuelve antes: nada se anula en cascada.
           Las solicitudes no vencen; el dueño de la empresa puede aprobar las propias confirmándolo.
         </p>
         <div role="tablist" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -186,7 +252,7 @@ export function AjustesTab({ companyId, projectId }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--at-line)' }}>
-                <th>Solicitud</th><th>Motivo</th><th>Estado</th><th>Solicitada</th><th />
+                <th>Solicitud</th><th>Motivo</th><th>Respaldo</th><th>Estado</th><th>Solicitada</th><th />
               </tr>
             </thead>
             <tbody>
@@ -204,6 +270,23 @@ export function AjustesTab({ companyId, projectId }: Props) {
                       </div>
                     </td>
                     <td>{s.motivo}{s.motivo_revision && <div style={{ color: 'var(--at-ink-3)' }}>Revisión: {s.motivo_revision}</div>}</td>
+                    <td>
+                      {(respaldosPorSolicitud.get(s.id) ?? []).map((r) => (
+                        <div key={r.id}>
+                          <button type="button" style={btnLink} onClick={() => void onVerRespaldo(r)} title={r.descripcion ?? undefined}>
+                            📎 {r.nombre_archivo}
+                          </button>
+                        </div>
+                      ))}
+                      {Array.isArray(s.respaldos_revisados) && s.estado !== 'pendiente' && (
+                        <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>
+                          {s.respaldos_revisados.length === 0 ? 'Sin respaldo al revisar' : `Revisados al decidir: ${s.respaldos_revisados.length}`}
+                        </div>
+                      )}
+                      {s.estado === 'pendiente' && (s.solicitado_por === ses.userId || puedeCrear) && (
+                        <button type="button" style={btnLink} disabled={ocupado} onClick={() => onElegirRespaldo(s)}>Adjuntar…</button>
+                      )}
+                    </td>
                     <td>
                       {ETIQUETA_ESTADO_AJUSTE[s.estado]}
                       {s.autoaprobada && <div style={{ fontSize: 11, color: 'var(--at-warning-strong)' }}>Autoaprobada</div>}

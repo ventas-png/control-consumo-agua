@@ -12,7 +12,11 @@ pendientes de #887 hubo que retirarlo (a3a6829b) en vez de relajarlo. Este
 documento es el procedimiento con el que se puso al día el 2026-09-23 y el que
 hay que repetir.
 
-## Estado registrado (re-verificado el 2026-09-27 hacia las 14:00 UTC)
+## Estado registrado (re-verificado el 2026-09-27 hacia las 16:40 UTC)
+
+Sin cambios desde la verificación de las 14:00: 504 migraciones, máxima `20261004000200`, sin
+`pagos_rechazo_eventos` ni `conta_ajustes_solicitudes`. #904 suma ahora `20261012000000` (seis migraciones
+del PR en total: `20261007000000`–`20261012000000`).
 
 **El sandbox está atrasado respecto de `main`.** Inventario de sólo lectura
 sobre `jwpmivhvlstslncrtokb` («control-agua-rls-sandbox», no es producción):
@@ -33,7 +37,8 @@ sobre `jwpmivhvlstslncrtokb` («control-agua-rls-sandbox», no es producción):
    `20261006000000` (ya en `main`), cada una en su transacción con huella
    verificada. No hay colisiones de versión ni nada que renumerar.
 2. Cuando #904 llegue a `main`, repetir con `20261007000000` a
-   `20261011000000` (cinco migraciones). Todas crean tablas vacías, agregan
+   `20261012000000` (seis migraciones; la última crea además el bucket privado
+   `ajustes-respaldos` y sus políticas en `storage.objects`). Todas crean tablas vacías, agregan
    columnas con default a `conta_asientos` y redefinen funciones/triggers; no
    reescriben datos existentes. Antes de aplicarlas, contar los borradores
    con la marca antigua (quedarán bloqueados para publicar hasta resolverlos):

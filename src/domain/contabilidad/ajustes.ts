@@ -13,11 +13,17 @@
 //
 // Idempotencia: la clave de una solicitud la genera la pantalla al abrir el
 // formulario y se conserva en cada reintento.
+//
+// 20261012000000: anular una CUOTA también se solicita (con sus dependencias
+// informadas: nada se anula en cascada); cada solicitud admite RESPALDO
+// documental (bucket privado `ajustes-respaldos`) mientras está pendiente, y
+// quien aprueba declara qué respaldos revisó.
 // ════════════════════════════════════════════════════════════════════════════
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { contabilidadKeys } from './keys'
+import { BUCKET_RESPALDOS_AJUSTE } from '../shared/buckets'
 
 export type TipoAjuste =
   | 'anular_cargo'
@@ -25,6 +31,7 @@ export type TipoAjuste =
   | 'anular_anticipo'
   | 'revertir_aplicacion_saldo_favor'
   | 'aplicar_saldo_favor'
+  | 'anular_cuota'
 
 export type EstadoAjuste = 'pendiente' | 'rechazada' | 'cancelada' | 'ejecutada' | 'fallida'
 
@@ -59,6 +66,35 @@ export interface SolicitudAjuste {
   resultado: Record<string, unknown> | null
   error_ejecucion: string | null
   intentos_ejecucion: number
+  /** Respaldos que declaró haber revisado quien aprobó o rechazó. */
+  respaldos_revisados?: Array<Record<string, unknown>> | null
+}
+
+export interface RespaldoAjuste {
+  id: string
+  solicitud_id: string
+  company_id: string
+  project_id: string
+  storage_path: string
+  nombre_archivo: string
+  mime: string | null
+  tamano: number | null
+  etag: string | null
+  sha256: string | null
+  descripcion: string | null
+  subido_por: string
+  subido_at: string
+}
+
+/** Lo que impide anular un documento (conta_ajuste_dependencias). */
+export interface DependenciaAjuste {
+  dependencia: 'cobro' | 'aplicacion_saldo_favor' | 'cobro_en_linea' | 'solicitud_aplicacion'
+             | 'devengo_borrador' | 'devengo_pendiente'
+  id: string
+  monto: number | null
+  estado: string | null
+  detalle: string
+  como_resolver: string
 }
 
 export interface IncidenciaConciliacion {
@@ -66,11 +102,12 @@ export interface IncidenciaConciliacion {
   company_id: string
   project_id: string | null
   tipo: 'reembolso_bloqueado' | 'reembolso_aplicado' | 'rechazo_tras_aprobacion'
-      | 'aprobado_tras_reembolso' | 'reembolso_sin_cobro'
+      | 'aprobado_tras_reembolso' | 'reembolso_sin_cobro' | 'reembolso_parcial'
   estado: 'abierta' | 'resuelta'
   payment_request_id: string | null
   pago_id: string | null
   monto: number | null
+  reembolso_id?: string | null
   detalle: string
   creada_at: string
   resuelta_por: string | null
@@ -84,6 +121,7 @@ export const ETIQUETA_TIPO_AJUSTE: Record<TipoAjuste, string> = {
   anular_anticipo: 'Anular anticipo',
   revertir_aplicacion_saldo_favor: 'Revertir aplicación de saldo a favor',
   aplicar_saldo_favor: 'Aplicar saldo a favor',
+  anular_cuota: 'Anular cuota',
 }
 
 export const ETIQUETA_ESTADO_AJUSTE: Record<EstadoAjuste, string> = {
@@ -100,6 +138,7 @@ export const ETIQUETA_INCIDENCIA: Record<IncidenciaConciliacion['tipo'], string>
   rechazo_tras_aprobacion: 'Rechazo después de aprobado',
   aprobado_tras_reembolso: 'Aprobado después de reembolsado',
   reembolso_sin_cobro: 'Reembolso sin cobro acreditado',
+  reembolso_parcial: 'Reembolso parcial por conciliar',
 }
 
 /**
@@ -161,6 +200,50 @@ export function useIncidenciasConciliacionQuery(companyId?: string, soloAbiertas
         return q.abortSignal(signal)
       })) ?? [],
   })
+}
+
+/** Respaldos de las solicitudes de la empresa (sólo lectura; RLS por proyecto). */
+export function useRespaldosAjusteQuery(companyId?: string) {
+  return useQuery({
+    queryKey: contabilidadKeys.respaldosAjuste(companyId),
+    enabled: !!companyId,
+    queryFn: async () =>
+      (await runQuery<RespaldoAjuste[]>((signal) =>
+        supabase
+          .from('conta_ajustes_respaldos')
+          .select('*')
+          .eq('company_id', companyId!)
+          .order('subido_at', { ascending: true })
+          .limit(1000)
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/** Qué impide anular una cuota o un cargo (para mostrarlo ANTES de pedirlo). */
+export async function fetchDependenciasAjuste(
+  tipo: 'anular_cuota' | 'anular_cargo',
+  documentoId: string,
+): Promise<DependenciaAjuste[]> {
+  return (await runQuery<DependenciaAjuste[]>((signal) =>
+    supabase
+      .rpc('conta_ajuste_dependencias', { p_tipo: tipo, p_documento_id: documentoId })
+      .abortSignal(signal),
+  )) ?? []
+}
+
+/** Texto de las dependencias para un aviso. */
+export function textoDependencias(deps: DependenciaAjuste[]): string {
+  return deps
+    .map((d) => `• ${d.detalle}${d.monto != null ? ` (${Number(d.monto).toFixed(2)})` : ''}: ${d.como_resolver}`)
+    .join('\n')
+}
+
+/** Enlace firmado y corto para ver un respaldo (bucket privado). */
+export async function urlRespaldo(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(BUCKET_RESPALDOS_AJUSTE).createSignedUrl(path, 300)
+  if (error || !data?.signedUrl) throw new Error(error?.message ?? 'No se pudo abrir el respaldo.')
+  return data.signedUrl
 }
 
 // ── Escrituras ──────────────────────────────────────────────────────────────
@@ -229,13 +312,20 @@ export interface ResultadoAprobacion {
 export function useAprobarAjusteMutation(companyId?: string) {
   const invalidar = useInvalidarAjustes(companyId)
   return useMutation({
-    mutationFn: async (input: { id: string; nota?: string | null; confirmarAutoaprobacion?: boolean }): Promise<ResultadoAprobacion> => {
+    mutationFn: async (input: {
+      id: string
+      nota?: string | null
+      confirmarAutoaprobacion?: boolean
+      /** Ids de los respaldos que se mostraron y revisó quien aprueba. */
+      respaldosRevisados?: string[]
+    }): Promise<ResultadoAprobacion> => {
       const filas = await runQuery<ResultadoAprobacion[]>((signal) =>
         supabase
           .rpc('conta_ajuste_aprobar', {
             p_id: input.id,
             p_nota: input.nota ?? null,
             p_confirmar_autoaprobacion: input.confirmarAutoaprobacion === true,
+            p_respaldos_revisados: input.respaldosRevisados ?? null,
           })
           .abortSignal(signal),
       )
@@ -299,6 +389,89 @@ export function useResolverIncidenciaMutation(companyId?: string) {
       return filas[0]
     },
     onSettled: () => { void qc.invalidateQueries({ queryKey: contabilidadKeys.incidenciasDeEmpresa(companyId) }) },
+  })
+}
+
+// ── Respaldo documental ─────────────────────────────────────────────────────
+
+const MAX_RESPALDO_MB = 15
+const MIME_RESPALDO = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+
+/** Nombre de archivo seguro para la ruta (sin carpetas ni caracteres raros). */
+export function nombreSeguroRespaldo(nombre: string): string {
+  const limpio = nombre.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+/, '').slice(-80)
+  return limpio || 'respaldo'
+}
+
+/** Ruta del objeto: <empresa>/<solicitud>/<clave>-<archivo>. */
+export function rutaRespaldo(companyId: string, solicitudId: string, clave: string, nombre: string): string {
+  return `${companyId}/${solicitudId}/${clave}-${nombreSeguroRespaldo(nombre)}`
+}
+
+async function sha256Hex(file: Blob): Promise<string | null> {
+  try {
+    const buf = await file.arrayBuffer()
+    const dig = await crypto.subtle.digest('SHA-256', buf)
+    return Array.from(new Uint8Array(dig)).map((b) => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    return null
+  }
+}
+
+export interface AdjuntarRespaldoInput {
+  /** Clave de idempotencia del respaldo (la misma en cada reintento). */
+  clave: string
+  companyId: string
+  solicitudId: string
+  archivo: File
+  descripcion?: string | null
+}
+
+/**
+ * Sube el archivo al bucket privado (sin sobrescribir) y lo registra como
+ * respaldo de la solicitud. Si la subida ya ocurrió en un intento anterior
+ * (el objeto existe), sólo lo registra. Los metadatos que quedan son los de
+ * storage, no los del navegador.
+ */
+export async function adjuntarRespaldo(input: AdjuntarRespaldoInput): Promise<{ respaldo_id: string; repetida: boolean }> {
+  if (input.archivo.size > MAX_RESPALDO_MB * 1024 * 1024) {
+    throw new Error(`El respaldo pesa más de ${MAX_RESPALDO_MB} MB.`)
+  }
+  if (!MIME_RESPALDO.includes(input.archivo.type)) {
+    throw new Error('El respaldo debe ser PDF o imagen (JPG, PNG, WEBP).')
+  }
+  const ruta = rutaRespaldo(input.companyId, input.solicitudId, input.clave, input.archivo.name)
+  const { error: upErr } = await supabase.storage
+    .from(BUCKET_RESPALDOS_AJUSTE)
+    .upload(ruta, input.archivo, { contentType: input.archivo.type, upsert: false })
+  // Reintento tras una subida que sí llegó: el objeto ya está (mismo nombre,
+  // misma clave). Cualquier otro error se informa.
+  if (upErr && !/exists|duplicate/i.test(upErr.message)) throw new Error(upErr.message)
+  const sha = await sha256Hex(input.archivo)
+  const filas = await runQuery<{ respaldo_id: string; repetida: boolean }[]>((signal) =>
+    supabase
+      .rpc('conta_ajuste_adjuntar_respaldo', {
+        p_id: input.clave,
+        p_solicitud_id: input.solicitudId,
+        p_storage_path: ruta,
+        p_descripcion: input.descripcion ?? null,
+        p_sha256: sha,
+      })
+      .abortSignal(signal),
+  )
+  if (!filas || filas.length !== 1) throw new Error('El servidor no registró el respaldo.')
+  return filas[0]
+}
+
+export function useAdjuntarRespaldoMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: adjuntarRespaldo,
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.respaldosAjuste(companyId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.ajustesDeEmpresa(companyId) })
+    },
   })
 }
 

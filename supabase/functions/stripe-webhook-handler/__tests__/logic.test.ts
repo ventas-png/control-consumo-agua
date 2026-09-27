@@ -20,6 +20,8 @@ import {
   decidirTrasReclamo,
   decidirTrasSellar,
   estadoDeEventoStripe,
+  importeDesdeStripe,
+  reembolsoParcialDeEvento,
 } from '../logic.ts'
 
 describe('decidirTrasReclamo', () => {
@@ -164,10 +166,47 @@ describe('estadoDeEventoStripe (20261011000000)', () => {
     expect(estadoDeEventoStripe('charge.refunded', { id: 'ch_1', payment_intent: 'pi_3', refunded: true }))
       .toEqual({ estado: 'reembolsado', intentId: 'pi_3' })
   })
-  it('charge.refunded PARCIAL → no cambia la solicitud (revisión manual)', () => {
+  it('charge.refunded PARCIAL → no cambia la solicitud (se registra aparte, sin rechazar)', () => {
     expect(estadoDeEventoStripe('charge.refunded', { id: 'ch_2', payment_intent: 'pi_4', refunded: false })).toBeNull()
   })
   it('otro evento → null', () => {
     expect(estadoDeEventoStripe('customer.created', { id: 'cus_1' })).toBeNull()
+  })
+})
+
+describe('reembolsoParcialDeEvento (20261012000000)', () => {
+  const base = { id: 'ch_9', payment_intent: 'pi_9', refunded: false, amount_refunded: 2550, currency: 'gtq' }
+
+  it('parcial: acumulado en la moneda, moneda en mayúsculas, referencia del cargo', () => {
+    expect(reembolsoParcialDeEvento('charge.refunded', base)).toEqual({
+      intentId: 'pi_9', acumulado: 25.5, moneda: 'GTQ', referenciaPago: 'ch_9', reembolsoRef: null,
+    })
+  })
+  it('toma el reembolso MÁS RECIENTE como referencia, aunque venga desordenado', () => {
+    const r = reembolsoParcialDeEvento('charge.refunded', {
+      ...base, refunds: { data: [{ id: 're_viejo', created: 10 }, { id: 're_nuevo', created: 20 }] },
+    })
+    expect(r?.reembolsoRef).toBe('re_nuevo')
+  })
+  it('el TOTAL no es parcial (lo maneja estadoDeEventoStripe como reembolsado)', () => {
+    expect(reembolsoParcialDeEvento('charge.refunded', { ...base, refunded: true })).toBeNull()
+    expect(estadoDeEventoStripe('charge.refunded', { ...base, refunded: true })?.estado).toBe('reembolsado')
+  })
+  it('sin importe, sin moneda o sin intent no hay nada que registrar', () => {
+    expect(reembolsoParcialDeEvento('charge.refunded', { ...base, amount_refunded: 0 })).toBeNull()
+    expect(reembolsoParcialDeEvento('charge.refunded', { ...base, currency: null })).toBeNull()
+    expect(reembolsoParcialDeEvento('charge.refunded', { ...base, payment_intent: null })).toBeNull()
+  })
+  it('otro evento → null', () => {
+    expect(reembolsoParcialDeEvento('payment_intent.succeeded', base)).toBeNull()
+  })
+})
+
+describe('importeDesdeStripe', () => {
+  it('monedas con centavos: divide entre 100', () => {
+    expect(importeDesdeStripe(1999, 'usd')).toBe(19.99)
+  })
+  it('monedas sin decimales: tal cual', () => {
+    expect(importeDesdeStripe(500, 'JPY')).toBe(500)
   })
 })

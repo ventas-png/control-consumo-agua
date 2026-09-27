@@ -100,10 +100,16 @@ SALIDA=$(PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 \
 echo "$SALIDA" | grep -q 'already exists' \
   || { echo "❌ la segunda pasada no falló por «already exists»:"; echo "$SALIDA" | tail -3; exit 1; }
 echo "   ✓ segunda pasada rechazada por «already exists», como corresponde"
+CIERRE=20261012000000_conta_anular_cuota_reembolsos_parciales_respaldos
 for f in "$MIGS"/*.sql; do
   base="$(basename "$f" .sql)"
   [[ "$base" > "$BAJO_PRUEBA" ]] && aplicar "$f"
 done
+SALIDA=$(PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 \
+  -d ajustes -f "$MIGS/$CIERRE.sql" 2>&1 || true)
+echo "$SALIDA" | grep -q 'already exists' \
+  || { echo "❌ la segunda pasada de $CIERRE no falló por «already exists»:"; echo "$SALIDA" | tail -3; exit 1; }
+echo "   ✓ $CIERRE: segunda pasada rechazada por «already exists»"
 
 echo "── 4/5 · padrón + fixtures de cargos, saldos a favor y del bloque 3, e invariantes de una sesión"
 aplicar "$PADRON"
@@ -114,6 +120,15 @@ aplicar "$AQUI/fixture.sql"
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d ajustes -f "$AQUI/assert.sql" 2>&1) || {
   echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
   echo "❌ invariante incumplida:"
+  echo "$SALIDA" | grep -E 'ERROR|FATAL' | head -5
+  exit 1
+}
+echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+
+aplicar "$AQUI/fixture_b.sql"
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d ajustes -f "$AQUI/assert_b.sql" 2>&1) || {
+  echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+  echo "❌ invariante incumplida (cierre del bloque 3):"
   echo "$SALIDA" | grep -E 'ERROR|FATAL' | head -5
   exit 1
 }
@@ -132,6 +147,12 @@ SC2=5e000000-0000-0000-0000-0000000000c2
 SC4=5e000000-0000-0000-0000-0000000000c4
 ANT2=9f5f0000-0000-0000-0000-0000000000e2
 Q4=c5f00000-0000-0000-0000-000000000004
+QX=c9a00000-0000-0000-0000-000000000021
+QY=c9a00000-0000-0000-0000-000000000022
+TX=5e0b0000-0000-0000-0000-000000000021
+TY=5e0b0000-0000-0000-0000-000000000022
+PP3=ad900000-0000-0000-0000-000000000043
+CONT=a0a0a0a0-0000-0000-0000-00000000000c
 
 # Preparación (como el admin): tres solicitudes de anulación y un anticipo
 # nuevo de Uno para las solicitudes simultáneas del portal.
@@ -142,6 +163,10 @@ SELECT * FROM public.conta_ajuste_solicitar('$SC1', 'anular_cargo', 'cargos_adic
 SELECT * FROM public.conta_ajuste_solicitar('$SC2', 'anular_cargo', 'cargos_adicionales_unidad', '$C2', 'SINT aprobación contra cobro');
 SELECT * FROM public.conta_ajuste_solicitar('$SC4', 'anular_cargo', 'cargos_adicionales_unidad', '$C4', 'SINT cobro contra aprobación');
 SELECT public.sf_anticipo('f0000000-0000-0000-0000-00000000a001', 'e0000000-0000-0000-0000-00000000a001', 25, '$ANT2');
+SELECT set_config('request.jwt.claim.sub', '$CONT', false);
+SELECT * FROM public.conta_ajuste_solicitar('$TX', 'anular_cuota', 'cuotas_condominio', '$QX', 'SINT aprobación contra cobro de cuota');
+SELECT * FROM public.conta_ajuste_solicitar('$TY', 'anular_cuota', 'cuotas_condominio', '$QY', 'SINT cobro de cuota contra aprobación');
+SELECT public.aj_aviso('$PP3', 'aprobado', 'webhook', 'evt-pp3-ok');
 SQL
 OANT2=$(psql -q -X -t -A -d ajustes -c "SELECT public.sf_origen_id('$ANT2')")
 
@@ -183,7 +208,17 @@ par d "$ADM" "SELECT 'D1:' || (public.aj_aviso('$PRC3', 'aprobado', 'webhook', '
 par e "$RUNO" "SELECT 'E1:' || estado FROM public.portal_solicitar_aplicacion_saldo_favor('5e000000-0000-0000-0000-0000000000d1', '$OANT2', 'cuotas_condominio', '$Q4', 5);" \
       "$RUNO" "SELECT 'E2:' || estado FROM public.portal_solicitar_aplicacion_saldo_favor('5e000000-0000-0000-0000-0000000000d2', '$OANT2', 'cuotas_condominio', '$Q4', 5);"
 
-cat "$SALIDAS"/[a-e][12].txt | grep -E '^[A-E][12]:' | sort | sed 's/^/   /'
+# F · la aprobación (anular QX) retiene la cuota; mientras, un cobro de QX.
+par f "$APR" "SELECT 'F1:' || estado FROM public.conta_ajuste_aprobar('$TX');" \
+      "$ADM" "SELECT 'F2:' || public.aj_cobro_cuota('$QX', 5, 'cc0b0000-0000-0000-0000-0000000000f2');"
+# F' · al revés: el cobro de QY primero; mientras, la aprobación de anularla.
+par g "$ADM" "SELECT 'G1:' || public.aj_cobro_cuota('$QY', 5, 'cc0b0000-0000-0000-0000-0000000000f3');" \
+      "$APR" "SELECT 'G2:' || estado || '/' || split_part(COALESCE(error_ejecucion, '-'), ':', 1) FROM public.conta_ajuste_aprobar('$TY');"
+# G · dos reembolsos parciales distintos del mismo cobro a la vez (acumulados 20 y 30).
+par h "$ADM" "SELECT 'H1:' || (public.aj_reembolso('$PP3', 'evt-pp3-r30', 30) ->> 'accion');" \
+      "$ADM" "SELECT 'H2:' || (public.aj_reembolso('$PP3', 'evt-pp3-r20', 20) ->> 'accion');"
+
+cat "$SALIDAS"/[a-h][12].txt | grep -E '^[A-H][12]:' | sort | sed 's/^/   /'
 
 grep -q '^A1:ejecutada/false$' "$SALIDAS/a1.txt" \
   || { echo "❌ A1 debía ejecutar:"; cat "$SALIDAS/a1.txt"; exit 1; }
@@ -207,6 +242,19 @@ grep -q '^E1:pendiente$' "$SALIDAS/e1.txt" \
 grep -q 'AJUSTE_YA_SOLICITADO' "$SALIDAS/e2.txt" \
   || { echo "❌ E2 debía fallar por AJUSTE_YA_SOLICITADO:"; cat "$SALIDAS/e2.txt"; exit 1; }
 echo "   E2: $(grep -o 'AJUSTE_YA_SOLICITADO[^.]*' "$SALIDAS/e2.txt" | head -1)"
+grep -q '^F1:ejecutada$' "$SALIDAS/f1.txt" \
+  || { echo "❌ F1 debía anular QX:"; cat "$SALIDAS/f1.txt"; exit 1; }
+grep -q 'COBRO_CUOTA_ANULADA' "$SALIDAS/f2.txt" \
+  || { echo "❌ F2 debía fallar por COBRO_CUOTA_ANULADA:"; cat "$SALIDAS/f2.txt"; exit 1; }
+echo "   F2: $(grep -o 'COBRO_CUOTA_ANULADA[^.]*' "$SALIDAS/f2.txt" | head -1)"
+grep -q '^G1:cc0b0000-0000-0000-0000-0000000000f3$' "$SALIDAS/g1.txt" \
+  || { echo "❌ G1 debía registrar el cobro:"; cat "$SALIDAS/g1.txt"; exit 1; }
+grep -q '^G2:fallida/AJUSTE_DEPENDENCIAS$' "$SALIDAS/g2.txt" \
+  || { echo "❌ G2 debía quedar fallida por AJUSTE_DEPENDENCIAS:"; cat "$SALIDAS/g2.txt"; exit 1; }
+grep -q '^H1:reembolso_parcial_registrado$' "$SALIDAS/h1.txt" \
+  || { echo "❌ H1 debía registrar el reembolso de 30:"; cat "$SALIDAS/h1.txt"; exit 1; }
+grep -q '^H2:reembolso_ya_contado$' "$SALIDAS/h2.txt" \
+  || { echo "❌ H2 (acumulado 20, llega mientras se registra el 30) debía quedar ya contado:"; cat "$SALIDAS/h2.txt"; exit 1; }
 
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d ajustes -f "$AQUI/concurrencia.sql" 2>&1) || {
   cat "$SALIDAS"/*.txt

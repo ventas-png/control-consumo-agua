@@ -28,3 +28,17 @@ SELECT public.chk(
   (SELECT count(*) FROM public.conta_ajustes_solicitudes s
     WHERE s.documento_id = 'c5f00000-0000-0000-0000-000000000004' AND s.canal = 'portal' AND s.estado = 'pendiente'), 1,
   'E · una sola solicitud abierta del portal por el documento');
+SELECT public.chk_txt(public.aj_cuota('c9a00000-0000-0000-0000-000000000021'), 'anulada/0/1/hoy',
+  'F · QX anulada, con su devengo reversado');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pagos p WHERE p.cuota_id = 'c9a00000-0000-0000-0000-000000000021'), 0,
+  'F · el cobro que llegó durante la aprobación no quedó registrado');
+SELECT public.chk_txt(public.aj_cuota('c9a00000-0000-0000-0000-000000000022'), 'emitida/1/0/-',
+  'F'' · QY sigue viva: el cobro llegó primero y la aprobación falló sin escribir');
+SELECT public.chk_txt(public.aj_sol('5e0b0000-0000-0000-0000-000000000022'), 'fallida/1/false', 'F'' · la solicitud queda fallida');
+SELECT public.chk_txt(public.aj_reembolsos('ad900000-0000-0000-0000-000000000043'), '1/30.00/30.00/1',
+  'G · dos reembolsos parciales a la vez: se cuenta el acumulado mayor una vez');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pasarela_eventos e
+    WHERE e.payment_request_id = 'ad900000-0000-0000-0000-000000000043' AND e.estado_informado = 'reembolso_parcial'), 2,
+  'G · los dos avisos quedan como evidencia');

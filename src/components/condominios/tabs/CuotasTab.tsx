@@ -1,7 +1,8 @@
 import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, useRef, useMemo, useCallback, type ChangeEvent} from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { openPromptDialog } from '../../shared/PromptDialog'
+import { openPromptDialog, openTextPrompt } from '../../shared/PromptDialog'
+import { fetchDependenciasAjuste, textoDependencias, textoSolicitudEnviada } from '../../../domain/contabilidad/ajustes'
 import { configurarCierreAutomatico } from '../../shared/cierreAutomaticoDialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { SelectionToolbar, type BulkAction } from '../../shared/SelectionToolbar'
@@ -221,25 +222,39 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
     }
   }
 
+  // Desde 20261012000000 una cuota se anula por SOLICITUD que aprueba otra
+  // persona (Contabilidad › Solicitudes de ajuste). Antes de pedirla se
+  // muestra lo que lo impide (cobros, saldo a favor aplicado…): nada se anula
+  // en cascada, cada cosa se resuelve por su camino.
   async function handleAnular(cuota: CuotaCondominio) {
-    const { isConfirmed } = await confirm({
-      title: '¿Anular cuota?',
-      text: 'La cuota quedará anulada (estado terminal). Esta acción no se puede revertir.',
-      icon: 'warning',
-      variant: 'danger',
-      confirmText: 'Sí, anular',
-    })
-    if (!isConfirmed) return
     setAccionCuotaId(cuota.id)
     try {
-      const proj = cuotaEstadoById.get(cuota.id)
-      await anularMut.mutateAsync({
-        cuota: { id: cuota.id, cuota_estado: proj?.cuota_estado ?? cuota.estado },
+      const deps = await fetchDependenciasAjuste('anular_cuota', cuota.id)
+      if (deps.length > 0) {
+        notify({
+          variant: 'warning',
+          title: 'La cuota no se puede anular todavía',
+          text: `Resuelve primero (no se anula en cascada):\n${textoDependencias(deps)}`,
+        })
+        return
+      }
+      const motivo = await openTextPrompt({
+        title: 'Solicitar anulación de la cuota',
+        description: 'Se registra una solicitud: nada cambia hasta que otra persona con permiso de autorizar la apruebe. Al ejecutarse se reversa su devengo (y su mora) y queda la evidencia.',
+        label: 'Motivo',
+        required: true,
+        validate: (v) => (v.trim().length < 5 ? 'Indica el motivo (al menos 5 caracteres).' : null),
       })
-      notify({ variant: 'success', title: '🚫 Cuota anulada', duration: 1600 })
+      if (!motivo) return
+      const proj = cuotaEstadoById.get(cuota.id)
+      const r = await anularMut.mutateAsync({
+        cuota: { id: cuota.id, cuota_estado: proj?.cuota_estado ?? cuota.estado },
+        motivo,
+      })
+      notify({ variant: 'success', title: 'Anulación solicitada', text: textoSolicitudEnviada(r) })
       onRefresh()
     } catch (err) {
-      notify({ variant: 'error', title: 'No se pudo anular', text: (err as Error).message })
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: (err as Error).message })
     } finally {
       setAccionCuotaId(null)
     }
@@ -476,7 +491,13 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
   async function eliminar(id: string) {
     const result = await confirm({ title: '¿Eliminar cuota?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
-    await softDelete('cuotas_condominio', { id })
+    // El servidor sólo deja eliminar una cuota SIN emitir y sin cobros ni
+    // saldo aplicado (20261012000000); una emitida se anula por solicitud.
+    const { error } = await softDelete('cuotas_condominio', { id })
+    if (error) {
+      notify({ variant: 'error', title: 'No se eliminó la cuota', text: error.message })
+      return
+    }
     onRefresh()
   }
 

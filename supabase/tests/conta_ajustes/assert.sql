@@ -53,7 +53,7 @@
 SELECT public.chk(
   (SELECT count(*) FROM (VALUES
      ('public.conta_ajuste_solicitar(uuid,text,text,uuid,text,uuid,numeric)'),
-     ('public.conta_ajuste_aprobar(uuid,text,boolean)'),
+     ('public.conta_ajuste_aprobar(uuid,text,boolean,uuid[])'),
      ('public.conta_ajuste_rechazar(uuid,text)'),
      ('public.conta_ajuste_cancelar(uuid,text)'),
      ('public.conta_ajuste_reintentar(uuid)'),
