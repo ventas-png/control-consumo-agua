@@ -122,7 +122,7 @@ el sandbox no tiene #901, #902 ni este PR (§ «Sandbox» abajo).
 | 2d | Sin umbral, sin vencimiento | ausencia de umbral/cron | — | — |
 | 2e | **anular_cuota** con reversos vinculados y evidencia | `conta_ajuste_ejecutar` (rama cuota), `conta_cuota_anulaciones` | `assert_b.sql` §14 | L |
 | 2f | Dependencias informadas, sin cascada | `conta_cuota_dependencias`, `conta_ajuste_dependencias` | §12, §13, §15; concurrencia F, F′ | L, V (`ajustes.test.ts`) |
-| 2g | Rutas anteriores sin atajo (cuota) | `trg_cuota_solo_por_solicitud`, `trg_pago_cuota_anulada`, `useAnularCuotaMutation` | §12, §14; `anularCuotaSolicitud.test.tsx` | L, V |
+| 2g | Rutas anteriores sin atajo (cuota) | `trg_cuota_solo_por_solicitud`, `conta_pago_cuota_no_anulada` (desde `conta_tg_pagos`: `pagos` tiene drift declarado en triggers), `useAnularCuotaMutation` | §12, §14; `anularCuotaSolicitud.test.tsx` | L, V |
 | 2h | Efectos en EC, portal, saldos, cortes históricos | `anulada_at` del servidor + reversos | §14 (corte de ayer / hoy, portal), §19 (conciliación) | L |
 | 2i | **ajuste_importe** | — | — | ⏸️ **Pendiente de E6** |
 | 3a | Permisos en servidor | `conta_ajuste_bloquear_para_revision`, `_puede_solicitar` | §2, §3, §6, §13, §14 | L |
