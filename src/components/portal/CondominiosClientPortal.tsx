@@ -15,6 +15,7 @@ import type {
 } from '../../types'
 import { PortalReservasTab }   from '../condominios/tabs/PortalReservasTab'
 import { PortalMiCuentaTab }   from '../condominios/tabs/PortalMiCuentaTab'
+import { PortalCargosSaldoFavor } from './PortalCargosSaldoFavor'
 import { PortalMisTicketsTab } from '../condominios/tabs/PortalMisTicketsTab'
 import { PortalMiUnidadTab }   from '../condominios/tabs/PortalMiUnidadTab'
 import { PortalVisitantesTab } from '../condominios/tabs/PortalVisitantesTab'
@@ -498,14 +499,18 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               )
             )}
             {tab === 'cuenta' && (
-              <PortalMiCuentaTab
-                cuotas={cuotasU}
-                moneda={moneda}
-                unidadNombre={unidad.nombre}
-                recargoRows={recargoRows}
-                canalPago={canalPago}
-                onPagado={cargarDatos}
-              />
+              <>
+                <PortalMiCuentaTab
+                  cuotas={cuotasU}
+                  moneda={moneda}
+                  unidadNombre={unidad.nombre}
+                  recargoRows={recargoRows}
+                  canalPago={canalPago}
+                  onPagado={cargarDatos}
+                />
+                {/* 20261011000000: cargos en línea, saldo a favor y solicitudes. */}
+                <PortalCargosSaldoFavor unidadId={selectedUnidadId} moneda={moneda} />
+              </>
             )}
             {tab === 'tickets' && (
               <PortalMisTicketsTab

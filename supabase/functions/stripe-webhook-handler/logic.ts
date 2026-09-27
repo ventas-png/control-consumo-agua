@@ -146,3 +146,27 @@ export function decidirTrasSellar(
     },
   }
 }
+
+/**
+ * Qué estado del proveedor representa un evento de Stripe, y sobre qué
+ * PaymentIntent (20261011000000). `null` = el evento no cambia la solicitud:
+ * se cierra como procesado sin tocar nada.
+ *
+ *   · payment_intent.succeeded       → aprobado
+ *   · payment_intent.payment_failed  → rechazado (no retrocede un succeeded)
+ *   · charge.refunded, TOTAL         → reembolsado
+ *   · charge.refunded, PARCIAL       → null (revisión manual en Stripe; un
+ *                                      reembolso parcial no rechaza el cobro)
+ */
+export function estadoDeEventoStripe(
+  tipo: string,
+  obj: { id?: string; payment_intent?: string | null; refunded?: boolean | null },
+): { estado: 'aprobado' | 'rechazado' | 'reembolsado'; intentId: string | null } | null {
+  if (tipo === 'payment_intent.succeeded') return { estado: 'aprobado', intentId: obj.id ?? null }
+  if (tipo === 'payment_intent.payment_failed') return { estado: 'rechazado', intentId: obj.id ?? null }
+  if (tipo === 'charge.refunded') {
+    if (obj.refunded !== true) return null
+    return { estado: 'reembolsado', intentId: obj.payment_intent ?? null }
+  }
+  return null
+}

@@ -110,3 +110,60 @@ export async function confirmarPagoCuota(paymentRequestId: string): Promise<Conf
   const r = await confirmarPago(paymentRequestId)
   return { estado: r.estado, cuotaLiquidada: r.liquidado, saldoRestante: r.saldoRestante, error: r.error }
 }
+
+/**
+ * Inicia el cobro en línea de un CARGO ADICIONAL propio (20261011000000). El
+ * servidor decide si se puede cobrar y cuánto (devengo publicado − cobros y
+ * saldos a favor aplicados); `monto` menor = abono parcial, acotado al saldo.
+ * Igual que las cuotas: el retorno del navegador NUNCA acredita, sólo dispara
+ * confirm-charge, que pregunta al proveedor desde el servidor.
+ */
+export async function iniciarPagoCargo(cargoId: string, monto?: number): Promise<IniciarPagoResult> {
+  const base = window.location.origin
+  const { data, error } = await supabase.functions.invoke('create-charge', {
+    body: {
+      cargo_adicional_id: cargoId,
+      ...(monto && monto > 0 ? { monto } : {}),
+      url_retorno: `${base}/portal?pago=ok`,
+      url_cancelacion: `${base}/portal?pago=cancelado`,
+    },
+  })
+  return parseIniciarPago(data, error)
+}
+
+export interface SolicitudAplicacionInput {
+  /** Clave de idempotencia (la misma en cada reintento del formulario). */
+  clave: string
+  origenId: string
+  documentoTabla: 'cuotas_condominio' | 'cargos_adicionales_unidad'
+  documentoId: string
+  importe: number
+  motivo?: string | null
+}
+
+/**
+ * E4: el residente SOLICITA aplicar su saldo a favor a un documento suyo. No
+ * se aplica nada: contabilidad aprueba y ejecuta. Devuelve el estado de la
+ * solicitud o el error del servidor.
+ */
+export async function solicitarAplicacionSaldoFavor(
+  input: SolicitudAplicacionInput,
+): Promise<{ estado: string | null; repetida: boolean; error: string | null }> {
+  const { data, error } = await supabase.rpc('portal_solicitar_aplicacion_saldo_favor', {
+    p_id: input.clave,
+    p_origen_id: input.origenId,
+    p_documento_tabla: input.documentoTabla,
+    p_documento_id: input.documentoId,
+    p_importe: input.importe,
+    p_motivo: input.motivo ?? null,
+  })
+  if (error) return { estado: null, repetida: false, error: error.message }
+  const fila = ((data as { estado: string; repetida: boolean }[] | null) ?? [])[0]
+  return { estado: fila?.estado ?? null, repetida: fila?.repetida === true, error: null }
+}
+
+/** Cancela una solicitud propia pendiente. */
+export async function cancelarSolicitudPortal(id: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.rpc('conta_ajuste_cancelar', { p_id: id, p_motivo: 'Cancelada por el residente' })
+  return { error: error?.message ?? null }
+}

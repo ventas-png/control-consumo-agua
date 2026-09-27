@@ -1,7 +1,9 @@
 import { hoyLocalISO, esFechaCalendarioVencida } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import { notify, confirm } from '../../shared/Dialog'
+import { notify } from '../../shared/Dialog'
+import { openTextPrompt } from '../../shared/PromptDialog'
+import { solicitarAjuste, textoSolicitudEnviada } from '../../../domain/contabilidad/ajustes'
 import { CargoAdicionalUnidad, CategoriaCargoAdicional, EstadoCargoAdicional, Unidad } from '../../../types'
 import { useCargosCobroResumenQuery } from '../../../domain/contabilidad/cobrosCargo'
 import CobroCargoModal from './CobroCargoModal'
@@ -92,13 +94,29 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
     onRefresh()
   }
 
+  // Desde 20261011000000 un cargo sólo se anula por una solicitud que aprueba
+  // OTRA persona (Contabilidad › Solicitudes de ajuste). Queda la evidencia
+  // (fecha del servidor, quién y por qué), tenga o no asiento. Con cobros
+  // vivos la ejecución falla con el motivo y la solicitud queda para reintentar.
   async function anular(c: CargoAdicionalUnidad) {
-    const res = await confirm({ title: 'Anular cargo', text: '¿Confirmar anulación?', icon: 'warning', variant: 'danger', confirmText: 'Anular' })
-    if (!res.isConfirmed) return
-    // Con cobros vivos el servidor rechaza la anulación: se muestra el motivo.
-    const { error } = await updateCondominioRow('cargos_adicionales_unidad', c.id, { estado: 'anulado' as EstadoCargoAdicional })
-    if (error) { notify({ variant: 'error', title: 'No se anuló el cargo', text: error.message }); return }
-    onRefresh()
+    const motivo = await openTextPrompt({
+      title: 'Solicitar anulación del cargo',
+      description: 'Se registra una solicitud: nada cambia hasta que otra persona con permiso de autorizar la apruebe. Si el cargo tiene cobros vivos, primero anula esos cobros.',
+      label: 'Motivo',
+      required: true,
+      validate: (v) => (v.trim().length < 5 ? 'Indica el motivo (al menos 5 caracteres).' : null),
+    })
+    if (!motivo) return
+    try {
+      const r = await solicitarAjuste({
+        clave: crypto.randomUUID(), tipo: 'anular_cargo', documentoTabla: 'cargos_adicionales_unidad',
+        documentoId: c.id, motivo: motivo.trim(),
+      })
+      notify({ variant: 'success', title: 'Anulación solicitada', text: textoSolicitudEnviada(r) })
+      onRefresh()
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: e instanceof Error ? e.message : String(e) })
+    }
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }

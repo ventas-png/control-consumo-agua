@@ -1,159 +1,115 @@
-# Propuesta — Ajustes, anulaciones y extensión a portal y pasarela (funcional 3)
+# Bloque 3 — Ajustes, anulaciones, portal y pasarela
 
-> **Estado: decisiones E1–E5 APROBADAS el 2026-09-26** (ver
-> [`DECISIONES_PENDIENTES_CONTABILIDAD.md`](DECISIONES_PENDIENTES_CONTABILIDAD.md), §E).
-> Todavía no hay código de este bloque en el PR.
+> **Estado: IMPLEMENTADO en `20261011000000_conta_ajustes_solicitudes_portal_pasarela`**
+> (PR #904). Decisiones en [`DECISIONES_PENDIENTES_CONTABILIDAD.md`](DECISIONES_PENDIENTES_CONTABILIDAD.md), §E.
+> Este documento reemplaza la propuesta anterior (que no tenía código).
 
-Este bloque se apoya en lo que ya existe (y se reutiliza, no se duplica):
-
-| Pieza existente | Qué aporta |
-| --- | --- |
-| `conta_anular_cobro_cargo`, `conta_anular_anticipo`, `conta_revertir_aplicacion_saldo_favor` | Anulaciones y reversos transaccionales con motivo y reverso contable |
-| `pagos_rechazo_eventos` (20261005000000) | Evidencia de servidor (hora, actor, motivo) de los rechazos de cobros |
-| `conta_reversar_automatico`, `conta_anular_asiento` | Un asiento publicado nunca se edita: se reversa con otro asiento |
-| `conta_ec_limitaciones` · `anulacion_sin_fecha` | Declara los cargos anulados sin evidencia de fecha (históricos) |
-| RBAC por acción (`view`, `create`, `edit`, `change_status`, `approve`, `delete`) por módulo, y rol de sistema «Finanzas / Contador» | Los permisos que se usarán; no se crean acciones nuevas |
-| `create-charge` / `confirm-charge` / `conciliar_pago_externo` (20260911042839) | Cobro en línea confirmado **en el servidor** e idempotente por `pagos.payment_request_id` único |
-| `stripe-webhook-handler` + idempotencia por evento (20260911231905) | Avisos de la pasarela deduplicados |
-
-## 1. Flujo propuesto
+## 1. Flujo
 
 ```
-solicitud (motivo + evidencia)
-   │  estado: pendiente
-   ▼
-revisión ──► rechazada (motivo del revisor)            [fin: nada cambia]
-   │
-   ▼
-aprobada ──► ejecución TRANSACCIONAL del ajuste/reverso ──► ejecutada
-                   │ (falla)
-                   ▼
-               fallida (motivo del servidor; se puede reintentar la ejecución)
-   ▼
-trazabilidad en el estado de cuenta (documento original + ajuste + aprobador)
+solicitar (motivo) ──► pendiente ──► aprobar ──► [misma transacción] ejecutar ──► ejecutada
+                          │              │                     │ (falla: nada queda escrito)
+                          │              │                     ▼
+                          │              │                  fallida ──► reintentar (otra persona)
+                          │              ▼                     │
+                          ├──► rechazada (motivo)  ◄───────────┘
+                          └──► cancelada (sólo quien la pidió, mientras esté pendiente)
 ```
 
-Tipos de solicitud (uno por fila; cada uno reutiliza la operación que ya existe):
+| Tipo | Documento | Ejecuta | Quién solicita |
+| --- | --- | --- | --- |
+| `anular_cargo` | cargo adicional | `UPDATE … estado='anulado'` (el trigger reversa el devengo) + evidencia en `conta_cargo_anulaciones` | condominios.edit o contabilidad.create |
+| `anular_cobro_cargo` | cobro de un cargo | `conta_anular_cobro_cargo` | ídem |
+| `anular_anticipo` | anticipo | `conta_anular_anticipo` | ídem |
+| `revertir_aplicacion_saldo_favor` | aplicación | `conta_revertir_aplicacion_saldo_favor` | contabilidad.create |
+| `aplicar_saldo_favor` | cuota o cargo | `conta_aplicar_saldo_favor` (clave = id de la solicitud) | el **residente** desde el portal (E4) |
 
-| Tipo | Qué ejecuta | Operación existente que reutiliza |
-| --- | --- | --- |
-| `anular_cargo` | Anula un cargo adicional (con o sin asiento) | `UPDATE cargos_adicionales_unidad SET estado='anulado'` + reverso del devengo (`conta_reversar_automatico`) |
-| `anular_cuota` | Anula una cuota por tipo | transición `anular` + reverso del devengo |
-| `anular_cobro` | Rechaza un cobro contabilizado | `conta_anular_cobro_cargo` / rechazo de Agua (queda en `pagos_rechazo_eventos`) |
-| `ajuste_importe` | Corrige el importe de un documento **publicado** | **Nota de crédito o débito**: un asiento nuevo por la diferencia, ligado al documento. El documento y su asiento originales NO se editan |
-| `revertir_aplicacion` | Revierte una aplicación de saldo a favor | `conta_revertir_aplicacion_saldo_favor` |
+**Aprobar** requiere «Autorizar / Denegar» en Contabilidad (`conta_puede_escribir('approve')`: permiso RBAC o rol owner/admin).
 
-## 2. Modelo de datos propuesto
+## 2. Reglas (todas en el servidor)
 
-- `conta_ajustes_solicitudes`: `id` (clave de idempotencia del cliente), `company_id`,
-  `project_id`, `tipo`, `documento_tabla`, `documento_id`, `importe_propuesto`
-  (sólo en `ajuste_importe`), `motivo`, `estado`, `solicitado_por`/`_at`,
-  `revisado_por`/`_at`, `motivo_revision`, `ejecutado_at`, `asiento_id` (del
-  ajuste o reverso), `error_ejecucion`. **Todas las fechas y actores, del
-  servidor** (`now()`, `auth.uid()`), nunca del cliente.
-- `conta_ajustes_evidencias`: archivos en Storage (bucket privado, ruta por
-  empresa) con hash, tipo y tamaño; sólo inserción.
-- `conta_ajustes_eventos`: bitácora de sólo inserción de cada transición
-  (estado anterior → nuevo, actor, hora del servidor, motivo).
-- Estado de cuenta: el ajuste aparece como un movimiento más, con «Ajuste
-  aprobado por X el D: motivo», enlazado al documento original.
+- **Cuatro ojos (E1).** Quien solicita no aprueba. **Única excepción: el `company_owner`**, y sólo con
+  `p_confirmar_autoaprobacion = true`; queda `autoaprobada = true` y el evento `autoaprobada` en la bitácora.
+  No hay excepción por «único aprobador». Reintentar una fallida tampoco lo puede hacer quien la pidió,
+  salvo que la haya autoaprobado.
+- **Sin umbral (E2)** y **sin vencimiento (E3)**: ningún proceso cambia una solicitud por antigüedad.
+  Recordatorio a 7 días, «estancada» a 30 y revisión del umbral a 3 meses son **propuestas**, sin código.
+- **Idempotencia.** El id de la solicitud lo genera el cliente: repetir con los mismos datos devuelve la
+  existente; con otros, `AJUSTE_CLAVE_REUSADA`. Una sola solicitud abierta por tipo y documento
+  (`AJUSTE_YA_SOLICITADO`). Aprobar dos veces ejecuta una vez (la solicitud se bloquea `FOR UPDATE`).
+- **Revalidación al aprobar**, con el documento bloqueado en el mismo orden que la operación:
+  documento (existe, mismo importe y responsable que al solicitar, no ya anulado/revertido), **período**
+  de hoy abierto (`AJUSTE_PERIODO_CERRADO`) y **saldo** (disponible del origen y saldo del documento).
+- **Ejecución atómica.** Corre en una subtransacción: si falla, no queda nada escrito y la solicitud queda
+  `fallida` con el motivo del servidor.
+- **Sin atajos.** Las tres RPC que el flujo ejecuta responden `AJUSTE_REQUIERE_SOLICITUD` si se invocan
+  sueltas (exigen la solicitud en ejecución en la transacción actual, marcada por su `txid` en una tabla
+  que la aplicación no puede escribir). Anular un cargo por `UPDATE` → `CARGO_ANULACION_SOLO_POR_SOLICITUD`;
+  borrarlo → `CARGO_NO_SE_BORRA` (salvo el borrado en cascada de su empresa/proyecto); reactivarlo →
+  `CARGO_ANULADO_DEFINITIVO`. Las tablas del flujo sólo se leen desde la aplicación.
+- **Bloqueo de rechazo con saldo aplicado (D1/E5)**: se mantiene, sin cascada.
 
-## 3. Roles: quién solicita, aprueba y ejecuta
+## 3. Anulación de cargos sin asiento: evidencia
 
-Con los permisos que ya existen (no se crea ninguno):
+`conta_cargo_anulaciones` guarda hora del servidor, actor, solicitud, motivo, si tenía asiento y su
+reverso. `conta_ec_fuera_de_saldo` sitúa la anulación al corte con esa fecha (a un corte anterior el cargo
+figura vigente con la nota «se anuló después del corte, el …»); `conta_ec_limitaciones` deja de contarlo en
+`anulacion_sin_fecha`. Los anulados **antes** de la migración no tienen evidencia y **siguen** en esa
+limitación: no se rellenan fechas.
 
-| Paso | Quién (propuesta) | Permiso existente |
-| --- | --- | --- |
-| Solicitar | Quien opera el documento | `platform.condominios.edit` (cargos/cuotas) o `platform.contabilidad.create` |
-| Aprobar / rechazar | Contabilidad | `platform.contabilidad.approve` («Autorizar / Denegar») o rol `company_owner`/`admin` |
-| Ejecutar | El sistema, en la MISMA transacción de la aprobación | — (la aprobación dispara la ejecución; si falla, queda `fallida` y la reintenta alguien con `approve`) |
+## 4. Portal
 
-**[DECIDIR] Autoaprobación.** Propuesta: **no** se permite que quien solicita
-apruebe su propia solicitud (cuatro ojos), salvo que la empresa tenga un solo
-usuario con `approve`. Alternativa: permitirla sólo al `company_owner`. No se
-propone umbral monetario: si el negocio quiere uno (p. ej. «ajustes mayores a X
-requieren owner»), debe fijar el monto y quién lo aprueba.
+`portal_saldos_favor`, `portal_documentos_con_saldo`, `portal_mis_solicitudes` y
+`portal_solicitar_aplicacion_saldo_favor`: el sujeto es el cliente de la sesión (`get_my_cliente_id()`),
+nunca un parámetro. El residente ve y solicita; no aplica. Pantalla: `PortalCargosSaldoFavor` en
+«Mi cuenta».
 
-**[DECIDIR] Plazo de las solicitudes pendientes** (¿vencen?, ¿se notifican?).
+## 5. Pasarela
 
-## 4. Anulación de cargos SIN asiento: evidencia
+- **Cargos adicionales en línea**: `create-charge` acepta `cargo_adicional_id`; el saldo y si es cobrable
+  los decide `conta_cargo_saldo_pagable` (service_role). Sólo el responsable histórico del cargo paga.
+- **Confirmación desde el servidor**: el retorno del navegador nunca acredita; un «aprobado» al crear la
+  solicitud queda `pending` y sólo `confirm-charge` (o el webhook) lo concilia.
+- **`pasarela_registrar_estado`** es el único punto por el que un aviso del proveedor cambia una solicitud:
+  deduplicado por (proveedor, clave de evento); el estado sólo avanza
+  (`pending → succeeded|failed`, `failed → succeeded`, `succeeded → refunded`). Un aviso contradictorio no
+  revierte nada y abre una incidencia (`rechazo_tras_aprobacion`, `aprobado_tras_reembolso`).
+- **Reembolso confirmado**: se conserva el evento, la solicitud pasa a `refunded` y se intenta rechazar el
+  cobro. Si el rechazo está bloqueado (p. ej. `COBRO_SALDO_FAVOR_APLICADO`) queda una incidencia
+  **abierta** `reembolso_bloqueado` con el motivo; si se rechaza, `reembolso_aplicado` para revisar el
+  documento. Stripe: `charge.refunded` total; un reembolso parcial no cambia la solicitud.
+- **Corrección encontrada**: `conciliar_pago_externo` insertaba texto en `pagos.verified_by` (uuid en
+  producción y en la cadena), así que toda conciliación fallaba por tipo. Ahora `verified_by` recibe un
+  uuid o NULL y la procedencia va a `verification_notes`.
 
-Hoy un cargo adicional anulado que nunca tuvo asiento no deja fecha, y el estado
-de cuenta lo declara como `anulacion_sin_fecha`. Propuesta:
+## 6. Matriz de requisitos → código → pruebas
 
-- Toda anulación (con o sin asiento) pasa por la solicitud aprobada y deja en
-  `conta_ajustes_eventos` la fecha del servidor, el actor y el motivo.
-- `conta_ec_limitaciones` deja de declarar como `anulacion_sin_fecha` los
-  cargos que tengan ese evento, y los ubica al corte con su fecha real.
-- Los históricos sin evidencia **siguen** en `anulacion_sin_fecha`: no se
-  rellenan con `updated_at` ni con la fecha de la migración.
-- Un `UPDATE` directo que anule un cargo sin pasar por el flujo se rechaza
-  (mismo patrón que `COBRO_CARGO_SOLO_RPC`).
+| # | Requisito | Código | Pruebas |
+| --- | --- | --- | --- |
+| 1 | Docs: autoaprobación sólo owner con confirmación; sin «único aprobador»; plazos como propuesta | `docs/DECISIONES_PENDIENTES_CONTABILIDAD.md` §E; este documento §2 | — (documentación) |
+| 2a | Solicitar, idempotente, una abierta por documento | `conta_ajuste_solicitar`, `conta_ajuste_alta`, `uq_conta_ajustes_abierta` | `conta_ajustes/assert.sql` §2; concurrencia E |
+| 2b | Revisión: aprobar / rechazar / cancelar / reintentar | `conta_ajuste_aprobar`, `_rechazar`, `_cancelar`, `_reintentar` | §3, §5, §6 |
+| 2c | Ejecución transaccional e idempotente | `conta_ajuste_ejecutar` (subtransacción), bloqueo `FOR UPDATE` | §3 (doble aprobación), §6 (falla sin escrituras); concurrencia A |
+| 2d | Sin umbral, sin vencimiento | ausencia de umbral/cron (E2, E3) | — (no hay código que probar) |
+| 3a | Permisos en servidor | `conta_ajuste_bloquear_para_revision`, `conta_ajuste_puede_solicitar` | §2 (visor, otra empresa), §3 (sin approve, otra empresa), §6 (reintento) |
+| 3b | Revalidar documento, período y saldo | `conta_ajuste_revalidar`, `conta_ajuste_foto` | §5 (importe cambiado), §6 (período cerrado, cobro vivo), §8 (saldo); concurrencia B y C |
+| 3c | Sin escrituras directas | `conta_ajuste_exigir`, `trg_cargo_solo_por_solicitud`, REVOKE de tablas | §0 (privilegios), §1 (UPDATE/DELETE/RPC/INSERT directos) |
+| 3d | E1 autoaprobación | `conta_ajuste_aprobar` + CHECK `conta_ajustes_autoaprobacion_marcada` | §3, §4 (owner con/sin confirmación; único aprobador en B); `ajustes.test.ts`; `ajustesTab.test.tsx` |
+| 4 | Evidencia de anulación sin asiento; históricos siguen como limitación | `conta_cargo_anulaciones`, `conta_ec_fuera_de_saldo`, `conta_ec_limitaciones` | §7; `conta_estado_cuenta/assert_corte.sql` (heredado sigue en la limitación) |
+| 5 | Portal: consulta y solicitud; contabilidad aprueba | `portal_*` (4 RPC), `PortalCargosSaldoFavor.tsx` | §8; concurrencia E; `PortalCargosSaldoFavor.test.tsx`; `rlsHarness.test.ts` (anon y staff rechazados) |
+| 6a | Cargos en portal/pasarela | `create-charge` (rama cargo), `conciliar_pago_externo` (rama cargo), `confirm-charge` | §9; `create-charge/__tests__/handler.test.ts` (cargo); `confirm-charge/__tests__/handler.test.ts` (cargo) |
+| 6b | Duplicados | `pasarela_eventos` UNIQUE, `pagos.payment_request_id` UNIQUE | §9 (mismo aviso, webhook + consulta); concurrencia D |
+| 6c | Eventos fuera de orden | `pasarela_registrar_estado` (estado sólo avanza) | §9 (rechazo tras aprobado, pendiente, aprobado tras reembolso, aprobación tardía); `confirm-charge` (no escribe `failed`) |
+| 6d | Confirmación desde servidor | `estadoPaymentRequest` (aprobado → pending), `confirm-charge` | `create-charge/__tests__/logic.test.ts`, handler (cargo pending); `PortalCargosSaldoFavor.test.tsx` (checkout no acredita) |
+| 7 | Bloqueo sin cascada; reembolso conservado con incidencia | `conta_rechazar_cobro_por_reembolso`, `conta_incidencias_conciliacion`, `stripe-webhook-handler` (`charge.refunded`) | §9 (reembolso bloqueado y aplicado, incidencia, resolver); `stripe-webhook-handler/__tests__/logic.test.ts` |
+| 8 | Autoaprobación, aislamiento, concurrencia, fallos y reintentos | — | `conta_ajustes` §1–§10 y concurrencia A–E; suites anteriores pasando por el flujo (`conta_ajustes/helper.sql`) |
+| 9a | Sandbox | — | **Pendiente**: sin #901, #902 ni este PR (ver `SANDBOX_E2E_SINCRONIZAR.md`) |
+| 9b | Auditor de drift | refresco de `huella-produccion.json` | **Pendiente de escritura**: verificado contra producción, ver la descripción del PR |
 
-## 5. Portal del residente y pasarela
+## 7. Fuera de alcance (explícito)
 
-Extender a portal y pasarela sólo lo que ya está aprobado (cargos, cobros y
-saldos a favor), con estas reglas:
-
-1. **Qué ve el residente.** Su estado de cuenta (el del auxiliar que es él
-   mismo), sus cuotas y cargos pendientes, sus cobros y su saldo a favor
-   disponible. Nunca los de otro cliente de la unidad: el sujeto sale de
-   `auth.uid()` → cliente, en el servidor, no de un parámetro.
-2. **Qué opera.**
-   - Pagar cuotas (ya existe) y **cargos adicionales**: `create-charge` y
-     `conciliar_pago_externo` aceptan `cargo_adicional_id`, y el cobro se
-     contabiliza por `conta_contabilizar_cobro_cargo_interno` (mismo camino que
-     el back-office).
-   - **Excedente de un pago en línea**: queda como saldo a favor del pagador si
-     es el responsable del documento (la regla del funcional 1), o pendiente
-     con motivo si no lo es.
-   - **[DECIDIR]** Si el residente puede **aplicar** su propio saldo a favor a
-     un documento suyo. Propuesta para la primera entrega: **no**. Lo solicita
-     desde el portal (una solicitud del §1) y lo aplica contabilidad.
-3. **Avisos de la pasarela.**
-   - **Duplicados.** La idempotencia sigue siendo una restricción, no una
-     consulta: `pagos.payment_request_id` único (ya existe) y, para los
-     webhooks, el id del evento único (ya existe en Stripe; se agrega igual
-     para el resto de proveedores).
-   - **Fuera de orden.** El estado de `payment_requests` sólo avanza
-     (`pending → succeeded|failed|refunded`). Un aviso «failed» que llega
-     después de «succeeded» no revierte nada; lo registra y lo marca para
-     revisión. Un reembolso es un **rechazo del cobro**, que pasa por el guard
-     `COBRO_SALDO_FAVOR_APLICADO` si su saldo ya se usó.
-   - **Retorno del navegador.** Nunca acredita: sólo dispara `confirm-charge`,
-     que pregunta al proveedor desde el servidor (ya es así hoy; se prueba).
-
-## 6. Pruebas previstas (arnés real, como los bloques anteriores)
-
-- **Autorización.** Quien solicita sin `approve` no aprueba. La autoaprobación
-  sigue lo que se decida. Otra empresa ve la solicitud como inexistente. El
-  residente sólo ve lo suyo.
-- **Aprobación repetida** (doble clic): una sola ejecución y un solo asiento.
-- **Ejecución concurrente** con sesiones reales: dos aprobaciones de la misma
-  solicitud, y aprobación contra un cobro nuevo del mismo documento.
-- **Fallo intermedio.** Sin cuenta o con el período cerrado queda `fallida` sin
-  escribir nada parcial, y se puede reintentar.
-- **Rechazo** (nada cambia), **reversión** (asiento de reverso con evidencia) y
-  **conciliación del estado de cuenta** antes y después de cada ajuste.
-- **Pasarela.**
-  - Aviso duplicado y avisos fuera de orden.
-  - Retorno del navegador sin confirmación del proveedor.
-  - Pago en línea con excedente.
-  - Reembolso de un cobro con saldo a favor ya aplicado.
-
-## 7. Decisiones (aprobadas el 2026-09-26)
-
-Respuestas: 1) no, salvo `company_owner` o un único aprobador, con marca de
-autoaprobación; 2) sin umbral al inicio, se revisa a los tres meses; 3) no
-vencen: recordatorio a 7 días y «estancada» a 30; 4) lo solicita; 5) se
-mantiene el bloqueo.
-
-Preguntas originales:
-
-1. Autoaprobación: ¿no permitida (propuesta) o sólo el owner?
-2. ¿Hay umbral monetario? Si lo hay: monto, moneda y quién aprueba por encima.
-3. ¿Vencen las solicitudes pendientes?
-4. ¿El residente aplica su saldo a favor o lo solicita (propuesta: lo solicita)?
-5. Rechazo de un cobro con saldo ya aplicado (funcional 1): ¿se mantiene el
-   bloqueo actual o se revierten las aplicaciones en cascada dentro de la
-   solicitud aprobada?
+- `ajuste_importe` (nota de crédito/débito sobre un documento publicado) y `anular_cuota` por el flujo:
+  no se implementaron. La cuota sigue su camino actual.
+- Recordatorios y estado «estancada» (E3′), revisión del umbral (E2′): propuestas sin código.
+- Reembolsos automáticos para QPayPro: su adaptador no expone la consulta/aviso de reembolso; hoy se
+  informan por Stripe (`charge.refunded`) o por `pasarela_registrar_estado` cuando el proveedor lo reporte.

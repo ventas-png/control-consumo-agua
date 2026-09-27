@@ -4313,6 +4313,135 @@ export type Database = {
           },
         ]
       }
+      conta_ajustes_eventos: {
+        Row: {
+          accion: string
+          actor: string | null
+          actor_cliente_id: string | null
+          company_id: string
+          detalle: string | null
+          estado_anterior: string | null
+          estado_nuevo: string
+          id: string
+          ocurrido_at: string
+          project_id: string
+          solicitud_id: string
+        }
+        Insert: {
+          accion: string
+          actor?: string | null
+          actor_cliente_id?: string | null
+          company_id: string
+          detalle?: string | null
+          estado_anterior?: string | null
+          estado_nuevo: string
+          id?: string
+          ocurrido_at?: string
+          project_id: string
+          solicitud_id: string
+        }
+        Update: {
+          accion?: string
+          actor?: string | null
+          actor_cliente_id?: string | null
+          company_id?: string
+          detalle?: string | null
+          estado_anterior?: string | null
+          estado_nuevo?: string
+          id?: string
+          ocurrido_at?: string
+          project_id?: string
+          solicitud_id?: string
+        }
+        Relationships: []
+      }
+      conta_ajustes_solicitudes: {
+        Row: {
+          autoaprobada: boolean
+          canal: string
+          company_id: string
+          documento_id: string
+          documento_tabla: string
+          ejecucion_txid: number | null
+          ejecutado_at: string | null
+          error_ejecucion: string | null
+          estado: string
+          foto_documento: Json
+          id: string
+          importe: number | null
+          intentos_ejecucion: number
+          moneda: string | null
+          motivo: string
+          motivo_revision: string | null
+          project_id: string
+          resultado: Json | null
+          revisado_at: string | null
+          revisado_por: string | null
+          saldo_origen_id: string | null
+          solicitado_at: string
+          solicitado_cliente_id: string | null
+          solicitado_por: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          autoaprobada?: boolean
+          canal: string
+          company_id: string
+          documento_id: string
+          documento_tabla: string
+          ejecucion_txid?: number | null
+          ejecutado_at?: string | null
+          error_ejecucion?: string | null
+          estado?: string
+          foto_documento?: Json
+          id: string
+          importe?: number | null
+          intentos_ejecucion?: number
+          moneda?: string | null
+          motivo: string
+          motivo_revision?: string | null
+          project_id: string
+          resultado?: Json | null
+          revisado_at?: string | null
+          revisado_por?: string | null
+          saldo_origen_id?: string | null
+          solicitado_at?: string
+          solicitado_cliente_id?: string | null
+          solicitado_por: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          autoaprobada?: boolean
+          canal?: string
+          company_id?: string
+          documento_id?: string
+          documento_tabla?: string
+          ejecucion_txid?: number | null
+          ejecutado_at?: string | null
+          error_ejecucion?: string | null
+          estado?: string
+          foto_documento?: Json
+          id?: string
+          importe?: number | null
+          intentos_ejecucion?: number
+          moneda?: string | null
+          motivo?: string
+          motivo_revision?: string | null
+          project_id?: string
+          resultado?: Json | null
+          revisado_at?: string | null
+          revisado_por?: string | null
+          saldo_origen_id?: string | null
+          solicitado_at?: string
+          solicitado_cliente_id?: string | null
+          solicitado_por?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       conta_anticipos: {
         Row: {
           cliente_id: string
@@ -4650,6 +4779,42 @@ export type Database = {
           ocurrido_at?: string
           periodo?: string
           project_id?: string | null
+        }
+        Relationships: []
+      }
+      conta_cargo_anulaciones: {
+        Row: {
+          anulado_at: string
+          anulado_por: string | null
+          cargo_id: string
+          company_id: string
+          motivo: string
+          project_id: string
+          reverso_id: string | null
+          solicitud_id: string
+          tenia_asiento: boolean
+        }
+        Insert: {
+          anulado_at?: string
+          anulado_por?: string | null
+          cargo_id: string
+          company_id: string
+          motivo: string
+          project_id: string
+          reverso_id?: string | null
+          solicitud_id: string
+          tenia_asiento: boolean
+        }
+        Update: {
+          anulado_at?: string
+          anulado_por?: string | null
+          cargo_id?: string
+          company_id?: string
+          motivo?: string
+          project_id?: string
+          reverso_id?: string | null
+          solicitud_id?: string
+          tenia_asiento?: boolean
         }
         Relationships: []
       }
@@ -5068,6 +5233,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      conta_incidencias_conciliacion: {
+        Row: {
+          company_id: string
+          creada_at: string
+          detalle: string
+          estado: string
+          evento_id: string | null
+          id: string
+          monto: number | null
+          nota_resolucion: string | null
+          pago_id: string | null
+          payment_request_id: string | null
+          project_id: string | null
+          resuelta_at: string | null
+          resuelta_por: string | null
+          tipo: string
+        }
+        Insert: {
+          company_id: string
+          creada_at?: string
+          detalle: string
+          estado?: string
+          evento_id?: string | null
+          id?: string
+          monto?: number | null
+          nota_resolucion?: string | null
+          pago_id?: string | null
+          payment_request_id?: string | null
+          project_id?: string | null
+          resuelta_at?: string | null
+          resuelta_por?: string | null
+          tipo: string
+        }
+        Update: {
+          company_id?: string
+          creada_at?: string
+          detalle?: string
+          estado?: string
+          evento_id?: string | null
+          id?: string
+          monto?: number | null
+          nota_resolucion?: string | null
+          pago_id?: string | null
+          payment_request_id?: string | null
+          project_id?: string | null
+          resuelta_at?: string | null
+          resuelta_por?: string | null
+          tipo?: string
+        }
+        Relationships: []
       }
       conta_intentos_contabilizacion: {
         Row: {
@@ -13748,6 +13964,54 @@ export type Database = {
           },
         ]
       }
+      pasarela_eventos: {
+        Row: {
+          clave_evento: string
+          company_id: string
+          detalle: string | null
+          estado_informado: string
+          estado_previo: string | null
+          estado_resultante: string | null
+          id: string
+          origen: string
+          payload: Json | null
+          payment_request_id: string
+          provider: string
+          recibido_at: string
+          resultado: string | null
+        }
+        Insert: {
+          clave_evento: string
+          company_id: string
+          detalle?: string | null
+          estado_informado: string
+          estado_previo?: string | null
+          estado_resultante?: string | null
+          id?: string
+          origen: string
+          payload?: Json | null
+          payment_request_id: string
+          provider: string
+          recibido_at?: string
+          resultado?: string | null
+        }
+        Update: {
+          clave_evento?: string
+          company_id?: string
+          detalle?: string | null
+          estado_informado?: string
+          estado_previo?: string | null
+          estado_resultante?: string | null
+          id?: string
+          origen?: string
+          payload?: Json | null
+          payment_request_id?: string
+          provider?: string
+          recibido_at?: string
+          resultado?: string | null
+        }
+        Relationships: []
+      }
       payfac_secrets: {
         Row: {
           company_id: string
@@ -13818,6 +14082,7 @@ export type Database = {
       }
       payment_requests: {
         Row: {
+          cargo_adicional_id: string | null
           ambiente: string
           cliente_id: string
           comision: number | null
@@ -13841,6 +14106,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          cargo_adicional_id?: string | null
           ambiente?: string
           cliente_id: string
           comision?: number | null
@@ -13864,6 +14130,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          cargo_adicional_id?: string | null
           ambiente?: string
           cliente_id?: string
           comision?: number | null
@@ -23563,6 +23830,46 @@ export type Database = {
           sin_stock: Json
         }[]
       }
+      conta_ajuste_aprobar: {
+        Args: { p_confirmar_autoaprobacion?: boolean; p_id: string; p_nota?: string }
+        Returns: {
+          autoaprobada: boolean
+          error_ejecucion: string
+          estado: string
+          repetida: boolean
+          resultado: Json
+          solicitud_id: string
+        }[]
+      }
+      conta_ajuste_cancelar: {
+        Args: { p_id: string; p_motivo?: string }
+        Returns: { estado: string; repetida: boolean; solicitud_id: string }[]
+      }
+      conta_ajuste_rechazar: {
+        Args: { p_id: string; p_motivo: string }
+        Returns: { estado: string; repetida: boolean; solicitud_id: string }[]
+      }
+      conta_ajuste_reintentar: {
+        Args: { p_id: string }
+        Returns: {
+          error_ejecucion: string
+          estado: string
+          resultado: Json
+          solicitud_id: string
+        }[]
+      }
+      conta_ajuste_solicitar: {
+        Args: {
+          p_documento_id: string
+          p_documento_tabla: string
+          p_id: string
+          p_importe?: number
+          p_motivo: string
+          p_saldo_origen_id?: string
+          p_tipo: string
+        }
+        Returns: { estado: string; repetida: boolean; solicitud_id: string }[]
+      }
       conta_anio_cerrado: {
         Args: { p_anio: number; p_company_id: string; p_project_id: string }
         Returns: boolean
@@ -23944,6 +24251,10 @@ export type Database = {
           puede_reprocesar: boolean
           total_filas: number
         }[]
+      }
+      conta_incidencia_resolver: {
+        Args: { p_id: string; p_nota: string }
+        Returns: { estado: string; incidencia_id: string; repetida: boolean }[]
       }
       conta_inicializar_catalogo: {
         Args: { p_plantilla: string; p_project_id: string | null }
@@ -25008,6 +25319,20 @@ export type Database = {
         Args: { p_solicitud_id: string }
         Returns: undefined
       }
+      portal_documentos_con_saldo: {
+        Args: never
+        Returns: {
+          concepto: string
+          documento_id: string
+          documento_tabla: string
+          estado: string
+          fecha: string
+          moneda: string
+          project_id: string
+          saldo: number
+          unidad_id: string
+        }[]
+      }
       portal_enviar_solicitud_renta: {
         Args: {
           p_arrendatario_email?: string
@@ -25039,6 +25364,24 @@ export type Database = {
           created_at: string
           id: string
           tiene_cuenta: boolean
+        }[]
+      }
+      portal_mis_solicitudes: {
+        Args: never
+        Returns: {
+          documento_id: string
+          documento_tabla: string
+          ejecutado_at: string
+          estado: string
+          importe: number
+          moneda: string
+          motivo: string
+          motivo_revision: string
+          revisado_at: string
+          saldo_origen_id: string
+          solicitado_at: string
+          solicitud_id: string
+          tipo: string
         }[]
       }
       portal_mis_unidades: { Args: never; Returns: Json[] }
@@ -25089,6 +25432,30 @@ export type Database = {
       portal_reservar_solicitud_renta: {
         Args: { p_unidad_id: string }
         Returns: string
+      }
+      portal_saldos_favor: {
+        Args: never
+        Returns: {
+          creado_at: string
+          disponible: number
+          monto: number
+          moneda: string
+          origen_id: string
+          project_id: string
+          tipo: string
+          unidad_id: string
+        }[]
+      }
+      portal_solicitar_aplicacion_saldo_favor: {
+        Args: {
+          p_documento_id: string
+          p_documento_tabla: string
+          p_id: string
+          p_importe: number
+          p_motivo?: string
+          p_origen_id: string
+        }
+        Returns: { estado: string; repetida: boolean; solicitud_id: string }[]
       }
       presencia_anular: {
         Args: { p_motivo: string; p_registro_id: string }

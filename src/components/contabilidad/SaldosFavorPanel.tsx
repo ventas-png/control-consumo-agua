@@ -31,6 +31,7 @@ import {
   type MetodoAnticipo,
   type OrigenSaldoFavor,
 } from '../../domain/contabilidad/saldosFavor'
+import { textoSolicitudEnviada } from '../../domain/contabilidad/ajustes'
 import type { SujetoEstadoCuenta } from '../../types/contabilidad'
 import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
 
@@ -71,44 +72,35 @@ export function SaldosFavorPanel({ companyId, projectId, sujeto, unidades, clien
 
   async function anularAnticipo(o: OrigenSaldoFavor) {
     const motivo = await openTextPrompt({
-      title: 'Anular anticipo',
-      description: 'El anticipo no se borra: queda rechazado con este motivo y su asiento se reversa. Si su saldo ya se aplicó, primero revierte esas aplicaciones.',
+      title: 'Solicitar anulación del anticipo',
+      description: 'Se registra una solicitud: otra persona con permiso de autorizar la aprueba y entonces el anticipo queda rechazado con este motivo y su asiento se reversa. Si su saldo ya se aplicó, primero revierte esas aplicaciones.',
       label: 'Motivo',
       required: true,
-      validate: (v) => (v.trim().length < 3 ? 'Indica el motivo.' : null),
+      validate: (v) => (v.trim().length < 5 ? 'Indica el motivo (al menos 5 caracteres).' : null),
     })
     if (!motivo) return
     try {
       const r = await anular.mutateAsync({ pagoId: o.pago_id, motivo: motivo.trim() })
-      notify({
-        variant: 'success',
-        title: r.resultado === 'ya_anulado' ? 'El anticipo ya estaba anulado' : 'Anticipo anulado',
-        text: r.reverso_numero ? `Reverso en la póliza #${r.reverso_numero}.` : 'No tenía asiento que reversar.',
-      })
+      notify({ variant: 'success', title: 'Anulación solicitada', text: textoSolicitudEnviada(r) })
     } catch (e) {
-      notify({ variant: 'error', title: 'No se anuló el anticipo', text: explicarErrorSaldoFavor(e instanceof Error ? e.message : String(e)) })
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: explicarErrorSaldoFavor(e instanceof Error ? e.message : String(e)) })
     }
   }
 
   async function revertirAplicacion(aplicacionId: string) {
     const motivo = await openTextPrompt({
-      title: 'Revertir aplicación',
-      description: 'Se genera el asiento de reverso: el documento vuelve a deber y el saldo vuelve a estar disponible. La aplicación original queda como evidencia.',
+      title: 'Solicitar reversión de la aplicación',
+      description: 'Se registra una solicitud: al aprobarla otra persona se genera el asiento de reverso, el documento vuelve a deber y el saldo vuelve a estar disponible. La aplicación original queda como evidencia.',
       label: 'Motivo',
       required: true,
-      validate: (v) => (v.trim().length < 3 ? 'Indica el motivo.' : null),
+      validate: (v) => (v.trim().length < 5 ? 'Indica el motivo (al menos 5 caracteres).' : null),
     })
     if (!motivo) return
     try {
       const r = await revertir.mutateAsync({ aplicacionId, motivo: motivo.trim() })
-      notify({
-        variant: 'success',
-        title: r.resultado === 'ya_revertida' ? 'La aplicación ya estaba revertida' : 'Aplicación revertida',
-        text: (r.reverso_numero ? `Reverso en la póliza #${r.reverso_numero}. ` : '')
-          + `Disponible del saldo: ${r.disponible_restante.toFixed(2)}.`,
-      })
+      notify({ variant: 'success', title: 'Reversión solicitada', text: textoSolicitudEnviada(r) })
     } catch (e) {
-      notify({ variant: 'error', title: 'No se revirtió', text: explicarErrorSaldoFavor(e instanceof Error ? e.message : String(e)) })
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: explicarErrorSaldoFavor(e instanceof Error ? e.message : String(e)) })
     }
   }
 

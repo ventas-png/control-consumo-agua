@@ -3,7 +3,8 @@
 // remoto mockeado con el fake compartido, payfacs mockeados; cors corre REAL.
 //
 // Foco: ownership del payment_request, idempotencia, y que la conciliación sea
-// UNA llamada a `conciliar_pago_externo`. Lo que el edge hacía antes —el
+// UNA llamada a `pasarela_registrar_estado` (20261011000000), que deduplica,
+// sólo deja avanzar el estado y concilia con `conciliar_pago_externo`. Lo que el edge hacía antes —el
 // `SELECT` de idempotencia, el INSERT del pago, el UPDATE del ítem y el cierre
 // de la solicitud, cada uno en su transacción— vive ahora dentro de esa RPC
 // (migración 20260911042839), así que aquí se comprueba lo que le toca al
@@ -83,14 +84,14 @@ function fixture(state: FakeSupabaseState, overrides: {
   state.byTable.companies = { data: { proveedor_pago: 'sandbox', default_currency: 'GTQ' }, error: null }
   state.byTable.projects = { data: { proveedor_pago: null }, error: null }
   state.byTable.payfac_secrets = { data: [], error: null }
-  state.rpcs.conciliar_pago_externo = overrides.conciliar ?? {
+  state.rpcs.pasarela_registrar_estado = overrides.conciliar ?? {
     data: { ok: true, ya_conciliado: false, pago_id: 'pago-1', liquidado: true, saldo_restante: 0 },
     error: null,
   }
 }
 
 const rpcsConciliar = (state: FakeSupabaseState) =>
-  state.rpcCalls.filter((c) => c.fn === 'conciliar_pago_externo')
+  state.rpcCalls.filter((c) => c.fn === 'pasarela_registrar_estado')
 
 const callsDe = (calls: FakeWriteCall[], table: string, op: FakeWriteCall['op']) =>
   calls.filter((c) => c.table === table && c.op === op)
@@ -167,7 +168,7 @@ describe('confirm-charge · idempotencia', () => {
 })
 
 describe('confirm-charge · la conciliación es UNA llamada transaccional', () => {
-  it('aprobado → llama a conciliar_pago_externo con SÓLO el id de la solicitud', async () => {
+  it('aprobado → llama a pasarela_registrar_estado con el id, lo informado y el origen', async () => {
     fixture(h.state)
     const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
     expect(res.status).toBe(200)
@@ -180,7 +181,9 @@ describe('confirm-charge · la conciliación es UNA llamada transaccional', () =
     // El id, y nada más: el monto, el ítem, el método y la referencia los lee
     // la RPC de la fila bloqueada, así que el edge no puede equivocarse ni
     // mentir sobre ellos.
-    expect(llamadas[0].args).toEqual({ p_payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' })
+    expect(llamadas[0].args).toEqual({
+      p_payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', p_estado: 'aprobado', p_origen: 'consulta',
+    })
   })
 
   it('el edge ya no inserta pagos, ni toca el ítem, ni sella la solicitud', async () => {
@@ -212,12 +215,51 @@ describe('confirm-charge · la conciliación es UNA llamada transaccional', () =
     expect(callsDe(h.state.calls, 'payment_requests', 'update').length).toBe(0)
   })
 
-  it('provider NO aprobado → refleja estado sin conciliar', async () => {
-    fixture(h.state)
+  it('provider NO aprobado → lo registra por la RPC (que no retrocede el estado) y el edge no escribe', async () => {
+    fixture(h.state, { conciliar: { data: { ok: true, estado: 'pending', accion: 'sin_cambio' }, error: null } })
     h.consulta = { ok: true, estado: 'pendiente' }
     const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
-    expect(await res.json()).toMatchObject({ ok: true, estado: 'pendiente', conciliado: false })
+    expect(await res.json()).toMatchObject({ ok: true, estado: 'pendiente', conciliado: false, estado_solicitud: 'pending' })
+    expect(rpcsConciliar(h.state)[0].args).toMatchObject({ p_estado: 'pendiente' })
+    expect(callsDe(h.state.calls, 'payment_requests', 'update').length).toBe(0)
+  })
+
+  it('rechazado: tampoco escribe `failed` por su cuenta (antes pisaba una acreditación simultánea)', async () => {
+    fixture(h.state, { conciliar: { data: { ok: true, estado: 'failed', accion: 'marcado_fallido' }, error: null } })
+    h.consulta = { ok: true, estado: 'rechazado' }
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(await res.json()).toMatchObject({ ok: true, estado: 'rechazado', conciliado: false, estado_solicitud: 'failed' })
+    expect(callsDe(h.state.calls, 'payment_requests', 'update').length).toBe(0)
+  })
+
+  it('solicitud reembolsada: estado final, no pregunta al proveedor ni concilia', async () => {
+    fixture(h.state, { pr: { estado: 'refunded' } })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(await res.json()).toMatchObject({ ok: true, estado: 'reembolsado', conciliado: false })
     expect(rpcsConciliar(h.state).length).toBe(0)
-    expect(callsDe(h.state.calls, 'payment_requests', 'update')[0].payload).toMatchObject({ estado: 'pending' })
+  })
+})
+
+describe('confirm-charge · cargo adicional (20261011000000)', () => {
+  it('concilia el cobro en línea de un cargo por la misma RPC', async () => {
+    fixture(h.state, { pr: { cuota_id: null, cargo_adicional_id: 'ca1' } })
+    h.state.byTable.cargos_adicionales_unidad = { data: { project_id: 'pj1' }, error: null }
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ ok: true, estado: 'aprobado', conciliado: true, liquidado: true })
+    expect(rpcsConciliar(h.state).length).toBe(1)
+  })
+
+  it('404 si el cargo no existe', async () => {
+    fixture(h.state, { pr: { cuota_id: null, cargo_adicional_id: 'ca1' } })
+    h.state.byTable.cargos_adicionales_unidad = { data: null, error: null }
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(404)
+  })
+
+  it('400 si la solicitud apunta a dos ítems', async () => {
+    fixture(h.state, { pr: { cargo_adicional_id: 'ca1' } })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(400)
   })
 })

@@ -203,22 +203,25 @@ describe('SaldosFavorPanel', () => {
     }))
   })
 
-  it('revertir pide motivo y lo manda; sin motivo no se llama al servidor', async () => {
-    h.respuestas.conta_revertir_aplicacion_saldo_favor = () => ({
-      data: [{ aplicacion_id: 'ap-1', resultado: 'revertida', reverso_id: 'as-3', reverso_numero: 23,
-        disponible_restante: 30, estado_documento: 'pendiente' }], error: null,
+  it('revertir pide motivo y SOLICITA la reversión (20261011000000); sin motivo no se llama al servidor', async () => {
+    h.respuestas.conta_ajuste_solicitar = () => ({
+      data: [{ solicitud_id: 'sol-1', estado: 'pendiente', repetida: false }], error: null,
     })
     montar()
     const apl = await screen.findByRole('table', { name: 'Aplicaciones de saldo a favor' })
     h.prompt.mockResolvedValueOnce(null)
     await act(async () => { fireEvent.click(within(apl).getByRole('button', { name: 'Revertir' })) })
-    expect(llamadasA('conta_revertir_aplicacion_saldo_favor')).toHaveLength(0)
+    expect(llamadasA('conta_ajuste_solicitar')).toHaveLength(0)
     h.prompt.mockResolvedValueOnce('  se aplicó al documento equivocado ')
     await act(async () => { fireEvent.click(within(apl).getByRole('button', { name: 'Revertir' })) })
-    await waitFor(() => expect(llamadasA('conta_revertir_aplicacion_saldo_favor')).toHaveLength(1))
-    expect(llamadasA('conta_revertir_aplicacion_saldo_favor')[0].args).toEqual({
-      p_aplicacion_id: 'ap-1', p_motivo: 'se aplicó al documento equivocado',
+    await waitFor(() => expect(llamadasA('conta_ajuste_solicitar')).toHaveLength(1))
+    expect(llamadasA('conta_ajuste_solicitar')[0].args).toMatchObject({
+      p_tipo: 'revertir_aplicacion_saldo_favor', p_documento_tabla: 'conta_saldo_favor_aplicaciones',
+      p_documento_id: 'ap-1', p_motivo: 'se aplicó al documento equivocado',
     })
+    // Nunca la RPC directa: la reversión la ejecuta la aprobación de otra persona.
+    expect(llamadasA('conta_revertir_aplicacion_saldo_favor')).toHaveLength(0)
+    expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ title: 'Reversión solicitada' }))
   })
 
   it('una aplicación revertida muestra su motivo y su reverso, sin botón', async () => {

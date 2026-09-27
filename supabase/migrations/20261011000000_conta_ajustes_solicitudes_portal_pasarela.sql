@@ -1758,7 +1758,7 @@ $$;
 -- parámetro: un residente no ve ni pide nada de otro cliente, aunque comparta
 -- la unidad.
 
-CREATE FUNCTION public.portal_cliente_sesion()
+CREATE FUNCTION public.conta_portal_cliente_sesion()
 RETURNS uuid
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
@@ -1775,7 +1775,7 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.portal_cliente_sesion() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.conta_portal_cliente_sesion() FROM PUBLIC, anon, authenticated;
 
 -- Saldos a favor disponibles del residente.
 CREATE FUNCTION public.portal_saldos_favor()
@@ -1791,7 +1791,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
-  v_cli uuid := public.portal_cliente_sesion();
+  v_cli uuid := public.conta_portal_cliente_sesion();
 BEGIN
   RETURN QUERY
   SELECT o.id, o.project_id, o.unidad_id, o.tipo, o.moneda, o.monto,
@@ -1826,7 +1826,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
-  v_cli uuid := public.portal_cliente_sesion();
+  v_cli uuid := public.conta_portal_cliente_sesion();
 BEGIN
   RETURN QUERY
   SELECT 'cuotas_condominio'::text, c.id, c.project_id, c.unidad_id,
@@ -1871,7 +1871,7 @@ CREATE FUNCTION public.portal_solicitar_aplicacion_saldo_favor(
 RETURNS TABLE (solicitud_id uuid, estado text, repetida boolean)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
-  v_cli    uuid := public.portal_cliente_sesion();
+  v_cli    uuid := public.conta_portal_cliente_sesion();
   v_o      public.conta_saldo_favor_origenes;
   v_resp   uuid;
   v_proj   uuid;
@@ -1936,7 +1936,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
-  v_cli uuid := public.portal_cliente_sesion();
+  v_cli uuid := public.conta_portal_cliente_sesion();
 BEGIN
   RETURN QUERY
   SELECT s.id, s.tipo, s.documento_tabla, s.documento_id, s.saldo_origen_id, s.importe, s.moneda,

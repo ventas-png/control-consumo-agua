@@ -12,7 +12,7 @@ pendientes de #887 hubo que retirarlo (a3a6829b) en vez de relajarlo. Este
 documento es el procedimiento con el que se puso al día el 2026-09-23 y el que
 hay que repetir.
 
-## Estado registrado (2026-09-26, re-verificado a las ~14:30 UTC)
+## Estado registrado (re-verificado el 2026-09-27 hacia las 14:00 UTC)
 
 **El sandbox está atrasado respecto de `main`.** Inventario de sólo lectura
 sobre `jwpmivhvlstslncrtokb` («control-agua-rls-sandbox», no es producción):
@@ -25,15 +25,15 @@ sobre `jwpmivhvlstslncrtokb` («control-agua-rls-sandbox», no es producción):
 | --- | --- | --- |
 | `20261005000000_conta_cobros_rechazo_evidencia` | #901 (en `main`, aplicada en producción el 2026-09-25) | **No aplicada.** Ni la fila de historial ni `pagos_rechazo_eventos`; `conta_tg_pagos` es la de `20261004000100`. |
 | `20261006000000_conta_cobros_vigencia_sin_fecha` | #902 (en `main` desde `aa6e046`; aplicada en producción: registrada allí y con `conta_ec_cobro_al_corte`) | **No aplicada.** Depende de la anterior. |
-| `20261007000000_conta_saldos_a_favor`, `20261008000000_conta_tipo_cambio_mensual`, `20261009000000_conta_sf_cuota_estado_y_tc_borradores` | #904 (PR en borrador) | **No aplicadas**, y no se aplican mientras #904 no esté en `main` (el paso 1 de abajo excluye PRs abiertos). Dependen de las dos anteriores. |
+| `20261007000000_conta_saldos_a_favor`, `20261008000000_conta_tipo_cambio_mensual`, `20261009000000_conta_sf_cuota_estado_y_tc_borradores`, `20261010000000_conta_decisiones_diferencial_tasa_manual_mora`, `20261011000000_conta_ajustes_solicitudes_portal_pasarela` | #904 (PR en borrador) | **No aplicadas**, y no se aplican mientras #904 no esté en `main` (el paso 1 de abajo excluye PRs abiertos). Dependen de las dos anteriores. |
 
 ### Coordinación pendiente (para quien administra el sandbox)
 
 1. Autorizar y ejecutar, con el procedimiento de abajo, `20261005000000` y
    `20261006000000` (ya en `main`), cada una en su transacción con huella
    verificada. No hay colisiones de versión ni nada que renumerar.
-2. Cuando #904 llegue a `main`, repetir con `20261007000000`,
-   `20261008000000` y `20261009000000`. Las tres crean tablas vacías, agregan
+2. Cuando #904 llegue a `main`, repetir con `20261007000000` a
+   `20261011000000` (cinco migraciones). Todas crean tablas vacías, agregan
    columnas con default a `conta_asientos` y redefinen funciones/triggers; no
    reescriben datos existentes. Antes de aplicarlas, contar los borradores
    con la marca antigua (quedarán bloqueados para publicar hasta resolverlos):

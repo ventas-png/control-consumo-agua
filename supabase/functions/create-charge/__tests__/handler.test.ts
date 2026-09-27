@@ -285,3 +285,68 @@ describe('create-charge · gate anti-sandbox (auditoría C1)', () => {
     expect(res.status).toBe(200)
   })
 })
+
+describe('create-charge · cargo adicional (20261011000000)', () => {
+  const CARGO = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1'
+  beforeEach(() => {
+    h.cobro = { ok: true, estado: 'pendiente', referencia: 'ref-1', redirectUrl: 'https://pay.test/x' }
+  })
+  function fixtureCargo(pagable: Record<string, unknown> | null, caller: Record<string, unknown> = { cliente_id: 'duenio' }) {
+    fixtureCuota(h.state, { caller })
+    h.state.rpcs.conta_cargo_saldo_pagable = {
+      data: pagable === null ? [] : [{
+        pagable: true, saldo: 60, motivo: null, company_id: 'co1', project_id: 'pj1',
+        responsable_cliente_id: 'duenio', concepto: 'Reparación', ...pagable,
+      }],
+      error: null,
+    }
+  }
+
+  it('el responsable paga su cargo: la solicitud lleva el cargo y su saldo, y NO se crea como acreditada', async () => {
+    fixtureCargo({})
+    h.cobro = { ok: true, estado: 'aprobado', referencia: 'ref-c' }
+    const res = await post({ cargo_adicional_id: CARGO }, 'user-jwt')
+    expect(res.status).toBe(200)
+    const pr = insertDe(h.state.calls, 'payment_requests')!
+    expect(pr).toMatchObject({ cargo_adicional_id: CARGO, cuota_id: null, registro_id: null, cliente_id: 'duenio', monto: 60 })
+    // Aprobado al crear → pending: sólo confirm-charge (servidor) acredita.
+    expect(pr.estado).toBe('pending')
+    expect(h.state.rpcCalls.find((c) => c.fn === 'conta_cargo_saldo_pagable')!.args).toEqual({ p_cargo_id: CARGO })
+  })
+
+  it('abono parcial acotado al saldo del servidor', async () => {
+    fixtureCargo({ saldo: 25 })
+    const res = await post({ cargo_adicional_id: CARGO, monto: 999 }, 'user-jwt')
+    expect(res.status).toBe(200)
+    expect(insertDe(h.state.calls, 'payment_requests')!.monto).toBe(25)
+  })
+
+  it('403 si el residente no es el responsable del cargo', async () => {
+    fixtureCargo({}, { cliente_id: 'otro' })
+    const res = await post({ cargo_adicional_id: CARGO }, 'user-jwt')
+    expect(res.status).toBe(403)
+    expect(insertDe(h.state.calls, 'payment_requests')).toBeUndefined()
+  })
+
+  it('403 si el usuario de tenant es de otra empresa', async () => {
+    fixtureCargo({}, { company_id: 'co2', cliente_id: null })
+    expect((await post({ cargo_adicional_id: CARGO }, 'user-jwt')).status).toBe(403)
+  })
+
+  it('409 con el motivo del servidor si no es pagable (anulado, sin devengo, saldado…)', async () => {
+    fixtureCargo({ pagable: false, saldo: 0, motivo: 'El cargo está anulado.' })
+    const res = await post({ cargo_adicional_id: CARGO }, 'user-jwt')
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toBe('El cargo está anulado.')
+  })
+
+  it('404 si el cargo no existe; 500 (sin cobrar) si no se puede leer el saldo', async () => {
+    fixtureCargo(null)
+    expect((await post({ cargo_adicional_id: CARGO }, 'user-jwt')).status).toBe(404)
+    fixtureCargo({})
+    h.state.rpcs.conta_cargo_saldo_pagable = { data: null, error: { message: 'db down' } }
+    const res = await post({ cargo_adicional_id: CARGO }, 'user-jwt')
+    expect(res.status).toBe(500)
+    expect(insertDe(h.state.calls, 'payment_requests')).toBeUndefined()
+  })
+})

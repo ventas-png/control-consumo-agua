@@ -9,8 +9,8 @@ import { describe, it, expect } from 'vitest'
 import { estadoPaymentRequest } from '../logic.ts'
 
 describe('create-charge/estadoPaymentRequest', () => {
-  it('aprobado → succeeded', () => {
-    expect(estadoPaymentRequest('aprobado')).toBe('succeeded')
+  it('aprobado al crear → pending: sólo la confirmación del servidor acredita', () => {
+    expect(estadoPaymentRequest('aprobado')).toBe('pending')
   })
 
   it('rechazado y error → failed (ambos cierran el request)', () => {

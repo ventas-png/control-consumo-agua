@@ -6,6 +6,7 @@ import { decryptSecret } from '../_shared/secretsCrypto.ts'
 // transacción que acredita el recibo.
 import {
   decidirCruceDeEmpresa,
+  estadoDeEventoStripe,
   decidirTrasConciliar,
   decidirTrasReclamo,
   decidirTrasSellar,
@@ -271,10 +272,17 @@ Deno.serve(async (req) => {
         // solicitud. La procedencia de la verificación viaja con ella: el pago
         // queda `aplicado` —el hecho contable— y conserva quién probó que el
         // cobro ocurrió, que es la firma de Stripe.
+        //
+        // Por `pasarela_registrar_estado` (20261011000000): el aviso queda
+        // registrado y deduplicado, y si la solicitud ya se reembolsó NO se
+        // vuelve a acreditar (queda una incidencia).
         const { data: conciliado, error: conciliarErr } = await adminClient.rpc(
-          'conciliar_pago_externo',
+          'pasarela_registrar_estado',
           {
             p_payment_request_id: pr.id,
+            p_estado: 'aprobado',
+            p_origen: 'webhook',
+            p_clave_evento: event.id,
             p_verificado_por: 'stripe_webhook',
             p_verificado_en: new Date(event.created * 1000).toISOString(),
           },
@@ -287,22 +295,59 @@ Deno.serve(async (req) => {
         return await cerrarYResponder(!conciliarErr, decision, conciliarErr?.message)
       }
 
-      if (event.type === 'payment_intent.payment_failed') {
-        const paymentIntent = event.data.object as { id: string }
-        const { error: updErr } = await adminClient
-          .from('payment_requests')
-          .update({ estado: 'failed' })
-          .eq('stripe_payment_intent', paymentIntent.id)
-          .eq('company_id', companyId)
-
-        if (updErr) {
+      // Rechazo y reembolso: por `pasarela_registrar_estado` (20261011000000).
+      // Un «failed» que llega después de un «succeeded» ya no lo pisa (el
+      // estado sólo avanza; queda una incidencia). Un reembolso intenta
+      // rechazar el cobro y, si está bloqueado (saldo a favor ya aplicado), el
+      // evento se CONSERVA con una incidencia abierta: nunca se descarta.
+      if (event.type === 'payment_intent.payment_failed' || event.type === 'charge.refunded') {
+        const obj = event.data.object as { id: string; payment_intent?: string | null; refunded?: boolean }
+        const mapeo = estadoDeEventoStripe(event.type, obj)
+        const intentId = mapeo?.intentId ?? null
+        if (!mapeo) {
+          // Reembolso PARCIAL: no es un rechazo del cobro. Queda para revisión
+          // manual en Stripe; no se cambia nada aquí.
+          return await cerrarYResponder(true, {
+            accion: 'responder', status: 200, body: { received: true, reembolso_parcial: true },
+          })
+        }
+        const { data: pr, error: prErr } = intentId
+          ? await adminClient.from('payment_requests').select('id, company_id')
+              .eq('stripe_payment_intent', intentId).maybeSingle()
+          : { data: null, error: null }
+        if (prErr) {
           return await cerrarYResponder(false, {
             accion: 'responder', status: 500,
-            body: { received: false, retryable: true, error: updErr.message },
-          }, `marcar failed: ${updErr.message}`)
+            body: { received: false, retryable: true, error: prErr.message },
+          }, `lectura de payment_requests: ${prErr.message}`)
         }
-        return await cerrarYResponder(
-          true, { accion: 'responder', status: 200, body: { received: true } })
+        if (!pr) {
+          return await cerrarYResponder(true, {
+            accion: 'responder', status: 200, body: { received: true, sin_solicitud: true },
+          })
+        }
+        const cruce = decidirCruceDeEmpresa(companyId, pr.company_id)
+        if (cruce.accion === 'responder') {
+          return await cerrarYResponder(
+            false, cruce, 'cruce de empresa entre el secreto verificado y la solicitud')
+        }
+        const { data: registrado, error: regErr } = await adminClient.rpc('pasarela_registrar_estado', {
+          p_payment_request_id: pr.id,
+          p_estado: mapeo.estado,
+          p_origen: 'webhook',
+          p_clave_evento: event.id,
+        })
+        if (regErr) {
+          return await cerrarYResponder(false, {
+            accion: 'responder', status: 500,
+            body: { received: false, retryable: true, error: regErr.message },
+          }, `registrar ${event.type}: ${regErr.message}`)
+        }
+        const r = (registrado ?? {}) as { accion?: string; incidencia_id?: string | null }
+        return await cerrarYResponder(true, {
+          accion: 'responder', status: 200,
+          body: { received: true, accion: r.accion ?? null, incidencia_id: r.incidencia_id ?? null },
+        })
       }
 
       // Un tipo de evento que no manejamos ES un procesamiento terminado: no

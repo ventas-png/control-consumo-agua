@@ -21,6 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { QueryError, runQuery } from '../queryFetch'
 import { contabilidadKeys } from './keys'
+import type { ResultadoSolicitud } from './ajustes'
 
 export type TipoOrigenSaldoFavor = 'excedente' | 'anticipo'
 export type DocumentoSaldoFavor = 'cuotas_condominio' | 'cargos_adicionales_unidad'
@@ -285,20 +286,36 @@ export function useAplicarSaldoFavorMutation(companyId?: string) {
   })
 }
 
+/**
+ * SOLICITA revertir una aplicación. Desde 20261011000000 la reversión la
+ * ejecuta la aprobación de otra persona (Contabilidad › Solicitudes de ajuste).
+ */
 export function useRevertirAplicacionMutation(companyId?: string) {
   const invalidar = useInvalidarSaldosFavor(companyId)
   return useMutation({
-    mutationFn: async (input: { aplicacionId: string; motivo: string }): Promise<ResultadoReversion> => {
-      const filas = await runQuery<ResultadoReversion[]>((signal) =>
-        supabase
-          .rpc('conta_revertir_aplicacion_saldo_favor', { p_aplicacion_id: input.aplicacionId, p_motivo: input.motivo })
-          .abortSignal(signal),
-      )
-      if (!filas || filas.length !== 1) throw new Error('El servidor no devolvió el resultado de la reversión.')
-      return filas[0]
-    },
+    mutationFn: async (input: { aplicacionId: string; motivo: string; clave?: string }): Promise<ResultadoSolicitud> =>
+      solicitar(input.clave, 'revertir_aplicacion_saldo_favor', 'conta_saldo_favor_aplicaciones', input.aplicacionId, input.motivo),
     onSettled: invalidar,
   })
+}
+
+async function solicitar(
+  clave: string | undefined,
+  tipo: 'revertir_aplicacion_saldo_favor' | 'anular_anticipo',
+  tabla: 'conta_saldo_favor_aplicaciones' | 'pagos',
+  id: string,
+  motivo: string,
+): Promise<ResultadoSolicitud> {
+  const filas = await runQuery<ResultadoSolicitud[]>((signal) =>
+    supabase
+      .rpc('conta_ajuste_solicitar', {
+        p_id: clave ?? crypto.randomUUID(), p_tipo: tipo, p_documento_tabla: tabla,
+        p_documento_id: id, p_motivo: motivo,
+      })
+      .abortSignal(signal),
+  )
+  if (!filas || filas.length !== 1) throw new Error('El servidor no devolvió la solicitud.')
+  return filas[0]
 }
 
 export interface RegistrarAnticipoInput {
@@ -339,16 +356,12 @@ export function useRegistrarAnticipoMutation(companyId?: string) {
   })
 }
 
+/** SOLICITA anular un anticipo (lo ejecuta la aprobación, 20261011000000). */
 export function useAnularAnticipoMutation(companyId?: string) {
   const invalidar = useInvalidarSaldosFavor(companyId)
   return useMutation({
-    mutationFn: async (input: { pagoId: string; motivo: string }): Promise<ResultadoAnulacionAnticipo> => {
-      const filas = await runQuery<ResultadoAnulacionAnticipo[]>((signal) =>
-        supabase.rpc('conta_anular_anticipo', { p_pago_id: input.pagoId, p_motivo: input.motivo }).abortSignal(signal),
-      )
-      if (!filas || filas.length !== 1) throw new Error('El servidor no devolvió el resultado de la anulación.')
-      return filas[0]
-    },
+    mutationFn: async (input: { pagoId: string; motivo: string; clave?: string }): Promise<ResultadoSolicitud> =>
+      solicitar(input.clave, 'anular_anticipo', 'pagos', input.pagoId, input.motivo),
     onSettled: invalidar,
   })
 }

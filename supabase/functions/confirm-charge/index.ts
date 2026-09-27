@@ -23,6 +23,15 @@
 //   • F2 — REGISTRO de agua (payment_requests.registro_id): el acumulador vive en
 //     `registros.monto_pagado`; al liquidar marca estado='pagado' y —si hay
 //     factura emitida/vencida— factura_estado='pagada'.
+//   • F3 — CARGO ADICIONAL (payment_requests.cargo_adicional_id, 20261011000000):
+//     el pago se registra por el camino del cargo y se contabiliza contra la
+//     CxC de su devengo; el estado del cargo se deriva de sus cobros.
+//
+// Todo lo que el proveedor informa pasa por `pasarela_registrar_estado`
+// (20261011000000): deduplicado y con un estado que SÓLO AVANZA. Antes, un
+// «rechazado» o un error de consulta escribía `failed` directo sobre la
+// solicitud; si en medio otra confirmación la había acreditado, la dejaba
+// en `failed` con el pago ya registrado.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
@@ -106,12 +115,13 @@ Deno.serve(async (req: Request) => {
     // ── 2) Cargar la solicitud de cobro ──
     const { data: prRow, error: prErr } = await admin
       .from('payment_requests')
-      .select('id, cliente_id, cuota_id, registro_id, company_id, monto, provider, ambiente, estado, provider_ref')
+      .select('id, cliente_id, cuota_id, registro_id, cargo_adicional_id, company_id, monto, provider, ambiente, estado, provider_ref')
       .eq('id', prId)
       .maybeSingle()
     if (prErr) return json({ error: prErr.message }, 500)
     const pr = prRow as {
       id: string; cliente_id: string | null; cuota_id: string | null; registro_id: string | null
+      cargo_adicional_id: string | null
       company_id: string; monto: number; provider: string; ambiente: string | null; estado: string
       provider_ref: string | null
     } | null
@@ -122,11 +132,12 @@ Deno.serve(async (req: Request) => {
     // y el retorno. No es un input del caller (era spoofeable / caía a sandbox).
     const ambiente: AmbientePago = normalizarAmbientePago(pr.ambiente)
 
-    // El cobro es de una cuota (F1) o de un registro (F2), nunca ambos.
+    // El cobro es de una cuota (F1), un registro (F2) o un cargo adicional (F3).
     const esCuota = !!pr.cuota_id
     const esRegistro = !!pr.registro_id
-    if (!esCuota && !esRegistro) {
-      return json({ error: 'confirm-charge concilia cuotas de condominio o recibos de agua.' }, 400)
+    const esCargo = !!pr.cargo_adicional_id
+    if (Number(esCuota) + Number(esRegistro) + Number(esCargo) !== 1) {
+      return json({ error: 'confirm-charge concilia cuotas de condominio, recibos de agua o cargos adicionales.' }, 400)
     }
     if (!pr.cliente_id) {
       return json({ error: 'La solicitud de cobro no tiene cliente asociado.' }, 409)
@@ -145,6 +156,10 @@ Deno.serve(async (req: Request) => {
     // Idempotencia: ya conciliada.
     if (pr.estado === 'succeeded') {
       return json({ ok: true, estado: 'aprobado', already: true })
+    }
+    // Reembolsada: estado final, no se vuelve a preguntar ni a acreditar.
+    if (pr.estado === 'refunded') {
+      return json({ ok: true, estado: 'reembolsado', conciliado: false })
     }
     if (!pr.provider_ref) {
       return json({ error: 'La solicitud no tiene referencia del proveedor para confirmar.' }, 409)
@@ -168,6 +183,16 @@ Deno.serve(async (req: Request) => {
       const cuota = cuotaRow as { project_id: string | null; deleted_at: string | null } | null
       if (!cuota || cuota.deleted_at) return json({ error: 'Cuota no encontrada' }, 404)
       itemProjectId = cuota.project_id
+    } else if (esCargo) {
+      const { data: caRow, error: caErr } = await admin
+        .from('cargos_adicionales_unidad')
+        .select('project_id')
+        .eq('id', pr.cargo_adicional_id)
+        .maybeSingle()
+      if (caErr) return json({ error: caErr.message }, 500)
+      const ca = caRow as { project_id: string | null } | null
+      if (!ca) return json({ error: 'Cargo no encontrado' }, 404)
+      itemProjectId = ca.project_id
     } else {
       const { data: regRow, error: regErr } = await admin
         .from('registros')
@@ -226,40 +251,41 @@ Deno.serve(async (req: Request) => {
       return json({ ok: false, estado: 'error', error: e instanceof Error ? e.message : 'Error consultando estado' }, 502)
     }
 
-    if (resultado.estado !== 'aprobado') {
-      // No aprobado aún: reflejar el estado sin conciliar.
-      const nuevoEstado = resultado.estado === 'rechazado' || resultado.estado === 'error' ? 'failed' : 'pending'
-      await admin.from('payment_requests').update({ estado: nuevoEstado }).eq('id', pr.id)
-      return json({ ok: true, estado: resultado.estado, conciliado: false })
-    }
-
-    // ── 5) Aprobado → conciliar, en UNA transacción y del lado de la base ──
-    // Esto eran cuatro pasos sueltos, cada uno en su propia transacción:
-    // un `SELECT` de idempotencia por `referencia`, el INSERT del pago, la
-    // acreditación del ítem y el cierre de la solicitud. Dos confirmaciones
-    // simultáneas —el retorno del portal y el cron de reconciliación— pasaban
-    // las dos el `SELECT` antes de que ninguna insertara: dos pagos y doble
-    // acreditación. Y una rotura entre el INSERT y la acreditación dejaba el
-    // pago registrado con el recibo sin acreditar, que el reintento ya no
-    // arreglaba porque encontraba el pago y salía por «already».
-    //
-    // `conciliar_pago_externo` hace los cuatro pasos con la solicitud
-    // bloqueada y en una sola transacción (migración 20260911042839), y la
-    // idempotencia ya no es una consulta sino un UNIQUE sobre
-    // `pagos.payment_request_id`. El edge sólo aporta el id: el monto, el
-    // ítem, el método y la referencia salen de la fila bloqueada.
-    const { data: conciliado, error: conciliarErr } = await admin.rpc(
-      'conciliar_pago_externo', { p_payment_request_id: pr.id },
-    )
-    if (conciliarErr) {
-      // El proveedor ya cobró y NADA quedó escrito: la transacción revirtió
-      // entera. El cron lo reintenta y esta vez sí cuadra.
+    // ── 5) Lo que informó el proveedor, por el ÚNICO punto que cambia la
+    // solicitud. `pasarela_registrar_estado` deduplica, sólo deja avanzar el
+    // estado y, si es «aprobado», concilia en UNA transacción
+    // (conciliar_pago_externo: el pago con llave única sobre la solicitud, el
+    // ítem acreditado y la solicitud cerrada). El edge sólo aporta el id y el
+    // estado informado; monto, ítem, método y referencia salen de la fila
+    // bloqueada.
+    const { data: registrado, error: regEstErr } = await admin.rpc('pasarela_registrar_estado', {
+      p_payment_request_id: pr.id,
+      p_estado: resultado.estado,
+      p_origen: 'consulta',
+    })
+    if (regEstErr) {
+      // Nada quedó escrito: la transacción revirtió entera. Si el proveedor ya
+      // cobró, el reintento (retorno del portal o cron) lo concilia.
       return json({
         ok: false, estado: 'error',
-        error: `Pago cobrado pero no conciliado: ${conciliarErr.message}`,
+        error: resultado.estado === 'aprobado'
+          ? `Pago cobrado pero no conciliado: ${regEstErr.message}`
+          : regEstErr.message,
       }, 500)
     }
-    const res = (conciliado ?? {}) as {
+    const reg = (registrado ?? {}) as { estado?: string; accion?: string }
+
+    if (resultado.estado !== 'aprobado') {
+      // No aprobado (o reembolsado): se refleja lo que quedó, sin conciliar.
+      return json({
+        ok: true,
+        estado: resultado.estado,
+        conciliado: false,
+        estado_solicitud: reg.estado ?? null,
+      })
+    }
+
+    const res = (registrado ?? {}) as {
       pago_id?: string | null
       liquidado?: boolean
       saldo_restante?: number

@@ -228,9 +228,8 @@ describe('CargosAdicionalesTab · cobros', () => {
           reverso_id: null, reverso_numero: null, reverso_fecha: null, codigo: null, motivo: null },
       ], error: null,
     })
-    h.respuestas.conta_anular_cobro_cargo = () => ({
-      data: [{ pago_id: 'p-vivo', resultado: 'anulado', asiento_id: 'a1', reverso_id: 'r1', reverso_numero: 8,
-        estado_cargo: 'pendiente', cobros_pendientes: 0 }], error: null,
+    h.respuestas.conta_ajuste_solicitar = () => ({
+      data: [{ solicitud_id: 'sol-1', estado: 'pendiente', repetida: false }], error: null,
     })
     h.prompt.mockResolvedValue('  error de captura ')
     montar([cargo('ca1', 'Vidrio')])
@@ -241,21 +240,47 @@ describe('CargosAdicionalesTab · cobros', () => {
     const anular = within(dialogo).getAllByRole('button', { name: 'Anular' })
     expect(anular).toHaveLength(1)
     await act(async () => { fireEvent.click(anular[0]) })
-    await waitFor(() => expect(llamadasA('conta_anular_cobro_cargo')).toHaveLength(1))
-    expect(llamadasA('conta_anular_cobro_cargo')[0].args).toEqual({ p_pago_id: 'p-vivo', p_motivo: 'error de captura' })
+    // 20261011000000: se SOLICITA; la anulación la ejecuta la aprobación de otra persona.
+    await waitFor(() => expect(llamadasA('conta_ajuste_solicitar')).toHaveLength(1))
+    expect(llamadasA('conta_ajuste_solicitar')[0].args).toMatchObject({
+      p_tipo: 'anular_cobro_cargo', p_documento_tabla: 'pagos', p_documento_id: 'p-vivo', p_motivo: 'error de captura',
+    })
+    expect(llamadasA('conta_anular_cobro_cargo')).toHaveLength(0)
     await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
-      variant: 'success', title: 'Cobro anulado', text: 'Reverso en la póliza #8. El cargo queda pendiente.',
+      variant: 'success', title: 'Anulación solicitada',
     })))
   })
 
-  it('anular el CARGO con cobros vivos muestra el rechazo del servidor', async () => {
+  it('anular el CARGO registra una solicitud con motivo; nunca un UPDATE directo (20261011000000)', async () => {
     h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1', { aplicado: 30, saldo: 70, cobros: 1 })], error: null })
-    h.update.mockResolvedValue({ error: { message: 'CARGO_CON_COBROS: el cargo tiene cobros vivos; anula cada cobro antes de anular el cargo.' } })
+    h.respuestas.conta_ajuste_solicitar = () => ({
+      data: [{ solicitud_id: 'sol-2', estado: 'pendiente', repetida: false }], error: null,
+    })
+    h.prompt.mockResolvedValue(' se emitió por error ')
+    montar([cargo('ca1', 'Vidrio')])
+    await screen.findByRole('button', { name: 'Registrar cobro' })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Anular' })) })
+    await waitFor(() => expect(llamadasA('conta_ajuste_solicitar')).toHaveLength(1))
+    expect(llamadasA('conta_ajuste_solicitar')[0].args).toMatchObject({
+      p_tipo: 'anular_cargo', p_documento_tabla: 'cargos_adicionales_unidad', p_documento_id: 'ca1', p_motivo: 'se emitió por error',
+    })
+    expect(h.update).not.toHaveBeenCalledWith('cargos_adicionales_unidad', 'ca1', expect.objectContaining({ estado: 'anulado' }))
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'success', title: 'Anulación solicitada',
+    })))
+  })
+
+  it('si el servidor rechaza la solicitud, se muestra su motivo', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1')], error: null })
+    h.respuestas.conta_ajuste_solicitar = () => ({
+      data: null, error: { code: '23505', message: 'AJUSTE_YA_SOLICITADO: ya hay una solicitud abierta (pendiente o fallida) para este documento.' },
+    })
+    h.prompt.mockResolvedValue('se emitió por error')
     montar([cargo('ca1', 'Vidrio')])
     await screen.findByRole('button', { name: 'Registrar cobro' })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Anular' })) })
     await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
-      variant: 'error', title: 'No se anuló el cargo',
+      variant: 'error', title: 'No se registró la solicitud', text: expect.stringMatching(/AJUSTE_YA_SOLICITADO/),
     })))
   })
 

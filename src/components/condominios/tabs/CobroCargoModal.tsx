@@ -18,6 +18,7 @@ import {
   type EnvioIncierto,
   type MetodoCobroCargo,
 } from '../../../domain/contabilidad/cobrosCargo'
+import { textoSolicitudEnviada } from '../../../domain/contabilidad/ajustes'
 
 interface Props {
   cargo: CargoAdicionalUnidad
@@ -170,27 +171,19 @@ export default function CobroCargoModal({ cargo, resumen, companyId, moneda, can
 
   async function anularCobro(pagoId: string) {
     const motivo = await openTextPrompt({
-      title: 'Anular cobro',
-      description: 'El cobro no se borra: queda rechazado con este motivo y su asiento se reversa.',
+      title: 'Solicitar anulación del cobro',
+      description: 'Se registra una solicitud: otra persona con permiso de autorizar la aprueba y entonces el cobro queda rechazado con este motivo y su asiento se reversa. El cobro nunca se borra.',
       label: 'Motivo',
       required: true,
-      validate: (v) => (v.trim().length < 3 ? 'Indica el motivo.' : null),
+      validate: (v) => (v.trim().length < 5 ? 'Indica el motivo (al menos 5 caracteres).' : null),
     })
     if (!motivo) return
     try {
       const r = await anular.mutateAsync({ pagoId, motivo: motivo.trim() })
-      notify({
-        variant: 'success',
-        title: r.resultado === 'ya_anulado' ? 'El cobro ya estaba anulado' : 'Cobro anulado',
-        text: (r.reverso_numero ? `Reverso en la póliza #${r.reverso_numero}. ` : '')
-          + `El cargo queda ${r.estado_cargo}.`
-          + (r.cobros_pendientes > 0
-            ? ` Hay ${r.cobros_pendientes} cobro(s) pendiente(s) de este cargo: reprocésalo desde Contabilidad › Pendientes.`
-            : ''),
-      })
+      notify({ variant: 'success', title: 'Anulación solicitada', text: textoSolicitudEnviada(r) })
       onCambio()
     } catch (e) {
-      notify({ variant: 'error', title: 'No se anuló el cobro', text: e instanceof Error ? e.message : String(e) })
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: e instanceof Error ? e.message : String(e) })
     }
   }
 

@@ -19,6 +19,7 @@ import {
   decidirTrasConciliar,
   decidirTrasReclamo,
   decidirTrasSellar,
+  estadoDeEventoStripe,
 } from '../logic.ts'
 
 describe('decidirTrasReclamo', () => {
@@ -149,5 +150,24 @@ describe('decidirTrasReclamo · processed_at es quien confirma', () => {
     })
     expect(d).toMatchObject({ accion: 'responder', status: 409 })
     expect(d.accion === 'responder' && d.body.already_processed).toBeUndefined()
+  })
+})
+
+describe('estadoDeEventoStripe (20261011000000)', () => {
+  it('succeeded → aprobado sobre el propio intent', () => {
+    expect(estadoDeEventoStripe('payment_intent.succeeded', { id: 'pi_1' })).toEqual({ estado: 'aprobado', intentId: 'pi_1' })
+  })
+  it('payment_failed → rechazado (la RPC no retrocede un succeeded)', () => {
+    expect(estadoDeEventoStripe('payment_intent.payment_failed', { id: 'pi_2' })).toEqual({ estado: 'rechazado', intentId: 'pi_2' })
+  })
+  it('charge.refunded TOTAL → reembolsado sobre el intent del cargo', () => {
+    expect(estadoDeEventoStripe('charge.refunded', { id: 'ch_1', payment_intent: 'pi_3', refunded: true }))
+      .toEqual({ estado: 'reembolsado', intentId: 'pi_3' })
+  })
+  it('charge.refunded PARCIAL → no cambia la solicitud (revisión manual)', () => {
+    expect(estadoDeEventoStripe('charge.refunded', { id: 'ch_2', payment_intent: 'pi_4', refunded: false })).toBeNull()
+  })
+  it('otro evento → null', () => {
+    expect(estadoDeEventoStripe('customer.created', { id: 'cus_1' })).toBeNull()
   })
 })
