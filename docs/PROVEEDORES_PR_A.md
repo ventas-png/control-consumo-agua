@@ -215,8 +215,8 @@ privilegios; funciones internas no ejecutables por `authenticated`; correlativos
   aserciones, 2 pruebas con sesiones concurrentes reales y chequeo append-only. Las regresiones de emisión y
   prórrogas se verificaron además **sin** su migración (fallan, como debe ser) y con ella (pasan).
 * `bash supabase/tests/compras_flujo/run.sh` (el riel de compras existente) pasa con las migraciones nuevas.
-* **Cadena combinada con el #904:** `main` + las 11 migraciones del #904 (`20261007…20261017`) + las de este
-  PR se aplican sobre una base vacía y la suite de proveedores pasa (517 ✓).
+* **Cadena combinada:** `main` (que ya incluye las 14 migraciones del #904) + las 9 de este PR se aplican sobre una
+  base vacía; las suites de proveedores, compras y contabilidad se repitieron sobre esa cadena (ver el cuerpo del PR).
 * `npm run type-check`, `npm run lint`, `npm test`, `npm run build`.
 * `node scripts/migrations-guard.mjs`.
 
@@ -241,51 +241,41 @@ Migraciones nuevas (orden de aplicación), todas por encima de la mayor del #904
 Las 6–9 son correcciones de las 1–4 (la 9 revalida la cuenta elegida al cambiar el destino de una línea): **no se editó ninguna migración ya enviada** (la rama de previsualización
 de Supabase ya las había aplicado).
 
-### Orden de aplicación propuesto: #904 primero, #907 después
+### Estado de #904 y orden de aplicación: #904 ya está en producción; #907 va después
 
-* Estado del #904 (borrador, sin fusionar; head `2da9f44e`): **14** migraciones, de `20261007000000` a
-  `20261019000100`, base `aa6e0461` (= `main` actual). Siguen por debajo de las `20261020…` de este PR; **si el #904
-  agregara una versión ≥ `20261020000000` habría que revisar el orden**.
-* **Versiones:** no hay solape ni hace falta renumerar nada. Si el #907 se fusionara antes, el #904 quedaría
-  «intercalado» (versiones menores aplicadas después de las `20261020…`); por eso el orden recomendado es
-  **#904 → #907**, y ninguna migración ya aplicada se renumera.
-* **Conflicto textual al fusionar el segundo:** `src/domain/shared/buckets.ts` (cada PR agrega una constante de
-  bucket); se resuelve conservando ambas. Verificado en una fusión local (no publicada). El resto se fusiona solo.
-* **Cadena combinada verificada:** `main` + #904 + #907 se aplican en orden sobre una base vacía; la suite de
-  proveedores pasa sobre esa cadena (535 ✓; ver §9). Se repitió con el head actual del #904 (14 migraciones).
-* **Huella de producción** (`scripts/schema-drift/huella-produccion.json`): este PR y el #904 la refrescan con
-  capturas reales **independientes** (#904: 2026-09-27; #907: 2026-10-01) y sus 2779 grupos son **idénticos**;
-  difieren solo los metadatos de captura, así que al fusionar el segundo basta conservar una de las dos (la más
-  reciente). Tras desplegar cada PR en producción hay que volver a refrescarla con una captura real
-  (procedimiento del README del auditor), nunca copiando hashes del replay local.
+* **#904 está fusionado en `main` (`eaa56bd3`) y sus 14 migraciones están aplicadas y registradas en
+  producción** (`20261007000000` a `20261019000100`, una por una con `apply-migrations-prod.yml`; 827 versiones, máxima
+  `20261019000100`). Las Edge Functions se desplegaron con `deploy-functions.yml`. El cierre del despliegue
+  (huella real de producción) se fusionó en `main` con el #909 (`7d2137ee`).
+* **Versiones:** las 9 migraciones de este PR (`20261020000000…20261020000800`) quedan por encima de la mayor
+  aplicada; no hay solape ni se renumera nada. **Ninguna de las 9 está aplicada en producción.**
+* **Conflictos resueltos al actualizar contra `main`:** `src/domain/shared/buckets.ts` (se conservan las dos
+  constantes: `BUCKET_CONTRATOS_RESPALDO` y `BUCKET_RESPALDOS_AJUSTE`) y `huella-produccion.json` (se conserva la
+  captura posterior al despliegue del #904; no se restauró la anterior).
+* **Huella de producción** (`scripts/schema-drift/huella-produccion.json`): refleja **producción**, no este PR. La
+  captura vigente es la del 2026-10-01 21:32 UTC (3067 grupos, 827 migraciones, máxima `20261019000100`). Este PR no
+  la modifica: las 9 migraciones aparecen en el auditor como cambios planificados. Tras desplegarlas en producción
+  hay que volver a refrescarla con una captura real (procedimiento del README del auditor), nunca copiando hashes
+  del replay local.
 
-### Check «Auditar drift en tres vías»: resuelto con una captura real de producción
-
-El check marcaba 4 grupos que este PR no toca: `conta_ec_cobro_al_corte` (+ grants), `conta_ec_fuera_de_saldo` y
-`conta_ec_limitaciones`. Origen: la migración `20261006000000` (#902) ya estaba aplicada en producción pero
-`huella-produccion.json` se había capturado antes.
-
-* **Captura:** 2026-10-01 13:52:39 UTC, **solo lectura** (`SELECT`) contra producción (`nnsqmeigtgewatameexo`),
-  PostgreSQL 17.6, 813 migraciones registradas, máxima `20261006000000`. Se ejecutó el mismo lote de
-  `fingerprint.sql` (guard + CTE) con dos proyecciones: los 12 grupos `conta_ec_%` y el sha256 del texto completo.
-* **Verificación:** la huella del archivo (captura anterior + los 4 grupos medidos) reproduce **exactamente** el
-  sha256 medido en producción (`35fff705…9e37`), su tamaño (309 194 bytes) y sus 2 779 grupos.
-* **Las 4 diferencias:** 2 grupos nuevos (`conta_ec_cobro_al_corte` y su `/grants`) y 2 cambiados
-  (`conta_ec_fuera_de_saldo`, `conta_ec_limitaciones`); los hashes de producción coinciden con los de la
-  reconstrucción del repositorio.
-* **Corroboración independiente:** la huella que el #904 versionó con su propia captura (2026-09-27) tiene los
-  mismos 2 779 grupos con los mismos hashes.
-* **Lo que no se hizo:** no se amplió la baseline, no se relajó ni desactivó el auditor y no se copió ningún hash
-  del replay local. `auditar.mjs --base origin/main` da «Sin drift no autorizado» (los cambios de este PR figuran
-  como cambio planificado).
-
-### Sandbox existente
+### Sandbox existente (verificado en solo lectura el 2026-10-01 21:56 UTC)
 
 Proyectos visibles para la cuenta: producción `control-agua` (`nnsqmeigtgewatameexo`) y el sandbox
-**`control-agua-rls-sandbox` (`jwpmivhvlstslncrtokb`)**. El sandbox tiene registrada como última migración
-`20261004000200`. **Le faltan**, en este orden: `20261005000000` y `20261006000000` (#901/#902), las 14 del #904
-(`20261007000000…20261019000100`) y las 9 de este PR (25 en total). **No se ejecutó nada en el sandbox**: requiere autorización explícita
-(esquema e historial de migraciones juntos, sin `reset`, recreación ni reparación masiva).
+**`control-agua-rls-sandbox` (`jwpmivhvlstslncrtokb`)**.
+
+* **Estado:** 504 migraciones registradas, última `20261004000200`. No tiene ninguna tabla del #904 ni de este PR;
+  solo la función previa `reconciliar_payment_requests_pendientes`. Lo único añadido por esta línea de trabajo es el
+  esquema `respaldo_sync_20261001` (dos funciones de lectura).
+* **Pendientes (25):** `20261005000000` y `20261006000000` (#901/#902), las 14 del #904
+  (`20261007000000…20261019000100`) y las 9 de este PR.
+* **Pruebas contra el sandbox: ninguna.** Todo lo citado en este documento (suites de proveedores, compras y
+  contabilidad) corrió en **PostgreSQL desechable** (local y CI), no en el sandbox. Los flujos de ajustes con cuatro
+  ojos, cobro sin confirmar, saldos a favor y proveedores **no se han ejercitado en el sandbox**.
+* **Bloqueo previo:** la huella base del sandbox difiere en 8 grupos cosméticos de la de producción; hay que
+  resolverla o aceptarla explícitamente antes de aplicar nada.
+* **Para sincronizarlo** (requiere autorización explícita): aplicar las 25 en orden, una por una, comprobando después
+  de cada una el registro y los objetos; sin `reset`, recreación ni reparación masiva; después correr los flujos
+  anteriores en el sandbox.
 
 ## 11. Interfaces para PR B (compra / recepción / factura)
 
