@@ -87,16 +87,25 @@ export async function confirmarPago(paymentRequestId: string): Promise<Confirmar
     body: { payment_request_id: paymentRequestId },
   })
   if (error) return { estado: null, liquidado: false, saldoRestante: null, error: await extractFunctionError(error) }
-  const d = data as { estado?: string; liquidado?: boolean; cuota_liquidada?: boolean; saldo_restante?: number | null; en_revision?: boolean; error?: string | null } | null
+  const d = data as {
+    estado?: string; conciliado?: boolean; liquidado?: boolean; cuota_liquidada?: boolean
+    saldo_restante?: number | null; en_revision?: boolean; already?: boolean; error?: string | null
+  } | null
   if (d?.error) return { estado: d.estado ?? 'error', liquidado: false, saldoRestante: null, error: d.error }
   // El proveedor cobró pero el documento ya no admite el cobro (cuota anulada
   // o eliminada): NO se acreditó y contabilidad lo revisa (20261015000000).
-  // No es «aprobado»: el portal no debe anunciar un abono que no existe.
   if (d?.en_revision === true) return { estado: 'en_revision', liquidado: false, saldoRestante: null, error: null }
+  // «aprobado» SÓLO si confirm-charge informa el cobro acreditado
+  // (`conciliado: true`, o `already` de una solicitud ya conciliada). Lo
+  // demás no se presenta como abono (20261016000000).
+  const acreditado = d?.estado === 'aprobado' && (d.conciliado === true || d.already === true)
+  if (d?.estado === 'aprobado' && !acreditado) {
+    return { estado: 'pendiente', liquidado: false, saldoRestante: null, error: null }
+  }
   return {
     estado: d?.estado ?? null,
-    liquidado: d?.liquidado === true || d?.cuota_liquidada === true,
-    saldoRestante: typeof d?.saldo_restante === 'number' ? d.saldo_restante : null,
+    liquidado: acreditado && (d?.liquidado === true || d?.cuota_liquidada === true),
+    saldoRestante: acreditado && typeof d?.saldo_restante === 'number' ? d.saldo_restante : null,
     error: null,
   }
 }

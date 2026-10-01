@@ -26,4 +26,25 @@ describe('confirmarPago', () => {
     expect(await confirmarPago('pr-2')).toEqual({ estado: 'en_revision', liquidado: false, saldoRestante: null, error: null })
     expect(await confirmarPagoCuota('pr-2')).toMatchObject({ estado: 'en_revision', cuotaLiquidada: false })
   })
+
+  it('«aprobado» sin conciliado: no es un abono (antes el saldo salía 0)', async () => {
+    h.respuesta = { data: { ok: true, estado: 'aprobado', conciliado: false, estado_solicitud: 'failed' }, error: null }
+    expect(await confirmarPago('pr-3')).toEqual({ estado: 'pendiente', liquidado: false, saldoRestante: null, error: null })
+  })
+
+  it('dos confirmaciones seguidas de un cobro retenido: ambas en revisión', async () => {
+    h.respuesta = { data: { ok: true, estado: 'aprobado', conciliado: false, en_revision: true }, error: null }
+    expect((await confirmarPago('pr-4')).estado).toBe('en_revision')
+    expect((await confirmarPago('pr-4')).estado).toBe('en_revision')
+  })
+
+  it('reembolsado: estado propio, sin liquidado ni saldo', async () => {
+    h.respuesta = { data: { ok: true, estado: 'reembolsado', conciliado: false }, error: null }
+    expect(await confirmarPago('pr-5')).toEqual({ estado: 'reembolsado', liquidado: false, saldoRestante: null, error: null })
+  })
+
+  it('solicitud ya conciliada (already) sigue siendo aprobado', async () => {
+    h.respuesta = { data: { ok: true, estado: 'aprobado', already: true }, error: null }
+    expect((await confirmarPago('pr-6')).estado).toBe('aprobado')
+  })
 })

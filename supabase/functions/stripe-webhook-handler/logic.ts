@@ -11,6 +11,8 @@
 // 2xx, así que devolver 200 equivale a decir «no lo traigas más». Esa frase sólo
 // es verdad cuando el evento se procesó ENTERO.
 
+import { leerConciliacion, type RespuestaRegistro } from '../_shared/payments/conciliacion.ts'
+
 /** Lo que devuelve `stripe_webhook_evento_reclamar`. */
 export interface Reclamo {
   reclamado: boolean
@@ -19,19 +21,8 @@ export interface Reclamo {
   intentos?: number
 }
 
-/** Lo que devuelve `conciliar_pago_externo`. */
-export interface Conciliacion {
-  ok?: boolean
-  pago_id?: string | null
-  liquidado?: boolean
-  saldo_restante?: number
-  ya_conciliado?: boolean
-  accion?: string
-  incidencia_id?: string | null
-}
-
-/** Acciones de un «aprobado» que NO acredita: el cobro cayó sobre una cuota anulada o eliminada (20261015000000). */
-export const ACCIONES_COBRO_RETENIDO = ['cobro_sobre_documento_anulado', 'cobro_retenido_ya_registrado'] as const
+/** Lo que devuelve `pasarela_registrar_estado` ante un «aprobado» (con su estado persistido). */
+export type Conciliacion = RespuestaRegistro
 
 export type Decision =
   | { accion: 'procesar' }
@@ -94,14 +85,24 @@ export function decidirTrasConciliar(
     }
   }
 
-  const r = res ?? {}
-  // Retenido: el evento ya quedó registrado con su incidencia. 200 para que
-  // el proveedor no reintente; reintentar no cambiaría nada.
-  if (r.accion && (ACCIONES_COBRO_RETENIDO as readonly string[]).includes(r.accion)) {
+  // Se decide por el ESTADO PERSISTIDO que devuelve la RPC, no por `accion`
+  // (un duplicado de un cobro retenido no está conciliado). Lo no acreditado
+  // también es 200: el evento quedó registrado y reintentarlo no cambiaría
+  // nada.
+  const l = leerConciliacion(res)
+  if (l.tipo !== 'conciliado') {
     return {
       accion: 'responder',
       status: 200,
-      body: { received: true, conciliado: false, en_revision: true, accion: r.accion, incidencia_id: r.incidencia_id ?? null },
+      body: {
+        received: true,
+        conciliado: false,
+        ...(l.tipo === 'en_revision' ? { en_revision: true } : {}),
+        ...(l.tipo === 'reembolsado' ? { reembolsado: true } : {}),
+        estado_solicitud: l.tipo === 'en_revision' ? l.estadoSolicitud
+          : l.tipo === 'reembolsado' ? 'refunded' : l.estadoSolicitud,
+        incidencia_id: l.incidenciaId,
+      },
     }
   }
   return {
@@ -110,10 +111,10 @@ export function decidirTrasConciliar(
     body: {
       received: true,
       conciliado: true,
-      ...(r.ya_conciliado ? { already_processed: true } : {}),
-      pago_id: r.pago_id ?? null,
-      liquidado: r.liquidado === true,
-      saldo_restante: r.saldo_restante ?? 0,
+      ...(l.yaConciliado ? { already_processed: true } : {}),
+      pago_id: l.pagoId,
+      liquidado: l.liquidado,
+      saldo_restante: l.saldoRestante,
     },
   }
 }

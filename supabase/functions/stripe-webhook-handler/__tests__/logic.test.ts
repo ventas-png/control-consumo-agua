@@ -68,16 +68,38 @@ describe('decidirTrasConciliar', () => {
     })
   })
 
-  it('cobro sobre una cuota anulada (20261015000000): 200 sin conciliar, con la incidencia, para que no se reintente', () => {
-    for (const accion of ['cobro_sobre_documento_anulado', 'cobro_retenido_ya_registrado']) {
+  it('cobro retenido (cuota anulada, 20261015000000): 200 sin conciliar, en revisión, para que no se reintente', () => {
+    // Se decide por el estado persistido, también cuando el aviso es duplicado
+    // (20261016000000): antes un `accion: 'duplicado'` se leía como conciliado.
+    for (const accion of ['cobro_sobre_documento_anulado', 'cobro_retenido_ya_registrado', 'duplicado']) {
       const d = decidirTrasConciliar(
-        { ok: true, accion, incidencia_id: 'inc-1' } as never, null,
+        { ok: true, accion, estado: 'pending_verification', conciliado: false, en_revision: true, reembolsado: false, incidencia_id: 'inc-1' },
+        null,
       )
       expect(d).toMatchObject({ accion: 'responder', status: 200 })
       expect(d.accion === 'responder' && d.body).toEqual({
-        received: true, conciliado: false, en_revision: true, accion, incidencia_id: 'inc-1',
+        received: true, conciliado: false, en_revision: true, estado_solicitud: 'pending_verification', incidencia_id: 'inc-1',
       })
     }
+  })
+
+  it('reembolso total previo: la aprobación atrasada no se presenta como conciliada', () => {
+    const d = decidirTrasConciliar(
+      { ok: true, accion: 'ignorado_reembolsado', estado: 'refunded', conciliado: false, en_revision: false, reembolsado: true },
+      null,
+    )
+    expect(d.accion === 'responder' && d.body).toMatchObject({ received: true, conciliado: false, reembolsado: true })
+    expect(d.accion === 'responder' && d.body).not.toHaveProperty('saldo_restante')
+  })
+
+  it('un duplicado de un cobro conciliado sí es conciliado, con lo que informa la RPC', () => {
+    const d = decidirTrasConciliar(
+      { ok: true, accion: 'duplicado', estado: 'succeeded', conciliado: true, ya_conciliado: true, pago_id: 'p-1', liquidado: false, saldo_restante: 12 },
+      null,
+    )
+    expect(d.accion === 'responder' && d.body).toMatchObject({
+      conciliado: true, already_processed: true, pago_id: 'p-1', liquidado: false, saldo_restante: 12,
+    })
   })
 
   it('abono parcial: liquidado false y el saldo que queda', () => {
@@ -107,11 +129,10 @@ describe('decidirTrasConciliar', () => {
     expect(d.accion === 'responder' && String(d.body.error)).toContain('deadlock detected')
   })
 
-  it('un cuerpo vacío de la RPC no se lee como liquidado', () => {
+  it('un cuerpo vacío de la RPC no se lee como conciliado ni inventa un saldo 0', () => {
     const d = decidirTrasConciliar(null, null)
-    expect(d.accion === 'responder' && d.body).toMatchObject({
-      liquidado: false, saldo_restante: 0, pago_id: null,
-    })
+    expect(d.accion === 'responder' && d.body).toMatchObject({ received: true, conciliado: false })
+    expect(d.accion === 'responder' && d.body).not.toHaveProperty('saldo_restante')
   })
 })
 

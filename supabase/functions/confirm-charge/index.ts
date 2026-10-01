@@ -39,6 +39,7 @@ import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { validarConfirmChargeBody } from './validate.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
+import { leerConciliacion, type RespuestaRegistro } from '../_shared/payments/conciliacion.ts'
 import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
   credencialesEfectivasDeAmbiente,
@@ -276,7 +277,7 @@ Deno.serve(async (req: Request) => {
           : regEstErr.message,
       }, 500)
     }
-    const reg = (registrado ?? {}) as { estado?: string; accion?: string }
+    const reg = (registrado ?? {}) as RespuestaRegistro
 
     if (resultado.estado !== 'aprobado') {
       // No aprobado (o reembolsado): se refleja lo que quedó, sin conciliar.
@@ -288,34 +289,32 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Cobro confirmado sobre una cuota anulada o eliminada (20261015000000):
-    // el dinero entró pero NO se acreditó; queda en revisión con incidencia.
-    if (reg.accion === 'cobro_sobre_documento_anulado' || reg.accion === 'cobro_retenido_ya_registrado') {
-      return json({
-        ok: true,
-        estado: 'aprobado',
-        conciliado: false,
-        en_revision: true,
-        estado_solicitud: reg.estado ?? 'pending_verification',
-      })
+    // Lo que quedó GUARDADO, no la acción del aviso (20261016000000): una
+    // segunda consulta de un cobro retenido es un duplicado y sigue sin
+    // acreditar. Sin conciliación no se informa pago ni saldo.
+    const l = leerConciliacion(registrado as RespuestaRegistro | null)
+    if (l.tipo === 'en_revision') {
+      // El proveedor cobró, pero la cuota estaba anulada o eliminada: no se
+      // acreditó; contabilidad lo revisa (incidencia abierta).
+      return json({ ok: true, estado: 'aprobado', conciliado: false, en_revision: true, estado_solicitud: l.estadoSolicitud })
     }
-
-    const res = (registrado ?? {}) as {
-      pago_id?: string | null
-      liquidado?: boolean
-      saldo_restante?: number
-      ya_conciliado?: boolean
+    if (l.tipo === 'reembolsado') {
+      // Reembolso total confirmado (antes o después de aprobar): nada acreditado.
+      return json({ ok: true, estado: 'reembolsado', conciliado: false, estado_solicitud: 'refunded' })
+    }
+    if (l.tipo === 'sin_acreditar') {
+      return json({ ok: true, estado: 'pendiente', conciliado: false, estado_solicitud: l.estadoSolicitud })
     }
 
     return json({
       ok: true,
       estado: 'aprobado',
       conciliado: true,
-      ...(res.ya_conciliado ? { already: true } : {}),
-      liquidado: res.liquidado === true,
-      cuota_liquidada: res.liquidado === true, // alias legacy (F1) — el frontend nuevo lee `liquidado`.
-      saldo_restante: res.saldo_restante ?? 0,
-      pago_id: res.pago_id ?? null,
+      ...(l.yaConciliado ? { already: true } : {}),
+      liquidado: l.liquidado,
+      cuota_liquidada: l.liquidado, // alias legacy (F1) — el frontend nuevo lee `liquidado`.
+      saldo_restante: l.saldoRestante,
+      pago_id: l.pagoId,
     })
   } catch (e) {
     await captureEdgeException(e, { function: 'confirm-charge' })

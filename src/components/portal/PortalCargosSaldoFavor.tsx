@@ -25,6 +25,7 @@ import {
   iniciarPagoCargo,
   solicitarAplicacionSaldoFavor,
 } from '../../domain/portal/mutations'
+import { avisoConfirmacionPago } from '../../domain/portal/avisoConfirmacionPago'
 
 interface Props {
   /** Unidad seleccionada en el portal: se muestra lo de esa unidad. */
@@ -81,9 +82,7 @@ export function PortalCargosSaldoFavor({ unidadId, moneda }: Props) {
         // Aprobación inmediata (demo): igual se confirma DESDE EL SERVIDOR.
         const conf = await confirmarPago(res.paymentRequestId)
         if (conf.error) { notify({ variant: 'error', title: 'Pago no confirmado', text: conf.error }); return }
-        notify(conf.estado === 'aprobado'
-          ? { variant: 'success', title: conf.liquidado ? 'Cargo pagado' : 'Abono registrado', text: conf.liquidado ? 'El cargo quedó al día.' : `Saldo restante: ${moneda} ${(conf.saldoRestante ?? 0).toFixed(2)}` }
-          : { variant: 'info', title: 'Pago en proceso', text: 'Se reflejará cuando el procesador lo confirme.' })
+        notify(avisoConfirmacionPago(conf, { moneda, tituloPagado: 'Cargo pagado', textoAlDia: 'El cargo quedó al día.' }))
         void cargar()
       }
     } finally {

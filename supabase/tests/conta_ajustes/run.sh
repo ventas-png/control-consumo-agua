@@ -160,6 +160,7 @@ TN=5e0b0000-0000-0000-0000-000000000019
 PQ2=ad900000-0000-0000-0000-0000000000a2
 PQ3=ad900000-0000-0000-0000-0000000000a3
 PQ4=ad900000-0000-0000-0000-0000000000a4
+PR8=ad900000-0000-0000-0000-0000000000a8
 
 # Preparación (como el admin): tres solicitudes de anulación y un anticipo
 # nuevo de Uno para las solicitudes simultáneas del portal.
@@ -238,7 +239,14 @@ par j "$ADM" "SELECT 'J1:' || (public.aj_aviso('$PQ4', 'aprobado', 'webhook', 'e
 #     retenido de QL (anulada en assert_b §20).
 par k "$ADM" "SELECT 'K1:' || (public.aj_aviso('$PQ2', 'aprobado', 'webhook', 'evt-ql2') ->> 'accion');" \
       "$ADM" "SELECT 'K2:' || (public.aj_aviso('$PQ2', 'aprobado', 'consulta', NULL) ->> 'accion');"
-cat "$SALIDAS"/[a-k][12].txt | grep -E '^[A-K][12]:' | sort | sed 's/^/   /'
+# M · reembolso TOTAL y aprobación del mismo cobro pendiente a la vez: el
+#     reembolso retiene la solicitud; la aprobación llega mientras.
+par m "$ADM" "SELECT 'M1:' || (public.aj_aviso('$PR8', 'reembolsado', 'webhook', 'evt-qt-ref') ->> 'accion');" \
+      "$ADM" "SELECT 'M2:' || (public.aj_aviso('$PR8', 'aprobado', 'webhook', 'evt-qt-ok') ->> 'accion');"
+# N · después, dos aprobaciones atrasadas distintas a la vez.
+par n "$ADM" "SELECT 'N1:' || (public.aj_aviso('$PR8', 'aprobado', 'webhook', 'evt-qt-ok-2') ->> 'conciliado');" \
+      "$ADM" "SELECT 'N2:' || (public.aj_aviso('$PR8', 'aprobado', 'consulta', NULL) ->> 'conciliado');"
+cat "$SALIDAS"/[a-n][12].txt | grep -E '^[A-N][12]:' | sort | sed 's/^/   /'
 
 grep -q '^A1:ejecutada/false$' "$SALIDAS/a1.txt" \
   || { echo "❌ A1 debía ejecutar:"; cat "$SALIDAS/a1.txt"; exit 1; }
@@ -288,6 +296,12 @@ grep -q '^K1:cobro_sobre_documento_anulado$' "$SALIDAS/k1.txt" \
   || { echo "❌ K1 debía abrir la incidencia:"; cat "$SALIDAS/k1.txt"; exit 1; }
 grep -q '^K2:cobro_retenido_ya_registrado$' "$SALIDAS/k2.txt" \
   || { echo "❌ K2 debía ver el cobro ya retenido, sin otra incidencia:"; cat "$SALIDAS/k2.txt"; exit 1; }
+grep -q '^M1:reembolso_antes_de_aprobar$' "$SALIDAS/m1.txt" \
+  || { echo "❌ M1 debía dejar la solicitud reembolsada:"; cat "$SALIDAS/m1.txt"; exit 1; }
+grep -q '^M2:ignorado_reembolsado$' "$SALIDAS/m2.txt" \
+  || { echo "❌ M2 (aprobación que esperó al reembolso) no debía conciliar:"; cat "$SALIDAS/m2.txt"; exit 1; }
+grep -q '^N1:false$' "$SALIDAS/n1.txt" && grep -q '^N2:false$' "$SALIDAS/n2.txt" \
+  || { echo "❌ N: ninguna aprobación atrasada debía conciliar:"; cat "$SALIDAS/n1.txt" "$SALIDAS/n2.txt"; exit 1; }
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d ajustes -f "$AQUI/concurrencia.sql" 2>&1) || {
   cat "$SALIDAS"/*.txt
   echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'

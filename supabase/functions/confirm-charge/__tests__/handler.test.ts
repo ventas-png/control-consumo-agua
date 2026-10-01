@@ -244,7 +244,7 @@ describe('confirm-charge · cobro sobre una cuota anulada o eliminada (202610150
   it('la RPC retiene el cobro: responde aprobado SIN conciliar y en revisión', async () => {
     fixture(h.state, {
       conciliar: {
-        data: { ok: true, duplicado: false, estado: 'pending_verification', accion: 'cobro_sobre_documento_anulado', incidencia_id: 'inc-1' },
+        data: { ok: true, duplicado: false, estado: 'pending_verification', accion: 'cobro_sobre_documento_anulado', conciliado: false, en_revision: true, reembolsado: false, incidencia_id: 'inc-1' },
         error: null,
       },
     })
@@ -260,7 +260,7 @@ describe('confirm-charge · cobro sobre una cuota anulada o eliminada (202610150
     fixture(h.state, {
       cuota: { deleted_at: '2026-09-30T00:00:00Z' },
       conciliar: {
-        data: { ok: true, estado: 'pending_verification', accion: 'cobro_sobre_documento_anulado', incidencia_id: 'inc-2' },
+        data: { ok: true, estado: 'pending_verification', accion: 'cobro_sobre_documento_anulado', conciliado: false, en_revision: true, reembolsado: false, incidencia_id: 'inc-2' },
         error: null,
       },
     })
@@ -268,6 +268,48 @@ describe('confirm-charge · cobro sobre una cuota anulada o eliminada (202610150
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ conciliado: false, en_revision: true })
     expect(rpcsConciliar(h.state)).toHaveLength(1)
+  })
+})
+
+describe('confirm-charge · la respuesta sigue el estado persistido (20261016000000)', () => {
+  it('dos consultas seguidas de un cobro retenido: las dos en revisión (la 2.ª es un duplicado)', async () => {
+    const respuestas = [
+      { ok: true, duplicado: false, accion: 'cobro_retenido_ya_registrado', estado: 'pending_verification', conciliado: false, en_revision: true, reembolsado: false },
+      { ok: true, duplicado: true, accion: 'duplicado', estado: 'pending_verification', conciliado: false, en_revision: true, reembolsado: false },
+    ]
+    for (const data of respuestas) {
+      fixture(h.state, { pr: { estado: 'pending_verification' }, conciliar: { data, error: null } })
+      const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+      const body = await res.json()
+      expect(body).toMatchObject({ ok: true, conciliado: false, en_revision: true })
+      expect(body).not.toHaveProperty('saldo_restante')
+      expect(body).not.toHaveProperty('pago_id')
+    }
+  })
+
+  it('reembolso total previo: la aprobación atrasada responde reembolsado, sin pago ni saldo', async () => {
+    fixture(h.state, {
+      pr: { estado: 'failed' },
+      conciliar: { data: { ok: true, accion: 'ignorado_reembolsado', estado: 'refunded', conciliado: false, en_revision: false, reembolsado: true }, error: null },
+    })
+    const body = await (await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')).json()
+    expect(body).toEqual({ ok: true, estado: 'reembolsado', conciliado: false, estado_solicitud: 'refunded' })
+  })
+
+  it('accion «duplicado» sin conciliación persistida: no se presenta como pagado', async () => {
+    fixture(h.state, {
+      conciliar: { data: { ok: true, duplicado: true, accion: 'duplicado', estado: 'failed', conciliado: false, en_revision: false, reembolsado: false }, error: null },
+    })
+    const body = await (await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')).json()
+    expect(body).toMatchObject({ ok: true, estado: 'pendiente', conciliado: false })
+  })
+
+  it('conciliado sin saldo informado: no inventa saldo 0', async () => {
+    fixture(h.state, {
+      conciliar: { data: { ok: true, estado: 'succeeded', conciliado: true, pago_id: 'pago-9', liquidado: false }, error: null },
+    })
+    const body = await (await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')).json()
+    expect(body).toMatchObject({ ok: true, estado: 'aprobado', conciliado: true, pago_id: 'pago-9', saldo_restante: null })
   })
 })
 

@@ -142,6 +142,12 @@ del portal o de una consulta futura, y no fija cuándo consultar. Implementada e
 - **Edges**: `confirm-charge` ya no corta con 404 una cuota eliminada y responde `en_revision`; el
   webhook de Stripe responde 200 sin conciliar (reintentar no cambiaría nada); el portal no anuncia
   un abono que no existe.
+- **Corrección `20261016000000`**: (1) un reembolso TOTAL confirmado antes de la aprobación deja la
+  solicitud `refunded` (sin pago que reversar; evento e incidencia como rastro) y una aprobación
+  atrasada ya no crea ni acredita pago; una sola incidencia `aprobado_tras_reembolso` por solicitud.
+  (2) La respuesta describe el estado guardado (`conciliado`, `en_revision`, `reembolsado`), también
+  en avisos duplicados: la segunda consulta de un cobro retenido sigue en revisión. Los edges y el
+  portal deciden por esos campos, nunca por `accion`, y no muestran saldo 0 si no vino.
 - **Fuera de alcance, sin cambios**: un cargo adicional anulado ya tenía otro camino
   (`20261011000000`): el pago se registra y su contabilización queda pendiente, visible en
   Contabilidad. Un recibo de agua eliminado sigue fallando como antes.

@@ -10,6 +10,7 @@
 --   18 · reembolsos parciales: duplicados, acumulados, fuera de orden
 --   19 · el estado de cuenta sigue cuadrando
 --   20 · confirmación tardía de un cobro sobre una cuota anulada o eliminada
+--   21 · reembolso total antes de aprobar; respuesta = estado persistido
 -- ============================================================================
 \set ON_ERROR_STOP 1
 \set A    '''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''
@@ -55,6 +56,10 @@
 \set TL   '''5e0b0000-0000-0000-0000-000000000017'''
 \set PQ1  '''ad900000-0000-0000-0000-0000000000a1'''
 \set PQ5  '''ad900000-0000-0000-0000-0000000000a5'''
+\set QR   '''c9a00000-0000-0000-0000-000000000023'''
+\set QS   '''c9a00000-0000-0000-0000-000000000024'''
+\set PR6  '''ad900000-0000-0000-0000-0000000000a6'''
+\set PR7  '''ad900000-0000-0000-0000-0000000000a7'''
 
 -- ── 11 · superficie nueva ──────────────────────────────────────────────────
 SELECT public.chk(
@@ -545,4 +550,68 @@ SELECT public.chk_txt(
   (SELECT (c->>'cuadra') || '|' || (c->'saldo_a_favor'->>'cuadra')
      FROM public.conta_estado_cuenta_conciliacion(:A1, :UNO, NULL, NULL) c),
   'true|true', '20 · el estado de cuenta sigue cuadrando');
+RESET ROLE;
+
+-- ── 21 · reembolso total antes de aprobar; respuesta = estado persistido ───
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+-- Reembolso total de una solicitud PENDIENTE, y después la aprobación atrasada.
+SELECT public.chk_txt(
+  (SELECT (r ->> 'accion') || '|' || (r ->> 'estado') || '|' || (r ->> 'conciliado') || '|' || (r ->> 'reembolsado')
+     FROM public.aj_aviso(:PR6, 'reembolsado', 'webhook', 'evt-qr-ref') r),
+  'reembolso_antes_de_aprobar|refunded|false|true', '21 · reembolso total de una pendiente: queda reembolsada');
+SELECT public.chk_txt(public.aj_pr(:PR6) || '|' || public.aj_incidencias(:PR6), 'refunded/0/-|reembolso_sin_cobro:abierta',
+  '21 · sin pago que reversar; el rastro queda en la incidencia');
+SELECT public.chk_txt(
+  (SELECT (r ->> 'accion') || '|' || (r ->> 'conciliado') || '|' || (r ? 'pago_id') || '|' || (r ? 'saldo_restante')
+     FROM public.aj_aviso(:PR6, 'aprobado', 'webhook', 'evt-qr-ok') r),
+  'ignorado_reembolsado|false|false|false', '21 · la aprobación atrasada no concilia, sin pago ni saldo en la respuesta');
+SELECT public.chk_txt(public.aj_pr(:PR6), 'refunded/0/-', '21 · ningún pago creado');
+SELECT public.chk_txt(public.aj_cuota(:QR), 'emitida/1/0/-', '21 · la cuota no recibió ningún abono');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pagos p WHERE p.cuota_id = :QR), 0, '21 · …ni sobre la cuota');
+-- Duplicados: el mismo aviso, otra clave, la consulta.
+SELECT public.chk_txt(
+  (SELECT (r ->> 'accion') || '|' || (r ->> 'conciliado') || '|' || (r ->> 'reembolsado')
+     FROM public.aj_aviso(:PR6, 'aprobado', 'webhook', 'evt-qr-ok') r),
+  'duplicado|false|true', '21 · el mismo «aprobado» otra vez: duplicado, sigue reembolsada');
+SELECT public.chk_txt(public.aj_aviso(:PR6, 'aprobado', 'consulta', NULL) ->> 'accion', 'ignorado_reembolsado',
+  '21 · otra clave (consulta): tampoco concilia…');
+SELECT public.chk_txt(public.aj_aviso(:PR6, 'reembolsado', 'webhook', 'evt-qr-ref-2') ->> 'accion', 'sin_cambio',
+  '21 · otro aviso de reembolso: sin cambio');
+SELECT public.chk_txt(public.aj_pr(:PR6) || '|' || public.aj_incidencias(:PR6),
+  'refunded/0/-|reembolso_sin_cobro:abierta,aprobado_tras_reembolso:abierta',
+  '21 · …y UNA sola incidencia «aprobado tras reembolso»');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pasarela_eventos e WHERE e.payment_request_id = :PR6), 4,
+  '21 · cada aviso distinto queda como evento (4; el duplicado no)');
+SELECT public.chk_falla($$SELECT public.aj_pr_conciliar('ad900000-0000-0000-0000-0000000000a6')$$,
+  'PAGO_REEMBOLSADO', '21 · conciliar directo también la rechaza');
+-- Lo mismo desde FALLIDA.
+SELECT public.chk_txt(public.aj_aviso(:PR7, 'reembolsado', 'webhook', 'evt-qs-ref') ->> 'accion', 'reembolso_antes_de_aprobar',
+  '21 · reembolso total de una fallida');
+SELECT public.chk_txt(public.aj_aviso(:PR7, 'aprobado', 'webhook', 'evt-qs-ok') ->> 'conciliado', 'false',
+  '21 · su aprobación atrasada tampoco concilia');
+SELECT public.chk_txt(public.aj_pr(:PR7) || '|' || public.aj_cuota(:QS), 'refunded/0/-|emitida/1/0/-',
+  '21 · sin pago ni abono');
+-- Dos consultas consecutivas de un cobro retenido (QF eliminada, §20): ambas en revisión.
+SELECT public.chk_txt(
+  (SELECT (r ->> 'accion') || '|' || (r ->> 'en_revision') || '|' || (r ->> 'conciliado') || '|' || (r ? 'saldo_restante')
+     FROM public.aj_aviso(:PQ5, 'aprobado', 'consulta', NULL) r),
+  'cobro_retenido_ya_registrado|true|false|false', '21 · 1.ª consulta del cobro retenido: en revisión');
+SELECT public.chk_txt(
+  (SELECT (r ->> 'accion') || '|' || (r ->> 'en_revision') || '|' || (r ->> 'conciliado') || '|' || (r ? 'saldo_restante') || '|' || (r ? 'pago_id')
+     FROM public.aj_aviso(:PQ5, 'aprobado', 'consulta', NULL) r),
+  'duplicado|true|false|false|false', '21 · 2.ª consulta (duplicada): sigue en revisión, sin saldo ni pago');
+SELECT public.chk_txt(public.aj_pr(:PQ5), 'pending_verification/0/-', '21 · …y sin pago');
+-- Un cobro válido sigue conciliando y su duplicado lo informa como conciliado.
+SELECT public.chk_txt(
+  (SELECT (r ->> 'accion') || '|' || (r ->> 'conciliado') || '|' || (r ->> 'estado')
+     FROM public.aj_aviso(:PP1, 'aprobado', 'webhook', 'evt-pp1-ok') r),
+  'duplicado|false|refunded', '21 · PP1 (reembolsado total en §18): su duplicado no se presenta como conciliado');
+SELECT public.chk_txt(
+  (SELECT (r ->> 'accion') || '|' || (r ->> 'conciliado') || '|' || (r ? 'pago_id') || '|' || (r ? 'saldo_restante')
+     FROM public.aj_aviso(:PP2, 'aprobado', 'webhook', 'evt-pp2-ok') r),
+  'duplicado|true|true|true', '21 · PP2 (cobrado, con reembolsos parciales): su duplicado sí es conciliado, con pago y saldo');
+SELECT public.chk_txt(public.aj_pr(:PP2), 'succeeded/1/aplicado', '21 · el reembolso parcial no cambió el cobro');
 RESET ROLE;

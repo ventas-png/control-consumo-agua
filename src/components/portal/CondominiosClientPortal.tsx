@@ -31,6 +31,7 @@ import { PortalTransparenciaTab } from '../condominios/tabs/PortalTransparenciaT
 // plat:P36: gating por plan
 import { FeatureGate } from '../../lib/featureFlags'
 import { UpgradeCTA } from '../shared/UpgradeCTA'
+import { avisoConfirmacionPago } from '../../domain/portal/avisoConfirmacionPago'
 
 interface Props {
   currentUser: UserSession
@@ -185,16 +186,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     void (async () => {
       const conf = await confirmarPagoCuota(prId)
       if (conf.error) { notify({ variant: 'error', title: 'Pago no confirmado', text: conf.error }); return }
-      if (conf.estado === 'aprobado') {
-        notify({
-          variant: 'success',
-          title: conf.cuotaLiquidada ? 'Cuota pagada' : 'Abono registrado',
-          text: conf.cuotaLiquidada ? 'Tu cuota quedó al día.' : `Saldo restante: ${moneda} ${(conf.saldoRestante ?? 0).toFixed(2)}`,
-        })
-        cargarDatos()
-      } else {
-        notify({ variant: 'info', title: 'Pago en proceso', text: 'Tu pago aún se está procesando; se reflejará en unos momentos.' })
-      }
+      notify(avisoConfirmacionPago(
+        { estado: conf.estado, liquidado: conf.cuotaLiquidada, saldoRestante: conf.saldoRestante },
+        { moneda, tituloPagado: 'Cuota pagada', textoAlDia: 'Tu cuota quedó al día.' }))
+      if (conf.estado === 'aprobado') cargarDatos()
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

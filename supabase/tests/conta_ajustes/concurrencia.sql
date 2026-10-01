@@ -66,3 +66,13 @@ SELECT public.chk(
 SELECT public.chk(
   (SELECT count(*) FROM public.pagos p WHERE p.cuota_id IN ('c9a00000-0000-0000-0000-000000000017', 'c9a00000-0000-0000-0000-000000000018')), 0,
   'I/K · ninguna cuota anulada recibió un pago');
+
+-- Reembolso total antes de aprobar, en paralelo (20261016000000).
+SELECT public.chk_txt(public.aj_pr('ad900000-0000-0000-0000-0000000000a8') || '|' || public.aj_incidencias('ad900000-0000-0000-0000-0000000000a8'),
+  'refunded/0/-|reembolso_sin_cobro:abierta,aprobado_tras_reembolso:abierta',
+  'M/N · reembolsada, sin pago, y UNA incidencia por tipo aunque llegaron tres aprobaciones');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pasarela_eventos e WHERE e.payment_request_id = 'ad900000-0000-0000-0000-0000000000a8'), 4,
+  'M/N · los cuatro avisos quedan como evidencia');
+SELECT public.chk_txt(public.aj_cuota('c9a00000-0000-0000-0000-000000000025'), 'emitida/1/0/-',
+  'M/N · la cuota no recibió ningún abono');

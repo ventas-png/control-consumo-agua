@@ -77,6 +77,20 @@ INSERT INTO public.payment_requests (id, cliente_id, cuota_id, company_id, monto
   ('ad900000-0000-0000-0000-0000000000a4', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000019', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'failed', 'pi_qn', 'prod'),
   ('ad900000-0000-0000-0000-0000000000a5', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-00000000000f', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'failed', 'pi_qf', 'prod');
 
+-- ── Reembolso TOTAL antes de la aprobación (20261016000000)
+--   QR  cobro en línea pending (PR6): reembolso total y después «aprobado»
+--   QS  cobro en línea failed (PR7): igual
+--   QT  cobro en línea pending (PR8): reembolso y aprobación a la vez, y
+--       después dos aprobaciones simultáneas (run.sh M, N)
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, cuota_estado) VALUES
+  ('c9a00000-0000-0000-0000-000000000023', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QR reembolso antes de aprobar', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000024', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QS reembolso de un fallido', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000025', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QT reembolso contra aprobación', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida');
+INSERT INTO public.payment_requests (id, cliente_id, cuota_id, company_id, monto, provider, estado, provider_ref, ambiente) VALUES
+  ('ad900000-0000-0000-0000-0000000000a6', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000023', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_qr', 'prod'),
+  ('ad900000-0000-0000-0000-0000000000a7', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000024', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'failed', 'pi_qs', 'prod'),
+  ('ad900000-0000-0000-0000-0000000000a8', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000025', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_qt', 'prod');
+
 -- ── Storage como en Supabase: RLS activa y permisos de tabla ───────────────
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 GRANT USAGE ON SCHEMA storage TO authenticated;
@@ -141,6 +155,21 @@ LANGUAGE sql SET search_path = '' AS $$
           jsonb_build_object('mimetype', 'application/pdf', 'size', 1234, 'eTag', p_etag))
   RETURNING name
 $$;
+
+-- Conciliación directa, como service_role (para probar su propia guarda).
+CREATE OR REPLACE FUNCTION public.aj_pr_conciliar(p_pr uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_claims text := current_setting('request.jwt.claims', true);
+  v_r jsonb;
+BEGIN
+  PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  v_r := public.conciliar_pago_externo(p_pr, NULL, NULL);
+  PERFORM set_config('request.jwt.claims', COALESCE(v_claims, ''), true);
+  RETURN v_r;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.aj_pr_conciliar(uuid) TO authenticated;
 
 GRANT EXECUTE ON FUNCTION public.aj_cuota(uuid), public.aj_cobro_cuota(uuid, numeric, uuid),
   public.aj_rechazar_cobro(uuid), public.aj_reembolso(uuid, text, numeric, text), public.aj_reembolsos(uuid),
