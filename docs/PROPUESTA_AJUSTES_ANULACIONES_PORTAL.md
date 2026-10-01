@@ -109,46 +109,53 @@ nunca un parámetro. El residente ve y solicita; no aplica. Pantalla: `PortalCar
 
 ## 6. Matriz de requisitos → código → pruebas → entorno
 
-Entornos: **L** = PostgreSQL desechable local con la cadena completa de migraciones (y el mismo arnés en
-CI); **V** = vitest (CI); **S** = sandbox existente. **Ningún requisito del bloque 3 está verificado en S**:
-el sandbox no tiene #901, #902 ni este PR (§ «Sandbox» abajo).
+Migraciones del bloque: `20261011000000`, `20261012000000`, `20261013000000` (correctiva: guarda de
+cuota anulada sin trigger en `pagos`) y `20261014000000` (correctiva E7).
+
+Entornos (dónde está **comprobado**, no sólo escrito):
+- **L** = PostgreSQL desechable local con la cadena completa de migraciones (`supabase/tests/*/run.sh`);
+- **CI** = el mismo arnés SQL y vitest en GitHub Actions sobre el SHA del PR;
+- **P** = rama de previsualización de Supabase del PR: **sólo** que las migraciones se aplican sobre su
+  base (check «Supabase Preview»); ningún flujo se ejercitó ahí;
+- **S** = sandbox existente: **nada del bloque 3 está verificado** (no tiene #901, #902 ni este PR; ver
+  abajo y `SANDBOX_E2E_SINCRONIZAR.md`).
 
 | # | Requisito | Código | Pruebas | Entorno |
 | --- | --- | --- | --- | --- |
 | 1 | Docs: autoaprobación sólo owner; sin «único aprobador»; plazos como propuesta | `DECISIONES…` §E | — | — |
-| 2a | Solicitar, idempotente, una abierta por documento | `conta_ajuste_solicitar`, `_alta`, `uq_conta_ajustes_abierta` | `conta_ajustes/assert.sql` §2; concurrencia E | L |
-| 2b | Revisión: aprobar / rechazar / cancelar / reintentar | `conta_ajuste_aprobar(…, uuid[])`, `_rechazar`, `_cancelar`, `_reintentar` | §3, §5, §6, §15, §16 | L |
-| 2c | Ejecución transaccional e idempotente | `conta_ajuste_ejecutar` (subtransacción) | §3, §6, §14 (repetida), §15; concurrencia A | L |
+| 2a | Solicitar, idempotente, una abierta por documento | `conta_ajuste_solicitar`, `_alta`, `uq_conta_ajustes_abierta` | `conta_ajustes/assert.sql` §2; concurrencia E | L, CI |
+| 2b | Revisión: aprobar / rechazar / cancelar / reintentar | `conta_ajuste_aprobar(…, uuid[])`, `_rechazar`, `_cancelar`, `_reintentar` | §3, §5, §6, §15, §16 | L, CI |
+| 2c | Ejecución transaccional e idempotente | `conta_ajuste_ejecutar` (subtransacción) | §3, §6, §14 (repetida), §15; concurrencia A | L, CI |
 | 2d | Sin umbral, sin vencimiento | ausencia de umbral/cron | — | — |
-| 2e | **anular_cuota** con reversos vinculados y evidencia | `conta_ajuste_ejecutar` (rama cuota), `conta_cuota_anulaciones` | `assert_b.sql` §14 | L |
-| 2f | Dependencias informadas, sin cascada | `conta_cuota_dependencias`, `conta_ajuste_dependencias` | §12, §13, §15; concurrencia F, F′ | L, V (`ajustes.test.ts`) |
-| 2g | Rutas anteriores sin atajo (cuota) | `trg_cuota_solo_por_solicitud`, `conta_pago_cuota_no_anulada` (desde `conta_tg_pagos`, correctiva `20261013000000`: `pagos` tiene drift declarado en triggers), `useAnularCuotaMutation` | §12, §14; `anularCuotaSolicitud.test.tsx` | L, V |
-| 2h | Efectos en EC, portal, saldos, cortes históricos | `anulada_at` del servidor + reversos | §14 (corte de ayer / hoy, portal), §19 (conciliación) | L |
-| 2i | **ajuste_importe** | — | — | ⏸️ **Pendiente de E6** |
-| 3a | Permisos en servidor | `conta_ajuste_bloquear_para_revision`, `_puede_solicitar` | §2, §3, §6, §13, §14 | L |
-| 3b | Revalidar documento, período y saldo | `conta_ajuste_revalidar` | §5, §6, §8, §15; concurrencia B, C, F′ | L |
-| 3c | Sin escrituras directas | `conta_ajuste_exigir`, triggers, REVOKE | §0, §1, §11, §12 | L |
-| 3d | E1 autoaprobación | `conta_ajuste_aprobar` + CHECK | §3, §4, §16; `ajustes.test.ts`; `ajustesTab.test.tsx` | L, V |
-| 4 | Evidencia de anulación sin asiento; históricos como limitación | `conta_cargo_anulaciones`, `conta_ec_*` | §7; `conta_estado_cuenta/assert_corte.sql` | L |
-| 5 | Portal: consulta y solicitud | `portal_*`, `PortalCargosSaldoFavor.tsx` | §8; concurrencia E; `PortalCargosSaldoFavor.test.tsx`; `rlsHarness.test.ts` | L, V |
-| 6a–d | Cargos en pasarela, duplicados, fuera de orden, confirmación en servidor | `create-charge`, `confirm-charge`, `pasarela_registrar_estado` | §9; concurrencia D; tests de edge | L, V |
-| 7 | Bloqueo sin cascada; reembolso total conservado con incidencia | `conta_rechazar_cobro_por_reembolso`, incidencias | §9 | L, V |
-| 7b | **Reembolso parcial**: datos del proveedor, incidencia, sin rechazar | `pasarela_registrar_reembolso_parcial`, `pasarela_reembolsos`, `stripe-webhook-handler` | §18; concurrencia G; `stripe-webhook-handler/__tests__/logic.test.ts` | L, V |
-| 7c | Parciales duplicados, acumulados y fuera de orden | UNIQUE (solicitud, acumulado), bloqueo de la solicitud | §18 (5 casos), concurrencia G | L |
-| 8 | **Respaldo documental** protegido y trazable | bucket `ajustes-respaldos`, `conta_ajustes_respaldos`, `conta_ajuste_adjuntar_respaldo`, `respaldos_revisados` | §17 (RLS de storage, otra empresa, residente, sin UPDATE/DELETE, lista revisada, eTag alterado, cerrado tras aprobar, rechazo); `ajustes.test.ts`; `ajustesTab.test.tsx` | L, V |
-| 9 | Aislamiento, concurrencia, fallos, reintentos | — | `conta_ajustes` §1–§19, concurrencia A–G | L |
-| 10a | Sandbox | — | **Bloqueado** (ver abajo) | S ✗ |
-| 10b | Auditor de drift | refresco de `huella-produccion.json` | **Pendiente de permiso de escritura** | — |
+| 2e | **anular_cuota** con reversos vinculados y evidencia | `conta_ajuste_ejecutar` (rama cuota), `conta_cuota_anulaciones` | `assert_b.sql` §14 | L, CI |
+| 2f | Dependencias informadas, sin cascada | `conta_cuota_dependencias`, `conta_ajuste_dependencias` | §12, §13, §15; concurrencia F, F′; `ajustes.test.ts` | L, CI |
+| 2g | Rutas anteriores sin atajo (cuota) | `trg_cuota_solo_por_solicitud`, `conta_pago_cuota_no_anulada` (desde `conta_tg_pagos`, correctiva `20261013000000`: `pagos` tiene drift declarado en triggers), `useAnularCuotaMutation` | §12, §14; `anularCuotaSolicitud.test.tsx` | L, CI |
+| 2h | Efectos en EC, portal, saldos, cortes históricos | `anulada_at` del servidor + reversos | §14 (corte de ayer / hoy, portal), §19 (conciliación) | L, CI |
+| 2i | **ajuste_importe** | — | — | ⏸️ **Pendiente de E6** (qué falta: `DECISIONES…` §E6) |
+| 2j | **E7**: sólo la tarifa sin emitir de una reserva cancelada se elimina sin solicitud; una cuota 'pendiente' ya es CxC | `20261014000000` (`conta_cuota_exigir_eliminable`), `AmenidadesTab` (cancelar antes, compensación por solicitud) | `assert_b.sql` §12 (QF, QF2, QF3, QG) | L, CI |
+| 2k | **E8**: cobros en línea abandonados | — (propuesta en `DECISIONES…` §E8) | — | ❓ pendiente |
+| 2l | Migraciones aplicables sobre una base de Supabase | `20261011`–`20261014` | check «Supabase Preview» | P |
+| 3a | Permisos en servidor | `conta_ajuste_bloquear_para_revision`, `_puede_solicitar` | §2, §3, §6, §13, §14 | L, CI |
+| 3b | Revalidar documento, período y saldo | `conta_ajuste_revalidar` | §5, §6, §8, §15; concurrencia B, C, F′ | L, CI |
+| 3c | Sin escrituras directas | `conta_ajuste_exigir`, triggers, REVOKE | §0, §1, §11, §12 | L, CI |
+| 3d | E1 autoaprobación | `conta_ajuste_aprobar` + CHECK | §3, §4, §16; `ajustes.test.ts`; `ajustesTab.test.tsx` | L, CI |
+| 4 | Evidencia de anulación sin asiento; históricos como limitación | `conta_cargo_anulaciones`, `conta_ec_*` | §7; `conta_estado_cuenta/assert_corte.sql` | L, CI |
+| 5 | Portal: consulta y solicitud | `portal_*`, `PortalCargosSaldoFavor.tsx` | §8; concurrencia E; `PortalCargosSaldoFavor.test.tsx`; `rlsHarness.test.ts` | L, CI |
+| 6a–d | Cargos en pasarela, duplicados, fuera de orden, confirmación en servidor | `create-charge`, `confirm-charge`, `pasarela_registrar_estado` | §9; concurrencia D; tests de edge | L, CI |
+| 7 | Bloqueo sin cascada; reembolso total conservado con incidencia | `conta_rechazar_cobro_por_reembolso`, incidencias | §9 | L, CI |
+| 7b | **Reembolso parcial**: datos del proveedor, incidencia, sin rechazar | `pasarela_registrar_reembolso_parcial`, `pasarela_reembolsos`, `stripe-webhook-handler` | §18; concurrencia G; `stripe-webhook-handler/__tests__/logic.test.ts` | L, CI |
+| 7c | Parciales duplicados, acumulados y fuera de orden | UNIQUE (solicitud, acumulado), bloqueo de la solicitud | §18 (5 casos), concurrencia G | L, CI |
+| 8 | **Respaldo documental** protegido y trazable | bucket `ajustes-respaldos`, `conta_ajustes_respaldos`, `conta_ajuste_adjuntar_respaldo`, `respaldos_revisados` | §17 (RLS de storage, otra empresa, residente, sin UPDATE/DELETE, lista revisada, eTag alterado, cerrado tras aprobar, rechazo); `ajustes.test.ts`; `ajustesTab.test.tsx` | L, CI |
+| 9 | Aislamiento, concurrencia, fallos, reintentos | — | `conta_ajustes` §1–§19, concurrencia A–G | L, CI |
+| 10a | Sandbox | procedimiento acotado en `SANDBOX_E2E_SINCRONIZAR.md` | **Espera autorización** (ver abajo) | S ✗ |
+| 10b | Auditor de drift | refresco de `huella-produccion.json` | Causa verificada contra producción (captura de sólo lectura 2026-09-27 23:46:56 UTC, sha256 `35fff705…9e37`, 2779 grupos, 813 migraciones): huella anterior a #902. **Escritura del archivo bloqueada por los permisos de la sesión** | CI ✗ |
 
-### Sandbox (2026-09-27, sólo lectura)
+### Sandbox (2026-10-01, sólo lectura)
 
 `jwpmivhvlstslncrtokb` = «control-agua-rls-sandbox» (≠ producción `nnsqmeigtgewatameexo`): 504 migraciones,
-máxima `20261004000200`. Faltan exactamente: `20261005000000`, `20261006000000` (en `main`) y
-`20261007000000`–`20261013000000` (este PR). Bloqueo: el procedimiento autorizado
-([`SANDBOX_E2E_SINCRONIZAR.md`](SANDBOX_E2E_SINCRONIZAR.md), paso 1) sólo aplica migraciones de `main`
-(«nada de PRs abiertos»), así que las de #904 no se pueden aplicar mientras el PR esté abierto, y las pruebas
-de integración del bloque 3 no pueden correr allí. Las de `main` (`20261005`, `20261006`) sí se pueden
-sincronizar con ese procedimiento, pero no habilitan las pruebas del bloque 3.
+máxima `20261004000200`. Faltan exactamente `20261005000000`, `20261006000000` (en `main`) y
+`20261007000000`–`20261014000000` (8 de este PR). El procedimiento autorizado sólo aplica `main`; el
+procedimiento acotado para las de este PR está en `SANDBOX_E2E_SINCRONIZAR.md` y **espera autorización**.
 
 ## 7. Fuera de alcance / pendiente
 
@@ -157,4 +164,5 @@ sincronizar con ese procedimiento, pero no habilitan las pruebas del bloque 3.
 - QPayPro: su adaptador no expone reembolsos; no se implementa nada no confirmado.
 - Carrera residual: un cobro en línea creado en el instante previo a la aprobación de la anulación de la cuota
   (sin solicitud de cobro todavía) y confirmado después falla al conciliar (`COBRO_CUOTA_ANULADA`) y el webhook
-  queda reintentando; queda visible en `stripe_webhook_events`. Ver E8.
+  queda reintentando; queda visible en `stripe_webhook_events`. Lo cierra el flujo propuesto en E8
+  (incidencia `cobro_sobre_documento_anulado`).

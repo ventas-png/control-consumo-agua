@@ -106,9 +106,30 @@ SELECT public.chk_falla($$DELETE FROM public.cuotas_condominio WHERE id = 'c9a00
 SELECT public.chk_falla($$UPDATE public.cuotas_condominio SET anulada_at = now() WHERE id = 'c9a00000-0000-0000-0000-00000000000e'$$,
   'CUOTA_FECHA_ANULACION_FIJA', '12 · poner una fecha de anulación a mano: rechazado');
 SELECT public.chk_txt(public.aj_cuota(:QE), 'emitida/1/0/-', '12 · QE intacta');
--- Sin emitir y sin dependencias: se sigue eliminando (reserva cancelada).
+-- E7 (20261014000000): 'pendiente' NO es «sin emitir». QF2 está 'pendiente'
+-- y ya es una cuenta por cobrar: devengo vivo, el residente la ve como deuda
+-- y figura en el estado de cuenta.
+SELECT public.chk_txt(public.aj_cuota('c9a00000-0000-0000-0000-000000000015'), 'pendiente/1/0/-',
+  '12 · QF2 (pendiente, sin reserva) tiene su devengo contabilizado');
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :RUNO, false);
+SELECT public.chk(
+  (SELECT count(*) FROM public.portal_documentos_con_saldo() d WHERE d.documento_id = 'c9a00000-0000-0000-0000-000000000015'), 1,
+  '12 · …el residente la ve como deuda en el portal');
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt(public.sf_cxc_doc('cuotas_condominio', 'c9a00000-0000-0000-0000-000000000015')::text, '30.00',
+  '12 · …y está en la cuenta por cobrar del libro (30)');
+SELECT public.chk_falla($$UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'c9a00000-0000-0000-0000-000000000015'$$,
+  'CUOTA_ELIMINACION_SOLO_POR_SOLICITUD', '12 · por eso eliminarla exige solicitud, aunque esté «pendiente» y sin dependencias');
+RESET ROLE;
+SELECT public.chk_falla($$DELETE FROM public.cuotas_condominio WHERE id = 'c9a00000-0000-0000-0000-000000000015'$$,
+  'CUOTA_ELIMINACION_SOLO_POR_SOLICITUD', '12 · …tampoco con DELETE');
+SELECT public.chk_falla($$UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'c9a00000-0000-0000-0000-000000000016'$$,
+  'CUOTA_ELIMINACION_SOLO_POR_SOLICITUD', '12 · la tarifa de una reserva CONFIRMADA tampoco');
+SELECT public.chk_txt(public.aj_cuota('c9a00000-0000-0000-0000-000000000015'), 'pendiente/1/0/-', '12 · QF2 intacta');
+-- La tarifa sin emitir de una reserva CANCELADA, sin dependencias, sí.
 SELECT public.chk(public.filas_afectadas($$UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'c9a00000-0000-0000-0000-00000000000f'$$), 1,
-  '12 · una cuota sin emitir y sin dependencias se elimina');
+  '12 · la tarifa sin emitir de una reserva cancelada se elimina sin solicitud');
 SELECT public.chk_txt(public.aj_cuota(:QF), 'pendiente/0/0/eliminada', '12 · …y su devengo se reversa');
 -- Sin emitir con un cobro vivo: no, y no en cascada.
 SELECT public.chk_uuid(public.aj_cobro_cuota(:QG, 10, :KG), :KG, '12 · QG (sin emitir) recibe un cobro');

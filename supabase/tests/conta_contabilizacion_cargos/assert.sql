@@ -418,7 +418,15 @@ RESET ROLE;
 
 -- ── 14 · borrar una cuota reversa, con dimensiones ──────────────────────────
 SET ROLE authenticated;
+-- Eliminación HEREDADA (anterior a 20261012000000, cuando una cuota se
+-- borraba sin solicitud): se desactiva expresamente el guard para modelarla.
+RESET ROLE;
+ALTER TABLE public.cuotas_condominio DISABLE TRIGGER trg_cuota_solo_por_solicitud;
+SET ROLE authenticated;
 UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'c1000000-0000-0000-0000-000000000004';
+RESET ROLE;
+ALTER TABLE public.cuotas_condominio ENABLE TRIGGER trg_cuota_solo_por_solicitud;
+SET ROLE authenticated;
 RESET ROLE;
 SELECT public.chk(public.n_vivos('cuotas_condominio', 'c1000000-0000-0000-0000-000000000004', 'cuota_emitida'), 0,
   '14 · el borrado suave de una cuota clasificada reversa su asiento');

@@ -12,60 +12,67 @@ pendientes de #887 hubo que retirarlo (a3a6829b) en vez de relajarlo. Este
 documento es el procedimiento con el que se puso al día el 2026-09-23 y el que
 hay que repetir.
 
-## Estado registrado (re-verificado el 2026-09-27 hacia las 16:40 UTC)
+## Estado registrado (re-verificado el 2026-10-01 03:14 UTC, sólo lectura)
 
-Sin cambios desde la verificación de las 14:00: 504 migraciones, máxima `20261004000200`, sin
-`pagos_rechazo_eventos` ni `conta_ajustes_solicitudes`. #904 suma ahora `20261012000000` y su correctiva `20261013000000` (siete
-migraciones del PR en total: `20261007000000`–`20261013000000`).
-
-**El sandbox está atrasado respecto de `main`.** Inventario de sólo lectura
-sobre `jwpmivhvlstslncrtokb` («control-agua-rls-sandbox», no es producción):
-504 migraciones registradas, máxima `20261004000200`; no existen
-`pagos_rechazo_eventos`, `conta_ec_cobro_al_corte(uuid, date)` ni
-`conta_saldo_favor_aplicaciones`. Comparado versión a versión con
-`supabase/migrations/`:
+`jwpmivhvlstslncrtokb` = «control-agua-rls-sandbox» (organización `mmqkhtbewmdashgswlxg`, creado el
+2026-08-19). **No es producción** (`nnsqmeigtgewatameexo`). 504 migraciones registradas, máxima
+`20261004000200`, y las 504 versiones locales hasta esa son las mismas (conciliadas el 2026-09-23).
+No existen `pagos_rechazo_eventos`, `conta_ec_cobro_al_corte(uuid, date)` ni
+`conta_ajustes_solicitudes`. Datos: 527 cuotas, 0 solicitudes de cobro en línea.
 
 | Versión | Origen | En el sandbox |
 | --- | --- | --- |
-| `20261005000000_conta_cobros_rechazo_evidencia` | #901 (en `main`, aplicada en producción el 2026-09-25) | **No aplicada.** Ni la fila de historial ni `pagos_rechazo_eventos`; `conta_tg_pagos` es la de `20261004000100`. |
-| `20261006000000_conta_cobros_vigencia_sin_fecha` | #902 (en `main` desde `aa6e046`; aplicada en producción: registrada allí y con `conta_ec_cobro_al_corte`) | **No aplicada.** Depende de la anterior. |
-| `20261007000000_conta_saldos_a_favor`, `20261008000000_conta_tipo_cambio_mensual`, `20261009000000_conta_sf_cuota_estado_y_tc_borradores`, `20261010000000_conta_decisiones_diferencial_tasa_manual_mora`, `20261011000000_conta_ajustes_solicitudes_portal_pasarela` | #904 (PR en borrador) | **No aplicadas**, y no se aplican mientras #904 no esté en `main` (el paso 1 de abajo excluye PRs abiertos). Dependen de las dos anteriores. |
+| `20261005000000_conta_cobros_rechazo_evidencia` | `main` (#901; aplicada en producción) | **Falta** |
+| `20261006000000_conta_cobros_vigencia_sin_fecha` | `main` (#902; aplicada en producción) | **Falta** |
+| `20261007000000` … `20261011000000` (5) | #904 (abierto) | **Faltan** |
+| `20261012000000_conta_anular_cuota_reembolsos_parciales_respaldos` | #904 | **Falta** |
+| `20261013000000_conta_cuota_anulada_sin_tocar_pagos` | #904 (correctiva de 20261012) | **Falta** |
+| `20261014000000_conta_cuota_eliminar_solo_tarifa_reserva_cancelada` | #904 (correctiva de 20261012, E7) | **Falta** |
 
-### Coordinación pendiente (para quien administra el sandbox)
+El procedimiento de abajo sólo admite migraciones de `main` (paso 1: «nada de PRs abiertos»).
+Las de #904 **no** se aplican con él. Para probarlas en este sandbox hace falta la autorización
+expresa del procedimiento acotado de la sección siguiente.
 
-1. Autorizar y ejecutar, con el procedimiento de abajo, `20261005000000` y
-   `20261006000000` (ya en `main`), cada una en su transacción con huella
-   verificada. No hay colisiones de versión ni nada que renumerar.
-2. Cuando #904 llegue a `main`, repetir con `20261007000000` a
-   `20261013000000` (siete migraciones; la última crea además el bucket privado
-   `ajustes-respaldos` y sus políticas en `storage.objects`). Todas crean tablas vacías, agregan
-   columnas con default a `conta_asientos` y redefinen funciones/triggers; no
-   reescriben datos existentes. Antes de aplicarlas, contar los borradores
-   con la marca antigua (quedarán bloqueados para publicar hasta resolverlos):
-   `select count(*) from conta_asientos where estado = 'borrador' and
-   concepto like '%[SIN TIPO DE CAMBIO %'`.
-3. Hasta entonces, **la validación de #904 contra el sandbox no se hizo**: la
-   de comportamiento está en los arneses SQL (`supabase/tests/conta_saldos_favor`,
-   `supabase/tests/conta_tipo_cambio_mensual`) contra la cadena completa de
-   migraciones, en CI.
+## Procedimiento ACOTADO para probar las migraciones de un PR abierto (requiere autorización)
 
-No hay versiones sólo en el sandbox ni colisiones: las dos versiones están
-libres en su historial.
+**No está autorizado todavía; no se ejecutó.** Es la propuesta para #904.
 
-**Las validaciones de #901 y #902 no lo actualizaron.** Cada una aplicó las
-migraciones y un caso sintético dentro de **una** transacción que terminó en
-`RAISE EXCEPTION 'SUITE_OK_ROLLBACK …'`; después se comprobó que no quedó nada
-(504 migraciones, sin la tabla ni las funciones nuevas, `conta_tg_pagos` sin
-cambios, sin datos sintéticos). Eso prueba que las migraciones corren sobre el
-estado real del sandbox; **no** lo deja al día.
+1. **Primero `main`.** `20261005000000` y `20261006000000` con el procedimiento normal (abajo),
+   cada una en su transacción con huella verificada. Si la huella previa del sandbox no coincide con
+   la reconstrucción de su historial, se detiene todo y se informa.
+2. **Respaldo** en `respaldo_sync_AAAAMMDD` (paso 3 del procedimiento normal), además de las
+   definiciones actuales de las funciones que #904 redefine (`conta_tg_pagos`, `conta_tg_cuotas`,
+   `conciliar_pago_externo`, las de estado de cuenta y saldos a favor) y del contenido de
+   `storage.buckets`/políticas de `storage.objects`.
+3. **Las 8 migraciones del PR, en orden, una por transacción**, con el SQL **del SHA autorizado**
+   (se registra el SHA), su fila en `supabase_migrations.schema_migrations` con la misma versión y
+   nombre, y la huella esperada tras cada paso (calculada antes sobre una reconstrucción local de
+   `main` + esas migraciones). Huella distinta → `ROLLBACK` de esa transacción y alto. Nada de
+   `repair`, `reset` ni borrado de datos: las migraciones sólo crean tablas vacías, agregan
+   columnas con default y redefinen funciones, triggers, políticas y un bucket privado.
+4. **Registro** en `respaldo_sync_AAAAMMDD.migraciones_de_pr` (versión, nombre, sha256 del archivo,
+   SHA del PR, quién autorizó). Cuando #904 llegue a `main`, se comprueba que cada archivo fusionado
+   tenga el mismo sha256: si coincide, no se vuelve a aplicar nada; si el PR cambió una migración ya
+   aplicada aquí, se trata como colisión (sección «Colisiones de versión») y se decide con quien
+   administra el sandbox.
+5. **Pruebas de los flujos del bloque 3 en el sandbox**, con datos sintéticos `SINT` dentro de
+   transacciones que terminan en `RAISE` (no quedan datos):
+   - anular cuota: solicitar, dependencias informadas, aprobar, reversos vinculados, evidencia,
+     estado de cuenta al corte, portal; eliminación de tarifa de reserva cancelada vs. cuota
+     `pendiente` (E7);
+   - respaldos: subir al bucket privado con la sesión de un usuario E2E, registrar, aprobar con la
+     lista revisada, eTag alterado, no reemplazable;
+   - reembolsos parciales: `pasarela_registrar_reembolso_parcial` como service_role con avisos
+     duplicados, acumulados y fuera de orden; incidencias visibles.
+   Después, el E2E del despliegue contra el sandbox y su preflight.
+6. **Cómo se deshace** si se decide no seguir: restaurar desde el respaldo las funciones y políticas
+   redefinidas y borrar las filas de historial de esas 8 versiones; las tablas nuevas quedan vacías
+   (eliminarlas sería un borrado: sólo con autorización expresa).
 
-Para ponerlo al día, con el procedimiento de abajo, en este orden y cada una en
-su propia transacción con verificación de huella: `20261005000000` y, cuando
-#902 esté en `main`, `20261006000000`. Ninguna toca datos existentes (crean una
-tabla vacía y redefinen funciones); no requieren renumeración ni `repair`.
-Quien administra el sandbox decide cuándo; hasta entonces, cualquier E2E que
-use `pagos_rechazo_eventos` o el estado de cuenta con cortes de cobros
-rechazados fallará contra él por desincronización, no por el código.
+Alternativa sin cambio persistente: el mismo paso 3 + las pruebas del paso 5 dentro de UNA
+transacción que termina en `RAISE` (como se validaron #901 y #902). Requiere enviar ~560 KB de
+SQL en una sola sentencia: no es viable por el conector de esta sesión; sí con `psql` y la URL de la
+base del sandbox por quien la administra.
 
 ## Cuándo hacerlo
 

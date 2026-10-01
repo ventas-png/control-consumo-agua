@@ -10,7 +10,10 @@
 --   QC  con una aplicación de saldo a favor viva
 --   QD  el cobro llega entre la solicitud y la aprobación
 --   QE  atajos: UPDATE, borrado suave y duro de una emitida
---   QF  sin emitir y sin dependencias: se elimina (como las de reservas)
+--   QF  tarifa sin emitir de una reserva CANCELADA, sin dependencias: se
+--       elimina sin solicitud (E7, 20261014000000)
+--   QF2 'pendiente' sin reserva: ya es cuenta por cobrar; no se elimina
+--   QF3 'pendiente', tarifa de una reserva CONFIRMADA: no se elimina
 --   QG  sin emitir con un cobro vivo: no se elimina
 --   QH  período cerrado → fallida; reabierto → reintento
 --   QI  autoaprobación del dueño
@@ -33,6 +36,15 @@ INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, con
   ('c9a00000-0000-0000-0000-000000000022', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QY cobro vs aprobación', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
   -- QZ: la otra empresa.
   ('c9a00000-0000-0000-0000-0000000000b1', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'b1b1b1b1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000b001', 'SINT QZ empresa B', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida');
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, cuota_estado) VALUES
+  ('c9a00000-0000-0000-0000-000000000015', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QF2 pendiente sin reserva', 30, '2026-09', 'pendiente', 'mantenimiento', 'pendiente'),
+  ('c9a00000-0000-0000-0000-000000000016', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QF3 reserva confirmada', 30, '2026-09', 'pendiente', 'mantenimiento', 'pendiente');
+INSERT INTO public.amenidades (id, nombre, project_id, company_id) VALUES
+  ('a3e00000-0000-0000-0000-000000000001', 'SINT Salón', 'a1a1a1a1-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+INSERT INTO public.reservas_amenidades (id, company_id, amenidad_id, unidad_id, fecha, hora_inicio, hora_fin, estado, cuota_id) VALUES
+  ('a3e00000-0000-0000-0000-0000000000f1', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a3e00000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', '2026-10-10', '10:00', '12:00', 'cancelada', 'c9a00000-0000-0000-0000-00000000000f'),
+  ('a3e00000-0000-0000-0000-0000000000f3', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a3e00000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', '2026-10-11', '10:00', '12:00', 'confirmada', 'c9a00000-0000-0000-0000-000000000016');
+
 -- QA existe desde antes de ayer: al corte de ayer estaba vigente.
 UPDATE public.cuotas_condominio SET created_at = CURRENT_DATE - 10 WHERE id = 'c9a00000-0000-0000-0000-00000000000a';
 

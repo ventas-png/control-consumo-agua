@@ -45,12 +45,75 @@ de «único aprobador», y los plazos de E2/E3 son **propuestas**, no decisiones
 | E4 | El residente **solicita** desde el portal la aplicación de su saldo a favor; contabilidad la aprueba y la ejecuta. El residente no aplica directamente. | ✅ Aprobada · implementada en `20261011000000` (`portal_solicitar_aplicacion_saldo_favor`) y en el portal. |
 | E5 | Igual que D1: se mantiene el bloqueo, sin cascada automática. Un reembolso confirmado por el proveedor **se conserva** y abre una incidencia visible de conciliación. | ✅ Aprobada · implementada en `20261011000000` (`conta_incidencias_conciliacion`). |
 
-### Decisiones pendientes del cierre del bloque 3 (2026-09-27)
+### Decisiones pendientes del cierre del bloque 3 (actualizado 2026-10-01)
 
-| # | Pregunta concreta | Estado |
-| --- | --- | --- |
-| E6 | **`ajuste_importe`** (nota de crédito/débito sobre una cuota o cargo publicado). Hace falta decidir: **(a)** contrapartida — la misma cuenta de ingreso del devengo original (reverso parcial) o una cuenta especial «descuentos y bonificaciones» / «ajustes a ingresos»; **(b)** sólo crédito (rebaja) o también débito (aumento); **(c)** tope — no más que el saldo pendiente del documento, o se admite dejar saldo a favor; **(d)** si la mora posterior se calcula sobre el importe neto; **(e)** fecha contable = la de la ejecución (propuesta). En cualquier caso el documento y su asiento original no se sobrescriben: la nota es un documento propio, vinculado, con su asiento. | ⏸️ **Sin implementar hasta decidir** (a)–(d). |
-| E7 | **Eliminar una cuota sin emitir.** Implementado en `20261012000000`: una cuota `pendiente` (sin emitir; p. ej. la tarifa de una reserva que se cancela) sin cobros ni saldo aplicado se sigue eliminando sin solicitud (su devengo lo reversa `conta_tg_cuotas`); una emitida sólo se anula por solicitud y cualquier eliminación con dependencias se rechaza. ¿Se confirma, o también la eliminación de cuotas sin emitir debe pasar por aprobación (afecta la cancelación de reservas de amenidades)? | ❓ Confirmar. |
-| E8 | **Cobro en línea en curso** de una cuota: hoy bloquea su anulación (dependencia `cobro_en_linea`). Una solicitud de cobro abandonada queda `pending` sin vencimiento, así que bloquearía indefinidamente. ¿Se acepta, o se define cuándo una solicitud de cobro abandonada deja de contar (p. ej. al consultarla al proveedor)? | ❓ Confirmar. |
+#### E6 · `ajuste_importe` — ⏸️ PENDIENTE, sin implementar
+
+Faltan las cuatro reglas: **(a)** contrapartida (la cuenta de ingreso del devengo original o una
+cuenta especial de ajustes/bonificaciones); **(b)** sólo crédito (rebaja) o también débito
+(aumento); **(c)** tope (no más que el saldo pendiente del documento, o se admite dejar saldo a
+favor); **(d)** si la mora posterior se calcula sobre el importe neto. Propuesta para (e): fecha
+contable = la de la ejecución.
+
+Qué falta implementar una vez definidas (nada de esto existe hoy):
+1. Tabla `conta_notas_ajuste` (documento propio, vinculado a la cuota o cargo; inmutable): tipo
+   crédito/débito según (b), importe, motivo, solicitud, asiento.
+2. Tipo `ajuste_importe` en el flujo (`conta_ajuste_solicitar/revalidar/ejecutar`): foto con el saldo,
+   revalidación del tope (c), período abierto, sin cambiar `monto` del documento.
+3. Generación del asiento de la nota contra la cuenta de (a), con el auxiliar y la unidad del
+   devengo; el asiento original no se toca.
+4. Saldos: `conta_cuota_saldo_cobro`, `conta_cargo_saldo_cobro`, `conta_cargo_saldo_pagable`,
+   `portal_documentos_con_saldo` y el estado de cuenta (al corte) restando/sumando las notas
+   vivas; mora según (d) en `conta_aplicar_mora_cuotas`.
+5. Pantalla (solicitar desde Cuotas y Cargos), pruebas SQL (permisos, aislamiento, doble
+   aprobación, concurrencia contra cobros, período cerrado, tope) y vitest.
+
+#### E7 · eliminar cuotas sin aprobación — ✅ implementado (`20261014000000`), ❓ confirmar alcance
+
+`cuota_estado = 'pendiente'` **no** distingue una cuota sin emitir de una pendiente de pago: es el
+valor por defecto de toda cuota hasta el cierre de ciclo, y una cuota 'pendiente' ya tiene su
+devengo contabilizado (al insertarse), el residente la ve como deuda y está en la cuenta por cobrar.
+Lo prueba `supabase/tests/conta_ajustes/assert_b.sql` §12 (QF2: 'pendiente', devengo vivo, visible en
+el portal, 30 en la CxC del libro → eliminarla exige solicitud).
+
+Regla implementada: sin solicitud sólo se elimina la **tarifa de una reserva de amenidad ya
+cancelada** (`reservas_amenidades.cuota_id`, `estado = 'cancelada'`), sin emitir
+(`cuota_estado = 'pendiente'` **y** `emitida_at` nulo) y sin dependencias. Todo lo demás se anula
+por solicitud. La pantalla de amenidades cancela primero la reserva y después elimina su tarifa;
+cuando falla guardar una reserva y ya se generó el cargo, ya no lo borra: solicita su anulación.
+**Confirmar**: ¿la cancelación de la reserva basta como autorización para eliminar su tarifa, o
+también debe pasar por aprobación?
+
+#### E8 · cobros en línea abandonados — ❓ propuesta, sin implementar
+
+Hoy una solicitud de cobro `pending` de una cuota bloquea su anulación sin plazo (dependencia
+`cobro_en_linea`). Flujo propuesto de conciliación (la antigüedad sólo decide **cuándo preguntar**,
+nunca libera):
+
+1. **Detección**: solicitudes `pending`/`pending_verification` con más de N horas (N a definir) o a
+   pedido de Contabilidad («Consultar al proveedor» en la incidencia o en la dependencia).
+2. **Consulta al proveedor desde el servidor** (`provider.consultarEstado`), registrada con
+   `pasarela_registrar_estado(origen = 'consulta')`: el aviso queda en `pasarela_eventos` con el
+   estado crudo del proveedor en `payload`, deduplicado.
+   - `aprobado` → se concilia como hoy.
+   - estado **final** de no-cobro informado por el proveedor (Stripe: PaymentIntent `canceled`;
+     sesión de checkout `expired`) → `rechazado` → la solicitud pasa a `failed` y deja de ser
+     dependencia.
+   - `pendiente`, sin respuesta o error → no cambia nada; queda el intento registrado.
+3. **QPayPro**: su `consultarEstado` todavía no consulta al proveedor (devuelve `pendiente` por
+   diseño: `_shared/payments/qpayproProvider.ts`). Hasta cablear el endpoint confirmado, sus cobros
+   abandonados **no** se liberan automáticamente: Contabilidad verifica en el panel de QPayPro y
+   registra el resultado con evidencia (decisión a confirmar: quién y con qué respaldo).
+4. **Confirmación tardía** (el proveedor aprueba después de `failed`): `failed → succeeded` ya
+   concilia hoy. Si mientras tanto la cuota se anuló, la conciliación no debe fallar en silencio ni
+   perder el dinero: se conserva el aviso, la solicitud queda `pending_verification` y se abre una
+   incidencia nueva `cobro_sobre_documento_anulado` (devolver por el proveedor o registrar como
+   anticipo, a decidir por Contabilidad). Hoy esa conciliación falla con `COBRO_CUOTA_ANULADA` y el
+   webhook reintenta: es el hueco que este flujo cierra.
+5. **Trazabilidad**: cada consulta y su resultado en `pasarela_eventos`; cada liberación enlazada al
+   evento del proveedor que la justifica; nada se libera por fecha.
+
+**Decidir**: N (cuándo consultar), quién puede pedir una consulta manual, y el tratamiento de QPayPro
+mientras no tenga consulta server-to-server.
 
 El detalle del bloque 3 está en [`PROPUESTA_AJUSTES_ANULACIONES_PORTAL.md`](PROPUESTA_AJUSTES_ANULACIONES_PORTAL.md).
