@@ -68,6 +68,18 @@ describe('decidirTrasConciliar', () => {
     })
   })
 
+  it('cobro sobre una cuota anulada (20261015000000): 200 sin conciliar, con la incidencia, para que no se reintente', () => {
+    for (const accion of ['cobro_sobre_documento_anulado', 'cobro_retenido_ya_registrado']) {
+      const d = decidirTrasConciliar(
+        { ok: true, accion, incidencia_id: 'inc-1' } as never, null,
+      )
+      expect(d).toMatchObject({ accion: 'responder', status: 200 })
+      expect(d.accion === 'responder' && d.body).toEqual({
+        received: true, conciliado: false, en_revision: true, accion, incidencia_id: 'inc-1',
+      })
+    }
+  })
+
   it('abono parcial: liquidado false y el saldo que queda', () => {
     const d = decidirTrasConciliar(
       { ok: true, pago_id: 'pago-2', liquidado: false, saldo_restante: 45.5 }, null,

@@ -103,6 +103,7 @@ export interface IncidenciaConciliacion {
   project_id: string | null
   tipo: 'reembolso_bloqueado' | 'reembolso_aplicado' | 'rechazo_tras_aprobacion'
       | 'aprobado_tras_reembolso' | 'reembolso_sin_cobro' | 'reembolso_parcial'
+      | 'cobro_sobre_documento_anulado'
   estado: 'abierta' | 'resuelta'
   payment_request_id: string | null
   pago_id: string | null
@@ -139,6 +140,7 @@ export const ETIQUETA_INCIDENCIA: Record<IncidenciaConciliacion['tipo'], string>
   aprobado_tras_reembolso: 'Aprobado después de reembolsado',
   reembolso_sin_cobro: 'Reembolso sin cobro acreditado',
   reembolso_parcial: 'Reembolso parcial por conciliar',
+  cobro_sobre_documento_anulado: 'Cobro confirmado sobre cuota anulada (sin acreditar)',
 }
 
 /**

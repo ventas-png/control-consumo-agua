@@ -42,3 +42,27 @@ SELECT public.chk(
   (SELECT count(*) FROM public.pasarela_eventos e
     WHERE e.payment_request_id = 'ad900000-0000-0000-0000-000000000043' AND e.estado_informado = 'reembolso_parcial'), 2,
   'G · los dos avisos quedan como evidencia');
+
+-- Confirmación tardía de un cobro sobre una cuota anulada (20261015000000).
+SELECT public.chk_txt(public.aj_cuota('c9a00000-0000-0000-0000-000000000018'), 'anulada/0/1/hoy',
+  'I · QM anulada');
+SELECT public.chk_txt(public.aj_pr('ad900000-0000-0000-0000-0000000000a3') || '|' || public.aj_incidencias('ad900000-0000-0000-0000-0000000000a3'),
+  'pending_verification/0/-|cobro_sobre_documento_anulado:abierta',
+  'I · la confirmación que esperó a la anulación: sin pago, con su incidencia');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pasarela_eventos e WHERE e.payment_request_id = 'ad900000-0000-0000-0000-0000000000a3'), 1,
+  'I · el aviso quedó registrado');
+SELECT public.chk_txt(public.aj_cuota('c9a00000-0000-0000-0000-000000000019'), 'pagada/1/0/-',
+  'J · QN sigue viva (pagada por el cobro que llegó primero); la anulación falló sin escribir');
+SELECT public.chk_txt(public.aj_pr('ad900000-0000-0000-0000-0000000000a4') || '|' || public.aj_incidencias('ad900000-0000-0000-0000-0000000000a4'),
+  'succeeded/1/aplicado|', 'J · …con su cobro acreditado una vez y sin incidencia');
+SELECT public.chk_txt(public.aj_sol('5e0b0000-0000-0000-0000-000000000019'), 'fallida/1/false', 'J · la solicitud queda fallida');
+SELECT public.chk_txt(public.aj_pr('ad900000-0000-0000-0000-0000000000a2') || '|' || public.aj_incidencias('ad900000-0000-0000-0000-0000000000a2'),
+  'pending_verification/0/-|cobro_sobre_documento_anulado:abierta',
+  'K · dos confirmaciones a la vez: ningún pago y UNA incidencia');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pasarela_eventos e WHERE e.payment_request_id = 'ad900000-0000-0000-0000-0000000000a2'), 2,
+  'K · los dos avisos quedan como evidencia');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pagos p WHERE p.cuota_id IN ('c9a00000-0000-0000-0000-000000000017', 'c9a00000-0000-0000-0000-000000000018')), 0,
+  'I/K · ninguna cuota anulada recibió un pago');

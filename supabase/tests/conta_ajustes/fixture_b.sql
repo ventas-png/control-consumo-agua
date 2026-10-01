@@ -59,6 +59,24 @@ INSERT INTO public.payment_requests (id, cliente_id, cargo_adicional_id, company
   ('ad900000-0000-0000-0000-000000000042', 'e0000000-0000-0000-0000-00000000a001', 'ad000000-0000-0000-0000-000000000042', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 40, 'stripe', 'pending', 'pi_pp2', 'prod'),
   ('ad900000-0000-0000-0000-000000000043', 'e0000000-0000-0000-0000-00000000a001', 'ad000000-0000-0000-0000-000000000043', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 50, 'stripe', 'pending', 'pi_pp3', 'prod');
 
+-- ── Confirmación TARDÍA sobre una cuota anulada o eliminada (20261015000000)
+--   QL  se anula por el flujo; sus cobros en línea habían quedado 'failed' y
+--       el proveedor los confirma DESPUÉS (PQ1 secuencial, PQ2 dos a la vez)
+--   QM  la anulación retiene la cuota; mientras, llega la confirmación (PQ3)
+--   QN  al revés: la confirmación primero (PQ4); mientras, la anulación
+--   QF  (tarifa eliminable) con un cobro en línea 'failed' (PQ5): se elimina
+--       y después llega la confirmación
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, cuota_estado) VALUES
+  ('c9a00000-0000-0000-0000-000000000017', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QL cobro tardío anulada', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000018', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QM anulación contra aviso', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000019', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QN aviso contra anulación', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida');
+INSERT INTO public.payment_requests (id, cliente_id, cuota_id, company_id, monto, provider, estado, provider_ref, ambiente) VALUES
+  ('ad900000-0000-0000-0000-0000000000a1', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000017', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'failed', 'pi_ql1', 'prod'),
+  ('ad900000-0000-0000-0000-0000000000a2', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000017', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'failed', 'pi_ql2', 'prod'),
+  ('ad900000-0000-0000-0000-0000000000a3', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000018', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'failed', 'pi_qm', 'prod'),
+  ('ad900000-0000-0000-0000-0000000000a4', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000019', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'failed', 'pi_qn', 'prod'),
+  ('ad900000-0000-0000-0000-0000000000a5', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-00000000000f', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'failed', 'pi_qf', 'prod');
+
 -- ── Storage como en Supabase: RLS activa y permisos de tabla ───────────────
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 GRANT USAGE ON SCHEMA storage TO authenticated;

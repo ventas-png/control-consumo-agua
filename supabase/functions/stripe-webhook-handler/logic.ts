@@ -26,7 +26,12 @@ export interface Conciliacion {
   liquidado?: boolean
   saldo_restante?: number
   ya_conciliado?: boolean
+  accion?: string
+  incidencia_id?: string | null
 }
+
+/** Acciones de un «aprobado» que NO acredita: el cobro cayó sobre una cuota anulada o eliminada (20261015000000). */
+export const ACCIONES_COBRO_RETENIDO = ['cobro_sobre_documento_anulado', 'cobro_retenido_ya_registrado'] as const
 
 export type Decision =
   | { accion: 'procesar' }
@@ -90,6 +95,15 @@ export function decidirTrasConciliar(
   }
 
   const r = res ?? {}
+  // Retenido: el evento ya quedó registrado con su incidencia. 200 para que
+  // el proveedor no reintente; reintentar no cambiaría nada.
+  if (r.accion && (ACCIONES_COBRO_RETENIDO as readonly string[]).includes(r.accion)) {
+    return {
+      accion: 'responder',
+      status: 200,
+      body: { received: true, conciliado: false, en_revision: true, accion: r.accion, incidencia_id: r.incidencia_id ?? null },
+    }
+  }
   return {
     accion: 'responder',
     status: 200,

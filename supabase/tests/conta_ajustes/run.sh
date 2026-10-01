@@ -153,6 +153,13 @@ TX=5e0b0000-0000-0000-0000-000000000021
 TY=5e0b0000-0000-0000-0000-000000000022
 PP3=ad900000-0000-0000-0000-000000000043
 CONT=a0a0a0a0-0000-0000-0000-00000000000c
+QM=c9a00000-0000-0000-0000-000000000018
+QN=c9a00000-0000-0000-0000-000000000019
+TM=5e0b0000-0000-0000-0000-000000000018
+TN=5e0b0000-0000-0000-0000-000000000019
+PQ2=ad900000-0000-0000-0000-0000000000a2
+PQ3=ad900000-0000-0000-0000-0000000000a3
+PQ4=ad900000-0000-0000-0000-0000000000a4
 
 # Preparación (como el admin): tres solicitudes de anulación y un anticipo
 # nuevo de Uno para las solicitudes simultáneas del portal.
@@ -166,6 +173,8 @@ SELECT public.sf_anticipo('f0000000-0000-0000-0000-00000000a001', 'e0000000-0000
 SELECT set_config('request.jwt.claim.sub', '$CONT', false);
 SELECT * FROM public.conta_ajuste_solicitar('$TX', 'anular_cuota', 'cuotas_condominio', '$QX', 'SINT aprobación contra cobro de cuota');
 SELECT * FROM public.conta_ajuste_solicitar('$TY', 'anular_cuota', 'cuotas_condominio', '$QY', 'SINT cobro de cuota contra aprobación');
+SELECT * FROM public.conta_ajuste_solicitar('$TM', 'anular_cuota', 'cuotas_condominio', '$QM', 'SINT anulación contra aviso tardío');
+SELECT * FROM public.conta_ajuste_solicitar('$TN', 'anular_cuota', 'cuotas_condominio', '$QN', 'SINT aviso tardío contra anulación');
 SELECT public.aj_aviso('$PP3', 'aprobado', 'webhook', 'evt-pp3-ok');
 SQL
 OANT2=$(psql -q -X -t -A -d ajustes -c "SELECT public.sf_origen_id('$ANT2')")
@@ -218,7 +227,18 @@ par g "$ADM" "SELECT 'G1:' || public.aj_cobro_cuota('$QY', 5, 'cc0b0000-0000-000
 par h "$ADM" "SELECT 'H1:' || (public.aj_reembolso('$PP3', 'evt-pp3-r30', 30) ->> 'accion');" \
       "$ADM" "SELECT 'H2:' || (public.aj_reembolso('$PP3', 'evt-pp3-r20', 20) ->> 'accion');"
 
-cat "$SALIDAS"/[a-h][12].txt | grep -E '^[A-H][12]:' | sort | sed 's/^/   /'
+# I · la aprobación (anular QM) retiene la cuota; mientras, el proveedor
+#     confirma su cobro en línea que había quedado 'failed'.
+par i "$APR" "SELECT 'I1:' || estado FROM public.conta_ajuste_aprobar('$TM');" \
+      "$ADM" "SELECT 'I2:' || (public.aj_aviso('$PQ3', 'aprobado', 'webhook', 'evt-qm') ->> 'accion');"
+# J · al revés: la confirmación de QN primero; mientras, la aprobación de anularla.
+par j "$ADM" "SELECT 'J1:' || (public.aj_aviso('$PQ4', 'aprobado', 'webhook', 'evt-qn') ->> 'accion');" \
+      "$APR" "SELECT 'J2:' || estado || '/' || split_part(COALESCE(error_ejecucion, '-'), ':', 1) FROM public.conta_ajuste_aprobar('$TN');"
+# K · dos confirmaciones distintas (webhook y consulta) a la vez del cobro
+#     retenido de QL (anulada en assert_b §20).
+par k "$ADM" "SELECT 'K1:' || (public.aj_aviso('$PQ2', 'aprobado', 'webhook', 'evt-ql2') ->> 'accion');" \
+      "$ADM" "SELECT 'K2:' || (public.aj_aviso('$PQ2', 'aprobado', 'consulta', NULL) ->> 'accion');"
+cat "$SALIDAS"/[a-k][12].txt | grep -E '^[A-K][12]:' | sort | sed 's/^/   /'
 
 grep -q '^A1:ejecutada/false$' "$SALIDAS/a1.txt" \
   || { echo "❌ A1 debía ejecutar:"; cat "$SALIDAS/a1.txt"; exit 1; }
@@ -256,6 +276,18 @@ grep -q '^H1:reembolso_parcial_registrado$' "$SALIDAS/h1.txt" \
 grep -q '^H2:reembolso_ya_contado$' "$SALIDAS/h2.txt" \
   || { echo "❌ H2 (acumulado 20, llega mientras se registra el 30) debía quedar ya contado:"; cat "$SALIDAS/h2.txt"; exit 1; }
 
+grep -q '^I1:ejecutada$' "$SALIDAS/i1.txt" \
+  || { echo "❌ I1 debía anular QM:"; cat "$SALIDAS/i1.txt"; exit 1; }
+grep -q '^I2:cobro_sobre_documento_anulado$' "$SALIDAS/i2.txt" \
+  || { echo "❌ I2 debía conservar la confirmación sin acreditar:"; cat "$SALIDAS/i2.txt"; exit 1; }
+grep -q '^J1:conciliado$' "$SALIDAS/j1.txt" \
+  || { echo "❌ J1 debía conciliar el cobro de QN:"; cat "$SALIDAS/j1.txt"; exit 1; }
+grep -q '^J2:fallida/AJUSTE_DEPENDENCIAS$' "$SALIDAS/j2.txt" \
+  || { echo "❌ J2 debía quedar fallida por AJUSTE_DEPENDENCIAS:"; cat "$SALIDAS/j2.txt"; exit 1; }
+grep -q '^K1:cobro_sobre_documento_anulado$' "$SALIDAS/k1.txt" \
+  || { echo "❌ K1 debía abrir la incidencia:"; cat "$SALIDAS/k1.txt"; exit 1; }
+grep -q '^K2:cobro_retenido_ya_registrado$' "$SALIDAS/k2.txt" \
+  || { echo "❌ K2 debía ver el cobro ya retenido, sin otra incidencia:"; cat "$SALIDAS/k2.txt"; exit 1; }
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d ajustes -f "$AQUI/concurrencia.sql" 2>&1) || {
   cat "$SALIDAS"/*.txt
   echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'

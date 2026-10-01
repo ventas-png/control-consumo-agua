@@ -180,8 +180,11 @@ Deno.serve(async (req: Request) => {
         .eq('id', pr.cuota_id)
         .maybeSingle()
       if (cuErr) return json({ error: cuErr.message }, 500)
+      // Una cuota ELIMINADA (o anulada) se consulta igual: si el proveedor sí
+      // cobró, la RPC conserva la confirmación sin acreditar y abre una
+      // incidencia (20261015000000). Cortar aquí la dejaba sin registrar.
       const cuota = cuotaRow as { project_id: string | null; deleted_at: string | null } | null
-      if (!cuota || cuota.deleted_at) return json({ error: 'Cuota no encontrada' }, 404)
+      if (!cuota) return json({ error: 'Cuota no encontrada' }, 404)
       itemProjectId = cuota.project_id
     } else if (esCargo) {
       const { data: caRow, error: caErr } = await admin
@@ -282,6 +285,18 @@ Deno.serve(async (req: Request) => {
         estado: resultado.estado,
         conciliado: false,
         estado_solicitud: reg.estado ?? null,
+      })
+    }
+
+    // Cobro confirmado sobre una cuota anulada o eliminada (20261015000000):
+    // el dinero entró pero NO se acreditó; queda en revisión con incidencia.
+    if (reg.accion === 'cobro_sobre_documento_anulado' || reg.accion === 'cobro_retenido_ya_registrado') {
+      return json({
+        ok: true,
+        estado: 'aprobado',
+        conciliado: false,
+        en_revision: true,
+        estado_solicitud: reg.estado ?? 'pending_verification',
       })
     }
 

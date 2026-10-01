@@ -9,6 +9,7 @@
 --   17 · respaldo documental
 --   18 · reembolsos parciales: duplicados, acumulados, fuera de orden
 --   19 · el estado de cuenta sigue cuadrando
+--   20 · confirmación tardía de un cobro sobre una cuota anulada o eliminada
 -- ============================================================================
 \set ON_ERROR_STOP 1
 \set A    '''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''
@@ -50,6 +51,10 @@
 \set PP1  '''ad900000-0000-0000-0000-000000000041'''
 \set PP2  '''ad900000-0000-0000-0000-000000000042'''
 \set ANTC '''9f5f0000-0000-0000-0000-00000000c0c0'''
+\set QL   '''c9a00000-0000-0000-0000-000000000017'''
+\set TL   '''5e0b0000-0000-0000-0000-000000000017'''
+\set PQ1  '''ad900000-0000-0000-0000-0000000000a1'''
+\set PQ5  '''ad900000-0000-0000-0000-0000000000a5'''
 
 -- ── 11 · superficie nueva ──────────────────────────────────────────────────
 SELECT public.chk(
@@ -462,4 +467,82 @@ SELECT public.chk_txt(
   (SELECT (c->>'cuadra') || '|' || (c->'saldo_a_favor'->>'cuadra')
      FROM public.conta_estado_cuenta_conciliacion(:A1, :UNO, NULL, NULL) c),
   'true|true', '19 · conciliación de Uno tras anular cuotas y reembolsos');
+RESET ROLE;
+
+-- ── 20 · confirmación tardía de un cobro sobre una cuota anulada ──────────
+-- El cobro en línea de QL quedó 'failed' (no bloquea la anulación) y QL se
+-- anula. Después el proveedor confirma que SÍ cobró.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :CONT, false);
+SELECT public.chk_txt(
+  (SELECT r.estado FROM public.conta_ajuste_solicitar(:TL, 'anular_cuota', 'cuotas_condominio', :QL, 'SINT QL emitida por error') r),
+  'pendiente', '20 · con el cobro en línea fallido, QL se puede solicitar anular');
+SELECT public.chk_txt(public.aj_aprobar_como(:APR, :TL), 'ejecutada', '20 · QL anulada');
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt(public.aj_aviso(:PQ1, 'aprobado', 'webhook', 'evt-ql1') ->> 'accion', 'cobro_sobre_documento_anulado',
+  '20 · la confirmación tardía NO falla: se registra');
+SELECT public.chk_txt(public.aj_pr(:PQ1), 'pending_verification/0/-',
+  '20 · sin pago ni acreditación; la solicitud queda en verificación (no se pierde)');
+SELECT public.chk_txt(public.aj_cuota(:QL), 'anulada/0/1/hoy', '20 · la cuota sigue anulada, sin devengo vivo');
+SELECT public.chk_txt(public.aj_incidencias(:PQ1), 'cobro_sobre_documento_anulado:abierta', '20 · UNA incidencia abierta');
+SELECT public.chk_txt(
+  (SELECT (i.detalle LIKE '%ANULADA%') || '|' || i.monto || '|' || (i.project_id = :A1) || '|' || (i.pago_id IS NULL)
+          || '|' || (i.evento_id = e.id)
+     FROM public.conta_incidencias_conciliacion i
+     JOIN public.pasarela_eventos e ON e.payment_request_id = i.payment_request_id AND e.clave_evento = 'evt-ql1'
+    WHERE i.payment_request_id = :PQ1),
+  'true|30.00|true|true|true', '20 · la incidencia dice qué pasó, cuánto, dónde y enlaza el aviso');
+SELECT public.chk_txt(
+  (SELECT e.estado_previo || '>' || e.estado_resultante || '|' || e.resultado
+     FROM public.pasarela_eventos e WHERE e.payment_request_id = :PQ1 AND e.clave_evento = 'evt-ql1'),
+  'failed>pending_verification|cobro_sobre_documento_anulado', '20 · el aviso del proveedor se conserva');
+-- Duplicados: la misma clave, otra clave, la consulta del servidor.
+SELECT public.chk_txt(public.aj_aviso(:PQ1, 'aprobado', 'webhook', 'evt-ql1') ->> 'accion', 'duplicado',
+  '20 · el mismo aviso otra vez: duplicado');
+SELECT public.chk_txt(public.aj_aviso(:PQ1, 'aprobado', 'webhook', 'evt-ql1-reenvio') ->> 'accion', 'cobro_retenido_ya_registrado',
+  '20 · otro aviso «aprobado» con otra clave: sólo su evento');
+SELECT public.chk_txt(public.aj_aviso(:PQ1, 'aprobado', 'consulta', NULL) ->> 'accion', 'cobro_retenido_ya_registrado',
+  '20 · la consulta del servidor: igual');
+SELECT public.chk_txt(public.aj_pr(:PQ1) || '|' || public.aj_incidencias(:PQ1), 'pending_verification/0/-|cobro_sobre_documento_anulado:abierta',
+  '20 · …sin pago y sin otra incidencia');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pasarela_eventos e WHERE e.payment_request_id = :PQ1), 3,
+  '20 · tres avisos distintos, tres eventos');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pagos p WHERE p.cuota_id = :QL OR p.payment_request_id = :PQ1), 0,
+  '20 · ningún pago: ni sobre la cuota ni convertido a otra cosa');
+-- Un «rechazado» fuera de orden no esconde el dinero cobrado.
+SELECT public.chk_txt(public.aj_aviso(:PQ1, 'rechazado', 'webhook', 'evt-ql1-rech') ->> 'accion', 'ignorado_fuera_de_orden',
+  '20 · un rechazo posterior no la pasa a failed');
+SELECT public.chk_txt(public.aj_pr(:PQ1), 'pending_verification/0/-', '20 · …sigue en verificación');
+-- La aplicación no puede tocar la incidencia ni el evento.
+SELECT public.chk_falla($$DELETE FROM public.conta_incidencias_conciliacion WHERE payment_request_id = 'ad900000-0000-0000-0000-0000000000a1'$$,
+  'permission denied', '20 · la incidencia no se borra desde la aplicación');
+SELECT public.chk_falla($$SELECT public.pasarela_registrar_estado('ad900000-0000-0000-0000-0000000000a1', 'aprobado', 'webhook', 'x2', NULL, NULL, NULL)$$,
+  'permission denied', '20 · la aplicación no registra avisos');
+-- Visible para contabilidad de A, invisible para otra empresa.
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_incidencias_conciliacion i
+    WHERE i.payment_request_id = :PQ1 AND i.tipo = 'cobro_sobre_documento_anulado'), 1,
+  '20 · contabilidad de A la ve');
+SELECT set_config('request.jwt.claim.sub', :ADB, false);
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_incidencias_conciliacion i WHERE i.payment_request_id = :PQ1), 0,
+  '20 · la otra empresa no');
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+-- El proveedor devuelve el dinero (lo decidió una persona): sin contabilidad que revertir.
+SELECT public.chk_txt(public.aj_aviso(:PQ1, 'reembolsado', 'webhook', 'evt-ql1-ref') ->> 'accion', 'reembolso_de_cobro_retenido',
+  '20 · reembolso del cobro retenido');
+SELECT public.chk_txt(public.aj_pr(:PQ1) || '|' || public.aj_incidencias(:PQ1), 'refunded/0/-|cobro_sobre_documento_anulado:abierta',
+  '20 · reembolsada, sin pago, la incidencia sigue abierta hasta que alguien la resuelva');
+-- Cuota ELIMINADA (QF, tarifa de reserva cancelada, §12) con un cobro fallido.
+SELECT public.chk_txt(public.aj_aviso(:PQ5, 'aprobado', 'webhook', 'evt-qf') ->> 'accion', 'cobro_sobre_documento_anulado',
+  '20 · confirmación tardía sobre una cuota eliminada: tampoco falla');
+SELECT public.chk_txt(public.aj_pr(:PQ5) || '|' ||
+  (SELECT (i.detalle LIKE '%ELIMINADA%')::text FROM public.conta_incidencias_conciliacion i WHERE i.payment_request_id = :PQ5),
+  'pending_verification/0/-|true', '20 · …sin pago, con la incidencia que lo dice');
+SELECT public.chk_txt(
+  (SELECT (c->>'cuadra') || '|' || (c->'saldo_a_favor'->>'cuadra')
+     FROM public.conta_estado_cuenta_conciliacion(:A1, :UNO, NULL, NULL) c),
+  'true|true', '20 · el estado de cuenta sigue cuadrando');
 RESET ROLE;

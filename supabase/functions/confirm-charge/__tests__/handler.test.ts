@@ -240,6 +240,37 @@ describe('confirm-charge · la conciliación es UNA llamada transaccional', () =
   })
 })
 
+describe('confirm-charge · cobro sobre una cuota anulada o eliminada (20261015000000)', () => {
+  it('la RPC retiene el cobro: responde aprobado SIN conciliar y en revisión', async () => {
+    fixture(h.state, {
+      conciliar: {
+        data: { ok: true, duplicado: false, estado: 'pending_verification', accion: 'cobro_sobre_documento_anulado', incidencia_id: 'inc-1' },
+        error: null,
+      },
+    })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ ok: true, estado: 'aprobado', conciliado: false, en_revision: true, estado_solicitud: 'pending_verification' })
+    expect(body.pago_id).toBeUndefined()
+    expect(callsDe(h.state.calls, 'pagos', 'insert').length).toBe(0)
+  })
+
+  it('cuota ELIMINADA: igual pregunta al proveedor y registra lo que informa (antes respondía 404 y la confirmación se perdía)', async () => {
+    fixture(h.state, {
+      cuota: { deleted_at: '2026-09-30T00:00:00Z' },
+      conciliar: {
+        data: { ok: true, estado: 'pending_verification', accion: 'cobro_sobre_documento_anulado', incidencia_id: 'inc-2' },
+        error: null,
+      },
+    })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ conciliado: false, en_revision: true })
+    expect(rpcsConciliar(h.state)).toHaveLength(1)
+  })
+})
+
 describe('confirm-charge · cargo adicional (20261011000000)', () => {
   it('concilia el cobro en línea de un cargo por la misma RPC', async () => {
     fixture(h.state, { pr: { cuota_id: null, cargo_adicional_id: 'ca1' } })

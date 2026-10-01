@@ -87,8 +87,12 @@ export async function confirmarPago(paymentRequestId: string): Promise<Confirmar
     body: { payment_request_id: paymentRequestId },
   })
   if (error) return { estado: null, liquidado: false, saldoRestante: null, error: await extractFunctionError(error) }
-  const d = data as { estado?: string; liquidado?: boolean; cuota_liquidada?: boolean; saldo_restante?: number | null; error?: string | null } | null
+  const d = data as { estado?: string; liquidado?: boolean; cuota_liquidada?: boolean; saldo_restante?: number | null; en_revision?: boolean; error?: string | null } | null
   if (d?.error) return { estado: d.estado ?? 'error', liquidado: false, saldoRestante: null, error: d.error }
+  // El proveedor cobró pero el documento ya no admite el cobro (cuota anulada
+  // o eliminada): NO se acreditó y contabilidad lo revisa (20261015000000).
+  // No es «aprobado»: el portal no debe anunciar un abono que no existe.
+  if (d?.en_revision === true) return { estado: 'en_revision', liquidado: false, saldoRestante: null, error: null }
   return {
     estado: d?.estado ?? null,
     liquidado: d?.liquidado === true || d?.cuota_liquidada === true,
