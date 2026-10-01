@@ -27,6 +27,16 @@ export const BUCKET_EVIDENCIAS = 'recepcion-evidencias'
 export const BUCKET_PRESENCIA = 'presencia-evidencias'
 
 /**
+ * Respaldo de contratos de proveedores (PR A). Bucket PRIVADO aparte porque
+ * `condominios-media` autoriza por proyecto y cualquier residente con acceso al
+ * proyecto podía leer el contrato (importes, contactos). Ruta
+ * `<empresa>/<proyecto>/<contrato>/<archivo>`; las policies de
+ * 20261020000100 resuelven el permiso desde la FILA del contrato (empresa,
+ * proyecto y permiso de la pestaña), y borrar solo se autoriza en borrador.
+ */
+export const BUCKET_CONTRATOS_RESPALDO = 'contratos-respaldo'
+
+/**
  * Respaldo documental de las solicitudes de ajuste contable. Bucket PRIVADO
  * (20261012000000). Ruta `<empresa>/<solicitud>/<archivo>`: sube quien pidió la
  * solicitud (o quien crea en Contabilidad) mientras está pendiente; lo ve quien

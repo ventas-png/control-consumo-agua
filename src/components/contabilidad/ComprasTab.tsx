@@ -13,6 +13,7 @@ import { StatusBadge } from '../shared/StatusBadge'
 import { confirm, notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { useProveedoresQuery } from '../../domain/cxp/queries'
+import { SugerenciaCuentaLinea } from '../proveedores/SugerenciaCuentaLinea'
 import {
   useActivosFijosQuery,
   useCompromisosQuery,
@@ -528,6 +529,9 @@ function OrdenCompraModal({
         // selector de insumos no esté en este formulario, esa línea se captura
         // desde la pestaña de Suministros del proyecto.
         suministro_id: null,
+        // La cuenta NO viaja desde aquí: la resuelve y valida el servidor al
+        // guardar (la misma entrada da la misma cuenta, sin depender de que una
+        // consulta previa haya terminado o fallado).
         cuenta_id: null,
         categoria: l.categoria,
         cantidad: parseFloat(l.cantidad) || 0,
@@ -654,6 +658,15 @@ function OrdenCompraModal({
               ))}
             </tbody>
           </table>
+        </div>
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {lineas.map((l, i) => (
+            <SugerenciaCuentaLinea
+              key={i} indice={i} projectId={projectId} proveedorId={proveedorId || null}
+              destino={l.destino_tipo === 'activo_fijo' ? 'activo_fijo' : 'gasto'} categoria={l.categoria}
+              fecha={hoyLocalISO()}
+            />
+          ))}
         </div>
         <p style={{ margin: '10px 0 0', textAlign: 'right', fontSize: 13 }}>
           Subtotal {formatCurrency(totales.subtotal, monedaBase)} · IVA {formatCurrency(totales.iva, monedaBase)} ·{' '}

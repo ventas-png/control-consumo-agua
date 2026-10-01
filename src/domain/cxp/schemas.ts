@@ -14,6 +14,14 @@ export const proveedorFormSchema = z.object({
   dias_credito: z.number().int().min(0, 'Días de crédito ≥ 0').max(365),
   categoria_default: z.string().trim().nullable(),
   notas: z.string().trim().max(500).nullable(),
+  // PR A (identidad compartida). Opcionales: los llamadores anteriores no los
+  // envían y el servidor asigna el código si falta. Ver domain/proveedores.
+  codigo: z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9._/-]{0,39}$/, 'Código: letras, dígitos y . _ / - (máx. 40)')
+    .nullable().or(z.literal('').transform(() => null)).optional(),
+  pais: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, 'País: código de 2 letras (GT, MX…)')
+    .nullable().or(z.literal('').transform(() => null)).optional(),
+  abastece: z.array(z.enum(['servicios', 'suministros', 'equipos'])).optional(),
+  alcance: z.enum(['empresa', 'proyectos']).optional(),
 })
 
 export type ProveedorFormInput = z.infer<typeof proveedorFormSchema>

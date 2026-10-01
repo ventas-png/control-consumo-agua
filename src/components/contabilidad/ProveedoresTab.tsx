@@ -5,6 +5,12 @@ import { StatusBadge } from '../shared/StatusBadge'
 import { confirm, notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { useProveedoresQuery } from '../../domain/cxp/queries'
+import { useDuplicadosFiscalesQuery } from '../../domain/proveedores/queries'
+import { ContextoActivo } from '../proveedores/ContextoActivo'
+import { ProveedorFicha } from '../proveedores/ProveedorFicha'
+import { ImportarProveedoresModal } from '../proveedores/ImportarProveedoresModal'
+import { ABASTECIMIENTO_LABELS, ALCANCE_LABELS, TIPOS_ABASTECIMIENTO, type AlcanceProveedor, type ProveedorCatalogo, type TipoAbastecimiento } from '../../types/proveedores'
+import type { Proyecto } from '../../types/plataforma'
 import { useGuardarProveedorMutation } from '../../domain/cxp/mutations'
 import { proveedorFormSchema } from '../../domain/cxp/schemas'
 import {
@@ -15,7 +21,7 @@ import {
 import { useDocumentosProveedorQuery } from '../../domain/compras/queries'
 import { proveedorDocumentoSchema, proveedorEstadoSchema } from '../../domain/compras/schemas'
 import { formatDateShort, hoyLocalISO } from '../../lib/format'
-import { CATEGORIAS_GASTO_CXP, type Proveedor } from '../../types/cxp'
+import { CATEGORIAS_GASTO_CXP } from '../../types/cxp'
 import {
   ESTADO_PROVEEDOR_LABELS,
   TIPO_DOC_PROVEEDOR_LABELS,
@@ -27,14 +33,13 @@ import { Campo, btnLink, btnPrimario, btnSecundario, input, usePermisosContabili
 
 interface Props {
   companyId: string
+  /** Proyecto de la contabilidad activa (null = la de la empresa); solo para mostrar el contexto. */
+  projectId?: string | null
+  proyectos?: Proyecto[]
 }
 
 /** El proveedor trae `estado` desde la Fase 6; el tipo base de CxP aún no. */
-type ProveedorConEstado = Proveedor & {
-  estado?: EstadoProveedor
-  autorizacion_vence?: string | null
-  motivo_estado?: string | null
-}
+type ProveedorConEstado = ProveedorCatalogo
 
 interface FormState {
   id: string | null
@@ -48,11 +53,16 @@ interface FormState {
   categoria_default: string
   direccion: string
   notas: string
+  codigo: string
+  pais: string
+  abastece: TipoAbastecimiento[]
+  alcance: AlcanceProveedor
 }
 
 const FORM_VACIO: FormState = {
   id: null, nombre: '', nit: '', rfc: '', email: '', telefono: '',
   contacto_nombre: '', dias_credito: '0', categoria_default: '', direccion: '', notas: '',
+  codigo: '', pais: '', abastece: [], alcance: 'proyectos',
 }
 
 const TONO_ESTADO: Record<EstadoProveedor, 'success' | 'warning' | 'info' | 'neutral' | 'danger'> = {
@@ -63,13 +73,17 @@ const TONO_ESTADO: Record<EstadoProveedor, 'success' | 'warning' | 'info' | 'neu
   vetado: 'danger',
 }
 
-export function ProveedoresTab({ companyId }: Props) {
+export function ProveedoresTab({ companyId, projectId = null, proyectos = [] }: Props) {
   const { puedeCrear, puedeEditar, puedeAutorizar } = usePermisosContabilidad()
   const { data: proveedores = [], isLoading } = useProveedoresQuery(companyId)
   const guardar = useGuardarProveedorMutation(companyId)
   const cambiarEstado = useCambiarEstadoProveedorMutation()
   const [form, setForm] = useState<FormState | null>(null)
   const [documentosDe, setDocumentosDe] = useState<ProveedorConEstado | null>(null)
+  const [fichaDe, setFichaDe] = useState<ProveedorConEstado | null>(null)
+  const [importando, setImportando] = useState(false)
+  const { data: duplicados = [] } = useDuplicadosFiscalesQuery(companyId, puedeEditar)
+  const proyectoNombre = proyectos.find((x) => x.id === projectId)?.nombre ?? null
 
   const hoy = hoyLocalISO()
   const lista = proveedores as ProveedorConEstado[]
@@ -79,7 +93,7 @@ export function ProveedoresTab({ companyId }: Props) {
     [lista, hoy],
   )
 
-  function abrirEdicion(p: Proveedor) {
+  function abrirEdicion(p: ProveedorConEstado) {
     setForm({
       id: p.id,
       nombre: p.nombre,
@@ -92,6 +106,10 @@ export function ProveedoresTab({ companyId }: Props) {
       categoria_default: p.categoria_default ?? '',
       direccion: p.direccion ?? '',
       notas: p.notas ?? '',
+      codigo: p.codigo ?? '',
+      pais: p.pais ?? '',
+      abastece: p.abastece ?? [],
+      alcance: p.alcance ?? 'empresa',
     })
   }
 
@@ -109,6 +127,10 @@ export function ProveedoresTab({ companyId }: Props) {
       dias_credito: parseInt(form.dias_credito, 10) || 0,
       categoria_default: limpio(form.categoria_default),
       notas: limpio(form.notas),
+      codigo: form.id && !form.codigo.trim() ? undefined : limpio(form.codigo),
+      pais: limpio(form.pais),
+      abastece: form.abastece,
+      alcance: form.alcance,
     })
     if (!parsed.success) {
       notify({ variant: 'warning', title: 'Atención', text: parsed.error.issues[0]?.message ?? 'Datos inválidos.' })
@@ -180,8 +202,9 @@ export function ProveedoresTab({ companyId }: Props) {
   }
 
   const columns: DataTableColumn<ProveedorConEstado>[] = [
+    { key: 'codigo', header: 'Código', accessor: (p) => p.codigo ?? '', width: 100, hideOnMobile: true },
     { key: 'nombre', header: 'Proveedor', accessor: (p) => p.nombre, sortable: true },
-    { key: 'nit', header: 'NIT / RFC', accessor: (p) => p.nit ?? p.rfc ?? '', render: (p) => p.nit ?? p.rfc ?? '—', width: 120, hideOnMobile: true },
+    { key: 'nit', header: 'NIT / RFC', accessor: (p) => p.nit ?? p.rfc ?? '', render: (p) => `${p.nit ?? p.rfc ?? '—'}${p.pais ? ` · ${p.pais}` : ''}`, width: 130, hideOnMobile: true },
     { key: 'contacto', header: 'Contacto', accessor: (p) => p.contacto_nombre ?? '', render: (p) => p.contacto_nombre ?? p.email ?? p.telefono ?? '—', hideOnMobile: true },
     { key: 'dias_credito', header: 'Crédito (días)', accessor: (p) => p.dias_credito, numeric: true, width: 110, hideOnMobile: true },
     {
@@ -217,6 +240,7 @@ export function ProveedoresTab({ companyId }: Props) {
             {puedeEditar && (
               <button onClick={(e) => { e.stopPropagation(); abrirEdicion(p) }} style={btnLink}>Editar</button>
             )}
+            <button onClick={(e) => { e.stopPropagation(); setFichaDe(p) }} style={btnLink}>Ficha</button>
             <button onClick={(e) => { e.stopPropagation(); setDocumentosDe(p) }} style={btnLink}>Papelería</button>
             {puedeAutorizar && estado !== 'autorizado' && (
               <button onClick={(e) => { e.stopPropagation(); void autorizar(p) }} style={btnLink}>Autorizar</button>
@@ -232,6 +256,22 @@ export function ProveedoresTab({ companyId }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--at-space-3)' }}>
+      <ContextoActivo companyId={companyId} proyectoNombre={proyectoNombre} alcance="empresa" titulo="Proveedores" />
+      <p style={{ margin: 0, fontSize: 12, color: 'var(--at-ink-soft)' }}>
+        El catálogo es de la empresa y es el mismo que ven Operaciones y Compras. Un contrato es otra cosa: la
+        condición de servicio de un proveedor en un proyecto (Operaciones → Contratos).
+      </p>
+      {duplicados.length > 0 && (
+        <div role="alert" style={{ margin: 0, padding: 10, borderRadius: 8, fontSize: 12, border: '1px solid var(--at-warning)' }}>
+          <strong>{duplicados.length} identificación(es) fiscal(es) repetidas en proveedores históricos.</strong>{' '}
+          No se fusionan solos: revisa cada grupo y decide.
+          <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+            {duplicados.slice(0, 5).map((d) => (
+              <li key={d.identificacion_norm}>{d.identificacion_norm}: {d.proveedores.map((x) => x.nombre).join(' · ')}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {sinAutorizar > 0 && (
         <p style={{ margin: 0, padding: 10, borderRadius: 8, fontSize: 12,
                     background: 'var(--at-warning-tint)', color: 'var(--at-ink)' }}>
@@ -247,10 +287,15 @@ export function ProveedoresTab({ companyId }: Props) {
         columns={columns}
         rowKey="id"
         isLoading={isLoading}
-        searchableKeys={['nombre', (p) => p.nit ?? '', (p) => p.rfc ?? '']}
-        searchPlaceholder="Buscar proveedor…"
+        searchableKeys={['nombre', (p) => p.codigo ?? '', (p) => p.nit ?? '', (p) => p.rfc ?? '']}
+        searchPlaceholder="Buscar por nombre, código o NIT…"
         toolbar={puedeCrear
-          ? <button onClick={() => setForm({ ...FORM_VACIO })} style={btnPrimario}>+ Nuevo proveedor</button>
+          ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setImportando(true)} style={btnSecundario}>Carga masiva</button>
+              <button onClick={() => setForm({ ...FORM_VACIO })} style={btnPrimario}>+ Nuevo proveedor</button>
+            </div>
+          )
           : undefined}
         emptyState={{
           title: 'Sin proveedores',
@@ -297,6 +342,26 @@ export function ProveedoresTab({ companyId }: Props) {
                 {CATEGORIAS_GASTO_CXP.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Campo>
+            <Campo label="Código visible (opcional)">
+              <input value={form.codigo} placeholder="Se asigna solo (PRV-00001)" onChange={(e) => setForm({ ...form, codigo: e.target.value })} style={input} />
+            </Campo>
+            <Campo label="País de la identificación (2 letras)">
+              <input value={form.pais} maxLength={2} placeholder="GT" onChange={(e) => setForm({ ...form, pais: e.target.value.toUpperCase() })} style={input} />
+            </Campo>
+            <Campo label="Alcance">
+              <select value={form.alcance} onChange={(e) => setForm({ ...form, alcance: e.target.value as AlcanceProveedor })} style={input}>
+                {(Object.keys(ALCANCE_LABELS) as AlcanceProveedor[]).map((a) => <option key={a} value={a}>{ALCANCE_LABELS[a]}</option>)}
+              </select>
+            </Campo>
+            <fieldset style={{ border: 'none', padding: 0, margin: 0, fontSize: 12 }}>
+              <legend style={{ fontWeight: 600, color: 'var(--at-ink-soft)' }}>Abastece</legend>
+              {TIPOS_ABASTECIMIENTO.map((t) => (
+                <label key={t} style={{ marginRight: 10 }}>
+                  <input type="checkbox" checked={form.abastece.includes(t)}
+                    onChange={(e) => setForm({ ...form, abastece: e.target.checked ? [...form.abastece, t] : form.abastece.filter((x) => x !== t) })} /> {ABASTECIMIENTO_LABELS[t]}
+                </label>
+              ))}
+            </fieldset>
             <Campo label="Dirección">
               <input value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} style={input} />
             </Campo>
@@ -308,6 +373,9 @@ export function ProveedoresTab({ companyId }: Props) {
           </div>
         </EditModal>
       )}
+
+      {fichaDe && <ProveedorFicha proveedor={fichaDe} companyId={companyId} proyectos={proyectos} onClose={() => setFichaDe(null)} />}
+      {importando && <ImportarProveedoresModal onClose={() => setImportando(false)} />}
 
       {documentosDe && (
         <DocumentosProveedorModal
