@@ -75,19 +75,39 @@ export type OrdenCompraFormInput = z.infer<typeof ordenCompraFormSchema>
 
 // ── Recepción ───────────────────────────────────────────────────────────────
 
-export const recepcionLineaSchema = z.object({
-  orden_compra_linea_id: z.string().uuid(),
-  cantidad: z.number().positive('La cantidad recibida debe ser mayor que 0'),
-  costo_unitario: z.number().min(0).default(0),
-  observacion: z.string().trim().max(300).nullable(),
-})
+export const recepcionLineaSchema = z
+  .object({
+    orden_compra_linea_id: z.string().uuid(),
+    /** ACEPTADA: lo que entra al inventario o se devenga. Puede ser 0 si todo se rechazó. */
+    cantidad: z.number().min(0, 'La cantidad aceptada no puede ser negativa'),
+    cantidad_rechazada: z.number().min(0, 'La cantidad rechazada no puede ser negativa').default(0),
+    motivo_rechazo: z.string().trim().max(300).nullable().default(null),
+    costo_unitario: z.number().min(0).default(0),
+    observacion: z.string().trim().max(300).nullable(),
+  })
+  .refine((l) => l.cantidad + l.cantidad_rechazada > 0, {
+    message: 'Indica lo aceptado o lo rechazado',
+    path: ['cantidad'],
+  })
+  .refine((l) => l.cantidad_rechazada === 0 || (l.motivo_rechazo ?? '').trim() !== '', {
+    message: 'Lo rechazado necesita un motivo',
+    path: ['motivo_rechazo'],
+  })
 
 export type RecepcionLineaInput = z.infer<typeof recepcionLineaSchema>
 
 export const recepcionFormSchema = z.object({
   orden_compra_id: z.string().uuid('Selecciona la orden de compra'),
+  /** `servicio` = conformidad de servicio: no mueve inventario ni da de alta activos. */
+  tipo: z.enum(['bienes', 'servicio']).default('bienes'),
   fecha: fechaISO,
   documento_referencia: z.string().trim().max(60).nullable(),
+  destino_fisico: z.string().trim().max(120).nullable().default(null),
+  /** Quien confirma el bien o el servicio (por defecto, quien captura). */
+  recibido_por: z.string().uuid().nullable().default(null),
+  respaldo_path: z.string().trim().max(300).nullable().default(null),
+  /** Evita duplicar la recepción por doble clic o reintento. */
+  clave_idempotencia: z.string().trim().max(80).nullable().default(null),
   notas: z.string().trim().max(500).nullable(),
   lineas: z.array(recepcionLineaSchema).min(1, 'Indica al menos un renglón recibido'),
 })

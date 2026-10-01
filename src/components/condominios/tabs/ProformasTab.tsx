@@ -4,6 +4,12 @@ import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '.
 import { confirm, notify } from '../../shared/Dialog'
 import { EmptyState } from '../../shared/EmptyState'
 import { Proforma, ContratoProveedor } from '../../../types'
+import { createCondominioRowReturning } from '../../../domain/condominios/tabMutations'
+import { useProveedoresQuery } from '../../../domain/cxp/queries'
+import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
+import type { ProveedorCatalogo } from '../../../types/proveedores'
+import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
+import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
 
 interface Props {
   proformas: Proforma[]
@@ -27,17 +33,21 @@ const ESTADO_CFG: Record<EstadoP, { label: string; color: string; bg: string; ne
 }
 
 const BLANK = {
-  proveedor_nombre: '', concepto: '', descripcion: '',
+  proveedor_id: '', proveedor_nombre: '', concepto: '', descripcion: '',
   monto: '', fecha_validez: '', notas: '',
 }
 
-export default function ProformasTab({ proformas, proveedores, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+// `proveedores` (contratos) sigue en Props porque el registro de pestañas lo pasa,
+// pero el proveedor de una proforma se elige del catálogo compartido por id.
+export default function ProformasTab({ proformas, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoP | ''>('')
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
   const [expandida, setExpandida] = useState<string | null>(null)
+  const { data: catalogo = [] } = useProveedoresQuery(companyId)
+  const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
 
   const filtradas = filtroEstado ? proformas.filter(p => p.estado === filtroEstado) : proformas
 
@@ -55,6 +65,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
 
   function abrirEditar(p: Proforma) {
     setForm({
+      proveedor_id: p.proveedor_id ?? '',
       proveedor_nombre: p.proveedor_nombre,
       concepto: p.concepto,
       descripcion: p.descripcion ?? '',
@@ -67,13 +78,19 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
   }
 
   async function guardar() {
-    if (!form.proveedor_nombre.trim() || !form.concepto.trim()) {
-      notify({ variant: 'warning', title: 'Faltan datos', text: 'Proveedor y concepto son obligatorios.' })
+    // Una proforma NUEVA exige proveedor del catálogo; una histórica sin vínculo se
+    // puede seguir editando mientras no se cambie su proveedor.
+    const historica = !!editId && !form.proveedor_id && !!form.proveedor_nombre.trim()
+    if ((!form.proveedor_id && !historica) || !form.concepto.trim()) {
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Elige el proveedor del catálogo y escribe el concepto.' })
       return
     }
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,
+      // La fotografía del nombre la pone el servidor al vincular; el texto de una
+      // proforma histórica sin vínculo se conserva tal cual.
+      ...(form.proveedor_id ? { proveedor_id: form.proveedor_id } : {}),
       proveedor_nombre: form.proveedor_nombre.trim(),
       concepto: form.concepto.trim(),
       descripcion: form.descripcion.trim() || null,
@@ -93,11 +110,16 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
     const cfg = ESTADO_CFG[p.estado]
     if (!cfg.next) return
     const nuevoEstado = cfg.next
-    const { error } = await updateCondominioRow('proformas_condominio', p.id, { estado: nuevoEstado })
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (nuevoEstado === 'convertida_oc') {
-      await createCondominioRow('ordenes_compra', {
+      if (!p.proveedor_id) {
+        notify({ variant: 'warning', title: 'Falta el proveedor del catálogo', text: 'Vincula esta proforma a un proveedor del catálogo (abajo, «Registros con proveedor solo en texto») antes de convertirla en orden.' })
+        return
+      }
+      // La orden nace del MISMO proveedor y queda ligada a la proforma (no solo
+      // un estado): así el seguimiento llega de la proforma a la orden.
+      const { data: orden, error: errOc } = await createCondominioRowReturning('ordenes_compra', {
         company_id: companyId, project_id: proyectoId,
+        proveedor_id: p.proveedor_id,
         proveedor_nombre: p.proveedor_nombre,
         concepto: p.concepto,
         descripcion: `Generada desde proforma. ${p.descripcion ?? ''}`.trim(),
@@ -105,8 +127,15 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
         estado: 'borrador',
         notas: `Proforma: ${p.id}`,
       })
-      notify({ variant: 'success', title: 'OC generada', text: 'Se creó una orden de compra en estado Borrador.' })
+      if (errOc || !orden) { notify({ variant: 'error', title: 'No se pudo crear la orden', text: errOc?.message ?? 'Error inesperado.' }); return }
+      const { error } = await updateCondominioRow('proformas_condominio', p.id, { estado: nuevoEstado, orden_compra_id: orden.id })
+      if (error) { notify({ variant: 'error', title: 'La orden se creó pero no se pudo ligar', text: error.message }); onRefresh(); return }
+      notify({ variant: 'success', title: 'OC generada', text: 'Se creó una orden de compra en Borrador, ligada a esta proforma.' })
+      onRefresh()
+      return
     }
+    const { error } = await updateCondominioRow('proformas_condominio', p.id, { estado: nuevoEstado })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -156,13 +185,14 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>{editId ? 'Editar proforma' : 'Nueva proforma'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Proveedor *</label>
-              <input list="proveedores-list" value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))}
-                placeholder="Nombre del proveedor"
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
-              <datalist id="proveedores-list">
-                {proveedores.map(p => <option key={p.id} value={p.proveedor_nombre} />)}
-              </datalist>
+              <ProveedorSelector
+                proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
+                value={form.proveedor_id || null} soloHabilitados label="Proveedor *"
+                onChange={(id, pr) => setForm(f => ({ ...f, proveedor_id: id ?? '', proveedor_nombre: pr?.nombre ?? '' }))}
+              />
+              {!form.proveedor_id && form.proveedor_nombre && (
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--at-ink-3)' }}>Histórico: «{form.proveedor_nombre}» (sin vincular al catálogo).</p>
+              )}
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Concepto *</label>
@@ -267,6 +297,8 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
           })}
         </div>
       )}
+
+      <OperacionesLegadoPanel companyId={companyId} tabla="proformas_condominio" projectId={proyectoId} canEdit={canEdit} />
     </div>
   )
 }

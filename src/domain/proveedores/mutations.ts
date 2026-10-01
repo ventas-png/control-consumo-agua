@@ -235,6 +235,20 @@ export function useVincularContratoMutation() {
   })
 }
 
+/** Vincula UN suministro o proforma histórico al proveedor del catálogo (decisión de una persona). */
+export function useVincularOperacionMutation() {
+  const invalidar = useInvalidarProveedores()
+  return useMutation({
+    mutationFn: async (vars: { tabla: 'suministros_condominio' | 'proformas_condominio'; registroId: string; proveedorId: string }) =>
+      await rpc<null>('operaciones_vincular_proveedor', {
+        p_tabla: vars.tabla,
+        p_registro_id: vars.registroId,
+        p_proveedor_id: vars.proveedorId,
+      }),
+    onSuccess: () => invalidar(),
+  })
+}
+
 /** `dryRun` por defecto: simular no cambia nada. */
 export function useVincularInequivocosMutation() {
   const invalidar = useInvalidarProveedores()

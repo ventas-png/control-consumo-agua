@@ -134,12 +134,15 @@ export function useCambiarEstadoOrdenCompraMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (vars: { id: string; estado: string; motivo?: string }) => {
+      // Devolver a borrador exige motivo y es una REVISIÓN (lo valida el servidor);
+      // cancelar usa `motivo_anulacion`. El motivo va a la columna que corresponde.
+      const campoMotivo = vars.estado === 'borrador' ? 'motivo_devolucion' : 'motivo_anulacion'
       await runQuery((signal) =>
         supabase
           .from('ordenes_compra')
           .update({
             estado: vars.estado,
-            ...(vars.motivo ? { motivo_anulacion: vars.motivo } : {}),
+            ...(vars.motivo ? { [campoMotivo]: vars.motivo } : {}),
             updated_at: new Date().toISOString(),
           })
           .eq('id', vars.id)

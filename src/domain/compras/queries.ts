@@ -20,6 +20,8 @@ import type {
   OrdenCompraLinea,
   ProveedorDocumento,
   RecepcionConRelaciones,
+  SeguimientoOrden,
+  FilaSeguimiento,
   RecepcionLinea,
 } from '../../types/compras'
 
@@ -195,6 +197,53 @@ export function useCuadreQuery(facturaId?: string) {
     queryFn: async () =>
       (await runQuery<FilaCuadre[]>((signal) =>
         supabase.rpc('compras_validar_match', { p_factura_id: facturaId! }).abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/**
+ * Seguimiento compartido de una orden (RPC de solo lectura). El servidor decide
+ * qué secciones ve cada quien; devuelve null si la orden no existe o no es
+ * visible para el usuario.
+ */
+export function useSeguimientoOrdenQuery(ordenId?: string) {
+  return useQuery({
+    queryKey: comprasKeys.seguimiento(ordenId),
+    enabled: !!ordenId,
+    queryFn: async () =>
+      (await runQuery<SeguimientoOrden | null>((signal) =>
+        supabase.rpc('compras_seguimiento_orden', { p_orden_id: ordenId! }).abortSignal(signal),
+      )) ?? null,
+  })
+}
+
+export interface FiltrosSeguimiento {
+  projectId?: string | null
+  proveedorId?: string | null
+  estado?: string | null
+  desde?: string | null
+  hasta?: string | null
+  /** true = solo la contabilidad de la empresa (órdenes sin proyecto). */
+  soloEmpresa?: boolean
+}
+
+/** Una fila por orden con comprometido / recibido / facturado / pagado por separado. */
+export function useSeguimientoListaQuery(companyId: string | undefined, f: FiltrosSeguimiento = {}) {
+  return useQuery({
+    queryKey: comprasKeys.seguimientoLista(companyId, f.projectId, f.proveedorId, f.estado, f.desde, f.hasta, f.soloEmpresa),
+    enabled: !!companyId,
+    queryFn: async () =>
+      (await runQuery<FilaSeguimiento[]>((signal) =>
+        supabase
+          .rpc('compras_seguimiento_lista', {
+            p_project_id: f.projectId ?? null,
+            p_proveedor_id: f.proveedorId ?? null,
+            p_estado: f.estado || null,
+            p_desde: f.desde || null,
+            p_hasta: f.hasta || null,
+            p_solo_empresa: f.soloEmpresa ?? false,
+          })
+          .abortSignal(signal),
       )) ?? [],
   })
 }

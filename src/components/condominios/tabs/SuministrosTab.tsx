@@ -5,6 +5,12 @@ import { notify } from '../../shared/Dialog'
 import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum, ContratoProveedor } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { ImportSuministrosModal } from '../ImportSuministrosModal'
+import { useProveedoresQuery } from '../../../domain/cxp/queries'
+import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
+import { proveedorHabilitadoEn } from '../../../domain/proveedores/identidad'
+import type { ProveedorCatalogo } from '../../../types/proveedores'
+import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
+import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
 
 interface Props {
   suministros: SuministroCondominio[]
@@ -35,7 +41,7 @@ const TIPOS_MOV: { value: TipoMovimientoSum; label: string; color: string }[] = 
   { value: 'ajuste',  label: 'Ajuste',  color: 'var(--at-warning)' },
 ]
 
-export default function SuministrosTab({ suministros, movimientos, proveedores, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function SuministrosTab({ suministros, movimientos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [selected, setSelected] = useState<SuministroCondominio | null>(null)
   const [vista, setVista] = useState<'lista' | 'nuevo' | 'movimiento'>('lista')
   const [saving, setSaving] = useState(false)
@@ -46,7 +52,7 @@ export default function SuministrosTab({ suministros, movimientos, proveedores, 
   const [form, setForm] = useState({
     nombre: '', categoria: 'limpieza' as CategoriaSupministro,
     unidad_medida: 'unidad' as UnidadMedidaSum, stock_actual: '0', stock_minimo: '0',
-    ubicacion: '', proveedor: '', costo_unitario: '', notas: '',
+    ubicacion: '', proveedor_id: '', proveedor: '', costo_unitario: '', notas: '',
   })
 
   const [movForm, setMovForm] = useState({
@@ -62,17 +68,14 @@ export default function SuministrosTab({ suministros, movimientos, proveedores, 
   const alertas = suministros.filter(s => s.activo && s.stock_actual <= s.stock_minimo)
   const movsDelSelected = selected ? movimientos.filter(m => m.suministro_id === selected.id) : []
 
-  // Proveedores autorizados/definidos (pestaña Proveedores) — únicas opciones
-  // válidas para el campo Proveedor del suministro. Nombres distintos, con los
-  // contratos activos primero.
-  const proveedoresDisponibles = Array.from(
-    new Set(
-      [...proveedores]
-        .sort((a, b) => (a.estado === 'activo' ? 0 : 1) - (b.estado === 'activo' ? 0 : 1))
-        .map(p => p.proveedor_nombre.trim())
-        .filter(Boolean)
-    )
-  )
+  // El proveedor sale del CATÁLOGO COMPARTIDO por id (el mismo de Contabilidad),
+  // no de la lista de contratos ni de texto libre. `proveedores` (contratos) sigue
+  // en Props porque el registro de pestañas lo pasa.
+  const { data: catalogo = [] } = useProveedoresQuery(companyId)
+  const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
+  const importables = (catalogo as ProveedorCatalogo[])
+    .filter(p => proveedorHabilitadoEn(p, asignaciones, proyectoId, hoyLocalISO()))
+    .map(p => ({ id: p.id, nombre: p.nombre }))
 
   async function guardar() {
     if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre obligatorio' }); return }
@@ -84,13 +87,14 @@ export default function SuministrosTab({ suministros, movimientos, proveedores, 
       stock_actual: parseFloat(form.stock_actual) || 0,
       stock_minimo: parseFloat(form.stock_minimo) || 0,
       ubicacion: form.ubicacion.trim() || null,
+      proveedor_id: form.proveedor_id || null,
       proveedor: form.proveedor.trim() || null,
       costo_unitario: form.costo_unitario ? parseFloat(form.costo_unitario) : null,
       notas: form.notas.trim() || null,
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ nombre: '', categoria: 'limpieza', unidad_medida: 'unidad', stock_actual: '0', stock_minimo: '0', ubicacion: '', proveedor: '', costo_unitario: '', notas: '' })
+    setForm({ nombre: '', categoria: 'limpieza', unidad_medida: 'unidad', stock_actual: '0', stock_minimo: '0', ubicacion: '', proveedor_id: '', proveedor: '', costo_unitario: '', notas: '' })
     setVista('lista')
     onRefresh()
   }
@@ -227,18 +231,11 @@ export default function SuministrosTab({ suministros, movimientos, proveedores, 
                 <input style={inp} placeholder="Cuarto de limpieza…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
               </div>
               <div>
-                <label style={lbl}>Proveedor</label>
-                <select style={inp} value={form.proveedor}
-                  onChange={e => setForm(p => ({ ...p, proveedor: e.target.value }))}
-                  disabled={proveedoresDisponibles.length === 0}>
-                  <option value="">— Sin proveedor —</option>
-                  {proveedoresDisponibles.map(nombre => <option key={nombre} value={nombre}>{nombre}</option>)}
-                </select>
-                {proveedoresDisponibles.length === 0 && (
-                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 2 }}>
-                    Define proveedores en la pestaña <strong>Proveedores</strong> para poder elegirlos aquí.
-                  </div>
-                )}
+                <ProveedorSelector
+                  proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
+                  value={form.proveedor_id || null} soloHabilitados label="Proveedor"
+                  onChange={(id, pr) => setForm(p => ({ ...p, proveedor_id: id ?? '', proveedor: pr?.nombre ?? '' }))}
+                />
               </div>
               <div>
                 <label style={lbl}>Costo unitario ({moneda})</label>
@@ -320,7 +317,7 @@ export default function SuministrosTab({ suministros, movimientos, proveedores, 
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>
                   {selected.ubicacion && <span>{selected.ubicacion} · </span>}
-                  {selected.proveedor && <span>Proveedor: {selected.proveedor}</span>}
+                  {selected.proveedor && <span>Proveedor: {selected.proveedor}{!selected.proveedor_id && ' (sin vincular al catálogo)'}</span>}
                 </div>
               </div>
               {canEdit && (
@@ -396,11 +393,13 @@ export default function SuministrosTab({ suministros, movimientos, proveedores, 
         )}
       </div>
 
+      <OperacionesLegadoPanel companyId={companyId} tabla="suministros_condominio" projectId={proyectoId} canEdit={canEdit} />
+
       {showImportModal && (
         <ImportSuministrosModal
           proyectoId={proyectoId}
           companyId={companyId}
-          proveedoresValidos={proveedoresDisponibles}
+          proveedoresValidos={importables}
           onClose={() => setShowImportModal(false)}
           onImportado={() => { setShowImportModal(false); onRefresh() }}
         />

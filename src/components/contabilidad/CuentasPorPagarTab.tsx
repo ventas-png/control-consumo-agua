@@ -452,7 +452,7 @@ function CuadreModal({ factura, monedaBase, onClose }: {
 
       {filas.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 640 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 860 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--at-ink-soft)' }}>
                 <th style={{ padding: 4 }}>Renglón</th>
@@ -461,6 +461,8 @@ function CuadreModal({ factura, monedaBase, onClose }: {
                 <th style={{ padding: 4, width: 80 }}>Se factura</th>
                 <th style={{ padding: 4, width: 100 }}>Precio OC</th>
                 <th style={{ padding: 4, width: 100 }}>Precio factura</th>
+                <th style={{ padding: 4, width: 110 }}>IVA OC / factura</th>
+                <th style={{ padding: 4, width: 90 }}>Moneda OC / factura</th>
                 <th style={{ padding: 4 }}>Resultado</th>
               </tr>
             </thead>
@@ -479,6 +481,15 @@ function CuadreModal({ factura, monedaBase, onClose }: {
                         ({f.diferencia_pct > 0 ? '+' : ''}{f.diferencia_pct}%)
                       </span>
                     )}
+                  </td>
+                  <td style={{ padding: 4 }} data-testid={`cuadre-iva-${f.linea}`}>
+                    {f.iva_orden !== undefined && f.iva_factura !== undefined
+                      ? `${formatCurrency(f.iva_orden, f.moneda_orden ?? monedaBase)} / ${formatCurrency(f.iva_factura, f.moneda_factura ?? monedaBase)}`
+                      : '—'}
+                  </td>
+                  <td style={{ padding: 4, color: f.moneda_orden && f.moneda_factura && f.moneda_orden !== f.moneda_factura ? 'var(--at-danger)' : undefined }}
+                      data-testid={`cuadre-moneda-${f.linea}`}>
+                    {f.moneda_orden ?? '—'} / {f.moneda_factura ?? '—'}
                   </td>
                   <td style={{ padding: 4 }}>
                     <StatusBadge tone={f.dentro_tolerancia ? 'success' : 'danger'}>

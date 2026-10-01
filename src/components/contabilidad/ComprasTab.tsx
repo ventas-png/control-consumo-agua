@@ -6,14 +6,16 @@
 // recepción (que es la que contabiliza y mueve inventario/activos) y la
 // contraseña de pago. La factura y el pago viven en «Cuentas por pagar», que es
 // donde el contador ya los busca.
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { DataTable, EditModal, type DataTableColumn } from '../shared'
 import { FilterChips } from '../shared/FilterChips'
 import { StatusBadge } from '../shared/StatusBadge'
 import { confirm, notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { useProveedoresQuery } from '../../domain/cxp/queries'
+import { useResponsablesQuery } from '../../domain/proveedores/queries'
 import { SugerenciaCuentaLinea } from '../proveedores/SugerenciaCuentaLinea'
+import { SeguimientoOrdenModal } from '../compras/SeguimientoOrdenModal'
 import {
   useActivosFijosQuery,
   useCompromisosQuery,
@@ -85,6 +87,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
   const [vista, setVista] = useState<Vista>('ordenes')
   const [nuevaOrden, setNuevaOrden] = useState(false)
   const [recibirDe, setRecibirDe] = useState<OrdenCompraConRelaciones | null>(null)
+  const [seguirDe, setSeguirDe] = useState<string | null>(null)
 
   const { data: ordenes = [], isLoading: cargandoOrdenes } = useOrdenesCompraQuery(companyId, projectId)
   const { data: recepciones = [], isLoading: cargandoRecepciones } = useRecepcionesQuery(companyId, projectId)
@@ -127,14 +130,28 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
       render: (o) => <StatusBadge tone={TONO_OC[o.estado] ?? 'neutral'}>{ESTADO_OC_LABELS[o.estado] ?? o.estado}</StatusBadge>,
     },
     {
-      key: 'acciones', header: '', width: 210,
+      key: 'acciones', header: '', width: 280,
       render: (o) => (
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button style={btnLink} onClick={(e) => { e.stopPropagation(); setSeguirDe(o.id) }}>Seguimiento</button>
           {o.estado === 'borrador' && puedeAutorizar && (
             <button style={btnLink} onClick={(e) => {
               e.stopPropagation()
               void accion(() => cambiarOrden.mutateAsync({ id: o.id, estado: 'aprobada' }), 'Orden aprobada.')
             }}>Aprobar</button>
+          )}
+          {o.estado === 'aprobada' && puedeAutorizar && (
+            <button style={btnLink} onClick={async (e) => {
+              e.stopPropagation()
+              const r = await openPromptDialog({
+                title: 'Devolver a borrador',
+                description: 'La aprobación se invalida y la orden vuelve a revisarse; queda escrito por qué.',
+                fields: [{ name: 'motivo', label: '¿Qué hay que corregir?', control: 'textarea', rows: 2 }],
+              })
+              const motivo = r?.motivo?.trim()
+              if (!motivo) return
+              await accion(() => cambiarOrden.mutateAsync({ id: o.id, estado: 'borrador', motivo }), 'Orden devuelta a borrador (nueva revisión).')
+            }}>Devolver a borrador</button>
           )}
           {o.estado === 'aprobada' && puedeCambiarEstado && (
             <button style={btnLink} onClick={(e) => {
@@ -468,6 +485,10 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
         />
       )}
 
+      {seguirDe && (
+        <SeguimientoOrdenModal ordenId={seguirDe} monedaBase={monedaBase} onClose={() => setSeguirDe(null)} />
+      )}
+
       {recibirDe && (
         <RecepcionModal
           companyId={companyId}
@@ -697,19 +718,35 @@ function RecepcionModal({
   onClose: () => void
 }) {
   const { data: lineasOC = [], isLoading } = useOrdenCompraLineasQuery(orden.id)
+  const { data: responsables = [] } = useResponsablesQuery(companyId)
   const crear = useCrearRecepcionMutation(companyId, projectId)
+  const [tipo, setTipo] = useState<'bienes' | 'servicio'>('bienes')
   const [fecha, setFecha] = useState(hoyLocalISO())
   const [referencia, setReferencia] = useState('')
+  const [destinoFisico, setDestinoFisico] = useState('')
+  const [responsable, setResponsable] = useState('')
+  const [notas, setNotas] = useState('')
   const [cantidades, setCantidades] = useState<Record<string, string>>({})
+  const [rechazos, setRechazos] = useState<Record<string, string>>({})
+  const [motivos, setMotivos] = useState<Record<string, string>>({})
+  // Una clave por apertura del formulario: si el usuario da doble clic o reintenta
+  // tras un corte de red, el servidor rechaza el segundo borrador en vez de duplicarlo.
+  const claveIdempotencia = useRef(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`)
 
-  // Por defecto se recibe TODO lo que falta: es lo que pasa el 90 % de las
-  // veces, y quien recibe parcial corrige el renglón que corresponda.
+  // Los servicios no se «reciben» en una bodega: se confirma su prestación con
+  // una conformidad. Por eso cada tipo muestra solo los renglones que le tocan.
   const pendientes = useMemo(
-    () => lineasOC.map((l) => ({ ...l, pendiente: pendienteDeRecibir(l) })).filter((l) => l.pendiente > 0),
-    [lineasOC],
+    () => lineasOC
+      .map((l) => ({ ...l, pendiente: pendienteDeRecibir(l) }))
+      .filter((l) => l.pendiente > 0 && (tipo === 'servicio' ? l.destino_tipo === 'servicio' : l.destino_tipo !== 'servicio')),
+    [lineasOC, tipo],
   )
+  const hayServicios = lineasOC.some((l) => l.destino_tipo === 'servicio' && pendienteDeRecibir(l) > 0)
+  const hayBienes = lineasOC.some((l) => l.destino_tipo !== 'servicio' && pendienteDeRecibir(l) > 0)
 
-  function cantidadDe(id: string, pendiente: number): string {
+  // Por defecto se acepta TODO lo que falta (lo más común); quien recibe parcial o
+  // rechaza corrige el renglón que corresponda.
+  function aceptadaDe(id: string, pendiente: number): string {
     return cantidades[id] ?? String(pendiente)
   }
 
@@ -717,17 +754,24 @@ function RecepcionModal({
     const lineas = pendientes
       .map((l) => ({
         orden_compra_linea_id: l.id,
-        cantidad: parseFloat(cantidadDe(l.id, l.pendiente)) || 0,
+        cantidad: parseFloat(aceptadaDe(l.id, l.pendiente)) || 0,
+        cantidad_rechazada: parseFloat(rechazos[l.id] ?? '') || 0,
+        motivo_rechazo: (motivos[l.id] ?? '').trim() || null,
         costo_unitario: l.precio_unitario,
         observacion: null,
       }))
-      .filter((l) => l.cantidad > 0)
+      .filter((l) => l.cantidad > 0 || l.cantidad_rechazada > 0)
 
     const parsed = recepcionFormSchema.safeParse({
       orden_compra_id: orden.id,
+      tipo,
       fecha,
       documento_referencia: referencia.trim() || null,
-      notas: null,
+      destino_fisico: tipo === 'bienes' ? destinoFisico.trim() || null : null,
+      recibido_por: responsable || null,
+      respaldo_path: null,
+      clave_idempotencia: claveIdempotencia.current,
+      notas: notas.trim() || null,
       lineas,
     })
     if (!parsed.success) {
@@ -738,7 +782,9 @@ function RecepcionModal({
       await crear.mutateAsync(parsed.data)
       notify({
         variant: 'success', title: 'Listo',
-        text: 'Recepción creada en borrador. Regístrala para que entre a contabilidad e inventario.',
+        text: tipo === 'servicio'
+          ? 'Conformidad creada en borrador. Regístrala para devengar el servicio (no mueve inventario).'
+          : 'Recepción creada en borrador. Regístrala para que entre a contabilidad e inventario.',
       })
       onClose()
     } catch (e) {
@@ -747,41 +793,65 @@ function RecepcionModal({
   }
 
   return (
-    <EditModal title={`Recibir contra ${orden.numero ?? orden.concepto}`} onClose={onClose} size="lg"
+    <EditModal title={`${tipo === 'servicio' ? 'Conformidad de servicio' : 'Recibir'} contra ${orden.numero ?? orden.concepto}`} onClose={onClose} size="lg"
       footer={
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={btnSecundario}>Cancelar</button>
           <button onClick={() => void guardar()} disabled={crear.isPending || pendientes.length === 0}
-                  style={btnPrimario}>Crear recepción</button>
+                  style={btnPrimario}>{tipo === 'servicio' ? 'Crear conformidad' : 'Crear recepción'}</button>
         </div>
       }
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <Campo label="Fecha de recepción">
+      {hayServicios && hayBienes && (
+        <div role="group" aria-label="Tipo de recepción" style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <button type="button" style={tipo === 'bienes' ? btnPrimario : btnSecundario} onClick={() => setTipo('bienes')}>Bienes</button>
+          <button type="button" style={tipo === 'servicio' ? btnPrimario : btnSecundario} onClick={() => setTipo('servicio')}>Servicios (conformidad)</button>
+        </div>
+      )}
+      {hayServicios && !hayBienes && tipo !== 'servicio' && (
+        <div style={{ marginBottom: 10 }}>
+          <button type="button" style={btnSecundario} onClick={() => setTipo('servicio')}>Esta orden es de servicios: registrar conformidad</button>
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+        <Campo label={tipo === 'servicio' ? 'Fecha de la conformidad' : 'Fecha de recepción'}>
           <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} style={input} />
         </Campo>
-        <Campo label="Envío / remisión del proveedor">
+        <Campo label={tipo === 'servicio' ? 'Acta / soporte de la conformidad' : 'Envío / remisión del proveedor'}>
           <input value={referencia} onChange={(e) => setReferencia(e.target.value)} style={input} />
+        </Campo>
+        {tipo === 'bienes' && (
+          <Campo label="Destino físico (bodega / ubicación)">
+            <input value={destinoFisico} onChange={(e) => setDestinoFisico(e.target.value)} style={input} placeholder="Ej.: Bodega general" />
+          </Campo>
+        )}
+        <Campo label={tipo === 'servicio' ? 'Responsable que confirma el servicio' : 'Responsable de la recepción'}>
+          <select value={responsable} onChange={(e) => setResponsable(e.target.value)} style={input}>
+            <option value="">Yo (quien captura)</option>
+            {responsables.map((r) => <option key={r.id} value={r.id}>{r.full_name ?? r.id}</option>)}
+          </select>
         </Campo>
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <strong style={{ fontSize: 12 }}>Qué llegó</strong>
+        <strong style={{ fontSize: 12 }}>{tipo === 'servicio' ? 'Qué se prestó' : 'Qué llegó'}</strong>
         {isLoading && <p style={{ fontSize: 12, color: 'var(--at-ink-soft)' }}>Cargando renglones…</p>}
         {!isLoading && pendientes.length === 0 && (
           <p style={{ fontSize: 12, color: 'var(--at-ink-soft)' }}>
-            Esta orden ya se recibió completa.
+            {hayServicios || hayBienes ? 'No hay renglones de este tipo por recibir.' : 'Esta orden ya se recibió completa.'}
           </p>
         )}
         {pendientes.length > 0 && (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 520 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 640 }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'var(--at-ink-soft)' }}>
                   <th style={{ padding: 4 }}>Renglón</th>
-                  <th style={{ padding: 4, width: 110 }}>Destino</th>
-                  <th style={{ padding: 4, width: 90 }}>Pendiente</th>
-                  <th style={{ padding: 4, width: 110 }}>Se recibe</th>
+                  <th style={{ padding: 4, width: 100 }}>Destino</th>
+                  <th style={{ padding: 4, width: 80 }}>Pendiente</th>
+                  <th style={{ padding: 4, width: 100 }}>Se acepta</th>
+                  <th style={{ padding: 4, width: 100 }}>Se rechaza</th>
+                  <th style={{ padding: 4 }}>Motivo del rechazo</th>
                 </tr>
               </thead>
               <tbody>
@@ -793,10 +863,28 @@ function RecepcionModal({
                     <td style={{ padding: 2 }}>
                       <input
                         type="number" min="0" step="0.01" max={l.pendiente}
-                        value={cantidadDe(l.id, l.pendiente)}
+                        value={aceptadaDe(l.id, l.pendiente)}
                         onChange={(e) => setCantidades((c) => ({ ...c, [l.id]: e.target.value }))}
                         style={{ ...input, width: '100%' }}
-                        aria-label={`Cantidad recibida de ${l.descripcion}`}
+                        aria-label={`Cantidad aceptada de ${l.descripcion}`}
+                      />
+                    </td>
+                    <td style={{ padding: 2 }}>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={rechazos[l.id] ?? ''}
+                        onChange={(e) => setRechazos((c) => ({ ...c, [l.id]: e.target.value }))}
+                        style={{ ...input, width: '100%' }}
+                        aria-label={`Cantidad rechazada de ${l.descripcion}`}
+                      />
+                    </td>
+                    <td style={{ padding: 2 }}>
+                      <input
+                        value={motivos[l.id] ?? ''}
+                        onChange={(e) => setMotivos((c) => ({ ...c, [l.id]: e.target.value }))}
+                        style={{ ...input, width: '100%' }}
+                        placeholder="Obligatorio si rechazas"
+                        aria-label={`Motivo del rechazo de ${l.descripcion}`}
                       />
                     </td>
                   </tr>
@@ -805,7 +893,14 @@ function RecepcionModal({
             </table>
           </div>
         )}
+        <p style={{ fontSize: 11, color: 'var(--at-ink-soft)', margin: '6px 0 0' }}>
+          Solo lo <strong>aceptado</strong> entra al inventario o se devenga; lo rechazado queda con su motivo y sigue pendiente.
+        </p>
       </div>
+
+      <Campo label="Observaciones">
+        <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} style={{ ...input, resize: 'vertical' }} />
+      </Campo>
     </EditModal>
   )
 }

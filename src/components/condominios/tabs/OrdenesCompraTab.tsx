@@ -1,11 +1,13 @@
-import { hoyLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { OrdenCompra, ContratoProveedor } from '../../../types'
 import { useProveedoresQuery } from '../../../domain/cxp/queries'
-import { proveedorHabilitado } from '../../../types/compras'
+import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
+import type { ProveedorCatalogo } from '../../../types/proveedores'
+import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
+import { SeguimientoOrdenModal } from '../../compras/SeguimientoOrdenModal'
 
 interface Props {
   ordenes: OrdenCompra[]
@@ -23,7 +25,10 @@ type EstadoOC = OrdenCompra['estado']
 const ESTADO_CFG: Record<EstadoOC, { label: string; color: string; bg: string; next?: EstadoOC; nextLabel?: string }> = {
   borrador:  { label: 'Borrador',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)', next: 'aprobada',  nextLabel: 'Aprobar' },
   aprobada:  { label: 'Aprobada',   color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', next: 'emitida',   nextLabel: 'Emitir OC' },
-  emitida:   { label: 'Emitida',    color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', next: 'recibida',  nextLabel: 'Marcar recibida' },
+  // Una orden emitida ya NO se marca «recibida» a mano: la recepción por línea
+  // (Compras → Recibir) la mueve a `recibida_parcial` / `recibida`, y la factura
+  // la cierra. El servidor rechaza el cambio manual.
+  emitida:   { label: 'Emitida',    color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   // `recibida_parcial` y `cerrada` los pone la contabilidad (Compras → recepción
   // y factura). Sin entrada aquí, `ESTADO_CFG[orden.estado]` sería `undefined`
   // y la tarjeta reventaba en cuanto una orden pasara por el riel nuevo.
@@ -51,10 +56,8 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
 
   // Catálogo de Contabilidad (no `contratos_proveedores`, que es otra lista).
   const { data: catalogo = [] } = useProveedoresQuery(companyId)
-  const autorizados = useMemo(
-    () => catalogo.filter(p => proveedorHabilitado(p, hoyLocalISO())),
-    [catalogo],
-  )
+  const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
+  const [seguirDe, setSeguirDe] = useState<string | null>(null)
 
   const filtradas = filtroEstado ? ordenes.filter(o => o.estado === filtroEstado) : ordenes
 
@@ -104,27 +107,22 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     const cfg = ESTADO_CFG[orden.estado]
     if (!cfg.next) return
     const updates: Partial<OrdenCompra> = { estado: cfg.next }
-    if (cfg.next === 'recibida') {
-      const result = await openPromptDialog({
-        title: 'Monto real de la OC',
-        fields: [{
-          name: 'montoReal',
-          label: 'Monto real',
-          type: 'number',
-          placeholder: `Estimado: ${orden.monto_estimado ?? '—'}`,
-          min: 0,
-          step: 0.01,
-          autoFocus: true,
-        }],
-        submitText: 'Confirmar recepción',
-      })
-      if (!result) return
-      const montoReal = result.montoReal
-      updates.monto_real = montoReal ? parseFloat(montoReal) : orden.monto_estimado
-      updates.fecha_entrega_esperada = hoyLocalISO()
-    }
     const { error } = await updateCondominioRow('ordenes_compra', orden.id, updates)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    onRefresh()
+  }
+
+  async function devolverABorrador(orden: OrdenCompra) {
+    const r = await openPromptDialog({
+      title: 'Devolver a borrador',
+      description: 'La aprobación se invalida y la orden se vuelve a revisar (nueva revisión); queda escrito por qué.',
+      fields: [{ name: 'motivo', label: '¿Qué hay que corregir?', control: 'textarea', rows: 2, required: true }],
+      submitText: 'Devolver',
+    })
+    const motivo = r?.motivo?.trim()
+    if (!motivo) return
+    const { error } = await updateCondominioRow('ordenes_compra', orden.id, { estado: 'borrador', motivo_devolucion: motivo })
+    if (error) { notify({ variant: 'error', title: 'No se pudo', text: error.message }); return }
     onRefresh()
   }
 
@@ -183,27 +181,16 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
-              <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Proveedor autorizado *</label>
-              {/* Antes era texto libre con un datalist de sugerencias, así que
-                  cada orden inventaba su propio proveedor y no había forma de
-                  exigir que estuviera autorizado. Ahora se elige del catálogo
-                  de Contabilidad, y solo aparecen los autorizados y vigentes:
-                  el trigger de BD rechaza aprobar la orden en cualquier otro
-                  caso, y ofrecer aquí a quien va a ser rechazado sería una
-                  trampa. */}
-              <select
-                value={form.proveedor_id}
-                onChange={e => {
-                  const id = e.target.value
-                  const p = autorizados.find(x => x.id === id)
-                  setForm(f => ({ ...f, proveedor_id: id, proveedor_nombre: p?.nombre ?? '' }))
-                }}
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }}
-              >
-                <option value="">Selecciona…</option>
-                {autorizados.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-              </select>
-              {autorizados.length === 0 && (
+              {/* El proveedor se elige del CATÁLOGO COMPARTIDO por su id (nunca texto
+                  libre) y solo aparecen los habilitados HOY en este proyecto: el
+                  servidor rechaza aprobar y emitir a cualquier otro, y ofrecerlo
+                  aquí sería una trampa. */}
+              <ProveedorSelector
+                proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
+                value={form.proveedor_id || null} soloHabilitados label="Proveedor autorizado *"
+                onChange={(id, p) => setForm(f => ({ ...f, proveedor_id: id ?? '', proveedor_nombre: p?.nombre ?? '' }))}
+              />
+              {catalogo.length === 0 && (
                 <p style={{ margin: '4px 0 0', fontSize: 10, color: 'var(--at-ink-3)' }}>
                   No hay proveedores autorizados. Autorízalos en Contabilidad → Proveedores.
                 </p>
@@ -248,6 +235,8 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
         </div>
       )}
 
+      {seguirDe && <SeguimientoOrdenModal ordenId={seguirDe} monedaBase={moneda} onClose={() => setSeguirDe(null)} />}
+
       {/* Lista */}
       {filtradas.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0' }}>
@@ -286,6 +275,16 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                     </div>
                     {orden.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 10 }}>📝 {orden.notas}</div>}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button onClick={() => setSeguirDe(orden.id)}
+                        style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
+                        Seguimiento
+                      </button>
+                      {canEdit && orden.estado === 'aprobada' && (
+                        <button onClick={() => devolverABorrador(orden)}
+                          style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
+                          Devolver a borrador
+                        </button>
+                      )}
                       {canEdit && cfg.next && (
                         <button onClick={() => avanzarEstado(orden)}
                           style={{ padding: '5px 12px', background: ESTADO_CFG[cfg.next!].bg, color: ESTADO_CFG[cfg.next!].color, border: `1px solid ${ESTADO_CFG[cfg.next!].color}66`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
