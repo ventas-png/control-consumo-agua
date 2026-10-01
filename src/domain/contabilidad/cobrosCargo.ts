@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { QueryError, runQuery } from '../queryFetch'
 import { contabilidadKeys } from './keys'
+import type { ResultadoSolicitud } from './ajustes'
 
 /** Resumen de cobro de UN cargo, como lo devuelve `conta_cargos_cobro_resumen`. */
 export interface CobroCargoResumen {
@@ -71,6 +72,11 @@ export interface CobroDeCargo {
   reverso_fecha: string | null
   codigo: string | null
   motivo: string | null
+  /**
+   * Lo que de este cobro quedó como saldo a favor del responsable
+   * (20261007000000): recibido = aplicado + saldo_a_favor.
+   */
+  saldo_a_favor?: number
 }
 
 export interface ResultadoRegistroCobro {
@@ -112,7 +118,7 @@ export type MetodoCobroCargo = (typeof METODOS_COBRO_CARGO)[number]['value']
 /** Texto para el usuario de un código de pendiente del servidor. */
 export function etiquetaPendienteCobro(codigo: string | null): string {
   switch (codigo) {
-    case 'excede_saldo': return 'Excede el saldo'
+    case 'excede_saldo': return 'Excedente sin asignar'
     case 'cobro_anterior_pendiente': return 'Espera un cobro anterior'
     case 'devengo_desalineado': return 'Importe distinto del devengo'
     case 'devengo_pendiente': return 'Cargo sin contabilizar'
@@ -196,17 +202,27 @@ export function useRegistrarCobroCargoMutation(companyId?: string) {
   })
 }
 
-/** Anula (rechaza con motivo) un cobro de cargo; su asiento se reversa. */
+/**
+ * SOLICITA anular (rechazar con motivo) un cobro de cargo. Desde
+ * 20261011000000 no se anula aquí: lo ejecuta la aprobación de otra persona
+ * (Contabilidad › Solicitudes de ajuste) y entonces su asiento se reversa.
+ */
 export function useAnularCobroCargoMutation(companyId?: string) {
   const invalidar = useInvalidarCobros(companyId)
   return useMutation({
-    mutationFn: async (input: { pagoId: string; motivo: string }): Promise<ResultadoAnulacionCobro> => {
-      const filas = await runQuery<ResultadoAnulacionCobro[]>((signal) =>
+    mutationFn: async (input: { pagoId: string; motivo: string; clave?: string }): Promise<ResultadoSolicitud> => {
+      const filas = await runQuery<ResultadoSolicitud[]>((signal) =>
         supabase
-          .rpc('conta_anular_cobro_cargo', { p_pago_id: input.pagoId, p_motivo: input.motivo })
+          .rpc('conta_ajuste_solicitar', {
+            p_id: input.clave ?? crypto.randomUUID(),
+            p_tipo: 'anular_cobro_cargo',
+            p_documento_tabla: 'pagos',
+            p_documento_id: input.pagoId,
+            p_motivo: input.motivo,
+          })
           .abortSignal(signal),
       )
-      if (!filas || filas.length !== 1) throw new Error('El servidor no devolvió el resultado de la anulación.')
+      if (!filas || filas.length !== 1) throw new Error('El servidor no devolvió la solicitud.')
       return filas[0]
     },
     onSettled: invalidar,

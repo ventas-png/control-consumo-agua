@@ -11,6 +11,8 @@
 // 2xx, así que devolver 200 equivale a decir «no lo traigas más». Esa frase sólo
 // es verdad cuando el evento se procesó ENTERO.
 
+import { leerConciliacion, type RespuestaRegistro } from '../_shared/payments/conciliacion.ts'
+
 /** Lo que devuelve `stripe_webhook_evento_reclamar`. */
 export interface Reclamo {
   reclamado: boolean
@@ -19,14 +21,8 @@ export interface Reclamo {
   intentos?: number
 }
 
-/** Lo que devuelve `conciliar_pago_externo`. */
-export interface Conciliacion {
-  ok?: boolean
-  pago_id?: string | null
-  liquidado?: boolean
-  saldo_restante?: number
-  ya_conciliado?: boolean
-}
+/** Lo que devuelve `pasarela_registrar_estado` ante un «aprobado» (con su estado persistido). */
+export type Conciliacion = RespuestaRegistro
 
 export type Decision =
   | { accion: 'procesar' }
@@ -89,17 +85,36 @@ export function decidirTrasConciliar(
     }
   }
 
-  const r = res ?? {}
+  // Se decide por el ESTADO PERSISTIDO que devuelve la RPC, no por `accion`
+  // (un duplicado de un cobro retenido no está conciliado). Lo no acreditado
+  // también es 200: el evento quedó registrado y reintentarlo no cambiaría
+  // nada.
+  const l = leerConciliacion(res)
+  if (l.tipo !== 'conciliado') {
+    return {
+      accion: 'responder',
+      status: 200,
+      body: {
+        received: true,
+        conciliado: false,
+        ...(l.tipo === 'en_revision' ? { en_revision: true } : {}),
+        ...(l.tipo === 'reembolsado' ? { reembolsado: true } : {}),
+        estado_solicitud: l.tipo === 'en_revision' ? l.estadoSolicitud
+          : l.tipo === 'reembolsado' ? 'refunded' : l.estadoSolicitud,
+        incidencia_id: l.incidenciaId,
+      },
+    }
+  }
   return {
     accion: 'responder',
     status: 200,
     body: {
       received: true,
       conciliado: true,
-      ...(r.ya_conciliado ? { already_processed: true } : {}),
-      pago_id: r.pago_id ?? null,
-      liquidado: r.liquidado === true,
-      saldo_restante: r.saldo_restante ?? 0,
+      ...(l.yaConciliado ? { already_processed: true } : {}),
+      pago_id: l.pagoId,
+      liquidado: l.liquidado,
+      saldo_restante: l.saldoRestante,
     },
   }
 }
@@ -144,5 +159,90 @@ export function decidirTrasSellar(
       retryable: true,
       error: 'el evento se procesó pero no se pudo sellar su resultado',
     },
+  }
+}
+
+/**
+ * Qué estado del proveedor representa un evento de Stripe, y sobre qué
+ * PaymentIntent (20261011000000). `null` = el evento no cambia la solicitud:
+ * se cierra como procesado sin tocar nada.
+ *
+ *   · payment_intent.succeeded       → aprobado
+ *   · payment_intent.payment_failed  → rechazado (no retrocede un succeeded)
+ *   · charge.refunded, TOTAL         → reembolsado
+ *   · charge.refunded, PARCIAL       → null: no cambia la solicitud. Lo
+ *                                      registra `reembolsoParcialDeEvento`
+ *                                      (20261012000000); un reembolso parcial
+ *                                      no rechaza el cobro.
+ */
+export function estadoDeEventoStripe(
+  tipo: string,
+  obj: { id?: string; payment_intent?: string | null; refunded?: boolean | null },
+): { estado: 'aprobado' | 'rechazado' | 'reembolsado'; intentId: string | null } | null {
+  if (tipo === 'payment_intent.succeeded') return { estado: 'aprobado', intentId: obj.id ?? null }
+  if (tipo === 'payment_intent.payment_failed') return { estado: 'rechazado', intentId: obj.id ?? null }
+  // E8 (20261019000000): un PaymentIntent CANCELADO es un estado final de
+  // no-cobro informado por el proveedor: la solicitud pasa a failed.
+  if (tipo === 'payment_intent.canceled') return { estado: 'rechazado', intentId: obj.id ?? null }
+  if (tipo === 'charge.refunded') {
+    if (obj.refunded !== true) return null
+    return { estado: 'reembolsado', intentId: obj.payment_intent ?? null }
+  }
+  return null
+}
+
+/** Monedas sin decimales en Stripe (el importe viene en unidades enteras). */
+const MONEDAS_SIN_DECIMALES = new Set([
+  'bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf',
+])
+
+/** Importe de Stripe (unidad mínima) → importe con decimales. */
+export function importeDesdeStripe(minimo: number, moneda: string): number {
+  if (MONEDAS_SIN_DECIMALES.has(moneda.toLowerCase())) return minimo
+  return Math.round(minimo) / 100
+}
+
+export interface ReembolsoParcial {
+  intentId: string
+  /** Acumulado reembolsado del cargo, ya en la moneda (no en centavos). */
+  acumulado: number
+  moneda: string
+  /** Referencia del pago en el proveedor (id del cargo). */
+  referenciaPago: string | null
+  /** Último reembolso informado, si el evento lo trae. */
+  reembolsoRef: string | null
+}
+
+/**
+ * Datos de un reembolso PARCIAL (`charge.refunded` con `refunded: false`)
+ * para `pasarela_registrar_reembolso_parcial` (20261012000000). Stripe
+ * informa el ACUMULADO reembolsado del cargo (`amount_refunded`): la RPC
+ * cuenta sólo el aumento respecto del mayor ya visto, así que un evento
+ * repetido o que llega fuera de orden no suma dos veces.
+ *
+ * `null` si no es un reembolso parcial o le faltan datos para registrarlo.
+ */
+export function reembolsoParcialDeEvento(
+  tipo: string,
+  obj: {
+    id?: string
+    payment_intent?: string | null
+    refunded?: boolean | null
+    amount_refunded?: number | null
+    currency?: string | null
+    refunds?: { data?: Array<{ id?: string; created?: number }> } | null
+  },
+): ReembolsoParcial | null {
+  if (tipo !== 'charge.refunded' || obj.refunded === true) return null
+  if (!obj.payment_intent || !obj.currency) return null
+  const minimo = Number(obj.amount_refunded ?? 0)
+  if (!Number.isFinite(minimo) || minimo <= 0) return null
+  const ultimos = [...(obj.refunds?.data ?? [])].sort((a, b) => (b.created ?? 0) - (a.created ?? 0))
+  return {
+    intentId: obj.payment_intent,
+    acumulado: importeDesdeStripe(minimo, obj.currency),
+    moneda: obj.currency.toUpperCase(),
+    referenciaPago: obj.id ?? null,
+    reembolsoRef: ultimos[0]?.id ?? null,
   }
 }

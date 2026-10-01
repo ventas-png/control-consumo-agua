@@ -156,7 +156,8 @@ SELECT public.chk(
 SELECT public.chk(public.saldo_aux('11000000-0000-0000-0000-00000000a101', 'e0000000-0000-0000-0000-00000000a001'), 100 + 500 + 80 + 15,
   '6 · antes de anular, Uno debe 695 en la CxC compartida');
 SET ROLE authenticated;
-UPDATE public.cargos_adicionales_unidad SET estado = 'anulado' WHERE id = 'ca100000-0000-0000-0000-000000000001';
+-- Desde 20261011000000, por una solicitud aprobada por otra persona.
+SELECT public.tst_anular_cargo('ca100000-0000-0000-0000-000000000001', 'SINT-AUX anulación del cargo');
 RESET ROLE;
 SELECT public.chk(public.n_vivos('cargos_adicionales_unidad', 'ca100000-0000-0000-0000-000000000001', 'cargo_adicional_emitido'), 0,
   '6 · anular el cargo reversa su asiento');
@@ -417,7 +418,15 @@ RESET ROLE;
 
 -- ── 14 · borrar una cuota reversa, con dimensiones ──────────────────────────
 SET ROLE authenticated;
+-- Eliminación HEREDADA (anterior a 20261012000000, cuando una cuota se
+-- borraba sin solicitud): se desactiva expresamente el guard para modelarla.
+RESET ROLE;
+ALTER TABLE public.cuotas_condominio DISABLE TRIGGER trg_cuota_solo_por_solicitud;
+SET ROLE authenticated;
 UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'c1000000-0000-0000-0000-000000000004';
+RESET ROLE;
+ALTER TABLE public.cuotas_condominio ENABLE TRIGGER trg_cuota_solo_por_solicitud;
+SET ROLE authenticated;
 RESET ROLE;
 SELECT public.chk(public.n_vivos('cuotas_condominio', 'c1000000-0000-0000-0000-000000000004', 'cuota_emitida'), 0,
   '14 · el borrado suave de una cuota clasificada reversa su asiento');

@@ -12,34 +12,211 @@ pendientes de #887 hubo que retirarlo (a3a6829b) en vez de relajarlo. Este
 documento es el procedimiento con el que se puso al día el 2026-09-23 y el que
 hay que repetir.
 
-## Estado registrado (2026-09-26)
+## Estado registrado (re-verificado el 2026-10-01 con el head `2da9f44e` de #904, sólo lectura)
 
-**El sandbox está atrasado respecto de `main`.** Inventario de sólo lectura del
-2026-09-26 sobre `jwpmivhvlstslncrtokb`: 504 migraciones registradas, máxima
-`20261004000200`. Comparado versión a versión con `supabase/migrations/`:
+`jwpmivhvlstslncrtokb` = «control-agua-rls-sandbox» (organización `mmqkhtbewmdashgswlxg`, creado el
+2026-08-19). **No es producción** (`nnsqmeigtgewatameexo`). 504 migraciones registradas, máxima
+`20261004000200`, y las 504 versiones locales hasta esa son las mismas (conciliadas el 2026-09-23).
+Las 504 versiones registradas coinciden **exactamente** con las 504 de `main` hasta esa versión
+(`md5` de la lista ordenada: `cb9c843197e453530e1b9a0cd667955a` en ambos lados). No existen
+`pagos_rechazo_eventos`, `conta_ec_cobro_al_corte(uuid, date)`, `conta_ajustes_solicitudes`,
+`conta_notas_credito` ni `conta_saldos_favor`. Datos: **547 cuotas** (eran 527 al 2026-10-01 03:14 UTC:
+alguien o algún E2E escribió 20 desde entonces; no se investigó ni se tocó) y 0 solicitudes de cobro
+en línea. `main` sigue en `aa6e0461`; no hay más migraciones nuevas que las dos de abajo.
 
 | Versión | Origen | En el sandbox |
 | --- | --- | --- |
-| `20261005000000_conta_cobros_rechazo_evidencia` | #901 (en `main`, aplicada en producción el 2026-09-25) | **No aplicada.** Ni la fila de historial ni `pagos_rechazo_eventos`; `conta_tg_pagos` es la de `20261004000100`. |
-| `20261006000000_conta_cobros_vigencia_sin_fecha` | #902 (PR abierto) | **No aplicada.** Depende de la anterior. |
+| `20261005000000_conta_cobros_rechazo_evidencia` | `main` (#901; aplicada en producción) | **Falta** |
+| `20261006000000_conta_cobros_vigencia_sin_fecha` | `main` (#902; aplicada en producción) | **Falta** |
+| `20261007000000` … `20261011000000` (5) | #904 (abierto) | **Faltan** |
+| `20261012000000_conta_anular_cuota_reembolsos_parciales_respaldos` | #904 | **Falta** |
+| `20261013000000_conta_cuota_anulada_sin_tocar_pagos` | #904 (correctiva de 20261012) | **Falta** |
+| `20261014000000_conta_cuota_eliminar_solo_tarifa_reserva_cancelada` | #904 (correctiva de 20261012, E7) | **Falta** |
+| `20261015000000_pasarela_cobro_tardio_cuota_anulada` | #904 (confirmación tardía sobre cuota anulada) | **Falta** |
+| `20261016000000_pasarela_reembolso_antes_de_aprobar_estado_persistido` | #904 (correctiva de 20261015) | **Falta** |
+| `20261017000000_conta_ajuste_importe_notas_credito` | #904 (E6) | **Falta** |
+| `20261018000000_conta_reserva_cancelada_anula_tarifa` | #904 (E7) | **Falta** |
+| `20261019000000_pasarela_cobros_abandonados_consulta` | #904 (E8) | **Falta** |
+| `20261019000100_pasarela_cobro_sin_confirmar_cierre_y_cuatro_ojos` | #904 (correctiva de 20261019000000) | **Falta** |
 
-No hay versiones sólo en el sandbox ni colisiones: las dos versiones están
-libres en su historial.
+**Hallazgo al iniciar la ejecución autorizada (2026-10-01): la huella base del sandbox NO coincide con
+la reconstrucción local de `main`, y por eso se detuvo.** Se creó sólo `respaldo_sync_20261001` con dos
+funciones de lectura (`huella_lineas`, `huella_hash`); no se aplicó ninguna migración. Huella agregada
+(sha256 de la huella canónica de `fingerprint.sql`, sin su guard): sandbox
+`d53eecd670db137a…`, reconstrucción local de `main` (`aa6e0461`, 504 migraciones)
+`5a9ceed3170673856…`. Diferencian **8 grupos** de ~2 400:
 
-**Las validaciones de #901 y #902 no lo actualizaron.** Cada una aplicó las
-migraciones y un caso sintético dentro de **una** transacción que terminó en
-`RAISE EXCEPTION 'SUITE_OK_ROLLBACK …'`; después se comprobó que no quedó nada
-(504 migraciones, sin la tabla ni las funciones nuevas, `conta_tg_pagos` sin
-cambios, sin datos sintéticos). Eso prueba que las migraciones corren sobre el
-estado real del sandbox; **no** lo deja al día.
+| Grupo | Qué difiere | Evidencia de que no es semántico |
+| --- | --- | --- |
+| `funcion:agua_costo_tarifa`, `agua_lectura_contexto`, `agua_lectura_resolver`, `agua_lecturas_inconsistencias`, `agua_tg_lectura_autoritativa`, `registrar_lectura` | el texto del cuerpo (el sandbox es más corto: 1 715 vs 2 028, 2 509 vs 3 949, 3 758 vs 5 788, 7 350 vs 10 957, 2 759 vs 3 733, 3 062 vs 5 355 caracteres) | quitando comentarios `--` y espacios, el md5 del cuerpo **coincide** en los seis |
+| `funcion:registrar_bitacora` | una línea de comentario (misma longitud, otro texto) | el md5 sin comentarios ni espacios **coincide** |
+| `tabla:company_sso_domains/columnas` | el sandbox serializa `citext` y `gen_random_bytes(…)`; la reconstrucción, `extensions.citext` y `extensions.gen_random_bytes(…)` | misma columna y tipo; sólo cambia la calificación del esquema de la extensión |
 
-Para ponerlo al día, con el procedimiento de abajo, en este orden y cada una en
-su propia transacción con verificación de huella: `20261005000000` y, cuando
-#902 esté en `main`, `20261006000000`. Ninguna toca datos existentes (crean una
-tabla vacía y redefinen funciones); no requieren renumeración ni `repair`.
-Quien administra el sandbox decide cuándo; hasta entonces, cualquier E2E que
-use `pagos_rechazo_eventos` o el estado de cuenta con cortes de cobros
-rechazados fallará contra él por desincronización, no por el código.
+Ninguna de las 16 migraciones por aplicar toca esos objetos. Es coherente con migraciones registradas
+en el sandbox con una versión anterior del texto del archivo (los comentarios se ampliaron después en
+`main`). El procedimiento manda detenerse ante una huella base distinta; **no se continuó**. Para
+seguir hace falta decidir si se acepta este residuo declarado (verificando cada paso con la huella
+excluyendo esos 8 grupos y su prueba de equivalencia) o se corrige antes el sandbox.
+
+**Manifiesto del SHA `2da9f44e`** (sha256 truncado; tamaño en bytes) — lo que se aplicaría, en orden:
+
+| Versión | sha256 | Bytes |
+| --- | --- | --- |
+| `20261005000000` (main) | `e1c8d4d90ed69561` | 39 275 |
+| `20261006000000` (main) | `5f4babf93772eecd` | 29 803 |
+| `20261007000000` | `5e12fd4029278fed` | 193 207 |
+| `20261008000000` | `e7dadd504a7e3de6` | 25 676 |
+| `20261009000000` | `57a6beef4869f33c` | 28 162 |
+| `20261010000000` | `1fee1ec4532aa088` | 31 158 |
+| `20261011000000` | `117d539160d0a6cb` | 129 605 |
+| `20261012000000` | `fc9e14769c8c6016` | 66 069 |
+| `20261013000000` | `f0d2d81ca2906410` | 13 428 |
+| `20261014000000` | `627e0c40ccb0bbd8` | 2 820 |
+| `20261015000000` | `542b189ce232bb1f` | 15 051 |
+| `20261016000000` | `9b9d807d261a47c6` | 15 289 |
+| `20261017000000` | `86c8a268beeda83a` | 114 777 |
+| `20261018000000` | `c65c2504f6e31a42` | 10 421 |
+| `20261019000000` | `caa1dbfcc3436cab` | 53 093 |
+| `20261019000100` | `e710395bcdf26f0e` | 27 349 |
+
+**#907 (proveedores)** trae nueve migraciones, `20261020000000` a `20261020000800`, todas por encima
+de las de #904. Orden de fusión previsto: **#904 → #907**. Nada de #907 se aplica en el sandbox con
+este procedimiento, y **ninguna versión ya aplicada se renumera**: si #907 se fusionara antes, las de
+#904 quedarían intercaladas y se decidiría entonces, sin tocar las ya aplicadas.
+
+El procedimiento normal (más abajo) sólo admite migraciones de `main` (paso 1: «nada de PRs
+abiertos»). Las 14 de #904 **no** se aplican con él: hace falta la autorización expresa del
+procedimiento acotado de la sección siguiente.
+
+## Procedimiento ACOTADO para probar las migraciones de un PR abierto (requiere autorización)
+
+**No está autorizado; no se ejecutó nada.** Es la propuesta para #904. Separa lo que se puede
+deshacer con una transacción de lo que no.
+
+### Qué deja cada tipo de prueba
+
+| Tipo | Cómo corre | Qué queda después | Limpieza |
+| --- | --- | --- | --- |
+| **A · SQL reversible** | Una conexión `psql` (o `database/query`), `BEGIN` … pruebas … `RAISE EXCEPTION 'fin'` | Nada en tablas, catálogo ni historial. Sólo avanzan secuencias (`nextval` no se revierte) | Ninguna |
+| **B · Storage real** | Peticiones HTTP a la API de Storage con la sesión de un usuario E2E | El objeto en el almacenamiento **y** su fila en `storage.objects`: cada subida es su propia transacción, ya confirmada cuando vuelve la respuesta. **Un `RAISE` en otra transacción no la revierte** | La de la tabla de abajo, sólo autorizada |
+| **C · Migraciones** | Paso 3, una por transacción | Esquema + fila de historial, juntos | Ver «Restauración» |
+
+Las pruebas B necesitan además filas **confirmadas** que las respalden: la política de
+`storage.objects` (`ajustes_respaldos_insert`) sólo deja subir a la carpeta de una solicitud que
+existe y está `pendiente`, y `conta_ajuste_adjuntar_respaldo` escribe en una tabla inmutable. Por eso B
+deja datos sintéticos persistentes y A no.
+
+### Pasos
+
+1. **Primero `main`.** `20261005000000` y `20261006000000` con el procedimiento normal (abajo),
+   cada una en su transacción con huella verificada. Si la huella previa del sandbox no coincide con
+   la reconstrucción de su historial, se detiene todo y se informa.
+2. **Respaldo** en `respaldo_sync_AAAAMMDD` (paso 3 del procedimiento normal) y, además:
+   - la **huella completa previa a #904** (`fingerprint.sql`), que es la referencia de la
+     restauración;
+   - `pg_get_functiondef` y ACL de **cada** función que las 14 migraciones redefinen o eliminan, y
+     la definición de cada trigger, constraint y política que cambian (lista generada desde los
+     archivos del SHA autorizado, no a mano);
+   - las filas de `storage.buckets` y las políticas de `storage.objects`.
+3. **Las 14 migraciones del PR, en orden, una por transacción**, con el SQL **del SHA autorizado**
+   (se registra el SHA), su fila en `supabase_migrations.schema_migrations` con la misma versión y
+   nombre, y la huella esperada tras cada paso (calculada antes sobre una reconstrucción local de
+   `main` + esas migraciones). Huella distinta → `ROLLBACK` de esa transacción y alto. Nada de
+   `repair`, `reset` ni borrado de datos: crean tablas vacías, agregan columnas con default,
+   redefinen funciones, triggers y políticas, y crean el bucket privado `ajustes-respaldos`.
+4. **Registro** en `respaldo_sync_AAAAMMDD.migraciones_de_pr` (versión, nombre, sha256 del archivo,
+   SHA del PR, quién autorizó). Cuando #904 llegue a `main`, se comprueba que cada archivo fusionado
+   tenga el mismo sha256: si coincide, no se vuelve a aplicar nada; si cambió una migración ya
+   aplicada aquí, es una colisión (sección «Colisiones de versión») y se decide con quien
+   administra el sandbox.
+5. **Pruebas A (reversibles)**, con datos `SINT` creados dentro de la misma transacción que termina
+   en `RAISE`:
+   - anular cuota: solicitar, dependencias informadas, aprobar, reversos vinculados, evidencia,
+     estado de cuenta al corte, portal; eliminación de la tarifa de una reserva cancelada contra una
+     cuota `pendiente` (E7);
+   - respaldos, **sólo la parte SQL**: registro con `conta_ajuste_adjuntar_respaldo` sobre una fila
+     de `storage.objects` insertada en la misma transacción, aprobación con la lista revisada,
+     eTag alterado (`AJUSTE_RESPALDO_ALTERADO`). Esto prueba las reglas, **no** la API de Storage;
+   - reembolsos parciales y confirmación tardía sobre cuota anulada como service_role: avisos
+     duplicados, acumulados, fuera de orden; incidencias visibles.
+6. **Pruebas B (Storage real)**, sólo si se autorizan aparte, porque dejan datos:
+   - archivos: dos PDF sintéticos de 1 KB generados en el momento (contenido
+     `SINT E2E respaldo <fecha>`; nada real ni de producción);
+   - ruta: `<company_id del tenant E2E>/<solicitud SINT>/<clave>-SINT-E2E-AAAAMMDD-n.pdf`
+     (`rutaRespaldo`), en `ajustes-respaldos`;
+   - qué se comprueba: subir con la sesión del usuario E2E; volver a subir a la misma ruta falla
+     (`upsert: false`, sin política de UPDATE); un usuario de otra empresa no puede leerlo; la URL
+     firmada vence; el sha256 registrado coincide con el archivo;
+   - **efectos persistentes** (todos en el tenant E2E, todos con `SINT-E2E-AAAAMMDD` en el
+     concepto o el motivo): 1 cuota sintética con su asiento de devengo; 1 solicitud `anular_cuota`
+     que se aprueba al final (la cuota queda anulada con su reverso: saldo neto 0) con sus eventos;
+     2 filas en `conta_ajustes_respaldos`; 2 objetos en el bucket con sus filas de
+     `storage.objects`;
+   - **limpieza autorizada**: sólo los 2 objetos, por la API de Storage con `service_role`
+     (`remove`), que borra a la vez el archivo y su fila. Nunca `DELETE` sobre `storage.objects`
+     por SQL (dejaría el archivo huérfano). Las filas contables y de bitácora **no** se borran: son
+     inmutables por diseño y quitarlas exigiría desactivar triggers, que está prohibido. Quedan como
+     datos sintéticos declarados aquí; si se borran los objetos, sus filas de
+     `conta_ajustes_respaldos` siguen con el sha256 y la ruta, y el registro anota que el archivo
+     se retiró y cuándo.
+7. Después, el E2E del despliegue contra el sandbox y su preflight.
+
+### Qué flujos validan las pruebas A (todas SQL con `RAISE` final, datos `SINT`, sin cobros reales)
+
+| Flujo | Qué se comprueba | Equivalente local |
+| --- | --- | --- |
+| Saldos a favor | generación (anticipo, excedente), aplicación, reversión, duplicado por clave | `conta_saldos_favor`, `conta_ajustes` §14–§16 |
+| Tipo de cambio mensual y tasa manual | tasa del mes, tasa manual con motivo y bitácora, rechazo sin motivo | suite de tipo de cambio |
+| Rebajas (E6) | límite = saldo pendiente, nota de crédito, asiento contra la CxC, saldo del portal | `conta_ajustes` §22; concurrencia P, Q, R |
+| Cancelación de reservas (E7) | tarifa anulada con reverso; con cobro o saldo aplicado: `requiere_solicitud` | `conta_ajustes` §23 |
+| Resolución manual de cobros (E8) | respaldo obligatorio; aprobador distinto, **también el propietario** | `conta_ajustes` §24, §25; concurrencia S, T |
+| Confirmaciones tardías | duplicados, cobro sobre cuota anulada retenido, cierre de `cobro_sin_confirmar` y conservación de la específica | `conta_ajustes` §20, §21, §25; concurrencia I–K, M, N, U |
+
+Esos son los resultados **locales** (arnés PostgreSQL desechable y CI). Hasta que se autorice y
+corra, **nada de esto está probado en el sandbox**.
+
+### Restauración (si se decide no seguir)
+
+La regla: **esquema e historial cambian juntos**. Una fila de `schema_migrations` sólo se quita en
+la misma transacción que revierte todos sus efectos, y sólo si la huella resultante es la de antes
+de esa migración. Nunca se borra una fila de historial dejando sus objetos vivos, ni se dejan
+objetos sin su fila.
+
+- **R1 · Mantenerlas aplicadas (por defecto).** Si ya corrieron pruebas B, es la única opción sin
+  borrar datos: las tablas nuevas tienen filas sintéticas inmutables. Esquema e historial coinciden;
+  el registro del paso 4 explica qué SHA está aplicado. Al fusionarse #904 se verifica el sha256
+  (paso 4).
+- **R2 · Revertir por completo** (sólo sin pruebas B, o con autorización expresa para borrar sus
+  datos). Una transacción por migración, **de la última a la primera** (20261019000100 → 20261007):
+  1. restaurar desde el respaldo las funciones, triggers, constraints y políticas que esa
+     migración redefinió, y volver a crear las que eliminó (p. ej. `conta_ajuste_aprobar(uuid,
+     text, boolean)`, que 20261012 sustituyó);
+  2. eliminar los objetos que creó (funciones, triggers, índices, columnas, tablas), **sólo si
+     están vacíos**; una tabla con filas detiene la reversión → se queda en R1;
+  3. el bucket `ajustes-respaldos` sólo vacío y por la API de Storage (`deleteBucket`), no por SQL;
+  4. borrar su fila de `schema_migrations`;
+  5. comprobar con `fingerprint.sql` que la huella es la esperada **antes** de esa migración
+     (calculada sobre la reconstrucción local); si no, `ROLLBACK` y alto.
+
+  Al terminar, la huella del sandbox debe ser igual a la huella previa registrada en el paso 2.
+
+**Antes de pedir la autorización** falta (no está hecho): el guion de R2 generado desde los
+archivos del SHA autorizado y **probado en local** (cadena de `main` + 14 migraciones + R2 → huella
+igual a la de `main`). Sin esa prueba no se propone R2: sólo R1.
+
+Alternativa sin cambio persistente: los pasos 3 y 5 dentro de UNA transacción que termina en
+`RAISE` (como se validaron #901 y #902). Cubre A y C, nunca B. Requiere enviar ~580 KB de SQL en una
+sola sentencia: no es viable por el conector de esta sesión; sí con `psql` y la URL de la base del
+sandbox por quien la administra.
+
+### Autorización que se pide
+
+Por separado, porque tienen efectos distintos:
+
+1. aplicar 20261005 y 20261006 (`main`) por el procedimiento normal;
+2. aplicar las 14 migraciones de #904 en el SHA que se indique (C, con R1 por defecto);
+3. correr las pruebas A;
+4. correr las pruebas B, con los efectos persistentes y la limpieza descritos en el paso 6.
 
 ## Cuándo hacerlo
 

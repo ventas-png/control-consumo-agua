@@ -445,6 +445,46 @@
         "anon",
         "authenticated-cross-tenant"
       ]
+    },
+    {
+      "nombre": "portal_saldos_favor",
+      "dominio": "saldo-favor-portal",
+      "porQue": "20261011000000 — lista saldos a favor del cliente de la sesión; sin sesión de residente no devuelve nada ajeno",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
+    },
+    {
+      "nombre": "portal_documentos_con_saldo",
+      "dominio": "saldo-favor-portal",
+      "porQue": "20261011000000 — lista cuotas y cargos con saldo del cliente de la sesión",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
+    },
+    {
+      "nombre": "portal_solicitar_aplicacion_saldo_favor",
+      "dominio": "saldo-favor-portal",
+      "porQue": "20261011000000 — crea una solicitud de aplicación de saldo a favor; sobre saldo o documento ajeno pediría mover dinero de otro cliente",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
+    },
+    {
+      "nombre": "portal_mis_solicitudes",
+      "dominio": "saldo-favor-portal",
+      "porQue": "20261011000000 — lista las solicitudes del cliente de la sesión",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     }
   ],
   "_sandbox": [

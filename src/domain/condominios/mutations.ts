@@ -20,6 +20,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { db } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { condominiosKeys } from './keys'
+import { solicitarAjuste } from '../contabilidad/ajustes'
 import type { TablesInsert, TablesUpdate } from '../../types/database.types'
 import {
   aplicarTransicionCuota,
@@ -188,23 +189,35 @@ export function usePagarCuotaMutation() {
 
 // ────────────────────────────────────────────────────────────────────────────
 // 3. ANULAR — pendiente|emitida|vencida → anulada (terminal).
+//
+// Desde 20261012000000 la anulación NO se escribe desde aquí: se SOLICITA con
+// motivo y la ejecuta la aprobación de otra persona en Contabilidad ›
+// Solicitudes de ajuste (reversa el devengo y la mora con asientos vinculados
+// y deja la evidencia). Un UPDATE directo lo rechaza el servidor
+// (CUOTA_ANULACION_SOLO_POR_SOLICITUD). Si la cuota tiene cobros o saldo a
+// favor aplicados, el servidor lo informa (AJUSTE_DEPENDENCIAS): no se anula
+// nada en cascada.
 // ────────────────────────────────────────────────────────────────────────────
 export interface AnularCuotaVars {
   cuota: CuotaTransicionInput
+  motivo: string
+  /** Clave de idempotencia (la misma en cada reintento). */
+  clave?: string
 }
 
 export function useAnularCuotaMutation() {
   const invalidar = useInvalidarCuotas()
   return useMutation({
-    mutationFn: async ({ cuota }: AnularCuotaVars) => {
+    mutationFn: async ({ cuota, motivo, clave }: AnularCuotaVars) => {
       const check = puedeTransicionarCuota(cuota.cuota_estado, 'anular')
       if (!check.ok) throw new TransicionCuotaInvalidaError(cuota.cuota_estado, 'anular', check.error)
-      // Parche = estado + anulada_at (businessCondominios.ts es la fuente del timestamp).
-      const patch = aplicarTransicionCuota(cuota.cuota_estado, 'anular')
-      await runQuery((signal) =>
-        db.from('cuotas_condominio').update(patch).eq('id', cuota.id).abortSignal(signal),
-      )
-      return patch
+      return solicitarAjuste({
+        clave: clave ?? crypto.randomUUID(),
+        tipo: 'anular_cuota',
+        documentoTabla: 'cuotas_condominio',
+        documentoId: cuota.id,
+        motivo: motivo.trim(),
+      })
     },
     onSuccess: invalidar,
   })

@@ -86,7 +86,9 @@ CREATE OR REPLACE FUNCTION public.rc_ev(p_pago uuid) RETURNS text LANGUAGE sql A
   SELECT COALESCE(string_agg(e.evento || ':' || e.estado_anterior || ':' || COALESCE(e.motivo, '-') || ':' ||
            CASE e.actor WHEN 'a0a0a0a0-0000-0000-0000-00000000000a' THEN 'adm'
                         WHEN 'a0a0a0a0-0000-0000-0000-00000000000c' THEN 'contador'
-                        ELSE COALESCE(e.actor::text, 'nadie') END,
+                        ELSE CASE WHEN EXISTS (SELECT 1 FROM public.app_users u
+                                                WHERE u.id = e.actor AND u.full_name = 'SINT Aprobador de ajustes')
+                                  THEN 'aprobador' ELSE COALESCE(e.actor::text, 'nadie') END END,
            ',' ORDER BY e.ocurrido_at, e.id), '')
     FROM public.pagos_rechazo_eventos e WHERE e.pago_id = p_pago
 $$;
@@ -299,19 +301,21 @@ SELECT public.rc_fechar_intentos();
 SELECT public.chk_txt(public.rc_asientos(:PC) || '|' || public.rc_fila(CURRENT_DATE - 1, :PC, 'codigo'), '0/0|devengo_pendiente',
   'R9 · …pendiente por el devengo');
 SELECT set_config('request.jwt.claim.sub', :VIS, false);
-SELECT public.chk_falla($$SELECT * FROM public.conta_anular_cobro_cargo('d0a00000-0000-0000-0000-0000000000ca', 'SINT-RECH visor')$$,
+SELECT public.chk_falla($$SELECT * FROM public.tst_anular_cobro_cargo('d0a00000-0000-0000-0000-0000000000ca', 'SINT-RECH visor')$$,
   'No autorizado', 'R6 · el visor contable no anula');
 SELECT set_config('request.jwt.claim.sub', :ADB, false);
-SELECT public.chk_falla($$SELECT * FROM public.conta_anular_cobro_cargo('d0a00000-0000-0000-0000-0000000000ca', 'SINT-RECH intruso')$$,
+SELECT public.chk_falla($$SELECT * FROM public.tst_anular_cobro_cargo('d0a00000-0000-0000-0000-0000000000ca', 'SINT-RECH intruso')$$,
   'no está en tu ámbito', 'R6 · ni el admin de otra empresa');
 SELECT set_config('request.jwt.claim.sub', :ADM, false);
 SELECT public.chk_txt(public.rc_ev(:PC), '', 'R6 · los intentos rechazados no dejan evidencia');
-SELECT public.chk_txt((SELECT resultado FROM public.conta_anular_cobro_cargo(:PC, 'SINT-RECH cargo mal cobrado')), 'anulado',
+SELECT public.chk_txt((SELECT resultado FROM public.tst_anular_cobro_cargo(:PC, 'SINT-RECH cargo mal cobrado')), 'anulado',
   'R9 · el admin anula el cobro');
-SELECT public.chk_txt(public.rc_ev(:PC), 'rechazo:verificado:SINT-RECH cargo mal cobrado:adm',
-  'R9 · la anulación deja evidencia con su motivo y su actor');
-SELECT public.chk_txt((SELECT resultado FROM public.conta_anular_cobro_cargo(:PC, 'SINT-RECH otra vez')) || '|' || public.rc_ev(:PC),
-  'ya_anulado|rechazo:verificado:SINT-RECH cargo mal cobrado:adm',
+-- Desde 20261011000000 la ejecuta la aprobación: el actor es quien aprobó.
+SELECT public.chk_txt(public.rc_ev(:PC), 'rechazo:verificado:SINT-RECH cargo mal cobrado:aprobador',
+  'R9 · la anulación deja evidencia con su motivo y su actor (quien la aprobó)');
+SELECT public.chk_falla($$SELECT * FROM public.tst_anular_cobro_cargo('d0a00000-0000-0000-0000-0000000000ca', 'SINT-RECH otra vez')$$,
+  'AJUSTE_DOCUMENTO_CAMBIO', 'R9 · otra solicitud sobre el cobro anulado falla al aprobar');
+SELECT public.chk_txt(public.rc_ev(:PC), 'rechazo:verificado:SINT-RECH cargo mal cobrado:aprobador',
   'R9 · repetirla no cambia nada');
 SELECT public.chk_txt(public.rc_fila(CURRENT_DATE - 1, :PC, 'clase') || '|' || public.rc_fila(CURRENT_DATE, :PC, 'clase'),
   'pendiente|-',

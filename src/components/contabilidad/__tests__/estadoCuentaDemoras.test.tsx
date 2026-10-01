@@ -44,6 +44,8 @@ vi.mock('../../../domain/contabilidad/queries', async (original) => ({
   }),
   useUnidadesLedgerQuery: () => ({ data: [] }),
 }))
+// El panel de saldos a favor tiene sus propias pruebas (saldosFavor.test.tsx).
+vi.mock('../SaldosFavorPanel', () => ({ SaldosFavorPanel: () => <div data-testid="saldos-favor" /> }))
 vi.mock('../AsientoDetalleModal', () => ({ AsientoDetalleModal: () => null }))
 
 import { EstadoCuentaTab } from '../EstadoCuentaTab'

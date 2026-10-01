@@ -9,7 +9,7 @@ import {
   updateCondominioRow,
   deleteCondominioRow,
 } from '../../../domain/condominios/tabMutations'
-import { softDelete } from '../../../lib/softDelete'
+import { solicitarAjuste, cancelarReservaConTarifa, avisoCancelacionReserva } from '../../../domain/contabilidad/ajustes'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
 import { useSignedUrls } from '../../../lib/storageUrls'
 import { formatPhoneForWa } from '../../../lib/validation'
@@ -283,7 +283,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     })
     setSaving(false)
     if (error) {
-      if (cuotaId) await softDelete('cuotas_condominio', { id: cuotaId })
+      if (cuotaId) await compensarCuotaSinReserva(cuotaId, error.message)
       notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
     setReservaForm({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad', tarifa_pagada: false })
@@ -301,14 +301,39 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     onRefresh()
   }
 
+  // E7 (20261018000000): cancelar o rechazar la reserva y ANULAR su tarifa van
+  // juntos en el servidor (reverso y constancia; nada se borra). Con cobros u
+  // otras dependencias la tarifa queda vigente y se dice por qué.
+  async function cancelarEnServidor(reservaId: string, opciones: { motivo?: string; rechazo?: boolean } = {}) {
+    try {
+      const r = await cancelarReservaConTarifa(reservaId, opciones)
+      notify(avisoCancelacionReserva(r))
+      return true
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se canceló la reserva', text: (e as Error).message })
+      return false
+    }
+  }
+
+  // Compensación: se generó el cargo pero la reserva no se guardó. Ese cargo
+  // ya es una cuenta por cobrar sin reserva que lo respalde: no se borra, se
+  // SOLICITA su anulación (la aprueba otra persona).
+  async function compensarCuotaSinReserva(cuotaId: string, causa: string) {
+    try {
+      await solicitarAjuste({
+        clave: crypto.randomUUID(), tipo: 'anular_cuota', documentoTabla: 'cuotas_condominio',
+        documentoId: cuotaId, motivo: `Cargo de reserva no registrada: ${causa}`.slice(0, 500),
+      })
+      notify({ variant: 'warning', title: 'Se solicitó anular el cargo generado', text: 'La reserva no se guardó; el cargo queda pendiente de que otra persona apruebe su anulación.' })
+    } catch (e) {
+      notify({ variant: 'error', title: 'El cargo generado sigue vigente', text: `No se pudo solicitar su anulación: ${(e as Error).message}` })
+    }
+  }
+
   async function cancelarReserva(id: string) {
     const r = await confirm({ title: '¿Cancelar reserva?', icon: 'warning', variant: 'danger', confirmText: 'Sí, cancelar', cancelText: 'No' })
     if (!r.isConfirmed) return
-    const reserva = reservas.find(x => x.id === id)
-    await updateCondominioRow('reservas_amenidades', id, { estado: 'cancelada' })
-    if (reserva?.cuota_id) {
-      await softDelete('cuotas_condominio', { id: reserva.cuota_id, estado: 'pendiente' })
-    }
+    if (!(await cancelarEnServidor(id))) return
     setSelectedReserva(null)
     onRefresh()
   }
@@ -497,7 +522,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     }
     const { error } = await updateCondominioRow('reservas_amenidades', r.id, update)
     if (error) {
-      if (cuotaId) await softDelete('cuotas_condominio', { id: cuotaId })
+      if (cuotaId) await compensarCuotaSinReserva(cuotaId, error.message)
       notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
     onRefresh()
@@ -552,7 +577,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       rechazada_motivo: null,
     })
     if (error) {
-      if (cuotaId && !r.cuota_id) await softDelete('cuotas_condominio', { id: cuotaId })
+      if (cuotaId && !r.cuota_id) await compensarCuotaSinReserva(cuotaId, error.message)
       notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
     onRefresh()
@@ -575,13 +600,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     })
     if (!result) return
     const motivo = result.motivo
-    if (r.cuota_id) {
-      await softDelete('cuotas_condominio', { id: r.cuota_id, estado: 'pendiente' })
-    }
-    await updateCondominioRow('reservas_amenidades', r.id, {
-      estado: 'cancelada',
-      rechazada_motivo: motivo.trim(),
-    })
+    if (!(await cancelarEnServidor(r.id, { motivo, rechazo: true }))) return
     onRefresh()
   }
 

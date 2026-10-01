@@ -100,7 +100,15 @@ SELECT public.chk_txt(
 -- ── 3 · anulación en período ABIERTO: reverso el mismo día ───────────────────
 INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, created_at) VALUES
   ('ec100000-0000-0000-0000-000000000003', :A, :A1, :U1, 'SINT-AUX K3', 40, '2026-05', 'pendiente', 'mantenimiento', '2026-05-05 12:00+00');
+-- Eliminación HEREDADA (anterior a 20261012000000, cuando una cuota se
+-- borraba sin solicitud): se desactiva expresamente el guard para modelarla.
+RESET ROLE;
+ALTER TABLE public.cuotas_condominio DISABLE TRIGGER trg_cuota_solo_por_solicitud;
+SET ROLE authenticated;
 UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'ec100000-0000-0000-0000-000000000003';
+RESET ROLE;
+ALTER TABLE public.cuotas_condominio ENABLE TRIGGER trg_cuota_solo_por_solicitud;
+SET ROLE authenticated;
 SELECT public.chk_txt(
   (SELECT string_agg((m->>'fecha') || ':' || (m->>'cargo') || ':' || (m->>'abono') || ':' || (m->>'es_reverso'), ',' ORDER BY (m->>'n')::int)
      FROM jsonb_array_elements(public.ec(:A1, :C1, NULL)->'movimientos') m

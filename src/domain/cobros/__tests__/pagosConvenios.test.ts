@@ -10,6 +10,8 @@ const updateEq = vi.fn()
 const updates: unknown[] = []
 /** Filtros `.is(col, valor)` que recibió cada consulta, por tabla. */
 const filtrosIs: Record<string, [string, unknown][]> = {}
+/** Respuesta de `conta_anticipos` (20261007000000): se lee sin filtros. */
+let anticipos: { data: unknown; error: unknown } = { data: [], error: null }
 vi.mock('../../../lib/supabase', () => {
   const client = {
     from: (tabla: string) => {
@@ -20,7 +22,7 @@ vi.mock('../../../lib/supabase', () => {
         order,
       }
       return {
-        select: () => conFiltros,
+        select: () => (tabla === 'conta_anticipos' ? Promise.resolve(anticipos) : conFiltros),
         insert,
         update: (cuerpo: unknown) => { updates.push(cuerpo); return { eq: updateEq } },
       }
@@ -77,6 +79,31 @@ describe('fetchPagosYConvenios', () => {
     const { pagos, convenios } = await fetchPagosYConvenios()
     expect(pagos.map(p => p.id)).toEqual(['agua', 'cuota', 'convenio'])
     expect(convenios).toEqual([{ id: 'c1', registro_ids: ['r1'] }])
+  })
+})
+
+describe('fetchPagosYConvenios · anticipos (20261007000000)', () => {
+  it('un anticipo no aparece entre los cobros de agua: es saldo a favor y se gestiona en Contabilidad', async () => {
+    anticipos = { data: [{ pago_id: 'anticipo' }], error: null }
+    order
+      .mockResolvedValueOnce({ data: [
+        { id: 'agua', registro_id: 'r1', cargo_adicional_id: null, monto: 100 },
+        { id: 'anticipo', cargo_adicional_id: null, monto: 60 },
+      ] })
+      .mockResolvedValueOnce({ data: [] })
+    const { pagos } = await fetchPagosYConvenios()
+    expect(pagos.map(p => p.id)).toEqual(['agua'])
+    anticipos = { data: [], error: null }
+  })
+
+  it('si la lista de anticipos no se puede leer, la pantalla no se cae', async () => {
+    anticipos = { data: null, error: { message: 'sin permiso' } }
+    order
+      .mockResolvedValueOnce({ data: [{ id: 'agua', registro_id: 'r1', cargo_adicional_id: null, monto: 100 }] })
+      .mockResolvedValueOnce({ data: [] })
+    const { pagos } = await fetchPagosYConvenios()
+    expect(pagos.map(p => p.id)).toEqual(['agua'])
+    anticipos = { data: [], error: null }
   })
 })
 

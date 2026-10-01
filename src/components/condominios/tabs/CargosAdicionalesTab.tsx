@@ -1,7 +1,10 @@
 import { hoyLocalISO, esFechaCalendarioVencida } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import { notify, confirm } from '../../shared/Dialog'
+import { notify } from '../../shared/Dialog'
+import { openTextPrompt } from '../../shared/PromptDialog'
+import { solicitarAjuste, textoSolicitudEnviada } from '../../../domain/contabilidad/ajustes'
+import { pedirRebaja } from '../../contabilidad/solicitarRebajaDialog'
 import { CargoAdicionalUnidad, CategoriaCargoAdicional, EstadoCargoAdicional, Unidad } from '../../../types'
 import { useCargosCobroResumenQuery } from '../../../domain/contabilidad/cobrosCargo'
 import CobroCargoModal from './CobroCargoModal'
@@ -92,13 +95,41 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
     onRefresh()
   }
 
+  // Desde 20261011000000 un cargo sólo se anula por una solicitud que aprueba
+  // OTRA persona (Contabilidad › Solicitudes de ajuste). Queda la evidencia
+  // (fecha del servidor, quién y por qué), tenga o no asiento. Con cobros
+  // vivos la ejecución falla con el motivo y la solicitud queda para reintentar.
   async function anular(c: CargoAdicionalUnidad) {
-    const res = await confirm({ title: 'Anular cargo', text: '¿Confirmar anulación?', icon: 'warning', variant: 'danger', confirmText: 'Anular' })
-    if (!res.isConfirmed) return
-    // Con cobros vivos el servidor rechaza la anulación: se muestra el motivo.
-    const { error } = await updateCondominioRow('cargos_adicionales_unidad', c.id, { estado: 'anulado' as EstadoCargoAdicional })
-    if (error) { notify({ variant: 'error', title: 'No se anuló el cargo', text: error.message }); return }
-    onRefresh()
+    const motivo = await openTextPrompt({
+      title: 'Solicitar anulación del cargo',
+      description: 'Se registra una solicitud: nada cambia hasta que otra persona con permiso de autorizar la apruebe. Si el cargo tiene cobros vivos, primero anula esos cobros.',
+      label: 'Motivo',
+      required: true,
+      validate: (v) => (v.trim().length < 5 ? 'Indica el motivo (al menos 5 caracteres).' : null),
+    })
+    if (!motivo) return
+    try {
+      const r = await solicitarAjuste({
+        clave: crypto.randomUUID(), tipo: 'anular_cargo', documentoTabla: 'cargos_adicionales_unidad',
+        documentoId: c.id, motivo: motivo.trim(),
+      })
+      notify({ variant: 'success', title: 'Anulación solicitada', text: textoSolicitudEnviada(r) })
+      onRefresh()
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  // E6 (20261017000000): rebajar el importe se SOLICITA (nota de crédito).
+  async function rebajar(c: CargoAdicionalUnidad) {
+    try {
+      const r = await pedirRebaja({ tabla: 'cargos_adicionales_unidad', id: c.id, concepto: `Cargo ${c.concepto}` })
+      if (!r) return
+      notify({ variant: 'success', title: 'Rebaja solicitada', text: textoSolicitudEnviada(r) })
+      onRefresh()
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: e instanceof Error ? e.message : String(e) })
+    }
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
@@ -251,6 +282,12 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                               <button onClick={() => marcarPagado(c)}
                                 style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                                 ✓ Pagado
+                              </button>
+                            )}
+                            {porTipo && (
+                              <button onClick={() => void rebajar(c)} title="Solicitar rebaja de importe (nota de crédito)"
+                                style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                                Rebajar
                               </button>
                             )}
                             <button onClick={() => anular(c)}

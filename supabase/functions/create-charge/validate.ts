@@ -11,6 +11,8 @@ export interface CreateChargeBody {
   cliente_id?: string
   registro_id?: string | null
   cuota_id?: string | null
+  /** Cargo adicional a pagar (portal, 20261011000000). */
+  cargo_adicional_id?: string | null
   company_id?: string
   project_id?: string | null
   monto?: number
@@ -51,7 +53,7 @@ function urlOpcional(v: unknown, campo: string): string | undefined {
 /**
  * Valida el body crudo de create-charge. Reglas:
  *  · ids (cliente/registro/cuota/company/project) → UUID válido si vienen.
- *  · exactamente un ítem a pagar: cuota_id o registro_id (el handler ya resuelve
+ *  · exactamente un ítem a pagar: cuota_id, registro_id o cargo_adicional_id (el handler ya resuelve
  *    la lógica fina, pero un body sin ninguno no tiene sentido y antes avanzaba
  *    hasta fallar en la BD).
  *  · monto: número finito ≥ 0 (0/ausente = saldo completo, contrato del handler)
@@ -69,6 +71,7 @@ export function validarCreateChargeBody(raw: unknown): ValidacionBody<CreateChar
       cliente_id: uuidOpcional(r.cliente_id, 'cliente_id') ?? undefined,
       registro_id: uuidOpcional(r.registro_id, 'registro_id'),
       cuota_id: uuidOpcional(r.cuota_id, 'cuota_id'),
+      cargo_adicional_id: uuidOpcional(r.cargo_adicional_id, 'cargo_adicional_id'),
       company_id: uuidOpcional(r.company_id, 'company_id') ?? undefined,
       project_id: uuidOpcional(r.project_id, 'project_id'),
       descripcion: textoOpcional(r.descripcion, 'descripcion', 500),
@@ -76,11 +79,12 @@ export function validarCreateChargeBody(raw: unknown): ValidacionBody<CreateChar
       url_cancelacion: urlOpcional(r.url_cancelacion, 'url_cancelacion'),
     }
 
-    if (!body.cuota_id && !body.registro_id) {
-      return { ok: false, error: 'se requiere cuota_id o registro_id' }
+    const items = [body.cuota_id, body.registro_id, body.cargo_adicional_id].filter(Boolean).length
+    if (items === 0) {
+      return { ok: false, error: 'se requiere cuota_id, registro_id o cargo_adicional_id' }
     }
-    if (body.cuota_id && body.registro_id) {
-      return { ok: false, error: 'cuota_id y registro_id son excluyentes' }
+    if (items > 1) {
+      return { ok: false, error: 'cuota_id, registro_id y cargo_adicional_id son excluyentes' }
     }
 
     if (r.monto !== undefined && r.monto !== null) {

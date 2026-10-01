@@ -12,11 +12,17 @@
 
 import type { EstadoCobroProveedor } from '../_shared/payments/types.ts'
 
-/** Mapea el estado normalizado del provider al estado de payment_requests. */
+/**
+ * Mapea el estado normalizado del provider al estado INICIAL de
+ * payment_requests. Un «aprobado» al crear queda `pending`: sólo la
+ * confirmación del servidor (confirm-charge → pasarela_registrar_estado)
+ * lo acredita. Marcarlo `succeeded` aquí dejaba la solicitud cerrada SIN pago
+ * registrado, y confirm-charge la daba por ya conciliada.
+ */
 export function estadoPaymentRequest(estado: EstadoCobroProveedor): string {
   switch (estado) {
     case 'aprobado':
-      return 'succeeded'
+      return 'pending'
     case 'rechazado':
     case 'error':
       return 'failed'

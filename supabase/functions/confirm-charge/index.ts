@@ -23,6 +23,15 @@
 //   • F2 — REGISTRO de agua (payment_requests.registro_id): el acumulador vive en
 //     `registros.monto_pagado`; al liquidar marca estado='pagado' y —si hay
 //     factura emitida/vencida— factura_estado='pagada'.
+//   • F3 — CARGO ADICIONAL (payment_requests.cargo_adicional_id, 20261011000000):
+//     el pago se registra por el camino del cargo y se contabiliza contra la
+//     CxC de su devengo; el estado del cargo se deriva de sus cobros.
+//
+// Todo lo que el proveedor informa pasa por `pasarela_registrar_estado`
+// (20261011000000): deduplicado y con un estado que SÓLO AVANZA. Antes, un
+// «rechazado» o un error de consulta escribía `failed` directo sobre la
+// solicitud; si en medio otra confirmación la había acreditado, la dejaba
+// en `failed` con el pago ya registrado.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
@@ -30,7 +39,10 @@ import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { validarConfirmChargeBody } from './validate.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
-import { decryptJson } from '../_shared/secretsCrypto.ts'
+import { leerConciliacion, type RespuestaRegistro } from '../_shared/payments/conciliacion.ts'
+import { decryptJson, decryptSecret } from '../_shared/secretsCrypto.ts'
+import { consultarPaymentIntentStripe } from '../_shared/payments/stripeConsulta.ts'
+import type { ResultadoCobro } from '../_shared/payments/types.ts'
 import {
   credencialesEfectivasDeAmbiente,
   getPaymentProvider,
@@ -106,14 +118,16 @@ Deno.serve(async (req: Request) => {
     // ── 2) Cargar la solicitud de cobro ──
     const { data: prRow, error: prErr } = await admin
       .from('payment_requests')
-      .select('id, cliente_id, cuota_id, registro_id, company_id, monto, provider, ambiente, estado, provider_ref')
+      .select('id, cliente_id, cuota_id, registro_id, cargo_adicional_id, company_id, monto, provider, ambiente, estado, provider_ref, stripe_payment_intent')
       .eq('id', prId)
       .maybeSingle()
     if (prErr) return json({ error: prErr.message }, 500)
     const pr = prRow as {
       id: string; cliente_id: string | null; cuota_id: string | null; registro_id: string | null
+      cargo_adicional_id: string | null
       company_id: string; monto: number; provider: string; ambiente: string | null; estado: string
       provider_ref: string | null
+      stripe_payment_intent?: string | null
     } | null
     if (!pr) return json({ error: 'Solicitud de cobro no encontrada' }, 404)
 
@@ -122,11 +136,12 @@ Deno.serve(async (req: Request) => {
     // y el retorno. No es un input del caller (era spoofeable / caía a sandbox).
     const ambiente: AmbientePago = normalizarAmbientePago(pr.ambiente)
 
-    // El cobro es de una cuota (F1) o de un registro (F2), nunca ambos.
+    // El cobro es de una cuota (F1), un registro (F2) o un cargo adicional (F3).
     const esCuota = !!pr.cuota_id
     const esRegistro = !!pr.registro_id
-    if (!esCuota && !esRegistro) {
-      return json({ error: 'confirm-charge concilia cuotas de condominio o recibos de agua.' }, 400)
+    const esCargo = !!pr.cargo_adicional_id
+    if (Number(esCuota) + Number(esRegistro) + Number(esCargo) !== 1) {
+      return json({ error: 'confirm-charge concilia cuotas de condominio, recibos de agua o cargos adicionales.' }, 400)
     }
     if (!pr.cliente_id) {
       return json({ error: 'La solicitud de cobro no tiene cliente asociado.' }, 409)
@@ -146,7 +161,13 @@ Deno.serve(async (req: Request) => {
     if (pr.estado === 'succeeded') {
       return json({ ok: true, estado: 'aprobado', already: true })
     }
-    if (!pr.provider_ref) {
+    // Reembolsada: estado final, no se vuelve a preguntar ni a acreditar.
+    if (pr.estado === 'refunded') {
+      return json({ ok: true, estado: 'reembolsado', conciliado: false })
+    }
+    // Stripe (E8, 20261019000000): su referencia es el PaymentIntent.
+    const esStripe = pr.provider === 'stripe'
+    if (esStripe ? !pr.stripe_payment_intent : !pr.provider_ref) {
       return json({ error: 'La solicitud no tiene referencia del proveedor para confirmar.' }, 409)
     }
 
@@ -165,9 +186,22 @@ Deno.serve(async (req: Request) => {
         .eq('id', pr.cuota_id)
         .maybeSingle()
       if (cuErr) return json({ error: cuErr.message }, 500)
+      // Una cuota ELIMINADA (o anulada) se consulta igual: si el proveedor sí
+      // cobró, la RPC conserva la confirmación sin acreditar y abre una
+      // incidencia (20261015000000). Cortar aquí la dejaba sin registrar.
       const cuota = cuotaRow as { project_id: string | null; deleted_at: string | null } | null
-      if (!cuota || cuota.deleted_at) return json({ error: 'Cuota no encontrada' }, 404)
+      if (!cuota) return json({ error: 'Cuota no encontrada' }, 404)
       itemProjectId = cuota.project_id
+    } else if (esCargo) {
+      const { data: caRow, error: caErr } = await admin
+        .from('cargos_adicionales_unidad')
+        .select('project_id')
+        .eq('id', pr.cargo_adicional_id)
+        .maybeSingle()
+      if (caErr) return json({ error: caErr.message }, 500)
+      const ca = caRow as { project_id: string | null } | null
+      if (!ca) return json({ error: 'Cargo no encontrado' }, 404)
+      itemProjectId = ca.project_id
     } else {
       const { data: regRow, error: regErr } = await admin
         .from('registros')
@@ -178,6 +212,23 @@ Deno.serve(async (req: Request) => {
       const reg = regRow as { project_id: string | null; deleted_at: string | null } | null
       if (!reg || reg.deleted_at) return json({ error: 'Recibo no encontrado' }, 404)
       itemProjectId = reg.project_id
+    }
+
+    // ── 3a) Stripe: se consulta su PaymentIntent con la clave de la empresa
+    //    (no pasa por el adapter genérico). Sólo succeeded/canceled deciden.
+    let resultadoStripe: ResultadoCobro | null = null
+    if (esStripe) {
+      const { data: sec } = await admin
+        .from('company_payment_secrets').select('stripe_secret_key').eq('company_id', pr.company_id).maybeSingle()
+      const cifrada = (sec as { stripe_secret_key?: string | null } | null)?.stripe_secret_key
+      if (!cifrada) return json({ ok: false, estado: 'error', error: 'La empresa no tiene configurada la clave de Stripe.' }, 409)
+      try {
+        const clave = await decryptSecret(cifrada)
+        if (!clave) return json({ ok: false, estado: 'error', error: 'No se pudo leer la clave de Stripe de la empresa.' }, 409)
+        resultadoStripe = await consultarPaymentIntentStripe(pr.stripe_payment_intent!, clave)
+      } catch (e) {
+        return json({ ok: false, estado: 'error', error: e instanceof Error ? e.message : 'Error consultando a Stripe' }, 502)
+      }
     }
 
     // ── 3) Resolver payfac + credenciales (por la empresa/proyecto del ítem) ──
@@ -221,60 +272,71 @@ Deno.serve(async (req: Request) => {
     // ── 4) Confirmar server-side ──
     let resultado
     try {
-      resultado = await provider.consultarEstado(pr.provider_ref)
+      resultado = resultadoStripe ?? await provider.consultarEstado(pr.provider_ref!)
     } catch (e) {
       return json({ ok: false, estado: 'error', error: e instanceof Error ? e.message : 'Error consultando estado' }, 502)
     }
 
-    if (resultado.estado !== 'aprobado') {
-      // No aprobado aún: reflejar el estado sin conciliar.
-      const nuevoEstado = resultado.estado === 'rechazado' || resultado.estado === 'error' ? 'failed' : 'pending'
-      await admin.from('payment_requests').update({ estado: nuevoEstado }).eq('id', pr.id)
-      return json({ ok: true, estado: resultado.estado, conciliado: false })
-    }
-
-    // ── 5) Aprobado → conciliar, en UNA transacción y del lado de la base ──
-    // Esto eran cuatro pasos sueltos, cada uno en su propia transacción:
-    // un `SELECT` de idempotencia por `referencia`, el INSERT del pago, la
-    // acreditación del ítem y el cierre de la solicitud. Dos confirmaciones
-    // simultáneas —el retorno del portal y el cron de reconciliación— pasaban
-    // las dos el `SELECT` antes de que ninguna insertara: dos pagos y doble
-    // acreditación. Y una rotura entre el INSERT y la acreditación dejaba el
-    // pago registrado con el recibo sin acreditar, que el reintento ya no
-    // arreglaba porque encontraba el pago y salía por «already».
-    //
-    // `conciliar_pago_externo` hace los cuatro pasos con la solicitud
-    // bloqueada y en una sola transacción (migración 20260911042839), y la
-    // idempotencia ya no es una consulta sino un UNIQUE sobre
-    // `pagos.payment_request_id`. El edge sólo aporta el id: el monto, el
-    // ítem, el método y la referencia salen de la fila bloqueada.
-    const { data: conciliado, error: conciliarErr } = await admin.rpc(
-      'conciliar_pago_externo', { p_payment_request_id: pr.id },
-    )
-    if (conciliarErr) {
-      // El proveedor ya cobró y NADA quedó escrito: la transacción revirtió
-      // entera. El cron lo reintenta y esta vez sí cuadra.
+    // ── 5) Lo que informó el proveedor, por el ÚNICO punto que cambia la
+    // solicitud. `pasarela_registrar_estado` deduplica, sólo deja avanzar el
+    // estado y, si es «aprobado», concilia en UNA transacción
+    // (conciliar_pago_externo: el pago con llave única sobre la solicitud, el
+    // ítem acreditado y la solicitud cerrada). El edge sólo aporta el id y el
+    // estado informado; monto, ítem, método y referencia salen de la fila
+    // bloqueada.
+    const { data: registrado, error: regEstErr } = await admin.rpc('pasarela_registrar_estado', {
+      p_payment_request_id: pr.id,
+      p_estado: resultado.estado,
+      p_origen: 'consulta',
+    })
+    if (regEstErr) {
+      // Nada quedó escrito: la transacción revirtió entera. Si el proveedor ya
+      // cobró, el reintento (retorno del portal o cron) lo concilia.
       return json({
         ok: false, estado: 'error',
-        error: `Pago cobrado pero no conciliado: ${conciliarErr.message}`,
+        error: resultado.estado === 'aprobado'
+          ? `Pago cobrado pero no conciliado: ${regEstErr.message}`
+          : regEstErr.message,
       }, 500)
     }
-    const res = (conciliado ?? {}) as {
-      pago_id?: string | null
-      liquidado?: boolean
-      saldo_restante?: number
-      ya_conciliado?: boolean
+    const reg = (registrado ?? {}) as RespuestaRegistro
+
+    if (resultado.estado !== 'aprobado') {
+      // No aprobado (o reembolsado): se refleja lo que quedó, sin conciliar.
+      return json({
+        ok: true,
+        estado: resultado.estado,
+        conciliado: false,
+        estado_solicitud: reg.estado ?? null,
+      })
+    }
+
+    // Lo que quedó GUARDADO, no la acción del aviso (20261016000000): una
+    // segunda consulta de un cobro retenido es un duplicado y sigue sin
+    // acreditar. Sin conciliación no se informa pago ni saldo.
+    const l = leerConciliacion(registrado as RespuestaRegistro | null)
+    if (l.tipo === 'en_revision') {
+      // El proveedor cobró, pero la cuota estaba anulada o eliminada: no se
+      // acreditó; contabilidad lo revisa (incidencia abierta).
+      return json({ ok: true, estado: 'aprobado', conciliado: false, en_revision: true, estado_solicitud: l.estadoSolicitud })
+    }
+    if (l.tipo === 'reembolsado') {
+      // Reembolso total confirmado (antes o después de aprobar): nada acreditado.
+      return json({ ok: true, estado: 'reembolsado', conciliado: false, estado_solicitud: 'refunded' })
+    }
+    if (l.tipo === 'sin_acreditar') {
+      return json({ ok: true, estado: 'pendiente', conciliado: false, estado_solicitud: l.estadoSolicitud })
     }
 
     return json({
       ok: true,
       estado: 'aprobado',
       conciliado: true,
-      ...(res.ya_conciliado ? { already: true } : {}),
-      liquidado: res.liquidado === true,
-      cuota_liquidada: res.liquidado === true, // alias legacy (F1) — el frontend nuevo lee `liquidado`.
-      saldo_restante: res.saldo_restante ?? 0,
-      pago_id: res.pago_id ?? null,
+      ...(l.yaConciliado ? { already: true } : {}),
+      liquidado: l.liquidado,
+      cuota_liquidada: l.liquidado, // alias legacy (F1) — el frontend nuevo lee `liquidado`.
+      saldo_restante: l.saldoRestante,
+      pago_id: l.pagoId,
     })
   } catch (e) {
     await captureEdgeException(e, { function: 'confirm-charge' })

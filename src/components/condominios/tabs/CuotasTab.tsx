@@ -1,8 +1,10 @@
 import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, useRef, useMemo, useCallback, type ChangeEvent} from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { openPromptDialog } from '../../shared/PromptDialog'
+import { openPromptDialog, openTextPrompt } from '../../shared/PromptDialog'
+import { fetchDependenciasAjuste, textoDependencias, textoSolicitudEnviada } from '../../../domain/contabilidad/ajustes'
 import { configurarCierreAutomatico } from '../../shared/cierreAutomaticoDialog'
+import { pedirRebaja } from '../../contabilidad/solicitarRebajaDialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { SelectionToolbar, type BulkAction } from '../../shared/SelectionToolbar'
 import { useBulkSelection } from '../../../hooks/useBulkSelection'
@@ -221,25 +223,61 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
     }
   }
 
+  // Desde 20261012000000 una cuota se anula por SOLICITUD que aprueba otra
+  // persona (Contabilidad › Solicitudes de ajuste). Antes de pedirla se
+  // muestra lo que lo impide (cobros, saldo a favor aplicado…): nada se anula
+  // en cascada, cada cosa se resuelve por su camino.
   async function handleAnular(cuota: CuotaCondominio) {
-    const { isConfirmed } = await confirm({
-      title: '¿Anular cuota?',
-      text: 'La cuota quedará anulada (estado terminal). Esta acción no se puede revertir.',
-      icon: 'warning',
-      variant: 'danger',
-      confirmText: 'Sí, anular',
-    })
-    if (!isConfirmed) return
+    setAccionCuotaId(cuota.id)
+    try {
+      const deps = await fetchDependenciasAjuste('anular_cuota', cuota.id)
+      if (deps.length > 0) {
+        notify({
+          variant: 'warning',
+          title: 'La cuota no se puede anular todavía',
+          text: `Resuelve primero (no se anula en cascada):\n${textoDependencias(deps)}`,
+        })
+        return
+      }
+      const motivo = await openTextPrompt({
+        title: 'Solicitar anulación de la cuota',
+        description: 'Se registra una solicitud: nada cambia hasta que otra persona con permiso de autorizar la apruebe. Al ejecutarse se reversa su devengo (y su mora) y queda la evidencia.',
+        label: 'Motivo',
+        required: true,
+        validate: (v) => (v.trim().length < 5 ? 'Indica el motivo (al menos 5 caracteres).' : null),
+      })
+      if (!motivo) return
+      const proj = cuotaEstadoById.get(cuota.id)
+      const r = await anularMut.mutateAsync({
+        cuota: { id: cuota.id, cuota_estado: proj?.cuota_estado ?? cuota.estado },
+        motivo,
+      })
+      notify({ variant: 'success', title: 'Anulación solicitada', text: textoSolicitudEnviada(r) })
+      onRefresh()
+    } catch (err) {
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: (err as Error).message })
+    } finally {
+      setAccionCuotaId(null)
+    }
+  }
+
+  // E6 (20261017000000): rebajar el importe se SOLICITA; al aprobarse queda
+  // una nota de crédito y baja el saldo (el importe y el devengo no cambian).
+  async function handleRebajar(cuota: CuotaCondominio) {
     setAccionCuotaId(cuota.id)
     try {
       const proj = cuotaEstadoById.get(cuota.id)
-      await anularMut.mutateAsync({
-        cuota: { id: cuota.id, cuota_estado: proj?.cuota_estado ?? cuota.estado },
+      const r = await pedirRebaja({
+        tabla: 'cuotas_condominio',
+        id: cuota.id,
+        concepto: `Cuota ${cuota.concepto} ${cuota.periodo}`,
+        tieneMora: Number(proj?.mora_monto ?? 0) > 0,
       })
-      notify({ variant: 'success', title: '🚫 Cuota anulada', duration: 1600 })
+      if (!r) return
+      notify({ variant: 'success', title: 'Rebaja solicitada', text: textoSolicitudEnviada(r) })
       onRefresh()
     } catch (err) {
-      notify({ variant: 'error', title: 'No se pudo anular', text: (err as Error).message })
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: (err as Error).message })
     } finally {
       setAccionCuotaId(null)
     }
@@ -476,7 +514,13 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
   async function eliminar(id: string) {
     const result = await confirm({ title: '¿Eliminar cuota?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
-    await softDelete('cuotas_condominio', { id })
+    // El servidor sólo deja eliminar una cuota SIN emitir y sin cobros ni
+    // saldo aplicado (20261012000000); una emitida se anula por solicitud.
+    const { error } = await softDelete('cuotas_condominio', { id })
+    if (error) {
+      notify({ variant: 'error', title: 'No se eliminó la cuota', text: error.message })
+      return
+    }
     onRefresh()
   }
 
@@ -931,6 +975,12 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
                   <button onClick={() => void handleAnular(c)} disabled={procesando} title="Anular cuota"
                     style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-danger)', cursor: procesando ? 'not-allowed' : 'pointer', color: 'var(--at-danger)', fontSize: '12px', padding: '4px 9px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
                     🚫 Anular
+                  </button>
+                )}
+                {canEdit && puedeAnular && (
+                  <button onClick={() => void handleRebajar(c)} disabled={procesando} title="Solicitar rebaja de importe (nota de crédito)"
+                    style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line-strong)', cursor: procesando ? 'not-allowed' : 'pointer', color: 'var(--at-ink-2)', fontSize: '12px', padding: '4px 9px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
+                    ➖ Rebajar
                   </button>
                 )}
                 {(c.estado === 'pendiente' || c.estado === 'moroso') && (

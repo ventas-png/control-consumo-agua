@@ -84,6 +84,9 @@ prev=""
 for a in "$@"; do
   [ "$prev" = "-o" ] && salida="$a"
   [ "$prev" = "-d" ] && payload="$a"
+  # El workflow envía el SQL por archivo (--data-binary @archivo) para no topar
+  # con el límite de 128 KiB por argumento de Linux (#908).
+  [ "$prev" = "--data-binary" ] && payload=$(cat "\${a#@}")
   prev="$a"
 done
 if grep -q 'insert into supabase_migrations' <<<"$payload"; then

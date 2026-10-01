@@ -35,3 +35,11 @@ export const BUCKET_PRESENCIA = 'presencia-evidencias'
  * proyecto y permiso de la pestaña), y borrar solo se autoriza en borrador.
  */
 export const BUCKET_CONTRATOS_RESPALDO = 'contratos-respaldo'
+
+/**
+ * Respaldo documental de las solicitudes de ajuste contable. Bucket PRIVADO
+ * (20261012000000). Ruta `<empresa>/<solicitud>/<archivo>`: sube quien pidió la
+ * solicitud (o quien crea en Contabilidad) mientras está pendiente; lo ve quien
+ * ve la solicitud. Sin UPDATE ni DELETE: un respaldo no se sustituye.
+ */
+export const BUCKET_RESPALDOS_AJUSTE = 'ajustes-respaldos'

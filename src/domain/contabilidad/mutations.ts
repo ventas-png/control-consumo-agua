@@ -352,6 +352,7 @@ export function useCrearAsientoBorradorMutation(companyId?: string) {
             estado: 'borrador',
             origen: 'manual',
             moneda_base: input.moneda_base,
+            tipo_cambio_motivo: input.tipo_cambio_motivo || null,
           })
           .select()
           .abortSignal(signal),

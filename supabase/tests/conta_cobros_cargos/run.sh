@@ -110,6 +110,7 @@ done
 
 echo "── 4/6 · padrón de dos empresas + fixture de cargos + el de cobros"
 aplicar "$PADRON"
+aplicar "$RAIZ/supabase/tests/conta_ajustes/helper.sql"   # anulaciones y reversos: por el flujo de solicitudes (20261011000000)
 aplicar "$CARGOS"
 aplicar "$AQUI/fixture.sql"
 
@@ -201,12 +202,12 @@ par b "SELECT 'B1:' || string_agg(COALESCE(evento,'-') || '=' || resultado, '+' 
       "SELECT 'B2:' || string_agg(COALESCE(evento,'-') || '=' || resultado, '+' ORDER BY evento) FROM public.conta_reprocesar_cargo('cargos_adicionales_unidad', '$CA10');"
 # C · reproceso del cargo contra anulación de SU cobro.
 par c "SELECT 'C1:' || string_agg(COALESCE(evento,'-') || '=' || resultado, '+' ORDER BY evento) FROM public.conta_reprocesar_cargo('cargos_adicionales_unidad', '$CA12');" \
-      "SELECT 'C2:' || resultado || '/' || (reverso_id IS NOT NULL) FROM public.conta_anular_cobro_cargo('$PC12', 'SINT-AUX anulación concurrente');"
+      "SELECT 'C2:' || resultado || '/' || (reverso_id IS NOT NULL) FROM public.tst_anular_cobro_cargo('$PC12', 'SINT-AUX anulación concurrente');"
 # D · alta de cobro contra anulación del cargo (el cobro llega primero).
 par d "SELECT 'D1:' || public.cc_cobrar('$CA13', 20, 'efectivo', '2026-06-05', 'cc000000-0000-0000-0000-0000000000d1');" \
-      "UPDATE public.cargos_adicionales_unidad SET estado = 'anulado' WHERE id = '$CA13';"
+      "SELECT public.tst_anular_cargo('$CA13', 'SINT-AUX anulación concurrente');"
 # E · anulación del cargo contra alta de cobro (la anulación llega primero).
-par e "UPDATE public.cargos_adicionales_unidad SET estado = 'anulado' WHERE id = '$CA14'; SELECT 'E1:anulado';" \
+par e "SELECT public.tst_anular_cargo('$CA14', 'SINT-AUX anulación concurrente'); SELECT 'E1:anulado';" \
       "SELECT 'E2:' || public.cc_cobrar('$CA14', 20, 'efectivo', '2026-06-05', 'cc000000-0000-0000-0000-0000000000e2');"
 
 # F · la MISMA clave en dos cargos distintos, a la vez (respuesta perdida y

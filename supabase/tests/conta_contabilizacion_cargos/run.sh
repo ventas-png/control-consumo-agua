@@ -106,6 +106,7 @@ done
 
 echo "── 4/6 · padrón de dos empresas + residentes de prueba"
 aplicar "$PADRON"
+aplicar "$RAIZ/supabase/tests/conta_ajustes/helper.sql"   # anulaciones y reversos: por el flujo de solicitudes (20261011000000)
 aplicar "$AQUI/fixture.sql"
 
 echo "── 5/6 · invariantes de una sesión"
@@ -156,7 +157,7 @@ cat "$SALIDAS/a1.txt" "$SALIDAS/a2.txt" | grep -E '^A[12]:' | sort | sed 's/^/  
 # B · reproceso contra anulación del mismo cargo.
 sesion 0   "SELECT 'B1:' || resultado FROM public.conta_reprocesar_cargo('cargos_adicionales_unidad', '$C8');" 1.5 > "$SALIDAS/b1.txt" 2>&1 &
 PB1=$!
-sesion 0.3 "UPDATE public.cargos_adicionales_unidad SET estado = 'anulado' WHERE id = '$C8'; SELECT 'B2:anulado';" 0 > "$SALIDAS/b2.txt" 2>&1 &
+sesion 0.3 "SELECT public.tst_anular_cargo('$C8', 'SINT-AUX anulación concurrente'); SELECT 'B2:anulado';" 0 > "$SALIDAS/b2.txt" 2>&1 &
 PB2=$!
 wait $PB1 $PB2
 cat "$SALIDAS/b1.txt" "$SALIDAS/b2.txt" | grep -E '^B[12]:' | sed 's/^/   /'

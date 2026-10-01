@@ -3,7 +3,8 @@
 // remoto mockeado con el fake compartido, payfacs mockeados; cors corre REAL.
 //
 // Foco: ownership del payment_request, idempotencia, y que la conciliación sea
-// UNA llamada a `conciliar_pago_externo`. Lo que el edge hacía antes —el
+// UNA llamada a `pasarela_registrar_estado` (20261011000000), que deduplica,
+// sólo deja avanzar el estado y concilia con `conciliar_pago_externo`. Lo que el edge hacía antes —el
 // `SELECT` de idempotencia, el INSERT del pago, el UPDATE del ítem y el cierre
 // de la solicitud, cada uno en su transacción— vive ahora dentro de esa RPC
 // (migración 20260911042839), así que aquí se comprueba lo que le toca al
@@ -22,6 +23,7 @@ const h = vi.hoisted(() => ({
   state: null as unknown as FakeSupabaseState,
   served: { handler: null as null | ((req: Request) => Promise<Response>) },
   consulta: { ok: true, estado: 'aprobado', referencia: 'ref-1' } as Record<string, unknown>,
+  stripe: vi.fn(async (_id: string, _clave: string) => ({ ok: true, estado: 'pendiente', referencia: 'pi_1' }) as Record<string, unknown>),
 }))
 
 vi.mock('https://esm.sh/@supabase/supabase-js@2', async () => {
@@ -30,7 +32,11 @@ vi.mock('https://esm.sh/@supabase/supabase-js@2', async () => {
 })
 
 vi.mock('../../_shared/sentry.ts', () => ({ captureEdgeException: async () => undefined }))
-vi.mock('../../_shared/secretsCrypto.ts', () => ({ decryptJson: async (x: unknown) => x }))
+vi.mock('../../_shared/secretsCrypto.ts', () => ({
+  decryptJson: async (x: unknown) => x,
+  decryptSecret: async (x: string | null) => (x ? `claro:${x}` : null),
+}))
+vi.mock('../../_shared/payments/stripeConsulta.ts', () => ({ consultarPaymentIntentStripe: h.stripe }))
 vi.mock('../../_shared/payments/index.ts', () => ({
   resolverConfigPagoEfectiva: () => ({ proveedorPago: 'sandbox', moneda: 'GTQ', ambiente: 'sandbox', desdeLocacion: false }),
   normalizarAmbientePago: (x: unknown) => (x === 'prod' ? 'prod' : 'sandbox'),
@@ -83,14 +89,14 @@ function fixture(state: FakeSupabaseState, overrides: {
   state.byTable.companies = { data: { proveedor_pago: 'sandbox', default_currency: 'GTQ' }, error: null }
   state.byTable.projects = { data: { proveedor_pago: null }, error: null }
   state.byTable.payfac_secrets = { data: [], error: null }
-  state.rpcs.conciliar_pago_externo = overrides.conciliar ?? {
+  state.rpcs.pasarela_registrar_estado = overrides.conciliar ?? {
     data: { ok: true, ya_conciliado: false, pago_id: 'pago-1', liquidado: true, saldo_restante: 0 },
     error: null,
   }
 }
 
 const rpcsConciliar = (state: FakeSupabaseState) =>
-  state.rpcCalls.filter((c) => c.fn === 'conciliar_pago_externo')
+  state.rpcCalls.filter((c) => c.fn === 'pasarela_registrar_estado')
 
 const callsDe = (calls: FakeWriteCall[], table: string, op: FakeWriteCall['op']) =>
   calls.filter((c) => c.table === table && c.op === op)
@@ -167,7 +173,7 @@ describe('confirm-charge · idempotencia', () => {
 })
 
 describe('confirm-charge · la conciliación es UNA llamada transaccional', () => {
-  it('aprobado → llama a conciliar_pago_externo con SÓLO el id de la solicitud', async () => {
+  it('aprobado → llama a pasarela_registrar_estado con el id, lo informado y el origen', async () => {
     fixture(h.state)
     const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
     expect(res.status).toBe(200)
@@ -180,7 +186,9 @@ describe('confirm-charge · la conciliación es UNA llamada transaccional', () =
     // El id, y nada más: el monto, el ítem, el método y la referencia los lee
     // la RPC de la fila bloqueada, así que el edge no puede equivocarse ni
     // mentir sobre ellos.
-    expect(llamadas[0].args).toEqual({ p_payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' })
+    expect(llamadas[0].args).toEqual({
+      p_payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', p_estado: 'aprobado', p_origen: 'consulta',
+    })
   })
 
   it('el edge ya no inserta pagos, ni toca el ítem, ni sella la solicitud', async () => {
@@ -212,12 +220,149 @@ describe('confirm-charge · la conciliación es UNA llamada transaccional', () =
     expect(callsDe(h.state.calls, 'payment_requests', 'update').length).toBe(0)
   })
 
-  it('provider NO aprobado → refleja estado sin conciliar', async () => {
-    fixture(h.state)
+  it('provider NO aprobado → lo registra por la RPC (que no retrocede el estado) y el edge no escribe', async () => {
+    fixture(h.state, { conciliar: { data: { ok: true, estado: 'pending', accion: 'sin_cambio' }, error: null } })
     h.consulta = { ok: true, estado: 'pendiente' }
     const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
-    expect(await res.json()).toMatchObject({ ok: true, estado: 'pendiente', conciliado: false })
+    expect(await res.json()).toMatchObject({ ok: true, estado: 'pendiente', conciliado: false, estado_solicitud: 'pending' })
+    expect(rpcsConciliar(h.state)[0].args).toMatchObject({ p_estado: 'pendiente' })
+    expect(callsDe(h.state.calls, 'payment_requests', 'update').length).toBe(0)
+  })
+
+  it('rechazado: tampoco escribe `failed` por su cuenta (antes pisaba una acreditación simultánea)', async () => {
+    fixture(h.state, { conciliar: { data: { ok: true, estado: 'failed', accion: 'marcado_fallido' }, error: null } })
+    h.consulta = { ok: true, estado: 'rechazado' }
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(await res.json()).toMatchObject({ ok: true, estado: 'rechazado', conciliado: false, estado_solicitud: 'failed' })
+    expect(callsDe(h.state.calls, 'payment_requests', 'update').length).toBe(0)
+  })
+
+  it('solicitud reembolsada: estado final, no pregunta al proveedor ni concilia', async () => {
+    fixture(h.state, { pr: { estado: 'refunded' } })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(await res.json()).toMatchObject({ ok: true, estado: 'reembolsado', conciliado: false })
     expect(rpcsConciliar(h.state).length).toBe(0)
-    expect(callsDe(h.state.calls, 'payment_requests', 'update')[0].payload).toMatchObject({ estado: 'pending' })
+  })
+})
+
+describe('confirm-charge · cobro sobre una cuota anulada o eliminada (20261015000000)', () => {
+  it('la RPC retiene el cobro: responde aprobado SIN conciliar y en revisión', async () => {
+    fixture(h.state, {
+      conciliar: {
+        data: { ok: true, duplicado: false, estado: 'pending_verification', accion: 'cobro_sobre_documento_anulado', conciliado: false, en_revision: true, reembolsado: false, incidencia_id: 'inc-1' },
+        error: null,
+      },
+    })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ ok: true, estado: 'aprobado', conciliado: false, en_revision: true, estado_solicitud: 'pending_verification' })
+    expect(body.pago_id).toBeUndefined()
+    expect(callsDe(h.state.calls, 'pagos', 'insert').length).toBe(0)
+  })
+
+  it('cuota ELIMINADA: igual pregunta al proveedor y registra lo que informa (antes respondía 404 y la confirmación se perdía)', async () => {
+    fixture(h.state, {
+      cuota: { deleted_at: '2026-09-30T00:00:00Z' },
+      conciliar: {
+        data: { ok: true, estado: 'pending_verification', accion: 'cobro_sobre_documento_anulado', conciliado: false, en_revision: true, reembolsado: false, incidencia_id: 'inc-2' },
+        error: null,
+      },
+    })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ conciliado: false, en_revision: true })
+    expect(rpcsConciliar(h.state)).toHaveLength(1)
+  })
+})
+
+describe('confirm-charge · la respuesta sigue el estado persistido (20261016000000)', () => {
+  it('dos consultas seguidas de un cobro retenido: las dos en revisión (la 2.ª es un duplicado)', async () => {
+    const respuestas = [
+      { ok: true, duplicado: false, accion: 'cobro_retenido_ya_registrado', estado: 'pending_verification', conciliado: false, en_revision: true, reembolsado: false },
+      { ok: true, duplicado: true, accion: 'duplicado', estado: 'pending_verification', conciliado: false, en_revision: true, reembolsado: false },
+    ]
+    for (const data of respuestas) {
+      fixture(h.state, { pr: { estado: 'pending_verification' }, conciliar: { data, error: null } })
+      const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+      const body = await res.json()
+      expect(body).toMatchObject({ ok: true, conciliado: false, en_revision: true })
+      expect(body).not.toHaveProperty('saldo_restante')
+      expect(body).not.toHaveProperty('pago_id')
+    }
+  })
+
+  it('reembolso total previo: la aprobación atrasada responde reembolsado, sin pago ni saldo', async () => {
+    fixture(h.state, {
+      pr: { estado: 'failed' },
+      conciliar: { data: { ok: true, accion: 'ignorado_reembolsado', estado: 'refunded', conciliado: false, en_revision: false, reembolsado: true }, error: null },
+    })
+    const body = await (await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')).json()
+    expect(body).toEqual({ ok: true, estado: 'reembolsado', conciliado: false, estado_solicitud: 'refunded' })
+  })
+
+  it('accion «duplicado» sin conciliación persistida: no se presenta como pagado', async () => {
+    fixture(h.state, {
+      conciliar: { data: { ok: true, duplicado: true, accion: 'duplicado', estado: 'failed', conciliado: false, en_revision: false, reembolsado: false }, error: null },
+    })
+    const body = await (await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')).json()
+    expect(body).toMatchObject({ ok: true, estado: 'pendiente', conciliado: false })
+  })
+
+  it('conciliado sin saldo informado: no inventa saldo 0', async () => {
+    fixture(h.state, {
+      conciliar: { data: { ok: true, estado: 'succeeded', conciliado: true, pago_id: 'pago-9', liquidado: false }, error: null },
+    })
+    const body = await (await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')).json()
+    expect(body).toMatchObject({ ok: true, estado: 'aprobado', conciliado: true, pago_id: 'pago-9', saldo_restante: null })
+  })
+})
+
+describe('confirm-charge · Stripe se consulta por su PaymentIntent (E8, 20261019000000)', () => {
+  it('consulta el PaymentIntent con la clave de la empresa y registra lo que informa Stripe', async () => {
+    fixture(h.state, {
+      pr: { provider: 'stripe', provider_ref: null, stripe_payment_intent: 'pi_1' },
+      conciliar: { data: { ok: true, accion: 'marcado_fallido', estado: 'failed', conciliado: false }, error: null },
+    })
+    h.state.byTable.company_payment_secrets = { data: { stripe_secret_key: 'cifrada' }, error: null }
+    h.stripe.mockResolvedValueOnce({ ok: true, estado: 'rechazado', referencia: 'pi_1' })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(200)
+    expect(h.stripe).toHaveBeenCalledWith('pi_1', 'claro:cifrada')
+    expect(rpcsConciliar(h.state)[0].args).toMatchObject({ p_estado: 'rechazado', p_origen: 'consulta' })
+  })
+
+  it('sin clave de Stripe configurada no consulta ni registra nada', async () => {
+    fixture(h.state, { pr: { provider: 'stripe', provider_ref: null, stripe_payment_intent: 'pi_2' } })
+    h.state.byTable.company_payment_secrets = { data: null, error: null }
+    h.stripe.mockClear()
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(409)
+    expect(h.stripe).not.toHaveBeenCalled()
+    expect(rpcsConciliar(h.state)).toHaveLength(0)
+  })
+})
+
+describe('confirm-charge · cargo adicional (20261011000000)', () => {
+  it('concilia el cobro en línea de un cargo por la misma RPC', async () => {
+    fixture(h.state, { pr: { cuota_id: null, cargo_adicional_id: 'ca1' } })
+    h.state.byTable.cargos_adicionales_unidad = { data: { project_id: 'pj1' }, error: null }
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ ok: true, estado: 'aprobado', conciliado: true, liquidado: true })
+    expect(rpcsConciliar(h.state).length).toBe(1)
+  })
+
+  it('404 si el cargo no existe', async () => {
+    fixture(h.state, { pr: { cuota_id: null, cargo_adicional_id: 'ca1' } })
+    h.state.byTable.cargos_adicionales_unidad = { data: null, error: null }
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(404)
+  })
+
+  it('400 si la solicitud apunta a dos ítems', async () => {
+    fixture(h.state, { pr: { cargo_adicional_id: 'ca1' } })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(400)
   })
 })
