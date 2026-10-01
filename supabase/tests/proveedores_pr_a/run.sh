@@ -4,7 +4,7 @@
 # Arnés contra un PostgreSQL REAL (local, efímero). NO toca ningún entorno remoto.
 #
 # Aplica la cadena ENTERA de migraciones sobre una base vacía y prueba las cinco
-# migraciones de este PR (20261020000000…20261020000700):
+# migraciones de este PR (20261020000000…20261020000800):
 #   · identidad canónica del proveedor, código visible, duplicados, contactos,
 #     habilitación por proyecto, candado de la orden de compra;
 #   · contratos vinculados al catálogo: fotografía, ciclo de vida, historial,

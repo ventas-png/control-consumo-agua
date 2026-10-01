@@ -183,3 +183,117 @@ SELECT public.chk_falla($$ SELECT * FROM public.compras_resolver_cuenta_linea_in
 SELECT public.chk_txt((SELECT origen FROM public.compras_resolver_cuenta_linea(:A2::uuid, 'gasto', 'seguridad')),
   'regla_compra', '8 · y la función pública sigue resolviendo (misma lógica, con guard de sesión)');
 RESET ROLE;
+
+-- ── 9. Cambiar el DESTINO revalida la cuenta ELEGIDA (migración 0800) ───────
+-- Cuentas de activo en A2 (aptas para inventario y activo fijo) y una orden nueva.
+INSERT INTO public.conta_cuentas (id, company_id, project_id, codigo, nombre, tipo, naturaleza, nivel, es_detalle, activa) VALUES
+  ('c1000000-0000-0000-0000-00000000a2f2', :A::uuid, :A2::uuid, '1990', 'Activo (inventario/fijo) A2', 'activo', 'deudora', 3, true, true);
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado)
+VALUES (:O2::uuid, :A::uuid, :A2::uuid, :L1::uuid, 'Línea Uno', 'Orden para cambios de destino', 'borrador');
+INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, descripcion, destino_tipo, categoria, cuenta_id, cantidad, precio_unitario) VALUES
+  ('0f200000-0000-0000-0000-000000000001', :A::uuid, :O2::uuid, 1, 'Gasto con cuenta elegida', 'gasto', 'obras', :G201::uuid, 1, 10),
+  ('0f200000-0000-0000-0000-000000000002', :A::uuid, :O2::uuid, 2, 'Gasto con cuenta elegida (inventario)', 'gasto', 'obras', :G202::uuid, 1, 10),
+  ('0f200000-0000-0000-0000-000000000003', :A::uuid, :O2::uuid, 3, 'Activo con cuenta elegida', 'activo_fijo', 'obras', 'c1000000-0000-0000-0000-00000000a2f2', 1, 10),
+  ('0f200000-0000-0000-0000-000000000004', :A::uuid, :O2::uuid, 4, 'Gasto con cuenta elegida (servicio)', 'gasto', 'obras', :G201::uuid, 1, 10),
+  ('0f200000-0000-0000-0000-000000000005', :A::uuid, :O2::uuid, 5, 'Automática (regla de obras)', 'gasto', 'obras', NULL, 1, 10),
+  ('0f200000-0000-0000-0000-000000000006', :A::uuid, :O2::uuid, 6, 'Gasto con cuenta elegida (heredada)', 'gasto', 'obras', :G201::uuid, 1, 10);
+RESET ROLE;
+SELECT public.chk_txt((SELECT cuenta_origen FROM public.orden_compra_lineas WHERE id = '0f200000-0000-0000-0000-000000000001'),
+  'linea_explicita', '9 · punto de partida: la línea 1 tiene cuenta elegida (gasto → a201)');
+
+-- 9a · gasto → ACTIVO FIJO conservando una cuenta de gasto: RECHAZADO, con mensaje claro.
+SET ROLE authenticated;
+SELECT public.chk_falla($$ UPDATE public.orden_compra_lineas SET destino_tipo = 'activo_fijo'
+                            WHERE id = '0f200000-0000-0000-0000-000000000001' $$,
+  'COMPRAS_LINEA_DESTINO_INCOMPATIBLE.*activo_fijo.*La cuenta no se cambió por ti',
+  '9a · gasto → activo fijo con una cuenta de gasto elegida: RECHAZADO (sin que cuenta_id cambie)');
+-- 9b · gasto → INVENTARIO conservando una cuenta de gasto: RECHAZADO.
+SELECT public.chk_falla($$ UPDATE public.orden_compra_lineas SET destino_tipo = 'inventario'
+                            WHERE id = '0f200000-0000-0000-0000-000000000002' $$,
+  'COMPRAS_LINEA_DESTINO_INCOMPATIBLE.*inventario',
+  '9b · gasto → inventario con una cuenta de gasto elegida: RECHAZADO');
+-- El mensaje nombra la causa (el motivo del resolutor) y dice qué hacer.
+SELECT public.chk_falla($$ UPDATE public.orden_compra_lineas SET destino_tipo = 'inventario'
+                            WHERE id = '0f200000-0000-0000-0000-000000000002' $$,
+  'Elige otra cuenta apta para el nuevo destino, o quítala',
+  '9b · y el mensaje dice cómo resolverlo');
+RESET ROLE;
+-- Nada se movió: ni el destino ni la cuenta (no se sustituyó por una sugerencia).
+SELECT public.chk_bool(
+  (SELECT destino_tipo = 'gasto' AND cuenta_id = :G201::uuid AND cuenta_origen = 'linea_explicita'
+     FROM public.orden_compra_lineas WHERE id = '0f200000-0000-0000-0000-000000000001'),
+  true, '9a · tras el rechazo la línea sigue igual: destino gasto, MISMA cuenta elegida');
+SELECT public.chk_bool(
+  (SELECT destino_tipo = 'gasto' AND cuenta_id = :G202::uuid
+     FROM public.orden_compra_lineas WHERE id = '0f200000-0000-0000-0000-000000000002'),
+  true, '9b · tras el rechazo la línea sigue igual: destino gasto, MISMA cuenta elegida');
+
+-- 9c · Línea ANTERIOR a cuenta_origen (cuenta_id con origen NULL): se trata como elegida.
+UPDATE public.orden_compra_lineas SET cuenta_origen = NULL WHERE id = '0f200000-0000-0000-0000-000000000006';
+SET ROLE authenticated;
+SELECT public.chk_falla($$ UPDATE public.orden_compra_lineas SET destino_tipo = 'activo_fijo'
+                            WHERE id = '0f200000-0000-0000-0000-000000000006' $$,
+  'COMPRAS_LINEA_DESTINO_INCOMPATIBLE', '9c · una línea heredada (origen NULL) con cuenta de gasto tampoco pasa a activo fijo');
+RESET ROLE;
+
+-- 9d · CASOS VÁLIDOS: la cuenta compatible se conserva tal cual.
+SET ROLE authenticated;
+-- activo fijo → inventario: ambos aceptan una cuenta de activo.
+UPDATE public.orden_compra_lineas SET destino_tipo = 'inventario' WHERE id = '0f200000-0000-0000-0000-000000000003';
+-- gasto → servicio: mismo destino de cuenta (gasto).
+UPDATE public.orden_compra_lineas SET destino_tipo = 'servicio' WHERE id = '0f200000-0000-0000-0000-000000000004';
+RESET ROLE;
+SELECT public.chk_bool(
+  (SELECT destino_tipo = 'inventario' AND cuenta_id = 'c1000000-0000-0000-0000-00000000a2f2'::uuid AND cuenta_origen = 'linea_explicita'
+     FROM public.orden_compra_lineas WHERE id = '0f200000-0000-0000-0000-000000000003'),
+  true, '9d · activo fijo → inventario con cuenta de activo: pasa y CONSERVA la cuenta elegida');
+SELECT public.chk_bool(
+  (SELECT destino_tipo = 'servicio' AND cuenta_id = :G201::uuid AND cuenta_origen = 'linea_explicita'
+     FROM public.orden_compra_lineas WHERE id = '0f200000-0000-0000-0000-000000000004'),
+  true, '9d · gasto → servicio con cuenta de gasto: pasa y CONSERVA la cuenta elegida');
+
+-- 9e · Cambiar destino y cuenta A LA VEZ, a una cuenta apta: pasa (el cambio es explícito).
+SET ROLE authenticated;
+UPDATE public.orden_compra_lineas SET destino_tipo = 'activo_fijo', cuenta_id = 'c1000000-0000-0000-0000-00000000a2f2'
+ WHERE id = '0f200000-0000-0000-0000-000000000001';
+RESET ROLE;
+SELECT public.chk_bool(
+  (SELECT destino_tipo = 'activo_fijo' AND cuenta_id = 'c1000000-0000-0000-0000-00000000a2f2'::uuid AND cuenta_origen = 'linea_explicita'
+     FROM public.orden_compra_lineas WHERE id = '0f200000-0000-0000-0000-000000000001'),
+  true, '9e · destino y cuenta cambiados juntos a una cuenta apta: pasa');
+-- …y de vuelta a gasto manteniendo la cuenta de activo: ahora es esa la incompatible.
+SET ROLE authenticated;
+SELECT public.chk_falla($$ UPDATE public.orden_compra_lineas SET destino_tipo = 'gasto'
+                            WHERE id = '0f200000-0000-0000-0000-000000000001' $$,
+  'COMPRAS_LINEA_DESTINO_INCOMPATIBLE', '9e · activo fijo → gasto conservando la cuenta de activo: RECHAZADO (simétrico)');
+-- Cuenta nueva incompatible en el mismo cambio: sigue rechazando por el camino de siempre.
+SELECT public.chk_falla($$ UPDATE public.orden_compra_lineas SET destino_tipo = 'activo_fijo', cuenta_id = 'c1000000-0000-0000-0000-00000000a202'
+                            WHERE id = '0f200000-0000-0000-0000-000000000004' $$,
+  'COMPRAS_LINEA_CUENTA_INVALIDA', '9e · destino nuevo con una cuenta nueva incompatible: rechazado');
+RESET ROLE;
+
+-- 9f · La RESOLUCIÓN AUTOMÁTICA sigue funcionando.
+SELECT public.chk_uuid((SELECT cuenta_id FROM public.orden_compra_lineas WHERE id = '0f200000-0000-0000-0000-000000000005'),
+  :G201::uuid, '9f · punto de partida: la línea automática obras/gasto tomó la regla (a201)');
+SET ROLE authenticated;
+UPDATE public.orden_compra_lineas SET destino_tipo = 'activo_fijo' WHERE id = '0f200000-0000-0000-0000-000000000005';
+RESET ROLE;
+SELECT public.chk_bool((SELECT cuenta_id IS NULL AND cuenta_origen IS NULL FROM public.orden_compra_lineas
+                         WHERE id = '0f200000-0000-0000-0000-000000000005'),
+  true, '9f · línea automática → activo fijo: se re-resuelve (sin regla para ese destino queda sin cuenta, sin error)');
+SET ROLE authenticated;
+UPDATE public.orden_compra_lineas SET destino_tipo = 'gasto' WHERE id = '0f200000-0000-0000-0000-000000000005';
+RESET ROLE;
+SELECT public.chk_uuid((SELECT cuenta_id FROM public.orden_compra_lineas WHERE id = '0f200000-0000-0000-0000-000000000005'),
+  :G201::uuid, '9f · …y de vuelta a gasto vuelve a tomar la regla (resolución automática intacta)');
+SELECT public.chk_txt((SELECT cuenta_origen FROM public.orden_compra_lineas WHERE id = '0f200000-0000-0000-0000-000000000005'),
+  'regla_compra', '9f · con su origen de regla de compra');
+-- Una línea nueva sin cuenta sigue resolviéndose al insertar.
+SET ROLE authenticated;
+INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, descripcion, destino_tipo, categoria, cantidad, precio_unitario)
+VALUES ('0f200000-0000-0000-0000-000000000007', :A::uuid, :O2::uuid, 7, 'Nueva automática', 'gasto', 'seguridad', 1, 10);
+RESET ROLE;
+SELECT public.chk_uuid((SELECT cuenta_id FROM public.orden_compra_lineas WHERE id = '0f200000-0000-0000-0000-000000000007'),
+  :G202::uuid, '9f · una línea nueva sin cuenta sigue resolviéndose al insertar (seguridad → a202)');
