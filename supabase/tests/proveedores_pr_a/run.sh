@@ -4,7 +4,7 @@
 # Arnés contra un PostgreSQL REAL (local, efímero). NO toca ningún entorno remoto.
 #
 # Aplica la cadena ENTERA de migraciones sobre una base vacía y prueba las cinco
-# migraciones de este PR (20261020000000…20261020000400):
+# migraciones de este PR (20261020000000…20261020000700):
 #   · identidad canónica del proveedor, código visible, duplicados, contactos,
 #     habilitación por proyecto, candado de la orden de compra;
 #   · contratos vinculados al catálogo: fotografía, ciclo de vida, historial,
@@ -134,6 +134,8 @@ bloque assert_historicos.sql    "5c · contratos históricos: vista previa, vín
 bloque assert_reglas.sql        "5d · cuentas sugeridas de compra: precedencia, vigencia, aptitud"
 bloque assert_importacion.sql   "5e · carga masiva: lotes, diferencias, atomicidad, repetición"
 bloque assert_permisos.sql      "5f · permisos de la carga y ACL de las funciones"
+bloque assert_emision_prorroga.sql "5g · emitir revalida el proveedor · prórrogas (ampliación vs reducción)"
+bloque assert_linea_cuenta.sql  "5h · cuenta de las líneas de compra: la resuelve el servidor, determinista"
 
 echo "── 6/8 · concurrencia: sesiones REALES simultáneas, no una simulación"
 UA=a0a0a0a0-0000-0000-0000-00000000000a
