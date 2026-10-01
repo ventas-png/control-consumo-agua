@@ -9,8 +9,7 @@ import {
   updateCondominioRow,
   deleteCondominioRow,
 } from '../../../domain/condominios/tabMutations'
-import { softDelete } from '../../../lib/softDelete'
-import { solicitarAjuste } from '../../../domain/contabilidad/ajustes'
+import { solicitarAjuste, cancelarReservaConTarifa, avisoCancelacionReserva } from '../../../domain/contabilidad/ajustes'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
 import { useSignedUrls } from '../../../lib/storageUrls'
 import { formatPhoneForWa } from '../../../lib/validation'
@@ -302,16 +301,17 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     onRefresh()
   }
 
-  // La tarifa de una reserva YA cancelada, sin emitir y sin cobros, se elimina
-  // sin solicitud. Si el servidor no lo permite (se emitió, tiene un cobro o
-  // saldo aplicado) se avisa: entonces se anula con una solicitud aprobada.
-  async function eliminarTarifaDeReservaCancelada(cuotaId: string) {
-    const { error } = await softDelete('cuotas_condominio', { id: cuotaId, estado: 'pendiente' })
-    if (error) {
-      notify({
-        variant: 'warning', title: 'La reserva se canceló, pero su cargo sigue vigente',
-        text: `${error.message} Solicita su anulación en Cuotas.`,
-      })
+  // E7 (20261018000000): cancelar o rechazar la reserva y ANULAR su tarifa van
+  // juntos en el servidor (reverso y constancia; nada se borra). Con cobros u
+  // otras dependencias la tarifa queda vigente y se dice por qué.
+  async function cancelarEnServidor(reservaId: string, opciones: { motivo?: string; rechazo?: boolean } = {}) {
+    try {
+      const r = await cancelarReservaConTarifa(reservaId, opciones)
+      notify(avisoCancelacionReserva(r))
+      return true
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se canceló la reserva', text: (e as Error).message })
+      return false
     }
   }
 
@@ -333,10 +333,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   async function cancelarReserva(id: string) {
     const r = await confirm({ title: '¿Cancelar reserva?', icon: 'warning', variant: 'danger', confirmText: 'Sí, cancelar', cancelText: 'No' })
     if (!r.isConfirmed) return
-    const reserva = reservas.find(x => x.id === id)
-    const { error: errRes } = await updateCondominioRow('reservas_amenidades', id, { estado: 'cancelada' })
-    if (errRes) { notify({ variant: 'error', title: 'Error', text: errRes.message }); return }
-    if (reserva?.cuota_id) await eliminarTarifaDeReservaCancelada(reserva.cuota_id)
+    if (!(await cancelarEnServidor(id))) return
     setSelectedReserva(null)
     onRefresh()
   }
@@ -603,14 +600,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     })
     if (!result) return
     const motivo = result.motivo
-    // Primero la reserva queda cancelada: el servidor sólo deja eliminar sin
-    // solicitud la tarifa sin emitir de una reserva CANCELADA (20261014000000).
-    const { error: errRes } = await updateCondominioRow('reservas_amenidades', r.id, {
-      estado: 'cancelada',
-      rechazada_motivo: motivo.trim(),
-    })
-    if (errRes) { notify({ variant: 'error', title: 'Error', text: errRes.message }); return }
-    if (r.cuota_id) await eliminarTarifaDeReservaCancelada(r.cuota_id)
+    if (!(await cancelarEnServidor(r.id, { motivo, rechazo: true }))) return
     onRefresh()
   }
 

@@ -12,6 +12,7 @@
 --   20 · confirmación tardía de un cobro sobre una cuota anulada o eliminada
 --   21 · reembolso total antes de aprobar; respuesta = estado persistido
 --   22 · E6: rebaja de importe (nota de crédito)
+--   23 · E7: cancelar la reserva anula su tarifa
 -- ============================================================================
 \set ON_ERROR_STOP 1
 \set A    '''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''
@@ -74,6 +75,15 @@
 \set TC2  '''5e0b0000-0000-0000-0000-000000000052'''
 \set KW1  '''cc0b0000-0000-0000-0000-000000000031'''
 \set AJB  '''11000000-0000-0000-0000-00000000a1b0'''
+\set RV1  '''a3e00000-0000-0000-0000-000000000101'''
+\set RV2  '''a3e00000-0000-0000-0000-000000000102'''
+\set RV3  '''a3e00000-0000-0000-0000-000000000103'''
+\set RV4  '''a3e00000-0000-0000-0000-000000000104'''
+\set RV5  '''a3e00000-0000-0000-0000-000000000105'''
+\set QR1  '''c9a00000-0000-0000-0000-000000000041'''
+\set QR2  '''c9a00000-0000-0000-0000-000000000042'''
+\set QR3  '''c9a00000-0000-0000-0000-000000000043'''
+\set QR5  '''c9a00000-0000-0000-0000-000000000045'''
 
 -- ── 11 · superficie nueva ──────────────────────────────────────────────────
 SELECT public.chk(
@@ -151,14 +161,20 @@ SELECT public.chk_falla($$DELETE FROM public.cuotas_condominio WHERE id = 'c9a00
 SELECT public.chk_falla($$UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'c9a00000-0000-0000-0000-000000000016'$$,
   'CUOTA_ELIMINACION_SOLO_POR_SOLICITUD', '12 · la tarifa de una reserva CONFIRMADA tampoco');
 SELECT public.chk_txt(public.aj_cuota('c9a00000-0000-0000-0000-000000000015'), 'pendiente/1/0/-', '12 · QF2 intacta');
--- La tarifa sin emitir de una reserva CANCELADA, sin dependencias, sí.
-SELECT public.chk(public.filas_afectadas($$UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'c9a00000-0000-0000-0000-00000000000f'$$), 1,
-  '12 · la tarifa sin emitir de una reserva cancelada se elimina sin solicitud');
-SELECT public.chk_txt(public.aj_cuota(:QF), 'pendiente/0/0/eliminada', '12 · …y su devengo se reversa');
--- Sin emitir con un cobro vivo: no, y no en cascada.
+-- E7 (20261018000000): tampoco la tarifa de una reserva CANCELADA se borra;
+-- se anula al cancelar la reserva (§23).
+SELECT public.chk_falla($$UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'c9a00000-0000-0000-0000-00000000000f'$$,
+  'CUOTA_ELIMINACION_SOLO_POR_SOLICITUD', '12 · la tarifa de una reserva cancelada tampoco se elimina (E7: se anula)');
+-- Una cuota eliminada ANTES de 20261018000000 (herencia), para §20: se
+-- simula con el guard apagado explícitamente, sólo aquí.
+ALTER TABLE public.cuotas_condominio DISABLE TRIGGER trg_cuota_solo_por_solicitud;
+UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = :QF;
+ALTER TABLE public.cuotas_condominio ENABLE TRIGGER trg_cuota_solo_por_solicitud;
+SELECT public.chk_txt(public.aj_cuota(:QF), 'pendiente/0/0/eliminada', '12 · (herencia) QF eliminada antes de E7: su devengo se reversó');
+-- Con un cobro vivo: tampoco, y nada en cascada.
 SELECT public.chk_uuid(public.aj_cobro_cuota(:QG, 10, :KG), :KG, '12 · QG (sin emitir) recibe un cobro');
 SELECT public.chk_falla($$UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'c9a00000-0000-0000-0000-000000000010'$$,
-  'CUOTA_CON_DEPENDENCIAS', '12 · eliminar una cuota con un cobro vivo: rechazado, sin cascada');
+  'CUOTA_ELIMINACION_SOLO_POR_SOLICITUD', '12 · eliminar una cuota con un cobro vivo: rechazado, sin cascada');
 SELECT public.chk_txt((SELECT p.estado FROM public.pagos p WHERE p.id = :KG), 'pendiente', '12 · el cobro sigue vivo');
 
 -- ── 13 · permisos, aislamiento y dependencias ──────────────────────────────
@@ -791,4 +807,87 @@ SELECT set_config('request.jwt.claim.sub', :ADM, false);
 SELECT public.chk_txt(
   (SELECT (c->>'cuadra') FROM public.conta_estado_cuenta_conciliacion(:A1, :UNO, NULL, NULL) c),
   'true', '22 · todo sigue cuadrando');
+RESET ROLE;
+
+-- ── 23 · E7: cancelar la reserva anula su tarifa ───────────────────────────
+SET ROLE authenticated;
+-- Permisos y aislamiento.
+SELECT set_config('request.jwt.claim.sub', :RUNO, false);
+SELECT public.chk_falla($$SELECT * FROM public.conta_reserva_cancelar('a3e00000-0000-0000-0000-000000000101')$$,
+  'No autorizado', '23 · un residente no cancela por esta vía');
+SELECT set_config('request.jwt.claim.sub', :ADB, false);
+SELECT public.chk_falla($$SELECT * FROM public.conta_reserva_cancelar('a3e00000-0000-0000-0000-000000000101')$$,
+  'no existe', '23 · otra empresa: la reserva no existe para ella');
+-- Cancelar: reserva cancelada, tarifa ANULADA con reverso y evidencia.
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt(
+  (SELECT r.tarifa FROM public.conta_reserva_cancelar(:RV1, 'SINT el residente desistió') r),
+  'anulada', '23 · cancelar la reserva anula su tarifa');
+RESET ROLE;
+SELECT public.chk_txt((SELECT r.estado FROM public.reservas_amenidades r WHERE r.id = :RV1), 'cancelada', '23 · la reserva quedó cancelada');
+SELECT public.chk_txt(public.aj_cuota(:QR1), 'anulada/0/1/hoy', '23 · tarifa anulada hoy, devengo reversado, con evidencia (no se borró)');
+SELECT public.chk_txt(
+  (SELECT s.canal || '|' || s.estado || '|' || s.autoaprobada || '|' || (s.revisado_por = s.solicitado_por) || '|' || (s.reserva_id = :RV1)
+     FROM public.conta_ajustes_solicitudes s WHERE s.documento_id = :QR1),
+  'reserva_cancelada|ejecutada|false|true|true', '23 · solicitud del canal reserva_cancelada, ejecutada, sin marca de autoaprobación');
+SELECT public.chk_txt(public.aj_eventos((SELECT s.id FROM public.conta_ajustes_solicitudes s WHERE s.documento_id = :QR1)),
+  'solicitada,aprobada,ejecutada', '23 · bitácora: autorizada por la cancelación');
+SELECT public.chk_txt(
+  (SELECT (an.motivo LIKE 'Reserva cancelada (2026-10-20): SINT el residente desistió') || '|' || (an.reverso_emision_id IS NOT NULL)
+     FROM public.conta_cuota_anulaciones an WHERE an.cuota_id = :QR1),
+  'true|true', '23 · evidencia con la reserva, el motivo y el reverso');
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt((SELECT r.tarifa FROM public.conta_reserva_cancelar(:RV1) r), 'ya_anulada', '23 · repetirlo no anula otra vez');
+-- Con un cobro: la reserva se cancela, la tarifa NO (pasa por solicitud).
+RESET ROLE;
+SELECT public.chk_uuid(public.aj_cobro_cuota(:QR2, 25, 'cc0b0000-0000-0000-0000-000000000042'), 'cc0b0000-0000-0000-0000-000000000042', '23 · QR2 recibe un cobro');
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt(
+  (SELECT r.tarifa || '|' || (r.detalle LIKE '%Cobro%') FROM public.conta_reserva_cancelar(:RV2) r),
+  'requiere_solicitud|true', '23 · con un cobro la tarifa queda vigente y se dice por qué');
+RESET ROLE;
+SELECT public.chk_txt((SELECT r.estado FROM public.reservas_amenidades r WHERE r.id = :RV2) || '|' || public.aj_cuota(:QR2),
+  'cancelada|pendiente/1/0/-', '23 · reserva cancelada, tarifa intacta, sin cascada');
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+-- Rechazo: exige motivo y lo guarda.
+SELECT public.chk_falla($$SELECT * FROM public.conta_reserva_cancelar('a3e00000-0000-0000-0000-000000000103', NULL, true)$$,
+  'RESERVA_MOTIVO', '23 · rechazar exige motivo');
+SELECT public.chk_txt(
+  (SELECT r.tarifa FROM public.conta_reserva_cancelar(:RV3, 'SINT salón ocupado', true) r),
+  'anulada', '23 · rechazar también anula la tarifa (emitida)');
+RESET ROLE;
+SELECT public.chk_txt((SELECT r.estado || '|' || r.rechazada_motivo FROM public.reservas_amenidades r WHERE r.id = :RV3),
+  'cancelada|SINT salón ocupado', '23 · reserva rechazada con su motivo');
+SELECT public.chk_txt(public.aj_cuota(:QR3), 'anulada/0/1/hoy', '23 · tarifa emitida anulada con su reverso');
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt((SELECT r.tarifa FROM public.conta_reserva_cancelar(:RV4) r), 'sin_tarifa', '23 · sin tarifa: sólo se cancela');
+-- Período cerrado: reserva cancelada, solicitud fallida y reintentable.
+RESET ROLE;
+INSERT INTO public.cierres_mensuales (company_id, project_id, periodo, estado)
+VALUES (:A, :A1, to_char(CURRENT_DATE, 'YYYY-MM'), 'cerrado');
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt(
+  (SELECT r.tarifa || '|' || split_part(r.detalle, ':', 1) FROM public.conta_reserva_cancelar(:RV5) r),
+  'fallida|AJUSTE_PERIODO_CERRADO', '23 · período cerrado: la anulación queda fallida');
+RESET ROLE;
+SELECT public.chk_txt((SELECT r.estado FROM public.reservas_amenidades r WHERE r.id = :RV5) || '|' || public.aj_cuota(:QR5),
+  'cancelada|pendiente/1/0/-', '23 · la reserva sí se canceló; la tarifa sigue, sin efectos parciales');
+DELETE FROM public.cierres_mensuales WHERE project_id = :A1 AND periodo = to_char(CURRENT_DATE, 'YYYY-MM');
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :APR, false);
+SELECT public.chk_txt(
+  (SELECT r.estado FROM public.conta_ajuste_reintentar((SELECT s.id FROM public.conta_ajustes_solicitudes s WHERE s.documento_id = :QR5)) r),
+  'ejecutada', '23 · reabierto, quien aprueba la reintenta');
+RESET ROLE;
+SELECT public.chk_txt(public.aj_cuota(:QR5), 'anulada/0/1/hoy', '23 · tarifa anulada');
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt(
+  (SELECT (c->>'cuadra') FROM public.conta_estado_cuenta_conciliacion(:A1, :UNO, NULL, NULL) c),
+  'true', '23 · el estado de cuenta sigue cuadrando');
 RESET ROLE;

@@ -355,6 +355,50 @@ export async function solicitarRebaja(input: SolicitarRebajaInput): Promise<Resu
   return filas[0]
 }
 
+export interface ResultadoCancelarReserva {
+  reserva_id: string
+  /** sin_tarifa | ya_anulada | anulada | requiere_solicitud | fallida */
+  tarifa: 'sin_tarifa' | 'ya_anulada' | 'anulada' | 'requiere_solicitud' | 'fallida'
+  cuota_id: string | null
+  solicitud_id: string | null
+  detalle: string | null
+}
+
+/**
+ * E7 (20261018000000): cancela (o rechaza, con motivo) una reserva y, en la
+ * misma transacción, ANULA su tarifa con reverso y evidencia. Si la tarifa
+ * tiene cobros u otras dependencias queda vigente (requiere_solicitud).
+ */
+export async function cancelarReservaConTarifa(
+  reservaId: string, opciones: { motivo?: string; rechazo?: boolean } = {},
+): Promise<ResultadoCancelarReserva> {
+  const filas = await runQuery<ResultadoCancelarReserva[]>((signal) =>
+    supabase
+      .rpc('conta_reserva_cancelar', {
+        p_reserva_id: reservaId,
+        p_motivo: opciones.motivo?.trim() || undefined,
+        p_rechazo: opciones.rechazo ?? false,
+      })
+      .abortSignal(signal),
+  )
+  if (!filas || filas.length !== 1) throw new Error('El servidor no devolvió el resultado de la cancelación.')
+  return filas[0]
+}
+
+/** Qué decirle a quien canceló, según lo que pasó con la tarifa. */
+export function avisoCancelacionReserva(r: ResultadoCancelarReserva): { variant: 'success' | 'warning'; title: string; text?: string } {
+  switch (r.tarifa) {
+    case 'anulada':
+      return { variant: 'success', title: 'Reserva cancelada', text: 'Su tarifa quedó anulada (con reverso contable y constancia).' }
+    case 'requiere_solicitud':
+      return { variant: 'warning', title: 'Reserva cancelada; su tarifa sigue vigente', text: `No se anula aquí; solicita su anulación en Cuotas:\n${r.detalle ?? ''}` }
+    case 'fallida':
+      return { variant: 'warning', title: 'Reserva cancelada; la anulación de su tarifa falló', text: `${r.detalle ?? ''} Se puede reintentar en Contabilidad › Solicitudes de ajuste.` }
+    default:
+      return { variant: 'success', title: 'Reserva cancelada' }
+  }
+}
+
 export function useSolicitarAjusteMutation(companyId?: string) {
   const invalidar = useInvalidarAjustes(companyId)
   return useMutation({

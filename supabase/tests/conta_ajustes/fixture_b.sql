@@ -158,6 +158,24 @@ $$;
 GRANT EXECUTE ON FUNCTION public.aj_rebaja_saldo(text, uuid, text), public.aj_nota(uuid), public.aj_nota_lineas(uuid),
   public.aj_cuota_neto(uuid) TO authenticated;
 
+-- ── E7: cancelar la reserva anula su tarifa (20261018000000)
+--   RV1 confirmada, tarifa QR1: se cancela → tarifa anulada con evidencia
+--   RV2 confirmada, tarifa QR2 con un cobro: la tarifa queda (solicitud)
+--   RV3 pendiente, tarifa QR3: se RECHAZA con motivo
+--   RV4 sin tarifa
+--   RV5 confirmada, tarifa QR5: período cerrado → fallida, reintento
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, cuota_estado) VALUES
+  ('c9a00000-0000-0000-0000-000000000041', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QR1 tarifa', 25, '2026-10', 'pendiente', 'mantenimiento', 'pendiente'),
+  ('c9a00000-0000-0000-0000-000000000042', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QR2 tarifa cobrada', 25, '2026-10', 'pendiente', 'mantenimiento', 'pendiente'),
+  ('c9a00000-0000-0000-0000-000000000043', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QR3 tarifa rechazo', 25, '2026-10', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000045', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QR5 tarifa periodo', 25, '2026-10', 'pendiente', 'mantenimiento', 'pendiente');
+INSERT INTO public.reservas_amenidades (id, company_id, amenidad_id, unidad_id, fecha, hora_inicio, hora_fin, estado, cuota_id) VALUES
+  ('a3e00000-0000-0000-0000-000000000101', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a3e00000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', '2026-10-20', '10:00', '12:00', 'confirmada', 'c9a00000-0000-0000-0000-000000000041'),
+  ('a3e00000-0000-0000-0000-000000000102', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a3e00000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', '2026-10-21', '10:00', '12:00', 'confirmada', 'c9a00000-0000-0000-0000-000000000042'),
+  ('a3e00000-0000-0000-0000-000000000103', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a3e00000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', '2026-10-22', '10:00', '12:00', 'pendiente', 'c9a00000-0000-0000-0000-000000000043'),
+  ('a3e00000-0000-0000-0000-000000000104', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a3e00000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', '2026-10-23', '10:00', '12:00', 'confirmada', NULL),
+  ('a3e00000-0000-0000-0000-000000000105', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a3e00000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', '2026-10-24', '10:00', '12:00', 'confirmada', 'c9a00000-0000-0000-0000-000000000045');
+
 -- ── Storage como en Supabase: RLS activa y permisos de tabla ───────────────
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 GRANT USAGE ON SCHEMA storage TO authenticated;

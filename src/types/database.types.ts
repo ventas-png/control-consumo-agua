@@ -4426,6 +4426,7 @@ export type Database = {
           motivo: string
           motivo_revision: string | null
           project_id: string
+          reserva_id: string | null
           respaldos_revisados: Json | null
           resultado: Json | null
           revisado_at: string | null
@@ -4456,6 +4457,7 @@ export type Database = {
           motivo: string
           motivo_revision?: string | null
           project_id: string
+          reserva_id?: string | null
           respaldos_revisados?: Json | null
           resultado?: Json | null
           revisado_at?: string | null
@@ -4486,6 +4488,7 @@ export type Database = {
           motivo?: string
           motivo_revision?: string | null
           project_id?: string
+          reserva_id?: string | null
           respaldos_revisados?: Json | null
           resultado?: Json | null
           revisado_at?: string | null
@@ -24122,6 +24125,16 @@ export type Database = {
           p_motivo: string
         }
         Returns: { estado: string; repetida: boolean; solicitud_id: string }[]
+      }
+      conta_reserva_cancelar: {
+        Args: { p_motivo?: string; p_rechazo?: boolean; p_reserva_id: string }
+        Returns: {
+          cuota_id: string
+          detalle: string
+          reserva_id: string
+          solicitud_id: string
+          tarifa: string
+        }[]
       }
       conta_anio_cerrado: {
         Args: { p_anio: number; p_company_id: string; p_project_id: string }
