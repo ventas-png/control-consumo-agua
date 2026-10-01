@@ -308,8 +308,14 @@ jobs:
           for f in $FILES; do
             base=$(basename "$f" .sql); ver=${base%%_*}; name=${base#*_}
             echo "::group::Aplicando $base"
-            sql=$(cat "$f")
-            payload=$(jq -Rs '{query: .}' <<<"$sql")
+            # El cuerpo va por ARCHIVO (`--data-binary @`), no como argumento de
+            # curl: Linux limita un solo argumento a 128 KiB (MAX_ARG_STRLEN) y las
+            # migraciones grandes lo superan (20261007: ~200 KB, 20261011: ~139 KB).
+            # Con `-d "$payload"` curl ni se ejecutaba («Argument list too long»,
+            # exit 126) y no se enviaba una sola línea de SQL. El contenido enviado
+            # es el mismo JSON {"query": <archivo>}.
+            payload_file=/tmp/apply-payload.json
+            jq -Rs '{query: .}' < "$f" > "$payload_file"
             # El código HTTP se MIRA. Antes solo se buscaba `.error` en el cuerpo,
             # y eso dejó pasar el fallo peor posible: el 2026-08-03 las tres
             # migraciones de #698 respondieron `{"message":"Unauthorized"}` con el
@@ -325,7 +331,7 @@ jobs:
             code=$(curl -s -o /tmp/apply-resp.json -w "%{http_code}" -X POST "$API_URL" \
               -H "Authorization: Bearer $ACCESS_TOKEN" \
               -H "Content-Type: application/json" \
-              -d "$payload")
+              --data-binary @"$payload_file")
             resp=$(cat /tmp/apply-resp.json)
             echo "HTTP $code"
             echo "$resp"
