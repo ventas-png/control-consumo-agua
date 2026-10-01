@@ -4,6 +4,7 @@ import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog, openTextPrompt } from '../../shared/PromptDialog'
 import { fetchDependenciasAjuste, textoDependencias, textoSolicitudEnviada } from '../../../domain/contabilidad/ajustes'
 import { configurarCierreAutomatico } from '../../shared/cierreAutomaticoDialog'
+import { pedirRebaja } from '../../contabilidad/solicitarRebajaDialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { SelectionToolbar, type BulkAction } from '../../shared/SelectionToolbar'
 import { useBulkSelection } from '../../../hooks/useBulkSelection'
@@ -252,6 +253,28 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
         motivo,
       })
       notify({ variant: 'success', title: 'Anulación solicitada', text: textoSolicitudEnviada(r) })
+      onRefresh()
+    } catch (err) {
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: (err as Error).message })
+    } finally {
+      setAccionCuotaId(null)
+    }
+  }
+
+  // E6 (20261017000000): rebajar el importe se SOLICITA; al aprobarse queda
+  // una nota de crédito y baja el saldo (el importe y el devengo no cambian).
+  async function handleRebajar(cuota: CuotaCondominio) {
+    setAccionCuotaId(cuota.id)
+    try {
+      const proj = cuotaEstadoById.get(cuota.id)
+      const r = await pedirRebaja({
+        tabla: 'cuotas_condominio',
+        id: cuota.id,
+        concepto: `Cuota ${cuota.concepto} ${cuota.periodo}`,
+        tieneMora: Number(proj?.mora_monto ?? 0) > 0,
+      })
+      if (!r) return
+      notify({ variant: 'success', title: 'Rebaja solicitada', text: textoSolicitudEnviada(r) })
       onRefresh()
     } catch (err) {
       notify({ variant: 'error', title: 'No se registró la solicitud', text: (err as Error).message })
@@ -952,6 +975,12 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
                   <button onClick={() => void handleAnular(c)} disabled={procesando} title="Anular cuota"
                     style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-danger)', cursor: procesando ? 'not-allowed' : 'pointer', color: 'var(--at-danger)', fontSize: '12px', padding: '4px 9px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
                     🚫 Anular
+                  </button>
+                )}
+                {canEdit && puedeAnular && (
+                  <button onClick={() => void handleRebajar(c)} disabled={procesando} title="Solicitar rebaja de importe (nota de crédito)"
+                    style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line-strong)', cursor: procesando ? 'not-allowed' : 'pointer', color: 'var(--at-ink-2)', fontSize: '12px', padding: '4px 9px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
+                    ➖ Rebajar
                   </button>
                 )}
                 {(c.estado === 'pendiente' || c.estado === 'moroso') && (

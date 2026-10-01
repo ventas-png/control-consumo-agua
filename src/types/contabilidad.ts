@@ -189,6 +189,7 @@ export const CUENTAS_ESPECIALES = [
   { evento: 'activo_fijo',            label: 'Activo fijo',                      proceso: 'Alta de activos' },
   { evento: 'depreciacion_acumulada', label: 'Depreciación acumulada',           proceso: 'Alta de activos' },
   { evento: 'gasto_depreciacion',     label: 'Gasto por depreciación',           proceso: 'Alta de activos' },
+  { evento: 'ajustes_bonificaciones', label: 'Ajustes y bonificaciones sobre cuotas y cargos', proceso: 'Rebajas de importe (notas de crédito)' },
 ] as const
 
 export type EventoEspecial = (typeof CUENTAS_ESPECIALES)[number]['evento']

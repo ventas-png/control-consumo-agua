@@ -91,6 +91,73 @@ INSERT INTO public.payment_requests (id, cliente_id, cuota_id, company_id, monto
   ('ad900000-0000-0000-0000-0000000000a7', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000024', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'failed', 'pi_qs', 'prod'),
   ('ad900000-0000-0000-0000-0000000000a8', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000025', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_qt', 'prod');
 
+-- ── Rebajas de importe / notas de crédito (E6, 20261017000000)
+--   AJ-BONIF  cuenta de ajustes y bonificaciones del ledger A1, SIN mapear al
+--             empezar (la primera aprobación falla por configuración)
+--   QW1  100: rebaja de principal 30, después un cobro de 100 (70 a la CxC)
+--   QW2   40 + mora 5: rebaja de la mora
+--   QW3   60: aprobación de una rebaja mientras llega un cobro (run.sh P)
+--   QW4  100: rebaja 40 y después mora sobre monto_cuota → base 60
+--   QW5  100: rebaja 40 y después mora sobre saldo_vencido → base 60
+--   QW6   60: el cobro llega primero; la rebaja ya no cabe (run.sh R)
+--   QW7   50: dos aprobaciones de la misma rebaja a la vez (run.sh Q)
+--   CW    cargo de 50: rebajas de 20 y 30
+INSERT INTO public.conta_cuentas
+  (id, company_id, project_id, codigo, nombre, tipo, naturaleza, nivel, es_detalle, activa) VALUES
+  ('11000000-0000-0000-0000-00000000a1b0', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'AJ-BONIF', 'Ajustes y bonificaciones', 'ingreso', 'deudora', 3, true, true);
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, cuota_estado) VALUES
+  ('c9a00000-0000-0000-0000-000000000031', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QW1 rebaja principal', 100, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000032', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QW2 rebaja mora', 40, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000033', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QW3 rebaja contra cobro', 60, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000034', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QW4 mora monto neto', 100, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000035', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QW5 mora saldo neto', 100, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000036', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QW6 cobro contra rebaja', 60, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000037', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QW7 doble aprobación', 50, '2026-09', 'pendiente', 'mantenimiento', 'emitida');
+INSERT INTO public.cargos_adicionales_unidad
+  (id, company_id, project_id, unidad_id, concepto, categoria, monto, fecha_cargo, estado) VALUES
+  ('ad000000-0000-0000-0000-000000000051', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT CW rebaja de cargo', 'reparacion', 50, '2026-09-02', 'pendiente');
+-- Saldo de un componente (lectura para las pruebas).
+CREATE OR REPLACE FUNCTION public.aj_rebaja_saldo(p_tabla text, p_id uuid, p_componente text) RETURNS numeric
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT public.conta_rebaja_saldo(p_tabla, p_id, p_componente)
+$$;
+-- «monto/saldo_antes/componente/aprobado por» de la nota de una solicitud.
+CREATE OR REPLACE FUNCTION public.aj_nota(p_sol uuid) RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT n.monto || '/' || n.saldo_antes || '/' || n.componente || '/' || n.aprobado_por
+    FROM public.conta_notas_credito n WHERE n.solicitud_id = p_sol
+$$;
+-- Asiento de la nota: «código:D|H importe:auxiliar?:unidad?:tipo_cargo» por línea.
+CREATE OR REPLACE FUNCTION public.aj_nota_lineas(p_sol uuid) RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT a.estado || '|' || a.fecha::text || '|' || string_agg(
+           c.codigo || ':' || CASE WHEN l.debe > 0 THEN 'D' || l.debe ELSE 'H' || l.haber END
+           || ':' || CASE WHEN l.auxiliar_cliente_id IS NULL THEN '-' ELSE 'x' END
+           || ':' || CASE WHEN l.unidad_id IS NULL THEN '-' ELSE 'u' END
+           || ':' || COALESCE(l.tipo_cargo, '-'), ',' ORDER BY l.orden)
+    FROM public.conta_notas_credito n
+    JOIN public.conta_asientos a ON a.id = n.asiento_id
+    JOIN public.conta_asiento_lineas l ON l.asiento_id = a.id
+    JOIN public.conta_cuentas c ON c.id = l.cuenta_id
+   WHERE n.solicitud_id = p_sol
+   GROUP BY a.estado, a.fecha
+$$;
+-- Devengo − cobros aplicados − notas vivas de una cuota (sin acotar a 0).
+CREATE OR REPLACE FUNCTION public.aj_cuota_neto(p_cuota uuid) RETURNS numeric
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT (c.monto
+          - COALESCE((SELECT sum(ap.monto) FROM public.conta_cobro_aplicaciones ap
+                        JOIN public.conta_asientos a ON a.id = ap.asiento_id
+                       WHERE ap.cuota_id = c.id AND ap.evento = 'cuota_emitida'
+                         AND a.estado = 'publicado' AND a.anulado_por_id IS NULL), 0)
+          - COALESCE((SELECT sum(n.monto) FROM public.conta_notas_credito n
+                       WHERE n.cuota_id = c.id AND n.componente = 'principal'
+                         AND public.conta_sf_asiento_vivo(n.asiento_id)), 0))::numeric(14,2)
+    FROM public.cuotas_condominio c WHERE c.id = p_cuota
+$$;
+GRANT EXECUTE ON FUNCTION public.aj_rebaja_saldo(text, uuid, text), public.aj_nota(uuid), public.aj_nota_lineas(uuid),
+  public.aj_cuota_neto(uuid) TO authenticated;
+
 -- ── Storage como en Supabase: RLS activa y permisos de tabla ───────────────
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 GRANT USAGE ON SCHEMA storage TO authenticated;

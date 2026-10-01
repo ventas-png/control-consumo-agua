@@ -22,6 +22,7 @@ import {
   ETIQUETA_ESTADO_AJUSTE,
   ETIQUETA_INCIDENCIA,
   ETIQUETA_TIPO_AJUSTE,
+  ETIQUETA_COMPONENTE_REBAJA,
   accionesSolicitud,
   urlRespaldo,
   useAdjuntarRespaldoMutation,
@@ -266,7 +267,8 @@ export function AjustesTab({ companyId, projectId }: Props) {
                       {s.canal === 'portal' && <span style={{ marginLeft: 6, fontSize: 11 }}>(portal)</span>}
                       <div style={{ color: 'var(--at-ink-3)' }}>
                         {foto.concepto ?? s.documento_tabla}
-                        {s.importe != null && <> · {Number(s.importe).toFixed(2)} {s.moneda ?? ''}</>}
+                        {s.importe != null && <> · {s.tipo === 'ajuste_importe' ? 'rebaja ' : ''}{Number(s.importe).toFixed(2)} {s.moneda ?? ''}</>}
+                        {s.componente && <> ({ETIQUETA_COMPONENTE_REBAJA[s.componente]})</>}
                       </div>
                     </td>
                     <td>{s.motivo}{s.motivo_revision && <div style={{ color: 'var(--at-ink-3)' }}>Revisión: {s.motivo_revision}</div>}</td>

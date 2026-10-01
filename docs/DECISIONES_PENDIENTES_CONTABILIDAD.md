@@ -45,38 +45,43 @@ de «único aprobador», y los plazos de E2/E3 son **propuestas**, no decisiones
 | E4 | El residente **solicita** desde el portal la aplicación de su saldo a favor; contabilidad la aprueba y la ejecuta. El residente no aplica directamente. | ✅ Aprobada · implementada en `20261011000000` (`portal_solicitar_aplicacion_saldo_favor`) y en el portal. |
 | E5 | Igual que D1: se mantiene el bloqueo, sin cascada automática. Un reembolso confirmado por el proveedor **se conserva** y abre una incidencia visible de conciliación. | ✅ Aprobada · implementada en `20261011000000` (`conta_incidencias_conciliacion`). |
 
-### Decisiones pendientes del cierre del bloque 3 (actualizado 2026-10-01)
+### Decisiones del cierre del bloque 3 (actualizado 2026-10-01)
 
-**Ninguna de estas tres está aprobada.** E7 tiene código, pero su alcance sigue esperando
-confirmación; E6 y E8 no tienen código.
+**E6 está aprobada (2026-10-01) e implementada.** E7 y E8 **siguen pendientes**: abajo va la
+recomendación de cada una como propuesta, no como decisión.
 
-| # | Qué hay que decidir | Qué existe hoy | Qué pasa mientras no se decide |
+| # | Qué hay que decidir | Qué existe hoy | Estado |
 | --- | --- | --- | --- |
-| E6 | Las cuatro reglas de `ajuste_importe`: contrapartida, crédito y/o débito, tope, base de la mora | Nada (ni tabla, ni tipo de solicitud, ni pantalla) | No hay forma de rebajar o aumentar el importe de una cuota o un cargo; sólo anularlo por solicitud |
-| E7 | ¿Cancelar la reserva basta para eliminar su tarifa **sin** aprobación, o también debe pasar por solicitud? | Implementado como «basta» (`20261014000000`), con pruebas | Se aplica esa regla; si la respuesta es «no basta», se cambia por una correctiva que exija solicitud también para ese caso |
-| E8 | Cuándo consultar al proveedor por un cobro abandonado (N horas), quién puede pedir la consulta manual, y cómo se trata QPayPro sin consulta servidor a servidor | Nada del flujo de consulta. Sí la protección de la confirmación tardía (abajo), que **no** depende de esta decisión | Un cobro `pending` sigue bloqueando la anulación de su cuota sin plazo; nada se libera por antigüedad |
+| E6 | Las cuatro reglas de `ajuste_importe` | Implementado en `20261017000000` | ✅ Aprobada |
+| E7 | ¿Cancelar la reserva basta para eliminar su tarifa **sin** aprobación? | Implementado como «basta» (`20261014000000`), con pruebas | ❓ Pendiente de confirmación; hay una opción recomendada |
+| E8 | Cuándo consultar al proveedor por un cobro abandonado, quién pide la consulta manual, qué hacer con QPayPro | Sólo la protección de la confirmación tardía (abajo), que no depende de esta decisión | ❓ Pendiente; hay una propuesta concreta |
 
+#### E6 · `ajuste_importe` (rebaja de importe) — ✅ aprobada el 2026-10-01 e implementada (`20261017000000`)
 
-#### E6 · `ajuste_importe` — ⏸️ PENDIENTE de decisión, sin implementar
+| Regla | Decisión |
+| --- | --- |
+| (a) Contrapartida | Cuenta especial nueva `ajustes_bonificaciones` («Ajustes y bonificaciones sobre cuotas y cargos»). Sin ella la solicitud no se ejecuta (`CONTA_CONFIG_INCOMPLETA`) y queda fallida, reintentable cuando se configure en Contabilidad › Configuración › Cuentas especiales. |
+| (b) Dirección | **Sólo rebaja.** Para cobrar más se crea un cargo o una cuota nueva. |
+| (c) Tope | El saldo pendiente del componente al aprobar (y se avisa ya al solicitar). No genera saldo a favor. |
+| (d) Mora | La mora que se calcule después se calcula sobre el importe **neto** de rebajas vivas, en los dos modos (`monto_cuota` y `saldo_vencido`). La mora ya registrada no se toca. |
+| (e) Fecha contable | La de la ejecución (hoy). |
 
-Faltan las cuatro reglas: **(a)** contrapartida (la cuenta de ingreso del devengo original o una
-cuenta especial de ajustes/bonificaciones); **(b)** sólo crédito (rebaja) o también débito
-(aumento); **(c)** tope (no más que el saldo pendiente del documento, o se admite dejar saldo a
-favor); **(d)** si la mora posterior se calcula sobre el importe neto. Propuesta para (e): fecha
-contable = la de la ejecución.
-
-Qué falta implementar una vez definidas (nada de esto existe hoy):
-1. Tabla `conta_notas_ajuste` (documento propio, vinculado a la cuota o cargo; inmutable): tipo
-   crédito/débito según (b), importe, motivo, solicitud, asiento.
-2. Tipo `ajuste_importe` en el flujo (`conta_ajuste_solicitar/revalidar/ejecutar`): foto con el saldo,
-   revalidación del tope (c), período abierto, sin cambiar `monto` del documento.
-3. Generación del asiento de la nota contra la cuenta de (a), con el auxiliar y la unidad del
-   devengo; el asiento original no se toca.
-4. Saldos: `conta_cuota_saldo_cobro`, `conta_cargo_saldo_cobro`, `conta_cargo_saldo_pagable`,
-   `portal_documentos_con_saldo` y el estado de cuenta (al corte) restando/sumando las notas
-   vivas; mora según (d) en `conta_aplicar_mora_cuotas`.
-5. Pantalla (solicitar desde Cuotas y Cargos), pruebas SQL (permisos, aislamiento, doble
-   aprobación, concurrencia contra cobros, período cerrado, tope) y vitest.
+Cómo funciona:
+- Se solicita desde Cuotas («➖ Rebajar», principal o mora) y Cargos adicionales («Rebajar») con importe y
+  motivo (`conta_ajuste_solicitar_rebaja`). Es idempotente y admite una rebaja abierta por documento.
+  La aprueba otra persona con permiso de autorizar (cuatro ojos, E1).
+- Al aprobarse queda una **nota de crédito** inmutable (`conta_notas_credito`). Su asiento carga la
+  cuenta de ajustes y abona la misma CxC del devengo, con su auxiliar, unidad y tipo de cargo. El devengo
+  original y el importe del documento no cambian: baja su **saldo**.
+- La rebaja cuenta en el saldo de cuota y cargo, en el portal, en el cobro en línea, en el reparto de un
+  cobro posterior (sólo se abona a la CxC el neto; el resto queda como saldo a favor), en la mora, en el
+  estado del documento cubierto y en el estado de cuenta con su conciliación.
+- Una nota viva es una dependencia: impide anular la cuota o el cargo, sin cascada. Para deshacerla se
+  reversa su póliza.
+- Pruebas: `supabase/tests/conta_ajustes/assert_b.sql` §22 y sesiones concurrentes P, Q y R. Cubren
+  permisos, aislamiento, tope, configuración ausente y reintento, estado de cuenta, portal, cobro
+  posterior, mora en los dos modos, cargo, dos aprobaciones a la vez, y rebaja contra cobro en los dos
+  órdenes.
 
 #### E7 · eliminar cuotas sin aprobación — ❓ PENDIENTE de confirmación (implementado en `20261014000000`)
 
@@ -93,6 +98,16 @@ por solicitud. La pantalla de amenidades cancela primero la reserva y después e
 cuando falla guardar una reserva y ya se generó el cargo, ya no lo borra: solicita su anulación.
 **Confirmar**: ¿la cancelación de la reserva basta como autorización para eliminar su tarifa, o
 también debe pasar por aprobación?
+
+
+**Opción recomendada (propuesta, no aprobada): «basta, pero con evidencia».** Cancelar la reserva
+autoriza quitar su tarifa sin una segunda aprobación, pero la tarifa se **anula** en vez de borrarse:
+- reverso del devengo vinculado al original y evidencia inmutable (quién canceló, cuándo, motivo,
+  reserva), igual que la anulación de una cuota;
+- sólo para los roles que ya pueden cancelar reservas, y sólo si la tarifa no tiene cobros ni saldo a
+  favor aplicado (si los tiene, pasa por solicitud con aprobación).
+
+Así la cancelación sigue siendo la autorización y la cuenta por cobrar no pierde trazabilidad.
 
 #### E8 · cobros en línea abandonados — ❓ PENDIENTE de decisión, propuesta sin implementar
 
@@ -117,6 +132,22 @@ Hoy una solicitud de cobro `pending` de una cuota bloquea su anulación sin plaz
    evento del proveedor que la justifica; nada se libera por fecha.
 
 **Decidir**: N, quién puede pedir una consulta manual, y el tratamiento de QPayPro.
+
+
+**Propuesta concreta (no aprobada):**
+- **N:** una consulta automática a la hora de crear el cobro y otra a las 24 h (la sesión de Stripe
+  caduca a las 24 h por defecto). Sólo un estado final del proveedor (pago cancelado o sesión expirada)
+  pasa la solicitud a `failed`. Sin respuesta o pendiente: no cambia nada.
+- **Consulta manual:** la pueden pedir los mismos que pueden solicitar ajustes (contador, administrador),
+  desde la dependencia o la incidencia.
+- **QPayPro:** mientras no tenga consulta de servidor a servidor, nada se resuelve solo. Contabilidad
+  verifica en el panel de QPayPro, adjunta la captura como respaldo y otra persona lo aprueba.
+- **Hallazgo:** el cron existente `reconciliar_payment_requests_pendientes`
+  (`20260717000000_reconciliar_payment_requests_cron.sql`, ya en `main`) marca `failed` **por
+  antigüedad**: a las 24 h si no hay referencia del proveedor y a los 30 días si la hay. Eso contradice
+  «nunca liberar por antigüedad». Desde `20261015000000` una aprobación tardía ya no se pierde, pero se
+  recomienda cambiar el barrido de 30 días por una consulta final al proveedor. No se tocó: espera esta
+  decisión.
 
 ### Protección implementada (no es una decisión): confirmación tardía sobre una cuota anulada
 

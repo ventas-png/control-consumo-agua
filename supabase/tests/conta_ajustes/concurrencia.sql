@@ -76,3 +76,16 @@ SELECT public.chk(
   'M/N · los cuatro avisos quedan como evidencia');
 SELECT public.chk_txt(public.aj_cuota('c9a00000-0000-0000-0000-000000000025'), 'emitida/1/0/-',
   'M/N · la cuota no recibió ningún abono');
+
+-- E6: rebaja contra cobro (20261017000000).
+SELECT public.chk_txt(public.aj_nota('5e0b0000-0000-0000-0000-000000000033') IS NOT NULL || '|' || public.aj_cuota_neto('c9a00000-0000-0000-0000-000000000033'),
+  'true|0.00', 'P · rebaja primero: el cobro abona sólo el neto (10); la CxC queda en 0, no negativa');
+SELECT public.chk_txt(public.sf_origen('cc0b0000-0000-0000-0000-000000000033'), 'excedente:50.00:50.00',
+  'P · …y lo demás queda como saldo a favor');
+SELECT public.chk_txt(COALESCE(public.aj_nota('5e0b0000-0000-0000-0000-000000000036'), '-') || '|' || public.aj_cuota_neto('c9a00000-0000-0000-0000-000000000036'),
+  '-|0.00', 'R · cobro primero: la rebaja no cabe y no deja nota; CxC en 0');
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_notas_credito n WHERE n.cuota_id = 'c9a00000-0000-0000-0000-000000000037'), 1,
+  'Q · dos aprobaciones a la vez: UNA nota');
+SELECT public.chk_txt(public.aj_rebaja_saldo('cuotas_condominio', 'c9a00000-0000-0000-0000-000000000037', 'principal')::text,
+  '30.00', 'Q · se rebajó una sola vez');

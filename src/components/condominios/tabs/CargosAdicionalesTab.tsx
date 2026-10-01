@@ -4,6 +4,7 @@ import { createCondominioRow, updateCondominioRow } from '../../../domain/condom
 import { notify } from '../../shared/Dialog'
 import { openTextPrompt } from '../../shared/PromptDialog'
 import { solicitarAjuste, textoSolicitudEnviada } from '../../../domain/contabilidad/ajustes'
+import { pedirRebaja } from '../../contabilidad/solicitarRebajaDialog'
 import { CargoAdicionalUnidad, CategoriaCargoAdicional, EstadoCargoAdicional, Unidad } from '../../../types'
 import { useCargosCobroResumenQuery } from '../../../domain/contabilidad/cobrosCargo'
 import CobroCargoModal from './CobroCargoModal'
@@ -113,6 +114,18 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
         documentoId: c.id, motivo: motivo.trim(),
       })
       notify({ variant: 'success', title: 'Anulación solicitada', text: textoSolicitudEnviada(r) })
+      onRefresh()
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se registró la solicitud', text: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  // E6 (20261017000000): rebajar el importe se SOLICITA (nota de crédito).
+  async function rebajar(c: CargoAdicionalUnidad) {
+    try {
+      const r = await pedirRebaja({ tabla: 'cargos_adicionales_unidad', id: c.id, concepto: `Cargo ${c.concepto}` })
+      if (!r) return
+      notify({ variant: 'success', title: 'Rebaja solicitada', text: textoSolicitudEnviada(r) })
       onRefresh()
     } catch (e) {
       notify({ variant: 'error', title: 'No se registró la solicitud', text: e instanceof Error ? e.message : String(e) })
@@ -269,6 +282,12 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                               <button onClick={() => marcarPagado(c)}
                                 style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                                 ✓ Pagado
+                              </button>
+                            )}
+                            {porTipo && (
+                              <button onClick={() => void rebajar(c)} title="Solicitar rebaja de importe (nota de crédito)"
+                                style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                                Rebajar
                               </button>
                             )}
                             <button onClick={() => anular(c)}

@@ -95,7 +95,7 @@ echo "   $N migraciones aplicadas sobre una base vacía"
 
 echo "── 3/5 · migración bajo prueba (dos veces: la segunda sólo puede fallar por «already exists») y posteriores"
 aplicar "$MIGS/$BAJO_PRUEBA.sql"
-SALIDA=$(PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 \
+SALIDA=$(PGOPTIONS="-c client_min_messages=warning" psql --single-transaction -v ON_ERROR_STOP=1 \
   -d ajustes -f "$MIGS/$BAJO_PRUEBA.sql" 2>&1 || true)
 echo "$SALIDA" | grep -q 'already exists' \
   || { echo "❌ la segunda pasada no falló por «already exists»:"; echo "$SALIDA" | tail -3; exit 1; }
@@ -105,7 +105,10 @@ for f in "$MIGS"/*.sql; do
   base="$(basename "$f" .sql)"
   [[ "$base" > "$BAJO_PRUEBA" ]] && aplicar "$f"
 done
-SALIDA=$(PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 \
+# En UNA transacción: lo que la segunda pasada alcance a ejecutar antes del
+# «already exists» (los ALTER del principio de 20261012) se revierte y no pisa
+# lo que redefinieron migraciones posteriores.
+SALIDA=$(PGOPTIONS="-c client_min_messages=warning" psql --single-transaction -v ON_ERROR_STOP=1 \
   -d ajustes -f "$MIGS/$CIERRE.sql" 2>&1 || true)
 echo "$SALIDA" | grep -q 'already exists' \
   || { echo "❌ la segunda pasada de $CIERRE no falló por «already exists»:"; echo "$SALIDA" | tail -3; exit 1; }
@@ -161,6 +164,14 @@ PQ2=ad900000-0000-0000-0000-0000000000a2
 PQ3=ad900000-0000-0000-0000-0000000000a3
 PQ4=ad900000-0000-0000-0000-0000000000a4
 PR8=ad900000-0000-0000-0000-0000000000a8
+QW3=c9a00000-0000-0000-0000-000000000033
+QW6=c9a00000-0000-0000-0000-000000000036
+QW7=c9a00000-0000-0000-0000-000000000037
+TW3=5e0b0000-0000-0000-0000-000000000033
+TW6=5e0b0000-0000-0000-0000-000000000036
+TW7=5e0b0000-0000-0000-0000-000000000037
+UNO=e0000000-0000-0000-0000-00000000a001
+A1=a1a1a1a1-0000-0000-0000-000000000001
 
 # Preparación (como el admin): tres solicitudes de anulación y un anticipo
 # nuevo de Uno para las solicitudes simultáneas del portal.
@@ -177,6 +188,9 @@ SELECT * FROM public.conta_ajuste_solicitar('$TY', 'anular_cuota', 'cuotas_condo
 SELECT * FROM public.conta_ajuste_solicitar('$TM', 'anular_cuota', 'cuotas_condominio', '$QM', 'SINT anulación contra aviso tardío');
 SELECT * FROM public.conta_ajuste_solicitar('$TN', 'anular_cuota', 'cuotas_condominio', '$QN', 'SINT aviso tardío contra anulación');
 SELECT public.aj_aviso('$PP3', 'aprobado', 'webhook', 'evt-pp3-ok');
+SELECT * FROM public.conta_ajuste_solicitar_rebaja('$TW3', 'cuotas_condominio', '$QW3', 'principal', 50, 'SINT rebaja contra cobro');
+SELECT * FROM public.conta_ajuste_solicitar_rebaja('$TW6', 'cuotas_condominio', '$QW6', 'principal', 50, 'SINT cobro contra rebaja');
+SELECT * FROM public.conta_ajuste_solicitar_rebaja('$TW7', 'cuotas_condominio', '$QW7', 'principal', 20, 'SINT doble aprobación de rebaja');
 SQL
 OANT2=$(psql -q -X -t -A -d ajustes -c "SELECT public.sf_origen_id('$ANT2')")
 
@@ -246,7 +260,16 @@ par m "$ADM" "SELECT 'M1:' || (public.aj_aviso('$PR8', 'reembolsado', 'webhook',
 # N · después, dos aprobaciones atrasadas distintas a la vez.
 par n "$ADM" "SELECT 'N1:' || (public.aj_aviso('$PR8', 'aprobado', 'webhook', 'evt-qt-ok-2') ->> 'conciliado');" \
       "$ADM" "SELECT 'N2:' || (public.aj_aviso('$PR8', 'aprobado', 'consulta', NULL) ->> 'conciliado');"
-cat "$SALIDAS"/[a-n][12].txt | grep -E '^[A-N][12]:' | sort | sed 's/^/   /'
+# P · la aprobación de una rebaja de 50 retiene QW3 (60); mientras, un cobro de 60.
+par p "$APR" "SELECT 'P1:' || estado FROM public.conta_ajuste_aprobar('$TW3');" \
+      "$ADM" "INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES ('cc0b0000-0000-0000-0000-000000000033', '$UNO', '$A1', '$QW3', 60, 'efectivo', 'verificado', now()) RETURNING 'P2:' || monto;"
+# R · al revés: el cobro de 60 de QW6 primero; mientras, la aprobación de la rebaja.
+par r "$ADM" "INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES ('cc0b0000-0000-0000-0000-000000000036', '$UNO', '$A1', '$QW6', 60, 'efectivo', 'verificado', now()) RETURNING 'R1:' || monto;" \
+      "$APR" "SELECT 'R2:' || estado || '/' || split_part(COALESCE(error_ejecucion, '-'), ':', 1) FROM public.conta_ajuste_aprobar('$TW6');"
+# Q · dos aprobaciones de la MISMA rebaja a la vez.
+par q "$APR" "SELECT 'Q1:' || estado || '/' || repetida FROM public.conta_ajuste_aprobar('$TW7');" \
+      "$APR" "SELECT 'Q2:' || estado || '/' || repetida FROM public.conta_ajuste_aprobar('$TW7');"
+cat "$SALIDAS"/[a-r][12].txt | grep -E '^[A-R][12]:' | sort | sed 's/^/   /'
 
 grep -q '^A1:ejecutada/false$' "$SALIDAS/a1.txt" \
   || { echo "❌ A1 debía ejecutar:"; cat "$SALIDAS/a1.txt"; exit 1; }
@@ -302,6 +325,18 @@ grep -q '^M2:ignorado_reembolsado$' "$SALIDAS/m2.txt" \
   || { echo "❌ M2 (aprobación que esperó al reembolso) no debía conciliar:"; cat "$SALIDAS/m2.txt"; exit 1; }
 grep -q '^N1:false$' "$SALIDAS/n1.txt" && grep -q '^N2:false$' "$SALIDAS/n2.txt" \
   || { echo "❌ N: ninguna aprobación atrasada debía conciliar:"; cat "$SALIDAS/n1.txt" "$SALIDAS/n2.txt"; exit 1; }
+grep -q '^P1:ejecutada$' "$SALIDAS/p1.txt" \
+  || { echo "❌ P1 debía ejecutar la rebaja:"; cat "$SALIDAS/p1.txt"; exit 1; }
+grep -q '^P2:60.00$' "$SALIDAS/p2.txt" \
+  || { echo "❌ P2 debía registrar el cobro:"; cat "$SALIDAS/p2.txt"; exit 1; }
+grep -q '^R1:60.00$' "$SALIDAS/r1.txt" \
+  || { echo "❌ R1 debía registrar el cobro:"; cat "$SALIDAS/r1.txt"; exit 1; }
+grep -q '^R2:fallida/AJUSTE_REBAJA_EXCEDE_SALDO$' "$SALIDAS/r2.txt" \
+  || { echo "❌ R2 debía fallar por AJUSTE_REBAJA_EXCEDE_SALDO:"; cat "$SALIDAS/r2.txt"; exit 1; }
+grep -q '^Q1:ejecutada/false$' "$SALIDAS/q1.txt" \
+  || { echo "❌ Q1 debía ejecutar:"; cat "$SALIDAS/q1.txt"; exit 1; }
+grep -q '^Q2:ejecutada/true$' "$SALIDAS/q2.txt" \
+  || { echo "❌ Q2 debía ver la ejecución de Q1, sin ejecutar otra vez:"; cat "$SALIDAS/q2.txt"; exit 1; }
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d ajustes -f "$AQUI/concurrencia.sql" 2>&1) || {
   cat "$SALIDAS"/*.txt
   echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'

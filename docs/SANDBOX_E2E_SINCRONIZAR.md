@@ -30,9 +30,10 @@ No existen `pagos_rechazo_eventos`, `conta_ec_cobro_al_corte(uuid, date)` ni
 | `20261014000000_conta_cuota_eliminar_solo_tarifa_reserva_cancelada` | #904 (correctiva de 20261012, E7) | **Falta** |
 | `20261015000000_pasarela_cobro_tardio_cuota_anulada` | #904 (confirmación tardía sobre cuota anulada) | **Falta** |
 | `20261016000000_pasarela_reembolso_antes_de_aprobar_estado_persistido` | #904 (correctiva de 20261015) | **Falta** |
+| `20261017000000_conta_ajuste_importe_notas_credito` | #904 (E6) | **Falta** |
 
 El procedimiento normal (más abajo) sólo admite migraciones de `main` (paso 1: «nada de PRs
-abiertos»). Las 10 de #904 **no** se aplican con él: hace falta la autorización expresa del
+abiertos»). Las 11 de #904 **no** se aplican con él: hace falta la autorización expresa del
 procedimiento acotado de la sección siguiente.
 
 ## Procedimiento ACOTADO para probar las migraciones de un PR abierto (requiere autorización)
@@ -61,11 +62,11 @@ deja datos sintéticos persistentes y A no.
 2. **Respaldo** en `respaldo_sync_AAAAMMDD` (paso 3 del procedimiento normal) y, además:
    - la **huella completa previa a #904** (`fingerprint.sql`), que es la referencia de la
      restauración;
-   - `pg_get_functiondef` y ACL de **cada** función que las 10 migraciones redefinen o eliminan, y
+   - `pg_get_functiondef` y ACL de **cada** función que las 11 migraciones redefinen o eliminan, y
      la definición de cada trigger, constraint y política que cambian (lista generada desde los
      archivos del SHA autorizado, no a mano);
    - las filas de `storage.buckets` y las políticas de `storage.objects`.
-3. **Las 10 migraciones del PR, en orden, una por transacción**, con el SQL **del SHA autorizado**
+3. **Las 11 migraciones del PR, en orden, una por transacción**, con el SQL **del SHA autorizado**
    (se registra el SHA), su fila en `supabase_migrations.schema_migrations` con la misma versión y
    nombre, y la huella esperada tras cada paso (calculada antes sobre una reconstrucción local de
    `main` + esas migraciones). Huella distinta → `ROLLBACK` de esa transacción y alto. Nada de
@@ -120,7 +121,7 @@ objetos sin su fila.
   el registro del paso 4 explica qué SHA está aplicado. Al fusionarse #904 se verifica el sha256
   (paso 4).
 - **R2 · Revertir por completo** (sólo sin pruebas B, o con autorización expresa para borrar sus
-  datos). Una transacción por migración, **de la última a la primera** (20261016 → 20261007):
+  datos). Una transacción por migración, **de la última a la primera** (20261017 → 20261007):
   1. restaurar desde el respaldo las funciones, triggers, constraints y políticas que esa
      migración redefinió, y volver a crear las que eliminó (p. ej. `conta_ajuste_aprobar(uuid,
      text, boolean)`, que 20261012 sustituyó);
@@ -134,7 +135,7 @@ objetos sin su fila.
   Al terminar, la huella del sandbox debe ser igual a la huella previa registrada en el paso 2.
 
 **Antes de pedir la autorización** falta (no está hecho): el guion de R2 generado desde los
-archivos del SHA autorizado y **probado en local** (cadena de `main` + 10 migraciones + R2 → huella
+archivos del SHA autorizado y **probado en local** (cadena de `main` + 11 migraciones + R2 → huella
 igual a la de `main`). Sin esa prueba no se propone R2: sólo R1.
 
 Alternativa sin cambio persistente: los pasos 3 y 5 dentro de UNA transacción que termina en
@@ -147,7 +148,7 @@ sandbox por quien la administra.
 Por separado, porque tienen efectos distintos:
 
 1. aplicar 20261005 y 20261006 (`main`) por el procedimiento normal;
-2. aplicar las 10 migraciones de #904 en el SHA que se indique (C, con R1 por defecto);
+2. aplicar las 11 migraciones de #904 en el SHA que se indique (C, con R1 por defecto);
 3. correr las pruebas A;
 4. correr las pruebas B, con los efectos persistentes y la limpieza descritos en el paso 6.
 

@@ -11,6 +11,7 @@
 --   19 · el estado de cuenta sigue cuadrando
 --   20 · confirmación tardía de un cobro sobre una cuota anulada o eliminada
 --   21 · reembolso total antes de aprobar; respuesta = estado persistido
+--   22 · E6: rebaja de importe (nota de crédito)
 -- ============================================================================
 \set ON_ERROR_STOP 1
 \set A    '''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''
@@ -60,6 +61,19 @@
 \set QS   '''c9a00000-0000-0000-0000-000000000024'''
 \set PR6  '''ad900000-0000-0000-0000-0000000000a6'''
 \set PR7  '''ad900000-0000-0000-0000-0000000000a7'''
+\set QW1  '''c9a00000-0000-0000-0000-000000000031'''
+\set QW2  '''c9a00000-0000-0000-0000-000000000032'''
+\set QW4  '''c9a00000-0000-0000-0000-000000000034'''
+\set QW5  '''c9a00000-0000-0000-0000-000000000035'''
+\set CW   '''ad000000-0000-0000-0000-000000000051'''
+\set TW1  '''5e0b0000-0000-0000-0000-000000000031'''
+\set TW2  '''5e0b0000-0000-0000-0000-000000000032'''
+\set TW4  '''5e0b0000-0000-0000-0000-000000000034'''
+\set TW5  '''5e0b0000-0000-0000-0000-000000000035'''
+\set TC1  '''5e0b0000-0000-0000-0000-000000000051'''
+\set TC2  '''5e0b0000-0000-0000-0000-000000000052'''
+\set KW1  '''cc0b0000-0000-0000-0000-000000000031'''
+\set AJB  '''11000000-0000-0000-0000-00000000a1b0'''
 
 -- ── 11 · superficie nueva ──────────────────────────────────────────────────
 SELECT public.chk(
@@ -614,4 +628,167 @@ SELECT public.chk_txt(
      FROM public.aj_aviso(:PP2, 'aprobado', 'webhook', 'evt-pp2-ok') r),
   'duplicado|true|true|true', '21 · PP2 (cobrado, con reembolsos parciales): su duplicado sí es conciliado, con pago y saldo');
 SELECT public.chk_txt(public.aj_pr(:PP2), 'succeeded/1/aplicado', '21 · el reembolso parcial no cambió el cobro');
+RESET ROLE;
+
+-- ── 22 · E6: rebaja de importe (nota de crédito) ───────────────────────────
+SET ROLE authenticated;
+-- Permisos y aislamiento.
+SELECT set_config('request.jwt.claim.sub', :VIS, false);
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_rebaja('5e0b0000-0000-0000-0000-0000000000f1', 'cuotas_condominio', 'c9a00000-0000-0000-0000-000000000031', 'principal', 10, 'SINT visor')$$,
+  'No autorizado', '22 · el visor contable no solicita rebajas');
+SELECT set_config('request.jwt.claim.sub', :ADB, false);
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_rebaja('5e0b0000-0000-0000-0000-0000000000f2', 'cuotas_condominio', 'c9a00000-0000-0000-0000-000000000031', 'principal', 10, 'SINT intruso')$$,
+  'no está en tu ámbito', '22 · otra empresa: la cuota no existe para ella');
+SELECT set_config('request.jwt.claim.sub', :CONT, false);
+-- Validaciones al solicitar: sólo rebajas, con tope.
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_rebaja('5e0b0000-0000-0000-0000-0000000000f3', 'cuotas_condominio', 'c9a00000-0000-0000-0000-000000000031', 'principal', -10, 'SINT aumento')$$,
+  'AJUSTE_IMPORTE', '22 · (b) un aumento no se admite: sólo rebajas');
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_rebaja('5e0b0000-0000-0000-0000-0000000000f4', 'cuotas_condominio', 'c9a00000-0000-0000-0000-000000000031', 'cargo', 10, 'SINT componente')$$,
+  'AJUSTE_COMPONENTE', '22 · una cuota se rebaja en principal o mora');
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_rebaja('5e0b0000-0000-0000-0000-0000000000f5', 'cuotas_condominio', 'c9a00000-0000-0000-0000-000000000031', 'principal', 100.01, 'SINT excede')$$,
+  'AJUSTE_REBAJA_EXCEDE_SALDO', '22 · (c) no más que el saldo pendiente');
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_rebaja('5e0b0000-0000-0000-0000-0000000000f6', 'cuotas_condominio', 'c9a00000-0000-0000-0000-000000000031', 'mora', 1, 'SINT sin mora')$$,
+  'AJUSTE_DEVENGO_PENDIENTE', '22 · sin mora devengada no hay mora que rebajar');
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar('5e0b0000-0000-0000-0000-0000000000f7', 'ajuste_importe', 'cuotas_condominio', 'c9a00000-0000-0000-0000-000000000031', 'SINT por la otra vía')$$,
+  'AJUSTE_TIPO', '22 · la rebaja sólo se pide por su RPC (con componente e importe)');
+-- Solicitar: no cambia nada; idempotente; una abierta por documento.
+SELECT public.chk_txt(
+  (SELECT r.estado || '/' || r.repetida FROM public.conta_ajuste_solicitar_rebaja(:TW1, 'cuotas_condominio', :QW1, 'principal', 30, 'SINT QW1 descuento por obra') r),
+  'pendiente/false', '22 · el contador solicita rebajar 30 de QW1');
+SELECT public.chk_txt(
+  (SELECT r.estado || '/' || r.repetida FROM public.conta_ajuste_solicitar_rebaja(:TW1, 'cuotas_condominio', :QW1, 'principal', 30, 'SINT QW1 descuento por obra') r),
+  'pendiente/true', '22 · la misma clave y los mismos datos: la misma solicitud');
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_rebaja('5e0b0000-0000-0000-0000-000000000031', 'cuotas_condominio', 'c9a00000-0000-0000-0000-000000000031', 'principal', 31, 'SINT QW1 descuento por obra')$$,
+  'AJUSTE_CLAVE_REUSADA', '22 · la misma clave con otro importe: rechazada');
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_rebaja('5e0b0000-0000-0000-0000-0000000000f8', 'cuotas_condominio', 'c9a00000-0000-0000-0000-000000000031', 'principal', 5, 'SINT segunda abierta')$$,
+  'AJUSTE_YA_SOLICITADO', '22 · una rebaja abierta por documento');
+SELECT public.chk_txt(public.aj_rebaja_saldo('cuotas_condominio', :QW1, 'principal')::text, '100.00', '22 · solicitar no cambia el saldo');
+-- Aprobar exige el permiso de autorizar (los cuatro ojos los prueba §16 para
+-- todo tipo de solicitud).
+SELECT public.chk_falla($$SELECT public.aj_aprobar_como('a0a0a0a0-0000-0000-0000-00000000000c', '5e0b0000-0000-0000-0000-000000000031')$$,
+  'No autorizado', '22 · el contador que la pidió no puede aprobarla');
+-- (a) Sin la cuenta especial no se ejecuta: fallida, nada escrito.
+SELECT public.chk_txt(public.aj_aprobar_como(:APR, :TW1), 'fallida/CONTA_CONFIG_INCOMPLETA',
+  '22 · sin cuenta de ajustes y bonificaciones: fallida');
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_notas_credito n WHERE n.cuota_id = :QW1), 0, '22 · …sin nota');
+SELECT public.chk_txt(public.aj_rebaja_saldo('cuotas_condominio', :QW1, 'principal')::text, '100.00', '22 · …ni saldo cambiado');
+RESET ROLE;
+INSERT INTO public.conta_mapeo_cuentas (company_id, project_id, evento, cuenta_id)
+VALUES (:A, :A1, 'ajustes_bonificaciones', :AJB);
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :APR, false);
+SELECT public.chk_txt((SELECT r.estado FROM public.conta_ajuste_reintentar(:TW1) r), 'ejecutada',
+  '22 · configurada la cuenta, el reintento ejecuta');
+SELECT public.chk_txt(public.aj_nota(:TW1), '30.00/100.00/principal/' || :APR,
+  '22 · nota: importe, saldo antes, componente y quién aprobó');
+SELECT public.chk_txt(public.aj_nota_lineas(:TW1),
+  'publicado|' || CURRENT_DATE || '|AJ-BONIF:D30.00:x:u:-,1-CXC-RES:H30.00:x:u:mantenimiento',
+  '22 · asiento de hoy: cargo a ajustes, abono a la CxC del devengo con su dimensión');
+SELECT public.chk_txt(public.aj_rebaja_saldo('cuotas_condominio', :QW1, 'principal')::text, '70.00', '22 · saldo neto 70');
+RESET ROLE;
+SELECT public.chk_txt(public.aj_cuota(:QW1) || '|' || (SELECT c.monto FROM public.cuotas_condominio c WHERE c.id = :QW1),
+  'emitida/1/0/-|100.00', '22 · el devengo y el importe del documento no se tocan');
+SET ROLE authenticated;
+SELECT public.chk_txt(public.aj_eventos(:TW1), 'solicitada,aprobada,fallida,reintento,ejecutada', '22 · bitácora completa');
+SELECT public.chk_falla($$UPDATE public.conta_notas_credito SET monto = 1 WHERE cuota_id = 'c9a00000-0000-0000-0000-000000000031'$$,
+  'permission denied', '22 · la aplicación no toca la nota');
+RESET ROLE;
+SELECT public.chk_falla($$UPDATE public.conta_notas_credito SET monto = 1 WHERE cuota_id = 'c9a00000-0000-0000-0000-000000000031'$$,
+  '', '22 · la nota es inmutable');
+SET ROLE authenticated;
+-- Visible: estado de cuenta, conciliación, portal.
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk(
+  (SELECT count(*) FROM jsonb_array_elements(public.conta_estado_cuenta(:A1, :UNO, NULL, NULL, NULL, 500, 0) -> 'movimientos') m
+    WHERE m ->> 'documento' LIKE 'Nota de crédito · cuota SINT QW1%' AND (m ->> 'abono')::numeric = 30
+      AND m ->> 'componente' = 'principal' AND m ->> 'cuota_id' = 'c9a00000-0000-0000-0000-000000000031'), 1,
+  '22 · el estado de cuenta muestra la nota como abono a la cuota');
+SELECT public.chk_txt(
+  (SELECT (c->>'cuadra') FROM public.conta_estado_cuenta_conciliacion(:A1, :UNO, NULL, NULL) c),
+  'true', '22 · la conciliación cuadra con la nota');
+SELECT set_config('request.jwt.claim.sub', :RUNO, false);
+SELECT public.chk_txt(
+  (SELECT d.saldo::text FROM public.portal_documentos_con_saldo() d WHERE d.documento_id = :QW1), '70.00',
+  '22 · el residente ve el saldo neto');
+SELECT set_config('request.jwt.claim.sub', :CONT, false);
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_rebaja('5e0b0000-0000-0000-0000-0000000000f9', 'cuotas_condominio', 'c9a00000-0000-0000-0000-000000000031', 'principal', 70.01, 'SINT tope nuevo')$$,
+  'AJUSTE_REBAJA_EXCEDE_SALDO', '22 · la siguiente rebaja ya topa en 70');
+-- Una nota viva impide anular la cuota (sin cascada).
+SELECT public.chk_txt(
+  (SELECT string_agg(d.dependencia, ',') FROM public.conta_ajuste_dependencias('anular_cuota', :QW1) d),
+  'nota_credito', '22 · dependencia: la nota de crédito');
+-- Un cobro posterior: sólo 70 a la CxC, 30 a favor.
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, monto, metodo, estado, verified_at) VALUES
+  (:KW1, :UNO, :A1, :QW1, 100, 'efectivo', 'verificado', now());
+RESET ROLE;
+SELECT public.chk_txt(
+  (SELECT string_agg(ap.evento || ':' || ap.monto, ',') FROM public.conta_cobro_aplicaciones ap WHERE ap.pago_id = :KW1),
+  'cuota_emitida:70.00', '22 · el cobro aplica a la CxC sólo el saldo neto');
+SELECT public.chk_txt(public.sf_origen(:KW1), 'excedente:30.00:30.00', '22 · el resto queda como saldo a favor');
+SELECT public.chk_txt(public.aj_cuota_neto(:QW1)::text, '0.00', '22 · la CxC de la cuota queda en 0, nunca negativa');
+SELECT public.chk_txt((SELECT c.cuota_estado FROM public.cuotas_condominio c WHERE c.id = :QW1), 'pagada', '22 · cuota pagada');
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt(
+  (SELECT (c->>'cuadra') FROM public.conta_estado_cuenta_conciliacion(:A1, :UNO, NULL, NULL) c),
+  'true', '22 · la conciliación sigue cuadrando tras el cobro');
+-- Mora: se rebaja la mora devengada.
+RESET ROLE;
+UPDATE public.cuotas_condominio SET mora_monto = 5 WHERE id = :QW2;
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :CONT, false);
+SELECT public.chk_txt(
+  (SELECT r.estado FROM public.conta_ajuste_solicitar_rebaja(:TW2, 'cuotas_condominio', :QW2, 'mora', 5, 'SINT QW2 condonar mora') r),
+  'pendiente', '22 · solicitar condonar la mora de QW2');
+SELECT public.chk_txt(public.aj_aprobar_como(:APR, :TW2), 'ejecutada', '22 · aprobada');
+SELECT public.chk_txt(public.aj_rebaja_saldo('cuotas_condominio', :QW2, 'mora') || '|' || public.aj_rebaja_saldo('cuotas_condominio', :QW2, 'principal'),
+  '0.00|40.00', '22 · mora en 0, principal intacto');
+-- Cargo adicional.
+SELECT public.chk_txt(
+  (SELECT r.estado FROM public.conta_ajuste_solicitar_rebaja(:TC1, 'cargos_adicionales_unidad', :CW, 'cargo', 20, 'SINT CW rebaja parcial') r),
+  'pendiente', '22 · solicitar rebajar 20 del cargo');
+SELECT public.chk_txt(public.aj_aprobar_como(:APR, :TC1), 'ejecutada', '22 · aprobada');
+SELECT public.chk_txt(public.aj_rebaja_saldo('cargos_adicionales_unidad', :CW, 'cargo')::text || '|' || public.aj_cargo(:CW),
+  '30.00|pendiente/1/0', '22 · cargo: saldo 30, sigue pendiente, devengo intacto');
+SELECT public.chk_txt(
+  (SELECT string_agg(d.dependencia, ',') FROM public.conta_ajuste_dependencias('anular_cargo', :CW) d),
+  'nota_credito', '22 · la nota impide anular el cargo');
+SELECT public.chk_txt(
+  (SELECT r.estado FROM public.conta_ajuste_solicitar_rebaja(:TC2, 'cargos_adicionales_unidad', :CW, 'cargo', 30, 'SINT CW rebaja del resto') r),
+  'pendiente', '22 · solicitar rebajar el resto');
+SELECT public.chk_txt(public.aj_aprobar_como(:APR, :TC2), 'ejecutada', '22 · aprobada');
+SELECT public.chk_txt(public.aj_rebaja_saldo('cargos_adicionales_unidad', :CW, 'cargo')::text || '|' || public.aj_cargo(:CW),
+  '0.00|pagado/1/0', '22 · cargo en 0: su estado derivado es pagado');
+-- (d) La mora posterior se calcula sobre el NETO, en los dos modos.
+SELECT public.chk_txt(
+  (SELECT r.estado FROM public.conta_ajuste_solicitar_rebaja(:TW4, 'cuotas_condominio', :QW4, 'principal', 40, 'SINT QW4 rebaja antes de mora') r),
+  'pendiente', '22 · QW4: rebaja 40');
+SELECT public.chk_txt(public.aj_aprobar_como(:APR, :TW4), 'ejecutada', '22 · aprobada');
+SELECT public.chk_txt(
+  (SELECT r.estado FROM public.conta_ajuste_solicitar_rebaja(:TW5, 'cuotas_condominio', :QW5, 'principal', 40, 'SINT QW5 rebaja antes de mora') r),
+  'pendiente', '22 · QW5: rebaja 40');
+SELECT public.chk_txt(public.aj_aprobar_como(:APR, :TW5), 'ejecutada', '22 · aprobada');
+RESET ROLE;
+UPDATE public.cuotas_condominio SET cuota_estado = 'vencida', emitida_at = now() - interval '40 days' WHERE id = :QW4;
+INSERT INTO public.reglas_mora_config (company_id, project_id, nombre, dias_vencimiento, tipo, valor, aplicar_sobre, periodo_gracia, activa, created_at)
+VALUES (:A, :A1, 'SINT 10% sobre el monto', 0, 'porcentaje', 10, 'monto_cuota', 0, true, now() - interval '1 minute');
+SELECT public.conta_aplicar_mora_cuotas();
+SELECT public.chk_txt((SELECT c.mora_monto::text FROM public.cuotas_condominio c WHERE c.id = :QW4), '6.00',
+  '22 · (d) monto_cuota: 10% de 60 (100 − rebaja 40), no de 100');
+-- saldo_vencido: QW5 vence ahora, con la regla nueva.
+UPDATE public.reglas_mora_config SET activa = false WHERE project_id = :A1 AND nombre LIKE 'SINT %';
+INSERT INTO public.reglas_mora_config (company_id, project_id, nombre, dias_vencimiento, tipo, valor, aplicar_sobre, periodo_gracia, activa)
+VALUES (:A, :A1, 'SINT 10% sobre el saldo', 0, 'porcentaje', 10, 'saldo_vencido', 0, true);
+UPDATE public.cuotas_condominio SET cuota_estado = 'vencida', emitida_at = now() - interval '40 days' WHERE id = :QW5;
+SELECT public.conta_aplicar_mora_cuotas();
+SELECT public.chk_txt((SELECT c.mora_monto::text FROM public.cuotas_condominio c WHERE c.id = :QW5), '6.00',
+  '22 · (d) saldo_vencido: 10% de 60 (saldo neto de la rebaja)');
+UPDATE public.reglas_mora_config SET activa = false WHERE project_id = :A1 AND nombre LIKE 'SINT %';
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt(
+  (SELECT (c->>'cuadra') FROM public.conta_estado_cuenta_conciliacion(:A1, :UNO, NULL, NULL) c),
+  'true', '22 · todo sigue cuadrando');
 RESET ROLE;

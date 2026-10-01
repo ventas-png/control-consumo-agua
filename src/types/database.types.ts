@@ -4411,6 +4411,7 @@ export type Database = {
           autoaprobada: boolean
           canal: string
           company_id: string
+          componente: string | null
           documento_id: string
           documento_tabla: string
           ejecucion_txid: number | null
@@ -4440,6 +4441,7 @@ export type Database = {
           autoaprobada?: boolean
           canal: string
           company_id: string
+          componente?: string | null
           documento_id: string
           documento_tabla: string
           ejecucion_txid?: number | null
@@ -4469,6 +4471,7 @@ export type Database = {
           autoaprobada?: boolean
           canal?: string
           company_id?: string
+          componente?: string | null
           documento_id?: string
           documento_tabla?: string
           ejecucion_txid?: number | null
@@ -5500,6 +5503,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      conta_notas_credito: {
+        Row: {
+          aprobado_por: string | null
+          asiento_id: string
+          cargo_adicional_id: string | null
+          cliente_id: string | null
+          company_id: string
+          componente: string
+          created_at: string
+          cuenta_ajuste_id: string
+          cuenta_cxc_id: string
+          cuota_id: string | null
+          id: string
+          moneda: string
+          monto: number
+          motivo: string
+          project_id: string
+          saldo_antes: number
+          solicitado_por: string
+          solicitud_id: string
+          unidad_id: string | null
+        }
+        Insert: {
+          aprobado_por?: string | null
+          asiento_id: string
+          cargo_adicional_id?: string | null
+          cliente_id?: string | null
+          company_id: string
+          componente: string
+          created_at?: string
+          cuenta_ajuste_id: string
+          cuenta_cxc_id: string
+          cuota_id?: string | null
+          id?: string
+          moneda: string
+          monto: number
+          motivo: string
+          project_id: string
+          saldo_antes: number
+          solicitado_por: string
+          solicitud_id: string
+          unidad_id?: string | null
+        }
+        Update: {
+          aprobado_por?: string | null
+          asiento_id?: string
+          cargo_adicional_id?: string | null
+          cliente_id?: string | null
+          company_id?: string
+          componente?: string
+          created_at?: string
+          cuenta_ajuste_id?: string
+          cuenta_cxc_id?: string
+          cuota_id?: string | null
+          id?: string
+          moneda?: string
+          monto?: number
+          motivo?: string
+          project_id?: string
+          saldo_antes?: number
+          solicitado_por?: string
+          solicitud_id?: string
+          unidad_id?: string | null
+        }
+        Relationships: []
       }
       conta_saldo_favor_aplicaciones: {
         Row: {
@@ -24040,6 +24109,17 @@ export type Database = {
           p_motivo: string
           p_saldo_origen_id?: string
           p_tipo: string
+        }
+        Returns: { estado: string; repetida: boolean; solicitud_id: string }[]
+      }
+      conta_ajuste_solicitar_rebaja: {
+        Args: {
+          p_componente: string
+          p_documento_id: string
+          p_documento_tabla: string
+          p_id: string
+          p_importe: number
+          p_motivo: string
         }
         Returns: { estado: string; repetida: boolean; solicitud_id: string }[]
       }

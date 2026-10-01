@@ -18,6 +18,12 @@
 // informadas: nada se anula en cascada); cada solicitud admite RESPALDO
 // documental (bucket privado `ajustes-respaldos`) mientras está pendiente, y
 // quien aprueba declara qué respaldos revisó.
+//
+// 20261017000000 (E6): REBAJAR el importe de una cuota (principal o mora) o de
+// un cargo adicional también se solicita (conta_ajuste_solicitar_rebaja). Sólo
+// rebajas, con tope en el saldo pendiente del componente; al aprobarse queda
+// una NOTA DE CRÉDITO contra la cuenta especial «ajustes y bonificaciones». El
+// importe del documento y su devengo no cambian: baja su saldo.
 // ════════════════════════════════════════════════════════════════════════════
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -32,6 +38,10 @@ export type TipoAjuste =
   | 'revertir_aplicacion_saldo_favor'
   | 'aplicar_saldo_favor'
   | 'anular_cuota'
+  | 'ajuste_importe'
+
+/** Qué se rebaja (ajuste_importe). */
+export type ComponenteRebaja = 'principal' | 'mora' | 'cargo'
 
 export type EstadoAjuste = 'pendiente' | 'rechazada' | 'cancelada' | 'ejecutada' | 'fallida'
 
@@ -68,6 +78,8 @@ export interface SolicitudAjuste {
   intentos_ejecucion: number
   /** Respaldos que declaró haber revisado quien aprobó o rechazó. */
   respaldos_revisados?: Array<Record<string, unknown>> | null
+  /** ajuste_importe: componente rebajado. */
+  componente?: ComponenteRebaja | null
 }
 
 export interface RespaldoAjuste {
@@ -89,7 +101,7 @@ export interface RespaldoAjuste {
 /** Lo que impide anular un documento (conta_ajuste_dependencias). */
 export interface DependenciaAjuste {
   dependencia: 'cobro' | 'aplicacion_saldo_favor' | 'cobro_en_linea' | 'solicitud_aplicacion'
-             | 'devengo_borrador' | 'devengo_pendiente'
+             | 'devengo_borrador' | 'devengo_pendiente' | 'nota_credito' | 'solicitud_rebaja'
   id: string
   monto: number | null
   estado: string | null
@@ -123,6 +135,13 @@ export const ETIQUETA_TIPO_AJUSTE: Record<TipoAjuste, string> = {
   revertir_aplicacion_saldo_favor: 'Revertir aplicación de saldo a favor',
   aplicar_saldo_favor: 'Aplicar saldo a favor',
   anular_cuota: 'Anular cuota',
+  ajuste_importe: 'Rebajar importe (nota de crédito)',
+}
+
+export const ETIQUETA_COMPONENTE_REBAJA: Record<ComponenteRebaja, string> = {
+  principal: 'principal',
+  mora: 'mora',
+  cargo: 'cargo',
 }
 
 export const ETIQUETA_ESTADO_AJUSTE: Record<EstadoAjuste, string> = {
@@ -265,7 +284,7 @@ function useInvalidarAjustes(companyId?: string) {
 export interface SolicitarAjusteInput {
   /** Clave de idempotencia: la misma en cada reintento del mismo formulario. */
   clave: string
-  tipo: Exclude<TipoAjuste, 'aplicar_saldo_favor'>
+  tipo: Exclude<TipoAjuste, 'aplicar_saldo_favor' | 'ajuste_importe'>
   documentoTabla: TablaAjuste
   documentoId: string
   motivo: string
@@ -286,6 +305,48 @@ export async function solicitarAjuste(input: SolicitarAjusteInput): Promise<Resu
         p_tipo: input.tipo,
         p_documento_tabla: input.documentoTabla,
         p_documento_id: input.documentoId,
+        p_motivo: input.motivo,
+      })
+      .abortSignal(signal),
+  )
+  if (!filas || filas.length !== 1) throw new Error('El servidor no devolvió la solicitud.')
+  return filas[0]
+}
+
+/**
+ * Importe de una rebaja escrito por el usuario → número, o el motivo por el
+ * que no vale. Sólo rebajas (positivo) con dos decimales como máximo; el tope
+ * (saldo pendiente) lo aplica el servidor al solicitar y otra vez al aprobar.
+ */
+export function leerImporteRebaja(texto: string): { importe: number } | { error: string } {
+  const limpio = texto.trim().replace(/\s/g, '').replace(',', '.')
+  if (!/^\d+(\.\d{1,2})?$/.test(limpio)) {
+    return { error: 'Escribe un importe positivo con dos decimales como máximo (sólo se admiten rebajas).' }
+  }
+  const importe = Number(limpio)
+  if (!(importe > 0)) return { error: 'El importe de la rebaja debe ser mayor que 0.' }
+  return { importe }
+}
+
+export interface SolicitarRebajaInput {
+  clave: string
+  documentoTabla: 'cuotas_condominio' | 'cargos_adicionales_unidad'
+  documentoId: string
+  componente: ComponenteRebaja
+  importe: number
+  motivo: string
+}
+
+/** Solicita una rebaja de importe (no cambia nada hasta que otra persona la apruebe). */
+export async function solicitarRebaja(input: SolicitarRebajaInput): Promise<ResultadoSolicitud> {
+  const filas = await runQuery<ResultadoSolicitud[]>((signal) =>
+    supabase
+      .rpc('conta_ajuste_solicitar_rebaja', {
+        p_id: input.clave,
+        p_documento_tabla: input.documentoTabla,
+        p_documento_id: input.documentoId,
+        p_componente: input.componente,
+        p_importe: input.importe,
         p_motivo: input.motivo,
       })
       .abortSignal(signal),
