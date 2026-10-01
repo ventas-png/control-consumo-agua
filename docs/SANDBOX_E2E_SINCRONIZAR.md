@@ -12,6 +12,17 @@ pendientes de #887 hubo que retirarlo (a3a6829b) en vez de relajarlo. Este
 documento es el procedimiento con el que se puso al día el 2026-09-23 y el que
 hay que repetir.
 
+## Aplicación por workflow (apply-migrations-sandbox.yml)
+
+Desde que existe `.github/workflows/apply-migrations-sandbox.yml`, el sandbox se sincroniza con `workflow_dispatch`, **una
+migración por corrida** (`migration_file`, nombre suelto) y **en orden estricto** (sólo la menor versión pendiente del
+historial del sandbox). Proyecto fijado en el archivo (`jwpmivhvlstslncrtokb`) y verificado por nombre antes de escribir; sin
+`push` ni `schedule`; `MAX_APPLY` queda en 10 y no se sube; sin reset, sin recrear y sin reparar el historial en bloque. Registro
+en `schema_migrations` fail-closed, igual que producción. Requiere el secret `SUPABASE_ACCESS_TOKEN` con acceso al proyecto
+sandbox (Environment `sandbox-db` o secret de repositorio). Tras cada corrida se comprueba la huella del sandbox contra la
+reconstrucción local excluyendo los 8 grupos de la sección anterior.
+
+
 ## Estado registrado (re-verificado el 2026-10-01 con el head `2da9f44e` de #904, sólo lectura)
 
 `jwpmivhvlstslncrtokb` = «control-agua-rls-sandbox» (organización `mmqkhtbewmdashgswlxg`, creado el
