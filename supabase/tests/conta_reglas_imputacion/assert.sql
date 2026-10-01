@@ -784,14 +784,17 @@ VALUES ('0c000000-0000-0000-0000-000000000001', :A::uuid, NULL,
 
 INSERT INTO public.orden_compra_lineas
   (id, company_id, orden_compra_id, linea, descripcion, categoria,
-   cantidad, precio_unitario, cantidad_recibida)
+   cantidad, precio_unitario, cantidad_recibida, iva_monto)
 VALUES ('0c100000-0000-0000-0000-000000000001', :A::uuid,
-        '0c000000-0000-0000-0000-000000000001', 1, 'Material', 'otros', 10, 50, 10);
+        '0c000000-0000-0000-0000-000000000001', 1, 'Material', 'otros', 10, 50, 10, 80);
 
 -- Las líneas sólo se cargan con la orden en borrador (20260821000100); ya
 -- cargada, la orden pasa a recibida como en el riel real.
+-- Fixture: simula la recepción sin pasar por el riel (el servidor ya no admite marcar «recibida» a mano).
+SELECT set_config('conta.allow_system_write', 'on', false);
 UPDATE public.ordenes_compra SET estado = 'recibida'
  WHERE id = '0c000000-0000-0000-0000-000000000001';
+SELECT set_config('conta.allow_system_write', 'off', false);
 
 -- Neto 500 = 10 × 50, exactamente lo recibido al precio de la orden: sin
 -- variación y sin resto. IVA 80 aparte.

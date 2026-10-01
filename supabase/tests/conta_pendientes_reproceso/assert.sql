@@ -267,10 +267,13 @@ INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, pro
 VALUES ('0c000000-0000-0000-0000-000000000001', :A::uuid, NULL,
         'd0000000-0000-0000-0000-00000000a001', 'Proveedor A', 'Compra recibida', 'borrador');
 INSERT INTO public.orden_compra_lineas
-  (id, company_id, orden_compra_id, linea, descripcion, categoria, cantidad, precio_unitario, cantidad_recibida)
+  (id, company_id, orden_compra_id, linea, descripcion, categoria, cantidad, precio_unitario, cantidad_recibida, iva_monto)
 VALUES ('0c100000-0000-0000-0000-000000000001', :A::uuid,
-        '0c000000-0000-0000-0000-000000000001', 1, 'Material', 'otros', 10, 50, 10);
+        '0c000000-0000-0000-0000-000000000001', 1, 'Material', 'otros', 10, 50, 10, 80);
+-- Fixture: simula la recepción sin pasar por el riel (el servidor ya no admite marcar «recibida» a mano).
+SELECT set_config('conta.allow_system_write', 'on', false);
 UPDATE public.ordenes_compra SET estado = 'recibida' WHERE id = '0c000000-0000-0000-0000-000000000001';
+SELECT set_config('conta.allow_system_write', 'off', false);
 
 SELECT public.factura(:F8, 'GR/IR íntegra', 580, 0, '0c000000-0000-0000-0000-000000000001');
 SELECT public.linea(:F8, 1, 10, 50, NULL, '0c100000-0000-0000-0000-000000000001', 80);
