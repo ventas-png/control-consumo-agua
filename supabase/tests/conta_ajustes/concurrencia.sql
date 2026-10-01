@@ -89,3 +89,16 @@ SELECT public.chk(
   'Q · dos aprobaciones a la vez: UNA nota');
 SELECT public.chk_txt(public.aj_rebaja_saldo('cuotas_condominio', 'c9a00000-0000-0000-0000-000000000037', 'principal')::text,
   '30.00', 'Q · se rebajó una sola vez');
+
+-- E8: resolución manual contra aviso del proveedor, y doble aprobación.
+SELECT public.chk_txt(public.aj_pr('ad900000-0000-0000-0000-0000000000b8') || '|' || public.aj_cuota('c9a00000-0000-0000-0000-000000000055'),
+  'succeeded/1/aplicado|pagada/1/0/-', 'S · resolución manual contra el aviso: UN pago');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pagos p WHERE p.cuota_id = 'c9a00000-0000-0000-0000-000000000055'), 1,
+  'S · una sola acreditación de la cuota');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pagos p WHERE p.cuota_id = 'c9a00000-0000-0000-0000-000000000056'), 1,
+  'T · dos aprobaciones a la vez: UN pago');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pasarela_eventos e WHERE e.payment_request_id = 'ad900000-0000-0000-0000-0000000000b9' AND e.origen = 'manual'), 1,
+  'T · un solo aviso manual como evidencia');

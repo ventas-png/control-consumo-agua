@@ -28,6 +28,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
+import { confirmarPago } from '../portal/mutations'
 import { contabilidadKeys } from './keys'
 import { BUCKET_RESPALDOS_AJUSTE } from '../shared/buckets'
 
@@ -39,6 +40,7 @@ export type TipoAjuste =
   | 'aplicar_saldo_favor'
   | 'anular_cuota'
   | 'ajuste_importe'
+  | 'resolver_cobro_en_linea'
 
 /** Qué se rebaja (ajuste_importe). */
 export type ComponenteRebaja = 'principal' | 'mora' | 'cargo'
@@ -50,6 +52,7 @@ export type TablaAjuste =
   | 'pagos'
   | 'conta_saldo_favor_aplicaciones'
   | 'cuotas_condominio'
+  | 'payment_requests'
 
 export interface SolicitudAjuste {
   id: string
@@ -59,6 +62,8 @@ export interface SolicitudAjuste {
   documento_tabla: TablaAjuste
   documento_id: string
   saldo_origen_id: string | null
+  /** resolver_cobro_en_linea: lo que el proveedor hizo (E8). */
+  resolucion?: 'cobrado' | 'no_cobrado' | null
   importe: number | null
   moneda: string | null
   motivo: string
@@ -115,7 +120,7 @@ export interface IncidenciaConciliacion {
   project_id: string | null
   tipo: 'reembolso_bloqueado' | 'reembolso_aplicado' | 'rechazo_tras_aprobacion'
       | 'aprobado_tras_reembolso' | 'reembolso_sin_cobro' | 'reembolso_parcial'
-      | 'cobro_sobre_documento_anulado'
+      | 'cobro_sobre_documento_anulado' | 'cobro_sin_confirmar'
   estado: 'abierta' | 'resuelta'
   payment_request_id: string | null
   pago_id: string | null
@@ -136,6 +141,7 @@ export const ETIQUETA_TIPO_AJUSTE: Record<TipoAjuste, string> = {
   aplicar_saldo_favor: 'Aplicar saldo a favor',
   anular_cuota: 'Anular cuota',
   ajuste_importe: 'Rebajar importe (nota de crédito)',
+  resolver_cobro_en_linea: 'Resolver cobro en línea sin confirmar',
 }
 
 export const ETIQUETA_COMPONENTE_REBAJA: Record<ComponenteRebaja, string> = {
@@ -160,6 +166,7 @@ export const ETIQUETA_INCIDENCIA: Record<IncidenciaConciliacion['tipo'], string>
   reembolso_sin_cobro: 'Reembolso sin cobro acreditado',
   reembolso_parcial: 'Reembolso parcial por conciliar',
   cobro_sobre_documento_anulado: 'Cobro confirmado sobre cuota anulada (sin acreditar)',
+  cobro_sin_confirmar: 'Cobro en línea sin confirmar (no se libera por fecha)',
 }
 
 /**
@@ -284,7 +291,7 @@ function useInvalidarAjustes(companyId?: string) {
 export interface SolicitarAjusteInput {
   /** Clave de idempotencia: la misma en cada reintento del mismo formulario. */
   clave: string
-  tipo: Exclude<TipoAjuste, 'aplicar_saldo_favor' | 'ajuste_importe'>
+  tipo: Exclude<TipoAjuste, 'aplicar_saldo_favor' | 'ajuste_importe' | 'resolver_cobro_en_linea'>
   documentoTabla: TablaAjuste
   documentoId: string
   motivo: string
@@ -353,6 +360,43 @@ export async function solicitarRebaja(input: SolicitarRebajaInput): Promise<Resu
   )
   if (!filas || filas.length !== 1) throw new Error('El servidor no devolvió la solicitud.')
   return filas[0]
+}
+
+export interface SolicitarResolucionCobroInput {
+  clave: string
+  paymentRequestId: string
+  resolucion: 'cobrado' | 'no_cobrado'
+  motivo: string
+}
+
+/**
+ * E8 (20261019000000): solicita resolver a mano un cobro en línea sin
+ * confirmar (el proveedor cobró / no cobró). Antes de aprobarse exige respaldo
+ * (captura del panel del proveedor) y la aprueba otra persona; se ejecuta como
+ * un aviso del proveedor (origen manual).
+ */
+export async function solicitarResolucionCobro(input: SolicitarResolucionCobroInput): Promise<ResultadoSolicitud> {
+  const filas = await runQuery<ResultadoSolicitud[]>((signal) =>
+    supabase
+      .rpc('conta_ajuste_solicitar_resolucion_cobro', {
+        p_id: input.clave,
+        p_payment_request_id: input.paymentRequestId,
+        p_resolucion: input.resolucion,
+        p_motivo: input.motivo,
+      })
+      .abortSignal(signal),
+  )
+  if (!filas || filas.length !== 1) throw new Error('El servidor no devolvió la solicitud.')
+  return filas[0]
+}
+
+/**
+ * E8: consulta manual al proveedor (confirm-charge). Sólo un estado FINAL del
+ * proveedor libera o acredita; «pendiente» no cambia nada.
+ */
+export async function consultarCobroAlProveedor(paymentRequestId: string): Promise<{ estado: string | null; error: string | null }> {
+  const r = await confirmarPago(paymentRequestId)
+  return { estado: r.estado, error: r.error }
 }
 
 export interface ResultadoCancelarReserva {

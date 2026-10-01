@@ -302,7 +302,8 @@ Deno.serve(async (req) => {
       // rechazar el cobro y, si está bloqueado (saldo a favor ya aplicado), el
       // evento se CONSERVA con una incidencia abierta: nunca se descarta. Un
       // reembolso PARCIAL se registra aparte (20261012000000), sin rechazar.
-      if (event.type === 'payment_intent.payment_failed' || event.type === 'charge.refunded') {
+      if (event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled'
+          || event.type === 'charge.refunded') {
         const obj = event.data.object as {
           id: string; payment_intent?: string | null; refunded?: boolean
           amount_refunded?: number | null; currency?: string | null

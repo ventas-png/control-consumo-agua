@@ -13,6 +13,7 @@
 --   21 · reembolso total antes de aprobar; respuesta = estado persistido
 --   22 · E6: rebaja de importe (nota de crédito)
 --   23 · E7: cancelar la reserva anula su tarifa
+--   24 · E8: cobros abandonados (cron) y resolución manual con respaldo
 -- ============================================================================
 \set ON_ERROR_STOP 1
 \set A    '''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''
@@ -890,4 +891,124 @@ SELECT set_config('request.jwt.claim.sub', :ADM, false);
 SELECT public.chk_txt(
   (SELECT (c->>'cuadra') FROM public.conta_estado_cuenta_conciliacion(:A1, :UNO, NULL, NULL) c),
   'true', '23 · el estado de cuenta sigue cuadrando');
+RESET ROLE;
+
+-- ── 24 · E8: cobros abandonados y resolución manual ────────────────────────
+\set PB1 '''ad900000-0000-0000-0000-0000000000b1'''
+\set PB2 '''ad900000-0000-0000-0000-0000000000b2'''
+\set PB3 '''ad900000-0000-0000-0000-0000000000b3'''
+\set PB4 '''ad900000-0000-0000-0000-0000000000b4'''
+\set PB5 '''ad900000-0000-0000-0000-0000000000b5'''
+\set PB6 '''ad900000-0000-0000-0000-0000000000b6'''
+\set PB7 '''ad900000-0000-0000-0000-0000000000b7'''
+\set QX1 '''c9a00000-0000-0000-0000-000000000051'''
+\set QX2 '''c9a00000-0000-0000-0000-000000000052'''
+\set QX3 '''c9a00000-0000-0000-0000-000000000053'''
+\set QX4 '''c9a00000-0000-0000-0000-000000000054'''
+\set SA1 '''5e0b0000-0000-0000-0000-0000000000a1'''
+\set SA2 '''5e0b0000-0000-0000-0000-0000000000a2'''
+\set SA3 '''5e0b0000-0000-0000-0000-0000000000a3'''
+RESET ROLE;
+SELECT public.chk(public.reconciliar_payment_requests_pendientes(), 2,
+  '24 · el cron consulta PB2 (1 h) y PB3 (24 h); no a quienes ya llevan 2 consultas');
+SELECT public.chk_txt(
+  (SELECT pr.estado || '|' || pr.consultas_auto FROM public.payment_requests pr WHERE pr.id = :PB1),
+  'failed|0', '24 · sin NINGUNA referencia tras 24 h: failed');
+SELECT public.chk_txt(
+  (SELECT pr.estado || '|' || pr.consultas_auto FROM public.payment_requests pr WHERE pr.id = :PB2),
+  'pending|1', '24 · con referencia, 1.ª consulta: sigue pending');
+SELECT public.chk_txt(
+  (SELECT pr.estado || '|' || pr.consultas_auto FROM public.payment_requests pr WHERE pr.id = :PB3),
+  'pending|2', '24 · con referencia, 2.ª consulta: sigue pending, NO se libera por antigüedad');
+SELECT public.chk(
+  (SELECT count(*) FROM public.payment_requests pr WHERE pr.id IN (:PB4, :PB5, :PB6, :PB7) AND pr.estado = 'pending'), 4,
+  '24 · los de 26 h con 2 consultas siguen pending (nunca failed por edad)');
+SELECT public.chk_txt(public.aj_incidencias(:PB4), 'cobro_sin_confirmar:abierta', '24 · incidencia visible tras las 2 consultas');
+SELECT public.chk_txt(public.aj_incidencias(:PB2), '', '24 · sin incidencia mientras quedan consultas');
+SELECT public.reconciliar_payment_requests_pendientes();
+SELECT public.reconciliar_payment_requests_pendientes();
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_incidencias_conciliacion i WHERE i.payment_request_id = :PB4 AND i.tipo = 'cobro_sin_confirmar'), 1,
+  '24 · repetir el cron no duplica la incidencia');
+SELECT public.chk_txt((SELECT pr.consultas_auto::text FROM public.payment_requests pr WHERE pr.id = :PB4), '2',
+  '24 · el cron no vuelve a consultar al agotar las dos');
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_txt(public.aj_cuota(:QX1), 'emitida/1/0/-', '24 · QX1 sigue viva y su cobro la bloquea');
+SELECT public.chk_falla($$SELECT public.aj_aviso('ad900000-0000-0000-0000-0000000000b4', 'aprobado', 'manual', 'manual:x')$$,
+  '', '24 · origen manual rechazado fuera de la ejecución');
+SELECT public.chk_txt(public.aj_pr(:PB4), 'pending/0/-', '24 · …y no hizo nada');
+SELECT set_config('request.jwt.claim.sub', :VIS, false);
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_resolucion_cobro('5e0b0000-0000-0000-0000-0000000000a1', 'ad900000-0000-0000-0000-0000000000b4', 'cobrado', 'SINT visitante')$$,
+  'No autorizado', '24 · quien no puede solicitar ajustes, no solicita');
+SELECT set_config('request.jwt.claim.sub', :ADB, false);
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_resolucion_cobro('5e0b0000-0000-0000-0000-0000000000a1', 'ad900000-0000-0000-0000-0000000000b4', 'cobrado', 'SINT otra empresa')$$,
+  'no existe o no está en tu ámbito', '24 · otra empresa no ve el cobro');
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_resolucion_cobro('5e0b0000-0000-0000-0000-0000000000a1', 'ad900000-0000-0000-0000-0000000000b4', 'quizas', 'SINT resolución')$$,
+  'AJUSTE_RESOLUCION', '24 · la resolución es cobrado o no_cobrado');
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_resolucion_cobro('5e0b0000-0000-0000-0000-0000000000a1', 'ad900000-0000-0000-0000-0000000000b4', 'cobrado', 'x')$$,
+  'AJUSTE_MOTIVO', '24 · exige motivo');
+SELECT public.chk_txt(
+  (SELECT r.estado FROM public.conta_ajuste_solicitar_resolucion_cobro(:SA1, :PB4, 'cobrado', 'SINT el banco confirma el cargo') r),
+  'pendiente', '24 · solicitud de resolución');
+SELECT public.chk_txt(
+  (SELECT r.repetida::text FROM public.conta_ajuste_solicitar_resolucion_cobro(:SA1, :PB4, 'cobrado', 'SINT el banco confirma el cargo') r),
+  'true', '24 · idempotente por clave');
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_resolucion_cobro('5e0b0000-0000-0000-0000-0000000000f9', 'ad900000-0000-0000-0000-0000000000b4', 'no_cobrado', 'SINT otra distinta')$$,
+  'AJUSTE_YA_SOLICITADO', '24 · una sola solicitud abierta por cobro');
+SELECT public.conta_ajuste_solicitar_resolucion_cobro('5e0b0000-0000-0000-0000-0000000000a4', :PB7, 'no_cobrado', 'SINT sin respaldo');
+SELECT public.chk_txt(public.aj_aprobar_como(:APR, '5e0b0000-0000-0000-0000-0000000000a4'), 'fallida/AJUSTE_RESPALDO_REQUERIDO', '24 · sin respaldo no se aprueba');
+SELECT public.chk_txt(public.aj_pr(:PB7), 'pending/0/-', '24 · …y el cobro no cambió');
+-- Con respaldo y por otra persona.
+SELECT public.aj_subir('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/5e0b0000-0000-0000-0000-0000000000a1/estado-banco.pdf');
+SELECT public.conta_ajuste_adjuntar_respaldo('4e0b0000-0000-0000-0000-0000000000a1', :SA1,
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/5e0b0000-0000-0000-0000-0000000000a1/estado-banco.pdf', 'Estado del banco', repeat('cd', 32));
+SELECT public.chk_falla($$SELECT public.aj_aprobar_con('a0a0a0a0-0000-0000-0000-00000000000a', '5e0b0000-0000-0000-0000-0000000000a1', '{4e0b0000-0000-0000-0000-0000000000a1}')$$,
+  '', '24 · quien solicitó no aprueba (cuatro ojos)');
+SELECT public.chk_txt(public.aj_aprobar_con(:APR, :SA1, '{4e0b0000-0000-0000-0000-0000000000a1}'), 'ejecutada', '24 · otra persona aprueba: se ejecuta');
+RESET ROLE;
+SELECT public.chk_txt(public.aj_pr(:PB4), 'succeeded/1/aplicado', '24 · «cobrado»: se acredita UN pago, como un aviso del proveedor');
+SELECT public.chk_txt(public.aj_incidencias(:PB4), 'cobro_sin_confirmar:resuelta', '24 · la incidencia queda resuelta');
+SELECT public.chk(
+  (SELECT count(*) FROM public.pasarela_eventos e WHERE e.payment_request_id = :PB4 AND e.origen = 'manual'), 1,
+  '24 · el aviso manual queda como evidencia (origen manual)');
+-- No cobrado.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.conta_ajuste_solicitar_resolucion_cobro(:SA2, :PB5, 'no_cobrado', 'SINT el cliente canceló en el banco');
+SELECT public.aj_subir('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/5e0b0000-0000-0000-0000-0000000000a2/carta.pdf');
+SELECT public.conta_ajuste_adjuntar_respaldo('4e0b0000-0000-0000-0000-0000000000a2', :SA2,
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/5e0b0000-0000-0000-0000-0000000000a2/carta.pdf', 'Carta del banco', repeat('ef', 32));
+SELECT public.chk_falla(format($$SELECT * FROM public.conta_incidencia_resolver(%L, 'SINT descartar a mano')$$,
+  (SELECT i.id FROM public.conta_incidencias_conciliacion i WHERE i.payment_request_id = 'ad900000-0000-0000-0000-0000000000b5' AND i.tipo = 'cobro_sin_confirmar')),
+  'INCIDENCIA_COBRO_PENDIENTE', '24 · la incidencia de un cobro pendiente no se descarta a mano');
+SELECT public.chk_txt(public.aj_aprobar_con(:APR, :SA2, '{4e0b0000-0000-0000-0000-0000000000a2}'), 'ejecutada', '24 · «no cobrado»: se ejecuta');
+RESET ROLE;
+SELECT public.chk_txt(public.aj_pr(:PB5), 'failed/0/-', '24 · «no cobrado»: failed, sin pago');
+SELECT public.chk_txt(public.aj_incidencias(:PB5), 'cobro_sin_confirmar:resuelta', '24 · incidencia resuelta');
+-- Cobrado sobre una cuota anulada: se retiene, no se acredita.
+-- Anulación del fixture sin pasar por el flujo (sólo para preparar el caso).
+SET session_replication_role = replica;
+UPDATE public.cuotas_condominio SET cuota_estado = 'anulada', anulada_at = now() WHERE id = :QX3;
+SET session_replication_role = origin;
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.conta_ajuste_solicitar_resolucion_cobro(:SA3, :PB6, 'cobrado', 'SINT cobrado tras anular');
+SELECT public.aj_subir('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/5e0b0000-0000-0000-0000-0000000000a3/e.pdf');
+SELECT public.conta_ajuste_adjuntar_respaldo('4e0b0000-0000-0000-0000-0000000000a3', :SA3,
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/5e0b0000-0000-0000-0000-0000000000a3/e.pdf', 'Estado', repeat('12', 32));
+SELECT public.chk_txt(public.aj_aprobar_con(:APR, :SA3, '{4e0b0000-0000-0000-0000-0000000000a3}'), 'ejecutada', '24 · cobrado sobre anulada: se ejecuta');
+RESET ROLE;
+SELECT public.chk(
+  (SELECT count(*) FROM public.pagos p WHERE p.payment_request_id = :PB6), 0,
+  '24 · cobrado sobre una cuota anulada: ningún pago');
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_incidencias_conciliacion i WHERE i.payment_request_id = :PB6 AND i.tipo = 'cobro_sobre_documento_anulado'), 1,
+  '24 · …con su incidencia de cobro sobre documento anulado');
+-- Un cobro ya resuelto por el proveedor no admite resolución manual.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :ADM, false);
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_resolucion_cobro('5e0b0000-0000-0000-0000-0000000000f8', 'ad900000-0000-0000-0000-0000000000b4', 'cobrado', 'SINT ya cobrado')$$,
+  'AJUSTE_DOCUMENTO_CAMBIO', '24 · un cobro ya resuelto no admite otra resolución');
 RESET ROLE;

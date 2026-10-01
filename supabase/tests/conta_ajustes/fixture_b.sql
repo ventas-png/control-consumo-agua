@@ -260,3 +260,55 @@ GRANT EXECUTE ON FUNCTION public.aj_cuota(uuid), public.aj_cobro_cuota(uuid, num
   public.aj_rechazar_cobro(uuid), public.aj_reembolso(uuid, text, numeric, text), public.aj_reembolsos(uuid),
   public.aj_subir(text, text)
   TO authenticated;
+
+-- ── E8: cobros en línea abandonados (20261019000000)
+--   PN1 sin referencia, 30 h        → el cron lo marca failed
+--   PN2 con referencia, 2 h         → 1.ª consulta
+--   PN3 con referencia, 30 h, 1 consulta → 2.ª consulta
+--   PN4 con referencia, 26 h, 2 consultas → incidencia, NO failed
+--   PN5 con referencia, 26 h, 2 consultas, cobro de 30 días ya failed → intacto
+--   QX1 (cobrado), QX2 (no cobrado), QX3 (cobrado sobre cuota anulada), QX4 (dos aprobaciones a la vez)
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, cuota_estado) VALUES
+  ('c9a00000-0000-0000-0000-000000000051', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QX1 resolución cobrado', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000052', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QX2 resolución no cobrado', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000053', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QX3 cobrado sobre anulada', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000054', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QX4 dos aprobaciones', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida');
+INSERT INTO public.payment_requests (id, cliente_id, cuota_id, company_id, monto, provider, estado, provider_ref, ambiente, created_at, consultas_auto) VALUES
+  ('ad900000-0000-0000-0000-0000000000b1', 'e0000000-0000-0000-0000-00000000a001', NULL, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', NULL, 'prod', now() - interval '30 hours', 0),
+  ('ad900000-0000-0000-0000-0000000000b2', 'e0000000-0000-0000-0000-00000000a001', NULL, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_n2', 'prod', now() - interval '2 hours', 0),
+  ('ad900000-0000-0000-0000-0000000000b3', 'e0000000-0000-0000-0000-00000000a001', NULL, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_n3', 'prod', now() - interval '30 hours', 1),
+  ('ad900000-0000-0000-0000-0000000000b4', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000051', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_n4', 'prod', now() - interval '26 hours', 2),
+  ('ad900000-0000-0000-0000-0000000000b5', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000052', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_n5', 'prod', now() - interval '26 hours', 2),
+  ('ad900000-0000-0000-0000-0000000000b6', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000053', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_n6', 'prod', now() - interval '26 hours', 2),
+  ('ad900000-0000-0000-0000-0000000000b7', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000054', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_n7', 'prod', now() - interval '26 hours', 2);
+-- Secretos del cron (el stub de net.http_post no hace nada).
+INSERT INTO vault.secrets (name, secret) VALUES ('edge_function_url', 'http://edge.test'), ('service_role_key', 'srk-test');
+
+-- Aprobar como p_aprobador indicando los respaldos revisados (E8).
+CREATE OR REPLACE FUNCTION public.aj_aprobar_con(p_aprobador uuid, p_sol uuid, p_resp uuid[])
+RETURNS text LANGUAGE plpgsql SET search_path = public AS $$
+DECLARE
+  v_yo text := current_setting('request.jwt.claim.sub', true);
+  v_r  record;
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', p_aprobador::text, false);
+  BEGIN
+    SELECT * INTO v_r FROM public.conta_ajuste_aprobar(p_sol, 'SINT visto el respaldo', false, p_resp);
+  EXCEPTION WHEN OTHERS THEN
+    PERFORM set_config('request.jwt.claim.sub', v_yo, false);
+    RAISE;
+  END;
+  PERFORM set_config('request.jwt.claim.sub', v_yo, false);
+  RETURN v_r.estado || CASE WHEN v_r.error_ejecucion IS NOT NULL THEN '/' || split_part(v_r.error_ejecucion, ':', 1) ELSE '' END;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.aj_aprobar_con(uuid, uuid, uuid[]) TO authenticated;
+
+-- E8 (concurrencia): QX5/PB8 aprobación manual contra aviso del proveedor
+-- (run.sh S); QX6/PB9 dos aprobaciones de la misma resolución (run.sh T).
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, cuota_estado) VALUES
+  ('c9a00000-0000-0000-0000-000000000055', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QX5 resolución contra aviso', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida'),
+  ('c9a00000-0000-0000-0000-000000000056', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000a001', 'SINT QX6 doble aprobación de resolución', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida');
+INSERT INTO public.payment_requests (id, cliente_id, cuota_id, company_id, monto, provider, estado, provider_ref, ambiente, created_at, consultas_auto) VALUES
+  ('ad900000-0000-0000-0000-0000000000b8', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000055', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_n8', 'prod', now() - interval '26 hours', 2),
+  ('ad900000-0000-0000-0000-0000000000b9', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000056', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_n9', 'prod', now() - interval '26 hours', 2);

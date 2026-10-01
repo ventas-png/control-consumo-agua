@@ -181,6 +181,9 @@ export function estadoDeEventoStripe(
 ): { estado: 'aprobado' | 'rechazado' | 'reembolsado'; intentId: string | null } | null {
   if (tipo === 'payment_intent.succeeded') return { estado: 'aprobado', intentId: obj.id ?? null }
   if (tipo === 'payment_intent.payment_failed') return { estado: 'rechazado', intentId: obj.id ?? null }
+  // E8 (20261019000000): un PaymentIntent CANCELADO es un estado final de
+  // no-cobro informado por el proveedor: la solicitud pasa a failed.
+  if (tipo === 'payment_intent.canceled') return { estado: 'rechazado', intentId: obj.id ?? null }
   if (tipo === 'charge.refunded') {
     if (obj.refunded !== true) return null
     return { estado: 'reembolsado', intentId: obj.payment_intent ?? null }

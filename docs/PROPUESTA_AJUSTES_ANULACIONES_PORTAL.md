@@ -2,8 +2,8 @@
 
 > **Estado: implementado en `20261011000000_conta_ajustes_solicitudes_portal_pasarela` y
 > `20261012000000_conta_anular_cuota_reembolsos_parciales_respaldos`**, con correctivas hasta
-> `20261017000000` (`ajuste_importe`, E6) (PR #904).
-> **Pendiente**: E7 y E8, y el sandbox no tiene las migraciones (ver §6, entorno). Decisiones en [`DECISIONES_PENDIENTES_CONTABILIDAD.md`](DECISIONES_PENDIENTES_CONTABILIDAD.md), §E.
+> `20261019000000` (E6 `20261017`, E7 `20261018`, E8 `20261019`) (PR #904).
+> E6, E7 y E8 aprobadas e implementadas. **Pendiente**: el sandbox no tiene las migraciones (ver §6, entorno). Decisiones en [`DECISIONES_PENDIENTES_CONTABILIDAD.md`](DECISIONES_PENDIENTES_CONTABILIDAD.md), §E.
 > Este documento reemplaza la propuesta anterior (que no tenía código).
 
 ## 1. Flujo
@@ -133,11 +133,13 @@ Entornos (dónde está **comprobado**, no sólo escrito):
 | 2g | Rutas anteriores sin atajo (cuota) | `trg_cuota_solo_por_solicitud`, `conta_pago_cuota_no_anulada` (desde `conta_tg_pagos`, correctiva `20261013000000`: `pagos` tiene drift declarado en triggers), `useAnularCuotaMutation` | §12, §14; `anularCuotaSolicitud.test.tsx` | L, CI |
 | 2h | Efectos en EC, portal, saldos, cortes históricos | `anulada_at` del servidor + reversos | §14 (corte de ayer / hoy, portal), §19 (conciliación) | L, CI |
 | 2i | **ajuste_importe (E6)**: sólo rebaja, tope en el saldo pendiente, contrapartida `ajustes_bonificaciones`, mora sobre el neto, fecha de ejecución | `20261017000000` (`conta_ajuste_solicitar_rebaja`, `conta_nota_credito_registrar`, `conta_notas_credito`, saldos, cobro posterior, mora, estado del documento, dependencias, estado de cuenta); `CuotasTab` y `CargosAdicionalesTab` («Rebajar»), `solicitarRebajaDialog`, `ajustes.ts` | `assert_b.sql` §22; concurrencia P, Q, R; `rebaja.test.ts`; `solicitarRebajaDialog.test.ts` | L, CI |
-| 2j | **E7**: sólo la tarifa sin emitir de una reserva cancelada se elimina sin solicitud; una cuota 'pendiente' ya es CxC | `20261014000000` (`conta_cuota_exigir_eliminable`), `AmenidadesTab` (cancelar antes, compensación por solicitud) | `assert_b.sql` §12 (QF, QF2, QF3, QG) | L, CI |
-| 2k | **E8**: cuándo consultar cobros en línea abandonados | — (propuesta en `DECISIONES…` §E8) | — | ❓ pendiente |
+| 2j | **E7 (antecedente, superado por 2o)**: sólo la tarifa sin emitir de una reserva cancelada se elimina sin solicitud; una cuota 'pendiente' ya es CxC | `20261014000000` (`conta_cuota_exigir_eliminable`), `AmenidadesTab` (cancelar antes, compensación por solicitud) | `assert_b.sql` §12 (QF, QF2, QF3, QG) | L, CI |
+| 2k | **E8**: cuándo consultar cobros en línea abandonados | ver 2p | ver 2p | L, CI |
 | 2m | **Confirmación tardía sobre cuota anulada o eliminada**: evento conservado, sin pago, una incidencia, sin devolver ni convertir (independiente de E8) | `20261015000000` (`pasarela_registrar_estado`, `pasarela_cuota_sin_cobro`, `uq_conta_incidencias_cobro_anulado`), `confirm-charge`, `stripe-webhook-handler`, `confirmarPago` | `assert_b.sql` §20 (duplicados por clave, otra clave, consulta, rechazo y reembolso posteriores, eliminada, aislamiento); concurrencia I, J, K; `confirm-charge/__tests__/handler.test.ts`; `logic.test.ts`; `confirmarPago.test.ts` | L, CI |
 | 2n | **Reembolso total antes de aprobar**: la solicitud queda `refunded`, una aprobación atrasada no crea ni acredita pago; una incidencia por tipo. **Respuesta = estado persistido** (`conciliado`, `en_revision`, `reembolsado`), también en duplicados; sin saldo 0 por defecto. Reembolsos parciales sin cambios | `20261016000000` (`pasarela_registrar_estado`, `pasarela_estado_persistido`, `uq_conta_incidencias_aprobado_tras_reembolso`), `_shared/payments/conciliacion.ts`, `confirm-charge`, `stripe-webhook-handler`, `confirmarPago`, `avisoConfirmacionPago` (5 pantallas del portal) | `assert_b.sql` §21; concurrencia M, N; `conciliacion.test.ts`; `handler.test.ts`; `logic.test.ts`; `confirmarPago.test.ts`; `avisoConfirmacionPago.test.ts` | L, CI |
-| 2l | Migraciones aplicables sobre una base de Supabase | `20261011`–`20261017` | check «Supabase Preview» | P |
+| 2o | **E7 (aprobada)**: cancelar la reserva anula su tarifa (reverso + evidencia) sin segunda aprobación; con cobros/saldo a favor → solicitud; ninguna cuota se elimina desde la app | `20261018000000` (`conta_reserva_cancelar`, canal `reserva_cancelada`, `conta_cuota_exigir_eliminable`), `AmenidadesTab`, `ajustes.ts` | `assert_b.sql` §23; `cancelarReserva.test.ts` | L, CI |
+| 2p | **E8 (aprobada)**: cron que consulta a 1 h y 24 h y nunca libera por antigüedad; consulta manual; resolución manual con respaldo y otra persona (QPayPro); incidencia `cobro_sin_confirmar` | `20261019000000` (`reconciliar_payment_requests_pendientes`, `conta_ajuste_solicitar_resolucion_cobro`, origen `manual`), `stripeConsulta.ts`, `confirm-charge`, `stripe-webhook-handler`, `AjustesTab`, `resolverCobroDialog` | `assert_b.sql` §24; concurrencia S, T; `stripeConsulta.test.ts`; `handler.test.ts`; `resolverCobroDialog.test.ts`; `ajustesTab.test.tsx` | L, CI |
+| 2l | Migraciones aplicables sobre una base de Supabase | `20261011`–`20261019` | check «Supabase Preview» | P |
 | 3a | Permisos en servidor | `conta_ajuste_bloquear_para_revision`, `_puede_solicitar` | §2, §3, §6, §13, §14 | L, CI |
 | 3b | Revalidar documento, período y saldo | `conta_ajuste_revalidar` | §5, §6, §8, §15; concurrencia B, C, F′ | L, CI |
 | 3c | Sin escrituras directas | `conta_ajuste_exigir`, triggers, REVOKE | §0, §1, §11, §12 | L, CI |
@@ -149,7 +151,7 @@ Entornos (dónde está **comprobado**, no sólo escrito):
 | 7b | **Reembolso parcial**: datos del proveedor, incidencia, sin rechazar | `pasarela_registrar_reembolso_parcial`, `pasarela_reembolsos`, `stripe-webhook-handler` | §18; concurrencia G; `stripe-webhook-handler/__tests__/logic.test.ts` | L, CI |
 | 7c | Parciales duplicados, acumulados y fuera de orden | UNIQUE (solicitud, acumulado), bloqueo de la solicitud | §18 (5 casos), concurrencia G | L, CI |
 | 8 | **Respaldo documental** protegido y trazable | bucket `ajustes-respaldos`, `conta_ajustes_respaldos`, `conta_ajuste_adjuntar_respaldo`, `respaldos_revisados` | §17 (RLS de storage, otra empresa, residente, sin UPDATE/DELETE, lista revisada, eTag alterado, cerrado tras aprobar, rechazo); `ajustes.test.ts`; `ajustesTab.test.tsx` | L, CI |
-| 9 | Aislamiento, concurrencia, fallos, reintentos | — | `conta_ajustes` §1–§22, concurrencia A–R | L, CI |
+| 9 | Aislamiento, concurrencia, fallos, reintentos | — | `conta_ajustes` §1–§24, concurrencia A–T | L, CI |
 | 10a | Sandbox | procedimiento acotado en `SANDBOX_E2E_SINCRONIZAR.md` | **Espera autorización** (ver abajo) | S ✗ |
 | 10b | Auditor de drift | `huella-produccion.json` refrescada con la captura real de producción (sólo lectura, 2026-09-27 23:46:56 UTC, sha256 `35fff705…9e37`, 2779 grupos, 813 migraciones, máxima `20261006000000`); `drift-conocido.json` sin cambios | `auditar.mjs --base aa6e0461` en local: «Sin drift no autorizado» | L, CI |
 
@@ -157,7 +159,7 @@ Entornos (dónde está **comprobado**, no sólo escrito):
 
 `jwpmivhvlstslncrtokb` = «control-agua-rls-sandbox» (≠ producción `nnsqmeigtgewatameexo`): 504 migraciones,
 máxima `20261004000200`. Faltan exactamente `20261005000000`, `20261006000000` (en `main`) y
-`20261007000000`–`20261017000000` (11 de este PR). El procedimiento autorizado sólo aplica `main`; el
+`20261007000000`–`20261019000000` (13 de este PR). El procedimiento autorizado sólo aplica `main`; el
 procedimiento acotado para las de este PR está en `SANDBOX_E2E_SINCRONIZAR.md` y **espera autorización**.
 
 ## 7. Fuera de alcance / pendiente

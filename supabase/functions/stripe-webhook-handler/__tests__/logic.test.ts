@@ -189,6 +189,10 @@ describe('decidirTrasReclamo · processed_at es quien confirma', () => {
 })
 
 describe('estadoDeEventoStripe (20261011000000)', () => {
+  it('E8 (20261019000000): un PaymentIntent cancelado es un no-cobro final (rechazado)', () => {
+    expect(estadoDeEventoStripe('payment_intent.canceled', { id: 'pi_c' })).toEqual({ estado: 'rechazado', intentId: 'pi_c' })
+  })
+
   it('succeeded → aprobado sobre el propio intent', () => {
     expect(estadoDeEventoStripe('payment_intent.succeeded', { id: 'pi_1' })).toEqual({ estado: 'aprobado', intentId: 'pi_1' })
   })

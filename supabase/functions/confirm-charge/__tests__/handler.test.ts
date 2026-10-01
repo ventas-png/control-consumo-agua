@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   state: null as unknown as FakeSupabaseState,
   served: { handler: null as null | ((req: Request) => Promise<Response>) },
   consulta: { ok: true, estado: 'aprobado', referencia: 'ref-1' } as Record<string, unknown>,
+  stripe: vi.fn(async (_id: string, _clave: string) => ({ ok: true, estado: 'pendiente', referencia: 'pi_1' }) as Record<string, unknown>),
 }))
 
 vi.mock('https://esm.sh/@supabase/supabase-js@2', async () => {
@@ -31,7 +32,11 @@ vi.mock('https://esm.sh/@supabase/supabase-js@2', async () => {
 })
 
 vi.mock('../../_shared/sentry.ts', () => ({ captureEdgeException: async () => undefined }))
-vi.mock('../../_shared/secretsCrypto.ts', () => ({ decryptJson: async (x: unknown) => x }))
+vi.mock('../../_shared/secretsCrypto.ts', () => ({
+  decryptJson: async (x: unknown) => x,
+  decryptSecret: async (x: string | null) => (x ? `claro:${x}` : null),
+}))
+vi.mock('../../_shared/payments/stripeConsulta.ts', () => ({ consultarPaymentIntentStripe: h.stripe }))
 vi.mock('../../_shared/payments/index.ts', () => ({
   resolverConfigPagoEfectiva: () => ({ proveedorPago: 'sandbox', moneda: 'GTQ', ambiente: 'sandbox', desdeLocacion: false }),
   normalizarAmbientePago: (x: unknown) => (x === 'prod' ? 'prod' : 'sandbox'),
@@ -310,6 +315,31 @@ describe('confirm-charge · la respuesta sigue el estado persistido (20261016000
     })
     const body = await (await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')).json()
     expect(body).toMatchObject({ ok: true, estado: 'aprobado', conciliado: true, pago_id: 'pago-9', saldo_restante: null })
+  })
+})
+
+describe('confirm-charge · Stripe se consulta por su PaymentIntent (E8, 20261019000000)', () => {
+  it('consulta el PaymentIntent con la clave de la empresa y registra lo que informa Stripe', async () => {
+    fixture(h.state, {
+      pr: { provider: 'stripe', provider_ref: null, stripe_payment_intent: 'pi_1' },
+      conciliar: { data: { ok: true, accion: 'marcado_fallido', estado: 'failed', conciliado: false }, error: null },
+    })
+    h.state.byTable.company_payment_secrets = { data: { stripe_secret_key: 'cifrada' }, error: null }
+    h.stripe.mockResolvedValueOnce({ ok: true, estado: 'rechazado', referencia: 'pi_1' })
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(200)
+    expect(h.stripe).toHaveBeenCalledWith('pi_1', 'claro:cifrada')
+    expect(rpcsConciliar(h.state)[0].args).toMatchObject({ p_estado: 'rechazado', p_origen: 'consulta' })
+  })
+
+  it('sin clave de Stripe configurada no consulta ni registra nada', async () => {
+    fixture(h.state, { pr: { provider: 'stripe', provider_ref: null, stripe_payment_intent: 'pi_2' } })
+    h.state.byTable.company_payment_secrets = { data: null, error: null }
+    h.stripe.mockClear()
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
+    expect(res.status).toBe(409)
+    expect(h.stripe).not.toHaveBeenCalled()
+    expect(rpcsConciliar(h.state)).toHaveLength(0)
   })
 })
 

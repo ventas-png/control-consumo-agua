@@ -170,6 +170,10 @@ QW7=c9a00000-0000-0000-0000-000000000037
 TW3=5e0b0000-0000-0000-0000-000000000033
 TW6=5e0b0000-0000-0000-0000-000000000036
 TW7=5e0b0000-0000-0000-0000-000000000037
+PB8=ad900000-0000-0000-0000-0000000000b8
+PB9=ad900000-0000-0000-0000-0000000000b9
+TS=5e0b0000-0000-0000-0000-000000000058
+TT=5e0b0000-0000-0000-0000-000000000059
 UNO=e0000000-0000-0000-0000-00000000a001
 A1=a1a1a1a1-0000-0000-0000-000000000001
 
@@ -191,6 +195,12 @@ SELECT public.aj_aviso('$PP3', 'aprobado', 'webhook', 'evt-pp3-ok');
 SELECT * FROM public.conta_ajuste_solicitar_rebaja('$TW3', 'cuotas_condominio', '$QW3', 'principal', 50, 'SINT rebaja contra cobro');
 SELECT * FROM public.conta_ajuste_solicitar_rebaja('$TW6', 'cuotas_condominio', '$QW6', 'principal', 50, 'SINT cobro contra rebaja');
 SELECT * FROM public.conta_ajuste_solicitar_rebaja('$TW7', 'cuotas_condominio', '$QW7', 'principal', 20, 'SINT doble aprobación de rebaja');
+SELECT * FROM public.conta_ajuste_solicitar_resolucion_cobro('$TS', '$PB8', 'cobrado', 'SINT resolución contra aviso');
+SELECT * FROM public.conta_ajuste_solicitar_resolucion_cobro('$TT', '$PB9', 'cobrado', 'SINT doble aprobación de resolución');
+SELECT public.aj_subir('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/$TS/e.pdf');
+SELECT public.aj_subir('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/$TT/e.pdf');
+SELECT public.conta_ajuste_adjuntar_respaldo('4e0b0000-0000-0000-0000-000000000058', '$TS', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/$TS/e.pdf', 'Estado', repeat('aa', 32));
+SELECT public.conta_ajuste_adjuntar_respaldo('4e0b0000-0000-0000-0000-000000000059', '$TT', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/$TT/e.pdf', 'Estado', repeat('bb', 32));
 SQL
 OANT2=$(psql -q -X -t -A -d ajustes -c "SELECT public.sf_origen_id('$ANT2')")
 
@@ -269,7 +279,13 @@ par r "$ADM" "INSERT INTO public.pagos (id, cliente_id, project_id, cuota_id, mo
 # Q · dos aprobaciones de la MISMA rebaja a la vez.
 par q "$APR" "SELECT 'Q1:' || estado || '/' || repetida FROM public.conta_ajuste_aprobar('$TW7');" \
       "$APR" "SELECT 'Q2:' || estado || '/' || repetida FROM public.conta_ajuste_aprobar('$TW7');"
-cat "$SALIDAS"/[a-r][12].txt | grep -E '^[A-R][12]:' | sort | sed 's/^/   /'
+# S · la resolución manual «cobrado» (retiene la solicitud) contra el aviso del proveedor.
+par s "$APR" "SELECT 'S1:' || estado || '/' || split_part(COALESCE(error_ejecucion, '-'), ':', 1) FROM public.conta_ajuste_aprobar('$TS', 'SINT visto', false, '{4e0b0000-0000-0000-0000-000000000058}');" \
+      "$ADM" "SELECT 'S2:' || (public.aj_aviso('$PB8', 'aprobado', 'webhook', 'evt-pb8') ->> 'accion');"
+# T · dos aprobaciones de la MISMA resolución a la vez.
+par t "$APR" "SELECT 'T1:' || estado || '/' || repetida FROM public.conta_ajuste_aprobar('$TT', 'SINT visto', false, '{4e0b0000-0000-0000-0000-000000000059}');" \
+      "$APR" "SELECT 'T2:' || estado || '/' || repetida FROM public.conta_ajuste_aprobar('$TT', 'SINT visto', false, '{4e0b0000-0000-0000-0000-000000000059}');"
+cat "$SALIDAS"/[a-t][12].txt | grep -E '^[A-T][12]:' | sort | sed 's/^/   /'
 
 grep -q '^A1:ejecutada/false$' "$SALIDAS/a1.txt" \
   || { echo "❌ A1 debía ejecutar:"; cat "$SALIDAS/a1.txt"; exit 1; }
@@ -337,6 +353,10 @@ grep -q '^Q1:ejecutada/false$' "$SALIDAS/q1.txt" \
   || { echo "❌ Q1 debía ejecutar:"; cat "$SALIDAS/q1.txt"; exit 1; }
 grep -q '^Q2:ejecutada/true$' "$SALIDAS/q2.txt" \
   || { echo "❌ Q2 debía ver la ejecución de Q1, sin ejecutar otra vez:"; cat "$SALIDAS/q2.txt"; exit 1; }
+grep -q '^S1:ejecutada/-$' "$SALIDAS/s1.txt" \
+  || { echo "❌ S1 debía ejecutar la resolución:"; cat "$SALIDAS/s1.txt"; exit 1; }
+grep -q '^T1:ejecutada/false$' "$SALIDAS/t1.txt" && grep -q '^T2:ejecutada/true$' "$SALIDAS/t2.txt" \
+  || { echo "❌ T: una ejecuta y la otra ve la ejecución:"; cat "$SALIDAS/t1.txt" "$SALIDAS/t2.txt"; exit 1; }
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d ajustes -f "$AQUI/concurrencia.sql" 2>&1) || {
   cat "$SALIDAS"/*.txt
   echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'

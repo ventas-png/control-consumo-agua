@@ -4427,6 +4427,7 @@ export type Database = {
           motivo_revision: string | null
           project_id: string
           reserva_id: string | null
+          resolucion: string | null
           respaldos_revisados: Json | null
           resultado: Json | null
           revisado_at: string | null
@@ -4458,6 +4459,7 @@ export type Database = {
           motivo_revision?: string | null
           project_id: string
           reserva_id?: string | null
+          resolucion?: string | null
           respaldos_revisados?: Json | null
           resultado?: Json | null
           revisado_at?: string | null
@@ -4489,6 +4491,7 @@ export type Database = {
           motivo_revision?: string | null
           project_id?: string
           reserva_id?: string | null
+          resolucion?: string | null
           respaldos_revisados?: Json | null
           resultado?: Json | null
           revisado_at?: string | null
@@ -14307,6 +14310,7 @@ export type Database = {
           comision: number | null
           comision_detalle: Json | null
           company_id: string
+          consultas_auto: number
           created_at: string | null
           cuota_id: string | null
           estado: string | null
@@ -14331,6 +14335,7 @@ export type Database = {
           comision?: number | null
           comision_detalle?: Json | null
           company_id: string
+          consultas_auto?: number
           created_at?: string | null
           cuota_id?: string | null
           estado?: string | null
@@ -14355,6 +14360,7 @@ export type Database = {
           comision?: number | null
           comision_detalle?: Json | null
           company_id?: string
+          consultas_auto?: number
           created_at?: string | null
           cuota_id?: string | null
           estado?: string | null
@@ -24112,6 +24118,15 @@ export type Database = {
           p_motivo: string
           p_saldo_origen_id?: string
           p_tipo: string
+        }
+        Returns: { estado: string; repetida: boolean; solicitud_id: string }[]
+      }
+      conta_ajuste_solicitar_resolucion_cobro: {
+        Args: {
+          p_id: string
+          p_motivo: string
+          p_payment_request_id: string
+          p_resolucion: string
         }
         Returns: { estado: string; repetida: boolean; solicitud_id: string }[]
       }

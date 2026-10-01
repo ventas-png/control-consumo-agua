@@ -24,6 +24,7 @@ import {
   ETIQUETA_TIPO_AJUSTE,
   ETIQUETA_COMPONENTE_REBAJA,
   accionesSolicitud,
+  consultarCobroAlProveedor,
   urlRespaldo,
   useAdjuntarRespaldoMutation,
   useAprobarAjusteMutation,
@@ -38,6 +39,7 @@ import {
   type RespaldoAjuste,
   type SolicitudAjuste,
 } from '../../domain/contabilidad/ajustes'
+import { pedirResolucionCobro } from './resolverCobroDialog'
 import { btnLink, btnSecundario, usePermisosContabilidad } from './ui'
 
 interface Props {
@@ -193,6 +195,31 @@ export function AjustesTab({ companyId, projectId }: Props) {
     }
   }
 
+  async function onConsultarCobro(paymentRequestId: string) {
+    try {
+      const r = await consultarCobroAlProveedor(paymentRequestId)
+      if (r.error) {
+        notify({ variant: 'warning', title: 'No se pudo consultar al proveedor', text: r.error })
+      } else if (r.estado === 'pendiente') {
+        notify({ variant: 'info', title: 'El proveedor aún no lo confirma', text: 'Sigue pendiente: sólo un estado final lo libera o acredita. Puedes solicitar su resolución con respaldo.' })
+      } else {
+        notify({ variant: 'success', title: 'Consulta registrada', text: `Estado del proveedor: ${r.estado ?? '—'}.` })
+      }
+      await incidencias.refetch?.()
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se consultó', text: errorTexto(e) })
+    }
+  }
+
+  async function onSolicitarResolucion(paymentRequestId: string, monto: number | null) {
+    try {
+      const r = await pedirResolucionCobro({ id: paymentRequestId, monto })
+      if (r) notify({ variant: 'success', title: r.repetida ? 'Ya estaba solicitada' : 'Solicitud enviada', text: 'Adjunta el respaldo (captura del panel del proveedor) para que otra persona pueda aprobarla.' })
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se solicitó', text: errorTexto(e) })
+    }
+  }
+
   async function onResolver(id: string) {
     const nota = await openTextPrompt({
       title: 'Resolver incidencia', label: 'Cómo se resolvió', required: true,
@@ -222,7 +249,14 @@ export function AjustesTab({ companyId, projectId }: Props) {
                 <strong>{ETIQUETA_INCIDENCIA[i.tipo]}</strong>
                 {i.monto != null && <> · {Number(i.monto).toFixed(2)}</>} · {fecha(i.creada_at)}
                 <div style={{ color: 'var(--at-ink-2)' }}>{i.detalle}</div>
-                {puedeCambiarEstado && (
+                {i.tipo === 'cobro_sin_confirmar' && i.payment_request_id && puedeCrear && (
+                  <>
+                    <button type="button" style={btnLink} onClick={() => void onConsultarCobro(i.payment_request_id!)}>Consultar al proveedor</button>
+                    {' · '}
+                    <button type="button" style={btnLink} onClick={() => void onSolicitarResolucion(i.payment_request_id!, i.monto)}>Solicitar resolución</button>
+                  </>
+                )}
+                {puedeCambiarEstado && i.tipo !== 'cobro_sin_confirmar' && (
                   <button type="button" style={btnLink} disabled={resolver.isPending} onClick={() => void onResolver(i.id)}>Marcar resuelta</button>
                 )}
               </li>

@@ -19,7 +19,7 @@ const h = vi.hoisted(() => ({
 vi.mock('../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
 vi.mock('../../shared/SessionContext', () => ({ useSession: () => h.sesion }))
 vi.mock('../../shared/Dialog', () => ({ notify: h.notify, confirm: h.confirm }))
-vi.mock('../../shared/PromptDialog', () => ({ openTextPrompt: vi.fn(async () => 'motivo del rechazo') }))
+vi.mock('../../shared/PromptDialog', () => ({ openTextPrompt: vi.fn(async () => 'motivo del rechazo'), openPromptDialog: vi.fn(async () => null) }))
 vi.mock('../ui', async (orig) => ({
   ...(await orig<typeof import('../ui')>()),
   usePermisosContabilidad: () => ({ puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: h.puedeAutorizar, puedeEliminar: false }),
@@ -169,5 +169,15 @@ describe('AjustesTab', () => {
     render(<AjustesTab companyId="c" projectId="p" />)
     expect(screen.getByText('Reembolso parcial por conciliar')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Marcar resuelta' })).toBeTruthy()
+  })
+
+  it('un cobro sin confirmar: consultar y solicitar resolución; no se descarta a mano', () => {
+    h.solicitudes = []
+    h.incidencias = [{ id: 'i2', tipo: 'cobro_sin_confirmar', payment_request_id: 'pr1', monto: 30, creada_at: '2026-09-27T00:00:00Z', detalle: 'Cobro sin confirmar', estado: 'abierta' }]
+    render(<AjustesTab companyId="c" projectId="p" />)
+    expect(screen.getByText('Cobro en línea sin confirmar (no se libera por fecha)')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Consultar al proveedor' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Solicitar resolución' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Marcar resuelta' })).toBeNull()
   })
 })

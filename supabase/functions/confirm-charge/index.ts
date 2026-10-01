@@ -40,7 +40,9 @@ import { getCorsHeaders } from '../_shared/cors.ts'
 import { validarConfirmChargeBody } from './validate.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
 import { leerConciliacion, type RespuestaRegistro } from '../_shared/payments/conciliacion.ts'
-import { decryptJson } from '../_shared/secretsCrypto.ts'
+import { decryptJson, decryptSecret } from '../_shared/secretsCrypto.ts'
+import { consultarPaymentIntentStripe } from '../_shared/payments/stripeConsulta.ts'
+import type { ResultadoCobro } from '../_shared/payments/types.ts'
 import {
   credencialesEfectivasDeAmbiente,
   getPaymentProvider,
@@ -116,7 +118,7 @@ Deno.serve(async (req: Request) => {
     // ── 2) Cargar la solicitud de cobro ──
     const { data: prRow, error: prErr } = await admin
       .from('payment_requests')
-      .select('id, cliente_id, cuota_id, registro_id, cargo_adicional_id, company_id, monto, provider, ambiente, estado, provider_ref')
+      .select('id, cliente_id, cuota_id, registro_id, cargo_adicional_id, company_id, monto, provider, ambiente, estado, provider_ref, stripe_payment_intent')
       .eq('id', prId)
       .maybeSingle()
     if (prErr) return json({ error: prErr.message }, 500)
@@ -125,6 +127,7 @@ Deno.serve(async (req: Request) => {
       cargo_adicional_id: string | null
       company_id: string; monto: number; provider: string; ambiente: string | null; estado: string
       provider_ref: string | null
+      stripe_payment_intent?: string | null
     } | null
     if (!pr) return json({ error: 'Solicitud de cobro no encontrada' }, 404)
 
@@ -162,7 +165,9 @@ Deno.serve(async (req: Request) => {
     if (pr.estado === 'refunded') {
       return json({ ok: true, estado: 'reembolsado', conciliado: false })
     }
-    if (!pr.provider_ref) {
+    // Stripe (E8, 20261019000000): su referencia es el PaymentIntent.
+    const esStripe = pr.provider === 'stripe'
+    if (esStripe ? !pr.stripe_payment_intent : !pr.provider_ref) {
       return json({ error: 'La solicitud no tiene referencia del proveedor para confirmar.' }, 409)
     }
 
@@ -209,6 +214,23 @@ Deno.serve(async (req: Request) => {
       itemProjectId = reg.project_id
     }
 
+    // ── 3a) Stripe: se consulta su PaymentIntent con la clave de la empresa
+    //    (no pasa por el adapter genérico). Sólo succeeded/canceled deciden.
+    let resultadoStripe: ResultadoCobro | null = null
+    if (esStripe) {
+      const { data: sec } = await admin
+        .from('company_payment_secrets').select('stripe_secret_key').eq('company_id', pr.company_id).maybeSingle()
+      const cifrada = (sec as { stripe_secret_key?: string | null } | null)?.stripe_secret_key
+      if (!cifrada) return json({ ok: false, estado: 'error', error: 'La empresa no tiene configurada la clave de Stripe.' }, 409)
+      try {
+        const clave = await decryptSecret(cifrada)
+        if (!clave) return json({ ok: false, estado: 'error', error: 'No se pudo leer la clave de Stripe de la empresa.' }, 409)
+        resultadoStripe = await consultarPaymentIntentStripe(pr.stripe_payment_intent!, clave)
+      } catch (e) {
+        return json({ ok: false, estado: 'error', error: e instanceof Error ? e.message : 'Error consultando a Stripe' }, 502)
+      }
+    }
+
     // ── 3) Resolver payfac + credenciales (por la empresa/proyecto del ítem) ──
     const { data: company } = await admin
       .from('companies').select('proveedor_pago, default_currency').eq('id', pr.company_id).maybeSingle()
@@ -250,7 +272,7 @@ Deno.serve(async (req: Request) => {
     // ── 4) Confirmar server-side ──
     let resultado
     try {
-      resultado = await provider.consultarEstado(pr.provider_ref)
+      resultado = resultadoStripe ?? await provider.consultarEstado(pr.provider_ref!)
     } catch (e) {
       return json({ ok: false, estado: 'error', error: e instanceof Error ? e.message : 'Error consultando estado' }, 502)
     }

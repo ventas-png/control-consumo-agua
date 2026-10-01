@@ -47,14 +47,14 @@ de «único aprobador», y los plazos de E2/E3 son **propuestas**, no decisiones
 
 ### Decisiones del cierre del bloque 3 (actualizado 2026-10-01)
 
-**E6 está aprobada (2026-10-01) e implementada.** E7 y E8 **siguen pendientes**: abajo va la
-recomendación de cada una como propuesta, no como decisión.
+**E6, E7 y E8 están aprobadas (2026-10-01) e implementadas.** E7: se adoptó la opción recomendada
+(«basta, pero con evidencia»). E8: se adoptó la propuesta concreta.
 
 | # | Qué hay que decidir | Qué existe hoy | Estado |
 | --- | --- | --- | --- |
 | E6 | Las cuatro reglas de `ajuste_importe` | Implementado en `20261017000000` | ✅ Aprobada |
-| E7 | ¿Cancelar la reserva basta para eliminar su tarifa **sin** aprobación? | Implementado como «basta» (`20261014000000`), con pruebas | ❓ Pendiente de confirmación; hay una opción recomendada |
-| E8 | Cuándo consultar al proveedor por un cobro abandonado, quién pide la consulta manual, qué hacer con QPayPro | Sólo la protección de la confirmación tardía (abajo), que no depende de esta decisión | ❓ Pendiente; hay una propuesta concreta |
+| E7 | ¿Cancelar la reserva basta para quitar su tarifa **sin** aprobación? | Implementado en `20261018000000`: la tarifa se **anula** (reverso + evidencia), no se borra | ✅ Aprobada (opción recomendada) |
+| E8 | Cuándo consultar al proveedor por un cobro abandonado, quién pide la consulta manual, qué hacer con QPayPro | Implementado en `20261019000000` (cron, consulta manual, resolución con respaldo) | ✅ Aprobada (propuesta concreta) |
 
 #### E6 · `ajuste_importe` (rebaja de importe) — ✅ aprobada el 2026-10-01 e implementada (`20261017000000`)
 
@@ -83,7 +83,7 @@ Cómo funciona:
   posterior, mora en los dos modos, cargo, dos aprobaciones a la vez, y rebaja contra cobro en los dos
   órdenes.
 
-#### E7 · eliminar cuotas sin aprobación — ❓ PENDIENTE de confirmación (implementado en `20261014000000`)
+#### E7 · quitar la tarifa de una reserva cancelada — ✅ aprobada el 2026-10-01 (opción «basta, pero con evidencia») e implementada (`20261018000000`)
 
 `cuota_estado = 'pendiente'` **no** distingue una cuota sin emitir de una pendiente de pago: es el
 valor por defecto de toda cuota hasta el cierre de ciclo, y una cuota 'pendiente' ya tiene su
@@ -100,7 +100,7 @@ cuando falla guardar una reserva y ya se generó el cargo, ya no lo borra: solic
 también debe pasar por aprobación?
 
 
-**Opción recomendada (propuesta, no aprobada): «basta, pero con evidencia».** Cancelar la reserva
+**Opción adoptada: «basta, pero con evidencia».** Cancelar la reserva
 autoriza quitar su tarifa sin una segunda aprobación, pero la tarifa se **anula** en vez de borrarse:
 - reverso del devengo vinculado al original y evidencia inmutable (quién canceló, cuándo, motivo,
   reserva), igual que la anulación de una cuota;
@@ -109,7 +109,16 @@ autoriza quitar su tarifa sin una segunda aprobación, pero la tarifa se **anula
 
 Así la cancelación sigue siendo la autorización y la cuenta por cobrar no pierde trazabilidad.
 
-#### E8 · cobros en línea abandonados — ❓ PENDIENTE de decisión, propuesta sin implementar
+**Implementación (`20261018000000`).** `conta_reserva_cancelar(reserva, motivo, rechazo)` cancela la
+reserva y, en la misma transacción, crea la solicitud `anular_cuota` (canal `reserva_cancelada`, ya
+«revisada» por la cancelación) y la ejecuta con el flujo normal: reverso vinculado, evidencia, período
+cerrado y dependencias. Devuelve `sin_tarifa`, `ya_anulada`, `anulada`, `fallida` (reintentable) o
+`requiere_solicitud` (cobros o saldo a favor: la tarifa sigue y se resuelve por solicitud con
+aprobación). Ninguna cuota se elimina ya desde la aplicación (`CUOTA_ELIMINACION_SOLO_POR_SOLICITUD`).
+Permiso: super_admin, company_owner/admin, `condominios.tab.amenidades` o `platform.condominios.edit`.
+Pruebas: `assert_b.sql` §23.
+
+#### E8 · cobros en línea abandonados — ✅ aprobada el 2026-10-01 (propuesta concreta) e implementada (`20261019000000`)
 
 Hoy una solicitud de cobro `pending` de una cuota bloquea su anulación sin plazo (dependencia
 `cobro_en_linea`). Flujo propuesto (la antigüedad sólo decide **cuándo preguntar**, nunca libera):
@@ -134,7 +143,7 @@ Hoy una solicitud de cobro `pending` de una cuota bloquea su anulación sin plaz
 **Decidir**: N, quién puede pedir una consulta manual, y el tratamiento de QPayPro.
 
 
-**Propuesta concreta (no aprobada):**
+**Propuesta concreta (aprobada):**
 - **N:** una consulta automática a la hora de crear el cobro y otra a las 24 h (la sesión de Stripe
   caduca a las 24 h por defecto). Sólo un estado final del proveedor (pago cancelado o sesión expirada)
   pasa la solicitud a `failed`. Sin respuesta o pendiente: no cambia nada.
@@ -184,3 +193,27 @@ del portal o de una consulta futura, y no fija cuándo consultar. Implementada e
   Contabilidad. Un recibo de agua eliminado sigue fallando como antes.
 
 El detalle del bloque 3 está en [`PROPUESTA_AJUSTES_ANULACIONES_PORTAL.md`](PROPUESTA_AJUSTES_ANULACIONES_PORTAL.md).
+
+**Implementación E8 (`20261019000000`).**
+- **Cron** (`reconciliar_payment_requests_pendientes`, reemplaza el de `main`): sin NINGUNA referencia
+  del proveedor tras 24 h → `failed` (el cobro no llegó a existir). Con referencia: consulta por
+  `confirm-charge` a la hora y a las 24 h (`consultas_auto`, `FOR UPDATE SKIP LOCKED`); tras las dos
+  consultas (y 25 h) abre **una** incidencia `cobro_sin_confirmar`. **Nada pasa a `failed` por edad**
+  (se acabó el barrido de 30 días de `main`: es un cambio de comportamiento explícito).
+- **Consulta**: Stripe se consulta por PaymentIntent con la clave de la empresa
+  (`_shared/payments/stripeConsulta.ts`); sólo un estado final lo libera (`canceled` → `rechazado`,
+  `succeeded` → `aprobado`); `processing`, `requires_*` o un error no cambian nada. El webhook
+  `payment_intent.canceled` hace lo mismo. **Consulta manual**: botón «Consultar al proveedor» en la
+  incidencia (visible a quien puede crear en Contabilidad). *Matiz*: el servidor (`confirm-charge`)
+  admite a cualquier usuario de la empresa, porque la consulta es de sólo lectura y su efecto es el
+  mismo que el del webhook (idempotente, 60/h por usuario); sólo la **resolución** exige permiso.
+- **QPayPro** (sin consulta de servidor a servidor): se resuelve a mano con la solicitud
+  `resolver_cobro_en_linea` (`cobrado` | `no_cobrado`): exige motivo, **al menos un respaldo** antes
+  de aprobar (`AJUSTE_RESPALDO_REQUERIDO`), la aprueba **otra persona** (cuatro ojos) y se ejecuta
+  como un aviso del proveedor con origen `manual` (único camino que admite ese origen). `cobrado`
+  concilia (o retiene, si la cuota ya se anuló); `no_cobrado` → `failed`. Una abierta por cobro; si
+  el proveedor ya resolvió, la solicitud falla `AJUSTE_DOCUMENTO_CAMBIO`.
+- La incidencia `cobro_sin_confirmar` no se descarta a mano mientras el cobro siga `pending`
+  (`INCIDENCIA_COBRO_PENDIENTE`); sigue bloqueando como dependencia `cobro_en_linea`.
+- Pruebas: `assert_b.sql` §24; concurrencia S (resolución contra aviso) y T (doble aprobación);
+  vitest `stripeConsulta`, `confirm-charge`, `resolverCobroDialog`, `ajustesTab`.
