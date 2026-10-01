@@ -59,9 +59,22 @@ Reglas de integridad (triggers, no solo UI):
 * **No se altera lo histórico:** una regla que ya rige es inmutable; cambiar un predeterminado cierra la
   vigente y abre otra con `compras_reemplazar_regla_cuenta` desde una fecha futura. Lo ya capturado
   conserva su cuenta.
-* En la captura de la orden **solo una regla de compra** se guarda en la línea (`cuenta_id`); si el origen
-  es regla del proveedor o mapeo, la línea queda vacía y el posteo se resuelve como hoy. Así este PR
-  no cambia el asiento de ningún documento existente.
+* **La cuenta de la línea la resuelve y valida el servidor al guardar** (trigger de `orden_compra_lineas`,
+  migración `20261020000700`), con la misma función que usa la sugerencia de la pantalla. La pantalla ya no
+  manda ninguna cuenta: la misma entrada da la misma cuenta, sin depender de que una consulta previa haya
+  terminado, fallado o llegado tarde.
+  * Sin cuenta en la línea: solo una **regla de compra** fija `cuenta_id` (con `cuenta_origen` y
+    `cuenta_regla_id`); si el origen sería regla del proveedor o mapeo, la línea queda vacía y el posteo
+    se resuelve como hoy (este PR no cambia el asiento de ningún documento existente). «Sin regla
+    aplicable» es un resultado válido; una regla cuya cuenta ya no sirve **rechaza el guardado** con su
+    motivo (`COMPRAS_LINEA_REGLA_ROTA`), no guarda una cuenta nula.
+  * Cuenta elegida: se valida (ledger, detalle, activa, tipo apto) y queda `linea_explicita`: prevalece.
+  * Cambiar categoría, destino o producto de una línea automática la re-resuelve; cambiar el proveedor
+    de una orden en borrador re-resuelve sus líneas automáticas. Una elegida a mano no se toca.
+  * Con la orden aprobada la línea es historia (ya no se edita) y un cambio posterior de predeterminados
+    no la altera.
+  * La vista previa de la pantalla distingue *consultando* / *consulta fallida* / *sin regla aplicable* /
+    *regla de compra* y nunca muestra la entrada anterior.
 
 ## 3. Contratos
 
@@ -88,6 +101,23 @@ Reglas de integridad (triggers, no solo UI):
 | Habilitación de proyecto *suspendida / retirada* | No se le emiten órdenes **en ese proyecto**; en los demás sigue igual. |
 | Contrato *suspendido / vencido / terminado / cancelado* | Informa y sirve de base a B/C (no se puede ligar una orden nueva a un contrato no activo). No toca documentos ya emitidos. |
 | Cualquiera de los anteriores | Nunca borra ni reescribe historia ni asientos. |
+
+**Emitir revalida** (migración `20261020000500`): al pasar de aprobada a **emitida** (y de borrador a emitida) se
+vuelven a comprobar autorización general, su vencimiento y la habilitación en el proyecto. Una suspensión,
+retiro o vencimiento posterior a la aprobación **bloquea la emisión**; cancelar, cerrar y las
+recepciones/facturas (que mueven el estado con `conta.allow_system_write`) **no** se bloquean.
+
+**Prórrogas** (migración `20261020000600`), con proveedor *habilitado en el proyecto* como condición solo de lo que amplía:
+
+| `fecha_fin` anterior → nueva | Clasificación | Exige proveedor habilitado |
+|---|---|---|
+| fecha → fecha posterior | ampliación | sí |
+| fecha → **NULL (indefinido)** | ampliación | sí |
+| fecha → fecha anterior | reducción | no |
+| NULL (indefinido) → fecha | reducción | no |
+| contrato en borrador | libre (aún no es compromiso) | no |
+
+El historial del contrato guarda el `sentido` (`ampliacion` | `reduccion`) de cada prórroga.
 
 ## 4. Históricos (sin ejecutar saneamiento)
 
@@ -174,37 +204,71 @@ privilegios; funciones internas no ejecutables por `authenticated`; correlativos
 | 11 | Sin fórmulas/macros; exportaciones neutralizadas | `csv.test.ts`, `importacion.test.ts` |
 | 12 | UI: contexto, «Contratos» ≠ «Proveedores», selector, import, reglas | `proveedoresUI.test.tsx` |
 | 13 | Migraciones nuevas únicamente; append-only; guard de RLS/SECURITY DEFINER | `migrations-guard`, `rlsInitplan` |
+| 14 | Aprobar → suspender/retirar/vencer (general o proyecto) → emitir: bloqueado; autorizado: emite; cancelar/cerrar/recibir no se bloquean | `assert_emision_prorroga` §1 |
+| 15 | Prórroga: indefinido amplía; reducir es libre; habilitado vs suspendido, por empresa y por proyecto | `assert_emision_prorroga` §2 |
+| 16 | La cuenta de la línea la fija el servidor, determinista; error de regla visible; histórico intacto | `assert_linea_cuenta`, `sugerenciaCuenta.test.tsx`, `ordenCompraCuenta.test.tsx` |
 
 ## 9. Verificación
 
-* `bash supabase/tests/proveedores_pr_a/run.sh` — PostgreSQL 16 local, cadena de migraciones completa, 459+
-  aserciones, 2 pruebas con sesiones concurrentes reales y chequeo append-only.
+* `bash supabase/tests/proveedores_pr_a/run.sh` — PostgreSQL 16 local, cadena de migraciones completa, 500+
+  aserciones, 2 pruebas con sesiones concurrentes reales y chequeo append-only. Las regresiones de emisión y
+  prórrogas se verificaron además **sin** su migración (fallan, como debe ser) y con ella (pasan).
+* `bash supabase/tests/compras_flujo/run.sh` (el riel de compras existente) pasa con las migraciones nuevas.
+* **Cadena combinada con el #904:** `main` + las 11 migraciones del #904 (`20261007…20261017`) + las de este
+  PR se aplican sobre una base vacía y la suite de proveedores pasa (517 ✓).
 * `npm run type-check`, `npm run lint`, `npm test`, `npm run build`.
 * `node scripts/migrations-guard.mjs`.
 
-## 10. Entornos y sincronización
+## 10. Entornos, sincronización y orden de fusión
 
-**No se escribió en ningún entorno remoto** (el conector de Supabase del entorno no estaba disponible y
-no se intentó eludirlo). `src/types/database.types.ts` **no** se regeneró a propósito: el cliente no está
-tipado con `Database` y regenerarlo chocaría con el PR 904; el workflow de deriva de tipos es informativo.
+**No se escribió en ningún entorno remoto.** `src/types/database.types.ts` **no** se regeneró a propósito: el
+cliente no está tipado con `Database` y regenerarlo chocaría con el PR 904; el workflow de deriva de tipos
+es informativo.
 
-Migraciones nuevas (orden de aplicación):
+Migraciones nuevas (orden de aplicación), todas por encima de la mayor del #904 (`20261017…`):
 
 1. `20261020000000_proveedores_identidad_y_proyectos.sql`
 2. `20261020000100_contratos_proveedor_vinculados.sql`
 3. `20261020000200_contratos_historicos_vinculacion.sql`
 4. `20261020000300_compras_reglas_cuenta.sql`
 5. `20261020000400_proveedores_importacion_lotes.sql`
+6. `20261020000500_compras_emision_revalida_proveedor.sql`
+7. `20261020000600_contratos_prorroga_ampliacion.sql`
+8. `20261020000700_compras_linea_cuenta_servidor.sql`
 
-Procedimiento autorizado para el sandbox existente (identificarlo antes de cualquier escritura): el flujo
-normal de migraciones del repo (workflows en `.github/workflows`), sin `reset` ni `repair` masivo. Si el sandbox exige
-sincronización previa, presentar esta lista exacta y esperar autorización.
+Las 6–8 son correcciones de las 1–4: **no se editó ninguna migración ya enviada** (la rama de previsualización
+de Supabase ya las había aplicado).
 
-Notas:
+### Orden de aplicación propuesto: #904 primero, #907 después
 
-* Las versiones se eligieron por encima de la mayor del PR 904 (`20261014…`). Si este PR se fusiona antes,
-  el 904 quedaría «intercalado» y habría que renumerarlo.
-* Deriva preexistente ajena a este PR: `conta_ec_*` (PR 901/902) aún no figura en la huella de producción.
+* Estado del #904 (borrador, sin fusionar): 11 migraciones `20261007…20261017`, base `aa6e0461`, limpio contra `main`.
+* **Versiones:** no hay solape ni hace falta renumerar nada. Si el #907 se fusionara antes, el #904 quedaría
+  «intercalado» (versiones menores aplicadas después de las `20261020…`); por eso el orden recomendado es
+  **#904 → #907**, y ninguna migración ya aplicada se renumera.
+* **Conflicto textual al fusionar el segundo:** `src/domain/shared/buckets.ts` (cada PR agrega una constante de
+  bucket); se resuelve conservando ambas. Verificado en una fusión local (no publicada). El resto se fusiona solo.
+* **Cadena combinada verificada:** `main` + #904 + #907 se aplican en orden sobre una base vacía; la suite de
+  proveedores pasa sobre esa cadena (ver §9).
+* **Huella de producción** (`scripts/schema-drift/huella-produccion.json`): tocan el archivo el #904 y, cuando
+  corresponda, la captura posterior a #902. Tras desplegar cada PR en producción hay que refrescarla con una
+  captura real (procedimiento del README del auditor), nunca copiando hashes del replay local.
+
+### Check «Auditar drift en tres vías»: sigue ROJO y no es de este PR
+
+Marca 4 grupos que este PR no toca: `conta_ec_cobro_al_corte` (+ grants), `conta_ec_fuera_de_saldo` y
+`conta_ec_limitaciones`. Origen: la migración `20261006000000` (#902) ya está aplicada en producción, pero
+`huella-produccion.json` se capturó antes. **La solución es refrescar la huella con una captura real de
+producción**; no se amplió la baseline, no se desactivó el auditor y no se copió ningún hash del replay
+local. Esa actualización **no está hecha en este PR** (ver el reporte de entrega: requiere autorización
+explícita para versionar datos leídos de producción).
+
+### Sandbox existente
+
+Proyectos visibles para la cuenta: producción `control-agua` (`nnsqmeigtgewatameexo`) y el sandbox
+**`control-agua-rls-sandbox` (`jwpmivhvlstslncrtokb`)**. El sandbox tiene registrada como última migración
+`20261004000200`. **Le faltan**, en este orden: `20261005000000` y `20261006000000` (#901/#902), las 11 del #904
+(`20261007…20261017`) y las 8 de este PR. **No se ejecutó nada en el sandbox**: requiere autorización explícita
+(esquema e historial de migraciones juntos, sin `reset`, recreación ni reparación masiva).
 
 ## 11. Interfaces para PR B (compra / recepción / factura)
 
