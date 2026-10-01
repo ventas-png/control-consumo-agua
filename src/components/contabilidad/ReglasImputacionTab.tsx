@@ -31,6 +31,7 @@ import {
   useEliminarReglaProveedorMutation,
 } from '../../domain/contabilidad/mutations'
 import { useProveedoresQuery } from '../../domain/cxp/queries'
+import { ReglasCompraSection } from '../proveedores/ReglasCompraSection'
 import {
   DESTINOS_IMPUTACION,
   DESTINOS_CABLEADOS,
@@ -205,6 +206,9 @@ export function ReglasImputacionTab({ companyId, projectId, puedeEditar = true }
           </ul>
         )}
       </section>
+
+      {/* ── 1b. Reglas de compra (categoría / producto) ── */}
+      <ReglasCompraSection companyId={companyId} projectId={projectId} puedeEditar={puedeEditar} />
 
       {/* ── 2. Previsualización ── */}
       <section style={card} aria-labelledby="vista-previa-titulo">

@@ -18,6 +18,7 @@
 // custom. exportData es para tablas planas.
 
 import { writeXlsx } from './xlsx'
+import { escaparCeldaCsv } from './csv'
 
 export type ExportFormat = 'xlsx' | 'csv' | 'pdf'
 
@@ -81,16 +82,8 @@ function downloadCsv(filename: string, headers: string[], rows: (string | number
 }
 
 function escapeCsvCell(v: string | number): string {
-  const s = String(v)
-  // Anti CSV/formula injection: una celda que empieza con = + - @ (o tab/CR)
-  // se ejecuta como fórmula al abrir el archivo en Excel/LibreOffice
-  // (=HYPERLINK(...) exfiltra datos). Prefijar con comilla simple la fuerza a
-  // texto. https://owasp.org/www-community/attacks/CSV_Injection
-  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
-  if (safe.includes(',') || safe.includes('"') || safe.includes('\n')) {
-    return `"${safe.replace(/"/g, '""')}"`
-  }
-  return safe
+  // Anti CSV/formula injection: la regla vive en lib/csv.ts (única definición).
+  return escaparCeldaCsv(v)
 }
 
 // ───── PDF ─────────────────────────────────────────────────────────────────

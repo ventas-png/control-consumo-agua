@@ -8,6 +8,7 @@ import { type ReactNode } from 'react'
 import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { FeatureGate } from '../../lib/featureFlags'
 import { UpgradeCTA } from '../shared/UpgradeCTA'
+import type { ContratoProveedorCatalogo } from '../../types/proveedores'
 import type {
   UserSession, Proyecto, Unidad,
   OrdenCompra, AsambleaDigital, Proforma,
@@ -313,7 +314,7 @@ const ReporteConsolidadoTab = lazy(() => import('./tabs/ReporteConsolidadoTab').
 const BenchmarkingTab = lazy(() => import('./tabs/BenchmarkingTab').then(m => ({ default: m.BenchmarkingTab })))
 const ArrendamientosTab = lazy(() => import('./tabs/ArrendamientosTab').then(m => ({ default: m.ArrendamientosTab })))
 const AsambleasTab = lazy(() => import('./tabs/AsambleasTab').then(m => ({ default: m.AsambleasTab })))
-const ProveedoresTab = lazy(() => import('./tabs/ProveedoresTab').then(m => ({ default: m.ProveedoresTab })))
+const ContratosProveedorTab = lazy(() => import('../proveedores/ContratosProveedorTab').then(m => ({ default: m.ContratosProveedorTab })))
 const ObjetosTab = lazy(() => import('./tabs/ObjetosTab').then(m => ({ default: m.ObjetosTab })))
 const AgendaTab = lazy(() => import('./tabs/AgendaTab').then(m => ({ default: m.AgendaTab })))
 const InventarioTab = lazy(() => import('./tabs/InventarioTab').then(m => ({ default: m.InventarioTab })))
@@ -526,8 +527,8 @@ export const TAB_REGISTRY: TabDef[] = [
     <ArrendamientosTab contratos={ctx.contratos} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('arrendamientos')} canEdit={ctx.canEdit('arrendamientos')} onRefresh={ctx.onRefresh} /> },
   { id: 'asambleas', label: 'Asambleas', icon: '🗳️', render: (ctx) =>
     <AsambleasTab asambleas={ctx.asambleas} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('asambleas')} canEdit={ctx.canEdit('asambleas')} onRefresh={ctx.onRefresh} /> },
-  { id: 'proveedores', label: 'Proveedores', icon: '🤝', render: (ctx) =>
-    <ProveedoresTab contratos={ctx.contratosProveedores} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proveedores')} canEdit={ctx.canEdit('proveedores')} onRefresh={ctx.onRefresh} /> },
+  { id: 'proveedores', label: 'Contratos', icon: '🤝', render: (ctx) =>
+    <ContratosProveedorTab contratos={ctx.contratosProveedores as ContratoProveedorCatalogo[]} proyectoId={ctx.proyectoId} proyectoNombre={ctx.proyectoActual?.nombre} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proveedores')} canEdit={ctx.canEdit('proveedores')} onRefresh={ctx.onRefresh} /> },
   { id: 'objetos', label: 'Obj. Perdidos', icon: '🔍', render: (ctx) =>
     <ObjetosTab objetos={ctx.objetos} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('objetos')} canEdit={ctx.canEdit('objetos')} onRefresh={ctx.onRefresh} /> },
   { id: 'agenda', label: 'Agenda', icon: '📅', render: (ctx) =>

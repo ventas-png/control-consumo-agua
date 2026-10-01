@@ -203,7 +203,7 @@ export function ContabilidadSection() {
         <CuentasPorPagarTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
       )}
       {tab === 'proveedores' && (
-        <ProveedoresTab key={companyId} companyId={companyId} />
+        <ProveedoresTab key={companyId} companyId={companyId} projectId={ledgerProjectId} proyectos={proyectos} />
       )}
       {tab === 'presupuesto' && (
         <PresupuestoTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} proyectos={proyectos} monedaBase={monedaBase} />

@@ -6,13 +6,15 @@
 // recepción (que es la que contabiliza y mueve inventario/activos) y la
 // contraseña de pago. La factura y el pago viven en «Cuentas por pagar», que es
 // donde el contador ya los busca.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DataTable, EditModal, type DataTableColumn } from '../shared'
 import { FilterChips } from '../shared/FilterChips'
 import { StatusBadge } from '../shared/StatusBadge'
 import { confirm, notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { useProveedoresQuery } from '../../domain/cxp/queries'
+import { useSugerenciaCuentaQuery } from '../../domain/proveedores/queries'
+import { ORIGEN_CUENTA_LABELS, type DestinoCompra } from '../../types/proveedores'
 import {
   useActivosFijosQuery,
   useCompromisosQuery,
@@ -499,6 +501,8 @@ function OrdenCompraModal({
   const [fechaRequerida, setFechaRequerida] = useState('')
   const [notas, setNotas] = useState('')
   const [lineas, setLineas] = useState<LineaForm[]>([{ ...LINEA_VACIA }])
+  // Cuenta que una REGLA DE COMPRA fija para cada renglón (null = ninguna: al contabilizar rige el mapeo de siempre).
+  const [sugeridas, setSugeridas] = useState<Record<number, string | null>>({})
 
   const totales = totalesOrden(lineas.map((l) => ({
     cantidad: parseFloat(l.cantidad) || 0,
@@ -521,14 +525,14 @@ function OrdenCompraModal({
       fecha_requerida: fechaRequerida || null,
       obra_id: null,
       notas: notas.trim() || null,
-      lineas: lineas.map((l) => ({
+      lineas: lineas.map((l, i) => ({
         descripcion: l.descripcion,
         destino_tipo: l.destino_tipo,
         // El destino Inventario exige elegir el insumo del almacén; mientras el
         // selector de insumos no esté en este formulario, esa línea se captura
         // desde la pestaña de Suministros del proyecto.
         suministro_id: null,
-        cuenta_id: null,
+        cuenta_id: sugeridas[i] ?? null,
         categoria: l.categoria,
         cantidad: parseFloat(l.cantidad) || 0,
         unidad: l.unidad,
@@ -655,6 +659,15 @@ function OrdenCompraModal({
             </tbody>
           </table>
         </div>
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {lineas.map((l, i) => (
+            <SugerenciaCuentaLinea
+              key={i} indice={i} projectId={projectId} proveedorId={proveedorId || null}
+              destino={l.destino_tipo === 'activo_fijo' ? 'activo_fijo' : 'gasto'} categoria={l.categoria}
+              onResuelta={(cuentaId) => setSugeridas((m) => (m[i] === cuentaId ? m : { ...m, [i]: cuentaId }))}
+            />
+          ))}
+        </div>
         <p style={{ margin: '10px 0 0', textAlign: 'right', fontSize: 13 }}>
           Subtotal {formatCurrency(totales.subtotal, monedaBase)} · IVA {formatCurrency(totales.iva, monedaBase)} ·{' '}
           <strong>Total {formatCurrency(totales.total, monedaBase)}</strong>
@@ -668,6 +681,40 @@ function OrdenCompraModal({
         </Campo>
       </div>
     </EditModal>
+  )
+}
+
+/**
+ * Cuenta que SUGIERE la configuración para un renglón. La resuelve el servidor
+ * (renglón > regla de compra > regla del proveedor > mapeo del evento). Solo una
+ * REGLA DE COMPRA se guarda en el renglón; si no hay regla, se deja vacío y el
+ * documento sigue resolviendo la cuenta al contabilizar, como hasta hoy. Y si
+ * falta configuración, se dice aquí: no se descubre al contabilizar.
+ */
+function SugerenciaCuentaLinea({
+  indice, projectId, proveedorId, destino, categoria, onResuelta,
+}: {
+  indice: number
+  projectId: string | null
+  proveedorId: string | null
+  destino: DestinoCompra
+  categoria: string
+  onResuelta: (cuentaId: string | null) => void
+}) {
+  const { data, isLoading } = useSugerenciaCuentaQuery(
+    { projectId, destino, categoria, suministroId: null, proveedorId, fecha: hoyLocalISO() },
+    !!proveedorId,
+  )
+  const cuentaId = data?.origen === 'regla_compra' ? data.cuenta_id : null
+  useEffect(() => { onResuelta(cuentaId) }, [cuentaId]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!proveedorId || isLoading || !data) return null
+  const sinResolver = data.origen === 'sin_resolver'
+  return (
+    <span role="status" style={{ fontSize: 11, color: sinResolver ? 'var(--at-warning)' : 'var(--at-ink-soft)' }}>
+      Renglón {indice + 1}: {sinResolver
+        ? 'sin cuenta configurada — habrá que configurarla antes de contabilizar'
+        : `cuenta ${data.cuenta_codigo ?? ''} ${data.cuenta_nombre ?? ''} · ${ORIGEN_CUENTA_LABELS[data.origen]}`}
+    </span>
   )
 }
 

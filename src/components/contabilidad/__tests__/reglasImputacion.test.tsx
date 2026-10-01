@@ -34,6 +34,8 @@ vi.mock('../../../domain/contabilidad/mutations', () => ({
   useGuardarReglaProveedorMutation: () => ({ mutateAsync: state.guardarProv, isPending: false }),
   useEliminarReglaProveedorMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
+// La sección de reglas de compra (PR A) tiene sus propias pruebas en components/proveedores.
+vi.mock('../../proveedores/ReglasCompraSection', () => ({ ReglasCompraSection: () => null }))
 vi.mock('../../../domain/cxp/queries', () => ({
   useProveedoresQuery: () => ({
     data: [{ id: 'prov-1', nombre: 'Proveedor Uno' }],
