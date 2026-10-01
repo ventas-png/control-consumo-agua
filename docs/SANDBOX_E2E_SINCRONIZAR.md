@@ -39,6 +39,25 @@ en línea. `main` sigue en `aa6e0461`; no hay más migraciones nuevas que las do
 | `20261019000000_pasarela_cobros_abandonados_consulta` | #904 (E8) | **Falta** |
 | `20261019000100_pasarela_cobro_sin_confirmar_cierre_y_cuatro_ojos` | #904 (correctiva de 20261019000000) | **Falta** |
 
+**Hallazgo al iniciar la ejecución autorizada (2026-10-01): la huella base del sandbox NO coincide con
+la reconstrucción local de `main`, y por eso se detuvo.** Se creó sólo `respaldo_sync_20261001` con dos
+funciones de lectura (`huella_lineas`, `huella_hash`); no se aplicó ninguna migración. Huella agregada
+(sha256 de la huella canónica de `fingerprint.sql`, sin su guard): sandbox
+`d53eecd670db137a…`, reconstrucción local de `main` (`aa6e0461`, 504 migraciones)
+`5a9ceed3170673856…`. Diferencian **8 grupos** de ~2 400:
+
+| Grupo | Qué difiere | Evidencia de que no es semántico |
+| --- | --- | --- |
+| `funcion:agua_costo_tarifa`, `agua_lectura_contexto`, `agua_lectura_resolver`, `agua_lecturas_inconsistencias`, `agua_tg_lectura_autoritativa`, `registrar_lectura` | el texto del cuerpo (el sandbox es más corto: 1 715 vs 2 028, 2 509 vs 3 949, 3 758 vs 5 788, 7 350 vs 10 957, 2 759 vs 3 733, 3 062 vs 5 355 caracteres) | quitando comentarios `--` y espacios, el md5 del cuerpo **coincide** en los seis |
+| `funcion:registrar_bitacora` | una línea de comentario (misma longitud, otro texto) | el md5 sin comentarios ni espacios **coincide** |
+| `tabla:company_sso_domains/columnas` | el sandbox serializa `citext` y `gen_random_bytes(…)`; la reconstrucción, `extensions.citext` y `extensions.gen_random_bytes(…)` | misma columna y tipo; sólo cambia la calificación del esquema de la extensión |
+
+Ninguna de las 16 migraciones por aplicar toca esos objetos. Es coherente con migraciones registradas
+en el sandbox con una versión anterior del texto del archivo (los comentarios se ampliaron después en
+`main`). El procedimiento manda detenerse ante una huella base distinta; **no se continuó**. Para
+seguir hace falta decidir si se acepta este residuo declarado (verificando cada paso con la huella
+excluyendo esos 8 grupos y su prueba de equivalencia) o se corrige antes el sandbox.
+
 **Manifiesto del SHA `2da9f44e`** (sha256 truncado; tamaño en bytes) — lo que se aplicaría, en orden:
 
 | Versión | sha256 | Bytes |
