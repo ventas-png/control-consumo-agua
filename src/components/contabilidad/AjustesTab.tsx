@@ -331,6 +331,9 @@ export function AjustesTab({ companyId, projectId }: Props) {
                     <td>{fecha(s.solicitado_at)}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {a.aprobar && <button type="button" style={btnLink} disabled={ocupado} onClick={() => void onAprobar(s, false)}>Aprobar</button>}
+                      {s.tipo === 'resolver_cobro_en_linea' && s.estado === 'pendiente' && s.solicitado_por === ses.userId && (
+                        <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>La aprueba otra persona (también si eres el dueño).</span>
+                      )}
                       {a.autoaprobar && <button type="button" style={btnLink} disabled={ocupado} onClick={() => void onAprobar(s, true)}>Autoaprobar…</button>}
                       {a.reintentar && <button type="button" style={btnLink} disabled={ocupado} onClick={() => void onReintentar(s)}>Reintentar</button>}
                       {a.rechazar && <button type="button" style={btnLink} disabled={ocupado} onClick={() => void onRechazar(s)}>Rechazar</button>}

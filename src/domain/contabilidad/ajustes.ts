@@ -175,7 +175,7 @@ export const ETIQUETA_INCIDENCIA: Record<IncidenciaConciliacion['tipo'], string>
  * Denegar» en Contabilidad (o rol owner/admin).
  */
 export function accionesSolicitud(
-  s: Pick<SolicitudAjuste, 'estado' | 'solicitado_por' | 'autoaprobada'>,
+  s: Pick<SolicitudAjuste, 'estado' | 'solicitado_por' | 'autoaprobada'> & { tipo?: TipoAjuste },
   sesion: { userId: string | null; rol: string | null; puedeAprobar: boolean },
 ): { aprobar: boolean; autoaprobar: boolean; rechazar: boolean; reintentar: boolean; cancelar: boolean } {
   const propia = !!sesion.userId && s.solicitado_por === sesion.userId
@@ -185,7 +185,8 @@ export function accionesSolicitud(
   return {
     // Cuatro ojos: la propia sólo la aprueba el dueño, y confirmándolo.
     aprobar: pendiente && sesion.puedeAprobar && !propia,
-    autoaprobar: pendiente && sesion.puedeAprobar && propia && owner,
+    // E8: resolver un cobro en línea a mano NUNCA se autoaprueba, ni el dueño.
+    autoaprobar: pendiente && sesion.puedeAprobar && propia && owner && s.tipo !== 'resolver_cobro_en_linea',
     rechazar: (pendiente || fallida) && sesion.puedeAprobar,
     reintentar: fallida && sesion.puedeAprobar && (!propia || s.autoaprobada),
     cancelar: pendiente && propia,

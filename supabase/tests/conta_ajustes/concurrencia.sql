@@ -102,3 +102,10 @@ SELECT public.chk(
 SELECT public.chk(
   (SELECT count(*) FROM public.pasarela_eventos e WHERE e.payment_request_id = 'ad900000-0000-0000-0000-0000000000b9' AND e.origen = 'manual'), 1,
   'T · un solo aviso manual como evidencia');
+
+-- E8 (20261019000100): dos avisos a la vez sobre un cobro con incidencia abierta.
+SELECT public.chk_txt(public.aj_pr('ad900000-0000-0000-0000-0000000000c8') || '|' || public.aj_sin_conf('ad900000-0000-0000-0000-0000000000c8'),
+  'succeeded/1/aplicado|resuelta:false:true', 'U · dos avisos a la vez: UN pago y la incidencia cerrada una vez');
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_incidencias_conciliacion i WHERE i.payment_request_id = 'ad900000-0000-0000-0000-0000000000c8'), 1,
+  'U · ninguna incidencia de más');

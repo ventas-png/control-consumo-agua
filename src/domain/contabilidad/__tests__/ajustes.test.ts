@@ -23,6 +23,16 @@ const YO = 'u-yo'
 const OTRO = 'u-otro'
 
 describe('accionesSolicitud · E1 (cuatro ojos, autoaprobación sólo del dueño)', () => {
+  it('E8: resolver un cobro en línea no se autoaprueba, ni el dueño; otros tipos conservan la excepción', () => {
+    const owner = { userId: YO, rol: 'company_owner', puedeAprobar: true }
+    const resolver = accionesSolicitud({ tipo: 'resolver_cobro_en_linea', estado: 'pendiente', solicitado_por: YO, autoaprobada: false }, owner)
+    expect(resolver).toMatchObject({ aprobar: false, autoaprobar: false, cancelar: true })
+    const otro = accionesSolicitud({ tipo: 'anular_cuota', estado: 'pendiente', solicitado_por: YO, autoaprobada: false }, owner)
+    expect(otro.autoaprobar).toBe(true)
+    const deOtra = accionesSolicitud({ tipo: 'resolver_cobro_en_linea', estado: 'pendiente', solicitado_por: OTRO, autoaprobada: false }, owner)
+    expect(deOtra.aprobar).toBe(true)
+  })
+
   it('la solicitud de otra persona la aprueba quien tiene permiso', () => {
     const a = accionesSolicitud({ estado: 'pendiente', solicitado_por: OTRO, autoaprobada: false },
       { userId: YO, rol: 'admin', puedeAprobar: true })

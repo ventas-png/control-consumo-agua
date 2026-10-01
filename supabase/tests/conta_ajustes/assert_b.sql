@@ -14,6 +14,7 @@
 --   22 · E6: rebaja de importe (nota de crédito)
 --   23 · E7: cancelar la reserva anula su tarifa
 --   24 · E8: cobros abandonados (cron) y resolución manual con respaldo
+--   25 · E8 (correctiva): cuatro ojos sin excepción y cierre de cobro_sin_confirmar
 -- ============================================================================
 \set ON_ERROR_STOP 1
 \set A    '''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''
@@ -1012,3 +1013,104 @@ SELECT set_config('request.jwt.claim.sub', :ADM, false);
 SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_solicitar_resolucion_cobro('5e0b0000-0000-0000-0000-0000000000f8', 'ad900000-0000-0000-0000-0000000000b4', 'cobrado', 'SINT ya cobrado')$$,
   'AJUSTE_DOCUMENTO_CAMBIO', '24 · un cobro ya resuelto no admite otra resolución');
 RESET ROLE;
+
+-- ── 25 · E8 (20261019000100): cuatro ojos sin excepción y cierre de la incidencia ──
+\set PC1 '''ad900000-0000-0000-0000-0000000000c1'''
+\set PC2 '''ad900000-0000-0000-0000-0000000000c2'''
+\set PC3 '''ad900000-0000-0000-0000-0000000000c3'''
+\set PC4 '''ad900000-0000-0000-0000-0000000000c4'''
+\set PC5 '''ad900000-0000-0000-0000-0000000000c5'''
+\set PC6 '''ad900000-0000-0000-0000-0000000000c6'''
+\set PC7 '''ad900000-0000-0000-0000-0000000000c7'''
+\set QZ4 '''c9a00000-0000-0000-0000-000000000064'''
+\set SO1 '''5e0b0000-0000-0000-0000-0000000000c7'''
+CREATE OR REPLACE FUNCTION public.aj_sin_conf(p_pr uuid) RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT COALESCE(string_agg(i.estado || ':' || (i.resuelta_por IS NOT NULL)::text || ':' || (i.resuelta_evento_id IS NOT NULL)::text, ','), '-')
+    FROM public.conta_incidencias_conciliacion i WHERE i.payment_request_id = p_pr AND i.tipo = 'cobro_sin_confirmar'
+$$;
+GRANT EXECUTE ON FUNCTION public.aj_sin_conf(uuid) TO authenticated;
+RESET ROLE;
+-- Todas abiertas desde la primera pasada del cron (§24).
+SELECT public.chk_txt(public.aj_sin_conf(:PC1) || '|' || public.aj_sin_conf(:PC4) || '|' || public.aj_sin_conf(:PC5),
+  'abierta:false:false|abierta:false:false|abierta:false:false', '25 · las incidencias de partida están abiertas');
+-- Pendiente, requiere acción y error NO cierran.
+SELECT public.aj_aviso(:PC5, 'pendiente', 'consulta', NULL);
+SELECT public.aj_aviso(:PC5, 'requiere_accion', 'webhook', 'evt-pc5-ra');
+SELECT public.aj_aviso(:PC5, 'error', 'consulta', 'consulta-error-pc5');
+SELECT public.chk_txt(public.aj_pr(:PC5) || '|' || public.aj_sin_conf(:PC5), 'pending/0/-|abierta:false:false',
+  '25 · pendiente, requiere acción o error de consulta: el cobro sigue pendiente y la incidencia abierta');
+-- Aprobado por webhook: concilia y cierra con el evento como prueba.
+SELECT public.aj_aviso(:PC1, 'aprobado', 'webhook', 'evt-pc1-ok');
+SELECT public.chk_txt(public.aj_pr(:PC1) || '|' || public.aj_sin_conf(:PC1), 'succeeded/1/aplicado|resuelta:false:true',
+  '25 · aprobado: pago acreditado y incidencia cerrada por el evento (sin persona)');
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_incidencias_conciliacion i JOIN public.pasarela_eventos e ON e.id = i.resuelta_evento_id
+    WHERE i.payment_request_id = :PC1 AND e.clave_evento = 'evt-pc1-ok' AND i.nota_resolucion LIKE '%evt-pc1-ok%'), 1,
+  '25 · la nota y el evento identifican quién la cerró');
+-- Duplicado: ni otro pago, ni otro cierre, ni cambia la fecha de cierre.
+SELECT set_config('aj.cerrada_at', (SELECT i.resuelta_at::text FROM public.conta_incidencias_conciliacion i WHERE i.payment_request_id = :PC1 AND i.tipo = 'cobro_sin_confirmar'), false);
+SELECT public.chk_txt(public.aj_aviso(:PC1, 'aprobado', 'webhook', 'evt-pc1-ok') ->> 'accion', 'duplicado', '25 · el evento repetido es un duplicado');
+SELECT public.aj_aviso(:PC1, 'aprobado', 'consulta', NULL);
+SELECT public.chk_txt(public.aj_pr(:PC1) || '|' || public.aj_sin_conf(:PC1) || '|' ||
+  (SELECT (i.resuelta_at::text = current_setting('aj.cerrada_at'))::text FROM public.conta_incidencias_conciliacion i WHERE i.payment_request_id = :PC1 AND i.tipo = 'cobro_sin_confirmar'),
+  'succeeded/1/aplicado|resuelta:false:true|true', '25 · duplicados: un solo pago, un solo cierre, sin reabrir ni reescribir');
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_incidencias_conciliacion i WHERE i.payment_request_id = :PC1 AND i.tipo = 'cobro_sin_confirmar'), 1,
+  '25 · sigue habiendo UNA incidencia cobro_sin_confirmar (el cron no la reabre)');
+SELECT public.reconciliar_payment_requests_pendientes();
+SELECT public.chk_txt(public.aj_sin_conf(:PC1), 'resuelta:false:true', '25 · el cron no reabre una incidencia cerrada');
+-- Rechazado por consulta: failed y cierre.
+SELECT public.aj_aviso(:PC2, 'rechazado', 'consulta', NULL);
+SELECT public.chk_txt(public.aj_pr(:PC2) || '|' || public.aj_sin_conf(:PC2), 'failed/0/-|resuelta:false:true', '25 · rechazado: fallido sin pago y cierre');
+-- Reembolsado antes de aprobar: refunded; cierra la de sin confirmar y deja la específica.
+SELECT public.aj_aviso(:PC3, 'reembolsado', 'webhook', 'evt-pc3-ref');
+SELECT public.chk_txt(public.aj_pr(:PC3) || '|' || public.aj_sin_conf(:PC3) || '|' || public.aj_incidencias(:PC3),
+  'refunded/0/-|resuelta:false:true|cobro_sin_confirmar:resuelta,reembolso_sin_cobro:abierta',
+  '25 · reembolsado: cierra la de sin confirmar y conserva la específica abierta');
+-- Aprobado sobre una cuota anulada: se retiene; cierra sin_confirmar y CONSERVA la incidencia específica.
+SET session_replication_role = replica;
+UPDATE public.cuotas_condominio SET cuota_estado = 'anulada', anulada_at = now() WHERE id = :QZ4;
+SET session_replication_role = origin;
+SELECT public.aj_aviso(:PC4, 'aprobado', 'webhook', 'evt-pc4-ok');
+SELECT public.chk_txt(public.aj_pr(:PC4) || '|' || public.aj_incidencias(:PC4),
+  'pending_verification/0/-|cobro_sin_confirmar:resuelta,cobro_sobre_documento_anulado:abierta',
+  '25 · cuota anulada: sin pago; la incidencia específica queda abierta y la de sin confirmar se cierra');
+SELECT public.aj_aviso(:PC4, 'aprobado', 'webhook', 'evt-pc4-ok');
+SELECT public.aj_aviso(:PC4, 'aprobado', 'webhook', 'evt-pc4-ok-2');
+SELECT public.chk_txt(public.aj_incidencias(:PC4),
+  'cobro_sin_confirmar:resuelta,cobro_sobre_documento_anulado:abierta', '25 · duplicados: ninguna incidencia nueva ni cambia nada');
+-- Una persona no descarta a mano la de un cobro pendiente (PC5), sí lo hace el proveedor al resolver.
+SELECT public.aj_aviso(:PC5, 'rechazado', 'consulta', NULL);
+SELECT public.chk_txt(public.aj_pr(:PC5) || '|' || public.aj_sin_conf(:PC5), 'failed/0/-|resuelta:false:true',
+  '25 · tras el pendiente, el rechazo final sí la cierra');
+-- La resolución manual no pasa por el cierre automático: la cierra con su solicitud.
+SELECT public.chk_txt(public.aj_sin_conf(:PC7), 'abierta:false:false', '25 · PC7 parte abierta');
+
+-- ── Cuatro ojos sin excepción (dueño) ──
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', :OWN, false);
+SELECT public.chk_txt(
+  (SELECT r.estado FROM public.conta_ajuste_solicitar_resolucion_cobro(:SO1, :PC7, 'cobrado', 'SINT el dueño solicita') r),
+  'pendiente', '25 · el dueño solicita la resolución');
+SELECT public.aj_subir('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/5e0b0000-0000-0000-0000-0000000000c7/panel.pdf');
+SELECT public.conta_ajuste_adjuntar_respaldo('4e0b0000-0000-0000-0000-0000000000c7', :SO1,
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/5e0b0000-0000-0000-0000-0000000000c7/panel.pdf', 'Panel', repeat('cc', 32));
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_aprobar('5e0b0000-0000-0000-0000-0000000000c7', 'SINT yo', true, '{4e0b0000-0000-0000-0000-0000000000c7}')$$,
+  'AJUSTE_AUTOAPROBACION_NO_PERMITIDA', '25 · el dueño NO se autoaprueba la resolución, ni confirmándolo');
+SELECT public.chk_falla($$SELECT * FROM public.conta_ajuste_aprobar('5e0b0000-0000-0000-0000-0000000000c7', 'SINT yo', false, '{4e0b0000-0000-0000-0000-0000000000c7}')$$,
+  'AJUSTE_AUTOAPROBACION_NO_PERMITIDA', '25 · …tampoco sin confirmarlo');
+RESET ROLE;
+SELECT public.chk_txt(public.aj_sol(:SO1) || '|' || public.aj_pr(:PC7), 'pendiente/0/false|pending/0/-', '25 · sigue pendiente y el cobro sin cambios');
+SELECT public.chk_falla($$UPDATE public.conta_ajustes_solicitudes SET autoaprobada = true WHERE id = '5e0b0000-0000-0000-0000-0000000000c7'$$,
+  'conta_ajustes_resolver_cobro_sin_auto', '25 · defensa en profundidad: la restricción también lo impide');
+SET ROLE authenticated;
+-- Otra persona la aprueba.
+SELECT public.chk_txt(public.aj_aprobar_con(:APR, :SO1, '{4e0b0000-0000-0000-0000-0000000000c7}'), 'ejecutada', '25 · otra persona aprueba y se ejecuta');
+RESET ROLE;
+SELECT public.chk_txt(public.aj_pr(:PC7) || '|' || public.aj_sin_conf(:PC7), 'succeeded/1/aplicado|resuelta:true:false',
+  '25 · resolución manual: pago acreditado y la incidencia la cierra la solicitud (con persona)');
+-- Otros tipos conservan su excepción: el dueño sí se autoaprueba una anulación de cuota (§16).
+SELECT public.chk(
+  (SELECT count(*) FROM public.conta_ajustes_solicitudes s WHERE s.autoaprobada AND s.tipo <> 'resolver_cobro_en_linea'), 2,
+  '25 · la autoaprobación del dueño sigue vigente para los demás tipos');

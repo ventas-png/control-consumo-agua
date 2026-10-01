@@ -180,4 +180,12 @@ describe('AjustesTab', () => {
     expect(screen.getByRole('button', { name: 'Solicitar resolución' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Marcar resuelta' })).toBeNull()
   })
+
+  it('E8: el dueño no ve «Autoaprobar» en una resolución de cobro propia; ve el aviso', () => {
+    h.sesion = { user_id: 'u-yo', role: 'company_owner' }
+    h.solicitudes = [solicitud('s-res', 'u-yo', { tipo: 'resolver_cobro_en_linea', documento_tabla: 'payment_requests', foto_documento: {} })]
+    render(<AjustesTab companyId="c" projectId="p" />)
+    expect(screen.queryByRole('button', { name: /Autoaprobar/ })).toBeNull()
+    expect(screen.getByText('La aprueba otra persona (también si eres el dueño).')).toBeTruthy()
+  })
 })

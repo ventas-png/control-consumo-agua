@@ -170,6 +170,7 @@ QW7=c9a00000-0000-0000-0000-000000000037
 TW3=5e0b0000-0000-0000-0000-000000000033
 TW6=5e0b0000-0000-0000-0000-000000000036
 TW7=5e0b0000-0000-0000-0000-000000000037
+PC8=ad900000-0000-0000-0000-0000000000c8
 PB8=ad900000-0000-0000-0000-0000000000b8
 PB9=ad900000-0000-0000-0000-0000000000b9
 TS=5e0b0000-0000-0000-0000-000000000058
@@ -285,7 +286,10 @@ par s "$APR" "SELECT 'S1:' || estado || '/' || split_part(COALESCE(error_ejecuci
 # T · dos aprobaciones de la MISMA resolución a la vez.
 par t "$APR" "SELECT 'T1:' || estado || '/' || repetida FROM public.conta_ajuste_aprobar('$TT', 'SINT visto', false, '{4e0b0000-0000-0000-0000-000000000059}');" \
       "$APR" "SELECT 'T2:' || estado || '/' || repetida FROM public.conta_ajuste_aprobar('$TT', 'SINT visto', false, '{4e0b0000-0000-0000-0000-000000000059}');"
-cat "$SALIDAS"/[a-t][12].txt | grep -E '^[A-T][12]:' | sort | sed 's/^/   /'
+# U · dos avisos «aprobado» (claves distintas) sobre un cobro con la incidencia abierta.
+par u "$ADM" "SELECT 'U1:' || (public.aj_aviso('$PC8', 'aprobado', 'webhook', 'evt-pc8-a') ->> 'accion');" \
+      "$ADM" "SELECT 'U2:' || (public.aj_aviso('$PC8', 'aprobado', 'consulta', NULL) ->> 'accion');"
+cat "$SALIDAS"/[a-u][12].txt | grep -E '^[A-U][12]:' | sort | sed 's/^/   /'
 
 grep -q '^A1:ejecutada/false$' "$SALIDAS/a1.txt" \
   || { echo "❌ A1 debía ejecutar:"; cat "$SALIDAS/a1.txt"; exit 1; }

@@ -312,3 +312,20 @@ INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, con
 INSERT INTO public.payment_requests (id, cliente_id, cuota_id, company_id, monto, provider, estado, provider_ref, ambiente, created_at, consultas_auto) VALUES
   ('ad900000-0000-0000-0000-0000000000b8', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000055', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_n8', 'prod', now() - interval '26 hours', 2),
   ('ad900000-0000-0000-0000-0000000000b9', 'e0000000-0000-0000-0000-00000000a001', 'c9a00000-0000-0000-0000-000000000056', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_n9', 'prod', now() - interval '26 hours', 2);
+
+-- ── E8 (20261019000100): cierre de «cobro_sin_confirmar» por el proveedor y
+--    cuatro ojos sin excepción. Todos con 2 consultas y 26 h → el cron abre
+--    su incidencia en la primera pasada.
+--   PC1 aprobado (webhook) · PC2 rechazado (consulta) · PC3 reembolsado
+--   PC4 aprobado sobre cuota ANULADA · PC5 pendiente / requiere_accion / error
+--   PC6 aprobado duplicado · PC7 resolución manual solicitada por el dueño
+--   PC8 dos avisos «aprobado» a la vez (run.sh U)
+INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, cuota_estado)
+SELECT ('c9a00000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001',
+       'f0000000-0000-0000-0000-00000000a001', 'SINT QZ' || n || ' cobro sin confirmar', 30, '2026-09', 'pendiente', 'mantenimiento', 'emitida'
+  FROM generate_series(61, 68) n;
+INSERT INTO public.payment_requests (id, cliente_id, cuota_id, company_id, monto, provider, estado, provider_ref, ambiente, created_at, consultas_auto)
+SELECT ('ad900000-0000-0000-0000-0000000000c' || n)::uuid, 'e0000000-0000-0000-0000-00000000a001',
+       ('c9a00000-0000-0000-0000-0000000000' || (60 + n))::uuid, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 30, 'stripe', 'pending', 'pi_c' || n, 'prod',
+       now() - interval '26 hours', 2
+  FROM generate_series(1, 8) n;

@@ -217,3 +217,31 @@ El detalle del bloque 3 está en [`PROPUESTA_AJUSTES_ANULACIONES_PORTAL.md`](PRO
   (`INCIDENCIA_COBRO_PENDIENTE`); sigue bloqueando como dependencia `cobro_en_linea`.
 - Pruebas: `assert_b.sql` §24; concurrencia S (resolución contra aviso) y T (doble aprobación);
   vitest `stripeConsulta`, `confirm-charge`, `resolverCobroDialog`, `ajustesTab`.
+
+**Correctiva de E8 (`20261019000100`).**
+- **Cuatro ojos sin excepción en `resolver_cobro_en_linea`.** Solicitante y aprobador son personas
+  distintas **también para el `company_owner`**: el servidor (`conta_ajuste_aprobar`) rechaza con
+  `AJUSTE_AUTOAPROBACION_NO_PERMITIDA`, con o sin confirmación, y una restricción
+  (`conta_ajustes_resolver_cobro_sin_auto`, `NOT VALID`: rige para filas nuevas) lo impide aunque se
+  escriba directo. La pantalla no ofrece «Autoaprobar» para ese tipo y avisa que la aprueba otra persona.
+  Los demás tipos **conservan** la excepción del dueño aprobada en E1.
+- **Cierre de `cobro_sin_confirmar` por el proveedor.** Cuando una consulta o un webhook deja el cobro
+  resuelto (estado final aprobado, rechazado o reembolsado y la solicitud ya no está `pending`),
+  `pasarela_registrar_estado` cierra la incidencia con el **evento** como prueba
+  (`resuelta_evento_id`, `nota_resolucion` con proveedor y clave; sin persona: `resuelta_por` queda
+  vacío). Es idempotente: un duplicado no la cierra dos veces, no cambia su fecha ni abre otra, y el cron
+  no la reabre. **Pendiente, «requiere acción» o un error de consulta no la cierran.**
+- **Si el resultado exige otra revisión** (p. ej. cobro sobre una cuota anulada o un reembolso sin
+  cobro) se abre o **se conserva la incidencia específica** (`cobro_sobre_documento_anulado`,
+  `reembolso_sin_cobro`…); sólo se cierra la de «sin confirmar», porque el proveedor ya respondió, y su
+  nota remite a la específica abierta.
+- La resolución manual sigue cerrando su incidencia con la solicitud aprobada (con persona). El cron abre
+  la incidencia con el cobro bloqueado (`FOR UPDATE … SKIP LOCKED`) para no abrirla sobre un cobro que un
+  aviso resuelve a la vez.
+- Pruebas: `assert_b.sql` §25 (dueño que se autoaprueba, aprobación por otra persona, confirmación tardía
+  con incidencia abierta, duplicados, pendiente/requiere acción/error, cuota anulada, reembolso,
+  restricción); concurrencia U (dos avisos a la vez); vitest de `accionesSolicitud` y `AjustesTab`.
+- **Numeración y #907.** Las migraciones de este PR llegan hasta `20261019000100`; el PR #907
+  (proveedores) usa `20261020000000`–`20261020000400`. Quedan **sin colisión** y en el orden que ya
+  declara #907 (después de las de #904). Si #907 se fusiona primero, estas versiones quedarían
+  intercaladas y habría que renumerarlas: se decide al fusionar, no antes.
