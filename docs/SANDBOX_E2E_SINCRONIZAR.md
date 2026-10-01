@@ -12,13 +12,17 @@ pendientes de #887 hubo que retirarlo (a3a6829b) en vez de relajarlo. Este
 documento es el procedimiento con el que se puso al día el 2026-09-23 y el que
 hay que repetir.
 
-## Estado registrado (re-verificado el 2026-10-01 03:14 UTC, sólo lectura)
+## Estado registrado (re-verificado el 2026-10-01 con el head `2da9f44e` de #904, sólo lectura)
 
 `jwpmivhvlstslncrtokb` = «control-agua-rls-sandbox» (organización `mmqkhtbewmdashgswlxg`, creado el
 2026-08-19). **No es producción** (`nnsqmeigtgewatameexo`). 504 migraciones registradas, máxima
 `20261004000200`, y las 504 versiones locales hasta esa son las mismas (conciliadas el 2026-09-23).
-No existen `pagos_rechazo_eventos`, `conta_ec_cobro_al_corte(uuid, date)` ni
-`conta_ajustes_solicitudes`. Datos: 527 cuotas, 0 solicitudes de cobro en línea.
+Las 504 versiones registradas coinciden **exactamente** con las 504 de `main` hasta esa versión
+(`md5` de la lista ordenada: `cb9c843197e453530e1b9a0cd667955a` en ambos lados). No existen
+`pagos_rechazo_eventos`, `conta_ec_cobro_al_corte(uuid, date)`, `conta_ajustes_solicitudes`,
+`conta_notas_credito` ni `conta_saldos_favor`. Datos: **547 cuotas** (eran 527 al 2026-10-01 03:14 UTC:
+alguien o algún E2E escribió 20 desde entonces; no se investigó ni se tocó) y 0 solicitudes de cobro
+en línea. `main` sigue en `aa6e0461`; no hay más migraciones nuevas que las dos de abajo.
 
 | Versión | Origen | En el sandbox |
 | --- | --- | --- |
@@ -34,6 +38,32 @@ No existen `pagos_rechazo_eventos`, `conta_ec_cobro_al_corte(uuid, date)` ni
 | `20261018000000_conta_reserva_cancelada_anula_tarifa` | #904 (E7) | **Falta** |
 | `20261019000000_pasarela_cobros_abandonados_consulta` | #904 (E8) | **Falta** |
 | `20261019000100_pasarela_cobro_sin_confirmar_cierre_y_cuatro_ojos` | #904 (correctiva de 20261019000000) | **Falta** |
+
+**Manifiesto del SHA `2da9f44e`** (sha256 truncado; tamaño en bytes) — lo que se aplicaría, en orden:
+
+| Versión | sha256 | Bytes |
+| --- | --- | --- |
+| `20261005000000` (main) | `e1c8d4d90ed69561` | 39 275 |
+| `20261006000000` (main) | `5f4babf93772eecd` | 29 803 |
+| `20261007000000` | `5e12fd4029278fed` | 193 207 |
+| `20261008000000` | `e7dadd504a7e3de6` | 25 676 |
+| `20261009000000` | `57a6beef4869f33c` | 28 162 |
+| `20261010000000` | `1fee1ec4532aa088` | 31 158 |
+| `20261011000000` | `117d539160d0a6cb` | 129 605 |
+| `20261012000000` | `fc9e14769c8c6016` | 66 069 |
+| `20261013000000` | `f0d2d81ca2906410` | 13 428 |
+| `20261014000000` | `627e0c40ccb0bbd8` | 2 820 |
+| `20261015000000` | `542b189ce232bb1f` | 15 051 |
+| `20261016000000` | `9b9d807d261a47c6` | 15 289 |
+| `20261017000000` | `86c8a268beeda83a` | 114 777 |
+| `20261018000000` | `c65c2504f6e31a42` | 10 421 |
+| `20261019000000` | `caa1dbfcc3436cab` | 53 093 |
+| `20261019000100` | `e710395bcdf26f0e` | 27 349 |
+
+**#907 (proveedores)** trae nueve migraciones, `20261020000000` a `20261020000800`, todas por encima
+de las de #904. Orden de fusión previsto: **#904 → #907**. Nada de #907 se aplica en el sandbox con
+este procedimiento, y **ninguna versión ya aplicada se renumera**: si #907 se fusionara antes, las de
+#904 quedarían intercaladas y se decidiría entonces, sin tocar las ya aplicadas.
 
 El procedimiento normal (más abajo) sólo admite migraciones de `main` (paso 1: «nada de PRs
 abiertos»). Las 14 de #904 **no** se aplican con él: hace falta la autorización expresa del
@@ -111,6 +141,20 @@ deja datos sintéticos persistentes y A no.
      `conta_ajustes_respaldos` siguen con el sha256 y la ruta, y el registro anota que el archivo
      se retiró y cuándo.
 7. Después, el E2E del despliegue contra el sandbox y su preflight.
+
+### Qué flujos validan las pruebas A (todas SQL con `RAISE` final, datos `SINT`, sin cobros reales)
+
+| Flujo | Qué se comprueba | Equivalente local |
+| --- | --- | --- |
+| Saldos a favor | generación (anticipo, excedente), aplicación, reversión, duplicado por clave | `conta_saldos_favor`, `conta_ajustes` §14–§16 |
+| Tipo de cambio mensual y tasa manual | tasa del mes, tasa manual con motivo y bitácora, rechazo sin motivo | suite de tipo de cambio |
+| Rebajas (E6) | límite = saldo pendiente, nota de crédito, asiento contra la CxC, saldo del portal | `conta_ajustes` §22; concurrencia P, Q, R |
+| Cancelación de reservas (E7) | tarifa anulada con reverso; con cobro o saldo aplicado: `requiere_solicitud` | `conta_ajustes` §23 |
+| Resolución manual de cobros (E8) | respaldo obligatorio; aprobador distinto, **también el propietario** | `conta_ajustes` §24, §25; concurrencia S, T |
+| Confirmaciones tardías | duplicados, cobro sobre cuota anulada retenido, cierre de `cobro_sin_confirmar` y conservación de la específica | `conta_ajustes` §20, §21, §25; concurrencia I–K, M, N, U |
+
+Esos son los resultados **locales** (arnés PostgreSQL desechable y CI). Hasta que se autorice y
+corra, **nada de esto está probado en el sandbox**.
 
 ### Restauración (si se decide no seguir)
 

@@ -242,6 +242,6 @@ El detalle del bloque 3 está en [`PROPUESTA_AJUSTES_ANULACIONES_PORTAL.md`](PRO
   con incidencia abierta, duplicados, pendiente/requiere acción/error, cuota anulada, reembolso,
   restricción); concurrencia U (dos avisos a la vez); vitest de `accionesSolicitud` y `AjustesTab`.
 - **Numeración y #907.** Las migraciones de este PR llegan hasta `20261019000100`; el PR #907
-  (proveedores) usa `20261020000000`–`20261020000400`. Quedan **sin colisión** y en el orden que ya
+  (proveedores) usa `20261020000000`–`20261020000800` (nueve). Quedan **sin colisión** y en el orden que ya
   declara #907 (después de las de #904). Si #907 se fusiona primero, estas versiones quedarían
   intercaladas y habría que renumerarlas: se decide al fusionar, no antes.

@@ -160,7 +160,7 @@ Entornos (dónde está **comprobado**, no sólo escrito):
 
 `jwpmivhvlstslncrtokb` = «control-agua-rls-sandbox» (≠ producción `nnsqmeigtgewatameexo`): 504 migraciones,
 máxima `20261004000200`. Faltan exactamente `20261005000000`, `20261006000000` (en `main`) y
-`20261007000000`–`20261019000100` (14 de este PR; #907 usa `20261020…`). El procedimiento autorizado sólo aplica `main`; el
+`20261007000000`–`20261019000100` (14 de este PR; #907 usa `20261020000000`–`20261020000800`, nueve). El procedimiento autorizado sólo aplica `main`; el
 procedimiento acotado para las de este PR está en `SANDBOX_E2E_SINCRONIZAR.md` y **espera autorización**.
 
 ## 7. Fuera de alcance / pendiente
