@@ -53,6 +53,8 @@ interface ReqBody {
   registro_id?: string | null
   /** Cuota de condominio a pagar (portal del residente). Alternativo a registro_id. */
   cuota_id?: string | null
+  /** Cargo adicional a pagar (portal, 20261011000000). Alternativo a cuota/registro. */
+  cargo_adicional_id?: string | null
   company_id?: string
   project_id?: string | null
   monto?: number
@@ -135,12 +137,14 @@ Deno.serve(async (req: Request) => {
     const body: ReqBody = validacion.body
     const cuotaId = body.cuota_id ?? null
     const registroIdBody = body.registro_id ?? null
+    const cargoId = body.cargo_adicional_id ?? null
 
     // Valores del ÍTEM a pagar, resueltos según sea CUOTA (condominio) o REGISTRO (agua).
     let companyId: string
     let projectId: string | null
     let clienteId: string
     let registroId: string | null = null
+    let cargoAdicionalId: string | null = null
     let monto: number
     let descripcionItem = ''
 
@@ -208,7 +212,13 @@ Deno.serve(async (req: Request) => {
       const { data: pagosPrevios } = await admin
         .from('pagos').select('monto').eq('cuota_id', cuotaId).is('deleted_at', null)
       const abonado = ((pagosPrevios as { monto: number }[] | null) ?? []).reduce((s, p) => s + Number(p.monto), 0)
-      const saldo = Math.max(0, totalCuota - abonado)
+      // …menos lo aplicado por saldos a favor vivos (contabilidad): sin esto
+      // se cobraría otra vez la parte ya cubierta. Si no se puede leer, no se
+      // cobra (mejor un reintento que un cobro de más).
+      const { data: aplicadoSf, error: sfErr } = await admin
+        .rpc('conta_cuota_saldo_favor_aplicado', { p_cuota_id: cuotaId })
+      if (sfErr) return json({ error: 'No se pudo calcular el saldo de la cuota.' }, 500)
+      const saldo = Math.max(0, totalCuota - abonado - Number(aplicadoSf ?? 0))
       if (saldo <= 0) return json({ error: 'La cuota ya está saldada.' }, 409)
 
       // Monto: abono parcial pedido (acotado al saldo) o el saldo completo.
@@ -222,6 +232,44 @@ Deno.serve(async (req: Request) => {
       clienteId = callerClienteId ?? uniClienteId ?? ''
       if (!clienteId) return json({ error: 'No hay cliente asociado para el pago de la cuota.' }, 409)
       descripcionItem = `${cuota.concepto} — ${cuota.periodo}`
+    } else if (cargoId) {
+      // ── Pago de un CARGO ADICIONAL (portal, 20261011000000) ──
+      // El saldo y si se puede cobrar los decide la base (devengo publicado −
+      // cobros y saldos a favor vivos): el edge no recalcula dinero.
+      const { data: pagRows, error: pagErr } = await admin
+        .rpc('conta_cargo_saldo_pagable', { p_cargo_id: cargoId })
+      if (pagErr) return json({ error: 'No se pudo calcular el saldo del cargo.' }, 500)
+      const pag = ((pagRows as unknown[] | null) ?? [])[0] as {
+        pagable: boolean; saldo: number; motivo: string | null
+        company_id: string; project_id: string | null; responsable_cliente_id: string | null
+        concepto: string | null
+      } | undefined
+      if (!pag) return json({ error: 'Cargo no encontrado' }, 404)
+
+      // AUTORIZACIÓN. El cobro de un cargo es del RESPONSABLE histórico del
+      // cargo (lo exige también la base al registrarlo): el residente sólo paga
+      // los suyos. Usuario de tenant: su empresa.
+      if (!internal) {
+        if (callerClienteId) {
+          if (pag.responsable_cliente_id !== callerClienteId) {
+            return json({ error: 'No autorizado para pagar este cargo' }, 403)
+          }
+        } else if (callerCompanyId !== pag.company_id) {
+          return json({ error: 'No autorizado para cobrar cargos de otra empresa' }, 403)
+        }
+      }
+      if (!pag.pagable) return json({ error: pag.motivo ?? 'El cargo no está disponible para pago.' }, 409)
+
+      const saldo = Number(pag.saldo)
+      if (!(saldo > 0)) return json({ error: 'El cargo ya está saldado.' }, 409)
+      const pedido = Number(body.monto)
+      monto = pedido > 0 ? Math.min(pedido, saldo) : saldo
+      companyId = pag.company_id
+      projectId = pag.project_id
+      clienteId = pag.responsable_cliente_id ?? ''
+      if (!clienteId) return json({ error: 'El cargo no tiene responsable.' }, 409)
+      cargoAdicionalId = cargoId
+      descripcionItem = pag.concepto ? `Cargo — ${pag.concepto}` : 'Cargo adicional'
     } else if (registroIdBody) {
       // ── Pago de un REGISTRO de agua (portal del residente o admin) ──
       const { data: regRow, error: regErr } = await admin
@@ -404,7 +452,7 @@ Deno.serve(async (req: Request) => {
       descripcion: recargoCalc.recargo != null
         ? `${descripcionBase} · incluye recargo por pago con tarjeta ${recargoCalc.recargo.toFixed(2)} ${monedaCobro.toUpperCase()}`
         : descripcionBase,
-      referenciaInterna: registroId ?? cuotaId ?? clienteId,
+      referenciaInterna: registroId ?? cuotaId ?? cargoAdicionalId ?? clienteId,
       pagador: {
         nombre: cli?.nombre ?? null,
         email: cli?.email ?? null,
@@ -417,6 +465,7 @@ Deno.serve(async (req: Request) => {
         company_id: companyId, cliente_id: clienteId,
         ...(registroId ? { registro_id: registroId } : {}),
         ...(cuotaId ? { cuota_id: cuotaId } : {}),
+        ...(cargoAdicionalId ? { cargo_adicional_id: cargoAdicionalId } : {}),
       },
     }
 
@@ -458,6 +507,7 @@ Deno.serve(async (req: Request) => {
         cliente_id: clienteId,
         registro_id: registroId,
         cuota_id: cuotaId,
+        cargo_adicional_id: cargoAdicionalId,
         company_id: companyId,
         monto,
         provider: config.proveedorPago,

@@ -165,7 +165,7 @@ describe('CargosAdicionalesTab · cobros', () => {
     expect(llamadasA('conta_registrar_cobro_cargo')[2].args.p_pago_id).toBe('clave-2')
   })
 
-  it('excedente: se advierte antes de enviar y el pendiente del servidor se informa con su motivo', async () => {
+  it('excedente: se advierte antes de enviar (quedará a favor) y el pendiente del servidor se informa con su motivo', async () => {
     h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1', { aplicado: 80, saldo: 20 })], error: null })
     h.respuestas.conta_registrar_cobro_cargo = () => ({
       data: [{ pago_id: 'clave-1', repetido: false, resultado: 'pendiente', codigo: 'excede_saldo',
@@ -177,13 +177,43 @@ describe('CargosAdicionalesTab · cobros', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrar cobro' }))
     const dialogo = await screen.findByRole('dialog')
     fireEvent.change(within(dialogo).getByLabelText('Importe (GTQ)'), { target: { value: '40' } })
-    expect(within(dialogo).getByText(/no se reparte a otros cargos ni se vuelve anticipo/)).toBeTruthy()
+    // 20261007000000: el excedente queda como saldo a favor del responsable.
+    expect(within(dialogo).getByRole('note').textContent).toMatch(/excedente de GTQ\s*20\.00\s*queda como saldo a favor/)
     await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
     await waitFor(() => expect(h.notify).toHaveBeenCalledWith({
       variant: 'warning',
-      title: 'Cobro registrado, pendiente de contabilizar (Excede el saldo)',
+      title: 'Cobro registrado, pendiente de contabilizar (Excedente sin asignar)',
       text: 'El cobro (40) supera el saldo pendiente del cargo (20).',
     }))
+  })
+
+  it('excedente contabilizado: se informa el saldo a favor y cada cobro muestra lo aplicado y lo que quedó a favor', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1', { aplicado: 80, saldo: 20 })], error: null })
+    h.respuestas.conta_registrar_cobro_cargo = () => ({
+      data: [{ pago_id: 'clave-1', repetido: false, resultado: 'contabilizada', codigo: null, motivo: null,
+        asiento_id: 'a9', asiento_numero: 9, estado_cargo: 'pagado' }], error: null,
+    })
+    h.respuestas.conta_cargo_cobros = () => ({
+      data: [
+        { pago_id: 'p-x', fecha: '2026-06-05', monto: 50, metodo: 'efectivo', referencia: null, estado: 'verificado',
+          anulacion_motivo: null, aplicado: 20, asiento_id: 'a9', asiento_numero: 9, asiento_estado: 'publicado',
+          reverso_id: null, reverso_numero: null, reverso_fecha: null, codigo: null, motivo: null, saldo_a_favor: 30 },
+      ], error: null,
+    })
+    montar([cargo('ca1', 'Vidrio')])
+    expect(await screen.findByText(/Cobrado GTQ 80 · Saldo GTQ 20/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar cobro' }))
+    const dialogo = await screen.findByRole('dialog')
+    const fila = (await within(dialogo).findByText('50.00')).closest('tr')!
+    // Recibido 50 = aplicado 20 + a favor 30.
+    expect(within(fila).getByText('20.00')).toBeTruthy()
+    expect(within(fila).getByText('30.00')).toBeTruthy()
+    fireEvent.change(within(dialogo).getByLabelText('Importe (GTQ)'), { target: { value: '50' } })
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' })) })
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'success',
+      text: expect.stringMatching(/El excedente \(GTQ 30\.00\) quedó como saldo a favor del responsable/),
+    })))
   })
 
   it('anular un cobro pide motivo y lo envía; el cobro anulado se muestra con su reverso', async () => {
@@ -198,9 +228,8 @@ describe('CargosAdicionalesTab · cobros', () => {
           reverso_id: null, reverso_numero: null, reverso_fecha: null, codigo: null, motivo: null },
       ], error: null,
     })
-    h.respuestas.conta_anular_cobro_cargo = () => ({
-      data: [{ pago_id: 'p-vivo', resultado: 'anulado', asiento_id: 'a1', reverso_id: 'r1', reverso_numero: 8,
-        estado_cargo: 'pendiente', cobros_pendientes: 0 }], error: null,
+    h.respuestas.conta_ajuste_solicitar = () => ({
+      data: [{ solicitud_id: 'sol-1', estado: 'pendiente', repetida: false }], error: null,
     })
     h.prompt.mockResolvedValue('  error de captura ')
     montar([cargo('ca1', 'Vidrio')])
@@ -211,21 +240,47 @@ describe('CargosAdicionalesTab · cobros', () => {
     const anular = within(dialogo).getAllByRole('button', { name: 'Anular' })
     expect(anular).toHaveLength(1)
     await act(async () => { fireEvent.click(anular[0]) })
-    await waitFor(() => expect(llamadasA('conta_anular_cobro_cargo')).toHaveLength(1))
-    expect(llamadasA('conta_anular_cobro_cargo')[0].args).toEqual({ p_pago_id: 'p-vivo', p_motivo: 'error de captura' })
+    // 20261011000000: se SOLICITA; la anulación la ejecuta la aprobación de otra persona.
+    await waitFor(() => expect(llamadasA('conta_ajuste_solicitar')).toHaveLength(1))
+    expect(llamadasA('conta_ajuste_solicitar')[0].args).toMatchObject({
+      p_tipo: 'anular_cobro_cargo', p_documento_tabla: 'pagos', p_documento_id: 'p-vivo', p_motivo: 'error de captura',
+    })
+    expect(llamadasA('conta_anular_cobro_cargo')).toHaveLength(0)
     await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
-      variant: 'success', title: 'Cobro anulado', text: 'Reverso en la póliza #8. El cargo queda pendiente.',
+      variant: 'success', title: 'Anulación solicitada',
     })))
   })
 
-  it('anular el CARGO con cobros vivos muestra el rechazo del servidor', async () => {
+  it('anular el CARGO registra una solicitud con motivo; nunca un UPDATE directo (20261011000000)', async () => {
     h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1', { aplicado: 30, saldo: 70, cobros: 1 })], error: null })
-    h.update.mockResolvedValue({ error: { message: 'CARGO_CON_COBROS: el cargo tiene cobros vivos; anula cada cobro antes de anular el cargo.' } })
+    h.respuestas.conta_ajuste_solicitar = () => ({
+      data: [{ solicitud_id: 'sol-2', estado: 'pendiente', repetida: false }], error: null,
+    })
+    h.prompt.mockResolvedValue(' se emitió por error ')
+    montar([cargo('ca1', 'Vidrio')])
+    await screen.findByRole('button', { name: 'Registrar cobro' })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Anular' })) })
+    await waitFor(() => expect(llamadasA('conta_ajuste_solicitar')).toHaveLength(1))
+    expect(llamadasA('conta_ajuste_solicitar')[0].args).toMatchObject({
+      p_tipo: 'anular_cargo', p_documento_tabla: 'cargos_adicionales_unidad', p_documento_id: 'ca1', p_motivo: 'se emitió por error',
+    })
+    expect(h.update).not.toHaveBeenCalledWith('cargos_adicionales_unidad', 'ca1', expect.objectContaining({ estado: 'anulado' }))
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'success', title: 'Anulación solicitada',
+    })))
+  })
+
+  it('si el servidor rechaza la solicitud, se muestra su motivo', async () => {
+    h.respuestas.conta_cargos_cobro_resumen = () => ({ data: [resumen('ca1')], error: null })
+    h.respuestas.conta_ajuste_solicitar = () => ({
+      data: null, error: { code: '23505', message: 'AJUSTE_YA_SOLICITADO: ya hay una solicitud abierta (pendiente o fallida) para este documento.' },
+    })
+    h.prompt.mockResolvedValue('se emitió por error')
     montar([cargo('ca1', 'Vidrio')])
     await screen.findByRole('button', { name: 'Registrar cobro' })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Anular' })) })
     await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
-      variant: 'error', title: 'No se anuló el cargo',
+      variant: 'error', title: 'No se registró la solicitud', text: expect.stringMatching(/AJUSTE_YA_SOLICITADO/),
     })))
   })
 

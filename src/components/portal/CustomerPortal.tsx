@@ -26,6 +26,7 @@ import { CustomerPaymentsTab } from './CustomerPaymentsTab'
 import { CustomerComunicacion } from './CustomerComunicacion'
 import { BrandLogo } from '../shared/BrandLogo'
 import { NotificationBell } from '../layout/NotificationBell'
+import { avisoConfirmacionPago } from '../../domain/portal/avisoConfirmacionPago'
 
 interface Props {
   currentUser: UserSession
@@ -188,16 +189,8 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     void (async () => {
       const conf = await confirmarPago(prId)
       if (conf.error) { notify({ variant: 'error', title: 'Pago no confirmado', text: conf.error }); return }
-      if (conf.estado === 'aprobado') {
-        notify({
-          variant: 'success',
-          title: conf.liquidado ? 'Recibo pagado' : 'Abono registrado',
-          text: conf.liquidado ? 'Tu recibo quedó al día.' : `Saldo restante: Q ${(conf.saldoRestante ?? 0).toFixed(2)}`,
-        })
-        cargarDatos()
-      } else {
-        notify({ variant: 'info', title: 'Pago en proceso', text: 'Tu pago aún se está procesando; se reflejará en unos momentos.' })
-      }
+      notify(avisoConfirmacionPago(conf, { moneda: 'Q', tituloPagado: 'Recibo pagado', textoAlDia: 'Tu recibo quedó al día.' }))
+      if (conf.estado === 'aprobado') cargarDatos()
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

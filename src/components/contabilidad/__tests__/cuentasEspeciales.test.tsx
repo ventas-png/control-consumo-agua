@@ -58,6 +58,9 @@ vi.mock('../../../domain/contabilidad/mutations', () => ({
   useGuardarTipoCambioMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
+// La sección de tipos de cambio mensuales tiene sus propias pruebas.
+vi.mock('../TiposCambioMensualSection', () => ({ TiposCambioMensualSection: () => null }))
+
 vi.mock('../ui', async (orig) => ({
   ...(await orig<typeof import('../ui')>()),
   usePermisosContabilidad: () => ({ puedeCrear: true, puedeEditar: true, puedeBorrar: true }),

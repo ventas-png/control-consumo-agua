@@ -35,7 +35,7 @@ describe('validarCreateChargeBody', () => {
 
   it('sin ítem a pagar (ni cuota ni registro) → rechazado', () => {
     const r = validarCreateChargeBody({ monto: 10 })
-    expect(r).toEqual({ ok: false, error: 'se requiere cuota_id o registro_id' })
+    expect(r).toEqual({ ok: false, error: 'se requiere cuota_id, registro_id o cargo_adicional_id' })
   })
 
   it('cuota_id y registro_id juntos → rechazado (excluyentes)', () => {

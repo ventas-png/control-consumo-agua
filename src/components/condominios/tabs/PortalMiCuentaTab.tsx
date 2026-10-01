@@ -6,6 +6,7 @@ import { iniciarPagoCuota, confirmarPagoCuota } from '../../../domain/portal/mut
 import { calcularRecargoTarjeta, type RecargoTarjetaRow } from '../../../lib/businessPagos'
 import { ResponsableCuotaBadge } from './CuotasUi'
 import { ModalPortal } from '../../shared/ModalPortal'
+import { avisoConfirmacionPago } from '../../../domain/portal/avisoConfirmacionPago'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -62,13 +63,9 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, recargoRows, c
       if (res.estado === 'aprobado' && res.paymentRequestId) {
         const conf = await confirmarPagoCuota(res.paymentRequestId)
         if (conf.error) { notify({ variant: 'error', title: 'Pago no confirmado', text: conf.error }); return }
-        notify({
-          variant: 'success',
-          title: conf.cuotaLiquidada ? 'Cuota pagada' : 'Abono registrado',
-          text: conf.cuotaLiquidada
-            ? 'Tu cuota quedó al día.'
-            : `Abono aplicado. Saldo restante: ${moneda} ${(conf.saldoRestante ?? 0).toFixed(2)}`,
-        })
+        notify(avisoConfirmacionPago(
+          { estado: conf.estado, liquidado: conf.cuotaLiquidada, saldoRestante: conf.saldoRestante },
+          { moneda, tituloPagado: 'Cuota pagada', textoAlDia: 'Tu cuota quedó al día.' }))
         setPagando(null)
         onPagado?.()
         return

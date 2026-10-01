@@ -414,6 +414,26 @@ const PORTAL_BAJA_RENTA_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   { name: 'portal_baja_renta', args: (b) => ({ p_unidad_id: b.unidadId }) },
 ]
 
+// RPCs del saldo a favor en el portal (20261011000000). El sujeto sale de la
+// sesión (auth.uid() → cliente): A es staff sin cliente, así que el rechazo es
+// el gate de residente — garantía de ROL. La solicitud usa ids REALES de B.
+const PORTAL_SALDO_FAVOR_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
+  { name: 'portal_saldos_favor', args: () => ({}) },
+  { name: 'portal_documentos_con_saldo', args: () => ({}) },
+  { name: 'portal_mis_solicitudes', args: () => ({}) },
+  {
+    name: 'portal_solicitar_aplicacion_saldo_favor',
+    args: (b) => ({
+      p_id: '00000000-0000-4000-8000-00000000f0f0',
+      p_origen_id: b.unidadId,
+      p_documento_tabla: 'cargos_adicionales_unidad',
+      p_documento_id: b.unidadId,
+      p_importe: 1,
+      p_motivo: 'Intruso RLS',
+    }),
+  },
+]
+
 // RPCs de la solicitud de autorización de renta (20260829000200). Son la ÚNICA
 // vía de escritura del portal sobre `solicitud_renta_unidad` desde que
 // 20260829000100 le quitó la policy de INSERT —que permitía insertar
@@ -1148,6 +1168,23 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         // portal): garantía de ROL, no de tenant — ver el bloque de arriba.
         const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} sobre unidad ajena debe fallar`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
+      })
+    }
+  })
+
+  describe('guard RPCs del saldo a favor del portal (20261011000000) — garantía de ROL', () => {
+    for (const { name, args } of PORTAL_SALDO_FAVOR_RPCS) {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args(B))
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+
+      it(`${idEvidencia(name, 'authenticated-cross-tenant')} authenticated (A, staff) NO obtiene nada de ${name}`, async () => {
+        // Sin cliente en la sesión el gate de residente rechaza: nada de B.
+        const { data, error } = await userA.rpc(name, args(B))
+        expect(error, `${name} sin sesión de residente debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
     }

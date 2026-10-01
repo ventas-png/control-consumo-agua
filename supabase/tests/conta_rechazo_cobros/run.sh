@@ -91,6 +91,7 @@ echo "   $N migraciones aplicadas sobre una base vacía"
 
 echo "── 3/5 · padrón + fixtures, y un rechazo LEGADO (antes de la migración)"
 aplicar "$PADRON"
+aplicar "$RAIZ/supabase/tests/conta_ajustes/helper.sql"   # anulaciones y reversos: por el flujo de solicitudes (20261011000000)
 aplicar "$CARGOS"
 aplicar "$COBROS"
 aplicar "$ESTADO"

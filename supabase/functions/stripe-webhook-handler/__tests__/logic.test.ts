@@ -19,6 +19,9 @@ import {
   decidirTrasConciliar,
   decidirTrasReclamo,
   decidirTrasSellar,
+  estadoDeEventoStripe,
+  importeDesdeStripe,
+  reembolsoParcialDeEvento,
 } from '../logic.ts'
 
 describe('decidirTrasReclamo', () => {
@@ -65,6 +68,40 @@ describe('decidirTrasConciliar', () => {
     })
   })
 
+  it('cobro retenido (cuota anulada, 20261015000000): 200 sin conciliar, en revisión, para que no se reintente', () => {
+    // Se decide por el estado persistido, también cuando el aviso es duplicado
+    // (20261016000000): antes un `accion: 'duplicado'` se leía como conciliado.
+    for (const accion of ['cobro_sobre_documento_anulado', 'cobro_retenido_ya_registrado', 'duplicado']) {
+      const d = decidirTrasConciliar(
+        { ok: true, accion, estado: 'pending_verification', conciliado: false, en_revision: true, reembolsado: false, incidencia_id: 'inc-1' },
+        null,
+      )
+      expect(d).toMatchObject({ accion: 'responder', status: 200 })
+      expect(d.accion === 'responder' && d.body).toEqual({
+        received: true, conciliado: false, en_revision: true, estado_solicitud: 'pending_verification', incidencia_id: 'inc-1',
+      })
+    }
+  })
+
+  it('reembolso total previo: la aprobación atrasada no se presenta como conciliada', () => {
+    const d = decidirTrasConciliar(
+      { ok: true, accion: 'ignorado_reembolsado', estado: 'refunded', conciliado: false, en_revision: false, reembolsado: true },
+      null,
+    )
+    expect(d.accion === 'responder' && d.body).toMatchObject({ received: true, conciliado: false, reembolsado: true })
+    expect(d.accion === 'responder' && d.body).not.toHaveProperty('saldo_restante')
+  })
+
+  it('un duplicado de un cobro conciliado sí es conciliado, con lo que informa la RPC', () => {
+    const d = decidirTrasConciliar(
+      { ok: true, accion: 'duplicado', estado: 'succeeded', conciliado: true, ya_conciliado: true, pago_id: 'p-1', liquidado: false, saldo_restante: 12 },
+      null,
+    )
+    expect(d.accion === 'responder' && d.body).toMatchObject({
+      conciliado: true, already_processed: true, pago_id: 'p-1', liquidado: false, saldo_restante: 12,
+    })
+  })
+
   it('abono parcial: liquidado false y el saldo que queda', () => {
     const d = decidirTrasConciliar(
       { ok: true, pago_id: 'pago-2', liquidado: false, saldo_restante: 45.5 }, null,
@@ -92,11 +129,10 @@ describe('decidirTrasConciliar', () => {
     expect(d.accion === 'responder' && String(d.body.error)).toContain('deadlock detected')
   })
 
-  it('un cuerpo vacío de la RPC no se lee como liquidado', () => {
+  it('un cuerpo vacío de la RPC no se lee como conciliado ni inventa un saldo 0', () => {
     const d = decidirTrasConciliar(null, null)
-    expect(d.accion === 'responder' && d.body).toMatchObject({
-      liquidado: false, saldo_restante: 0, pago_id: null,
-    })
+    expect(d.accion === 'responder' && d.body).toMatchObject({ received: true, conciliado: false })
+    expect(d.accion === 'responder' && d.body).not.toHaveProperty('saldo_restante')
   })
 })
 
@@ -149,5 +185,65 @@ describe('decidirTrasReclamo · processed_at es quien confirma', () => {
     })
     expect(d).toMatchObject({ accion: 'responder', status: 409 })
     expect(d.accion === 'responder' && d.body.already_processed).toBeUndefined()
+  })
+})
+
+describe('estadoDeEventoStripe (20261011000000)', () => {
+  it('E8 (20261019000000): un PaymentIntent cancelado es un no-cobro final (rechazado)', () => {
+    expect(estadoDeEventoStripe('payment_intent.canceled', { id: 'pi_c' })).toEqual({ estado: 'rechazado', intentId: 'pi_c' })
+  })
+
+  it('succeeded → aprobado sobre el propio intent', () => {
+    expect(estadoDeEventoStripe('payment_intent.succeeded', { id: 'pi_1' })).toEqual({ estado: 'aprobado', intentId: 'pi_1' })
+  })
+  it('payment_failed → rechazado (la RPC no retrocede un succeeded)', () => {
+    expect(estadoDeEventoStripe('payment_intent.payment_failed', { id: 'pi_2' })).toEqual({ estado: 'rechazado', intentId: 'pi_2' })
+  })
+  it('charge.refunded TOTAL → reembolsado sobre el intent del cargo', () => {
+    expect(estadoDeEventoStripe('charge.refunded', { id: 'ch_1', payment_intent: 'pi_3', refunded: true }))
+      .toEqual({ estado: 'reembolsado', intentId: 'pi_3' })
+  })
+  it('charge.refunded PARCIAL → no cambia la solicitud (se registra aparte, sin rechazar)', () => {
+    expect(estadoDeEventoStripe('charge.refunded', { id: 'ch_2', payment_intent: 'pi_4', refunded: false })).toBeNull()
+  })
+  it('otro evento → null', () => {
+    expect(estadoDeEventoStripe('customer.created', { id: 'cus_1' })).toBeNull()
+  })
+})
+
+describe('reembolsoParcialDeEvento (20261012000000)', () => {
+  const base = { id: 'ch_9', payment_intent: 'pi_9', refunded: false, amount_refunded: 2550, currency: 'gtq' }
+
+  it('parcial: acumulado en la moneda, moneda en mayúsculas, referencia del cargo', () => {
+    expect(reembolsoParcialDeEvento('charge.refunded', base)).toEqual({
+      intentId: 'pi_9', acumulado: 25.5, moneda: 'GTQ', referenciaPago: 'ch_9', reembolsoRef: null,
+    })
+  })
+  it('toma el reembolso MÁS RECIENTE como referencia, aunque venga desordenado', () => {
+    const r = reembolsoParcialDeEvento('charge.refunded', {
+      ...base, refunds: { data: [{ id: 're_viejo', created: 10 }, { id: 're_nuevo', created: 20 }] },
+    })
+    expect(r?.reembolsoRef).toBe('re_nuevo')
+  })
+  it('el TOTAL no es parcial (lo maneja estadoDeEventoStripe como reembolsado)', () => {
+    expect(reembolsoParcialDeEvento('charge.refunded', { ...base, refunded: true })).toBeNull()
+    expect(estadoDeEventoStripe('charge.refunded', { ...base, refunded: true })?.estado).toBe('reembolsado')
+  })
+  it('sin importe, sin moneda o sin intent no hay nada que registrar', () => {
+    expect(reembolsoParcialDeEvento('charge.refunded', { ...base, amount_refunded: 0 })).toBeNull()
+    expect(reembolsoParcialDeEvento('charge.refunded', { ...base, currency: null })).toBeNull()
+    expect(reembolsoParcialDeEvento('charge.refunded', { ...base, payment_intent: null })).toBeNull()
+  })
+  it('otro evento → null', () => {
+    expect(reembolsoParcialDeEvento('payment_intent.succeeded', base)).toBeNull()
+  })
+})
+
+describe('importeDesdeStripe', () => {
+  it('monedas con centavos: divide entre 100', () => {
+    expect(importeDesdeStripe(1999, 'usd')).toBe(19.99)
+  })
+  it('monedas sin decimales: tal cual', () => {
+    expect(importeDesdeStripe(500, 'JPY')).toBe(500)
   })
 })

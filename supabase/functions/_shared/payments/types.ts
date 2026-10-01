@@ -35,6 +35,8 @@ export type EstadoCobroProveedor =
   | 'requiere_accion'
   | 'rechazado'
   | 'error'
+  /** El proveedor confirmó el reembolso de un cobro aprobado (20261011000000). */
+  | 'reembolsado'
 
 /**
  * Datos del pagador (cliente) que el payfac puede necesitar para el recibo / la

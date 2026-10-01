@@ -67,6 +67,8 @@ export const asientoFormSchema = z.object({
   concepto: z.string().trim().min(3, 'El concepto es obligatorio').max(300),
   project_id: z.string().uuid().nullable(),
   lineas: z.array(asientoLineaFormSchema).min(2, 'Una póliza lleva al menos 2 líneas'),
+  /** Por qué alguna línea en otra moneda no usa la tasa mensual (decisión B1). */
+  tipo_cambio_motivo: z.string().trim().max(500).optional(),
 }).refine(
   (a) => {
     const debe = round2(a.lineas.reduce((s, l) => s + l.debe, 0))

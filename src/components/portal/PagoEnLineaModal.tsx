@@ -5,6 +5,7 @@ import { calcularTotalPagar } from '../../lib/business'
 import { calcularRecargoTarjeta, type RecargoTarjetaRow } from '../../lib/businessPagos'
 import { iniciarPagoRegistro, confirmarPago } from '../../domain/portal/mutations'
 import { ModalPortal } from '../shared/ModalPortal'
+import { avisoConfirmacionPago } from '../../domain/portal/avisoConfirmacionPago'
 
 interface Props {
   registro: Registro
@@ -71,13 +72,7 @@ export function PagoEnLineaModal({ registro, moneda, recargoRows, canalPago, onC
           notify({ variant: 'error', title: 'Pago no confirmado', text: conf.error })
           return
         }
-        notify({
-          variant: 'success',
-          title: conf.liquidado ? 'Recibo pagado' : 'Abono registrado',
-          text: conf.liquidado
-            ? 'Tu recibo quedó al día.'
-            : `Abono aplicado. Saldo restante: ${moneda} ${(conf.saldoRestante ?? 0).toFixed(2)}`,
-        })
+        notify(avisoConfirmacionPago(conf, { moneda, tituloPagado: 'Recibo pagado', textoAlDia: 'Tu recibo quedó al día.' }))
         onPagado()
         return
       }

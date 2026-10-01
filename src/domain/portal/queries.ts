@@ -362,3 +362,67 @@ export async function fetchAnuncioLecturas(anuncioIds: string[]): Promise<Record
   }
   return out
 }
+
+// ── Saldo a favor, cargos y solicitudes del residente (20261011000000) ──────
+// El sujeto lo resuelve el servidor desde la sesión (auth.uid() → cliente):
+// estas lecturas no reciben ningún id de cliente.
+
+export interface PortalSaldoFavor {
+  origen_id: string
+  project_id: string
+  unidad_id: string
+  tipo: 'excedente' | 'anticipo'
+  moneda: string
+  monto: number
+  disponible: number
+  creado_at: string
+}
+
+export interface PortalDocumentoConSaldo {
+  documento_tabla: 'cuotas_condominio' | 'cargos_adicionales_unidad'
+  documento_id: string
+  project_id: string
+  unidad_id: string
+  concepto: string
+  fecha: string | null
+  estado: string
+  moneda: string | null
+  saldo: number
+}
+
+export interface PortalSolicitud {
+  solicitud_id: string
+  tipo: string
+  documento_tabla: string
+  documento_id: string
+  saldo_origen_id: string | null
+  importe: number | null
+  moneda: string | null
+  /** pendiente | en_revision | ejecutada | rechazada | cancelada */
+  estado: string
+  motivo: string
+  motivo_revision: string | null
+  solicitado_at: string
+  revisado_at: string | null
+  ejecutado_at: string | null
+}
+
+export async function fetchPortalCuentaContable(): Promise<{
+  saldos: PortalSaldoFavor[]
+  documentos: PortalDocumentoConSaldo[]
+  solicitudes: PortalSolicitud[]
+  error: string | null
+}> {
+  const [s, d, q] = await Promise.all([
+    supabase.rpc('portal_saldos_favor'),
+    supabase.rpc('portal_documentos_con_saldo'),
+    supabase.rpc('portal_mis_solicitudes'),
+  ])
+  const error = s.error?.message ?? d.error?.message ?? q.error?.message ?? null
+  return {
+    saldos: (s.data as PortalSaldoFavor[] | null) ?? [],
+    documentos: (d.data as PortalDocumentoConSaldo[] | null) ?? [],
+    solicitudes: (q.data as PortalSolicitud[] | null) ?? [],
+    error,
+  }
+}

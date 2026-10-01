@@ -252,7 +252,15 @@ RESET ROLE;
 UPDATE public.conta_intentos_contabilizacion SET created_at = '2026-06-10 12:00+00'
  WHERE origen_tabla = 'cuotas_condominio' AND origen_id = 'ec500000-0000-0000-0000-000000000024';
 SET ROLE authenticated;
+-- Eliminación HEREDADA (anterior a 20261012000000, cuando una cuota se
+-- borraba sin solicitud): se desactiva expresamente el guard para modelarla.
+RESET ROLE;
+ALTER TABLE public.cuotas_condominio DISABLE TRIGGER trg_cuota_solo_por_solicitud;
+SET ROLE authenticated;
 UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'ec500000-0000-0000-0000-000000000024';
+RESET ROLE;
+ALTER TABLE public.cuotas_condominio ENABLE TRIGGER trg_cuota_solo_por_solicitud;
+SET ROLE authenticated;
 SELECT public.chk_txt(public.ecc_fila('2026-06-30', 'ec500000-0000-0000-0000-000000000024', 'codigo'), 'sin_configuracion',
   'C7 · anulada HOY, al corte de junio seguía vigente y pendiente, con el motivo de ese momento');
 SELECT public.chk(
@@ -267,7 +275,15 @@ SELECT public.chk(
 -- K25, con asiento: se anula hoy, el reverso (julio abierto) lleva 07-10.
 INSERT INTO public.cuotas_condominio (id, company_id, project_id, unidad_id, concepto, monto, periodo, estado, tipo_cargo, created_at) VALUES
   ('ec500000-0000-0000-0000-000000000025', :A, :A1, :U3, 'SINT-AUX K25', 45, '2026-07', 'pendiente', 'mantenimiento', '2026-07-10 12:00+00');
+-- Eliminación HEREDADA (anterior a 20261012000000, cuando una cuota se
+-- borraba sin solicitud): se desactiva expresamente el guard para modelarla.
+RESET ROLE;
+ALTER TABLE public.cuotas_condominio DISABLE TRIGGER trg_cuota_solo_por_solicitud;
+SET ROLE authenticated;
 UPDATE public.cuotas_condominio SET deleted_at = now() WHERE id = 'ec500000-0000-0000-0000-000000000025';
+RESET ROLE;
+ALTER TABLE public.cuotas_condominio ENABLE TRIGGER trg_cuota_solo_por_solicitud;
+SET ROLE authenticated;
 SELECT public.chk_txt(
   public.ecc_fila('2026-07-31', 'ec500000-0000-0000-0000-000000000025', 'codigo') || '|' ||
   public.ecc_fila('2026-07-31', 'ec500000-0000-0000-0000-000000000025', 'fecha'),
@@ -295,7 +311,13 @@ UPDATE public.pagos SET estado = 'rechazado' WHERE id = 'ec600000-0000-0000-0000
 DELETE FROM public.conta_config_tipo_cargo WHERE project_id = :A1 AND tipo_cargo = 'adicional_reparacion';
 INSERT INTO public.cargos_adicionales_unidad (id, company_id, project_id, unidad_id, concepto, categoria, monto, fecha_cargo, estado) VALUES
   ('ec700000-0000-0000-0000-000000000020', :A, :A1, :U3, 'SINT-AUX CA20', 'reparacion', 15, '2026-08-07', 'pendiente');
+-- Anulado ANTES de 20261011000000 (sin evidencia de la fecha): el dato
+-- heredado que la limitación anulacion_sin_fecha sigue declarando.
+RESET ROLE;
+ALTER TABLE public.cargos_adicionales_unidad DISABLE TRIGGER trg_cargo_solo_por_solicitud;
 UPDATE public.cargos_adicionales_unidad SET estado = 'anulado' WHERE id = 'ec700000-0000-0000-0000-000000000020';
+ALTER TABLE public.cargos_adicionales_unidad ENABLE TRIGGER trg_cargo_solo_por_solicitud;
+SET ROLE authenticated;
 INSERT INTO public.conta_config_tipo_cargo (company_id, project_id, tipo_cargo, cuenta_cxc_id, cuenta_ingreso_id) VALUES
   (:A, :A1, 'adicional_reparacion', '11000000-0000-0000-0000-00000000a101', '11000000-0000-0000-0000-00000000a103');
 INSERT INTO public.cargos_adicionales_unidad (id, company_id, project_id, unidad_id, concepto, categoria, monto, fecha_cargo, estado) VALUES
