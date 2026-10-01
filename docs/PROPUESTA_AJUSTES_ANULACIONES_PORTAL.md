@@ -110,7 +110,8 @@ nunca un parámetro. El residente ve y solicita; no aplica. Pantalla: `PortalCar
 ## 6. Matriz de requisitos → código → pruebas → entorno
 
 Migraciones del bloque: `20261011000000`, `20261012000000`, `20261013000000` (correctiva: guarda de
-cuota anulada sin trigger en `pagos`) y `20261014000000` (correctiva E7).
+cuota anulada sin trigger en `pagos`), `20261014000000` (correctiva E7) y `20261015000000`
+(confirmación tardía de un cobro sobre una cuota anulada).
 
 Entornos (dónde está **comprobado**, no sólo escrito):
 - **L** = PostgreSQL desechable local con la cadena completa de migraciones (`supabase/tests/*/run.sh`);
@@ -133,8 +134,9 @@ Entornos (dónde está **comprobado**, no sólo escrito):
 | 2h | Efectos en EC, portal, saldos, cortes históricos | `anulada_at` del servidor + reversos | §14 (corte de ayer / hoy, portal), §19 (conciliación) | L, CI |
 | 2i | **ajuste_importe** | — | — | ⏸️ **Pendiente de E6** (qué falta: `DECISIONES…` §E6) |
 | 2j | **E7**: sólo la tarifa sin emitir de una reserva cancelada se elimina sin solicitud; una cuota 'pendiente' ya es CxC | `20261014000000` (`conta_cuota_exigir_eliminable`), `AmenidadesTab` (cancelar antes, compensación por solicitud) | `assert_b.sql` §12 (QF, QF2, QF3, QG) | L, CI |
-| 2k | **E8**: cobros en línea abandonados | — (propuesta en `DECISIONES…` §E8) | — | ❓ pendiente |
-| 2l | Migraciones aplicables sobre una base de Supabase | `20261011`–`20261014` | check «Supabase Preview» | P |
+| 2k | **E8**: cuándo consultar cobros en línea abandonados | — (propuesta en `DECISIONES…` §E8) | — | ❓ pendiente |
+| 2m | **Confirmación tardía sobre cuota anulada o eliminada**: evento conservado, sin pago, una incidencia, sin devolver ni convertir (independiente de E8) | `20261015000000` (`pasarela_registrar_estado`, `pasarela_cuota_sin_cobro`, `uq_conta_incidencias_cobro_anulado`), `confirm-charge`, `stripe-webhook-handler`, `confirmarPago` | `assert_b.sql` §20 (duplicados por clave, otra clave, consulta, rechazo y reembolso posteriores, eliminada, aislamiento); concurrencia I, J, K; `confirm-charge/__tests__/handler.test.ts`; `logic.test.ts`; `confirmarPago.test.ts` | L, CI |
+| 2l | Migraciones aplicables sobre una base de Supabase | `20261011`–`20261015` | check «Supabase Preview» | P |
 | 3a | Permisos en servidor | `conta_ajuste_bloquear_para_revision`, `_puede_solicitar` | §2, §3, §6, §13, §14 | L, CI |
 | 3b | Revalidar documento, período y saldo | `conta_ajuste_revalidar` | §5, §6, §8, §15; concurrencia B, C, F′ | L, CI |
 | 3c | Sin escrituras directas | `conta_ajuste_exigir`, triggers, REVOKE | §0, §1, §11, §12 | L, CI |
@@ -146,15 +148,15 @@ Entornos (dónde está **comprobado**, no sólo escrito):
 | 7b | **Reembolso parcial**: datos del proveedor, incidencia, sin rechazar | `pasarela_registrar_reembolso_parcial`, `pasarela_reembolsos`, `stripe-webhook-handler` | §18; concurrencia G; `stripe-webhook-handler/__tests__/logic.test.ts` | L, CI |
 | 7c | Parciales duplicados, acumulados y fuera de orden | UNIQUE (solicitud, acumulado), bloqueo de la solicitud | §18 (5 casos), concurrencia G | L, CI |
 | 8 | **Respaldo documental** protegido y trazable | bucket `ajustes-respaldos`, `conta_ajustes_respaldos`, `conta_ajuste_adjuntar_respaldo`, `respaldos_revisados` | §17 (RLS de storage, otra empresa, residente, sin UPDATE/DELETE, lista revisada, eTag alterado, cerrado tras aprobar, rechazo); `ajustes.test.ts`; `ajustesTab.test.tsx` | L, CI |
-| 9 | Aislamiento, concurrencia, fallos, reintentos | — | `conta_ajustes` §1–§19, concurrencia A–G | L, CI |
+| 9 | Aislamiento, concurrencia, fallos, reintentos | — | `conta_ajustes` §1–§20, concurrencia A–K | L, CI |
 | 10a | Sandbox | procedimiento acotado en `SANDBOX_E2E_SINCRONIZAR.md` | **Espera autorización** (ver abajo) | S ✗ |
-| 10b | Auditor de drift | refresco de `huella-produccion.json` | Causa verificada contra producción (captura de sólo lectura 2026-09-27 23:46:56 UTC, sha256 `35fff705…9e37`, 2779 grupos, 813 migraciones): huella anterior a #902. **Escritura del archivo bloqueada por los permisos de la sesión** | CI ✗ |
+| 10b | Auditor de drift | `huella-produccion.json` refrescada con la captura real de producción (sólo lectura, 2026-09-27 23:46:56 UTC, sha256 `35fff705…9e37`, 2779 grupos, 813 migraciones, máxima `20261006000000`); `drift-conocido.json` sin cambios | `auditar.mjs --base aa6e0461` en local: «Sin drift no autorizado» | L, CI |
 
 ### Sandbox (2026-10-01, sólo lectura)
 
 `jwpmivhvlstslncrtokb` = «control-agua-rls-sandbox» (≠ producción `nnsqmeigtgewatameexo`): 504 migraciones,
 máxima `20261004000200`. Faltan exactamente `20261005000000`, `20261006000000` (en `main`) y
-`20261007000000`–`20261014000000` (8 de este PR). El procedimiento autorizado sólo aplica `main`; el
+`20261007000000`–`20261015000000` (9 de este PR). El procedimiento autorizado sólo aplica `main`; el
 procedimiento acotado para las de este PR está en `SANDBOX_E2E_SINCRONIZAR.md` y **espera autorización**.
 
 ## 7. Fuera de alcance / pendiente
@@ -162,7 +164,6 @@ procedimiento acotado para las de este PR está en `SANDBOX_E2E_SINCRONIZAR.md` 
 - `ajuste_importe`: **no implementado**, espera las decisiones E6. El bloque no está completo sin él.
 - Recordatorios y «estancada» (E3′), revisión del umbral (E2′): propuestas sin código.
 - QPayPro: su adaptador no expone reembolsos; no se implementa nada no confirmado.
-- Carrera residual: un cobro en línea creado en el instante previo a la aprobación de la anulación de la cuota
-  (sin solicitud de cobro todavía) y confirmado después falla al conciliar (`COBRO_CUOTA_ANULADA`) y el webhook
-  queda reintentando; queda visible en `stripe_webhook_events`. Lo cierra el flujo propuesto en E8
-  (incidencia `cobro_sobre_documento_anulado`).
+- Confirmación tardía de un cobro sobre una cuota anulada: **cerrada** en `20261015000000` (fila 2m),
+  separada de E8. Sin cambios para un recibo de agua eliminado (sigue fallando como antes) y para un
+  cargo anulado (ya registraba el pago con la contabilización pendiente, `20261011000000`).

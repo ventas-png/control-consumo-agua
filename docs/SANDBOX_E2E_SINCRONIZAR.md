@@ -28,51 +28,127 @@ No existen `pagos_rechazo_eventos`, `conta_ec_cobro_al_corte(uuid, date)` ni
 | `20261012000000_conta_anular_cuota_reembolsos_parciales_respaldos` | #904 | **Falta** |
 | `20261013000000_conta_cuota_anulada_sin_tocar_pagos` | #904 (correctiva de 20261012) | **Falta** |
 | `20261014000000_conta_cuota_eliminar_solo_tarifa_reserva_cancelada` | #904 (correctiva de 20261012, E7) | **Falta** |
+| `20261015000000_pasarela_cobro_tardio_cuota_anulada` | #904 (confirmación tardía sobre cuota anulada) | **Falta** |
 
-El procedimiento de abajo sólo admite migraciones de `main` (paso 1: «nada de PRs abiertos»).
-Las de #904 **no** se aplican con él. Para probarlas en este sandbox hace falta la autorización
-expresa del procedimiento acotado de la sección siguiente.
+El procedimiento normal (más abajo) sólo admite migraciones de `main` (paso 1: «nada de PRs
+abiertos»). Las 9 de #904 **no** se aplican con él: hace falta la autorización expresa del
+procedimiento acotado de la sección siguiente.
 
 ## Procedimiento ACOTADO para probar las migraciones de un PR abierto (requiere autorización)
 
-**No está autorizado todavía; no se ejecutó.** Es la propuesta para #904.
+**No está autorizado; no se ejecutó nada.** Es la propuesta para #904. Separa lo que se puede
+deshacer con una transacción de lo que no.
+
+### Qué deja cada tipo de prueba
+
+| Tipo | Cómo corre | Qué queda después | Limpieza |
+| --- | --- | --- | --- |
+| **A · SQL reversible** | Una conexión `psql` (o `database/query`), `BEGIN` … pruebas … `RAISE EXCEPTION 'fin'` | Nada en tablas, catálogo ni historial. Sólo avanzan secuencias (`nextval` no se revierte) | Ninguna |
+| **B · Storage real** | Peticiones HTTP a la API de Storage con la sesión de un usuario E2E | El objeto en el almacenamiento **y** su fila en `storage.objects`: cada subida es su propia transacción, ya confirmada cuando vuelve la respuesta. **Un `RAISE` en otra transacción no la revierte** | La de la tabla de abajo, sólo autorizada |
+| **C · Migraciones** | Paso 3, una por transacción | Esquema + fila de historial, juntos | Ver «Restauración» |
+
+Las pruebas B necesitan además filas **confirmadas** que las respalden: la política de
+`storage.objects` (`ajustes_respaldos_insert`) sólo deja subir a la carpeta de una solicitud que
+existe y está `pendiente`, y `conta_ajuste_adjuntar_respaldo` escribe en una tabla inmutable. Por eso B
+deja datos sintéticos persistentes y A no.
+
+### Pasos
 
 1. **Primero `main`.** `20261005000000` y `20261006000000` con el procedimiento normal (abajo),
    cada una en su transacción con huella verificada. Si la huella previa del sandbox no coincide con
    la reconstrucción de su historial, se detiene todo y se informa.
-2. **Respaldo** en `respaldo_sync_AAAAMMDD` (paso 3 del procedimiento normal), además de las
-   definiciones actuales de las funciones que #904 redefine (`conta_tg_pagos`, `conta_tg_cuotas`,
-   `conciliar_pago_externo`, las de estado de cuenta y saldos a favor) y del contenido de
-   `storage.buckets`/políticas de `storage.objects`.
-3. **Las 8 migraciones del PR, en orden, una por transacción**, con el SQL **del SHA autorizado**
+2. **Respaldo** en `respaldo_sync_AAAAMMDD` (paso 3 del procedimiento normal) y, además:
+   - la **huella completa previa a #904** (`fingerprint.sql`), que es la referencia de la
+     restauración;
+   - `pg_get_functiondef` y ACL de **cada** función que las 9 migraciones redefinen o eliminan, y
+     la definición de cada trigger, constraint y política que cambian (lista generada desde los
+     archivos del SHA autorizado, no a mano);
+   - las filas de `storage.buckets` y las políticas de `storage.objects`.
+3. **Las 9 migraciones del PR, en orden, una por transacción**, con el SQL **del SHA autorizado**
    (se registra el SHA), su fila en `supabase_migrations.schema_migrations` con la misma versión y
    nombre, y la huella esperada tras cada paso (calculada antes sobre una reconstrucción local de
    `main` + esas migraciones). Huella distinta → `ROLLBACK` de esa transacción y alto. Nada de
-   `repair`, `reset` ni borrado de datos: las migraciones sólo crean tablas vacías, agregan
-   columnas con default y redefinen funciones, triggers, políticas y un bucket privado.
+   `repair`, `reset` ni borrado de datos: crean tablas vacías, agregan columnas con default,
+   redefinen funciones, triggers y políticas, y crean el bucket privado `ajustes-respaldos`.
 4. **Registro** en `respaldo_sync_AAAAMMDD.migraciones_de_pr` (versión, nombre, sha256 del archivo,
    SHA del PR, quién autorizó). Cuando #904 llegue a `main`, se comprueba que cada archivo fusionado
-   tenga el mismo sha256: si coincide, no se vuelve a aplicar nada; si el PR cambió una migración ya
-   aplicada aquí, se trata como colisión (sección «Colisiones de versión») y se decide con quien
+   tenga el mismo sha256: si coincide, no se vuelve a aplicar nada; si cambió una migración ya
+   aplicada aquí, es una colisión (sección «Colisiones de versión») y se decide con quien
    administra el sandbox.
-5. **Pruebas de los flujos del bloque 3 en el sandbox**, con datos sintéticos `SINT` dentro de
-   transacciones que terminan en `RAISE` (no quedan datos):
+5. **Pruebas A (reversibles)**, con datos `SINT` creados dentro de la misma transacción que termina
+   en `RAISE`:
    - anular cuota: solicitar, dependencias informadas, aprobar, reversos vinculados, evidencia,
-     estado de cuenta al corte, portal; eliminación de tarifa de reserva cancelada vs. cuota
-     `pendiente` (E7);
-   - respaldos: subir al bucket privado con la sesión de un usuario E2E, registrar, aprobar con la
-     lista revisada, eTag alterado, no reemplazable;
-   - reembolsos parciales: `pasarela_registrar_reembolso_parcial` como service_role con avisos
-     duplicados, acumulados y fuera de orden; incidencias visibles.
-   Después, el E2E del despliegue contra el sandbox y su preflight.
-6. **Cómo se deshace** si se decide no seguir: restaurar desde el respaldo las funciones y políticas
-   redefinidas y borrar las filas de historial de esas 8 versiones; las tablas nuevas quedan vacías
-   (eliminarlas sería un borrado: sólo con autorización expresa).
+     estado de cuenta al corte, portal; eliminación de la tarifa de una reserva cancelada contra una
+     cuota `pendiente` (E7);
+   - respaldos, **sólo la parte SQL**: registro con `conta_ajuste_adjuntar_respaldo` sobre una fila
+     de `storage.objects` insertada en la misma transacción, aprobación con la lista revisada,
+     eTag alterado (`AJUSTE_RESPALDO_ALTERADO`). Esto prueba las reglas, **no** la API de Storage;
+   - reembolsos parciales y confirmación tardía sobre cuota anulada como service_role: avisos
+     duplicados, acumulados, fuera de orden; incidencias visibles.
+6. **Pruebas B (Storage real)**, sólo si se autorizan aparte, porque dejan datos:
+   - archivos: dos PDF sintéticos de 1 KB generados en el momento (contenido
+     `SINT E2E respaldo <fecha>`; nada real ni de producción);
+   - ruta: `<company_id del tenant E2E>/<solicitud SINT>/<clave>-SINT-E2E-AAAAMMDD-n.pdf`
+     (`rutaRespaldo`), en `ajustes-respaldos`;
+   - qué se comprueba: subir con la sesión del usuario E2E; volver a subir a la misma ruta falla
+     (`upsert: false`, sin política de UPDATE); un usuario de otra empresa no puede leerlo; la URL
+     firmada vence; el sha256 registrado coincide con el archivo;
+   - **efectos persistentes** (todos en el tenant E2E, todos con `SINT-E2E-AAAAMMDD` en el
+     concepto o el motivo): 1 cuota sintética con su asiento de devengo; 1 solicitud `anular_cuota`
+     que se aprueba al final (la cuota queda anulada con su reverso: saldo neto 0) con sus eventos;
+     2 filas en `conta_ajustes_respaldos`; 2 objetos en el bucket con sus filas de
+     `storage.objects`;
+   - **limpieza autorizada**: sólo los 2 objetos, por la API de Storage con `service_role`
+     (`remove`), que borra a la vez el archivo y su fila. Nunca `DELETE` sobre `storage.objects`
+     por SQL (dejaría el archivo huérfano). Las filas contables y de bitácora **no** se borran: son
+     inmutables por diseño y quitarlas exigiría desactivar triggers, que está prohibido. Quedan como
+     datos sintéticos declarados aquí; si se borran los objetos, sus filas de
+     `conta_ajustes_respaldos` siguen con el sha256 y la ruta, y el registro anota que el archivo
+     se retiró y cuándo.
+7. Después, el E2E del despliegue contra el sandbox y su preflight.
 
-Alternativa sin cambio persistente: el mismo paso 3 + las pruebas del paso 5 dentro de UNA
-transacción que termina en `RAISE` (como se validaron #901 y #902). Requiere enviar ~560 KB de
-SQL en una sola sentencia: no es viable por el conector de esta sesión; sí con `psql` y la URL de la
-base del sandbox por quien la administra.
+### Restauración (si se decide no seguir)
+
+La regla: **esquema e historial cambian juntos**. Una fila de `schema_migrations` sólo se quita en
+la misma transacción que revierte todos sus efectos, y sólo si la huella resultante es la de antes
+de esa migración. Nunca se borra una fila de historial dejando sus objetos vivos, ni se dejan
+objetos sin su fila.
+
+- **R1 · Mantenerlas aplicadas (por defecto).** Si ya corrieron pruebas B, es la única opción sin
+  borrar datos: las tablas nuevas tienen filas sintéticas inmutables. Esquema e historial coinciden;
+  el registro del paso 4 explica qué SHA está aplicado. Al fusionarse #904 se verifica el sha256
+  (paso 4).
+- **R2 · Revertir por completo** (sólo sin pruebas B, o con autorización expresa para borrar sus
+  datos). Una transacción por migración, **de la última a la primera** (20261015 → 20261007):
+  1. restaurar desde el respaldo las funciones, triggers, constraints y políticas que esa
+     migración redefinió, y volver a crear las que eliminó (p. ej. `conta_ajuste_aprobar(uuid,
+     text, boolean)`, que 20261012 sustituyó);
+  2. eliminar los objetos que creó (funciones, triggers, índices, columnas, tablas), **sólo si
+     están vacíos**; una tabla con filas detiene la reversión → se queda en R1;
+  3. el bucket `ajustes-respaldos` sólo vacío y por la API de Storage (`deleteBucket`), no por SQL;
+  4. borrar su fila de `schema_migrations`;
+  5. comprobar con `fingerprint.sql` que la huella es la esperada **antes** de esa migración
+     (calculada sobre la reconstrucción local); si no, `ROLLBACK` y alto.
+
+  Al terminar, la huella del sandbox debe ser igual a la huella previa registrada en el paso 2.
+
+**Antes de pedir la autorización** falta (no está hecho): el guion de R2 generado desde los
+archivos del SHA autorizado y **probado en local** (cadena de `main` + 9 migraciones + R2 → huella
+igual a la de `main`). Sin esa prueba no se propone R2: sólo R1.
+
+Alternativa sin cambio persistente: los pasos 3 y 5 dentro de UNA transacción que termina en
+`RAISE` (como se validaron #901 y #902). Cubre A y C, nunca B. Requiere enviar ~580 KB de SQL en una
+sola sentencia: no es viable por el conector de esta sesión; sí con `psql` y la URL de la base del
+sandbox por quien la administra.
+
+### Autorización que se pide
+
+Por separado, porque tienen efectos distintos:
+
+1. aplicar 20261005 y 20261006 (`main`) por el procedimiento normal;
+2. aplicar las 9 migraciones de #904 en el SHA que se indique (C, con R1 por defecto);
+3. correr las pruebas A;
+4. correr las pruebas B, con los efectos persistentes y la limpieza descritos en el paso 6.
 
 ## Cuándo hacerlo
 

@@ -47,7 +47,17 @@ de «único aprobador», y los plazos de E2/E3 son **propuestas**, no decisiones
 
 ### Decisiones pendientes del cierre del bloque 3 (actualizado 2026-10-01)
 
-#### E6 · `ajuste_importe` — ⏸️ PENDIENTE, sin implementar
+**Ninguna de estas tres está aprobada.** E7 tiene código, pero su alcance sigue esperando
+confirmación; E6 y E8 no tienen código.
+
+| # | Qué hay que decidir | Qué existe hoy | Qué pasa mientras no se decide |
+| --- | --- | --- | --- |
+| E6 | Las cuatro reglas de `ajuste_importe`: contrapartida, crédito y/o débito, tope, base de la mora | Nada (ni tabla, ni tipo de solicitud, ni pantalla) | No hay forma de rebajar o aumentar el importe de una cuota o un cargo; sólo anularlo por solicitud |
+| E7 | ¿Cancelar la reserva basta para eliminar su tarifa **sin** aprobación, o también debe pasar por solicitud? | Implementado como «basta» (`20261014000000`), con pruebas | Se aplica esa regla; si la respuesta es «no basta», se cambia por una correctiva que exija solicitud también para ese caso |
+| E8 | Cuándo consultar al proveedor por un cobro abandonado (N horas), quién puede pedir la consulta manual, y cómo se trata QPayPro sin consulta servidor a servidor | Nada del flujo de consulta. Sí la protección de la confirmación tardía (abajo), que **no** depende de esta decisión | Un cobro `pending` sigue bloqueando la anulación de su cuota sin plazo; nada se libera por antigüedad |
+
+
+#### E6 · `ajuste_importe` — ⏸️ PENDIENTE de decisión, sin implementar
 
 Faltan las cuatro reglas: **(a)** contrapartida (la cuenta de ingreso del devengo original o una
 cuenta especial de ajustes/bonificaciones); **(b)** sólo crédito (rebaja) o también débito
@@ -68,7 +78,7 @@ Qué falta implementar una vez definidas (nada de esto existe hoy):
 5. Pantalla (solicitar desde Cuotas y Cargos), pruebas SQL (permisos, aislamiento, doble
    aprobación, concurrencia contra cobros, período cerrado, tope) y vitest.
 
-#### E7 · eliminar cuotas sin aprobación — ✅ implementado (`20261014000000`), ❓ confirmar alcance
+#### E7 · eliminar cuotas sin aprobación — ❓ PENDIENTE de confirmación (implementado en `20261014000000`)
 
 `cuota_estado = 'pendiente'` **no** distingue una cuota sin emitir de una pendiente de pago: es el
 valor por defecto de toda cuota hasta el cierre de ciclo, y una cuota 'pendiente' ya tiene su
@@ -84,18 +94,17 @@ cuando falla guardar una reserva y ya se generó el cargo, ya no lo borra: solic
 **Confirmar**: ¿la cancelación de la reserva basta como autorización para eliminar su tarifa, o
 también debe pasar por aprobación?
 
-#### E8 · cobros en línea abandonados — ❓ propuesta, sin implementar
+#### E8 · cobros en línea abandonados — ❓ PENDIENTE de decisión, propuesta sin implementar
 
 Hoy una solicitud de cobro `pending` de una cuota bloquea su anulación sin plazo (dependencia
-`cobro_en_linea`). Flujo propuesto de conciliación (la antigüedad sólo decide **cuándo preguntar**,
-nunca libera):
+`cobro_en_linea`). Flujo propuesto (la antigüedad sólo decide **cuándo preguntar**, nunca libera):
 
 1. **Detección**: solicitudes `pending`/`pending_verification` con más de N horas (N a definir) o a
    pedido de Contabilidad («Consultar al proveedor» en la incidencia o en la dependencia).
 2. **Consulta al proveedor desde el servidor** (`provider.consultarEstado`), registrada con
    `pasarela_registrar_estado(origen = 'consulta')`: el aviso queda en `pasarela_eventos` con el
    estado crudo del proveedor en `payload`, deduplicado.
-   - `aprobado` → se concilia como hoy.
+   - `aprobado` → se concilia como hoy (o se retiene, si la cuota ya se anuló: ver abajo).
    - estado **final** de no-cobro informado por el proveedor (Stripe: PaymentIntent `canceled`;
      sesión de checkout `expired`) → `rechazado` → la solicitud pasa a `failed` y deja de ser
      dependencia.
@@ -103,17 +112,38 @@ nunca libera):
 3. **QPayPro**: su `consultarEstado` todavía no consulta al proveedor (devuelve `pendiente` por
    diseño: `_shared/payments/qpayproProvider.ts`). Hasta cablear el endpoint confirmado, sus cobros
    abandonados **no** se liberan automáticamente: Contabilidad verifica en el panel de QPayPro y
-   registra el resultado con evidencia (decisión a confirmar: quién y con qué respaldo).
-4. **Confirmación tardía** (el proveedor aprueba después de `failed`): `failed → succeeded` ya
-   concilia hoy. Si mientras tanto la cuota se anuló, la conciliación no debe fallar en silencio ni
-   perder el dinero: se conserva el aviso, la solicitud queda `pending_verification` y se abre una
-   incidencia nueva `cobro_sobre_documento_anulado` (devolver por el proveedor o registrar como
-   anticipo, a decidir por Contabilidad). Hoy esa conciliación falla con `COBRO_CUOTA_ANULADA` y el
-   webhook reintenta: es el hueco que este flujo cierra.
-5. **Trazabilidad**: cada consulta y su resultado en `pasarela_eventos`; cada liberación enlazada al
+   registra el resultado con evidencia (a decidir: quién y con qué respaldo).
+4. **Trazabilidad**: cada consulta y su resultado en `pasarela_eventos`; cada liberación enlazada al
    evento del proveedor que la justifica; nada se libera por fecha.
 
-**Decidir**: N (cuándo consultar), quién puede pedir una consulta manual, y el tratamiento de QPayPro
-mientras no tenga consulta server-to-server.
+**Decidir**: N, quién puede pedir una consulta manual, y el tratamiento de QPayPro.
+
+### Protección implementada (no es una decisión): confirmación tardía sobre una cuota anulada
+
+Separada de E8 a propósito: vale para cualquier «aprobado» tardío, venga del webhook, del retorno
+del portal o de una consulta futura, y no fija cuándo consultar. Implementada en `20261015000000`.
+
+- **Antes**: una solicitud `failed` no impide anular la cuota. Si después el proveedor confirmaba
+  el cobro, el pago chocaba con `COBRO_CUOTA_ANULADA` (o «cuota no encontrada» si estaba eliminada),
+  la transacción revertía entera —incluido el aviso— y el webhook reintentaba sin fin. El dinero
+  cobrado no quedaba escrito en ninguna parte.
+- **Ahora** (`pasarela_registrar_estado`): se conserva el evento; la solicitud pasa a
+  `pending_verification`; **no** se registra pago ni se acredita nada; se abre **una** incidencia
+  visible `cobro_sobre_documento_anulado` por solicitud (índice único). Avisos repetidos —misma
+  clave, otra clave, consulta— o simultáneos sólo dejan su evento. Un «rechazado» posterior no la
+  pasa a `failed`; un reembolso posterior del proveedor la deja `refunded` sin tocar contabilidad.
+- **Sin decisiones automáticas**: el dinero no se devuelve ni se convierte en saldo a favor. Cada
+  caso lo resuelve una persona (reembolsar en el proveedor, o registrar un anticipo por el flujo de
+  ajustes) y cierra la incidencia con nota.
+- **Concurrencia**: se bloquea la solicitud y luego la cuota, el mismo orden que la conciliación.
+  O la anulación termina primero y el aviso queda retenido, o el cobro entra primero y la anulación
+  falla por dependencias. Pruebas: `supabase/tests/conta_ajustes/assert_b.sql` §20 y sesiones reales
+  I/J/K en `run.sh`.
+- **Edges**: `confirm-charge` ya no corta con 404 una cuota eliminada y responde `en_revision`; el
+  webhook de Stripe responde 200 sin conciliar (reintentar no cambiaría nada); el portal no anuncia
+  un abono que no existe.
+- **Fuera de alcance, sin cambios**: un cargo adicional anulado ya tenía otro camino
+  (`20261011000000`): el pago se registra y su contabilización queda pendiente, visible en
+  Contabilidad. Un recibo de agua eliminado sigue fallando como antes.
 
 El detalle del bloque 3 está en [`PROPUESTA_AJUSTES_ANULACIONES_PORTAL.md`](PROPUESTA_AJUSTES_ANULACIONES_PORTAL.md).
