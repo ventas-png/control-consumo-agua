@@ -31,8 +31,39 @@ Una sola sentencia que **revierte todo** y termina SIEMPRE en excepción. Cómo 
 
 Cubre: orden aprobada y emitida (solicitante ≠ aprobador); **condiciones inmutables** (cambiar proveedor/moneda de una orden emitida y marcarla «recibida» a mano → rechazados); **recepción transaccional e idempotente** (nueva con clave; reintento = mismo documento; misma clave con otro contenido → conflicto; línea ajena → falla sin cabecera huérfana); recepción parcial (40 de 100, 5 rechazados con motivo); conformidad de servicio sin inventario ni activo; recepción final y sobre-recepción rechazada; dos facturas parciales; **cuentas personalizadas** (servicio en `6205` por cuenta explícita; activo en `9101` por mapeo; inventario `1106`; puente `2105` en 0; CxP `2104` = 2576); asientos balanceados y sin borradores; sin duplicados (3 de recepción, 2 de factura); pendientes por línea (60/1/1 tras la parcial; 0 al final); seguimiento (comprometido 2576, recibido 2300, facturado 2576, pagado 0; el operador no ve facturas); **restricciones**: otra empresa no ve ni recibe ni factura contra la orden; otro proyecto de la misma empresa no la ve ni lista el proyecto; factura duplicada rechazada; operador sin permisos no aprueba.
 
-## 4. No ejecutado (pendiente explícito)
+## 4. Qué se probó y con qué método (no se mezclan)
 
-* **Interfaz conectada al sandbox y capturas**: el entorno de esta sesión no alcanza `jwpmivhvlstslncrtokb.supabase.co` (el proxy de salida deniega el host por política de la organización). Hace falta añadir ese host a los dominios permitidos del entorno (menú del entorno → Edit → Network access) o ejecutar la prueba desde otra máquina.
-* **Padrón persistente «ZZ Validación Bloque B»**: no se creó. Solo tendría sentido junto con la prueba de interfaz; el guion transaccional no deja residuos. Si se crea, usará UUID `5b5b1…` (distintos de los del guion) y quedará identificado por ese prefijo.
-* Las pruebas de CI, E2E y la suite SQL local siguen siendo evidencias distintas y no sustituyen a la interfaz contra el sandbox.
+| Capa | Dónde | Estado | Qué demuestra | Qué NO demuestra |
+|---|---|---|---|---|
+| **Pruebas SQL locales** | PostgreSQL 16 efímero (`compras_bloque_b/run.sh`) | ✅ | reglas del servidor, concurrencia real, migraciones dos veces | nada del sandbox ni de la interfaz |
+| **CI de GitHub** (último SHA `b9241185`) | GitHub Actions | ✅ 9/9 checks reales en verde: Type-check/test/build, E2E, RLS harness, RLS sandbox de recepción, Coverage gate, drift (auditor y pruebas), Supabase Preview, Vercel | el código compila, las suites del repo pasan | el comportamiento en el sandbox compartido |
+| **SQL en el sandbox real** | `control-agua-rls-sandbox` | ✅ 7 migraciones aplicadas y verificadas; guion `GUION_OK_REVERTIDO` 52/52, 0 residuos | el esquema y las reglas funcionan sobre el sandbox, de punta a punta, como SQL | que la interfaz las use bien |
+| **Interfaz conectada al sandbox** | navegador contra `jwpmivhvlstslncrtokb` | ⛔ **NO realizada** | — | — |
+
+Las pruebas de componentes (vitest) prueban pantallas con datos simulados; **no** sustituyen a la interfaz contra el sandbox.
+
+## 5. Prueba de interfaz: bloqueo y protocolo (pendiente de habilitación)
+
+**Bloqueo.** El egress de la sesión deniega `jwpmivhvlstslncrtokb.supabase.co:443` (política de red de la organización). Se reprobó el 2026-10-02: sigue denegado. **No se elude** (ni túneles ni otro host). Opciones autorizadas:
+1. El propietario añade ese host a los dominios permitidos del entorno (menú del entorno → Edit → Network access), o
+2. la prueba se ejecuta desde una máquina con acceso permitido siguiendo este protocolo.
+
+**Control de destino (obligatorio antes de abrir la aplicación).**
+- `VITE_SUPABASE_URL` debe ser exactamente `https://jwpmivhvlstslncrtokb.supabase.co`; `VITE_SUPABASE_ANON_KEY` debe ser la llave pública de **ese** proyecto (su payload JWT dice `ref: jwpmivhvlstslncrtokb`).
+- Se aborta si la URL o la llave contienen la referencia de producción (`nnsqmeigtgewatameexo`) o si el ref de la llave difiere.
+- Con la app abierta se comprueba en la pestaña Red del navegador (o en el log de Playwright) que **todas** las peticiones a Supabase van al host del sandbox y ninguna al de producción; esa lista se adjunta como evidencia.
+
+**Datos de prueba.** Padrón persistente identificable «ZZ Validación Bloque B» (UUID `5b5b1…`, distintos de los del guion `5b5b0…`), con usuarios administrador, operador y contador **de prueba**; credenciales fuera del repositorio. No se borra ni se modifica nada ajeno; al terminar se decide con el propietario si el padrón se conserva o se retira (solo filas `5b5b1…`).
+
+**Recorrido de interfaz a registrar (con captura por paso y resultado esperado/obtenido).**
+1. Operaciones → Órdenes de compra: crear con proveedor del catálogo (selector por id); aprobar y emitir (admin ≠ solicitante).
+2. Compras → Recibir: recepción **parcial** con una cantidad rechazada y su motivo; registrar. Verificar pendiente y rechazado en el seguimiento.
+3. Compras → Recibir: **conformidad de servicio** (sin movimiento de inventario).
+4. Recepción **final** de inventario y activo (el activo aparece en la cuenta personalizada).
+5. Cuentas por pagar: dos facturas parciales; ver el cuadre (IVA y moneda) y aprobar; ver asientos.
+6. Seguimiento de la orden como contador (ve facturas) y como operador (no las ve).
+7. Negativos en la interfaz: factura duplicada, recibir de más, usuario de otra empresa/proyecto.
+
+## 6. No ejecutado (pendiente explícito)
+* Todo el recorrido de §5 (interfaz contra el sandbox) y sus capturas.
+* El padrón persistente: **no se creó** a propósito hasta que la prueba pueda ejecutarse (evita datos y credenciales de prueba sin uso).
