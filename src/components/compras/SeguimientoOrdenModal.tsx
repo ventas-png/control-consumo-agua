@@ -124,7 +124,7 @@ export function SeguimientoOrdenContenido({ s, monedaBase }: { s: SeguimientoOrd
                 <StatusBadge tone={r.estado === 'registrada' ? 'success' : r.estado === 'anulada' ? 'danger' : 'neutral'}>{ESTADO_RECEPCION_LABELS[r.estado]}</StatusBadge>
                 {' '}· aceptado {r.aceptado}{r.rechazado > 0 && <>, rechazado {r.rechazado}</>}
                 {r.destino_fisico && <> · {r.destino_fisico}</>}
-                {r.tiene_respaldo && <> · con soporte</>}
+                {r.tiene_respaldo && <> · con soporte{r.respaldos ? ` (${r.respaldos} archivo${r.respaldos === 1 ? '' : 's'})` : ''}</>}
               </li>
             ))}
           </ul>
@@ -164,6 +164,23 @@ export function SeguimientoOrdenContenido({ s, monedaBase }: { s: SeguimientoOrd
                 </div>
               ))}
             </div>
+          )}
+        </Seccion>
+      )}
+
+      {verConta && (
+        <Seccion titulo="Pagos" testId="seg-pagos">
+          {!s.pagos || s.pagos.length === 0 ? <Vacio>Todavía no hay pagos de las facturas de esta orden.</Vacio> : (
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+              {s.pagos.map((p) => (
+                <li key={`${p.id}:${p.factura_id}`}>
+                  {p.fecha_pago ? formatDateShort(p.fecha_pago) : 'Sin fecha'} · {p.metodo_pago}{p.referencia ? ` ${p.referencia}` : ''} ·{' '}
+                  <StatusBadge tone={p.estado === 'pagada' ? 'success' : 'neutral'}>{p.estado}</StatusBadge>{' '}
+                  · aplicado a la factura {p.numero_factura ?? '—'}: <strong>{$(p.monto_aplicado)}</strong>
+                  {p.contrasena && <> (contraseña {p.contrasena}; el pago total es {$(p.monto_pago)})</>}
+                </li>
+              ))}
+            </ul>
           )}
         </Seccion>
       )}

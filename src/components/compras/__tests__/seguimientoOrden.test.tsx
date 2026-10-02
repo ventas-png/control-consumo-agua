@@ -36,7 +36,7 @@ function base(extra: Partial<SeguimientoOrden> = {}): SeguimientoOrden {
         cuenta: { id: 'c', codigo: '1106', nombre: 'Inventario' }, cuenta_origen: 'regla_compra' },
     ],
     recepciones: [{ id: 'r1', numero: 'REC-1', fecha: '2026-10-01', tipo: 'bienes', estado: 'registrada', recibido_por: null,
-      destino_fisico: 'Bodega general', documento_referencia: 'REM-1', tiene_respaldo: true, motivo_anulacion: null, aceptado: 40, rechazado: 5 }],
+      destino_fisico: 'Bodega general', documento_referencia: 'REM-1', tiene_respaldo: true, respaldos: 1, motivo_anulacion: null, aceptado: 40, rechazado: 5 }],
     movimientos_inventario: [{ id: 'm1', tipo: 'entrada', cantidad: 40, fecha: '2026-10-01', suministro_id: 's1', origen: 'recepcion_lineas' }],
     activos: [{ id: 'a1', codigo: 'ACT-1', nombre: 'Bomba de agua', estado: 'activo', costo: 500 }],
     eventos: [

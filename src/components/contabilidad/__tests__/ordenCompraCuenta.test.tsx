@@ -17,7 +17,7 @@ const vacio = { data: [], isLoading: false }
 vi.mock('../../../domain/compras/queries', () => ({
   useOrdenesCompraQuery: () => vacio, useRecepcionesQuery: () => vacio, useContrasenasQuery: () => vacio,
   useActivosFijosQuery: () => vacio, useCompromisosQuery: () => vacio, useDuplicadosQuery: () => vacio,
-  useOrdenCompraLineasQuery: () => vacio, useCuadreQuery: () => vacio,
+  useOrdenCompraLineasQuery: () => vacio, useCuadreQuery: () => vacio, useInsumosAlmacenQuery: () => vacio,
 }))
 vi.mock('../../../domain/compras/mutations', () => ({
   useCambiarEstadoOrdenCompraMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),

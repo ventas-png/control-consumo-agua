@@ -22,6 +22,8 @@ import type {
   RecepcionConRelaciones,
   SeguimientoOrden,
   FilaSeguimiento,
+  InsumoAlmacen,
+  RecepcionRespaldo,
   RecepcionLinea,
 } from '../../types/compras'
 
@@ -336,5 +338,44 @@ export function useComprasConfigQuery(companyId?: string) {
         requiere_recepcion: true,
       }
     },
+  })
+}
+
+/**
+ * Insumos ACTIVOS del almacén del proyecto, para elegirlos en un renglón de inventario. Solo
+ * hay bodega en un proyecto: con `projectId` null (contabilidad de la empresa) no hay insumos.
+ */
+export function useInsumosAlmacenQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: comprasKeys.insumos(companyId, projectId),
+    enabled: !!companyId && !!projectId,
+    queryFn: async () =>
+      (await runQuery<InsumoAlmacen[]>((signal) =>
+        supabase
+          .from('suministros_condominio')
+          .select('id, nombre, unidad_medida, stock_actual')
+          .eq('company_id', companyId!)
+          .eq('project_id', projectId!)
+          .eq('activo', true)
+          .order('nombre', { ascending: true })
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/** Evidencia (entrega o conformidad) de una recepción: solo-añadir, con quién y cuándo. */
+export function useRespaldosRecepcionQuery(recepcionId?: string) {
+  return useQuery({
+    queryKey: comprasKeys.respaldos(recepcionId),
+    enabled: !!recepcionId,
+    queryFn: async () =>
+      (await runQuery<RecepcionRespaldo[]>((signal) =>
+        supabase
+          .from('recepcion_respaldos')
+          .select('*')
+          .eq('recepcion_id', recepcionId!)
+          .order('created_at', { ascending: true })
+          .abortSignal(signal),
+      )) ?? [],
   })
 }

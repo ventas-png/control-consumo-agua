@@ -27,6 +27,10 @@ export const comprasKeys = {
   ) =>
     [...comprasKeys.all, 'seguimiento-lista', companyId ?? null, projectId ?? null, proveedorId ?? null,
      estado ?? null, desde ?? null, hasta ?? null, soloEmpresa ?? false] as const,
+  insumos: (companyId?: string, projectId?: string | null) =>
+    [...comprasKeys.all, 'insumos', companyId ?? null, projectId ?? null] as const,
+  respaldos: (recepcionId?: string) =>
+    [...comprasKeys.all, 'respaldos', recepcionId ?? null] as const,
   cuadre: (facturaId?: string) =>
     [...comprasKeys.all, 'cuadre', facturaId ?? null] as const,
   facturaLineas: (facturaId?: string) =>

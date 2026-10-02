@@ -8,6 +8,8 @@ import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
 import type { ProveedorCatalogo } from '../../../types/proveedores'
 import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
 import { SeguimientoOrdenModal } from '../../compras/SeguimientoOrdenModal'
+import { SeguimientoComprasPanel } from '../../compras/SeguimientoComprasPanel'
+import { ImportarLineasOrdenModal } from '../../compras/ImportarLineasOrdenModal'
 
 interface Props {
   ordenes: OrdenCompra[]
@@ -58,6 +60,8 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
   const { data: catalogo = [] } = useProveedoresQuery(companyId)
   const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
   const [seguirDe, setSeguirDe] = useState<string | null>(null)
+  const [vistaOc, setVistaOc] = useState<'ordenes' | 'seguimiento'>('ordenes')
+  const [importarEn, setImportarEn] = useState<OrdenCompra | null>(null)
 
   const filtradas = filtroEstado ? ordenes.filter(o => o.estado === filtroEstado) : ordenes
 
@@ -140,8 +144,32 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     onRefresh()
   }
 
+  const botonVista = (v: 'ordenes' | 'seguimiento', texto: string) => (
+    <button onClick={() => setVistaOc(v)} aria-pressed={vistaOc === v}
+      style={{ padding: '6px 14px', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+               background: vistaOc === v ? 'var(--at-primary)' : 'var(--at-surface)', color: vistaOc === v ? 'white' : 'var(--at-ink)' }}>
+      {texto}
+    </button>
+  )
+
+  if (vistaOc === 'seguimiento') {
+    return (
+      <div style={{ padding: 16 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          {botonVista('ordenes', 'Órdenes')}
+          {botonVista('seguimiento', 'Seguimiento')}
+        </div>
+        <SeguimientoComprasPanel companyId={companyId} projectId={proyectoId} monedaBase={moneda} />
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: 16 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {botonVista('ordenes', 'Órdenes')}
+        {botonVista('seguimiento', 'Seguimiento')}
+      </div>
       {/* KPIs */}
       {/* auto-fit en vez de 5 columnas fijas: el ciclo pasó de 5 estados a 7 y
           las tarjetas se salían de la fila en pantallas angostas. */}
@@ -233,6 +261,14 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
         </div>
       )}
 
+      {importarEn && (
+        <ImportarLineasOrdenModal
+          orden={{ id: importarEn.id, numero: importarEn.numero ?? null, concepto: importarEn.concepto }}
+          monedaBase={moneda}
+          onClose={() => { setImportarEn(null); onRefresh() }}
+        />
+      )}
+
       {seguirDe && <SeguimientoOrdenModal ordenId={seguirDe} monedaBase={moneda} onClose={() => setSeguirDe(null)} />}
 
       {/* Lista */}
@@ -278,6 +314,12 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                         style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
                         Seguimiento
                       </button>
+                      {canCreate && orden.estado === 'borrador' && (
+                        <button onClick={() => setImportarEn(orden)}
+                          style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface)' }}>
+                          Importar renglones
+                        </button>
+                      )}
                       {canEdit && orden.estado === 'aprobada' && (
                         <button onClick={() => devolverABorrador(orden)}
                           style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
