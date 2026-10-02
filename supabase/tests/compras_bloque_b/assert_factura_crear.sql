@@ -30,6 +30,7 @@
 \set OB  '''0f400000-0000-0000-0000-000000000004'''
 \set OU  '''0f400000-0000-0000-0000-000000000005'''
 \set U1  '''0f410000-0000-0000-0000-000000000005'''
+\set B1  '''0f410000-0000-0000-0000-000000000006'''
 
 CREATE TEMP TABLE res_fc (k text PRIMARY KEY, j jsonb);
 GRANT ALL ON res_fc TO authenticated;
@@ -48,7 +49,8 @@ INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, 
   (:X2::uuid, :C::uuid, :OX::uuid, 2, 'Insumo',   'gasto', 'mantenimiento',  5, 'u', 20, 12),
   (:Y1::uuid, :C::uuid, :OY::uuid, 1, 'Material', 'gasto', 'mantenimiento', 10, 'u', 10, 12),
   (:Z1::uuid, :C::uuid, :OZ::uuid, 1, 'Material', 'gasto', 'mantenimiento', 10, 'u', 10, 12),
-  (:U1::uuid, :C::uuid, :OU::uuid, 1, 'Material', 'gasto', 'mantenimiento', 10, 'u', 10, 12);
+  (:U1::uuid, :C::uuid, :OU::uuid, 1, 'Material', 'gasto', 'mantenimiento', 10, 'u', 10, 12),
+  (:B1::uuid, :C::uuid, :OB::uuid, 1, 'Material', 'gasto', 'mantenimiento', 10, 'u', 10, 12);
 UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id IN (:OX::uuid, :OY::uuid, :OZ::uuid, :OU::uuid);
 UPDATE public.ordenes_compra SET estado = 'emitida'  WHERE id IN (:OX::uuid, :OY::uuid, :OZ::uuid, :OU::uuid);
 -- OX y OU se reciben completas (como lo haría el flujo)
@@ -158,7 +160,7 @@ SELECT public.chk_falla($$ SELECT public.compras_factura_crear('cccccccc-cccc-cc
   'COMPRAS_FACTURA_ORDEN_PROYECTO', '5 · la orden es de otro proyecto de la misma empresa');
 SELECT public.chk_falla($$ SELECT public.compras_factura_crear('cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001',
   '{"proveedor_id":"e3000000-0000-0000-0000-000000000001","orden_compra_id":"0f400000-0000-0000-0000-000000000004","concepto":"Orden en borrador","clave_idempotencia":"clave-v-ord3"}'::jsonb,
-  '[{"orden_compra_linea_id":"0f410000-0000-0000-0000-000000000001","cantidad":1,"precio_unitario":10}]'::jsonb) $$,
+  '[{"orden_compra_linea_id":"0f410000-0000-0000-0000-000000000006","cantidad":1,"precio_unitario":10}]'::jsonb) $$,
   'COMPRAS_FACTURA_ORDEN_ESTADO', '5 · la orden está en borrador: no admite facturas');
 SELECT public.chk_falla($$ SELECT public.compras_factura_crear('cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001',
   '{"proveedor_id":"e3000000-0000-0000-0000-000000000001","orden_compra_id":"0f400000-0000-0000-0000-000000000001","concepto":"Moneda distinta","moneda":"USD","clave_idempotencia":"clave-v-mon1"}'::jsonb,
@@ -239,3 +241,62 @@ SELECT public.chk_txt((SELECT estado FROM public.facturas_proveedor WHERE clave_
 SELECT public.chk_uuid((SELECT aprobada_por FROM public.facturas_proveedor WHERE clave_idempotencia = 'clave-fc-0001'), :UA::uuid, '10 · aprobada_por lo sella el servidor');
 SELECT public.chk_num((SELECT cantidad_facturada FROM public.orden_compra_lineas WHERE id = :X1::uuid), 10, '10 · lo facturado de X1 sube a 10');
 SELECT public.chk_num((SELECT cantidad_facturada FROM public.orden_compra_lineas WHERE id = :X2::uuid), 5, '10 · lo facturado de X2 sube a 5');
+
+-- ── 11. Reintento tras COMPLETAR la operación y CERRAR la orden (migración 20261021000900) ─
+-- La factura de la sección 1 se aprobó en la 10 y facturó todo lo recibido: la orden
+-- OX quedó cerrada. El estado de la orden frena facturas NUEVAS, no la recuperación
+-- de una operación ya completada.
+SELECT public.chk_txt((SELECT estado FROM public.ordenes_compra WHERE id = :OX::uuid), 'cerrada', '11 · la orden OX quedó cerrada tras facturar todo lo recibido');
+CREATE TEMP TABLE antes_fc AS SELECT
+  (SELECT count(*) FROM public.facturas_proveedor WHERE company_id = :C::uuid) AS facturas,
+  (SELECT count(*) FROM public.factura_proveedor_lineas WHERE company_id = :C::uuid) AS renglones,
+  (SELECT count(*) FROM public.conta_asientos WHERE company_id = :C::uuid) AS asientos,
+  (SELECT count(*) FROM public.conta_asiento_lineas al JOIN public.conta_asientos a ON a.id = al.asiento_id WHERE a.company_id = :C::uuid) AS lineas_asiento,
+  (SELECT sum(cantidad_facturada) FROM public.orden_compra_lineas WHERE orden_compra_id = :OX::uuid) AS facturado;
+
+-- (a) el MISMO contenido con la MISMA clave devuelve la factura original
+SELECT public.como(:UK::uuid);
+SET ROLE authenticated;
+INSERT INTO res_fc SELECT 'r11', public.compras_factura_crear(:C::uuid, :C1::uuid,
+  '{"proveedor_id":"e3000000-0000-0000-0000-000000000001","orden_compra_id":"0f400000-0000-0000-0000-000000000001","numero_factura":"FC-0001","fecha_emision":"2026-10-02","concepto":"Factura de OX","monto_total":1,"iva_monto":0,"moneda":"GTQ","clave_idempotencia":"clave-fc-0001"}'::jsonb,
+  '[{"orden_compra_linea_id":"0f410000-0000-0000-0000-000000000001","cantidad":10,"precio_unitario":10,"iva_monto":12},
+    {"orden_compra_linea_id":"0f410000-0000-0000-0000-000000000002","cantidad":5,"precio_unitario":20,"iva_monto":12}]'::jsonb);
+RESET ROLE;
+SELECT public.chk_bool((SELECT (j->>'reutilizada')::boolean FROM res_fc WHERE k = 'r11'), true, '11a · el reintento con la orden CERRADA se reconoce como reutilizado');
+SELECT public.chk_txt((SELECT j->'factura'->>'id' FROM res_fc WHERE k = 'r11'), (SELECT j->'factura'->>'id' FROM res_fc WHERE k = 'a'), '11a · devuelve la MISMA factura (mismo id)');
+SELECT public.chk((SELECT jsonb_array_length(j->'lineas') FROM res_fc WHERE k = 'r11'), 2, '11a · con sus dos renglones originales');
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE company_id = :C::uuid) - (SELECT facturas FROM antes_fc), 0, '11a · sin facturas nuevas');
+SELECT public.chk((SELECT count(*) FROM public.factura_proveedor_lineas WHERE company_id = :C::uuid) - (SELECT renglones FROM antes_fc), 0, '11a · sin renglones nuevos');
+SELECT public.chk((SELECT count(*) FROM public.conta_asientos WHERE company_id = :C::uuid) - (SELECT asientos FROM antes_fc), 0, '11a · sin asientos nuevos');
+SELECT public.chk((SELECT count(*) FROM public.conta_asiento_lineas al JOIN public.conta_asientos a ON a.id = al.asiento_id WHERE a.company_id = :C::uuid) - (SELECT lineas_asiento FROM antes_fc), 0, '11a · sin líneas de asiento nuevas');
+SELECT public.chk_num((SELECT sum(cantidad_facturada) FROM public.orden_compra_lineas WHERE orden_compra_id = :OX::uuid), (SELECT facturado FROM antes_fc), '11a · lo facturado de la orden no cambia');
+SELECT public.chk_txt((SELECT estado FROM public.ordenes_compra WHERE id = :OX::uuid), 'cerrada', '11a · la orden sigue cerrada');
+
+-- (b) la MISMA clave con OTRO contenido se rechaza aunque la orden esté cerrada
+SELECT public.como(:UK::uuid);
+SET ROLE authenticated;
+SELECT public.chk_falla($$ SELECT public.compras_factura_crear('cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001',
+  '{"proveedor_id":"e3000000-0000-0000-0000-000000000001","orden_compra_id":"0f400000-0000-0000-0000-000000000001","numero_factura":"FC-0001","fecha_emision":"2026-10-02","concepto":"Factura de OX","moneda":"GTQ","clave_idempotencia":"clave-fc-0001"}'::jsonb,
+  '[{"orden_compra_linea_id":"0f410000-0000-0000-0000-000000000001","cantidad":9,"precio_unitario":10,"iva_monto":12},
+    {"orden_compra_linea_id":"0f410000-0000-0000-0000-000000000002","cantidad":5,"precio_unitario":20,"iva_monto":12}]'::jsonb) $$,
+  'COMPRAS_FACTURA_CLAVE_CONFLICTO', '11b · misma clave con otro contenido (orden cerrada): rechazo explícito');
+
+-- (c) una clave NUEVA sobre la orden cerrada no crea nada
+SELECT public.chk_falla($$ SELECT public.compras_factura_crear('cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001',
+  '{"proveedor_id":"e3000000-0000-0000-0000-000000000001","orden_compra_id":"0f400000-0000-0000-0000-000000000001","numero_factura":"FC-0002","concepto":"Otra factura sobre orden cerrada","clave_idempotencia":"clave-fc-cerrada-1"}'::jsonb,
+  '[{"orden_compra_linea_id":"0f410000-0000-0000-0000-000000000001","cantidad":1,"precio_unitario":10,"iva_monto":1.2}]'::jsonb) $$,
+  'COMPRAS_FACTURA_ORDEN_ESTADO', '11c · clave nueva sobre orden cerrada: rechazo');
+RESET ROLE;
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE clave_idempotencia = 'clave-fc-cerrada-1'), 0, '11c · la clave nueva no dejó factura');
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE company_id = :C::uuid) - (SELECT facturas FROM antes_fc), 0, '11c · sigue sin facturas nuevas');
+
+-- (d) la recuperación NO amplía permisos: otra empresa y quien no ve la factura no la obtienen
+SELECT public.como(:UD::uuid);                       -- admin de OTRA empresa, con la misma clave y contenido
+SET ROLE authenticated;
+SELECT public.chk_falla($$ SELECT public.compras_factura_crear('cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001',
+  '{"proveedor_id":"e3000000-0000-0000-0000-000000000001","orden_compra_id":"0f400000-0000-0000-0000-000000000001","numero_factura":"FC-0001","fecha_emision":"2026-10-02","concepto":"Factura de OX","monto_total":1,"iva_monto":0,"moneda":"GTQ","clave_idempotencia":"clave-fc-0001"}'::jsonb,
+  '[{"orden_compra_linea_id":"0f410000-0000-0000-0000-000000000001","cantidad":10,"precio_unitario":10,"iva_monto":12},
+    {"orden_compra_linea_id":"0f410000-0000-0000-0000-000000000002","cantidad":5,"precio_unitario":20,"iva_monto":12}]'::jsonb) $$,
+  'COMPRAS_FACTURA_EMPRESA', '11d · otra empresa no recupera la factura aunque conozca la clave');
+RESET ROLE;
+DROP TABLE antes_fc;

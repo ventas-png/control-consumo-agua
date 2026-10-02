@@ -451,6 +451,24 @@ BEGIN
     t := 'SIN ERROR';
   EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
   ev := ev || pg_temp.ck('10 la orden recibida y facturada del todo está cerrada: no admite otra factura', t, 'COMPRAS_FACTURA_ORDEN_ESTADO');
+  -- reintento de la factura que CERRÓ la orden (0900): devuelve la original, sin escribir nada
+  ev := ev || pg_temp.ck('10 la orden oe está cerrada', (SELECT estado FROM public.ordenes_compra WHERE id = oe), 'cerrada');
+  v := (SELECT count(*) FROM public.facturas_proveedor WHERE company_id = c) * 1000000
+     + (SELECT count(*) FROM public.factura_proveedor_lineas WHERE company_id = c) * 10000
+     + (SELECT count(*) FROM public.conta_asientos WHERE company_id = c);
+  j2 := public.compras_factura_crear(c, pj,
+    format('{"proveedor_id":"%s","orden_compra_id":"%s","numero_factura":"ZZ-RPC-1","concepto":"Factura por la operación de servidor","clave_idempotencia":"zz-fac-rpc-1"}', pv2, oe)::jsonb,
+    format('[{"orden_compra_linea_id":"%s","cantidad":10,"precio_unitario":10,"iva_monto":12},{"orden_compra_linea_id":"%s","cantidad":5,"precio_unitario":20,"iva_monto":12}]', le1, le2)::jsonb);
+  ev := ev || pg_temp.ck('10 reintento con la orden CERRADA · misma factura, reutilizada', ((j2->>'reutilizada')::boolean)::text || '/' || ((j2->'factura'->>'id')::uuid = fid)::text, 'true/true');
+  ev := ev || pg_temp.ckn('10 y sin filas ni asientos nuevos (facturas, renglones, asientos)', (SELECT count(*) FROM public.facturas_proveedor WHERE company_id = c) * 1000000
+     + (SELECT count(*) FROM public.factura_proveedor_lineas WHERE company_id = c) * 10000
+     + (SELECT count(*) FROM public.conta_asientos WHERE company_id = c) - v, 0);
+  BEGIN PERFORM public.compras_factura_crear(c, pj,
+      format('{"proveedor_id":"%s","orden_compra_id":"%s","numero_factura":"ZZ-RPC-1","concepto":"Factura por la operación de servidor","clave_idempotencia":"zz-fac-rpc-1"}', pv2, oe)::jsonb,
+      format('[{"orden_compra_linea_id":"%s","cantidad":9,"precio_unitario":10,"iva_monto":12},{"orden_compra_linea_id":"%s","cantidad":5,"precio_unitario":20,"iva_monto":12}]', le1, le2)::jsonb);
+    t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('10 misma clave con OTRO contenido y orden cerrada', t, 'COMPRAS_FACTURA_CLAVE_CONFLICTO');
   RESET ROLE;
 
   -- ── Veredicto: la excepción SIEMPRE revierte; su prefijo dice si hubo fallo ─

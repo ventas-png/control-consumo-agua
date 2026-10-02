@@ -128,6 +128,18 @@ Local (PG real): 6 suites + `assert_factura_crear` (47) + `assert_aprobacion` (3
 No se pudo probar por pantalla: facturar con moneda distinta a la de la orden (el formulario de orden no tiene campo de moneda; probado en SQL), suplantación del autorizador (la interfaz ya no envía esos campos; probado en SQL enviándolos a mano), línea de inventario.
 Dato en el sandbox: el padrón quedó con OC-000002 (cerrada tras la factura), conformidad CONF de OC-000002, F-ZZ-0003 (aprobada con justificación) y F-ZZ-USD-1 (aprobada, USD). Se conserva; el retiro lo decide el propietario.
 
+## 8. Corrección 0900: el reintento recupera la factura aunque la orden esté cerrada
+
+**Defecto**: `compras_factura_crear` validaba el estado de la orden ANTES de buscar la clave de idempotencia. Si la factura creada cerraba la orden, un reintento legítimo (respuesta perdida, doble clic) recibía `COMPRAS_FACTURA_ORDEN_ESTADO` en lugar de la factura que sí existía. Reproducido localmente con solo 0800 (la prueba 11a falla con ese error).
+**Corrección** (`20261021000900`, `CREATE OR REPLACE` de la misma función; no edita 0800): primero identidad, empresa, acceso (RLS), alcance (proyecto, proveedor, orden y renglones de esa orden) y huella; luego la clave (mismo contenido → original, `reutilizada: true`; otro contenido → `COMPRAS_FACTURA_CLAVE_CONFLICTO`); después el estado de la orden, que solo frena facturas nuevas. Sin cambios de firma ni de permisos; quien no ve la factura por RLS no la recupera.
+**Pruebas** (`assert_factura_crear.sql` §11, 14 comprobaciones; guion `sandbox_flujo_completo.sql`, 84): crear → aprobar (la orden se cierra) → repetir: mismo id, 0 facturas/renglones/asientos/líneas de asiento nuevos, lo facturado no cambia; misma clave con otro contenido → rechazo; clave nueva sobre orden cerrada → `COMPRAS_FACTURA_ORDEN_ESTADO` sin factura; otra empresa con la misma clave → `COMPRAS_FACTURA_EMPRESA`. Local: suite completa verde y guion 84/84.
+
+| Ambiente | 0700 | 0800 | 0900 |
+|---|---|---|---|
+| Local / CI | aplicada | aplicada | aplicada |
+| Sandbox | aplicada | aplicada | **pendiente de autorización** |
+| Producción | pendiente | pendiente | pendiente |
+
 ## 6. No ejecutado (pendiente explícito)
 * **Migraciones 0700 y 0800 en producción**: no aplicadas (se aplicarían solas al fusionar el PR a `main`).
 * Línea de **inventario** desde la pantalla de orden (no hay selector de insumo en ese formulario).
