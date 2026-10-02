@@ -118,18 +118,18 @@ GRANT SELECT, INSERT, DELETE ON public.recepcion_respaldos TO authenticated;
 
 DROP POLICY IF EXISTS recepcion_respaldos_select ON public.recepcion_respaldos;
 CREATE POLICY recepcion_respaldos_select ON public.recepcion_respaldos FOR SELECT TO authenticated
-  USING (public.is_super_admin() OR (company_id = public.get_my_company_id()
+  USING ((SELECT public.is_super_admin()) OR (company_id = (SELECT public.get_my_company_id())
          AND (project_id IS NULL OR public.can_access_project(project_id))
-         AND public.compras_respaldo_puede_ver()));
+         AND (SELECT public.compras_respaldo_puede_ver())));
 DROP POLICY IF EXISTS recepcion_respaldos_insert ON public.recepcion_respaldos;
 CREATE POLICY recepcion_respaldos_insert ON public.recepcion_respaldos FOR INSERT TO authenticated
-  WITH CHECK (company_id = public.get_my_company_id()
+  WITH CHECK (company_id = (SELECT public.get_my_company_id())
               AND (project_id IS NULL OR public.can_access_project(project_id))
-              AND public.compras_respaldo_puede_ver() AND public.compras_import_puede_capturar());
+              AND (SELECT public.compras_respaldo_puede_ver()) AND (SELECT public.compras_import_puede_capturar()));
 -- Retirar un archivo subido por error: solo con la recepción en borrador.
 DROP POLICY IF EXISTS recepcion_respaldos_delete ON public.recepcion_respaldos;
 CREATE POLICY recepcion_respaldos_delete ON public.recepcion_respaldos FOR DELETE TO authenticated
-  USING (company_id = public.get_my_company_id() AND public.compras_import_puede_capturar()
+  USING (company_id = (SELECT public.get_my_company_id()) AND (SELECT public.compras_import_puede_capturar())
          AND EXISTS (SELECT 1 FROM public.recepciones r WHERE r.id = recepcion_id AND r.estado = 'borrador'));
 
 DO $$

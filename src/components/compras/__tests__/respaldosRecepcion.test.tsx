@@ -23,7 +23,7 @@ vi.mock('../../shared/Dialog', () => ({ confirm: m.confirm, notify: m.notify }))
 
 import { RespaldosRecepcionModal, tamanoLegible } from '../RespaldosRecepcionModal'
 
-const R = { id: 'r1', numero: 'REC-000001', tipo: 'bienes' as const, estado: 'borrador' as const }
+const R: { id: string; numero: string; tipo: 'bienes' | 'servicio'; estado: 'borrador' | 'registrada' | 'anulada' } = { id: 'r1', numero: 'REC-000001', tipo: 'bienes', estado: 'borrador' }
 const respaldo = (extra: Record<string, unknown> = {}) => ({
   id: 'x1', recepcion_id: 'r1', ruta: 'c/p/r1/remision-ab.pdf', nombre: 'Remisión 123.pdf', tipo: 'entrega', mime: 'application/pdf',
   bytes: 52000, sha256: 'a'.repeat(64), notas: 'Firmada por bodega', created_by: 'u1', created_at: '2026-10-02T15:00:00Z', ...extra,

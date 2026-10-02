@@ -106,24 +106,24 @@ GRANT  EXECUTE ON FUNCTION public.compras_import_puede_capturar() TO authenticat
 
 DROP POLICY IF EXISTS compras_lineimp_select ON public.compras_linea_importaciones;
 CREATE POLICY compras_lineimp_select ON public.compras_linea_importaciones FOR SELECT TO authenticated
-  USING (public.is_super_admin() OR (company_id = public.get_my_company_id()
+  USING ((SELECT public.is_super_admin()) OR (company_id = (SELECT public.get_my_company_id())
          AND (project_id IS NULL OR public.can_access_project(project_id))));
 DROP POLICY IF EXISTS compras_lineimp_insert ON public.compras_linea_importaciones;
 CREATE POLICY compras_lineimp_insert ON public.compras_linea_importaciones FOR INSERT TO authenticated
-  WITH CHECK (company_id = public.get_my_company_id() AND public.compras_import_puede_capturar()
+  WITH CHECK (company_id = (SELECT public.get_my_company_id()) AND (SELECT public.compras_import_puede_capturar())
               AND (project_id IS NULL OR public.can_access_project(project_id)));
 DROP POLICY IF EXISTS compras_lineimp_update ON public.compras_linea_importaciones;
 CREATE POLICY compras_lineimp_update ON public.compras_linea_importaciones FOR UPDATE TO authenticated
-  USING (company_id = public.get_my_company_id() AND public.compras_import_puede_capturar()
+  USING (company_id = (SELECT public.get_my_company_id()) AND (SELECT public.compras_import_puede_capturar())
          AND (project_id IS NULL OR public.can_access_project(project_id)))
-  WITH CHECK (company_id = public.get_my_company_id());
+  WITH CHECK (company_id = (SELECT public.get_my_company_id()));
 
 DROP POLICY IF EXISTS compras_lineimpf_select ON public.compras_linea_importacion_filas;
 CREATE POLICY compras_lineimpf_select ON public.compras_linea_importacion_filas FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.compras_linea_importaciones l WHERE l.id = lote_id));
 DROP POLICY IF EXISTS compras_lineimpf_insert ON public.compras_linea_importacion_filas;
 CREATE POLICY compras_lineimpf_insert ON public.compras_linea_importacion_filas FOR INSERT TO authenticated
-  WITH CHECK (company_id = public.get_my_company_id() AND public.compras_import_puede_capturar()
+  WITH CHECK (company_id = (SELECT public.get_my_company_id()) AND (SELECT public.compras_import_puede_capturar())
               AND EXISTS (SELECT 1 FROM public.compras_linea_importaciones l WHERE l.id = lote_id));
 
 DO $$
