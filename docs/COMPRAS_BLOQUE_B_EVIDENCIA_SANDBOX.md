@@ -96,10 +96,10 @@ Las pruebas de componentes (vitest) usan datos simulados; **no** sustituyen a la
 
 | ID | Defecto | Dónde | Estado |
 |---|---|---|---|
-| **D-1** | **No había forma de facturar contra una orden desde la interfaz**: el formulario «Registrar factura» no tenía selector de orden ni renglones (solo proveedor y categoría); el cuadre de 3 vías solo era alcanzable por SQL. `08` | `CuentasPorPagarTab` | **Corregido en este PR** (selector de orden, renglones por facturar, total calculado; cabecera+renglones con compensación si fallan). Probado en pantalla contra el sandbox (`09`–`11`) |
-| **D-2** | El duplicado de factura mostraba el error crudo de Postgres | `CuentasPorPagarTab` | **Corregido** (`13`) |
-| **D-3** | **Servidor:** una factura ligada a una orden y **sin renglones se aprueba sin error** y genera su asiento, saltándose el cuadre de 3 vías (el cuadre es por renglón y devolvía cero filas). Reproducido con una sonda local reversible (`APROBADA SIN ERROR · renglones=0 · asientos=1`) | `compras_tg_factura_match` | **Migración `20261021000700` preparada, con pruebas locales (sección 13) y las 5 suites previas en verde. NO aplicada en el sandbox ni en producción** (requiere autorización; al fusionar se aplicaría en producción) |
-| **D-4** | Operaciones mostraba un contador por **posición en la lista** (`OC-0001`), no el número real de la orden (`OC-000001`); cambiaba al agregar órdenes. `20` → `19` | `OrdenesCompraTab` | **Corregido** (+ 2 pruebas que fallan con el código anterior) |
+| **D-1** | **No había forma de facturar contra una orden desde la interfaz** (sin selector de orden ni renglones; el cuadre de 3 vías solo era alcanzable por SQL). `08` | `CuentasPorPagarTab` | **Corregido**. Primera versión: cabecera y renglones en dos solicitudes con borrado compensatorio (frágil). **Segunda versión (esta): una sola llamada a `compras_factura_crear` (migración 0800)**, transaccional e idempotente. Probado en pantalla contra el sandbox (§7) |
+| **D-2** | El duplicado de factura mostraba el error crudo de Postgres | `CuentasPorPagarTab` | **Corregido** (`13`); ahora el servidor responde `COMPRAS_FACTURA_NUMERO_DUPLICADO` y la pantalla lo traduce |
+| **D-3** | **Servidor:** una factura ligada a una orden y **sin renglones se aprobaba sin error** y generaba su asiento (doble gasto). Además el autorizador de la excepción (`match_forzado_por`, `aprobada_por`) lo escribía el cliente (suplantable) y la excepción dejaba pasar facturación anticipada, moneda distinta y exceso sobre lo pedido | `compras_tg_factura_match` | **Migración `20261021000700` (reescrita: «aprobación endurecida») + 0800. APLICADAS en el sandbox y probadas (§7). Pendientes en producción** |
+| **D-4** | Operaciones mostraba un contador por **posición en la lista** (`OC-0001`), no el número real de la orden | `OrdenesCompraTab` | **Corregido** (+ 2 pruebas que fallan con el código anterior) |
 
 ### 5.4 Observaciones (no son defectos del bloque)
 
@@ -108,8 +108,29 @@ Las pruebas de componentes (vitest) usan datos simulados; **no** sustituyen a la
 * El sandbox no tiene desplegada la función `log-security-event` (404) y el proxy del entorno no deja pasar el WebSocket de Realtime: ruido de consola del entorno, sin efecto en el flujo.
 * En la primera visita de «Condominios» (compilación en frío del servidor de desarrollo) la lista de órdenes tardó en aparecer para el administrador; con la caché caliente carga a los pocos segundos.
 
+## 7. Protección de facturas y facturación transaccional (migraciones 0700 y 0800)
+
+**Autorización**: el propietario autorizó aplicar 0700 y 0800 **solo en el sandbox** `control-agua-rls-sandbox` (`jwpmivhvlstslncrtokb`, no la Preview del PR). Se aplicaron una por una, en orden, con el workflow `Apply Migrations to Sandbox` (ref = `claude/keen-carson-f9vmw3`, SHA `fbd59d5d`, runs 37022856010 y 37022912822). Verificación posterior: versión máxima `20261021000800`, ambas registradas, `compras_factura_crear` SECURITY INVOKER sin EXECUTE para `anon`, columnas/índice/trigger de idempotencia presentes, facturas previas del padrón intactas. Producción no se tocó.
+
+### 7.1 Ejecutado en SQL (guion `sandbox_flujo_completo.sql`, reversible)
+Resultado en el sandbox: **`GUION_OK_REVERTIDO: 80 comprobaciones coinciden`**, sin residuos (0 empresas/facturas/usuarios `5b5b0000…` después). Cubre, además del recorrido de la sección 3: factura por la función (total calculado por el servidor = 224, no el `1` que mandó el cliente); reintento con misma clave y contenido (misma factura, 1 cabecera + 2 renglones); misma clave con otro contenido → `COMPRAS_FACTURA_CLAVE_CONFLICTO`; renglón de otra orden → `COMPRAS_FACTURA_LINEA_AJENA` sin cabecera huérfana; número repetido → `COMPRAS_FACTURA_NUMERO_DUPLICADO`; orden cerrada → `COMPRAS_FACTURA_ORDEN_ESTADO`; **orden sin renglones nunca se aprueba, ni con justificación ni declarándose autorizador** (`COMPRAS_FACTURA_SIN_RENGLONES`); **facturar antes de recibir y moneda distinta no son forzables** (`COMPRAS_MATCH_NO_FORZABLE`); precio/IVA fuera de tolerancia solo con justificación y **el servidor sella como autorizador a quien ejecuta** (el contador que declaró `aprobada_por = admin` queda registrado como él mismo).
+Local (PG real): 6 suites + `assert_factura_crear` (47) + `assert_aprobacion` (31) + concurrencia (misma clave y contenido a la vez, misma clave con contenido distinto, línea que falla, backend terminado antes del COMMIT: sin cabecera huérfana).
+
+### 7.2 Probado en pantalla (sandbox, padrón `5b5b1000…`, admin «ZZ Admin»)
+| Caso | Resultado | Captura |
+|---|---|---|
+| Factura contra orden OC-000002 (conformidad recibida de 10 × GTQ 100 + IVA 120) | selector de orden, renglones «por facturar», total 1,120.00 calculado | `160` |
+| Mismo documento con **precio 120 (+20 %) e IVA 0** | se registra (una llamada al servidor); cuadre marca «Precio fuera de tolerancia», IVA OC 120.00 / factura 0.00 | `161`, `170` |
+| Aprobar sin justificación | el servidor rechaza; sigue «Registrada» | — |
+| Aprobar con justificación escrita | «Aprobada»; asiento: 2105 débito 1,000 (lo recibido al precio de la orden), 5199 débito 200 (diferencia), 2104 crédito 1,200; `match_forzado_por = aprobada_por =` quien ejecutó | `173` |
+| **Moneda extranjera**: factura directa USD 100 (TC mensual 7.75 sembrado en el padrón) | registrada y aprobada; asiento en moneda base: 5199 débito 775.00 / 2104 crédito 775.00 | `180`, `182` |
+
+No se pudo probar por pantalla: facturar con moneda distinta a la de la orden (el formulario de orden no tiene campo de moneda; probado en SQL), suplantación del autorizador (la interfaz ya no envía esos campos; probado en SQL enviándolos a mano), línea de inventario.
+Dato en el sandbox: el padrón quedó con OC-000002 (cerrada tras la factura), conformidad CONF de OC-000002, F-ZZ-0003 (aprobada con justificación) y F-ZZ-USD-1 (aprobada, USD). Se conserva; el retiro lo decide el propietario.
+
 ## 6. No ejecutado (pendiente explícito)
-* **Migración 0700 en el sandbox**: no se aplicó (sin autorización). La interfaz corregida **no depende de ella**: captura siempre los renglones.
+* **Migraciones 0700 y 0800 en producción**: no aplicadas (se aplicarían solas al fusionar el PR a `main`).
 * Línea de **inventario** desde la pantalla de orden (no hay selector de insumo en ese formulario).
-* Facturas en moneda extranjera y diferencias de precio/IVA **por pantalla**: probadas en SQL (65/65) y el cuadre las muestra (`10`), pero no se capturó su recorrido en pantalla.
+* Moneda distinta a la de la orden por pantalla (sin campo de moneda en el formulario de orden): solo SQL.
+* Riesgo residual: `compras_tg_factura_acumular` captura excepciones con WARNING (si fallara al acumular lo facturado, la aprobación seguiría). Recomendado endurecer en un PR aparte.
 * Retiro del padrón `5b5b1000…`: a decidir por el propietario.
