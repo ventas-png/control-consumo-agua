@@ -58,7 +58,7 @@ No existe documento que las resuelva; el código no las asume.
 * **Local, PostgreSQL 16 real** (`bash supabase/tests/compras_bloque_b/run.sh`): cadena completa de migraciones, cada migración nueva dos veces, 6 suites (ciclo, recepción, factura, seguimiento, operaciones y **correcciones de revisión**: cuentas semánticas con un catálogo SIN 1401/1409/5107, condiciones congeladas con peticiones directas al servidor, creación transaccional con fallo de líneas / respuesta perdida / clave con otro contenido) y **6 pruebas de concurrencia con sesiones reales** (dos recepciones que no caben, dos facturas por las mismas unidades, misma clave de idempotencia, y por la función: misma clave y contenido a la vez, misma clave con contenido distinto a la vez, fallo de línea con dos sesiones). Regresiones locales: `compras_flujo`, `proveedores_pr_a` (una aserción ajustada: saltarse la aprobación ahora es transición inválida), `migrations-guard`, `drift:auditar`.
 * **Local, vitest/tsc/eslint**: seguimiento, esquema de recepción, panel de históricos y carga masiva de suministros + toda la suite existente.
 * **CI**: lo que corra el PR; no se sustituye por lo anterior.
-* **Sandbox real**: **no ejecutado** (ver §6). No hay evidencia de sandbox en este PR; el guion de validación está listo y probado en local.
+* **Sandbox real**: las 7 migraciones se aplicaron una por una y se verificaron, y el guion de recorrido completo terminó en `GUION_OK_REVERTIDO` (52/52, sin residuos). Detalle en `docs/COMPRAS_BLOQUE_B_EVIDENCIA_SANDBOX.md`. **Pendiente**: interfaz conectada al sandbox y capturas (el entorno de la sesión no alcanza el host).
 * **Capturas de pantalla del flujo completo: no incluidas.**
 
 ## 5. Configuración antes de operar
