@@ -10,8 +10,8 @@
 --   aunque estuviera inválido o definido de otra forma.
 --
 -- CORRECCIÓN
---   Esta migración EXIGE que el índice exista, sea único, esté válido y listo, y tenga la definición
---   esperada: (origen_tabla, origen_id) WHERE origen_tabla IN ('recepcion_lineas',
+--   Esta migración EXIGE que el índice exista, sea único, esté válido y listo, y tenga EXACTAMENTE la
+--   definición esperada (comparada contra un índice de referencia, no por fragmentos de texto): (origen_tabla, origen_id) WHERE origen_tabla IN ('recepcion_lineas',
 --   'recepcion_lineas_anulada') AND origen_id IS NOT NULL.
 --     · Con movimientos duplicados: SE DETIENE con un diagnóstico (qué renglón, cuántos movimientos y
 --       sus ids). NO se omite con un WARNING y NO se borra ni se modifica ningún movimiento: los
@@ -32,9 +32,11 @@ DO $$
 DECLARE
   v_dup    text;
   v_idx    record;
-  v_cols   text[];
   v_pred   text;
   v_ok     boolean;
+  v_found  boolean;
+  v_def    jsonb;
+  v_ref    jsonb;
 BEGIN
   LOCK TABLE public.movimientos_suministro IN SHARE ROW EXCLUSIVE MODE;
 
@@ -74,21 +76,44 @@ BEGIN
       WHERE origen_tabla IN ('recepcion_lineas', 'recepcion_lineas_anulada') AND origen_id IS NOT NULL;
   END IF;
 
-  -- 3. Verificación final: instalado, único, válido, listo y con la definición esperada.
-  SELECT i.indisvalid AND i.indisready AND i.indisunique AND i.indnatts = 2,
-         ARRAY(SELECT a.attname::text FROM unnest(i.indkey::int2[]) WITH ORDINALITY k(attnum, ord)
-                 JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.ord),
+  -- 3. Verificación final: válido, listo y con la definición EXACTA. No se busca texto en el predicado
+  --    (un `AND cantidad > 0` también contiene los fragmentos esperados y dejaría sin proteger los
+  --    movimientos con cantidad <= 0). Se construye un índice de referencia con la definición esperada,
+  --    dentro de esta misma transacción y bajo el mismo bloqueo, y se comparan los catálogos campo a
+  --    campo (columnas, clases de operador, colaciones, opciones, método de acceso, unicidad, NULLS
+  --    NOT DISTINCT, expresiones y el predicado desparseado por el propio servidor, que no arrastra
+  --    posiciones de texto como sí hace el árbol almacenado). El de referencia se elimina al terminar.
+  CREATE UNIQUE INDEX uq_mov_suministro_origen_recepcion_ref
+    ON public.movimientos_suministro (origen_tabla, origen_id)
+    WHERE origen_tabla IN ('recepcion_lineas', 'recepcion_lineas_anulada') AND origen_id IS NOT NULL;
+
+  SELECT jsonb_build_object(
+           'am', c.relam, 'tabla', i.indrelid, 'unico', i.indisunique,
+           'natts', i.indnatts, 'nkey', i.indnkeyatts,
+           'cols', i.indkey::text, 'clases', i.indclass::text, 'colaciones', i.indcollation::text,
+           'opciones', i.indoption::text, 'nulls_no_distintos', to_jsonb(i) -> 'indnullsnotdistinct',
+           'expresiones', pg_get_expr(i.indexprs, i.indrelid), 'predicado', pg_get_expr(i.indpred, i.indrelid)),
+         i.indisvalid AND i.indisready,
          pg_get_expr(i.indpred, i.indrelid)
-    INTO v_ok, v_cols, v_pred
+    INTO v_def, v_ok, v_pred
     FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid JOIN pg_namespace n ON n.oid = c.relnamespace
    WHERE n.nspname = 'public' AND c.relname = 'uq_mov_suministro_origen_recepcion';
+  v_found := FOUND;
 
-  IF NOT FOUND OR NOT COALESCE(v_ok, false)
-     OR v_cols IS DISTINCT FROM ARRAY['origen_tabla', 'origen_id']
-     OR v_pred IS NULL
-     OR v_pred NOT LIKE '%recepcion_lineas%' OR v_pred NOT LIKE '%recepcion_lineas_anulada%'
-     OR v_pred NOT LIKE '%origen_id IS NOT NULL%' THEN
-    RAISE EXCEPTION 'COMPRAS_INVENTARIO_INDICE: uq_mov_suministro_origen_recepcion no quedó instalado como único, válido y con la definición esperada (columnas %, predicado %). No se continúa sin la protección.',
-      v_cols, v_pred;
+  SELECT jsonb_build_object(
+           'am', c.relam, 'tabla', i.indrelid, 'unico', i.indisunique,
+           'natts', i.indnatts, 'nkey', i.indnkeyatts,
+           'cols', i.indkey::text, 'clases', i.indclass::text, 'colaciones', i.indcollation::text,
+           'opciones', i.indoption::text, 'nulls_no_distintos', to_jsonb(i) -> 'indnullsnotdistinct',
+           'expresiones', pg_get_expr(i.indexprs, i.indrelid), 'predicado', pg_get_expr(i.indpred, i.indrelid))
+    INTO v_ref
+    FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'public' AND c.relname = 'uq_mov_suministro_origen_recepcion_ref';
+
+  DROP INDEX public.uq_mov_suministro_origen_recepcion_ref;
+
+  IF NOT v_found OR NOT COALESCE(v_ok, false) OR v_def IS DISTINCT FROM v_ref THEN
+    RAISE EXCEPTION 'COMPRAS_INVENTARIO_INDICE: uq_mov_suministro_origen_recepcion no está instalado como único, válido y con la definición exacta esperada (predicado actual: %). Debe proteger todo movimiento de recepcion_lineas / recepcion_lineas_anulada con origen_id. No se continúa sin la protección.',
+      COALESCE(v_pred, '(sin predicado)');
   END IF;
 END $$;
