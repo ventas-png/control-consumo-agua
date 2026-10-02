@@ -11,7 +11,7 @@ import { runQuery } from '../queryFetch'
 import { comprasKeys } from './keys'
 import { cxpKeys } from '../cxp/keys'
 import { contabilidadKeys } from '../contabilidad/keys'
-import type { ContrasenaPago, OrdenCompra, Recepcion } from '../../types/compras'
+import type { ContrasenaPago, OrdenCompra, Recepcion, RecepcionLinea } from '../../types/compras'
 import type {
   ContrasenaFormInput,
   OrdenCompraFormInput,
@@ -167,6 +167,47 @@ export function useEliminarOrdenCompraMutation() {
 
 // ── Recepción ───────────────────────────────────────────────────────────────
 
+/** Lo que devuelve `compras_recepcion_crear`: el documento COMPLETO. */
+export interface RecepcionCreada {
+  recepcion: Recepcion
+  lineas: RecepcionLinea[]
+  /** true = ya existía (reintento con la misma clave y contenido): se recuperó, no se creó otra. */
+  reutilizada: boolean
+}
+
+/**
+ * Crea la recepción en BORRADOR con sus líneas en UNA transacción del servidor
+ * (`compras_recepcion_crear`). Antes eran dos peticiones (cabecera y luego
+ * líneas): un fallo entre ambas dejaba un borrador vacío y el reintento con la
+ * misma clave chocaba con él. Ahora:
+ *  · si algo falla, no queda nada;
+ *  · el reintento con la MISMA clave y el MISMO contenido (por ejemplo, si la
+ *    respuesta se perdió) devuelve el mismo documento completo;
+ *  · la misma clave con contenido DISTINTO se rechaza con un mensaje claro.
+ */
+export async function crearRecepcionTransaccional(
+  companyId: string,
+  projectId: string | null | undefined,
+  input: RecepcionFormInput,
+): Promise<RecepcionCreada> {
+  const { lineas, ...cabecera } = input
+  if (!cabecera.clave_idempotencia) {
+    throw new Error('Falta la clave de idempotencia de la recepción.')
+  }
+  const creada = await runQuery<RecepcionCreada>((signal) =>
+    supabase
+      .rpc('compras_recepcion_crear', {
+        p_company_id: companyId,
+        p_project_id: projectId ?? null,
+        p_cabecera: cabecera,
+        p_lineas: lineas,
+      })
+      .abortSignal(signal),
+  )
+  if (!creada?.recepcion) throw new Error('No se pudo crear la recepción.')
+  return creada
+}
+
 /**
  * Crea la recepción en BORRADOR con sus líneas y la deja lista para registrar.
  * Se separa a propósito: al pasar a `registrada` la BD contabiliza, mueve
@@ -177,24 +218,8 @@ export function useCrearRecepcionMutation(companyId?: string, projectId?: string
   return useMutation({
     mutationFn: async (input: RecepcionFormInput) => {
       if (!companyId) throw new Error('Falta companyId.')
-      const { lineas, ...cabecera } = input
-      const filas = await runQuery<Recepcion[]>((signal) =>
-        supabase
-          .from('recepciones')
-          .insert({ ...cabecera, company_id: companyId, project_id: projectId ?? null, estado: 'borrador' })
-          .select()
-          .abortSignal(signal),
-      )
-      const rec = filas?.[0]
-      if (!rec) throw new Error('No se pudo crear la recepción.')
-
-      await runQuery((signal) =>
-        supabase
-          .from('recepcion_lineas')
-          .insert(lineas.map((l) => ({ ...l, company_id: companyId, recepcion_id: rec.id })))
-          .abortSignal(signal),
-      )
-      return rec
+      const { recepcion } = await crearRecepcionTransaccional(companyId, projectId, input)
+      return recepcion
     },
     onSuccess: () => invalidar(),
   })

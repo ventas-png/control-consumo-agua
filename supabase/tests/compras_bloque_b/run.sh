@@ -3,8 +3,8 @@
 # COMPRAS · BLOQUE B — orden, recepción, factura y seguimiento integrados
 # Arnés contra un PostgreSQL REAL (local, efímero). NO toca ningún entorno remoto.
 #
-# Aplica la cadena ENTERA de migraciones sobre una base vacía y prueba las seis
-# migraciones del bloque (20261021000000…20261021000500):
+# Aplica la cadena ENTERA de migraciones sobre una base vacía y prueba las siete
+# migraciones del bloque (20261021000000…20261021000600, la última correctiva):
 #   · ciclo de la orden en el servidor (transiciones, congelamiento, devolución
 #     como revisión, separación solicitante/aprobador, historial);
 #   · recepción por línea: aceptado/rechazado, servicios por conformidad, activos
@@ -25,7 +25,7 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
 PRIMERA=20261021000000
-NUESTRAS=$(ls "$MIGS" | grep -E '^202610210000[0-9]{2}_' | sed 's/\.sql$//' | sort)
+NUESTRAS=$(ls "$MIGS" | grep -E '^2026102100[0-9]{4}_' | sed 's/\.sql$//' | sort)
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -127,6 +127,7 @@ bloque assert_recepcion.sql    "5b · recepción por línea, servicios, activos,
 bloque assert_factura.sql      "5c · factura parcial/múltiple, diferencias, moneda, periodo, configuración"
 bloque assert_seguimiento.sql  "5d · seguimiento compartido y su alcance"
 bloque assert_operaciones.sql  "5e · suministros y proformas con proveedor del catálogo"
+bloque assert_correcciones.sql "5f · correcciones de revisión: cuentas semánticas, condiciones congeladas, recepción transaccional"
 
 echo "── 6/8 · concurrencia: sesiones REALES simultáneas, no una simulación"
 aplicar "$AQUI/concurrencia_prep.sql"
@@ -184,6 +185,39 @@ DUP=$(cat "$SALIDAS"/c1.txt "$SALIDAS"/c2.txt | grep -c 'uq_recepciones_clave' |
 [ "$N_C" = "1" ] && [ "$DUP" = "1" ] \
   && echo "  ✓ C · doble clic con la misma clave: UN borrador y el segundo intento se rechazó" \
   || { echo "❌ C · borradores=$N_C rechazos=$DUP"; cat "$SALIDAS"/c1.txt "$SALIDAS"/c2.txt; exit 1; }
+
+# D · la MISMA clave y el MISMO contenido dos veces a la vez, por la función: una
+# sesión crea y la otra espera el candado y RECUPERA el mismo documento.
+CAB_D='{"orden_compra_id":"0c100000-0000-0000-0000-000000000001","tipo":"bienes","fecha":"2026-10-01","clave_idempotencia":"rpc-simultanea"}'
+LIN_D='[{"orden_compra_linea_id":"0c110000-0000-0000-0000-000000000001","cantidad":5}]'
+par d "SELECT public.compras_recepcion_crear('$C', '$C1', '$CAB_D'::jsonb, '$LIN_D'::jsonb)->'recepcion'->>'id';" \
+      "SELECT public.compras_recepcion_crear('$C', '$C1', '$CAB_D'::jsonb, '$LIN_D'::jsonb)->'recepcion'->>'id';"
+N_D=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.recepciones WHERE clave_idempotencia = 'rpc-simultanea'")
+L_D=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.recepcion_lineas WHERE recepcion_id IN (SELECT id FROM public.recepciones WHERE clave_idempotencia = 'rpc-simultanea')")
+ID1=$(grep -Eo '[0-9a-f]{8}-[0-9a-f-]{27}' "$SALIDAS"/d1.txt | head -1)
+ID2=$(grep -Eo '[0-9a-f]{8}-[0-9a-f-]{27}' "$SALIDAS"/d2.txt | head -1)
+[ "$N_D" = "1" ] && [ "$L_D" = "1" ] && [ -n "$ID1" ] && [ "$ID1" = "$ID2" ] \
+  && echo "  ✓ D · misma clave y contenido a la vez: UNA recepción con UNA línea y las dos sesiones recibieron el MISMO documento" \
+  || { echo "❌ D · recepciones=$N_D líneas=$L_D id1=$ID1 id2=$ID2"; cat "$SALIDAS"/d1.txt "$SALIDAS"/d2.txt; exit 1; }
+
+# E · la misma clave con contenido DISTINTO a la vez: una crea y la otra se rechaza.
+CAB_E='{"orden_compra_id":"0c100000-0000-0000-0000-000000000001","tipo":"bienes","fecha":"2026-10-01","clave_idempotencia":"rpc-conflicto"}'
+par e "SELECT public.compras_recepcion_crear('$C', '$C1', '$CAB_E'::jsonb, '[{\"orden_compra_linea_id\":\"0c110000-0000-0000-0000-000000000001\",\"cantidad\":5}]'::jsonb)->'recepcion'->>'id';" \
+      "SELECT public.compras_recepcion_crear('$C', '$C1', '$CAB_E'::jsonb, '[{\"orden_compra_linea_id\":\"0c110000-0000-0000-0000-000000000001\",\"cantidad\":6}]'::jsonb)->'recepcion'->>'id';"
+N_E=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.recepciones WHERE clave_idempotencia = 'rpc-conflicto'")
+CONF=$(cat "$SALIDAS"/e1.txt "$SALIDAS"/e2.txt | grep -c 'COMPRAS_RECEPCION_CLAVE_CONFLICTO' || true)
+[ "$N_E" = "1" ] && [ "$CONF" = "1" ] \
+  && echo "  ✓ E · misma clave con contenido distinto a la vez: UNA recepción y la otra sesión se rechazó por conflicto" \
+  || { echo "❌ E · recepciones=$N_E conflictos=$CONF"; cat "$SALIDAS"/e1.txt "$SALIDAS"/e2.txt; exit 1; }
+
+# F · el fallo de una línea con dos sesiones: nada a medias.
+par f "SELECT public.compras_recepcion_crear('$C', '$C1', '{\"orden_compra_id\":\"0c100000-0000-0000-0000-000000000001\",\"tipo\":\"bienes\",\"clave_idempotencia\":\"rpc-fallo-par\"}'::jsonb, '[{\"orden_compra_linea_id\":\"0c110000-0000-0000-0000-000000000001\",\"cantidad\":1},{\"orden_compra_linea_id\":\"0c110000-0000-0000-0000-000000000002\",\"cantidad\":1}]'::jsonb);" \
+      "SELECT public.compras_recepcion_crear('$C', '$C1', '{\"orden_compra_id\":\"0c100000-0000-0000-0000-000000000001\",\"tipo\":\"bienes\",\"clave_idempotencia\":\"rpc-fallo-par\"}'::jsonb, '[{\"orden_compra_linea_id\":\"0c110000-0000-0000-0000-000000000001\",\"cantidad\":1},{\"orden_compra_linea_id\":\"0c110000-0000-0000-0000-000000000002\",\"cantidad\":1}]'::jsonb);"
+N_F=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.recepciones WHERE clave_idempotencia = 'rpc-fallo-par'")
+AJ=$(cat "$SALIDAS"/f1.txt "$SALIDAS"/f2.txt | grep -c 'COMPRAS_RECEPCION_LINEA_AJENA' || true)
+[ "$N_F" = "0" ] && [ "$AJ" = "2" ] \
+  && echo "  ✓ F · dos intentos simultáneos con una línea ajena: los dos fallan y NO queda cabecera huérfana" \
+  || { echo "❌ F · recepciones=$N_F rechazos=$AJ"; cat "$SALIDAS"/f1.txt "$SALIDAS"/f2.txt; exit 1; }
 
 echo "── 7/8 · las migraciones del bloque son append-only (no editan lo ya aplicado)"
 (cd "$RAIZ" && node scripts/migrations-append-only.mjs >/dev/null 2>&1) \

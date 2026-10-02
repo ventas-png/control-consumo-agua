@@ -13,10 +13,10 @@ Fase 6 (`ordenes_compra` → `recepciones` → `facturas_proveedor` → `contras
 | Históricos sin vínculo | vista previa de contratos (#907) | `operaciones_sin_proveedor_vista_previa()` + `operaciones_vincular_proveedor()` + panel: se identifica, **nunca se une solo**, uno a uno | — |
 | Proforma → orden | solo un estado | `proformas_condominio.orden_compra_id`, misma empresa/proyecto/proveedor | proformas históricas sin proveedor del catálogo no se convierten hasta vincularlas |
 | Cuenta de línea | resolvedor #907 | sin cambios | — |
-| Aprobación / emisión | trigger de proveedor autorizado | máquina de estados en servidor, historial append-only, congelamiento tras aprobar, «devolver a borrador» = revisión con motivo, solicitante inmutable | **separación solicitante/aprobador**: implementada como bandera `compras_config.aprobacion_separada`, **apagada** (decisión §3) |
-| Recepción parcial por línea | recepción GR/IR | aceptado/rechazado + motivo, destino físico, respaldo, responsable, idempotencia (`clave_idempotencia`), bloqueo de filas contra concurrencia | — |
+| Aprobación / emisión | trigger de proveedor autorizado | máquina de estados en servidor, historial append-only, condiciones **congeladas desde la aprobación y también al emitir y después** (ni en la misma petición que emite), «devolver a borrador» = revisión con motivo y como operación propia, solicitante inmutable | **separación solicitante/aprobador**: implementada como bandera `compras_config.aprobacion_separada`, **apagada** (decisión §3) |
+| Recepción parcial por línea | recepción GR/IR | aceptado/rechazado + motivo, destino físico, respaldo, responsable, bloqueo de filas contra concurrencia; **creación transaccional e idempotente** (`compras_recepcion_crear`: cabecera y líneas en una transacción; misma clave y contenido = recupera el mismo documento; otro contenido = rechazo) | — |
 | Servicios | `destino servicio` | conformidad de servicio (`recepciones.tipo='servicio'`): no mueve inventario ni activos, devenga con la política existente | — |
-| Activo desde equipo / inventario | triggers Fase 6 | verificado con pruebas, sin cambios | — |
+| Activo desde equipo / inventario | triggers Fase 6 | cuentas del activo resueltas **por significado** (`conta_cuenta_especial`), no por código: se restauró lo que 20261021000100 había revertido (corregido en 20261021000600) | — |
 | Factura vs orden | cuadre cantidad/precio | + **IVA** (prorrateado) y **moneda**; moneda distinta nunca cuadra; sin autoaprobar; cabecera forzada deja quién/por qué | tolerancias: se usan las ya configuradas (`compras_config`, defaults 0 % cantidad / 5 % precio) |
 | Varias facturas por orden / una por varias recepciones | parcial | probado (parcial, final, cierre automático de la orden) | — |
 | Aislamiento entre empresas | RLS | triggers de integridad cruzada (recepción/factura/líneas contra orden de otra empresa o proveedor) | — |
@@ -34,8 +34,9 @@ Fase 6 (`ordenes_compra` → `recepciones` → `facturas_proveedor` → `contras
 4. `20261021000300_compras_seguimiento` — dos RPC de solo lectura.
 5. `20261021000400_operaciones_proveedor_compartido` — `proveedor_id` en suministros/proformas, vínculo, vista previa.
 6. `20261021000500_compras_integridad_cruzada` — 4 triggers de integridad entre empresa/orden/proveedor.
+7. `20261021000600_compras_correcciones_revision` — **correctiva** (#911): cuentas semánticas en la recepción de activos, condiciones congeladas al emitir y después, y `compras_recepcion_crear` (creación transaccional e idempotente) con `recepciones.hash_contenido`.
 
-Ninguna edita una migración aplicada ni renumera. Reversa documentada en la cabecera de cada archivo.
+Ninguna edita una migración aplicada ni renumera: las correcciones de revisión son una migración NUEVA porque las seis primeras pueden estar ya aplicadas en Preview u otro entorno. Las notas «CÓMO REVERTIR» de las cabeceras de 0000…0500 quedan **superadas** por la sección 6 de este documento (no son reversiones sin pérdida).
 
 ## 3. Decisiones que **no** se tomaron (necesitan al usuario)
 
@@ -54,7 +55,7 @@ No existe documento que las resuelva; el código no las asume.
 
 ## 4. Pruebas — qué es local, qué es CI y qué **no** se hizo
 
-* **Local, PostgreSQL 16 real** (`bash supabase/tests/compras_bloque_b/run.sh`): cadena completa de migraciones, cada migración nueva dos veces, 5 suites (ciclo, recepción, factura, seguimiento, operaciones) y **3 pruebas de concurrencia con sesiones reales** (dos recepciones que no caben, dos facturas por las mismas unidades, misma clave de idempotencia). Regresiones locales: `compras_flujo`, `proveedores_pr_a` (una aserción ajustada: saltarse la aprobación ahora es transición inválida), `migrations-guard`, `drift:auditar`.
+* **Local, PostgreSQL 16 real** (`bash supabase/tests/compras_bloque_b/run.sh`): cadena completa de migraciones, cada migración nueva dos veces, 6 suites (ciclo, recepción, factura, seguimiento, operaciones y **correcciones de revisión**: cuentas semánticas con un catálogo SIN 1401/1409/5107, condiciones congeladas con peticiones directas al servidor, creación transaccional con fallo de líneas / respuesta perdida / clave con otro contenido) y **6 pruebas de concurrencia con sesiones reales** (dos recepciones que no caben, dos facturas por las mismas unidades, misma clave de idempotencia, y por la función: misma clave y contenido a la vez, misma clave con contenido distinto a la vez, fallo de línea con dos sesiones). Regresiones locales: `compras_flujo`, `proveedores_pr_a` (una aserción ajustada: saltarse la aprobación ahora es transición inválida), `migrations-guard`, `drift:auditar`.
 * **Local, vitest/tsc/eslint**: seguimiento, esquema de recepción, panel de históricos y carga masiva de suministros + toda la suite existente.
 * **CI**: lo que corra el PR; no se sustituye por lo anterior.
 * **Sandbox real**: **no ejecutado** (ver §6). No hay evidencia de sandbox en este PR.
@@ -66,6 +67,10 @@ Proveedores autorizados y habilitados por proyecto; catálogo contable sembrado 
 
 ## 6. Despliegue y recuperación (sin ejecutar nada)
 
-* Sandbox `control-agua-rls-sandbox` (`jwpmivhvlstslncrtokb`): última migración registrada `20261004000200`; **faltan 31 archivos** (`20261005000000` … `20261021000500`). **No se escribió ni se escribirá sin autorización**. Si se autoriza, se aplican **archivo por archivo, en orden** (no se sube el límite de 10 por corrida del workflow: tres corridas), con verificación de versión antes y después.
-* Producción: no se toca. El límite de 10 por corrida obliga a desplegar las 6 de este bloque en una corrida propia, después de que #907 (ya aplicado) y las demás estén al día.
-* Recuperación: cada migración es aditiva; las columnas nuevas son nulas/por defecto, así que se puede revertir con los `DROP` de cada cabecera sin pérdida de datos previos. Los documentos creados con las reglas nuevas conservan su historial.
+* Sandbox `control-agua-rls-sandbox` (`jwpmivhvlstslncrtokb`): última migración registrada `20261004000200`; **faltan 32 archivos** (`20261005000000` … `20261021000600`). **No se escribió ni se escribirá sin autorización**. Si se autoriza, se aplican **archivo por archivo, en orden** (no se sube el límite de 10 por corrida del workflow: cuatro corridas), con verificación de versión antes y después.
+* Producción: no se toca. El límite de 10 por corrida obliga a desplegar las 7 de este bloque (6 + la correctiva `…0600`) en una corrida propia, después de que #907 (ya aplicado) y las demás estén al día.
+* **Recuperación — NO es una reversión sin pérdida.** Las migraciones del bloque agregan tablas y columnas que, una vez desplegadas, empiezan a guardar datos reales: `orden_compra_eventos` (historial de la orden), `recepcion_lineas.cantidad_rechazada` y `motivo_rechazo`, `recepciones.tipo`, `destino_fisico`, `respaldo_path`, `clave_idempotencia` y `hash_contenido`, `ordenes_compra.revision` y `motivo_devolucion`, `compras_config.aprobacion_separada`, `proveedor_id` y vínculos en suministros/proformas, entre otras. **Eliminar esas tablas o columnas con los `DROP` de las cabeceras BORRA lo registrado después del despliegue** (historial, rechazos y sus motivos, claves de idempotencia, vínculos con el catálogo) y no se puede reconstruir. Lo único que se puede deshacer sin pérdida son las **funciones y triggers** (restaurando la versión anterior con `CREATE OR REPLACE`), con la salvedad de que volver a una versión anterior reabre los defectos que la corrigieron (la recepción volvería a buscar `1401/1409/5107` por código, la orden emitida volvería a no tener candado).
+  * Antes de desplegar: respaldo verificable (copia o punto de restauración) y decidir quién autoriza perder lo posterior si hubiera que volver atrás.
+  * Si algo falla después de operar: **corregir hacia adelante** con una migración nueva (el camino de #911), o restaurar la copia de respaldo **aceptando perder todo lo registrado desde entonces**.
+  * No eliminar `recepciones.hash_contenido` ni `clave_idempotencia` con recepciones ya creadas: se pierde la huella que distingue un reintento legítimo de una clave reutilizada con otro contenido.
+* Lo que sí es seguro: las migraciones son aditivas, así que desplegarlas **no** cambia ni borra filas existentes; el riesgo está en deshacerlas, no en aplicarlas.
