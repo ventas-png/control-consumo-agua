@@ -18,9 +18,13 @@ interface SuministroRow {
   stock_minimo: number
   ubicacion?: string | null
   proveedor?: string | null
+  proveedor_id?: string | null
   costo_unitario?: number | null
   notas?: string | null
 }
+
+/** Proveedor del catálogo compartido que se puede elegir en esta carga. */
+export interface ProveedorImportable { id: string; nombre: string }
 
 const COLUMNS: ImportColumn[] = [
   { key: 'nombre',         width: 26, exampleValues: ['Detergente multiusos', 'Bolsas de basura 50L', 'Cloro industrial'] },
@@ -35,13 +39,18 @@ const COLUMNS: ImportColumn[] = [
 ]
 
 /**
- * Crea el validador de fila. `proveedoresValidos` son los nombres de proveedores
- * definidos/autorizados (pestaña Proveedores): la columna `proveedor` es opcional,
- * pero si trae valor debe coincidir (sin distinguir mayúsculas) con uno de ellos —
- * así la importación masiva respeta la misma restricción que el formulario.
+ * Crea el validador de fila. `proveedoresValidos` son los proveedores del CATÁLOGO
+ * COMPARTIDO habilitados hoy en el proyecto: la columna `proveedor` es opcional,
+ * pero si trae valor debe coincidir (sin distinguir mayúsculas) con UNO solo de
+ * ellos, y la fila queda ligada por su id — la misma regla que el formulario.
+ * Un nombre repetido en el catálogo es ambiguo y se rechaza: no se adivina.
  */
-function makeValidateRow(proveedoresValidos: string[]) {
-  const proveedorLookup = new Map(proveedoresValidos.map(n => [n.trim().toLowerCase(), n.trim()]))
+export function makeValidateRow(proveedoresValidos: ProveedorImportable[]) {
+  const proveedorLookup = new Map<string, ProveedorImportable | null>()
+  for (const p of proveedoresValidos) {
+    const k = p.nombre.trim().toLowerCase()
+    proveedorLookup.set(k, proveedorLookup.has(k) ? null : { id: p.id, nombre: p.nombre.trim() })
+  }
 
   return function validateRow(row: Record<string, unknown>): RowValidationResult<SuministroRow> {
   const errors: string[] = []
@@ -92,11 +101,13 @@ function makeValidateRow(proveedoresValidos: string[]) {
   }
 
   // proveedor → opcional, pero si viene debe ser un proveedor autorizado.
-  let proveedor: string | undefined
+  let proveedor: ProveedorImportable | undefined
   const rawProveedor = sanitizeInput(String(row['proveedor'] ?? '').trim())
   if (rawProveedor) {
-    const match = proveedorLookup.get(rawProveedor.toLowerCase())
-    if (!match) errors.push(`proveedor no autorizado: "${row['proveedor']}" — debe ser un proveedor definido en la pestaña Proveedores`)
+    const k = rawProveedor.toLowerCase()
+    const match = proveedorLookup.get(k)
+    if (match === null) errors.push(`proveedor ambiguo: "${row['proveedor']}" está repetido en el catálogo; vincúlalo después desde la lista`)
+    else if (!match) errors.push(`proveedor no habilitado: "${row['proveedor']}" — debe ser un proveedor del catálogo habilitado en este proyecto`)
     else proveedor = match
   }
 
@@ -112,7 +123,8 @@ function makeValidateRow(proveedoresValidos: string[]) {
       stock_minimo,
       costo_unitario: costo_unitario ?? undefined,
       ubicacion:  sanitizeInput(String(row['ubicacion'] ?? '').trim()) || undefined,
-      proveedor:  proveedor ?? undefined,
+      proveedor:  proveedor?.nombre,
+      proveedor_id: proveedor?.id,
       notas:      sanitizeInput(String(row['notas'] ?? '').trim()) || undefined,
     },
   }
@@ -122,9 +134,9 @@ function makeValidateRow(proveedoresValidos: string[]) {
 interface Props {
   proyectoId: string
   companyId: string
-  /** Nombres de proveedores autorizados (pestaña Proveedores). La columna
-   *  `proveedor` del archivo debe coincidir con uno de estos si trae valor. */
-  proveedoresValidos: string[]
+  /** Proveedores del catálogo habilitados en el proyecto. La columna `proveedor`
+   *  del archivo debe coincidir con uno solo de estos si trae valor. */
+  proveedoresValidos: ProveedorImportable[]
   onClose: () => void
   onImportado: () => void
 }

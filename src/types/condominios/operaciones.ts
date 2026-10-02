@@ -849,7 +849,10 @@ export interface SuministroCondominio {
   stock_actual: number
   stock_minimo: number
   ubicacion?: string | null
+  /** Texto histórico (fotografía del nombre al guardar). */
   proveedor?: string | null
+  /** Proveedor del catálogo compartido; NULL = histórico sin vincular. */
+  proveedor_id?: string | null
   costo_unitario?: number | null
   notas?: string | null
   activo: boolean

@@ -19,6 +19,14 @@ export const comprasKeys = {
     [...comprasKeys.all, 'contrasena-facturas', contrasenaId ?? null] as const,
   compromisos: (companyId?: string, projectId?: string | null) =>
     [...comprasKeys.all, 'compromisos', companyId ?? null, projectId ?? null] as const,
+  seguimiento: (ordenId?: string) =>
+    [...comprasKeys.all, 'seguimiento', ordenId ?? null] as const,
+  seguimientoLista: (
+    companyId?: string, projectId?: string | null, proveedorId?: string | null,
+    estado?: string | null, desde?: string | null, hasta?: string | null, soloEmpresa?: boolean,
+  ) =>
+    [...comprasKeys.all, 'seguimiento-lista', companyId ?? null, projectId ?? null, proveedorId ?? null,
+     estado ?? null, desde ?? null, hasta ?? null, soloEmpresa ?? false] as const,
   cuadre: (facturaId?: string) =>
     [...comprasKeys.all, 'cuadre', facturaId ?? null] as const,
   facturaLineas: (facturaId?: string) =>

@@ -144,6 +144,24 @@ export function useResumenVinculacionQuery(companyId?: string, enabled = true) {
   })
 }
 
+/** Suministros y proformas históricos con proveedor solo en texto (identificados, nunca unidos solos). */
+export interface OperacionLegado {
+  tabla: 'suministros_condominio' | 'proformas_condominio'
+  registro_id: string
+  project_id: string
+  texto: string
+  clasificacion: 'inequivoca' | 'ambigua' | 'sin_coincidencia'
+  candidatos: { id: string; codigo: string | null; nombre: string; estado: string }[]
+}
+
+export function useOperacionesLegadoQuery(companyId?: string, enabled = true) {
+  return useQuery({
+    queryKey: proveedoresKeys.operacionesLegado(companyId),
+    enabled: !!companyId && enabled,
+    queryFn: async () => (await rpc<OperacionLegado[]>('operaciones_sin_proveedor_vista_previa')) ?? [],
+  })
+}
+
 /** Grupos de proveedores LEGADOS con la misma identificación fiscal (solo informa). */
 export function useDuplicadosFiscalesQuery(companyId?: string, enabled = true) {
   return useQuery({

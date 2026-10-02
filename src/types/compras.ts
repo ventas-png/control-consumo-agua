@@ -26,6 +26,8 @@ export type DestinoLinea = 'inventario' | 'activo_fijo' | 'servicio' | 'gasto'
 
 export type EstadoRecepcion = 'borrador' | 'registrada' | 'anulada'
 
+export type TipoRecepcion = 'bienes' | 'servicio'
+
 export type EstadoContrasena = 'emitida' | 'pagada' | 'anulada'
 
 export type EstadoActivoFijo = 'activo' | 'en_reparacion' | 'dado_de_baja'
@@ -67,6 +69,9 @@ export interface OrdenCompra {
   /** Texto libre heredado; se conserva para no perder el histórico. */
   proveedor_nombre: string
   numero: string | null
+  /** Sube cada vez que una orden aprobada se devuelve a borrador (Bloque B). */
+  revision?: number
+  motivo_devolucion?: string | null
   correlativo: number | null
   concepto: string
   descripcion: string | null
@@ -123,6 +128,11 @@ export interface Recepcion {
   fecha: string
   documento_referencia: string | null
   recibido_por: string | null
+  /** `servicio` = conformidad de servicio: no mueve inventario ni da de alta activos. */
+  tipo?: TipoRecepcion
+  destino_fisico?: string | null
+  respaldo_path?: string | null
+  clave_idempotencia?: string | null
   estado: EstadoRecepcion
   registrada_at: string | null
   anulada_at: string | null
@@ -137,7 +147,10 @@ export interface RecepcionLinea {
   company_id: string
   recepcion_id: string
   orden_compra_linea_id: string
+  /** ACEPTADA: lo que entra al inventario / se devenga. */
   cantidad: number
+  cantidad_rechazada?: number
+  motivo_rechazo?: string | null
   costo_unitario: number
   total: number
   observacion: string | null
@@ -220,6 +233,12 @@ export interface FilaCuadre {
   diferencia_pct: number | null
   dentro_tolerancia: boolean
   motivo: string
+  /** IVA (prorrateado a la cantidad facturada) de la orden vs el de la factura. */
+  iva_orden?: number
+  iva_factura?: number
+  diferencia_iva?: number
+  moneda_orden?: string | null
+  moneda_factura?: string | null
 }
 
 /** Fila de compras_compromisos: comprometido vs recibido por proveedor. */
@@ -348,4 +367,146 @@ export function proveedorHabilitado(
   const estado = p.estado ?? (p.activo ? 'autorizado' : 'suspendido')
   if (estado !== 'autorizado') return false
   return !p.autorizacion_vence || p.autorizacion_vence >= hoyISO
+}
+
+// ── Seguimiento compartido de la orden (Bloque B) ───────────────────────────
+// Espeja lo que devuelve la RPC `compras_seguimiento_orden` (solo lectura).
+// Las secciones de facturas y los importes de facturación/pago vienen ausentes
+// o nulos para quien no puede ver Contabilidad.
+
+export interface SeguimientoIndicadores {
+  comprometido: number
+  comprometido_neto: number
+  recibido: number
+  facturado: number | null
+  facturado_neto: number | null
+  pagado: number | null
+  pendiente_por_recibir: number
+  pendiente_por_facturar: number | null
+}
+
+export interface SeguimientoLinea {
+  id: string
+  linea: number
+  descripcion: string
+  destino: DestinoLinea
+  unidad: string | null
+  precio_unitario: number
+  cantidad_ordenada: number
+  cantidad_aceptada: number
+  cantidad_rechazada: number
+  cantidad_pendiente: number
+  cantidad_facturada: number | null
+  cantidad_pendiente_facturar: number | null
+  cuenta: { id: string; codigo: string; nombre: string } | null
+  cuenta_origen: string | null
+}
+
+export interface SeguimientoRecepcion {
+  id: string
+  numero: string | null
+  fecha: string
+  tipo: TipoRecepcion
+  estado: EstadoRecepcion
+  recibido_por: string | null
+  destino_fisico: string | null
+  documento_referencia: string | null
+  tiene_respaldo: boolean
+  motivo_anulacion: string | null
+  aceptado: number
+  rechazado: number
+}
+
+export interface SeguimientoDiferencia {
+  linea: number
+  descripcion: string
+  motivo: string
+  dif_precio: number | null
+  dif_iva: number | null
+  moneda_orden: string | null
+  moneda_factura: string | null
+  cantidad_factura: number
+}
+
+export interface SeguimientoFactura {
+  id: string
+  numero_factura: string | null
+  fecha_emision: string
+  estado: string
+  moneda: string | null
+  monto_total: number
+  iva_monto: number | null
+  monto_pagado: number
+  saldo: number
+  contabilizada: boolean
+  match_forzado: boolean
+  justificacion: string | null
+  diferencias: SeguimientoDiferencia[]
+}
+
+export interface SeguimientoEvento {
+  tipo: 'estado' | 'devolucion'
+  estado_anterior: EstadoOrdenCompra | null
+  estado_nuevo: EstadoOrdenCompra
+  motivo: string | null
+  revision: number
+  origen: 'usuario' | 'sistema'
+  actor_id: string | null
+  created_at: string
+}
+
+export interface SeguimientoOrden {
+  orden: {
+    id: string
+    numero: string | null
+    concepto: string
+    estado: EstadoOrdenCompra
+    revision: number
+    project_id: string | null
+    moneda: string | null
+    fecha_requerida: string | null
+    aprobada_at: string | null
+    emitida_at: string | null
+    cerrada_at: string | null
+    solicitada_por: string | null
+    aprobada_por: string | null
+    motivo_devolucion: string | null
+    motivo_anulacion: string | null
+    proveedor: {
+      id: string
+      codigo: string | null
+      nombre: string
+      identificacion: string | null
+      pais: string | null
+      estado: EstadoProveedor | null
+    }
+    contrato: { id: string; referencia: string | null; estado: string } | null
+  }
+  contabilidad_visible: boolean
+  indicadores: SeguimientoIndicadores
+  lineas: SeguimientoLinea[]
+  recepciones: SeguimientoRecepcion[]
+  movimientos_inventario: { id: string; tipo: string; cantidad: number; fecha: string; suministro_id: string; origen: string }[]
+  activos: { id: string; codigo: string; nombre: string; estado: string; costo: number }[]
+  eventos: SeguimientoEvento[]
+  /** Ausente si el usuario no puede ver Contabilidad. */
+  facturas?: SeguimientoFactura[]
+}
+
+/** Fila de `compras_seguimiento_lista`. facturado/pagado son null sin acceso a Contabilidad. */
+export interface FilaSeguimiento {
+  orden_id: string
+  numero: string | null
+  concepto: string
+  estado: EstadoOrdenCompra
+  project_id: string | null
+  proveedor_id: string | null
+  proveedor: string
+  moneda: string | null
+  fecha: string
+  comprometido: number
+  comprometido_neto: number
+  recibido: number
+  facturado: number | null
+  pagado: number | null
 }

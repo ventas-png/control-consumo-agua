@@ -98,12 +98,15 @@ SELECT public.chk_falla($$ UPDATE public.ordenes_compra SET estado = 'emitida' W
   'COMPRAS_PROVEEDOR_NO_AUTORIZADO.*venció', '1e · autorización general vencida: emitir BLOQUEADO (mensaje de vencimiento)');
 RESET ROLE;
 
--- (f) Directo de borrador a emitida con el proveedor suspendido: también.
+-- (f) Directo de borrador a emitida con el proveedor suspendido: también. Desde el
+--     Bloque B saltarse la aprobación es en sí una transición inválida (el
+--     servidor la corta antes de llegar al proveedor); cualquiera de los dos
+--     errores es un bloqueo correcto.
 SET ROLE authenticated;
 INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado)
 VALUES ('0e000000-0000-0000-0000-000000000005', :A::uuid, :A1::uuid, :E1::uuid, 'Emisión Uno', 'Borrador con proveedor suspendido', 'borrador');
 SELECT public.chk_falla($$ UPDATE public.ordenes_compra SET estado = 'emitida' WHERE id = '0e000000-0000-0000-0000-000000000005' $$,
-  'COMPRAS_PROVEEDOR_NO_AUTORIZADO', '1f · borrador → emitida con el proveedor suspendido: BLOQUEADO');
+  'COMPRAS_PROVEEDOR_NO_AUTORIZADO|COMPRAS_OC_TRANSICION_INVALIDA', '1f · borrador → emitida con el proveedor suspendido: BLOQUEADO');
 RESET ROLE;
 
 -- (g) CASO AUTORIZADO: todo en regla → aprobada → emitida SÍ funciona.

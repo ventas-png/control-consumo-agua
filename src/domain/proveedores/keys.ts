@@ -17,6 +17,8 @@ export const proveedoresKeys = {
     [...proveedoresKeys.all, 'historicos-vista-previa', companyId ?? null] as const,
   historicosResumen: (companyId?: string) =>
     [...proveedoresKeys.all, 'historicos-resumen', companyId ?? null] as const,
+  operacionesLegado: (companyId?: string) =>
+    [...proveedoresKeys.all, 'operaciones-legado', companyId ?? null] as const,
   responsables: (companyId?: string) =>
     [...proveedoresKeys.all, 'responsables', companyId ?? null] as const,
   suministros: (projectId?: string | null) =>

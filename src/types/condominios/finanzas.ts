@@ -631,6 +631,10 @@ export interface Proforma {
   company_id: string
   project_id: string
   proveedor_nombre: string
+  /** Proveedor del catálogo compartido; NULL = histórico sin vincular. */
+  proveedor_id?: string | null
+  /** Orden de compra a la que se convirtió (mismo proveedor, empresa y proyecto). */
+  orden_compra_id?: string | null
   concepto: string
   descripcion?: string | null
   monto?: number | null
