@@ -25,7 +25,7 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
 PRIMERA=20261021000000
-NUESTRAS=$(ls "$MIGS" | grep -E '^2026102[12]00[0-9]{4}_' | sed 's/\.sql$//' | sort)
+NUESTRAS=$(ls "$MIGS" | grep -E '^2026102[123]00[0-9]{4}_' | sed 's/\.sql$//' | sort)
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -135,6 +135,9 @@ bloque assert_inventario.sql   "5i · inventario desde la orden: insumo validado
 bloque assert_importacion_lineas.sql "5j · carga masiva de renglones: vista previa, errores por fila, todo o nada, sin duplicar"
 bloque assert_respaldos.sql    "5k · respaldos de recepción: bucket privado, acceso por empresa/proyecto, congelamiento, trazabilidad"
 bloque assert_seguimiento_pantalla.sql "5l · seguimiento filtrable: pendientes, monedas separadas, pagos enlazados y sin datos financieros para Operaciones"
+bloque assert_correcciones_c.sql "5m · correcciones del bloque C: pendientes por renglón, respaldos validados en servidor, retiro del principal"
+echo "── 5n · la protección de inventario es obligatoria (con duplicados reales, siempre en transacciones que se revierten)"
+BD=$BD bash "$AQUI/indice_obligatorio.sh" || exit 1
 
 echo "── 6/8 · concurrencia: sesiones REALES simultáneas, no una simulación"
 aplicar "$AQUI/concurrencia_prep.sql"
@@ -327,6 +330,31 @@ D_N=$(cat "$SALIDAS"/n1.txt "$SALIDAS"/n2.txt | grep -c 'COMPRAS_IMPORT_DUPLICAD
 [ "$N_N" = "2" ] && [ "$D_N" = "1" ] \
   && echo "  ✓ N · dos lotes con el mismo contenido a la vez: uno se aplicó (2 renglones) y el otro se rechazó como duplicado" \
   || { echo "❌ N · renglones=$N_N duplicados=$D_N"; cat "$SALIDAS"/n1.txt "$SALIDAS"/n2.txt; exit 1; }
+
+# O · respaldos: el MISMO archivo registrado por dos sesiones a la vez: UN registro y las dos reciben OK
+# (antes la segunda recibía un error crudo de unicidad).
+aplicar "$AQUI/concurrencia_respaldos_prep.sql"
+RO=0cd20000-0000-0000-0000-000000000001; RUTA_O="$C/$C1/$RO/doble.pdf"
+ADJ_O="SELECT public.compras_recepcion_adjuntar('$RO', '$RUTA_O', 'Doble.pdf', 'application/pdf', 1234, repeat('a', 64), 'entrega')->>'reutilizado';"
+par o "$ADJ_O" "$ADJ_O"
+N_O=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.recepcion_respaldos WHERE recepcion_id = '$RO'")
+NUEVO_O=$(cat "$SALIDAS"/o1.txt "$SALIDAS"/o2.txt | grep -c '^false$' || true)
+REUT_O=$(cat "$SALIDAS"/o1.txt "$SALIDAS"/o2.txt | grep -c '^true$' || true)
+[ "$N_O" = "1" ] && [ "$NUEVO_O" = "1" ] && [ "$REUT_O" = "1" ] \
+  && echo "  ✓ O · el mismo archivo registrado a la vez: UN registro, una sesión lo creó y la otra recibió el existente" \
+  || { echo "❌ O · registros=$N_O nuevos=$NUEVO_O reutilizados=$REUT_O"; cat "$SALIDAS"/o1.txt "$SALIDAS"/o2.txt; exit 1; }
+
+# P · retiro vs registro: una sesión REGISTRA la recepción (aún sin confirmar) y otra intenta RETIRAR su
+# respaldo. El retiro espera, ve la recepción ya registrada y se rechaza: la evidencia queda íntegra.
+RP=0cd20000-0000-0000-0000-000000000002
+par p "UPDATE public.recepciones SET estado = 'registrada' WHERE id = '$RP';" \
+      "DELETE FROM public.recepcion_respaldos WHERE recepcion_id = '$RP';"
+N_P=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.recepcion_respaldos WHERE recepcion_id = '$RP'")
+E_P=$(psql -q -t -A -d $BD -c "SELECT estado FROM public.recepciones WHERE id = '$RP'")
+INM_P=$(cat "$SALIDAS"/p1.txt "$SALIDAS"/p2.txt | grep -c 'COMPRAS_RESPALDO_INMUTABLE' || true)
+[ "$N_P" = "1" ] && [ "$E_P" = "registrada" ] && [ "$INM_P" = "1" ] \
+  && echo "  ✓ P · retiro y registro a la vez: la recepción quedó registrada y la evidencia INTACTA (el retiro se rechazó)" \
+  || { echo "❌ P · respaldos=$N_P estado=$E_P rechazos=$INM_P"; cat "$SALIDAS"/p1.txt "$SALIDAS"/p2.txt; exit 1; }
 
 echo "── 7/8 · las migraciones del bloque son append-only (no editan lo ya aplicado)"
 (cd "$RAIZ" && node scripts/migrations-append-only.mjs >/dev/null 2>&1) \

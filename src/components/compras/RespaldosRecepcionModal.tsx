@@ -14,6 +14,7 @@ import {
   MIME_RESPALDO,
   urlRespaldoRecepcion,
   useAdjuntarRespaldoMutation,
+  RetiroRespaldoError,
   useRetirarRespaldoMutation,
   validarArchivoRespaldo,
 } from '../../domain/compras/respaldos'
@@ -84,8 +85,15 @@ export function RespaldosRecepcionModal({ companyId, projectId, recepcion, puede
     if (!ok) return
     try {
       await retirar.mutateAsync(r)
+      notify({ variant: 'success', title: 'Archivo retirado', text: `«${r.nombre}» se quitó de la recepción y del almacenamiento.` })
     } catch (e) {
-      notify({ variant: 'error', title: 'No se pudo retirar', text: e instanceof Error ? e.message : 'Error inesperado.' })
+      // Si el registro se retiró pero el archivo no, NO es un éxito: se dice con la ruta que quedó sin referencia.
+      const huerfano = e instanceof RetiroRespaldoError && e.fase === 'almacenamiento'
+      notify({
+        variant: huerfano ? 'warning' : 'error',
+        title: huerfano ? 'Registro retirado, archivo pendiente de limpiar' : 'No se pudo retirar',
+        text: e instanceof Error ? e.message : 'Error inesperado.',
+      })
     }
   }
 

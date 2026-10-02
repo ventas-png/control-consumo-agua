@@ -107,6 +107,7 @@ export function SeguimientoComprasPanel({ companyId, projectId, monedaBase }: Pr
     { key: 'pend_rec', header: 'Pend. recibir', accessor: (f) => f.pendiente_por_recibir, numeric: true, render: (f) => $(f.pendiente_por_recibir, f.moneda), width: 120 },
     ...(verFinanzas ? [
       { key: 'pend_fac', header: 'Pend. facturar', accessor: (f: FilaSeguimiento) => f.pendiente_por_facturar ?? 0, numeric: true, render: (f: FilaSeguimiento) => $(f.pendiente_por_facturar, f.moneda), width: 120 },
+      { key: 'dif_precio', header: 'Dif. de precio', accessor: (f: FilaSeguimiento) => f.diferencia_precio_facturada ?? 0, numeric: true, render: (f: FilaSeguimiento) => $(f.diferencia_precio_facturada, f.moneda), width: 120 },
       { key: 'pend_pag', header: 'Pend. pagar', accessor: (f: FilaSeguimiento) => f.pendiente_por_pagar ?? 0, numeric: true, render: (f: FilaSeguimiento) => $(f.pendiente_por_pagar, f.moneda), width: 110 },
     ] as DataTableColumn<FilaSeguimiento>[] : []),
     {

@@ -77,7 +77,8 @@ export function SeguimientoOrdenContenido({ s, monedaBase }: { s: SeguimientoOrd
         <Indicador testId="ind-recibido" titulo="Recibido" valor={$(ind.recibido)} nota={`pendiente ${$(ind.pendiente_por_recibir)} · sin IVA`} />
         {verConta ? (
           <>
-            <Indicador testId="ind-facturado" titulo="Facturado" valor={$(ind.facturado)} nota={`pendiente por facturar ${$(ind.pendiente_por_facturar)} (sin IVA)`} />
+            <Indicador testId="ind-facturado" titulo="Facturado" valor={$(ind.facturado)} nota={`pendiente por facturar ${$(ind.pendiente_por_facturar)} (sin IVA, a precio de la orden)`} />
+            <Indicador testId="ind-dif-precio" titulo="Diferencia de precio" valor={$(ind.diferencia_precio_facturada)} nota="facturado − precio de la orden; no entra en el pendiente" />
             <Indicador testId="ind-pagado" titulo="Pagado" valor={$(ind.pagado)} />
           </>
         ) : (
@@ -95,6 +96,8 @@ export function SeguimientoOrdenContenido({ s, monedaBase }: { s: SeguimientoOrd
                 <th style={cabecera}>Renglón</th><th style={cabecera}>Destino</th><th style={cabecera}>Cuenta</th>
                 <th style={cabecera}>Pedido</th><th style={cabecera}>Aceptado</th><th style={cabecera}>Rechazado</th><th style={cabecera}>Pendiente</th>
                 {verConta && <th style={cabecera}>Facturado</th>}
+                {verConta && <th style={cabecera}>Pend. facturar</th>}
+                {verConta && <th style={cabecera}>Dif. precio</th>}
               </tr>
             </thead>
             <tbody>
@@ -108,6 +111,8 @@ export function SeguimientoOrdenContenido({ s, monedaBase }: { s: SeguimientoOrd
                   <td style={celda}>{l.cantidad_rechazada}</td>
                   <td style={celda}>{l.cantidad_pendiente}</td>
                   {verConta && <td style={celda}>{l.cantidad_facturada ?? 0}</td>}
+                  {verConta && <td style={celda}>{$(l.pendiente_por_facturar)}</td>}
+                  {verConta && <td style={celda}>{$(l.diferencia_precio)}</td>}
                 </tr>
               ))}
             </tbody>
