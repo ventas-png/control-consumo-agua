@@ -133,11 +133,12 @@ Dato en el sandbox: el padrón quedó con OC-000002 (cerrada tras la factura), c
 **Defecto**: `compras_factura_crear` validaba el estado de la orden ANTES de buscar la clave de idempotencia. Si la factura creada cerraba la orden, un reintento legítimo (respuesta perdida, doble clic) recibía `COMPRAS_FACTURA_ORDEN_ESTADO` en lugar de la factura que sí existía. Reproducido localmente con solo 0800 (la prueba 11a falla con ese error).
 **Corrección** (`20261021000900`, `CREATE OR REPLACE` de la misma función; no edita 0800): primero identidad, empresa, acceso (RLS), alcance (proyecto, proveedor, orden y renglones de esa orden) y huella; luego la clave (mismo contenido → original, `reutilizada: true`; otro contenido → `COMPRAS_FACTURA_CLAVE_CONFLICTO`); después el estado de la orden, que solo frena facturas nuevas. Sin cambios de firma ni de permisos; quien no ve la factura por RLS no la recupera.
 **Pruebas** (`assert_factura_crear.sql` §11, 14 comprobaciones; guion `sandbox_flujo_completo.sql`, 84): crear → aprobar (la orden se cierra) → repetir: mismo id, 0 facturas/renglones/asientos/líneas de asiento nuevos, lo facturado no cambia; misma clave con otro contenido → rechazo; clave nueva sobre orden cerrada → `COMPRAS_FACTURA_ORDEN_ESTADO` sin factura; otra empresa con la misma clave → `COMPRAS_FACTURA_EMPRESA`. Local: suite completa verde y guion 84/84.
+**Sandbox** (autorizado por el propietario; solo 0900, con el workflow `Apply Migrations to Sandbox`, ref = rama): versión máxima `20261021000900`, 0700/0800/0900 registradas, `compras_factura_crear` SECURITY INVOKER, sin EXECUTE para `anon`, con EXECUTE para `authenticated`; guion reversible `GUION_OK_REVERTIDO: 84 comprobaciones`, sin residuos (0 empresas/facturas/usuarios `5b5b0000…`; el padrón `5b5b1000…` intacto). Producción no se tocó.
 
 | Ambiente | 0700 | 0800 | 0900 |
 |---|---|---|---|
 | Local / CI | aplicada | aplicada | aplicada |
-| Sandbox | aplicada | aplicada | **pendiente de autorización** |
+| Sandbox | aplicada | aplicada | **aplicada** (run 37027482249, SHA `a3332db7`) |
 | Producción | pendiente | pendiente | pendiente |
 
 ## 6. No ejecutado (pendiente explícito)
