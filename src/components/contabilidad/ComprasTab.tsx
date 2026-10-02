@@ -16,11 +16,16 @@ import { useProveedoresQuery } from '../../domain/cxp/queries'
 import { useResponsablesQuery } from '../../domain/proveedores/queries'
 import { SugerenciaCuentaLinea } from '../proveedores/SugerenciaCuentaLinea'
 import { SeguimientoOrdenModal } from '../compras/SeguimientoOrdenModal'
+import { RespaldosRecepcionModal } from '../compras/RespaldosRecepcionModal'
+import { SeguimientoComprasPanel } from '../compras/SeguimientoComprasPanel'
+import { ImportarLineasOrdenModal } from '../compras/ImportarLineasOrdenModal'
+import { adjuntarRespaldoRecepcion, validarArchivoRespaldo, MIME_RESPALDO, MAX_BYTES_RESPALDO } from '../../domain/compras/respaldos'
 import {
   useActivosFijosQuery,
   useCompromisosQuery,
   useContrasenasQuery,
   useDuplicadosQuery,
+  useInsumosAlmacenQuery,
   useOrdenCompraLineasQuery,
   useOrdenesCompraQuery,
   useRecepcionesQuery,
@@ -58,7 +63,7 @@ interface Props {
   monedaBase: string
 }
 
-type Vista = 'ordenes' | 'recepciones' | 'contrasenas' | 'activos' | 'compromisos' | 'duplicados'
+type Vista = 'ordenes' | 'recepciones' | 'seguimiento' | 'contrasenas' | 'activos' | 'compromisos' | 'duplicados'
 
 const TONO_OC = {
   borrador: 'info', aprobada: 'warning', emitida: 'warning',
@@ -70,6 +75,8 @@ const TONO_CP = { emitida: 'warning', pagada: 'success', anulada: 'neutral' } as
 interface LineaForm {
   descripcion: string
   destino_tipo: DestinoLinea
+  /** Insumo del almacén; solo con destino «inventario». */
+  suministro_id: string
   categoria: string
   cantidad: string
   unidad: string
@@ -78,7 +85,7 @@ interface LineaForm {
 }
 
 const LINEA_VACIA: LineaForm = {
-  descripcion: '', destino_tipo: 'gasto', categoria: 'otros',
+  descripcion: '', destino_tipo: 'gasto', suministro_id: '', categoria: 'otros',
   cantidad: '1', unidad: 'unidad', precio_unitario: '0', iva_monto: '0',
 }
 
@@ -88,6 +95,8 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
   const [nuevaOrden, setNuevaOrden] = useState(false)
   const [recibirDe, setRecibirDe] = useState<OrdenCompraConRelaciones | null>(null)
   const [seguirDe, setSeguirDe] = useState<string | null>(null)
+  const [respaldosDe, setRespaldosDe] = useState<RecepcionConRelaciones | null>(null)
+  const [importarEn, setImportarEn] = useState<OrdenCompraConRelaciones | null>(null)
 
   const { data: ordenes = [], isLoading: cargandoOrdenes } = useOrdenesCompraQuery(companyId, projectId)
   const { data: recepciones = [], isLoading: cargandoRecepciones } = useRecepcionesQuery(companyId, projectId)
@@ -130,10 +139,13 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
       render: (o) => <StatusBadge tone={TONO_OC[o.estado] ?? 'neutral'}>{ESTADO_OC_LABELS[o.estado] ?? o.estado}</StatusBadge>,
     },
     {
-      key: 'acciones', header: '', width: 280,
+      key: 'acciones', header: '', width: 340,
       render: (o) => (
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button style={btnLink} onClick={(e) => { e.stopPropagation(); setSeguirDe(o.id) }}>Seguimiento</button>
+          {o.estado === 'borrador' && puedeCrear && (
+            <button style={btnLink} onClick={(e) => { e.stopPropagation(); setImportarEn(o) }}>Importar renglones</button>
+          )}
           {o.estado === 'borrador' && puedeAutorizar && (
             <button style={btnLink} onClick={(e) => {
               e.stopPropagation()
@@ -191,9 +203,10 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
       render: (r) => <StatusBadge tone={TONO_REC[r.estado] ?? 'neutral'}>{ESTADO_RECEPCION_LABELS[r.estado]}</StatusBadge>,
     },
     {
-      key: 'acciones', header: '', width: 180,
+      key: 'acciones', header: '', width: 240,
       render: (r) => (
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button style={btnLink} onClick={(e) => { e.stopPropagation(); setRespaldosDe(r) }}>Respaldos</button>
           {r.estado === 'borrador' && puedeCambiarEstado && (
             <button style={btnLink} onClick={async (e) => {
               e.stopPropagation()
@@ -356,6 +369,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
         options={[
           { value: 'ordenes', label: 'Órdenes de compra', count: ordenes.filter((o) => o.estado !== 'cancelada').length },
           { value: 'recepciones', label: 'Recepciones', count: recepciones.filter((r) => r.estado !== 'anulada').length },
+          { value: 'seguimiento', label: 'Seguimiento' },
           { value: 'contrasenas', label: 'Contraseñas de pago', count: contrasenas.filter((c) => c.estado === 'emitida').length },
           { value: 'activos', label: 'Activos fijos', count: activos.filter((a) => a.estado !== 'dado_de_baja').length },
           { value: 'compromisos', label: 'Comprometido' },
@@ -397,6 +411,10 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
             description: 'Se crean desde una orden aprobada o emitida, con el botón «Recibir». Al registrarlas entran a inventario, activos o gasto, y la contabilidad las reconoce el mismo día.',
           }}
         />
+      )}
+
+      {vista === 'seguimiento' && (
+        <SeguimientoComprasPanel companyId={companyId} projectId={projectId} monedaBase={monedaBase} />
       )}
 
       {vista === 'contrasenas' && (
@@ -489,6 +507,24 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
         <SeguimientoOrdenModal ordenId={seguirDe} monedaBase={monedaBase} onClose={() => setSeguirDe(null)} />
       )}
 
+      {importarEn && (
+        <ImportarLineasOrdenModal
+          orden={{ id: importarEn.id, numero: importarEn.numero, concepto: importarEn.concepto, moneda: importarEn.moneda }}
+          monedaBase={monedaBase}
+          onClose={() => setImportarEn(null)}
+        />
+      )}
+
+      {respaldosDe && (
+        <RespaldosRecepcionModal
+          companyId={companyId}
+          projectId={projectId}
+          recepcion={{ id: respaldosDe.id, numero: respaldosDe.numero, tipo: respaldosDe.tipo ?? 'bienes', estado: respaldosDe.estado }}
+          puedeAdjuntar={puedeCrear}
+          onClose={() => setRespaldosDe(null)}
+        />
+      )}
+
       {recibirDe && (
         <RecepcionModal
           companyId={companyId}
@@ -505,7 +541,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
 // Nueva orden de compra
 // ════════════════════════════════════════════════════════════════════════════
 
-function OrdenCompraModal({
+export function OrdenCompraModal({
   companyId, projectId, monedaBase, proveedores, hayProveedores, onClose,
 }: {
   companyId: string
@@ -516,6 +552,9 @@ function OrdenCompraModal({
   onClose: () => void
 }) {
   const crear = useCrearOrdenCompraMutation(companyId, projectId)
+  // Solo un proyecto tiene bodega: en la contabilidad de la empresa no hay insumos.
+  const { data: insumos = [], isLoading: cargandoInsumos } = useInsumosAlmacenQuery(companyId, projectId)
+  const hayBodega = !!projectId
   const [proveedorId, setProveedorId] = useState('')
   const [concepto, setConcepto] = useState('')
   const [fechaRequerida, setFechaRequerida] = useState('')
@@ -532,6 +571,18 @@ function OrdenCompraModal({
     setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, [campo]: valor } : l)))
   }
 
+  // El insumo manda en la unidad: un renglón de inventario se pide en la unidad con la que se
+  // lleva el insumo (el servidor lo exige igual). Cambiar el destino suelta el insumo.
+  function cambiarDestino(i: number, destino: DestinoLinea) {
+    setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, destino_tipo: destino, suministro_id: destino === 'inventario' ? l.suministro_id : '' } : l)))
+  }
+  function elegirInsumo(i: number, id: string) {
+    const ins = insumos.find((x) => x.id === id)
+    setLineas((ls) => ls.map((l, j) => (j === i
+      ? { ...l, suministro_id: id, descripcion: l.descripcion || ins?.nombre || '', unidad: ins?.unidad_medida ?? l.unidad }
+      : l)))
+  }
+
   async function guardar() {
     const parsed = ordenCompraFormSchema.safeParse({
       proveedor_id: proveedorId,
@@ -546,10 +597,9 @@ function OrdenCompraModal({
       lineas: lineas.map((l) => ({
         descripcion: l.descripcion,
         destino_tipo: l.destino_tipo,
-        // El destino Inventario exige elegir el insumo del almacén; mientras el
-        // selector de insumos no esté en este formulario, esa línea se captura
-        // desde la pestaña de Suministros del proyecto.
-        suministro_id: null,
+        // El destino Inventario exige el insumo del almacén (el servidor valida empresa, proyecto,
+        // unidad y destino); con cualquier otro destino no viaja insumo.
+        suministro_id: l.destino_tipo === 'inventario' ? (l.suministro_id || null) : null,
         // La cuenta NO viaja desde aquí: la resuelve y valida el servidor al
         // guardar (la misma entrada da la misma cuenta, sin depender de que una
         // consulta previa haya terminado o fallado).
@@ -635,12 +685,21 @@ function OrdenCompraModal({
                   <td style={{ padding: 2 }}>
                     <input value={l.descripcion} onChange={(e) => actualizar(i, 'descripcion', e.target.value)}
                            style={{ ...input, width: '100%' }} aria-label={`Descripción del renglón ${i + 1}`} />
+                    {l.destino_tipo === 'inventario' && (
+                      <select value={l.suministro_id} onChange={(e) => elegirInsumo(i, e.target.value)}
+                              style={{ ...input, width: '100%', marginTop: 4 }} aria-label={`Insumo del renglón ${i + 1}`}>
+                        <option value="">{cargandoInsumos ? 'Cargando insumos…' : insumos.length === 0 ? 'No hay insumos activos en este proyecto' : 'Elige el insumo del almacén…'}</option>
+                        {insumos.map((x) => (
+                          <option key={x.id} value={x.id}>{x.nombre} · {x.unidad_medida} · stock {x.stock_actual}</option>
+                        ))}
+                      </select>
+                    )}
                   </td>
                   <td style={{ padding: 2 }}>
-                    <select value={l.destino_tipo} onChange={(e) => actualizar(i, 'destino_tipo', e.target.value)}
+                    <select value={l.destino_tipo} onChange={(e) => cambiarDestino(i, e.target.value as DestinoLinea)}
                             style={{ ...input, width: '100%' }} aria-label={`Destino del renglón ${i + 1}`}>
                       {(Object.keys(DESTINO_LINEA_LABELS) as DestinoLinea[])
-                        .filter((d) => d !== 'inventario')
+                        .filter((d) => d !== 'inventario' || hayBodega)
                         .map((d) => <option key={d} value={d}>{DESTINO_LINEA_LABELS[d]}</option>)}
                     </select>
                   </td>
@@ -657,6 +716,8 @@ function OrdenCompraModal({
                   </td>
                   <td style={{ padding: 2 }}>
                     <input value={l.unidad} onChange={(e) => actualizar(i, 'unidad', e.target.value)}
+                           readOnly={l.destino_tipo === 'inventario' && !!l.suministro_id}
+                           title={l.destino_tipo === 'inventario' && l.suministro_id ? 'La unidad la fija el insumo del almacén' : undefined}
                            style={{ ...input, width: '100%' }} aria-label={`Unidad del renglón ${i + 1}`} />
                   </td>
                   <td style={{ padding: 2 }}>
@@ -684,7 +745,8 @@ function OrdenCompraModal({
           {lineas.map((l, i) => (
             <SugerenciaCuentaLinea
               key={i} indice={i} projectId={projectId} proveedorId={proveedorId || null}
-              destino={l.destino_tipo === 'activo_fijo' ? 'activo_fijo' : 'gasto'} categoria={l.categoria}
+              destino={l.destino_tipo === 'activo_fijo' ? 'activo_fijo' : l.destino_tipo === 'inventario' ? 'inventario' : 'gasto'}
+              categoria={l.categoria} suministroId={l.suministro_id || null}
               fecha={hoyLocalISO()}
             />
           ))}
@@ -729,6 +791,9 @@ function RecepcionModal({
   const [cantidades, setCantidades] = useState<Record<string, string>>({})
   const [rechazos, setRechazos] = useState<Record<string, string>>({})
   const [motivos, setMotivos] = useState<Record<string, string>>({})
+  // Evidencia opcional al crear (remisión, foto o acta). Se sube DESPUÉS de crear el borrador y,
+  // si falla, la recepción NO se pierde: se puede adjuntar luego desde «Respaldos».
+  const [respaldo, setRespaldo] = useState<File | null>(null)
   // Una clave por apertura del formulario: si el usuario da doble clic o reintenta
   // tras un corte de red, el servidor rechaza el segundo borrador en vez de duplicarlo.
   const claveIdempotencia = useRef(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`)
@@ -778,8 +843,29 @@ function RecepcionModal({
       notify({ variant: 'warning', title: 'Atención', text: parsed.error.issues[0]?.message ?? 'Datos inválidos.' })
       return
     }
+    if (respaldo) {
+      const problema = validarArchivoRespaldo(respaldo)
+      if (problema) {
+        notify({ variant: 'warning', title: 'Atención', text: `Respaldo: ${problema}` })
+        return
+      }
+    }
     try {
-      await crear.mutateAsync(parsed.data)
+      const creada = await crear.mutateAsync(parsed.data)
+      if (respaldo) {
+        try {
+          await adjuntarRespaldoRecepcion({
+            companyId, projectId, recepcionId: creada.id, archivo: respaldo, tipo: tipo === 'servicio' ? 'conformidad' : 'entrega',
+          })
+        } catch (e) {
+          notify({
+            variant: 'warning', title: 'Recepción creada, respaldo pendiente',
+            text: `${e instanceof Error ? e.message : 'No se pudo adjuntar el archivo.'} La recepción quedó en borrador: adjunta el archivo desde «Respaldos».`,
+          })
+          onClose()
+          return
+        }
+      }
       notify({
         variant: 'success', title: 'Listo',
         text: tipo === 'servicio'
@@ -897,6 +983,11 @@ function RecepcionModal({
           Solo lo <strong>aceptado</strong> entra al inventario o se devenga; lo rechazado queda con su motivo y sigue pendiente.
         </p>
       </div>
+
+      <Campo label={`${tipo === 'servicio' ? 'Acta o soporte de la conformidad' : 'Remisión o foto de la entrega'} (opcional · PDF, JPG, PNG o WEBP, hasta ${MAX_BYTES_RESPALDO / 1024 / 1024} MB)`}>
+        <input type="file" accept={MIME_RESPALDO.join(',')} aria-label="Respaldo de la recepción"
+               onChange={(e) => setRespaldo(e.target.files?.[0] ?? null)} style={input} />
+      </Campo>
 
       <Campo label="Observaciones">
         <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} style={{ ...input, resize: 'vertical' }} />

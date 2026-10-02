@@ -412,6 +412,8 @@ export interface SeguimientoRecepcion {
   destino_fisico: string | null
   documento_referencia: string | null
   tiene_respaldo: boolean
+  /** Nº de archivos de evidencia; null si el usuario no puede ver la evidencia. */
+  respaldos: number | null
   motivo_anulacion: string | null
   aceptado: number
   rechazado: number
@@ -491,9 +493,16 @@ export interface SeguimientoOrden {
   eventos: SeguimientoEvento[]
   /** Ausente si el usuario no puede ver Contabilidad. */
   facturas?: SeguimientoFactura[]
+  /** Ausente si el usuario no puede ver Contabilidad: pagos de las facturas de la orden. */
+  pagos?: SeguimientoPago[]
 }
 
-/** Fila de `compras_seguimiento_lista`. facturado/pagado son null sin acceso a Contabilidad. */
+/**
+ * Fila de `compras_seguimiento_lista`. Cada fila va en la moneda de SU orden (`moneda` nunca es
+ * null: si la orden no tiene, es la base de su contabilidad): los totales de una pantalla se
+ * agrupan por moneda, jamás se suman monedas distintas. Los campos financieros son null sin
+ * acceso a Contabilidad.
+ */
 export interface FilaSeguimiento {
   orden_id: string
   numero: string | null
@@ -502,11 +511,93 @@ export interface FilaSeguimiento {
   project_id: string | null
   proveedor_id: string | null
   proveedor: string
-  moneda: string | null
+  moneda: string
   fecha: string
   comprometido: number
   comprometido_neto: number
   recibido: number
   facturado: number | null
+  facturado_neto: number | null
   pagado: number | null
+  pendiente_por_recibir: number
+  pendiente_por_facturar: number | null
+  pendiente_por_pagar: number | null
+  n_recepciones: number
+  n_facturas: number | null
+}
+
+/** Un pago enlazado a una factura de la orden (`pagos` de `compras_seguimiento_orden`). */
+export interface SeguimientoPago {
+  id: string
+  factura_id: string
+  numero_factura: string | null
+  /** Total de la orden de pago. */
+  monto_pago: number
+  /** Lo que cubre de las facturas de ESTA orden (si el pago liquida una contraseña, su reparto). */
+  monto_aplicado: number
+  contrasena: string | null
+  estado: string
+  metodo_pago: string
+  referencia: string | null
+  fecha_pago: string | null
+  pagada_at: string | null
+}
+
+/** Insumo del almacén de un proyecto, para elegirlo en un renglón de inventario. */
+export interface InsumoAlmacen {
+  id: string
+  nombre: string
+  unidad_medida: string
+  stock_actual: number
+}
+
+export type TipoRespaldoRecepcion = 'entrega' | 'conformidad' | 'otro'
+
+/** Una evidencia de entrega o conformidad de una recepción (`recepcion_respaldos`). */
+export interface RecepcionRespaldo {
+  id: string
+  recepcion_id: string
+  ruta: string
+  nombre: string
+  tipo: TipoRespaldoRecepcion
+  mime: string
+  bytes: number
+  sha256: string
+  notas: string | null
+  created_by: string | null
+  created_at: string
+}
+
+/** Resultado por fila de la vista previa de una carga masiva de renglones. */
+export interface FilaImportacionLinea {
+  fila: number
+  origen: Record<string, string>
+  datos: {
+    descripcion: string
+    destino_tipo: DestinoLinea
+    suministro_id: string | null
+    categoria: string
+    cantidad: number
+    unidad: string
+    precio_unitario: number
+    iva_monto: number
+    cuenta_id: string | null
+  } | null
+  errores: { campo: string; mensaje: string }[]
+  advertencias: { campo: string; mensaje: string }[]
+}
+
+export interface VistaPreviaImportacionLineas {
+  lote_id: string
+  orden_compra_id: string
+  resumen: { total: number; validas: number; con_error: number; duplicado_de_lote_aplicado: boolean }
+  filas: FilaImportacionLinea[]
+}
+
+export interface ResultadoImportacionLineas {
+  lote_id: string
+  orden_compra_id: string
+  renglones_creados: number
+  linea_ids: string[]
+  reutilizada: boolean
 }

@@ -22,11 +22,13 @@ interface Props {
   destino: DestinoCompra
   categoria: string
   fecha: string
+  /** Insumo del renglón de inventario: la regla puede depender de él. */
+  suministroId?: string | null
 }
 
-export function SugerenciaCuentaLinea({ indice, projectId, proveedorId, destino, categoria, fecha }: Props) {
+export function SugerenciaCuentaLinea({ indice, projectId, proveedorId, destino, categoria, fecha, suministroId = null }: Props) {
   const { data, isLoading, isError, error } = useSugerenciaCuentaQuery({
-    projectId, destino, categoria, suministroId: null, proveedorId, fecha,
+    projectId, destino, categoria, suministroId, proveedorId, fecha,
   })
   const etiqueta = `Renglón ${indice + 1}: `
   let texto: string

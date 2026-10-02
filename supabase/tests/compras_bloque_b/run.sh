@@ -25,7 +25,7 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
 PRIMERA=20261021000000
-NUESTRAS=$(ls "$MIGS" | grep -E '^2026102100[0-9]{4}_' | sed 's/\.sql$//' | sort)
+NUESTRAS=$(ls "$MIGS" | grep -E '^2026102[12]00[0-9]{4}_' | sed 's/\.sql$//' | sort)
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -131,6 +131,10 @@ bloque assert_correcciones.sql "5f · correcciones de revisión: cuentas semánt
 # Van AL FINAL: las suites comparten base y las de seguimiento cuentan órdenes por filtro.
 bloque assert_factura_crear.sql "5g · factura creada por UNA operación de servidor: todo o nada, idempotente, validada"
 bloque assert_aprobacion.sql   "5h · aprobación endurecida: sin renglones, autorizador sellado, excepciones acotadas"
+bloque assert_inventario.sql   "5i · inventario desde la orden: insumo validado, solo lo aceptado, sin duplicar existencias"
+bloque assert_importacion_lineas.sql "5j · carga masiva de renglones: vista previa, errores por fila, todo o nada, sin duplicar"
+bloque assert_respaldos.sql    "5k · respaldos de recepción: bucket privado, acceso por empresa/proyecto, congelamiento, trazabilidad"
+bloque assert_seguimiento_pantalla.sql "5l · seguimiento filtrable: pendientes, monedas separadas, pagos enlazados y sin datos financieros para Operaciones"
 
 echo "── 6/8 · concurrencia: sesiones REALES simultáneas, no una simulación"
 aplicar "$AQUI/concurrencia_prep.sql"
@@ -287,6 +291,42 @@ IDK2=$(grep -Eo '[0-9a-f]{8}-[0-9a-f-]{27}' "$SALIDAS"/k2.txt | head -1); IDK3=$
 [ "$N_K0" = "0" ] && [ "$L_K0" = "0" ] && [ "$N_K1" = "1" ] && [ -n "$IDK2" ] && [ "$IDK2" = "$IDK3" ] \
   && echo "  ✓ K · sesión terminada antes de confirmar: no quedó NADA; el reintento crea UNA factura y un segundo reintento devuelve la misma" \
   || { echo "❌ K · tras la caída facturas=$N_K0 renglones sueltos=$L_K0; tras el reintento=$N_K1 id2=$IDK2 id3=$IDK3"; cat "$SALIDAS"/k1.txt "$SALIDAS"/k2.txt "$SALIDAS"/k3.txt; exit 1; }
+
+# L · inventario: la MISMA recepción registrada por dos sesiones a la vez: UNA entrada al
+# kardex, el stock sube una sola vez y hay UN asiento.
+aplicar "$AQUI/concurrencia_inventario_prep.sql"
+par l "UPDATE public.recepciones SET estado = 'registrada' WHERE id = '0c200000-0000-0000-0000-000000000005';" \
+      "UPDATE public.recepciones SET estado = 'registrada' WHERE id = '0c200000-0000-0000-0000-000000000005';"
+ST_L=$(psql -q -t -A -d $BD -c "SELECT stock_actual FROM public.suministros_condominio WHERE id = '0c5c0000-0000-0000-0000-000000000001'")
+EN_L=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.movimientos_suministro WHERE suministro_id = '0c5c0000-0000-0000-0000-000000000001' AND tipo = 'entrada'")
+AS_L=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.conta_asientos WHERE origen_tabla = 'recepciones' AND origen_id = '0c200000-0000-0000-0000-000000000005'")
+[ "$ST_L" = "25.00" ] && [ "$EN_L" = "1" ] && [ "$AS_L" = "1" ] \
+  && echo "  ✓ L · la misma recepción registrada por dos sesiones a la vez: UNA entrada (stock 25) y UN asiento" \
+  || { echo "❌ L · stock=$ST_L entradas=$EN_L asientos=$AS_L"; cat "$SALIDAS"/l1.txt "$SALIDAS"/l2.txt; exit 1; }
+
+# M · carga masiva: el MISMO lote aplicado por dos sesiones a la vez: se crea UNA vez
+# (la otra recibe el resultado ya aplicado) y no hay renglones duplicados.
+aplicar "$AQUI/concurrencia_import_prep.sql"
+L1=$(psql -q -t -A -d $BD -c "SELECT id FROM public.zz_lotes_import WHERE k = 'l1'")
+L2A=$(psql -q -t -A -d $BD -c "SELECT id FROM public.zz_lotes_import WHERE k = 'l2a'")
+L2B=$(psql -q -t -A -d $BD -c "SELECT id FROM public.zz_lotes_import WHERE k = 'l2b'")
+par m "SELECT public.compras_lineas_importar_aplicar('$L1')->>'reutilizada';" \
+      "SELECT public.compras_lineas_importar_aplicar('$L1')->>'reutilizada';"
+N_M=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.orden_compra_lineas WHERE orden_compra_id = '0c700000-0000-0000-0000-000000000001'")
+R_M=$(cat "$SALIDAS"/m1.txt "$SALIDAS"/m2.txt | grep -c '^true$' || true)
+F_M=$(cat "$SALIDAS"/m1.txt "$SALIDAS"/m2.txt | grep -c '^false$' || true)
+[ "$N_M" = "3" ] && [ "$R_M" = "1" ] && [ "$F_M" = "1" ] \
+  && echo "  ✓ M · el mismo lote aplicado a la vez: UNA creación (3 renglones) y la otra sesión recibió el resultado ya aplicado" \
+  || { echo "❌ M · renglones=$N_M reutilizadas=$R_M creadas=$F_M"; cat "$SALIDAS"/m1.txt "$SALIDAS"/m2.txt; exit 1; }
+
+# N · dos lotes DISTINTOS con el MISMO contenido aplicados a la vez: uno entra y el otro se rechaza como duplicado.
+par n "SELECT public.compras_lineas_importar_aplicar('$L2A')->>'renglones_creados';" \
+      "SELECT public.compras_lineas_importar_aplicar('$L2B')->>'renglones_creados';"
+N_N=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.orden_compra_lineas WHERE orden_compra_id = '0c700000-0000-0000-0000-000000000002'")
+D_N=$(cat "$SALIDAS"/n1.txt "$SALIDAS"/n2.txt | grep -c 'COMPRAS_IMPORT_DUPLICADO' || true)
+[ "$N_N" = "2" ] && [ "$D_N" = "1" ] \
+  && echo "  ✓ N · dos lotes con el mismo contenido a la vez: uno se aplicó (2 renglones) y el otro se rechazó como duplicado" \
+  || { echo "❌ N · renglones=$N_N duplicados=$D_N"; cat "$SALIDAS"/n1.txt "$SALIDAS"/n2.txt; exit 1; }
 
 echo "── 7/8 · las migraciones del bloque son append-only (no editan lo ya aplicado)"
 (cd "$RAIZ" && node scripts/migrations-append-only.mjs >/dev/null 2>&1) \

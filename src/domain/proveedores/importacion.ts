@@ -32,13 +32,21 @@ export interface ColumnaPlantilla {
 }
 
 export interface Plantilla {
-  tipo: TipoImportacion
+  /** `TipoImportacion` para las cargas de proveedores; otra cadena para plantillas de otros módulos. */
+  tipo: string
   titulo: string
   descripcion: string
   nombreArchivo: string
   columnas: ColumnaPlantilla[]
   /** Reglas que el usuario debe conocer antes de cargar. */
   notas: string[]
+}
+
+/** Una plantilla propia (`Plantilla`) o una de las cargas de proveedores por su tipo. */
+export type ClavePlantilla = TipoImportacion | Plantilla
+
+function plantillaDe(t: ClavePlantilla): Plantilla {
+  return typeof t === 'string' ? PLANTILLAS[t] : t
 }
 
 export const MAX_FILAS_CARGA = 2000
@@ -135,8 +143,8 @@ export const PLANTILLAS: Record<TipoImportacion, Plantilla> = {
 }
 
 /** Encabezado + 2 filas de ejemplo, listas para CSV o XLSX. */
-export function filasPlantilla(tipo: TipoImportacion): string[][] {
-  const p = PLANTILLAS[tipo]
+export function filasPlantilla(tipo: ClavePlantilla): string[][] {
+  const p = plantillaDe(tipo)
   return [
     p.columnas.map((c) => c.key),
     p.columnas.map((c) => c.ejemplos[0]),
@@ -144,7 +152,7 @@ export function filasPlantilla(tipo: TipoImportacion): string[][] {
   ]
 }
 
-export function csvPlantilla(tipo: TipoImportacion): string {
+export function csvPlantilla(tipo: ClavePlantilla): string {
   return construirCsv(filasPlantilla(tipo))
 }
 
@@ -153,9 +161,9 @@ export function csvPlantilla(tipo: TipoImportacion): string {
  * como Texto (Excel no convierte «00123» en 123 ni «2026-02-01» en una fecha) y
  * hoja «Instrucciones». Devuelve el buffer; la descarga la hace el llamador.
  */
-export async function xlsxPlantilla(tipo: TipoImportacion): Promise<ArrayBuffer> {
+export async function xlsxPlantilla(tipo: ClavePlantilla): Promise<ArrayBuffer> {
   const ExcelJS = (await import('exceljs')).default
-  const p = PLANTILLAS[tipo]
+  const p = plantillaDe(tipo)
   const wb = new ExcelJS.Workbook()
   const datos = wb.addWorksheet('Datos')
   for (const fila of filasPlantilla(tipo)) datos.addRow(fila)
@@ -250,10 +258,10 @@ function decodificarTexto(buffer: ArrayBuffer): string {
 
 /** Comprueba los encabezados contra la plantilla: faltantes (error) y desconocidos (aviso). */
 export function validarEncabezados(
-  tipo: TipoImportacion,
+  tipo: ClavePlantilla,
   columnas: readonly string[],
 ): { errores: string[]; advertencias: string[] } {
-  const p = PLANTILLAS[tipo]
+  const p = plantillaDe(tipo)
   const conocidas = new Set(p.columnas.map((c) => c.key))
   const tiene = (k: string) => columnas.includes(k)
   const errores: string[] = []
@@ -263,7 +271,8 @@ export function validarEncabezados(
     if (c.key === 'proyecto' && (tiene('proyecto') || tiene('proyecto_id'))) continue
     if (!tiene(c.key)) errores.push(`Falta la columna obligatoria «${c.key}».`)
   }
-  if (tipo !== 'proveedores') {
+  // Las asignaciones y los contratos se identifican por proveedor y proyecto; una plantilla propia no.
+  if (typeof tipo === 'string' && tipo !== 'proveedores') {
     if (!tiene('proveedor_codigo') && !tiene('proveedor_identificacion')) {
       errores.push('Falta identificar al proveedor: usa «proveedor_codigo» o «proveedor_identificacion».')
     }
@@ -279,7 +288,7 @@ export function validarEncabezados(
 
 function filasDesdeMatriz(
   matriz: string[][],
-  tipo: TipoImportacion,
+  tipo: ClavePlantilla,
   advertenciasIniciales: string[],
 ): Omit<ArchivoLeido, 'sha256'> {
   if (matriz.length === 0) throw new ArchivoImportacionError('El archivo está vacío.')
@@ -313,8 +322,8 @@ function filasDesdeMatriz(
 }
 
 /** Columnas que son identificadores/códigos de la plantilla del tipo. */
-function columnasIdentificador(tipo: TipoImportacion): Set<string> {
-  return new Set(PLANTILLAS[tipo].columnas.filter((c) => c.identificador).map((c) => c.key))
+function columnasIdentificador(tipo: ClavePlantilla): Set<string> {
+  return new Set(plantillaDe(tipo).columnas.filter((c) => c.identificador).map((c) => c.key))
 }
 
 // Valores del enum de exceljs (`ExcelJS.ValueType`), fijos por contrato público.
@@ -322,7 +331,7 @@ const VT = { Number: 2, Date: 4, Hyperlink: 5, Formula: 6, RichText: 8, Boolean:
 
 async function matrizDesdeXlsx(
   buffer: ArrayBuffer,
-  tipo: TipoImportacion,
+  tipo: ClavePlantilla,
 ): Promise<{ matriz: string[][]; advertencias: string[] }> {
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
@@ -413,7 +422,7 @@ async function matrizDesdeXlsx(
 export async function leerArchivoImportacion(
   nombre: string,
   buffer: ArrayBuffer,
-  tipo: TipoImportacion,
+  tipo: ClavePlantilla,
 ): Promise<ArchivoLeido> {
   const ext = extensionDe(nombre)
   if (EXTENSIONES_RECHAZADAS[ext]) throw new ArchivoImportacionError(EXTENSIONES_RECHAZADAS[ext])
