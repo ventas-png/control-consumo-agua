@@ -31,13 +31,27 @@ Una sola sentencia que **revierte todo** y termina SIEMPRE en excepción. Cómo 
 
 Cubre: orden aprobada y emitida (solicitante ≠ aprobador); **condiciones inmutables** (cambiar proveedor/moneda de una orden emitida y marcarla «recibida» a mano → rechazados); **recepción transaccional e idempotente** (nueva con clave; reintento = mismo documento; misma clave con otro contenido → conflicto; línea ajena → falla sin cabecera huérfana); recepción parcial (40 de 100, 5 rechazados con motivo); conformidad de servicio sin inventario ni activo; recepción final y sobre-recepción rechazada; dos facturas parciales; **cuentas personalizadas** (servicio en `6205` por cuenta explícita; activo en `9101` por mapeo; inventario `1106`; puente `2105` en 0; CxP `2104` = 2576); asientos balanceados y sin borradores; sin duplicados (3 de recepción, 2 de factura); pendientes por línea (60/1/1 tras la parcial; 0 al final); seguimiento (comprometido 2576, recibido 2300, facturado 2576, pagado 0; el operador no ve facturas); **restricciones**: otra empresa no ve ni recibe ni factura contra la orden; otro proyecto de la misma empresa no la ve ni lista el proyecto; factura duplicada rechazada; operador sin permisos no aprueba.
 
+
+## 3b. Ampliación del guion tras el merge (2026-10-02) — 65/65 en el sandbox
+
+El guion se amplió con la sección 9 y se volvió a ejecutar en el sandbox: **`GUION_OK_REVERTIDO: 65 comprobaciones coinciden con lo esperado`**, y después **0 residuos** (empresas, proveedores, órdenes, facturas, asientos, activos y usuarios `5b5b…` = 0; última migración sin cambios `20261021000600`). Se ejecutó solo en el sandbox; producción no se usó.
+
+Comprobaciones nuevas (todas obtenido = esperado):
+* **Permisos de la orden**: el operador sin permiso de aprobar no aprueba (la orden sigue en `borrador`); devolver a borrador sin motivo → `COMPRAS_OC_DEVOLUCION_MOTIVO`; con motivo → `borrador` y `revision = 1`.
+* **Factura con diferencias** (orden de 10 × 100 + IVA 120): precio +20 % visible y no se aprueba en silencio; IVA 0 contra 120 pedido (`iva_orden/iva_factura = 120.00/0.00`) bloquea; moneda `USD` contra `GTQ` bloquea; con justificación se aprueba, queda quién la forzó y se contabiliza **una sola vez**.
+* **Proveedor suspendido entre aprobar y emitir** → `COMPRAS_PROVEEDOR_NO_AUTORIZADO`.
+
+Reintentos y duplicados cubiertos en el recorrido completo (todos con conteo exacto): misma clave y mismo contenido → mismo documento; misma clave con otro contenido → `COMPRAS_RECEPCION_CLAVE_CONFLICTO`; línea ajena → sin cabecera huérfana; registrar dos veces la misma recepción → 1 asiento y stock sin duplicar; aprobar dos veces la misma factura → 1 asiento; factura duplicada → `unique_violation`; recibir de más → rechazado. Aislamiento: otra empresa no ve, no recibe ni factura contra la orden; otro proyecto de la misma empresa no la ve ni lista el proyecto.
+
+**No se encontró ningún defecto**; no hay PR correctivo.
+
 ## 4. Qué se probó y con qué método (no se mezclan)
 
 | Capa | Dónde | Estado | Qué demuestra | Qué NO demuestra |
 |---|---|---|---|---|
 | **Pruebas SQL locales** | PostgreSQL 16 efímero (`compras_bloque_b/run.sh`) | ✅ | reglas del servidor, concurrencia real, migraciones dos veces | nada del sandbox ni de la interfaz |
-| **CI de GitHub** (último SHA `b9241185`) | GitHub Actions | ✅ 9/9 checks reales en verde: Type-check/test/build, E2E, RLS harness, RLS sandbox de recepción, Coverage gate, drift (auditor y pruebas), Supabase Preview, Vercel | el código compila, las suites del repo pasan | el comportamiento en el sandbox compartido |
-| **SQL en el sandbox real** | `control-agua-rls-sandbox` | ✅ 7 migraciones aplicadas y verificadas; guion `GUION_OK_REVERTIDO` 52/52, 0 residuos | el esquema y las reglas funcionan sobre el sandbox, de punta a punta, como SQL | que la interfaz las use bien |
+| **CI de GitHub** (PR `1132efb4`, y **merge `17e45035` en `main`**: CI y Coverage gate en éxito) | GitHub Actions | ✅ 9/9 checks reales en verde: Type-check/test/build, E2E, RLS harness, RLS sandbox de recepción, Coverage gate, drift (auditor y pruebas), Supabase Preview, Vercel | el código compila, las suites del repo pasan | el comportamiento en el sandbox compartido |
+| **SQL en el sandbox real** | `control-agua-rls-sandbox` | ✅ 7 migraciones aplicadas y verificadas; guion `GUION_OK_REVERTIDO` **65/65** (ampliado el 2026-10-02 tras el merge), 0 residuos | el esquema y las reglas funcionan sobre el sandbox, de punta a punta, como SQL | que la interfaz las use bien |
 | **Interfaz conectada al sandbox** | navegador contra `jwpmivhvlstslncrtokb` | ⛔ **NO realizada** | — | — |
 
 Las pruebas de componentes (vitest) prueban pantallas con datos simulados; **no** sustituyen a la interfaz contra el sandbox.
