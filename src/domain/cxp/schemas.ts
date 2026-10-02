@@ -38,12 +38,49 @@ export const facturaProveedorFormSchema = z.object({
   monto_total: z.number().positive('El monto debe ser mayor que 0'),
   iva_monto: z.number().min(0).default(0),
   notas: z.string().trim().max(500).nullable(),
+  /** Orden que origina la factura (cuadre de 3 vías). Con orden, la factura se
+   *  captura por renglón: ver `facturaRenglonSchema`. */
+  orden_compra_id: z.string().uuid().nullable().optional(),
 }).refine((f) => f.iva_monto <= f.monto_total, {
   message: 'El IVA no puede exceder el total',
   path: ['iva_monto'],
 })
 
 export type FacturaProveedorFormInput = z.infer<typeof facturaProveedorFormSchema>
+
+/** Un renglón de factura contra un renglón de la orden. El servidor cuadra
+ *  cantidad, precio, IVA y moneda de cada uno al aprobar (compras_validar_match);
+ *  aquí solo se exige que sea capturable. */
+export const facturaRenglonSchema = z.object({
+  orden_compra_linea_id: z.string().uuid('Renglón de orden inválido'),
+  descripcion: z.string().trim().min(1).max(300),
+  cantidad: z.number().positive('La cantidad a facturar debe ser mayor que 0'),
+  precio_unitario: z.number().min(0, 'El precio no puede ser negativo'),
+  iva_monto: z.number().min(0, 'El IVA no puede ser negativo'),
+})
+
+export type FacturaRenglonInput = z.infer<typeof facturaRenglonSchema>
+
+/** Entrada de `compras_factura_crear`: la factura, sus renglones (con orden) y la
+ *  clave de idempotencia de ESTE intento de captura. */
+export type FacturaCrearInput = FacturaProveedorFormInput & {
+  clave_idempotencia: string
+  renglones?: FacturaRenglonInput[]
+}
+
+/** Quita el código técnico del servidor («COMPRAS_FACTURA_X: texto») para mostrar
+ *  solo el texto, que está escrito para leerse tal cual. */
+export function textoErrorServidor(mensaje: string): string {
+  return mensaje.replace(/^\s*(?:[A-Z][A-Z0-9]*_)+[A-Z0-9]+:\s*/, '').trim() || mensaje
+}
+
+/** Totales de una factura capturada por renglón (mismo redondeo que el servidor:
+ *  total del renglón = round(cantidad × precio, 2) + IVA). */
+export function totalesFactura(renglones: Pick<FacturaRenglonInput, 'cantidad' | 'precio_unitario' | 'iva_monto'>[]) {
+  const subtotal = redondear2(renglones.reduce((s, r) => s + redondear2(r.cantidad * r.precio_unitario), 0))
+  const iva = redondear2(renglones.reduce((s, r) => s + r.iva_monto, 0))
+  return { subtotal, iva, total: redondear2(subtotal + iva) }
+}
 
 export const ordenPagoFormSchema = z.object({
   factura_id: z.string().uuid('Selecciona la factura'),

@@ -581,6 +581,8 @@ export interface OrdenCompra {
   /** NULL = orden de la EMPRESA (contabilidad propia), no de un proyecto. */
   project_id: string | null
   correlativo: number
+  /** Número visible de la orden (OC-000001); el mismo en Operaciones, Contabilidad y el seguimiento. */
+  numero?: string | null
   /** FK al catálogo de Contabilidad; NULL solo en órdenes previas al backfill. */
   proveedor_id?: string | null
   proveedor_nombre: string

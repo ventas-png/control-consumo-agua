@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { DataTable, type DataTableColumn } from '../shared'
 import { EditModal } from '../shared'
 import { FilterChips } from '../shared/FilterChips'
@@ -20,8 +20,11 @@ import {
   useCrearOrdenPagoMutation,
   useMarcarOrdenPagadaMutation,
 } from '../../domain/cxp/mutations'
-import { facturaProveedorFormSchema, ordenPagoFormSchema, saldoFactura } from '../../domain/cxp/schemas'
-import { useCuadreQuery } from '../../domain/compras/queries'
+import {
+  facturaProveedorFormSchema, facturaRenglonSchema, ordenPagoFormSchema, saldoFactura, textoErrorServidor, totalesFactura,
+} from '../../domain/cxp/schemas'
+import { useCuadreQuery, useOrdenCompraLineasQuery, useOrdenesCompraQuery } from '../../domain/compras/queries'
+import { redondear2 } from '../../lib/business'
 import {
   useAprobarFacturaConCuadreMutation,
   useCrearContrasenaMutation,
@@ -645,20 +648,89 @@ function ContrasenaFormModal({ companyId, projectId, monedaBase, facturas, onClo
 }
 
 // ── Modal: registrar factura ────────────────────────────────────────────────
+//
+// Dos modos. SIN orden: gasto directo (monto total + IVA), como siempre. CON
+// orden: la factura se captura por RENGLÓN contra lo recibido y aún no facturado;
+// el servidor cuadra cada renglón (cantidad, precio, IVA, moneda) al aprobarla y
+// la deja devengar contra «Bienes y servicios por facturar». Sin esta captura no
+// existía forma de facturar contra una orden desde la interfaz.
 
-function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: {
+/** Estados de orden contra los que ya hay algo recibido que facturar. */
+const ESTADOS_FACTURABLES = ['recibida_parcial', 'recibida']
+
+type RenglonEdit = { cantidad: string; precio: string; iva: string; ivaManual: boolean }
+
+export function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: {
   companyId: string
   projectId: string | null
   monedaBase: string
   onClose: () => void
 }) {
   const { data: proveedores = [] } = useProveedoresQuery(companyId)
+  const { data: ordenes = [] } = useOrdenesCompraQuery(companyId, projectId)
   const crear = useCrearFacturaProveedorMutation(companyId)
   const [f, setF] = useState({
     proveedor_id: '', numero_factura: '',
     fecha_emision: hoyLocalISO(), fecha_vencimiento: '',
     concepto: '', categoria: 'otros', moneda: '', monto_total: '', iva_monto: '', notas: '',
   })
+  const [ordenId, setOrdenId] = useState('')
+  const [edit, setEdit] = useState<Record<string, RenglonEdit>>({})
+  // Una clave por apertura del formulario: un doble clic o un reintento tras un corte de
+  // red devuelve LA MISMA factura en vez de crear otra. Si el servidor rechazó el intento
+  // no dejó nada, así que la misma clave sirve para el reintento corregido.
+  const claveIdempotencia = useRef(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `fac-${Date.now()}-${Math.random()}`)
+
+  const ordenesDelProveedor = useMemo(
+    () => ordenes.filter((o) =>
+      o.proveedor_id === f.proveedor_id
+      && (o.project_id ?? null) === (projectId ?? null)
+      && ESTADOS_FACTURABLES.includes(o.estado)),
+    [ordenes, f.proveedor_id, projectId],
+  )
+  const orden = ordenesDelProveedor.find((o) => o.id === ordenId) ?? null
+  const { data: lineasOC = [], isLoading: cargandoLineas } = useOrdenCompraLineasQuery(orden?.id)
+
+  // Lo que falta por facturar de cada renglón: recibido (aceptado) menos facturado.
+  const renglonesOC = useMemo(
+    () => lineasOC
+      .map((l) => ({ ...l, porFacturar: redondear2(l.cantidad_recibida - l.cantidad_facturada) }))
+      .filter((l) => l.porFacturar > 0),
+    [lineasOC],
+  )
+
+  function valorDe(l: (typeof renglonesOC)[number]): RenglonEdit {
+    const e = edit[l.id]
+    const cantidad = e?.cantidad ?? String(l.porFacturar)
+    const prorrata = l.cantidad > 0 ? redondear2(l.iva_monto * (parseFloat(cantidad) || 0) / l.cantidad) : 0
+    return {
+      cantidad,
+      precio: e?.precio ?? String(l.precio_unitario),
+      iva: e?.ivaManual ? e.iva : String(prorrata),
+      ivaManual: e?.ivaManual ?? false,
+    }
+  }
+  function cambiar(l: (typeof renglonesOC)[number], campo: 'cantidad' | 'precio' | 'iva', valor: string) {
+    const actual = valorDe(l)
+    setEdit((m) => ({
+      ...m,
+      [l.id]: { ...actual, [campo]: valor, ivaManual: campo === 'iva' ? true : actual.ivaManual },
+    }))
+  }
+
+  const renglonesCapturados = renglonesOC
+    .map((l) => {
+      const v = valorDe(l)
+      return {
+        orden_compra_linea_id: l.id,
+        descripcion: l.descripcion,
+        cantidad: parseFloat(v.cantidad) || 0,
+        precio_unitario: parseFloat(v.precio) || 0,
+        iva_monto: parseFloat(v.iva) || 0,
+      }
+    })
+    .filter((r) => r.cantidad > 0)
+  const totales = totalesFactura(renglonesCapturados)
 
   function onProveedor(id: string) {
     const p = proveedores.find((x) => x.id === id)
@@ -666,10 +738,35 @@ function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: {
     if (p && p.dias_credito > 0 && !vence) {
       vence = sumarDiasCalendario(f.fecha_emision, p.dias_credito) ?? vence
     }
+    setOrdenId(''); setEdit({})
     setF({ ...f, proveedor_id: id, categoria: p?.categoria_default ?? f.categoria, fecha_vencimiento: vence })
   }
 
+  function onOrden(id: string) {
+    setOrdenId(id); setEdit({})
+    const o = ordenesDelProveedor.find((x) => x.id === id)
+    setF((prev) => ({
+      ...prev,
+      moneda: o?.moneda ?? '',
+      concepto: o && !prev.concepto.trim() ? `Factura de la orden ${o.numero ?? o.concepto}` : prev.concepto,
+    }))
+  }
+
   async function guardar() {
+    const conOrden = !!orden
+    if (conOrden) {
+      if (renglonesCapturados.length === 0) {
+        notify({ variant: 'warning', title: 'Atención', text: 'Indica al menos un renglón con cantidad a facturar.' })
+        return
+      }
+      const malo = renglonesCapturados
+        .map((r) => facturaRenglonSchema.safeParse(r))
+        .find((r) => !r.success)
+      if (malo && !malo.success) {
+        notify({ variant: 'warning', title: 'Atención', text: malo.error.issues[0]?.message ?? 'Renglón inválido.' })
+        return
+      }
+    }
     const parsed = facturaProveedorFormSchema.safeParse({
       proveedor_id: f.proveedor_id,
       project_id: projectId,
@@ -678,26 +775,41 @@ function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: {
       fecha_vencimiento: f.fecha_vencimiento || null,
       concepto: f.concepto,
       categoria: f.categoria,
-      moneda: f.moneda.trim() || null,
-      monto_total: parseFloat(f.monto_total),
-      iva_monto: parseFloat(f.iva_monto) || 0,
+      // Con orden, la moneda de la factura es la de la orden: otra distinta nunca cuadra.
+      moneda: conOrden ? (orden!.moneda ?? null) : (f.moneda.trim() || null),
+      monto_total: conOrden ? totales.total : parseFloat(f.monto_total),
+      iva_monto: conOrden ? totales.iva : (parseFloat(f.iva_monto) || 0),
       notas: f.notas.trim() || null,
+      orden_compra_id: conOrden ? orden!.id : null,
     })
     if (!parsed.success) {
       notify({ variant: 'warning', title: 'Atención', text: parsed.error.issues[0]?.message ?? 'Datos inválidos.' })
       return
     }
     try {
-      await crear.mutateAsync(parsed.data)
-      notify({ variant: 'success', title: 'Registrada', text: 'Factura registrada. Apruébala para devengar el gasto.' })
+      const creada = await crear.mutateAsync({
+        ...parsed.data,
+        clave_idempotencia: claveIdempotencia.current,
+        ...(conOrden ? { renglones: renglonesCapturados } : {}),
+      })
+      notify({
+        variant: 'success', title: creada.reutilizada ? 'Ya estaba registrada' : 'Registrada',
+        text: creada.reutilizada
+          ? 'Esta factura ya se había registrado con estos mismos datos; no se creó otra.'
+          : conOrden
+          ? 'Factura registrada contra la orden. Al aprobarla se cuadra con lo ordenado y lo recibido.'
+          : 'Factura registrada. Apruébala para devengar el gasto.',
+      })
       onClose()
     } catch (e) {
-      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo registrar.' })
+      // Los mensajes del servidor (COMPRAS_FACTURA_*) están escritos para leerse tal cual:
+      // número repetido, clave ya usada con otro contenido, renglón ajeno, etc.
+      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? textoErrorServidor(e.message) : 'No se pudo registrar.' })
     }
   }
 
   return (
-    <EditModal title="Registrar factura de proveedor" onClose={onClose} size="md"
+    <EditModal title="Registrar factura de proveedor" onClose={onClose} size={orden ? 'lg' : 'md'}
       footer={
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={btnSecundario}>Cancelar</button>
@@ -714,6 +826,26 @@ function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: {
             </select>
           </Campo>
         </div>
+        {f.proveedor_id && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Campo label="Orden de compra (opcional)">
+              <select value={ordenId} onChange={(e) => onOrden(e.target.value)} style={{ ...input, width: '100%' }}
+                      aria-label="Orden de compra a facturar">
+                <option value="">Sin orden (gasto directo)</option>
+                {ordenesDelProveedor.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.numero ?? 'Sin número'} · {o.concepto} · {formatCurrency(o.total, o.moneda ?? monedaBase)}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            {ordenesDelProveedor.length === 0 && (
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--at-ink-soft)' }}>
+                Este proveedor no tiene órdenes con algo recibido por facturar en esta contabilidad.
+              </p>
+            )}
+          </div>
+        )}
         <Campo label="No. de factura">
           <input value={f.numero_factura} onChange={(e) => setF({ ...f, numero_factura: e.target.value })} style={input} />
         </Campo>
@@ -734,15 +866,74 @@ function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: {
             {CATEGORIAS_GASTO_CXP.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </Campo>
-        <Campo label={`Moneda (vacío = ${monedaBase})`}>
-          <input value={f.moneda} onChange={(e) => setF({ ...f, moneda: e.target.value.toUpperCase() })} style={input} maxLength={3} placeholder={monedaBase} />
-        </Campo>
-        <Campo label="Monto total *">
-          <input type="number" min="0" step="0.01" value={f.monto_total} onChange={(e) => setF({ ...f, monto_total: e.target.value })} style={{ ...input, textAlign: 'right' }} />
-        </Campo>
-        <Campo label="IVA incluido">
-          <input type="number" min="0" step="0.01" value={f.iva_monto} onChange={(e) => setF({ ...f, iva_monto: e.target.value })} style={{ ...input, textAlign: 'right' }} />
-        </Campo>
+        {!orden && (
+          <>
+            <Campo label={`Moneda (vacío = ${monedaBase})`}>
+              <input value={f.moneda} onChange={(e) => setF({ ...f, moneda: e.target.value.toUpperCase() })} style={input} maxLength={3} placeholder={monedaBase} />
+            </Campo>
+            <Campo label="Monto total *">
+              <input type="number" min="0" step="0.01" value={f.monto_total} onChange={(e) => setF({ ...f, monto_total: e.target.value })} style={{ ...input, textAlign: 'right' }} />
+            </Campo>
+            <Campo label="IVA incluido">
+              <input type="number" min="0" step="0.01" value={f.iva_monto} onChange={(e) => setF({ ...f, iva_monto: e.target.value })} style={{ ...input, textAlign: 'right' }} />
+            </Campo>
+          </>
+        )}
+        {orden && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <strong style={{ fontSize: 12 }}>Qué se factura de {orden.numero ?? 'la orden'}</strong>
+            {cargandoLineas && <p style={{ fontSize: 12, color: 'var(--at-ink-soft)' }}>Cargando renglones…</p>}
+            {!cargandoLineas && renglonesOC.length === 0 && (
+              <p style={{ fontSize: 12, color: 'var(--at-ink-soft)' }}>Todo lo recibido de esta orden ya está facturado.</p>
+            )}
+            {renglonesOC.length > 0 && (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 620 }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', color: 'var(--at-ink-soft)' }}>
+                      <th style={{ padding: 4 }}>Renglón</th>
+                      <th style={{ padding: 4, width: 90 }}>Por facturar</th>
+                      <th style={{ padding: 4, width: 100 }}>A facturar</th>
+                      <th style={{ padding: 4, width: 100 }}>Precio</th>
+                      <th style={{ padding: 4, width: 100 }}>IVA</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {renglonesOC.map((l) => {
+                      const v = valorDe(l)
+                      return (
+                        <tr key={l.id}>
+                          <td style={{ padding: 4 }}>{l.descripcion}</td>
+                          <td style={{ padding: 4 }}>{l.porFacturar} {l.unidad}</td>
+                          <td style={{ padding: 2 }}>
+                            <input type="number" min="0" step="0.01" value={v.cantidad}
+                                   onChange={(e) => cambiar(l, 'cantidad', e.target.value)}
+                                   style={{ ...input, width: '100%' }} aria-label={`Cantidad a facturar de ${l.descripcion}`} />
+                          </td>
+                          <td style={{ padding: 2 }}>
+                            <input type="number" min="0" step="0.01" value={v.precio}
+                                   onChange={(e) => cambiar(l, 'precio', e.target.value)}
+                                   style={{ ...input, width: '100%' }} aria-label={`Precio facturado de ${l.descripcion}`} />
+                          </td>
+                          <td style={{ padding: 2 }}>
+                            <input type="number" min="0" step="0.01" value={v.iva}
+                                   onChange={(e) => cambiar(l, 'iva', e.target.value)}
+                                   style={{ ...input, width: '100%' }} aria-label={`IVA facturado de ${l.descripcion}`} />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p style={{ fontSize: 11, color: 'var(--at-ink-soft)', margin: '6px 0 0' }}>
+              Total de la factura: <strong>{formatCurrency(totales.total, orden.moneda ?? monedaBase)}</strong>
+              {' '}(IVA {formatCurrency(totales.iva, orden.moneda ?? monedaBase)}). Lo que no cuadre con lo ordenado o recibido se
+              mostrará al aprobarla.
+            </p>
+          </div>
+        )}
         <div style={{ gridColumn: '1 / -1' }}>
           <Campo label="Notas">
             <textarea value={f.notas} onChange={(e) => setF({ ...f, notas: e.target.value })} style={{ ...input, width: '100%', minHeight: 50 }} />

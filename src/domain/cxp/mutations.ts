@@ -10,8 +10,8 @@ import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { cxpKeys } from './keys'
 import { contabilidadKeys } from '../contabilidad/keys'
-import type { FacturaProveedor, OrdenPago, Proveedor } from '../../types/cxp'
-import type { FacturaProveedorFormInput, OrdenPagoFormInput, ProveedorFormInput } from './schemas'
+import type { FacturaCreada, OrdenPago, Proveedor } from '../../types/cxp'
+import type { FacturaCrearInput, OrdenPagoFormInput, ProveedorFormInput } from './schemas'
 
 function useInvalidarCxP(companyId?: string) {
   const qc = useQueryClient()
@@ -64,19 +64,48 @@ export function useGuardarProveedorMutation(companyId?: string) {
 
 // ── Facturas de proveedor ───────────────────────────────────────────────────
 
+/**
+ * Crea la factura (y, si viene de una orden, sus renglones) con UNA llamada a
+ * `compras_factura_crear`: una sola transacción en el servidor.
+ *  · todo o nada: si un renglón falla no queda ni la cabecera;
+ *  · idempotente por `clave_idempotencia`: un doble clic o un reintento tras una
+ *    respuesta perdida devuelve la MISMA factura; la misma clave con otro contenido
+ *    se rechaza;
+ *  · el servidor valida empresa, proyecto, proveedor, orden y renglones, y calcula
+ *    total, IVA y moneda de una factura con orden a partir de los renglones.
+ * Antes eran dos peticiones y un borrado compensatorio desde el cliente.
+ */
+export async function crearFacturaProveedor(
+  companyId: string,
+  input: FacturaCrearInput,
+): Promise<FacturaCreada> {
+  const { renglones, project_id, ...cabecera } = input
+  if (!cabecera.clave_idempotencia) {
+    throw new Error('Falta la clave de idempotencia de la factura.')
+  }
+  if (cabecera.orden_compra_id && !renglones?.length) {
+    throw new Error('Una factura contra una orden se captura por renglón: indica qué se factura de cada uno.')
+  }
+  const creada = await runQuery<FacturaCreada>((signal) =>
+    supabase
+      .rpc('compras_factura_crear', {
+        p_company_id: companyId,
+        p_project_id: project_id ?? null,
+        p_cabecera: cabecera,
+        p_lineas: renglones?.length ? renglones : null,
+      })
+      .abortSignal(signal),
+  )
+  if (!creada?.factura) throw new Error('No se pudo crear la factura.')
+  return creada
+}
+
 export function useCrearFacturaProveedorMutation(companyId?: string) {
   const invalidar = useInvalidarCxP(companyId)
   return useMutation({
-    mutationFn: async (input: FacturaProveedorFormInput) => {
+    mutationFn: async (input: FacturaCrearInput) => {
       if (!companyId) throw new Error('Falta companyId.')
-      const rows = await runQuery<FacturaProveedor[]>((signal) =>
-        supabase
-          .from('facturas_proveedor')
-          .insert({ ...input, company_id: companyId, estado: 'registrada' })
-          .select()
-          .abortSignal(signal),
-      )
-      return rows?.[0] ?? null
+      return await crearFacturaProveedor(companyId, input)
     },
     onSuccess: () => invalidar(),
   })
@@ -87,14 +116,12 @@ export function useAprobarFacturaMutation(companyId?: string) {
   const invalidar = useInvalidarCxP(companyId)
   return useMutation({
     mutationFn: async (facturaId: string) => {
-      const { data: auth } = await supabase.auth.getUser()
+      // Quién aprueba y cuándo lo sella el servidor (auth.uid(), now()): lo que mande el cliente no cuenta.
       await runQuery((signal) =>
         supabase
           .from('facturas_proveedor')
           .update({
             estado: 'aprobada',
-            aprobada_por: auth.user?.id ?? null,
-            aprobada_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq('id', facturaId)

@@ -128,6 +128,9 @@ bloque assert_factura.sql      "5c · factura parcial/múltiple, diferencias, mo
 bloque assert_seguimiento.sql  "5d · seguimiento compartido y su alcance"
 bloque assert_operaciones.sql  "5e · suministros y proformas con proveedor del catálogo"
 bloque assert_correcciones.sql "5f · correcciones de revisión: cuentas semánticas, condiciones congeladas, recepción transaccional"
+# Van AL FINAL: las suites comparten base y las de seguimiento cuentan órdenes por filtro.
+bloque assert_factura_crear.sql "5g · factura creada por UNA operación de servidor: todo o nada, idempotente, validada"
+bloque assert_aprobacion.sql   "5h · aprobación endurecida: sin renglones, autorizador sellado, excepciones acotadas"
 
 echo "── 6/8 · concurrencia: sesiones REALES simultáneas, no una simulación"
 aplicar "$AQUI/concurrencia_prep.sql"
@@ -170,9 +173,9 @@ par b "UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = '0c30
       "UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = '0c300000-0000-0000-0000-000000000002';"
 APR=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE orden_compra_id = '0c100000-0000-0000-0000-000000000002' AND estado = 'aprobada'")
 FAC=$(psql -q -t -A -d $BD -c "SELECT cantidad_facturada FROM public.orden_compra_lineas WHERE id = '0c110000-0000-0000-0000-000000000002'")
-FUERA=$(cat "$SALIDAS"/b1.txt "$SALIDAS"/b2.txt | grep -c 'COMPRAS_MATCH_FUERA_DE_TOLERANCIA' || true)
+FUERA=$(cat "$SALIDAS"/b1.txt "$SALIDAS"/b2.txt | grep -c 'COMPRAS_MATCH_NO_FORZABLE' || true)
 [ "$APR" = "1" ] && [ "$FAC" = "10.0000" ] && [ "$FUERA" = "1" ] \
-  && echo "  ✓ B · dos facturas por las mismas unidades a la vez: una aprobada (facturado 10) y la otra fuera de tolerancia" \
+  && echo "  ✓ B · dos facturas por las mismas unidades a la vez: una aprobada (facturado 10) y la otra rechazada por facturar más de lo recibido" \
   || { echo "❌ B · aprobadas=$APR facturado=$FAC rechazos=$FUERA"; cat "$SALIDAS"/b1.txt "$SALIDAS"/b2.txt; exit 1; }
 N_FA=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.conta_asientos WHERE origen_tabla = 'facturas_proveedor' AND origen_id IN ('0c300000-0000-0000-0000-000000000001','0c300000-0000-0000-0000-000000000002') AND estado <> 'anulado'")
 [ "$N_FA" = "1" ] && echo "  ✓ B · y UN solo asiento" || { echo "❌ B · asientos=$N_FA"; exit 1; }
@@ -218,6 +221,72 @@ AJ=$(cat "$SALIDAS"/f1.txt "$SALIDAS"/f2.txt | grep -c 'COMPRAS_RECEPCION_LINEA_
 [ "$N_F" = "0" ] && [ "$AJ" = "2" ] \
   && echo "  ✓ F · dos intentos simultáneos con una línea ajena: los dos fallan y NO queda cabecera huérfana" \
   || { echo "❌ F · recepciones=$N_F rechazos=$AJ"; cat "$SALIDAS"/f1.txt "$SALIDAS"/f2.txt; exit 1; }
+
+# G · la factura por la función con la MISMA clave y el MISMO contenido a la vez.
+Q=0c100000-0000-0000-0000-000000000003; QL=0c110000-0000-0000-0000-000000000003; P1=e3000000-0000-0000-0000-000000000001
+cab_f() { echo "{\"proveedor_id\":\"$P1\",\"orden_compra_id\":\"$Q\",\"numero_factura\":\"$2\",\"concepto\":\"Concurrencia\",\"fecha_emision\":\"2026-10-02\",\"clave_idempotencia\":\"$1\"}"; }
+lin_f() { echo "[{\"orden_compra_linea_id\":\"$QL\",\"cantidad\":$1,\"precio_unitario\":10}]"; }
+fcrear() { echo "SELECT public.compras_factura_crear('$C', '$C1', '$(cab_f "$1" "$2")'::jsonb, '$(lin_f "$3")'::jsonb)->'factura'->>'id';"; }
+par g "$(fcrear fc-simultanea FG-1 5)" "$(fcrear fc-simultanea FG-1 5)"
+N_G=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE clave_idempotencia = 'fc-simultanea'")
+L_G=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.factura_proveedor_lineas WHERE factura_id IN (SELECT id FROM public.facturas_proveedor WHERE clave_idempotencia = 'fc-simultanea')")
+IDG1=$(grep -Eo '[0-9a-f]{8}-[0-9a-f-]{27}' "$SALIDAS"/g1.txt | head -1); IDG2=$(grep -Eo '[0-9a-f]{8}-[0-9a-f-]{27}' "$SALIDAS"/g2.txt | head -1)
+[ "$N_G" = "1" ] && [ "$L_G" = "1" ] && [ -n "$IDG1" ] && [ "$IDG1" = "$IDG2" ] \
+  && echo "  ✓ G · factura, misma clave y contenido a la vez: UNA factura con UN renglón y las dos sesiones recibieron la MISMA" \
+  || { echo "❌ G · facturas=$N_G renglones=$L_G id1=$IDG1 id2=$IDG2"; cat "$SALIDAS"/g1.txt "$SALIDAS"/g2.txt; exit 1; }
+
+# H · la misma clave con contenido DISTINTO a la vez: una crea y la otra se rechaza.
+par h "$(fcrear fc-conflicto FH-1 3)" "$(fcrear fc-conflicto FH-1 4)"
+N_H=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE clave_idempotencia = 'fc-conflicto'")
+CONF_H=$(cat "$SALIDAS"/h1.txt "$SALIDAS"/h2.txt | grep -c 'COMPRAS_FACTURA_CLAVE_CONFLICTO' || true)
+[ "$N_H" = "1" ] && [ "$CONF_H" = "1" ] \
+  && echo "  ✓ H · factura, misma clave con contenido distinto a la vez: UNA factura y la otra sesión se rechazó por conflicto" \
+  || { echo "❌ H · facturas=$N_H conflictos=$CONF_H"; cat "$SALIDAS"/h1.txt "$SALIDAS"/h2.txt; exit 1; }
+
+# I · el MISMO número de factura con claves DISTINTAS a la vez: una sola factura.
+par i "$(fcrear fc-num-a FI-1 1)" "$(fcrear fc-num-b FI-1 1)"
+N_I=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE numero_factura = 'FI-1' AND proveedor_id = '$P1'")
+DUP_I=$(cat "$SALIDAS"/i1.txt "$SALIDAS"/i2.txt | grep -c 'COMPRAS_FACTURA_NUMERO_DUPLICADO' || true)
+RES_I=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE clave_idempotencia IN ('fc-num-a','fc-num-b')")
+[ "$N_I" = "1" ] && [ "$DUP_I" = "1" ] && [ "$RES_I" = "1" ] \
+  && echo "  ✓ I · mismo número con claves distintas a la vez: UNA factura y la otra se rechazó como duplicada, sin dejar rastro" \
+  || { echo "❌ I · facturas=$N_I duplicadas=$DUP_I residuo=$RES_I"; cat "$SALIDAS"/i1.txt "$SALIDAS"/i2.txt; exit 1; }
+
+# J · un renglón ajeno con dos sesiones a la vez: los dos fallan y no queda nada.
+CAB_J=$(cab_f fc-fallo-par FJ-1)
+LIN_J="[{\"orden_compra_linea_id\":\"$QL\",\"cantidad\":1,\"precio_unitario\":10},{\"orden_compra_linea_id\":\"0c110000-0000-0000-0000-000000000001\",\"cantidad\":1,\"precio_unitario\":10}]"
+par j "SELECT public.compras_factura_crear('$C', '$C1', '$CAB_J'::jsonb, '$LIN_J'::jsonb);" \
+      "SELECT public.compras_factura_crear('$C', '$C1', '$CAB_J'::jsonb, '$LIN_J'::jsonb);"
+N_J=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE clave_idempotencia = 'fc-fallo-par' OR numero_factura = 'FJ-1'")
+AJ_J=$(cat "$SALIDAS"/j1.txt "$SALIDAS"/j2.txt | grep -c 'COMPRAS_FACTURA_LINEA_AJENA' || true)
+[ "$N_J" = "0" ] && [ "$AJ_J" = "2" ] \
+  && echo "  ✓ J · dos intentos simultáneos con un renglón ajeno: los dos fallan y NO queda cabecera ni renglones" \
+  || { echo "❌ J · facturas=$N_J rechazos=$AJ_J"; cat "$SALIDAS"/j1.txt "$SALIDAS"/j2.txt; exit 1; }
+
+# K · INTERRUPCIÓN: la sesión que crea la factura muere ANTES de confirmar. No debe quedar
+# nada, y el reintento con la misma clave crea exactamente una factura.
+psql -q -X -t -A -v ON_ERROR_STOP=0 -d $BD >"$SALIDAS"/k1.txt 2>&1 <<SQL &
+SET application_name = 'fc-interrumpida';
+SELECT set_config('request.jwt.claim.sub', '$UA', false);
+SET ROLE authenticated;
+BEGIN;
+$(fcrear fc-interrumpida FK-1 2)
+SELECT pg_sleep(8);
+COMMIT;
+SQL
+PK=$!
+sleep 2
+psql -q -t -A -d $BD -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = 'fc-interrumpida'" >/dev/null
+wait $PK || true
+N_K0=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE clave_idempotencia = 'fc-interrumpida' OR numero_factura = 'FK-1'")
+L_K0=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.factura_proveedor_lineas WHERE descripcion = 'Material' AND factura_id NOT IN (SELECT id FROM public.facturas_proveedor)")
+sesion 0 "$(fcrear fc-interrumpida FK-1 2)" 0 > "$SALIDAS"/k2.txt 2>&1
+sesion 0 "$(fcrear fc-interrumpida FK-1 2)" 0 > "$SALIDAS"/k3.txt 2>&1
+N_K1=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE clave_idempotencia = 'fc-interrumpida'")
+IDK2=$(grep -Eo '[0-9a-f]{8}-[0-9a-f-]{27}' "$SALIDAS"/k2.txt | head -1); IDK3=$(grep -Eo '[0-9a-f]{8}-[0-9a-f-]{27}' "$SALIDAS"/k3.txt | head -1)
+[ "$N_K0" = "0" ] && [ "$L_K0" = "0" ] && [ "$N_K1" = "1" ] && [ -n "$IDK2" ] && [ "$IDK2" = "$IDK3" ] \
+  && echo "  ✓ K · sesión terminada antes de confirmar: no quedó NADA; el reintento crea UNA factura y un segundo reintento devuelve la misma" \
+  || { echo "❌ K · tras la caída facturas=$N_K0 renglones sueltos=$L_K0; tras el reintento=$N_K1 id2=$IDK2 id3=$IDK3"; cat "$SALIDAS"/k1.txt "$SALIDAS"/k2.txt "$SALIDAS"/k3.txt; exit 1; }
 
 echo "── 7/8 · las migraciones del bloque son append-only (no editan lo ya aplicado)"
 (cd "$RAIZ" && node scripts/migrations-append-only.mjs >/dev/null 2>&1) \

@@ -42,11 +42,24 @@ DECLARE
   r3  constant uuid := '5b5b0000-0000-0000-0000-0000000000c3';
   f1  constant uuid := '5b5b0000-0000-0000-0000-0000000000a9';
   f2  constant uuid := '5b5b0000-0000-0000-0000-0000000000aa';
+  od  constant uuid := '5b5b0000-0000-0000-0000-0000000000e5';  -- orden con diferencias
+  ld  constant uuid := '5b5b0000-0000-0000-0000-0000000000e6';
+  rd  constant uuid := '5b5b0000-0000-0000-0000-0000000000c5';
+  fd  constant uuid := '5b5b0000-0000-0000-0000-0000000000ab';
+  o3  constant uuid := '5b5b0000-0000-0000-0000-0000000000e7';  -- proveedor suspendido entre aprobar y emitir
+  l3b constant uuid := '5b5b0000-0000-0000-0000-0000000000e8';
+  oe  constant uuid := '5b5b0000-0000-0000-0000-0000000000e9';  -- orden facturada por compras_factura_crear
+  le1 constant uuid := '5b5b0000-0000-0000-0000-0000000000ea';
+  le2 constant uuid := '5b5b0000-0000-0000-0000-0000000000eb';
+  oa  constant uuid := '5b5b0000-0000-0000-0000-0000000000ec';  -- orden SIN recibir (factura anticipada)
+  la  constant uuid := '5b5b0000-0000-0000-0000-0000000000ed';
   ev  text[] := ARRAY[]::text[];
   v   numeric;
   t   text;
   j   jsonb;
   j2  jsonb;
+  j3  jsonb;
+  fid uuid;
   r1  uuid;
   cta_servicio uuid;
   cta_activo   uuid;
@@ -281,6 +294,181 @@ BEGIN
   BEGIN PERFORM * FROM public.compras_seguimiento_lista(pj); t := 'SIN ERROR';
   EXCEPTION WHEN OTHERS THEN t := 'rechazada'; END;
   ev := ev || pg_temp.ck('8 listar el proyecto sin acceso', t, 'rechazada');
+  RESET ROLE;
+
+
+  -- ── 9 · PERMISOS de la orden, DEVOLUCIÓN, DIFERENCIAS de factura, proveedor suspendido ─
+  PERFORM set_config('request.jwt.claim.sub', uo::text, true);
+  SET LOCAL ROLE authenticated;
+  INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto)
+    VALUES (od, c, pj, pv2, 'ZZ Otro proveedor', 'Orden con diferencias');
+  INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, descripcion, destino_tipo, categoria, cantidad, unidad, precio_unitario, iva_monto)
+    VALUES (ld, c, od, 1, 'Tubería', 'gasto', 'mantenimiento', 10, 'unidad', 100, 120);
+  -- el operador (solicitante) NO aprueba su propia orden sin permiso de aprobar
+  BEGIN UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = od; EXCEPTION WHEN OTHERS THEN NULL; END;
+  PERFORM set_config('request.jwt.claim.sub', ua::text, true);
+  ev := ev || pg_temp.ck('9 operador sin permiso intenta aprobar la orden · estado', (SELECT estado FROM public.ordenes_compra WHERE id = od), 'borrador');
+  UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = od;
+  BEGIN UPDATE public.ordenes_compra SET estado = 'borrador' WHERE id = od; t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('9 devolver a borrador SIN motivo', t, 'COMPRAS_OC_DEVOLUCION_MOTIVO');
+  UPDATE public.ordenes_compra SET estado = 'borrador', motivo_devolucion = 'Corregir el precio' WHERE id = od;
+  ev := ev || pg_temp.ck('9 devolver a borrador CON motivo · estado/revisión', (SELECT estado || '/' || revision FROM public.ordenes_compra WHERE id = od), 'borrador/1');
+  UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = od;
+  UPDATE public.ordenes_compra SET estado = 'emitida'  WHERE id = od;
+  j := public.compras_recepcion_crear(c, pj,
+    format('{"orden_compra_id":"%s","tipo":"bienes","fecha":"%s","clave_idempotencia":"zz-rec-d"}', od, CURRENT_DATE)::jsonb,
+    format('[{"orden_compra_linea_id":"%s","cantidad":10,"cantidad_rechazada":0,"costo_unitario":100}]', ld)::jsonb);
+  UPDATE public.recepciones SET estado = 'registrada' WHERE id = (j->'recepcion'->>'id')::uuid;
+  ev := ev || pg_temp.ck('9 recepción total de la orden con diferencias', (SELECT estado FROM public.ordenes_compra WHERE id = od), 'recibida');
+
+  PERFORM set_config('request.jwt.claim.sub', uk::text, true);
+  INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, orden_compra_id, numero_factura, concepto, categoria, monto_total)
+    VALUES (fd, c, pj, pv2, od, 'ZZ-0100', 'Factura con diferencias', 'mantenimiento', 1);
+  INSERT INTO public.factura_proveedor_lineas (id, company_id, factura_id, orden_compra_linea_id, linea, descripcion, cantidad, precio_unitario, iva_monto)
+    VALUES ('5b5b0000-0000-0000-0000-0000000000ac', c, fd, ld, 1, 'Tubería', 10, 120, 120);
+  ev := ev || pg_temp.ck('9 cuadre · precio +20 % visible', (SELECT (NOT dentro_tolerancia)::text FROM public.compras_validar_match(fd) LIMIT 1), 'true');
+  BEGIN UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = fd; t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('9 precio +20 % no se aprueba en silencio', t, 'COMPRAS_MATCH_FUERA_DE_TOLERANCIA');
+  UPDATE public.factura_proveedor_lineas SET precio_unitario = 100, iva_monto = 0 WHERE factura_id = fd;
+  ev := ev || pg_temp.ck('9 cuadre · IVA 0 contra 120 pedido (iva_orden/iva_factura)', (SELECT iva_orden::text || '/' || iva_factura::text FROM public.compras_validar_match(fd) LIMIT 1), '120.00/0.00');
+  BEGIN UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = fd; t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('9 diferencia de IVA no se aprueba en silencio', t, 'COMPRAS_MATCH_FUERA_DE_TOLERANCIA');
+  UPDATE public.factura_proveedor_lineas SET iva_monto = 120 WHERE factura_id = fd;
+  UPDATE public.facturas_proveedor SET moneda = 'USD' WHERE id = fd;
+  ev := ev || pg_temp.ck('9 cuadre · moneda factura/orden', (SELECT moneda_factura || '/' || moneda_orden FROM public.compras_validar_match(fd) LIMIT 1), 'USD/GTQ');
+  BEGIN UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = fd; t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('9 diferencia de moneda no se aprueba (ni con justificación)', t, 'COMPRAS_MATCH_NO_FORZABLE');
+  UPDATE public.facturas_proveedor SET moneda = 'GTQ' WHERE id = fd;
+  UPDATE public.factura_proveedor_lineas SET precio_unitario = 120 WHERE factura_id = fd;
+  -- el contador (quien ejecuta) DECLARA que autorizó el admin y que aprobó el admin: el servidor firma a quien ejecuta
+  UPDATE public.facturas_proveedor SET estado = 'aprobada', match_forzado_por = ua, aprobada_por = ua, match_justificacion = 'Alza pactada por escrito.' WHERE id = fd;
+  ev := ev || pg_temp.ck('9 aprobada con justificación · estado/autorizador sellado (= quien ejecuta, no el declarado)', (SELECT estado || '/' || (match_forzado_por = uk)::text || '/' || (aprobada_por = uk)::text FROM public.facturas_proveedor WHERE id = fd), 'aprobada/true/true');
+  ev := ev || pg_temp.ckn('9 y contabilizada una sola vez', (SELECT count(*) FROM public.conta_asientos WHERE origen_tabla = 'facturas_proveedor' AND origen_id = fd AND estado = 'publicado'), 1);
+
+  -- proveedor suspendido ENTRE aprobar y emitir
+  PERFORM set_config('request.jwt.claim.sub', uo::text, true);
+  INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto)
+    VALUES (o3, c, pj, pv, 'ZZ Proveedor de validación', 'Se suspende tras aprobar');
+  INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, descripcion, destino_tipo, categoria, cantidad, unidad, precio_unitario)
+    VALUES (l3b, c, o3, 1, 'Material', 'gasto', 'mantenimiento', 1, 'unidad', 10);
+  PERFORM set_config('request.jwt.claim.sub', ua::text, true);
+  UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = o3;
+  RESET ROLE;
+  UPDATE public.proveedores SET estado = 'suspendido', motivo_estado = 'Papelería vencida (prueba)' WHERE id = pv;
+  SET LOCAL ROLE authenticated;
+  BEGIN UPDATE public.ordenes_compra SET estado = 'emitida' WHERE id = o3; t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('9 proveedor suspendido entre aprobar y emitir', t, 'COMPRAS_PROVEEDOR_NO_AUTORIZADO');
+  RESET ROLE;
+
+  -- ── 10 · FACTURA POR UNA OPERACIÓN DE SERVIDOR y APROBACIÓN ENDURECIDA (0700 y 0800) ─
+  PERFORM set_config('request.jwt.claim.sub', ua::text, true);
+  SET LOCAL ROLE authenticated;
+  INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto) VALUES
+    (oe, c, pj, pv2, 'ZZ Otro proveedor', 'Orden facturada por la operación de servidor'),
+    (oa, c, pj, pv2, 'ZZ Otro proveedor', 'Orden sin recibir');
+  INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, descripcion, destino_tipo, categoria, cantidad, unidad, precio_unitario, iva_monto) VALUES
+    (le1, c, oe, 1, 'Material', 'gasto', 'mantenimiento', 10, 'unidad', 10, 12),
+    (le2, c, oe, 2, 'Insumo',   'gasto', 'mantenimiento',  5, 'unidad', 20, 12),
+    (la,  c, oa, 1, 'Material', 'gasto', 'mantenimiento',  1, 'unidad', 100, 12);
+  UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id IN (oe, oa);
+  UPDATE public.ordenes_compra SET estado = 'emitida'  WHERE id IN (oe, oa);
+  j := public.compras_recepcion_crear(c, pj,
+    format('{"orden_compra_id":"%s","tipo":"bienes","fecha":"%s","clave_idempotencia":"zz-rec-e"}', oe, CURRENT_DATE)::jsonb,
+    format('[{"orden_compra_linea_id":"%s","cantidad":10,"costo_unitario":10},{"orden_compra_linea_id":"%s","cantidad":5,"costo_unitario":20}]', le1, le2)::jsonb);
+  UPDATE public.recepciones SET estado = 'registrada' WHERE id = (j->'recepcion'->>'id')::uuid;
+
+  PERFORM set_config('request.jwt.claim.sub', uk::text, true);
+  j := public.compras_factura_crear(c, pj,
+    format('{"proveedor_id":"%s","orden_compra_id":"%s","numero_factura":"ZZ-RPC-1","concepto":"Factura por la operación de servidor","monto_total":1,"clave_idempotencia":"zz-fac-rpc-1"}', pv2, oe)::jsonb,
+    format('[{"orden_compra_linea_id":"%s","cantidad":10,"precio_unitario":10,"iva_monto":12},{"orden_compra_linea_id":"%s","cantidad":5,"precio_unitario":20,"iva_monto":12}]', le1, le2)::jsonb);
+  fid := (j->'factura'->>'id')::uuid;
+  ev := ev || pg_temp.ck('10 factura por la función · nueva/estado/renglones', (j->>'reutilizada') || '/' || (j->'factura'->>'estado') || '/' || jsonb_array_length(j->'lineas'), 'false/registrada/2');
+  ev := ev || pg_temp.ckn('10 el total sale de los renglones (224), no del 1 que mandó el cliente', (SELECT monto_total FROM public.facturas_proveedor WHERE id = fid), 224);
+  -- doble clic / respuesta perdida: LA MISMA factura, nada duplicado
+  j2 := public.compras_factura_crear(c, pj,
+    format('{"proveedor_id":"%s","orden_compra_id":"%s","numero_factura":"ZZ-RPC-1","concepto":"Factura por la operación de servidor","clave_idempotencia":"zz-fac-rpc-1"}', pv2, oe)::jsonb,
+    format('[{"orden_compra_linea_id":"%s","cantidad":5.0,"precio_unitario":20,"iva_monto":12},{"orden_compra_linea_id":"%s","cantidad":10,"precio_unitario":10,"iva_monto":12.0}]', le2, le1)::jsonb);
+  ev := ev || pg_temp.ck('10 reintento con la misma clave y contenido · misma factura', ((j2->>'reutilizada')::boolean)::text || '/' || ((j2->'factura'->>'id')::uuid = fid)::text, 'true/true');
+  ev := ev || pg_temp.ckn('10 una sola factura y dos renglones tras el reintento', (SELECT count(*) FROM public.facturas_proveedor WHERE clave_idempotencia = 'zz-fac-rpc-1') * 100 + (SELECT count(*) FROM public.factura_proveedor_lineas WHERE factura_id = fid), 102);
+  -- misma clave con OTRO contenido
+  BEGIN PERFORM public.compras_factura_crear(c, pj,
+      format('{"proveedor_id":"%s","orden_compra_id":"%s","numero_factura":"ZZ-RPC-1","concepto":"Factura por la operación de servidor","clave_idempotencia":"zz-fac-rpc-1"}', pv2, oe)::jsonb,
+      format('[{"orden_compra_linea_id":"%s","cantidad":9,"precio_unitario":10,"iva_monto":12},{"orden_compra_linea_id":"%s","cantidad":5,"precio_unitario":20,"iva_monto":12}]', le1, le2)::jsonb);
+    t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('10 misma clave con OTRO contenido', t, 'COMPRAS_FACTURA_CLAVE_CONFLICTO');
+  -- un renglón ajeno: la operación entera falla y NO queda cabecera huérfana
+  BEGIN PERFORM public.compras_factura_crear(c, pj,
+      format('{"proveedor_id":"%s","orden_compra_id":"%s","numero_factura":"ZZ-RPC-2","concepto":"Con un renglón ajeno","clave_idempotencia":"zz-fac-rpc-2"}', pv2, oe)::jsonb,
+      format('[{"orden_compra_linea_id":"%s","cantidad":1,"precio_unitario":10},{"orden_compra_linea_id":"%s","cantidad":1,"precio_unitario":10}]', le1, l1)::jsonb);
+    t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('10 un renglón de OTRA orden · falla', t, 'COMPRAS_FACTURA_LINEA_AJENA');
+  ev := ev || pg_temp.ckn('10 sin cabecera huérfana tras el fallo', (SELECT count(*) FROM public.facturas_proveedor WHERE clave_idempotencia = 'zz-fac-rpc-2' OR numero_factura = 'ZZ-RPC-2'), 0);
+  -- número repetido con otra clave
+  BEGIN PERFORM public.compras_factura_crear(c, pj,
+      format('{"proveedor_id":"%s","numero_factura":"ZZ-RPC-1","concepto":"Mismo número","monto_total":10,"clave_idempotencia":"zz-fac-rpc-3"}', pv2)::jsonb, NULL);
+    t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('10 número de factura repetido con otra clave', t, 'COMPRAS_FACTURA_NUMERO_DUPLICADO');
+  -- el operador (sin permiso de aprobar) no aprueba lo que el contador capturó
+  PERFORM set_config('request.jwt.claim.sub', u2::text, true);
+  UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = fid;
+  ev := ev || pg_temp.ck('10 usuario de otro proyecto intenta aprobar · estado', (SELECT estado FROM public.facturas_proveedor WHERE id = fid), 'registrada');
+  PERFORM set_config('request.jwt.claim.sub', ua::text, true);
+  UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = fid;
+  ev := ev || pg_temp.ck('10 el admin aprueba · estado/aprobada_por sellado', (SELECT estado || '/' || (aprobada_por = ua)::text FROM public.facturas_proveedor WHERE id = fid), 'aprobada/true');
+  ev := ev || pg_temp.ckn('10 y lo facturado de los renglones sube (10 + 5)', (SELECT sum(cantidad_facturada) FROM public.orden_compra_lineas WHERE orden_compra_id = oe), 15);
+
+  -- sin renglones: nunca se aprueba, ni con justificación ni declarándose autorizador
+  PERFORM set_config('request.jwt.claim.sub', uk::text, true);
+  INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, orden_compra_id, numero_factura, concepto, categoria, monto_total)
+    VALUES ('5b5b0000-0000-0000-0000-0000000000ee', c, pj, pv2, oa, 'ZZ-SIN-REN', 'Con orden y sin renglones', 'mantenimiento', 112);
+  PERFORM set_config('request.jwt.claim.sub', ua::text, true);
+  BEGIN UPDATE public.facturas_proveedor SET estado = 'aprobada', match_forzado_por = ua, match_justificacion = 'Factura global del proveedor.' WHERE id = '5b5b0000-0000-0000-0000-0000000000ee'; t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('10 con orden y SIN renglones, ni con justificación', t, 'COMPRAS_FACTURA_SIN_RENGLONES');
+  ev := ev || pg_temp.ck('10 la factura sin renglones sigue registrada', (SELECT estado FROM public.facturas_proveedor WHERE id = '5b5b0000-0000-0000-0000-0000000000ee'), 'registrada');
+  -- facturar ANTES de recibir: no se autoriza
+  PERFORM set_config('request.jwt.claim.sub', uk::text, true);
+  j3 := public.compras_factura_crear(c, pj,
+    format('{"proveedor_id":"%s","orden_compra_id":"%s","numero_factura":"ZZ-ANTICIPO","concepto":"Antes de recibir","clave_idempotencia":"zz-fac-anticipo"}', pv2, oa)::jsonb,
+    format('[{"orden_compra_linea_id":"%s","cantidad":1,"precio_unitario":100,"iva_monto":12}]', la)::jsonb);
+  PERFORM set_config('request.jwt.claim.sub', ua::text, true);
+  BEGIN UPDATE public.facturas_proveedor SET estado = 'aprobada', match_justificacion = 'Anticipo autorizado por gerencia.' WHERE id = (j3->'factura'->>'id')::uuid; t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('10 facturar antes de recibir no se autoriza ni con justificación', t, 'COMPRAS_MATCH_NO_FORZABLE');
+  -- la orden ya facturada del todo está cerrada: no admite facturas nuevas
+  PERFORM set_config('request.jwt.claim.sub', uk::text, true);
+  BEGIN PERFORM public.compras_factura_crear(c, pj,
+      format('{"proveedor_id":"%s","orden_compra_id":"%s","numero_factura":"ZZ-RPC-4","concepto":"Sobre una orden cerrada","clave_idempotencia":"zz-fac-rpc-4"}', pv2, oe)::jsonb,
+      format('[{"orden_compra_linea_id":"%s","cantidad":1,"precio_unitario":10,"iva_monto":1.2}]', le1)::jsonb);
+    t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('10 la orden recibida y facturada del todo está cerrada: no admite otra factura', t, 'COMPRAS_FACTURA_ORDEN_ESTADO');
+  -- reintento de la factura que CERRÓ la orden (0900): devuelve la original, sin escribir nada
+  ev := ev || pg_temp.ck('10 la orden oe está cerrada', (SELECT estado FROM public.ordenes_compra WHERE id = oe), 'cerrada');
+  v := (SELECT count(*) FROM public.facturas_proveedor WHERE company_id = c) * 1000000
+     + (SELECT count(*) FROM public.factura_proveedor_lineas WHERE company_id = c) * 10000
+     + (SELECT count(*) FROM public.conta_asientos WHERE company_id = c);
+  j2 := public.compras_factura_crear(c, pj,
+    format('{"proveedor_id":"%s","orden_compra_id":"%s","numero_factura":"ZZ-RPC-1","concepto":"Factura por la operación de servidor","clave_idempotencia":"zz-fac-rpc-1"}', pv2, oe)::jsonb,
+    format('[{"orden_compra_linea_id":"%s","cantidad":10,"precio_unitario":10,"iva_monto":12},{"orden_compra_linea_id":"%s","cantidad":5,"precio_unitario":20,"iva_monto":12}]', le1, le2)::jsonb);
+  ev := ev || pg_temp.ck('10 reintento con la orden CERRADA · misma factura, reutilizada', ((j2->>'reutilizada')::boolean)::text || '/' || ((j2->'factura'->>'id')::uuid = fid)::text, 'true/true');
+  ev := ev || pg_temp.ckn('10 y sin filas ni asientos nuevos (facturas, renglones, asientos)', (SELECT count(*) FROM public.facturas_proveedor WHERE company_id = c) * 1000000
+     + (SELECT count(*) FROM public.factura_proveedor_lineas WHERE company_id = c) * 10000
+     + (SELECT count(*) FROM public.conta_asientos WHERE company_id = c) - v, 0);
+  BEGIN PERFORM public.compras_factura_crear(c, pj,
+      format('{"proveedor_id":"%s","orden_compra_id":"%s","numero_factura":"ZZ-RPC-1","concepto":"Factura por la operación de servidor","clave_idempotencia":"zz-fac-rpc-1"}', pv2, oe)::jsonb,
+      format('[{"orden_compra_linea_id":"%s","cantidad":9,"precio_unitario":10,"iva_monto":12},{"orden_compra_linea_id":"%s","cantidad":5,"precio_unitario":20,"iva_monto":12}]', le1, le2)::jsonb);
+    t := 'SIN ERROR';
+  EXCEPTION WHEN OTHERS THEN t := split_part(SQLERRM, ':', 1); END;
+  ev := ev || pg_temp.ck('10 misma clave con OTRO contenido y orden cerrada', t, 'COMPRAS_FACTURA_CLAVE_CONFLICTO');
   RESET ROLE;
 
   -- ── Veredicto: la excepción SIEMPRE revierte; su prefijo dice si hubo fallo ─
