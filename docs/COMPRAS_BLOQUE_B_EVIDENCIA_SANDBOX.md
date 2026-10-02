@@ -1,6 +1,6 @@
 # Compras · Bloque B — evidencia de validación en el sandbox
 
-Entorno: `control-agua-rls-sandbox` (`jwpmivhvlstslncrtokb`), identidad confirmada por nombre y ref. **Producción no se tocó.** Fecha: 2026-10-02. Autorización del propietario: aplicar las 7 migraciones por el workflow con la rama como ref, ejecutar el guion (transaccional, revertido) y crear padrón persistente (no se creó: ver «No ejecutado»).
+Entorno: `control-agua-rls-sandbox` (`jwpmivhvlstslncrtokb`), identidad confirmada por nombre y ref. **Producción no se tocó.** Fecha: 2026-10-02. Autorización del propietario: aplicar las 7 migraciones por el workflow con la rama como ref, ejecutar el guion (transaccional, revertido) y crear el padrón persistente de prueba «ZZ Validación Bloque B» (creado el 2026-10-02 para la prueba de interfaz: ver §5). **La migración 0700 de este PR correctivo NO está aplicada en el sandbox** (no estaba autorizada).
 
 ## 1. Estado antes y después (historial real, solo lectura)
 
@@ -49,35 +49,67 @@ Reintentos y duplicados cubiertos en el recorrido completo (todos con conteo exa
 
 | Capa | Dónde | Estado | Qué demuestra | Qué NO demuestra |
 |---|---|---|---|---|
-| **Pruebas SQL locales** | PostgreSQL 16 efímero (`compras_bloque_b/run.sh`) | ✅ | reglas del servidor, concurrencia real, migraciones dos veces | nada del sandbox ni de la interfaz |
-| **CI de GitHub** (PR `1132efb4`, y **merge `17e45035` en `main`**: CI y Coverage gate en éxito) | GitHub Actions | ✅ 9/9 checks reales en verde: Type-check/test/build, E2E, RLS harness, RLS sandbox de recepción, Coverage gate, drift (auditor y pruebas), Supabase Preview, Vercel | el código compila, las suites del repo pasan | el comportamiento en el sandbox compartido |
-| **SQL en el sandbox real** | `control-agua-rls-sandbox` | ✅ 7 migraciones aplicadas y verificadas; guion `GUION_OK_REVERTIDO` **65/65** (ampliado el 2026-10-02 tras el merge), 0 residuos | el esquema y las reglas funcionan sobre el sandbox, de punta a punta, como SQL | que la interfaz las use bien |
-| **Interfaz conectada al sandbox** | navegador contra `jwpmivhvlstslncrtokb` | ⛔ **NO realizada** | — | — |
+| **Pruebas SQL locales** | PostgreSQL efímero (`compras_bloque_b/run.sh`, ahora con la migración 0700 y la sección 13; más cinco suites previas que aprueban facturas con orden) | ✅ | reglas del servidor, concurrencia real, migraciones dos veces | nada del sandbox ni de la interfaz |
+| **CI de GitHub** (PR `1132efb4`, y **merge `17e45035` en `main`**: CI y Coverage gate en éxito) | GitHub Actions | ✅ 9/9 checks reales en verde | el código compila, las suites del repo pasan | el comportamiento en el sandbox compartido |
+| **SQL en el sandbox real** | `control-agua-rls-sandbox` | ✅ 7 migraciones aplicadas; guion `GUION_OK_REVERTIDO` **65/65**, 0 residuos | el esquema y las reglas funcionan sobre el sandbox como SQL | que la interfaz las use bien |
+| **Interfaz conectada al sandbox** | Chromium (Playwright) → app local (Vite) → `jwpmivhvlstslncrtokb` | ✅ **realizada el 2026-10-02** (§5), con **tres defectos hallados** (D-1, D-2, D-4) corregidos en este PR y uno de servidor (D-3) con migración preparada sin aplicar | el flujo completo desde la pantalla, con permisos, aislamiento y reintentos | el comportamiento con datos reales de producción |
 
-Las pruebas de componentes (vitest) prueban pantallas con datos simulados; **no** sustituyen a la interfaz contra el sandbox.
+Las pruebas de componentes (vitest) usan datos simulados; **no** sustituyen a la interfaz contra el sandbox.
 
-## 5. Prueba de interfaz: bloqueo y protocolo (pendiente de habilitación)
+## 5. Prueba de interfaz contra el sandbox (2026-10-02)
 
-**Bloqueo.** El egress de la sesión deniega `jwpmivhvlstslncrtokb.supabase.co:443` (política de red de la organización). Se reprobó el 2026-10-02: sigue denegado. **No se elude** (ni túneles ni otro host). Opciones autorizadas:
-1. El propietario añade ese host a los dominios permitidos del entorno (menú del entorno → Edit → Network access), o
-2. la prueba se ejecuta desde una máquina con acceso permitido siguiendo este protocolo.
+**Método.** Aplicación local (Vite) con `VITE_SUPABASE_URL=https://jwpmivhvlstslncrtokb.supabase.co` y la llave pública de **ese** proyecto (su payload JWT dice `ref: jwpmivhvlstslncrtokb`), pasadas por entorno de proceso, sin archivos `.env`. Antes de abrir la app, un control aborta si la URL o la llave contienen `nnsqmeigtgewatameexo` (producción) o si el `ref` de la llave no es el del sandbox. Chromium sale por el proxy del entorno (política de red: el host del sandbox se habilitó; producción sigue denegada con 403) con una CA de confianza aislada para la prueba, **sin desactivar la verificación TLS**. Además, una salvaguarda del propio script aborta y registra cualquier petición a producción.
 
-**Control de destino (obligatorio antes de abrir la aplicación).**
-- `VITE_SUPABASE_URL` debe ser exactamente `https://jwpmivhvlstslncrtokb.supabase.co`; `VITE_SUPABASE_ANON_KEY` debe ser la llave pública de **ese** proyecto (su payload JWT dice `ref: jwpmivhvlstslncrtokb`).
-- Se aborta si la URL o la llave contienen la referencia de producción (`nnsqmeigtgewatameexo`) o si el ref de la llave difiere.
-- Con la app abierta se comprueba en la pestaña Red del navegador (o en el log de Playwright) que **todas** las peticiones a Supabase van al host del sandbox y ninguna al de producción; esa lista se adjunta como evidencia.
+**Destino de red** (`capturas/compras_bloque_b/red-destino.txt`): en un recorrido de login → Compras → Seguimiento → Cuentas por pagar, **109 peticiones, todas a `jwpmivhvlstslncrtokb.supabase.co`; 0 a producción; 0 bloqueadas por la salvaguarda.**
 
-**Datos de prueba.** Padrón persistente identificable «ZZ Validación Bloque B» (UUID `5b5b1…`, distintos de los del guion `5b5b0…`), con usuarios administrador, operador y contador **de prueba**; credenciales fuera del repositorio. No se borra ni se modifica nada ajeno; al terminar se decide con el propietario si el padrón se conserva o se retira (solo filas `5b5b1…`).
+**Datos de prueba.** Padrón persistente identificable «ZZ Validación Bloque B» (UUID `5b5b1000…`, distinto de los `5b5b0000…` del guion): 2 empresas, 3 proyectos, 5 usuarios (`zz-bloqueb-*@example.com`; contraseña de prueba fuera del repositorio), 2 proveedores autorizados, 51 cuentas (dos personalizadas: 6205 servicios y 9101 activos), tipo de cambio. Plantilla: `supabase/tests/compras_bloque_b/sandbox_padron_ui.sql.tpl`. **No se tocó ningún registro ajeno** (las 3 empresas previas siguen igual). Retiro: borrar solo filas `5b5b1000…` (decisión del propietario).
 
-**Recorrido de interfaz a registrar (con captura por paso y resultado esperado/obtenido).**
-1. Operaciones → Órdenes de compra: crear con proveedor del catálogo (selector por id); aprobar y emitir (admin ≠ solicitante).
-2. Compras → Recibir: recepción **parcial** con una cantidad rechazada y su motivo; registrar. Verificar pendiente y rechazado en el seguimiento.
-3. Compras → Recibir: **conformidad de servicio** (sin movimiento de inventario).
-4. Recepción **final** de inventario y activo (el activo aparece en la cuenta personalizada).
-5. Cuentas por pagar: dos facturas parciales; ver el cuadre (IVA y moneda) y aprobar; ver asientos.
-6. Seguimiento de la orden como contador (ve facturas) y como operador (no las ve).
-7. Negativos en la interfaz: factura duplicada, recibir de más, usuario de otra empresa/proyecto.
+### 5.1 Recorrido (admin del padrón; capturas en `docs/capturas/compras_bloque_b/`)
+
+| # | Paso en pantalla | Resultado obtenido (esperado = obtenido) | Verificado además en el servidor |
+|---|---|---|---|
+| 1 | Compras → Nueva orden (servicio 300+36 IVA, activo fijo 2×500+120 IVA) → Crear borrador | Orden en **Borrador** por GTQ 1,456.00 · `01` | total 1456.00 |
+| 2 | Aprobar → Emitir → Seguimiento | Estados Aprobada → Emitida; historial con 3 eventos · `02` | |
+| 3 | Recibir (bienes): 1 aceptada, **1 rechazada con motivo** | Recepción creada y registrada: «aceptado 1, rechazado 1» · `03` | orden `recibida_parcial`; línea recibida 1 de 2; 1 activo; asiento Dr 9101 500 / Cr 2105 500 |
+| 4 | Recepción final con **doble clic** en «Crear recepción» | **Una sola** recepción (REC-000002), no dos · `05` | |
+| 5 | Conformidad de servicio | REC-000003 «conformidad de servicio», sin inventario · `04` | asiento Dr 5199 300 / Cr 2105 300 |
+| 6 | Activos fijos | 2 activos (AF-000001, AF-000002) · `06` | |
+| 7 | Seguimiento tras recibir | Estado Recibida; recibido GTQ 1,300.00, pendiente 0 · `07` | |
+| 8 | **Registrar factura** contra la orden (ver D-1) | Selector de orden, renglones por facturar, total 1,456.00 (IVA 156.00) · `08` (antes) y `09` (después) | |
+| 9 | Revisar y aprobar | Cuadre de 3 vías: ambos renglones «Cuadra» (precio, IVA y moneda) · `10`; factura Aprobada · `11` | Dr 2105 1,300 + Dr 1105 IVA 156 / Cr 2104 1,456; **2105 en cero**; orden **cerrada**; facturado 1/1 y 2/2 |
+| 10 | Seguimiento como **contador** | Ve la factura F-ZZ-0001, facturado GTQ 1,456.00 · `14` | |
+| 11 | Seguimiento como **operador** | «Facturas y pagos solo los ve Contabilidad»; no ve facturas ni montos facturados · `15` | |
+
+### 5.2 Reintentos, permisos y aislamiento (por interfaz)
+
+| Prueba | Resultado |
+|---|---|
+| Doble clic al crear recepción | 1 documento (la clave de idempotencia se reutiliza) |
+| Doble clic al registrar factura (F-ZZ-0002) | 1 factura |
+| Factura con número repetido (F-ZZ-0001, mismo proveedor) | Rechazada por `uq_facturas_prov_numero`; mensaje crudo antes (`12`), claro después (`13`, D-2) |
+| Operador de compras | No ve «+ Nueva OC», ni aprobar/emitir; la denegación del servidor está probada en SQL (§3b) |
+| Contador | Entra a Contabilidad; no ve el módulo Condominios («sin acceso») |
+| Operador del **otro proyecto** (misma empresa) | Ve su condominio «ZZ Otro proyecto» sin órdenes · `16` |
+| Admin de **otra empresa** | Compras: 0 órdenes · `17`; Cuentas por pagar: no ve la factura ni el proveedor · `18` |
+
+### 5.3 Defectos hallados y su estado
+
+| ID | Defecto | Dónde | Estado |
+|---|---|---|---|
+| **D-1** | **No había forma de facturar contra una orden desde la interfaz**: el formulario «Registrar factura» no tenía selector de orden ni renglones (solo proveedor y categoría); el cuadre de 3 vías solo era alcanzable por SQL. `08` | `CuentasPorPagarTab` | **Corregido en este PR** (selector de orden, renglones por facturar, total calculado; cabecera+renglones con compensación si fallan). Probado en pantalla contra el sandbox (`09`–`11`) |
+| **D-2** | El duplicado de factura mostraba el error crudo de Postgres | `CuentasPorPagarTab` | **Corregido** (`13`) |
+| **D-3** | **Servidor:** una factura ligada a una orden y **sin renglones se aprueba sin error** y genera su asiento, saltándose el cuadre de 3 vías (el cuadre es por renglón y devolvía cero filas). Reproducido con una sonda local reversible (`APROBADA SIN ERROR · renglones=0 · asientos=1`) | `compras_tg_factura_match` | **Migración `20261021000700` preparada, con pruebas locales (sección 13) y las 5 suites previas en verde. NO aplicada en el sandbox ni en producción** (requiere autorización; al fusionar se aplicaría en producción) |
+| **D-4** | Operaciones mostraba un contador por **posición en la lista** (`OC-0001`), no el número real de la orden (`OC-000001`); cambiaba al agregar órdenes. `20` → `19` | `OrdenesCompraTab` | **Corregido** (+ 2 pruebas que fallan con el código anterior) |
+
+### 5.4 Observaciones (no son defectos del bloque)
+
+* La interfaz crea las líneas de orden sin cuenta (`Cuenta —` en el seguimiento): es por diseño (la resuelve una regla o el mapeo al contabilizar). Sin regla, el servicio se devengó a `5199 Otros gastos`; con cuenta explícita iría a la del renglón (probado en SQL, §3).
+* El formulario de orden de Contabilidad no permite elegir el **insumo** del almacén, así que una línea de **inventario** no se puede crear desde ahí (se hace desde Suministros). Por eso el recorrido de pantalla cubrió servicio y activo fijo; el inventario (recepción parcial con rechazo, stock) está probado en SQL (65/65).
+* El sandbox no tiene desplegada la función `log-security-event` (404) y el proxy del entorno no deja pasar el WebSocket de Realtime: ruido de consola del entorno, sin efecto en el flujo.
+* En la primera visita de «Condominios» (compilación en frío del servidor de desarrollo) la lista de órdenes tardó en aparecer para el administrador; con la caché caliente carga a los pocos segundos.
 
 ## 6. No ejecutado (pendiente explícito)
-* Todo el recorrido de §5 (interfaz contra el sandbox) y sus capturas.
-* El padrón persistente: **no se creó** a propósito hasta que la prueba pueda ejecutarse (evita datos y credenciales de prueba sin uso).
+* **Migración 0700 en el sandbox**: no se aplicó (sin autorización). La interfaz corregida **no depende de ella**: captura siempre los renglones.
+* Línea de **inventario** desde la pantalla de orden (no hay selector de insumo en ese formulario).
+* Facturas en moneda extranjera y diferencias de precio/IVA **por pantalla**: probadas en SQL (65/65) y el cuadre las muestra (`10`), pero no se capturó su recorrido en pantalla.
+* Retiro del padrón `5b5b1000…`: a decidir por el propietario.

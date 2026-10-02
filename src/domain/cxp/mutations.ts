@@ -11,7 +11,7 @@ import { runQuery } from '../queryFetch'
 import { cxpKeys } from './keys'
 import { contabilidadKeys } from '../contabilidad/keys'
 import type { FacturaProveedor, OrdenPago, Proveedor } from '../../types/cxp'
-import type { FacturaProveedorFormInput, OrdenPagoFormInput, ProveedorFormInput } from './schemas'
+import type { FacturaProveedorFormInput, FacturaRenglonInput, OrdenPagoFormInput, ProveedorFormInput } from './schemas'
 
 function useInvalidarCxP(companyId?: string) {
   const qc = useQueryClient()
@@ -64,19 +64,56 @@ export function useGuardarProveedorMutation(companyId?: string) {
 
 // ── Facturas de proveedor ───────────────────────────────────────────────────
 
+/**
+ * Registra la factura y, si viene de una orden, sus renglones. Una factura con
+ * orden SIN renglones no tiene contra qué cuadrar (el cuadre de 3 vías es por
+ * renglón y aprobaría sin revisar nada), así que no se deja a medias: si los
+ * renglones fallan, la cabecera se borra (o se anula si no se puede borrar).
+ */
+export async function crearFacturaProveedor(
+  companyId: string,
+  input: FacturaProveedorFormInput & { renglones?: FacturaRenglonInput[] },
+): Promise<FacturaProveedor | null> {
+  const { renglones, ...cabecera } = input
+  if (cabecera.orden_compra_id && !renglones?.length) {
+    throw new Error('Una factura contra una orden se captura por renglón: indica qué se factura de cada uno.')
+  }
+  const rows = await runQuery<FacturaProveedor[]>((signal) =>
+    supabase
+      .from('facturas_proveedor')
+      .insert({ ...cabecera, company_id: companyId, estado: 'registrada' })
+      .select()
+      .abortSignal(signal),
+  )
+  const factura = rows?.[0] ?? null
+  if (factura && renglones?.length) {
+    try {
+      await runQuery((signal) =>
+        supabase
+          .from('factura_proveedor_lineas')
+          .insert(renglones.map((r, i) => ({ ...r, company_id: companyId, factura_id: factura.id, linea: i + 1 })))
+          .abortSignal(signal),
+      )
+    } catch (e) {
+      try {
+        await runQuery((signal) => supabase.from('facturas_proveedor').delete().eq('id', factura.id).abortSignal(signal))
+      } catch {
+        await runQuery((signal) =>
+          supabase.from('facturas_proveedor').update({ estado: 'anulada' }).eq('id', factura.id).abortSignal(signal),
+        ).catch(() => undefined)
+      }
+      throw e
+    }
+  }
+  return factura
+}
+
 export function useCrearFacturaProveedorMutation(companyId?: string) {
   const invalidar = useInvalidarCxP(companyId)
   return useMutation({
-    mutationFn: async (input: FacturaProveedorFormInput) => {
+    mutationFn: async (input: FacturaProveedorFormInput & { renglones?: FacturaRenglonInput[] }) => {
       if (!companyId) throw new Error('Falta companyId.')
-      const rows = await runQuery<FacturaProveedor[]>((signal) =>
-        supabase
-          .from('facturas_proveedor')
-          .insert({ ...input, company_id: companyId, estado: 'registrada' })
-          .select()
-          .abortSignal(signal),
-      )
-      return rows?.[0] ?? null
+      return await crearFacturaProveedor(companyId, input)
     },
     onSuccess: () => invalidar(),
   })

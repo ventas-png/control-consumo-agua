@@ -140,8 +140,6 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     onRefresh()
   }
 
-  const correlativo = (i: number) => `OC-${String(ordenes.length - i).padStart(4, '0')}`
-
   return (
     <div style={{ padding: 16 }}>
       {/* KPIs */}
@@ -245,14 +243,15 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtradas.map((orden, i) => {
+          {filtradas.map((orden) => {
             const cfg = ESTADO_CFG[orden.estado]
             const isOpen = expandida === orden.id
             return (
               <div key={orden.id} style={{ background: 'var(--at-surface)', border: `1px solid ${cfg.color}33`, borderRadius: 10, borderLeft: `4px solid ${cfg.color}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: 'pointer' }}
                   onClick={() => setExpandida(isOpen ? null : orden.id)}>
-                  <div style={{ width: 60, fontSize: 10, color: 'var(--at-ink-3)', fontWeight: 600, flexShrink: 0 }}>{correlativo(i)}</div>
+                  {/* El número REAL de la orden (el mismo en Contabilidad y en el seguimiento), no un contador por posición en la lista. */}
+                  <div style={{ minWidth: 76, fontSize: 10, color: 'var(--at-ink-3)', fontWeight: 600, flexShrink: 0 }}>{orden.numero ?? 'Sin número'}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-ink)' }}>{orden.concepto}</div>
                     <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{orden.proveedor_nombre}</div>

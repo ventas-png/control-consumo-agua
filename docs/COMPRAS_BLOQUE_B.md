@@ -35,6 +35,7 @@ Fase 6 (`ordenes_compra` → `recepciones` → `facturas_proveedor` → `contras
 5. `20261021000400_operaciones_proveedor_compartido` — `proveedor_id` en suministros/proformas, vínculo, vista previa.
 6. `20261021000500_compras_integridad_cruzada` — 4 triggers de integridad entre empresa/orden/proveedor.
 7. `20261021000600_compras_correcciones_revision` — **correctiva** (#911): cuentas semánticas en la recepción de activos, condiciones congeladas al emitir y después, y `compras_recepcion_crear` (creación transaccional e idempotente) con `recepciones.hash_contenido`.
+8. `20261021000700_compras_factura_orden_exige_renglones` — **correctiva, posterior al merge de #911** (hallazgo D-3 de la validación de interfaz): una factura ligada a una orden y sin renglones ya no se aprueba en silencio (el cuadre es por renglón y devolvía «todo cuadra»); solo con la justificación escrita de siempre. **No aplicada en el sandbox ni en producción** hasta que el propietario lo autorice; al fusionar el PR que la contiene, `apply-migrations-prod` la aplicaría en producción.
 
 Ninguna edita una migración aplicada ni renumera: las correcciones de revisión son una migración NUEVA porque las seis primeras pueden estar ya aplicadas en Preview u otro entorno. Las notas «CÓMO REVERTIR» de las cabeceras de 0000…0500 quedan **superadas** por la sección 6 de este documento (no son reversiones sin pérdida).
 

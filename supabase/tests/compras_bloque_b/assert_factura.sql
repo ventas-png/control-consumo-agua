@@ -2,7 +2,7 @@
 
 -- ============================================================================
 -- INVARIANTES · FACTURA INTEGRADA A ORDEN Y RECEPCIONES
--- (migraciones 20261021000200 y 20261021000500) sobre el motor de Fase 6.
+-- (migraciones 20261021000200, 20261021000500 y 20261021000700) sobre el motor de Fase 6.
 -- Orden OF (C1, P1): F1 inventario 100 × 10 (IVA 120) · F2 activo fijo 2 × 500
 -- (IVA 120) · F3 servicio 1 × 300 (IVA 36).
 -- ============================================================================
@@ -351,3 +351,38 @@ SELECT public.chk_falla($$ INSERT INTO public.orden_compra_lineas (company_id, o
      FROM public.conta_cuentas c WHERE c.company_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' AND c.project_id = 'c1c1c1c1-0000-0000-0000-000000000001' AND c.codigo LIKE '5101%' LIMIT 1 $$,
   'COMPRAS_LINEA_CUENTA_INVALIDA', '12 · una cuenta de gasto NO se acepta para un activo fijo: se rechaza explicando');
 RESET ROLE;
+
+-- ── 13. Factura LIGADA a una orden pero SIN renglones: no hay con qué cuadrar ─
+-- (20261021000700) `compras_validar_match` es por renglón: sin renglones devolvía
+-- cero filas = «todo cuadra» y la factura se aprobaba y devengaba sin comparar.
+-- Orden PROPIA de esta sección: las pruebas siguientes cuentan las facturas de OF.
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto)
+VALUES ('0f100000-0000-0000-0000-0000000000a1', :C::uuid, :C1::uuid, :P1::uuid, 'Ferretería Bloque B', 'Orden para factura sin renglones');
+INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, orden_compra_id, numero_factura, concepto, categoria, monto_total)
+VALUES ('0f300000-0000-0000-0000-000000000060', :C::uuid, :C1::uuid, :P1::uuid, '0f100000-0000-0000-0000-0000000000a1', 'F-0060', 'Con orden y sin renglones', 'limpieza', 400);
+SELECT public.chk_falla($$ UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = '0f300000-0000-0000-0000-000000000060' $$,
+  'COMPRAS_FACTURA_SIN_RENGLONES', '13 · factura con orden y sin renglones NO se aprueba en silencio');
+RESET ROLE;
+SELECT public.chk_txt((SELECT estado FROM public.facturas_proveedor WHERE id = '0f300000-0000-0000-0000-000000000060'), 'registrada',
+  '13 · la factura queda registrada (no se pierde el documento)');
+SELECT public.chk((SELECT count(*) FROM public.conta_asientos WHERE origen_tabla = 'facturas_proveedor' AND origen_id = '0f300000-0000-0000-0000-000000000060'), 0,
+  '13 · y no genera asiento');
+-- Con la autorización escrita de siempre sí se puede (queda quién y por qué).
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+UPDATE public.facturas_proveedor SET estado = 'aprobada', match_forzado_por = :UA::uuid, match_justificacion = 'Factura global del proveedor; se concilia aparte.'
+ WHERE id = '0f300000-0000-0000-0000-000000000060';
+RESET ROLE;
+SELECT public.chk_txt((SELECT estado FROM public.facturas_proveedor WHERE id = '0f300000-0000-0000-0000-000000000060'), 'aprobada',
+  '13 · con justificación escrita se aprueba y queda registrado quién la autorizó');
+SELECT public.chk_bool((SELECT match_forzado_por = :UA::uuid AND match_justificacion <> '' FROM public.facturas_proveedor WHERE id = '0f300000-0000-0000-0000-000000000060'), true,
+  '13 · la autorización queda firmada');
+-- Se anula para no alterar los totales de las pruebas siguientes (comparten base).
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+UPDATE public.facturas_proveedor SET estado = 'anulada' WHERE id = '0f300000-0000-0000-0000-000000000060';
+RESET ROLE;
+SELECT public.chk_txt((SELECT estado FROM public.facturas_proveedor WHERE id = '0f300000-0000-0000-0000-000000000060'), 'anulada',
+  '13 · la factura de prueba se anula (su asiento se reversa)');

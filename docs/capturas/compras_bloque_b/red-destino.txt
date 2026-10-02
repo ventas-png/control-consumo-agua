@@ -1,0 +1,4 @@
+Hosts externos contactados por la aplicación (recorrido: login, Compras, Seguimiento, Cuentas por pagar):
+   109 × jwpmivhvlstslncrtokb.supabase.co
+Peticiones a producción (nnsqmeigtgewatameexo.supabase.co): 0
+Peticiones bloqueadas por la salvaguarda de producción: 0
