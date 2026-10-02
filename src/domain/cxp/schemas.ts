@@ -61,6 +61,19 @@ export const facturaRenglonSchema = z.object({
 
 export type FacturaRenglonInput = z.infer<typeof facturaRenglonSchema>
 
+/** Entrada de `compras_factura_crear`: la factura, sus renglones (con orden) y la
+ *  clave de idempotencia de ESTE intento de captura. */
+export type FacturaCrearInput = FacturaProveedorFormInput & {
+  clave_idempotencia: string
+  renglones?: FacturaRenglonInput[]
+}
+
+/** Quita el código técnico del servidor («COMPRAS_FACTURA_X: texto») para mostrar
+ *  solo el texto, que está escrito para leerse tal cual. */
+export function textoErrorServidor(mensaje: string): string {
+  return mensaje.replace(/^\s*(?:[A-Z][A-Z0-9]*_)+[A-Z0-9]+:\s*/, '').trim() || mensaje
+}
+
 /** Totales de una factura capturada por renglón (mismo redondeo que el servidor:
  *  total del renglón = round(cantidad × precio, 2) + IVA). */
 export function totalesFactura(renglones: Pick<FacturaRenglonInput, 'cantidad' | 'precio_unitario' | 'iva_monto'>[]) {

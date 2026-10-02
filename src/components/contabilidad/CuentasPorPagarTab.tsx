@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { DataTable, type DataTableColumn } from '../shared'
 import { EditModal } from '../shared'
 import { FilterChips } from '../shared/FilterChips'
@@ -21,7 +21,7 @@ import {
   useMarcarOrdenPagadaMutation,
 } from '../../domain/cxp/mutations'
 import {
-  facturaProveedorFormSchema, facturaRenglonSchema, ordenPagoFormSchema, saldoFactura, totalesFactura,
+  facturaProveedorFormSchema, facturaRenglonSchema, ordenPagoFormSchema, saldoFactura, textoErrorServidor, totalesFactura,
 } from '../../domain/cxp/schemas'
 import { useCuadreQuery, useOrdenCompraLineasQuery, useOrdenesCompraQuery } from '../../domain/compras/queries'
 import { redondear2 } from '../../lib/business'
@@ -676,6 +676,10 @@ export function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: 
   })
   const [ordenId, setOrdenId] = useState('')
   const [edit, setEdit] = useState<Record<string, RenglonEdit>>({})
+  // Una clave por apertura del formulario: un doble clic o un reintento tras un corte de
+  // red devuelve LA MISMA factura en vez de crear otra. Si el servidor rechazó el intento
+  // no dejó nada, así que la misma clave sirve para el reintento corregido.
+  const claveIdempotencia = useRef(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `fac-${Date.now()}-${Math.random()}`)
 
   const ordenesDelProveedor = useMemo(
     () => ordenes.filter((o) =>
@@ -783,23 +787,24 @@ export function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: 
       return
     }
     try {
-      await crear.mutateAsync(conOrden ? { ...parsed.data, renglones: renglonesCapturados } : parsed.data)
+      const creada = await crear.mutateAsync({
+        ...parsed.data,
+        clave_idempotencia: claveIdempotencia.current,
+        ...(conOrden ? { renglones: renglonesCapturados } : {}),
+      })
       notify({
-        variant: 'success', title: 'Registrada',
-        text: conOrden
+        variant: 'success', title: creada.reutilizada ? 'Ya estaba registrada' : 'Registrada',
+        text: creada.reutilizada
+          ? 'Esta factura ya se había registrado con estos mismos datos; no se creó otra.'
+          : conOrden
           ? 'Factura registrada contra la orden. Al aprobarla se cuadra con lo ordenado y lo recibido.'
           : 'Factura registrada. Apruébala para devengar el gasto.',
       })
       onClose()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : ''
-      notify({
-        variant: 'error', title: 'Error',
-        // El índice único (empresa, proveedor, número) es la barrera contra la factura repetida.
-        text: /uq_facturas_prov_numero/.test(msg)
-          ? 'Ya hay una factura de este proveedor con ese número. Si es la misma, no la registres otra vez.'
-          : msg || 'No se pudo registrar.',
-      })
+      // Los mensajes del servidor (COMPRAS_FACTURA_*) están escritos para leerse tal cual:
+      // número repetido, clave ya usada con otro contenido, renglón ajeno, etc.
+      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? textoErrorServidor(e.message) : 'No se pudo registrar.' })
     }
   }
 

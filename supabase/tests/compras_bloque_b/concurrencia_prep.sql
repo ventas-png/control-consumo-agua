@@ -43,3 +43,18 @@ INSERT INTO public.factura_proveedor_lineas (company_id, factura_id, orden_compr
   (:C::uuid, '0c300000-0000-0000-0000-000000000001', '0c110000-0000-0000-0000-000000000002', 1, 'Material', 10, 10),
   (:C::uuid, '0c300000-0000-0000-0000-000000000002', '0c110000-0000-0000-0000-000000000002', 1, 'Material', 10, 10);
 RESET ROLE;
+
+-- Tercera orden Q: recibida completa (10 × 10), para facturar por compras_factura_crear
+-- con sesiones simultáneas, interrumpidas y reintentadas.
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto)
+VALUES ('0c100000-0000-0000-0000-000000000003', :C::uuid, :C1::uuid, :P1::uuid, 'Ferretería Bloque B', 'Concurrencia RPC de factura');
+INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, descripcion, destino_tipo, categoria, cantidad, precio_unitario)
+VALUES ('0c110000-0000-0000-0000-000000000003', :C::uuid, '0c100000-0000-0000-0000-000000000003', 1, 'Material', 'gasto', 'mantenimiento', 10, 10);
+UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = '0c100000-0000-0000-0000-000000000003';
+UPDATE public.ordenes_compra SET estado = 'emitida'  WHERE id = '0c100000-0000-0000-0000-000000000003';
+INSERT INTO public.recepciones (id, company_id, project_id, orden_compra_id, tipo) VALUES ('0c200000-0000-0000-0000-000000000004', :C::uuid, :C1::uuid, '0c100000-0000-0000-0000-000000000003', 'bienes');
+INSERT INTO public.recepcion_lineas (company_id, recepcion_id, orden_compra_linea_id, cantidad) VALUES (:C::uuid, '0c200000-0000-0000-0000-000000000004', '0c110000-0000-0000-0000-000000000003', 10);
+UPDATE public.recepciones SET estado = 'registrada' WHERE id = '0c200000-0000-0000-0000-000000000004';
+RESET ROLE;

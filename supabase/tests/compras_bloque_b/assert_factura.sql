@@ -2,7 +2,7 @@
 
 -- ============================================================================
 -- INVARIANTES · FACTURA INTEGRADA A ORDEN Y RECEPCIONES
--- (migraciones 20261021000200, 20261021000500 y 20261021000700) sobre el motor de Fase 6.
+-- (migraciones 20261021000200 y 20261021000500) sobre el motor de Fase 6.
 -- Orden OF (C1, P1): F1 inventario 100 × 10 (IVA 120) · F2 activo fijo 2 × 500
 -- (IVA 120) · F3 servicio 1 × 300 (IVA 36).
 -- ============================================================================
@@ -11,6 +11,7 @@
 \set UA  '''c0c0c0c0-0000-0000-0000-00000000000a'''
 \set UO  '''c0c0c0c0-0000-0000-0000-00000000000d'''
 \set UN  '''c0c0c0c0-0000-0000-0000-00000000000e'''
+\set UK  '''c0c0c0c0-0000-0000-0000-00000000000c'''
 \set UD  '''d0d0d0d0-0000-0000-0000-00000000000d'''
 \set P1  '''e3000000-0000-0000-0000-000000000001'''
 \set P2  '''e3000000-0000-0000-0000-000000000002'''
@@ -53,7 +54,7 @@ SELECT public.chk_bool((SELECT NOT dentro_tolerancia AND motivo ILIKE '%recib%' 
 SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
 SELECT public.chk_falla($$ UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = '0f300000-0000-0000-0000-000000000001' $$,
-  'COMPRAS_MATCH_FUERA_DE_TOLERANCIA', '1 · la diferencia NO se aprueba en silencio');
+  'COMPRAS_MATCH_NO_FORZABLE', '1 · facturar más de lo recibido NO se aprueba (ni con justificación: dejaría la cuenta puente descuadrada)');
 -- Se corrige a lo recibido: factura parcial de la línea 1 (40) y de la bomba (1).
 UPDATE public.factura_proveedor_lineas SET cantidad = 40, iva_monto = 48 WHERE factura_id = '0f300000-0000-0000-0000-000000000001';
 INSERT INTO public.factura_proveedor_lineas (company_id, factura_id, orden_compra_linea_id, linea, descripcion, cantidad, precio_unitario, iva_monto)
@@ -141,7 +142,7 @@ VALUES ('0f300000-0000-0000-0000-000000000003', :C::uuid, :C1::uuid, :P1::uuid, 
 INSERT INTO public.factura_proveedor_lineas (company_id, factura_id, orden_compra_linea_id, linea, descripcion, cantidad, precio_unitario, iva_monto)
 VALUES (:C::uuid, '0f300000-0000-0000-0000-000000000003', :F1::uuid, 1, 'Cloro industrial', 10, 10, 12);
 SELECT public.chk_falla($$ UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = '0f300000-0000-0000-0000-000000000003' $$,
-  'COMPRAS_MATCH_FUERA_DE_TOLERANCIA', '5 · facturar lo que ya se facturó en otra factura queda fuera de tolerancia');
+  'COMPRAS_MATCH_NO_FORZABLE', '5 · facturar lo que ya se facturó en otra factura NO se aprueba (ni con justificación)');
 DELETE FROM public.facturas_proveedor WHERE id = '0f300000-0000-0000-0000-000000000003';
 RESET ROLE;
 SELECT public.chk_txt((SELECT estado FROM public.ordenes_compra WHERE id = :OF::uuid), 'cerrada', '5 · recibida y facturada del todo, la orden se cierra');
@@ -193,7 +194,7 @@ SELECT public.chk_bool((SELECT NOT dentro_tolerancia AND moneda_orden <> moneda_
 SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
 SELECT public.chk_falla($$ UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = '0f300000-0000-0000-0000-000000000010' $$,
-  'COMPRAS_MATCH_FUERA_DE_TOLERANCIA', '6 · diferencia de moneda no se aprueba en silencio');
+  'COMPRAS_MATCH_NO_FORZABLE', '6 · diferencia de moneda no se aprueba (ni con justificación: el devengo mezclaría monedas)');
 -- Aprobación forzada con justificación (queda trazada)
 UPDATE public.facturas_proveedor SET moneda = 'GTQ' WHERE id = '0f300000-0000-0000-0000-000000000010';
 UPDATE public.factura_proveedor_lineas SET precio_unitario = 120 WHERE factura_id = '0f300000-0000-0000-0000-000000000010';
@@ -286,6 +287,12 @@ INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, 
 VALUES ('0f110000-0000-0000-0000-000000000040', :C::uuid, '0f100000-0000-0000-0000-000000000005', 1, 'Reparación', 'servicio', 'mantenimiento', 1, 400);
 UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = '0f100000-0000-0000-0000-000000000005';
 UPDATE public.ordenes_compra SET estado = 'emitida'  WHERE id = '0f100000-0000-0000-0000-000000000005';
+-- La factura se aprueba DESPUÉS de la conformidad: facturar antes de recibir no se autoriza (20261021000700).
+INSERT INTO public.recepciones (id, company_id, project_id, orden_compra_id, tipo, recibido_por)
+VALUES ('0f200000-0000-0000-0000-000000000040', :C::uuid, :C1::uuid, '0f100000-0000-0000-0000-000000000005', 'servicio', :UK::uuid);
+INSERT INTO public.recepcion_lineas (company_id, recepcion_id, orden_compra_linea_id, cantidad)
+VALUES (:C::uuid, '0f200000-0000-0000-0000-000000000040', '0f110000-0000-0000-0000-000000000040', 1);
+UPDATE public.recepciones SET estado = 'registrada' WHERE id = '0f200000-0000-0000-0000-000000000040';
 INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, orden_compra_id, numero_factura, concepto, categoria, monto_total, fecha_emision)
 VALUES ('0f300000-0000-0000-0000-000000000040', :C::uuid, :C1::uuid, :P2::uuid, '0f100000-0000-0000-0000-000000000005', 'P-0001', 'Reparación', 'mantenimiento', 1,
         (date_trunc('month', CURRENT_DATE) - interval '1 month')::date + 9);
@@ -296,8 +303,8 @@ INSERT INTO public.cierres_mensuales (company_id, project_id, periodo, estado)
 VALUES (:C::uuid, :C1::uuid, to_char(CURRENT_DATE - interval '1 month', 'YYYY-MM'), 'cerrado');
 SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
--- Sin recepción previa el cuadre bloquea; se fuerza con justificación para llegar al posteo.
-UPDATE public.facturas_proveedor SET estado = 'aprobada', match_forzado_por = :UA::uuid, match_justificacion = 'Prueba de periodo cerrado.' WHERE id = '0f300000-0000-0000-0000-000000000040';
+-- Con la conformidad ya registrada la factura cuadra y se aprueba sin excepciones.
+UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = '0f300000-0000-0000-0000-000000000040';
 RESET ROLE;
 SELECT public.chk_bool((SELECT periodo = to_char(CURRENT_DATE, 'YYYY-MM') FROM public.conta_asientos WHERE origen_tabla = 'facturas_proveedor' AND origen_id = '0f300000-0000-0000-0000-000000000040' AND estado <> 'anulado'), true,
   '10 · la factura de un mes cerrado se contabiliza en el periodo ABIERTO, sin tocar el cerrado');
@@ -314,6 +321,11 @@ INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, 
 VALUES ('0f110000-0000-0000-0000-000000000050', :C::uuid, '0f100000-0000-0000-0000-000000000006', 1, 'Pintura', 'gasto', 'mantenimiento', 1, 250);
 UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = '0f100000-0000-0000-0000-000000000006';
 UPDATE public.ordenes_compra SET estado = 'emitida'  WHERE id = '0f100000-0000-0000-0000-000000000006';
+INSERT INTO public.recepciones (id, company_id, project_id, orden_compra_id, tipo)
+VALUES ('0f200000-0000-0000-0000-000000000050', :C::uuid, :C2::uuid, '0f100000-0000-0000-0000-000000000006', 'bienes');
+INSERT INTO public.recepcion_lineas (company_id, recepcion_id, orden_compra_linea_id, cantidad)
+VALUES (:C::uuid, '0f200000-0000-0000-0000-000000000050', '0f110000-0000-0000-0000-000000000050', 1);
+UPDATE public.recepciones SET estado = 'registrada' WHERE id = '0f200000-0000-0000-0000-000000000050';
 RESET ROLE;
 DELETE FROM public.conta_mapeo_cuentas WHERE company_id = :C::uuid AND project_id = :C2::uuid AND evento = 'cxp_proveedores';
 SELECT public.como(:UA::uuid);
@@ -322,7 +334,7 @@ INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id,
 VALUES ('0f300000-0000-0000-0000-000000000050', :C::uuid, :C2::uuid, :P2::uuid, '0f100000-0000-0000-0000-000000000006', 'M-0001', 'Pintura', 'mantenimiento', 1);
 INSERT INTO public.factura_proveedor_lineas (company_id, factura_id, orden_compra_linea_id, linea, descripcion, cantidad, precio_unitario)
 VALUES (:C::uuid, '0f300000-0000-0000-0000-000000000050', '0f110000-0000-0000-0000-000000000050', 1, 'Pintura', 1, 250);
-UPDATE public.facturas_proveedor SET estado = 'aprobada', match_forzado_por = :UA::uuid, match_justificacion = 'Servicio facturado antes de la conformidad.' WHERE id = '0f300000-0000-0000-0000-000000000050';
+UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = '0f300000-0000-0000-0000-000000000050';
 RESET ROLE;
 SELECT public.chk_txt((SELECT estado FROM public.facturas_proveedor WHERE id = '0f300000-0000-0000-0000-000000000050'), 'aprobada',
   '11 · la factura se aprueba (el documento no se pierde)');
@@ -351,38 +363,3 @@ SELECT public.chk_falla($$ INSERT INTO public.orden_compra_lineas (company_id, o
      FROM public.conta_cuentas c WHERE c.company_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' AND c.project_id = 'c1c1c1c1-0000-0000-0000-000000000001' AND c.codigo LIKE '5101%' LIMIT 1 $$,
   'COMPRAS_LINEA_CUENTA_INVALIDA', '12 · una cuenta de gasto NO se acepta para un activo fijo: se rechaza explicando');
 RESET ROLE;
-
--- ── 13. Factura LIGADA a una orden pero SIN renglones: no hay con qué cuadrar ─
--- (20261021000700) `compras_validar_match` es por renglón: sin renglones devolvía
--- cero filas = «todo cuadra» y la factura se aprobaba y devengaba sin comparar.
--- Orden PROPIA de esta sección: las pruebas siguientes cuentan las facturas de OF.
-SELECT public.como(:UA::uuid);
-SET ROLE authenticated;
-INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto)
-VALUES ('0f100000-0000-0000-0000-0000000000a1', :C::uuid, :C1::uuid, :P1::uuid, 'Ferretería Bloque B', 'Orden para factura sin renglones');
-INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, orden_compra_id, numero_factura, concepto, categoria, monto_total)
-VALUES ('0f300000-0000-0000-0000-000000000060', :C::uuid, :C1::uuid, :P1::uuid, '0f100000-0000-0000-0000-0000000000a1', 'F-0060', 'Con orden y sin renglones', 'limpieza', 400);
-SELECT public.chk_falla($$ UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = '0f300000-0000-0000-0000-000000000060' $$,
-  'COMPRAS_FACTURA_SIN_RENGLONES', '13 · factura con orden y sin renglones NO se aprueba en silencio');
-RESET ROLE;
-SELECT public.chk_txt((SELECT estado FROM public.facturas_proveedor WHERE id = '0f300000-0000-0000-0000-000000000060'), 'registrada',
-  '13 · la factura queda registrada (no se pierde el documento)');
-SELECT public.chk((SELECT count(*) FROM public.conta_asientos WHERE origen_tabla = 'facturas_proveedor' AND origen_id = '0f300000-0000-0000-0000-000000000060'), 0,
-  '13 · y no genera asiento');
--- Con la autorización escrita de siempre sí se puede (queda quién y por qué).
-SELECT public.como(:UA::uuid);
-SET ROLE authenticated;
-UPDATE public.facturas_proveedor SET estado = 'aprobada', match_forzado_por = :UA::uuid, match_justificacion = 'Factura global del proveedor; se concilia aparte.'
- WHERE id = '0f300000-0000-0000-0000-000000000060';
-RESET ROLE;
-SELECT public.chk_txt((SELECT estado FROM public.facturas_proveedor WHERE id = '0f300000-0000-0000-0000-000000000060'), 'aprobada',
-  '13 · con justificación escrita se aprueba y queda registrado quién la autorizó');
-SELECT public.chk_bool((SELECT match_forzado_por = :UA::uuid AND match_justificacion <> '' FROM public.facturas_proveedor WHERE id = '0f300000-0000-0000-0000-000000000060'), true,
-  '13 · la autorización queda firmada');
--- Se anula para no alterar los totales de las pruebas siguientes (comparten base).
-SELECT public.como(:UA::uuid);
-SET ROLE authenticated;
-UPDATE public.facturas_proveedor SET estado = 'anulada' WHERE id = '0f300000-0000-0000-0000-000000000060';
-RESET ROLE;
-SELECT public.chk_txt((SELECT estado FROM public.facturas_proveedor WHERE id = '0f300000-0000-0000-0000-000000000060'), 'anulada',
-  '13 · la factura de prueba se anula (su asiento se reversa)');

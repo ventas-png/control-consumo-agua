@@ -394,17 +394,14 @@ export function useAprobarFacturaConCuadreMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (vars: { facturaId: string; justificacion?: string }) => {
-      const { data: auth } = await supabase.auth.getUser()
+      // Solo se manda la justificación. El aprobador y el AUTORIZADOR de la excepción
+      // los sella el servidor con auth.uid(): el cliente no puede firmar por otro.
       await runQuery((signal) =>
         supabase
           .from('facturas_proveedor')
           .update({
             estado: 'aprobada',
-            aprobada_por: auth.user?.id ?? null,
-            aprobada_at: new Date().toISOString(),
-            ...(vars.justificacion
-              ? { match_forzado_por: auth.user?.id ?? null, match_justificacion: vars.justificacion }
-              : {}),
+            ...(vars.justificacion ? { match_justificacion: vars.justificacion } : {}),
             updated_at: new Date().toISOString(),
           })
           .eq('id', vars.facturaId)

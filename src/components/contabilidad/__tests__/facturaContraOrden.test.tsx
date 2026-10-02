@@ -52,7 +52,7 @@ function abrir() {
 }
 
 beforeEach(() => {
-  m.crear.mockResolvedValue(undefined)
+  m.crear.mockResolvedValue({ factura: { id: 'f1' }, lineas: [], reutilizada: false })
   m.ordenes = [orden()]
   m.lineas = [linea(L1, 'Bombas', {}), linea(L2, 'Mantenimiento', { cantidad: 1, precio_unitario: 300, iva_monto: 36, cantidad_recibida: 1 })]
 })
@@ -84,6 +84,8 @@ describe('Registrar factura: contra una orden', () => {
     await waitFor(() => expect(m.crear).toHaveBeenCalled())
     const input = m.crear.mock.calls[0][0] as Record<string, unknown> & { renglones: Record<string, unknown>[] }
     expect(input).toMatchObject({ orden_compra_id: ORDEN, proveedor_id: PROV, monto_total: 1456, iva_monto: 156, moneda: null })
+    expect(typeof input.clave_idempotencia).toBe('string')
+    expect((input.clave_idempotencia as string).length).toBeGreaterThanOrEqual(8)
     expect(input.renglones).toEqual([
       { orden_compra_linea_id: L1, descripcion: 'Bombas', cantidad: 2, precio_unitario: 500, iva_monto: 120 },
       { orden_compra_linea_id: L2, descripcion: 'Mantenimiento', cantidad: 1, precio_unitario: 300, iva_monto: 36 },
@@ -133,5 +135,31 @@ describe('Registrar factura: contra una orden', () => {
     expect(input.orden_compra_id).toBeNull()
     expect(input.renglones).toBeUndefined()
     expect(input.monto_total).toBe(100)
+  })
+
+  it('doble clic y reintento tras un rechazo del servidor usan LA MISMA clave de idempotencia', async () => {
+    m.crear.mockRejectedValueOnce(new Error('COMPRAS_FACTURA_LINEA_AJENA: 1 renglón(es) no son de la orden de esta factura.'))
+    abrir()
+    fireEvent.change(screen.getByLabelText('Orden de compra a facturar'), { target: { value: ORDEN } })
+    fireEvent.click(screen.getByText('Registrar'))
+    await waitFor(() => expect(m.crear).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByText('Registrar'))           // el reintento (el servidor no dejó nada)
+    await waitFor(() => expect(m.crear).toHaveBeenCalledTimes(2))
+    const claves = m.crear.mock.calls.map((c) => (c[0] as { clave_idempotencia: string }).clave_idempotencia)
+    expect(claves[0]).toBe(claves[1])
+  })
+
+  it('una apertura nueva del formulario genera una clave nueva (otra captura, otra factura)', async () => {
+    abrir()
+    fireEvent.change(screen.getByLabelText('Orden de compra a facturar'), { target: { value: ORDEN } })
+    fireEvent.click(screen.getByText('Registrar'))
+    await waitFor(() => expect(m.crear).toHaveBeenCalledTimes(1))
+    cleanup()
+    abrir()
+    fireEvent.change(screen.getByLabelText('Orden de compra a facturar'), { target: { value: ORDEN } })
+    fireEvent.click(screen.getByText('Registrar'))
+    await waitFor(() => expect(m.crear).toHaveBeenCalledTimes(2))
+    const claves = m.crear.mock.calls.map((c) => (c[0] as { clave_idempotencia: string }).clave_idempotencia)
+    expect(claves[0]).not.toBe(claves[1])
   })
 })

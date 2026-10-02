@@ -67,6 +67,14 @@ export interface FacturaProveedor {
   match_justificacion?: string | null
 }
 
+/** Lo que devuelve `compras_factura_crear`: la factura, sus renglones y si es una
+ *  factura ya creada por un intento anterior con la misma clave (reintento). */
+export interface FacturaCreada {
+  factura: FacturaProveedor
+  lineas: Array<{ id: string; linea: number; orden_compra_linea_id: string | null; descripcion: string; cantidad: number; precio_unitario: number; iva_monto: number }>
+  reutilizada: boolean
+}
+
 export interface FacturaProveedorConProveedor extends FacturaProveedor {
   proveedores: Pick<Proveedor, 'nombre'> | null
 }

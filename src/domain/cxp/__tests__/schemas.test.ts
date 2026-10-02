@@ -5,6 +5,7 @@ import {
   ordenPagoFormSchema,
   proveedorFormSchema,
   saldoFactura,
+  textoErrorServidor,
   totalesFactura,
 } from '../schemas'
 
@@ -129,5 +130,17 @@ describe('factura con orden', () => {
       { cantidad: 3, precio_unitario: 0.335, iva_monto: 0 },
     ]).subtotal).toBe(2.02)
     expect(totalesFactura([])).toEqual({ subtotal: 0, iva: 0, total: 0 })
+  })
+})
+
+describe('textoErrorServidor', () => {
+  it('quita el código técnico y deja el texto, que está escrito para leerse tal cual', () => {
+    expect(textoErrorServidor('COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con el número "F-1".'))
+      .toBe('ya hay una factura de este proveedor con el número "F-1".')
+    expect(textoErrorServidor('COMPRAS_MATCH_NO_FORZABLE: 1 renglón(es) no se pueden aprobar.')).toBe('1 renglón(es) no se pueden aprobar.')
+  })
+  it('no toca los mensajes que no traen código ni los deja vacíos', () => {
+    expect(textoErrorServidor('Sin conexión con el servidor.')).toBe('Sin conexión con el servidor.')
+    expect(textoErrorServidor('COMPRAS_FACTURA_X:')).toBe('COMPRAS_FACTURA_X:')
   })
 })
