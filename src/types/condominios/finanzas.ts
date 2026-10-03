@@ -591,6 +591,8 @@ export interface OrdenCompra {
   concepto: string
   descripcion?: string | null
   monto_estimado?: number | null
+  /** Total de los renglones (con IVA), que calcula el servidor; 0 si la orden no tiene renglones. */
+  total?: number | null
   monto_real?: number | null
   fecha_entrega_esperada?: string | null
   estado: EstadoOrdenCompra

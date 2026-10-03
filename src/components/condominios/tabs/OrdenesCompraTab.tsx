@@ -1,15 +1,20 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { OrdenCompra, ContratoProveedor } from '../../../types'
 import { useProveedoresQuery } from '../../../domain/cxp/queries'
 import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
+import { useInsumosAlmacenQuery } from '../../../domain/compras/queries'
+import { crearOrdenTransaccional } from '../../../domain/compras/mutations'
+import { mensajeCrearOrden, nuevaClaveIdempotencia } from '../../../domain/compras/ordenCrear'
+import { ordenCompraLineaSchema } from '../../../domain/compras/schemas'
 import type { ProveedorCatalogo } from '../../../types/proveedores'
 import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
 import { SeguimientoOrdenModal } from '../../compras/SeguimientoOrdenModal'
 import { SeguimientoComprasPanel } from '../../compras/SeguimientoComprasPanel'
 import { ImportarLineasOrdenModal } from '../../compras/ImportarLineasOrdenModal'
+import { LineasOrdenEditor, lineasParaServidor, type LineaForm } from '../../compras/LineasOrdenEditor'
 import { useTransicionOrdenConContrato } from '../../compras/excepcionContrato'
 import { ContratoSelector } from '../../proveedores/ContratoSelector'
 import { ContratoSeguimientoModal } from '../../proveedores/ContratoSeguimientoModal'
@@ -59,6 +64,12 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
   const [expandida, setExpandida] = useState<string | null>(null)
+  // Renglones de la orden NUEVA (opcionales aquí: también se cargan después con «Importar renglones»). La clave de
+  // idempotencia es por apertura del formulario: un doble clic o un reintento devuelven la MISMA orden.
+  const [lineas, setLineas] = useState<LineaForm[]>([])
+  const claveIdempotencia = useRef(nuevaClaveIdempotencia('oc'))
+  const enviando = useRef(false)
+  const { data: insumos = [], isLoading: cargandoInsumos } = useInsumosAlmacenQuery(companyId, proyectoId)
 
   // Catálogo de Contabilidad (no `contratos_proveedores`, que es otra lista).
   const { data: catalogo = [] } = useProveedoresQuery(companyId)
@@ -86,35 +97,68 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     return base
   }, [ordenes])
 
-  const montoTotal = ordenes.filter(o => o.estado !== 'cancelada').reduce((s, o) => s + (o.monto_estimado ?? 0), 0)
+  // El estimado de la cabecera o, si la orden trae renglones y no estimado, el total que calculó el servidor.
+  const montoDe = (o: OrdenCompra) => o.monto_estimado || o.total || 0
+  const montoTotal = ordenes.filter(o => o.estado !== 'cancelada').reduce((s, o) => s + montoDe(o), 0)
 
   function abrirNueva() {
-    setEditId(null); setForm({ ...BLANK }); setShowForm(true)
+    claveIdempotencia.current = nuevaClaveIdempotencia('oc')
+    setEditId(null); setForm({ ...BLANK }); setLineas([]); setShowForm(true)
   }
 
   async function guardar() {
     if (!form.concepto.trim() || !form.proveedor_id) {
       notify({ variant: 'warning', title: 'Campos requeridos', text: 'Elige un proveedor autorizado y escribe el concepto.' }); return
     }
+    if (enviando.current) return
+    enviando.current = true
     setSaving(true)
-    const payload = {
-      company_id: companyId, project_id: proyectoId,
-      proveedor_id: form.proveedor_id,
-      contrato_id: form.contrato_id || null,
-      proveedor_nombre: form.proveedor_nombre.trim(),
-      concepto: form.concepto.trim(),
-      descripcion: form.descripcion.trim() || null,
-      monto_estimado: form.monto_estimado ? parseFloat(form.monto_estimado) : null,
-      fecha_entrega_esperada: form.fecha_entrega_esperada || null,
-      notas: form.notas.trim() || null,
-      estado: 'borrador' as EstadoOC,
+    try {
+      if (editId) {
+        // Editar el borrador solo toca la cabecera (los renglones se corrigen con la importación o en Contabilidad).
+        const { error } = await updateCondominioRow('ordenes_compra', editId, {
+          company_id: companyId, project_id: proyectoId,
+          proveedor_id: form.proveedor_id,
+          contrato_id: form.contrato_id || null,
+          proveedor_nombre: form.proveedor_nombre.trim(),
+          concepto: form.concepto.trim(),
+          descripcion: form.descripcion.trim() || null,
+          monto_estimado: form.monto_estimado ? parseFloat(form.monto_estimado) : null,
+          fecha_entrega_esperada: form.fecha_entrega_esperada || null,
+          notas: form.notas.trim() || null,
+          estado: 'borrador' as EstadoOC,
+        })
+        if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+      } else {
+        // Orden NUEVA: cabecera y renglones en UNA operación del servidor (todo o nada, idempotente por clave).
+        const renglones = lineasParaServidor(lineas)
+        const validos = ordenCompraLineaSchema.array().safeParse(renglones)
+        if (!validos.success) {
+          notify({ variant: 'warning', title: 'Revisa los renglones', text: validos.error.issues[0]?.message ?? 'Datos inválidos.' }); return
+        }
+        if (validos.data.some((l) => l.destino_tipo === 'inventario' && !l.suministro_id)) {
+          notify({ variant: 'warning', title: 'Revisa los renglones', text: 'Las líneas con destino Inventario deben apuntar a un insumo del almacén' }); return
+        }
+        await crearOrdenTransaccional(companyId, proyectoId, {
+          proveedor_id: form.proveedor_id,
+          contrato_id: form.contrato_id || null,
+          concepto: form.concepto.trim(),
+          descripcion: form.descripcion.trim() || null,
+          monto_estimado: form.monto_estimado ? parseFloat(form.monto_estimado) : null,
+          fecha_entrega_esperada: form.fecha_entrega_esperada || null,
+          fecha_requerida: null,
+          notas: form.notas.trim() || null,
+          lineas: validos.data,
+          clave_idempotencia: claveIdempotencia.current,
+        })
+      }
+      setShowForm(false); setEditId(null); setForm({ ...BLANK }); setLineas([]); onRefresh()
+    } catch (e) {
+      notify({ variant: 'error', title: 'Error', text: mensajeCrearOrden(e) })
+    } finally {
+      enviando.current = false
+      setSaving(false)
     }
-    const { error } = editId
-      ? await updateCondominioRow('ordenes_compra', editId, payload)
-      : await createCondominioRow('ordenes_compra', payload)
-    setSaving(false)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setShowForm(false); setEditId(null); setForm({ ...BLANK }); onRefresh()
   }
 
   async function avanzarEstado(orden: OrdenCompra) {
@@ -278,6 +322,17 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                 style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
           </div>
+          {!editId && (
+            <div style={{ marginBottom: 10 }}>
+              <LineasOrdenEditor
+                lineas={lineas} onChange={setLineas} projectId={proyectoId} proveedorId={form.proveedor_id || null}
+                monedaBase={moneda} insumos={insumos} cargandoInsumos={cargandoInsumos} minimo={0} titulo="Renglones (opcional)"
+              />
+              <p style={{ margin: '4px 0 0', fontSize: 10, color: 'var(--at-ink-3)' }}>
+                Se guardan junto con la orden, todo o nada. También puedes cargarlos después con «Importar renglones».
+              </p>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={guardar} disabled={saving}
               style={{ padding: '8px 18px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
@@ -324,8 +379,8 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                     <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{orden.proveedor_nombre}</div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {orden.monto_estimado && (
-                      <div style={{ fontWeight: 700, fontSize: 13, color: cfg.color }}>{moneda} {orden.monto_estimado.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
+                    {montoDe(orden) > 0 && (
+                      <div style={{ fontWeight: 700, fontSize: 13, color: cfg.color }}>{moneda} {montoDe(orden).toLocaleString('es', { minimumFractionDigits: 2 })}</div>
                     )}
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', background: cfg.bg, color: cfg.color, borderRadius: 6 }}>{cfg.label}</span>
                   </div>
