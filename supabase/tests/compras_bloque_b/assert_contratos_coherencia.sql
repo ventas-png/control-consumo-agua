@@ -11,7 +11,7 @@
 --        proveedor, moneda e importe). Cambiar el contrato o el importe exige una autorización nueva.
 --
 -- Corre DESPUÉS de assert_contratos_compras.sql (comparte empresa C, proyectos C1/C2 y proveedores P1/P2);
--- crea sus propios contratos y órdenes (prefijos cf1… y 0ce5…).
+-- crea sus propios contratos y órdenes (prefijos cf2… y 0ce5…).
 -- ============================================================================
 \set C   '''cccccccc-cccc-cccc-cccc-cccccccccccc'''
 \set C1  '''c1c1c1c1-0000-0000-0000-000000000001'''
@@ -21,12 +21,12 @@
 \set UO  '''c0c0c0c0-0000-0000-0000-00000000000d'''
 \set P1  '''e3000000-0000-0000-0000-000000000001'''
 \set P2  '''e3000000-0000-0000-0000-000000000002'''
-\set KA  '''cf100000-0000-0000-0000-000000000001'''
-\set KU  '''cf100000-0000-0000-0000-000000000002'''
-\set KE  '''cf100000-0000-0000-0000-000000000003'''
-\set KF  '''cf100000-0000-0000-0000-000000000004'''
-\set KV1 '''cf100000-0000-0000-0000-000000000005'''
-\set KV2 '''cf100000-0000-0000-0000-000000000006'''
+\set KA  '''cf200000-0000-0000-0000-000000000001'''
+\set KU  '''cf200000-0000-0000-0000-000000000002'''
+\set KE  '''cf200000-0000-0000-0000-000000000003'''
+\set KF  '''cf200000-0000-0000-0000-000000000004'''
+\set KV1 '''cf200000-0000-0000-0000-000000000005'''
+\set KV2 '''cf200000-0000-0000-0000-000000000006'''
 \set OX  '''0ce50000-0000-0000-0000-000000000001'''
 \set OE  '''0ce50000-0000-0000-0000-000000000002'''
 \set OV  '''0ce50000-0000-0000-0000-000000000003'''
@@ -74,12 +74,12 @@ SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
 -- Quitar el contrato y cambiar de proveedor es una decisión válida; volver a ligarlo ya no.
 UPDATE public.ordenes_compra SET proveedor_id = :P2::uuid, contrato_id = NULL WHERE id = :OX::uuid;
-SELECT public.chk_falla($$ UPDATE public.ordenes_compra SET contrato_id = 'cf100000-0000-0000-0000-000000000001' WHERE id = '0ce50000-0000-0000-0000-000000000001' $$,
+SELECT public.chk_falla($$ UPDATE public.ordenes_compra SET contrato_id = 'cf200000-0000-0000-0000-000000000001' WHERE id = '0ce50000-0000-0000-0000-000000000001' $$,
   'COMPRAS_CONTRATO_PROVEEDOR', '10 · sin contrato y con otro proveedor, volver a ligar el contrato anterior: rechazado');
 -- Cambio coherente de proveedor, moneda y contrato en UNA sentencia.
 UPDATE public.ordenes_compra SET proveedor_id = :P2::uuid, moneda = 'USD', contrato_id = :KU::uuid WHERE id = :OX::uuid;
 SELECT public.chk_txt((SELECT proveedor_id::text || '|' || COALESCE(upper(moneda), '-') || '|' || contrato_id::text FROM public.ordenes_compra WHERE id = :OX::uuid),
-  'e3000000-0000-0000-0000-000000000002|USD|cf100000-0000-0000-0000-000000000002',
+  'e3000000-0000-0000-0000-000000000002|USD|cf200000-0000-0000-0000-000000000002',
   '10 · proveedor, moneda y contrato cambiados juntos y de forma coherente: permitido');
 UPDATE public.ordenes_compra SET proveedor_id = :P1::uuid, moneda = 'GTQ', contrato_id = :KA::uuid WHERE id = :OX::uuid;
 SELECT public.chk_uuid((SELECT contrato_id FROM public.ordenes_compra WHERE id = :OX::uuid), :KA::uuid,
@@ -125,7 +125,7 @@ SELECT public.chk((SELECT count(*) FROM public.orden_compra_excepciones WHERE or
   '11 · queda UNA excepción, con el contrato, el proveedor, la moneda y el importe autorizados');
 SELECT public.chk_txt((SELECT contrato_id::text || '|' || proveedor_id::text || '|' || upper(moneda) || '|' || trim_scale(total)::text
                          FROM public.orden_compra_excepciones WHERE id = :'ex1'::uuid),
-  'cf100000-0000-0000-0000-000000000003|e3000000-0000-0000-0000-000000000001|GTQ|1200',
+  'cf200000-0000-0000-0000-000000000003|e3000000-0000-0000-0000-000000000001|GTQ|1200',
   '11 · …y guarda exactamente las condiciones que se autorizaron');
 
 -- (a) Cambia el IMPORTE (precio de la línea) y se intenta aprobar con la excepción de 1200.
@@ -208,7 +208,7 @@ RESET ROLE;
 SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
 SELECT public.chk_falla($$ INSERT INTO public.orden_compra_excepciones (company_id, project_id, orden_compra_id, contrato_id, revision, etapa, causas, motivo, autorizado_por)
-  VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc','c1c1c1c1-0000-0000-0000-000000000001','0ce50000-0000-0000-0000-000000000002','cf100000-0000-0000-0000-000000000004', 9, 'aprobar', 'monto', 'Excepción fabricada a mano', 'c0c0c0c0-0000-0000-0000-00000000000a') $$,
+  VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc','c1c1c1c1-0000-0000-0000-000000000001','0ce50000-0000-0000-0000-000000000002','cf200000-0000-0000-0000-000000000004', 9, 'aprobar', 'monto', 'Excepción fabricada a mano', 'c0c0c0c0-0000-0000-0000-00000000000a') $$,
   'permission denied', '11 · una excepción no se inserta a mano por la API');
 RESET ROLE;
 SELECT public.como(:UA::uuid);

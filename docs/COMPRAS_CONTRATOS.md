@@ -89,8 +89,10 @@ Todo va en migraciones **incrementales** (`20261024000000`–`20261025000000`); 
 | **CI** del PR | GitHub Actions | Type-check/test/build, auditor de drift, RLS harness, RLS desechable, E2E y coverage (ver el estado del PR) |
 
 **Postgres desechable**
+- `run.sh` completo del bloque: **EXIT 0, 771 ✓** (incluye las suites 5o y 5p, la protección de inventario y la concurrencia).
 - `assert_contratos_compras.sql`: **137 ✓** — aislamiento entre empresas y proyectos, Operaciones vs Contabilidad, proveedor suspendido, contrato vencido, renovación, órdenes parciales, cancelaciones y reintentos sin duplicados.
 - `assert_contratos_coherencia.sql` (suite **5p**, nueva): **24 ✓** — edición de borradores conservando el contrato y reutilización de excepciones (§2.1). **Probada primero en rojo**: contra las definiciones anteriores de los triggers, el primer `UPDATE` directo («cambiar el proveedor conservando el contrato») **no fue rechazado**; con `20261025000000` pasa completa.
+- Una primera corrida completa con la suite 5p falló en la preparación de la concurrencia por un **choque de ids** entre las dos suites (mismo prefijo `cf1…`); se cambió el prefijo de 5p y la corrida final pasa.
 - Concurrencia con sesiones reales: **Q** dos aprobaciones de 600 sobre máximo 1000 (una pasa, una se rechaza), **R** misma renovación a la vez (un contrato, un evento), **S** misma ampliación a la vez (una ampliación).
 - `proveedores_pr_a/run.sh` (carga masiva, históricos y demás de PR A) con la migración nueva en la cadena: **EXIT 0, 535 ✓**.
 
