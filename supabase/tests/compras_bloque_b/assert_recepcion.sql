@@ -113,12 +113,13 @@ SET ROLE authenticated;
 SELECT public.chk_falla($$ UPDATE public.recepciones SET estado = 'registrada' WHERE id = '0b200000-0000-0000-0000-000000000002' $$,
   'COMPRAS_SERVICIO_SIN_CONFORMIDAD', '3 · un servicio NO se recibe como un bien: exige conformidad de servicio');
 RESET ROLE;
--- Conformidad de servicio, con responsable y respaldo.
+-- Conformidad de servicio, con responsable. El respaldo ya NO se declara al crear (una ruta sin archivo
+-- registrado se rechaza: ver assert_correcciones_c.sql); se adjunta después con compras_recepcion_adjuntar.
 SELECT public.como(:UO::uuid);
 SET ROLE authenticated;
-INSERT INTO public.recepciones (id, company_id, project_id, orden_compra_id, tipo, recibido_por, respaldo_path, notas)
+INSERT INTO public.recepciones (id, company_id, project_id, orden_compra_id, tipo, recibido_por, notas)
 VALUES ('0b200000-0000-0000-0000-000000000003', :C::uuid, :C1::uuid, :OS::uuid, 'servicio', :UC::uuid,
-        'cccccccc-cccc-cccc-cccc-cccccccccccc/conformidad/acta-mantenimiento.pdf', 'Hito: mantenimiento de octubre');
+        'Hito: mantenimiento de octubre');
 INSERT INTO public.recepcion_lineas (company_id, recepcion_id, orden_compra_linea_id, cantidad)
 VALUES (:C::uuid, '0b200000-0000-0000-0000-000000000003', :L3::uuid, 1);
 INSERT INTO public.recepcion_lineas (company_id, recepcion_id, orden_compra_linea_id, cantidad)

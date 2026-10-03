@@ -27,12 +27,12 @@ function base(extra: Partial<SeguimientoOrden> = {}): SeguimientoOrden {
     contabilidad_visible: true,
     indicadores: {
       comprometido: 2576, comprometido_neto: 2300, recibido: 900, facturado: 1008, facturado_neto: 900, pagado: 0,
-      pendiente_por_recibir: 1400, pendiente_por_facturar: 0,
+      pendiente_por_recibir: 1400, pendiente_por_facturar: 0, diferencia_precio_facturada: -40,
     },
     lineas: [
       { id: 'l1', linea: 1, descripcion: 'Cloro industrial', destino: 'inventario', unidad: 'litro', precio_unitario: 10,
         cantidad_ordenada: 100, cantidad_aceptada: 40, cantidad_rechazada: 5, cantidad_pendiente: 60,
-        cantidad_facturada: 40, cantidad_pendiente_facturar: 0,
+        cantidad_facturada: 40, cantidad_pendiente_facturar: 0, pendiente_por_facturar: 0, diferencia_precio: -40,
         cuenta: { id: 'c', codigo: '1106', nombre: 'Inventario' }, cuenta_origen: 'regla_compra' },
     ],
     recepciones: [{ id: 'r1', numero: 'REC-1', fecha: '2026-10-01', tipo: 'bienes', estado: 'registrada', recibido_por: null,
@@ -98,16 +98,24 @@ describe('SeguimientoOrdenContenido', () => {
     expect(screen.getByText('Contabilizada')).toBeTruthy()
   })
 
+  it('la diferencia de precio se muestra APARTE del pendiente por facturar (indicador y renglón)', () => {
+    render(<SeguimientoOrdenContenido s={base({})} monedaBase="GTQ" />)
+    expect(screen.getByTestId('ind-dif-precio').textContent).toMatch(/40\.00/)
+    expect(screen.getByTestId('ind-dif-precio').textContent).toMatch(/no entra en el pendiente/)
+    expect(screen.getByTestId('ind-facturado').textContent).toMatch(/pendiente por facturar .*0\.00.*a precio de la orden/)
+  })
+
   it('para quien NO ve Contabilidad no hay facturas, facturado ni pagado', () => {
     const s = base({
       contabilidad_visible: false,
       facturas: undefined,
       indicadores: { comprometido: 2576, comprometido_neto: 2300, recibido: 900, facturado: null, facturado_neto: null, pagado: null,
-        pendiente_por_recibir: 1400, pendiente_por_facturar: null },
+        pendiente_por_recibir: 1400, pendiente_por_facturar: null, diferencia_precio_facturada: null },
     })
     render(<SeguimientoOrdenContenido s={s} monedaBase="GTQ" />)
     expect(screen.queryByTestId('ind-facturado')).toBeNull()
     expect(screen.queryByTestId('ind-pagado')).toBeNull()
+    expect(screen.queryByTestId('ind-dif-precio')).toBeNull()
     expect(screen.queryByTestId('seg-facturas')).toBeNull()
     expect(screen.getByTestId('sin-contabilidad')).toBeTruthy()
     // Lo operativo sí se ve.

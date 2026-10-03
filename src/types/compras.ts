@@ -381,8 +381,12 @@ export interface SeguimientoIndicadores {
   facturado: number | null
   facturado_neto: number | null
   pagado: number | null
+  /** Σ renglones: max(cantidad − recibida, 0) × precio de la orden (sin IVA). */
   pendiente_por_recibir: number
+  /** Σ renglones: max(recibida − facturada, 0) × precio de la orden (sin IVA). NULL sin acceso a Contabilidad. */
   pendiente_por_facturar: number | null
+  /** Σ (precio facturado − precio de la orden) × cantidad facturada; APARTE del pendiente. NULL sin Contabilidad. */
+  diferencia_precio_facturada: number | null
 }
 
 export interface SeguimientoLinea {
@@ -398,6 +402,10 @@ export interface SeguimientoLinea {
   cantidad_pendiente: number
   cantidad_facturada: number | null
   cantidad_pendiente_facturar: number | null
+  /** cantidad_pendiente_facturar × precio de la orden. NULL sin Contabilidad. */
+  pendiente_por_facturar: number | null
+  /** (precio facturado − precio de la orden) × cantidad facturada de este renglón. NULL sin Contabilidad. */
+  diferencia_precio: number | null
   cuenta: { id: string; codigo: string; nombre: string } | null
   cuenta_origen: string | null
 }
@@ -524,6 +532,7 @@ export interface FilaSeguimiento {
   pendiente_por_pagar: number | null
   n_recepciones: number
   n_facturas: number | null
+  diferencia_precio_facturada: number | null
 }
 
 /** Un pago enlazado a una factura de la orden (`pagos` de `compras_seguimiento_orden`). */

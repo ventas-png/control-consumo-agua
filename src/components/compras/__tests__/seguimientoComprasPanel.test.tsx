@@ -26,7 +26,7 @@ const fila = (extra: Partial<FilaSeguimiento>): FilaSeguimiento => ({
   orden_id: 'o1', numero: 'OC-000001', concepto: 'Cloro', estado: 'recibida', project_id: 'p1', proveedor_id: 'pv1',
   proveedor: 'Ferretería', moneda: 'GTQ', fecha: '2026-10-01', comprometido: 1120, comprometido_neto: 1000, recibido: 1000,
   facturado: 672, facturado_neto: 600, pagado: 300, pendiente_por_recibir: 0, pendiente_por_facturar: 400,
-  pendiente_por_pagar: 372, n_recepciones: 2, n_facturas: 1, ...extra,
+  pendiente_por_pagar: 372, n_recepciones: 2, n_facturas: 1, diferencia_precio_facturada: -50, ...extra,
 })
 
 beforeEach(() => { m.filas = [fila({}), fila({ orden_id: 'o2', numero: 'OC-000002', moneda: 'USD', comprometido: 112, comprometido_neto: 100, recibido: 100, facturado: 112, facturado_neto: 100, pagado: 0, pendiente_por_facturar: 0, pendiente_por_pagar: 112 })] })

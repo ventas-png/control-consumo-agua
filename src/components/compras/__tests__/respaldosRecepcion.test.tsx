@@ -84,6 +84,33 @@ describe('Respaldos de una recepción', () => {
     expect(screen.getByText(/Adjuntar no cambia la recepción ni su asiento/)).toBeTruthy()
   })
 
+  it('retirar con éxito: avisa que se quitó de la recepción y del almacenamiento', async () => {
+    m.retirar.mockResolvedValueOnce(undefined)
+    abrir(R)
+    fireEvent.click(screen.getByText('Retirar'))
+    await waitFor(() => expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success', title: 'Archivo retirado' })))
+  })
+
+  it('si el archivo NO se pudo eliminar de Storage no hay éxito: avisa con la ruta pendiente de limpiar', async () => {
+    const { RetiroRespaldoError } = await import('../../../domain/compras/respaldos')
+    m.retirar.mockRejectedValueOnce(new RetiroRespaldoError('Se retiró el registro de «Remisión 123.pdf», pero el archivo NO se eliminó (caído). Quedó sin referencia en «c/p/r1/remision-ab.pdf»', 'almacenamiento', 'c/p/r1/remision-ab.pdf'))
+    abrir(R)
+    fireEvent.click(screen.getByText('Retirar'))
+    await waitFor(() => expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'warning', title: expect.stringMatching(/archivo pendiente de limpiar/), text: expect.stringMatching(/c\/p\/r1\/remision-ab\.pdf/),
+    })))
+    expect(m.notify).not.toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }))
+  })
+
+  it('si el servidor rechaza el retiro, es un error y no un éxito', async () => {
+    const { RetiroRespaldoError } = await import('../../../domain/compras/respaldos')
+    m.retirar.mockRejectedValueOnce(new RetiroRespaldoError('No se retiró «Remisión 123.pdf»: la recepción salió de borrador.', 'registro'))
+    abrir(R)
+    fireEvent.click(screen.getByText('Retirar'))
+    await waitFor(() => expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error', title: 'No se pudo retirar' })))
+    expect(m.notify).not.toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }))
+  })
+
   it('una recepción registrada admite evidencia ADICIONAL', async () => {
     abrir({ ...R, estado: 'registrada' })
     elegir(new File(['%PDF'], 'flete.pdf', { type: 'application/pdf' }))
