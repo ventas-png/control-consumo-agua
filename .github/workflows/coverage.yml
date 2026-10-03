@@ -784,6 +784,20 @@ jobs:
           PGPORT_TEST: 55516
         run: supabase/tests/conta_ajustes/run.sh
 
+      # Cierre técnico del circuito de compras y contabilidad
+      # (20261026000000 … 20261026000400): la lectura de facturas, pagos y libro
+      # exige permiso de Contabilidad, empresa y proyecto (matriz perfil × tabla,
+      # privilegios, reportes INVOKER y RPC DEFINER); la orden de compra se crea
+      # por UNA operación del servidor (cabecera + renglones, idempotente, todo o
+      # nada); y compras_tg_factura_acumular ya no traga errores reales. Incluye un
+      # CONTROL NEGATIVO (sin las migraciones las pruebas deben fallar) y
+      # concurrencia con sesiones reales.
+      - name: Compras — cierre técnico (lectura financiera, orden atómica, acumulación)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55531
+        run: supabase/tests/compras_cierre_tecnico/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
