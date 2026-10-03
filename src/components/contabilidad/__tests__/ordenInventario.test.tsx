@@ -6,6 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 vi.mock('../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
+vi.mock('../../../domain/proveedores/contratosCompras', async (orig) => ({
+  ...(await orig<typeof import('../../../domain/proveedores/contratosCompras')>()),
+  useContratosParaOrdenQuery: () => ({ data: [], isLoading: false }),
+  useExcepcionContratoMutation: () => ({ mutateAsync: vi.fn() }),
+}))
 
 const PROV = '11111111-1111-4111-8111-111111111111'
 const PROY = '22222222-2222-4222-8222-222222222222'

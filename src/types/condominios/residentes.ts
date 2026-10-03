@@ -907,6 +907,14 @@ export interface EvaluacionProveedor {
   evaluado_por?: string | null
   fecha: string
   created_at: string
+  /** Proveedor del catálogo compartido que se evalúa (obligatorio en las evaluaciones nuevas). */
+  proveedor_catalogo_id?: string | null
+  contrato_id?: string | null
+  orden_compra_id?: string | null
+  cumplimiento?: number | null
+  comunicacion?: number | null
+  /** Quien evalúa, sellado por el servidor. */
+  evaluado_por_id?: string | null
 }
 
 export interface ReclamoCondominio {

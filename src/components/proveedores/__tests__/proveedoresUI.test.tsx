@@ -11,6 +11,9 @@ vi.mock('../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() 
 
 const m = vi.hoisted(() => ({
   cambiarEstado: vi.fn(),
+  renovar: vi.fn(),
+  prorrogar: vi.fn(),
+  ampliar: vi.fn(),
   eliminar: vi.fn(),
   previsualizar: vi.fn(),
   aplicar: vi.fn(),
@@ -55,6 +58,13 @@ vi.mock('../../../domain/proveedores/mutations', () => ({
   useVincularContratoMutation: () => ok(vi.fn()),
   useVincularInequivocosMutation: () => ok(vi.fn()),
   useRevertirVinculosMutation: () => ok(vi.fn()),
+}))
+vi.mock('../../../domain/proveedores/contratosCompras', async (orig) => ({
+  ...(await orig<typeof import('../../../domain/proveedores/contratosCompras')>()),
+  useRenovarContratoMutation: () => ok(m.renovar),
+  useProrrogarContratoMutation: () => ok(m.prorrogar),
+  useAmpliarMontoContratoMutation: () => ok(m.ampliar),
+  useSeguimientoContratoQuery: () => ({ data: null, isLoading: false }),
 }))
 vi.mock('../../../domain/cxp/queries', () => ({
   useProveedoresQuery: () => ({
@@ -190,6 +200,91 @@ describe('ContratosProveedorTab', () => {
     expect(screen.queryByText('Suspender')).toBeNull()
     expect(screen.queryByText('+ Nuevo contrato')).toBeNull()
     expect(screen.getByText('Historial')).toBeTruthy()
+  })
+})
+
+describe('ContratosProveedorTab · conectado a las compras', () => {
+  const props = { proyectoId: 'pr1', proyectoNombre: 'Torre Sur', companyId: 'c1', moneda: 'GTQ', canCreate: true, canEdit: true, onRefresh: vi.fn() }
+  const activo = (over: Partial<ContratoProveedorCatalogo> = {}) => contrato({
+    estado: 'activo', modalidad: 'por_demanda', moneda: 'GTQ', monto_maximo: 1000, responsable_id: 'u1',
+    fecha_inicio: '2020-01-01', fecha_fin: '2099-12-31', referencia: 'CT-01', ...over,
+  })
+
+  it('un contrato activo ofrece Seguimiento, Prorrogar, Renovar y (si tiene monto máximo) Ampliar monto; un borrador, ninguno', () => {
+    const { rerender } = render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    for (const t of ['Seguimiento', 'Prorrogar', 'Ampliar monto', 'Renovar']) expect(screen.getByText(t)).toBeTruthy()
+    rerender(<ContratosProveedorTab {...props} contratos={[activo({ monto_maximo: null })]} />)
+    expect(screen.queryByText('Ampliar monto')).toBeNull()          // sin límite total no hay tope que ampliar
+    rerender(<ContratosProveedorTab {...props} contratos={[contrato({ estado: 'borrador' })]} />)
+    for (const t of ['Seguimiento', 'Prorrogar', 'Ampliar monto', 'Renovar']) expect(screen.queryByText(t)).toBeNull()
+  })
+
+  it('un contrato cancelado no se renueva; uno terminado sí, y conserva su historial', () => {
+    const { rerender } = render(<ContratosProveedorTab {...props} contratos={[activo({ estado: 'cancelado' })]} />)
+    expect(screen.queryByText('Renovar')).toBeNull()
+    rerender(<ContratosProveedorTab {...props} contratos={[activo({ estado: 'terminado' })]} />)
+    expect(screen.getByText('Renovar')).toBeTruthy()
+  })
+
+  it('sin permiso de edición no prorroga ni amplía; sin permiso de crear no renueva', () => {
+    render(<ContratosProveedorTab {...props} canEdit={false} canCreate={false} contratos={[activo()]} />)
+    expect(screen.queryByText('Prorrogar')).toBeNull()
+    expect(screen.queryByText('Ampliar monto')).toBeNull()
+    expect(screen.queryByText('Renovar')).toBeNull()
+    expect(screen.getByText('Seguimiento')).toBeTruthy()
+  })
+
+  it('un contrato «activo» fuera de sus fechas lo avisa: no ampara órdenes nuevas', () => {
+    render(<ContratosProveedorTab {...props} contratos={[activo({ fecha_fin: '2021-01-01' })]} />)
+    expect(screen.getByTestId('fuera-de-vigencia-k1').textContent).toMatch(/no ampara órdenes nuevas/)
+  })
+
+  it('renovar manda inicio, fin y motivo; no toca el contrato original y si se cancela no llama al servidor', async () => {
+    m.prompt.mockResolvedValueOnce(null)
+    render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    fireEvent.click(screen.getByText('Renovar'))
+    await waitFor(() => expect(m.prompt).toHaveBeenCalled())
+    expect(m.prompt.mock.calls[0][0].description).toMatch(/NUEVO en borrador/)
+    expect(m.prompt.mock.calls[0][0].description).toMatch(/conserva sus condiciones, documentos e historial/)
+    expect(m.renovar).not.toHaveBeenCalled()
+    m.prompt.mockResolvedValueOnce({ fecha_inicio: '2100-01-01', fecha_fin: '', motivo: ' Renovación anual ' })
+    fireEvent.click(screen.getByText('Renovar'))
+    await waitFor(() => expect(m.renovar).toHaveBeenCalledWith({ contratoId: 'k1', fechaInicio: '2100-01-01', fechaFin: null, motivo: 'Renovación anual' }))
+    expect(m.cambiarEstado).not.toHaveBeenCalled()
+  })
+
+  it('prorrogar exige motivo y manda la fecha (vacía = indefinido)', async () => {
+    m.prompt.mockResolvedValueOnce({ fecha_fin: '', motivo: ' Adenda 2 ' })
+    render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    fireEvent.click(screen.getByText('Prorrogar'))
+    await waitFor(() => expect(m.prorrogar).toHaveBeenCalledWith({ contratoId: 'k1', fechaFin: null, motivo: 'Adenda 2' }))
+  })
+
+  it('ampliar monto: la MISMA petición reenvía la MISMA clave (un reintento no duplica) y otra distinta, otra clave', async () => {
+    const datos = { incremento: '500', documento: 'ADENDA-1', motivo: 'Ampliación autorizada por el comité' }
+    m.prompt.mockResolvedValue(datos)
+    render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    fireEvent.click(screen.getByText('Ampliar monto'))
+    await waitFor(() => expect(m.ampliar).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByText('Ampliar monto'))
+    await waitFor(() => expect(m.ampliar).toHaveBeenCalledTimes(2))
+    const [a, b] = m.ampliar.mock.calls.map((c) => c[0])
+    expect(a.clave).toBe(b.clave)
+    expect(a).toMatchObject({ contratoId: 'k1', incremento: 500, motivo: datos.motivo, documento: 'ADENDA-1' })
+    m.prompt.mockResolvedValue({ ...datos, incremento: '700' })
+    fireEvent.click(screen.getByText('Ampliar monto'))
+    await waitFor(() => expect(m.ampliar).toHaveBeenCalledTimes(3))
+    expect(m.ampliar.mock.calls[2][0].clave).not.toBe(a.clave)
+    m.prompt.mockReset()
+  })
+
+  it('si el servidor rechaza la ampliación, el mensaje se muestra tal cual', async () => {
+    m.prompt.mockResolvedValueOnce({ incremento: '5', documento: '', motivo: 'Ampliación sin límite que subir' })
+    m.ampliar.mockRejectedValueOnce(new Error('CONTRATO_SIN_LIMITE: este contrato no tiene monto máximo'))
+    render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    fireEvent.click(screen.getByText('Ampliar monto'))
+    await waitFor(() => expect(m.notify).toHaveBeenCalled())
+    expect(m.notify.mock.calls[0][0].text).toMatch(/CONTRATO_SIN_LIMITE/)
   })
 })
 

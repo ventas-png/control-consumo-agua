@@ -4,6 +4,11 @@ import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { EvaluacionProveedor, ContratoProveedor } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { useProveedoresQuery } from '../../../domain/cxp/queries'
+import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
+import { useOrdenesProveedorProyectoQuery } from '../../../domain/proveedores/contratosCompras'
+import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
+import type { ContratoProveedorCatalogo, ProveedorCatalogo } from '../../../types/proveedores'
 
 interface Props {
   evaluaciones: EvaluacionProveedor[]
@@ -15,7 +20,14 @@ interface Props {
   onRefresh: () => void
 }
 
-const BLANK = { proveedor_id: '', nombre_proveedor: '', calificacion: 5, puntualidad: 5, calidad: 5, precio: 5, comentarios: '', evaluado_por: '', fecha: hoyLocalISO() }
+// El proveedor se elige del CATÁLOGO COMPARTIDO (por id, nunca por texto) y, si corresponde, el contrato y la orden
+// evaluados. El evaluador lo sella el servidor con la sesión. Una evaluación baja NO suspende al proveedor: suspender
+// es una decisión de quien autoriza proveedores (Contabilidad), por su vía de siempre.
+const BLANK = {
+  proveedor_catalogo_id: '', contrato_id: '', orden_compra_id: '',
+  calificacion: 5, puntualidad: 5, calidad: 5, precio: 5, cumplimiento: 5, comunicacion: 5,
+  comentarios: '', fecha: hoyLocalISO(),
+}
 
 function Stars({ value, onChange, readOnly = false }: { value: number; onChange?: (n: number) => void; readOnly?: boolean }) {
   return (
@@ -43,28 +55,44 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
   const [saving, setSaving] = useState(false)
   const [filtroProveedor, setFiltroProveedor] = useState('')
   const [view, setView] = useState<'lista' | 'ranking'>('lista')
+  const { data: catalogo = [] } = useProveedoresQuery(companyId)
+  const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
+  const contratosDelProveedor = (proveedores as unknown as ContratoProveedorCatalogo[]).filter(
+    c => form.proveedor_catalogo_id !== '' && c.proveedor_id === form.proveedor_catalogo_id,
+  )
+  const { data: ordenesDelProveedor = [] } = useOrdenesProveedorProyectoQuery(
+    companyId, proyectoId, form.proveedor_catalogo_id || null, form.contrato_id || null,
+  )
 
   function setF<K extends keyof typeof form>(k: K, v: typeof form[K]) { setForm(p => ({ ...p, [k]: v })) }
 
   function startEdit(e: EvaluacionProveedor) {
     setEditId(e.id)
-    setForm({ proveedor_id: e.proveedor_id ?? '', nombre_proveedor: e.nombre_proveedor, calificacion: e.calificacion, puntualidad: e.puntualidad ?? 5, calidad: e.calidad ?? 5, precio: e.precio ?? 5, comentarios: e.comentarios ?? '', evaluado_por: e.evaluado_por ?? '', fecha: e.fecha })
+    setForm({ proveedor_catalogo_id: e.proveedor_catalogo_id ?? '', contrato_id: e.contrato_id ?? e.proveedor_id ?? '', orden_compra_id: e.orden_compra_id ?? '',
+      cumplimiento: e.cumplimiento ?? 5, comunicacion: e.comunicacion ?? 5,
+      calificacion: e.calificacion, puntualidad: e.puntualidad ?? 5, calidad: e.calidad ?? 5, precio: e.precio ?? 5, comentarios: e.comentarios ?? '', fecha: e.fecha })
     setShowForm(true)
   }
 
   async function handleSave() {
-    if (!form.nombre_proveedor.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El nombre del proveedor es obligatorio.' })
+    if (!editId && !form.proveedor_catalogo_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Elige el proveedor del catálogo que se evalúa.' })
     setSaving(true)
-    const payload = {
-      proveedor_id: form.proveedor_id || null, nombre_proveedor: form.nombre_proveedor.trim(),
+    const criterios = {
       calificacion: form.calificacion, puntualidad: form.puntualidad, calidad: form.calidad, precio: form.precio,
-      comentarios: form.comentarios || null, evaluado_por: form.evaluado_por || null, fecha: form.fecha,
+      cumplimiento: form.cumplimiento, comunicacion: form.comunicacion, comentarios: form.comentarios || null,
     }
     let error
     if (editId) {
-      ({ error } = await updateCondominioRow('evaluaciones_proveedor', editId, payload))
+      // Proveedor, contrato, orden, evaluador y fecha no se cambian (lo exige el servidor): solo criterios y comentarios.
+      ({ error } = await updateCondominioRow('evaluaciones_proveedor', editId, criterios))
     } else {
-      ({ error } = await createCondominioRow('evaluaciones_proveedor', { ...payload, company_id: companyId, project_id: proyectoId }))
+      // El evaluador NO viaja: el servidor lo sella con la sesión.
+      ({ error } = await createCondominioRow('evaluaciones_proveedor', {
+        ...criterios, fecha: form.fecha, company_id: companyId, project_id: proyectoId,
+        proveedor_catalogo_id: form.proveedor_catalogo_id,
+        contrato_id: form.contrato_id || null,
+        orden_compra_id: form.orden_compra_id || null,
+      }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -78,14 +106,15 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
     onRefresh()
   }
 
+  const nombreDe = (e: EvaluacionProveedor) => (catalogo as ProveedorCatalogo[]).find(p => p.id === e.proveedor_catalogo_id)?.nombre ?? e.nombre_proveedor
   let filtered = evaluaciones
   if (filtroProveedor) filtered = filtered.filter(e => e.nombre_proveedor.toLowerCase().includes(filtroProveedor.toLowerCase()))
 
   // Ranking: group by proveedor_nombre, compute avg
   const ranking = Object.values(
     evaluaciones.reduce<Record<string, { nombre: string; evals: EvaluacionProveedor[] }>>((acc, e) => {
-      const key = e.nombre_proveedor
-      if (!acc[key]) acc[key] = { nombre: key, evals: [] }
+      const key = e.proveedor_catalogo_id ?? e.nombre_proveedor
+      if (!acc[key]) acc[key] = { nombre: nombreDe(e), evals: [] }
       acc[key].evals.push(e)
       return acc
     }, {})
@@ -130,37 +159,46 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
       {showForm && (
         <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar evaluación' : 'Nueva Evaluación'}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <ProveedorSelector
+                proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
+                value={form.proveedor_catalogo_id || null} disabled={!!editId} label="Proveedor del catálogo *"
+                onChange={(id) => setForm(p => ({ ...p, proveedor_catalogo_id: id ?? '', contrato_id: '', orden_compra_id: '' }))}
+              />
+            </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Proveedor (contrato)</label>
-              <select style={inputStyle} value={form.proveedor_id} onChange={e => {
-                const p = proveedores.find(p => p.id === e.target.value)
-                setF('proveedor_id', e.target.value)
-                if (p) setF('nombre_proveedor', p.proveedor_nombre)
-              }}>
-                <option value="">— Seleccionar o escribir —</option>
-                {proveedores.map(p => <option key={p.id} value={p.id}>{p.proveedor_nombre}</option>)}
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Contrato (opcional)</label>
+              <select style={inputStyle} value={form.contrato_id} disabled={!!editId || !form.proveedor_catalogo_id}
+                onChange={e => setForm(p => ({ ...p, contrato_id: e.target.value, orden_compra_id: '' }))}>
+                <option value="">— Sin contrato —</option>
+                {contratosDelProveedor.map(c => <option key={c.id} value={c.id}>{c.referencia ?? c.servicio} · {c.estado}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Nombre proveedor *</label>
-              <input style={inputStyle} value={form.nombre_proveedor} onChange={e => setF('nombre_proveedor', e.target.value)} placeholder="Nombre de la empresa" autoFocus />
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Orden de compra (opcional)</label>
+              <select style={inputStyle} value={form.orden_compra_id} disabled={!!editId || !form.proveedor_catalogo_id}
+                onChange={e => setF('orden_compra_id', e.target.value)}>
+                <option value="">— Sin orden —</option>
+                {ordenesDelProveedor.map(o => <option key={o.id} value={o.id}>{o.numero ?? o.concepto} · {o.estado}</option>)}
+              </select>
             </div>
             <div>
               <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha evaluación</label>
-              <input style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
-            </div>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Evaluado por</label>
-              <input style={inputStyle} value={form.evaluado_por} onChange={e => setF('evaluado_por', e.target.value)} placeholder="Nombre del evaluador" />
+              <input style={inputStyle} type="date" value={form.fecha} disabled={!!editId} onChange={e => setF('fecha', e.target.value)} />
             </div>
           </div>
+          <p data-testid="eval-aviso" style={{ margin: '0 0 10px', fontSize: '11px', color: 'var(--at-ink-3)' }}>
+            Quedas registrado como evaluador. Una evaluación baja <strong>no suspende</strong> al proveedor: esa decisión la toma quien autoriza proveedores en Contabilidad.
+          </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '12px' }}>
             {([
               { k: 'calificacion' as const, label: 'Calificación general' },
               { k: 'puntualidad' as const, label: 'Puntualidad' },
               { k: 'calidad' as const, label: 'Calidad del trabajo' },
               { k: 'precio' as const, label: 'Precio / valor' },
+              { k: 'cumplimiento' as const, label: 'Cumplimiento del contrato' },
+              { k: 'comunicacion' as const, label: 'Comunicación' },
             ]).map(({ k, label }) => (
               <div key={k}>
                 <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '5px' }}>{label}</label>
@@ -235,7 +273,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
-                        <span style={{ fontWeight: 700, fontSize: '13px' }}>{e.nombre_proveedor}</span>
+                        <span style={{ fontWeight: 700, fontSize: '13px' }}>{nombreDe(e)}</span>
                         <Stars value={e.calificacion} readOnly />
                         <span style={{ fontSize: '11px', fontWeight: 700, color: e.calificacion >= 4 ? 'var(--at-success)' : e.calificacion >= 3 ? 'var(--at-warning)' : 'var(--at-danger)' }}>{e.calificacion}/5</span>
                       </div>
@@ -243,6 +281,11 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
                         {e.puntualidad != null && <span>⏱ Puntualidad: {e.puntualidad}/5</span>}
                         {e.calidad != null && <span>⭐ Calidad: {e.calidad}/5</span>}
                         {e.precio != null && <span>💰 Precio: {e.precio}/5</span>}
+                        {e.cumplimiento != null && <span>📋 Cumplimiento: {e.cumplimiento}/5</span>}
+                        {e.comunicacion != null && <span>💬 Comunicación: {e.comunicacion}/5</span>}
+                        {(e.contrato_id ?? e.proveedor_id) && <span>📄 Con contrato</span>}
+                        {e.orden_compra_id && <span>🛒 Con orden de compra</span>}
+                        {e.calificacion <= 2 && <span data-testid={`eval-baja-${e.id}`} style={{ color: 'var(--at-warning)' }}>⚠ Evaluación baja: no suspende al proveedor</span>}
                         <span>📅 {e.fecha}</span>
                         {e.evaluado_por && <span>👤 {e.evaluado_por}</span>}
                       </div>

@@ -19,6 +19,9 @@ import { SeguimientoOrdenModal } from '../compras/SeguimientoOrdenModal'
 import { RespaldosRecepcionModal } from '../compras/RespaldosRecepcionModal'
 import { SeguimientoComprasPanel } from '../compras/SeguimientoComprasPanel'
 import { ImportarLineasOrdenModal } from '../compras/ImportarLineasOrdenModal'
+import { useTransicionOrdenConContrato } from '../compras/excepcionContrato'
+import { ContratoSelector } from '../proveedores/ContratoSelector'
+import { ContratoSeguimientoModal } from '../proveedores/ContratoSeguimientoModal'
 import { adjuntarRespaldoRecepcion, validarArchivoRespaldo, MIME_RESPALDO, MAX_BYTES_RESPALDO } from '../../domain/compras/respaldos'
 import {
   useActivosFijosQuery,
@@ -107,6 +110,10 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
   const { data: duplicados = [], isLoading: cargandoDuplicados } = useDuplicadosQuery(companyId, projectId)
 
   const cambiarOrden = useCambiarEstadoOrdenCompraMutation()
+  // Aprobar y emitir una orden amparada en un contrato exigen que siga vigente y dentro de su monto; quien tiene
+  // el permiso de cambio de estado autoriza una excepción (motivo, a su nombre, en el historial de la orden).
+  const transicionar = useTransicionOrdenConContrato(puedeCambiarEstado)
+  const [seguirContrato, setSeguirContrato] = useState<string | null>(null)
   const cambiarRecepcion = useCambiarEstadoRecepcionMutation()
   const enlazarGasto = useEnlazarGastoAFacturaMutation()
   const descartarDuplicado = useDescartarDuplicadoMutation(companyId)
@@ -143,13 +150,18 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
       render: (o) => (
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button style={btnLink} onClick={(e) => { e.stopPropagation(); setSeguirDe(o.id) }}>Seguimiento</button>
+          {o.contrato_id && (
+            <button style={btnLink} onClick={(e) => { e.stopPropagation(); setSeguirContrato(o.contrato_id ?? null) }}>Contrato</button>
+          )}
           {o.estado === 'borrador' && puedeCrear && (
             <button style={btnLink} onClick={(e) => { e.stopPropagation(); setImportarEn(o) }}>Importar renglones</button>
           )}
           {o.estado === 'borrador' && puedeAutorizar && (
             <button style={btnLink} onClick={(e) => {
               e.stopPropagation()
-              void accion(() => cambiarOrden.mutateAsync({ id: o.id, estado: 'aprobada' }), 'Orden aprobada.')
+              void accion(() => (o.contrato_id
+                ? transicionar({ ordenId: o.id, etapa: 'aprobar', ejecutar: () => cambiarOrden.mutateAsync({ id: o.id, estado: 'aprobada' }) })
+                : cambiarOrden.mutateAsync({ id: o.id, estado: 'aprobada' })), 'Orden aprobada.')
             }}>Aprobar</button>
           )}
           {o.estado === 'aprobada' && puedeAutorizar && (
@@ -168,7 +180,9 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
           {o.estado === 'aprobada' && puedeCambiarEstado && (
             <button style={btnLink} onClick={(e) => {
               e.stopPropagation()
-              void accion(() => cambiarOrden.mutateAsync({ id: o.id, estado: 'emitida' }), 'Orden emitida al proveedor.')
+              void accion(() => (o.contrato_id
+                ? transicionar({ ordenId: o.id, etapa: 'emitir', ejecutar: () => cambiarOrden.mutateAsync({ id: o.id, estado: 'emitida' }) })
+                : cambiarOrden.mutateAsync({ id: o.id, estado: 'emitida' })), 'Orden emitida al proveedor.')
             }}>Emitir</button>
           )}
           {['aprobada', 'emitida', 'recibida_parcial'].includes(o.estado) && puedeCrear && (
@@ -503,6 +517,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
         />
       )}
 
+      {seguirContrato && <ContratoSeguimientoModal contratoId={seguirContrato} onClose={() => setSeguirContrato(null)} />}
       {seguirDe && (
         <SeguimientoOrdenModal ordenId={seguirDe} monedaBase={monedaBase} onClose={() => setSeguirDe(null)} />
       )}
@@ -556,6 +571,7 @@ export function OrdenCompraModal({
   const { data: insumos = [], isLoading: cargandoInsumos } = useInsumosAlmacenQuery(companyId, projectId)
   const hayBodega = !!projectId
   const [proveedorId, setProveedorId] = useState('')
+  const [contratoId, setContratoId] = useState<string | null>(null)
   const [concepto, setConcepto] = useState('')
   const [fechaRequerida, setFechaRequerida] = useState('')
   const [notas, setNotas] = useState('')
@@ -586,6 +602,7 @@ export function OrdenCompraModal({
   async function guardar() {
     const parsed = ordenCompraFormSchema.safeParse({
       proveedor_id: proveedorId,
+      contrato_id: contratoId,
       project_id: projectId,
       concepto,
       descripcion: null,
@@ -645,7 +662,7 @@ export function OrdenCompraModal({
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <Campo label="Proveedor autorizado *">
-          <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)} style={input}>
+          <select value={proveedorId} onChange={(e) => { setProveedorId(e.target.value); setContratoId(null) }} style={input}>
             <option value="">Selecciona…</option>
             {proveedores.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
           </select>
@@ -653,6 +670,9 @@ export function OrdenCompraModal({
         <Campo label="Fecha requerida">
           <input type="date" value={fechaRequerida} onChange={(e) => setFechaRequerida(e.target.value)} style={input} />
         </Campo>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <ContratoSelector companyId={companyId} projectId={projectId} proveedorId={proveedorId || null} value={contratoId} onChange={(id) => setContratoId(id)} />
+        </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <Campo label="Concepto *">
             <input value={concepto} onChange={(e) => setConcepto(e.target.value)} style={{ ...input, width: '100%' }} />

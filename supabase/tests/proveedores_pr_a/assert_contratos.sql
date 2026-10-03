@@ -239,7 +239,10 @@ UPDATE public.proveedor_contactos SET email = 'nuevo@launion.test' WHERE id = 'c
 SELECT public.chk_txt((SELECT proveedor_email FROM public.contratos_proveedores WHERE id = 'cc000000-0000-0000-0000-0000000000c1'),
   'marta@launion.test', '4 · cambiar el contacto del catálogo no altera el contacto del contrato');
 
--- Prórroga: se permite con proveedor habilitado y queda en el historial.
+-- Prórroga: se permite con proveedor habilitado y queda en el historial. Desde 20261024000100 ampliar la
+-- vigencia exige documentar el motivo (contrato_prorrogar); aquí se declara a nivel de sesión para seguir
+-- probando los candados del proveedor (la regla del motivo se prueba en compras_bloque_b/assert_contratos_compras).
+SELECT set_config('proveedores.motivo_ampliacion', 'Prórroga de prueba', false);
 SET ROLE authenticated;
 UPDATE public.contratos_proveedores SET fecha_fin = '2027-06-30' WHERE id = 'cc000000-0000-0000-0000-0000000000c1';
 RESET ROLE;

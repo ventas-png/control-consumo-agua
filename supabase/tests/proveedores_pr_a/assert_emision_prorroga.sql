@@ -157,6 +157,11 @@ RESET ROLE;
 SELECT public.chk((SELECT count(*) FROM public.contratos_proveedores WHERE id::text LIKE 'ce000000-%d_' AND estado = 'activo'), 2,
   '2 · dos contratos activos con fecha final definida');
 
+-- Desde 20261024000100 ampliar la vigencia exige documentar el motivo; aquí se declara a nivel de sesión
+-- para seguir probando los candados del proveedor (la regla del motivo se prueba en
+-- compras_bloque_b/assert_contratos_compras.sql).
+SELECT set_config('proveedores.motivo_ampliacion', 'Prórroga de prueba', false);
+
 -- 2a · Proveedor HABILITADO: ampliar a fecha posterior, ampliar a indefinido y reducir, todo libre.
 SET ROLE authenticated;
 UPDATE public.contratos_proveedores SET fecha_fin = '2027-06-30' WHERE id = 'ce000000-0000-0000-0000-0000000000d1';

@@ -10,6 +10,10 @@ import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
 import { SeguimientoOrdenModal } from '../../compras/SeguimientoOrdenModal'
 import { SeguimientoComprasPanel } from '../../compras/SeguimientoComprasPanel'
 import { ImportarLineasOrdenModal } from '../../compras/ImportarLineasOrdenModal'
+import { useTransicionOrdenConContrato } from '../../compras/excepcionContrato'
+import { ContratoSelector } from '../../proveedores/ContratoSelector'
+import { ContratoSeguimientoModal } from '../../proveedores/ContratoSeguimientoModal'
+import { usePermisosProveedor } from '../../proveedores/permisos'
 
 interface Props {
   ordenes: OrdenCompra[]
@@ -41,7 +45,7 @@ const ESTADO_CFG: Record<EstadoOC, { label: string; color: string; bg: string; n
 }
 
 const BLANK = {
-  proveedor_id: '', proveedor_nombre: '', concepto: '', descripcion: '', monto_estimado: '',
+  proveedor_id: '', proveedor_nombre: '', contrato_id: '', concepto: '', descripcion: '', monto_estimado: '',
   fecha_entrega_esperada: '', notas: '',
 }
 
@@ -62,6 +66,11 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
   const [seguirDe, setSeguirDe] = useState<string | null>(null)
   const [vistaOc, setVistaOc] = useState<'ordenes' | 'seguimiento'>('ordenes')
   const [importarEn, setImportarEn] = useState<OrdenCompra | null>(null)
+  const [seguirContrato, setSeguirContrato] = useState<string | null>(null)
+  // Aprobar y emitir una orden con contrato exigen que siga vigente; quien tiene el permiso de cambio de estado
+  // de Contabilidad puede autorizar una excepción (con motivo). El servidor decide.
+  const permisos = usePermisosProveedor()
+  const transicionar = useTransicionOrdenConContrato(permisos.cambiarEstado)
 
   const filtradas = filtroEstado ? ordenes.filter(o => o.estado === filtroEstado) : ordenes
 
@@ -91,6 +100,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     const payload = {
       company_id: companyId, project_id: proyectoId,
       proveedor_id: form.proveedor_id,
+      contrato_id: form.contrato_id || null,
       proveedor_nombre: form.proveedor_nombre.trim(),
       concepto: form.concepto.trim(),
       descripcion: form.descripcion.trim() || null,
@@ -111,8 +121,21 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     const cfg = ESTADO_CFG[orden.estado]
     if (!cfg.next) return
     const updates: Partial<OrdenCompra> = { estado: cfg.next }
-    const { error } = await updateCondominioRow('ordenes_compra', orden.id, updates)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    const ejecutar = async () => {
+      const { error } = await updateCondominioRow('ordenes_compra', orden.id, updates)
+      if (error) throw new Error(error.message)
+    }
+    try {
+      if (orden.contrato_id && (cfg.next === 'aprobada' || cfg.next === 'emitida')) {
+        const r = await transicionar({ ordenId: orden.id, etapa: cfg.next === 'aprobada' ? 'aprobar' : 'emitir', ejecutar })
+        if (r === 'excepcion') notify({ variant: 'success', title: 'Excepción autorizada', text: 'Quedó registrada a tu nombre, con el motivo, en el historial de la orden.' })
+      } else {
+        await ejecutar()
+      }
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se pudo', text: (e as Error).message })
+      return
+    }
     onRefresh()
   }
 
@@ -214,8 +237,15 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
               <ProveedorSelector
                 proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
                 value={form.proveedor_id || null} soloHabilitados label="Proveedor autorizado *"
-                onChange={(id, p) => setForm(f => ({ ...f, proveedor_id: id ?? '', proveedor_nombre: p?.nombre ?? '' }))}
+                onChange={(id, p) => setForm(f => ({ ...f, proveedor_id: id ?? '', proveedor_nombre: p?.nombre ?? '', contrato_id: '' }))}
               />
+              <div style={{ marginTop: 8 }}>
+                <ContratoSelector
+                  companyId={companyId} projectId={proyectoId} proveedorId={form.proveedor_id || null}
+                  value={form.contrato_id || null}
+                  onChange={(id) => setForm(f => ({ ...f, contrato_id: id ?? '' }))}
+                />
+              </div>
               {catalogo.length === 0 && (
                 <p style={{ margin: '4px 0 0', fontSize: 10, color: 'var(--at-ink-3)' }}>
                   No hay proveedores autorizados. Autorízalos en Contabilidad → Proveedores.
@@ -269,6 +299,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
         />
       )}
 
+      {seguirContrato && <ContratoSeguimientoModal contratoId={seguirContrato} onClose={() => setSeguirContrato(null)} />}
       {seguirDe && <SeguimientoOrdenModal ordenId={seguirDe} monedaBase={moneda} onClose={() => setSeguirDe(null)} />}
 
       {/* Lista */}
@@ -305,6 +336,15 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                   <div style={{ padding: '0 14px 14px', borderTop: '1px solid var(--at-chip)' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, margin: '10px 0', fontSize: 11, color: 'var(--at-ink-3)' }}>
                       {orden.fecha_entrega_esperada && <div>Entrega esperada: <strong>{orden.fecha_entrega_esperada}</strong></div>}
+                      {orden.contrato_id && (
+                        <div data-testid={`orden-contrato-${orden.id}`}>
+                          Amparada en un contrato{' '}
+                          <button type="button" onClick={() => setSeguirContrato(orden.contrato_id ?? null)}
+                            style={{ border: 'none', background: 'none', color: 'var(--at-primary)', cursor: 'pointer', fontSize: 11, padding: 0, textDecoration: 'underline' }}>
+                            ver seguimiento del contrato
+                          </button>
+                        </div>
+                      )}
                       {orden.estado === 'recibida' && <div>Recibido: <strong style={{ color: 'var(--at-success)' }}>✓</strong></div>}
                       {orden.monto_real && <div>Monto real: <strong style={{ color: 'var(--at-ink)' }}>{moneda} {orden.monto_real.toFixed(2)}</strong></div>}
                     </div>
@@ -333,7 +373,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                         </button>
                       )}
                       {canEdit && orden.estado === 'borrador' && (
-                        <button onClick={() => { setEditId(orden.id); setForm({ proveedor_id: orden.proveedor_id ?? '', proveedor_nombre: orden.proveedor_nombre, concepto: orden.concepto, descripcion: orden.descripcion ?? '', monto_estimado: String(orden.monto_estimado ?? ''), fecha_entrega_esperada: orden.fecha_entrega_esperada ?? '', notas: orden.notas ?? '' }); setShowForm(true) }}
+                        <button onClick={() => { setEditId(orden.id); setForm({ proveedor_id: orden.proveedor_id ?? '', proveedor_nombre: orden.proveedor_nombre, contrato_id: orden.contrato_id ?? '', concepto: orden.concepto, descripcion: orden.descripcion ?? '', monto_estimado: String(orden.monto_estimado ?? ''), fecha_entrega_esperada: orden.fecha_entrega_esperada ?? '', notas: orden.notas ?? '' }); setShowForm(true) }}
                           style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
                           ✏️ Editar
                         </button>

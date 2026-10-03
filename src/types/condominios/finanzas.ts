@@ -585,6 +585,8 @@ export interface OrdenCompra {
   numero?: string | null
   /** FK al catálogo de Contabilidad; NULL solo en órdenes previas al backfill. */
   proveedor_id?: string | null
+  /** Contrato que ampara la orden (opcional): al aprobar y emitir debe estar vigente y dentro de su monto. */
+  contrato_id?: string | null
   proveedor_nombre: string
   concepto: string
   descripcion?: string | null
