@@ -59,6 +59,46 @@ No son lo mismo y no se mezclan los resultados:
 
 **Producción**: no se tocó. Pendiente de tu autorización (y no hecho): comprobar en solo lectura que la comparación exacta acepta el índice real de producción antes de fusionar, y refrescar `huella-produccion.json` tras aplicar las migraciones.
 
+## 4b. Comprobación en producción del índice (solo lectura, autorizada)
+
+Antes de fusionar se comprobó que `uq_mov_suministro_origen_recepcion` en producción coincide con la definición que exige la
+migración final `20261023000200`. **Solo consultas de lectura a los catálogos**: no se ejecutó la migración, no se creó ningún
+índice, no se modificaron datos ni el historial de migraciones. Una primera ejecución fue denegada por la persona usuaria; se
+volvió a pedir la autorización y se ejecutó una versión más corta de la misma consulta.
+
+Consulta usada:
+
+```sql
+SELECT c.relname, t.relname AS tabla, am.amname, i.indisunique, i.indisvalid, i.indisready,
+       i.indnatts, i.indnkeyatts, i.indkey::text AS cols, i.indclass::text AS clases,
+       i.indcollation::text AS colaciones, i.indoption::text AS opciones,
+       pg_get_expr(i.indexprs, i.indrelid) AS expresiones,
+       pg_get_expr(i.indpred, i.indrelid) AS predicado,
+       pg_get_indexdef(i.indexrelid) AS definicion
+  FROM pg_index i
+  JOIN pg_class c ON c.oid = i.indexrelid
+  JOIN pg_class t ON t.oid = i.indrelid
+  JOIN pg_am am ON am.oid = c.relam
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE n.nspname = 'public' AND c.relname = 'uq_mov_suministro_origen_recepcion';
+```
+
+Resultado en producción frente a lo que construye la migración (índice de referencia, medido en el Postgres desechable):
+
+| Campo | Producción | Exigido |
+|---|---|---|
+| tabla / método | `movimientos_suministro` / `btree` | igual |
+| único / válido / listo | sí / sí / sí | sí / sí / sí |
+| columnas (`indkey`) | `15 16` = `(origen_tabla, origen_id)` | igual |
+| clases de operador / colaciones / opciones | `3126 10065` / `100 0` / `0 0` | igual |
+| `indnatts` / `indnkeyatts` | 2 / 2 (sin `INCLUDE`) | 2 / 2 |
+| expresiones | ninguna | ninguna |
+| predicado | `((origen_tabla = ANY (ARRAY['recepcion_lineas'::text, 'recepcion_lineas_anulada'::text])) AND (origen_id IS NOT NULL))` | idéntico, carácter por carácter |
+| `NULLS NOT DISTINCT` | no (la definición no lo incluye) | no |
+
+**Coincide**: la migración pasaría en producción sin cambiar nada (solo verifica). Límite: la comparación se hizo contra los
+valores de catálogo del índice de referencia local, no ejecutando la migración (prohibido en esta comprobación).
+
 ## 5. Limitaciones
 
 1. `sha256` del respaldo lo declara el cliente; el servidor compara tamaño y mime solo cuando el objeto los trae.
