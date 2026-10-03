@@ -66,6 +66,8 @@ export interface OrdenCompra {
   /** NULL = contabilidad de la empresa. */
   project_id: string | null
   proveedor_id: string | null
+  /** Contrato que ampara la orden (opcional): al aprobar y emitir debe estar vigente y dentro de su monto. */
+  contrato_id?: string | null
   /** Texto libre heredado; se conserva para no perder el histórico. */
   proveedor_nombre: string
   numero: string | null

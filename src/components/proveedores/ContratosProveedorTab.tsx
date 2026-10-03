@@ -9,7 +9,7 @@
 // La pantalla ofrece; el servidor decide: transiciones, motivos, congelamiento
 // económico, fotografía del proveedor y alcance por proyecto los exigen los
 // triggers y la RLS.
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { hoyLocalISO } from '../../lib/format'
 import { buildUploadPath, validateFileMagic } from '../../lib/fileValidation'
 import { BUCKET_CONTRATOS_RESPALDO } from '../../domain/shared/buckets'
@@ -22,6 +22,13 @@ import {
   useEliminarContratoBorradorMutation,
   useSubirRespaldoContratoMutation,
 } from '../../domain/proveedores/mutations'
+import {
+  diaSiguiente,
+  ESTADOS_RENOVABLES,
+  useAmpliarMontoContratoMutation,
+  useProrrogarContratoMutation,
+  useRenovarContratoMutation,
+} from '../../domain/proveedores/contratosCompras'
 import { contratoFormSchema, faltantesParaActivar, SERVICIOS_CONTRATO } from '../../domain/proveedores/schemas'
 import { etiquetaProveedor } from '../../domain/proveedores/identidad'
 import {
@@ -31,6 +38,7 @@ import {
   PERIODICIDAD_LABELS,
   PERIODICIDADES,
   TRANSICIONES_CONTRATO,
+  contratoVigente,
   type ContratoProveedorCatalogo,
   type EstadoContratoProveedor,
   type ModalidadContrato,
@@ -46,6 +54,7 @@ import { Campo, input, btnLink, btnPrimario, btnSecundario } from '../contabilid
 import { ContextoActivo } from './ContextoActivo'
 import { HistoricosPanel } from './HistoricosPanel'
 import { ProveedorSelector } from './ProveedorSelector'
+import { ContratoSeguimientoModal } from './ContratoSeguimientoModal'
 
 interface Props {
   contratos: ContratoProveedorCatalogo[]
@@ -105,6 +114,12 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
   const cambiarEstado = useCambiarEstadoContratoMutation()
   const eliminar = useEliminarContratoBorradorMutation()
   const subir = useSubirRespaldoContratoMutation()
+  const renovarContrato = useRenovarContratoMutation()
+  const prorrogarContrato = useProrrogarContratoMutation()
+  const ampliarMonto = useAmpliarMontoContratoMutation()
+  // La clave de una ampliación se conserva mientras no cambie lo que se pide: un doble clic o un reintento tras
+  // un corte de red reenvían LA MISMA clave y el servidor devuelve la ampliación ya registrada.
+  const claveAmpliacion = useRef<{ firma: string; clave: string } | null>(null)
 
   const [filtroEstado, setFiltroEstado] = useState<EstadoContratoProveedor | 'todos'>('todos')
   const [busqueda, setBusqueda] = useState('')
@@ -113,6 +128,8 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [historialDe, setHistorialDe] = useState<ContratoProveedorCatalogo | null>(null)
   const [verHistoricos, setVerHistoricos] = useState(false)
+  const [seguirContrato, setSeguirContrato] = useState<string | null>(null)
+  const hoy = hoyLocalISO()
 
   const catalogo = proveedores as ProveedorCatalogo[]
   const porId = useMemo(() => new Map(catalogo.map((p) => [p.id, p])), [catalogo])
@@ -176,13 +193,24 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
     try {
       if (editando) {
         // En un contrato ya activo solo se mandan los campos que siguen siendo editables.
+        // La fecha final de un contrato ya activado NO se edita aquí: cambiarla es una prórroga y debe quedar
+        // documentada con su motivo (contrato_prorrogar). El servidor rechaza ampliarla sin motivo.
+        const cambiaFin = congelado && (parsed.data.fecha_fin ?? null) !== (editando.fecha_fin ?? null)
+        let motivoFin: string | null = null
+        if (cambiaFin) {
+          motivoFin = await pedirMotivoProrroga(parsed.data.fecha_fin ?? null)
+          if (!motivoFin) return
+        }
         const cambios: Record<string, unknown> = congelado
           ? {
-              fecha_fin: parsed.data.fecha_fin, descripcion: parsed.data.descripcion, alcance: parsed.data.alcance,
+              descripcion: parsed.data.descripcion, alcance: parsed.data.alcance,
               responsable_id: parsed.data.responsable_id, notas: parsed.data.notas, referencia: parsed.data.referencia,
             }
           : { ...parsed.data }
         await actualizar.mutateAsync({ id: editando.id, cambios })
+        if (cambiaFin && motivoFin) {
+          await prorrogarContrato.mutateAsync({ contratoId: editando.id, fechaFin: parsed.data.fecha_fin ?? null, motivo: motivoFin })
+        }
       } else {
         await crear.mutateAsync(parsed.data)
       }
@@ -229,6 +257,87 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
       onRefresh()
     } catch (e) {
       notify({ variant: 'error', title: 'No se pudo cambiar el estado', text: (e as Error).message })
+    }
+  }
+
+  async function pedirMotivoProrroga(fechaFin: string | null): Promise<string | null> {
+    const r = await openPromptDialog({
+      title: 'Prórroga del contrato',
+      description: `La nueva fecha final es ${fechaFin ?? 'indefinida'}. El motivo queda en el historial del contrato y no se puede borrar.`,
+      fields: [{ name: 'motivo', label: 'Motivo de la prórroga', control: 'textarea', required: true, rows: 3 }],
+      submitText: 'Guardar prórroga',
+      validate: (d) => ((d.motivo ?? '').trim().length >= 5 ? null : 'Indica el motivo (al menos 5 caracteres)'),
+    })
+    return r ? r.motivo.trim() : null
+  }
+
+  async function prorrogar(c: ContratoProveedorCatalogo) {
+    const r = await openPromptDialog({
+      title: 'Prorrogar contrato',
+      description: 'Cambia la fecha final (vacía = indefinido). Ampliar la vigencia exige proveedor autorizado y habilitado hoy; reducirla es libre. Queda el motivo en el historial.',
+      fields: [
+        { name: 'fecha_fin', label: 'Nueva fecha final (vacía = indefinido)', type: 'date', initialValue: c.fecha_fin ?? '' },
+        { name: 'motivo', label: 'Motivo', control: 'textarea', required: true, rows: 3 },
+      ],
+      submitText: 'Prorrogar',
+      validate: (d) => ((d.motivo ?? '').trim().length >= 5 ? null : 'Indica el motivo (al menos 5 caracteres)'),
+    })
+    if (!r) return
+    try {
+      await prorrogarContrato.mutateAsync({ contratoId: c.id, fechaFin: r.fecha_fin || null, motivo: r.motivo.trim() })
+      notify({ variant: 'success', title: 'Prórroga registrada', text: 'La nueva vigencia y su motivo quedaron en el historial.' })
+      onRefresh()
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se pudo prorrogar', text: (e as Error).message })
+    }
+  }
+
+  async function renovar(c: ContratoProveedorCatalogo) {
+    const r = await openPromptDialog({
+      title: 'Renovar contrato',
+      description: 'Se crea un contrato NUEVO en borrador, del mismo proveedor y con las mismas condiciones, ligado a este. Este contrato conserva sus condiciones, documentos e historial. Renovar no genera órdenes, facturas, pagos ni asientos; el nuevo se activa aparte.',
+      fields: [
+        { name: 'fecha_inicio', label: 'Inicio de la renovación', type: 'date', required: true, initialValue: c.fecha_fin ? diaSiguiente(c.fecha_fin) : hoy },
+        { name: 'fecha_fin', label: 'Fin (vacío = indefinido)', type: 'date' },
+        { name: 'motivo', label: 'Motivo de la renovación', control: 'textarea', required: true, rows: 3 },
+      ],
+      submitText: 'Crear renovación',
+      validate: (d) => (!d.fecha_inicio ? 'Indica el inicio' : (d.motivo ?? '').trim().length < 5 ? 'Indica el motivo (al menos 5 caracteres)' : null),
+    })
+    if (!r) return
+    try {
+      await renovarContrato.mutateAsync({ contratoId: c.id, fechaInicio: r.fecha_inicio, fechaFin: r.fecha_fin || null, motivo: r.motivo.trim() })
+      notify({ variant: 'success', title: 'Renovación creada en borrador', text: 'Revísala y actívala cuando corresponda. El contrato anterior no cambió.' })
+      onRefresh()
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se pudo renovar', text: (e as Error).message })
+    }
+  }
+
+  async function ampliar(c: ContratoProveedorCatalogo) {
+    const r = await openPromptDialog({
+      title: 'Ampliar monto máximo',
+      description: `Suma un incremento al monto máximo (${c.moneda ?? ''} ${(c.monto_maximo ?? 0).toLocaleString('es')} original) sin sobrescribir la condición original: queda documentado quién, cuánto y por qué.`,
+      fields: [
+        { name: 'incremento', label: `Incremento (${c.moneda ?? ''})`, type: 'number', required: true },
+        { name: 'documento', label: 'Documento o adenda (opcional)' },
+        { name: 'motivo', label: 'Motivo', control: 'textarea', required: true, rows: 3 },
+      ],
+      submitText: 'Ampliar',
+      validate: (d) => (!(Number(d.incremento) > 0) ? 'El incremento debe ser mayor que cero' : (d.motivo ?? '').trim().length < 10 ? 'Indica el motivo (al menos 10 caracteres)' : null),
+    })
+    if (!r) return
+    const incremento = Number(r.incremento)
+    const firma = `${c.id}|${incremento}|${r.motivo.trim()}|${r.documento ?? ''}`
+    if (claveAmpliacion.current?.firma !== firma) claveAmpliacion.current = { firma, clave: crypto.randomUUID() }
+    try {
+      await ampliarMonto.mutateAsync({
+        contratoId: c.id, incremento, motivo: r.motivo.trim(), clave: claveAmpliacion.current.clave, documento: r.documento?.trim() || null,
+      })
+      notify({ variant: 'success', title: 'Ampliación registrada', text: 'El monto máximo vigente subió; el original se conserva en el historial.' })
+      onRefresh()
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se pudo ampliar', text: (e as Error).message })
     }
   }
 
@@ -320,7 +429,15 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
                       {c.periodicidad && <div style={{ fontSize: 11 }}>{PERIODICIDAD_LABELS[c.periodicidad]}</div>}
                       {c.importe_periodico != null && <div style={{ fontSize: 11 }}>{c.moneda} {c.importe_periodico.toLocaleString('es')}</div>}
                     </td>
-                    <td>{c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' → sin fin'}</td>
+                    <td>
+                      {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' → sin fin'}
+                      {c.estado === 'activo' && !contratoVigente(c, hoy) && (
+                        <div data-testid={`fuera-de-vigencia-${c.id}`} style={{ fontSize: 11, color: 'var(--at-warning)' }}>
+                          Activo, pero hoy está fuera de sus fechas: no ampara órdenes nuevas.
+                        </div>
+                      )}
+                      {c.renovado_de && <div style={{ fontSize: 11, color: 'var(--at-ink-soft)' }}>Renueva a un contrato anterior</div>}
+                    </td>
                     <td>
                       <StatusBadge tone={TONO[c.estado] ?? 'neutral'}>{ESTADO_CONTRATO_LABELS[c.estado] ?? c.estado}</StatusBadge>
                       {c.motivo_estado && ['suspendido', 'terminado', 'cancelado'].includes(c.estado) && (
@@ -335,6 +452,18 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
                         <button key={e} type="button" style={btnLink} onClick={() => void cambiar(c, e)}>{ACCION_ETIQUETA[e]}</button>
                       ))}
                       <button type="button" style={btnLink} onClick={() => setHistorialDe(c)}>Historial</button>
+                      {c.proveedor_id && c.estado !== 'borrador' && (
+                        <button type="button" style={btnLink} onClick={() => setSeguirContrato(c.id)}>Seguimiento</button>
+                      )}
+                      {canEdit && c.proveedor_id && ['activo', 'suspendido', 'vencido'].includes(c.estado) && (
+                        <button type="button" style={btnLink} onClick={() => void prorrogar(c)}>Prorrogar</button>
+                      )}
+                      {canEdit && c.estado === 'activo' && c.monto_maximo != null && (
+                        <button type="button" style={btnLink} onClick={() => void ampliar(c)}>Ampliar monto</button>
+                      )}
+                      {canCreate && c.proveedor_id && (ESTADOS_RENOVABLES as readonly string[]).includes(c.estado) && (
+                        <button type="button" style={btnLink} onClick={() => void renovar(c)}>Renovar</button>
+                      )}
                       {c.respaldo_path && (
                         <SecureFileLink src={c.respaldo_path} bucket={BUCKET_CONTRATOS_RESPALDO} style={{ fontSize: 12 }}>Respaldo</SecureFileLink>
                       )}
@@ -367,6 +496,7 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
         />
       )}
       {historialDe && <HistorialContrato contrato={historialDe} onClose={() => setHistorialDe(null)} />}
+      {seguirContrato && <ContratoSeguimientoModal contratoId={seguirContrato} onClose={() => setSeguirContrato(null)} />}
     </div>
   )
 }

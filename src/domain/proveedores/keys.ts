@@ -11,6 +11,10 @@ export const proveedoresKeys = {
     [...proveedoresKeys.all, 'asignaciones-de-proveedor', proveedorId ?? null] as const,
   contratosDeProveedor: (proveedorId?: string) =>
     [...proveedoresKeys.all, 'contratos-de-proveedor', proveedorId ?? null] as const,
+  seguimientoContrato: (contratoId?: string) =>
+    [...proveedoresKeys.all, 'seguimiento-contrato', contratoId ?? null] as const,
+  contratosParaOrden: (companyId?: string, projectId?: string | null, proveedorId?: string | null) =>
+    [...proveedoresKeys.all, 'contratos-para-orden', companyId ?? null, projectId ?? null, proveedorId ?? null] as const,
   eventosContrato: (contratoId?: string) =>
     [...proveedoresKeys.all, 'eventos-contrato', contratoId ?? null] as const,
   historicosVistaPrevia: (companyId?: string) =>

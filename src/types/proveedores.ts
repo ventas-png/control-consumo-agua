@@ -159,13 +159,17 @@ export interface ContratoProveedorCatalogo {
   respaldo_path?: string | null
   documento_url?: string | null
   proveedor_snapshot?: Record<string, unknown> | null
+  /** Contrato al que renueva este (cadena de renovaciones); el anterior conserva todo. */
+  renovado_de?: string | null
   activado_at?: string | null
   terminado_at?: string | null
   notas?: string | null
   created_at: string
 }
 
-export type TipoEventoContrato = 'alta' | 'estado' | 'vinculo_proveedor' | 'vinculo_revertido' | 'prorroga'
+export type TipoEventoContrato =
+  | 'alta' | 'estado' | 'vinculo_proveedor' | 'vinculo_revertido' | 'prorroga'
+  | 'renovacion' | 'renovado_por' | 'ampliacion_monto'
 
 export interface EventoContrato {
   id: string
@@ -353,4 +357,110 @@ export interface ResultadoAplicacion {
   desactualizado?: boolean
   error?: string
   nota?: string
+}
+
+
+// ── Contratos conectados a las compras ──────────────────────────────────────
+
+/** Etapa de la orden en la que se autoriza una excepción de contrato. */
+export type EtapaExcepcionContrato = 'aprobar' | 'emitir'
+
+/**
+ * Un contrato está VIGENTE si está activo y hoy cae dentro de sus fechas (sin fecha final = indefinido).
+ * La pantalla lo usa solo para OFRECER; el servidor decide al ligar, aprobar y emitir.
+ */
+export function contratoVigente(
+  c: { estado: string; fecha_inicio: string; fecha_fin?: string | null },
+  hoy: string,
+): boolean {
+  return c.estado === 'activo' && c.fecha_inicio <= hoy && (c.fecha_fin == null || c.fecha_fin >= hoy)
+}
+
+/** Indicadores de UNA moneda del contrato. Lo financiero llega NULL si el usuario no ve Contabilidad. */
+export interface IndicadoresContratoMoneda {
+  moneda: string
+  ordenes: number
+  comprometido: number
+  recibido: number
+  facturado: number | null
+  pagado: number | null
+  pendiente_por_recibir: number
+  pendiente_por_facturar: number | null
+  diferencia_precio_facturada: number | null
+  /** Solo en la moneda del contrato y si el contrato tiene monto máximo. */
+  monto_maximo_vigente: number | null
+  disponible: number | null
+}
+
+export interface OrdenSeguimientoContrato {
+  id: string
+  numero: string | null
+  concepto: string
+  estado: string
+  moneda: string
+  revision: number
+  created_at: string
+  valor_orden: number
+  /** false = borrador o cancelada: no compromete monto. */
+  compromete: boolean
+  comprometido: number
+  recibido: number
+  facturado: number | null
+  pagado: number | null
+  pendiente_por_recibir: number
+  pendiente_por_facturar: number | null
+  diferencia_precio_facturada: number | null
+  con_excepcion: boolean
+}
+
+export interface SeguimientoContrato {
+  contrato: {
+    id: string
+    referencia: string | null
+    estado: EstadoContratoProveedor
+    vigente: boolean
+    modalidad: ModalidadContrato | null
+    periodicidad: PeriodicidadContrato | null
+    moneda: string | null
+    importe_periodico: number | null
+    fecha_inicio: string
+    fecha_fin: string | null
+    indefinido: boolean
+    monto_maximo_original: number | null
+    ampliaciones_total: number | null
+    monto_maximo_vigente: number | null
+    /** true = el contrato no tiene monto máximo: no hay límite total (y no se inventa uno). */
+    sin_limite_total: boolean
+    renovado_de: string | null
+    proveedor: { id: string | null; codigo: string | null; nombre: string; estado: string | null }
+  }
+  contabilidad_visible: boolean
+  por_moneda: IndicadoresContratoMoneda[]
+  ordenes: OrdenSeguimientoContrato[]
+  recepciones: Array<{
+    id: string; numero: string | null; fecha: string; tipo: string; estado: string
+    orden_id: string; orden_numero: string | null; aceptado: number; rechazado: number
+  }>
+  facturas: Array<{
+    id: string; numero_factura: string; fecha_emision: string | null; estado: string; moneda: string | null
+    monto_total: number; monto_pagado: number; saldo: number; orden_id: string; orden_numero: string | null
+  }>
+  pagos: Array<{
+    id: string; numero_factura: string | null; monto_pago: number; monto_aplicado: number | null
+    estado: string; metodo_pago: string | null; referencia: string | null; fecha_pago: string | null
+    orden_id: string; orden_numero: string | null
+  }>
+  excepciones: Array<{
+    id: string; orden_id: string; orden_numero: string | null; etapa: EtapaExcepcionContrato
+    causas: string; motivo: string; autorizado_por: string; revision: number; created_at: string
+  }>
+  ampliaciones: Array<{
+    id: string; monto_anterior: number; incremento: number; monto_nuevo: number; moneda: string | null
+    motivo: string; referencia_documento: string | null; autorizado_por: string; created_at: string
+  }>
+  renovaciones: Array<{ id: string; referencia: string | null; estado: string; fecha_inicio: string; fecha_fin: string | null }>
+  eventos: Array<{
+    tipo: TipoEventoContrato; estado_anterior: string | null; estado_nuevo: string | null
+    motivo: string | null; detalle: Record<string, unknown> | null; actor_id: string | null; created_at: string
+  }>
 }

@@ -25,7 +25,7 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
 PRIMERA=20261021000000
-NUESTRAS=$(ls "$MIGS" | grep -E '^2026102[123]00[0-9]{4}_' | sed 's/\.sql$//' | sort)
+NUESTRAS=$(ls "$MIGS" | grep -E '^2026102[1234]00[0-9]{4}_' | sed 's/\.sql$//' | sort)
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -136,6 +136,7 @@ bloque assert_importacion_lineas.sql "5j · carga masiva de renglones: vista pre
 bloque assert_respaldos.sql    "5k · respaldos de recepción: bucket privado, acceso por empresa/proyecto, congelamiento, trazabilidad"
 bloque assert_seguimiento_pantalla.sql "5l · seguimiento filtrable: pendientes, monedas separadas, pagos enlazados y sin datos financieros para Operaciones"
 bloque assert_correcciones_c.sql "5m · correcciones del bloque C: pendientes por renglón, respaldos validados en servidor, retiro del principal"
+bloque assert_contratos_compras.sql "5o · contratos conectados a las compras: vigencia, monto, excepción auditada, renovación, seguimiento, evaluaciones"
 echo "── 5n · la protección de inventario es obligatoria (con duplicados reales, siempre en transacciones que se revierten)"
 BD=$BD bash "$AQUI/indice_obligatorio.sh" || exit 1
 
@@ -355,6 +356,37 @@ INM_P=$(cat "$SALIDAS"/p1.txt "$SALIDAS"/p2.txt | grep -c 'COMPRAS_RESPALDO_INMU
 [ "$N_P" = "1" ] && [ "$E_P" = "registrada" ] && [ "$INM_P" = "1" ] \
   && echo "  ✓ P · retiro y registro a la vez: la recepción quedó registrada y la evidencia INTACTA (el retiro se rechazó)" \
   || { echo "❌ P · respaldos=$N_P estado=$E_P rechazos=$INM_P"; cat "$SALIDAS"/p1.txt "$SALIDAS"/p2.txt; exit 1; }
+
+# Q · contratos: dos órdenes de 600 sobre un contrato con máximo de 1000, aprobadas a la vez: solo cabe UNA.
+aplicar "$AQUI/concurrencia_contratos_prep.sql"
+KQ=cf100000-0000-0000-0000-000000000001
+par q "UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = '0cf00000-0000-0000-0000-000000000001';" \
+      "UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = '0cf00000-0000-0000-0000-000000000002';"
+N_Q=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.ordenes_compra WHERE contrato_id = '$KQ' AND estado = 'aprobada'")
+RECH_Q=$(cat "$SALIDAS"/q1.txt "$SALIDAS"/q2.txt | grep -c 'COMPRAS_CONTRATO_NO_VIGENTE' || true)
+[ "$N_Q" = "1" ] && [ "$RECH_Q" = "1" ] \
+  && echo "  ✓ Q · dos aprobaciones de 600 sobre un máximo de 1000 a la vez: una se aprobó y la otra se rechazó por monto" \
+  || { echo "❌ Q · aprobadas=$N_Q rechazadas=$RECH_Q"; cat "$SALIDAS"/q1.txt "$SALIDAS"/q2.txt; exit 1; }
+
+# R · la misma renovación por dos sesiones a la vez: UN contrato y las dos reciben el mismo id.
+KR=cf100000-0000-0000-0000-000000000002
+REN_R="SELECT public.contrato_renovar('$KR', CURRENT_DATE + 30, NULL, 'Renovación concurrente');"
+par r "$REN_R" "$REN_R"
+N_R=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.contratos_proveedores WHERE renovado_de = '$KR'")
+ID_R=$(cat "$SALIDAS"/r1.txt "$SALIDAS"/r2.txt | grep -E '^[0-9a-f-]{36}$' | grep -v "^$UA$" | sort -u | wc -l | tr -d ' ')
+EV_R=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.contrato_proveedor_eventos WHERE contrato_id = '$KR' AND tipo = 'renovado_por'")
+[ "$N_R" = "1" ] && [ "$ID_R" = "1" ] && [ "$EV_R" = "1" ] \
+  && echo "  ✓ R · la misma renovación a la vez: UN contrato nuevo, el mismo id para las dos sesiones y un solo evento" \
+  || { echo "❌ R · contratos=$N_R ids=$ID_R eventos=$EV_R"; cat "$SALIDAS"/r1.txt "$SALIDAS"/r2.txt; exit 1; }
+
+# S · la misma ampliación (misma clave) por dos sesiones a la vez: UNA ampliación y el mismo id.
+AMP_S="SELECT public.contrato_ampliar_monto('$KQ', 500, 'Ampliación concurrente autorizada', 'amp-concurrente-1');"
+par s "$AMP_S" "$AMP_S"
+N_S=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.contrato_ampliaciones WHERE contrato_id = '$KQ'")
+ID_S=$(cat "$SALIDAS"/s1.txt "$SALIDAS"/s2.txt | grep -E '^[0-9a-f-]{36}$' | grep -v "^$UA$" | sort -u | wc -l | tr -d ' ')
+[ "$N_S" = "1" ] && [ "$ID_S" = "1" ] \
+  && echo "  ✓ S · la misma ampliación (misma clave) a la vez: UNA ampliación y el mismo id para las dos sesiones" \
+  || { echo "❌ S · ampliaciones=$N_S ids=$ID_S"; cat "$SALIDAS"/s1.txt "$SALIDAS"/s2.txt; exit 1; }
 
 echo "── 7/8 · las migraciones del bloque son append-only (no editan lo ya aplicado)"
 (cd "$RAIZ" && node scripts/migrations-append-only.mjs >/dev/null 2>&1) \

@@ -58,6 +58,8 @@ export type OrdenCompraLineaInput = z.infer<typeof ordenCompraLineaSchema>
 export const ordenCompraFormSchema = z.object({
   proveedor_id: z.string().uuid('Selecciona un proveedor autorizado'),
   project_id: z.string().uuid().nullable(),
+  /** Contrato que ampara la orden (opcional). El servidor valida proveedor, proyecto, empresa, moneda y vigencia. */
+  contrato_id: z.string().uuid().nullable().default(null),
   concepto: z.string().trim().min(3, 'El concepto es obligatorio').max(300),
   descripcion: z.string().trim().max(1000).nullable(),
   condiciones_pago: z.string().trim().max(200).nullable(),
