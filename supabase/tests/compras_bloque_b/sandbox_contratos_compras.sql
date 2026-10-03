@@ -256,8 +256,7 @@ BEGIN
     pg_temp.err(format($q$UPDATE public.contratos_proveedores SET fecha_fin = CURRENT_DATE + 900 WHERE id = %L$q$, k1)), 'CONTRATO_AMPLIACION_MOTIVO');
   PERFORM public.contrato_prorrogar(k1, CURRENT_DATE + 900, 'Se amplía la vigencia por la adenda 2');
   RESET ROLE;
-  ev := ev || pg_temp.ckn('6e · una sola renovación y el original conserva su plazo (indefinido) e importe',
-    (SELECT count(*) FROM public.contratos_proveedores WHERE renovado_de = k2 AND true) , 1);
+  ev := ev || pg_temp.ckn('6e · una sola renovación del original', (SELECT count(*) FROM public.contratos_proveedores WHERE renovado_de = k2), 1);
   ev := ev || pg_temp.ck('6f · el original conserva estado e importe', (SELECT estado || '|' || importe_periodico::text || '|' || coalesce(fecha_fin::text, 'indef') FROM public.contratos_proveedores WHERE id = k2), 'activo|500.00|indef');
   ev := ev || pg_temp.ckn('6g · el original registra «renovado por»', (SELECT count(*) FROM public.contrato_proveedor_eventos WHERE contrato_id = k2 AND tipo = 'renovado_por'), 1);
   ev := ev || pg_temp.ck('6h · la prórroga deja su motivo en el historial', (SELECT detalle ->> 'motivo' FROM public.contrato_proveedor_eventos WHERE contrato_id = k1 AND tipo = 'prorroga' ORDER BY created_at DESC LIMIT 1), 'Se amplía la vigencia por la adenda 2');
@@ -304,7 +303,7 @@ BEGIN
   j := public.compras_contrato_seguimiento(k1);
   ev := ev || pg_temp.ckn('7h · K1 contratado original', (j->'contrato'->>'monto_maximo_original')::numeric, 1000);
   ev := ev || pg_temp.ckn('7i · K1 monto máximo vigente (original + ampliación documentada)', (j->'contrato'->>'monto_maximo_vigente')::numeric, 2000);
-  ev := ev || pg_temp.ckn('7j · K1 comprometido 900 (600 + 300 aprobada… la cancelada de 300 no cuenta; 500 aprobada)', (j->'por_moneda'->0->>'comprometido')::numeric, 1100);
+  ev := ev || pg_temp.ckn('7j · K1 comprometido 1100 (600 emitida + 500 aprobada; la de 300 cancelada no cuenta)', (j->'por_moneda'->0->>'comprometido')::numeric, 1100);
   ev := ev || pg_temp.ckn('7k · K1 disponible = vigente − comprometido', (j->'por_moneda'->0->>'disponible')::numeric, 900);
   RESET ROLE;
   PERFORM set_config('request.jwt.claim.sub', uq::text, true);
