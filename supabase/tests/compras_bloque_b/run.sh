@@ -25,7 +25,7 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
 PRIMERA=20261021000000
-NUESTRAS=$(ls "$MIGS" | grep -E '^2026102[1234]00[0-9]{4}_' | sed 's/\.sql$//' | sort)
+NUESTRAS=$(ls "$MIGS" | grep -E '^2026102[12345]00[0-9]{4}_' | sed 's/\.sql$//' | sort)
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -137,6 +137,7 @@ bloque assert_respaldos.sql    "5k · respaldos de recepción: bucket privado, a
 bloque assert_seguimiento_pantalla.sql "5l · seguimiento filtrable: pendientes, monedas separadas, pagos enlazados y sin datos financieros para Operaciones"
 bloque assert_correcciones_c.sql "5m · correcciones del bloque C: pendientes por renglón, respaldos validados en servidor, retiro del principal"
 bloque assert_contratos_compras.sql "5o · contratos conectados a las compras: vigencia, monto, excepción auditada, renovación, seguimiento, evaluaciones"
+bloque assert_contratos_coherencia.sql "5p · regresión: editar una orden en borrador no rompe la coherencia con el contrato; una excepción no se reutiliza si cambian las condiciones"
 echo "── 5n · la protección de inventario es obligatoria (con duplicados reales, siempre en transacciones que se revierten)"
 BD=$BD bash "$AQUI/indice_obligatorio.sh" || exit 1
 
