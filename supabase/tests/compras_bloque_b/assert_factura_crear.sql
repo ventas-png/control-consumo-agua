@@ -195,12 +195,15 @@ RESET ROLE;
 -- ── 6. Permisos y RLS: la función no amplía nada ────────────────────────────
 SELECT public.como(:UN::uuid);                       -- operador sin permisos de contabilidad ni de compras
 SET ROLE authenticated;
--- Un 'operator' puede insertar facturas (policy de INSERT); lo que no puede es aprobar. Se comprueba que la FUNCIÓN no le da más que el INSERT directo:
-INSERT INTO res_fc SELECT 'n', public.compras_factura_crear(:C::uuid, :C1::uuid,
-  '{"proveedor_id":"e3000000-0000-0000-0000-000000000001","concepto":"Gasto del operador","monto_total":50,"iva_monto":6,"clave_idempotencia":"clave-op-0001"}'::jsonb, NULL);
-UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE clave_idempotencia = 'clave-op-0001';   -- la policy de UPDATE no le deja ver la fila: 0 filas
+-- Desde 20261026000000 la lectura de facturas exige el permiso de Contabilidad. La función es SECURITY INVOKER y devuelve lo que
+-- crea (INSERT … RETURNING): un operador SIN ese permiso ya no puede capturar facturas por ella, porque no podría ver lo que
+-- acaba de crear. Se rechaza entera y no deja nada. (Antes pasaba: la política de lectura era «cualquiera de la empresa».)
+-- Esto es, a propósito, MÁS estricto que el INSERT directo, que la política de escritura sigue admitiendo (ver docs/COMPRAS_CIERRE_TECNICO.md).
+SELECT public.chk_falla($$ SELECT public.compras_factura_crear('cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001',
+  '{"proveedor_id":"e3000000-0000-0000-0000-000000000001","concepto":"Gasto del operador","monto_total":50,"iva_monto":6,"clave_idempotencia":"clave-op-0001"}'::jsonb, NULL) $$,
+  'row-level security', '6 · el operador sin permiso contable ya no captura por la función (no podría ver lo que crea)');
 RESET ROLE;
-SELECT public.chk_txt((SELECT estado FROM public.facturas_proveedor WHERE clave_idempotencia = 'clave-op-0001'), 'registrada', '6 · el operador captura pero NO aprueba: sigue registrada (la policy de UPDATE rige igual)');
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE clave_idempotencia = 'clave-op-0001'), 0, '6 · y el rechazo no dejó ninguna factura');
 
 -- ── 7. Gasto directo (sin orden) por la misma función ───────────────────────
 SELECT public.como(:UK::uuid);
