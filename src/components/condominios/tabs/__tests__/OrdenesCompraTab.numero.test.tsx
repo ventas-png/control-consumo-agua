@@ -16,6 +16,8 @@ const h = vi.hoisted(() => ({
 vi.mock('../../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
 vi.mock('../../../../domain/cxp/queries', () => ({ useProveedoresQuery: () => ({ data: [], isLoading: false }) }))
 vi.mock('../../../../domain/proveedores/queries', () => ({ useAsignacionesQuery: () => ({ data: [], isLoading: false }) }))
+vi.mock('../../../../domain/compras/queries', () => ({ useInsumosAlmacenQuery: () => ({ data: [], isLoading: false }) }))
+vi.mock('../../../../domain/compras/mutations', () => ({ crearOrdenTransaccional: vi.fn() }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: vi.fn(), updateCondominioRow: h.update, deleteCondominioRow: vi.fn(),
 }))

@@ -11,7 +11,7 @@ import { runQuery } from '../queryFetch'
 import { comprasKeys } from './keys'
 import { cxpKeys } from '../cxp/keys'
 import { contabilidadKeys } from '../contabilidad/keys'
-import type { ContrasenaPago, OrdenCompra, Recepcion, RecepcionLinea } from '../../types/compras'
+import type { ContrasenaPago, OrdenCompra, OrdenCompraLinea, Recepcion, RecepcionLinea } from '../../types/compras'
 import type {
   ContrasenaFormInput,
   OrdenCompraFormInput,
@@ -89,37 +89,66 @@ export function useEliminarDocumentoProveedorMutation() {
 
 // ── Orden de compra ─────────────────────────────────────────────────────────
 
+/** Lo que devuelve `compras_orden_crear`: la orden COMPLETA (con totales ya calculados) y sus renglones. */
+export interface OrdenCreada {
+  orden: OrdenCompra
+  lineas: OrdenCompraLinea[]
+  /** true = ya existía (reintento con la misma clave y contenido): se recuperó, no se creó otra. */
+  reutilizada: boolean
+}
+
+/** Datos de la orden que se captura: el formulario de Contabilidad, o la cabecera de Operaciones (renglones opcionales). */
+export type OrdenCompraCaptura =
+  Omit<OrdenCompraFormInput, 'lineas' | 'project_id' | 'obra_id' | 'condiciones_pago' | 'dias_credito' | 'descripcion' | 'notas'>
+  & Partial<Pick<OrdenCompraFormInput, 'obra_id' | 'condiciones_pago' | 'dias_credito' | 'descripcion' | 'notas'>>
+  & {
+    lineas?: OrdenCompraFormInput['lineas']
+    monto_estimado?: number | null
+    fecha_entrega_esperada?: string | null
+    /** Una por intento de captura: el doble clic o el reintento devuelven LA MISMA orden. */
+    clave_idempotencia: string
+  }
+
+/**
+ * Crea la orden en BORRADOR con sus renglones en UNA transacción del servidor (`compras_orden_crear`), desde
+ * Contabilidad y desde Operaciones. Antes eran dos peticiones (cabecera y luego renglones): un fallo entre ambas
+ * dejaba una orden sin renglones, y el reintento o el doble clic creaba otra. Ahora:
+ *  · si algo falla —un renglón, el contrato, el insumo, la cuenta—, no queda nada;
+ *  · el reintento con la MISMA clave y el MISMO contenido (respuesta perdida, doble clic) devuelve la misma orden;
+ *  · la misma clave con contenido DISTINTO se rechaza (COMPRAS_ORDEN_CLAVE_CONFLICTO).
+ * El nombre del proveedor y los totales los pone el servidor; las validaciones de proveedor, contrato, cuentas e
+ * inventario siguen siendo las de los triggers de siempre.
+ */
+export async function crearOrdenTransaccional(
+  companyId: string,
+  projectId: string | null | undefined,
+  input: OrdenCompraCaptura,
+): Promise<OrdenCreada> {
+  if (!input.clave_idempotencia) {
+    throw new Error('Falta la clave de idempotencia de la orden.')
+  }
+  const { lineas, ...cabecera } = input
+  const creada = await runQuery<OrdenCreada>((signal) =>
+    supabase
+      .rpc('compras_orden_crear', {
+        p_company_id: companyId,
+        p_project_id: projectId ?? null,
+        p_cabecera: cabecera,
+        p_lineas: lineas ?? [],
+      })
+      .abortSignal(signal),
+  )
+  if (!creada?.orden) throw new Error('No se pudo crear la orden.')
+  return creada
+}
+
 /** Crea la orden en BORRADOR con sus líneas. Aprobarla es un paso aparte. */
 export function useCrearOrdenCompraMutation(companyId?: string, projectId?: string | null) {
   const invalidar = useInvalidarCompras()
   return useMutation({
-    mutationFn: async (input: OrdenCompraFormInput & { proveedorNombre: string }) => {
+    mutationFn: async (input: OrdenCompraCaptura) => {
       if (!companyId) throw new Error('Falta companyId.')
-      const { lineas, proveedorNombre, ...cabecera } = input
-      const filas = await runQuery<OrdenCompra[]>((signal) =>
-        supabase
-          .from('ordenes_compra')
-          .insert({
-            ...cabecera,
-            company_id: companyId,
-            project_id: projectId ?? null,
-            // La columna heredada sigue siendo NOT NULL: se llena con el nombre
-            // del proveedor elegido para no romper la vista de condominios.
-            proveedor_nombre: proveedorNombre,
-            estado: 'borrador',
-          })
-          .select()
-          .abortSignal(signal),
-      )
-      const orden = filas?.[0]
-      if (!orden) throw new Error('No se pudo crear la orden.')
-
-      await runQuery((signal) =>
-        supabase
-          .from('orden_compra_lineas')
-          .insert(lineas.map((l, i) => ({ ...l, company_id: companyId, orden_compra_id: orden.id, linea: i + 1 })))
-          .abortSignal(signal),
-      )
+      const { orden } = await crearOrdenTransaccional(companyId, projectId, input)
       return orden
     },
     onSuccess: () => invalidar(),
