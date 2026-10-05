@@ -14,7 +14,7 @@ import { confirm, notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { useProveedoresQuery } from '../../domain/cxp/queries'
 import { useResponsablesQuery } from '../../domain/proveedores/queries'
-import { SugerenciaCuentaLinea } from '../proveedores/SugerenciaCuentaLinea'
+import { LineasOrdenEditor, LINEA_VACIA, lineasParaServidor, type LineaForm } from '../compras/LineasOrdenEditor'
 import { SeguimientoOrdenModal } from '../compras/SeguimientoOrdenModal'
 import { RespaldosRecepcionModal } from '../compras/RespaldosRecepcionModal'
 import { SeguimientoComprasPanel } from '../compras/SeguimientoComprasPanel'
@@ -41,9 +41,9 @@ import {
   useDescartarDuplicadoMutation,
   useEnlazarGastoAFacturaMutation,
 } from '../../domain/compras/mutations'
-import { ordenCompraFormSchema, pendienteDeRecibir, recepcionFormSchema, totalesOrden } from '../../domain/compras/schemas'
+import { ordenCompraFormSchema, pendienteDeRecibir, recepcionFormSchema } from '../../domain/compras/schemas'
+import { mensajeCrearOrden, nuevaClaveIdempotencia } from '../../domain/compras/ordenCrear'
 import { formatCurrency, formatDateShort, hoyLocalISO } from '../../lib/format'
-import { CATEGORIAS_GASTO_CXP } from '../../types/cxp'
 import {
   DESTINO_LINEA_LABELS,
   ESTADO_CONTRASENA_LABELS,
@@ -52,7 +52,6 @@ import {
   proveedorHabilitado,
   type ActivoFijo,
   type ContrasenaConRelaciones,
-  type DestinoLinea,
   type FilaDuplicado,
   type OrdenCompraConRelaciones,
   type RecepcionConRelaciones,
@@ -74,23 +73,6 @@ const TONO_OC = {
 } as const
 const TONO_REC = { borrador: 'info', registrada: 'success', anulada: 'neutral' } as const
 const TONO_CP = { emitida: 'warning', pagada: 'success', anulada: 'neutral' } as const
-
-interface LineaForm {
-  descripcion: string
-  destino_tipo: DestinoLinea
-  /** Insumo del almacén; solo con destino «inventario». */
-  suministro_id: string
-  categoria: string
-  cantidad: string
-  unidad: string
-  precio_unitario: string
-  iva_monto: string
-}
-
-const LINEA_VACIA: LineaForm = {
-  descripcion: '', destino_tipo: 'gasto', suministro_id: '', categoria: 'otros',
-  cantidad: '1', unidad: 'unidad', precio_unitario: '0', iva_monto: '0',
-}
 
 export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
   const { puedeCrear, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
@@ -567,37 +549,18 @@ export function OrdenCompraModal({
   onClose: () => void
 }) {
   const crear = useCrearOrdenCompraMutation(companyId, projectId)
-  // Solo un proyecto tiene bodega: en la contabilidad de la empresa no hay insumos.
   const { data: insumos = [], isLoading: cargandoInsumos } = useInsumosAlmacenQuery(companyId, projectId)
-  const hayBodega = !!projectId
+  // Una clave por apertura del formulario: un doble clic, un reintento tras un corte o una respuesta perdida
+  // devuelven LA MISMA orden en vez de crear otra (el servidor guarda la clave con la huella del contenido). Si la
+  // creación falla, no queda nada, así que la misma clave sirve para el reintento corregido.
+  const claveIdempotencia = useRef(nuevaClaveIdempotencia('oc'))
+  const enviando = useRef(false)   // un segundo clic antes de que la pantalla se re-pinte no lanza otra petición
   const [proveedorId, setProveedorId] = useState('')
   const [contratoId, setContratoId] = useState<string | null>(null)
   const [concepto, setConcepto] = useState('')
   const [fechaRequerida, setFechaRequerida] = useState('')
   const [notas, setNotas] = useState('')
   const [lineas, setLineas] = useState<LineaForm[]>([{ ...LINEA_VACIA }])
-
-  const totales = totalesOrden(lineas.map((l) => ({
-    cantidad: parseFloat(l.cantidad) || 0,
-    precio_unitario: parseFloat(l.precio_unitario) || 0,
-    iva_monto: parseFloat(l.iva_monto) || 0,
-  })))
-
-  function actualizar(i: number, campo: keyof LineaForm, valor: string) {
-    setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, [campo]: valor } : l)))
-  }
-
-  // El insumo manda en la unidad: un renglón de inventario se pide en la unidad con la que se
-  // lleva el insumo (el servidor lo exige igual). Cambiar el destino suelta el insumo.
-  function cambiarDestino(i: number, destino: DestinoLinea) {
-    setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, destino_tipo: destino, suministro_id: destino === 'inventario' ? l.suministro_id : '' } : l)))
-  }
-  function elegirInsumo(i: number, id: string) {
-    const ins = insumos.find((x) => x.id === id)
-    setLineas((ls) => ls.map((l, j) => (j === i
-      ? { ...l, suministro_id: id, descripcion: l.descripcion || ins?.nombre || '', unidad: ins?.unidad_medida ?? l.unidad }
-      : l)))
-  }
 
   async function guardar() {
     const parsed = ordenCompraFormSchema.safeParse({
@@ -611,34 +574,22 @@ export function OrdenCompraModal({
       fecha_requerida: fechaRequerida || null,
       obra_id: null,
       notas: notas.trim() || null,
-      lineas: lineas.map((l) => ({
-        descripcion: l.descripcion,
-        destino_tipo: l.destino_tipo,
-        // El destino Inventario exige el insumo del almacén (el servidor valida empresa, proyecto,
-        // unidad y destino); con cualquier otro destino no viaja insumo.
-        suministro_id: l.destino_tipo === 'inventario' ? (l.suministro_id || null) : null,
-        // La cuenta NO viaja desde aquí: la resuelve y valida el servidor al
-        // guardar (la misma entrada da la misma cuenta, sin depender de que una
-        // consulta previa haya terminado o fallado).
-        cuenta_id: null,
-        categoria: l.categoria,
-        cantidad: parseFloat(l.cantidad) || 0,
-        unidad: l.unidad,
-        precio_unitario: parseFloat(l.precio_unitario) || 0,
-        iva_monto: parseFloat(l.iva_monto) || 0,
-      })),
+      lineas: lineasParaServidor(lineas),
     })
     if (!parsed.success) {
       notify({ variant: 'warning', title: 'Atención', text: parsed.error.issues[0]?.message ?? 'Datos inválidos.' })
       return
     }
+    if (enviando.current) return
+    enviando.current = true
     try {
-      const prov = proveedores.find((p) => p.id === proveedorId)
-      await crear.mutateAsync({ ...parsed.data, proveedorNombre: prov?.nombre ?? '' })
+      await crear.mutateAsync({ ...parsed.data, clave_idempotencia: claveIdempotencia.current })
       notify({ variant: 'success', title: 'Listo', text: 'Orden creada en borrador. Apruébala para emitirla.' })
       onClose()
     } catch (e) {
-      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo crear la orden.' })
+      notify({ variant: 'error', title: 'Error', text: mensajeCrearOrden(e) })
+    } finally {
+      enviando.current = false
     }
   }
 
@@ -680,102 +631,10 @@ export function OrdenCompraModal({
         </div>
       </div>
 
-      <div style={{ marginTop: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <strong style={{ fontSize: 12 }}>Renglones</strong>
-          <button style={btnLink} onClick={() => setLineas((ls) => [...ls, { ...LINEA_VACIA }])}>+ Agregar renglón</button>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 640 }}>
-            <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--at-ink-soft)' }}>
-                <th style={{ padding: 4 }}>Descripción</th>
-                <th style={{ padding: 4, width: 120 }}>Destino</th>
-                <th style={{ padding: 4, width: 130 }}>Categoría</th>
-                <th style={{ padding: 4, width: 80 }}>Cant.</th>
-                <th style={{ padding: 4, width: 90 }}>Unidad</th>
-                <th style={{ padding: 4, width: 100 }}>Precio</th>
-                <th style={{ padding: 4, width: 90 }}>IVA</th>
-                <th style={{ padding: 4, width: 30 }} />
-              </tr>
-            </thead>
-            <tbody>
-              {lineas.map((l, i) => (
-                <tr key={i}>
-                  <td style={{ padding: 2 }}>
-                    <input value={l.descripcion} onChange={(e) => actualizar(i, 'descripcion', e.target.value)}
-                           style={{ ...input, width: '100%' }} aria-label={`Descripción del renglón ${i + 1}`} />
-                    {l.destino_tipo === 'inventario' && (
-                      <select value={l.suministro_id} onChange={(e) => elegirInsumo(i, e.target.value)}
-                              style={{ ...input, width: '100%', marginTop: 4 }} aria-label={`Insumo del renglón ${i + 1}`}>
-                        <option value="">{cargandoInsumos ? 'Cargando insumos…' : insumos.length === 0 ? 'No hay insumos activos en este proyecto' : 'Elige el insumo del almacén…'}</option>
-                        {insumos.map((x) => (
-                          <option key={x.id} value={x.id}>{x.nombre} · {x.unidad_medida} · stock {x.stock_actual}</option>
-                        ))}
-                      </select>
-                    )}
-                  </td>
-                  <td style={{ padding: 2 }}>
-                    <select value={l.destino_tipo} onChange={(e) => cambiarDestino(i, e.target.value as DestinoLinea)}
-                            style={{ ...input, width: '100%' }} aria-label={`Destino del renglón ${i + 1}`}>
-                      {(Object.keys(DESTINO_LINEA_LABELS) as DestinoLinea[])
-                        .filter((d) => d !== 'inventario' || hayBodega)
-                        .map((d) => <option key={d} value={d}>{DESTINO_LINEA_LABELS[d]}</option>)}
-                    </select>
-                  </td>
-                  <td style={{ padding: 2 }}>
-                    <select value={l.categoria} onChange={(e) => actualizar(i, 'categoria', e.target.value)}
-                            style={{ ...input, width: '100%' }} aria-label={`Categoría del renglón ${i + 1}`}>
-                      {CATEGORIAS_GASTO_CXP.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </td>
-                  <td style={{ padding: 2 }}>
-                    <input type="number" min="0" step="0.01" value={l.cantidad}
-                           onChange={(e) => actualizar(i, 'cantidad', e.target.value)}
-                           style={{ ...input, width: '100%' }} aria-label={`Cantidad del renglón ${i + 1}`} />
-                  </td>
-                  <td style={{ padding: 2 }}>
-                    <input value={l.unidad} onChange={(e) => actualizar(i, 'unidad', e.target.value)}
-                           readOnly={l.destino_tipo === 'inventario' && !!l.suministro_id}
-                           title={l.destino_tipo === 'inventario' && l.suministro_id ? 'La unidad la fija el insumo del almacén' : undefined}
-                           style={{ ...input, width: '100%' }} aria-label={`Unidad del renglón ${i + 1}`} />
-                  </td>
-                  <td style={{ padding: 2 }}>
-                    <input type="number" min="0" step="0.01" value={l.precio_unitario}
-                           onChange={(e) => actualizar(i, 'precio_unitario', e.target.value)}
-                           style={{ ...input, width: '100%' }} aria-label={`Precio del renglón ${i + 1}`} />
-                  </td>
-                  <td style={{ padding: 2 }}>
-                    <input type="number" min="0" step="0.01" value={l.iva_monto}
-                           onChange={(e) => actualizar(i, 'iva_monto', e.target.value)}
-                           style={{ ...input, width: '100%' }} aria-label={`IVA del renglón ${i + 1}`} />
-                  </td>
-                  <td style={{ padding: 2, textAlign: 'right' }}>
-                    {lineas.length > 1 && (
-                      <button style={btnLink} aria-label={`Quitar renglón ${i + 1}`}
-                              onClick={() => setLineas((ls) => ls.filter((_, j) => j !== i))}>✕</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {lineas.map((l, i) => (
-            <SugerenciaCuentaLinea
-              key={i} indice={i} projectId={projectId} proveedorId={proveedorId || null}
-              destino={l.destino_tipo === 'activo_fijo' ? 'activo_fijo' : l.destino_tipo === 'inventario' ? 'inventario' : 'gasto'}
-              categoria={l.categoria} suministroId={l.suministro_id || null}
-              fecha={hoyLocalISO()}
-            />
-          ))}
-        </div>
-        <p style={{ margin: '10px 0 0', textAlign: 'right', fontSize: 13 }}>
-          Subtotal {formatCurrency(totales.subtotal, monedaBase)} · IVA {formatCurrency(totales.iva, monedaBase)} ·{' '}
-          <strong>Total {formatCurrency(totales.total, monedaBase)}</strong>
-        </p>
-      </div>
+      <LineasOrdenEditor
+        lineas={lineas} onChange={setLineas} projectId={projectId} proveedorId={proveedorId || null}
+        monedaBase={monedaBase} insumos={insumos} cargandoInsumos={cargandoInsumos}
+      />
 
       <div style={{ marginTop: 12 }}>
         <Campo label="Notas">
