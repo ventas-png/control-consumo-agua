@@ -329,5 +329,17 @@ else
   echo "  (omitido: sin node en este entorno)"
 fi
 
+# Auditoría RBAC: el control negativo debe fallar antes de la corrección.
+AUDIT_MIG="$MIGS/20261026000500_auditoria_borrado_roles.sql"
+AUDIT_TEST="$RAIZ/supabase/tests/auditoria_roles/assert.sql"
+if psql -q -v ON_ERROR_STOP=1 -d "$BD" -f "$RAIZ/supabase/tests/auditoria_roles/negative.sql" > "$SALIDAS/audit-antes.txt" 2>&1; then
+  echo "❌ auditoría RBAC: el control negativo pasó sin la corrección"; exit 1
+fi
+grep -q 'permission_audit_log_target_role_id_fkey' "$SALIDAS/audit-antes.txt" \
+  || { cat "$SALIDAS/audit-antes.txt"; exit 1; }
+aplicar "$AUDIT_MIG"
+aplicar "$AUDIT_MIG"
+bloque ../auditoria_roles/assert.sql 'Auditoría de roles: DELETE simple y cascada sin perder eventos'
+
 echo "── 8/8 · listo"
 echo "✅ compras (lectura financiera, creación atómica de órdenes y acumulación de facturas) verificado contra PostgreSQL real"

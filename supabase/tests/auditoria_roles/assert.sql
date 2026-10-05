@@ -1,0 +1,96 @@
+-- Sólo fixture. El caller puede configurar estos dos UUID para sandbox.
+-- Toda la prueba se revierte; nunca usarla contra producción.
+BEGIN;
+DO $$
+DECLARE
+  cid uuid := COALESCE(NULLIF(current_setting('test.audit_company', true), ''),
+    'cccccccc-cccc-cccc-cccc-cccccccccccc')::uuid;
+  uid uuid := COALESCE(NULLIF(current_setting('test.audit_user', true), ''),
+    'c0c0c0c0-0000-0000-0000-00000000000a')::uuid;
+  rid uuid := gen_random_uuid();
+  simple uuid := gen_random_uuid();
+  before_count bigint;
+  other_cid uuid;
+  other_role uuid := gen_random_uuid();
+  owned_role uuid := gen_random_uuid();
+  affected bigint;
+  k text;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.app_users WHERE id=uid AND company_id=cid) THEN
+    RAISE EXCEPTION 'AUDIT_FIXTURE_MISSING';
+  END IF;
+  PERFORM set_config('request.jwt.claim.sub', uid::text, true);
+  IF EXISTS (SELECT 1 FROM public.permission_audit_log WHERE target_role_id IS NOT NULL
+    AND NOT (COALESCE(details,'{}'::jsonb) ? 'role_id')) THEN
+    RAISE EXCEPTION 'AUDIT_LEGACY_BACKFILL_FAILED';
+  END IF;
+  INSERT INTO public.roles(id, company_id, name) VALUES (rid,cid,'Audit regresión '||rid);
+  IF NOT EXISTS (SELECT 1 FROM public.permission_audit_log WHERE target_role_id=rid
+    AND action='create_role' AND actor_id=uid AND details->>'role_id'=rid::text) THEN
+    RAISE EXCEPTION 'AUDIT_CREATE_FAILED';
+  END IF;
+  UPDATE public.roles SET name='Audit actualizado '||rid, description='actualizada' WHERE id=rid;
+  IF NOT EXISTS (SELECT 1 FROM public.permission_audit_log WHERE target_role_id=rid
+    AND action='update_role' AND details->'after'->>'description'='actualizada'
+    AND details->'before'->>'name'='Audit regresión '||rid) THEN
+    RAISE EXCEPTION 'AUDIT_UPDATE_FAILED';
+  END IF;
+  INSERT INTO public.role_permissions(role_id,permission_key) VALUES (rid,'platform.contabilidad.view');
+  INSERT INTO public.user_roles(user_id,role_id) VALUES (uid,rid);
+  DELETE FROM public.role_permissions WHERE role_id=rid;
+  DELETE FROM public.user_roles WHERE role_id=rid;
+  IF (SELECT count(*) FROM public.permission_audit_log WHERE target_role_id=rid
+    AND action IN ('remove_role','revoke_permission')) <> 2 THEN
+    RAISE EXCEPTION 'AUDIT_DIRECT_REMOVAL_FAILED';
+  END IF;
+  INSERT INTO public.role_permissions(role_id,permission_key) VALUES (rid,'platform.contabilidad.view');
+  INSERT INTO public.user_roles(user_id,role_id) VALUES (uid,rid);
+  before_count := (SELECT count(*) FROM public.permission_audit_log WHERE target_role_id=rid);
+  DELETE FROM public.roles WHERE id=rid;
+  IF EXISTS (SELECT 1 FROM public.roles WHERE id=rid)
+    OR EXISTS (SELECT 1 FROM public.user_roles WHERE role_id=rid)
+    OR EXISTS (SELECT 1 FROM public.role_permissions WHERE role_id=rid) THEN
+    RAISE EXCEPTION 'AUDIT_CASCADE_FAILED';
+  END IF;
+  IF (SELECT count(*) FROM public.permission_audit_log WHERE details->>'role_id'=rid::text)
+    <> before_count+3 THEN RAISE EXCEPTION 'AUDIT_HISTORY_LOST'; END IF;
+  IF EXISTS (SELECT 1 FROM public.permission_audit_log WHERE details->>'role_id'=rid::text
+    AND target_role_id IS NOT NULL) THEN RAISE EXCEPTION 'AUDIT_DANGLING_FK'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.permission_audit_log WHERE details->>'role_id'=rid::text
+    AND action='delete_role' AND actor_id=uid AND details->>'company_id'=cid::text) THEN
+    RAISE EXCEPTION 'AUDIT_DELETE_SNAPSHOT_FAILED';
+  END IF;
+  INSERT INTO public.roles(id,company_id,name) VALUES (simple,cid,'Audit simple '||simple);
+  DELETE FROM public.roles WHERE id=simple;
+  IF (SELECT count(*) FROM public.permission_audit_log WHERE details->>'role_id'=simple::text) <> 2 THEN
+    RAISE EXCEPTION 'AUDIT_SIMPLE_DELETE_FAILED';
+  END IF;
+  SELECT id INTO other_cid FROM public.companies WHERE id<>cid ORDER BY id LIMIT 1;
+  IF other_cid IS NULL THEN RAISE EXCEPTION 'AUDIT_SECOND_COMPANY_MISSING'; END IF;
+  INSERT INTO public.roles(id,company_id,name) VALUES
+    (other_role,other_cid,'Audit aislado '||other_role),
+    (owned_role,cid,'Audit administrador '||owned_role);
+  -- La corrección no debe ampliar el acceso: el admin normal sólo borra su empresa.
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  DELETE FROM public.roles WHERE id=other_role;
+  GET DIAGNOSTICS affected=ROW_COUNT;
+  IF affected<>0 THEN RAISE EXCEPTION 'AUDIT_CROSS_COMPANY_DELETE'; END IF;
+  DELETE FROM public.roles WHERE id=owned_role;
+  GET DIAGNOSTICS affected=ROW_COUNT;
+  IF affected<>1 THEN RAISE EXCEPTION 'AUDIT_ADMIN_DELETE_FAILED'; END IF;
+  EXECUTE 'RESET ROLE';
+  IF NOT EXISTS (SELECT 1 FROM public.permission_audit_log
+    WHERE action='delete_role' AND actor_id=uid AND details->>'role_id'=owned_role::text) THEN
+    RAISE EXCEPTION 'AUDIT_ADMIN_ACTOR_LOST';
+  END IF;
+  FOREACH k IN ARRAY ARRAY['audit_roles_changes','audit_role_permissions_changes','audit_user_roles_changes'] LOOP
+    IF has_function_privilege('anon','public.'||k||'()','EXECUTE')
+      OR has_function_privilege('authenticated','public.'||k||'()','EXECUTE') THEN
+      RAISE EXCEPTION 'AUDIT_EXPOSED_FUNCTION: %',k;
+    END IF;
+  END LOOP;
+  RAISE NOTICE 'AUDIT_ROLES_OK: creación, edición, retiro directo, cascada, snapshots, actor, FK, ACL y RLS de empresa';
+END;
+$$;
+ROLLBACK;
+SELECT 'AUDIT_ROLES_OK_REVERTIDO' AS resultado;
