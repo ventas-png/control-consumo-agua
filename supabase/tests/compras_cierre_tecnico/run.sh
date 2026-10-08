@@ -30,6 +30,10 @@ MIGS="$RAIZ/supabase/migrations"
 PRIMERA=20261026000000
 NUESTRAS=$(ls "$MIGS" | grep -E '^20261026000[0-4]00_' | sed 's/\.sql$//' | sort)
 FIXTURE_B="$RAIZ/supabase/tests/compras_bloque_b/fixture.sql"
+# Auditoría de roles (no es de la serie): se aplica SOLO en el paso 7b, después de su control negativo. El bucle del paso 4
+# que instala «las migraciones posteriores a la serie» la excluye a propósito: si la instalara antes, el control negativo
+# correría contra la corrección ya aplicada y «pasaría» sin probar nada (fallo real de la corrida 37369174666 de CI).
+AUDIT_BASE=20261026000500_auditoria_borrado_roles
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -140,7 +144,7 @@ for base in $NUESTRAS; do
 done
 for f in "$MIGS"/*.sql; do
   base="$(basename "$f" .sql)"
-  if [[ "${base:0:14}" > "$PRIMERA" ]] && ! grep -qx "$base" <<<"$NUESTRAS"; then aplicar "$f"; fi
+  if [[ "${base:0:14}" > "$PRIMERA" ]] && ! grep -qx "$base" <<<"$NUESTRAS" && [[ "$base" != "$AUDIT_BASE" ]]; then aplicar "$f"; fi
 done
 aplicar "$AQUI/fixture_lectura.sql"
 
@@ -329,5 +333,159 @@ else
   echo "  (omitido: sin node en este entorno)"
 fi
 
+# ── 7b · Auditoría de roles (20261026000500_auditoria_borrado_roles) ────────────────────────────────────────────────────
+# Qué se prueba y por qué así:
+#   · CONTROL NEGATIVO contra una COPIA de la base que NO tiene la corrección. Que no la tiene se demuestra por catálogo
+#     (no se supone: la corrida 37369174666 falló porque el paso 4 la había instalado antes). Solo vale si falla EXACTAMENTE
+#     como falló en producción: SQLSTATE 23503 por permission_audit_log_target_role_id_fkey, al insertar desde
+#     audit_roles_changes() el evento de un rol que ya no existe. Cualquier otro error no es prueba.
+#   · la migración dos veces: la segunda no cambia NADA (huella de funciones + auditoría), y ni RLS, ni políticas, ni
+#     privilegios, ni ACL de las funciones, ni triggers, ni constraints cambian respecto de antes de aplicarla.
+#   · la regresión (assert.sql) sin dejar residuos, y MUTACIONES: con la migración aplicada, deshacer UNA corrección a la vez
+#     (la función original completa, o solo la FK del rol, o solo la FK del usuario) debe romper la regresión por la causa
+#     esperada; así consta que cada corrección hace falta. Si un patrón de sed dejara de coincidir, el arnés aborta (no pasa en falso).
+echo "── 7b/8 · auditoría de roles: control negativo, migración dos veces, regresión y mutaciones"
+AUDIT_MIG="$MIGS/$AUDIT_BASE.sql"
+AUDIT_DIR="$RAIZ/supabase/tests/auditoria_roles"
+BD_AUDIT=compras_cct_audit
+FUNCS_AUDIT="'audit_roles_changes','audit_role_permissions_changes','audit_user_roles_changes'"
+ORIGINALES="$MIGS/20260518000008_rbac_helpers_and_sync.sql"
+
+# Las tres funciones corregidas guardan la identidad del rol en details.role_id; las originales nunca mencionan esa clave.
+con_correccion() {
+  psql -q -t -A -d "$1" -c "SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ($FUNCS_AUDIT) AND prosrc LIKE '%''role_id''%'"
+}
+# Superficie de seguridad que la migración NO debe tocar: RLS, políticas, privilegios de tabla y triggers de roles, role_permissions,
+# user_roles y permission_audit_log; constraints de permission_audit_log; ACL, SECURITY DEFINER y search_path de las tres funciones.
+superficie() {
+  psql -q -t -A -v ON_ERROR_STOP=1 -d "$1" <<SQL
+SELECT md5(string_agg(x, E'\n' ORDER BY x)) FROM (
+  SELECT 'rls|' || c.relname || '|' || c.relrowsecurity || '|' || c.relforcerowsecurity AS x
+    FROM pg_class c WHERE c.oid IN ('public.roles'::regclass, 'public.role_permissions'::regclass, 'public.user_roles'::regclass, 'public.permission_audit_log'::regclass)
+  UNION ALL SELECT 'pol|' || tablename || '|' || policyname || '|' || cmd || '|' || roles::text || '|' || coalesce(qual, '') || '|' || coalesce(with_check, '')
+    FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('roles', 'role_permissions', 'user_roles', 'permission_audit_log')
+  UNION ALL SELECT 'grant|' || table_name || '|' || grantee || '|' || privilege_type
+    FROM information_schema.role_table_grants WHERE table_schema = 'public' AND table_name IN ('roles', 'role_permissions', 'user_roles', 'permission_audit_log')
+  UNION ALL SELECT 'fn|' || proname || '|' || coalesce(proacl::text, 'NULL') || '|' || prosecdef || '|' || coalesce(array_to_string(proconfig, ','), '')
+    FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ($FUNCS_AUDIT)
+  UNION ALL SELECT 'trg|' || tgenabled::text || '|' || pg_get_triggerdef(oid)
+    FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN ('public.roles'::regclass, 'public.role_permissions'::regclass, 'public.user_roles'::regclass, 'public.permission_audit_log'::regclass)
+  UNION ALL SELECT 'con|' || conname || '|' || pg_get_constraintdef(oid)
+    FROM pg_constraint WHERE conrelid = 'public.permission_audit_log'::regclass
+) s;
+SQL
+}
+# Huella de lo que la migración puede escribir: definición de las tres funciones + TODAS las filas de la auditoría.
+huella_audit() {
+  psql -q -t -A -v ON_ERROR_STOP=1 -d "$1" <<SQL
+SELECT md5(coalesce((SELECT string_agg(pg_get_functiondef(p.oid), E'\n' ORDER BY p.proname) FROM pg_proc p
+                      WHERE p.pronamespace = 'public'::regnamespace AND p.proname IN ($FUNCS_AUDIT)), '')
+        || coalesce((SELECT string_agg(l::text, E'\n' ORDER BY l.id) FROM public.permission_audit_log l), ''))
+       || '|' || (SELECT count(*) FROM public.permission_audit_log);
+SQL
+}
+estado_roles() {
+  psql -q -t -A -v ON_ERROR_STOP=1 -d "$BD" -c "SELECT (SELECT count(*) FROM public.roles) || '/' || (SELECT count(*) FROM public.role_permissions) || '/' || (SELECT count(*) FROM public.user_roles) || '/' || (SELECT count(*) FROM public.permission_audit_log) || '/' || (SELECT count(*) FROM public.roles WHERE name LIKE 'Audit %')"
+}
+sin_role_id() {
+  psql -q -t -A -d "$BD" -c "SELECT count(*) FROM public.permission_audit_log WHERE target_role_id IS NOT NULL AND NOT (COALESCE(details, '{}'::jsonb) ? 'role_id')"
+}
+# Corre un script contra $1 (con mensajes en inglés y SQLSTATE) y exige que FALLE, y que el error contenga TODOS los textos pedidos.
+debe_fallar_por() {
+  local bd="$1" archivo="$2" etiqueta="$3" salida e; shift 3
+  if salida=$(PGOPTIONS="-c lc_messages=C" psql -q -X -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -d "$bd" -f "$archivo" 2>&1); then
+    echo "❌ auditoría RBAC · $etiqueta: PASÓ y debía fallar (no prueba nada)"; exit 1
+  fi
+  for e in "$@"; do
+    grep -qF -- "$e" <<<"$salida" || { echo "❌ auditoría RBAC · $etiqueta: falló, pero NO por la causa esperada («$e» ausente):"; echo "$salida" | head -8; exit 1; }
+  done
+}
+
+# 1 · la corrección NO está aplicada (por catálogo), y el backfill tiene qué hacer.
+[ "$(con_correccion "$BD")" = "0" ] \
+  || { echo "❌ auditoría RBAC: la corrección ya estaba aplicada antes del control negativo (¿algún paso anterior instaló $AUDIT_BASE?)"; exit 1; }
+PEND=$(sin_role_id)
+[ "$PEND" -gt 0 ] || { echo "❌ auditoría RBAC: no hay eventos previos sin role_id; el backfill no se ejercita"; exit 1; }
+SUP0=$(superficie "$BD"); HUE0=$(huella_audit "$BD")
+[[ "$SUP0" =~ ^[0-9a-f]{32}$ ]] && [[ "$HUE0" =~ ^[0-9a-f]{32}\|[0-9]+$ ]] \
+  || { echo "❌ auditoría RBAC: las huellas previas no son válidas (superficie='$SUP0', auditoría='$HUE0'); una comparación vacía no prueba nada"; exit 1; }
+
+# 2 · control negativo en una copia sin la corrección.
+psql -q -d postgres -c "CREATE DATABASE $BD_AUDIT TEMPLATE $BD" >/dev/null
+[ "$(con_correccion "$BD_AUDIT")" = "0" ] || { echo "❌ auditoría RBAC: la copia del control negativo ya trae la corrección"; exit 1; }
+debe_fallar_por "$BD_AUDIT" "$AUDIT_DIR/negative.sql" "control negativo" \
+  'ERROR:  23503:' 'violates foreign key constraint "permission_audit_log_target_role_id_fkey"' \
+  'is not present in table "roles"' 'PL/pgSQL function audit_roles_changes()'
+echo "  ✓ control negativo: sin la corrección, borrar un rol falla por 23503 en permission_audit_log_target_role_id_fkey, desde audit_roles_changes() (como en producción)"
+psql -q -d postgres -c "DROP DATABASE $BD_AUDIT" >/dev/null
+
+# 3 · la migración, dos veces: la segunda no cambia nada, y no toca RLS, políticas, privilegios, ACL ni triggers.
+aplicar "$AUDIT_MIG"
+[ "$(con_correccion "$BD")" = "3" ] || { echo "❌ auditoría RBAC: tras la migración las tres funciones deben llevar la corrección"; exit 1; }
+[ "$(sin_role_id)" = "0" ] || { echo "❌ auditoría RBAC: el backfill dejó $(sin_role_id) eventos con rol vivo sin role_id"; exit 1; }
+HUE1=$(huella_audit "$BD")
+aplicar "$AUDIT_MIG"
+HUE2=$(huella_audit "$BD")
+[[ "$HUE1" =~ ^[0-9a-f]{32}\|[0-9]+$ ]] && [[ "$HUE2" =~ ^[0-9a-f]{32}\|[0-9]+$ ]] \
+  || { echo "❌ auditoría RBAC: huellas posteriores no válidas ('$HUE1' / '$HUE2')"; exit 1; }
+[ "$HUE0" != "$HUE1" ] || { echo "❌ auditoría RBAC: la migración no cambió nada (¿ya estaba aplicada?)"; exit 1; }
+[ "$HUE1" = "$HUE2" ] || { echo "❌ auditoría RBAC: la segunda aplicación cambió funciones o filas de auditoría (no es idempotente)"; exit 1; }
+SUP1=$(superficie "$BD")
+[[ "$SUP1" =~ ^[0-9a-f]{32}$ ]] && [ "$SUP1" = "$SUP0" ] \
+  || { echo "❌ auditoría RBAC: la migración cambió RLS, políticas, privilegios o triggers de las 4 tablas, constraints de la auditoría, o ACL/definer/search_path de las 3 funciones"; exit 1; }
+echo "  ✓ migración aplicada dos veces: la segunda no cambia nada ($PEND eventos previos recibieron role_id); sin cambios en RLS, políticas, privilegios y triggers de las 4 tablas, constraints de la auditoría ni ACL/definer/search_path de las 3 funciones"
+
+# 4 · la regresión completa, sin residuos.
+ANTES_R=$(estado_roles)
+[[ "$ANTES_R" =~ ^[0-9]+(/[0-9]+){4}$ ]] || { echo "❌ auditoría RBAC: el estado previo de roles no es válido ('$ANTES_R')"; exit 1; }
+SAL_AUDIT=$(psql -q -X -v ON_ERROR_STOP=1 -d "$BD" -f "$AUDIT_DIR/assert.sql" 2>&1) || {
+  echo "❌ auditoría RBAC: la regresión (assert.sql) falló:"; echo "$SAL_AUDIT" | grep -E 'ERROR|DETAIL|CONTEXT' | head -6; exit 1; }
+grep -q 'AUDIT_ROLES_OK_REVERTIDO' <<<"$SAL_AUDIT" || { echo "❌ auditoría RBAC: assert.sql no llegó a su veredicto"; echo "$SAL_AUDIT" | tail -5; exit 1; }
+[ "$(estado_roles)" = "$ANTES_R" ] || { echo "❌ auditoría RBAC: assert.sql dejó residuos (roles/permisos/asignaciones/auditoría: antes $ANTES_R, después $(estado_roles))"; exit 1; }
+echo "  ✓ regresión: borrado simple y en cascada, eventos, actor e identidades históricas, FK viva o NULL, ACL de las funciones y aislamiento entre empresas; todo revertido, sin residuos"
+
+# 5 · mutaciones: con la migración aplicada, cada una de las tres funciones debe HACER FALTA. Por función, dos regresiones:
+#     (a) la definición ORIGINAL completa (20260518000008) y (b) «solo FK»: la corregida, pero apuntando otra vez con la FK
+#     viva a un rol que en una eliminación ya no existe. Ambas deben romper la regresión, y por la causa esperada.
+extraer() {   # extraer ARCHIVO FUNCIÓN → la definición CREATE OR REPLACE FUNCTION completa
+  awk -v f="$2" '$0 ~ ("^CREATE OR REPLACE FUNCTION public\\." f "\\(\\)") { on = 1 } on { print } on && $0 == "$$;" { exit }' "$1"
+}
+mutar() {     # mutar ETIQUETA ARCHIVO_SQL PATRÓN…  (aplica el archivo en una copia y exige que assert.sql falle por los patrones)
+  local etiqueta="$1" archivo="$2"; shift 2
+  psql -q -d postgres -c "CREATE DATABASE $BD_AUDIT TEMPLATE $BD" >/dev/null
+  aplicar "$archivo" "$BD_AUDIT"
+  debe_fallar_por "$BD_AUDIT" "$AUDIT_DIR/assert.sql" "mutación ($etiqueta)" "$@"
+  echo "  ✓ mutación ($etiqueta): la regresión falla por la causa esperada"
+  psql -q -d postgres -c "DROP DATABASE $BD_AUDIT" >/dev/null
+}
+FK_ROL='violates foreign key constraint "permission_audit_log_target_role_id_fkey"'
+for f in audit_roles_changes audit_role_permissions_changes audit_user_roles_changes; do
+  extraer "$ORIGINALES" "$f" > "$SALIDAS/original-$f.sql"
+  extraer "$AUDIT_MIG" "$f" > "$SALIDAS/fijo-$f.sql"
+  cp "$SALIDAS/fijo-$f.sql" "$SALIDAS/solofk-$f.sql"
+  [ -s "$SALIDAS/original-$f.sql" ] && [ -s "$SALIDAS/fijo-$f.sql" ] && ! grep -qF "'role_id'" "$SALIDAS/original-$f.sql" \
+    || { echo "❌ auditoría RBAC: no se pudo extraer la definición original/corregida de $f"; exit 1; }
+done
+sed -i "s/VALUES (auth.uid(), NULL, 'delete_role'/VALUES (auth.uid(), OLD.id, 'delete_role'/" "$SALIDAS/solofk-audit_roles_changes.sql"
+sed -i "s/(SELECT r.id FROM public.roles r WHERE r.id = OLD.role_id)/OLD.role_id/" \
+  "$SALIDAS/solofk-audit_role_permissions_changes.sql" "$SALIDAS/solofk-audit_user_roles_changes.sql"
+# Segunda corrección de la migración: al borrar un USUARIO con asignaciones, target_user_id debe ser NULL (el usuario ya no existe).
+cp "$SALIDAS/fijo-audit_user_roles_changes.sql" "$SALIDAS/solofk-usuario-audit_user_roles_changes.sql"
+sed -i "s/(SELECT u.id FROM public.app_users u WHERE u.id = OLD.user_id)/OLD.user_id/" "$SALIDAS/solofk-usuario-audit_user_roles_changes.sql"
+for f in audit_roles_changes audit_role_permissions_changes audit_user_roles_changes; do
+  ! cmp -s "$SALIDAS/solofk-$f.sql" "$SALIDAS/fijo-$f.sql" \
+    || { echo "❌ auditoría RBAC: la mutación «solo FK» de $f no cambió nada (el patrón ya no coincide con la migración)"; exit 1; }
+done
+! cmp -s "$SALIDAS/solofk-usuario-audit_user_roles_changes.sql" "$SALIDAS/fijo-audit_user_roles_changes.sql" \
+  || { echo "❌ auditoría RBAC: la mutación «solo FK usuario» no cambió nada (el patrón ya no coincide con la migración)"; exit 1; }
+mutar "audit_roles_changes ORIGINAL"            "$SALIDAS/original-audit_roles_changes.sql"            'AUDIT_CREATE_FAILED'
+mutar "audit_role_permissions_changes ORIGINAL" "$SALIDAS/original-audit_role_permissions_changes.sql" 'AUDIT_GRANT_EVENT_FAILED'
+mutar "audit_user_roles_changes ORIGINAL"       "$SALIDAS/original-audit_user_roles_changes.sql"       'AUDIT_ASSIGN_EVENT_FAILED'
+mutar "audit_roles_changes solo FK"             "$SALIDAS/solofk-audit_roles_changes.sql"              'ERROR:  23503:' "$FK_ROL" 'PL/pgSQL function audit_roles_changes()'
+mutar "audit_role_permissions_changes solo FK"  "$SALIDAS/solofk-audit_role_permissions_changes.sql"  'ERROR:  23503:' "$FK_ROL" 'PL/pgSQL function audit_role_permissions_changes()'
+mutar "audit_user_roles_changes solo FK"        "$SALIDAS/solofk-audit_user_roles_changes.sql"        'ERROR:  23503:' "$FK_ROL" 'PL/pgSQL function audit_user_roles_changes()'
+mutar "audit_user_roles_changes solo FK usuario" "$SALIDAS/solofk-usuario-audit_user_roles_changes.sql" 'ERROR:  23503:' \
+  'violates foreign key constraint "permission_audit_log_target_user_id_fkey"' 'PL/pgSQL function audit_user_roles_changes()'
+
 echo "── 8/8 · listo"
-echo "✅ compras (lectura financiera, creación atómica de órdenes y acumulación de facturas) verificado contra PostgreSQL real"
+echo "✅ compras (lectura financiera, creación atómica de órdenes y acumulación de facturas) y auditoría de borrado de roles verificados contra PostgreSQL real"
