@@ -152,9 +152,9 @@ Todo se ejecutó en esta sesión, contra un PostgreSQL 16 local con la **cadena 
 | `compras_cierre_tecnico`, `compras_flujo` | rc=0 |
 | `conta_tipo_cambio_mensual`, `conta_pendientes_reproceso`, `conta_reglas_imputacion` | rc=0 (adaptadas, ver abajo) |
 | `personal_usuario`, `presencia_marcaje`, `puntos_verificacion` | rc=0 |
-| Barrido de las demás suites de `supabase/tests/` (62, de una en una) con las seis primeras migraciones | PENDIENTE_BARRIDO |
-| Guardas: `migrations-guard`, `migrations-append-only`, auditor de drift | PENDIENTE_GUARDAS |
-| Pantalla: `tsc`, `eslint`, `vitest` | PENDIENTE_UI |
+| Barrido de las otras 62 suites de `supabase/tests/` (de una en una, sobre las ocho migraciones) | **62/62 en verde.** `personal_usuario` falló dos veces seguidas por un choque de puerto con el auditor de drift que corría a la vez (`pg_ctl: could not start server`, no llegó a ejecutar ninguna aserción) y pasó repetida sola; con `compras_bloque_b`, 63/63 |
+| Guardas: `migrations-guard`, `migrations-append-only`, auditor de drift | `migrations-guard` ✅ · `migrations-append-only`: 8 migraciones nuevas, 0 violaciones del histórico ✅ · auditor de drift: 565 migraciones sobre base vacía, «Sin drift no autorizado» (salida 0) ✅ |
+| Pantalla: `tsc`, `eslint`, `vitest` | `tsc --noEmit` sin errores · `eslint src --max-warnings=0` sin avisos · `vitest run`: 446 archivos y **7 176 pruebas** en verde (157 omitidas por diseño; 1 archivo omitido) |
 
 **Suites existentes que hubo que adaptar** (y por qué). Ninguna aserción se debilitó: cada una *capturaba por la API* un dato que ahora el servidor rechaza, así que el dato se emula como **dato histórico** (`session_replication_role = replica` o el trigger apagado solo en ese punto):
 
