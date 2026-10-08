@@ -457,7 +457,7 @@ export interface SeguimientoFactura {
 }
 
 export interface SeguimientoEvento {
-  tipo: 'estado' | 'devolucion'
+  tipo: 'estado' | 'devolucion' | 'excepcion_contrato' | 'modificacion'
   estado_anterior: EstadoOrdenCompra | null
   estado_nuevo: EstadoOrdenCompra
   motivo: string | null

@@ -54,6 +54,20 @@ function base(extra: Partial<SeguimientoOrden> = {}): SeguimientoOrden {
 }
 
 describe('SeguimientoOrdenContenido', () => {
+  it('el historial muestra una modificación posterior a la aprobación con lo que cambió, sin llamarla cambio de estado', () => {
+    const s = base({
+      eventos: [
+        { tipo: 'estado', estado_anterior: 'borrador', estado_nuevo: 'aprobada', motivo: null, revision: 0, origen: 'usuario', actor_id: 'u', created_at: '2026-09-30T10:00:00Z' },
+        { tipo: 'modificacion', estado_anterior: 'emitida', estado_nuevo: 'emitida', motivo: 'notas: «A» → «B»', revision: 0, origen: 'usuario', actor_id: 'u', created_at: '2026-10-01T10:00:00Z' },
+      ],
+    })
+    render(<SeguimientoOrdenContenido s={s} monedaBase="GTQ" />)
+    const historial = screen.getByTestId('seg-historial')
+    expect(within(historial).getByText(/Modificada estando emitida/)).toBeTruthy()
+    expect(within(historial).getByText(/notas: «A» → «B»/)).toBeTruthy()
+    expect(within(historial).queryByText(/Emitida → Emitida/)).toBeNull()
+  })
+
   it('muestra comprometido, recibido, facturado y pagado como indicadores SEPARADOS', () => {
     render(<SeguimientoOrdenContenido s={base()} monedaBase="GTQ" />)
     expect(within(screen.getByTestId('ind-comprometido')).getByText(/2,576/)).toBeTruthy()

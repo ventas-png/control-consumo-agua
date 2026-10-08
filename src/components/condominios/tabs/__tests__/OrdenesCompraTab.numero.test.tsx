@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   notify: vi.fn(),
   excepcion: vi.fn(),
   cambiarEstado: true,
+  autorizar: true,
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
@@ -24,7 +25,7 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
 vi.mock('../../../compras/SeguimientoOrdenModal', () => ({ SeguimientoOrdenModal: () => null }))
 vi.mock('../../../proveedores/ContratoSeguimientoModal', () => ({ ContratoSeguimientoModal: () => null }))
 vi.mock('../../../proveedores/ContratoSelector', () => ({ ContratoSelector: () => null }))
-vi.mock('../../../proveedores/permisos', () => ({ usePermisosProveedor: () => ({ cambiarEstado: h.cambiarEstado }) }))
+vi.mock('../../../proveedores/permisos', () => ({ usePermisosProveedor: () => ({ cambiarEstado: h.cambiarEstado, autorizar: h.autorizar }) }))
 vi.mock('../../../../domain/proveedores/contratosCompras', async (orig) => ({
   ...(await orig<typeof import('../../../../domain/proveedores/contratosCompras')>()),
   useExcepcionContratoMutation: () => ({ mutateAsync: h.excepcion }),
@@ -39,7 +40,7 @@ const orden = (id: string, numero: string | null, concepto: string) => ({
   concepto, monto_estimado: null, estado: 'emitida', created_at: '2026-10-02T00:00:00Z',
 })
 
-beforeEach(() => { h.cambiarEstado = true })
+beforeEach(() => { h.cambiarEstado = true; h.autorizar = true })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('Operaciones · Órdenes de compra', () => {
@@ -121,5 +122,43 @@ describe('Operaciones · aprobar una orden amparada en un contrato', () => {
     fireEvent.click(screen.getByText(/Aprobar/))
     await waitFor(() => expect(h.notify).toHaveBeenCalled())
     expect(h.prompt).not.toHaveBeenCalled()
+  })
+})
+
+// El servidor exige un permiso distinto por paso (migración 20261027000300): aprobar y devolver →
+// «Autorizar / Denegar»; emitir y cancelar → «Cambiar estado». La pantalla solo ofrece lo que va a aceptar.
+describe('Operaciones · cada paso se ofrece según su permiso', () => {
+  const montar = (estado: string) => {
+    render(<OrdenesCompraTab ordenes={[{ ...orden('o1', 'OC-000001', 'Compra X'), estado }] as never} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit onRefresh={vi.fn()} proveedores={[]} />)
+    fireEvent.click(screen.getByText('Compra X'))
+  }
+
+  it('sin «Autorizar / Denegar» no se ofrece aprobar una orden en borrador', () => {
+    h.autorizar = false
+    montar('borrador')
+    expect(screen.queryByText(/Aprobar/)).toBeNull()
+    expect(screen.getByText(/Cancelar OC/)).toBeTruthy()      // cancelar es «Cambiar estado»
+  })
+
+  it('sin «Autorizar / Denegar» no se ofrece devolver a borrador, pero sí emitir', () => {
+    h.autorizar = false
+    montar('aprobada')
+    expect(screen.queryByText(/Devolver a borrador/)).toBeNull()
+    expect(screen.getByText(/Emitir OC/)).toBeTruthy()
+  })
+
+  it('sin «Cambiar estado» no se ofrece emitir ni cancelar, pero sí aprobar y devolver', () => {
+    h.cambiarEstado = false
+    montar('aprobada')
+    expect(screen.queryByText(/Emitir OC/)).toBeNull()
+    expect(screen.queryByText(/Cancelar OC/)).toBeNull()
+    expect(screen.getByText(/Devolver a borrador/)).toBeTruthy()
+  })
+
+  it('con ambos permisos se ofrece todo el ciclo de una orden aprobada', () => {
+    montar('aprobada')
+    expect(screen.getByText(/Emitir OC/)).toBeTruthy()
+    expect(screen.getByText(/Cancelar OC/)).toBeTruthy()
+    expect(screen.getByText(/Devolver a borrador/)).toBeTruthy()
   })
 })

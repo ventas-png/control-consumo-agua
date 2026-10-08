@@ -82,6 +82,9 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
   // de Contabilidad puede autorizar una excepción (con motivo). El servidor decide.
   const permisos = usePermisosProveedor()
   const transicionar = useTransicionOrdenConContrato(permisos.cambiarEstado)
+  // El servidor exige un permiso distinto por paso (aprobar → «Autorizar / Denegar»; emitir y cancelar →
+  // «Cambiar estado»): aquí solo se ofrece lo que va a aceptar.
+  const puedeAvanzar = (siguiente: EstadoOC) => (siguiente === 'aprobada' ? permisos.autorizar : permisos.cambiarEstado)
 
   const filtradas = filtroEstado ? ordenes.filter(o => o.estado === filtroEstado) : ordenes
 
@@ -415,13 +418,13 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                           Importar renglones
                         </button>
                       )}
-                      {canEdit && orden.estado === 'aprobada' && (
+                      {canEdit && permisos.autorizar && orden.estado === 'aprobada' && (
                         <button onClick={() => devolverABorrador(orden)}
                           style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
                           Devolver a borrador
                         </button>
                       )}
-                      {canEdit && cfg.next && (
+                      {canEdit && cfg.next && puedeAvanzar(cfg.next) && (
                         <button onClick={() => avanzarEstado(orden)}
                           style={{ padding: '5px 12px', background: ESTADO_CFG[cfg.next!].bg, color: ESTADO_CFG[cfg.next!].color, border: `1px solid ${ESTADO_CFG[cfg.next!].color}66`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
                           → {cfg.nextLabel}
@@ -433,7 +436,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                           ✏️ Editar
                         </button>
                       )}
-                      {canEdit && (orden.estado === 'borrador' || orden.estado === 'aprobada') && (
+                      {canEdit && permisos.cambiarEstado && (orden.estado === 'borrador' || orden.estado === 'aprobada') && (
                         <button onClick={() => cancelar(orden)}
                           style={{ padding: '5px 12px', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>
                           Cancelar OC

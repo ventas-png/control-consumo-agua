@@ -14,6 +14,8 @@ export interface PermisosProveedor {
   escribirCatalogo: boolean
   /** Habilita, suspende o autoriza (permiso de cambio de estado en Contabilidad). */
   cambiarEstado: boolean
+  /** Aprueba órdenes, facturas y órdenes de pago (permiso «Autorizar / Denegar» de Contabilidad). */
+  autorizar: boolean
   /** Ve la pestaña de contratos de Operaciones. */
   verContratos: boolean
   /** Ve órdenes de compra y recepciones (pestaña de Operaciones o Contabilidad). */
@@ -32,6 +34,7 @@ export function usePermisosProveedor(): PermisosProveedor {
     verContabilidad,
     escribirCatalogo: perms.canCreate('contabilidad') || perms.canEdit('contabilidad'),
     cambiarEstado: perms.canChangeStatus('contabilidad'),
+    autorizar: perms.canApprove('contabilidad'),
     verContratos: tab('proveedores'),
     verCompras: verContabilidad || tab('ordenes_compra'),
     verPapeleria: verContabilidad,

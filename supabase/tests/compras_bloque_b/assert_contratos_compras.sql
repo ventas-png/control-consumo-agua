@@ -495,6 +495,7 @@ UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE numero_factura IN
 INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, factura_id, monto, metodo_pago, referencia)
 SELECT '0ce30000-0000-0000-0000-000000000001', f.company_id, f.project_id, f.proveedor_id, f.id, 300, 'transferencia', 'CK-TRF-300'
   FROM public.facturas_proveedor f WHERE f.numero_factura = 'CK-G1';
+UPDATE public.ordenes_pago SET estado = 'aprobada' WHERE id = '0ce30000-0000-0000-0000-000000000001';
 UPDATE public.ordenes_pago SET estado = 'pagada', fecha_pago = CURRENT_DATE WHERE id = '0ce30000-0000-0000-0000-000000000001';
 RESET ROLE;
 SELECT public.chk_txt((SELECT estado FROM public.ordenes_compra WHERE id = '0ce00000-0000-0000-0000-00000000000a'), 'cerrada', '7 · la orden en USD quedó recibida y facturada (cerrada)');

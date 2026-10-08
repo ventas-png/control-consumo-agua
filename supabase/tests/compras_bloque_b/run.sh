@@ -138,6 +138,7 @@ bloque assert_seguimiento_pantalla.sql "5l · seguimiento filtrable: pendientes,
 bloque assert_correcciones_c.sql "5m · correcciones del bloque C: pendientes por renglón, respaldos validados en servidor, retiro del principal"
 bloque assert_contratos_compras.sql "5o · contratos conectados a las compras: vigencia, monto, excepción auditada, renovación, seguimiento, evaluaciones"
 bloque assert_contratos_coherencia.sql "5p · regresión: editar una orden en borrador no rompe la coherencia con el contrato; una excepción no se reutiliza si cambian las condiciones"
+bloque assert_controles_servidor.sql "5q · controles de servidor: aislamiento de referencias, pagos, sin borrado, permisos por acción, duplicados, trazabilidad"
 echo "── 5n · la protección de inventario es obligatoria (con duplicados reales, siempre en transacciones que se revierten)"
 BD=$BD bash "$AQUI/indice_obligatorio.sh" || exit 1
 
@@ -388,6 +389,36 @@ ID_S=$(cat "$SALIDAS"/s1.txt "$SALIDAS"/s2.txt | grep -E '^[0-9a-f-]{36}$' | gre
 [ "$N_S" = "1" ] && [ "$ID_S" = "1" ] \
   && echo "  ✓ S · la misma ampliación (misma clave) a la vez: UNA ampliación y el mismo id para las dos sesiones" \
   || { echo "❌ S · ampliaciones=$N_S ids=$ID_S"; cat "$SALIDAS"/s1.txt "$SALIDAS"/s2.txt; exit 1; }
+
+# T · pagos: dos órdenes de pago de 700 sobre una factura de 1000, creadas a la vez. La factura se
+# bloquea al comprobar el saldo: la segunda espera, ve la reserva de la primera y se rechaza.
+aplicar "$AQUI/concurrencia_controles_prep.sql"
+FT=ce300000-0000-0000-0000-0000000000e1
+OP_T="INSERT INTO public.ordenes_pago (company_id, project_id, proveedor_id, factura_id, monto) VALUES ('$C', '$C1', 'e3000000-0000-0000-0000-000000000001', '$FT', 700);"
+par t "$OP_T" "$OP_T"
+N_T=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.ordenes_pago WHERE factura_id = '$FT'")
+RECH_T=$(cat "$SALIDAS"/t1.txt "$SALIDAS"/t2.txt | grep -c 'COMPRAS_PAGO_EXCEDE_SALDO' || true)
+[ "$N_T" = "1" ] && [ "$RECH_T" = "1" ] \
+  && echo "  ✓ T · dos órdenes de pago de 700 sobre una factura de 1000 a la vez: se creó UNA y la otra se rechazó por saldo" \
+  || { echo "❌ T · ordenes=$N_T rechazos=$RECH_T"; cat "$SALIDAS"/t1.txt "$SALIDAS"/t2.txt; exit 1; }
+
+# U · el mismo proveedor escrito de dos formas, dado de alta a la vez: UN proveedor.
+par u "INSERT INTO public.proveedores (company_id, nombre) VALUES ('$C', 'Concurrente CE Norte');" \
+      "INSERT INTO public.proveedores (company_id, nombre) VALUES ('$C', 'CONCURRENTE  ce norte.');"
+N_U=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.proveedores WHERE company_id = '$C' AND lower(nombre) LIKE 'concurrente%ce%norte%'")
+DUP_U=$(cat "$SALIDAS"/u1.txt "$SALIDAS"/u2.txt | grep -c 'PROVEEDOR_DUPLICADO' || true)
+[ "$N_U" = "1" ] && [ "$DUP_U" = "1" ] \
+  && echo "  ✓ U · el mismo proveedor escrito de dos formas, dado de alta a la vez: UN proveedor y el otro intento se rechazó" \
+  || { echo "❌ U · proveedores=$N_U rechazos=$DUP_U"; cat "$SALIDAS"/u1.txt "$SALIDAS"/u2.txt; exit 1; }
+
+# V · el mismo número de factura escrito de dos formas, registrado a la vez: UNA factura.
+par v "INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES ('$C', '$C1', 'e3000000-0000-0000-0000-000000000001', 'CE-CON-V1', 'a', 10);" \
+      "INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES ('$C', '$C1', 'e3000000-0000-0000-0000-000000000001', 'ce con v1', 'b', 10);"
+N_V=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = 'e3000000-0000-0000-0000-000000000001' AND upper(regexp_replace(numero_factura, '[^A-Za-z0-9]', '', 'g')) = 'CECONV1'")
+DUP_V=$(cat "$SALIDAS"/v1.txt "$SALIDAS"/v2.txt | grep -c 'COMPRAS_FACTURA_NUMERO_DUPLICADO' || true)
+[ "$N_V" = "1" ] && [ "$DUP_V" = "1" ] \
+  && echo "  ✓ V · el mismo número de factura escrito de dos formas, a la vez: UNA factura y el otro intento se rechazó" \
+  || { echo "❌ V · facturas=$N_V rechazos=$DUP_V"; cat "$SALIDAS"/v1.txt "$SALIDAS"/v2.txt; exit 1; }
 
 echo "── 7/8 · las migraciones del bloque son append-only (no editan lo ya aplicado)"
 (cd "$RAIZ" && node scripts/migrations-append-only.mjs >/dev/null 2>&1) \
