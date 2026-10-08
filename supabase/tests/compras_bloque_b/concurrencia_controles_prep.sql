@@ -1,8 +1,7 @@
 \set ON_ERROR_STOP on
--- Preparación de la concurrencia de los CONTROLES DE SERVIDOR (run.sh, escenarios T, U y V).
+-- Preparación de la concurrencia de los CONTROLES DE SERVIDOR (run.sh, escenarios T y U).
 --   T · dos órdenes de pago de 700 sobre una factura de 1 000, creadas a la vez: solo cabe UNA.
---   U · el mismo proveedor escrito de dos formas, dado de alta a la vez: UN proveedor.
---   V · el mismo número de factura escrito de dos formas, registrado a la vez: UNA factura.
+--   U · el mismo número de factura escrito de dos formas, registrado a la vez: UNA factura.
 \set C   '''cccccccc-cccc-cccc-cccc-cccccccccccc'''
 \set C1  '''c1c1c1c1-0000-0000-0000-000000000001'''
 \set UA  '''c0c0c0c0-0000-0000-0000-00000000000a'''

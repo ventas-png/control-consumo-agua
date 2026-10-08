@@ -402,23 +402,14 @@ RECH_T=$(cat "$SALIDAS"/t1.txt "$SALIDAS"/t2.txt | grep -c 'COMPRAS_PAGO_EXCEDE_
   && echo "  ✓ T · dos órdenes de pago de 700 sobre una factura de 1000 a la vez: se creó UNA y la otra se rechazó por saldo" \
   || { echo "❌ T · ordenes=$N_T rechazos=$RECH_T"; cat "$SALIDAS"/t1.txt "$SALIDAS"/t2.txt; exit 1; }
 
-# U · el mismo proveedor escrito de dos formas, dado de alta a la vez: UN proveedor.
-par u "INSERT INTO public.proveedores (company_id, nombre) VALUES ('$C', 'Concurrente CE Norte');" \
-      "INSERT INTO public.proveedores (company_id, nombre) VALUES ('$C', 'CONCURRENTE  ce norte.');"
-N_U=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.proveedores WHERE company_id = '$C' AND lower(nombre) LIKE 'concurrente%ce%norte%'")
-DUP_U=$(cat "$SALIDAS"/u1.txt "$SALIDAS"/u2.txt | grep -c 'PROVEEDOR_DUPLICADO' || true)
-[ "$N_U" = "1" ] && [ "$DUP_U" = "1" ] \
-  && echo "  ✓ U · el mismo proveedor escrito de dos formas, dado de alta a la vez: UN proveedor y el otro intento se rechazó" \
-  || { echo "❌ U · proveedores=$N_U rechazos=$DUP_U"; cat "$SALIDAS"/u1.txt "$SALIDAS"/u2.txt; exit 1; }
-
-# V · el mismo número de factura escrito de dos formas, registrado a la vez: UNA factura.
-par v "INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES ('$C', '$C1', 'e3000000-0000-0000-0000-000000000001', 'CE-CON-V1', 'a', 10);" \
+# U · el mismo número de factura escrito de dos formas, registrado a la vez: UNA factura.
+par u "INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES ('$C', '$C1', 'e3000000-0000-0000-0000-000000000001', 'CE-CON-V1', 'a', 10);" \
       "INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES ('$C', '$C1', 'e3000000-0000-0000-0000-000000000001', 'ce con v1', 'b', 10);"
-N_V=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = 'e3000000-0000-0000-0000-000000000001' AND upper(regexp_replace(numero_factura, '[^A-Za-z0-9]', '', 'g')) = 'CECONV1'")
-DUP_V=$(cat "$SALIDAS"/v1.txt "$SALIDAS"/v2.txt | grep -c 'COMPRAS_FACTURA_NUMERO_DUPLICADO' || true)
-[ "$N_V" = "1" ] && [ "$DUP_V" = "1" ] \
-  && echo "  ✓ V · el mismo número de factura escrito de dos formas, a la vez: UNA factura y el otro intento se rechazó" \
-  || { echo "❌ V · facturas=$N_V rechazos=$DUP_V"; cat "$SALIDAS"/v1.txt "$SALIDAS"/v2.txt; exit 1; }
+N_U=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = 'e3000000-0000-0000-0000-000000000001' AND upper(regexp_replace(numero_factura, '[^A-Za-z0-9]', '', 'g')) = 'CECONV1'")
+DUP_U=$(cat "$SALIDAS"/u1.txt "$SALIDAS"/u2.txt | grep -c 'COMPRAS_FACTURA_NUMERO_DUPLICADO' || true)
+[ "$N_U" = "1" ] && [ "$DUP_U" = "1" ] \
+  && echo "  ✓ U · el mismo número de factura escrito de dos formas, a la vez: UNA factura y el otro intento se rechazó" \
+  || { echo "❌ U · facturas=$N_U rechazos=$DUP_U"; cat "$SALIDAS"/u1.txt "$SALIDAS"/u2.txt; exit 1; }
 
 echo "── 7/8 · las migraciones del bloque son append-only (no editan lo ya aplicado)"
 (cd "$RAIZ" && node scripts/migrations-append-only.mjs >/dev/null 2>&1) \

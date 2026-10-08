@@ -563,39 +563,26 @@ SELECT public.chk_txt((SELECT estado FROM public.ordenes_compra WHERE id = 'ce10
   '4f · un proceso sin usuario (mantenimiento) no pasa por los permisos de persona');
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 5 · DUPLICADOS
+-- 5 · DUPLICADOS (proveedor: decisión vigente; factura: número equivalente)
 -- ═══════════════════════════════════════════════════════════════════════════
 SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
--- 5a · el proveedor reescrito
+-- 5a · el proveedor con nombre equivalente. DECISIÓN VIGENTE (PR A, proveedores_pr_a/assert_identidad §4):
+-- «los nombres parecidos conviven; no se rechazan por parecerse» y los duplicados se LISTAN, no se
+-- bloquean. 20261027000400 intentó rechazarlos y 20261027000600 lo deshizo al chocar con esa decisión.
+-- Esta aserción fija el comportamiento ACTUAL: si el negocio decide lo contrario (pregunta 8 de
+-- docs/COMPRAS_CONTROLES_SERVIDOR.md) este caso debe cambiar con esa decisión, no por accidente.
 INSERT INTO public.proveedores (id, company_id, nombre) VALUES ('ce600000-0000-0000-0000-000000000001', :C::uuid, 'Distribuidora CE Norte');
-SELECT public.chk_falla($$ INSERT INTO public.proveedores (company_id, nombre) VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'DISTRIBUIDORA  ce norte') $$,
-  'PROVEEDOR_DUPLICADO', '5a · el mismo nombre en mayúsculas y con espacios de más no crea otro proveedor');
-SELECT public.chk_falla($$ INSERT INTO public.proveedores (company_id, nombre) VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'distribuidora CE-Norte.') $$,
-  'PROVEEDOR_DUPLICADO', '5a · ni con guiones y puntos de más');
-INSERT INTO public.proveedores (id, company_id, nombre) VALUES ('ce600000-0000-0000-0000-000000000002', :C::uuid, 'Distribuidora CE Norte, S.A.');
-INSERT INTO public.proveedores (id, company_id, nombre, nit, pais) VALUES ('ce600000-0000-0000-0000-000000000003', :C::uuid, 'DISTRIBUIDORA CE NORTE', '7777777-7', 'GT');
-INSERT INTO public.proveedores (id, company_id, nombre, codigo) VALUES ('ce600000-0000-0000-0000-000000000004', :C::uuid, 'distribuidora ce norte', 'CE-NORTE-4');
-SELECT public.chk_falla($$ UPDATE public.proveedores SET nombre = 'distribuidora ce norte' WHERE id = 'ce600000-0000-0000-0000-000000000002' $$,
-  'PROVEEDOR_DUPLICADO', '5a · renombrar otro proveedor sin identificación al mismo nombre también se rechaza');
+INSERT INTO public.proveedores (id, company_id, nombre) VALUES ('ce600000-0000-0000-0000-000000000002', :C::uuid, 'DISTRIBUIDORA  ce norte.');
 RESET ROLE;
-SELECT public.chk((SELECT count(*) FROM public.proveedores WHERE company_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' AND public.proveedor_normalizar_nombre(nombre) = 'distribuidora ce norte'), 3,
-  '5a · con identificación fiscal o código propio SÍ se crea otro (la forma societaria distinta es otro nombre): 1 + NIT + código');
-SELECT public.como(:UD::uuid);
-SET ROLE authenticated;
-INSERT INTO public.proveedores (id, company_id, nombre) VALUES ('ce600000-0000-0000-0000-0000000000d1', :D::uuid, 'Distribuidora CE Norte');
-RESET ROLE;
-SELECT public.chk((SELECT count(*) FROM public.proveedores WHERE id = 'ce600000-0000-0000-0000-0000000000d1'), 1, '5a · el mismo nombre en OTRA empresa es otro proveedor');
--- Un duplicado histórico no bloquea sus ediciones ajenas (se crea sin triggers, como lo dejó el pasado).
-SET session_replication_role = replica;
-INSERT INTO public.proveedores (id, company_id, nombre, codigo) VALUES ('ce600000-0000-0000-0000-000000000005', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Distribuidora  CE  Norte', 'LEGADO-5');
-SET session_replication_role = origin;
+SELECT public.chk((SELECT count(*) FROM public.proveedores WHERE company_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' AND public.proveedor_normalizar_nombre(nombre) = 'distribuidora ce norte'), 2,
+  '5a · (decisión vigente) dos nombres equivalentes sin identificación fiscal conviven: se listan, no se bloquean');
 SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
-UPDATE public.proveedores SET telefono = '2222-0000' WHERE id = 'ce600000-0000-0000-0000-000000000005';
+INSERT INTO public.proveedores (id, company_id, nombre, nit, pais) VALUES ('ce600000-0000-0000-0000-000000000003', :C::uuid, 'Proveedor CE con NIT', '7777777-7', 'GT');
+SELECT public.chk_falla($$ INSERT INTO public.proveedores (company_id, nombre, nit, pais) VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'Otro nombre, mismo NIT', '7777777-7', 'GT') $$,
+  'PROVEEDOR_DUPLICADO', '5a · lo que SÍ une es la identificación fiscal: el mismo NIT en el mismo país se rechaza');
 RESET ROLE;
-SELECT public.chk_txt((SELECT telefono FROM public.proveedores WHERE id = 'ce600000-0000-0000-0000-000000000005'), '2222-0000',
-  '5a · un duplicado histórico sigue editable (el control es al nacer o al cambiar el nombre)');
 
 -- 5b · la factura con otro formato de número
 SELECT public.como(:UA::uuid);

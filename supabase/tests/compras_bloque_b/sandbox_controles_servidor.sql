@@ -1,6 +1,6 @@
 -- ============================================================================
 -- VALIDACIÓN EN SANDBOX · CONTROLES DE SERVIDOR DEL CIRCUITO DE COMPRAS
--- (migraciones 20261027000000 … 20261027000500). Corre ANTES de aplicarlas (debe MOSTRAR las fallas:
+-- (migraciones 20261027000000 … 20261027000600). Corre ANTES de aplicarlas (debe MOSTRAR las fallas:
 -- es la prueba de que el defecto existe en el esquema desplegado) y DESPUÉS (todo OK).
 --
 -- «API directa»: DML como `authenticated` con el sub del JWT fijado, que es lo que ejecuta PostgREST.
@@ -238,8 +238,9 @@ BEGIN
 
   -- ═══ 5 · DUPLICADOS ══════════════════════════════════════════════════════════════
   INSERT INTO public.proveedores (company_id, nombre) VALUES (c, 'ZZ CS Distribuidora Norte');
-  ev := ev || pg_temp.ck('5a · el proveedor reescrito en mayúsculas y con espacios de más: rechazado',
-    pg_temp.err(format($q$INSERT INTO public.proveedores (company_id, nombre) VALUES (%L,'ZZ CS  DISTRIBUIDORA norte.')$q$, c)), 'PROVEEDOR_DUPLICADO');
+  INSERT INTO public.proveedores (company_id, nombre) VALUES (c, 'ZZ CS  DISTRIBUIDORA norte.');
+  ev := ev || pg_temp.ck('5a · (decisión vigente de PR A) los nombres equivalentes sin identificación fiscal conviven: se listan, no se bloquean',
+    (SELECT count(*)::text FROM public.proveedores WHERE company_id = c AND public.proveedor_normalizar_nombre(nombre) = 'zz cs distribuidora norte'), '2');
   INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES (c, pj, pv, 'ZZ-FAC-100', 'primera', 100);
   ev := ev || pg_temp.ck('5b · el mismo número de factura con otro formato: rechazado',
     pg_temp.err(format($q$INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES (%L,%L,%L,' zz fac 100 ','misma',100)$q$, c, pj, pv)), 'COMPRAS_FACTURA_NUMERO_DUPLICADO');

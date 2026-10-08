@@ -744,7 +744,13 @@ SELECT public.chk(
 
 -- Esto es lo que rompe: el trigger está declarado AFTER UPDATE OF estado OR
 -- DELETE, así que el DELETE lo dispara y la función toca NEW.
+--
+-- Desde 20261027000200 una factura aprobada NO se borra por la API (se anula), así que el
+-- DELETE solo es alcanzable con el guard apagado: se apaga SOLO aquí para seguir probando
+-- que la rama DELETE de `conta_tg_facturas_prov` no se rompe (p. ej. en una purga).
+ALTER TABLE public.facturas_proveedor DISABLE TRIGGER trg_compras_no_borrar;
 DELETE FROM public.facturas_proveedor WHERE id = 'aaaa2222-0000-0000-0000-000000000001';
+ALTER TABLE public.facturas_proveedor ENABLE TRIGGER trg_compras_no_borrar;
 
 SELECT public.chk(
   (SELECT count(*) FROM public.conta_asientos
@@ -868,8 +874,13 @@ SELECT public.chk_num(
 -- (c) Cuenta explícita INVÁLIDA: agrupadora. No se contabiliza en otra: queda
 --     pendiente de configuración, que es lo único honesto cuando alguien
 --     eligió una cuenta y esa cuenta no sirve.
+-- Desde 20261027000000 la captura de un renglón de factura rechaza una cuenta agrupadora, inactiva o de
+-- otra contabilidad. Aquí se prueba el comportamiento del GENERADOR CONTABLE ante un renglón que YA existía
+-- así (dato histórico): se inserta sin triggers, como lo dejó el pasado.
 SELECT public.factura('aaaa3333-0000-0000-0000-000000000003', 'Cuenta elegida inválida', 300);
+SET session_replication_role = replica;
 SELECT public.linea('aaaa3333-0000-0000-0000-000000000003', 1, 1, 300, 'c0000000-0000-0000-0000-00000000a001');
+SET session_replication_role = origin;
 SELECT public.aprobar_id('aaaa3333-0000-0000-0000-000000000003');
 
 SELECT public.chk(
