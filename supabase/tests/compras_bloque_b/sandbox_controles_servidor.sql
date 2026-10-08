@@ -238,6 +238,10 @@ BEGIN
   RESET ROLE;
   PERFORM set_config('request.jwt.claim.sub', ua::text, true);
   SET LOCAL ROLE authenticated;
+  INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado, aprobada_por)
+    VALUES ('5b700000-0000-0000-0000-0000000000ee', c, pj, pv, 'ZZ CS Proveedor C', 'nace aprobada', 'aprobada', uc);
+  ev := ev || pg_temp.ck('4a · el administrador sí inserta una orden ya «aprobada» y el servidor sella SU firma (el navegador dijo el contador)',
+    (SELECT aprobada_por::text FROM public.ordenes_compra WHERE id = '5b700000-0000-0000-0000-0000000000ee'), ua::text);
   ev := ev || pg_temp.ck('4b · una factura no se crea «aprobada»',
     pg_temp.err(format($q$INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total, estado) VALUES (%L,%L,%L,'ZZ-DIR-1','x',500,'aprobada')$q$, c, pj, pv)), 'COMPRAS_ESTADO_INICIAL');
   INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES ('5b700000-0000-0000-0000-0000000000ed', c, pj, pv, 'ZZ-SIS-1', 'x', 500);

@@ -172,7 +172,7 @@ Todo se ejecutó en esta sesión, contra un PostgreSQL 16 local con la **cadena 
 ## 7. Límites y riesgos declarados
 
 - **No se tocó producción.** Se hizo un `SELECT` de versiones. La huella de producción no se recapturó.
-- **Sandbox.** PENDIENTE_SANDBOX
+- **Sandbox (`control-agua-rls-sandbox`, el existente, sin resetear).** Las ocho migraciones se aplicaron con `apply-migrations-sandbox.yml`, una por corrida y en orden; el sandbox queda en `20261027000700` (565 versiones). **Antes** de aplicarlas, el guion reversible `sandbox_controles_servidor.sql` (versión de entonces: 38 comprobaciones) mostró 30 en FALLO: el defecto existía en el esquema desplegado. **Después**: 40 comprobaciones, 0 con FALLO (`GUION_OK_REVERTIDO`; el guion es una sola sentencia que termina siempre con una excepción que revierte todo) y sin residuo (`5b700000%`: 0 empresas, órdenes, facturas, pagos y usuarios).
 - **No se probaron `DELETE` en el sandbox** (la herramienta SQL se cuelga con ellos, límite documentado desde #922): los cuatro caminos de borrado y la cascada de una empresa o proyecto se probaron solo en el PostgreSQL desechable.
 - **Sin prueba de pantalla** contra el sandbox para los cambios de Operaciones: solo pruebas de componentes (Vitest).
 - **Codificación.** El PostgreSQL local de esta sesión es `SQL_ASCII`; las pruebas nuevas no dependen de acentos. Producción es UTF-8.
