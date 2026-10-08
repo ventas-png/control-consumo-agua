@@ -1,6 +1,6 @@
 -- ============================================================================
 -- VALIDACIÓN EN SANDBOX · CONTROLES DE SERVIDOR DEL CIRCUITO DE COMPRAS
--- (migraciones 20261027000000 … 20261027000600). Corre ANTES de aplicarlas (debe MOSTRAR las fallas:
+-- (migraciones 20261027000000 … 20261027000700). Corre ANTES de aplicarlas (debe MOSTRAR las fallas:
 -- es la prueba de que el defecto existe en el esquema desplegado) y DESPUÉS (todo OK).
 --
 -- «API directa»: DML como `authenticated` con el sub del JWT fijado, que es lo que ejecuta PostgREST.
@@ -228,8 +228,16 @@ BEGIN
   -- ═══ 4 · ESTADOS DE NACIMIENTO Y ESTADOS DE SISTEMA ══════════════════════════════
   PERFORM set_config('request.jwt.claim.sub', ua::text, true);
   SET LOCAL ROLE authenticated;
-  ev := ev || pg_temp.ck('4a · una orden no se crea «emitida»',
-    pg_temp.err(format($q$INSERT INTO public.ordenes_compra (company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado) VALUES (%L,%L,%L,'x','directa','emitida')$q$, c, pj, pv)), 'COMPRAS_ESTADO_INICIAL');
+  ev := ev || pg_temp.ck('4a · una orden no nace «recibida»',
+    pg_temp.err(format($q$INSERT INTO public.ordenes_compra (company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado) VALUES (%L,%L,%L,'x','directa','recibida')$q$, c, pj, pv)), 'COMPRAS_ESTADO_INICIAL');
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub', uc::text, true);
+  SET LOCAL ROLE authenticated;
+  ev := ev || pg_temp.ck('4a · quien solo crea NO inserta una orden ya «aprobada»',
+    pg_temp.err(format($q$INSERT INTO public.ordenes_compra (company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado) VALUES (%L,%L,%L,'x','directa','aprobada')$q$, c, pj, pv)), 'COMPRAS_PERMISO_ACCION');
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub', ua::text, true);
+  SET LOCAL ROLE authenticated;
   ev := ev || pg_temp.ck('4b · una factura no se crea «aprobada»',
     pg_temp.err(format($q$INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total, estado) VALUES (%L,%L,%L,'ZZ-DIR-1','x',500,'aprobada')$q$, c, pj, pv)), 'COMPRAS_ESTADO_INICIAL');
   INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES ('5b700000-0000-0000-0000-0000000000ed', c, pj, pv, 'ZZ-SIS-1', 'x', 500);

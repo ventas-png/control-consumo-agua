@@ -524,9 +524,22 @@ RESET ROLE;
 -- sin cuadre ni devengo y luego «pagada»; orden «emitida» con número; recepción «registrada» sin efectos).
 SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
+-- Una orden puede nacer aprobada o emitida (camino que la batería de PR A usa para validar al proveedor), pero
+-- solo con el permiso del paso; no hay forma de que quien solo crea se apruebe a sí mismo con un INSERT.
+SELECT public.como(:UC::uuid);
 SELECT public.chk_falla($$ INSERT INTO public.ordenes_compra (company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado)
-                           VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc','c1c1c1c1-0000-0000-0000-000000000001','e3000000-0000-0000-0000-000000000001','x','directo emitida','emitida') $$,
-  'COMPRAS_ESTADO_INICIAL', '4e · una orden no se crea ya «emitida»');
+                           VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc','c1c1c1c1-0000-0000-0000-000000000001','e3000000-0000-0000-0000-000000000001','x','directa aprobada','aprobada') $$,
+  'COMPRAS_PERMISO_ACCION', '4e · quien solo crea NO inserta una orden ya «aprobada» (se saltaría «Autorizar / Denegar»)');
+SELECT public.como(:US::uuid);
+SELECT public.chk_falla($$ INSERT INTO public.ordenes_compra (company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado)
+                           VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc','c1c1c1c1-0000-0000-0000-000000000001','e3000000-0000-0000-0000-000000000001','x','directa emitida','emitida') $$,
+  'COMPRAS_PERMISO_ACCION', '4e · ni «emitida» quien solo cambia estado (le falta aprobar)');
+SELECT public.como(:UA::uuid);
+INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado, aprobada_por)
+VALUES ('ce100000-0000-0000-0000-0000000000f4', :C::uuid, :C1::uuid, :P1::uuid, 'x', 'directa aprobada por el administrador', 'aprobada', :UC::uuid);
+SELECT public.chk_falla($$ INSERT INTO public.ordenes_compra (company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado)
+                           VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc','c1c1c1c1-0000-0000-0000-000000000001','e3000000-0000-0000-0000-000000000001','x','nace recibida','recibida') $$,
+  'COMPRAS_ESTADO_INICIAL', '4e · y una orden no nace «recibida» ni «cerrada» ni «cancelada» (ni el administrador)');
 SELECT public.chk_falla($$ INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total, estado)
                            VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc','c1c1c1c1-0000-0000-0000-000000000001','e3000000-0000-0000-0000-000000000001','CE-DIR-1','x',500,'aprobada') $$,
   'COMPRAS_ESTADO_INICIAL', '4e · una factura no se crea ya «aprobada»');
@@ -550,6 +563,12 @@ VALUES ('ce500000-0000-0000-0000-0000000000f9', :C::uuid, :C1::uuid, :P1::uuid, 
 SELECT public.chk_falla($$ UPDATE public.contrasenas_pago SET estado = 'pagada' WHERE id = 'ce500000-0000-0000-0000-0000000000f9' $$,
   'COMPRAS_ESTADO_SOLO_SISTEMA', '4e · una contraseña no se marca «pagada» a mano');
 RESET ROLE;
+
+RESET ROLE;
+SELECT public.chk_uuid((SELECT aprobada_por FROM public.ordenes_compra WHERE id = 'ce100000-0000-0000-0000-0000000000f4'), :UA::uuid,
+  '4e · la orden insertada ya aprobada por el administrador lleva SU firma (el navegador dijo UC)');
+SELECT public.chk_txt((SELECT estado FROM public.ordenes_compra WHERE id = 'ce100000-0000-0000-0000-0000000000f4'), 'aprobada', '4e · y quedó aprobada');
+SELECT public.chk_bool((SELECT numero IS NOT NULL FROM public.ordenes_compra WHERE id = 'ce100000-0000-0000-0000-0000000000f4'), true, '4e · y numerada');
 
 -- 4f · El administrador (rol) recorre todo el circuito sin permisos individuales: el resto del
 -- bloque (sección 2) ya lo hace. Y sin usuario (servicio / mantenimiento) no se aplican estos controles.
