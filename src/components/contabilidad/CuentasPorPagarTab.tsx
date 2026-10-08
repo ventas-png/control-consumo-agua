@@ -57,7 +57,11 @@ const TONO_FACTURA = {
 const TONO_ORDEN = { borrador: 'info', aprobada: 'warning', pagada: 'success', anulada: 'neutral' } as const
 
 export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) {
-  const { puedeCrear, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
+  const { puedeCrear, puedeEditar, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
+  // Un PASO (aprobar, anular, pagar) exige la acción Y «Editar»: la política de UPDATE pide editar y el servidor
+  // además pide la acción. Con solo la acción el UPDATE no afecta ninguna fila.
+  const puedeAutorizarPaso = puedeAutorizar && puedeEditar
+  const puedeCambiarEstadoPaso = puedeCambiarEstado && puedeEditar
   const [vista, setVista] = useState<Vista>('facturas')
   const [nuevaFactura, setNuevaFactura] = useState(false)
   const [ordenPara, setOrdenPara] = useState<FacturaProveedorConProveedor | null>(null)
@@ -126,10 +130,10 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
           {/* Con orden de compra detrás, aprobar pasa por el cuadre de 3 vías:
               lo pedido, lo recibido y lo facturado tienen que coincidir. Sin
               orden (gasto directo, caja chica) se aprueba como siempre. */}
-          {f.estado === 'registrada' && puedeAutorizar && f.orden_compra_id && (
+          {f.estado === 'registrada' && puedeAutorizarPaso && f.orden_compra_id && (
             <button onClick={(e) => { e.stopPropagation(); setCuadreDe(f) }} style={btnLink}>Revisar y aprobar</button>
           )}
-          {f.estado === 'registrada' && puedeAutorizar && !f.orden_compra_id && (
+          {f.estado === 'registrada' && puedeAutorizarPaso && !f.orden_compra_id && (
             <button
               onClick={(e) => { e.stopPropagation(); void accion(() => aprobarFactura.mutateAsync(f.id), 'Factura aprobada: el gasto quedó devengado contra CxP.') }}
               style={btnLink}
@@ -140,7 +144,7 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
           {(f.estado === 'aprobada' || f.estado === 'pagada_parcial') && puedeCrear && (
             <button onClick={(e) => { e.stopPropagation(); setOrdenPara(f) }} style={btnLink}>Pagar</button>
           )}
-          {f.estado !== 'anulada' && f.monto_pagado === 0 && puedeCambiarEstado && (
+          {f.estado !== 'anulada' && f.monto_pagado === 0 && puedeCambiarEstadoPaso && (
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -189,15 +193,15 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
       header: '',
       render: (o) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          {o.estado === 'borrador' && puedeAutorizar && (
+          {o.estado === 'borrador' && puedeAutorizarPaso && (
             <button onClick={() => void accion(() => aprobarOrden.mutateAsync(o.id), 'Orden aprobada.')} style={btnLink}>Aprobar</button>
           )}
-          {o.estado === 'aprobada' && puedeCambiarEstado && (
+          {o.estado === 'aprobada' && puedeCambiarEstadoPaso && (
             <button onClick={() => void accion(() => pagarOrden.mutateAsync({ ordenId: o.id }), 'Orden pagada: asiento generado y saldo de la factura actualizado.')} style={btnLink}>
               Marcar pagada
             </button>
           )}
-          {o.estado !== 'anulada' && puedeCambiarEstado && (
+          {o.estado !== 'anulada' && puedeCambiarEstadoPaso && (
             <button
               onClick={() => {
                 void (async () => {

@@ -7,7 +7,7 @@
 // escriben las líneas.
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { runAfectando, runQuery } from '../queryFetch'
 import { comprasKeys } from './keys'
 import { cxpKeys } from '../cxp/keys'
 import { contabilidadKeys } from '../contabilidad/keys'
@@ -166,7 +166,7 @@ export function useCambiarEstadoOrdenCompraMutation() {
       // Devolver a borrador exige motivo y es una REVISIÓN (lo valida el servidor);
       // cancelar usa `motivo_anulacion`. El motivo va a la columna que corresponde.
       const campoMotivo = vars.estado === 'borrador' ? 'motivo_devolucion' : 'motivo_anulacion'
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('ordenes_compra')
           .update({
@@ -175,6 +175,7 @@ export function useCambiarEstadoOrdenCompraMutation() {
             updated_at: new Date().toISOString(),
           })
           .eq('id', vars.id)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -186,8 +187,8 @@ export function useEliminarOrdenCompraMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (id: string) => {
-      await runQuery((signal) =>
-        supabase.from('ordenes_compra').delete().eq('id', id).abortSignal(signal),
+      await runAfectando((signal) =>
+        supabase.from('ordenes_compra').delete().eq('id', id).select('id').abortSignal(signal),
       )
     },
     onSuccess: () => invalidar(),
@@ -259,7 +260,7 @@ export function useCambiarEstadoRecepcionMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (vars: { id: string; estado: 'registrada' | 'anulada'; motivo?: string }) => {
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('recepciones')
           .update({
@@ -268,6 +269,7 @@ export function useCambiarEstadoRecepcionMutation() {
             updated_at: new Date().toISOString(),
           })
           .eq('id', vars.id)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -309,11 +311,12 @@ export function useAnularContrasenaMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (vars: { id: string; motivo: string }) => {
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('contrasenas_pago')
           .update({ estado: 'anulada', motivo_anulacion: vars.motivo, updated_at: new Date().toISOString() })
           .eq('id', vars.id)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -425,7 +428,7 @@ export function useAprobarFacturaConCuadreMutation() {
     mutationFn: async (vars: { facturaId: string; justificacion?: string }) => {
       // Solo se manda la justificación. El aprobador y el AUTORIZADOR de la excepción
       // los sella el servidor con auth.uid(): el cliente no puede firmar por otro.
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('facturas_proveedor')
           .update({
@@ -434,6 +437,7 @@ export function useAprobarFacturaConCuadreMutation() {
             updated_at: new Date().toISOString(),
           })
           .eq('id', vars.facturaId)
+          .select('id')
           .abortSignal(signal),
       )
     },

@@ -75,7 +75,11 @@ const TONO_REC = { borrador: 'info', registrada: 'success', anulada: 'neutral' }
 const TONO_CP = { emitida: 'warning', pagada: 'success', anulada: 'neutral' } as const
 
 export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
-  const { puedeCrear, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
+  const { puedeCrear, puedeEditar, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
+  // Un PASO (aprobar, emitir, cancelar, registrar, anular) exige la acción Y «Editar»: la política de UPDATE de esas
+  // tablas pide editar y el servidor además pide la acción. Con solo la acción el UPDATE no afecta ninguna fila.
+  const puedeAutorizarPaso = puedeAutorizar && puedeEditar
+  const puedeCambiarEstadoPaso = puedeCambiarEstado && puedeEditar
   const [vista, setVista] = useState<Vista>('ordenes')
   const [nuevaOrden, setNuevaOrden] = useState(false)
   const [recibirDe, setRecibirDe] = useState<OrdenCompraConRelaciones | null>(null)
@@ -138,7 +142,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
           {o.estado === 'borrador' && puedeCrear && (
             <button style={btnLink} onClick={(e) => { e.stopPropagation(); setImportarEn(o) }}>Importar renglones</button>
           )}
-          {o.estado === 'borrador' && puedeAutorizar && (
+          {o.estado === 'borrador' && puedeAutorizarPaso && (
             <button style={btnLink} onClick={(e) => {
               e.stopPropagation()
               void accion(() => (o.contrato_id
@@ -146,7 +150,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
                 : cambiarOrden.mutateAsync({ id: o.id, estado: 'aprobada' })), 'Orden aprobada.')
             }}>Aprobar</button>
           )}
-          {o.estado === 'aprobada' && puedeAutorizar && (
+          {o.estado === 'aprobada' && puedeAutorizarPaso && (
             <button style={btnLink} onClick={async (e) => {
               e.stopPropagation()
               const r = await openPromptDialog({
@@ -159,7 +163,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
               await accion(() => cambiarOrden.mutateAsync({ id: o.id, estado: 'borrador', motivo }), 'Orden devuelta a borrador (nueva revisión).')
             }}>Devolver a borrador</button>
           )}
-          {o.estado === 'aprobada' && puedeCambiarEstado && (
+          {o.estado === 'aprobada' && puedeCambiarEstadoPaso && (
             <button style={btnLink} onClick={(e) => {
               e.stopPropagation()
               void accion(() => (o.contrato_id
@@ -170,7 +174,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
           {['aprobada', 'emitida', 'recibida_parcial'].includes(o.estado) && puedeCrear && (
             <button style={btnLink} onClick={(e) => { e.stopPropagation(); setRecibirDe(o) }}>Recibir</button>
           )}
-          {['borrador', 'aprobada', 'emitida'].includes(o.estado) && puedeCambiarEstado && (
+          {['borrador', 'aprobada', 'emitida'].includes(o.estado) && puedeCambiarEstadoPaso && (
             <button style={btnLink} onClick={async (e) => {
               e.stopPropagation()
               const r = await openPromptDialog({
@@ -203,7 +207,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
       render: (r) => (
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button style={btnLink} onClick={(e) => { e.stopPropagation(); setRespaldosDe(r) }}>Respaldos</button>
-          {r.estado === 'borrador' && puedeCambiarEstado && (
+          {r.estado === 'borrador' && puedeCambiarEstadoPaso && (
             <button style={btnLink} onClick={async (e) => {
               e.stopPropagation()
               const ok = await confirm({
@@ -215,7 +219,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
               await accion(() => cambiarRecepcion.mutateAsync({ id: r.id, estado: 'registrada' }), 'Recepción registrada y contabilizada.')
             }}>Registrar</button>
           )}
-          {r.estado === 'registrada' && puedeCambiarEstado && (
+          {r.estado === 'registrada' && puedeCambiarEstadoPaso && (
             <button style={btnLink} onClick={async (e) => {
               e.stopPropagation()
               const res = await openPromptDialog({

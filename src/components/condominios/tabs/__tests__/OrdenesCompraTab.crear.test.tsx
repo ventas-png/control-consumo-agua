@@ -23,8 +23,8 @@ vi.mock('../../../../domain/compras/queries', () => ({
 vi.mock('../../../../domain/compras/mutations', () => ({ crearOrdenTransaccional: h.crear }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: vi.fn(() => { throw new Error('Operaciones ya no inserta la cabecera por separado') }),
-  updateCondominioRow: h.update,
-  deleteCondominioRow: vi.fn(),
+  updateCondominioRowAfectando: h.update,
+  deleteCondominioRowAfectando: vi.fn(),
 }))
 vi.mock('../../../proveedores/ProveedorSelector', () => ({
   ProveedorSelector: ({ onChange }: { onChange: (id: string | null, p?: { nombre: string }) => void }) => (
@@ -37,7 +37,7 @@ vi.mock('../../../compras/SeguimientoOrdenModal', () => ({ SeguimientoOrdenModal
 vi.mock('../../../compras/SeguimientoComprasPanel', () => ({ SeguimientoComprasPanel: () => null }))
 vi.mock('../../../compras/ImportarLineasOrdenModal', () => ({ ImportarLineasOrdenModal: () => null }))
 vi.mock('../../../proveedores/ContratoSeguimientoModal', () => ({ ContratoSeguimientoModal: () => null }))
-vi.mock('../../../proveedores/permisos', () => ({ usePermisosProveedor: () => ({ cambiarEstado: true, autorizar: true }) }))
+vi.mock('../../../proveedores/permisos', () => ({ usePermisosProveedor: () => ({ cambiarEstado: true, autorizar: true, cambiarEstadoPaso: true, autorizarPaso: true }) }))
 vi.mock('../../../../domain/proveedores/contratosCompras', async (orig) => ({
   ...(await orig<typeof import('../../../../domain/proveedores/contratosCompras')>()),
   useExcepcionContratoMutation: () => ({ mutateAsync: vi.fn() }),

@@ -7,7 +7,7 @@
 import { hoyLocalISO } from '../../lib/format'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { runAfectando, runQuery } from '../queryFetch'
 import { cxpKeys } from './keys'
 import { contabilidadKeys } from '../contabilidad/keys'
 import type { FacturaCreada, OrdenPago, Proveedor } from '../../types/cxp'
@@ -117,7 +117,7 @@ export function useAprobarFacturaMutation(companyId?: string) {
   return useMutation({
     mutationFn: async (facturaId: string) => {
       // Quién aprueba y cuándo lo sella el servidor (auth.uid(), now()): lo que mande el cliente no cuenta.
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('facturas_proveedor')
           .update({
@@ -125,6 +125,7 @@ export function useAprobarFacturaMutation(companyId?: string) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', facturaId)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -137,11 +138,12 @@ export function useAnularFacturaMutation(companyId?: string) {
   const invalidar = useInvalidarCxP(companyId)
   return useMutation({
     mutationFn: async (facturaId: string) => {
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('facturas_proveedor')
           .update({ estado: 'anulada', updated_at: new Date().toISOString() })
           .eq('id', facturaId)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -182,7 +184,7 @@ export function useAprobarOrdenMutation(companyId?: string) {
   return useMutation({
     mutationFn: async (ordenId: string) => {
       const { data: auth } = await supabase.auth.getUser()
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('ordenes_pago')
           .update({
@@ -192,6 +194,7 @@ export function useAprobarOrdenMutation(companyId?: string) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', ordenId)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -205,7 +208,7 @@ export function useMarcarOrdenPagadaMutation(companyId?: string) {
   const invalidar = useInvalidarCxP(companyId)
   return useMutation({
     mutationFn: async (vars: { ordenId: string; fechaPago?: string }) => {
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('ordenes_pago')
           .update({
@@ -215,6 +218,7 @@ export function useMarcarOrdenPagadaMutation(companyId?: string) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', vars.ordenId)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -226,11 +230,12 @@ export function useAnularOrdenMutation(companyId?: string) {
   const invalidar = useInvalidarCxP(companyId)
   return useMutation({
     mutationFn: async (ordenId: string) => {
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('ordenes_pago')
           .update({ estado: 'anulada', updated_at: new Date().toISOString() })
           .eq('id', ordenId)
+          .select('id')
           .abortSignal(signal),
       )
     },

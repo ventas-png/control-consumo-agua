@@ -16,6 +16,14 @@ export interface PermisosProveedor {
   cambiarEstado: boolean
   /** Aprueba órdenes, facturas y órdenes de pago (permiso «Autorizar / Denegar» de Contabilidad). */
   autorizar: boolean
+  /**
+   * Puede APROBAR un paso de compras (orden, factura, orden de pago): el servidor exige «Autorizar / Denegar» Y
+   * «Editar» de Contabilidad (la política de UPDATE de esas tablas pide editar). Solo se ofrece el botón si se cumplen
+   * las dos: con solo «Autorizar» el UPDATE no afecta ninguna fila.
+   */
+  autorizarPaso: boolean
+  /** Puede EMITIR, CANCELAR, CERRAR, registrar, anular o pagar: «Cambiar estado» Y «Editar» de Contabilidad. */
+  cambiarEstadoPaso: boolean
   /** Ve la pestaña de contratos de Operaciones. */
   verContratos: boolean
   /** Ve órdenes de compra y recepciones (pestaña de Operaciones o Contabilidad). */
@@ -35,6 +43,8 @@ export function usePermisosProveedor(): PermisosProveedor {
     escribirCatalogo: perms.canCreate('contabilidad') || perms.canEdit('contabilidad'),
     cambiarEstado: perms.canChangeStatus('contabilidad'),
     autorizar: perms.canApprove('contabilidad'),
+    autorizarPaso: perms.canApprove('contabilidad') && perms.canEdit('contabilidad'),
+    cambiarEstadoPaso: perms.canChangeStatus('contabilidad') && perms.canEdit('contabilidad'),
     verContratos: tab('proveedores'),
     verCompras: verContabilidad || tab('ordenes_compra'),
     verPapeleria: verContabilidad,

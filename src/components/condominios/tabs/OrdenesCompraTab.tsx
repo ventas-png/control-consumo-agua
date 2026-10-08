@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { deleteCondominioRowAfectando, updateCondominioRowAfectando } from '../../../domain/condominios/tabMutations'
 import { OrdenCompra, ContratoProveedor } from '../../../types'
 import { useProveedoresQuery } from '../../../domain/cxp/queries'
 import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
@@ -57,6 +57,14 @@ const BLANK = {
 // `proveedores` (contratos_proveedores) sigue en Props porque el registro de
 // pestañas lo pasa, pero esta pantalla ya no lo usa: el proveedor de una orden
 // sale del catálogo de Contabilidad, que es el único que sabe de autorizaciones.
+/**
+ * El servidor solo borra un borrador que nunca tuvo efecto: sin número, sin revisiones (nunca se devolvió) y sin
+ * aprobación previa. Un borrador devuelto se cancela (con motivo), no se borra: no se ofrece un botón que va a fallar.
+ */
+export function sePuedeEliminar(orden: Pick<OrdenCompra, 'numero' | 'revision' | 'aprobada_at'>): boolean {
+  return !orden.numero && !((orden.revision ?? 0) > 0) && !orden.aprobada_at
+}
+
 export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoOC | ''>('')
   const [showForm, setShowForm] = useState(false)
@@ -83,8 +91,9 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
   const permisos = usePermisosProveedor()
   const transicionar = useTransicionOrdenConContrato(permisos.cambiarEstado)
   // El servidor exige un permiso distinto por paso (aprobar → «Autorizar / Denegar»; emitir y cancelar →
-  // «Cambiar estado»): aquí solo se ofrece lo que va a aceptar.
-  const puedeAvanzar = (siguiente: EstadoOC) => (siguiente === 'aprobada' ? permisos.autorizar : permisos.cambiarEstado)
+  // «Cambiar estado»), y los dos exigen además «Editar» de Contabilidad (la política de UPDATE): aquí solo se ofrece
+  // lo que el servidor va a aceptar. Si aun así no cambia ninguna fila, se avisa (nunca «éxito» sin cambio).
+  const puedeAvanzar = (siguiente: EstadoOC) => (siguiente === 'aprobada' ? permisos.autorizarPaso : permisos.cambiarEstadoPaso)
 
   const filtradas = filtroEstado ? ordenes.filter(o => o.estado === filtroEstado) : ordenes
 
@@ -119,7 +128,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     try {
       if (editId) {
         // Editar el borrador solo toca la cabecera (los renglones se corrigen con la importación o en Contabilidad).
-        const { error } = await updateCondominioRow('ordenes_compra', editId, {
+        const { error } = await updateCondominioRowAfectando('ordenes_compra', editId, {
           company_id: companyId, project_id: proyectoId,
           proveedor_id: form.proveedor_id,
           contrato_id: form.contrato_id || null,
@@ -169,7 +178,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     if (!cfg.next) return
     const updates: Partial<OrdenCompra> = { estado: cfg.next }
     const ejecutar = async () => {
-      const { error } = await updateCondominioRow('ordenes_compra', orden.id, updates)
+      const { error } = await updateCondominioRowAfectando('ordenes_compra', orden.id, updates)
       if (error) throw new Error(error.message)
     }
     try {
@@ -195,7 +204,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     })
     const motivo = r?.motivo?.trim()
     if (!motivo) return
-    const { error } = await updateCondominioRow('ordenes_compra', orden.id, { estado: 'borrador', motivo_devolucion: motivo })
+    const { error } = await updateCondominioRowAfectando('ordenes_compra', orden.id, { estado: 'borrador', motivo_devolucion: motivo })
     if (error) { notify({ variant: 'error', title: 'No se pudo', text: error.message }); return }
     onRefresh()
   }
@@ -203,14 +212,16 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
   async function cancelar(orden: OrdenCompra) {
     const r = await confirm({ title: '¿Cancelar orden?', text: orden.concepto, icon: 'warning', variant: 'danger', confirmText: 'Cancelar OC' })
     if (!r.isConfirmed) return
-    await updateCondominioRow('ordenes_compra', orden.id, { estado: 'cancelada' })
+    const { error } = await updateCondominioRowAfectando('ordenes_compra', orden.id, { estado: 'cancelada' })
+    if (error) { notify({ variant: 'error', title: 'No se pudo', text: error.message }); return }
     onRefresh()
   }
 
   async function eliminar(orden: OrdenCompra) {
     const r = await confirm({ title: '¿Eliminar borrador?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('ordenes_compra', orden.id)
+    const { error } = await deleteCondominioRowAfectando('ordenes_compra', orden.id)
+    if (error) { notify({ variant: 'error', title: 'No se pudo', text: error.message }); return }
     onRefresh()
   }
 
@@ -418,7 +429,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                           Importar renglones
                         </button>
                       )}
-                      {canEdit && permisos.autorizar && orden.estado === 'aprobada' && (
+                      {canEdit && permisos.autorizarPaso && orden.estado === 'aprobada' && (
                         <button onClick={() => devolverABorrador(orden)}
                           style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
                           Devolver a borrador
@@ -436,13 +447,13 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                           ✏️ Editar
                         </button>
                       )}
-                      {canEdit && permisos.cambiarEstado && (orden.estado === 'borrador' || orden.estado === 'aprobada') && (
+                      {canEdit && permisos.cambiarEstadoPaso && (orden.estado === 'borrador' || orden.estado === 'aprobada') && (
                         <button onClick={() => cancelar(orden)}
                           style={{ padding: '5px 12px', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>
                           Cancelar OC
                         </button>
                       )}
-                      {canEdit && orden.estado === 'borrador' && (
+                      {canEdit && orden.estado === 'borrador' && sePuedeEliminar(orden) && (
                         <button onClick={() => eliminar(orden)}
                           style={{ padding: '5px 12px', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>
                           🗑 Eliminar
