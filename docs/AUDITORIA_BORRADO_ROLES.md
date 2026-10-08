@@ -40,7 +40,7 @@ El 2026-10-05, contra el sandbox existente `jwpmivhvlstslncrtokb`:
   invocación directa cerrada. Resultado `AUDIT_ROLES_RLS_OK_REVERTIDO`.
 - Esas pruebas y la sustitución de funciones se revirtieron al terminar;
   el despliegue persistente es posterior (ver «Despliegue y limpieza»).
-  Producción no recibió este arreglo.
+  A esa fecha producción no había recibido este arreglo.
 - `migrations-guard`, sintaxis del arnés y `git diff --check` sin hallazgos.
 
 Regresión reproducible: el arnés de PostgreSQL desechable
@@ -148,8 +148,59 @@ Estado del sandbox `jwpmivhvlstslncrtokb`, verificado en solo lectura el
   actor: se eliminó desde la herramienta SQL, sin sesión de usuario). No se
   desactivaron triggers ni se borró el evento para limpiar.
 
-Producción no recibió este arreglo. Este PR queda sin fusionar: la fusión
-despliega la migración a producción y requiere aprobación independiente.
+### Producción (verificado en solo lectura el 2026-10-08)
+
+- **Fusión:** PR 924, squash `8a4debd075bfda340884a227cde7e0d7aa2a649b`, con la
+  aprobación de un revisor independiente sobre el commit `2133d03`.
+- **Despliegue:** corrida 37795384002 de `Apply Migrations to Production`,
+  `success`. Aplicó únicamente `20261026000500_auditoria_borrado_roles.sql`
+  (HTTP 201); no se reaplicó ninguna migración histórica ni hizo falta reparar
+  el historial.
+- **Versión registrada** en `supabase_migrations.schema_migrations`:
+  `20261026000500` (`auditoria_borrado_roles`), la última de 864.
+- **Funciones:** el `md5(prosrc)` de las tres es idéntico al texto de la
+  migración fusionada (`audit_roles_changes` `e154622e…`,
+  `audit_role_permissions_changes` `ecc33c9d…`, `audit_user_roles_changes`
+  `a298e7b9…`); `SECURITY DEFINER` con `search_path=public`.
+- **ACL:** `postgres=X/postgres,service_role=X/postgres`. Sin EXECUTE para
+  PUBLIC, `anon` ni `authenticated`.
+- **Triggers y FK:** `trg_audit_roles`, `trg_audit_role_permissions` y
+  `trg_audit_user_roles` habilitados. Las tres FK de la auditoría (actor, rol,
+  usuario) son `ON DELETE SET NULL`.
+- **Backfill:** 0 eventos con `target_role_id` vivo y sin `details.role_id`, 0
+  con un `role_id` distinto de la FK y 0 FK colgantes. 6 058 de los 6 059
+  eventos llevan `role_id`; el que falta es un huérfano anterior, sin FK ni
+  identidad, al que la migración no inventa nada.
+- **Conservación:** `permission_audit_log` tiene `n_tup_del = 0` con las
+  estadísticas sin reiniciar: nunca se ha borrado una fila de auditoría, y la
+  migración solo actualiza `details`.
+- **Asignaciones:** la migración no toca `user_roles`, y el último evento de
+  auditoría es del 2026-09-29, anterior al despliegue: no hubo altas ni bajas de
+  asignaciones (las de Alexander y Marco incluidas).
+- **Límite:** no se creó ni se eliminó ningún rol ni usuario real. En
+  producción nunca se ha borrado un rol (`roles.n_tup_del = 0`, ningún evento
+  `delete_role`), así que el comportamiento ante un borrado real se sostiene en
+  que las definiciones son idénticas a las probadas en el arnés y en el
+  sandbox, no en un borrado hecho en producción. Las consultas fueron solo
+  `SELECT`, pero la sesión del conector no está forzada a solo lectura.
+
+### Huella de producción
+
+`scripts/schema-drift/huella-produccion.json` se refrescó con el lote completo
+de `fingerprint.sql` (guard y CTE sin modificar; solo se quitaron las líneas de
+comentario) ejecutado contra producción el 2026-10-08 15:00:48 UTC
+(PostgreSQL 17.6, 864 migraciones, `main` `8a4debd`). Todos los hashes salen de
+producción. Respecto de la captura del 2026-10-05: 3357 → 3357 grupos, **3
+cambiados** (los cuerpos de `audit_roles_changes()`,
+`audit_role_permissions_changes()` y `audit_user_roles_changes()`), 0 nuevos y 0
+desaparecidos. Sus hashes nuevos coinciden con los valores «PR» que el auditor
+había reportado como cambio planificado antes de fusionar, y los grants, los
+triggers y las tablas no cambiaron. Con la huella nueva, el auditor de tres vías
+compara 3357 grupos con 0 cambios planificados, 0 ambiguos y las 84 diferencias
+de la baseline, sin cambios. `drift-conocido.json` no se tocó.
+
+### Reversión
+
 `git revert` no revierte DDL. Para volver al cuerpo anterior hace falta una
 migración compensatoria revisada, que reintroduciría el bloqueo de DELETE; no
 borrar los snapshots históricos agregados.
