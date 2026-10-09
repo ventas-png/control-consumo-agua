@@ -7,7 +7,7 @@
 import { hoyLocalISO } from '../../lib/format'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runAfectando, runQuery } from '../queryFetch'
+import { esClaveDuplicada, runAfectando, runQuery } from '../queryFetch'
 import { cxpKeys } from './keys'
 import { contabilidadKeys } from '../contabilidad/keys'
 import type { FacturaCreada, OrdenPago, Proveedor } from '../../types/cxp'
@@ -159,21 +159,38 @@ export function useCrearOrdenPagoMutation(companyId?: string) {
     mutationFn: async (vars: { input: OrdenPagoFormInput; proveedorId: string; projectId: string | null }) => {
       if (!companyId) throw new Error('Falta companyId.')
       const { data: auth } = await supabase.auth.getUser()
-      const rows = await runQuery<OrdenPago[]>((signal) =>
-        supabase
-          .from('ordenes_pago')
-          .insert({
-            ...vars.input,
-            company_id: companyId,
-            proveedor_id: vars.proveedorId,
-            project_id: vars.projectId,
-            estado: 'borrador',
-            solicitada_por: auth.user?.id ?? null,
-          })
-          .select()
-          .abortSignal(signal),
-      )
-      return rows?.[0] ?? null
+      try {
+        const rows = await runQuery<OrdenPago[]>((signal) =>
+          supabase
+            .from('ordenes_pago')
+            .insert({
+              ...vars.input,
+              company_id: companyId,
+              proveedor_id: vars.proveedorId,
+              project_id: vars.projectId,
+              estado: 'borrador',
+              solicitada_por: auth.user?.id ?? null,
+            })
+            .select()
+            .abortSignal(signal),
+        )
+        return rows?.[0] ?? null
+      } catch (e) {
+        // Reintento de una captura que YA se guardó (doble clic, reenvío tras un corte): se devuelve la misma orden.
+        if (vars.input.clave_idempotencia && esClaveDuplicada(e, 'uq_ordenes_pago_clave')) {
+          const claveGuardada = vars.input.clave_idempotencia
+          const previas = await runQuery<OrdenPago[]>((signal) =>
+            supabase
+              .from('ordenes_pago')
+              .select('*')
+              .eq('company_id', companyId)
+              .eq('clave_idempotencia', claveGuardada)
+              .abortSignal(signal),
+          )
+          if (previas?.[0]) return previas[0]
+        }
+        throw e
+      }
     },
     onSuccess: () => invalidar(),
   })

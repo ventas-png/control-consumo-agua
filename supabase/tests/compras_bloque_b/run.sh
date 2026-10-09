@@ -88,6 +88,19 @@ bloque() {
   echo "$salida" | sed -n 's/.*NOTICE:  /  /p'
 }
 
+# Igual que bloque(), pero imprime solo cuántas comprobaciones pasaron (las pruebas de hallazgos son largas).
+bloque_resumen() {
+  local archivo="$1" etiqueta="$2" salida n
+  salida=$(psql -q -v ON_ERROR_STOP=1 -d $BD -f "$AQUI/$archivo" 2>&1) || {
+    echo "$salida" | sed -n 's/.*NOTICE:  /  /p' | tail -5
+    echo "❌ invariante incumplida en $archivo:"
+    echo "$salida" | grep -E '^psql:.*ERROR|^DETAIL|^CONTEXT' | head -6
+    exit 1
+  }
+  n=$(echo "$salida" | grep -c 'NOTICE:  .*✓' || true)
+  echo "  ✓ $etiqueta · $n comprobaciones"
+}
+
 echo "── 1/8 · andamiaje de plataforma"
 aplicar "$RAIZ/scripts/schema-drift/bootstrap.sql"
 
@@ -115,8 +128,14 @@ for base in $NUESTRAS; do
 done
 for f in "$MIGS"/*.sql; do
   base="$(basename "$f" .sql)"
-  if [[ "$base" > "$PRIMERA" ]] && ! grep -qx "$base" <<<"$NUESTRAS"; then aplicar "$f"; fi
+  if [[ "$base" > "$PRIMERA" ]] && ! grep -qx "$base" <<<"$NUESTRAS" && [[ "$base" != 20261027* ]]; then aplicar "$f"; fi
 done
+# Huella del catálogo ANTES de las migraciones 20261027…: la reversión (scripts/reversion-compras-controles.sql) debe devolverlo a esto.
+psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_previo.txt"
+for f in "$MIGS"/20261027*.sql; do
+  [ -e "$f" ] && aplicar "$f"
+done
+psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_migrado.txt"
 
 echo "── 4/8 · padrón: dos empresas, tres proyectos, usuarios con perfiles distintos"
 aplicar "$AQUI/fixture.sql"
@@ -139,6 +158,10 @@ bloque assert_correcciones_c.sql "5m · correcciones del bloque C: pendientes po
 bloque assert_contratos_compras.sql "5o · contratos conectados a las compras: vigencia, monto, excepción auditada, renovación, seguimiento, evaluaciones"
 bloque assert_contratos_coherencia.sql "5p · regresión: editar una orden en borrador no rompe la coherencia con el contrato; una excepción no se reutiliza si cambian las condiciones"
 bloque assert_controles_servidor.sql "5q · controles de servidor: aislamiento de referencias, pagos, sin borrado, permisos por acción, duplicados, trazabilidad"
+echo "── 5r · cierre de hallazgos adversariales: una prueba por hallazgo confirmado (rojas antes de 20261027000800, verdes después)"
+for f in "$AQUI"/hallazgos/*.sql; do
+  bloque_resumen "hallazgos/$(basename "$f")" "$(basename "$f" .sql)"
+done
 echo "── 5n · la protección de inventario es obligatoria (con duplicados reales, siempre en transacciones que se revierten)"
 BD=$BD bash "$AQUI/indice_obligatorio.sh" || exit 1
 
@@ -410,6 +433,34 @@ DUP_U=$(cat "$SALIDAS"/u1.txt "$SALIDAS"/u2.txt | grep -c 'COMPRAS_FACTURA_NUMER
 [ "$N_U" = "1" ] && [ "$DUP_U" = "1" ] \
   && echo "  ✓ U · el mismo número de factura escrito de dos formas, a la vez: UNA factura y el otro intento se rechazó" \
   || { echo "❌ U · facturas=$N_U rechazos=$DUP_U"; cat "$SALIDAS"/u1.txt "$SALIDAS"/u2.txt; exit 1; }
+
+# V… · cierre adversarial: sesiones REALES contra los defectos de concurrencia confirmados (cada fragmento se
+# verificó ROJO sobre la base sin 20261027000800: interbloqueo, doble pago, pago sin asiento…).
+echo "── 6b/8 · concurrencia del cierre adversarial (CONC-01…04, EV-05, EV-09)"
+export C C1 UA PGHOST PGPORT PGUSER BD SALIDAS
+export UC=c0c0c0c0-0000-0000-0000-00000000000c UQ=c0c0c0c0-0000-0000-0000-00000000001a US=c0c0c0c0-0000-0000-0000-00000000001b
+. "$AQUI/hallazgos/conc_lib.sh"
+for f in "$AQUI"/hallazgos/*.conc.sh; do
+  . "$f" || { echo "❌ concurrencia: $(basename "$f")"; exit 1; }
+done
+
+# Reversión: sentencias EJECUTABLES, generadas del catálogo (no la prosa de las cabeceras). Sobre una copia de la base con TODO el
+# bloque aplicado, devuelven triggers, funciones, índices, restricciones, políticas y columnas a lo que había antes de 20261027000000.
+echo "── 6c/8 · reversión de 20261027000000…0800 (scripts/reversion-compras-controles.sql)"
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_rev" -c "CREATE DATABASE ${BD}_rev TEMPLATE $BD" >/dev/null
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d ${BD}_rev -f "$RAIZ/scripts/reversion-compras-controles.sql" >/dev/null \
+  || { echo "❌ la reversión falla al ejecutarse"; exit 1; }
+psql -q -t -A -d ${BD}_rev -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_revertido_total.txt"
+# Las suites dejan sus propios ayudantes en la base (chk, como, fa1_…): se ignora todo objeto que no existía ni antes ni después de las
+# migraciones 20261027…; lo que la reversión debe devolver EXACTO es cada objeto que había antes y la desaparición de los que ellas añadieron.
+cut -d'|' -f1,2 "$SALIDAS/catalogo_previo.txt" "$SALIDAS/catalogo_migrado.txt" | sort -u > "$SALIDAS/catalogo_claves.txt"
+awk -F'|' 'NR==FNR { k[$0]; next } (($1 "|" $2) in k)' "$SALIDAS/catalogo_claves.txt" "$SALIDAS/catalogo_revertido_total.txt" > "$SALIDAS/catalogo_revertido.txt"
+if diff -q "$SALIDAS/catalogo_previo.txt" "$SALIDAS/catalogo_revertido.txt" >/dev/null; then
+  echo "  ✓ la reversión devuelve el catálogo EXACTO a antes de 20261027000000 ($(wc -l < "$SALIDAS/catalogo_previo.txt") objetos comparados)"
+else
+  echo "❌ la reversión no deja el catálogo como estaba:"; diff "$SALIDAS/catalogo_previo.txt" "$SALIDAS/catalogo_revertido.txt" | head -20; exit 1
+fi
+psql -q -d postgres -c "DROP DATABASE ${BD}_rev" >/dev/null
 
 echo "── 7/8 · las migraciones del bloque son append-only (no editan lo ya aplicado)"
 (cd "$RAIZ" && node scripts/migrations-append-only.mjs >/dev/null 2>&1) \

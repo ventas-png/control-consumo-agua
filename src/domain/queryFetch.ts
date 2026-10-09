@@ -44,6 +44,16 @@ export async function runQuery<T>(
 }
 
 /**
+ * ¿El servidor rechazó el INSERT por la clave única de idempotencia `indice`? Es el reintento (doble clic, reenvío tras
+ * un corte) de algo que YA se creó: no es un error del usuario, el documento existe y hay que devolverlo.
+ */
+export function esClaveDuplicada(e: unknown, indice: string): boolean {
+  const causa = e instanceof QueryError ? e.cause : null
+  const texto = `${causa?.message ?? ''} ${causa?.details ?? ''} ${e instanceof Error ? e.message : ''}`
+  return (causa?.code === '23505' || texto.includes('duplicate key')) && texto.includes(indice)
+}
+
+/**
  * El servidor aceptó la orden pero no cambió ninguna fila. En PostgREST un UPDATE o DELETE que la política de
  * filas (RLS) no deja tocar NO falla: devuelve éxito con cero filas. Mostrar «Listo» en ese caso es un éxito
  * falso sobre un documento o un movimiento de dinero que no se movió.

@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- DIAGNÓSTICO PREVIO A 20261027000000…0500 (controles de servidor de Compras)
+-- DIAGNÓSTICO PREVIO A 20261027000000…0800 (controles de servidor de Compras)
 -- SOLO LECTURA: un único SELECT, sin escribir nada. Se puede correr en el SQL
 -- Editor del proyecto (producción incluida) ANTES de aplicar las migraciones.
 --
@@ -23,6 +23,20 @@
 --                           pueden hacer por API lo que la pantalla ya no les ofrece y
 --                           dejarán de poder. Si es un olvido, asignar el permiso ANTES
 --                           de aplicar.
+--   · `pago_sin_asiento`    órdenes pagadas, en un proyecto cuya contabilidad opera, sin su asiento de pago vivo
+--                           (0800 hace que un pago nuevo no se confirme sin asiento; lo ya pagado NO se toca).
+--   · `reverso_pendiente`   anulaciones cuyo asiento de pago/devengo/recepción sigue publicado sin reverso.
+--   · `contrasena_inconsistente` contraseñas cuyo total no cuadra con sus partidas, órdenes de otro proveedor o
+--                           proyecto que su contraseña, o varias órdenes vivas sobre la misma contraseña (si hay
+--                           alguna, 0800 NO crea el índice único parcial de «una orden viva por contraseña» y
+--                           deja solo el bloqueo; el índice se crea después de depurarlas).
+--   · `acumulado_sin_respaldo` / `orden_incoherente` / `documento_desvinculado`  acumulados, totales y vínculos
+--                           que 0800 deja de aceptar que se escriban a mano (no repara los existentes).
+--   · `autoaprobacion` / `configuracion`  órdenes aprobadas por quien las creó con la separación activa, y
+--                           cuántas empresas la tienen encendida (0800 la hace valer también al nacer la orden).
+--   · `referencia_cruzada` incluye ahora activos fijos, gastos y obra de la orden (EV-10).
+--   · `privilegio_anon`     tablas de Compras sobre las que el rol `anon` conserva privilegios DML: la RLS los
+--                           contiene, pero antes de 0800 un trigger podía responder con datos de otra empresa.
 --   Cero filas en un apartado = nada que decidir ahí.
 -- ════════════════════════════════════════════════════════════════════════════
 WITH
@@ -234,6 +248,35 @@ hallazgos AS (
          format('%s empresa(s) con la separación solicitante/aprobador ACTIVA y %s con ella apagada (de %s con configuración de compras)',
                 count(*) FILTER (WHERE aprobacion_separada), count(*) FILTER (WHERE NOT aprobacion_separada), count(*))
     FROM public.compras_config
+  UNION ALL
+  -- ── EV-10 · referencias de activos fijos, gastos y obra de la orden ─────────────
+  SELECT 'referencia_cruzada', 'activos_fijos', a.id::text, 'proveedor o proyecto de otra empresa'
+    FROM public.activos_fijos a
+   WHERE (a.proveedor_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.proveedores v WHERE v.id = a.proveedor_id AND v.company_id = a.company_id))
+      OR (a.project_id   IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.projects p    WHERE p.id = a.project_id    AND p.company_id = a.company_id))
+  UNION ALL
+  SELECT 'referencia_cruzada', 'gastos_condominio', g.id::text, 'proveedor o proyecto de otra empresa'
+    FROM public.gastos_condominio g
+   WHERE (g.proveedor_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.proveedores v WHERE v.id = g.proveedor_id AND v.company_id = g.company_id))
+      OR (g.project_id   IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.projects p    WHERE p.id = g.project_id    AND p.company_id = g.company_id))
+  UNION ALL
+  SELECT 'referencia_cruzada', 'ordenes_compra', o.id::text, 'obra de otra empresa o de otro proyecto que la orden'
+    FROM public.ordenes_compra o JOIN public.obras_mejoras b ON b.id = o.obra_id
+   WHERE b.company_id <> o.company_id OR (o.project_id IS NOT NULL AND b.project_id IS DISTINCT FROM o.project_id)
+  UNION ALL
+  -- ── EV-09 · privilegios que el rol `anon` conserva sobre las tablas de Compras ───────────────
+  SELECT 'privilegio_anon', t.tabla, NULL,
+         format('anon tiene %s (la RLS los contiene; 0800 además corta la fuga por mensajes de error antes de la RLS)',
+                concat_ws(', ', CASE WHEN has_table_privilege('anon', 'public.' || t.tabla, 'SELECT') THEN 'SELECT' END,
+                                CASE WHEN has_table_privilege('anon', 'public.' || t.tabla, 'INSERT') THEN 'INSERT' END,
+                                CASE WHEN has_table_privilege('anon', 'public.' || t.tabla, 'UPDATE') THEN 'UPDATE' END,
+                                CASE WHEN has_table_privilege('anon', 'public.' || t.tabla, 'DELETE') THEN 'DELETE' END))
+    FROM unnest(ARRAY['proveedores','suministros_condominio','proformas_condominio','contratos_proveedores','evaluaciones_proveedor',
+                      'activos_fijos','gastos_condominio','obras_mejoras','proveedor_documentos','movimientos_suministro',
+                      'ordenes_compra','recepciones','facturas_proveedor','ordenes_pago','contrasenas_pago']) AS t(tabla)
+   WHERE to_regclass('public.' || t.tabla) IS NOT NULL
+     AND (has_table_privilege('anon', 'public.' || t.tabla, 'INSERT') OR has_table_privilege('anon', 'public.' || t.tabla, 'UPDATE')
+          OR has_table_privilege('anon', 'public.' || t.tabla, 'DELETE'))
   UNION ALL
   -- ── Perfiles afectados por el control de permisos por acción ─────────────
   SELECT 'perfil_afectado', 'app_users', p.id::text,

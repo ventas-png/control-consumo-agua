@@ -1,5 +1,88 @@
--- EN CONSTRUCCIÓN (PR en borrador): ensamblado parcial, aún sin las piezas de aprobación separada, fugas/FK, borrado, índice e idempotencia.
--- NO se ha aplicado a ningún entorno; no despachar al sandbox hasta cerrar el ensamblado y reemplazar esta cabecera.
+-- ════════════════════════════════════════════════════════════════════════════
+-- COMPRAS · CIERRE DE LOS HALLAZGOS DE LA REVISIÓN ADVERSARIAL DEL PR #926
+-- Una sola migración ADITIVA e idempotente (se puede aplicar dos veces). No edita las 0000…0700 ya
+-- aplicadas al sandbox: añade disparadores y funciones nuevas y reescribe solo seis funciones (abajo).
+-- No reescribe ninguna fila existente y no relaja ningún control: cada pieza solo AÑADE un rechazo,
+-- ordena un bloqueo o hace que un error contable deje de callarse.
+--
+-- CÓMO SE CONFIRMÓ CADA HALLAZGO
+--   Cada defecto se reprodujo ANTES con una prueba que falla hoy (SQL, y sesiones reales simultáneas
+--   cuando es de concurrencia) y se cerró con la pieza de esta migración. Las pruebas viven en
+--   supabase/tests/compras_bloque_b/hallazgos/<ID>.sql (+ <ID>.conc.sh) y las ejecuta run.sh (§5r y §6b).
+--   La matriz hallazgo → reproducción → corrección → prueba → resultado está en
+--   docs/COMPRAS_CONTROLES_SERVIDOR.md (§3).
+--
+-- QUÉ CIERRA (id · pieza)
+--   Pagos concurrentes y pago ↔ asiento
+--     CONC-01  orden canónico de bloqueo al pagar y al anular (contraseña → facturas por id → asientos → folio):
+--              sin interbloqueo ni pago «pagada» sin asiento.
+--     CONC-04  un fallo contable ya no se calla: el pago no se confirma sin su asiento y la anulación no
+--              se confirma sin su reverso (COMPRAS_PAGO_SIN_ASIENTO / COMPRAS_PAGO_REVERSO_FALLIDO).
+--     CONC-02  una contraseña no se paga dos veces (bloqueo + índice único parcial cuando los datos lo permiten).
+--     CONC-03  las partidas de una contraseña no se editan mientras se paga su orden.
+--   Aislamiento empresa / proyecto / proveedor
+--     EV-01    la orden de pago por contraseña es del mismo proveedor y proyecto que la contraseña y sus facturas.
+--     EV-02    el total de la contraseña lo deriva el servidor; la orden paga lo que suman las partidas.
+--     EV-09    ningún trigger responde con datos de otra empresa antes de la RLS (18 tablas y los respaldos de recepción;
+--              también sin sesión: el rol `anon` conserva DML en 10 de ellas).
+--     EV-10    activos fijos, gastos y obra de la orden: proveedor / proyecto / obra de la misma empresa.
+--     DEP-6    el alcance solo revalida lo que cambia (una fila histórica ya no bloquea ediciones ajenas).
+--   Retroceso de estados y evidencia
+--     EV-03    los estados no retroceden sin pasar por su acción (factura, recepción, contraseña).
+--     VER-02   el no-borrado de documentos decide por evidencia que nadie edita.
+--     VER-04   identidad de la factura y de la recepción inmutable tras su efecto contable.
+--     EV-05    importes de la orden derivados de sus renglones; inmutables fuera de borrador.
+--     EV-06    sellos de actor y de fecha: los pone el servidor, en la transición.
+--     VER-03   lo que alimenta el asiento no se reescribe después.
+--     EV-04 / VER-01  lo recibido y lo facturado de un renglón solo lo mueve el sistema.
+--     EV-08    el número de la orden, la recepción y la contraseña lo asigna el servidor y queda fijo.
+--   Aprobación separada
+--     DEP-1 / EV-07  la separación solicitante/aprobador también rige cuando la orden NACE «aprobada»/«emitida».
+--   Borrado y rendimiento
+--     RG-3 / DEP-5  borrar un proyecto con órdenes de pago aprobadas o pagadas deja de fallar (la acción
+--              referencial ON DELETE SET NULL no es una edición).
+--     DEP-2    el índice del número de factura normalizado lo usa por fin la consulta del trigger (~240×).
+--   Idempotencia de pagos
+--     VER-09  las órdenes de pago y las contraseñas aceptan una clave de idempotencia: el doble clic no paga dos veces.
+--
+-- QUÉ NO HACE (decisiones de negocio pendientes; se documentan, no se imponen)
+--   · RG-4 (números de factura distintos que normalizan igual, p. ej. «1-23» y «12-3»): confirmado y medido
+--     con seis variantes; falta decidir cuál regla se quiere. La prueba y la alternativa recomendada (A) quedan en
+--     supabase/tests/compras_bloque_b/pendientes_decision/, fuera de run.sh.
+--   · Quién puede apagar/encender la separación solicitante/aprobador (hoy cualquiera con «Editar» puede
+--     apagarla, autoaprobarse y volver a encenderla). Hay un prototipo verificado en
+--     pendientes_decision/; se decide con el dueño.
+--   · Libro sin catálogo contable = se permite pagar sin asiento (por diseño; producción no tiene asientos).
+--   · Roles que pueden encadenar varios pasos y reparto de permisos entre pasos: docs/COMPRAS_CONTROLES_SERVIDOR.md §6 (P-1).
+--
+-- ORDEN DE DISPARO (los disparadores del mismo evento corren en orden alfabético)
+--   trg_00_… (guardián de empresa) · trg_compras_00_… (sellos, números) · trg_compras_01_… (importes) ·
+--   los existentes de 0000…0700 · trg_z… (máquinas de estado, identidad) · trg_zz… (congelamiento, números fijos).
+--   conta_tg_ordenes_pago_verificar corre DESPUÉS de trg_conta_ordenes_pago y ANTES de trg_cxp_orden_saldo.
+--
+-- DESPLIEGUE
+--   · Va dentro de una transacción con `lock_timeout = 10 s`: si una tabla está ocupada, la migración falla
+--     limpia (sin cambios parciales) y se reintenta; nunca deja la base a medias ni espera sin límite.
+--   · CREATE TRIGGER pide SHARE ROW EXCLUSIVE brevemente sobre cada tabla; conviene fuera de un cierre de mes.
+--   · Orden entre migraciones: 0400 antes que 0600 (la regla de nombre de proveedor la restaura 0600).
+--   · Con esta migración quedan 9 pendientes (0000…0800) frente al tope de diez por despliegue (no se toca).
+--
+-- CÓMO REVERTIR
+--   Sentencias EJECUTABLES, generadas del catálogo y verificadas (run.sh §6c: tras ejecutarlas el catálogo vuelve EXACTO a
+--   antes de 20261027000000): scripts/reversion-compras-controles.sql, sección «20261027000800». En resumen:
+--     · quita 58 disparadores y 37 funciones que esta migración AÑADE;
+--     · quita los índices uq_contrasenas_pago_clave, uq_ordenes_pago_clave, uq_ordenes_pago_contrasena_viva
+--       y las columnas contrasenas_pago.clave_idempotencia, ordenes_pago.clave_idempotencia (las claves de idempotencia guardadas se pierden);
+--     · restaura las definiciones anteriores de las funciones que REESCRIBE:
+--         public.compras_tg_alcance_documento()             ← 20261027000000_compras_aislamiento_referencias.sql
+--         public.compras_tg_factura_numero_equivalente()    ← 20261027000400_compras_duplicados_proveedor_y_factura.sql
+--         public.compras_tg_no_borrar_documento()           ← 20261027000200_compras_documentos_sin_borrado.sql
+--         public.compras_tg_orden_pago_controles()          ← 20261027000100_compras_pagos_controles.sql
+--         public.proveedor_habilitado(uuid)                 ← 20260821000000_compras_proveedor_autorizado.sql
+--         public.compras_normalizar_numero(text)    ← 20261027000400_compras_duplicados_proveedor_y_factura.sql (sin STRICT)
+--   Revertir NO deshace datos (ninguna pieza reescribe filas) y REABRE los defectos que cada pieza cerraba.
+-- ════════════════════════════════════════════════════════════════════════════
+BEGIN;
 SET LOCAL lock_timeout = '10s';
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -502,7 +585,7 @@ CREATE TRIGGER trg_compras_bloqueo_partida
 REVOKE ALL ON FUNCTION public.compras_tg_bloqueo_partida() FROM PUBLIC, anon, authenticated;
 
 -- ════════════════════════════════════════════════════════════════════════════
--- PIEZA 5 · EV-01 · la orden de pago por contraseña es del mismo proveedor y proyecto que la contraseña y sus facturas
+-- PIEZA 5 · EV-01 · la orden de pago por contraseña es del mismo proveedor y proyecto que la contraseña y sus facturas (con la guarda de RG-3)
 -- ════════════════════════════════════════════════════════════════════════════
 -- ════════════════════════════════════════════════════════════════════════════
 -- [EV-01] LA ORDEN DE PAGO DE UNA CONTRASEÑA ES DEL MISMO PROVEEDOR Y DE LA MISMA CONTABILIDAD
@@ -552,6 +635,13 @@ DECLARE
   v_it     record;
   v_valida boolean;
 BEGIN
+  -- [RG-3 · DEP-5] Acción referencial de la purga de un proyecto (ON DELETE SET NULL de project_id): no es una edición.
+  IF TG_OP = 'UPDATE'
+     AND OLD.project_id IS NOT NULL AND NEW.project_id IS NULL
+     AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = OLD.project_id)
+     AND (to_jsonb(NEW) - 'project_id' - 'updated_at') = (to_jsonb(OLD) - 'project_id' - 'updated_at') THEN
+    RETURN NEW;
+  END IF;
   IF NEW.contrasena_pago_id IS NULL OR NEW.estado = 'anulada' THEN
     RETURN NEW;
   END IF;
@@ -2294,3 +2384,1003 @@ $$;
 --   SELECT a.id, a.codigo, c.ultimo FROM public.activos_fijos a
 --     LEFT JOIN public.compras_correlativos c ON c.company_id = a.company_id AND c.project_id IS NOT DISTINCT FROM a.project_id AND c.documento = 'activo_fijo'
 --    WHERE a.codigo ~ '^AF-[0-9]{1,15}$' AND substring(a.codigo FROM 4)::bigint > COALESCE(c.ultimo, 0);
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PIEZA 15 · DEP-1 / EV-07 · la separación solicitante/aprobador también rige al nacer la orden
+-- ════════════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════
+-- [EV-07] MISMA CORRECCIÓN QUE [DEP-1] (misma causa raíz: el camino INSERT «aprobada»/«emitida» de
+-- 20261027000700 no consulta compras_config.aprobacion_separada). Este archivo es IDÉNTICO en SQL a
+-- DEP-1.fix.sql para que EV-07 pueda verificarse por separado; al unir en 20261027000800 se incluye UNA vez
+-- (es idempotente: aplicarlo dos veces no cambia nada).
+-- ════════════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════
+-- [DEP-1] [EV-07] · LA SEPARACIÓN SOLICITANTE / APROBADOR TAMBIÉN RIGE AL NACER LA ORDEN
+-- (prototipo de la migración 20261027000800; idempotente; solo AÑADE un trigger)
+--
+-- DEFECTO
+--   `compras_config.aprobacion_separada` solo se comprobaba en `compras_tg_oc_ciclo`
+--   (BEFORE UPDATE, borrador → aprobada). 20261027000700 permite que una orden NAZCA «aprobada»
+--   (con `approve`) o «emitida» (con `approve` y `change_status`) por INSERT y no consulta la
+--   configuración: quien solicita (created_by = auth.uid(), lo sella el servidor) es, en ese mismo
+--   acto, quien aprueba (aprobada_por = auth.uid(), también lo sella el servidor). Con la
+--   separación encendida, una sola persona solicitaba y aprobaba su propia orden.
+--
+-- QUÉ HACE
+--   Trigger NUEVO `trg_compras_permiso_orden_separada` (BEFORE INSERT): si la empresa de la orden
+--   tiene `aprobacion_separada` encendida y la sesión es de usuario, rechaza el INSERT en estado
+--   «aprobada» o «emitida» con el MISMO código que el camino por UPDATE (COMPRAS_OC_AUTOAPROBACION).
+--   No se compara `created_by`: en una sesión de usuario el solicitante de un INSERT es SIEMPRE
+--   quien inserta (trg_compras_oc_solicitante y trg_sellar_creado_por lo fuerzan a auth.uid()) y
+--   el aprobador que sella compras_tg_permiso_orden es ese mismo auth.uid(). Así no depende de lo
+--   que mande el cliente en created_by / aprobada_por.
+--
+-- POR QUÉ ASÍ (forma mínima)
+--   · Función y trigger NUEVOS: no se reescribe compras_tg_permiso_orden (0700), que sigue exigiendo
+--     el permiso del paso. Ningún control existente se quita ni se relaja; solo se añade un rechazo.
+--   · Nombre del trigger: «trg_compras_permiso_orden_separada» ordena DESPUÉS de
+--     «trg_compras_permiso_orden». Quien carece del permiso del paso recibe el mismo
+--     COMPRAS_PERMISO_ACCION de antes (ningún código de error existente cambia): la separación solo
+--     añade un rechazo a quien ya pasó el permiso. Y ordena después de «trg_compras_oc_estado»
+--     (proveedor autorizado, numeración): el rechazo es del statement completo, no deja número.
+--   · Con la separación apagada o sin fila en compras_config (el defecto), NO cambia nada: es el
+--     comportamiento de 0700 que usa PR A (proveedores_pr_a/assert_identidad §8).
+--   · Sin sesión de usuario (service_role, mantenimiento) o con conta.allow_system_write (triggers de
+--     sistema): compras_sesion_usuario() es false y no se aplica, como en el resto de controles.
+--   · La configuración es por empresa (company_id de la orden), igual que compras_tg_oc_ciclo.
+--
+-- QUÉ NO HACE (decisión de negocio, no se impone)
+--   No fija ningún umbral de monto ni enciende la separación: sigue siendo el interruptor de la
+--   empresa. Tampoco cambia quién puede apagar el interruptor (ver notas del informe).
+--
+-- CÓMO REVERTIR
+--   DROP TRIGGER IF EXISTS trg_compras_permiso_orden_separada ON public.ordenes_compra;
+--   DROP FUNCTION IF EXISTS public.compras_tg_permiso_orden_separada();
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.compras_tg_permiso_orden_separada()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_separada boolean;
+BEGIN
+  -- Nacer en borrador es solicitar: la separación no lo impide.
+  IF NEW.estado NOT IN ('aprobada', 'emitida') THEN
+    RETURN NEW;
+  END IF;
+  -- Procesos sin usuario y triggers de sistema no son una decisión de una persona.
+  IF NOT public.compras_sesion_usuario() THEN
+    RETURN NEW;
+  END IF;
+
+  -- [DEP-1][EV-07] misma lectura que compras_tg_oc_ciclo (por la empresa de la orden), ahora también al nacer
+  SELECT c.aprobacion_separada INTO v_separada
+    FROM public.compras_config c WHERE c.company_id = NEW.company_id;
+  IF COALESCE(v_separada, false) THEN
+    RAISE EXCEPTION 'COMPRAS_OC_AUTOAPROBACION: la empresa exige que la orden la apruebe una persona distinta de quien la solicita, y una orden que nace «%» la solicita y la aprueba la misma persona. Captúrala en borrador para que otra persona con «Autorizar / Denegar» la apruebe.', NEW.estado
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.compras_tg_permiso_orden_separada() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_compras_permiso_orden_separada ON public.ordenes_compra;
+CREATE TRIGGER trg_compras_permiso_orden_separada
+  BEFORE INSERT ON public.ordenes_compra
+  FOR EACH ROW EXECUTE FUNCTION public.compras_tg_permiso_orden_separada();
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PIEZA 16 · EV-09 + RG-3 / DEP-5 · el servidor no responde con datos de otra empresa antes de la RLS; la purga de un proyecto no se confunde con una edición
+-- ════════════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════
+-- EV-09 · PROTOTIPO DE CORRECCIÓN (SQL NUEVO; se unirá a la migración 20261027000800)
+--
+-- DEFECTO
+--   Los triggers BEFORE SECURITY DEFINER del circuito de compras corren ANTES de la política
+--   RLS de INSERT/UPDATE (la RLS evalúa el WITH CHECK DESPUÉS de los BEFORE ROW) y leen con
+--   privilegios de dueño sin filtrar por empresa. Un usuario de C (o el rol `anon`, que no
+--   necesita sesión) que conoce el UUID de la empresa D y el de un proveedor/factura/contraseña
+--   de D recibe, en el mensaje de error, número, fecha, importe, saldo y estado de documentos
+--   de D, el nombre y código de proveedores de D, y la pertenencia de proyecto/proveedor/cuenta
+--   a D. Antes del PR el mismo INSERT moría en la RLS sin leer nada.
+--
+-- QUÉ HACE (todo ADITIVO: ninguna verificación existente se quita ni se relaja)
+--   A. GUARDIÁN DE EMPRESA «RLS primero». Un trigger BEFORE INSERT OR UPDATE OF company_id
+--      que se llama trg_00_compras_rls_empresa (el primero en orden alfabético de cada tabla)
+--      y que, SOLO cuando la sesión está sujeta a la RLS de la tabla, rechaza con EL MISMO
+--      error que daría la RLS (42501 «new row violates row-level security policy for table
+--      "x"») toda fila cuya empresa no sea la de la persona (salvo super_admin: es la
+--      misma condición de las políticas). Es SECURITY INVOKER a propósito: así
+--      `row_security_active()` ve el rol real de la sentencia y
+--        · service_role / superusuario / mantenimiento (BYPASSRLS) no se tocan;
+--        · una RPC SECURITY DEFINER que escribe con permiso de dueño (la RLS no aplica ahí)
+--          tampoco; los triggers de sistema (definer) tampoco.
+--      Cubre las tablas del circuito (0000–0700) y las que comparten el mismo patrón y se
+--      comprobó que filtran (proveedores, contratos, suministros, proformas, evaluaciones…).
+--   A2. orden de pago: la factura y la contraseña de la orden deben ser de la empresa de la
+--      orden ANTES de que corra el trigger preexistente compras_tg_orden_contrasena, que
+--      lee la contraseña ajena (número y total en el mensaje) y es anterior, en orden alfabético,
+--      al `…_AJENA` de 20261027000100. Misma comprobación y mismo código que 0100, sin
+--      FOR UPDATE: ya no se bloquea una fila de otra empresa.
+--   A3. recepcion_respaldos (preexistente): su trigger de alta deriva la empresa de la recepción
+--      indicada y devuelve su estado, tipo y ruta aunque sea de otra empresa; si la recepción no es
+--      visible para quien escribe, el mismo error genérico de la RLS (el guardián de A no sirve
+--      aquí: la empresa de la fila no viene del cliente).
+--   A4. proveedor_habilitado(uuid): igual que proveedor_habilitado_en, no responde por un
+--      proveedor de otra empresa (antes devolvía true/false: oráculo de autorización ajena).
+--   B.  Dentro de la MISMA empresa, el mensaje no dice número, fecha, importe, saldo ni estado
+--      de un documento que la persona no puede ver (el proyecto del documento no es de su
+--      alcance): compras_tg_factura_numero_equivalente (0400) y compras_tg_orden_pago_controles
+--      (0100). Misma condición que la política SELECT de esas tablas. Los códigos y la
+--      lógica no cambian; quien SÍ ve el documento sigue recibiendo el mensaje completo.
+--
+-- QUÉ NO HACE
+--   No cambia políticas RLS ni grants de tablas, no impone que la persona tenga acceso al
+--   proyecto para crear un documento (eso es una decisión de negocio: ver notas) y no toca
+--   los caminos del sistema (auth.uid() nulo, conta.allow_system_write).
+--
+-- CÓMO REVERTIR (sin pérdida de datos)
+--   DROP TRIGGER trg_00_compras_rls_empresa ON public.<cada tabla>;  DROP FUNCTION public.compras_tg_rls_empresa();
+--   DROP TRIGGER trg_compras_alcance_orden_pago_ref ON public.ordenes_pago;
+--   DROP FUNCTION public.compras_tg_alcance_orden_pago_ref();  y restaurar las funciones de 0100/0400
+--   y proveedor_habilitado(uuid) con su cuerpo anterior.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── A. Guardián de empresa «RLS primero» ────────────────────────────────────
+-- SECURITY INVOKER (no DEFINER): hay que ver el rol que ejecuta la sentencia.
+CREATE OR REPLACE FUNCTION public.compras_tg_rls_empresa()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_ok boolean := false;
+BEGIN
+  -- La RLS no aplica a este rol/contexto (superusuario, service_role, dueño de la tabla,
+  -- RPC SECURITY DEFINER): el control de empresa no es de este trigger.
+  IF NOT pg_catalog.row_security_active(TG_RELID) THEN
+    RETURN NEW;
+  END IF;
+  -- Misma condición que las políticas de INSERT/UPDATE de estas tablas:
+  -- is_super_admin() OR company_id = get_my_company_id().
+  -- Sin sesión (anon) ninguna política da paso. OJO: se evalúa en una sentencia APARTE porque
+  -- PostgreSQL comprueba el EXECUTE de las funciones al inicializar la expresión, no al evaluarla:
+  -- `anon` no puede ejecutar is_super_admin()/get_my_company_id() y un solo AND no lo evita.
+  IF auth.uid() IS NOT NULL THEN
+    v_ok := COALESCE(public.is_super_admin(), false)
+            OR COALESCE(NEW.company_id = public.get_my_company_id(), false);
+  END IF;
+  IF v_ok THEN
+    RETURN NEW;
+  END IF;
+  -- El mismo error, con el mismo texto y SQLSTATE, que daría la RLS: sin leer nada de nadie.
+  RAISE EXCEPTION USING ERRCODE = '42501',
+    MESSAGE = format('new row violates row-level security policy for table "%s"', TG_TABLE_NAME);
+END;
+$$;
+
+COMMENT ON FUNCTION public.compras_tg_rls_empresa() IS
+  'Guardián «RLS primero» (EV-09): corre antes que cualquier otro BEFORE y, si la sesión está sujeta a la RLS y la fila no es de su empresa, lanza el mismo error genérico de la RLS antes de que un trigger SECURITY DEFINER lea datos de otra empresa.';
+
+REVOKE ALL ON FUNCTION public.compras_tg_rls_empresa() FROM PUBLIC, anon, authenticated;
+
+DO $$
+DECLARE
+  v_tabla text;
+BEGIN
+  FOREACH v_tabla IN ARRAY ARRAY[
+    -- circuito (20261027000000 … 0700)
+    'ordenes_compra', 'orden_compra_lineas', 'recepciones', 'recepcion_lineas',
+    'facturas_proveedor', 'factura_proveedor_lineas', 'ordenes_pago',
+    'contrasenas_pago', 'contrasena_pago_facturas',
+    -- mismo patrón, preexistentes (el barrido de EV-09 las encontró filtrando)
+    'proveedores', 'contratos_proveedores', 'suministros_condominio', 'proformas_condominio',
+    'evaluaciones_proveedor', 'proveedor_proyectos', 'proveedor_contactos',
+    -- las dos tablas que EV-10 pasa a proteger con un trigger de alcance
+    'activos_fijos', 'gastos_condominio'
+    -- NO recepcion_respaldos: su empresa se DERIVA de la recepción (el INSERT directo legítimo no la
+    -- envía y la fija trg_compras_recepcion_respaldo_alta); esa tabla tiene su propio guardián (A3).
+  ] LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS trg_00_compras_rls_empresa ON public.%I', v_tabla);
+    EXECUTE format(
+      'CREATE TRIGGER trg_00_compras_rls_empresa BEFORE INSERT OR UPDATE OF company_id ON public.%I '
+      'FOR EACH ROW EXECUTE FUNCTION public.compras_tg_rls_empresa()', v_tabla);
+  END LOOP;
+END $$;
+
+-- ── A2. Orden de pago: factura y contraseña de la empresa de la orden, ANTES de leerlas ──
+-- trg_compras_alcance_orden_pago (0000) < trg_compras_alcance_orden_pago_ref < trg_compras_orden_contrasena
+CREATE OR REPLACE FUNCTION public.compras_tg_alcance_orden_pago_ref()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_empresa uuid;
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND NEW.company_id         = OLD.company_id
+     AND NEW.factura_id         IS NOT DISTINCT FROM OLD.factura_id
+     AND NEW.contrasena_pago_id IS NOT DISTINCT FROM OLD.contrasena_pago_id THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.factura_id IS NOT NULL THEN
+    -- Sin FOR UPDATE: la fila de otra empresa no se bloquea ni se lee más allá de su empresa.
+    SELECT f.company_id INTO v_empresa FROM public.facturas_proveedor f WHERE f.id = NEW.factura_id;
+    IF FOUND AND v_empresa IS DISTINCT FROM NEW.company_id THEN
+      RAISE EXCEPTION 'COMPRAS_PAGO_FACTURA_AJENA: la factura no pertenece a la empresa de la orden de pago.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+
+  IF NEW.contrasena_pago_id IS NOT NULL THEN
+    SELECT c.company_id INTO v_empresa FROM public.contrasenas_pago c WHERE c.id = NEW.contrasena_pago_id;
+    IF FOUND AND v_empresa IS DISTINCT FROM NEW.company_id THEN
+      RAISE EXCEPTION 'COMPRAS_PAGO_CONTRASENA_AJENA: la contraseña no pertenece a la empresa de la orden de pago.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NEW;   -- si no existe, la FK rechaza la fila
+END;
+$$;
+
+COMMENT ON FUNCTION public.compras_tg_alcance_orden_pago_ref() IS
+  'EV-09: la factura y la contraseña de una orden de pago son de la empresa de la orden, comprobado antes de que otro trigger lea (o bloquee) la fila ajena. Mismos códigos que 20261027000100.';
+
+DROP TRIGGER IF EXISTS trg_compras_alcance_orden_pago_ref ON public.ordenes_pago;
+CREATE TRIGGER trg_compras_alcance_orden_pago_ref
+  BEFORE INSERT OR UPDATE OF company_id, factura_id, contrasena_pago_id ON public.ordenes_pago
+  FOR EACH ROW EXECUTE FUNCTION public.compras_tg_alcance_orden_pago_ref();
+
+REVOKE ALL ON FUNCTION public.compras_tg_alcance_orden_pago_ref() FROM PUBLIC, anon, authenticated;
+
+-- ── A3. Respaldo de recepción: la recepción referenciada debe ser visible para quien escribe ──
+-- compras_tg_recepcion_respaldo_alta (preexistente) DERIVA company_id de la recepción que le
+-- indican y devuelve su estado («está anulada»), su tipo y su ruta aunque sea de otra empresa;
+-- el guardián de empresa no lo ve porque la fila trae la empresa propia. Mismo error genérico
+-- de la RLS cuando la recepción no es visible para la persona (empresa + acceso al proyecto: la
+-- misma condición con la que la política INSERT de esta tabla juzga la fila ya derivada).
+CREATE OR REPLACE FUNCTION public.compras_tg_rls_respaldo_recepcion()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_ok boolean := false;
+BEGIN
+  IF NOT pg_catalog.row_security_active(TG_RELID) THEN
+    RETURN NEW;
+  END IF;
+  IF auth.uid() IS NOT NULL THEN   -- sentencia aparte: ver compras_tg_rls_empresa()
+    v_ok := COALESCE(public.is_super_admin(), false)
+            OR EXISTS (SELECT 1 FROM public.recepciones r WHERE r.id = NEW.recepcion_id);   -- bajo la RLS de quien escribe
+  END IF;
+  IF v_ok THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION USING ERRCODE = '42501',
+    MESSAGE = format('new row violates row-level security policy for table "%s"', TG_TABLE_NAME);
+END;
+$$;
+
+COMMENT ON FUNCTION public.compras_tg_rls_respaldo_recepcion() IS
+  'EV-09: RLS primero para recepcion_respaldos (la empresa de la fila se deriva de la recepción): si la recepción no es visible para quien escribe, el mismo error genérico de la RLS.';
+
+DROP TRIGGER IF EXISTS trg_00_compras_rls_respaldo_recepcion ON public.recepcion_respaldos;
+CREATE TRIGGER trg_00_compras_rls_respaldo_recepcion
+  BEFORE INSERT OR UPDATE OF recepcion_id ON public.recepcion_respaldos
+  FOR EACH ROW EXECUTE FUNCTION public.compras_tg_rls_respaldo_recepcion();
+
+REVOKE ALL ON FUNCTION public.compras_tg_rls_respaldo_recepcion() FROM PUBLIC, anon, authenticated;
+
+-- ── A4. proveedor_habilitado(uuid): no responde por un proveedor de otra empresa ──
+-- (cuerpo vigente + la guarda de proveedor_habilitado_en; grants intactos)
+CREATE OR REPLACE FUNCTION public.proveedor_habilitado(p_proveedor_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.proveedores
+    WHERE id = p_proveedor_id
+      AND estado = 'autorizado'
+      AND (autorizacion_vence IS NULL OR autorizacion_vence >= CURRENT_DATE)
+      -- [EV-09] con sesión de usuario solo se responde por proveedores de su empresa
+      -- (sin sesión —servicio, triggers de sistema— o super_admin, como siempre).
+      AND (auth.uid() IS NULL
+           OR COALESCE(public.is_super_admin(), false)
+           OR company_id = public.get_my_company_id())
+  )
+$$;
+
+-- ── B. Mensajes: sin datos de documentos que la persona no ve ───────────────
+-- Misma condición que la política SELECT de facturas/contraseñas/órdenes de pago:
+-- super_admin, o su empresa + poder leer Contabilidad + acceso al proyecto del documento.
+-- Sin sesión de usuario (servicio / permiso de sistema) no hay a quién ocultarle nada.
+CREATE OR REPLACE FUNCTION public.compras_puede_ver_documento(p_company uuid, p_project uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  SELECT COALESCE(
+           NOT public.compras_sesion_usuario()
+           OR COALESCE(public.is_super_admin(), false)
+           OR (p_company = public.get_my_company_id()
+               AND COALESCE(public.conta_puede_leer(), false)
+               AND COALESCE(public.can_access_project(p_project), false)),
+           false)
+$$;
+
+COMMENT ON FUNCTION public.compras_puede_ver_documento(uuid, uuid) IS
+  'EV-09: ¿la sesión puede leer un documento de esa empresa y proyecto? Misma condición que la política SELECT. Interna: decide si un mensaje de error puede nombrar datos del documento.';
+
+REVOKE ALL ON FUNCTION public.compras_puede_ver_documento(uuid, uuid) FROM PUBLIC, anon, authenticated;
+
+-- 0400 · factura con número equivalente (cuerpo vigente; bloques cambiados marcados)
+CREATE OR REPLACE FUNCTION public.compras_tg_factura_numero_equivalente()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_norm text := public.compras_normalizar_numero(NEW.numero_factura);
+  v_dup  record;
+BEGIN
+  IF v_norm IS NULL OR NEW.estado = 'anulada' THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'UPDATE'
+     AND NEW.numero_factura IS NOT DISTINCT FROM OLD.numero_factura
+     AND NEW.proveedor_id   =  OLD.proveedor_id THEN
+    RETURN NEW;
+  END IF;
+
+  -- Dos altas simultáneas del mismo número se serializan: la segunda ve a la primera.
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended('factura-numero:' || NEW.company_id::text || ':' || NEW.proveedor_id::text || ':' || v_norm, 0));
+
+  -- [EV-09] se trae también el proyecto de la factura existente, y se prefiere una que la
+  -- persona pueda ver para que el mensaje, si nombra algo, nombre algo suyo.
+  SELECT f.numero_factura, f.estado, f.fecha_emision, f.monto_total, f.company_id, f.project_id INTO v_dup
+    FROM public.facturas_proveedor f
+   WHERE f.company_id   = NEW.company_id
+     AND f.proveedor_id = NEW.proveedor_id
+     AND f.id          <> NEW.id
+     AND f.estado      <> 'anulada'
+     -- El número IDÉNTICO lo rechaza el índice único `uq_facturas_prov_numero` con su error
+     -- de siempre; aquí solo el mismo número escrito de otra forma.
+     AND f.numero_factura IS DISTINCT FROM NEW.numero_factura
+     AND public.compras_normalizar_numero(f.numero_factura) = v_norm
+   ORDER BY public.compras_puede_ver_documento(f.company_id, f.project_id) DESC
+   LIMIT 1;
+
+  IF FOUND THEN
+    -- Mismo SQLSTATE y mismo nombre de restricción que el índice único exacto: la RPC
+    -- `compras_factura_crear` ya traduce ese error y el cliente ya lo muestra.
+    -- [EV-09] si la factura existente es de un proyecto que la persona no ve, el mensaje no
+    -- dice su número, fecha, importe ni estado (el aviso de duplicado se conserva).
+    IF public.compras_puede_ver_documento(v_dup.company_id, v_dup.project_id) THEN
+      RAISE EXCEPTION 'COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente («%», % por %, %). Si es la misma, no la registres otra vez.',
+        v_dup.numero_factura, to_char(v_dup.fecha_emision, 'DD/MM/YYYY'), v_dup.monto_total, v_dup.estado
+        USING ERRCODE = 'unique_violation', CONSTRAINT = 'uq_facturas_prov_numero';
+    END IF;
+    RAISE EXCEPTION 'COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente. Si es la misma, no la registres otra vez.'
+      USING ERRCODE = 'unique_violation', CONSTRAINT = 'uq_facturas_prov_numero';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- 0100 · controles de la orden de pago (cuerpo vigente; bloques cambiados marcados)
+CREATE OR REPLACE FUNCTION public.compras_tg_orden_pago_controles()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_uid       uuid := auth.uid();
+  v_f         public.facturas_proveedor;
+  v_c         public.contrasenas_pago;
+  v_it        record;
+  v_reservado numeric(14,2);
+  v_saldo     numeric(14,2);
+  v_pasa      boolean;     -- ¿hay que validar la factura/contraseña en esta operación?
+  v_paga      boolean;     -- ¿esta operación la deja «pagada»?
+  v_ve        boolean;     -- [EV-09] ¿la persona puede ver el documento que el mensaje nombraría?
+BEGIN
+  -- [RG-3 · DEP-5] ACCIÓN REFERENCIAL DE LA PURGA DE UN PROYECTO.
+  -- La llave ordenes_pago.project_id es ON DELETE SET NULL: al eliminar el proyecto, el motor corre
+  -- `UPDATE ONLY ordenes_pago SET project_id = NULL` sobre cada orden del proyecto, en CUALQUIER estado.
+  -- Eso no es una edición de la orden (el proyecto ya no existe, no se le cambió «de contabilidad»):
+  -- se deja pasar SOLO si lo único que cambia es project_id (de un proyecto que ya no existe) a NULL.
+  -- Una persona no puede fabricar esta condición: la llave impide que project_id apunte a un proyecto
+  -- inexistente, y mover una orden viva a otro proyecto o a NULL con el proyecto vivo sigue siendo
+  -- COMPRAS_PAGO_INMUTABLE. Nada más de la orden se relaja (monto, factura, contraseña, proveedor, estado).
+  IF TG_OP = 'UPDATE'
+     AND OLD.project_id IS NOT NULL AND NEW.project_id IS NULL
+     AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = OLD.project_id)
+     AND (to_jsonb(NEW) - 'project_id' - 'updated_at') = (to_jsonb(OLD) - 'project_id' - 'updated_at') THEN
+    RETURN NEW;
+  END IF;
+
+  -- ── Máquina de estados ────────────────────────────────────────────────────
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.estado <> 'borrador' THEN
+      RAISE EXCEPTION 'COMPRAS_PAGO_ESTADO_INICIAL: una orden de pago nace en borrador y luego se aprueba y se paga; no se crea ya «%».', NEW.estado
+        USING ERRCODE = 'check_violation';
+    END IF;
+    IF v_uid IS NOT NULL THEN
+      NEW.solicitada_por := v_uid;
+    END IF;
+  ELSE
+    IF NEW.estado IS DISTINCT FROM OLD.estado
+       AND NOT ((OLD.estado = 'borrador' AND NEW.estado IN ('aprobada', 'anulada'))
+             OR (OLD.estado = 'aprobada' AND NEW.estado IN ('pagada', 'anulada'))
+             OR (OLD.estado = 'pagada'   AND NEW.estado = 'anulada')) THEN
+      RAISE EXCEPTION 'COMPRAS_PAGO_TRANSICION_INVALIDA: una orden de pago no pasa de «%» a «%»; el camino es borrador → aprobada → pagada, y anular.', OLD.estado, NEW.estado
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    IF OLD.estado <> 'borrador'
+       AND (NEW.company_id          IS DISTINCT FROM OLD.company_id
+         OR NEW.project_id          IS DISTINCT FROM OLD.project_id
+         OR NEW.proveedor_id        IS DISTINCT FROM OLD.proveedor_id
+         OR NEW.factura_id          IS DISTINCT FROM OLD.factura_id
+         OR NEW.contrasena_pago_id  IS DISTINCT FROM OLD.contrasena_pago_id
+         OR NEW.monto               IS DISTINCT FROM OLD.monto) THEN
+      RAISE EXCEPTION 'COMPRAS_PAGO_INMUTABLE: la orden de pago ya no está en borrador y no cambia de factura, contraseña, proveedor, proyecto ni monto. Anúlala y captura otra.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    -- Sellos del servidor: quién aprueba y cuándo se paga no lo dice el navegador.
+    IF v_uid IS NOT NULL THEN
+      IF NEW.estado = 'aprobada' AND OLD.estado <> 'aprobada' THEN
+        NEW.aprobada_por := v_uid;
+        NEW.aprobada_at  := now();
+      ELSIF NEW.aprobada_por IS DISTINCT FROM OLD.aprobada_por OR NEW.aprobada_at IS DISTINCT FROM OLD.aprobada_at THEN
+        NEW.aprobada_por := OLD.aprobada_por;
+        NEW.aprobada_at  := OLD.aprobada_at;
+      END IF;
+      IF NEW.estado = 'pagada' AND OLD.estado <> 'pagada' THEN
+        NEW.pagada_at := now();
+      ELSIF NEW.pagada_at IS DISTINCT FROM OLD.pagada_at THEN
+        NEW.pagada_at := OLD.pagada_at;
+      END IF;
+      IF NEW.solicitada_por IS DISTINCT FROM OLD.solicitada_por THEN
+        NEW.solicitada_por := OLD.solicitada_por;
+      END IF;
+    END IF;
+  END IF;
+
+  -- ── ¿Qué hay que comprobar contra la factura o la contraseña? ─────────────
+  v_paga := NEW.estado = 'pagada' AND (TG_OP = 'INSERT' OR OLD.estado <> 'pagada');
+  v_pasa := TG_OP = 'INSERT'
+         OR (NEW.estado = 'aprobada' AND OLD.estado <> 'aprobada')
+         OR v_paga
+         OR (OLD.estado = 'borrador'
+             AND (NEW.factura_id IS DISTINCT FROM OLD.factura_id
+               OR NEW.contrasena_pago_id IS DISTINCT FROM OLD.contrasena_pago_id
+               OR NEW.monto IS DISTINCT FROM OLD.monto
+               OR NEW.proveedor_id IS DISTINCT FROM OLD.proveedor_id
+               OR NEW.project_id IS DISTINCT FROM OLD.project_id));
+  IF NOT v_pasa OR NEW.estado = 'anulada' THEN
+    RETURN NEW;
+  END IF;
+
+  -- ── Orden contra UNA factura ──────────────────────────────────────────────
+  IF NEW.factura_id IS NOT NULL THEN
+    -- [EV-09] La empresa de la factura se comprueba SIN bloquearla (trg_compras_alcance_orden_pago_ref
+    -- ya lo hizo antes; esto es defensa en profundidad): el FOR UPDATE solo recae sobre filas
+    -- de la empresa de la orden, nunca sobre una factura ajena.
+    PERFORM 1 FROM public.facturas_proveedor f WHERE f.id = NEW.factura_id AND f.company_id <> NEW.company_id;
+    IF FOUND THEN
+      RAISE EXCEPTION 'COMPRAS_PAGO_FACTURA_AJENA: la factura no pertenece a la empresa de la orden de pago.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    -- La fila de la factura se bloquea: dos órdenes que se aprueban o se pagan a la
+    -- vez sobre la misma factura se serializan y la segunda lee el saldo ya movido.
+    SELECT * INTO v_f FROM public.facturas_proveedor f WHERE f.id = NEW.factura_id FOR UPDATE;
+    IF NOT FOUND THEN
+      RETURN NEW;   -- la FK rechaza la fila
+    END IF;
+    v_ve := public.compras_puede_ver_documento(v_f.company_id, v_f.project_id);   -- [EV-09]
+
+    IF v_f.company_id <> NEW.company_id THEN
+      RAISE EXCEPTION 'COMPRAS_PAGO_FACTURA_AJENA: la factura no pertenece a la empresa de la orden de pago.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    IF v_f.proveedor_id <> NEW.proveedor_id THEN
+      RAISE EXCEPTION 'COMPRAS_PAGO_FACTURA_AJENA: la orden de pago es de otro proveedor que la factura.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    IF v_f.project_id IS DISTINCT FROM NEW.project_id THEN
+      RAISE EXCEPTION 'COMPRAS_PAGO_FACTURA_AJENA: la orden de pago es de otra contabilidad (proyecto o empresa) que la factura.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    IF v_f.estado NOT IN ('aprobada', 'pagada_parcial') THEN
+      -- [EV-09] número y estado solo si la persona ve la factura
+      IF v_ve THEN
+        RAISE EXCEPTION 'COMPRAS_FACTURA_NO_PAGABLE: la factura % está «%»; solo se paga una factura aprobada (o pagada parcial). Una factura sin aprobar no se ha cuadrado contra la orden ni contabilizado.',
+          COALESCE(v_f.numero_factura, v_f.id::text), v_f.estado
+          USING ERRCODE = 'check_violation';
+      END IF;
+      RAISE EXCEPTION 'COMPRAS_FACTURA_NO_PAGABLE: la factura indicada no está en un estado que se pueda pagar; solo se paga una factura aprobada (o pagada parcial).'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    v_saldo := v_f.monto_total - v_f.monto_pagado;
+    IF NEW.monto > v_saldo THEN
+      -- [EV-09] saldo e importes solo si la persona ve la factura
+      IF v_ve THEN
+        RAISE EXCEPTION 'COMPRAS_PAGO_EXCEDE_SALDO: la factura % tiene un saldo de % y la orden de pago es por %. No se paga más de lo que se debe.',
+          COALESCE(v_f.numero_factura, v_f.id::text), v_saldo, NEW.monto
+          USING ERRCODE = 'check_violation';
+      END IF;
+      RAISE EXCEPTION 'COMPRAS_PAGO_EXCEDE_SALDO: la orden de pago es por más de lo que se debe de la factura indicada. No se paga más de lo que se debe.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    IF NOT v_paga THEN
+      -- Al crear o aprobar: tampoco puede rebasar lo que ya reservan OTRAS órdenes
+      -- vivas de la misma factura ni las contraseñas emitidas que la incluyen.
+      SELECT COALESCE(SUM(o.monto), 0) INTO v_reservado
+        FROM public.ordenes_pago o
+       WHERE o.factura_id = NEW.factura_id AND o.id <> NEW.id AND o.estado IN ('borrador', 'aprobada');
+      v_reservado := v_reservado + COALESCE((
+        SELECT SUM(cf.monto)
+          FROM public.contrasena_pago_facturas cf
+          JOIN public.contrasenas_pago c ON c.id = cf.contrasena_id
+         WHERE cf.factura_id = NEW.factura_id AND c.estado = 'emitida'), 0);
+      IF NEW.monto > v_saldo - v_reservado THEN
+        -- [EV-09]
+        IF v_ve THEN
+          RAISE EXCEPTION 'COMPRAS_PAGO_EXCEDE_SALDO: la factura % tiene un saldo de % y ya hay % reservado en otras órdenes de pago o contraseñas vivas; esta orden es por %.',
+            COALESCE(v_f.numero_factura, v_f.id::text), v_saldo, v_reservado, NEW.monto
+            USING ERRCODE = 'check_violation';
+        END IF;
+        RAISE EXCEPTION 'COMPRAS_PAGO_EXCEDE_SALDO: la orden de pago es por más de lo que queda disponible de la factura indicada (hay otras órdenes de pago o contraseñas vivas).'
+          USING ERRCODE = 'check_violation';
+      END IF;
+    END IF;
+  END IF;
+
+  -- ── Orden que liquida una CONTRASEÑA ──────────────────────────────────────
+  IF NEW.contrasena_pago_id IS NOT NULL THEN
+    SELECT * INTO v_c FROM public.contrasenas_pago c WHERE c.id = NEW.contrasena_pago_id;
+    IF NOT FOUND THEN
+      RETURN NEW;   -- la FK rechaza la fila
+    END IF;
+    IF v_c.company_id <> NEW.company_id THEN
+      RAISE EXCEPTION 'COMPRAS_PAGO_CONTRASENA_AJENA: la contraseña no pertenece a la empresa de la orden de pago.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    IF v_paga THEN
+      IF v_c.estado <> 'emitida' THEN
+        -- [EV-09]
+        IF public.compras_puede_ver_documento(v_c.company_id, v_c.project_id) THEN
+          RAISE EXCEPTION 'COMPRAS_CONTRASENA_CERRADA: la contraseña % está «%» y no se puede pagar.', COALESCE(v_c.numero, v_c.id::text), v_c.estado
+            USING ERRCODE = 'check_violation';
+        END IF;
+        RAISE EXCEPTION 'COMPRAS_CONTRASENA_CERRADA: la contraseña indicada ya no está emitida y no se puede pagar.'
+          USING ERRCODE = 'check_violation';
+      END IF;
+      -- Cada partida debe caber en el saldo ACTUAL de su factura (un pago directo
+      -- posterior pudo dejarlo corto). Se bloquean en orden de id: sin interbloqueos.
+      FOR v_it IN
+        SELECT cf.factura_id, cf.monto FROM public.contrasena_pago_facturas cf
+         WHERE cf.contrasena_id = NEW.contrasena_pago_id ORDER BY cf.factura_id
+      LOOP
+        SELECT * INTO v_f FROM public.facturas_proveedor f WHERE f.id = v_it.factura_id FOR UPDATE;
+        v_ve := public.compras_puede_ver_documento(v_f.company_id, v_f.project_id);   -- [EV-09]
+        IF v_f.estado NOT IN ('aprobada', 'pagada_parcial') THEN
+          -- [EV-09]
+          IF v_ve THEN
+            RAISE EXCEPTION 'COMPRAS_FACTURA_NO_PAGABLE: la factura % de la contraseña está «%» y no se puede pagar.',
+              COALESCE(v_f.numero_factura, v_f.id::text), v_f.estado
+              USING ERRCODE = 'check_violation';
+          END IF;
+          RAISE EXCEPTION 'COMPRAS_FACTURA_NO_PAGABLE: una factura de la contraseña no está en un estado que se pueda pagar.'
+            USING ERRCODE = 'check_violation';
+        END IF;
+        IF v_it.monto > v_f.monto_total - v_f.monto_pagado THEN
+          -- [EV-09]
+          IF v_ve THEN
+            RAISE EXCEPTION 'COMPRAS_PAGO_EXCEDE_SALDO: la factura % de la contraseña tiene un saldo de % y la partida es por %.',
+              COALESCE(v_f.numero_factura, v_f.id::text), v_f.monto_total - v_f.monto_pagado, v_it.monto
+              USING ERRCODE = 'check_violation';
+          END IF;
+          RAISE EXCEPTION 'COMPRAS_PAGO_EXCEDE_SALDO: una partida de la contraseña es por más de lo que se debe de su factura.'
+            USING ERRCODE = 'check_violation';
+        END IF;
+      END LOOP;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PIEZA 17 · EV-10 · referencias entre empresas en activos fijos, gastos y obra de la orden
+-- ════════════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════
+-- EV-10 · PROTOTIPO DE CORRECCIÓN (SQL NUEVO; se unirá a la migración 20261027000800)
+--
+-- DEFECTO
+--   Tres referencias del circuito de compras seguían abiertas entre empresas: las políticas
+--   de INSERT solo miran `company_id = mi empresa` en la fila nueva, y nada comprobaba que lo
+--   REFERENCIADO fuera de esa empresa:
+--     · activos_fijos.proveedor_id  (y activos_fijos.project_id)
+--     · gastos_condominio.proveedor_id (y gastos_condominio.project_id): el gasto contabiliza
+--       (trg_conta_gastos) con el proveedor/proyecto de otra empresa;
+--     · ordenes_compra.obra_id.
+--   Sí estaban cerradas (su propio trigger): evaluaciones_proveedor, proformas_condominio,
+--   suministros_condominio (proveedor), proveedor_proyectos, gastos_condominio.factura_id,
+--   ordenes_compra.contrato_id, la cuenta de los renglones y todo lo de 20261027000000.
+--
+-- QUÉ HACE (BEFORE INSERT / UPDATE OF …, para todos los caminos, también el de sistema:
+--           una referencia entre empresas no tiene un uso legítimo)
+--   · compras_tg_alcance_referencias(): proveedor y proyecto de la fila ∈ empresa de la fila,
+--     con el mismo helper de 20261027000000 (compras_alcance_verificar). A diferencia de
+--     compras_tg_alcance_documento, SOLO verifica la referencia que nace o cambia (o todas si
+--     cambia la empresa): una fila histórica inconsistente no queda bloqueada por un cambio
+--     ajeno a esa referencia (la misma lección de DEP-6).
+--       trg_compras_alcance_activo  en activos_fijos
+--       trg_compras_alcance_gasto   en gastos_condominio
+--   · compras_tg_alcance_orden_obra(): la obra de la orden ∈ empresa de la orden y, si la orden
+--     es de un proyecto, ∈ ese proyecto (mismo criterio que ya aplica el trigger del contrato:
+--     «el contrato es de otro proyecto que la orden»). Solo al nacer o al cambiar obra,
+--     proyecto o empresa.
+--       trg_compras_alcance_orden_obra en ordenes_compra
+--   La protección «RLS primero» de la empresa en estas dos tablas la aporta EV-09.fix.sql
+--   (trg_00_compras_rls_empresa): sin ella un trigger nuevo sería un oráculo más.
+--
+-- QUÉ NO HACE
+--   No repara filas existentes (el diagnóstico de solo lectura las lista), no cambia
+--   políticas RLS ni firmas, no revalida filas históricas por cambios ajenos a la referencia.
+--   No cubre las otras referencias abiertas que el barrido del catálogo encontró fuera de las
+--   tres pedidas (ver notas: suministros/proformas/obras.project_id, proveedor_documentos,
+--   conta_duplicados_descartados.factura_id, activos_fijos.cuenta_*): se REPORTAN.
+--
+-- CÓMO REVERTIR (sin pérdida de datos: solo funciones y triggers)
+--   DROP TRIGGER trg_compras_alcance_activo ON public.activos_fijos;
+--   DROP TRIGGER trg_compras_alcance_gasto ON public.gastos_condominio;
+--   DROP TRIGGER trg_compras_alcance_orden_obra ON public.ordenes_compra;
+--   DROP FUNCTION public.compras_tg_alcance_referencias(); DROP FUNCTION public.compras_tg_alcance_orden_obra();
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── Proveedor y proyecto de un activo o de un gasto ─────────────────────────
+CREATE OR REPLACE FUNCTION public.compras_tg_alcance_referencias()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_empresa boolean := TG_OP = 'INSERT' OR NEW.company_id IS DISTINCT FROM OLD.company_id;
+  v_proy    uuid;
+  v_prov    uuid;
+BEGIN
+  -- Solo lo que nace o cambia (todo, si cambia la empresa). NULL = no se verifica.
+  IF v_empresa OR NEW.project_id IS DISTINCT FROM OLD.project_id THEN
+    v_proy := NEW.project_id;
+  END IF;
+  IF v_empresa OR NEW.proveedor_id IS DISTINCT FROM OLD.proveedor_id THEN
+    v_prov := NEW.proveedor_id;
+  END IF;
+  IF v_proy IS NULL AND v_prov IS NULL THEN
+    RETURN NEW;
+  END IF;
+  PERFORM public.compras_alcance_verificar(NEW.company_id, v_proy, v_prov, TG_ARGV[0]);
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.compras_tg_alcance_referencias() IS
+  'EV-10: el proveedor y el proyecto de la fila son de la empresa de la fila. Solo verifica lo que nace o cambia (no revalida filas históricas por cambios ajenos).';
+
+DROP TRIGGER IF EXISTS trg_compras_alcance_activo ON public.activos_fijos;
+CREATE TRIGGER trg_compras_alcance_activo
+  BEFORE INSERT OR UPDATE OF company_id, project_id, proveedor_id ON public.activos_fijos
+  FOR EACH ROW EXECUTE FUNCTION public.compras_tg_alcance_referencias('del activo fijo');
+
+DROP TRIGGER IF EXISTS trg_compras_alcance_gasto ON public.gastos_condominio;
+CREATE TRIGGER trg_compras_alcance_gasto
+  BEFORE INSERT OR UPDATE OF company_id, project_id, proveedor_id ON public.gastos_condominio
+  FOR EACH ROW EXECUTE FUNCTION public.compras_tg_alcance_referencias('del gasto');
+
+-- ── La obra de una orden de compra ──────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.compras_tg_alcance_orden_obra()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_o record;
+BEGIN
+  IF NEW.obra_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'UPDATE'
+     AND NEW.obra_id    IS NOT DISTINCT FROM OLD.obra_id
+     AND NEW.company_id =  OLD.company_id
+     AND NEW.project_id IS NOT DISTINCT FROM OLD.project_id THEN
+    RETURN NEW;   -- nada de lo que liga la orden a la obra cambió
+  END IF;
+
+  SELECT o.company_id, o.project_id INTO v_o FROM public.obras_mejoras o WHERE o.id = NEW.obra_id;
+  IF NOT FOUND THEN
+    RETURN NEW;   -- la FK rechaza la fila
+  END IF;
+  IF v_o.company_id IS DISTINCT FROM NEW.company_id THEN
+    RAISE EXCEPTION 'COMPRAS_ALCANCE_OBRA: la obra de la orden de compra no pertenece a la empresa del documento.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF NEW.project_id IS NOT NULL AND v_o.project_id IS DISTINCT FROM NEW.project_id THEN
+    RAISE EXCEPTION 'COMPRAS_ALCANCE_OBRA: la obra es de otro proyecto que la orden de compra. Si cambias el proyecto, cambia o quita también la obra.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.compras_tg_alcance_orden_obra() IS
+  'EV-10: la obra de una orden de compra es de la empresa de la orden y, si la orden es de un proyecto, de ese proyecto. Solo al nacer o cambiar obra/proyecto/empresa.';
+
+DROP TRIGGER IF EXISTS trg_compras_alcance_orden_obra ON public.ordenes_compra;
+CREATE TRIGGER trg_compras_alcance_orden_obra
+  BEFORE INSERT OR UPDATE OF obra_id, company_id, project_id ON public.ordenes_compra
+  FOR EACH ROW EXECUTE FUNCTION public.compras_tg_alcance_orden_obra();
+
+-- ── Permisos de ejecución: solo los invocan los triggers ────────────────────
+REVOKE ALL ON FUNCTION public.compras_tg_alcance_referencias() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.compras_tg_alcance_orden_obra()  FROM PUBLIC, anon, authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PIEZA 18 · DEP-6 · el alcance solo revalida lo que cambia
+-- ════════════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════
+-- DEP-6 · PROTOTIPO DE CORRECCIÓN (SQL NUEVO; se unirá a la migración 20261027000800)
+--
+-- DEFECTO
+--   compras_tg_alcance_documento() (20261027000000) sale temprano solo si NO cambia ninguna de las tres
+--   columnas (company_id, project_id, proveedor_id); si cambia UNA, revalida LAS TRES. Una fila histórica
+--   que ya traía un proveedor (o un proyecto) ajeno no se puede mover de proyecto aunque el proveedor no
+--   cambie, y —peor— la purga de un proyecto (la acción referencial ON DELETE SET NULL de project_id,
+--   que cambia SOLO project_id) revalida el proveedor histórico y falla con COMPRAS_ALCANCE_PROVEEDOR.
+--   Contradice la cabecera de 0000: «solo se evalúan cuando la fila NACE o cambia lo que referencia».
+--
+-- QUÉ HACE (la fila NUEVA inconsistente se sigue rechazando; nada se relaja para lo que cambia)
+--   Reescribe compras_tg_alcance_documento() a partir de su definición vigente con un bloque marcado [DEP-6]:
+--     · INSERT: se verifican las dos referencias, igual que antes.
+--     · UPDATE que cambia la EMPRESA: se verifican las dos (ambas deben ser de la empresa nueva), igual que antes.
+--     · UPDATE con la misma empresa: solo se pasa a compras_alcance_verificar la referencia que CAMBIÓ
+--       (NULL para la intacta). Mover el proyecto no revalida el proveedor histórico, y cambiar el proveedor
+--       no revalida el proyecto histórico. Lo que cambia se valida como siempre.
+--
+-- POR QUÉ ES SEGURO
+--   Para que una referencia ajena entre a una fila hay que escribirla (INSERT o UPDATE que la cambie), y ahí
+--   se verifica. Lo que no se toca conserva el valor histórico que ya tenía: no se agrega nada nuevo.
+--
+-- CÓMO REVERTIR: restaurar la definición de 20261027000000 (CREATE OR REPLACE sin el bloque).
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.compras_tg_alcance_documento()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_proyecto  uuid := NEW.project_id;     -- [DEP-6] qué referencias se verifican
+  v_proveedor uuid := NEW.proveedor_id;   -- [DEP-6]
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND NEW.company_id   IS NOT DISTINCT FROM OLD.company_id
+     AND NEW.project_id   IS NOT DISTINCT FROM OLD.project_id
+     AND NEW.proveedor_id IS NOT DISTINCT FROM OLD.proveedor_id THEN
+    RETURN NEW;
+  END IF;
+
+  -- [DEP-6] Misma empresa: solo se evalúa lo que cambió; lo intacto (aunque sea histórico) no se revalida.
+  -- Si la empresa cambió, las dos referencias deben ser de la empresa nueva: se verifican ambas.
+  IF TG_OP = 'UPDATE' AND NEW.company_id IS NOT DISTINCT FROM OLD.company_id THEN
+    IF NEW.project_id IS NOT DISTINCT FROM OLD.project_id THEN
+      v_proyecto := NULL;
+    END IF;
+    IF NEW.proveedor_id IS NOT DISTINCT FROM OLD.proveedor_id THEN
+      v_proveedor := NULL;
+    END IF;
+  END IF;
+
+  PERFORM public.compras_alcance_verificar(NEW.company_id, v_proyecto, v_proveedor, TG_ARGV[0]);
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.compras_tg_alcance_documento() IS
+  'Proveedor y proyecto de un documento ∈ empresa del documento. [DEP-6] En un UPDATE de la misma empresa solo se verifica la referencia que cambió: la fila histórica no se revalida por mover otra columna.';
+
+REVOKE ALL ON FUNCTION public.compras_tg_alcance_documento() FROM PUBLIC, anon, authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PIEZA 19 · DEP-2 · el índice de número de factura normalizado lo usa la consulta del trigger
+-- ════════════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════
+-- [DEP-2] El índice idx_facturas_prov_numero_norm (20261027000400) no lo usaba
+-- la consulta del trigger compras_tg_factura_numero_equivalente: cada alta de
+-- factura recorría TODAS las del proveedor (63 ms por alta con 20 000 facturas).
+--
+-- CAUSA. El índice es PARCIAL (WHERE numero_factura IS NOT NULL AND estado <> 'anulada').
+--   Para usarlo, el planificador debe PROBAR que el WHERE de la consulta implica ese
+--   predicado. «estado <> 'anulada'» está escrito tal cual; «numero_factura IS NOT NULL»
+--   no: solo se podría deducir de «compras_normalizar_numero(numero_factura) = v_norm» si
+--   la función fuese STRICT (con una función estricta, «f(x) = valor» exige x no nulo), y
+--   no lo es (LANGUAGE sql sin STRICT, y con SET search_path no se «inlinea»).
+--
+-- CORRECCIÓN (dos patas; cada una es suficiente por sí sola, se midió):
+--   1. [ESTE ARCHIVO] compras_normalizar_numero pasa a STRICT. El resultado es IDÉNTICO para toda
+--      entrada (NULL → NULL, antes por coalesce+NULLIF), así que el contenido del índice
+--      no cambia y NO hay que reconstruirlo: no hay REINDEX ni bloqueo de la tabla.
+--      CREATE OR REPLACE FUNCTION solo toca el catálogo de funciones (no pide ningún
+--      candado sobre facturas_proveedor); se verificó con pg_locks.
+--   2. [NO en este archivo] La consulta del trigger añade «AND f.numero_factura IS NOT NULL»
+--      (redundante para el resultado —normalizar(NULL) es NULL y NULL = v_norm nunca es
+--      verdadero— pero hace el predicado del índice trivialmente demostrable). Como RG-4
+--      reescribe esa misma función, el predicado vive en RG-4.fix.sql (marcado [DEP-2]); así los
+--      dos archivos se pueden unir en CUALQUIER orden sin que uno revierta al otro. Si RG-4 no
+--      cambia el trigger, ver alternativas/DEP-2_pata2.alt.sql.
+--
+-- Idempotente. No cambia ninguna regla: el mismo control, con la misma excepción y el
+-- mismo mensaje, resuelto por el índice que 0400 creó para ello.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── Pata 1 · [DEP-2] STRICT (mismo resultado para toda entrada; el índice sigue válido) ──
+CREATE OR REPLACE FUNCTION public.compras_normalizar_numero(p_numero text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE STRICT PARALLEL SAFE               -- [DEP-2] STRICT (antes: sin STRICT)
+SET search_path TO 'pg_catalog'
+AS $$
+  SELECT NULLIF(regexp_replace(upper(coalesce(p_numero, '')), '[^A-Z0-9]', '', 'g'), '')
+$$;
+
+COMMENT ON FUNCTION public.compras_normalizar_numero(text) IS
+  'Número de factura sin mayúsculas, espacios ni puntuación (solo A-Z y 0-9); NULL si queda vacío. Para detectar el mismo número escrito con otro formato. STRICT (NULL → NULL) para que el planificador pruebe «numero_factura IS NOT NULL» y use idx_facturas_prov_numero_norm.';
+
+REVOKE ALL ON FUNCTION public.compras_normalizar_numero(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.compras_normalizar_numero(text) TO authenticated, service_role;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PIEZA 20 · VER-09 · las órdenes de pago y las contraseñas aceptan una clave de idempotencia
+-- ════════════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════
+-- [VER-09] LA ORDEN DE PAGO (Y LA CONTRASEÑA DE PAGO) TIENEN CLAVE DE IDEMPOTENCIA
+--
+-- DEFECTO  Crear una orden de pago no era idempotente. La pantalla inserta con DML directo
+--          (`ordenes_pago`), sin clave: un doble clic o un reintento tras perder la respuesta
+--          crea DOS órdenes de la misma factura y, mientras quepan en el saldo (400 + 400
+--          sobre 1 000), las dos se aprueban y se pagan: dos asientos, 800 salidos de caja
+--          en vez de 400. Los controles de 20261027000100 (saldo, estado, reserva) NO lo ven
+--          como duplicado: son dos pagos parciales legítimos. Solo `contrato_ampliaciones`,
+--          `facturas_proveedor`, `ordenes_compra` y `recepciones` tenían `clave_idempotencia`.
+--
+-- CORRECCIÓN (aditiva; el MISMO patrón de facturas_proveedor / ordenes_compra / recepciones)
+--   · `ordenes_pago.clave_idempotencia text` (NULL en todas las filas existentes).
+--   · CHECK de formato: sin espacios en los extremos y de 8 a 200 caracteres (la cadena vacía
+--     o una clave corta NO cuentan como clave: serían una clave común a todos los intentos).
+--   · Índice único PARCIAL `uq_ordenes_pago_clave (company_id, clave_idempotencia)
+--     WHERE clave_idempotencia IS NOT NULL`: el reintento con la misma clave es rechazado por
+--     la base (23505, nombra el índice); dos sesiones simultáneas se serializan en el índice.
+--     Una orden SIN clave se comporta exactamente como hoy.
+--   · Trigger BEFORE UPDATE OF clave_idempotencia: la clave identifica UN intento de captura
+--     y no se edita ni se borra después (si se pudiera poner en NULL, el reintento volvería a
+--     pasar). Excepción: el camino de sistema (conta.allow_system_write = 'on'), como en las
+--     otras tablas con clave.
+--   · Lo mismo en `contrasenas_pago` (uq_contrasenas_pago_clave): el doble clic en «Emitir»
+--     crea hoy dos cabeceras (CP-000001, CP-000002); la segunda se queda sin partidas. Con
+--     clave, la segunda cabecera se rechaza y no queda cabecera huérfana. Una contraseña por
+--     el MISMO saldo ya la frena compras_tg_contrasena_factura; esto cubre la parcial.
+--
+-- NO HACE (decisiones de negocio, no se imponen por código)
+--   · La clave NO es obligatoria: una orden sin clave sigue siendo válida (importaciones,
+--     service_role, pantallas antiguas en caché). Hacerla obligatoria para sesiones de usuario
+--     es una decisión de despliegue (primero la pantalla, luego el servidor).
+--   · NO prohíbe dos órdenes con la misma referencia/monto/factura SIN la misma clave: dos pagos
+--     parciales iguales pueden ser legítimos. Si el negocio quiere unicidad por (factura,
+--     referencia) es otra regla, con su propia decisión.
+--
+-- La pantalla debe generar una clave por apertura del formulario y, ante cualquier error de un
+-- intento que llevaba clave, buscar por (company_id, clave_idempotencia) antes de mostrar el
+-- error: ver notas del hallazgo. Sin esa parte el servidor ya protege; la pantalla solo explica.
+--
+-- IMPACTO EN DATOS: dos columnas nuevas (NULL), dos CHECK que hoy ninguna fila incumple, dos índices parciales
+--   vacíos y dos triggers de UPDATE OF clave. Ninguna fila existente cambia ni se revalida.
+-- IDEMPOTENTE · REVERTIR:
+--   DROP TRIGGER trg_compras_orden_pago_clave_inmutable ON public.ordenes_pago;
+--   DROP TRIGGER trg_compras_contrasena_clave_inmutable ON public.contrasenas_pago;
+--   DROP FUNCTION public.compras_tg_pago_clave_inmutable();
+--   DROP INDEX public.uq_ordenes_pago_clave; DROP INDEX public.uq_contrasenas_pago_clave;
+--   ALTER TABLE public.ordenes_pago DROP COLUMN clave_idempotencia;      -- arrastra su CHECK
+--   ALTER TABLE public.contrasenas_pago DROP COLUMN clave_idempotencia;  -- arrastra su CHECK
+-- ════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.ordenes_pago      ADD COLUMN IF NOT EXISTS clave_idempotencia text;
+ALTER TABLE public.contrasenas_pago  ADD COLUMN IF NOT EXISTS clave_idempotencia text;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'ordenes_pago_clave_longitud' AND conrelid = 'public.ordenes_pago'::regclass) THEN
+    ALTER TABLE public.ordenes_pago
+      ADD CONSTRAINT ordenes_pago_clave_longitud
+      CHECK (clave_idempotencia IS NULL
+             OR (clave_idempotencia = btrim(clave_idempotencia) AND char_length(clave_idempotencia) BETWEEN 8 AND 200));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'contrasenas_pago_clave_longitud' AND conrelid = 'public.contrasenas_pago'::regclass) THEN
+    ALTER TABLE public.contrasenas_pago
+      ADD CONSTRAINT contrasenas_pago_clave_longitud
+      CHECK (clave_idempotencia IS NULL
+             OR (clave_idempotencia = btrim(clave_idempotencia) AND char_length(clave_idempotencia) BETWEEN 8 AND 200));
+  END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ordenes_pago_clave
+  ON public.ordenes_pago (company_id, clave_idempotencia)
+  WHERE clave_idempotencia IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_contrasenas_pago_clave
+  ON public.contrasenas_pago (company_id, clave_idempotencia)
+  WHERE clave_idempotencia IS NOT NULL;
+
+COMMENT ON COLUMN public.ordenes_pago.clave_idempotencia IS
+  'Identificador que genera el cliente por intento de captura: un reintento o doble clic con la misma clave no crea otra orden de pago (uq_ordenes_pago_clave). Opcional; no se edita después.';
+COMMENT ON COLUMN public.contrasenas_pago.clave_idempotencia IS
+  'Identificador que genera el cliente por intento de emisión: un reintento o doble clic con la misma clave no crea otra contraseña (uq_contrasenas_pago_clave). Opcional; no se edita después.';
+
+-- La clave identifica UN intento de captura: no se cambia ni se borra después.
+CREATE OR REPLACE FUNCTION public.compras_tg_pago_clave_inmutable()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public', 'pg_temp'
+AS $$
+BEGIN
+  IF NEW.clave_idempotencia IS DISTINCT FROM OLD.clave_idempotencia
+     AND COALESCE(current_setting('conta.allow_system_write', true), 'off') <> 'on' THEN
+    RAISE EXCEPTION 'COMPRAS_PAGO_CLAVE_INMUTABLE: la clave de idempotencia de % no se modifica ni se borra después de crearla.', TG_TABLE_NAME
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.compras_tg_pago_clave_inmutable() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_compras_orden_pago_clave_inmutable ON public.ordenes_pago;
+CREATE TRIGGER trg_compras_orden_pago_clave_inmutable
+  BEFORE UPDATE OF clave_idempotencia ON public.ordenes_pago
+  FOR EACH ROW EXECUTE FUNCTION public.compras_tg_pago_clave_inmutable();
+
+DROP TRIGGER IF EXISTS trg_compras_contrasena_clave_inmutable ON public.contrasenas_pago;
+CREATE TRIGGER trg_compras_contrasena_clave_inmutable
+  BEFORE UPDATE OF clave_idempotencia ON public.contrasenas_pago
+  FOR EACH ROW EXECUTE FUNCTION public.compras_tg_pago_clave_inmutable();
+
+COMMIT;

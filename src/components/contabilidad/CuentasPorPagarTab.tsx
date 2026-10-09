@@ -29,6 +29,7 @@ import {
   useAprobarFacturaConCuadreMutation,
   useCrearContrasenaMutation,
 } from '../../domain/compras/mutations'
+import { nuevaClaveIdempotencia } from '../../domain/compras/ordenCrear'
 import { contrasenaFormSchema } from '../../domain/compras/schemas'
 import { formatCurrency, formatDateShort, hoyLocalISO, sumarDiasCalendario } from '../../lib/format'
 import {
@@ -539,6 +540,8 @@ function ContrasenaFormModal({ companyId, projectId, monedaBase, facturas, onClo
   onClose: () => void
 }) {
   const crear = useCrearContrasenaMutation(companyId, projectId)
+  // Una clave por apertura del formulario (ver la nota de la orden de pago): un doble clic no emite dos contraseñas.
+  const claveIdempotencia = useRef(nuevaClaveIdempotencia('cp'))
   const [proveedorId, setProveedorId] = useState('')
   const [fechaPago, setFechaPago] = useState('')
   const [entregadaPor, setEntregadaPor] = useState('')
@@ -569,6 +572,7 @@ function ContrasenaFormModal({ companyId, projectId, monedaBase, facturas, onClo
       entregada_por: entregadaPor.trim() || null,
       recibida_por: recibidaPor.trim() || null,
       observaciones: null,
+      clave_idempotencia: claveIdempotencia.current,
       facturas: candidatas
         .filter((f) => elegidas[f.id])
         .map((f) => ({ factura_id: f.id, monto: saldoFactura(f) })),
@@ -958,6 +962,9 @@ function OrdenFormModal({ companyId, factura, monedaBase, onClose }: {
 }) {
   const crear = useCrearOrdenPagoMutation(companyId)
   const saldo = saldoFactura(factura)
+  // Una clave por apertura del formulario: el doble clic o el reintento tras un corte devuelven LA MISMA orden de
+  // pago en vez de crear (y luego pagar) otra. Si la creación falla, no queda nada y la misma clave sirve al reintento.
+  const claveIdempotencia = useRef(nuevaClaveIdempotencia('op'))
   const [o, setO] = useState({
     monto: String(saldo),
     metodo_pago: 'transferencia' as MetodoPagoCxP,
@@ -979,6 +986,7 @@ function OrdenFormModal({ companyId, factura, monedaBase, onClose }: {
       fecha_pago: o.fecha_pago || null,
       referencia: o.referencia.trim() || null,
       notas: o.notas.trim() || null,
+      clave_idempotencia: claveIdempotencia.current,
     })
     if (!parsed.success) {
       notify({ variant: 'warning', title: 'Atención', text: parsed.error.issues[0]?.message ?? 'Datos inválidos.' })

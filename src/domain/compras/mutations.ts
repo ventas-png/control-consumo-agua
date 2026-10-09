@@ -7,7 +7,7 @@
 // escriben las líneas.
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runAfectando, runQuery } from '../queryFetch'
+import { esClaveDuplicada, runAfectando, runQuery } from '../queryFetch'
 import { comprasKeys } from './keys'
 import { cxpKeys } from '../cxp/keys'
 import { contabilidadKeys } from '../contabilidad/keys'
@@ -285,13 +285,31 @@ export function useCrearContrasenaMutation(companyId?: string, projectId?: strin
     mutationFn: async (input: ContrasenaFormInput) => {
       if (!companyId) throw new Error('Falta companyId.')
       const { facturas, ...cabecera } = input
-      const filas = await runQuery<ContrasenaPago[]>((signal) =>
-        supabase
-          .from('contrasenas_pago')
-          .insert({ ...cabecera, company_id: companyId, project_id: projectId ?? null })
-          .select()
-          .abortSignal(signal),
-      )
+      let filas: ContrasenaPago[] | null
+      try {
+        filas = await runQuery<ContrasenaPago[]>((signal) =>
+          supabase
+            .from('contrasenas_pago')
+            .insert({ ...cabecera, company_id: companyId, project_id: projectId ?? null })
+            .select()
+            .abortSignal(signal),
+        )
+      } catch (e) {
+        // Reintento de una emisión que YA se guardó: se devuelve la misma contraseña (sus partidas las puso el primer intento).
+        if (cabecera.clave_idempotencia && esClaveDuplicada(e, 'uq_contrasenas_pago_clave')) {
+          const claveGuardada = cabecera.clave_idempotencia
+          const previas = await runQuery<ContrasenaPago[]>((signal) =>
+            supabase
+              .from('contrasenas_pago')
+              .select('*')
+              .eq('company_id', companyId)
+              .eq('clave_idempotencia', claveGuardada)
+              .abortSignal(signal),
+          )
+          if (previas?.[0]) return previas[0]
+        }
+        throw e
+      }
       const cp = filas?.[0]
       if (!cp) throw new Error('No se pudo emitir la contraseña.')
 
@@ -337,26 +355,35 @@ export function useCrearOrdenPagoDeContrasenaMutation(companyId?: string) {
       metodo_pago: string
       referencia: string | null
       notas: string | null
+      /** Identifica ESTE intento: un doble clic no crea otra orden de pago (uq_ordenes_pago_clave). */
+      clave_idempotencia?: string | null
     }) => {
       if (!companyId) throw new Error('Falta companyId.')
       const { data: auth } = await supabase.auth.getUser()
-      await runQuery((signal) =>
-        supabase
-          .from('ordenes_pago')
-          .insert({
-            company_id: companyId,
-            project_id: vars.contrasena.project_id,
-            proveedor_id: vars.contrasena.proveedor_id,
-            contrasena_pago_id: vars.contrasena.id,
-            monto: vars.contrasena.total,
-            metodo_pago: vars.metodo_pago,
-            referencia: vars.referencia,
-            notas: vars.notas,
-            estado: 'borrador',
-            solicitada_por: auth.user?.id ?? null,
-          })
-          .abortSignal(signal),
-      )
+      try {
+        await runQuery((signal) =>
+          supabase
+            .from('ordenes_pago')
+            .insert({
+              company_id: companyId,
+              project_id: vars.contrasena.project_id,
+              proveedor_id: vars.contrasena.proveedor_id,
+              contrasena_pago_id: vars.contrasena.id,
+              monto: vars.contrasena.total,
+              metodo_pago: vars.metodo_pago,
+              referencia: vars.referencia,
+              notas: vars.notas,
+              clave_idempotencia: vars.clave_idempotencia ?? null,
+              estado: 'borrador',
+              solicitada_por: auth.user?.id ?? null,
+            })
+            .abortSignal(signal),
+        )
+      } catch (e) {
+        // El mismo intento ya se guardó: la orden existe, no hay nada más que crear.
+        if (vars.clave_idempotencia && esClaveDuplicada(e, 'uq_ordenes_pago_clave')) return
+        throw e
+      }
     },
     onSuccess: () => invalidar(),
   })
