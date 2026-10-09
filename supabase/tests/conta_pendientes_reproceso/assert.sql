@@ -275,6 +275,8 @@ INSERT INTO public.conta_mapeo_cuentas (company_id, project_id, evento, cuenta_i
 INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado)
 VALUES ('0c000000-0000-0000-0000-000000000001', :A::uuid, NULL,
         'd0000000-0000-0000-0000-00000000a001', 'Proveedor A', 'Compra recibida', 'borrador');
+-- Fixture: el recibido lo fija el sistema (permiso de sistema), no una sesión de usuario ([EV-04]).
+SELECT set_config('conta.allow_system_write', 'on', false);
 INSERT INTO public.orden_compra_lineas
   (id, company_id, orden_compra_id, linea, descripcion, categoria, cantidad, precio_unitario, cantidad_recibida, iva_monto)
 VALUES ('0c100000-0000-0000-0000-000000000001', :A::uuid,

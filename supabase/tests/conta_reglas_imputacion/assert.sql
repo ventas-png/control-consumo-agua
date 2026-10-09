@@ -788,6 +788,8 @@ INSERT INTO public.ordenes_compra
 VALUES ('0c000000-0000-0000-0000-000000000001', :A::uuid, NULL,
         'd0000000-0000-0000-0000-00000000a001', 'Proveedor A', 'Compra recibida', 'borrador');
 
+-- Fixture: el recibido lo fija el sistema (permiso de sistema), no una sesión de usuario ([EV-04]).
+SELECT set_config('conta.allow_system_write', 'on', false);
 INSERT INTO public.orden_compra_lineas
   (id, company_id, orden_compra_id, linea, descripcion, categoria,
    cantidad, precio_unitario, cantidad_recibida, iva_monto)
