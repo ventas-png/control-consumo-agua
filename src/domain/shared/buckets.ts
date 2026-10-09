@@ -43,3 +43,13 @@ export const BUCKET_CONTRATOS_RESPALDO = 'contratos-respaldo'
  * ve la solicitud. Sin UPDATE ni DELETE: un respaldo no se sustituye.
  */
 export const BUCKET_RESPALDOS_AJUSTE = 'ajustes-respaldos'
+
+/**
+ * Evidencia fotográfica de housekeeping (estado de la unidad antes y después del
+ * servicio). Bucket PRIVADO propio: `condominios-media` autoriza por proyecto y
+ * dejaría a cualquier residente ver el interior de la unidad de su vecino. Ruta
+ * `<project_id>/<servicio_id>/<archivo>`; las policies de 20261023000000 resuelven
+ * el permiso desde la fila del servicio. Las fotos se depuran a los 90 días
+ * (purgar-fotos-registros); el texto del servicio no.
+ */
+export const BUCKET_HOUSEKEEPING = 'housekeeping-evidencias'

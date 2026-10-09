@@ -14,6 +14,11 @@
 //                                  marcaje se discute; pasada, es una serie
 //                                  temporal de la cara de cada trabajador sin
 //                                  ninguna pregunta que conteste.
+//   `housekeeping-evidencias` 90 d la foto del estado de una unidad antes y
+//                                  después de un servicio de limpieza. Pasado un
+//                                  trimestre el servicio ya se cerró y la foto
+//                                  solo pesa; el TEXTO (hallazgos y observaciones,
+//                                  en `servicios_housekeeping`) no se purga nunca.
 //
 // EN LOS DOS CASOS LA FILA SOBREVIVE. Se anula la columna de la foto (y, en el
 // fichaje, el GPS que la acompaña); la lectura y el marcaje —hora, estado,
@@ -43,6 +48,7 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 const DIAS_REGISTROS_DEFAULT = 90
 const DIAS_PRESENCIA_DEFAULT = 365
+const DIAS_HOUSEKEEPING_DEFAULT = 90
 
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get('origin')
@@ -72,6 +78,7 @@ Deno.serve(async (req: Request) => {
     // sola cosa: se conserva para no romper una invocación manual guardada.
     const diasRegistros = diasDelBody(body, ['dias_registros', 'dias'], DIAS_REGISTROS_DEFAULT)
     const diasPresencia = diasDelBody(body, ['dias_presencia'], DIAS_PRESENCIA_DEFAULT)
+    const diasHousekeeping = diasDelBody(body, ['dias_housekeeping'], DIAS_HOUSEKEEPING_DEFAULT)
 
     const objetivos: ObjetivoPurga[] = [
       {
@@ -94,6 +101,16 @@ Deno.serve(async (req: Request) => {
         // guardarlo.
         columnasAcompanantes: ['gps_entrada', 'gps_salida'],
         diasRetencion: diasPresencia,
+      },
+      {
+        // La fila de la foto sobrevive con `path` NULL (quién, cuándo y en qué
+        // fase se tomó); la UI la muestra como "foto depurada".
+        nombre: 'housekeeping',
+        tabla: 'servicio_housekeeping_fotos',
+        bucket: 'housekeeping-evidencias',
+        columnaFecha: 'created_at',
+        columnasFoto: ['path'],
+        diasRetencion: diasHousekeeping,
       },
     ]
 

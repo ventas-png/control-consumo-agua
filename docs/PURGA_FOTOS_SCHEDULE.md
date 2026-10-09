@@ -7,6 +7,7 @@ Elimina automáticamente las fotos que guardan los dos flujos que las producen.
 | --- | --- | --- | --- |
 | Foto de una lectura de agua | `registro-fotos` | **90 días** | `registros.foto` |
 | Foto y ubicación de un fichaje | `presencia-evidencias` | **365 días** | `presencia_personal.foto_entrada`, `.foto_salida`, `.gps_entrada`, `.gps_salida` |
+| Fotos de evidencia de housekeeping (ingreso y cierre) | `housekeeping-evidencias` | **90 días** | `servicio_housekeeping_fotos.path` |
 
 Los datos de la lectura (consumo, lectura, monto, estado) y los del marcaje
 (hora de entrada y salida, estado, horas trabajadas) **siempre se conservan**.
@@ -37,6 +38,17 @@ dato —dónde estuvo una persona identificada, a qué hora— y sin la foto ya 
 sirve para lo único que justificaba guardarlo. Dejarlo sobrevivir lo convertiría
 en el rastro de ubicación más longevo del sistema, conservado por omisión y no
 porque alguien decidiera conservarlo.
+
+### Housekeeping — 90 días, y el texto no caduca
+
+Las fotos del estado de la unidad antes y después de una limpieza se depuran a
+los 90 días con la misma función y el mismo cron (objetivo `housekeeping`, plazo
+`dias_housekeeping`, default 90 en la edge function). La fila de la foto
+sobrevive con `path` NULL —fase, quién la subió y cuándo— y la UI la muestra
+como «foto depurada». Los **hallazgos de ingreso y las observaciones de cierre
+viven en `servicios_housekeeping` y no se purgan nunca**: son el registro de que
+algo estaba roto aunque la foto ya no exista. Migración:
+`20261023000000_housekeeping_evidencias.sql`.
 
 ## Por qué dos mecánicas
 
