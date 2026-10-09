@@ -1,10 +1,12 @@
 \set ON_ERROR_STOP on
 
 -- ============================================================================
--- INVARIANTES · CONTROLES DE SERVIDOR DEL CIRCUITO DE COMPRAS (20261027000000…0500)
+-- INVARIANTES · CONTROLES DE SERVIDOR DEL CIRCUITO DE COMPRAS (20261027000000…0700)
+-- (el cierre de la revisión adversarial, 20261027000800, tiene sus pruebas en hallazgos/, una por hallazgo)
 --
---   1. Aislamiento: ninguna referencia (proveedor, proyecto, cabecera, cuenta, factura)
---      cruza empresas ni contabilidades, ni siquiera para un administrador.
+--   1. Aislamiento: ninguna referencia del circuito (proveedor, proyecto, cabecera, cuenta, factura)
+--      cruza empresas ni contabilidades, ni siquiera para un administrador. (Activos fijos, gastos y la
+--      obra de la orden —EV-10— y los mensajes de error previos a la RLS —EV-09— los cubre 0800.)
 --   2. Pagos: solo se paga una factura aprobada, del mismo proveedor y contabilidad,
 --      hasta su saldo; máquina de estados; sellos del servidor; reintentos.
 --   3. Sin borrado: lo que tuvo efecto se anula, no se borra; la purga en cascada de una

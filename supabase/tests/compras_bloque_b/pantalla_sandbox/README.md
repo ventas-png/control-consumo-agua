@@ -16,7 +16,8 @@ Operaciones › Órdenes compra ofrece y cómo reacciona cuando el servidor no c
 2. Levantar la app apuntando al sandbox, sin archivos `.env`: `VITE_SUPABASE_URL=https://jwpmivhvlstslncrtokb.supabase.co`
    y la llave **pública** de ese proyecto (su payload JWT dice `ref: jwpmivhvlstslncrtokb`); verificar antes que ni la URL
    ni la llave contienen la referencia de producción.
-3. `ZZ_UI_PW=… node supabase/tests/compras_bloque_b/pantalla_sandbox/pantalla_controles.mjs`
+3. `ZZ_UI_PW=… CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome node supabase/tests/compras_bloque_b/pantalla_sandbox/pantalla_controles.mjs`
+   (`CHROMIUM_PATH` solo hace falta si Playwright no encuentra su navegador; si hay `HTTPS_PROXY`, `127.0.0.1` y `localhost` van directos).
 
 ## Salvaguardas del guion
 - Toda petición a la referencia de producción se **aborta y se cuenta**; el resumen imprime el destino de red
