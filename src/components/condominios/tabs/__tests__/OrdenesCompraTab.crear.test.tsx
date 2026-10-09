@@ -37,7 +37,7 @@ vi.mock('../../../compras/SeguimientoOrdenModal', () => ({ SeguimientoOrdenModal
 vi.mock('../../../compras/SeguimientoComprasPanel', () => ({ SeguimientoComprasPanel: () => null }))
 vi.mock('../../../compras/ImportarLineasOrdenModal', () => ({ ImportarLineasOrdenModal: () => null }))
 vi.mock('../../../proveedores/ContratoSeguimientoModal', () => ({ ContratoSeguimientoModal: () => null }))
-vi.mock('../../../proveedores/permisos', () => ({ usePermisosProveedor: () => ({ cambiarEstado: true, autorizar: true, cambiarEstadoPaso: true, autorizarPaso: true }) }))
+vi.mock('../../../proveedores/permisos', () => ({ usePermisosProveedor: () => ({ cambiarEstado: true, puedeCambiarEstadoPaso: true, puedeAprobarOrdenCompra: true }) }))
 vi.mock('../../../../domain/proveedores/contratosCompras', async (orig) => ({
   ...(await orig<typeof import('../../../../domain/proveedores/contratosCompras')>()),
   useExcepcionContratoMutation: () => ({ mutateAsync: vi.fn() }),

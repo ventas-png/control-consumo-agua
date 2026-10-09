@@ -14,7 +14,7 @@ const m = vi.hoisted(() => ({
   excepcion: vi.fn(),
   prompt: vi.fn(),
   notify: vi.fn(),
-  permisos: { puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: true, puedeEliminar: true },
+  permisos: {} as Record<string, boolean>,
   ordenes: [] as unknown[],
 }))
 
@@ -68,6 +68,14 @@ vi.mock('../ui', async (original) => {
 
 import { ComprasTab } from '../ComprasTab'
 
+// La persona de estas pruebas: puede crear, editar, cambiar estado y TIENE la llave de aprobar órdenes de compra
+// («Autorizar / Denegar — Órdenes compra»). Aprobar y devolver cuelgan de esa llave; emitir y cancelar, de «Cambiar estado».
+const PERMISOS = {
+  puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: true, puedeEliminar: true,
+  puedeAprobarOrdenCompra: true, puedeRegistrarRecepcion: true, puedeAprobarFactura: true, puedeAprobarOrdenPago: true,
+  puedeEjecutarPago: true, puedeAnularPago: true, puedeCambiarEstadoPaso: true,
+}
+
 const NO_VIGENTE = new Error('COMPRAS_CONTRATO_NO_VIGENTE: no se puede aprobar la orden al amparo de su contrato (rebasa el monto máximo vigente de 1000.00)')
 
 const orden = (estado: string, contrato: string | null = 'k1') => ({
@@ -76,7 +84,7 @@ const orden = (estado: string, contrato: string | null = 'k1') => ({
 })
 
 beforeEach(() => {
-  m.permisos = { puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: true, puedeEliminar: true }
+  m.permisos = { ...PERMISOS }
   m.ordenes = []
   m.crear.mockResolvedValue(undefined)
   m.cambiar.mockResolvedValue(undefined)
@@ -146,6 +154,7 @@ describe('Aprobar y emitir con contrato no vigente', () => {
   })
 
   it('sin el permiso de cambio de estado: no se ofrece la excepción y se muestra el rechazo del servidor', async () => {
+    // sin «Cambiar estado»: no hay excepción que autorizar, pero la llave de aprobar sigue ofreciendo Aprobar
     m.permisos = { ...m.permisos, puedeCambiarEstado: false }
     m.ordenes = [orden('borrador')]
     m.cambiar.mockRejectedValue(NO_VIGENTE)

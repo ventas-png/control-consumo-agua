@@ -13,7 +13,8 @@ const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   borrar: vi.fn(),
   cambiarEstado: true,
-  autorizar: true,
+  // «Autorizar / Denegar — Órdenes compra»: la llave que el servidor exige para aprobar y devolver una orden.
+  aprobarOrden: true,
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
@@ -27,7 +28,9 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
 vi.mock('../../../compras/SeguimientoOrdenModal', () => ({ SeguimientoOrdenModal: () => null }))
 vi.mock('../../../proveedores/ContratoSeguimientoModal', () => ({ ContratoSeguimientoModal: () => null }))
 vi.mock('../../../proveedores/ContratoSelector', () => ({ ContratoSelector: () => null }))
-vi.mock('../../../proveedores/permisos', () => ({ usePermisosProveedor: () => ({ cambiarEstado: h.cambiarEstado, autorizar: h.autorizar, cambiarEstadoPaso: h.cambiarEstado, autorizarPaso: h.autorizar }) }))
+vi.mock('../../../proveedores/permisos', () => ({
+  usePermisosProveedor: () => ({ cambiarEstado: h.cambiarEstado, puedeCambiarEstadoPaso: h.cambiarEstado, puedeAprobarOrdenCompra: h.aprobarOrden }),
+}))
 vi.mock('../../../../domain/proveedores/contratosCompras', async (orig) => ({
   ...(await orig<typeof import('../../../../domain/proveedores/contratosCompras')>()),
   useExcepcionContratoMutation: () => ({ mutateAsync: h.excepcion }),
@@ -42,7 +45,7 @@ const orden = (id: string, numero: string | null, concepto: string) => ({
   concepto, monto_estimado: null, estado: 'emitida', created_at: '2026-10-02T00:00:00Z',
 })
 
-beforeEach(() => { h.cambiarEstado = true; h.autorizar = true; h.confirm.mockResolvedValue({ isConfirmed: true }) })
+beforeEach(() => { h.cambiarEstado = true; h.aprobarOrden = true; h.confirm.mockResolvedValue({ isConfirmed: true }) })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('Operaciones · Órdenes de compra', () => {
@@ -127,23 +130,24 @@ describe('Operaciones · aprobar una orden amparada en un contrato', () => {
   })
 })
 
-// El servidor exige un permiso distinto por paso (migración 20261027000300): aprobar y devolver →
-// «Autorizar / Denegar»; emitir y cancelar → «Cambiar estado». La pantalla solo ofrece lo que va a aceptar.
+// El servidor exige un permiso distinto por paso: aprobar y devolver → «Autorizar / Denegar — Órdenes compra»
+// (condominios.tab.ordenes_compra.approve); emitir y cancelar → «Cambiar estado» de Contabilidad. La pantalla solo
+// ofrece lo que va a aceptar. Con las llaves reales de la sesión: OrdenesCompraTab.pasos.test.tsx.
 describe('Operaciones · cada paso se ofrece según su permiso', () => {
   const montar = (estado: string) => {
     render(<OrdenesCompraTab ordenes={[{ ...orden('o1', 'OC-000001', 'Compra X'), estado }] as never} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit onRefresh={vi.fn()} proveedores={[]} />)
     fireEvent.click(screen.getByText('Compra X'))
   }
 
-  it('sin «Autorizar / Denegar» no se ofrece aprobar una orden en borrador', () => {
-    h.autorizar = false
+  it('sin la llave de aprobar órdenes no se ofrece aprobar una orden en borrador', () => {
+    h.aprobarOrden = false
     montar('borrador')
     expect(screen.queryByText(/Aprobar/)).toBeNull()
     expect(screen.getByText(/Cancelar OC/)).toBeTruthy()      // cancelar es «Cambiar estado»
   })
 
-  it('sin «Autorizar / Denegar» no se ofrece devolver a borrador, pero sí emitir', () => {
-    h.autorizar = false
+  it('sin la llave de aprobar órdenes no se ofrece devolver a borrador, pero sí emitir', () => {
+    h.aprobarOrden = false
     montar('aprobada')
     expect(screen.queryByText(/Devolver a borrador/)).toBeNull()
     expect(screen.getByText(/Emitir OC/)).toBeTruthy()
@@ -157,7 +161,7 @@ describe('Operaciones · cada paso se ofrece según su permiso', () => {
     expect(screen.getByText(/Devolver a borrador/)).toBeTruthy()
   })
 
-  it('con ambos permisos se ofrece todo el ciclo de una orden aprobada', () => {
+  it('con la llave de aprobar y «Cambiar estado» se ofrece todo el ciclo de una orden aprobada', () => {
     montar('aprobada')
     expect(screen.getByText(/Emitir OC/)).toBeTruthy()
     expect(screen.getByText(/Cancelar OC/)).toBeTruthy()

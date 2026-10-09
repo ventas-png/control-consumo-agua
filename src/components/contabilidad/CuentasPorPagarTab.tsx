@@ -30,6 +30,7 @@ import {
   useCrearContrasenaMutation,
 } from '../../domain/compras/mutations'
 import { nuevaClaveIdempotencia } from '../../domain/compras/ordenCrear'
+import { mensajeAccionCompras } from '../../domain/compras/errores'
 import { contrasenaFormSchema } from '../../domain/compras/schemas'
 import { formatCurrency, formatDateShort, hoyLocalISO, sumarDiasCalendario } from '../../lib/format'
 import {
@@ -58,11 +59,12 @@ const TONO_FACTURA = {
 const TONO_ORDEN = { borrador: 'info', aprobada: 'warning', pagada: 'success', anulada: 'neutral' } as const
 
 export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) {
-  const { puedeCrear, puedeEditar, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
-  // Un PASO (aprobar, anular, pagar) exige la acción Y «Editar»: la política de UPDATE pide editar y el servidor
-  // además pide la acción. Con solo la acción el UPDATE no afecta ninguna fila.
-  const puedeAutorizarPaso = puedeAutorizar && puedeEditar
-  const puedeCambiarEstadoPaso = puedeCambiarEstado && puedeEditar
+  // Cada PASO exige SU llave Y «Editar» (la política de UPDATE pide editar y el servidor además pide la llave de la
+  // acción): aprobar la factura, aprobar la orden de pago, pagar y anular el pago son cuatro permisos distintos. La
+  // combinación se decide una sola vez (`decidirPasosCompras`); anular la factura sigue con «Cambiar estado» + «Editar».
+  const {
+    puedeCrear, puedeAprobarFactura, puedeAprobarOrdenPago, puedeEjecutarPago, puedeAnularPago, puedeCambiarEstadoPaso,
+  } = usePermisosContabilidad()
   const [vista, setVista] = useState<Vista>('facturas')
   const [nuevaFactura, setNuevaFactura] = useState(false)
   const [ordenPara, setOrdenPara] = useState<FacturaProveedorConProveedor | null>(null)
@@ -91,7 +93,7 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
       await fn()
       notify({ variant: 'success', title: 'Listo', text: ok })
     } catch (e) {
-      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo completar la acción.' })
+      notify({ variant: 'error', title: 'Error', text: mensajeAccionCompras(e, 'No se pudo completar la acción.') })
     }
   }
 
@@ -131,10 +133,10 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
           {/* Con orden de compra detrás, aprobar pasa por el cuadre de 3 vías:
               lo pedido, lo recibido y lo facturado tienen que coincidir. Sin
               orden (gasto directo, caja chica) se aprueba como siempre. */}
-          {f.estado === 'registrada' && puedeAutorizarPaso && f.orden_compra_id && (
+          {f.estado === 'registrada' && puedeAprobarFactura && f.orden_compra_id && (
             <button onClick={(e) => { e.stopPropagation(); setCuadreDe(f) }} style={btnLink}>Revisar y aprobar</button>
           )}
-          {f.estado === 'registrada' && puedeAutorizarPaso && !f.orden_compra_id && (
+          {f.estado === 'registrada' && puedeAprobarFactura && !f.orden_compra_id && (
             <button
               onClick={(e) => { e.stopPropagation(); void accion(() => aprobarFactura.mutateAsync(f.id), 'Factura aprobada: el gasto quedó devengado contra CxP.') }}
               style={btnLink}
@@ -194,15 +196,15 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
       header: '',
       render: (o) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          {o.estado === 'borrador' && puedeAutorizarPaso && (
+          {o.estado === 'borrador' && puedeAprobarOrdenPago && (
             <button onClick={() => void accion(() => aprobarOrden.mutateAsync(o.id), 'Orden aprobada.')} style={btnLink}>Aprobar</button>
           )}
-          {o.estado === 'aprobada' && puedeCambiarEstadoPaso && (
+          {o.estado === 'aprobada' && puedeEjecutarPago && (
             <button onClick={() => void accion(() => pagarOrden.mutateAsync({ ordenId: o.id }), 'Orden pagada: asiento generado y saldo de la factura actualizado.')} style={btnLink}>
               Marcar pagada
             </button>
           )}
-          {o.estado !== 'anulada' && puedeCambiarEstadoPaso && (
+          {o.estado !== 'anulada' && puedeAnularPago && (
             <button
               onClick={() => {
                 void (async () => {
@@ -276,7 +278,7 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
           searchPlaceholder="Buscar orden…"
           emptyState={{
             title: 'Sin órdenes de pago',
-            description: 'Crea órdenes desde la pestaña Facturas (botón Pagar). Un operador puede solicitarlas; aprobar y marcar pagada es de administradores.',
+            description: 'Crea órdenes desde la pestaña Facturas (botón Pagar). Quien tiene el permiso de crear puede solicitarlas; aprobar la orden, marcarla pagada y anular el pago son permisos distintos.',
           }}
         />
       )}
@@ -434,7 +436,7 @@ function CuadreModal({ factura, monedaBase, onClose }: {
       })
       onClose()
     } catch (e) {
-      notify({ variant: 'error', title: 'No se pudo aprobar', text: e instanceof Error ? e.message : 'Error inesperado.' })
+      notify({ variant: 'error', title: 'No se pudo aprobar', text: mensajeAccionCompras(e, 'Error inesperado.') })
     }
   }
 

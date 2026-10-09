@@ -9,6 +9,7 @@ import { useInsumosAlmacenQuery } from '../../../domain/compras/queries'
 import { crearOrdenTransaccional } from '../../../domain/compras/mutations'
 import { mensajeCrearOrden, nuevaClaveIdempotencia } from '../../../domain/compras/ordenCrear'
 import { ordenCompraLineaSchema } from '../../../domain/compras/schemas'
+import { mensajeAccionCompras } from '../../../domain/compras/errores'
 import type { ProveedorCatalogo } from '../../../types/proveedores'
 import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
 import { SeguimientoOrdenModal } from '../../compras/SeguimientoOrdenModal'
@@ -90,10 +91,11 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
   // de Contabilidad puede autorizar una excepción (con motivo). El servidor decide.
   const permisos = usePermisosProveedor()
   const transicionar = useTransicionOrdenConContrato(permisos.cambiarEstado)
-  // El servidor exige un permiso distinto por paso (aprobar → «Autorizar / Denegar»; emitir y cancelar →
-  // «Cambiar estado»), y los dos exigen además «Editar» de Contabilidad (la política de UPDATE): aquí solo se ofrece
-  // lo que el servidor va a aceptar. Si aun así no cambia ninguna fila, se avisa (nunca «éxito» sin cambio).
-  const puedeAvanzar = (siguiente: EstadoOC) => (siguiente === 'aprobada' ? permisos.autorizarPaso : permisos.cambiarEstadoPaso)
+  // El servidor exige un permiso distinto por paso (aprobar y devolver → «Autorizar / Denegar — Órdenes compra»;
+  // emitir y cancelar → «Cambiar estado»), y los dos exigen además «Editar» de Contabilidad (la política de UPDATE):
+  // aquí solo se ofrece lo que el servidor va a aceptar (`usePermisosProveedor` → `decidirPasosCompras`). Si aun así no
+  // cambia ninguna fila, se avisa (nunca «éxito» sin cambio).
+  const puedeAvanzar = (siguiente: EstadoOC) => (siguiente === 'aprobada' ? permisos.puedeAprobarOrdenCompra : permisos.puedeCambiarEstadoPaso)
 
   const filtradas = filtroEstado ? ordenes.filter(o => o.estado === filtroEstado) : ordenes
 
@@ -189,7 +191,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
         await ejecutar()
       }
     } catch (e) {
-      notify({ variant: 'error', title: 'No se pudo', text: (e as Error).message })
+      notify({ variant: 'error', title: 'No se pudo', text: mensajeAccionCompras(e) })
       return
     }
     onRefresh()
@@ -205,7 +207,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     const motivo = r?.motivo?.trim()
     if (!motivo) return
     const { error } = await updateCondominioRowAfectando('ordenes_compra', orden.id, { estado: 'borrador', motivo_devolucion: motivo })
-    if (error) { notify({ variant: 'error', title: 'No se pudo', text: error.message }); return }
+    if (error) { notify({ variant: 'error', title: 'No se pudo', text: mensajeAccionCompras(error) }); return }
     onRefresh()
   }
 
@@ -213,7 +215,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     const r = await confirm({ title: '¿Cancelar orden?', text: orden.concepto, icon: 'warning', variant: 'danger', confirmText: 'Cancelar OC' })
     if (!r.isConfirmed) return
     const { error } = await updateCondominioRowAfectando('ordenes_compra', orden.id, { estado: 'cancelada' })
-    if (error) { notify({ variant: 'error', title: 'No se pudo', text: error.message }); return }
+    if (error) { notify({ variant: 'error', title: 'No se pudo', text: mensajeAccionCompras(error) }); return }
     onRefresh()
   }
 
@@ -429,7 +431,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                           Importar renglones
                         </button>
                       )}
-                      {canEdit && permisos.autorizarPaso && orden.estado === 'aprobada' && (
+                      {canEdit && permisos.puedeAprobarOrdenCompra && orden.estado === 'aprobada' && (
                         <button onClick={() => devolverABorrador(orden)}
                           style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
                           Devolver a borrador
@@ -447,7 +449,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                           ✏️ Editar
                         </button>
                       )}
-                      {canEdit && permisos.cambiarEstadoPaso && (orden.estado === 'borrador' || orden.estado === 'aprobada') && (
+                      {canEdit && permisos.puedeCambiarEstadoPaso && (orden.estado === 'borrador' || orden.estado === 'aprobada') && (
                         <button onClick={() => cancelar(orden)}
                           style={{ padding: '5px 12px', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>
                           Cancelar OC

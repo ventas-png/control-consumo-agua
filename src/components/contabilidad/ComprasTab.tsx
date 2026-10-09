@@ -23,6 +23,7 @@ import { useTransicionOrdenConContrato } from '../compras/excepcionContrato'
 import { ContratoSelector } from '../proveedores/ContratoSelector'
 import { ContratoSeguimientoModal } from '../proveedores/ContratoSeguimientoModal'
 import { adjuntarRespaldoRecepcion, validarArchivoRespaldo, MIME_RESPALDO, MAX_BYTES_RESPALDO } from '../../domain/compras/respaldos'
+import { mensajeAccionCompras } from '../../domain/compras/errores'
 import {
   useActivosFijosQuery,
   useCompromisosQuery,
@@ -75,11 +76,12 @@ const TONO_REC = { borrador: 'info', registrada: 'success', anulada: 'neutral' }
 const TONO_CP = { emitida: 'warning', pagada: 'success', anulada: 'neutral' } as const
 
 export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
-  const { puedeCrear, puedeEditar, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
-  // Un PASO (aprobar, emitir, cancelar, registrar, anular) exige la acción Y «Editar»: la política de UPDATE de esas
-  // tablas pide editar y el servidor además pide la acción. Con solo la acción el UPDATE no afecta ninguna fila.
-  const puedeAutorizarPaso = puedeAutorizar && puedeEditar
-  const puedeCambiarEstadoPaso = puedeCambiarEstado && puedeEditar
+  // Cada PASO del circuito exige SU llave Y «Editar» (la política de UPDATE de esas tablas pide editar y el servidor
+  // además pide la llave de la acción): aprobar la orden de compra, registrar la recepción, etc. Esa combinación se
+  // decide una sola vez (`decidirPasosCompras`); emitir, cancelar y anular siguen con «Cambiar estado» + «Editar».
+  const {
+    puedeCrear, puedeCambiarEstado, puedeAprobarOrdenCompra, puedeRegistrarRecepcion, puedeCambiarEstadoPaso,
+  } = usePermisosContabilidad()
   const [vista, setVista] = useState<Vista>('ordenes')
   const [nuevaOrden, setNuevaOrden] = useState(false)
   const [recibirDe, setRecibirDe] = useState<OrdenCompraConRelaciones | null>(null)
@@ -116,8 +118,8 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
       notify({ variant: 'success', title: 'Listo', text: ok })
     } catch (e) {
       // Los mensajes de los triggers (COMPRAS_*) están escritos para leerse tal
-      // cual: dicen qué pasó y qué hacer. Se muestran sin reescribir.
-      notify({ variant: 'error', title: 'No se pudo', text: e instanceof Error ? e.message : 'Error inesperado.' })
+      // cual: dicen qué pasó y qué hacer (qué permiso falta, qué proyecto). Se muestra el texto del servidor.
+      notify({ variant: 'error', title: 'No se pudo', text: mensajeAccionCompras(e, 'Error inesperado.') })
     }
   }
 
@@ -142,7 +144,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
           {o.estado === 'borrador' && puedeCrear && (
             <button style={btnLink} onClick={(e) => { e.stopPropagation(); setImportarEn(o) }}>Importar renglones</button>
           )}
-          {o.estado === 'borrador' && puedeAutorizarPaso && (
+          {o.estado === 'borrador' && puedeAprobarOrdenCompra && (
             <button style={btnLink} onClick={(e) => {
               e.stopPropagation()
               void accion(() => (o.contrato_id
@@ -150,7 +152,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
                 : cambiarOrden.mutateAsync({ id: o.id, estado: 'aprobada' })), 'Orden aprobada.')
             }}>Aprobar</button>
           )}
-          {o.estado === 'aprobada' && puedeAutorizarPaso && (
+          {o.estado === 'aprobada' && puedeAprobarOrdenCompra && (
             <button style={btnLink} onClick={async (e) => {
               e.stopPropagation()
               const r = await openPromptDialog({
@@ -207,15 +209,16 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
       render: (r) => (
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button style={btnLink} onClick={(e) => { e.stopPropagation(); setRespaldosDe(r) }}>Respaldos</button>
-          {r.estado === 'borrador' && puedeCambiarEstadoPaso && (
+          {r.estado === 'borrador' && puedeRegistrarRecepcion && (
             <button style={btnLink} onClick={async (e) => {
               e.stopPropagation()
-              const ok = await confirm({
+              // `confirm` devuelve { isConfirmed }: un objeto siempre es «verdadero», así que `if (!ok)` no frenaba el «Cancelar».
+              const { isConfirmed } = await confirm({
                 title: 'Registrar recepción',
                 text: 'Al registrarla se contabiliza la entrada (contra «Bienes y servicios por facturar»), se mueven las existencias y se dan de alta los activos. ¿Continuar?',
                 confirmText: 'Registrar',
               })
-              if (!ok) return
+              if (!isConfirmed) return
               await accion(() => cambiarRecepcion.mutateAsync({ id: r.id, estado: 'registrada' }), 'Recepción registrada y contabilizada.')
             }}>Registrar</button>
           )}
@@ -320,14 +323,14 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
           {puedeCrear && (
             <button style={btnLink} onClick={async (e) => {
               e.stopPropagation()
-              const ok = await confirm({
+              const { isConfirmed } = await confirm({
                 title: 'Es el mismo desembolso',
                 text: d.gasto_contabilizado
                   ? 'El gasto ya está contabilizado: se anulará y su asiento se reversará, de modo que solo quede el de la factura. La factura no se toca.'
                   : 'El gasto queda enlazado a la factura y ya no generará asiento propio: la factura es la que contabiliza.',
                 confirmText: 'Enlazar',
               })
-              if (!ok) return
+              if (!isConfirmed) return
               await accion(
                 () => enlazarGasto.mutateAsync({
                   gastoId: d.gasto_id,
