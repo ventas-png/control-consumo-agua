@@ -48,7 +48,7 @@ sobrevive con `path` NULL —fase, quién la subió y cuándo— y la UI la mues
 como «foto depurada». Los **hallazgos de ingreso y las observaciones de cierre
 viven en `servicios_housekeeping` y no se purgan nunca**: son el registro de que
 algo estaba roto aunque la foto ya no exista. Migración:
-`20261023000000_housekeeping_evidencias.sql`.
+`20261023000001_housekeeping_evidencias.sql`.
 
 ## Por qué dos mecánicas
 
