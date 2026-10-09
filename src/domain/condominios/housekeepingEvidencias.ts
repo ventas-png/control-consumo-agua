@@ -79,3 +79,9 @@ export async function eliminarServicioConEvidencias(servicioId: string): Promise
   if (paths.length > 0) await removeMedia(BUCKET_HOUSEKEEPING, paths)
   return { error: null }
 }
+
+/** Descarga el objeto de una foto de evidencia (para armar el informe PDF). */
+export async function descargarFotoServicio(path: string): Promise<Blob | null> {
+  const { data, error } = await supabase.storage.from(BUCKET_HOUSEKEEPING).download(path)
+  return error ? null : data
+}

@@ -5,8 +5,7 @@
 // Peso: las fotos ya están a 1280 px en el bucket; para el PDF se bajan a 900 px
 // y calidad 0.7. Con 40 fotos queda alrededor de 4–6 MB, por debajo del límite de
 // documentos de WhatsApp. jsPDF se importa al generar, no al abrir la pestaña.
-import { supabase } from '../../../lib/supabase'
-import { BUCKET_HOUSEKEEPING } from '../../../domain/shared/buckets'
+import { descargarFotoServicio } from '../../../domain/condominios/housekeepingEvidencias'
 import type { FotoHousekeeping, ServicioHousekeeping } from '../../../types'
 
 const MAX_LADO_PDF = 900
@@ -25,8 +24,8 @@ export interface DatosInformeHK {
 
 /** Baja una foto del bucket y la reduce a data-URI JPEG liviano. */
 async function fotoADataUri(path: string): Promise<{ uri: string; w: number; h: number } | null> {
-  const { data, error } = await supabase.storage.from(BUCKET_HOUSEKEEPING).download(path)
-  if (error || !data) return null
+  const data = await descargarFotoServicio(path)
+  if (!data) return null
   const url = URL.createObjectURL(data)
   try {
     const img = await new Promise<HTMLImageElement>((res, rej) => {
