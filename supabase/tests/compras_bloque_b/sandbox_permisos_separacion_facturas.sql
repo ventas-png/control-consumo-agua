@@ -144,7 +144,7 @@ BEGIN
   INSERT INTO public.role_permissions (role_id, permission_key, effect)
     SELECT pg_temp.id(1024 + g), p, 'allow' FROM generate_series(1, 6) g, unnest(v_base || v_k[g]) p
     UNION ALL SELECT pg_temp.id(1280 + g), p, 'allow' FROM generate_series(1, 6) g, unnest(v_base || v_k[g]) p
-    UNION ALL SELECT pg_temp.id(1537), p, 'allow' FROM unnest(v_base || 'platform.contabilidad.delete') p
+    UNION ALL SELECT pg_temp.id(1537), p, 'allow' FROM unnest(v_base || 'platform.contabilidad.delete'::text) p
     UNION ALL SELECT pg_temp.id(1538), p, 'allow' FROM unnest(v_base || ARRAY['platform.contabilidad.approve', 'platform.contabilidad.change_status']) p
     UNION ALL SELECT pg_temp.id(1539), p, 'allow' FROM unnest(v_base || v_k[1]) p
     UNION ALL SELECT pg_temp.id(1540), p, 'allow' FROM unnest(v_base || ARRAY['platform.contabilidad.approve', 'platform.contabilidad.change_status'] || v_k) p;
@@ -411,6 +411,6 @@ BEGIN
   SELECT count(*) INTO fallos FROM unnest(ev) e WHERE e LIKE 'FALLO%';
   RAISE EXCEPTION E'%\n— % comprobaciones, % con FALLO —\n%\nhuella_md5_del_guion=%', CASE WHEN fallos = 0 THEN 'GUION_OK_REVERTIDO' ELSE 'GUION_FALLO' END,
     cardinality(ev), fallos, array_to_string(ev, E'\n'),
-    md5(regexp_replace(substr(current_query(), position('DO $guion$' in current_query())), '\$guion\$[^$]*$', '$guion$'));
+    md5(regexp_replace(substr(current_query(), position('DO ' || chr(36) || 'guion' in current_query())), '[^$]*$', ''));
 END
 $guion$;
