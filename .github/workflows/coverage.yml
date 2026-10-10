@@ -798,6 +798,19 @@ jobs:
           PGPORT_TEST: 55531
         run: supabase/tests/compras_cierre_tecnico/run.sh
 
+      # Seguridad de las asignaciones de proyecto (20261026000600): nadie se asigna,
+      # cambia ni borra sus propios proyectos (salvo propietario y superadministrador)
+      # y la persona y el proyecto son de la MISMA empresa para todo actor. Datos con la
+      # forma de producción (43 filas, 10 huérfanas, un administrador acotado): las filas
+      # y el alcance de cada persona quedan idénticos. Incluye CONTROL NEGATIVO (sin la
+      # migración la matriz se pone en rojo), reversión exacta, mutaciones por pieza,
+      # guardas del pre/post-vuelo, lock_timeout y concurrencia con sesiones reales.
+      - name: Asignaciones de proyecto — seguridad (autoasignación, empresa, privilegios)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55532
+        run: supabase/tests/asignaciones_proyecto/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
