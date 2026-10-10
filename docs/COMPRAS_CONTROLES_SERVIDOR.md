@@ -487,7 +487,7 @@ Tareas del bot: Configurations ✅ · **Migrations ❌** · Seeding ⏸ · Edge 
 
 | Orden | PR | Migraciones | Por qué en ese lugar |
 |---|---|---|---|
-| **1** | PR de seguridad de `user_project_assignments` (PR_SEG) | 1: `20261026000600_seguridad_asignaciones_proyecto` | Cierra un hueco **preexistente y alto**; es independiente de este PR (no usa nada de compras) y no debe esperar a las decisiones pendientes de este. Su versión queda entre el máximo de producción (`20261026000500`) y la primera de este PR (`20261027000000`) |
+| **1** | PR de seguridad de `user_project_assignments` (PR #928) | 1: `20261026000600_seguridad_asignaciones_proyecto` | Cierra un hueco **preexistente y alto**; es independiente de este PR (no usa nada de compras) y no debe esperar a las decisiones pendientes de este. Su versión queda entre el máximo de producción (`20261026000500`) y la primera de este PR (`20261027000000`) |
 | **2** | este PR (#926) | 10: `20261027000000` … `20261027000900` | Una sola ejecución con las diez (`…0400` y `…0600` en la misma). Tras el paso 1 hay que traer `main` a la rama (merge) para que el *push* siga trayendo exactamente diez |
 | **3** | PR #927 (housekeeping) | 1: `20261028000000` | Su versión es posterior; no comparte *push* con ninguna de las anteriores |
 | **4** (futuro, si se aprueba) | PR de alcance por proyecto (§5.3, R1/R2) | las que necesite (se prototipó una) | Depende de objetos de la `0900`: va **después** del paso 2, con su pre-vuelo |
