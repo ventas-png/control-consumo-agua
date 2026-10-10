@@ -99,6 +99,9 @@ vi.mock('../ui', async (original) => {
     usePermisosContabilidad: () => ({
       puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true,
       puedeAutorizar: true, puedeEliminar: true,
+      // quien lo puede todo: también las seis decisiones del circuito de compras y pagos (cada una con su llave)
+      puedeAprobarOrdenCompra: true, puedeRegistrarRecepcion: true, puedeAprobarFactura: true, puedeAprobarOrdenPago: true,
+      puedeEjecutarPago: true, puedeAnularPago: true, puedeCambiarEstadoPaso: true,
     }),
   }
 })

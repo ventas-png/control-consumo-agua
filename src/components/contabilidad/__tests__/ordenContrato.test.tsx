@@ -155,7 +155,7 @@ describe('Aprobar y emitir con contrato no vigente', () => {
 
   it('sin el permiso de cambio de estado: no se ofrece la excepción y se muestra el rechazo del servidor', async () => {
     // sin «Cambiar estado»: no hay excepción que autorizar, pero la llave de aprobar sigue ofreciendo Aprobar
-    m.permisos = { ...m.permisos, puedeCambiarEstado: false }
+    m.permisos = { ...m.permisos, puedeCambiarEstado: false, puedeCambiarEstadoPaso: false }
     m.ordenes = [orden('borrador')]
     m.cambiar.mockRejectedValue(NO_VIGENTE)
     render(<ComprasTab companyId="c1" projectId="22222222-2222-4222-8222-222222222222" monedaBase="GTQ" />)

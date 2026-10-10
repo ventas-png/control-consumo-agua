@@ -181,7 +181,8 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     const updates: Partial<OrdenCompra> = { estado: cfg.next }
     const ejecutar = async () => {
       const { error } = await updateCondominioRowAfectando('ordenes_compra', orden.id, updates)
-      if (error) throw new Error(error.message)
+      // El SQLSTATE viaja con el error: el traductor distingue los dos COMPRAS_ALCANCE_PROYECTO del servidor por él.
+      if (error) throw Object.assign(new Error(error.message), { code: error.code })
     }
     try {
       if (orden.contrato_id && (cfg.next === 'aprobada' || cfg.next === 'emitida')) {

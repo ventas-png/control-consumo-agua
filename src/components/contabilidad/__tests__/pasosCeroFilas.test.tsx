@@ -19,7 +19,7 @@ import { VER_Y_EDITAR, montarConSesion } from '../../../test/sesionPermisos'
 
 const h = vi.hoisted(() => ({
   filas: [] as unknown[],
-  error: null as { message: string } | null,
+  error: null as { message: string; code?: string } | null,
   parches: [] as Array<{ tabla: string; patch: Record<string, unknown> }>,
   notify: vi.fn(),
   confirm: vi.fn(),
@@ -80,6 +80,10 @@ const PROV = '11111111-1111-4111-8111-111111111111'
 const PROY = '22222222-2222-4222-8222-222222222222'
 const SIN_FILAS = /El servidor no aplicó el cambio/
 const RECHAZO_PERMISO = 'COMPRAS_PERMISO_ACCION: para marcar pagada una orden de pago (contabiliza el pago) tu perfil necesita el permiso «Compras y pagos — Ejecutar un pago».'
+// COMPRAS_ALCANCE_PROYECTO tiene DOS usos en el servidor: el de la persona (42501, no está asignada al proyecto del
+// documento) y el de la migración 20261027000000 (23514, el proyecto no es de la empresa del documento).
+const RECHAZO_ASIGNACION = { message: 'COMPRAS_ALCANCE_PROYECTO: para ejecutar un pago tu perfil necesita estar asignado al proyecto del documento.', code: '42501' }
+const RECHAZO_OTRA_EMPRESA = { message: 'COMPRAS_ALCANCE_PROYECTO: el proyecto OC-000012 no pertenece a la empresa del documento.', code: '23514' }
 
 const orden = (estado: string) => ({
   id: 'o1', numero: 'OC-000001', proveedor_id: PROV, proveedor_nombre: 'Ferretería', concepto: 'Material',
@@ -214,6 +218,26 @@ describe('las seis acciones desde la pantalla: cero filas NO es éxito', () => {
     expect(invalidar).not.toHaveBeenCalled()
   })
 
+  it.each(casos)('$nombre: el rechazo por asignación al proyecto (42501) se muestra sin el código', async (c) => {
+    h.error = RECHAZO_ASIGNACION
+    const invalidar = arrancar(c)
+    c.clic()
+    await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
+    expect(textoDeAvisos('error')[0]).toBe('Para ejecutar un pago tu perfil necesita estar asignado al proyecto del documento.')
+    expect(textoDeAvisos('success')).toEqual([])
+    expect(invalidar).not.toHaveBeenCalled()
+  })
+
+  it.each(casos)('$nombre: «el proyecto no pertenece a la empresa» (23514) NO se presenta como falta de asignación: llega tal cual', async (c) => {
+    h.error = RECHAZO_OTRA_EMPRESA
+    const invalidar = arrancar(c)
+    c.clic()
+    await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
+    expect(textoDeAvisos('error')[0]).toBe(RECHAZO_OTRA_EMPRESA.message)
+    expect(textoDeAvisos('success')).toEqual([])
+    expect(invalidar).not.toHaveBeenCalled()
+  })
+
   it('«Cancelar» en la confirmación de anular un pago no escribe nada', async () => {
     h.confirm.mockResolvedValue({ isConfirmed: false })
     const c = casos[casos.length - 1]
@@ -278,5 +302,31 @@ describe('Operaciones › Órdenes compra: aprobar y devolver con cero filas NO 
     await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
     expect(textoDeAvisos('error')[0]).toBe('Para aprobar una orden de compra tu perfil necesita el permiso «Autorizar / Denegar — Órdenes compra».')
     expect(onRefresh).not.toHaveBeenCalled()
+  })
+
+  it('el rechazo por asignación al proyecto (42501) se muestra sin el código, y el de «otra empresa» (23514) tal cual', async () => {
+    h.error = RECHAZO_ASIGNACION
+    const onRefresh = montarOp('borrador')
+    fireEvent.click(screen.getByText(/Aprobar/))
+    await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
+    expect(textoDeAvisos('error')[0]).toBe('Para ejecutar un pago tu perfil necesita estar asignado al proyecto del documento.')
+    expect(onRefresh).not.toHaveBeenCalled()
+    cleanup()
+    h.notify.mockClear()
+
+    h.error = RECHAZO_OTRA_EMPRESA
+    const otraVez = montarOp('borrador')
+    fireEvent.click(screen.getByText(/Aprobar/))
+    await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
+    expect(textoDeAvisos('error')[0]).toBe(RECHAZO_OTRA_EMPRESA.message)
+    expect(otraVez).not.toHaveBeenCalled()
+  })
+
+  it('el SQLSTATE llega al traductor aunque el texto no diga nada reconocible (aprobar reenvía el error con su código)', async () => {
+    h.error = { message: 'COMPRAS_ALCANCE_PROYECTO: texto que el servidor aún no usa.', code: '42501' }
+    montarOp('borrador')
+    fireEvent.click(screen.getByText(/Aprobar/))
+    await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
+    expect(textoDeAvisos('error')[0]).toBe('Texto que el servidor aún no usa.')
   })
 })
