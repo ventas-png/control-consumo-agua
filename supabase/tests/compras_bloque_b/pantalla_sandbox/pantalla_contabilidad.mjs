@@ -253,6 +253,16 @@ async function opcionQueContiene(select, texto) {
   const opts = await select.locator('option').evaluateAll((os) => os.map((o) => ({ v: o.value, t: o.textContent || '' })))
   return opts.find((o) => o.t.includes(texto))?.v ?? null
 }
+async function esperarTexto(locator, rx, ms = 15000) {
+  const fin = Date.now() + ms
+  let t = ''
+  while (Date.now() < fin) {
+    t = (await locator.innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
+    if (rx.test(t)) return t
+    await esperar(250)
+  }
+  return null
+}
 const foto = (page, nombre) => page.screenshot({ path: `${OUT}${nombre}.png`, fullPage: true }).catch(() => {})
 const celda = async (row, i) => (await row.locator('td').nth(i).innerText()).replace(/\s+/g, ' ').trim()
 
@@ -442,7 +452,8 @@ async function fase4() {
     await sel.selectOption(v)
     await dlg.getByLabel('No. de factura').fill(NUM_FACTURA_OC)
     await dlg.getByText('Total de la factura:').waitFor()
-    ok(/1,?000\.00/.test(await dlg.getByText('Total de la factura:').innerText()), 'solicitante · el formulario calcula el total de la factura por renglón: 1,000.00')
+    const totalForm = await esperarTexto(dlg.getByText('Total de la factura:'), /1,?000\.00/)
+    ok(!!totalForm, 'solicitante · el formulario calcula el total de la factura por renglón (una vez cargados los renglones): 1,000.00', totalForm || '')
     await foto(page, '4-factura-contra-orden')
     await dlg.getByRole('button', { name: 'Registrar', exact: true }).click()
     const av = await esperarAviso(page, n0, /Registrada/)
