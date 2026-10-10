@@ -48,7 +48,9 @@ sobrevive con `path` NULL —fase, quién la subió y cuándo— y la UI la mues
 como «foto depurada». Los **hallazgos de ingreso y las observaciones de cierre
 viven en `servicios_housekeeping` y no se purgan nunca**: son el registro de que
 algo estaba roto aunque la foto ya no exista. Migración:
-`20261027000000_housekeeping_evidencias.sql`.
+`20261028000000_housekeeping_evidencias.sql`. Diseño completo, cola de limpieza con reintentos y borrado
+coordinado: `docs/HOUSEKEEPING_EVIDENCIAS.md`. El cron horario `hk_limpieza_storage_hourly` llama a esta misma
+función con `{"mode":"limpieza_housekeeping"}` (no purga por retención: solo drena la cola y barre huérfanos).
 
 ## Por qué dos mecánicas
 

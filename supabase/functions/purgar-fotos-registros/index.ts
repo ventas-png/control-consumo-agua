@@ -42,6 +42,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { diasDelBody, purgarObjetivo, type ClientePurga, type ObjetivoPurga } from './logic.ts'
+import { drenarColaHousekeeping, type ClienteLimpieza } from '../_shared/housekeepingLimpieza.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -74,6 +75,13 @@ Deno.serve(async (req: Request) => {
     if (!autorizado) return json({ error: 'Forbidden' }, 403)
 
     const body = await req.json().catch(() => ({})) as Record<string, unknown>
+
+    // `mode: 'limpieza_housekeeping'` (cron horario): NO purga por retención, solo reintenta la
+    // cola de archivos de housekeeping (fotos/servicios borrados) y barre huérfanos.
+    if (body.mode === 'limpieza_housekeeping') {
+      const limpieza = await drenarColaHousekeeping(admin as unknown as ClienteLimpieza, { barrerHuerfanas: true })
+      return json({ success: limpieza.errores.length === 0, limpieza_housekeeping: limpieza, errores: limpieza.errores })
+    }
     // `dias` a secas es la clave histórica de esta función, cuando purgaba una
     // sola cosa: se conserva para no romper una invocación manual guardada.
     const diasRegistros = diasDelBody(body, ['dias_registros', 'dias'], DIAS_REGISTROS_DEFAULT)
@@ -121,12 +129,18 @@ Deno.serve(async (req: Request) => {
     for (const objetivo of objetivos) {
       resultados.push(await purgarObjetivo(admin as unknown as ClientePurga, objetivo))
     }
-    const errores = resultados.flatMap(r => r.errores.map(e => `${r.nombre}/${e}`))
+    // La purga mensual también deja la cola de housekeeping al día (retries del mes).
+    const limpieza = await drenarColaHousekeeping(admin as unknown as ClienteLimpieza, { barrerHuerfanas: true })
+    const errores = [
+      ...resultados.flatMap(r => r.errores.map(e => `${r.nombre}/${e}`)),
+      ...limpieza.errores.map(e => `limpieza_housekeeping/${e}`),
+    ]
 
     return json({
       success: errores.length === 0,
       objetivos: resultados,
       // Totales agregados: lo que miraba quien ya leía esta respuesta.
+      limpieza_housekeeping: limpieza,
       objetos_borrados: resultados.reduce((n, r) => n + r.objetos_borrados, 0),
       filas_actualizadas: resultados.reduce((n, r) => n + r.filas_actualizadas, 0),
       errores,

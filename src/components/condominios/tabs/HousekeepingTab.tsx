@@ -99,8 +99,9 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar servicio?', text: 'Se eliminarán también sus fotos y observaciones.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await eliminarServicioConEvidencias(id)
-    if (error) return notify({ variant: 'error', title: 'Error', text: error })
+    const { error, limpieza } = await eliminarServicioConEvidencias(id)
+    if (error) return notify({ variant: 'error', title: 'No se eliminó el servicio', text: error })
+    if (limpieza === 'pendiente') notify({ variant: 'info', title: 'Servicio eliminado', text: 'Las fotos se retirarán del almacenamiento en segundo plano.' })
     onRefresh()
   }
 

@@ -139,9 +139,10 @@ export function HousekeepingEvidencias({ servicio, projectId, tipoLabel, estadoL
   }
 
   async function eliminar(f: FotoHousekeeping) {
-    const { error } = await eliminarFotoServicio(f)
-    if (error) return notify({ variant: 'error', title: 'No se pudo eliminar', text: error })
+    const { error, limpieza } = await eliminarFotoServicio(f)
+    if (error) return notify({ variant: 'error', title: 'No se pudo eliminar la foto', text: error })
     setFotos(prev => prev.filter(x => x.id !== f.id))
+    if (limpieza === 'pendiente') notify({ variant: 'info', title: 'Foto eliminada', text: 'El archivo se retirará del almacenamiento en segundo plano.' })
   }
 
   async function compartir() {

@@ -1,3 +1,8 @@
+-- COPIA LITERAL de la versión anterior de esta migración (20261023000001_housekeeping_evidencias,
+-- commit 3ce34d3 de la PR #927), que es la que quedó aplicada en el preview branch.
+-- NO es una migración del repositorio: la prueba la aplica primero para demostrar que
+-- 20261028000000 converge desde ese estado. No editar.
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- Housekeeping · evidencia del estado de la unidad antes y después del servicio
 -- ════════════════════════════════════════════════════════════════════════════
