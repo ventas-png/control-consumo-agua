@@ -1,9 +1,9 @@
-// PROPUESTA (escéptico 2): cada UPDATE/DELETE de paso (a) apunta SOLO a la fila indicada y (b) escribe lo que el paso dice.
+// ESCRITURAS DE PASO: cada UPDATE/DELETE de las acciones de compras y pagos (a) apunta SOLO a la fila indicada y (b) escribe lo que el paso dice.
 //
-// Los simuladores de las pruebas existentes hacen `c.eq = () => c` y solo miran `estado`: quitar o cambiar el `.eq('id', …)` de un
-// UPDATE de estado, o dejar de mandar el motivo / la justificación / la fecha, dejaba TODAS las pruebas en verde. Un UPDATE sin filtro
-// cambia todas las filas que la política de la empresa deja tocar (PostgREST no lo impide si no hay `pg_safeupdate`): aprobar «una»
-// factura aprobaría todas las registradas.
+// Los simuladores de las demás pruebas (`pasosCeroFilas`, `mutationsFilasAfectadas`) hacen `c.eq = () => c` y solo miran `estado`: quitar o
+// cambiar el `.eq('id', …)` de un UPDATE de estado, o dejar de mandar el motivo / la justificación / la fecha, dejaba esas pruebas en verde.
+// Un UPDATE sin filtro cambia todas las filas que la política de la empresa deja tocar (PostgREST no lo impide si no hay `pg_safeupdate`):
+// aprobar «una» factura aprobaría todas las registradas. Este simulador CAPTURA `eq`, `update` y `delete` y afirma tabla, id y parche exactos.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

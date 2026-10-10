@@ -19,6 +19,10 @@
 --     entera por la RPC, y el aviso genérico (factura de un proyecto que la persona no ve) sale idéntico para cualquier estructura
 --     de la oculta ([RG-4r4], [RG-4s]); SQLSTATE 23505 en todos.
 --
+--   · TANDA FINAL (segundo escéptico): la clave de idempotencia ya usada por una factura de un proyecto que la persona no ve responde
+--     COMPRAS_FACTURA_CLAVE_EN_USO, no «número duplicado»; el candado de la RPC es el de (empresa, clave); anon no ejecuta la RPC; y un
+--     duplicado con un carácter invisible (U+200B) llega a la pantalla con el aviso de siempre ([RG-4t]).
+--
 -- HOY (sin la parte 2) debe FALLAR en [RG-4r1]. Con ella, pasar.
 -- Se ejecuta con:  psql -X -v ON_ERROR_STOP=1 -d <BD> -f RG-4.rpc.sql   (superusuario; requiere pieza.sql y
 -- pieza_factura_crear.sql aplicadas). Toda su escritura va dentro de BEGIN … ROLLBACK: no deja residuo.
@@ -133,6 +137,55 @@ SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
 SELECT public.chk_bool(public.hx5_rpc(:C1::uuid, 'ocu 7002', 'rg5-clave-0006') ~ '«OCU-7002», .* por 5555\.55, aprobada\)', true,
   '[RG-4s] el administrador (ve C2) recibe por la RPC el detalle completo de la factura existente');
+RESET ROLE;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- t · La clave de idempotencia ya usada por una factura que la persona no ve; el candado de la RPC; el ACL; un invisible por la RPC
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Si la clave la tiene una factura de otro alcance, la persona no la ve (el reintento no la recupera) y el INSERT choca con el índice de la
+-- clave: la RPC debe responder CLAVE_EN_USO («usa otra clave»), NO «número duplicado», que sería falso (el número no existe). Eso depende
+-- de que el manejador distinga la restricción del número (uq_facturas_prov_numero) de la de la clave.
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+SELECT public.chk_txt(public.hx5_rpc(:C2::uuid, 'OCU-500', 'rg5-clave-0020'), 'OK OCU-500',
+  '[RG-4t·montaje] el administrador registra «OCU-500» en C2 con la clave rg5-clave-0020');
+RESET ROLE;
+SELECT public.como(:UX::uuid);
+SET ROLE authenticated;
+SELECT public.chk_txt(public.hx5_rpc(:C1::uuid, 'OTRO-777', 'rg5-clave-0020'),
+  'ERR 23505 COMPRAS_FACTURA_CLAVE_EN_USO: la clave de idempotencia ya está en uso. Usa otra clave.',
+  '[RG-4t] el operador que no ve C2 reutiliza esa clave con otro número («OTRO-777», que no existe): la RPC responde CLAVE_EN_USO, no «número duplicado»');
+SELECT public.chk_bool(public.hx5_rpc(:C1::uuid, 'OTRO-777', 'rg5-clave-0020') !~* '(OCU-500|OCU500|NUMERO_DUPLICADO|OTRO-777)', true,
+  '[RG-4t] …y el aviso no nombra la factura oculta ni afirma que «OTRO-777» esté duplicado');
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = :PA::uuid AND numero_factura = 'OTRO-777'), 0,
+  '[RG-4t] …y no se creó ninguna factura «OTRO-777»');
+RESET ROLE;
+-- el candado consultivo de la RPC es el de (empresa, clave de idempotencia): lo que retuvo la alta de la clave rg5-clave-0001 (la primera de este archivo)
+SELECT public.chk(
+  (SELECT count(*) FROM pg_locks l
+    WHERE l.locktype = 'advisory' AND l.pid = pg_backend_pid() AND l.granted AND l.objsubid = 1
+      AND ((l.classid::text::bigint << 32) | l.objid::text::bigint)
+          = hashtextextended('compras_factura:' || 'cccccccc-cccc-cccc-cccc-cccccccccccc' || ':' || 'rg5-clave-0001', 0)), 1,
+  '[RG-4t] la RPC retuvo el candado consultivo de (empresa, clave de idempotencia): «compras_factura:<empresa>:<clave>»');
+SELECT public.chk(
+  (SELECT count(*) FROM pg_locks l
+    WHERE l.locktype = 'advisory' AND l.pid = pg_backend_pid() AND l.granted AND l.objsubid = 1
+      AND ((l.classid::text::bigint << 32) | l.objid::text::bigint)
+          = hashtextextended('compras_factura:' || 'rg5-clave-0001', 0)), 0,
+  '[RG-4t] …y NO el de la clave sin la empresa (dos empresas con la misma clave no se bloquean entre sí)');
+-- ACL: la RPC la ejecutan las sesiones de la API autenticadas y el servicio; anon no
+SELECT public.chk_bool(has_function_privilege('authenticated', 'public.compras_factura_crear(uuid,uuid,jsonb,jsonb)', 'EXECUTE')
+                       AND has_function_privilege('service_role', 'public.compras_factura_crear(uuid,uuid,jsonb,jsonb)', 'EXECUTE'), true,
+  '[RG-4t] authenticated y service_role pueden ejecutar compras_factura_crear');
+SELECT public.chk_bool(has_function_privilege('anon', 'public.compras_factura_crear(uuid,uuid,jsonb,jsonb)', 'EXECUTE'), false,
+  '[RG-4t] anon NO puede ejecutar compras_factura_crear (sin sesión no se crean facturas)');
+-- un duplicado escrito con un carácter invisible llega a la pantalla con el mismo aviso (tanda final: el espacio de ancho cero U+200B no es un separador)
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+SELECT public.chk_txt(public.hx5_rpc(:C1::uuid, 'FAC-001', 'rg5-clave-0021'), 'OK FAC-001', '[RG-4t·montaje] la RPC registra «FAC-001»');
+SELECT public.chk_txt(regexp_replace(public.hx5_rpc(:C1::uuid, 'F' || convert_from(decode('e2808b', 'hex'), 'UTF8') || 'AC001', 'rg5-clave-0022'), '\d\d/\d\d/\d{4}', 'DD/MM/AAAA'),
+  'ERR 23505 COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente («FAC-001», DD/MM/AAAA por 100.00, registrada). Si es la misma, no la registres otra vez. Si es otra, escribe su número tal como viene impreso, con su guion o separador entre serie y correlativo (p. ej. «A-123»); si ya lo escribiste así, la existente se registró con más separadores: corrige o anula esa primero.',
+  '[RG-4t] «F<U+200B>AC001» frente a «FAC-001»: la RPC lo rechaza como duplicado, con el aviso de siempre (antes se registraba)');
 RESET ROLE;
 
 ROLLBACK;

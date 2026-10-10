@@ -15,6 +15,9 @@
 --   · F-3 · `p_company_id = get_my_company_id()` da NULL si la sesión no tiene empresa: el `IF NOT NULL` no entraba y un
 --     administrador sin empresa pasaba por cualquier empresa vía una función definer.
 --   · F-4 · La comprobación del proyecto NUEVO en el disparador de la factura no la cubría ninguna prueba.
+--   · H2-2 / H2-3 (segundo escéptico) · Tres cláusulas del disparador de mover (el salto de eliminar un proyecto, el origen con destino NULL y el
+--     cambio solo de empresa) y el orden empresa → permiso no las cubría ninguna prueba; y la orden de pago en borrador SÍ puede cambiar de
+--     proyecto al anularse (borrador → anulada), así que su bloque NUEVO del permiso es alcanzable, no «defensa en profundidad inalcanzable».
 --
 -- COMPORTAMIENTO ESPERADO (E: empresa con proyectos A y B; ua/uab/uf/uo/cr: operadores asignados solo a A, o a A y B)
 --   · Con la llave y la asignación solo a A, cada una de las seis acciones de H-1 sobre el documento de B muere con
@@ -27,6 +30,12 @@
 --     UPDATE sin WHERE; asignada a los dos proyectos, mueve. Un `SET project_id = <el mismo>` no mueve nada y no se toca.
 --   · Mover Y cambiar el estado en la misma sentencia: el error es el del PERMISO (con el paso de la acción), no el de mover:
 --     el disparador de mover dispara después de los de permiso, sellos y alcance de referencias.
+--   · Sacar «sin proyecto» (destino NULL = de la empresa) el documento de un proyecto AJENO también muere con COMPRAS_ALCANCE_PROYECTO («en que
+--     está hoy»), y mandar a OTRA empresa un documento sin proyecto (cambia solo la empresa) muere con COMPRAS_ALCANCE_EMPRESA.
+--   · Una persona de OTRA empresa que ni siquiera tiene la llave recibe COMPRAS_ALCANCE_EMPRESA, no COMPRAS_PERMISO_ACCION (empresa → permiso → proyecto).
+--   · Qué documentos pueden cambiar de proyecto en la misma sentencia que su estado (§5): la orden en borrador, la factura de gasto directo, la
+--     contraseña sin partidas y —al ANULARSE— la orden de pago en borrador (su bloque NUEVO del permiso es alcanzable y se prueba); la recepción,
+--     la orden de pago aprobada o pagada y las órdenes aprobadas / emitidas, no (otro control las frena antes).
 --   · Eliminar un proyecto (acción referencial ON DELETE SET NULL) lo puede hacer un administrador con asignaciones sin que
 --     mover lo frene; los documentos quedan sin proyecto.
 --   · Un administrador SIN empresa no pasa por ninguna empresa.
@@ -251,8 +260,9 @@ GRANT EXECUTE ON FUNCTION public.perm_error(text) TO authenticated;
 -- 0 · PADRÓN (superusuario)
 --   Empresa E (proyectos A y B): ua [A] y uab [A,B] con view/create/edit + los genéricos · uf [A] con la llave de aprobar facturas
 --   · uo [A] con la llave de la orden · cr [A] con view/create/edit y NADA más · documentos de cada tipo en A y en B.
---   Empresa F (su administrador FAD, exento de proyecto) · empresa M (para las sentencias a ciegas, SOLO con sus documentos)
---   · nc: administrador SIN empresa · adm2: administrador de E con asignaciones a A y al proyecto G que se elimina (no es exento ni antes ni después).
+--   Empresa F (su administrador FAD, exento de proyecto; fcr: persona de F sin ninguna llave) · empresa M (para las sentencias a ciegas, SOLO con sus documentos)
+--   · nc: administrador SIN empresa · adm2: administrador de E con asignaciones a A y al proyecto G que se elimina (no es exento ni antes ni después)
+--   · up [A] y upab [A, B]: con la llave de anular un pago · od_n: orden borrador de E SIN proyecto.
 -- ═══════════════════════════════════════════════════════════════════════════
 DO $padron$
 DECLARE
@@ -265,6 +275,7 @@ DECLARE
   ua constant uuid := public.perm_id('ua', 'u');  uab constant uuid := public.perm_id('uab', 'u');  uf constant uuid := public.perm_id('uf', 'u');
   uo constant uuid := public.perm_id('uo', 'u');  cr constant uuid := public.perm_id('cr', 'u');   um constant uuid := public.perm_id('um', 'u');
   nc constant uuid := public.perm_id('nc', 'u');  adm2 constant uuid := public.perm_id('adm2', 'u');
+  fcr constant uuid := public.perm_id('fcr', 'u');  up constant uuid := public.perm_id('up', 'u');  upab constant uuid := public.perm_id('upab', 'u');
   v_base text[] := ARRAY['platform.contabilidad.view', 'platform.contabilidad.create', 'platform.contabilidad.edit'];
   v_gen  text[] := ARRAY['platform.contabilidad.approve', 'platform.contabilidad.change_status'];
 BEGIN
@@ -278,6 +289,10 @@ BEGIN
   PERFORM public.perm_persona(uo,  E, 'PERM-4 uo (A, aprueba órdenes)',  ARRAY[A]); PERFORM public.perm_rol(uo, E, 'solo la llave de la orden', v_base || ARRAY['condominios.tab.ordenes_compra.approve']);
   PERFORM public.perm_persona(cr,  E, 'PERM-4 cr (A, sin nada)',     ARRAY[A]);    PERFORM public.perm_rol(cr,  E, 'solo base', v_base);
   PERFORM public.perm_persona(um,  M, 'PERM-4 um (solo MA)',         ARRAY[MA]);   PERFORM public.perm_rol(um,  M, 'base y genéricos', v_base || v_gen);
+  -- fcr: persona de OTRA empresa (F), con view/create/edit y ninguna llave de acción · up / upab: de E con la llave de anular un pago, solo A / A y B
+  PERFORM public.perm_persona(fcr, F, 'PERM-4 fcr (de F, sin llaves)', ARRAY[FA]);   PERFORM public.perm_rol(fcr, F, 'solo base', v_base);
+  PERFORM public.perm_persona(up,  E, 'PERM-4 up (solo A, anula pagos)', ARRAY[A]);  PERFORM public.perm_rol(up,  E, 'solo pago_anular', v_base || ARRAY['platform.contabilidad.compras.pago_anular']);
+  PERFORM public.perm_persona(upab, E, 'PERM-4 upab (A y B, anula pagos)', ARRAY[A, B]); PERFORM public.perm_rol(upab, E, 'solo pago_anular', v_base || ARRAY['platform.contabilidad.compras.pago_anular']);
   -- un administrador SIN empresa (app_users.company_id admite NULL)
   INSERT INTO auth.users (id) VALUES (nc);
   INSERT INTO public.app_users (id, company_id, full_name, role) VALUES (nc, NULL, 'PERM-4 administrador sin empresa', 'admin');
@@ -294,6 +309,7 @@ BEGIN
   PERFORM public.perm_cadena('od_a', E, A, P, 'oc_borrador');    PERFORM public.perm_cadena('od_b', E, B, P, 'oc_borrador');     -- cancelar / mover
   PERFORM public.perm_cadena('od2_a', E, A, P, 'oc_borrador');   PERFORM public.perm_cadena('od3_a', E, A, P, 'oc_borrador');   -- mover con éxito
   PERFORM public.perm_cadena('od4_a', E, A, P, 'oc_borrador');   PERFORM public.perm_cadena('od5_a', E, A, P, 'oc_borrador');   -- mover como proceso de sistema
+  PERFORM public.perm_cadena('od_n', E, NULL, P, 'oc_borrador');                                                                 -- SIN proyecto: mover de empresa
   PERFORM public.perm_cadena('ce_a', E, A, P, 'oc_emitida');     PERFORM public.perm_cadena('ce_b', E, B, P, 'oc_emitida');      -- cerrar
   PERFORM public.perm_cadena('rb_a', E, A, P, 'rec_borrador');   PERFORM public.perm_cadena('rb_b', E, B, P, 'rec_borrador');    -- anular recepción
   PERFORM public.perm_cadena('fr_a', E, A, P, 'fac_registrada'); PERFORM public.perm_cadena('fr_b', E, B, P, 'fac_registrada');  -- anular factura
@@ -311,6 +327,7 @@ BEGIN
   -- documentos para la alcanzabilidad (§5): cada uno solo lo toca el administrador
   PERFORM public.perm_cadena('u_rb', E, A, P, 'rec_borrador');   PERFORM public.perm_cadena('u_ob', E, A, P, 'op_borrador');
   PERFORM public.perm_cadena('u_oa', E, A, P, 'oc_aprobada');    PERFORM public.perm_cadena('u_ce', E, A, P, 'oc_emitida');
+  PERFORM public.perm_cadena('u_ob2', E, A, P, 'op_borrador');   PERFORM public.perm_cadena('u_oap', E, A, P, 'op_aprobada');   -- orden de pago: anular en borrador / otros estados
   -- Documentos de F (los arma su administrador) y de M (para las sentencias a ciegas: solo estos)
   PERFORM public.perm_como(FAD);
   PERFORM public.perm_cadena('fo', F, FA, FP, 'oc_borrador');
@@ -439,6 +456,24 @@ BEGIN
     '^COMPRAS_PROVEEDOR_NO_AUTORIZADO',
     '[H-1 · empresa · emitir la orden] el administrador de OTRA empresa tampoco emite la orden de E (la frena antes el control de proveedor autorizado)');
   PERFORM public.perm_como(NULL);
+
+  -- Una persona de OTRA empresa SIN la llave de la acción recibe el error de EMPRESA, no el de permiso: el orden de las comprobaciones
+  -- (empresa → permiso → proyecto) hace que no se averigüe nada de una empresa ajena ni siquiera para decir «te falta tal llave».
+  -- (fcr: persona de F con view/create/edit y ninguna llave. Mutante S5: el permiso antes que la empresa.)
+  PERFORM public.perm_como(public.perm_id('fcr', 'u'));
+  FOR ac IN
+    SELECT * FROM (VALUES
+      ('aprobar una orden de pago',  'ordenes_pago',       'op',  'u_ob', 'aprobada', 'aprobar una orden de pago'),
+      ('cancelar la orden',          'ordenes_compra',     'oc',  'od',   'cancelada', 'cancelar una orden de compra'),
+      ('anular la factura',          'facturas_proveedor', 'fac', 'fr',   'anulada',   'anular una factura de proveedor')
+    ) AS v(nombre, tabla, tipo, pref, dest, paso)
+  LOOP
+    PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L)', ac.tabla,
+                                     public.perm_id(CASE WHEN ac.pref = 'u_ob' THEN ac.pref ELSE ac.pref || '_a' END, ac.tipo), ac.dest), '42501',
+      format('^COMPRAS_ALCANCE_EMPRESA: para %s el documento tiene que ser de la empresa de tu sesión\.$', ac.paso),
+      format('[H-1 · empresa sin la llave · %s] una persona de OTRA empresa que tampoco tiene la llave recibe COMPRAS_ALCANCE_EMPRESA, no COMPRAS_PERMISO_ACCION', ac.nombre));
+  END LOOP;
+  PERFORM public.perm_como(NULL);
 END;
 $h1emp$;
 
@@ -468,7 +503,28 @@ BEGIN
     '[mover] ni su propia orden borrador de A al proyecto B (destino ajeno)');
   PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'facturas_proveedor', public.perm_id('gd_a', 'fac'), 'registrada', format(', project_id = %L', B)), '42501', v_pat_des,
     '[mover] ni su propia factura de gasto directo de A al proyecto B (destino ajeno)');
+  -- ── (a2) destino «sin proyecto»: sacar del proyecto AJENO un documento no se permite aunque el destino (NULL = de la empresa) sea de todos ──
+  -- Mutantes S1 (el salto de eliminar un proyecto sin comprobar que el proyecto YA NO existe) y S14 (sin mirar el origen si el destino es NULL):
+  -- ambos dejaban a una persona asignada solo a A mandar «sin proyecto» (visible para toda la empresa) el documento de B.
+  PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'ordenes_compra', public.perm_id('od_b', 'oc'), 'borrador', ', project_id = NULL'), '42501', v_pat_ori,
+    '[mover] asignado solo a A: una función definer no manda «sin proyecto» la orden borrador de B (origen ajeno: el destino NULL no lo exime)');
+  PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'facturas_proveedor', public.perm_id('gd_b', 'fac'), 'registrada', ', project_id = NULL'), '42501', v_pat_ori,
+    '[mover] ni la factura de gasto directo de B');
   PERFORM public.perm_como(NULL);
+  SELECT project_id INTO v_pj FROM public.ordenes_compra WHERE id = public.perm_id('od_b', 'oc');
+  PERFORM public.chk_uuid(v_pj, B, '[mover] la orden de B sigue en B (no quedó sin proyecto)');
+  SELECT project_id INTO v_pj FROM public.facturas_proveedor WHERE id = public.perm_id('gd_b', 'fac');
+  PERFORM public.chk_uuid(v_pj, B, '[mover] y la factura de gasto directo de B también');
+
+  -- ── (a3) cambio SOLO de empresa en un documento sin proyecto: el proyecto no cambia (NULL → NULL) y aun así la empresa se mira ──
+  -- Mutante S3 (retornar si el proyecto no cambia, sin mirar la empresa): una función definer mandaba la orden sin proyecto de E a la empresa F.
+  PERFORM public.perm_como(ua);
+  PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'ordenes_compra', public.perm_id('od_n', 'oc'), 'borrador',
+                                   format(', company_id = %L, proveedor_id = %L', F, public.perm_id('FP', 'pv'))), '42501', v_pat_emp,
+    '[mover · empresa] asignado solo a A: una función definer no manda a la empresa F la orden SIN proyecto de E (cambia solo la empresa)');
+  PERFORM public.perm_como(NULL);
+  SELECT company_id INTO v_pj FROM public.ordenes_compra WHERE id = public.perm_id('od_n', 'oc');
+  PERFORM public.chk_uuid(v_pj, E, '[mover · empresa] la orden sin proyecto sigue en la empresa E');
 
   -- ── (b) a ciegas: UPDATE sin WHERE (no lee columnas, la política SELECT no esconde nada) en una empresa con SOLO estos documentos ──
   PERFORM public.perm_como(um);
@@ -636,25 +692,57 @@ END;
 $catalogo$;
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 5 · Las combinaciones «mover + cambiar de estado» que NO llegan al bloque de proyecto NUEVO de recepción, orden de pago y
---     órdenes aprobadas / emitidas: otro control las frena antes. (Por eso quitar esos bloques no cambia nada HOY; esta prueba
---     avisa si algún día dejan de estar ancladas y entonces el bloque empieza a importar.) El administrador exento tiene todas las llaves.
+-- 5 · ¿Qué documentos pueden CAMBIAR DE PROYECTO en la misma sentencia que cambia su estado? (alcanzabilidad de los bloques «NUEVOS»)
+--     · La ORDEN DE PAGO EN BORRADOR sí, al ANULARSE (borrador → anulada): `compras_tg_orden_pago_controles` sale con RETURN NEW apenas
+--       NEW.estado = 'anulada', antes de validar el proyecto contra la factura. Su bloque NUEVO es ALCANZABLE y lo prueba el caso (a):
+--       quien solo tiene el proyecto A recibe el error del PERMISO (`… al proyecto del documento`), no el de mover.
+--     · La recepción (registrar y anular), la orden de pago aprobada o pagada (aprobarse, pagarse, anularse), la orden de pago borrador →
+--       aprobada y las órdenes aprobadas / emitidas NO: otro control las frena antes (caso (b)). Esta prueba avisa si algún día dejan de
+--       estar ancladas y entonces su bloque NUEVO empieza a importar. El administrador exento tiene todas las llaves.
 -- ═══════════════════════════════════════════════════════════════════════════
 DO $alcanzable$
 DECLARE
-  B constant uuid := public.perm_id('B', 'pb');  AD constant uuid := public.perm_id('AD', 'u');
+  A constant uuid := public.perm_id('A', 'pa');  B constant uuid := public.perm_id('B', 'pb');  AD constant uuid := public.perm_id('AD', 'u');
+  up constant uuid := public.perm_id('up', 'u');  upab constant uuid := public.perm_id('upab', 'u');
+  v_pj uuid;  v_est text;
 BEGIN
+  -- (a) orden de pago BORRADOR → ANULADA + proyecto nuevo: ALCANZABLE.
+  PERFORM public.perm_como(up);
+  PERFORM public.perm_falla(format('UPDATE public.ordenes_pago SET estado = ''anulada'', project_id = %L WHERE id = %L', B, public.perm_id('u_ob2', 'op')), '42501',
+    '^COMPRAS_ALCANCE_PROYECTO: para anular una orden de pago tu perfil necesita estar asignado al proyecto del documento\.$',
+    '[alcanzable] anular una orden de pago en borrador y mandarla a B (asignado solo a A): lo detiene el permiso de anular (proyecto NUEVO), no el de mover');
+  PERFORM public.perm_como(NULL);
+  SELECT project_id, estado INTO v_pj, v_est FROM public.ordenes_pago WHERE id = public.perm_id('u_ob2', 'op');
+  PERFORM public.chk_uuid(v_pj, A, '[alcanzable] la orden de pago sigue en A…');
+  PERFORM public.chk_txt(v_est, 'borrador', '[alcanzable] …y en borrador (nada se aplicó a medias)');
+  -- con los dos proyectos asignados SÍ pasa en la misma sentencia (prueba de que la combinación es alcanzable): la orden queda anulada en B y su
+  -- factura sigue en A (una inconsistencia de datos preexistente de `compras_tg_orden_pago_controles`, que no explota nada; ver INFORME §12.5)
+  PERFORM public.perm_como(upab);
+  PERFORM public.perm_filas(format('UPDATE public.ordenes_pago SET estado = ''anulada'', project_id = %L WHERE id = %L', B, public.perm_id('u_ob2', 'op')), 1,
+    '[alcanzable] asignado a A y B: anular la orden de pago en borrador y mandarla a B en la misma sentencia SÍ pasa (la combinación existe)');
+  PERFORM public.perm_como(NULL);
+  SELECT project_id, estado INTO v_pj, v_est FROM public.ordenes_pago WHERE id = public.perm_id('u_ob2', 'op');
+  PERFORM public.chk_uuid(v_pj, B, '[alcanzable] la orden de pago anulada quedó en B…');
+  PERFORM public.chk_txt(v_est, 'anulada', '[alcanzable] …y anulada');
+
+  -- (b) las que otro control frena antes (el administrador exento tiene todas las llaves, así que el error es el del control, no el del permiso)
   PERFORM public.perm_como(AD);
   PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'recepciones', public.perm_id('u_rb', 'rec'), 'registrada', format(', project_id = %L', B)), '23514',
-    '^COMPRAS_RECEPCION_ORDEN_AJENA', '[alcanzable] registrar una recepción y mandarla a otro proyecto: la ancla su orden (COMPRAS_RECEPCION_ORDEN_AJENA)');
+    '^COMPRAS_RECEPCION_ORDEN_AJENA', '[inalcanzable] registrar una recepción y mandarla a otro proyecto: la ancla su orden (COMPRAS_RECEPCION_ORDEN_AJENA)');
+  PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'recepciones', public.perm_id('u_rb', 'rec'), 'anulada', format(', project_id = %L', B)), '23514',
+    '^COMPRAS_RECEPCION_ORDEN_AJENA', '[inalcanzable] anular una recepción y mandarla a otro proyecto: la ancla su orden (COMPRAS_RECEPCION_ORDEN_AJENA)');
   PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'ordenes_pago', public.perm_id('u_ob', 'op'), 'aprobada', format(', project_id = %L', B)), '23514',
-    '^COMPRAS_PAGO_FACTURA_AJENA', '[alcanzable] aprobar una orden de pago y mandarla a otro proyecto: la ancla su factura (COMPRAS_PAGO_FACTURA_AJENA)');
+    '^COMPRAS_PAGO_FACTURA_AJENA', '[inalcanzable] aprobar una orden de pago y mandarla a otro proyecto: la ancla su factura (COMPRAS_PAGO_FACTURA_AJENA)');
+  PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'ordenes_pago', public.perm_id('u_oap', 'op'), 'pagada', format(', project_id = %L, fecha_pago = CURRENT_DATE', B)), '23514',
+    '^COMPRAS_PAGO_INMUTABLE', '[inalcanzable] pagar una orden de pago aprobada y mandarla a otro proyecto: ya no admite cambios (COMPRAS_PAGO_INMUTABLE)');
+  PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'ordenes_pago', public.perm_id('u_oap', 'op'), 'anulada', format(', project_id = %L', B)), '23514',
+    '^COMPRAS_PAGO_INMUTABLE', '[inalcanzable] anular una orden de pago aprobada y mandarla a otro proyecto: ya no admite cambios (COMPRAS_PAGO_INMUTABLE)');
   PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'ordenes_compra', public.perm_id('u_oa', 'oc'), 'borrador', format(', project_id = %L', B)), '23514',
-    '^COMPRAS_OC_APROBADA_CAMBIO', '[alcanzable] devolver a borrador una orden aprobada y mandarla a otro proyecto: está congelada (COMPRAS_OC_APROBADA_CAMBIO)');
+    '^COMPRAS_OC_APROBADA_CAMBIO', '[inalcanzable] devolver a borrador una orden aprobada y mandarla a otro proyecto: está congelada (COMPRAS_OC_APROBADA_CAMBIO)');
   PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'ordenes_compra', public.perm_id('u_oa', 'oc'), 'emitida', format(', project_id = %L', B)), '23514',
-    '^COMPRAS_OC_APROBADA_CAMBIO', '[alcanzable] emitir una orden aprobada y mandarla a otro proyecto: está congelada (COMPRAS_OC_APROBADA_CAMBIO)');
+    '^COMPRAS_OC_APROBADA_CAMBIO', '[inalcanzable] emitir una orden aprobada y mandarla a otro proyecto: está congelada (COMPRAS_OC_APROBADA_CAMBIO)');
   PERFORM public.perm_falla(format('SELECT public.perm_definer_estado(%L, %L, %L, %L)', 'ordenes_compra', public.perm_id('u_ce', 'oc'), 'cerrada', format(', project_id = %L', B)), '23514',
-    '^COMPRAS_OC_EMITIDA_CAMBIO', '[alcanzable] cerrar una orden emitida y mandarla a otro proyecto: está congelada (COMPRAS_OC_EMITIDA_CAMBIO)');
+    '^COMPRAS_OC_EMITIDA_CAMBIO', '[inalcanzable] cerrar una orden emitida y mandarla a otro proyecto: está congelada (COMPRAS_OC_EMITIDA_CAMBIO)');
   PERFORM public.perm_como(NULL);
 END;
 $alcanzable$;

@@ -2,8 +2,9 @@
 -- REVERSIÓN DE LAS MIGRACIONES 20261027000000…0900 (compras · controles de servidor)
 -- GENERADO del catálogo de una cadena real de migraciones (no se edita a mano): cada sección deshace UNA migración
 -- y supone que las posteriores ya están revertidas (por eso van de la última a la primera).
--- Cada bloque es una transacción: si algo falla, no queda nada a medias. Son solo funciones, disparadores,
--- índices y restricciones; NO hay datos que borrar ni restaurar (salvo las claves de idempotencia de 0800).
+-- Cada bloque es una transacción: si algo falla, no queda nada a medias. Son funciones, disparadores, índices, restricciones y políticas
+-- (y, en 0900, la tabla de la bitácora de la separación y los privilegios de compras_config); NO hay datos de negocio que borrar ni restaurar
+-- (salvo las claves de idempotencia de 0800; la bitácora de la separación se CONSERVA si tiene cambios).
 -- Revertir REABRE los defectos que cada migración cerraba. Verificado con 
 -- supabase/tests/compras_bloque_b/run.sh §6c (aplica la cadena, revierte TODO y revierte SOLO la sección de 0900; compara el catálogo).
 -- La sección de 20261027000900 está escrita con sus tres piezas (facturas, separación, permisos) y se puede correr SOLA para volver al
@@ -346,6 +347,11 @@ DROP FUNCTION IF EXISTS public.compras_numero_separadores(text);
 --
 -- LA BITÁCORA ES EVIDENCIA: por defecto NO se borra si contiene algo más que la línea base. Para descartarla a propósito (base
 -- desechable, comprobación de catálogo) se declara en la sesión:   SET compras.reversion_descartar_bitacora = 'si';
+--
+-- DESPUÉS DE REVERTIR Y VOLVER A APLICAR: mientras la pieza está revertida, el interruptor se vuelve a cambiar escribiendo en compras_config
+-- (alguien con `edit` puede apagarlo o encenderlo) y la bitácora conservada no se entera. Al reaplicar la pieza su CONCILIACIÓN anota ese cambio
+-- como de sistema (sin actor ni motivo) con el valor que la fila realmente tiene, y deja la memoria alineada: no cambia ningún valor. Si fue un
+-- apagado, aparece en `separacion_sistema` de vigilancia.sql. Conviene correr la vigilancia tras reaplicar (SEP-reversion lo comprueba de extremo a extremo).
 -- ════════════════════════════════════════════════════════════════════════════
 DROP TRIGGER IF EXISTS trg_compras_00_config_separacion          ON public.compras_config;
 DROP TRIGGER IF EXISTS trg_compras_00_config_separacion_truncate ON public.compras_config;

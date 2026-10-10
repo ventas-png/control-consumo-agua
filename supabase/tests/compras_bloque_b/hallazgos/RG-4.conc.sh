@@ -6,6 +6,7 @@
 #                                2.ª, al despertar, ve a la 1.ª y la deja pasar).
 #   B · «FAC-001» ∥ «FAC001»   → entra UNA; la otra recibe COMPRAS_FACTURA_NUMERO_DUPLICADO (sin esperar al COMMIT no habría
 #                                forma de verla: es el candado el que la hace verla).
+#   H · «FAC-001» ∥ «F<U+200B>AC001» (carácter invisible de la lista) → entra UNA; la otra se rechaza (tanda final).
 #   C · «1-23» ∥ «123», en los dos órdenes → entra UNA. Y los TRES a la vez («1-23» ∥ «12-3» ∥ «123») en 8 rondas con
 #                                órdenes y retardos distintos → el resultado es siempre {«123»} o {«1-23», «12-3»}: nunca
 #                                «123» junto a otra (la no transitividad no abre ningún hueco con sesiones reales).
@@ -84,6 +85,18 @@ SQL
     bien "B · «FAC-001» ∥ «FAC001»: la 2.ª esperó (sesiones esperando: $b), vio a la 1.ª y se rechazó con COMPRAS_FACTURA_NUMERO_DUPLICADO; hay UNA factura"
   else
     fallo "B · «FAC-001» ∥ «FAC001»: esperando=$b vivas=$v (esperado ≥1, 1 y COMPRAS_FACTURA_NUMERO_DUPLICADO en la 2.ª)"
+  fi
+
+  # ── H · «FAC-001» ∥ «F<U+200B>AC001» (un carácter invisible, de la lista de la pieza): UNA ────────────────────────────────
+  # El candado es el de la clave (v_norm), la misma para los dos; al despertar, la 2.ª ve a la 1.ª y, como el perfil ignora el invisible, la rechaza.
+  P=$(prov 29)
+  local ZW; ZW=$(printf 'F\xe2\x80\x8bAC001')
+  par_u rg4h "$UA" "$(ins "$P" 'FAC-001')" 2.5 "$UA" "$(ins "$P" "$ZW")" 0 &
+  sleep 1.3; b=$(esperando advisory); wait
+  if [ "$b" -ge 1 ] && [ "$(vivas "$P")" = "1" ] && [ "$(hay "$P" 'FAC-001')" = "1" ] && ! grep -q ERROR "$SALIDAS/rg4h1.txt" && grep -q "COMPRAS_FACTURA_NUMERO_DUPLICADO" "$SALIDAS/rg4h2.txt"; then
+    bien "H · «FAC-001» ∥ «F<U+200B>AC001»: la 2.ª esperó (sesiones esperando: $b), vio a la 1.ª y se rechazó con COMPRAS_FACTURA_NUMERO_DUPLICADO; hay UNA factura"
+  else
+    fallo "H · «FAC-001» ∥ «F<U+200B>AC001»: esperando=$b vivas=$(vivas "$P") (esperado ≥1, 1 y COMPRAS_FACTURA_NUMERO_DUPLICADO en la 2.ª)"
   fi
 
   # ── C · «1-23» ∥ «123» en los dos órdenes: UNA ────────────────────────────────────────────────────────

@@ -34,6 +34,12 @@
 --     (2) Lo que NACE o QUEDA «anulada» no se compara con las vivas: INSERT de sistema y UPDATE que anula y cambia el número
 --     ([RG-4g2]). Estas pruebas matan a los dos mutantes que sobrevivieron al escéptico (k_anulada, c_sin_empresa).
 --
+--   · TANDA FINAL (segundo escéptico): (1) cada estado VIVO cuenta —también «pagada_parcial» y «pagada»: el duplicado de una factura
+--     ya pagada se rechaza ([RG-4g3])—; (2) un par equivalente PREEXISTENTE no se revalida si el UPDATE no cambia el número ni el
+--     proveedor, y sí si el número cambia de verdad ([RG-4j2]); (3) los 27 CARACTERES INVISIBLES de la lista (espacio de ancho cero,
+--     guion blando, BOM…) no cuentan como separadores: «F<U+200B>AC001» es duplicado de «FAC-001» y «1–23»/«12–3» siguen siendo distintas
+--     ([RG-4·invisibles]: lista, cada carácter, vecinos, trigger real, oráculo independiente al azar, sin dependientes del IMMUTABLE).
+--
 -- HOY (sin la pieza) debe FALLAR en [RG-4a]. Con la pieza RG-4 de la migración 20261027000900, pasar.
 -- Se ejecuta con:  psql -X -v ON_ERROR_STOP=1 -d <BD> -f RG-4.sql   (superusuario, sobre la plantilla con
 -- fixture.sql o con la suite ya corrida). No depende de usuarios de otras suites. Toda su escritura va dentro
@@ -54,6 +60,10 @@
 \set PS  '''fb400000-0000-0000-0000-0000000000a5'''
 \set PN  '''fb400000-0000-0000-0000-0000000000a6'''
 \set PQ  '''fb4a0000-0000-0000-0000-000000000001'''
+\set PL  '''fb400000-0000-0000-0000-0000000000a7'''
+\set PI  '''fb400000-0000-0000-0000-0000000000a8'''
+\set PT  '''fb400000-0000-0000-0000-0000000000a9'''
+\set PJ  '''fb400000-0000-0000-0000-0000000000aa'''
 -- Aviso genérico (factura de un proyecto que la persona no ve): UN texto constante (ver pieza.sql, EV-09).
 \set generico 'COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente. Si es la misma, no la registres otra vez. Si es otra, escribe su número tal como viene impreso, con su guion o separador entre serie y correlativo (p. ej. «A-123»); si ya lo escribiste así, pide a quien administra las facturas que corrija o anule primero la existente.'
 
@@ -151,10 +161,14 @@ INSERT INTO public.proveedores (id, company_id, nombre, nit, pais, alcance) VALU
   (:PG, :C::uuid, 'Proveedor azar RG-4',    '9950004-4', 'GT', 'empresa'),
   (:PH, :C::uuid, 'Proveedor 20 mil RG-4',  '9950005-5', 'GT', 'empresa'),
   (:PS, :C::uuid, 'Proveedor sugerencia RG-4', '9950006-6', 'GT', 'empresa'),
-  (:PN, :C::uuid, 'Proveedor anuladas RG-4',   '9950007-7', 'GT', 'empresa');
+  (:PN, :C::uuid, 'Proveedor anuladas RG-4',   '9950007-7', 'GT', 'empresa'),
+  (:PL, :C::uuid, 'Proveedor preexistentes RG-4', '9950008-8', 'GT', 'empresa'),
+  (:PI, :C::uuid, 'Proveedor invisibles RG-4',    '9950009-9', 'GT', 'empresa'),
+  (:PT, :C::uuid, 'Proveedor estados RG-4',       '9950010-0', 'GT', 'empresa'),
+  (:PJ, :C::uuid, 'Proveedor pares invisibles RG-4', '9950011-1', 'GT', 'empresa');
 SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
-UPDATE public.proveedores SET estado = 'autorizado' WHERE id IN (:PA::uuid, :PB::uuid, :PM::uuid, :PG::uuid, :PH::uuid, :PS::uuid, :PN::uuid);
+UPDATE public.proveedores SET estado = 'autorizado' WHERE id IN (:PA::uuid, :PB::uuid, :PM::uuid, :PG::uuid, :PH::uuid, :PS::uuid, :PN::uuid, :PL::uuid, :PI::uuid, :PT::uuid, :PJ::uuid);
 RESET ROLE;
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -558,6 +572,58 @@ SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE proveedo
 SELECT public.chk(public.hx4_pares_equivalentes(:PN::uuid), 0, '[RG-4g2] invariante: ningún par de vivas del proveedor es equivalente');
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- g3 · CADA estado vivo cuenta: el duplicado de una factura registrada, aprobada, pagada EN PARTE o PAGADA se rechaza
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Lo único que el trigger no compara son las anuladas. Las que más importan son las pagadas: registrar el duplicado de una factura ya
+-- pagada abriría la puerta a pagarla dos veces. Los estados «pagada_parcial» y «pagada» solo se alcanzan por el camino de SISTEMA
+-- (los pagos los contabiliza el sistema, no una sesión de usuario). Estas pruebas matan al mutante que las deja fuera de la consulta.
+SELECT public.chk_txt(
+  (SELECT string_agg(m[1], ',' ORDER BY m[1]) FROM pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+    WHERE c.conname = 'facturas_proveedor_estado_check'),
+  'anulada,aprobada,pagada,pagada_parcial,registrada',
+  '[RG-4g3·montaje] los estados posibles de una factura son exactamente cinco (los cuatro vivos y «anulada»): si se añade uno, esta sección debe cubrirlo');
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+SELECT public.hx4_alta(180, :PT::uuid, 'EST-REG-1');
+SELECT public.hx4_alta(181, :PT::uuid, 'EST-APR-2');
+SELECT public.hx4_alta(182, :PT::uuid, 'EST-PAR-3');
+SELECT public.hx4_alta(183, :PT::uuid, 'EST-PAG-4');
+UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = public.hx4_id(181);
+SELECT public.chk_falla($$ UPDATE public.facturas_proveedor SET estado = 'pagada', monto_pagado = 100 WHERE id = public.hx4_id(183) $$,
+  'COMPRAS_ESTADO_SOLO_SISTEMA', '[RG-4g3·montaje] ni un administrador puede dejar una factura «pagada» a mano (COMPRAS_ESTADO_SOLO_SISTEMA): por eso se siembra por el camino de sistema');
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT public.chk_txt(public.hx4_sistema($$ UPDATE public.facturas_proveedor SET estado = 'pagada_parcial', monto_pagado = 1 WHERE id = public.hx4_id(182) $$), 'PASA',
+  '[RG-4g3·montaje] sistema: «EST-PAR-3» pasa a pagada_parcial');
+SELECT public.chk_txt(public.hx4_sistema($$ UPDATE public.facturas_proveedor SET estado = 'pagada', monto_pagado = monto_total WHERE id = public.hx4_id(183) $$), 'PASA',
+  '[RG-4g3·montaje] sistema: «EST-PAG-4» pasa a pagada');
+SELECT public.chk_txt(
+  (SELECT string_agg(estado, ',' ORDER BY numero_factura) FROM public.facturas_proveedor WHERE proveedor_id = :PT::uuid),
+  'aprobada,pagada,pagada_parcial,registrada',
+  '[RG-4g3·montaje] el proveedor tiene una factura en cada estado vivo: registrada, aprobada, pagada_parcial y pagada');
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+SELECT public.chk_falla($$ SELECT public.hx4_alta(184, 'fb400000-0000-0000-0000-0000000000a9', 'est reg 1') $$,
+  '^COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente \(«EST-REG-1», \d\d/\d\d/\d{4} por 100\.00, registrada\)\.',
+  '[RG-4g3] «est reg 1» es duplicado de «EST-REG-1» (registrada)');
+SELECT public.chk_falla($$ SELECT public.hx4_alta(184, 'fb400000-0000-0000-0000-0000000000a9', 'ESTAPR2') $$,
+  '^COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente \(«EST-APR-2», \d\d/\d\d/\d{4} por 100\.00, aprobada\)\.',
+  '[RG-4g3] «ESTAPR2» es duplicado de «EST-APR-2» (aprobada)');
+SELECT public.chk_falla($$ SELECT public.hx4_alta(184, 'fb400000-0000-0000-0000-0000000000a9', 'est.par.3') $$,
+  '^COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente \(«EST-PAR-3», \d\d/\d\d/\d{4} por 100\.00, pagada_parcial\)\.',
+  '[RG-4g3] «est.par.3» es duplicado de «EST-PAR-3» (PAGADA EN PARTE): no se puede registrar otra vez una factura que ya se empezó a pagar');
+SELECT public.chk_falla($$ SELECT public.hx4_alta(184, 'fb400000-0000-0000-0000-0000000000a9', 'EST PAG 4') $$,
+  '^COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente \(«EST-PAG-4», \d\d/\d\d/\d{4} por 100\.00, pagada\)\.',
+  '[RG-4g3] «EST PAG 4» es duplicado de «EST-PAG-4» (PAGADA): no se puede registrar otra vez una factura ya pagada (doble pago)');
+SELECT public.chk_txt(public.hx4_intenta($$ SELECT public.hx4_alta(184, 'fb400000-0000-0000-0000-0000000000a9', 'EST-PAG-4') $$), 'IDENTICO',
+  '[RG-4g3] …y el número IDÉNTICO de la pagada lo rechaza el índice único exacto (la factura pagada está viva para los dos controles)');
+SELECT public.chk_txt(public.hx4_intenta($$ SELECT public.hx4_alta(184, 'fb400000-0000-0000-0000-0000000000a9', 'EST-PAG-5') $$), 'PASA',
+  '[RG-4g3] control: otro número («EST-PAG-5», otra clave) se registra sin problema');
+RESET ROLE;
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = :PT::uuid), 5,
+  '[RG-4g3] los intentos rechazados no dejaron nada: el proveedor tiene sus 4 facturas y la de control');
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- h · La RPC transaccional da el mismo resultado y el mismo código de error
 -- ═══════════════════════════════════════════════════════════════════════════
 SELECT public.como(:UA::uuid);
@@ -618,6 +684,37 @@ SELECT public.hx4_acepta($$ UPDATE public.facturas_proveedor SET estado = 'aprob
   '[RG-4j] aprobar un duplicado histórico equivalente no se bloquea (solo nace o cambia el número)');
 SELECT public.hx4_acepta($$ UPDATE public.facturas_proveedor SET concepto = 'editada' WHERE id = public.hx4_id(110) $$,
   '[RG-4j] …ni editar su concepto');
+RESET ROLE;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- j2 · Un par equivalente PREEXISTENTE no se revalida mientras no cambie el número ni el proveedor; si el número cambia DE VERDAD, sí
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Un UPDATE que nombra numero_factura o proveedor_id en su SET dispara el trigger aunque el valor sea el mismo; el trigger debe dejarlo
+-- pasar (no cambió nada). Si saliera rechazado, una factura de un par histórico no se podría ni tocar. Matan al mutante que quita ese RETURN.
+SET session_replication_role = replica;
+SELECT public.hx4_alta(190, :PL::uuid, 'LEG-001');
+SELECT public.hx4_alta(191, :PL::uuid, 'LEG001');
+SET session_replication_role = origin;
+SELECT public.chk(public.hx4_pares_equivalentes(:PL::uuid), 1, '[RG-4j2·montaje] el proveedor tiene un par equivalente PREEXISTENTE («LEG-001» / «LEG001»)');
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+SELECT public.chk_txt(public.hx4_intenta($$ UPDATE public.facturas_proveedor SET numero_factura = numero_factura, concepto = 'editado' WHERE id = public.hx4_id(191) $$), 'PASA',
+  '[RG-4j2] UPDATE que nombra numero_factura sin cambiarlo («LEG001» = «LEG001») en un par preexistente: pasa (no se revalida)');
+SELECT public.chk_txt(public.hx4_intenta($$ UPDATE public.facturas_proveedor SET proveedor_id = proveedor_id, concepto = 'editado 2' WHERE id = public.hx4_id(190) $$), 'PASA',
+  '[RG-4j2] UPDATE que nombra proveedor_id sin cambiarlo en el otro miembro del par: pasa');
+SELECT public.chk_txt(public.hx4_intenta($$ UPDATE public.facturas_proveedor SET numero_factura = 'LEG001', proveedor_id = 'fb400000-0000-0000-0000-0000000000a7', concepto = 'editado 3' WHERE id = public.hx4_id(191) $$), 'PASA',
+  '[RG-4j2] …y con el mismo número y el mismo proveedor escritos a la vez');
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id IN (public.hx4_id(190), public.hx4_id(191)) AND concepto LIKE 'editado%'), 2,
+  '[RG-4j2] las dos filas se modificaron de verdad (no son UPDATE de cero filas)');
+-- controles positivos: cambiar de verdad el número a otro equivalente SÍ se rechaza, y la fila no cambia
+SELECT public.chk_txt(public.hx4_intenta($$ UPDATE public.facturas_proveedor SET numero_factura = 'leg.001' WHERE id = public.hx4_id(191) $$), 'BLOQUEA',
+  '[RG-4j2] control: cambiar «LEG001» a «leg.001» (otro equivalente de «LEG-001») se rechaza');
+SELECT public.chk_txt(public.hx4_intenta($$ UPDATE public.facturas_proveedor SET numero_factura = 'LEG-0-01' WHERE id = public.hx4_id(191) $$), 'BLOQUEA',
+  '[RG-4j2] control: …y a «LEG-0-01» (más separadores, compatible con «LEG-001») también');
+SELECT public.chk_txt((SELECT numero_factura FROM public.facturas_proveedor WHERE id = public.hx4_id(191)), 'LEG001',
+  '[RG-4j2] …y el número de la fila sigue siendo «LEG001»');
+SELECT public.chk_txt(public.hx4_intenta($$ UPDATE public.facturas_proveedor SET numero_factura = 'LEG-002' WHERE id = public.hx4_id(191) $$), 'PASA',
+  '[RG-4j2] control: cambiar a un número de otra clave («LEG-002») se permite');
 RESET ROLE;
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -1066,6 +1163,215 @@ SELECT public.chk_txt(public.hx4_intenta($$ INSERT INTO public.facturas_proveedo
     VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc','c1c1c1c1-0000-0000-0000-000000000001','fb400000-0000-0000-0000-0000000000b1','A-B-C-D-E-F','x',1) $$), 'BLOQUEA',
   '[RG-4·plan] «A-B-C-D-E-F» incluye todos los perfiles de las candidatas: se rechaza');
 RESET ROLE;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- o · CARACTERES INVISIBLES: pegar un número desde un PDF no debe abrir un hueco en el control de duplicados
+-- ═══════════════════════════════════════════════════════════════════════════
+-- La clave del índice ya ignora todo lo que no es A-Z0-9, pero el perfil de separadores contaba un carácter sin glifo (espacio de ancho cero,
+-- guion blando…) como separador: «F<U+200B>AC001» ({1}) no era compatible con «FAC-001» ({3}) y se registraba el duplicado. La pieza quita
+-- de la LISTA de 27 caracteres antes de calcular el perfil. Aquí: (a) la lista de la función es esta; (b) cada carácter, solo, en el
+-- interior, junto a un separador y en los extremos; (c) los que SE VEN (espacio de no separación, guion largo, punto medio, signo menos…)
+-- y los vecinos de cada uno de la lista siguen siendo separadores; (d) «1–23» y «12–3» siguen siendo distintas; (e) por el trigger real
+-- (los 27 uno a uno); (f) contra un oráculo independiente con miles de cadenas al azar; (g) nadie depende de que sean IMMUTABLE.
+-- Los caracteres se construyen con convert_from(decode(hex,'hex'),'UTF8'): lo mismo en una base SQL_ASCII que en una UTF8.
+CREATE TEMP TABLE hx4_inv (cp text, hex text, nombre text, ch text);
+INSERT INTO hx4_inv (cp, hex, nombre) VALUES
+ ('U+00AD','c2ad','guion blando'),                                ('U+061C','d89c','marca de letra árabe'),
+ ('U+115F','e1859f','relleno de Hangul (choseong)'),             ('U+1160','e185a0','relleno de Hangul (jungseong)'),
+ ('U+180E','e1a08e','separador vocálico mongol'),                ('U+200B','e2808b','espacio de ancho cero'),
+ ('U+200C','e2808c','no unión de ancho cero'),                   ('U+200D','e2808d','unión de ancho cero'),
+ ('U+200E','e2808e','marca de izquierda a derecha'),             ('U+200F','e2808f','marca de derecha a izquierda'),
+ ('U+202A','e280aa','incrustación de izquierda a derecha'),      ('U+202B','e280ab','incrustación de derecha a izquierda'),
+ ('U+202C','e280ac','fin de formato direccional'),               ('U+202D','e280ad','forzar izquierda a derecha'),
+ ('U+202E','e280ae','forzar derecha a izquierda'),               ('U+2060','e281a0','unión de palabras'),
+ ('U+2061','e281a1','aplicación de función'),                    ('U+2062','e281a2','multiplicación invisible'),
+ ('U+2063','e281a3','separador invisible'),                      ('U+2064','e281a4','suma invisible'),
+ ('U+2066','e281a6','aislamiento de izquierda a derecha'),       ('U+2067','e281a7','aislamiento de derecha a izquierda'),
+ ('U+2068','e281a8','aislamiento de primer fuerte'),             ('U+2069','e281a9','fin de aislamiento'),
+ ('U+3164','e385a4','relleno de Hangul'),                        ('U+FEFF','efbbbf','espacio de no separación de ancho cero (BOM)'),
+ ('U+FFA0','efbea0','relleno de Hangul de ancho medio');
+-- UTF-8 de un punto de código, calculado con aritmética (independiente de la columna `hex` de la tabla)
+CREATE FUNCTION public.hx4_utf8hex(p_cp int) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE WHEN p_cp < 128   THEN lpad(to_hex(p_cp), 2, '0')
+              WHEN p_cp < 2048  THEN to_hex(192 | (p_cp >> 6)) || to_hex(128 | (p_cp & 63))
+              WHEN p_cp < 65536 THEN to_hex(224 | (p_cp >> 12)) || to_hex(128 | ((p_cp >> 6) & 63)) || to_hex(128 | (p_cp & 63))
+              ELSE to_hex(240 | (p_cp >> 18)) || to_hex(128 | ((p_cp >> 12) & 63)) || to_hex(128 | ((p_cp >> 6) & 63)) || to_hex(128 | (p_cp & 63)) END $$;
+CREATE FUNCTION public.hx4_cp(p text) RETURNS int LANGUAGE sql IMMUTABLE AS $$ SELECT ('x' || lpad(substr(p, 3), 8, '0'))::bit(32)::int $$;
+CREATE FUNCTION public.hx4_chr(p_cp int) RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT convert_from(decode(public.hx4_utf8hex(p_cp), 'hex'), 'UTF8') $$;
+UPDATE hx4_inv SET ch = convert_from(decode(hex, 'hex'), 'UTF8');
+GRANT SELECT ON hx4_inv TO PUBLIC;
+-- Los que SE VEN (o separan visiblemente): siguen siendo separadores
+CREATE TEMP TABLE hx4_visibles (cp text, nombre text);
+INSERT INTO hx4_visibles VALUES
+ ('U+00A0','espacio de no separación'), ('U+2002','espacio eme-medio'), ('U+2003','espacio eme'), ('U+2009','espacio fino'), ('U+200A','espacio finísimo'),
+ ('U+202F','espacio fino de no separación'), ('U+205F','espacio matemático medio'), ('U+3000','espacio ideográfico'), ('U+2013','guion medio'),
+ ('U+2014','raya'), ('U+2212','signo menos'), ('U+00B7','punto medio'), ('U+2022','viñeta'), ('U+2028','separador de línea'), ('U+2029','separador de párrafo');
+GRANT SELECT ON hx4_visibles TO PUBLIC;
+
+-- (a) la lista: 27 filas, cada código hexadecimal es la codificación UTF-8 de su U+XXXX, y la lista de la FUNCIÓN es esta, ni una más ni una menos
+SELECT public.chk((SELECT count(*) FROM hx4_inv), 27, '[RG-4·invisibles·montaje] la lista de la prueba tiene 27 caracteres');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv WHERE hex <> public.hx4_utf8hex(public.hx4_cp(cp))), ''), '',
+  '[RG-4·invisibles·montaje] el código hexadecimal de cada fila es la codificación UTF-8 de su U+XXXX (calculada con aritmética)');
+SELECT public.chk((SELECT count(*) FROM hx4_inv WHERE ch IS NULL OR octet_length(ch) <> octet_length(decode(hex, 'hex'))), 0,
+  '[RG-4·invisibles·montaje] cada carácter se construye entero, con los bytes de su codificación');
+SELECT public.chk_txt(
+  (SELECT string_agg(regexp_replace(m[1], '7c$', ''), ',' ORDER BY regexp_replace(m[1], '7c$', '')) FROM pg_proc p, regexp_matches(p.prosrc, '''([0-9a-f]{4,8})''', 'g') AS m
+    WHERE p.oid = 'public.compras_numero_separadores(text)'::regprocedure),   -- cada código termina en «7c» (la barra) menos el último; ningún carácter UTF-8 termina en el byte 7c
+  (SELECT string_agg(hex, ',' ORDER BY hex) FROM hx4_inv),
+  '[RG-4·invisibles] la lista de compras_numero_separadores es exactamente la de esta prueba (27 caracteres; si se añade o quita uno, se cambia aquí también)');
+
+-- (b) cada carácter de la lista, en cada posición
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv WHERE public.compras_numero_separadores('F' || ch || 'AC001') <> '{}'), ''), '',
+  '[RG-4·invisibles] «F<c>AC001» (el carácter en el interior de la clave) tiene el perfil {} para los 27: no es un separador');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv WHERE public.compras_numero_separadores('FAC-' || ch || '001') <> '{3}'), ''), '',
+  '[RG-4·invisibles] «FAC-<c>001» (junto a un separador visible) tiene el perfil {3} para los 27');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv WHERE public.compras_numero_separadores(ch || 'FAC-001' || ch) <> '{3}'), ''), '',
+  '[RG-4·invisibles] «<c>FAC-001<c>» (en los dos extremos) tiene el perfil {3} para los 27');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv WHERE public.compras_numero_separadores('1' || ch || '-' || ch || '23') <> '{1}'), ''), '',
+  '[RG-4·invisibles] «1<c>-<c>23» (a los dos lados del separador) tiene el perfil {1} para los 27');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv WHERE NOT public.compras_numeros_equivalentes('FAC-001', 'F' || ch || 'AC001')), ''), '',
+  '[RG-4·invisibles] «FAC-001» y «F<c>AC001» son equivalentes para los 27 (el hueco que se abría: un duplicado real escrito con un carácter invisible)');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv WHERE public.compras_normalizar_numero('F' || ch || 'AC001') IS DISTINCT FROM 'FAC001'), ''), '',
+  '[RG-4·invisibles] y la clave del índice no cambia: «F<c>AC001» normaliza a FAC001 (la pieza no toca compras_normalizar_numero)');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv
+                                 WHERE public.compras_normalizar_numero(ch) IS NOT NULL OR public.compras_numero_separadores(ch) <> '{}' OR public.compras_numeros_equivalentes(ch, ch)), ''), '',
+  '[RG-4·invisibles] cada uno de los 27, SOLO, no es un número: sin clave (NULL), perfil {} y ninguna equivalencia (como «---»)');
+-- (c) lo que SE VE y los vecinos de cada carácter de la lista siguen siendo separadores
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_visibles WHERE public.compras_numero_separadores('F' || public.hx4_chr(public.hx4_cp(cp)) || 'AC001') <> '{1}'), ''), '',
+  '[RG-4·invisibles] los 15 caracteres que SE VEN (espacios, guion medio, raya, signo menos, punto medio…) siguen siendo separadores: «F<c>AC001» tiene el perfil {1}');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(v.cp || '±' || n, ',' ORDER BY v.cp, n) FROM hx4_inv v, LATERAL (VALUES (public.hx4_cp(v.cp) - 1), (public.hx4_cp(v.cp) + 1)) x(n)
+                                  WHERE public.hx4_utf8hex(n) NOT IN (SELECT hex FROM hx4_inv)
+                                    AND public.compras_numero_separadores('F' || public.hx4_chr(n) || 'AC001') <> '{1}'), ''), '',
+  '[RG-4·invisibles] los caracteres vecinos (código ±1) de cada uno de la lista que NO están en ella siguen siendo separadores (la lista no se come a sus vecinos)');
+-- (d) «1–23» y «12–3» siguen siendo distintas, aunque lleven un carácter invisible
+CREATE FUNCTION public.hx4_par_en(p_prov uuid, p_a text, p_b text) RETURNS text LANGUAGE plpgsql AS $$
+DECLARE r text;
+BEGIN
+  BEGIN
+    INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total)
+    VALUES (gen_random_uuid(), 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001', p_prov, p_a, 'par invisibles', 10);
+    r := public.hx4_intenta(format('INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total)
+                                    VALUES (gen_random_uuid(), %L, %L, %L, %L, %L, 10)',
+                                   'cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001', p_prov, p_b, 'par invisibles'));
+    RAISE EXCEPTION 'deshacer' USING ERRCODE = 'XX999';
+  EXCEPTION WHEN SQLSTATE 'XX999' THEN NULL;
+  END;
+  RETURN r;
+END $$;
+CREATE TEMP TABLE hx4_pares_inv (id text, a text, b text, esperado text, nota text);
+INSERT INTO hx4_pares_inv
+SELECT v.id, v.a, v.b, v.esperado, v.nota
+  FROM (SELECT public.hx4_chr(8211) AS en, public.hx4_chr(183) AS pm, public.hx4_chr(8722) AS mn, public.hx4_chr(160) AS nb, public.hx4_chr(12288) AS id_,
+               public.hx4_chr(8203) AS zw, public.hx4_chr(173) AS sh, public.hx4_chr(65279) AS bom, public.hx4_chr(8206) AS lrm, public.hx4_chr(8204) AS zwnj, public.hx4_chr(8205) AS zwj) c,
+       LATERAL (VALUES
+         ('P01', '1' || c.en || '23',        '12' || c.en || '3',        'PASA',    '«1–23» y «12–3» (guion medio U+2013): distintas'),
+         ('P02', 'A' || c.pm || 'B1',        'AB' || c.pm || '1',        'PASA',    '«A·B1» y «AB·1» (punto medio U+00B7): distintas'),
+         ('P03', '1' || c.mn || '23',        '12' || c.mn || '3',        'PASA',    '«1−23» y «12−3» (signo menos U+2212): distintas'),
+         ('P04', '1' || c.nb || '23',        '12' || c.nb || '3',        'PASA',    'con espacio de no separación U+00A0: distintas'),
+         ('P05', '1' || c.id_ || '23',       '12' || c.id_ || '3',       'PASA',    'con espacio ideográfico U+3000: distintas'),
+         ('P06', '1' || c.zw || '-23',       '12-3',                     'PASA',    '«1<U+200B>-23» y «12-3»: el invisible no vuelve equivalentes a dos números distintos'),
+         ('P07', '1-2' || c.sh || '3',       '12-3',                     'PASA',    '«1-2<U+00AD>3» ({1}) y «12-3» ({2}): distintas'),
+         ('P08', '1-23' || c.bom,            c.lrm || '12-3',            'PASA',    'invisibles en los extremos: «1-23» y «12-3» siguen siendo distintas'),
+         ('D01', '1-23',                     '1' || c.zw || '-23',       'BLOQUEA', '«1-23» y «1<U+200B>-23»: el mismo número con un espacio de ancho cero'),
+         ('D02', '12-3',                     '12-' || c.sh || '3',       'BLOQUEA', '«12-3» y «12-<U+00AD>3»: el mismo número con un guion blando'),
+         ('D03', '1-23',                     '1-2' || c.bom || '3',      'BLOQUEA', '«1-23» y «1-2<U+FEFF>3»'),
+         ('D04', 'FAC-001',                  'F' || c.zw || 'AC001',     'BLOQUEA', '«FAC-001» y «F<U+200B>AC001» (el caso de la tanda final)'),
+         ('D05', 'FAC-001',                  'FAC' || c.zwnj || '-' || c.zwj || '001', 'BLOQUEA', '«FAC-001» y «FAC<U+200C>-<U+200D>001»'),
+         ('D06', 'F' || c.zw || 'AC' || c.sh || '001', 'fac 001',         'BLOQUEA', 'dos invisibles distintos en el primero y un espacio en el segundo')
+       ) v(id, a, b, esperado, nota);
+GRANT SELECT ON hx4_pares_inv TO PUBLIC;
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+CREATE TEMP TABLE hx4_res_inv AS SELECT p.*, public.hx4_par_en(:PJ::uuid, p.a, p.b) AS obtenido FROM hx4_pares_inv p;
+RESET ROLE;
+SELECT public.chk_txt(r.obtenido, r.esperado, format('[RG-4·invisibles·pares] %s %s → %s', r.id, r.nota, r.esperado)) FROM hx4_res_inv r ORDER BY r.id;
+-- (e) por el trigger real, uno a uno: con «FAC-001» registrada, «F<c>AC001» se rechaza para los 27
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+SELECT public.hx4_alta(200, :PI::uuid, 'FAC-001');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv
+                                 WHERE public.hx4_intenta(format($f$ INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total)
+                                                                    VALUES (gen_random_uuid(), 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001', %L, %L, 'inv', 1) $f$,
+                                                                 'fb400000-0000-0000-0000-0000000000a8', 'F' || ch || 'AC001')) <> 'BLOQUEA'), ''), '',
+  '[RG-4·invisibles] por el trigger real, con «FAC-001» registrada, el alta de «F<c>AC001» se RECHAZA para los 27 caracteres (antes se registraba el duplicado)');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv
+                                 WHERE public.hx4_intenta(format($f$ INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total)
+                                                                    VALUES (gen_random_uuid(), 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001', %L, %L, 'inv', 1) $f$,
+                                                                 'fb400000-0000-0000-0000-0000000000a8', 'FAC-001' || ch)) <> 'BLOQUEA'), ''), '',
+  '[RG-4·invisibles] …y «FAC-001<c>» (el carácter al final) también para los 27');
+SELECT public.chk_txt(COALESCE((SELECT string_agg(cp, ',' ORDER BY cp) FROM hx4_inv
+                                 WHERE public.hx4_intenta(format($f$ INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total)
+                                                                    VALUES (gen_random_uuid(), 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001', %L, %L, 'inv', 1) $f$,
+                                                                 'fb400000-0000-0000-0000-0000000000a8', ch || 'FAC-001')) <> 'BLOQUEA'), ''), '',
+  '[RG-4·invisibles] …y «<c>FAC-001» (el carácter al principio) también para los 27');
+SELECT public.chk_txt(regexp_replace(public.hx4_error($$ SELECT public.hx4_alta(201, 'fb400000-0000-0000-0000-0000000000a8', 'FAC001') $$), '\d\d/\d\d/\d{4}', 'DD/MM/AAAA'),
+  '23505|uq_facturas_prov_numero|COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente («FAC-001», DD/MM/AAAA por 100.00, registrada). Si es la misma, no la registres otra vez. Si es otra, escribe su número tal como viene impreso, con su guion o separador entre serie y correlativo (p. ej. «A-123»); si ya lo escribiste así, la existente se registró con más separadores: corrige o anula esa primero.',
+  '[RG-4·invisibles] control: sin invisibles, «FAC001» frente a «FAC-001» da el aviso de siempre (SQLSTATE 23505, restricción y texto)');
+SELECT public.chk_txt(regexp_replace(public.hx4_error(format($f$ SELECT public.hx4_alta(202, 'fb400000-0000-0000-0000-0000000000a8', %L) $f$, 'F' || public.hx4_chr(8203) || 'AC001')), '\d\d/\d\d/\d{4}', 'DD/MM/AAAA'),
+  '23505|uq_facturas_prov_numero|COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente («FAC-001», DD/MM/AAAA por 100.00, registrada). Si es la misma, no la registres otra vez. Si es otra, escribe su número tal como viene impreso, con su guion o separador entre serie y correlativo (p. ej. «A-123»); si ya lo escribiste así, la existente se registró con más separadores: corrige o anula esa primero.',
+  '[RG-4·invisibles] «F<U+200B>AC001» da el mismo aviso, con el mismo SQLSTATE 23505 y la misma restricción uq_facturas_prov_numero');
+RESET ROLE;
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = :PI::uuid), 1,
+  '[RG-4·invisibles] los rechazos no dejaron nada: el proveedor sigue con su única factura «FAC-001»');
+
+-- (f) un ORÁCULO independiente: para cada cadena, el perfil esperado = el perfil de referencia (carácter a carácter) de la cadena SIN los caracteres de la lista
+-- (borrados con replace() uno a uno: otro mecanismo que el regexp de la función). Cadenas al azar con invisibles, separadores visibles y letras/dígitos.
+CREATE FUNCTION public.hx4_ref_sin_inv(p text) RETURNS text LANGUAGE plpgsql STABLE AS $$
+DECLARE r record; u text := p;
+BEGIN
+  FOR r IN SELECT ch FROM hx4_inv LOOP u := replace(u, r.ch, ''); END LOOP;
+  RETURN u;
+END $$;
+SELECT setseed(0.3737);
+CREATE TEMP TABLE hx4_cad_inv AS
+SELECT g AS n,
+       COALESCE((SELECT string_agg(CASE WHEN random() < 0.2 THEN a.inv[1 + floor(random() * 27)::int]
+                                        ELSE (ARRAY['A','b','1','2','3','C','d','E','-','.',' ', a.visible1])[1 + floor(random() * 12)::int] END, '' ORDER BY k)
+                   FROM generate_series(1, 2 + floor(random() * 13)::int) k WHERE g > 0), '') AS s
+  FROM generate_series(1, 3000) g,
+       (SELECT (SELECT array_agg(ch ORDER BY cp) FROM hx4_inv) AS inv, public.hx4_chr(8211) AS visible1) a;
+SELECT public.chk_bool((SELECT count(*) FILTER (WHERE s ~ '[^ -~]') > 1500 AND count(DISTINCT s) > 2500 FROM hx4_cad_inv), true,
+  '[RG-4·invisibles·montaje] el azar es variado: más de 1 500 de las 3 000 cadenas llevan algún carácter no ASCII y más de 2 500 son distintas');
+SELECT public.chk((SELECT count(*) FROM hx4_cad_inv WHERE public.compras_numero_separadores(s) IS DISTINCT FROM public.hx4_ref_perfil(public.hx4_ref_sin_inv(s))), 0,
+  '[RG-4·invisibles] el perfil coincide con el oráculo (referencia carácter a carácter de la cadena sin los 27) en 3 000 cadenas al azar con invisibles');
+SELECT public.chk((SELECT count(*) FROM hx4_cad_inv WHERE public.compras_normalizar_numero(s) IS DISTINCT FROM public.hx4_ref_clave(s)), 0,
+  '[RG-4·invisibles] y la clave normalizada coincide con su referencia en las mismas 3 000 cadenas');
+SELECT public.chk_bool((SELECT count(*) FROM hx4_cad_inv WHERE public.hx4_ref_perfil(s) IS DISTINCT FROM public.hx4_ref_perfil(public.hx4_ref_sin_inv(s))) > 500, true,
+  '[RG-4·invisibles·montaje] el azar no es vacío: en más de 500 cadenas quitar los invisibles cambia el perfil (el oráculo SÍ discrimina)');
+-- Pares con la misma clave «Ab1C2»; entre cada dos caracteres puede haber separador, invisible o nada
+CREATE TEMP TABLE hx4_cad_inv2 AS
+SELECT 30000 + g AS n,
+       (SELECT string_agg(CASE WHEN random() < 0.3 THEN (ARRAY['-','.',' ','/'])[1 + floor(random() * 4)::int]
+                               WHEN random() < 0.4 THEN a.inv[1 + floor(random() * 27)::int] ELSE '' END || t.ch, '' ORDER BY t.i)
+          FROM unnest(ARRAY['A','b','1','C','2']) WITH ORDINALITY AS t(ch, i) WHERE g > 0) AS s
+  FROM generate_series(1, 130) g, (SELECT (SELECT array_agg(ch ORDER BY cp) FROM hx4_inv) AS inv) a;
+ALTER TABLE hx4_cad_inv2 ADD COLUMN rp int[], ADD COLUMN rp_viejo int[];
+UPDATE hx4_cad_inv2 SET rp = public.hx4_ref_perfil(public.hx4_ref_sin_inv(s)), rp_viejo = public.hx4_ref_perfil(s);
+CREATE TEMP TABLE hx4_pares_inv2 AS
+SELECT public.compras_numeros_equivalentes(a.s, b.s) AS f_ab,
+       public.compras_numeros_equivalentes(b.s, a.s) AS f_ba,
+       (a.rp <@ b.rp OR b.rp <@ a.rp) AS ref,
+       (a.rp_viejo <@ b.rp_viejo OR b.rp_viejo <@ a.rp_viejo) AS ref_viejo
+  FROM hx4_cad_inv2 a JOIN hx4_cad_inv2 b ON a.n < b.n;
+DO $$ BEGIN
+  RAISE NOTICE '  · % pares con la misma clave: % equivalentes y % distintos; % cambian de trato al quitar los invisibles',
+    (SELECT count(*) FROM hx4_pares_inv2), (SELECT count(*) FROM hx4_pares_inv2 WHERE ref), (SELECT count(*) FROM hx4_pares_inv2 WHERE NOT ref), (SELECT count(*) FROM hx4_pares_inv2 WHERE ref AND NOT ref_viejo);
+END $$;
+SELECT public.chk_bool((SELECT count(*) FILTER (WHERE ref) > 500 AND count(*) FILTER (WHERE NOT ref) > 500 AND count(*) FILTER (WHERE ref AND NOT ref_viejo) > 100 FROM hx4_pares_inv2), true,
+  '[RG-4·invisibles·montaje] hay miles de pares con la misma clave: cientos equivalentes, cientos distintos y más de 100 que SOLO son equivalentes porque se quitan los invisibles');
+SELECT public.chk((SELECT count(*) FROM hx4_pares_inv2 WHERE f_ab IS DISTINCT FROM ref), 0,
+  '[RG-4·invisibles] la equivalencia coincide con el oráculo en todos esos pares');
+SELECT public.chk((SELECT count(*) FROM hx4_pares_inv2 WHERE f_ab IS DISTINCT FROM f_ba), 0,
+  '[RG-4·invisibles] y sigue siendo simétrica');
+-- (g) las funciones se declaran IMMUTABLE aunque convert_from sea STABLE: es seguro solo si nada guarda su resultado. Ningún objeto depende de ellas.
+SELECT public.chk((SELECT count(*) FROM pg_depend d WHERE d.refclassid = 'pg_proc'::regclass
+                      AND d.refobjid IN ('public.compras_numero_separadores(text)'::regprocedure, 'public.compras_numeros_equivalentes(text, text)'::regprocedure)), 0,
+  '[RG-4·invisibles] ningún índice, columna generada, restricción, vista ni política depende de las funciones de equivalencia (su IMMUTABLE no puede dejar una copia vieja guardada)');
+SELECT public.chk_bool((SELECT count(*) FROM pg_depend d WHERE d.refclassid = 'pg_proc'::regclass AND d.refobjid = 'public.compras_normalizar_numero(text)'::regprocedure
+                           AND d.classid = 'pg_class'::regclass) >= 1, true,
+  '[RG-4·invisibles] control positivo: la misma consulta SÍ ve que idx_facturas_prov_numero_norm depende de compras_normalizar_numero');
+SELECT public.chk_bool((SELECT p.provolatile = 's' FROM pg_proc p WHERE p.oid = 'pg_catalog.convert_from(bytea,name)'::regprocedure), true,
+  '[RG-4·invisibles] la premisa del comentario es cierta: convert_from es STABLE (por eso se documenta por qué las funciones pueden ser IMMUTABLE)');
 
 ROLLBACK;
 

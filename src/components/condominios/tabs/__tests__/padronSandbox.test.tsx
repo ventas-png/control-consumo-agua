@@ -213,14 +213,15 @@ function leerActualizacion(plantilla: string) {
   const usuario = /INSERT INTO public\.app_users[^;]*?SELECT\s+(\w+)\s*,\s*c\s*,\s*'([^']*)'\s*,\s*'(\w+)'/.exec(sql)
   const rol = /INSERT INTO public\.roles[^;]*?SELECT\s+(\w+)\s*,\s*c\s*,\s*'([^']*)'/.exec(sql)
   const asignacion = /INSERT INTO public\.user_project_assignments[^;]*?SELECT\s+(\w+)\s*,\s*(\w+)\s*,\s*'(\w+)'/.exec(sql)
-  const correo = /'(zz-ui-\w+@example\.com)'/.exec(sql)
+  // el correo aparece dos veces (auth.users y la identidad): TODAS las apariciones cuentan
+  const correos = [...sql.matchAll(/'(zz-ui-[^'@\s]*@[^'\s]*)'/g)].map((m) => m[1])
   return {
     foreach: lista ? { rol: lista[2], llaves: [...lista[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) } : null,
     llaveDeLaOrden: llave ? { llave: llave[1], roles: llave[2].split(',').map((x) => x.trim()) } : null,
     usuario: usuario ? { variable: usuario[1], nombre: usuario[2], rol: usuario[3] } : null,
     rol: rol ? { variable: rol[1], nombre: rol[2] } : null,
     asignacion: asignacion ? { tipo: asignacion[3] } : null,
-    correo: correo?.[1] ?? null,
+    correos,
   }
 }
 
@@ -258,7 +259,8 @@ function diferenciasConLaActualizacion(completa: string, actualizacion: string):
     if (!usuario || usuario[1] !== a.usuario?.nombre || usuario[2] !== a.usuario?.rol) dif.push(`app_users del cuarto perfil: completa «${usuario?.[1]}» / ${usuario?.[2]} · actualización «${a.usuario?.nombre}» / ${a.usuario?.rol}`)
     const rolNombre = new RegExp(`\\(\\s*${a.rol?.variable}\\s*,\\s*c\\s*,\\s*'([^']*)'\\s*\\)`).exec(completaSql)
     if (!rolNombre || rolNombre[1] !== a.rol?.nombre) dif.push(`nombre del rol del cuarto perfil: completa «${rolNombre?.[1]}» · actualización «${a.rol?.nombre}»`)
-    if (a.correo !== `zz-ui-${cuarto.etiqueta}@example.com`) dif.push(`correo del cuarto perfil: actualización ${a.correo} · la completa arma zz-ui-${cuarto.etiqueta}@example.com`)
+    const correo = `zz-ui-${cuarto.etiqueta}@example.com`
+    if (a.correos.length === 0 || a.correos.some((c) => c !== correo)) dif.push(`correo del cuarto perfil: actualización ${a.correos.join(' / ') || '(ninguno)'} · la completa arma ${correo}`)
     if (!new RegExp(`\\(\\s*${a.usuario?.variable}\\s*,\\s*pj\\s*,\\s*'${a.asignacion?.tipo}'\\s*\\)`).test(completaSql)) dif.push(`asignación al proyecto del cuarto perfil: la completa no la siembra como '${a.asignacion?.tipo}'`)
   }
   return dif
@@ -272,7 +274,7 @@ describe('la plantilla de actualización pone al día lo MISMO que la completa s
     expect(a.llaveDeLaOrden).toEqual({ llave: LLAVE_OC, roles: ['rq', 'rs'] })
     expect(a.usuario).toEqual({ variable: 'u4', nombre: 'ZZ UI Solo generico', rol: 'operator' })
     expect(a.rol).toEqual({ variable: 'r4', nombre: 'ZZ UI Solo generico' })
-    expect(a.correo).toBe('zz-ui-soloGenerico@example.com')
+    expect(a.correos).toEqual(['zz-ui-soloGenerico@example.com', 'zz-ui-soloGenerico@example.com'])
     expect(constantesUuid(ACTUALIZACION).size).toBeGreaterThanOrEqual(5)
   })
 

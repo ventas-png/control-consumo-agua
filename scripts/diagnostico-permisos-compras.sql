@@ -25,8 +25,12 @@
 --   Un ROL se evalúa solo por sus llaves 'allow' (un rol no tiene vencimiento: lo tiene su asignación a la persona).
 --
 -- FILAS DEVUELTAS (una sola consulta; ordene por las columnas que quiera)
---   tipo = 'rol_sistema'  plantillas (is_system): «Administrador General», «Finanzas / Contador»…; `usuarios` = personas
---                          activas que las tienen asignadas hoy (sin vencer)
+--   tipo = 'rol_sistema'  plantillas (is_system, sin empresa): «Administrador General», «Finanzas / Contador»…; `usuarios` = personas
+--                          activas que tienen asignada ESA plantilla hoy (sin vencer). OJO con el rótulo «0»: las personas casi nunca
+--                          llevan la plantilla sino una COPIA de su empresa con el MISMO nombre (fila `rol_empresa`, p. ej. el «Admin
+--                          Plataforma» de una persona), así que una plantilla puede decir 0 mientras alguien «tiene un rol» con ese nombre.
+--                          (Producción, 2026-10-10, solo lectura: las plantillas tienen 0 asignaciones en `user_roles`, ni vencidas ni de
+--                          personas inactivas; las copias por empresa con esos nombres suman 3 asignaciones vigentes.)
 --   tipo = 'rol_empresa'  roles de la empresa (incluye los de «ajustes individuales», user_override_for); `perfil` dice si es de ajustes
 --   tipo = 'usuario'      personas NO exentas de proyecto con alguna de las seis acciones antes o después, junto con los
 --                          proyectos asignados. Exentas = super_admin, superadmin, company_owner y administrador SIN
@@ -80,7 +84,7 @@ roles_filas AS (
   SELECT CASE WHEN is_system THEN 'rol_sistema' ELSE 'rol_empresa' END AS tipo,
          c.nombre AS empresa,
          name AS nombre,
-         CASE WHEN is_system THEN 'plantilla de sistema'
+         CASE WHEN is_system THEN 'plantilla de sistema (no sus copias por empresa, que son filas rol_empresa)'
               WHEN user_override_for IS NOT NULL THEN 'ajustes individuales'
               ELSE 'rol de empresa' END AS perfil,
          usuarios::text AS usuarios,

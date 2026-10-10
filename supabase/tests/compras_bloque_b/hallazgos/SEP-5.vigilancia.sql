@@ -10,6 +10,8 @@
 --   · separacion_sistema   una fila por cada cambio de SISTEMA que apagó la separación (no por los que la encendieron ni por los de personas).
 --   · separacion_sin_fila  la bitácora dice «activa» y la empresa no tiene fila en compras_config.
 --   · separacion_sin_base  la fila está encendida y la bitácora no la respalda (sin ninguna fila, o su última fila dice «apagada»).
+--   · separacion_apagada_por_fuera  la fila está APAGADA y la última fila de la bitácora dice «activa» (la separación se apagó sin pasar por la
+--                          RPC ni por los triggers: la 0900 revertida y reaplicada sin conciliar, triggers deshabilitados, replica).
 --   · Nada de lo anterior aparece cuando todo es coherente (RPC de personas, filas respaldadas).
 --   · Es de solo lectura: corre en una transacción READ ONLY, con un rol que solo tiene SELECT, sin asignar identificador de
 --     transacción (no escribió nada) y sin alterar el contenido de las tablas.
@@ -115,12 +117,56 @@ SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
 SELECT (public.compras_separacion_configurar(:C::uuid, false, 'Apagada por el administrador para la prueba') ->> 'aprobacion_separada') AS ok \gset
 RESET ROLE;
+CREATE TEMP TABLE v7b AS :vig
+SELECT public.chk((SELECT count(*) FROM v7b WHERE apartado = 'separacion_apagada_por_fuera' AND id = :C), 0,
+  '[SEP-5l] una fila APAGADA que la bitácora también da por apagada (la apagó la RPC) es coherente: no es «apagada por fuera»');
 SELECT public.como_sistema($$ SET LOCAL session_replication_role = replica;
   UPDATE public.compras_config SET aprobacion_separada = true WHERE company_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
   SET LOCAL session_replication_role = origin $$);
 CREATE TEMP TABLE v8 AS :vig
 SELECT public.chk((SELECT count(*) FROM v8 WHERE apartado = 'separacion_sin_base' AND id = :C AND detalle LIKE '%la da por apagada%'), 1,
   '[SEP-5i] «separacion_sin_base»: la fila de C está encendida y la última fila de la bitácora la da por apagada');
+
+SELECT public.chk((SELECT count(*) FROM v8 WHERE apartado = 'separacion_apagada_por_fuera' AND id = :C), 0,
+  '[SEP-5l] y una fila ENCENDIDA con la bitácora «apagada» es «sin base», no «apagada por fuera» (las dos incoherencias no se confunden)');
+
+-- ── 5b · La tercera incoherencia: fila APAGADA con la última fila de la bitácora «ACTIVA» ──
+-- Es lo que deja el procedimiento de reversión de la 0900: se revierte (la bitácora se conserva), alguien con `edit` apaga la fila con un UPDATE
+-- directo y se reaplica la pieza SIN conciliar; o los triggers deshabilitados / session_replication_role = replica. La RPC lo ve como «sin cambio».
+SELECT public.sep_preparar(:C::uuid, NULL);
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+SELECT (public.compras_separacion_configurar(:C::uuid, true, 'Encendida para la auditoría del trimestre (vigilancia)') ->> 'aprobacion_separada') AS ok \gset
+RESET ROLE;
+CREATE TEMP TABLE v9a AS :vig
+SELECT public.chk((SELECT count(*) FROM v9a WHERE apartado = 'separacion_apagada_por_fuera' AND id = :C), 0,
+  '[SEP-5m] (control) encendida por la RPC con la bitácora «activa»: coherente, no se lista');
+SELECT public.como_sistema($$ SET LOCAL session_replication_role = replica;
+  UPDATE public.compras_config SET aprobacion_separada = false WHERE company_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+  SET LOCAL session_replication_role = origin $$);
+SELECT public.chk_txt(public.sep_valor(:C::uuid), 'false', '[SEP-5n] (preparación) la fila de C quedó APAGADA sin pasar por los triggers');
+SELECT b.valor_nuevo::text AS ultima, b.id AS ultima_id FROM public.compras_config_separacion_bitacora b WHERE b.company_id = :C::uuid ORDER BY b.id DESC LIMIT 1 \gset
+SELECT public.chk_txt(:'ultima', 'true', '[SEP-5n] (preparación) y la última fila de la bitácora de C sigue diciendo «activa»');
+CREATE TEMP TABLE v9 AS :vig
+SELECT public.chk((SELECT count(*) FROM v9 WHERE apartado = 'separacion_apagada_por_fuera' AND id = :C), 1,
+  '[SEP-5n] «separacion_apagada_por_fuera»: la fila de C está apagada y la bitácora la da por activa');
+SELECT public.chk_bool((SELECT bool_and(tabla = 'compras_config' AND detalle LIKE '%APAGADA%' AND detalle LIKE '%ACTIVA%' AND detalle LIKE '%(' || :ultima_id || ',%')
+                          FROM v9 WHERE apartado = 'separacion_apagada_por_fuera' AND id = :C), true,
+  '[SEP-5n] y dice cuál es la fila de bitácora que la da por activa');
+SELECT public.chk((SELECT count(*) FROM v9 WHERE apartado IN ('separacion_sin_fila', 'separacion_sin_base') AND id = :C), 0,
+  '[SEP-5n] no es «sin fila» (la fila existe) ni «sin base» (no está encendida)');
+SELECT public.chk((SELECT count(*) FROM v9 WHERE apartado = 'separacion_apagada_por_fuera' AND id <> :C AND id IN (:D, :K1)), 0,
+  '[SEP-5n] y no aparecen otras empresas coherentes en ese apartado');
+-- La RPC lo trata como «sin cambio» (la fila manda): no finge una operación; el estado se alinea reaplicando la pieza o encendiendo por la RPC.
+SELECT public.como(:UA::uuid);
+SET ROLE authenticated;
+SELECT public.chk_falla($$ SELECT public.compras_separacion_configurar('cccccccc-cccc-cccc-cccc-cccccccccccc', false, 'Se deja constancia de que está apagada') $$,
+  'COMPRAS_SEPARACION_SIN_CAMBIO', '[SEP-5o] la RPC pedir «apagar» sobre una fila ya apagada: SIN_CAMBIO (nunca éxito sin operación)');
+SELECT (public.compras_separacion_configurar(:C::uuid, true, 'La encendemos de nuevo tras la revisión de la vigilancia') ->> 'aprobacion_separada') AS ok \gset
+RESET ROLE;
+CREATE TEMP TABLE v10 AS :vig
+SELECT public.chk((SELECT count(*) FROM v10 WHERE apartado = 'separacion_apagada_por_fuera' AND id = :C), 0,
+  '[SEP-5o] encendida otra vez por la RPC, la incoherencia desaparece del informe');
 
 -- ── 6 · Solo lectura: READ ONLY + un rol que solo tiene SELECT + ningún identificador de transacción asignado + tablas intactas ──
 SELECT md5(COALESCE((SELECT string_agg(g::text, '|' ORDER BY g.company_id) FROM public.compras_config g), '')

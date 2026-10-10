@@ -10,10 +10,12 @@
 #        factura (el candado consultivo serializa, pero la instantánea es vieja): «123» y «1-23» conviven. En READ COMMITTED
 #        (el nivel de PostgREST/Supabase) se rechaza. Heredado de 0400 (se demuestra también con «FAC-001» / «FAC001»).
 #
-#   L3 · Caracteres INVISIBLES o de formato en el INTERIOR del número (U+200B espacio de ancho cero, U+00AD guion blando: el
-#        artefacto típico de pegar desde un PDF) cuentan como separador al calcular el perfil: «F<U+200B>AC001» ({1}) deja de ser
-#        equivalente a «FAC-001» ({3}) y un duplicado real escrito así se registra (0800 lo rechazaba). Al principio o al final se
-#        recortan y el duplicado se sigue detectando. NO se corrige (ni con \uXXXX en un regexp —falla en SQL_ASCII— ni con chr(>127)).
+#   L3 · Caracteres INVISIBLES que NO están en la lista de la pieza. Los 27 de la lista (espacio de ancho cero U+200B, guion blando U+00AD, BOM…)
+#        se quitan antes de calcular el perfil y un duplicado escrito con ellos SE RECHAZA (eso ya no es un límite: lo prueba RG-4.sql,
+#        [RG-4·invisibles], y L3d lo muestra aquí). Uno que no esté en la lista —un selector de variación U+FE0F, una etiqueta U+E0041— sigue
+#        contando como separador interior y el duplicado se registra («F<c>AC001» {1} frente a «FAC-001» {3}); y una letra de OTRO ALFABETO
+#        que se parece a una latina (la «А» cirílica) cambia la clave misma, así que tampoco se detecta (esto último ya era así en 0400/0800).
+#        Si se amplía la lista, L3a/L3b pasan a BLOQUEA y este script avisa «CAMBIÓ».
 #   L4 · SONDEO (EV-09): quien no ve una factura puede deducir su estructura de separadores probando números (rechazo = compatible,
 #        alta = incomparable), con el aviso genérico que no dice nada de la factura. 0800 solo dejaba saber que existe la clave.
 #
@@ -95,7 +97,7 @@ SQL
     if [ "$V" = "2" ]; then dice L2 "$nivel: la sesión con instantánea vieja registró «$a» junto a «$b» (DOS vivas equivalentes) → LÍMITE vigente (heredado de 0400)"; else dice L2 "CAMBIÓ: $nivel ahora lo rechaza (vivas=$V) — actualiza el INFORME"; ok=0; fi
   fi
 done
-# ── L3 · invisibles en el interior ─────────────────────────────────────────────────────────────────────────────────
+# ── L3 · invisibles que NO están en la lista, y uno de la lista (control) ──────────────────────────────────────────
 HAY=$(q "SELECT to_regprocedure('public.compras_numeros_equivalentes(text,text)') IS NOT NULL")
 intenta() {                                                    # intenta <proveedor> <literal SQL del número> → PASA | BLOQUEA | ERROR
   local out; out=$(psql -q -X -t -A -d "$BD" 2>&1 <<SQL
@@ -105,18 +107,21 @@ SQL
 )
   if echo "$out" | grep -q 'COMPRAS_FACTURA_NUMERO_DUPLICADO'; then echo BLOQUEA; elif echo "$out" | grep -q 'ERROR'; then echo "ERROR $out"; else echo PASA; fi
 }
-ZW="E'F\xe2\x80\x8bAC001'"; SH="E'F\xc2\xadAC001'"; ZF="E'FAC001\xe2\x80\x8b'"; ZI="E'\xe2\x80\x8bFAC001'"
-k=7; for caso in "L3a:interior U+200B:$ZW:PASA" "L3b:interior U+00AD (guion blando):$SH:PASA" "L3c:al FINAL U+200B (se recorta):$ZF:BLOQUEA" "L3d:al INICIO U+200B (se recorta):$ZI:BLOQUEA"; do
-  IFS=: read -r id txt lit esp <<<"$caso"; P=$(prov "$k"); k=$((k+1))
+# id : qué es : literal : esperado CON la pieza : esperado SIN la pieza (0800: la clave sola; la clave ignora todo lo que no es A-Z0-9)
+ZW="E'F\xe2\x80\x8bAC001'"; VS="E'F\xef\xb8\x8fAC001'"; TG="E'F\xf3\xa0\x81\x81AC001'"; CI="E'F\xd0\x90C001'"
+k=7; for caso in "L3a:selector de variación U+FE0F en el interior (NO listado):$VS:PASA:BLOQUEA" "L3b:etiqueta U+E0041 en el interior (NO listada):$TG:PASA:BLOQUEA" \
+                 "L3c:«А» cirílica en lugar de la «A» latina (cambia la clave):$CI:PASA:PASA" "L3d:espacio de ancho cero U+200B en el interior (SÍ listado, control):$ZW:BLOQUEA:BLOQUEA"; do
+  IFS=: read -r id txt lit esp esp0 <<<"$caso"; P=$(prov "$k"); k=$((k+1))
   psql -q -X -v ON_ERROR_STOP=1 -d "$BD" >/dev/null <<SQL
 SELECT public.como('$UA'::uuid); SET ROLE authenticated;
 $(ins "$P" 'FAC-001')
 SQL
   R=$(intenta "$P" "$lit")
-  [ "$HAY" = f ] && esp=BLOQUEA                               # sin la pieza (0800): la clave sola, todos se rechazan
+  [ "$HAY" = f ] && esp=$esp0                                 # sin la pieza (0800)
   if [ "$R" = "$esp" ]; then
-    case "$id:$HAY" in L3a:t|L3b:t) dice "$id" "«FAC-001» viva y la misma clave escrita con $txt → $R: un duplicado real escrito así NO se detecta → LÍMITE vigente (0800 lo rechazaba)";;
-                       *) dice "$id" "«FAC-001» viva y la misma clave escrita con $txt → $R (se sigue detectando)";; esac
+    case "$id:$HAY" in L3a:t|L3b:t|L3c:t) dice "$id" "«FAC-001» viva y su clave escrita con $txt → $R: el duplicado NO se detecta → LÍMITE vigente";;
+                       L3c:f)             dice "$id" "«FAC-001» viva y su clave escrita con $txt → $R (0800 tampoco lo detectaba: la clave es solo A-Z0-9)";;
+                       *) dice "$id" "«FAC-001» viva y su clave escrita con $txt → $R (se detecta)";; esac
   else dice "$id" "CAMBIÓ: con $txt se esperaba $esp y salió «$R» — actualiza el INFORME"; ok=0; fi
 done
 

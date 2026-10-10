@@ -1,4 +1,71 @@
--- BORRADOR DE CABECERA (se reemplaza al integrar las piezas finales)
+-- ════════════════════════════════════════════════════════════════════════════
+-- COMPRAS · PERMISOS INDEPENDIENTES POR ACCIÓN, PROTECCIÓN DE LA SEPARACIÓN SOLICITANTE/APROBADOR
+-- Y NÚMEROS DE FACTURA (alternativa A de RG-4)
+-- PR #926 · ronda 2 · décima y última migración del PR (tope de despliegue MAX_APPLY = 10: no se toca)
+--
+-- Una sola migración ADITIVA e idempotente (se puede aplicar varias veces). No edita 20261027000000…0800, ya aplicadas al
+-- sandbox: añade funciones, disparadores y una tabla, y reescribe solo las funciones que se indican en cada pieza. NO escribe
+-- ni borra ningún documento, rol, asignación de proyecto ni configuración existente, y NO concede ninguna llave a nadie.
+--
+-- QUÉ HACE
+--   PIEZA 1 · PERMISOS INDEPENDIENTES POR ACCIÓN (en el servidor, para RPC y para escrituras directas por la API)
+--     Hoy dos permisos genéricos de Contabilidad («Autorizar / Denegar» y «Cambiar estado») deciden seis acciones distintas.
+--     Cada una pasa a exigir el suyo:
+--       aprobar una orden de compra        condominios.tab.ordenes_compra.approve            (YA existía; no se crea otro)
+--       registrar una recepción            platform.contabilidad.compras.recepcion_registrar (nueva)
+--       aprobar una factura de proveedor   platform.contabilidad.compras.factura_aprobar     (nueva)
+--       aprobar una orden de pago          platform.contabilidad.compras.orden_pago_aprobar  (nueva)
+--       ejecutar un pago                   platform.contabilidad.compras.pago_ejecutar       (nueva)
+--       anular un pago                     platform.contabilidad.compras.pago_anular         (nueva)
+--     La comprobación (compras_exigir_permiso) mira la empresa, el permiso y el ALCANCE DE PROYECTO del documento: la RLS
+--     de UPDATE no lo mira y un UPDATE sin WHERE o una función SECURITY DEFINER alcanzaba documentos de otro proyecto. Mover
+--     un documento de proyecto o de empresa tampoco es un atajo (disparador trg_zzcompras_mover_alcance en las cinco tablas).
+--     Las acciones que NO son de las seis (emitir/cancelar/cerrar la orden; anular recepción, factura o contraseña) siguen
+--     con «Cambiar estado», ahora también con el alcance de empresa y proyecto.
+--   PIEZA 2 · PROTECCIÓN DE LA SEPARACIÓN SOLICITANTE/APROBADOR (compras_config.aprobacion_separada)
+--     El interruptor solo cambia por la RPC compras_separacion_configurar(empresa, activa, motivo), que exige ser
+--     administrador o propietario DE ESA EMPRESA (o superadministrador) y un motivo, y deja una fila en la bitácora protegida
+--     compras_config_separacion_bitacora (empresa, actor sellado por el servidor, fecha, valor anterior, valor nuevo, motivo).
+--     UPDATE, DELETE, UPSERT, reemplazo de la fila, TRUNCATE y mover company_id del interruptor se rechazan a toda sesión de
+--     usuario (también a un administrador); la AUSENCIA de la fila no permite a un editor apagar una separación ya
+--     establecida (la bitácora la recuerda). NO se enciende en ninguna empresa, NO se inventan umbrales ni prohibiciones
+--     entre personas: separar permisos por acción NO es exigir personas distintas en todos los pasos.
+--   PIEZA 3 · NÚMEROS DE FACTURA, ALTERNATIVA A de RG-4
+--     «1-23» y «12-3» (serie y correlativo distintos) dejan de rechazarse entre sí; «FAC-001», «fac 001» y «FAC001» siguen
+--     siendo la misma factura. Índice, consulta de duplicados y candado asesor usan EXACTAMENTE la misma normalización
+--     (compras_normalizar_numero); el afinado por separadores solo se evalúa sobre las pocas candidatas que devuelve el
+--     índice (que NO cambia: sin REINDEX). Los caracteres invisibles de un pegado desde PDF (U+200B…) no esconden un duplicado.
+--     compras_factura_crear deja pasar el mensaje del disparador (antes lo tapaba con uno engañoso).
+--
+-- QUÉ NO HACE (decisiones de negocio y de plataforma que NO se tomaron aquí; ver docs/COMPRAS_CONTROLES_SERVIDOR.md §6)
+--   · NO concede ninguna llave nueva a ningún rol (ni a las plantillas de sistema): quien hoy aprueba o paga con los
+--     permisos genéricos DEJA de poder las cinco acciones nuevas hasta que se le asignen (propuesta SIN ejecutar:
+--     scripts/propuesta-asignaciones-permisos-compras.sql; matriz antes/después: scripts/diagnostico-permisos-compras.sql).
+--   · NO renumera, elimina ni fusiona facturas; NO toca las asignaciones de proyecto de nadie.
+--   · NO cierra user_project_assignments (una persona puede asignarse proyectos con una escritura directa): defecto
+--     PREEXISTENTE, verificado en producción en solo lectura, entregado aparte con su corrección y su prueba en
+--     supabase/tests/compras_bloque_b/pendientes_decision/asignaciones/. Mientras no se cierre, la asignación de
+--     proyecto no es un límite de seguridad contra un usuario hostil.
+--
+-- DATOS EXISTENTES Y CONFLICTOS
+--   Esta migración no crea ningún índice único ni restricción nueva sobre datos existentes, así que ningún dato puede hacerla
+--   fallar. El pre-vuelo informa (NOTICE) de lo que ya existe y NO toca: pares de facturas de la misma clave de número, empresas
+--   con la separación encendida (su línea base se siembra en la bitácora) y llaves ya concedidas; el post-vuelo comprueba que
+--   nada de eso cambió y que no se concedió ninguna llave ni se movió ninguna asignación de proyecto. Producción hoy: 1 factura
+--   (anulada), ninguna empresa con la separación encendida.
+--
+-- BLOQUEOS, TIEMPOS Y RECUPERACIÓN
+--   · Una sola transacción con SET LOCAL lock_timeout = '10s' y statement_timeout = '120s': si una tabla está ocupada la
+--     migración FALLA entera sin dejar nada a medias (reintentar fuera de pagos, aprobaciones y cierres).
+--   · Toma bloqueos breves al crear disparadores sobre ordenes_compra, recepciones, facturas_proveedor, ordenes_pago,
+--     contrasenas_pago y compras_config. CREATE OR REPLACE TRIGGER exige PostgreSQL ≥ 14 (producción: 17).
+--   · REVERSIÓN: scripts/reversion-compras-controles.sql, sección «20261027000900» (se puede correr SOLA; comprobada en una
+--     base desechable). Revertir REABRE los defectos. La bitácora de la separación es evidencia: se CONSERVA si tiene cambios.
+--   · Requisito: 20261027000000…0800 aplicadas (el pre-vuelo se detiene con un mensaje claro si falta algo).
+--
+-- PRUEBAS (supabase/tests/compras_bloque_b/): hallazgos/PERM-1…4 (permisos), SEP-0…6, SEP-conc, SEP-idempotencia, SEP-reversion
+--   (separación), RG-4 (+ .rpc, .diagnostico, .conc) (números de factura); run.sh las ejecuta y comprueba la reversión.
+-- ════════════════════════════════════════════════════════════════════════════
 BEGIN;
 SET LOCAL lock_timeout = '10s';
 SET LOCAL statement_timeout = '120s';
@@ -81,7 +148,6 @@ $prevuelo$;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- PIEZA 1 · PERMISOS INDEPENDIENTES POR ACCIÓN
--- (fragmento: permisos/pieza.sql)
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -140,10 +206,12 @@ $prevuelo$;
 --   Un administrador CON asignaciones de proyecto no es exento (`user_is_project_exempt`): solo actúa en los suyos.
 --
 -- MOVER EL DOCUMENTO NO ES UN ATAJO (disparador `trg_zzcompras_mover_alcance`, en las cinco tablas)
---   La comprobación de proyecto de arriba solo corre cuando cambia el ESTADO. Una orden en borrador y una factura
---   de gasto directo (sin orden) pueden cambiar de `project_id`, y la RLS de UPDATE no mira el proyecto: quien
---   alcanzaba un documento «a ciegas» (UPDATE sin columnas en el WHERE, o una RPC definer) lo movía a SU proyecto y
---   después lo aprobaba de forma legítima. El disparador, SOLO para sesiones de usuario, exige para cambiar
+--   La comprobación de proyecto de arriba solo corre cuando cambia el ESTADO. Una orden en borrador, una factura
+--   de gasto directo (sin orden), una contraseña sin partidas y una orden de pago en borrador que se ANULA (la
+--   anulación sale de `compras_tg_orden_pago_controles` antes de validar el proyecto contra la factura) pueden
+--   cambiar de `project_id` —incluso en la misma sentencia que su estado— y la RLS de UPDATE no mira el proyecto:
+--   quien alcanzaba un documento «a ciegas» (UPDATE sin columnas en el WHERE, o una RPC definer) lo movía a SU
+--   proyecto y después lo aprobaba de forma legítima. El disparador, SOLO para sesiones de usuario, exige para cambiar
 --   `project_id` o `company_id` de un documento de compras: que sea de la empresa de la sesión (origen y destino;
 --   el superadministrador, cualquiera), que la persona tenga acceso al proyecto en que está HOY y, si cambia de
 --   proyecto, al de destino. Es deliberadamente ESTRECHO: no mira las ediciones que dejan el documento donde está
@@ -156,10 +224,13 @@ $prevuelo$;
 -- QUÉ NO HACE
 --   · NO concede NINGUNA llave nueva a NINGÚN rol, ni a las plantillas de sistema (tampoco a «Administrador
 --     General»): ni siquiera a quien hoy tiene `approve` o `change_status`. Las asignaciones se proponen aparte
---     (propuesta_asignaciones.sql, SIN ejecutar, con cada concesión comentada y a confirmar por una persona).
+--     (scripts/propuesta-asignaciones-permisos-compras.sql, SIN ejecutar, con cada concesión comentada y a confirmar por una persona).
 --   · NO exige personas distintas en pasos distintos: separar los permisos NO es separar a las personas.
 --   · NO toca la RLS, los grants ni ningún dato de usuarios, roles, asignaciones o documentos. Los disparadores de
 --     permiso existentes no se recrean (solo cambian los cuerpos de cinco funciones); se añade UN disparador por tabla.
+--   · BLOQUEOS: los cinco disparadores de mover se crean con CREATE OR REPLACE TRIGGER (PostgreSQL ≥ 14; producción
+--     17), que toma SHARE ROW EXCLUSIVE sobre cada tabla (deja leer) en vez del ACCESS EXCLUSIVE de DROP TRIGGER +
+--     CREATE TRIGGER (medido con pg_locks). Va tras el `SET LOCAL lock_timeout`.
 --
 -- EFECTO EXPLÍCITO DE REUTILIZAR LA LLAVE DE LA PESTAÑA DE ÓRDENES DE COMPRA
 --   Aprobar una orden de compra ya NO se decide con `platform.contabilidad.approve` sino con
@@ -167,9 +238,9 @@ $prevuelo$;
 --   `platform.contabilidad.approve` pasa de «no podía aprobar en el servidor» a «puede» (la pantalla ya se lo
 --   mostraba): el servidor se AMPLÍA para esa combinación; quien solo tenía `platform.contabilidad.approve`
 --   deja de poder aprobar órdenes. Con la matriz de producción del 2026-10-09 solo cambia la plantilla de
---   sistema «Administrador General» (0 usuarios): ningún usuario real gana (ver INFORME.md §12.4).
+--   sistema «Administrador General» (0 usuarios): ningún usuario real gana (ver docs/COMPRAS_CONTROLES_SERVIDOR.md, matriz de permisos).
 --
--- OTROS CAMINOS QUE TRANSICIONAN ESTOS ESTADOS (revisado en la copia de hall_b0800)
+-- OTROS CAMINOS QUE TRANSICIONAN ESTOS ESTADOS (revisado en una copia de la base con la cadena hasta 20261027000800)
 --   Ninguna RPC, función ni disparador de sistema escribe estos estados con una sesión de usuario SIN pasar por
 --   los cuatro disparadores de permiso: (i) las únicas escrituras de estado que hacen funciones son disparadores
 --   AFTER de sistema, que corren con `conta.allow_system_write` en 'on' y mueven estados DERIVADOS: sobre
@@ -186,13 +257,13 @@ $prevuelo$;
 --   llaves nuevas hasta que se le asignen (la orden de compra la conserva quien ya tenga la llave de la pestaña,
 --   `condominios.tab.ordenes_compra.approve`; quien solo tenía `platform.contabilidad.approve` deja de aprobar
 --   órdenes). Administradores, propietarios y superadministradores no cambian. Antes de fusionar, correr
---   matriz_antes_despues.sql (solo lectura) en producción: lista, por rol y por usuario, qué acciones tenían y
+--   scripts/diagnostico-permisos-compras.sql (solo lectura) en producción: lista, por rol y por usuario, qué acciones tenían y
 --   cuáles tendrán. En producción hoy: Alexander Monterroso (Finanzas / Contador) y Marco Santos Godoy (admin con 3
 --   proyectos). Ninguna asignación de proyecto se modifica ni se amplía. El alcance de empresa y proyecto que
 --   ahora también rige emitir/cancelar/cerrar y anular recepción, factura y contraseña no quita nada a quien
 --   actúa sobre documentos de sus proyectos (los demás ni los ve).
 --
--- CÓMO REVERTIR (sin pérdida de datos de documentos; ver reversion_pieza.sql)
+-- CÓMO REVERTIR (sin pérdida de datos de documentos; ver scripts/reversion-compras-controles.sql, sección 20261027000900)
 --   Quitar el disparador trg_zzcompras_mover_alcance de las cinco tablas y su función; restaurar las cinco funciones
 --   compras_tg_permiso_orden / _recepcion / _factura / _contrasena / _orden_pago a sus cuerpos de 20261027000700
 --   (orden) y 20261027000300 (las otras cuatro), y DROP FUNCTION compras_exigir_permiso(text, text, uuid, uuid).
@@ -289,7 +360,7 @@ COMMENT ON FUNCTION public.compras_exigir_permiso(text, text, uuid, uuid) IS
   'Interna de los triggers de compras: exige a una sesión de usuario que el documento sea de su empresa (salvo superadministrador; NULL-segura), el permiso PROPIO de la acción (llave exacta, respeta denegar y vencimiento) y acceso a su proyecto. Sin usuario o con el permiso de sistema no se aplica.';
 
 -- ── (c) Disparadores de permiso: solo cambian los bloques de las acciones ───
--- Partiendo de las definiciones VIGENTES en hall_b0800 (pg_get_functiondef; las de 0300/0700 ya no son las vigentes
+-- Partiendo de las definiciones VIGENTES tras 20261027000800 (pg_get_functiondef; las de 0300/0700 ya no son las vigentes
 -- de las demás piezas). Los disparadores no cambian. Todas las transiciones con permiso pasan por
 -- compras_exigir_permiso; las que no son de las seis acciones conservan `platform.contabilidad.change_status`.
 
@@ -565,20 +636,15 @@ $function$;
 COMMENT ON FUNCTION public.compras_tg_mover_alcance() IS
   'Disparador BEFORE UPDATE OF project_id, company_id de ordenes_compra, recepciones, facturas_proveedor, ordenes_pago y contrasenas_pago: solo para sesiones de usuario, mover un documento exige empresa de la sesión (origen y destino) y acceso al proyecto de origen y al de destino. No mira las ediciones que no lo mueven. Se salta la acción referencial de eliminar un proyecto.';
 
-DROP TRIGGER IF EXISTS trg_zzcompras_mover_alcance ON public.ordenes_compra;
-CREATE TRIGGER trg_zzcompras_mover_alcance BEFORE UPDATE OF project_id, company_id ON public.ordenes_compra
+CREATE OR REPLACE TRIGGER trg_zzcompras_mover_alcance BEFORE UPDATE OF project_id, company_id ON public.ordenes_compra
   FOR EACH ROW EXECUTE FUNCTION public.compras_tg_mover_alcance();
-DROP TRIGGER IF EXISTS trg_zzcompras_mover_alcance ON public.recepciones;
-CREATE TRIGGER trg_zzcompras_mover_alcance BEFORE UPDATE OF project_id, company_id ON public.recepciones
+CREATE OR REPLACE TRIGGER trg_zzcompras_mover_alcance BEFORE UPDATE OF project_id, company_id ON public.recepciones
   FOR EACH ROW EXECUTE FUNCTION public.compras_tg_mover_alcance();
-DROP TRIGGER IF EXISTS trg_zzcompras_mover_alcance ON public.facturas_proveedor;
-CREATE TRIGGER trg_zzcompras_mover_alcance BEFORE UPDATE OF project_id, company_id ON public.facturas_proveedor
+CREATE OR REPLACE TRIGGER trg_zzcompras_mover_alcance BEFORE UPDATE OF project_id, company_id ON public.facturas_proveedor
   FOR EACH ROW EXECUTE FUNCTION public.compras_tg_mover_alcance();
-DROP TRIGGER IF EXISTS trg_zzcompras_mover_alcance ON public.ordenes_pago;
-CREATE TRIGGER trg_zzcompras_mover_alcance BEFORE UPDATE OF project_id, company_id ON public.ordenes_pago
+CREATE OR REPLACE TRIGGER trg_zzcompras_mover_alcance BEFORE UPDATE OF project_id, company_id ON public.ordenes_pago
   FOR EACH ROW EXECUTE FUNCTION public.compras_tg_mover_alcance();
-DROP TRIGGER IF EXISTS trg_zzcompras_mover_alcance ON public.contrasenas_pago;
-CREATE TRIGGER trg_zzcompras_mover_alcance BEFORE UPDATE OF project_id, company_id ON public.contrasenas_pago
+CREATE OR REPLACE TRIGGER trg_zzcompras_mover_alcance BEFORE UPDATE OF project_id, company_id ON public.contrasenas_pago
   FOR EACH ROW EXECUTE FUNCTION public.compras_tg_mover_alcance();
 
 -- ── (e) Permisos de ejecución: solo los invocan los triggers ────────────────
@@ -593,7 +659,6 @@ REVOKE ALL ON FUNCTION public.compras_tg_mover_alcance()                      FR
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- PIEZA 2 · PROTECCIÓN DE LA SEPARACIÓN SOLICITANTE/APROBADOR
--- (fragmento: separacion/pieza.sql)
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -628,6 +693,8 @@ REVOKE ALL ON FUNCTION public.compras_tg_mover_alcance()                      FR
 --      con actor sellado por el servidor y origen 'sistema'); y, como red de seguridad, rechaza lo que una carrera haya
 --      dejado pasar el BEFORE.
 --   5. Línea base: una fila de bitácora por cada empresa que ya tenga la separación encendida (hoy: ninguna en producción).
+--      Conciliación: una fila de bitácora «sistema» por cada empresa cuya fila difiere de su última fila de bitácora (p. ej. se apagó
+--      mientras esta pieza estaba revertida); no cambia ningún valor, solo deja la memoria alineada y el rastro escrito.
 --
 -- RONDA DE CORRECCIONES (escéptico independiente): todo lo siguiente lo demuestran pruebas ROJAS sin la corrección y VERDES con ella.
 --   · Autorización con NULL (BLOQUEANTE): quien tiene un JWT válido pero NO tiene fila en app_users no tiene rol ni empresa
@@ -638,6 +705,12 @@ REVOKE ALL ON FUNCTION public.compras_tg_mover_alcance()                      FR
 --   · Motivo útil: al menos 10 letras o cifras (no basta la longitud: «..........» o chr(1)×12 ya no valen) y al menos una letra
 --     (un número no es una razón). Ver el detalle junto a la RPC.
 --
+-- TANDA FINAL (segundo escéptico): una corrección en la pieza y una ampliación de la vigilancia; el resto son pruebas (SEP-6, SEP-5, SEP-idempotencia, SEP-reversion).
+--   · Punto ciego «fila APAGADA con la última fila de la bitácora ACTIVA»: lo produce el procedimiento de reversión de esta misma pieza
+--     (revertir, apagar con UPDATE directo, reaplicar). La conciliación de arriba lo alinea al reaplicar y `scripts/vigilancia-separacion-compras.sql` tiene un
+--     cuarto apartado (separacion_apagada_por_fuera) para detectarlo mientras no se reaplique (triggers deshabilitados, carga con
+--     session_replication_role = replica). La RPC NO lo concilia por su cuenta (se valoró y se descartó: ver docs/COMPRAS_CONTROLES_SERVIDOR.md).
+--
 -- QUÉ NO CAMBIA
 --   · Los lectores del interruptor —compras_tg_oc_ciclo, compras_tg_permiso_orden_separada, compras_oc_excepcion_contrato—
 --     siguen leyendo `compras_config.aprobacion_separada`, la MISMA fila, sin una segunda fuente que pueda divergir. La
@@ -645,8 +718,8 @@ REVOKE ALL ON FUNCTION public.compras_tg_mover_alcance()                      FR
 --   · Las demás columnas de compras_config (tolerancias, mínimo, requiere_recepcion) siguen editables con `edit`.
 --   · No se enciende la separación en ninguna empresa, no hay umbrales ni prohibiciones entre personas nuevas.
 --   · Los procesos sin sesión de usuario o con conta.allow_system_write (service_role, mantenimiento, la purga de una empresa)
---     cambian la configuración como siempre: quedan en la bitácora con origen 'sistema'. PENDIENTE DE DECISIÓN DEL DUEÑO (ver INFORME):
---     se mantiene a propósito; scripts/diagnostico-compras-controles.sql (vigilancia.sql) lista esos cambios para revisarlos.
+--     cambian la configuración como siempre: quedan en la bitácora con origen 'sistema'. PENDIENTE DE DECISIÓN DEL DUEÑO (ver docs/COMPRAS_CONTROLES_SERVIDOR.md §6):
+--     se mantiene a propósito; scripts/vigilancia-separacion-compras.sql lista esos cambios para revisarlos.
 --
 -- ORDEN DE DISPARO en compras_config (alfabético): trg_compras_00_config_separacion (BEFORE fila) → trg_compras_config_touch
 --   (BEFORE UPDATE, updated_at) → … → trg_zz_compras_config_separacion_bitacora (AFTER fila). El rechazo va primero: no se
@@ -667,8 +740,20 @@ REVOKE ALL ON FUNCTION public.compras_tg_mover_alcance()                      FR
 --     locale de la base ([[:alnum:]]); se descuentan los rellenos Hangul invisibles, pero no se persigue todo Unicode (marcas combinantes, etc.).
 --   · app_users.activo solo lo exigen la RPC, la lectura de la bitácora y el código de rechazo de esta pieza; el resto del repo (RLS de las demás
 --     tablas, user_has_permission) no lo consulta: un usuario desactivado conserva allí lo que ya tenía. No se toca en esta pieza.
+--     En particular, un PROPIETARIO (company_owner) desactivado puede reactivar a un administrador desactivado y CREAR un administrador
+--     activo desde una cuenta huérfana de auth.users (las políticas app_users_insert/app_users_update solo piden is_company_owner() y la
+--     empresa, no miran `activo`); ese administrador sí usa la RPC (el rastro queda a nombre de esa cuenta). La capa «activo» de esta pieza
+--     es tan firme como lo sea `activo` en la plataforma: es una DECISIÓN DE PLATAFORMA, fuera de esta pieza. Recomendación: que
+--     is_company_owner() exija `activo` (o que app_users_insert/update lo comprueben), con su migración y sus pruebas.
+--   · La regla del motivo depende de la locale de la base ([[:alnum:]]): en SQL_ASCII o con locale C las letras con tilde no cuentan
+--     (un motivo de una sola palabra con tilde, como «Aprobación», mide 9 y se rechaza; uno de dos palabras pasa). COMPROBADO (solo lectura) en
+--     producción y en el sandbox: UTF8 · en_US.UTF-8, 'á' ~ '[[:alpha:]]' = true, «Aprobación» = 10 útiles: se acepta. Antes de aplicar en otra base:
+--     select datcollate, datctype, pg_encoding_to_char(encoding) from pg_database where datname = current_database(); y select 'á' ~ '[[:alpha:]]'.
+--   · La línea base y la conciliación leen y escriben en una sola sentencia cada una, sin bloquear compras_config: un cambio directo que
+--     se confirme entre su lectura y la creación de los triggers (esta misma migración los crea justo después y los toma con su candado de
+--     tabla) puede quedar sin anotar; la vigilancia lo lista (separacion_sin_base / separacion_apagada_por_fuera).
 --
--- CÓMO REVERTIR: reversion_pieza.sql (sección para scripts/reversion-compras-controles.sql; comprobada: devuelve el catálogo EXACTO).
+-- CÓMO REVERTIR: scripts/reversion-compras-controles.sql, sección 20261027000900 (comprobada: devuelve el catálogo EXACTO).
 --   La bitácora es evidencia: se conserva si tiene algo más que la línea base, salvo SET compras.reversion_descartar_bitacora = 'si'.
 -- ════════════════════════════════════════════════════════════════════════════
 
@@ -740,7 +825,7 @@ CREATE TRIGGER trg_compras_00_sep_bitacora_sin_vaciar
   BEFORE TRUNCATE ON public.compras_config_separacion_bitacora
   FOR EACH STATEMENT EXECUTE FUNCTION public.compras_tg_config_separacion_bitacora_inmutable();
 
--- ── 2 · Línea base ───────────────────────────────────────────────────────────
+-- ── 2 · Línea base y conciliación ────────────────────────────────────────────
 -- Una fila por cada empresa que YA tiene la separación encendida y aún no tiene bitácora. Re-aplicar la migración no duplica
 -- (NOT EXISTS por empresa) ni «resucita» una separación que un administrador apagó después (hay bitácora).
 INSERT INTO public.compras_config_separacion_bitacora (company_id, actor_id, valor_anterior, valor_nuevo, motivo, origen)
@@ -749,6 +834,22 @@ SELECT c.company_id, NULL, NULL, true,
   FROM public.compras_config c
  WHERE c.aprobacion_separada
    AND NOT EXISTS (SELECT 1 FROM public.compras_config_separacion_bitacora b WHERE b.company_id = c.company_id);
+
+-- Conciliación. Una empresa cuya fila de compras_config DIFIERE de la última fila de su bitácora (la fila manda: es lo que lee el circuito)
+-- es una separación que cambió SIN pasar por esta pieza. El camino normal: la 0900 se revirtió (su reversión conserva la
+-- bitácora), alguien con `edit` apagó —o encendió— la fila directamente y la pieza se volvió a aplicar; la línea base no concilia nada
+-- porque ya hay bitácora. Aquí ese cambio se anota como de SISTEMA (sin actor ni motivo: no se inventa quién fue) con el valor que la
+-- fila realmente tiene: no se enciende ni se apaga nada, solo la memoria alcanza a la realidad (y la RPC y los triggers vuelven a
+-- partir de un estado coherente). Si fue un APAGADO, `scripts/vigilancia-separacion-compras.sql` lo lista (separacion_sistema). Idempotente: tras la primera pasada
+-- la última fila coincide con la fila y la segunda no encuentra diferencias. No inventa historia: una empresa sin bitácora no entra
+-- (la línea base ya sembró las encendidas) y una empresa SIN fila tampoco (bitácora «activa» y fila ausente: la restablece la RPC y la
+-- vigilancia la lista como separacion_sin_fila).
+INSERT INTO public.compras_config_separacion_bitacora (company_id, actor_id, valor_anterior, valor_nuevo, motivo, origen)
+SELECT c.company_id, NULL, u.valor_nuevo, c.aprobacion_separada, NULL, 'sistema'
+  FROM public.compras_config c
+  JOIN LATERAL (SELECT b.valor_nuevo FROM public.compras_config_separacion_bitacora b
+                 WHERE b.company_id = c.company_id ORDER BY b.id DESC LIMIT 1) u ON true
+ WHERE c.aprobacion_separada IS DISTINCT FROM u.valor_nuevo;
 
 -- ── 3 · Ayudas internas (nadie las invoca desde la API) ──────────────────────
 -- Valor ESTABLECIDO por la bitácora: su última fila (por id, no por fecha: el id sigue el orden del candado). NULL = sin bitácora.
@@ -1113,7 +1214,6 @@ COMMENT ON FUNCTION public.compras_separacion_configurar(uuid, boolean, text) IS
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- PIEZA 3a · NÚMEROS DE FACTURA (alternativa A de RG-4): funciones y disparador
--- (fragmento: factura/pieza.sql)
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -1145,6 +1245,26 @@ COMMENT ON FUNCTION public.compras_separacion_configurar(uuid, boolean, text) IS
 --   + el criterio de separadores (RG-4). Mismo SQLSTATE (23505) y mismo CONSTRAINT (uq_facturas_prov_numero):
 --   los clientes y las pruebas existentes no cambian. NO recrea el trigger ni el índice: solo funciones.
 --
+-- CARACTERES INVISIBLES (tanda final). Al pegar un número desde un PDF, un correo o un chat suelen colarse caracteres sin glifo
+--   (espacio de ancho cero U+200B, guion blando U+00AD, marcas de dirección U+200E/F, BOM U+FEFF…). La clave del índice ya los
+--   ignora (compras_normalizar_numero borra todo lo que no es A-Z0-9), pero el perfil de separadores los contaba como un separador
+--   más: «F<U+200B>AC001» ({1}) no era compatible con «FAC-001» ({3}) y un duplicado real escrito así se registraba. Ahora
+--   compras_numero_separadores QUITA esos caracteres antes de calcular el perfil. Solo ese cálculo: la clave, el índice y el candado
+--   no cambian. La lista son 27 caracteres sin glifo (categoría Unicode Cf, más los 4 rellenos de Hangul, que se ven en blanco):
+--   ceros de ancho (200B 200C 200D 2060 FEFF), marcas e incrustaciones de dirección (200E 200F 061C 202A-202E 2066-2069),
+--   operadores invisibles (2061-2064), guion blando (00AD), separador vocálico mongol (180E) y rellenos de Hangul (115F 1160 3164 FFA0).
+--   Quedan FUERA a propósito los que se ven (espacio de no separación U+00A0, espacios finos, guion largo «–», punto medio «·»,
+--   signo menos «−»: siguen siendo separadores, así que «1–23» y «12–3» siguen siendo distintas) y los que no son de formato.
+--   CÓMO SE ESCRIBEN. No se puede usar \uXXXX ni U&'\XXXX' (fallan en una base SQL_ASCII, como la plantilla local) ni chr(>127): los 27 se
+--   construyen con UNA llamada convert_from(decode('<hex UTF-8 de cada uno, con «7c» entre ellos>', 'hex'), 'UTF8'), que da el mismo resultado
+--   en SQL_ASCII y en UTF8 (C y C.utf8). La cadena se parte en una línea por carácter (con su comentario) con la continuación de literales del
+--   SQL estándar. Una sola llamada y ninguna subconsulta: el costo de la función sube poco y el plan de la consulta del trigger no cambia.
+--   La función se declara IMMUTABLE aunque convert_from sea STABLE (depende de la codificación de la base, que no
+--   cambia): ningún índice, columna generada ni restricción usa estas funciones (lo comprueba [RG-4·invisibles]), así que ninguna
+--   copia almacenada puede quedar vieja. Soporta bases UTF8 (Supabase) y SQL_ASCII; en una base con otra codificación (p. ej.
+--   LATIN1) convert_from falla al no poder representar el carácter: ya hoy ninguna migración del PR se carga en LATIN1.
+--   El diagnóstico previo (scripts/diagnostico-numeros-factura.sql) lleva EN LÍNEA la misma lista: [RG-4·diag] exige que las dos listas sean la misma.
+--
 -- NO HACE: no crea ningún índice único (ningún dato existente puede hacerla fallar), no toca filas, no
 --   fusiona ni renumera facturas. Un par equivalente PREEXISTENTE no se revalida (el trigger solo evalúa
 --   el alta y el cambio de número/proveedor). No retiene ningún candado sobre facturas_proveedor.
@@ -1159,19 +1279,18 @@ COMMENT ON FUNCTION public.compras_separacion_configurar(uuid, boolean, text) IS
 --   EV-09: esa redacción depende de la estructura de la factura existente, así que SOLO se usa donde la persona ya la ve. El aviso
 --   genérico (factura de un proyecto que no ve) es UN solo texto constante: no cambia con la estructura de la oculta.
 --
--- LÍMITES CONOCIDOS (los dos primeros heredados de 0400, no introducidos aquí; con prueba en el INFORME y en RG-4.limites.sh):
+-- LÍMITES CONOCIDOS (los dos primeros heredados de 0400, no introducidos aquí; con prueba en hallazgos/RG-4.limites.sh):
 --   · Una transacción en REPEATABLE READ / SERIALIZABLE cuya instantánea es anterior al alta de otra sesión no ve a
 --     esa otra factura (el candado la serializa, pero la instantánea es vieja). PostgREST/Supabase usa READ COMMITTED.
 --   · Reactivar una factura anulada solo cambia `estado`, que este trigger no vigila; lo cierra cxp_proteger_factura
 --     (CXP_INMUTABLE) para toda sesión de usuario. El camino de sistema (conta.allow_system_write = on) no pasa por ahí.
 --   · Un número SIN separador frente a dos con separadores en posiciones distintas («123» / «1-23» + «12-3») se
 --     rechaza (ambiguo, del lado seguro): quien tenga «1-23» y «12-3» no puede registrar «123» del mismo proveedor.
---   · Caracteres INVISIBLES o de formato dentro del número (U+200B espacio de ancho cero, U+00AD guion blando…, típicos de pegar
---     desde un PDF) cuentan como separador al calcular el perfil: «F<U+200B>AC001» tiene el perfil {1} y «FAC-001» el {3}, así que se
---     tratan como distintas y un duplicado real escrito así deja de detectarse (0800 lo rechazaba). Solo en el interior: al principio o
---     al final se recortan. NO se corrige aquí: ni con \uXXXX en un regexp (falla en bases SQL_ASCII, como la plantilla local) ni con
---     chr(>127); ignorar «cualquier otro no alfanumérico» en el perfil cambiaría la alternativa A (el guion largo «–», separador
---     legítimo de muchos PDF, dejaría de distinguir «1–23» de «12–3»). Límite de la alternativa A: ver INFORME «Límites documentados».
+--   · Caracteres invisibles NO listados dentro del número. Los 27 de la lista ya no mueven el perfil (se rechaza el duplicado, como en 0800);
+--     uno que no esté en ella —un selector de variación U+FE0F, una etiqueta U+E0041— sigue contando como separador interior: «F<U+FE0F>AC001»
+--     ({1}) frente a «FAC-001» ({3}) se registra, y 0800 lo rechazaba (su clave ignora todo lo que no es A-Z0-9). Se cubre ampliando LA LISTA de
+--     compras_numero_separadores (y la del diagnóstico) y la prueba [RG-4·invisibles]. Distinto: una letra de OTRO alfabeto que se parece a una
+--     latina (la «А» cirílica) cambia la clave misma, así que no se detecta ni aquí ni en 0400/0800 (hallazgos/RG-4.limites.sh L3).
 --   · Sondeo: quien NO ve una factura puede deducir su estructura de separadores probando números (rechazo = compatible, alta =
 --     incomparable); 0800 solo dejaba saber que existe la clave. Hay que adivinar la clave y el mensaje no revela nada más (EV-09).
 --   · De los 5 pares «ambiguos» de RG-4.comparacion.sql se rechazan 3. «FAC-001»/«FA-C001» y «1.234»/«12.34» PASAN: tienen la
@@ -1181,16 +1300,17 @@ COMMENT ON FUNCTION public.compras_separacion_configurar(uuid, boolean, text) IS
 -- PARTE 2 (recomendada, archivo aparte): pieza_factura_crear.sql. La pantalla crea facturas SOLO por
 --   compras_factura_crear, que reescribe el mensaje del trigger; sin la parte 2 la sugerencia de abajo no llega a la pantalla.
 --
--- CÓMO REVERTIR (sin pérdida de datos; el orden importa): reversion_RG-4.sql — primero CREATE OR REPLACE
+-- CÓMO REVERTIR (sin pérdida de datos; el orden importa): sección 20261027000900 de scripts/reversion-compras-controles.sql — primero CREATE OR REPLACE
 --   compras_tg_factura_numero_equivalente (cuerpo y comentario de 20261027000800; copia exacta en
---   `vigente_0800_trigger.sql`) y compras_factura_crear, después DROP FUNCTION public.compras_numeros_equivalentes(text, text)
---   y DROP FUNCTION public.compras_numero_separadores(text). Comprobado: devuelve el catálogo EXACTO a hall_b0800.
+--   el cuerpo de 20261027000800) y compras_factura_crear, después DROP FUNCTION public.compras_numeros_equivalentes(text, text)
+--   y DROP FUNCTION public.compras_numero_separadores(text). Comprobado: devuelve el catálogo EXACTO al posterior a 20261027000800.
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ── Perfil de separadores de un número ──────────────────────────────────────
 -- Posiciones (sobre la clave alfanumérica) donde hay un separador entre dos caracteres alfanuméricos.
 -- Usa la misma clase de caracteres que compras_normalizar_numero ([^A-Z0-9] tras upper()); la prueba
--- RG-4 la contrasta con una implementación de referencia carácter a carácter.
+-- RG-4 la contrasta con una implementación de referencia carácter a carácter. ANTES de calcularlo quita los
+-- 27 caracteres invisibles de la lista (ver «CARACTERES INVISIBLES» en la cabecera): no son separadores.
 CREATE OR REPLACE FUNCTION public.compras_numero_separadores(p_numero text)
 RETURNS integer[]
 LANGUAGE sql
@@ -1203,14 +1323,49 @@ AS $$
              (sum(length(t.p)) OVER (ORDER BY t.n))::integer AS pos,
              count(*) OVER ()                                AS total
         FROM regexp_split_to_table(
-               regexp_replace(upper(p_numero), '^[^A-Z0-9]+|[^A-Z0-9]+$', '', 'g'),
+               regexp_replace(
+                 -- LA LISTA: el código UTF-8 de cada carácter sin glifo en hexadecimal, seguido de 7c (la barra «|»), todo en UNA cadena: los literales
+                 -- separados por un salto de línea se unen (SQL estándar), así que cada carácter lleva su comentario y no queda ninguna subconsulta que armar en cada llamada.
+                 -- Se usa como alternación en el regexp_replace: borra cualquiera de ellos. El último no lleva «7c».
+                 regexp_replace(upper(p_numero),
+                   convert_from(decode(
+                     'c2ad7c'   -- U+00AD  guion blando
+                     'd89c7c'   -- U+061C  marca de letra árabe
+                     'e1859f7c' -- U+115F  relleno de Hangul (choseong)
+                     'e185a07c' -- U+1160  relleno de Hangul (jungseong)
+                     'e1a08e7c' -- U+180E  separador vocálico mongol
+                     'e2808b7c' -- U+200B  espacio de ancho cero
+                     'e2808c7c' -- U+200C  no unión de ancho cero
+                     'e2808d7c' -- U+200D  unión de ancho cero
+                     'e2808e7c' -- U+200E  marca de izquierda a derecha
+                     'e2808f7c' -- U+200F  marca de derecha a izquierda
+                     'e280aa7c' -- U+202A  incrustación de izquierda a derecha
+                     'e280ab7c' -- U+202B  incrustación de derecha a izquierda
+                     'e280ac7c' -- U+202C  fin de formato direccional
+                     'e280ad7c' -- U+202D  forzar izquierda a derecha
+                     'e280ae7c' -- U+202E  forzar derecha a izquierda
+                     'e281a07c' -- U+2060  unión de palabras
+                     'e281a17c' -- U+2061  aplicación de función
+                     'e281a27c' -- U+2062  multiplicación invisible
+                     'e281a37c' -- U+2063  separador invisible
+                     'e281a47c' -- U+2064  suma invisible
+                     'e281a67c' -- U+2066  aislamiento de izquierda a derecha
+                     'e281a77c' -- U+2067  aislamiento de derecha a izquierda
+                     'e281a87c' -- U+2068  aislamiento de primer fuerte
+                     'e281a97c' -- U+2069  fin de aislamiento
+                     'e385a47c' -- U+3164  relleno de Hangul
+                     'efbbbf7c' -- U+FEFF  espacio de no separación de ancho cero (BOM)
+                     'efbea0'   -- U+FFA0  relleno de Hangul de ancho medio
+                     , 'hex'), 'UTF8'),
+                   '', 'g'),
+                 '^[^A-Z0-9]+|[^A-Z0-9]+$', '', 'g'),
                '[^A-Z0-9]+') WITH ORDINALITY AS t(p, n)
     ) s
    WHERE s.n < s.total
 $$;
 
 COMMENT ON FUNCTION public.compras_numero_separadores(text) IS
-  'Posiciones, sobre la clave alfanumérica del número, donde hay un separador entre dos caracteres alfanuméricos («1-23» → {1}; «FAC001» → {}). Los separadores de los extremos y el tipo de separador no cuentan. Para distinguir «1-23» de «12-3» (RG-4).';
+  'Posiciones, sobre la clave alfanumérica del número, donde hay un separador entre dos caracteres alfanuméricos («1-23» → {1}; «FAC001» → {}). Los separadores de los extremos, el tipo de separador y los 27 caracteres invisibles de la lista (U+200B, U+00AD, U+FEFF…) no cuentan. Para distinguir «1-23» de «12-3» (RG-4).';
 
 -- ── ¿Pueden ser la misma factura? ───────────────────────────────────────────
 -- Misma clave alfanumérica Y separadores compatibles (el perfil de uno incluido en el del otro).
@@ -1308,7 +1463,7 @@ BEGIN
         USING ERRCODE = 'unique_violation', CONSTRAINT = 'uq_facturas_prov_numero';
     END IF;
     -- [RG-4] El aviso genérico NO mira los separadores de la factura que la persona no ve: el mismo texto para
-    -- cualquier factura oculta (quien sondea no aprende su estructura por la redacción); ver INFORME, límite EV-09.
+    -- cualquier factura oculta (quien sondea no aprende su estructura por la redacción); ver docs/COMPRAS_CONTROLES_SERVIDOR.md, límite EV-09.
     RAISE EXCEPTION 'COMPRAS_FACTURA_NUMERO_DUPLICADO: ya hay una factura de este proveedor con un número equivalente. Si es la misma, no la registres otra vez. Si es otra, escribe su número tal como viene impreso, con su guion o separador entre serie y correlativo (p. ej. «A-123»); si ya lo escribiste así, pide a quien administra las facturas que corrija o anule primero la existente.'
       USING ERRCODE = 'unique_violation', CONSTRAINT = 'uq_facturas_prov_numero';
   END IF;
@@ -1324,13 +1479,12 @@ REVOKE ALL ON FUNCTION public.compras_tg_factura_numero_equivalente() FROM PUBLI
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- PIEZA 3b · compras_factura_crear deja pasar el mensaje del disparador
--- (fragmento: factura/pieza_factura_crear.sql)
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- PIEZA RG-4 · PARTE 2 (recomendada) · compras_factura_crear conserva el mensaje del trigger de equivalencia
 -- ════════════════════════════════════════════════════════════════════════════
--- Fragmento IDEMPOTENTE para pegar en la migración 20261027000900 DESPUÉS de pieza.sql (sin BEGIN/COMMIT).
+-- Parte 3b (IDEMPOTENTE), a continuación de la parte 3a.
 --
 -- DEFECTO. La pantalla crea facturas SOLO por esta RPC. Su manejador de `unique_violation` traducía TODO error de
 --   la restricción `uq_facturas_prov_numero` a «…con el número "<lo que escribió la persona>"…», también el que
@@ -1345,7 +1499,7 @@ REVOKE ALL ON FUNCTION public.compras_tg_factura_numero_equivalente() FROM PUBLI
 --   Mismo SQLSTATE (23505). La idempotencia no cambia: el reintento con la misma clave se recupera ANTES de insertar.
 --
 -- CÓMO REVERTIR: CREATE OR REPLACE con el cuerpo de 20261021000900 / 0800 (copia exacta en
---   `vigente_0800_factura_crear.sql`).
+--   el cuerpo de 20261021000900).
 -- ════════════════════════════════════════════════════════════════════════════
 CREATE OR REPLACE FUNCTION public.compras_factura_crear(p_company_id uuid, p_project_id uuid, p_cabecera jsonb, p_lineas jsonb)
  RETURNS jsonb

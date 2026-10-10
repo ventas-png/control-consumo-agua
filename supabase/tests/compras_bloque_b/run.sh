@@ -142,6 +142,7 @@ psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_migr
 
 echo "── 4/8 · padrón: dos empresas, tres proyectos, usuarios con perfiles distintos"
 aplicar "$AQUI/fixture.sql"
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_fresca" -c "CREATE DATABASE ${BD}_fresca TEMPLATE $BD" >/dev/null   # plantilla sin suites para SEP-idempotencia y SEP-reversion
 
 echo "── 5/8 · invariantes de una sesión"
 bloque assert_ciclo.sql        "5a · ciclo de la orden: transiciones, congelamiento, devolución, historial"
@@ -165,10 +166,16 @@ echo "── 5r · cierre de hallazgos adversariales: una prueba por hallazgo co
 for f in "$AQUI"/hallazgos/*.sql; do
   bloque_resumen "hallazgos/$(basename "$f")" "$(basename "$f" .sql)"
 done
-echo "── 5s · la migración 20261027000900 se puede aplicar cuatro veces seguidas sobre una copia con datos: mismo catálogo y misma bitácora"
-psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_idem" -c "CREATE DATABASE ${BD}_idem TEMPLATE $BD" >/dev/null
-BD=${BD}_idem PIEZA="$(ls "$MIGS"/20261027000900_*.sql)" bash "$AQUI/hallazgos/SEP-idempotencia.sh" || exit 1
+echo "── 5s · la migración 20261027000900 es idempotente y revertible: aplicada nueve veces, mismo catálogo y misma bitácora; revertir, trabajar sin ella y volver a aplicarla no deja la separación inconsistente"
+MIG0900="$(ls "$MIGS"/20261027000900_*.sql)"
+awk '/^-- ── 20261027000900_/ { d = 1; print; next } d && /^-- ── 2026/ { exit } d { print }' "$RAIZ/scripts/reversion-compras-controles.sql" > "$SALIDAS/reversion_0900.sql"
+[ -s "$SALIDAS/reversion_0900.sql" ] || { echo "❌ no se encontró la sección de 20261027000900 en scripts/reversion-compras-controles.sql"; exit 1; }
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_idem" -c "CREATE DATABASE ${BD}_idem TEMPLATE ${BD}_fresca" >/dev/null
+BD=${BD}_idem PIEZA="$MIG0900" bash "$AQUI/hallazgos/SEP-idempotencia.sh" || exit 1
 psql -q -d postgres -c "DROP DATABASE ${BD}_idem" >/dev/null
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_sepr" -c "CREATE DATABASE ${BD}_sepr TEMPLATE ${BD}_fresca" >/dev/null
+BD=${BD}_sepr PIEZA="$MIG0900" REVERSION="$SALIDAS/reversion_0900.sql" VIGILANCIA="$RAIZ/scripts/vigilancia-separacion-compras.sql" bash "$AQUI/hallazgos/SEP-reversion.sh" || exit 1
+psql -q -d postgres -c "DROP DATABASE ${BD}_sepr" >/dev/null
 echo "── 5n · la protección de inventario es obligatoria (con duplicados reales, siempre en transacciones que se revierten)"
 BD=$BD bash "$AQUI/indice_obligatorio.sh" || exit 1
 
@@ -473,8 +480,6 @@ psql -q -d postgres -c "DROP DATABASE ${BD}_rev" >/dev/null
 
 # Reversión PARCIAL: SOLO la sección de 20261027000900 (lo que se corre para volver al estado posterior a 0800 sin tocar lo anterior).
 psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_rev9" -c "CREATE DATABASE ${BD}_rev9 TEMPLATE $BD" >/dev/null
-awk '/^-- ── 20261027000900_/ { d = 1; print; next } d && /^-- ── 2026/ { exit } d { print }' "$RAIZ/scripts/reversion-compras-controles.sql" > "$SALIDAS/reversion_0900.sql"
-[ -s "$SALIDAS/reversion_0900.sql" ] || { echo "❌ no se encontró la sección de 20261027000900 en scripts/reversion-compras-controles.sql"; exit 1; }
 PGOPTIONS="-c client_min_messages=warning -c compras.reversion_descartar_bitacora=si" psql -q -v ON_ERROR_STOP=1 -d ${BD}_rev9 -f "$SALIDAS/reversion_0900.sql" >/dev/null \
   || { echo "❌ la sección de 20261027000900 de la reversión falla al ejecutarse"; exit 1; }
 psql -q -t -A -d ${BD}_rev9 -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_revertido_0900_bruto.txt"

@@ -10,7 +10,7 @@
 -- POR QUÉ: el interruptor solo cambia por la RPC compras_separacion_configurar (con motivo y rastro de persona), pero un proceso de
 -- SISTEMA (service_role, mantenimiento sin sesión de usuario, con conta.allow_system_write) puede cambiar o borrar la fila encendida:
 -- queda en la bitácora con origen 'sistema' y actor NULL. Es una decisión del dueño mantenerlo así (ver INFORME); esta consulta es
--- la forma de enterarse. Tres apartados:
+-- la forma de enterarse. Cuatro apartados:
 --   · `separacion_sistema`  cada cambio hecho por el SISTEMA que APAGÓ la separación (una fila de bitácora). Si la empresa ya no existe
 --                           es la purga de una empresa (esperada); en cualquier otro caso, preguntar quién fue el proceso.
 --   · `separacion_sin_fila` empresas cuya bitácora dice «activa» y que NO tienen fila en compras_config: para el circuito están
@@ -19,6 +19,12 @@
 --   · `separacion_sin_base` empresas con la fila ENCENDIDA y sin respaldo en la bitácora: o no tienen NINGUNA fila (falta la línea
 --                           base: la fila se creó con los triggers deshabilitados o antes de la bitácora) o su última fila la da por
 --                           apagada (la fila se encendió por fuera). Ambas cosas hacen que un cambio posterior no se pueda reconstruir.
+--   · `separacion_apagada_por_fuera` empresas con la fila APAGADA y la última fila de la bitácora «activa»: la separación se apagó sin
+--                           pasar por la RPC ni por los triggers (la 0900 estaba revertida, triggers deshabilitados, carga con
+--                           session_replication_role = replica). Para el circuito está apagada. Reaplicar la pieza de la 0900 (su
+--                           conciliación anota el cambio como de sistema, lo que lo deja en `separacion_sistema`) o restablecerla
+--                           con compras_separacion_configurar(empresa, true, motivo). Es el estado que deja el procedimiento
+--                           «revertir la 0900, apagar con UPDATE directo, reaplicar» si la conciliación no existiera.
 -- ════════════════════════════════════════════════════════════════════════════
 WITH
 ultima AS (
@@ -51,5 +57,12 @@ hallazgos AS (
     FROM public.compras_config g
     LEFT JOIN ultima u ON u.company_id = g.company_id
    WHERE g.aprobacion_separada AND (u.id IS NULL OR NOT u.valor_nuevo)
+  UNION ALL
+  SELECT 'separacion_apagada_por_fuera', 'compras_config', g.company_id::text,
+         format('la fila dice APAGADA pero la última fila de la bitácora (%s, origen %s) da la separación por ACTIVA: se apagó sin pasar por la RPC ni por los triggers (reversión de la 0900, triggers deshabilitados o carga con session_replication_role = replica); reaplicar la pieza de la 0900 (la conciliación lo anota) o restablecerla con compras_separacion_configurar',
+                u.id, u.origen)
+    FROM public.compras_config g
+    JOIN ultima u ON u.company_id = g.company_id
+   WHERE NOT g.aprobacion_separada AND u.valor_nuevo
 )
 SELECT apartado, tabla, id, detalle FROM hallazgos ORDER BY apartado, tabla, id;

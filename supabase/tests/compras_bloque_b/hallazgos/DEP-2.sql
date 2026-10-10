@@ -178,6 +178,9 @@ SELECT public.chk_bool(
   (SELECT COALESCE(idx_scan, 0) FROM pg_stat_user_indexes WHERE indexrelname = 'idx_facturas_prov_numero_norm') - :idx_antes >= 100,
   true,
   '[DEP-2c] las altas de factura leyeron idx_facturas_prov_numero_norm (idx_scan creció en ≥ 100)');
--- El montaje se revirtió entero.
-SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fa9%'), 0,
+-- El montaje se revirtió entero. Se cuentan los ids con la FORMA EXACTA de esta prueba (fa9 + 5 hex + '-0000-0000-0000-0000000000' + 2 hex):
+-- el filtro anterior, LIKE 'fa9%', también contaba cualquier factura de otra suite con id aleatorio (gen_random_uuid(), versión 4) que
+-- empezara por «fa9» (1 de cada 4096) y ponía roja la prueba sin que ella dejara nada. Un id v4 nunca tiene «0000» en el 3.er grupo, así que
+-- no coincide con esta forma; cualquier residuo de ESTA prueba (b1, b2, c1…c5…) sí.
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fa9_____-0000-0000-0000-0000000000__'), 0,
   '[DEP-2·limpieza] la prueba no deja residuo');

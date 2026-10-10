@@ -1,6 +1,11 @@
 \set ON_ERROR_STOP on
 -- ============================================================================
--- SEP-0 · Padrón y ayudas de las pruebas de la separación solicitante/aprobador (SEP-1, SEP-2, SEP-3, SEP-conc).
+-- SEP-0 · Padrón y ayudas de las pruebas de la separación solicitante/aprobador (SEP-1…SEP-6, SEP-conc, SEP-reversion).
+--
+-- ¡SOLO PARA LA BASE DESECHABLE DEL ARNÉS! NO cargar este archivo (ni fixture.sql, que lleva la misma ayuda como_sistema) en el sandbox ni en
+-- producción: crea en `public` funciones como public.como_sistema(text) —SECURITY INVOKER, hace RESET ROLE y ejecuta el texto que se le pasa—
+-- y las sep_* (EXECUTE de SQL). En un proyecto Supabase real PostgREST las expondría como RPC y servirían para escalar de privilegios.
+-- Las pruebas que las necesitan solo corren con run.sh sobre su propia base local; el guion de sandbox (sandbox_*.sql) no las usa.
 -- No comprueba nada: crea (de forma idempotente) las personas y las ayudas que usan las demás. SEP-1/2/3 lo incluyen con \ir.
 --
 -- Personas propias (prefijo 5e90…; las de la plantilla —UA/UB admin de C, UC contador, UN/UO sin permiso contable, UD admin de D— se usan tal cual):
@@ -78,13 +83,28 @@ END;
 $$;
 
 -- La cadena de una empresa es coherente: el «anterior» de cada fila es el «nuevo» de la anterior (la primera puede no tener antecedente).
-CREATE OR REPLACE FUNCTION public.sep_cadena_rota(p_empresa uuid)
+-- p_desde: solo se cuentan los cortes de las filas POSTERIORES a ese id (la fila anterior a él hace de antecedente). Las pruebas que a propósito
+-- apagan o encienden la fila sin pasar por los triggers (SEP-5, SEP-6) dejan cortes en la historia; SEP-conc mide solo lo que ella misma escribe.
+DROP FUNCTION IF EXISTS public.sep_cadena_rota(uuid);
+CREATE OR REPLACE FUNCTION public.sep_cadena_rota(p_empresa uuid, p_desde bigint DEFAULT 0)
 RETURNS bigint LANGUAGE plpgsql AS $$
 DECLARE n bigint;
 BEGIN
-  EXECUTE 'SELECT count(*) FROM (SELECT valor_anterior, lag(valor_nuevo) OVER (ORDER BY id) AS previo, row_number() OVER (ORDER BY id) AS pos
-                                   FROM public.compras_config_separacion_bitacora WHERE company_id = $1) t
-            WHERE pos > 1 AND valor_anterior IS DISTINCT FROM previo' INTO n USING p_empresa;
+  EXECUTE 'SELECT count(*) FROM (SELECT id, valor_anterior, lag(valor_nuevo) OVER (ORDER BY id) AS previo, row_number() OVER (ORDER BY id) AS pos
+                                   FROM public.compras_config_separacion_bitacora
+                                  WHERE company_id = $1
+                                    AND id >= COALESCE((SELECT max(x.id) FROM public.compras_config_separacion_bitacora x WHERE x.company_id = $1 AND x.id <= $2), 0)) t
+            WHERE pos > 1 AND valor_anterior IS DISTINCT FROM previo' INTO n USING p_empresa, p_desde;
+  RETURN n;
+END;
+$$;
+
+-- Último id de bitácora de la empresa (0 = ninguno): el punto desde el que una escena mide su propia cadena.
+CREATE OR REPLACE FUNCTION public.sep_ultimo_id(p_empresa uuid)
+RETURNS bigint LANGUAGE plpgsql AS $$
+DECLARE n bigint;
+BEGIN
+  EXECUTE 'SELECT COALESCE(max(id), 0) FROM public.compras_config_separacion_bitacora WHERE company_id = $1' INTO n USING p_empresa;
   RETURN n;
 END;
 $$;

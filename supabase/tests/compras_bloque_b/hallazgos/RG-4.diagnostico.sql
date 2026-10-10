@@ -10,6 +10,10 @@
 --   —el motor rechaza ahí cualquier INSERT/UPDATE/DELETE, también dentro de un WITH— y (3) las tablas que lee quedan
 --   byte a byte iguales. Un control positivo demuestra que (2) sí rechaza una escritura.
 --
+--   TANDA FINAL: el perfil en línea también ignora los 27 caracteres INVISIBLES de compras_numero_separadores (espacio de ancho cero, guion
+--   blando, BOM…). La población los lleva al azar entre los caracteres de los números; el diagnóstico debe clasificar igual que las
+--   funciones, la lista del archivo debe ser EXACTAMENTE la de la función, y debe haber pares cuya clase DEPENDE de quitarlos (no es vacío).
+--
 -- Se ejecuta con:
 --     psql -X -v ON_ERROR_STOP=1 -d <BD> -f RG-4.diagnostico.sql          (desde cualquier carpeta del repositorio: lee
 --                                              scripts/diagnostico-numeros-factura.sql; otra ruta: DIAG=/ruta/al.sql psql …)
@@ -42,6 +46,12 @@ SELECT public.chk_txt(:'empieza', 'WITH', '[RG-4·diag] la primera palabra fuera
 INSERT INTO public.proveedores (id, company_id, nombre, nit, pais, alcance)
 SELECT ('fb600000-0000-0000-0000-0000000000' || lpad(to_hex(k), 2, '0'))::uuid, :C::uuid, 'Proveedor diag RG-4 ' || k, '998' || k || '-1', 'GT', 'empresa'
   FROM generate_series(1, 6) k;
+-- Los 27 caracteres invisibles, tal como los lista la función (la prueba de que el archivo lleva la MISMA lista va más abajo)
+CREATE TEMP TABLE hx6_inv AS
+SELECT convert_from(decode(regexp_replace(m[1], '7c$', ''), 'hex'), 'UTF8') AS ch
+  FROM pg_proc p, regexp_matches(p.prosrc, '''([0-9a-f]{4,8})''', 'g') AS m
+ WHERE p.oid = 'public.compras_numero_separadores(text)'::regprocedure;
+SELECT public.chk((SELECT count(*) FROM hx6_inv), 27, '[RG-4·diag·montaje] la función lista 27 caracteres invisibles');
 SELECT setseed(0.2626);
 SET LOCAL session_replication_role = replica;
 INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total, estado, fecha_emision)
@@ -51,7 +61,8 @@ SELECT ('fb6' || lpad(to_hex(g), 5, '0') || '-0000-0000-0000-0000000000f1')::uui
        CASE WHEN g % 40 = 0 THEN NULL
             WHEN g % 41 = 0 THEN (ARRAY['---', '...', ' '])[1 + g % 3]
             ELSE (SELECT CASE WHEN q.r < 0.35 THEN lower(q.x) WHEN q.r < 0.6 THEN upper(q.x) ELSE q.x END           -- mayúsculas y minúsculas: la clave las unifica
-                    FROM (SELECT (SELECT string_agg(CASE WHEN random() < 0.35 THEN (ARRAY['-', '.', ' ', '/', '_', '--'])[1 + floor(random() * 6)::int] ELSE '' END || t.ch, '' ORDER BY t.i)
+                    FROM (SELECT (SELECT string_agg(CASE WHEN random() < 0.35 THEN (ARRAY['-', '.', ' ', '/', '_', '--'])[1 + floor(random() * 6)::int]
+                                                             WHEN random() < 0.25 THEN ((SELECT array_agg(i.ch) FROM hx6_inv i))[1 + floor(random() * 27)::int] ELSE '' END || t.ch, '' ORDER BY t.i)
                                     FROM unnest(ARRAY['A', 'b', '1', 'C', '2']) WITH ORDINALITY AS t(ch, i) WHERE g > 0) AS x,
                                  random() AS r) q)
                  || CASE WHEN random() < 0.2 THEN '.' ELSE '' END END,
@@ -89,11 +100,20 @@ SELECT public.chk_bool(
      FROM hx6_huella0 h), true,
   '[RG-4·diag] tras ejecutarlo, facturas, proveedores, empresas y proyectos están byte a byte iguales');
 
+-- El perfil de la pieza ANTERIOR (sin quitar los invisibles): sirve para contar los pares cuya clase depende de quitarlos
+CREATE FUNCTION public.hx6_perfil_viejo(p_numero text) RETURNS integer[] LANGUAGE sql IMMUTABLE AS $$
+  SELECT COALESCE(array_agg(s.pos ORDER BY s.n), ARRAY[]::integer[])
+    FROM (SELECT t.n, (sum(length(t.p)) OVER (ORDER BY t.n))::integer AS pos, count(*) OVER () AS total
+            FROM regexp_split_to_table(regexp_replace(upper(p_numero), '^[^A-Z0-9]+|[^A-Z0-9]+$', '', 'g'), '[^A-Z0-9]+') WITH ORDINALITY AS t(p, n)) s
+   WHERE s.n < s.total $$;
+
 -- ── La clasificación coincide con la regla (las funciones), par por par ──────────────────────────────────────
 CREATE TEMP TABLE hx6_ref AS
 SELECT a.company_id, a.proveedor_id, public.compras_normalizar_numero(a.numero_factura) AS clave, a.id AS id_a, b.id AS id_b,
        public.compras_numeros_equivalentes(a.numero_factura, b.numero_factura) AS equiv,
-       public.compras_numero_separadores(a.numero_factura) <> public.compras_numero_separadores(b.numero_factura) AS perfiles_distintos
+       public.compras_numero_separadores(a.numero_factura) <> public.compras_numero_separadores(b.numero_factura) AS perfiles_distintos,
+       (public.hx6_perfil_viejo(a.numero_factura) <@ public.hx6_perfil_viejo(b.numero_factura)
+        OR public.hx6_perfil_viejo(b.numero_factura) <@ public.hx6_perfil_viejo(a.numero_factura)) AS equiv_viejo
   FROM public.facturas_proveedor a
   JOIN public.facturas_proveedor b ON b.company_id = a.company_id AND b.proveedor_id = a.proveedor_id AND b.id <> a.id
                                   AND public.compras_normalizar_numero(b.numero_factura) = public.compras_normalizar_numero(a.numero_factura)
@@ -101,6 +121,12 @@ SELECT a.company_id, a.proveedor_id, public.compras_normalizar_numero(a.numero_f
    AND a.id < b.id;
 SELECT public.chk_bool((SELECT count(*) FILTER (WHERE equiv) > 150 AND count(*) FILTER (WHERE NOT equiv) > 150 FROM hx6_ref), true,
   '[RG-4·diag·montaje] la población tiene cientos de pares equivalentes y cientos de pares distintos');
+SELECT public.chk_bool((SELECT count(*) FILTER (WHERE equiv AND NOT equiv_viejo) > 20 FROM hx6_ref), true,
+  '[RG-4·diag·montaje] hay más de 20 pares cuya clase DEPENDE de quitar los invisibles (equivalentes solo porque se quitan): la población discrimina');
+SELECT public.chk_txt(
+  (SELECT string_agg(regexp_replace(m[1], '7c$', ''), ',' ORDER BY regexp_replace(m[1], '7c$', '')) FROM regexp_matches(:'diag', '''([0-9a-f]{4,8})''', 'g') AS m),
+  (SELECT string_agg(regexp_replace(m[1], '7c$', ''), ',' ORDER BY regexp_replace(m[1], '7c$', '')) FROM pg_proc p, regexp_matches(p.prosrc, '''([0-9a-f]{4,8})''', 'g') AS m WHERE p.oid = 'public.compras_numero_separadores(text)'::regprocedure),
+  '[RG-4·diag] la lista de caracteres invisibles del diagnóstico es EXACTAMENTE la de compras_numero_separadores (27 códigos, los mismos)');
 SELECT public.chk((SELECT n FROM hx6_diag WHERE apartado = 'resumen' AND concepto LIKE 'facturas_proveedor (todas%'), (SELECT count(*) FROM public.facturas_proveedor),
   '[RG-4·diag] resumen: total de facturas');
 SELECT public.chk((SELECT n FROM hx6_diag WHERE apartado = 'resumen' AND concepto LIKE 'facturas vivas (no anuladas) con número%'),
@@ -144,4 +170,4 @@ ROLLBACK;
 
 SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fb6%') + (SELECT count(*) FROM public.proveedores WHERE id::text LIKE 'fb6%'), 0,
   '[RG-4·limpieza] la prueba no deja residuo (facturas ni proveedores)');
-SELECT public.chk((SELECT count(*) FROM pg_proc WHERE proname IN ('hx6_diag_fn', 'hx6_escribe')), 0, '[RG-4·limpieza] ni funciones de ayuda');
+SELECT public.chk((SELECT count(*) FROM pg_proc WHERE proname IN ('hx6_diag_fn', 'hx6_escribe', 'hx6_perfil_viejo')), 0, '[RG-4·limpieza] ni funciones de ayuda');
