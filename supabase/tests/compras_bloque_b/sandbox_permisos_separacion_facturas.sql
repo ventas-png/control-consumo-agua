@@ -34,13 +34,14 @@ DECLARE
     'platform.contabilidad.compras.pago_ejecutar', 'platform.contabilidad.compras.pago_anular'];
   v_cl   constant text[] := ARRAY['oc.approve', 'recepcion_registrar', 'factura_aprobar', 'orden_pago_aprobar', 'pago_ejecutar', 'pago_anular'];
   v_nom  constant text[] := ARRAY['aprobar la OC', 'registrar la recepción', 'aprobar la factura', 'aprobar la orden de pago', 'ejecutar el pago', 'anular el pago'];
+  v_fn   text[];
   v_base constant text[] := ARRAY['platform.contabilidad.view', 'platform.contabilidad.create', 'platform.contabilidad.edit'];
   zw  constant text := convert_from(decode('e2808b', 'hex'), 'UTF8');   -- U+200B espacio de ancho cero
   rd  constant text := convert_from(decode('e28093', 'hex'), 'UTF8');   -- U+2013 raya (pegado desde un PDF)
-  sq text[]; sqt text[]; vf text[]; ex text[];
+  sq text[]; sqt text[] := ARRAY[]::text[]; vf text[]; ex text[];
   ev text[] := ARRAY[]::text[];
   stm text[]; stl text[];
-  rj jsonb; r text; r2 text; sql_ins text; p uuid;
+  rj jsonb; r text; sql_ins text; pp uuid; n1 int; n2 int;
   i int; j int; fallos int;
 BEGIN
   CREATE FUNCTION pg_temp.ck(p_lbl text, p_o text, p_e text) RETURNS text LANGUAGE sql IMMUTABLE AS
@@ -92,20 +93,20 @@ BEGIN
   -- · 3 recepción en borrador · 4 recepción registrada · 5 factura registrada · 6 factura aprobada. Un servicio de 1 × 100.
   CREATE FUNCTION pg_temp.cadena(n int, hasta int, p_pj uuid, p_pv uuid) RETURNS void LANGUAGE plpgsql AS
     $f$ DECLARE c constant uuid := '5b710000-0000-0000-0000-00000000000c';
-        oc uuid := pg_temp.d(n, 0); ln uuid := pg_temp.d(n, 1); rc uuid := pg_temp.d(n, 2); fc uuid := pg_temp.d(n, 3);
+        oc uuid := pg_temp.d(n, 0); lin uuid := pg_temp.d(n, 1); rc uuid := pg_temp.d(n, 2); fc uuid := pg_temp.d(n, 3);
     BEGIN
       INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto) VALUES (oc, c, p_pj, p_pv, 'ZZ PP Proveedor C', 'ZZ cadena ' || n);
       INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, descripcion, destino_tipo, categoria, cantidad, unidad, precio_unitario, iva_monto)
-        VALUES (ln, c, oc, 1, 'Servicio', 'servicio', 'servicios', 1, 'servicio', 100, 0);
+        VALUES (lin, c, oc, 1, 'Servicio', 'servicio', 'servicios', 1, 'servicio', 100, 0);
       IF hasta >= 2 THEN UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = oc; UPDATE public.ordenes_compra SET estado = 'emitida' WHERE id = oc; END IF;
       IF hasta >= 3 THEN
         INSERT INTO public.recepciones (id, company_id, project_id, orden_compra_id, tipo, recibido_por) VALUES (rc, c, p_pj, oc, 'servicio', auth.uid());
-        INSERT INTO public.recepcion_lineas (company_id, recepcion_id, orden_compra_linea_id, cantidad) VALUES (c, rc, ln, 1);
+        INSERT INTO public.recepcion_lineas (company_id, recepcion_id, orden_compra_linea_id, cantidad) VALUES (c, rc, lin, 1);
       END IF;
       IF hasta >= 4 THEN UPDATE public.recepciones SET estado = 'registrada' WHERE id = rc; END IF;
       IF hasta >= 5 THEN
         INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, orden_compra_id, numero_factura, concepto, monto_total) VALUES (fc, c, p_pj, p_pv, oc, 'ZZ-PP-' || n, 'ZZ factura', 1);
-        INSERT INTO public.factura_proveedor_lineas (company_id, factura_id, orden_compra_linea_id, linea, descripcion, cantidad, precio_unitario, iva_monto) VALUES (c, fc, ln, 1, 'Servicio', 1, 100, 0);
+        INSERT INTO public.factura_proveedor_lineas (company_id, factura_id, orden_compra_linea_id, linea, descripcion, cantidad, precio_unitario, iva_monto) VALUES (c, fc, lin, 1, 'Servicio', 1, 100, 0);
       END IF;
       IF hasta >= 6 THEN UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = fc; END IF;
     END $f$;
@@ -248,9 +249,9 @@ BEGIN
   ev := ev || pg_temp.ck('2.1 · al empezar C no tiene fila de configuración ni bitácora', pg_temp.q(format('SELECT (SELECT count(*) FROM public.compras_config WHERE company_id = %L) || ''/'' || (SELECT count(*) FROM public.compras_config_separacion_bitacora WHERE company_id = %L)', c, c)), '0/0');
   -- 2.2 · quién puede usar la RPC
   FOR i IN 1..6 LOOP
-    p := (ARRAY[ue, ug, ud, ua, uo, usa])[i];
+    pp := (ARRAY[ue, ug, ud, ua, uo, usa])[i];
     ev := ev || pg_temp.ck(format('2.2.%s · compras_separacion_configurar(C, true) como %s', i, (ARRAY['editor', 'genéricos approve/change_status', 'administrador de OTRA empresa', 'administrador de C', 'propietario de C', 'superadministrador'])[i]),
-      pg_temp.prueba(p, format($q$SELECT public.compras_separacion_configurar(%L, true, 'ZZ Prueba del guion: encender')$q$, c)),
+      pg_temp.prueba(pp, format($q$SELECT public.compras_separacion_configurar(%L, true, 'ZZ Prueba del guion: encender')$q$, c)),
       (ARRAY['COMPRAS_CONFIG_SEPARACION_SOLO_ADMIN', 'COMPRAS_CONFIG_SEPARACION_SOLO_ADMIN', 'COMPRAS_ALCANCE_EMPRESA', 'PASA 1', 'PASA 1', 'PASA 1'])[i]);
   END LOOP;
   ev := ev || pg_temp.ck('2.2.7 · sin motivo útil: rechazada', pg_temp.prueba(ua, format($q$SELECT public.compras_separacion_configurar(%L, true, '..')$q$, c)), 'COMPRAS_SEPARACION_MOTIVO');
@@ -330,9 +331,9 @@ BEGIN
   ev := ev || pg_temp.ck('2.9.4 · apagada: el editor sigue sin poder encenderla a mano (UPDATE directo)', pg_temp.prueba(ue, format('UPDATE public.compras_config SET aprobacion_separada = true WHERE company_id = %L', c)), 'COMPRAS_CONFIG_SEPARACION_SOLO_ADMIN');
   -- 2.10 · la bitácora es append-only y nadie de la API escribe en ella
   FOR i IN 1..4 LOOP
-    FOREACH p IN ARRAY ARRAY[ue, ua] LOOP
-      ev := ev || pg_temp.ck(format('2.10.%s · bitácora, %s como %s', i, (ARRAY['UPDATE', 'DELETE', 'TRUNCATE', 'INSERT con un actor inventado'])[i], CASE WHEN p = ua THEN 'administrador' ELSE 'editor' END),
-        pg_temp.prueba(p, (ARRAY['UPDATE public.compras_config_separacion_bitacora SET motivo = ''ZZ reescrito''', 'DELETE FROM public.compras_config_separacion_bitacora WHERE true', 'TRUNCATE public.compras_config_separacion_bitacora',
+    FOREACH pp IN ARRAY ARRAY[ue, ua] LOOP
+      ev := ev || pg_temp.ck(format('2.10.%s · bitácora, %s como %s', i, (ARRAY['UPDATE', 'DELETE', 'TRUNCATE', 'INSERT con un actor inventado'])[i], CASE WHEN pp = ua THEN 'administrador' ELSE 'editor' END),
+        pg_temp.prueba(pp, (ARRAY['UPDATE public.compras_config_separacion_bitacora SET motivo = ''ZZ reescrito''', 'DELETE FROM public.compras_config_separacion_bitacora WHERE true', 'TRUNCATE public.compras_config_separacion_bitacora',
           format('INSERT INTO public.compras_config_separacion_bitacora (company_id, actor_id, valor_anterior, valor_nuevo, motivo, origen) VALUES (%L, %L, true, false, ''ZZ falsificada por el cliente'', ''usuario'')', c, ue)])[i]),
         'permission denied for table compras_config_separacion_bitacora');
     END LOOP;
@@ -362,7 +363,7 @@ BEGIN
   ev := ev || pg_temp.ck('3.10 · el número idéntico lo rechaza el índice único de siempre', pg_temp.alta(pv, 'FAC-001'), 'duplicate key value violates unique constraint "uq_facturas_prov_numero"');
   ev := ev || pg_temp.ck('3.11 · el mismo número en OTRO proveedor se acepta', pg_temp.alta(pv2, 'FAC-001'), 'ALTA');
   ev := ev || pg_temp.ck('3.12 · «A-12» y «A1-2» conviven', pg_temp.alta(pv, 'A-12') || '/' || pg_temp.alta(pv, 'A1-2'), 'ALTA/ALTA');
-  ev := ev || pg_temp.ck('3.13 · quedaron 7 facturas vivas del proveedor C y 1 del otro', pg_temp.q(format('SELECT (SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = %L AND numero_factura <> ''ZZ-PP-2'' AND numero_factura <> ''ZZ-PP-3'') || ''/'' || (SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = %L)', pv, pv2)), '4/1');
+  ev := ev || pg_temp.ck('3.13 · quedaron 5 facturas de prueba del proveedor C y 1 del otro', pg_temp.q(format('SELECT (SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = %L AND concepto = ''ZZ número'') || ''/'' || (SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = %L AND concepto = ''ZZ número'')', pv, pv2)), '5/1');
   -- 3.14 · UPDATE del número hacia uno equivalente
   ev := ev || pg_temp.ck('3.14.1 · (montaje) «OTRO-9» se registra', pg_temp.alta(pv, 'OTRO-9'), 'ALTA');
   FOR i IN 1..3 LOOP
@@ -370,16 +371,16 @@ BEGIN
       pg_temp.err(format('UPDATE public.facturas_proveedor SET numero_factura = %L WHERE proveedor_id = %L AND numero_factura = ''OTRO-9''', (ARRAY['fac 001', '12 3', 'OTRO-10'])[i], pv)),
       (ARRAY['COMPRAS_FACTURA_NUMERO_DUPLICADO', 'COMPRAS_FACTURA_NUMERO_DUPLICADO', 'SIN ERROR'])[i]);
   END LOOP;
-  -- 3.15 · la RPC compras_factura_crear se comporta igual que el INSERT directo (mismo resultado para cada número)
-  ev := ev || pg_temp.ck('3.15.1 · (montaje) la RPC registra «3-45»', pg_temp.err(pg_temp.rpc(pv, '3-45', 'zz-pp-clave-0001')), 'SIN ERROR');
-  r := pg_temp.alta(pv, '3-45');
+  -- 3.15 · la RPC compras_factura_crear se comporta igual que el INSERT directo (mismo resultado para cada número; el idéntico se compara aparte)
+  ev := ev || pg_temp.ck('3.15.1 · (montaje) la RPC acepta «3-45» (y se revierte)', pg_temp.err(pg_temp.rpc(pv, '3-45', 'zz-pp-clave-0001')), 'SIN ERROR');
+  ev := ev || pg_temp.ck('3.15.2 · (montaje) «3-45» se registra por INSERT directo', pg_temp.alta(pv, '3-45'), 'ALTA');
   FOR i IN 1..7 LOOP
-    p := NULL;
-    r := (ARRAY['FAC001', 'fac 001', 'F' || zw || 'AC001', '345', '34 5', '34-5', '1-23x'])[i];
-    ev := ev || pg_temp.ck(format('3.15.%s · RPC = INSERT directo con «%s»', i + 1, replace(r, zw, '<U+200B>')),
+    r := (ARRAY['FAC001', 'fac 001', 'F' || zw || 'AC001', '345', '34 5', '34-5', '12 3'])[i];
+    ev := ev || pg_temp.ck(format('3.15.%s · RPC = INSERT directo con «%s»', i + 2, replace(r, zw, '<U+200B>')),
       pg_temp.err(pg_temp.rpc(pv, r, 'zz-pp-clave-0002')), pg_temp.err(pg_temp.nf(pv, r)));
   END LOOP;
-  ev := ev || pg_temp.ck('3.15.9 · la RPC con el número idéntico: «COMPRAS_FACTURA_NUMERO_DUPLICADO»', pg_temp.err(pg_temp.rpc(pv, '3-45', 'zz-pp-clave-0003')), 'COMPRAS_FACTURA_NUMERO_DUPLICADO');
+  ev := ev || pg_temp.ck('3.15.10 · la RPC con el número idéntico «3-45»: COMPRAS_FACTURA_NUMERO_DUPLICADO', pg_temp.err(pg_temp.rpc(pv, '3-45', 'zz-pp-clave-0003')), 'COMPRAS_FACTURA_NUMERO_DUPLICADO');
+  ev := ev || pg_temp.ck('3.15.11 · la RPC con «34 5» (distinto de «3-45») la registra de verdad, sin tapar nada', pg_temp.q(format('SELECT public.compras_factura_crear(%L, %L, jsonb_build_object(''proveedor_id'', %L::text, ''numero_factura'', ''34 5'', ''concepto'', ''ZZ RPC número'', ''monto_total'', 100, ''clave_idempotencia'', ''zz-pp-clave-0004''), ''[]''::jsonb) -> ''factura'' ->> ''numero_factura''', c, pj, pv)), '34 5');
   PERFORM pg_temp.sale();
 
   -- ═══ 4 · CATÁLOGO, LLAVES CONCEDIDAS Y PRIVILEGIOS ══════════════════════════════
@@ -389,9 +390,16 @@ BEGIN
   ev := ev || pg_temp.ck('4.4 · ninguna plantilla de sistema recibió las llaves nuevas', pg_temp.q($q$SELECT count(*)::text FROM public.role_permissions rp JOIN public.roles r ON r.id = rp.role_id WHERE r.is_system AND rp.permission_key LIKE 'platform.contabilidad.compras.%'$q$), '0');
   ev := ev || pg_temp.ck('4.5 · ningún rol real las tiene (fuera de los padrones de prueba 5b…)', pg_temp.q($q$SELECT count(*)::text FROM public.role_permissions rp JOIN public.roles r ON r.id = rp.role_id WHERE rp.permission_key LIKE 'platform.contabilidad.compras.%' AND (r.company_id IS NULL OR r.company_id::text NOT LIKE '5b%')$q$), '0');
   ev := ev || pg_temp.ck('4.6 · las únicas concesiones de este guion son las de su padrón (5 + 5 + 5)', pg_temp.q(format('SELECT count(*)::text FROM public.role_permissions rp JOIN public.roles r ON r.id = rp.role_id WHERE rp.permission_key LIKE ''platform.contabilidad.compras.%%'' AND r.company_id IN (%L, %L)', c, d)), '15');
-  sql_ins := 'SELECT count(*)::text FROM unnest(ARRAY[''public.compras_exigir_permiso(text,text,uuid,uuid)'', ''public.compras_tg_permiso_orden()'', ''public.compras_tg_permiso_recepcion()'', ''public.compras_tg_permiso_factura()'', ''public.compras_tg_permiso_orden_pago()'', ''public.compras_tg_permiso_contrasena()'', ''public.compras_tg_mover_alcance()'', ''public.compras_separacion_memoria(uuid)'', ''public.compras_separacion_via_rpc(uuid,boolean)'', ''public.compras_separacion_rechazar(text)'', ''public.compras_separacion_registrar(uuid,boolean,boolean)'', ''public.compras_tg_config_separacion()'', ''public.compras_tg_config_separacion_truncate()'', ''public.compras_tg_config_separacion_bitacora()'', ''public.compras_tg_config_separacion_bitacora_inmutable()'', ''public.compras_numero_separadores(text)'', ''public.compras_numeros_equivalentes(text,text)'', ''public.compras_tg_factura_numero_equivalente()'', ''public.compras_separacion_configurar(uuid,boolean,text)'', ''public.compras_factura_crear(uuid,uuid,jsonb,jsonb)'']) f WHERE has_function_privilege(%L, f::regprocedure, ''EXECUTE'')';
-  ev := ev || pg_temp.ck('4.7 · de las 20 funciones nuevas o reescritas, anon no ejecuta ninguna', pg_temp.q(format(sql_ins, 'anon')), '0');
-  ev := ev || pg_temp.ck('4.8 · authenticated ejecuta solo las dos RPC (compras_separacion_configurar y compras_factura_crear)', pg_temp.q(format(sql_ins, 'authenticated')), '2');
+  v_fn := ARRAY['public.compras_exigir_permiso(text,text,uuid,uuid)', 'public.compras_tg_permiso_orden()', 'public.compras_tg_permiso_recepcion()', 'public.compras_tg_permiso_factura()',
+    'public.compras_tg_permiso_orden_pago()', 'public.compras_tg_permiso_contrasena()', 'public.compras_tg_mover_alcance()', 'public.compras_separacion_memoria(uuid)',
+    'public.compras_separacion_via_rpc(uuid,boolean)', 'public.compras_separacion_rechazar(text)', 'public.compras_separacion_registrar(uuid,boolean,boolean)',
+    'public.compras_tg_config_separacion()', 'public.compras_tg_config_separacion_truncate()', 'public.compras_tg_config_separacion_bitacora()',
+    'public.compras_tg_config_separacion_bitacora_inmutable()', 'public.compras_numero_separadores(text)', 'public.compras_numeros_equivalentes(text,text)',
+    'public.compras_tg_factura_numero_equivalente()', 'public.compras_separacion_configurar(uuid,boolean,text)', 'public.compras_factura_crear(uuid,uuid,jsonb,jsonb)'];
+  SELECT count(*) FILTER (WHERE has_function_privilege('anon', to_regprocedure(f), 'EXECUTE')), count(*) FILTER (WHERE has_function_privilege('authenticated', to_regprocedure(f), 'EXECUTE'))
+    INTO n1, n2 FROM unnest(v_fn) f;
+  ev := ev || pg_temp.ck('4.7 · de las 20 funciones nuevas o reescritas existen 20 y anon no ejecuta ninguna', (SELECT count(*) FROM unnest(v_fn) f WHERE to_regprocedure(f) IS NOT NULL) || '/' || n1, '20/0');
+  ev := ev || pg_temp.ck('4.8 · authenticated ejecuta solo las dos RPC (compras_separacion_configurar y compras_factura_crear)', n2::text, '2');
   FOREACH r IN ARRAY ARRAY['anon', 'authenticated'] LOOP
     ev := ev || pg_temp.ck(format('4.9 · privilegios de %s sobre la bitácora', r), pg_temp.q(format('SELECT string_agg(p || ''='' || has_table_privilege(%L, ''public.compras_config_separacion_bitacora'', p)::text, '' '' ORDER BY p) FROM unnest(ARRAY[''DELETE'', ''INSERT'', ''REFERENCES'', ''SELECT'', ''TRIGGER'', ''TRUNCATE'', ''UPDATE'']) p', r)),
       CASE WHEN r = 'anon' THEN 'DELETE=false INSERT=false REFERENCES=false SELECT=false TRIGGER=false TRUNCATE=false UPDATE=false' ELSE 'DELETE=false INSERT=false REFERENCES=false SELECT=true TRIGGER=false TRUNCATE=false UPDATE=false' END);
