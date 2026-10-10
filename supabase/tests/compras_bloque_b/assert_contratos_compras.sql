@@ -272,8 +272,8 @@ SELECT public.chk_falla($$ SELECT public.compras_oc_excepcion_contrato('0ce00000
   'COMPRAS_EXCEPCION_SIN_CONTRATO', '4 · una orden sin contrato no tiene qué exceptuar');
 
 -- Con la separación activada, quien solicitó la orden (UA) no autoriza su propia excepción; otra persona (UB) sí.
-INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES (:C::uuid, true)
-  ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true;
+SELECT public.como_sistema($$ INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc', true)
+  ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true $$);
 SELECT public.como(:UA::uuid);
 SET ROLE authenticated;
 SELECT public.chk_falla($$ SELECT public.compras_oc_excepcion_contrato('0ce00000-0000-0000-0000-000000000005', 'aprobar', 'Quien solicitó la orden autoriza su excepción') $$,
@@ -287,7 +287,7 @@ INSERT INTO exc SELECT 'e1', public.compras_oc_excepcion_contrato('0ce00000-0000
 INSERT INTO exc SELECT 'e2', public.compras_oc_excepcion_contrato('0ce00000-0000-0000-0000-000000000005', 'aprobar', 'Contrato en renovación; el servicio no puede parar');
 SELECT public.chk_uuid((SELECT id FROM exc WHERE k = 'e1'), (SELECT id FROM exc WHERE k = 'e2'), '4 · reintentar la excepción devuelve la misma (no se duplica)');
 RESET ROLE;
-UPDATE public.compras_config SET aprobacion_separada = false WHERE company_id = :C::uuid;
+SELECT public.como_sistema($$ UPDATE public.compras_config SET aprobacion_separada = false WHERE company_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' $$);
 SELECT public.chk((SELECT count(*) FROM public.orden_compra_excepciones WHERE orden_compra_id = '0ce00000-0000-0000-0000-000000000005'), 1,
   '4 · una sola excepción registrada');
 SELECT public.chk_uuid((SELECT autorizado_por FROM public.orden_compra_excepciones WHERE orden_compra_id = '0ce00000-0000-0000-0000-000000000005'), :UB::uuid,

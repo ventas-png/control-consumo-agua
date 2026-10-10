@@ -23,6 +23,7 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
+cd "$RAIZ"   # las pruebas de hallazgos que leen scripts/*.sql (SEP-5, RG-4.diagnostico) los buscan desde la raíz del repo
 MIGS="$RAIZ/supabase/migrations"
 PRIMERA=20261021000000
 NUESTRAS=$(ls "$MIGS" | grep -E '^2026102[12345]00[0-9]{4}_' | sed 's/\.sql$//' | sort)
@@ -133,6 +134,8 @@ done
 # Huella del catálogo ANTES de las migraciones 20261027…: la reversión (scripts/reversion-compras-controles.sql) debe devolverlo a esto.
 psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_previo.txt"
 for f in "$MIGS"/20261027*.sql; do
+  # Instantánea ANTES de la última migración del bloque (20261027000900): su sección de la reversión, sola, debe devolver ESTO.
+  if [[ "$(basename "$f")" == 20261027000900_* ]]; then psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_pre0900.txt"; fi
   [ -e "$f" ] && aplicar "$f"
 done
 psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_migrado.txt"
@@ -162,6 +165,10 @@ echo "── 5r · cierre de hallazgos adversariales: una prueba por hallazgo co
 for f in "$AQUI"/hallazgos/*.sql; do
   bloque_resumen "hallazgos/$(basename "$f")" "$(basename "$f" .sql)"
 done
+echo "── 5s · la migración 20261027000900 se puede aplicar cuatro veces seguidas sobre una copia con datos: mismo catálogo y misma bitácora"
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_idem" -c "CREATE DATABASE ${BD}_idem TEMPLATE $BD" >/dev/null
+BD=${BD}_idem PIEZA="$(ls "$MIGS"/20261027000900_*.sql)" bash "$AQUI/hallazgos/SEP-idempotencia.sh" || exit 1
+psql -q -d postgres -c "DROP DATABASE ${BD}_idem" >/dev/null
 echo "── 5n · la protección de inventario es obligatoria (con duplicados reales, siempre en transacciones que se revierten)"
 BD=$BD bash "$AQUI/indice_obligatorio.sh" || exit 1
 
@@ -446,9 +453,11 @@ done
 
 # Reversión: sentencias EJECUTABLES, generadas del catálogo (no la prosa de las cabeceras). Sobre una copia de la base con TODO el
 # bloque aplicado, devuelven triggers, funciones, índices, restricciones, políticas y columnas a lo que había antes de 20261027000000.
-echo "── 6c/8 · reversión de 20261027000000…0800 (scripts/reversion-compras-controles.sql)"
+echo "── 6c/8 · reversión de 20261027000000…0900 (scripts/reversion-compras-controles.sql)"
+# La bitácora de la separación es EVIDENCIA: la reversión la conserva si tiene cambios registrados. Las suites SEP dejan filas en ella, así que
+# esta comprobación declara a propósito que se puede descartar (compras.reversion_descartar_bitacora = 'si').
 psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_rev" -c "CREATE DATABASE ${BD}_rev TEMPLATE $BD" >/dev/null
-PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d ${BD}_rev -f "$RAIZ/scripts/reversion-compras-controles.sql" >/dev/null \
+PGOPTIONS="-c client_min_messages=warning -c compras.reversion_descartar_bitacora=si" psql -q -v ON_ERROR_STOP=1 -d ${BD}_rev -f "$RAIZ/scripts/reversion-compras-controles.sql" >/dev/null \
   || { echo "❌ la reversión falla al ejecutarse"; exit 1; }
 psql -q -t -A -d ${BD}_rev -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_revertido_total.txt"
 # Las suites dejan sus propios ayudantes en la base (chk, como, fa1_…): se ignora todo objeto que no existía ni antes ni después de las
@@ -461,6 +470,22 @@ else
   echo "❌ la reversión no deja el catálogo como estaba:"; diff "$SALIDAS/catalogo_previo.txt" "$SALIDAS/catalogo_revertido.txt" | head -20; exit 1
 fi
 psql -q -d postgres -c "DROP DATABASE ${BD}_rev" >/dev/null
+
+# Reversión PARCIAL: SOLO la sección de 20261027000900 (lo que se corre para volver al estado posterior a 0800 sin tocar lo anterior).
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_rev9" -c "CREATE DATABASE ${BD}_rev9 TEMPLATE $BD" >/dev/null
+awk '/^-- ── 20261027000900_/ { d = 1; print; next } d && /^-- ── 2026/ { exit } d { print }' "$RAIZ/scripts/reversion-compras-controles.sql" > "$SALIDAS/reversion_0900.sql"
+[ -s "$SALIDAS/reversion_0900.sql" ] || { echo "❌ no se encontró la sección de 20261027000900 en scripts/reversion-compras-controles.sql"; exit 1; }
+PGOPTIONS="-c client_min_messages=warning -c compras.reversion_descartar_bitacora=si" psql -q -v ON_ERROR_STOP=1 -d ${BD}_rev9 -f "$SALIDAS/reversion_0900.sql" >/dev/null \
+  || { echo "❌ la sección de 20261027000900 de la reversión falla al ejecutarse"; exit 1; }
+psql -q -t -A -d ${BD}_rev9 -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_revertido_0900_bruto.txt"
+cut -d'|' -f1,2 "$SALIDAS/catalogo_pre0900.txt" "$SALIDAS/catalogo_migrado.txt" | sort -u > "$SALIDAS/catalogo_claves_0900.txt"
+awk -F'|' 'NR==FNR { k[$0]; next } (($1 "|" $2) in k)' "$SALIDAS/catalogo_claves_0900.txt" "$SALIDAS/catalogo_revertido_0900_bruto.txt" > "$SALIDAS/catalogo_revertido_0900.txt"
+if diff -q "$SALIDAS/catalogo_pre0900.txt" "$SALIDAS/catalogo_revertido_0900.txt" >/dev/null; then
+  echo "  ✓ la sección de 20261027000900, SOLA, devuelve el catálogo EXACTO al estado posterior a 20261027000800 ($(wc -l < "$SALIDAS/catalogo_pre0900.txt") objetos comparados)"
+else
+  echo "❌ la reversión parcial de 20261027000900 no deja el catálogo como estaba tras 0800:"; diff "$SALIDAS/catalogo_pre0900.txt" "$SALIDAS/catalogo_revertido_0900.txt" | head -20; exit 1
+fi
+psql -q -d postgres -c "DROP DATABASE ${BD}_rev9" >/dev/null
 
 echo "── 7/8 · las migraciones del bloque son append-only (no editan lo ya aplicado)"
 (cd "$RAIZ" && node scripts/migrations-append-only.mjs >/dev/null 2>&1) \

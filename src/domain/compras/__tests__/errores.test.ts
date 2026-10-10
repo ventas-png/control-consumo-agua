@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { PostgrestError } from '@supabase/supabase-js'
 import { QueryError, SinFilasAfectadasError } from '../../queryFetch'
 import { clasificarErrorCompras, mensajeAccionCompras } from '../errores'
+import { FINALES } from '../../../test/erroresFinalesCompras'
 
 const PERMISO = 'COMPRAS_PERMISO_ACCION: para aprobar (contabilizar) una factura de proveedor tu perfil necesita el permiso «Compras y pagos — Aprobar una factura de proveedor».'
 
@@ -131,42 +132,11 @@ describe('COMPRAS_ALCANCE_PROYECTO · las dos comprobaciones del servidor se dis
   })
 })
 
-// Los textos y SQLSTATE FINALES que levanta la migración 20261027000900 (permisos por acción y separación solicitante/aprobador), tal
-// como los escribe el servidor (con los `%` ya sustituidos). Se fijan aquí para que el traductor no dependa de que la migración esté ya
-// en el repositorio; `erroresMigraciones.test.ts` contrasta lo mismo contra las migraciones reales en cuanto existan.
-const FINALES: Array<[codigo: string, sqlstate: string, familia: string, texto: string]> = [
-  // compras_exigir_permiso: permiso, empresa y proyecto (42501)
-  ['COMPRAS_PERMISO_ACCION', '42501', 'permiso', 'COMPRAS_PERMISO_ACCION: para marcar pagada una orden de pago (contabiliza el pago) tu perfil necesita el permiso «Compras y pagos — Ejecutar un pago».'],
-  ['COMPRAS_PERMISO_ACCION', '42501', 'permiso', 'COMPRAS_PERMISO_ACCION: para aprobar una orden de compra tu perfil necesita el permiso «Autorizar / Denegar — Órdenes compra».'],
-  ['COMPRAS_ALCANCE_EMPRESA', '42501', 'alcance_empresa', 'COMPRAS_ALCANCE_EMPRESA: para registrar una recepción (mueve existencias y contabiliza) el documento tiene que ser de la empresa de tu sesión.'],
-  ['COMPRAS_ALCANCE_PROYECTO', '42501', 'alcance_proyecto', 'COMPRAS_ALCANCE_PROYECTO: para anular una orden de pago tu perfil necesita estar asignado al proyecto del documento.'],
-  // mover un documento de compras a otro proyecto o empresa (trigger de alcance)
-  ['COMPRAS_ALCANCE_PROYECTO', '42501', 'alcance_proyecto', 'COMPRAS_ALCANCE_PROYECTO: para mover un documento de compras tu perfil necesita estar asignado al proyecto en que está hoy.'],
-  ['COMPRAS_ALCANCE_PROYECTO', '42501', 'alcance_proyecto', 'COMPRAS_ALCANCE_PROYECTO: para mover un documento de compras tu perfil necesita estar asignado al proyecto de destino.'],
-  ['COMPRAS_ALCANCE_EMPRESA', '42501', 'alcance_empresa', 'COMPRAS_ALCANCE_EMPRESA: para mover un documento de compras el documento tiene que ser de la empresa de tu sesión, y seguir en ella.'],
-  // el que NO cambia: dato inconsistente del documento (migración 0000, 23514); no es falta de asignación de la persona
-  ['COMPRAS_ALCANCE_PROYECTO', '23514', 'proyecto_de_otra_empresa', 'COMPRAS_ALCANCE_PROYECTO: el proyecto OC-000012 no pertenece a la empresa del documento.'],
-  // interruptor de la separación solicitante/aprobador: escritura directa de compras_config (42501)
-  ['COMPRAS_CONFIG_SEPARACION_VIA_RPC', '42501', 'separacion', 'COMPRAS_CONFIG_SEPARACION_VIA_RPC: el interruptor de la separación solicitante/aprobador no se cambia escribiendo en compras_config (UPDATE rechazado, ni siquiera para el administrador): usa compras_separacion_configurar(empresa, activa, motivo), que valida el alcance, exige el motivo y deja la bitácora.'],
-  ['COMPRAS_CONFIG_SEPARACION_SOLO_ADMIN', '42501', 'separacion', 'COMPRAS_CONFIG_SEPARACION_SOLO_ADMIN: encender o apagar la separación solicitante/aprobador (o borrar, vaciar, reemplazar o mover la configuración que la tiene encendida: DELETE rechazado) lo hace únicamente el administrador de la empresa, con un motivo, desde compras_separacion_configurar.'],
-  ['COMPRAS_CONFIG_SEPARACION_TRUNCATE', '42501', 'separacion', 'COMPRAS_CONFIG_SEPARACION_TRUNCATE: la configuración de compras no se vacía desde una sesión de usuario: apagaría la separación solicitante/aprobador de todas las empresas.'],
-  // la RPC compras_separacion_configurar y la bitácora
-  ['COMPRAS_SEPARACION_SESION', '42501', 'separacion', 'COMPRAS_SEPARACION_SESION: cambiar la separación solicitante/aprobador exige una sesión de usuario: el actor lo toma el servidor de la sesión.'],
-  ['COMPRAS_SEPARACION_PARAMETROS', '22023', 'separacion', 'COMPRAS_SEPARACION_PARAMETROS: indica la empresa y si la separación queda activa (true) o desactivada (false).'],
-  ['COMPRAS_CONFIG_SEPARACION_SOLO_ADMIN', '42501', 'separacion', 'COMPRAS_CONFIG_SEPARACION_SOLO_ADMIN: encender o apagar la separación solicitante/aprobador lo hace únicamente el administrador de la empresa (o el super administrador).'],
-  ['COMPRAS_ALCANCE_EMPRESA', '42501', 'alcance_empresa', 'COMPRAS_ALCANCE_EMPRESA: la separación solicitante/aprobador solo la cambia el administrador DE ESA empresa.'],
-  ['COMPRAS_SEPARACION_PERFIL', '42501', 'separacion', 'COMPRAS_SEPARACION_PERFIL: tu usuario no tiene un perfil activo en la aplicación; la separación solicitante/aprobador solo la cambia un administrador activo.'],
-  ['COMPRAS_SEPARACION_EMPRESA_INEXISTENTE', 'P0002', 'separacion', 'COMPRAS_SEPARACION_EMPRESA_INEXISTENTE: la empresa 9c1d no existe; no se cambió nada.'],
-  ['COMPRAS_SEPARACION_MOTIVO', '23514', 'separacion', 'COMPRAS_SEPARACION_MOTIVO: cambiar la separación exige un motivo real: al menos 10 letras o cifras (sin contar espacios, signos ni caracteres invisibles) y al menos una letra.'],
-  ['COMPRAS_SEPARACION_MOTIVO', '23514', 'separacion', 'COMPRAS_SEPARACION_MOTIVO: el motivo no puede pasar de 1000 caracteres (tiene 1204).'],
-  ['COMPRAS_SEPARACION_SIN_CAMBIO', '23514', 'separacion', 'COMPRAS_SEPARACION_SIN_CAMBIO: la separación solicitante/aprobador de la empresa ya está activa; no se cambió nada.'],
-  ['COMPRAS_SEPARACION_NO_APLICADA', '40001', 'separacion', 'COMPRAS_SEPARACION_NO_APLICADA: la configuración de la empresa cambió mientras se aplicaba el cambio; no se cambió nada. Reintenta.'],
-  ['COMPRAS_SEPARACION_SIN_BITACORA', 'XX000', 'separacion', 'COMPRAS_SEPARACION_SIN_BITACORA: el cambio no dejó rastro en la bitácora; se revierte.'],
-  ['COMPRAS_SEPARACION_BITACORA_INMUTABLE', '42501', 'separacion', 'COMPRAS_SEPARACION_BITACORA_INMUTABLE: la bitácora de la separación solicitante/aprobador solo se escribe; no se modifica, no se borra ni se vacía (UPDATE rechazado).'],
-]
-
-describe('los textos y SQLSTATE FINALES de la migración 20261027000900', () => {
-  it.each(FINALES.map(([codigo, sqlstate, familia, texto]) => ({ codigo, sqlstate, familia, texto, nombre: `${sqlstate} ${texto.slice(0, 90)}` })))('$nombre', ({ codigo, sqlstate, familia, texto }) => {
+// Los textos y SQLSTATE FINALES de los rechazos que la pantalla traduce están en `src/test/erroresFinalesCompras.ts` (tal como los escribe el
+// servidor, con los `%` ya sustituidos). Se fijan ahí, y no se leen de las migraciones, para que el traductor no dependa de que la migración
+// esté ya en el repositorio; `erroresMigraciones.test.ts` exige que cada fila siga siendo un `RAISE EXCEPTION` real de la migración de origen.
+describe('los textos y SQLSTATE FINALES que el servidor levanta', () => {
+  it.each(FINALES.map(({ codigo, sqlstate, familia, texto }) => ({ codigo, sqlstate, familia, texto, nombre: `${sqlstate} ${texto.slice(0, 90)}` })))('$nombre', ({ codigo, sqlstate, familia, texto }) => {
     const cuerpo = texto.slice(texto.indexOf(':') + 1).trim()
     const comoLlega = new QueryError(texto, pg(texto, sqlstate))          // runQuery / runAfectando: el SQLSTATE solo viaja en la causa
     expect(clasificarErrorCompras(comoLlega)).toMatchObject({ familia, codigo, texto: cuerpo })
@@ -180,6 +150,61 @@ describe('los textos y SQLSTATE FINALES de la migración 20261027000900', () => 
     const delTexto = (sqlstate: string) => clasificarErrorCompras({ message: 'COMPRAS_ALCANCE_PROYECTO: texto que no dice cuál de los dos es.', code: sqlstate }).familia
     expect(delTexto('42501')).toBe('alcance_proyecto')
     expect(delTexto('23514')).toBe('proyecto_de_otra_empresa')
+  })
+})
+
+// Los rechazos que SÍ provocan los botones de las seis acciones aunque no sean de `compras_exigir_permiso`: quien solicita una orden y la
+// aprueba (cuando la empresa enciende la separación solicitante/aprobador), la excepción de contrato, autorizar a un proveedor y los
+// estados que un documento no puede traer de nacimiento. La persona lee el texto del servidor, sin el código técnico.
+describe('mensajeAccionCompras · lo que ve quien aprueba su propia orden y los demás rechazos de los botones', () => {
+  const comoLlega = (texto: string, sqlstate: string) => new QueryError(texto, pg(texto, sqlstate))
+
+  it('COMPRAS_OC_AUTOAPROBACION (aprobar): «la empresa exige que la apruebe otra persona», sin el código', () => {
+    const t = 'COMPRAS_OC_AUTOAPROBACION: quien solicita la orden no la aprueba; la empresa exige que la apruebe otra persona.'
+    expect(clasificarErrorCompras(comoLlega(t, '23514'))).toMatchObject({ familia: 'separacion', codigo: 'COMPRAS_OC_AUTOAPROBACION' })
+    expect(mensajeAccionCompras(comoLlega(t, '23514'))).toBe('Quien solicita la orden no la aprueba; la empresa exige que la apruebe otra persona.')
+  })
+
+  it('COMPRAS_OC_AUTOAPROBACION (la orden nace ya aprobada): el texto largo del servidor, entero y sin el código', () => {
+    const t = 'COMPRAS_OC_AUTOAPROBACION: la empresa exige que la orden la apruebe una persona distinta de quien la solicita, y una orden que nace «aprobada» la solicita y la aprueba la misma persona. Captúrala en borrador para que otra persona con «Autorizar / Denegar» la apruebe.'
+    expect(mensajeAccionCompras(comoLlega(t, '23514')))
+      .toBe('La empresa exige que la orden la apruebe una persona distinta de quien la solicita, y una orden que nace «aprobada» la solicita y la aprueba la misma persona. Captúrala en borrador para que otra persona con «Autorizar / Denegar» la apruebe.')
+  })
+
+  it('COMPRAS_EXCEPCION_AUTOAUTORIZACION: quien solicita la orden no autoriza su excepción', () => {
+    const t = 'COMPRAS_EXCEPCION_AUTOAUTORIZACION: quien solicita la orden no autoriza su excepción; la empresa exige otra persona.'
+    expect(clasificarErrorCompras(comoLlega(t, '23514')).familia).toBe('separacion')
+    expect(mensajeAccionCompras(comoLlega(t, '23514'))).toBe('Quien solicita la orden no autoriza su excepción; la empresa exige otra persona.')
+  })
+
+  it.each([
+    ['COMPRAS_EXCEPCION_PERMISO', 'autorizar una excepción exige el permiso de cambio de estado de Contabilidad.'],
+    ['COMPRAS_NO_AUTORIZADO', 'autorizar un proveedor requiere el permiso de cambio de estado en Contabilidad.'],
+    ['COMPRAS_NO_AUTORIZADO', 'cambiar la habilitación de un proveedor en un proyecto requiere el permiso de cambio de estado en Contabilidad.'],
+  ])('%s: falta una llave; se dice cuál, sin el código', (codigo, cuerpo) => {
+    const t = `${codigo}: ${cuerpo}`
+    expect(clasificarErrorCompras(comoLlega(t, '42501'))).toMatchObject({ familia: 'permiso', codigo, texto: cuerpo })
+    expect(mensajeAccionCompras(comoLlega(t, '42501'))).toBe(cuerpo.charAt(0).toUpperCase() + cuerpo.slice(1))
+  })
+
+  it.each([
+    ['COMPRAS_ESTADO_INICIAL', 'una orden de compra nace en borrador (o, con permiso, aprobada o emitida); no se crea ya «aprobada».'],
+    ['COMPRAS_ESTADO_SOLO_SISTEMA', 'una contraseña queda «pagada» cuando se paga la orden de pago que la liquida; no se marca a mano.'],
+  ])('%s: el estado no es de nacimiento o lo deja el sistema; se muestra el texto del servidor sin el código', (codigo, cuerpo) => {
+    const t = `${codigo}: ${cuerpo}`
+    expect(clasificarErrorCompras(comoLlega(t, '23514'))).toMatchObject({ familia: 'estado', codigo, texto: cuerpo })
+    expect(mensajeAccionCompras(comoLlega(t, '23514'))).toBe(cuerpo.charAt(0).toUpperCase() + cuerpo.slice(1))
+  })
+
+  it('códigos de nombre parecido que son OTRAS comprobaciones no se traducen (siguen llegando con su código)', () => {
+    for (const codigo of [
+      'COMPRAS_PROVEEDOR_NO_AUTORIZADO', 'COMPRAS_PAGO_ESTADO_INICIAL', 'COMPRAS_EXCEPCION_ESTADO', 'COMPRAS_EXCEPCION_ETAPA',
+      'COMPRAS_OC_APROBADA_CAMBIO', 'COMPRAS_RESPALDO_PERMISO', 'COMPRAS_IMPORT_PERMISO', 'COMPRAS_NO_AUTORIZADOS', 'COMPRAS_ESTADO_INICIAL_X',
+    ]) {
+      const t = `${codigo}: un texto del servidor.`
+      expect(clasificarErrorCompras(comoLlega(t, '42501'))).toMatchObject({ familia: 'otro', codigo })
+      expect(mensajeAccionCompras(comoLlega(t, '42501'))).toBe(t)
+    }
   })
 })
 

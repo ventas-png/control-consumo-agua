@@ -30,7 +30,7 @@ import {
   useCrearContrasenaMutation,
 } from '../../domain/compras/mutations'
 import { nuevaClaveIdempotencia } from '../../domain/compras/ordenCrear'
-import { mensajeAccionCompras } from '../../domain/compras/errores'
+import { DURACION_ERROR_LARGO_MS, mensajeAccionCompras } from '../../domain/compras/errores'
 import { contrasenaFormSchema } from '../../domain/compras/schemas'
 import { formatCurrency, formatDateShort, hoyLocalISO, sumarDiasCalendario } from '../../lib/format'
 import {
@@ -52,9 +52,6 @@ interface Props {
 }
 
 type Vista = 'facturas' | 'ordenes' | 'antiguedad' | 'proyeccion'
-
-/** Cuánto dura un aviso de error largo (~270 caracteres) en pantalla; el de 3,5 s por omisión no alcanza para leerlo. */
-const DURACION_ERROR_LARGO_MS = 12_000
 
 const TONO_FACTURA = {
   registrada: 'info', aprobada: 'warning', pagada_parcial: 'warning', pagada: 'success', anulada: 'neutral',
@@ -96,7 +93,8 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
       await fn()
       notify({ variant: 'success', title: 'Listo', text: ok })
     } catch (e) {
-      notify({ variant: 'error', title: 'Error', text: mensajeAccionCompras(e, 'No se pudo completar la acción.') })
+      // El rechazo de permiso o de alcance nombra lo que hay que pedir: se queda el tiempo de leerlo entero.
+      notify({ variant: 'error', title: 'Error', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e, 'No se pudo completar la acción.') })
     }
   }
 
@@ -439,7 +437,7 @@ function CuadreModal({ factura, monedaBase, onClose }: {
       })
       onClose()
     } catch (e) {
-      notify({ variant: 'error', title: 'No se pudo aprobar', text: mensajeAccionCompras(e, 'Error inesperado.') })
+      notify({ variant: 'error', title: 'No se pudo aprobar', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e, 'Error inesperado.') })
     }
   }
 

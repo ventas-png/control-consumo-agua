@@ -82,8 +82,10 @@ export function useEliminarDocumentoProveedorMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (id: string) => {
-      await runQuery((signal) =>
-        supabase.from('proveedor_documentos').delete().eq('id', id).abortSignal(signal),
+      // Un DELETE que la política de filas no deja tocar contesta éxito con cero filas: sin `runAfectando` la papelería
+      // seguía mostrando el documento «eliminado» sin que el servidor lo hubiera borrado.
+      await runAfectando((signal) =>
+        supabase.from('proveedor_documentos').delete().eq('id', id).select('id').abortSignal(signal),
       )
     },
     onSuccess: () => invalidar(),

@@ -23,7 +23,7 @@ import { useTransicionOrdenConContrato } from '../compras/excepcionContrato'
 import { ContratoSelector } from '../proveedores/ContratoSelector'
 import { ContratoSeguimientoModal } from '../proveedores/ContratoSeguimientoModal'
 import { adjuntarRespaldoRecepcion, validarArchivoRespaldo, MIME_RESPALDO, MAX_BYTES_RESPALDO } from '../../domain/compras/respaldos'
-import { mensajeAccionCompras } from '../../domain/compras/errores'
+import { DURACION_ERROR_LARGO_MS, mensajeAccionCompras } from '../../domain/compras/errores'
 import {
   useActivosFijosQuery,
   useCompromisosQuery,
@@ -118,8 +118,9 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
       notify({ variant: 'success', title: 'Listo', text: ok })
     } catch (e) {
       // Los mensajes de los triggers (COMPRAS_*) están escritos para leerse tal
-      // cual: dicen qué pasó y qué hacer (qué permiso falta, qué proyecto). Se muestra el texto del servidor.
-      notify({ variant: 'error', title: 'No se pudo', text: mensajeAccionCompras(e, 'Error inesperado.') })
+      // cual: dicen qué pasó y qué hacer (qué permiso falta, qué proyecto). Se muestra el texto del servidor, el tiempo
+      // suficiente para leerlo entero (nombra el permiso que hay que pedir).
+      notify({ variant: 'error', title: 'No se pudo', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e, 'Error inesperado.') })
     }
   }
 

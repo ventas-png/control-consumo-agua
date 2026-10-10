@@ -9,7 +9,7 @@ import { useInsumosAlmacenQuery } from '../../../domain/compras/queries'
 import { crearOrdenTransaccional } from '../../../domain/compras/mutations'
 import { mensajeCrearOrden, nuevaClaveIdempotencia } from '../../../domain/compras/ordenCrear'
 import { ordenCompraLineaSchema } from '../../../domain/compras/schemas'
-import { mensajeAccionCompras } from '../../../domain/compras/errores'
+import { DURACION_ERROR_LARGO_MS, mensajeAccionCompras } from '../../../domain/compras/errores'
 import type { ProveedorCatalogo } from '../../../types/proveedores'
 import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
 import { SeguimientoOrdenModal } from '../../compras/SeguimientoOrdenModal'
@@ -192,7 +192,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
         await ejecutar()
       }
     } catch (e) {
-      notify({ variant: 'error', title: 'No se pudo', text: mensajeAccionCompras(e) })
+      notify({ variant: 'error', title: 'No se pudo', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e) })
       return
     }
     onRefresh()
@@ -208,7 +208,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     const motivo = r?.motivo?.trim()
     if (!motivo) return
     const { error } = await updateCondominioRowAfectando('ordenes_compra', orden.id, { estado: 'borrador', motivo_devolucion: motivo })
-    if (error) { notify({ variant: 'error', title: 'No se pudo', text: mensajeAccionCompras(error) }); return }
+    if (error) { notify({ variant: 'error', title: 'No se pudo', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(error) }); return }
     onRefresh()
   }
 
@@ -216,7 +216,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     const r = await confirm({ title: '¿Cancelar orden?', text: orden.concepto, icon: 'warning', variant: 'danger', confirmText: 'Cancelar OC' })
     if (!r.isConfirmed) return
     const { error } = await updateCondominioRowAfectando('ordenes_compra', orden.id, { estado: 'cancelada' })
-    if (error) { notify({ variant: 'error', title: 'No se pudo', text: mensajeAccionCompras(error) }); return }
+    if (error) { notify({ variant: 'error', title: 'No se pudo', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(error) }); return }
     onRefresh()
   }
 

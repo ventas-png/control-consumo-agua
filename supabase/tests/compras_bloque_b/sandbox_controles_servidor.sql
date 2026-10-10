@@ -72,10 +72,18 @@ BEGIN
     ('5b700000-0000-0000-0000-0000000000a8', 'platform.contabilidad.create', 'allow'),
     ('5b700000-0000-0000-0000-0000000000a8', 'platform.contabilidad.edit', 'allow'),
     ('5b700000-0000-0000-0000-0000000000a8', 'platform.contabilidad.approve', 'allow'),
+    -- PERMISOS POR ACCIÓN (20261027000900): `approve` genérico ya no basta; este perfil recibe las llaves de lo que `approve` cubría.
+    ('5b700000-0000-0000-0000-0000000000a8', 'condominios.tab.ordenes_compra.approve', 'allow'),
+    ('5b700000-0000-0000-0000-0000000000a8', 'platform.contabilidad.compras.factura_aprobar', 'allow'),
+    ('5b700000-0000-0000-0000-0000000000a8', 'platform.contabilidad.compras.orden_pago_aprobar', 'allow'),
     ('5b700000-0000-0000-0000-0000000000a9', 'platform.contabilidad.view', 'allow'),
     ('5b700000-0000-0000-0000-0000000000a9', 'platform.contabilidad.create', 'allow'),
     ('5b700000-0000-0000-0000-0000000000a9', 'platform.contabilidad.edit', 'allow'),
     ('5b700000-0000-0000-0000-0000000000a9', 'platform.contabilidad.change_status', 'allow'),
+    -- PERMISOS POR ACCIÓN (20261027000900): `change_status` genérico ya no registra recepciones ni paga; este perfil recibe las llaves de lo que cubría.
+    ('5b700000-0000-0000-0000-0000000000a9', 'platform.contabilidad.compras.recepcion_registrar', 'allow'),
+    ('5b700000-0000-0000-0000-0000000000a9', 'platform.contabilidad.compras.pago_ejecutar', 'allow'),
+    ('5b700000-0000-0000-0000-0000000000a9', 'platform.contabilidad.compras.pago_anular', 'allow'),
     ('5b700000-0000-0000-0000-0000000000aa', 'platform.contabilidad.view', 'allow'),
     ('5b700000-0000-0000-0000-0000000000aa', 'platform.contabilidad.create', 'allow'),
     ('5b700000-0000-0000-0000-0000000000aa', 'platform.contabilidad.edit', 'allow'),

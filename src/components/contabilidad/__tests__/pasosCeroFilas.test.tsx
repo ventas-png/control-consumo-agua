@@ -11,9 +11,10 @@
 // NINGUNA invalidación de consultas; con una fila → éxito e invalidación (control positivo: sin él la prueba no
 // distinguiría un botón roto de uno que protege); con el rechazo de permiso del servidor → su texto, sin el código.
 //
-// Las mismas pestañas tienen otras dos escrituras con efecto contable que NO son de las seis y que antes también mostraban
-// «Listo» con cero filas: enlazar un gasto a una factura (anula el gasto contabilizado y reversa su asiento) y autorizar o
-// suspender a un proveedor (de lo que depende poder emitirle órdenes). Se recorren al final con el mismo contrato.
+// Las mismas pestañas tienen otras escrituras con efecto contable que NO son de las seis y que antes también mostraban
+// «Listo» con cero filas: enlazar un gasto a una factura (anula el gasto contabilizado y reversa su asiento), autorizar o
+// suspender a un proveedor y activar, suspender o terminar un contrato (de lo que depende poder emitir y aprobar órdenes).
+// Se recorren al final con el mismo contrato.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { QueryClient } from '@tanstack/react-query'
@@ -82,6 +83,7 @@ import { ComprasTab } from '../ComprasTab'
 import { CuentasPorPagarTab } from '../CuentasPorPagarTab'
 import { ProveedoresTab } from '../ProveedoresTab'
 import OrdenesCompraTab from '../../condominios/tabs/OrdenesCompraTab'
+import { ContratosProveedorTab } from '../../proveedores/ContratosProveedorTab'
 
 const K = LLAVES_ACCION_COMPRAS
 const PROV = '11111111-1111-4111-8111-111111111111'
@@ -184,6 +186,12 @@ function arrancar(c: Caso) {
 const textoDeAvisos = (variante: string) =>
   h.notify.mock.calls.map(([o]) => o as { variant: string; text: string }).filter((o) => o.variant === variante).map((o) => o.text)
 
+// El rechazo de permiso o de alcance nombra el permiso que hay que pedir (~130 caracteres): con los 3,5 s del aviso por
+// omisión (`duration` sin definir) no da tiempo de leerlo. Debe durar al menos 10 s (la constante compartida son 12 s).
+const DURACION_MINIMA_MS = 10_000
+const duracionDelError = () =>
+  h.notify.mock.calls.map(([o]) => o as { variant: string; duration?: number }).filter((o) => o.variant === 'error').map((o) => o.duration)
+
 beforeEach(() => {
   h.filas = []; h.error = null; h.parches = []
   h.ordenes = []; h.recepciones = []; h.facturas = []; h.ordenesPago = []; h.duplicados = []; h.proveedores = [FERRETERIA]
@@ -223,6 +231,8 @@ describe('las seis acciones desde la pantalla: cero filas NO es éxito', () => {
     c.clic()
     await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
     expect(textoDeAvisos('error')[0]).toBe('Para marcar pagada una orden de pago (contabiliza el pago) tu perfil necesita el permiso «Compras y pagos — Ejecutar un pago».')
+    expect(duracionDelError()).toEqual([expect.any(Number)])
+    expect(duracionDelError()[0]).toBeGreaterThanOrEqual(DURACION_MINIMA_MS)
     expect(textoDeAvisos('success')).toEqual([])
     expect(invalidar).not.toHaveBeenCalled()
   })
@@ -233,6 +243,8 @@ describe('las seis acciones desde la pantalla: cero filas NO es éxito', () => {
     c.clic()
     await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
     expect(textoDeAvisos('error')[0]).toBe('Para ejecutar un pago tu perfil necesita estar asignado al proyecto del documento.')
+    expect(duracionDelError()).toEqual([expect.any(Number)])
+    expect(duracionDelError()[0]).toBeGreaterThanOrEqual(DURACION_MINIMA_MS)
     expect(textoDeAvisos('success')).toEqual([])
     expect(invalidar).not.toHaveBeenCalled()
   })
@@ -310,6 +322,7 @@ describe('Operaciones › Órdenes compra: aprobar y devolver con cero filas NO 
     fireEvent.click(screen.getByText(/Aprobar/))
     await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
     expect(textoDeAvisos('error')[0]).toBe('Para aprobar una orden de compra tu perfil necesita el permiso «Autorizar / Denegar — Órdenes compra».')
+    expect(duracionDelError()[0]).toBeGreaterThanOrEqual(DURACION_MINIMA_MS)
     expect(onRefresh).not.toHaveBeenCalled()
   })
 
@@ -319,6 +332,7 @@ describe('Operaciones › Órdenes compra: aprobar y devolver con cero filas NO 
     fireEvent.click(screen.getByText(/Aprobar/))
     await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
     expect(textoDeAvisos('error')[0]).toBe('Para ejecutar un pago tu perfil necesita estar asignado al proyecto del documento.')
+    expect(duracionDelError()[0]).toBeGreaterThanOrEqual(DURACION_MINIMA_MS)
     expect(onRefresh).not.toHaveBeenCalled()
     cleanup()
     h.notify.mockClear()
@@ -347,6 +361,7 @@ describe('Operaciones › Órdenes compra: aprobar y devolver con cero filas NO 
     fireEvent.click(screen.getByText(/Devolver a borrador/))
     await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
     expect(textoDeAvisos('error')[0]).toBe('Para devolver a borrador una orden aprobada tu perfil necesita el permiso «Autorizar / Denegar — Órdenes compra».')
+    expect(duracionDelError()[0]).toBeGreaterThanOrEqual(DURACION_MINIMA_MS)
     expect(textoDeAvisos('success')).toEqual([])
     expect(onRefresh).not.toHaveBeenCalled()
   })
@@ -357,6 +372,7 @@ describe('Operaciones › Órdenes compra: aprobar y devolver con cero filas NO 
     fireEvent.click(screen.getByText(/Cancelar OC/))
     await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
     expect(textoDeAvisos('error')[0]).toBe('Para cancelar una orden de compra tu perfil necesita el permiso «Cambiar estado — Contabilidad».')
+    expect(duracionDelError()[0]).toBeGreaterThanOrEqual(DURACION_MINIMA_MS)
     expect(textoDeAvisos('success')).toEqual([])
     expect(onRefresh).not.toHaveBeenCalled()
   })
@@ -454,5 +470,48 @@ describe('otras escrituras con efecto contable: cero filas NO es éxito', () => 
     expect(invalidar).toHaveBeenCalled()
     expect(h.parches[0].tabla).toBe(c.tabla)
     expect(h.parches[0].patch).toMatchObject(c.patch)
+  })
+})
+
+// Contratos de proveedor (Operaciones): activar, suspender, terminar o cancelar. De que el contrato esté activo depende poder
+// aprobar una orden de compra bajo él; un UPDATE que la política de filas deja en cero filas no falla en PostgREST, y sin
+// `.select('id')` la pantalla refrescaba como si el contrato hubiera cambiado de estado.
+describe('Contratos de proveedor › cambiar el estado: cero filas NO es éxito', () => {
+  const contrato = {
+    id: 'k1', company_id: 'c1', project_id: 'p1', proveedor_id: PROV, proveedor_nombre: 'Ferretería', servicio: 'otro',
+    fecha_inicio: '2026-01-01', estado: 'activo', modalidad: 'recurrente', moneda: 'GTQ', periodicidad: 'mensual',
+    importe_periodico: 100, responsable_id: 'u1', created_at: '2026-01-01',
+  }
+  const montarContrato = (onRefresh = vi.fn()) => {
+    h.prompt.mockResolvedValue({ motivo: 'Incumplimiento' })
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+    const invalidar = vi.spyOn(qc, 'invalidateQueries')
+    montarConSesion(
+      <ContratosProveedorTab contratos={[contrato] as never} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit onRefresh={onRefresh} />,
+      { permisos: VER_Y_EDITAR, queryClient: qc },
+    )
+    fireEvent.click(screen.getByText('Suspender'))
+    return { onRefresh, invalidar }
+  }
+
+  it('con cero filas muestra el error, no refresca y no invalida; el UPDATE sí se intentó con el estado y el motivo', async () => {
+    h.filas = []
+    const { onRefresh, invalidar } = montarContrato()
+    await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
+    expect(textoDeAvisos('error')[0]).toMatch(SIN_FILAS)
+    expect(textoDeAvisos('success')).toEqual([])
+    expect(onRefresh).not.toHaveBeenCalled()
+    expect(invalidar).not.toHaveBeenCalled()
+    expect(h.parches).toHaveLength(1)
+    expect(h.parches[0]).toEqual({ tabla: 'contratos_proveedores', patch: { estado: 'suspendido', motivo_estado: 'Incumplimiento' } })
+  })
+
+  it('con una fila afectada refresca la lista y no avisa de ningún error (control positivo)', async () => {
+    h.filas = [{ id: 'k1' }]
+    const { onRefresh, invalidar } = montarContrato()
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
+    expect(textoDeAvisos('error')).toEqual([])
+    expect(invalidar).toHaveBeenCalled()
+    expect(h.parches[0]).toEqual({ tabla: 'contratos_proveedores', patch: { estado: 'suspendido', motivo_estado: 'Incumplimiento' } })
   })
 })

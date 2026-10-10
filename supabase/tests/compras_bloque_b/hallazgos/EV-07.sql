@@ -87,8 +87,8 @@ SELECT ultimo AS ultimo_antes FROM public.compras_correlativos
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Se enciende la separación en C. Ahora el adversario (UQ: ver/crear/editar/autorizar) intenta TODO.
 -- ═══════════════════════════════════════════════════════════════════════════
-INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES (:C::uuid, true)
-  ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true;
+SELECT public.como_sistema($$ INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc', true)
+  ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true $$);
 
 SELECT public.como(:UQ::uuid);
 SET ROLE authenticated;

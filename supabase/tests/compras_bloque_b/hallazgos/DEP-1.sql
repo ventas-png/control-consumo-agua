@@ -59,7 +59,9 @@ INSERT INTO public.role_permissions (role_id, permission_key, effect) VALUES
   ('fa601000-0000-0000-0000-0000000000b1', 'platform.contabilidad.create',        'allow'),
   ('fa601000-0000-0000-0000-0000000000b1', 'platform.contabilidad.edit',          'allow'),
   ('fa601000-0000-0000-0000-0000000000b1', 'platform.contabilidad.approve',       'allow'),
-  ('fa601000-0000-0000-0000-0000000000b1', 'platform.contabilidad.change_status', 'allow');
+  ('fa601000-0000-0000-0000-0000000000b1', 'platform.contabilidad.change_status', 'allow'),
+  -- PERMISOS POR ACCIÓN (20261027000900): nacer una orden «aprobada»/«emitida» exige la llave de la pestaña, no `approve` genérico.
+  ('fa601000-0000-0000-0000-0000000000b1', 'condominios.tab.ordenes_compra.approve', 'allow');
 INSERT INTO public.user_roles (user_id, role_id)
 VALUES ('fa601000-0000-0000-0000-0000000000a1', 'fa601000-0000-0000-0000-0000000000b1');
 
@@ -167,7 +169,7 @@ SELECT public.chk_txt((SELECT estado FROM public.ordenes_compra WHERE id = 'fa60
 -- ═══════════════════════════════════════════════════════════════════════════
 -- B · Separación APAGADA (fila en false): el comportamiento de 0700 no cambia
 -- ═══════════════════════════════════════════════════════════════════════════
-UPDATE public.compras_config SET aprobacion_separada = false WHERE company_id = :C::uuid;
+SELECT public.como_sistema($$ UPDATE public.compras_config SET aprobacion_separada = false WHERE company_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' $$);
 
 SELECT public.como(:UQ::uuid);
 SET ROLE authenticated;
@@ -210,8 +212,8 @@ SELECT public.chk_txt((SELECT estado FROM public.ordenes_compra WHERE id = 'fa60
 -- C · La configuración es POR EMPRESA
 -- ═══════════════════════════════════════════════════════════════════════════
 -- D enciende la separación; C no la tiene: UQ (C) sigue pudiendo; el administrador de D no.
-INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES (:D::uuid, true)
-  ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true;
+SELECT public.como_sistema($$ INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES ('dddddddd-dddd-dddd-dddd-dddddddddddd', true)
+  ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true $$);
 SELECT public.como(:UQ::uuid);
 SET ROLE authenticated;
 INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado)
@@ -225,9 +227,9 @@ RESET ROLE;
 SELECT public.chk_txt((SELECT estado FROM public.ordenes_compra WHERE id = 'fa601001-0000-0000-0000-000000000031'), 'aprobada', '[DEP-1p] y la empresa C (apagada) no se ve afectada por la de D');
 
 -- C enciende y D apaga: el administrador de D vuelve a poder, el de C no.
-UPDATE public.compras_config SET aprobacion_separada = false WHERE company_id = :D::uuid;
-INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES (:C::uuid, true)
-  ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true;
+SELECT public.como_sistema($$ UPDATE public.compras_config SET aprobacion_separada = false WHERE company_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd' $$);
+SELECT public.como_sistema($$ INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc', true)
+  ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true $$);
 SELECT public.como(:UD::uuid);
 SET ROLE authenticated;
 INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado)
@@ -250,6 +252,6 @@ SELECT public.chk((SELECT count(*) FROM public.ordenes_compra
   '[DEP-1r] invariante: bajo separación encendida no existe orden con solicitante = aprobador');
 
 -- ── Se deja la configuración como estaba ─────────────────────────────────────
-DELETE FROM public.compras_config WHERE company_id IN (:C::uuid, :D::uuid);
-INSERT INTO public.compras_config SELECT * FROM fa6_dep1_previa;
+SELECT public.como_sistema($$ DELETE FROM public.compras_config WHERE company_id IN ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'dddddddd-dddd-dddd-dddd-dddddddddddd') $$);
+SELECT public.como_sistema($$ INSERT INTO public.compras_config SELECT * FROM fa6_dep1_previa $$);
 DROP TABLE fa6_dep1_previa;

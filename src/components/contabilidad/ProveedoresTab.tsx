@@ -20,6 +20,7 @@ import {
 } from '../../domain/compras/mutations'
 import { useDocumentosProveedorQuery } from '../../domain/compras/queries'
 import { proveedorDocumentoSchema, proveedorEstadoSchema } from '../../domain/compras/schemas'
+import { DURACION_ERROR_LARGO_MS, mensajeAccionCompras } from '../../domain/compras/errores'
 import { formatDateShort, hoyLocalISO } from '../../lib/format'
 import { CATEGORIAS_GASTO_CXP } from '../../types/cxp'
 import {
@@ -481,7 +482,13 @@ function DocumentosProveedorModal({
                         onClick={async () => {
                           // confirm() devuelve { isConfirmed }: un objeto siempre es «verdadero», así que `if (ok)` eliminaba aunque se cancelara.
                           const { isConfirmed } = await confirm({ title: 'Eliminar documento', text: '¿Eliminar este documento del expediente?', confirmText: 'Eliminar' })
-                          if (isConfirmed) await eliminar.mutateAsync(d.id)
+                          if (!isConfirmed) return
+                          try {
+                            await eliminar.mutateAsync(d.id)
+                          } catch (e) {
+                            // Sin el try/catch el rechazo del servidor (o «no cambió ninguna fila») quedaba sin manejar y sin aviso alguno.
+                            notify({ variant: 'error', title: 'No se pudo eliminar', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e, 'No se pudo eliminar el documento.') })
+                          }
                         }}
                       >✕</button>
                     )}

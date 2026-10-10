@@ -99,10 +99,18 @@ INSERT INTO public.role_permissions (role_id, permission_key, effect) VALUES
   ('9b000000-0000-0000-0000-00000000001a', 'platform.contabilidad.create',  'allow'),
   ('9b000000-0000-0000-0000-00000000001a', 'platform.contabilidad.edit',    'allow'),
   ('9b000000-0000-0000-0000-00000000001a', 'platform.contabilidad.approve', 'allow'),
+  -- PERMISOS POR ACCIÓN (20261027000900): `approve` genérico ya no basta; UQ recibe las llaves de lo que `approve` cubría.
+  ('9b000000-0000-0000-0000-00000000001a', 'condominios.tab.ordenes_compra.approve',               'allow'),
+  ('9b000000-0000-0000-0000-00000000001a', 'platform.contabilidad.compras.factura_aprobar',        'allow'),
+  ('9b000000-0000-0000-0000-00000000001a', 'platform.contabilidad.compras.orden_pago_aprobar',     'allow'),
   ('9b000000-0000-0000-0000-00000000001b', 'platform.contabilidad.view',          'allow'),
   ('9b000000-0000-0000-0000-00000000001b', 'platform.contabilidad.create',        'allow'),
   ('9b000000-0000-0000-0000-00000000001b', 'platform.contabilidad.edit',          'allow'),
-  ('9b000000-0000-0000-0000-00000000001b', 'platform.contabilidad.change_status', 'allow');
+  ('9b000000-0000-0000-0000-00000000001b', 'platform.contabilidad.change_status', 'allow'),
+  -- PERMISOS POR ACCIÓN (20261027000900): `change_status` genérico ya no registra recepciones ni paga; US recibe las llaves de lo que cubría.
+  ('9b000000-0000-0000-0000-00000000001b', 'platform.contabilidad.compras.recepcion_registrar',    'allow'),
+  ('9b000000-0000-0000-0000-00000000001b', 'platform.contabilidad.compras.pago_ejecutar',          'allow'),
+  ('9b000000-0000-0000-0000-00000000001b', 'platform.contabilidad.compras.pago_anular',            'allow');
 INSERT INTO public.user_roles (user_id, role_id) VALUES
   ('c0c0c0c0-0000-0000-0000-00000000001a', '9b000000-0000-0000-0000-00000000001a'),
   ('c0c0c0c0-0000-0000-0000-00000000001b', '9b000000-0000-0000-0000-00000000001b');
