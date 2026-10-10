@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import { createCompanyUser, deleteCompanyUser, setUsuarioActivo } from '../../domain/empresa/usuarios'
+import { createCompanyUser, deleteCompanyUser, puedeEditarAsignaciones, setUsuarioActivo } from '../../domain/empresa/usuarios'
 import { insertUserRoles, ensureCompanyRoleFromTemplate } from '../../domain/empresa/roles'
 import type { UserSession, Proyecto } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
@@ -223,6 +223,8 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
   // only appears when the action would actually succeed.
   const isSuperAdmin = currentUser.role === 'super_admin'
   const canDeleteUsers = isSuperAdmin || currentUser.role === 'company_owner' || currentUser.role === 'admin'
+  // ¿Puede quien mira cambiar los proyectos de esa fila? Un administrador no, en la suya (ver puedeEditarAsignaciones).
+  const permisoAcceso = (u: Usuario) => puedeEditarAsignaciones({ id: currentUser.user_id, role: currentUser.role }, u)
   const DELETABLE_TARGET_ROLES = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
 
   return (
@@ -352,6 +354,11 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
                     <div style={{ color: 'var(--at-ink)', fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {u.full_name}
                     </div>
+                    {!permisoAcceso(u).permitido && (
+                      <div id={`acceso-propio-${u.id}`} style={{ color: 'var(--at-ink-3)', fontSize: '11px', marginTop: '2px' }}>
+                        Tus proyectos los cambia otro administrador, el propietario o el superadministrador.
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '3px' }}>
                       {(u.assigned_roles ?? []).map(r => {
                         const icon = r.service === 'agua' ? '💧' : r.service === 'condominios' ? '🏢' : '⚙️'
@@ -370,14 +377,19 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {/* Un administrador no cambia sus propios proyectos (ampliaría su alcance o, borrándolos, quedaría exento):
+                      el servidor lo rechaza (migración 20261026000600), así que aquí no se ofrece y se explica. */}
                   <button
                     onClick={() => setUsuarioAsignar(u)}
-                    title="Asignar acceso a proyectos"
+                    disabled={!permisoAcceso(u).permitido}
+                    aria-describedby={permisoAcceso(u).permitido ? undefined : `acceso-propio-${u.id}`}
+                    title={permisoAcceso(u).motivo ?? 'Asignar acceso a proyectos'}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '5px',
                       padding: '6px 10px', borderRadius: '7px', border: '1px solid var(--at-primary-soft)',
                       background: 'var(--at-primary-tint)', color: 'var(--at-accent-2)',
-                      cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
+                      cursor: permisoAcceso(u).permitido ? 'pointer' : 'not-allowed', opacity: permisoAcceso(u).permitido ? 1 : 0.55,
+                      fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                     }}
                   >
                     <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -440,7 +452,7 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
         <AsignacionModal
           usuario={usuarioAsignar}
           proyectos={proyectos}
-
+          actor={{ id: currentUser.user_id, role: currentUser.role }}
           onClose={() => setUsuarioAsignar(null)}
           onSaved={() => onReload()}
         />

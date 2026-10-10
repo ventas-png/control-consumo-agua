@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import {
   fetchUserProjectAssignments,
-  deleteUserProjectAssignments,
-  insertUserProjectAssignments,
+  guardarAsignacionesProyecto,
+  puedeEditarAsignaciones,
 } from '../../domain/empresa/usuarios'
 import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
+import { notify } from '../shared/Dialog'
 
 interface Usuario {
   id: string
@@ -23,9 +24,12 @@ interface AsignacionModalProps {
   proyectos: Proyecto[]
   onClose: () => void
   onSaved: () => void
+  /** Quien edita. Un administrador no puede editarse a sí mismo (el servidor lo rechaza): se deshabilita Guardar con la explicación. */
+  actor?: { id: string; role: string }
 }
 
-export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: AsignacionModalProps) {
+export function AsignacionModal({ usuario, proyectos, onClose, onSaved, actor }: AsignacionModalProps) {
+  const permiso = actor ? puedeEditarAsignaciones(actor, usuario) : { permitido: true, motivo: null }
   const [asignados, setAsignados] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -42,26 +46,21 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
   }, [usuario.id])
 
   async function guardar() {
+    if (!permiso.permitido) return
     setSaving(true)
     try {
-      const { error: deleteError } = await deleteUserProjectAssignments(usuario.id)
-      if (deleteError) throw new Error(deleteError)
-
-      if (asignados.size > 0) {
-        const nuevas = Array.from(asignados).map(project_id => ({
-          user_id: usuario.id,
-          project_id,
-          permission_type: 'total',
-        }))
-        const { error: insertError } = await insertUserProjectAssignments(nuevas)
-        if (insertError) throw new Error(insertError)
+      // Inserta las que faltan y borra sólo las que sobran (las filas que no cambian no se tocan) y lo comprueba leyendo de vuelta.
+      const { error } = await guardarAsignacionesProyecto(
+        usuario.id,
+        Array.from(asignados),
+        proyectos.map(p => p.id),
+      )
+      if (error) {
+        notify({ title: 'Asignaciones sin guardar', text: error, variant: 'error', duration: 9000 })
+        return
       }
-
       onSaved()
       onClose()
-    } catch (err) {
-      console.error('Error guardando asignaciones:', err)
-      alert('Error al guardar las asignaciones. Por favor intente de nuevo.')
     } finally {
       setSaving(false)
     }
@@ -99,12 +98,24 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
             onClick={() => void guardar()}
             loading={saving}
             loadingText="Guardando..."
+            disabled={!permiso.permitido}
           >
             Guardar
           </Button>
         </>
       }
     >
+      {!permiso.permitido && (
+        <div
+          role="note"
+          style={{
+            marginBottom: '12px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', lineHeight: 1.4,
+            color: 'var(--at-ink)', background: 'var(--at-surface-2)', border: '1px solid var(--at-line-strong)',
+          }}
+        >
+          {permiso.motivo}
+        </div>
+      )}
       {loading ? (
         <div style={{ color: 'var(--at-ink-3)', textAlign: 'center', padding: '20px' }}>Cargando...</div>
       ) : proyectos.length === 0 ? (
@@ -129,8 +140,9 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
                 <input
                   type="checkbox"
                   checked={checked}
+                  disabled={!permiso.permitido}
                   onChange={() => toggleProyecto(p.id)}
-                  style={{ accentColor: 'var(--at-primary)', width: '16px', height: '16px', cursor: 'pointer' }}
+                  style={{ accentColor: 'var(--at-primary)', width: '16px', height: '16px', cursor: permiso.permitido ? 'pointer' : 'not-allowed' }}
                 />
                 <span style={{ color: 'var(--at-ink)', fontSize: '14px', fontWeight: checked ? 600 : 400 }}>
                   {p.nombre}
