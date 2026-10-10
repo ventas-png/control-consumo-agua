@@ -562,15 +562,14 @@ BEGIN
   PERFORM hkt.ok('J1 la tabla de fotos tiene EXACTAMENTE select + insert',
     (SELECT array_agg(policyname::text ORDER BY policyname) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'servicio_housekeeping_fotos')
       = ARRAY['hk_fotos_insert', 'hk_fotos_select']);
-  PERFORM hkt.ok('J2 el bucket tiene EXACTAMENTE select + insert (ni update ni delete para clientes)',
+  PERFORM hkt.ok('J2 el bucket tiene EXACTAMENTE select + insert (los clientes no modifican ni borran archivos)',
     (SELECT array_agg(policyname::text ORDER BY policyname) FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname LIKE 'hk\_evidencias\_%')
       = ARRAY['hk_evidencias_insert', 'hk_evidencias_select']);
-  PERFORM hkt.ok('J3 authenticated: SELECT+INSERT sí; UPDATE/DELETE/TRUNCATE no',
-    has_table_privilege('authenticated', 'public.servicio_housekeeping_fotos', 'SELECT')
-    AND has_table_privilege('authenticated', 'public.servicio_housekeeping_fotos', 'INSERT')
-    AND NOT has_table_privilege('authenticated', 'public.servicio_housekeeping_fotos', 'UPDATE')
-    AND NOT has_table_privilege('authenticated', 'public.servicio_housekeeping_fotos', 'DELETE')
-    AND NOT has_table_privilege('authenticated', 'public.servicio_housekeeping_fotos', 'TRUNCATE'));
+  -- Lista EXACTA de privilegios (más estricta que preguntar uno a uno): solo leer y subir.
+  PERFORM hkt.ok('J3 authenticated tiene EXACTAMENTE SELECT + INSERT sobre la tabla de fotos (ni modificar, ni borrar, ni vaciar)',
+    (SELECT array_agg(privilege_type::text ORDER BY privilege_type) FROM information_schema.role_table_grants
+      WHERE grantee = 'authenticated' AND table_schema = 'public' AND table_name = 'servicio_housekeeping_fotos')
+      = ARRAY['INSERT', 'SELECT']);
   PERFORM hkt.ok('J4 anon: nada en la tabla de fotos ni en la cola',
     NOT has_table_privilege('anon', 'public.servicio_housekeeping_fotos', 'SELECT')
     AND NOT has_table_privilege('anon', 'public.hk_limpieza_storage', 'SELECT')

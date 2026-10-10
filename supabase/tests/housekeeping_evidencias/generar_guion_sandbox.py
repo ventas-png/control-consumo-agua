@@ -12,7 +12,6 @@ Diferencias con el PostgreSQL desechable, y por qué:
   · los permisos salen del RBAC real (roles / role_permissions / user_roles), no de `test_permisos`;
   · sin residente (necesita `unidades` reales) → se omiten A9, B6 y C7;
   · sin la cascada de PROYECTO (G32): borrar un proyecto arrastra decenas de tablas del sandbox;
-  · `DELETE FROM hk_limpieza_storage` → TRUNCATE (la herramienta SQL del sandbox se cuelga con DELETE masivos);
   · la concurrencia real (dos sesiones) no cabe en una sentencia: se prueba solo en el PostgreSQL desechable.
 Uso: python3 generar_guion_sandbox.py > sandbox_housekeeping.sql
 """
@@ -79,7 +78,6 @@ INSERT INTO public.servicios_housekeeping (id, company_id, project_id, estado)
 cuerpo = asr
 cuerpo = cuerpo.replace('\\set ON_ERROR_STOP on\n', '').replace('\\i lib.sql\n', '').replace('\\i datos.sql\n', '')
 cuerpo = cuerpo.replace("SELECT 'ASSERT_OK' AS resultado;", '')
-cuerpo = cuerpo.replace('DELETE FROM public.hk_limpieza_storage;', 'TRUNCATE public.hk_limpieza_storage;')
 
 def quitar(txt, ini, fin, incluir_fin=False):
     i = txt.index(ini); j = txt.index(fin, i)
@@ -100,27 +98,59 @@ cuerpo = '\n'.join(
     re.sub(r'(\b\w+) public\.(servicios_housekeeping|servicio_housekeeping_fotos);', r'\1 record;', ln) if ln.startswith('DECLARE') else ln
     for ln in cuerpo.split('\n'))
 
+# ── Sin sentencias destructivas escritas a mano ─────────────────────────────────────────────
+# La herramienta SQL del sandbox RETIENE (espera una confirmación humana que no llega y corta a los 60 s)
+# las sentencias destructivas: se comprobó que ni siquiera llegan a la base (pg_stat_activity vacío). No se
+# disfraza el texto para esquivarlo: estas partes NO contienen DELETE/TRUNCATE/DROP escritos aquí. El borrado
+# se ejerce llamando a las RPC del producto (hk_eliminar_foto / hk_eliminar_servicio), cuyos DELETE internos
+# sí corren en el sandbox sobre filas de prueba y dentro de una transacción que se revierte.
+# Lo que se omite aquí (D2, D4, G11, G12, G29, G30, G31 y los vaciados de la cola) se prueba en el
+# PostgreSQL desechable con assert.sql completo.
+def quitar_entre(txt, ini, fin, incluir_fin=True):
+    a = txt.index(ini); b = txt.index(fin, a)
+    return txt[:a] + txt[b + (len(fin) if incluir_fin else 0):]
+
+cuerpo = quitar_entre(cuerpo, "  PERFORM hkt.ok('D2", "  PERFORM hkt.ok('D3", incluir_fin=False)
+cuerpo = quitar_entre(cuerpo, "  PERFORM hkt.ok('D4", "  PERFORM hkt.root();\n  SELECT count(*) INTO despues", incluir_fin=False)
+cuerpo = quitar_entre(cuerpo, "  -- «Cero filas afectadas»: un BEFORE", "  DROP TRIGGER trg_hkt_cancela ON public.servicio_housekeeping_fotos;\n")
+cuerpo = quitar_entre(cuerpo, "  -- «Cero filas» en el servicio", "  PERFORM hkt.ok('G30 …y el servicio sigue ahí', (SELECT count(*) FROM public.servicios_housekeeping WHERE id = hkt.sv(14)) = 1);\n")
+# G31 (DELETE directo): desde su comentario hasta el final de su comprobación
+a = cuerpo.index("  -- Por la vía vieja")
+b = cuerpo.index("= 1);", cuerpo.index("PERFORM hkt.ok('G31", a)) + len("= 1);\n")
+cuerpo = cuerpo[:a] + cuerpo[b:]
+cuerpo = cuerpo.replace("  DELETE FROM public.hk_limpieza_storage;\n", "")
+# La BD de cada parte arranca con la cola vacía (preflight) porque cada parte es su propia transacción.
+
+# Comentarios de línea completa fuera (mismo contenido, menos superficie de texto).
+cuerpo = '\n'.join(l for l in cuerpo.split('\n') if not l.strip().startswith('--'))
+
 # Cada «DO $$ … $$;» pasa a ser un bloque anidado.
 bloques = []
 resto = cuerpo
-sembrado = resto[:resto.index('-- ── A ·')]
+sembrado = resto[:resto.index('DO $$')]
 resto = resto[len(sembrado):]
 for m in re.finditer(r'DO \$\$\n(.*?)\n?\$\$;', resto, flags=re.S):
     bloques.append(m.group(1).rstrip() + ';')
-assert len(bloques) >= 10, f'se esperaban ≥10 bloques, hay {len(bloques)}'
+assert len(bloques) == 13, f'se esperaban 13 bloques, hay {len(bloques)}'
 
-salida = ['-- GENERADO por generar_guion_sandbox.py a partir de assert.sql: NO editar a mano.',
-          '-- VALIDACIÓN EN SANDBOX · 20261028000000_housekeeping_evidencias. UNA sentencia que TERMINA SIEMPRE con una',
-          '-- excepción que REVIERTE todo (GUION_OK_REVERTIDO / GUION_FALLO / GUION_ABORTA). Padrón de usar y tirar `ZZ HK`.',
-          'DO $guion$', 'DECLARE', '  fallos int; total int; detalle text;', 'BEGIN',
-          "  SET LOCAL statement_timeout = '120s';",
-          '  SET LOCAL lock_timeout = \'10s\';']
-salida.append(lib.replace('\\i', '--').strip())
-salida.append(datos.strip())
-salida.append(sembrado.strip())
-for b in bloques:
-    salida.append('  BEGIN\n' + b + '\n  END;')
-salida.append('''  PERFORM hkt.root();
+# Cada parte es SU PROPIA transacción (arranca con la cola y el bucket vacíos). Índices de bloque:
+# 0 A · 1 B · 2 C(filas+objetos) · 3 C9/C10 · 4 D · 5 E · 6 F · 7 G(fotos) · 8 G(servicios) · 9 H(cola) · 10 H(huérfanas) · 11 I · 12 J
+PARTES = [[0, 1, 2, 3, 4, 5], [6, 12], [7], [8], [9], [10, 11]]
+
+lib_txt = lib.replace('\\i', '--')
+lib_txt = '\n'.join(l for l in lib_txt.split('\n') if not l.strip().startswith('--'))
+
+def parte(indices, n):
+    salida = [f'-- GENERADO por generar_guion_sandbox.py (parte {n} de {len(PARTES)}): NO editar a mano.',
+              '-- Una sentencia que TERMINA SIEMPRE con una excepción que REVIERTE todo (GUION_OK_REVERTIDO / GUION_FALLO / GUION_ABORTA).',
+              'DO $guion$', 'DECLARE', '  fallos int; total int; detalle text;', 'BEGIN',
+              "  SET LOCAL lock_timeout = '10s';"]
+    salida.append(lib_txt.strip())
+    salida.append(datos.strip())
+    salida.append(sembrado.strip())
+    for b in [bloques[i] for i in indices]:
+        salida.append('  BEGIN\n' + b + '\n  END;')
+    salida.append("""  PERFORM hkt.root();
   SELECT count(*) FILTER (WHERE NOT ok), count(*) INTO fallos, total FROM hkt.res;
   SELECT string_agg(CASE WHEN ok THEN 'OK    ' ELSE 'FALLO ' END || txt, E'\\n' ORDER BY n) INTO detalle FROM hkt.res;
   IF fallos > 0 THEN
@@ -128,5 +158,17 @@ salida.append('''  PERFORM hkt.root();
   END IF;
   RAISE EXCEPTION E'GUION_OK_REVERTIDO · % comprobaciones, 0 con FALLO\\n%', total, detalle;
 END
-$guion$;''')
-sys.stdout.write('\n'.join(salida) + '\n')
+$guion$;""")
+    texto = '\n'.join(salida) + '\n'
+    prohibidas = re.findall(r'(?i)\b(delete|truncate|drop)\b', texto)
+    assert not prohibidas, f'la parte {n} contiene sentencias destructivas: {set(prohibidas)}'
+    return texto
+
+if len(sys.argv) > 1 and sys.argv[1] == '--escribir':
+    for n, idx in enumerate(PARTES, 1):
+        (aqui / f'sandbox_housekeeping_parte{n}.sql').write_text(parte(idx, n))
+    print(f'{len(PARTES)} partes escritas', file=sys.stderr)
+elif len(sys.argv) > 2 and sys.argv[1] == '--parte':
+    n = int(sys.argv[2]); sys.stdout.write(parte(PARTES[n - 1], n))
+else:
+    print('uso: generar_guion_sandbox.py --escribir | --parte N', file=sys.stderr); sys.exit(2)

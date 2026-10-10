@@ -18,9 +18,10 @@
 #                 deben quedar exactamente 20 y 4 rechazos
 #   6 · mutación  la MISMA prueba contra una copia SIN el candado: debe dar 24. Si diera 20
 #                 la prueba de concurrencia no estaría probando nada.
-#   7 · guion del sandbox  sandbox_housekeeping.sql (GENERADO desde assert.sql) se ejecuta aquí con el
-#                 contrato del sandbox (RBAC real, JWT por GUC): debe terminar en GUION_OK_REVERTIDO,
-#                 sin dejar residuo, y abortar si la migración no está aplicada.
+#   7 · guion del sandbox  sandbox_housekeeping_parte1..6.sql (GENERADOS desde assert.sql, sin sentencias
+#                 destructivas escritas a mano) se ejecutan aquí con el contrato del sandbox (RBAC real,
+#                 JWT por GUC): cada parte debe terminar en GUION_OK_REVERTIDO, sin dejar residuo, y
+#                 abortar si la migración no está aplicada.
 #
 # USO:  supabase/tests/housekeeping_evidencias/run.sh
 # Requiere initdb/pg_ctl/psql. No toca ningún proyecto remoto: cluster temporal.
@@ -137,21 +138,29 @@ else
   echo "❌ la mutación no se detectó («$R» en vez de 24|0): la prueba de concurrencia no prueba el candado"; exit 1
 fi
 
-echo "── 7/7 · guion del sandbox, ejecutado aquí con el contrato del sandbox ─"
-# El archivo está generado: si alguien edita assert.sql y no regenera, el sandbox probaría otra cosa.
-python3 -I "$AQUI/generar_guion_sandbox.py" | cmp -s - "$AQUI/sandbox_housekeeping.sql" \
-  || { echo "❌ sandbox_housekeeping.sql no coincide con generar_guion_sandbox.py (regenerar: python3 generar_guion_sandbox.py > sandbox_housekeeping.sql)"; exit 1; }
-echo "  OK    sandbox_housekeeping.sql coincide con su generador"
+echo "── 7/7 · guion del sandbox (6 partes), ejecutado aquí con el contrato del sandbox ─"
+# Los archivos están generados: si alguien edita assert.sql y no regenera, el sandbox probaría otra cosa.
+PARTES=6
+for n in $(seq 1 $PARTES); do
+  python3 -I "$AQUI/generar_guion_sandbox.py" --parte "$n" | cmp -s - "$AQUI/sandbox_housekeeping_parte$n.sql" \
+    || { echo "❌ sandbox_housekeeping_parte$n.sql no coincide con generar_guion_sandbox.py (regenerar: python3 generar_guion_sandbox.py --escribir)"; exit 1; }
+done
+echo "  OK    las $PARTES partes coinciden con su generador"
 for f in "$AQUI/fixture.sql" "$AQUI/fixture_compat_sandbox.sql" "$MIGRACION"; do aplicar hksb "$f"; done
-SALIDA=$(psql -q -d hksb -f "$AQUI/sandbox_housekeeping.sql" 2>&1 || true)
-echo "$SALIDA" | grep -q "GUION_OK_REVERTIDO" || { echo "$SALIDA" | head -20; echo "❌ el guion del sandbox no terminó en GUION_OK_REVERTIDO"; exit 1; }
-N=$(echo "$SALIDA" | sed -n 's/.*GUION_OK_REVERTIDO · \([0-9]*\) comprobaciones.*/\1/p')
-echo "  OK    GUION_OK_REVERTIDO · $N comprobaciones, 0 con FALLO"
+TOTAL=0
+for n in $(seq 1 $PARTES); do
+  SALIDA=$(psql -q -d hksb -f "$AQUI/sandbox_housekeeping_parte$n.sql" 2>&1 || true)
+  echo "$SALIDA" | grep -q "GUION_OK_REVERTIDO" || { echo "$SALIDA" | head -25; echo "❌ la parte $n del guion no terminó en GUION_OK_REVERTIDO"; exit 1; }
+  N=$(echo "$SALIDA" | sed -n 's/.*GUION_OK_REVERTIDO · \([0-9]*\) comprobaciones.*/\1/p')
+  TOTAL=$((TOTAL + N))
+  echo "  OK    parte $n · GUION_OK_REVERTIDO · $N comprobaciones, 0 con FALLO"
+done
+echo "  OK    total: $TOTAL comprobaciones en $PARTES transacciones independientes"
 RES=$(psql -q -At -d hksb -c "SELECT (SELECT count(*) FROM public.companies) || '|' || (SELECT count(*) FROM public.servicio_housekeeping_fotos) || '|' || (SELECT count(*) FROM storage.objects) || '|' || coalesce(to_regclass('hkt.res')::text, 'sin_hkt') || '|' || (SELECT count(*) FROM public.hk_limpieza_storage)")
 [ "$RES" = "0|0|0|sin_hkt|0" ] || { echo "❌ el guion dejó residuo («$RES»)"; exit 1; }
 echo "  OK    sin residuo: 0 empresas, 0 fotos, 0 objetos, 0 en la cola y el esquema de pruebas revertido"
 for f in "$AQUI/fixture.sql" "$AQUI/fixture_compat_sandbox.sql"; do aplicar hksb0 "$f"; done
-SALIDA=$(psql -q -d hksb0 -f "$AQUI/sandbox_housekeeping.sql" 2>&1 || true)
+SALIDA=$(psql -q -d hksb0 -f "$AQUI/sandbox_housekeeping_parte1.sql" 2>&1 || true)
 echo "$SALIDA" | grep -q "GUION_ABORTA: la migración 20261028000000_housekeeping_evidencias NO está aplicada" \
   || { echo "$SALIDA" | head -5; echo "❌ sin la migración el guion debía abortar"; exit 1; }
 echo "  OK    sin la migración aplicada el guion ABORTA sin escribir nada (lo que verá el sandbox antes de aplicarla)"

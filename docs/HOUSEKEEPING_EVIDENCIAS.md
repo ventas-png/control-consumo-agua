@@ -84,11 +84,11 @@ resetear** el branch: aplicar el contenido final (idempotente y probado contra e
 
 ```sql
 -- 1) aplicar el contenido de 20261028000000_housekeeping_evidencias.sql (idempotente)
--- 2) mover el registro de la versión antigua a la definitiva
+-- 2) mover el registro de la versión antigua a la definitiva (solo versión y nombre, como hace
+--    apply-migrations-sandbox.yml)
 BEGIN;
 DELETE FROM supabase_migrations.schema_migrations WHERE version = '20261023000001' AND name = 'housekeeping_evidencias';
-INSERT INTO supabase_migrations.schema_migrations (version, name, statements)
-VALUES ('20261028000000', 'housekeeping_evidencias', ARRAY[ /* sentencias del archivo */ ])
+INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('20261028000000', 'housekeeping_evidencias')
 ON CONFLICT (version) DO NOTHING;
 COMMIT;
 ```
