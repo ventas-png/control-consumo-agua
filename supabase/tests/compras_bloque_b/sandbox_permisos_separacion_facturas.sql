@@ -1,15 +1,11 @@
 -- ============================================================================
--- VALIDACIÓN EN SANDBOX · PERMISOS POR ACCIÓN, SEPARACIÓN SOLICITANTE/APROBADOR Y NÚMEROS DE FACTURA
--- (migración 20261027000900). Corre DESPUÉS de aplicarla (antes de ella debe MOSTRAR las fallas).
---
--- «API directa»: DML como `authenticated` con el sub del JWT fijado, que es lo que ejecuta PostgREST (no se usa ninguna
--- RPC de ayuda; solo las RPC reales compras_separacion_configurar y compras_factura_crear). SQL plano; UNA sola sentencia
--- (DO) que TERMINA SIEMPRE con una excepción para REVERTIR todo (incluida la separación que se enciende a mitad de camino):
---   GUION_OK_REVERTIDO → todo coincide · GUION_FALLO → alguna comprobación no coincide · otro → fallo del recorrido.
--- Sin DROP ni DELETE suelto. Los DELETE/UPDATE/TRUNCATE de la bitácora y de compras_config son INTENTOS que deben ser
--- rechazados (cada uno en su subtransacción). Padrón de usar y tirar `5b71…`, empresas «ZZ Permisos C» y «ZZ Permisos D».
--- La fila AUSENTE de compras_config se simula con ALTER TABLE … DISABLE TRIGGER dentro de la transacción (en el sandbox
--- `postgres` no es superusuario y no puede usar session_replication_role); se vuelve a habilitar y todo se revierte.
+-- VALIDACIÓN EN SANDBOX · PERMISOS POR ACCIÓN, SEPARACIÓN SOLICITANTE/APROBADOR Y NÚMEROS DE FACTURA (migración 20261027000900).
+-- «API directa»: DML como `authenticated` con el sub del JWT fijado (lo que ejecuta PostgREST); sin RPC de ayuda (solo las reales:
+-- compras_separacion_configurar y compras_factura_crear). UNA sola sentencia (DO) que TERMINA SIEMPRE con una excepción que REVIERTE todo
+-- (también la separación que se enciende a mitad de camino): GUION_OK_REVERTIDO · GUION_FALLO (alguna comprobación no coincide) · otro (fallo del recorrido).
+-- Sin DROP ni DELETE suelto: los DELETE/UPDATE/TRUNCATE sobre compras_config y la bitácora son INTENTOS que deben rechazarse, cada uno en su
+-- subtransacción. Padrón de usar y tirar `5b71…` (empresas «ZZ Permisos C» y «ZZ Permisos D»). La fila AUSENTE de compras_config se simula con
+-- ALTER TABLE … DISABLE TRIGGER dentro de la transacción (en el sandbox `postgres` no es superusuario: no puede usar session_replication_role).
 -- ============================================================================
 DO $guion$
 DECLARE
@@ -41,16 +37,16 @@ DECLARE
   sq text[]; sqt text[] := ARRAY[]::text[]; vf text[]; ex text[];
   ev text[] := ARRAY[]::text[];
   stm text[]; stl text[];
-  rj jsonb; r text; sql_ins text; pp uuid; n1 int; n2 int;
+  rj jsonb; r text; sql_ins text; pp uuid; n1 int; n2 int; n3 int;
   i int; j int; fallos int;
 BEGIN
   CREATE FUNCTION pg_temp.ck(p_lbl text, p_o text, p_e text) RETURNS text LANGUAGE sql IMMUTABLE AS
     $f$ SELECT CASE WHEN $2 IS NOT DISTINCT FROM $3 THEN 'OK    ' ELSE 'FALLO ' END || $1 || ' · obtenido=' || coalesce($2, 'NULL') || ' esperado=' || coalesce($3, 'NULL') $f$;
-  -- Ejecuta una sentencia que DEBE fallar. Si NO falla, informa «SIN ERROR» y REVIERTE su efecto.
+  -- Sentencia que DEBE fallar; si NO falla informa «SIN ERROR» y REVIERTE su efecto.
   CREATE FUNCTION pg_temp.err(p text) RETURNS text LANGUAGE plpgsql AS
     $f$ BEGIN EXECUTE p; RAISE EXCEPTION 'SIN_ERROR_REVERTIDO';
         EXCEPTION WHEN OTHERS THEN IF SQLERRM = 'SIN_ERROR_REVERTIDO' THEN RETURN 'SIN ERROR'; END IF; RETURN split_part(SQLERRM, ':', 1); END $f$;
-  -- Igual que err(), pero con la sesión de otra persona (JWT + rol authenticated); vuelve al rol de partida y sin sub (= proceso de sistema).
+  -- Como err() con la sesión de otra persona (JWT + authenticated); vuelve al rol de partida y sin sub (= proceso de sistema).
   CREATE FUNCTION pg_temp.err_como(p_uid uuid, p text) RETURNS text LANGUAGE plpgsql AS
     $f$ DECLARE r text; BEGIN
         PERFORM set_config('request.jwt.claim.sub', p_uid::text, true);
@@ -59,8 +55,8 @@ BEGIN
         EXECUTE 'RESET ROLE';
         PERFORM set_config('request.jwt.claim.sub', '', true);
         RETURN r; END $f$;
-  -- Ejecuta una sentencia como esa persona y REVIERTE siempre. Devuelve: el rechazo («COMPRAS_…»), «0 FILAS» si no afectó ninguna
-  -- (GET DIAGNOSTICS ROW_COUNT: la pantalla no debe mostrar éxito), o lo que devuelve p_verif leído DESPUÉS de la sentencia, o «PASA n».
+  -- Sentencia como esa persona, REVIERTE siempre. Devuelve el rechazo («COMPRAS_…»), «0 FILAS» si no afectó ninguna (ROW_COUNT: la pantalla
+  -- no debe mostrar éxito), lo que lea p_verif DESPUÉS de la sentencia, o «PASA n».
   CREATE FUNCTION pg_temp.prueba(p_uid uuid, p text, p_verif text DEFAULT NULL) RETURNS text LANGUAGE plpgsql AS
     $f$ DECLARE r text; n bigint; BEGIN
         PERFORM set_config('request.jwt.claim.sub', p_uid::text, true);
@@ -86,11 +82,11 @@ BEGIN
     $f$ DECLARE r text; BEGIN PERFORM pg_temp.entra(p_uid); EXECUTE p INTO r; PERFORM pg_temp.sale(); RETURN r; END $f$;
   CREATE FUNCTION pg_temp.id(p int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $f$ SELECT ('5b710000-0000-0000-0000-' || lpad(to_hex(p), 12, '0'))::uuid $f$;
   CREATE FUNCTION pg_temp.d(n int, k int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $f$ SELECT pg_temp.id(4096 + n * 16 + k) $f$;
-  -- Última fila de la bitácora de C, una columna como texto.
+  -- Una columna de la última fila de la bitácora de C.
   CREATE FUNCTION pg_temp.bit(p_col text) RETURNS text LANGUAGE sql AS
     $f$ SELECT pg_temp.q(format('SELECT %I::text FROM public.compras_config_separacion_bitacora WHERE company_id = %L ORDER BY id DESC LIMIT 1', p_col, '5b710000-0000-0000-0000-00000000000c')) $f$;
-  -- Cadena de documentos de C armada por la SESIÓN ACTUAL (un administrador), hasta el paso pedido: 1 orden en borrador · 2 aprobada y emitida
-  -- · 3 recepción en borrador · 4 recepción registrada · 5 factura registrada · 6 factura aprobada. Un servicio de 1 × 100.
+  -- Cadena de documentos de C hasta el paso pedido (1 orden en borrador · 2 emitida · 3 recepción en borrador · 4 registrada · 5 factura
+  -- registrada · 6 factura aprobada), armada por la sesión actual (un administrador). Un servicio de 1 × 100.
   CREATE FUNCTION pg_temp.cadena(n int, hasta int, p_pj uuid, p_pv uuid) RETURNS void LANGUAGE plpgsql AS
     $f$ DECLARE c constant uuid := '5b710000-0000-0000-0000-00000000000c';
         oc uuid := pg_temp.d(n, 0); lin uuid := pg_temp.d(n, 1); rc uuid := pg_temp.d(n, 2); fc uuid := pg_temp.d(n, 3);
@@ -110,7 +106,7 @@ BEGIN
       END IF;
       IF hasta >= 6 THEN UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = fc; END IF;
     END $f$;
-  -- Alta REAL (con su propia subtransacción) de una factura de C1: «ALTA» o el rechazo (y entonces no queda nada). Y su sentencia como texto.
+  -- Alta REAL de una factura de C1 («ALTA» o el rechazo; entonces no queda nada) y su sentencia como texto.
   CREATE FUNCTION pg_temp.nf(p_prov uuid, p_num text) RETURNS text LANGUAGE sql AS
     $f$ SELECT format('INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES (%L,%L,%L,%L,%L,100)',
                       '5b710000-0000-0000-0000-00000000000c', '5b710000-0000-0000-0000-0000000000a1', p_prov, p_num, 'ZZ número') $f$;
@@ -165,9 +161,8 @@ BEGIN
   UPDATE public.proveedores SET estado = 'autorizado' WHERE id = pvd;
   PERFORM pg_temp.sale();
 
-  -- Las seis acciones: sentencia por id, la misma SIN filtro de fila (lo que la RLS de UPDATE no frena: solo el servidor), qué leer después y qué se espera.
-  -- Documentos (ver pg_temp.cadena): d(0,0) orden en borrador de C1 · d(1,2) recepción en borrador · d(2,3) factura registrada ·
-  -- d(3,4) orden de pago aprobada (30) · d(3,5) orden de pago en borrador (30) · d(9,0) orden en borrador de C2.
+  -- Las seis acciones: sentencia por id, la misma SIN filtro de fila, qué leer después y qué se espera. Documentos: d(0,0) orden en borrador de C1
+  -- · d(1,2) recepción en borrador · d(2,3) factura registrada · d(3,4) orden de pago aprobada · d(3,5) orden de pago en borrador · d(9,0) orden de C2.
   sq := ARRAY[
     format($q$UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = %L$q$, pg_temp.d(0, 0)),
     format($q$UPDATE public.recepciones SET estado = 'registrada' WHERE id = %L$q$, pg_temp.d(1, 2)),
@@ -186,8 +181,8 @@ BEGIN
   ex := ARRAY['aprobada/{u}', 'registrada', 'aprobada', 'aprobada/{u}', 'pagada/30.00', 'anulada'];
 
   -- ═══ 1 · PERMISOS POR ACCIÓN · armado de los documentos y alcance de proyecto (UPDATE sin filtro de fila) ═══
-  -- 1.3 · una persona con la llave y SIN asignación al proyecto: el UPDATE que no lee columnas de la fila (no pasa por la política SELECT)
-  --       llega a documentos de C1 y solo el servidor lo frena. Cada prueba va cuando la tabla solo tiene filas que dan el MISMO rechazo.
+  -- 1.3 · la llave SIN asignación al proyecto: el UPDATE que no lee columnas de la fila (no pasa por la política SELECT) llega a documentos de
+  --       C1 y solo el servidor lo frena. Cada prueba va cuando la tabla solo tiene filas que dan el MISMO rechazo (orden de la fila indiferente).
   PERFORM pg_temp.entra(ua);
   PERFORM pg_temp.cadena(0, 1, pj, pv);
   PERFORM pg_temp.cadena(9, 1, pj2, pv);
@@ -390,15 +385,14 @@ BEGIN
   ev := ev || pg_temp.ck('4.4 · ninguna plantilla de sistema recibió las llaves nuevas', pg_temp.q($q$SELECT count(*)::text FROM public.role_permissions rp JOIN public.roles r ON r.id = rp.role_id WHERE r.is_system AND rp.permission_key LIKE 'platform.contabilidad.compras.%'$q$), '0');
   ev := ev || pg_temp.ck('4.5 · ningún rol real las tiene (fuera de los padrones de prueba 5b…)', pg_temp.q($q$SELECT count(*)::text FROM public.role_permissions rp JOIN public.roles r ON r.id = rp.role_id WHERE rp.permission_key LIKE 'platform.contabilidad.compras.%' AND (r.company_id IS NULL OR r.company_id::text NOT LIKE '5b%')$q$), '0');
   ev := ev || pg_temp.ck('4.6 · las únicas concesiones de este guion son las de su padrón (5 + 5 + 5)', pg_temp.q(format('SELECT count(*)::text FROM public.role_permissions rp JOIN public.roles r ON r.id = rp.role_id WHERE rp.permission_key LIKE ''platform.contabilidad.compras.%%'' AND r.company_id IN (%L, %L)', c, d)), '15');
-  v_fn := ARRAY['public.compras_exigir_permiso(text,text,uuid,uuid)', 'public.compras_tg_permiso_orden()', 'public.compras_tg_permiso_recepcion()', 'public.compras_tg_permiso_factura()',
-    'public.compras_tg_permiso_orden_pago()', 'public.compras_tg_permiso_contrasena()', 'public.compras_tg_mover_alcance()', 'public.compras_separacion_memoria(uuid)',
-    'public.compras_separacion_via_rpc(uuid,boolean)', 'public.compras_separacion_rechazar(text)', 'public.compras_separacion_registrar(uuid,boolean,boolean)',
-    'public.compras_tg_config_separacion()', 'public.compras_tg_config_separacion_truncate()', 'public.compras_tg_config_separacion_bitacora()',
-    'public.compras_tg_config_separacion_bitacora_inmutable()', 'public.compras_numero_separadores(text)', 'public.compras_numeros_equivalentes(text,text)',
-    'public.compras_tg_factura_numero_equivalente()', 'public.compras_separacion_configurar(uuid,boolean,text)', 'public.compras_factura_crear(uuid,uuid,jsonb,jsonb)'];
-  SELECT count(*) FILTER (WHERE has_function_privilege('anon', to_regprocedure(f), 'EXECUTE')), count(*) FILTER (WHERE has_function_privilege('authenticated', to_regprocedure(f), 'EXECUTE'))
-    INTO n1, n2 FROM unnest(v_fn) f;
-  ev := ev || pg_temp.ck('4.7 · de las 20 funciones nuevas o reescritas existen 20 y anon no ejecuta ninguna', (SELECT count(*) FROM unnest(v_fn) f WHERE to_regprocedure(f) IS NOT NULL) || '/' || n1, '20/0');
+  v_fn := ARRAY['compras_exigir_permiso', 'compras_tg_permiso_orden', 'compras_tg_permiso_recepcion', 'compras_tg_permiso_factura', 'compras_tg_permiso_orden_pago',
+    'compras_tg_permiso_contrasena', 'compras_tg_mover_alcance', 'compras_separacion_memoria', 'compras_separacion_via_rpc', 'compras_separacion_rechazar',
+    'compras_separacion_registrar', 'compras_tg_config_separacion', 'compras_tg_config_separacion_truncate', 'compras_tg_config_separacion_bitacora',
+    'compras_tg_config_separacion_bitacora_inmutable', 'compras_numero_separadores', 'compras_numeros_equivalentes', 'compras_tg_factura_numero_equivalente',
+    'compras_separacion_configurar', 'compras_factura_crear'];
+  SELECT count(*), count(*) FILTER (WHERE has_function_privilege('anon', f.oid, 'EXECUTE')), count(*) FILTER (WHERE has_function_privilege('authenticated', f.oid, 'EXECUTE')) INTO n3, n1, n2
+    FROM pg_proc f WHERE f.pronamespace = 'public'::regnamespace AND f.proname = ANY (v_fn);
+  ev := ev || pg_temp.ck('4.7 · de las 20 funciones nuevas o reescritas existen 20 (una por nombre) y anon no ejecuta ninguna', n3 || '/' || n1, '20/0');
   ev := ev || pg_temp.ck('4.8 · authenticated ejecuta solo las dos RPC (compras_separacion_configurar y compras_factura_crear)', n2::text, '2');
   FOREACH r IN ARRAY ARRAY['anon', 'authenticated'] LOOP
     ev := ev || pg_temp.ck(format('4.9 · privilegios de %s sobre la bitácora', r), pg_temp.q(format('SELECT string_agg(p || ''='' || has_table_privilege(%L, ''public.compras_config_separacion_bitacora'', p)::text, '' '' ORDER BY p) FROM unnest(ARRAY[''DELETE'', ''INSERT'', ''REFERENCES'', ''SELECT'', ''TRIGGER'', ''TRUNCATE'', ''UPDATE'']) p', r)),
