@@ -138,6 +138,7 @@ const SQLSTATE_POR_CONDICION: Record<string, string> = {
   internal_error: 'XX000',
   raise_exception: 'P0001',
   unique_violation: '23505',
+  undefined_object: '42704',
   foreign_key_violation: '23503',
   not_null_violation: '23502',
   invalid_text_representation: '22P02',
