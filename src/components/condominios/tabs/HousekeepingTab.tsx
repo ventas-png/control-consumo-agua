@@ -1,8 +1,11 @@
 import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
-import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ServicioHousekeeping, EstadoHousekeeping, TipoHousekeeping, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { eliminarServicioConEvidencias } from '../../../domain/condominios/housekeepingEvidencias'
+import { HousekeepingEvidencias } from './HousekeepingEvidencias'
+import { UsuarioChip } from '../../shared/UsuarioChip'
 
 interface Props {
   servicios: ServicioHousekeeping[]
@@ -43,6 +46,8 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
   const [editId, setEditId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [evidenciaId, setEvidenciaId] = useState<string | null>(null)
+  const evidencia = servicios.find(s => s.id === evidenciaId) ?? null
 
   const today = hoyLocalISO()
   const thisMonth = today.slice(0, 7)
@@ -92,10 +97,11 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
   }
 
   async function handleDelete(id: string) {
-    const r = await confirm({ title: '¿Eliminar servicio?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
+    const r = await confirm({ title: '¿Eliminar servicio?', text: 'Se eliminarán también sus fotos y observaciones.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await deleteCondominioRow('servicios_housekeeping', id)
-    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
+    const { error, limpieza } = await eliminarServicioConEvidencias(id)
+    if (error) return notify({ variant: 'error', title: 'No se eliminó el servicio', text: error })
+    if (limpieza === 'pendiente') notify({ variant: 'info', title: 'Servicio eliminado', text: 'Las fotos se retirarán del almacenamiento en segundo plano.' })
     onRefresh()
   }
 
@@ -239,9 +245,14 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
                         {s.responsable && <div>👤 {s.responsable}</div>}
                         {(s.hora_inicio || s.hora_fin) && <div>🕐 {s.hora_inicio ?? '?'} — {s.hora_fin ?? '?'}</div>}
                         {s.costo && <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>💰 {moneda} {s.costo.toFixed(2)}</div>}
+                        {s.completado_por && <div>✅ Completó: <UsuarioChip userId={s.completado_por} /></div>}
+                        {!s.completado_por && s.iniciado_por && <div>▶️ Inició: <UsuarioChip userId={s.iniciado_por} /></div>}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <button onClick={() => setEvidenciaId(s.id)} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>📋 Evidencia</button>
                       </div>
                       {canEdit && (
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
                           {s.estado === 'pendiente' && (
                             <button onClick={() => handleEstado(s.id, 'en_proceso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Iniciar</button>
                           )}
@@ -259,6 +270,12 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
             </div>
           ))}
         </div>
+      )}
+      {evidencia && (
+        <HousekeepingEvidencias
+          servicio={evidencia} projectId={proyectoId} companyId={companyId}
+          tipoLabel={TIPO_CONFIG[evidencia.tipo].label} estadoLabel={ESTADO_CONFIG[evidencia.estado].label}
+          canEdit={canEdit} onClose={() => setEvidenciaId(null)} onRefresh={onRefresh} />
       )}
     </div>
   )

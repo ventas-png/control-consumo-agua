@@ -37,6 +37,11 @@ verify_jwt = false
 [functions.purgar-fotos-registros]
 verify_jwt = false
 
+# Retira de Storage los archivos de housekeeping ya eliminados (cola con reintentos).
+# verify_jwt=false: valida el token a mano (usuario de la empresa o super_admin).
+[functions.housekeeping-limpieza]
+verify_jwt = false
+
 # Aviso de paquete al residente: autentica con service key o JWT de la empresa.
 [functions.notify-package]
 verify_jwt = false
