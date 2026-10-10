@@ -531,6 +531,55 @@ async function filaOrdenPago(page, referencia) {
 const ordenPorReferencia = (ref) => uno(`ordenes_pago?referencia=eq.${encodeURIComponent(ref)}&select=*`)
 const ordenesPorReferencia = (ref) => leer(`ordenes_pago?referencia=eq.${encodeURIComponent(ref)}&select=*`)
 
+/**
+ * Crea una orden de pago por la pantalla con un CORTE DE RED real: la primera petición POST llega al servidor y se procesa, pero su
+ * respuesta se aborta (la pantalla ve «Failed to fetch»). Luego se vuelve a pulsar «Crear orden» en el MISMO formulario (misma clave de
+ * idempotencia). Lo esperado: el servidor tiene UNA sola orden y la pantalla termina en éxito sin errores confusos.
+ */
+async function crearOrdenPagoConCorte(page, { monto, referencia, etiqueta }) {
+  let interceptadas = 0
+  let corte = null
+  await page.route(/\/rest\/v1\/ordenes_pago(\?|$)/, async (route) => {
+    if (route.request().method() === 'POST' && interceptadas === 0) {
+      interceptadas++
+      const r = await route.fetch()                         // la petición LLEGA al servidor y se procesa…
+      corte = { status: r.status() }
+      await route.abort('connectionreset')                   // …pero la pantalla no recibe la respuesta
+      return
+    }
+    return route.fallback()
+  })
+  const dlg = await abrirPagar(page, { monto, referencia })
+  const n0 = await nAvisos(page)
+  await dlg.getByRole('button', { name: 'Crear orden' }).click()
+  await esperar(4000)
+  const tras1 = await avisosDesde(page, n0)
+  ok(interceptadas === 1 && corte?.status === 201, `${etiqueta} · red: la petición POST llegó al servidor (201) y su respuesta se abortó`, JSON.stringify(corte))
+  ok(!tras1.some((a) => a.exito), `${etiqueta} · pantalla: tras el corte NO muestra aviso de éxito`, textoAvisos(tras1))
+  ok(tras1.some((a) => !a.exito && /Error/.test(a.texto)), `${etiqueta} · pantalla: tras el corte muestra un aviso de ERROR (no sabe si se guardó)`, textoAvisos(tras1))
+  ok(await page.getByRole('dialog').getByText('Nueva orden de pago').first().isVisible(), `${etiqueta} · pantalla: el formulario sigue abierto para reintentar`)
+  const durante = await ordenesPorReferencia(referencia)
+  ok(durante.length === 1 && durante[0].estado === 'borrador' && dinero(durante[0].monto) === monto, `${etiqueta} · servidor: la orden SÍ se creó (1 fila, borrador, ${monto}.00) aunque la pantalla vio un error`, `${durante.length} fila(s)`)
+  // reintento: se vuelve a pulsar «Crear orden» en el MISMO formulario (misma clave de idempotencia)
+  const n1 = await nAvisos(page)
+  await page.getByRole('dialog').getByRole('button', { name: 'Crear orden' }).click()
+  await esperar(5000)
+  const tras2 = await avisosDesde(page, n1)
+  const exito = tras2.some((a) => a.exito && /Orden de pago creada en borrador/.test(a.texto))
+  const error = tras2.filter((a) => !a.exito)
+  ok(exito, `${etiqueta} · pantalla: el REINTENTO termina con aviso de éxito (la orden ya existía: se devuelve la misma)`, textoAvisos(tras2))
+  ok(error.length === 0, `${etiqueta} · pantalla: el reintento NO muestra ningún error confuso`, textoAvisos(error))
+  if (!exito && error.some((a) => /COMPRAS_PAGO_EXCEDE_SALDO/.test(a.texto))) {
+    hallazgo(`${etiqueta}: el REINTENTO de la creación tras perder la respuesta muestra «COMPRAS_PAGO_EXCEDE_SALDO… ya hay ${monto}.00 reservado en otras órdenes» aunque esa «otra orden» es LA MISMA que se acaba de crear (misma clave de idempotencia). La pantalla solo recupera la orden previa cuando el servidor contesta con el choque del índice único (uq_ordenes_pago_clave); con el saldo TOTAL el control de saldo del trigger se dispara antes y la pantalla no busca la orden por su clave. El formulario se queda con un error que no se puede resolver reintentando. No hay doble pago: el servidor no crea una segunda orden. Ver src/domain/cxp/mutations.ts (useCrearOrdenPagoMutation) y VER-09c, que prevé justo esa recuperación «por su clave».`)
+  }
+  const despues = await ordenesPorReferencia(referencia)
+  ok(despues.length === 1 && despues[0].id === durante[0]?.id, `${etiqueta} · servidor: sigue habiendo UNA sola orden de pago (la misma id) tras el reintento`, `${despues.length} fila(s)`)
+  ok(!!despues[0]?.clave_idempotencia, `${etiqueta} · servidor: la orden guarda su clave de idempotencia`)
+  await foto(page, `5-reintento-creacion-${referencia}`)
+  if (await page.getByRole('dialog').count()) await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click().catch(() => {})
+  return despues[0] ?? null
+}
+
 async function aprobarOrdenPago(referencia) {
   const { ctx, page } = await abrir('apruebaop', { tab: 'cxp', vista: /^Órdenes de pago/ })
   const row = await filaOrdenPago(page, referencia)
@@ -555,24 +604,20 @@ const REF2 = 'ZZ-UC-PAGO-2'
 async function fase5() {
   paso('FASE 5 · ÓRDENES DE PAGO: pago parcial (400) y resto (600) con reintento tras un corte de red')
   E.pagado = 0
-  // ── 5a · pago parcial de 400: solicitante → aprobador de órdenes de pago → pagador ──
+  // ── 5a · pago parcial de 400 (CABE en el saldo de 1000): el solicitante lo crea con un corte de red y reintenta ──
   {
     const { ctx, page } = await abrir('solicitante', { tab: 'cxp', vista: /^Facturas/ })
-    const dlg = await abrirPagar(page, { monto: 400, referencia: REF1 })
-    const n0 = await nAvisos(page)
-    await dlg.getByRole('button', { name: 'Crear orden' }).click()
-    const av = await esperarAviso(page, n0, /Orden de pago creada en borrador/)
-    ok(av && av.exito, 'solicitante · la pantalla avisa «Orden de pago creada en borrador…» (éxito)', av ? av.texto : textoAvisos(await avisosDesde(page, n0)))
-    await esperar(1200)
+    paso('FASE 5a · REINTENTO con pago PARCIAL (400 de 1000): se aborta la RESPUESTA de la creación (el servidor ya la procesó)')
+    const op = await crearOrdenPagoConCorte(page, { monto: 400, referencia: REF1, etiqueta: 'pago 1 (parcial, cabe en el saldo)' })
+    E.op1 = op?.id
     await irA(page, 'cxp', /^Órdenes de pago/)
     const row = await filaOrdenPago(page, REF1)
     ok(!!row && /Borrador/i.test(await celda(row, 5)), 'solicitante · la orden de pago aparece como «Borrador»', row ? await celda(row, 5) : '')
     const bs = row ? controles(await botones(row)) : []
     ok(!bs.includes('Aprobar') && !bs.includes('Marcar pagada') && !bs.includes('Anular'), 'solicitante · la orden de pago NO ofrece Aprobar / Marcar pagada / Anular', `botones [${bs.join(', ')}]`)
-    const op = await ordenPorReferencia(REF1)
-    ok(op && op.estado === 'borrador' && dinero(op.monto) === 400 && op.factura_id === E.factura && op.solicitada_por === PERSONAS.solicitante.id,
-      'servidor · orden de pago «borrador» por 400.00, de la factura, solicitada por el solicitante', op ? `${op.estado} ${op.monto}` : '')
-    E.op1 = op?.id
+    const o = await ordenPorReferencia(REF1)
+    ok(o && o.estado === 'borrador' && dinero(o.monto) === 400 && o.factura_id === E.factura && o.solicitada_por === PERSONAS.solicitante.id,
+      'servidor · orden de pago «borrador» por 400.00, de la factura, solicitada por el solicitante', o ? `${o.estado} ${o.monto}` : '')
     ok(dinero((await facturaDe(E.factura)).monto_pagado) === 0, 'servidor · el saldo de la factura sigue intacto (monto_pagado 0)')
     await ctx.close()
   }
@@ -602,47 +647,15 @@ async function fase5() {
     await ctx.close()
   }
 
-  // ── 5b · el resto (600) con REINTENTO: la respuesta de la creación se pierde (el servidor SÍ la procesó) ──
-  paso('FASE 5b · REINTENTO: se aborta la RESPUESTA de la creación de la orden de pago (el servidor ya la procesó)')
+  // ── 5b · el resto (600 = TODO el saldo, lo que la pantalla propone por omisión) con el mismo corte de red ──
+  paso('FASE 5b · REINTENTO con el SALDO TOTAL (600 de 600): se aborta la RESPUESTA de la creación (el servidor ya la procesó)')
   {
     const { ctx, page } = await abrir('solicitante', { tab: 'cxp', vista: /^Facturas/ })
-    let interceptadas = 0
-    await page.route(/\/rest\/v1\/ordenes_pago(\?|$)/, async (route) => {
-      if (route.request().method() === 'POST' && interceptadas === 0) {
-        interceptadas++
-        const r = await route.fetch()                         // la petición LLEGA al servidor y se procesa…
-        E.corte_crear = { status: r.status() }
-        await route.abort('connectionreset')                   // …pero la pantalla no recibe la respuesta
-        return
-      }
-      return route.fallback()
-    })
-    const dlg = await abrirPagar(page, { monto: 600, referencia: REF2 })
-    const n0 = await nAvisos(page)
-    await dlg.getByRole('button', { name: 'Crear orden' }).click()
-    await esperar(4000)
-    const tras1 = await avisosDesde(page, n0)
-    ok(interceptadas === 1 && E.corte_crear?.status === 201, 'red · la petición POST llegó al servidor (201) y su respuesta se abortó', JSON.stringify(E.corte_crear))
-    ok(!tras1.some((a) => a.exito), 'pantalla · tras el corte NO muestra aviso de éxito', textoAvisos(tras1))
-    ok(tras1.some((a) => !a.exito && /Error/.test(a.texto)), 'pantalla · tras el corte muestra un aviso de ERROR (la pantalla no sabe si se guardó)', textoAvisos(tras1))
-    ok(await page.getByRole('dialog').getByText('Nueva orden de pago').first().isVisible(), 'pantalla · el formulario sigue abierto para reintentar')
-    const durante = await ordenesPorReferencia(REF2)
-    ok(durante.length === 1 && durante[0].estado === 'borrador' && dinero(durante[0].monto) === 600, 'servidor · la orden de pago SÍ se creó (1 fila, borrador, 600.00) aunque la pantalla vio un error', `${durante.length} fila(s)`)
-    E.op2 = durante[0]?.id
-    // reintento: se vuelve a pulsar «Crear orden» en el MISMO formulario (misma clave de idempotencia)
-    const n1 = await nAvisos(page)
-    await page.getByRole('dialog').getByRole('button', { name: 'Crear orden' }).click()
-    await esperar(5000)
-    const tras2 = await avisosDesde(page, n1)
-    ok(tras2.some((a) => a.exito && /Orden de pago creada en borrador/.test(a.texto)), 'pantalla · el REINTENTO termina con aviso de éxito (la orden ya existía: se devuelve la misma)', textoAvisos(tras2))
-    ok(!tras2.some((a) => !a.exito), 'pantalla · el reintento NO muestra ningún error confuso', textoAvisos(tras2))
-    const despues = await ordenesPorReferencia(REF2)
-    ok(despues.length === 1 && despues[0].id === E.op2, 'servidor · sigue habiendo UNA sola orden de pago (la misma id) tras el reintento', `${despues.length} fila(s)`)
-    ok(!!despues[0]?.clave_idempotencia, 'servidor · la orden guarda su clave de idempotencia')
+    const op = await crearOrdenPagoConCorte(page, { monto: 600, referencia: REF2, etiqueta: 'pago 2 (resto = saldo total)' })
+    E.op2 = op?.id
     const todas = await ordenesPagoDe(E.factura)
     ok(todas.length === 2, 'servidor · la factura tiene exactamente 2 órdenes de pago (la 1 y la 2), ninguna duplicada', String(todas.length))
     ok(dinero((await facturaDe(E.factura)).monto_pagado) === 400, 'servidor · el saldo no cambió con una orden en borrador (monto_pagado 400.00)')
-    await foto(page, '5-reintento-creacion')
     await ctx.close()
   }
   await aprobarOrdenPago(REF2)
