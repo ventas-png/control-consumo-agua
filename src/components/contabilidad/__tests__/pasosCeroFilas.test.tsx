@@ -10,6 +10,10 @@
 // y para cada una se exige: con cero filas → aviso de error con el texto de «sin filas», NINGÚN aviso de éxito y
 // NINGUNA invalidación de consultas; con una fila → éxito e invalidación (control positivo: sin él la prueba no
 // distinguiría un botón roto de uno que protege); con el rechazo de permiso del servidor → su texto, sin el código.
+//
+// Las mismas pestañas tienen otras dos escrituras con efecto contable que NO son de las seis y que antes también mostraban
+// «Listo» con cero filas: enlazar un gasto a una factura (anula el gasto contabilizado y reversa su asiento) y autorizar o
+// suspender a un proveedor (de lo que depende poder emitirle órdenes). Se recorren al final con el mismo contrato.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { QueryClient } from '@tanstack/react-query'
@@ -28,6 +32,8 @@ const h = vi.hoisted(() => ({
   recepciones: [] as unknown[],
   facturas: [] as unknown[],
   ordenesPago: [] as unknown[],
+  duplicados: [] as unknown[],
+  proveedores: [] as unknown[],
 }))
 
 vi.mock('../../../lib/supabase', () => {
@@ -38,6 +44,8 @@ vi.mock('../../../lib/supabase', () => {
     c.update = (patch: Record<string, unknown>) => { h.parches.push({ tabla, patch }); return c }
     c.eq = () => c
     c.select = () => fin
+    // sin `.select()` PostgREST no devuelve las filas (data null): con cero filas afectadas es indistinguible de un éxito
+    c.abortSignal = () => Promise.resolve({ data: null, error: h.error })
     return c
   }
   return {
@@ -51,14 +59,11 @@ vi.mock('../../../domain/compras/queries', () => ({
   useOrdenesCompraQuery: () => ({ data: h.ordenes, isLoading: false }),
   useRecepcionesQuery: () => ({ data: h.recepciones, isLoading: false }),
   useContrasenasQuery: () => vacio, useActivosFijosQuery: () => vacio, useCompromisosQuery: () => vacio,
-  useDuplicadosQuery: () => vacio, useOrdenCompraLineasQuery: () => vacio, useCuadreQuery: () => vacio,
+  useDuplicadosQuery: () => ({ data: h.duplicados, isLoading: false }), useOrdenCompraLineasQuery: () => vacio, useCuadreQuery: () => vacio,
   useInsumosAlmacenQuery: () => vacio,
 }))
 vi.mock('../../../domain/cxp/queries', () => ({
-  useProveedoresQuery: () => ({
-    data: [{ id: '11111111-1111-4111-8111-111111111111', nombre: 'Ferretería', estado: 'autorizado', activo: true, autorizacion_vence: null }],
-    isLoading: false,
-  }),
+  useProveedoresQuery: () => ({ data: h.proveedores, isLoading: false }),
   useFacturasProveedorQuery: () => ({ data: h.facturas, isLoading: false }),
   useOrdenesPagoQuery: () => ({ data: h.ordenesPago, isLoading: false }),
   useAgingQuery: () => vacio, useProyeccionPagosQuery: () => vacio,
@@ -67,18 +72,22 @@ vi.mock('../../../domain/proveedores/queries', () => ({
   useSugerenciaCuentaQuery: () => ({ data: null, isLoading: false, isError: false, error: null }),
   useResponsablesQuery: () => vacio,
   useAsignacionesQuery: () => vacio,
+  useDuplicadosFiscalesQuery: () => vacio,
+  useEmpresaNombreQuery: () => ({ data: 'Empresa Uno', isLoading: false }),
 }))
 vi.mock('../../shared/PromptDialog', () => ({ openPromptDialog: h.prompt }))
 vi.mock('../../shared/Dialog', () => ({ confirm: h.confirm, notify: h.notify }))
 
 import { ComprasTab } from '../ComprasTab'
 import { CuentasPorPagarTab } from '../CuentasPorPagarTab'
+import { ProveedoresTab } from '../ProveedoresTab'
 import OrdenesCompraTab from '../../condominios/tabs/OrdenesCompraTab'
 
 const K = LLAVES_ACCION_COMPRAS
 const PROV = '11111111-1111-4111-8111-111111111111'
 const PROY = '22222222-2222-4222-8222-222222222222'
 const SIN_FILAS = /El servidor no aplicó el cambio/
+const FERRETERIA = { id: PROV, nombre: 'Ferretería', estado: 'autorizado', activo: true, dias_credito: 0, autorizacion_vence: null, alcance: 'empresa' }
 const RECHAZO_PERMISO = 'COMPRAS_PERMISO_ACCION: para marcar pagada una orden de pago (contabiliza el pago) tu perfil necesita el permiso «Compras y pagos — Ejecutar un pago».'
 // COMPRAS_ALCANCE_PROYECTO tiene DOS usos en el servidor: el de la persona (42501, no está asignada al proyecto del
 // documento) y el de la migración 20261027000000 (23514, el proyecto no es de la empresa del documento).
@@ -177,7 +186,7 @@ const textoDeAvisos = (variante: string) =>
 
 beforeEach(() => {
   h.filas = []; h.error = null; h.parches = []
-  h.ordenes = []; h.recepciones = []; h.facturas = []; h.ordenesPago = []
+  h.ordenes = []; h.recepciones = []; h.facturas = []; h.ordenesPago = []; h.duplicados = []; h.proveedores = [FERRETERIA]
   h.confirm.mockResolvedValue({ isConfirmed: true })
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
@@ -257,10 +266,10 @@ describe('Operaciones › Órdenes compra: aprobar y devolver con cero filas NO 
     id: 'o1', company_id: 'c1', project_id: 'p1', correlativo: 1, numero: 'OC-000001', proveedor_id: null, proveedor_nombre: 'Prov',
     concepto: 'Compra X', monto_estimado: null, estado, created_at: '2026-10-02T00:00:00Z',
   })
-  const montarOp = (estado: string, onRefresh = vi.fn()) => {
+  const montarOp = (estado: string, onRefresh = vi.fn(), permisos: readonly string[] = [...VER_Y_EDITAR, K.aprobarOrdenCompra]) => {
     montarConSesion(
       <OrdenesCompraTab ordenes={[ordenOp(estado)] as never} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit onRefresh={onRefresh} proveedores={[]} />,
-      { permisos: [...VER_Y_EDITAR, K.aprobarOrdenCompra] },
+      { permisos },
     )
     fireEvent.click(screen.getByText('Compra X'))
     return onRefresh
@@ -328,5 +337,122 @@ describe('Operaciones › Órdenes compra: aprobar y devolver con cero filas NO 
     fireEvent.click(screen.getByText(/Aprobar/))
     await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
     expect(textoDeAvisos('error')[0]).toBe('Texto que el servidor aún no usa.')
+  })
+
+  // Devolver y cancelar son otros dos caminos de escritura de la misma pestaña: también muestran el texto del servidor sin el código.
+  it('devolver a borrador: el rechazo por permiso se muestra con el texto del servidor, sin el código, y no refresca', async () => {
+    h.error = { message: 'COMPRAS_PERMISO_ACCION: para devolver a borrador una orden aprobada tu perfil necesita el permiso «Autorizar / Denegar — Órdenes compra».', code: '42501' }
+    h.prompt.mockResolvedValueOnce({ motivo: 'Corregir el precio del renglón 2' })
+    const onRefresh = montarOp('aprobada')
+    fireEvent.click(screen.getByText(/Devolver a borrador/))
+    await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
+    expect(textoDeAvisos('error')[0]).toBe('Para devolver a borrador una orden aprobada tu perfil necesita el permiso «Autorizar / Denegar — Órdenes compra».')
+    expect(textoDeAvisos('success')).toEqual([])
+    expect(onRefresh).not.toHaveBeenCalled()
+  })
+
+  it('cancelar: el rechazo por permiso se muestra con el texto del servidor, sin el código, y no refresca', async () => {
+    h.error = { message: 'COMPRAS_PERMISO_ACCION: para cancelar una orden de compra tu perfil necesita el permiso «Cambiar estado — Contabilidad».', code: '42501' }
+    const onRefresh = montarOp('borrador', vi.fn(), [...VER_Y_EDITAR, 'platform.contabilidad.change_status'])
+    fireEvent.click(screen.getByText(/Cancelar OC/))
+    await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
+    expect(textoDeAvisos('error')[0]).toBe('Para cancelar una orden de compra tu perfil necesita el permiso «Cambiar estado — Contabilidad».')
+    expect(textoDeAvisos('success')).toEqual([])
+    expect(onRefresh).not.toHaveBeenCalled()
+  })
+
+  it('cancelar con cero filas: error visible, sin refrescar', async () => {
+    h.filas = []
+    const onRefresh = montarOp('borrador', vi.fn(), [...VER_Y_EDITAR, 'platform.contabilidad.change_status'])
+    fireEvent.click(screen.getByText(/Cancelar OC/))
+    await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
+    expect(textoDeAvisos('error')[0]).toMatch(SIN_FILAS)
+    expect(onRefresh).not.toHaveBeenCalled()
+    expect(h.parches[0]).toMatchObject({ tabla: 'ordenes_compra', patch: { estado: 'cancelada' } })
+  })
+})
+
+// ── Otras escrituras con efecto contable de las mismas pestañas (fuera de las seis acciones) ─────────────────────────
+// `useEnlazarGastoAFacturaMutation` anula un gasto contabilizado y reversa su asiento; `useCambiarEstadoProveedorMutation`
+// autoriza, suspende o veta a un proveedor. Un UPDATE que la política de filas deja en cero filas NO falla en PostgREST: sin
+// `.select('id')` la pantalla decía «Gasto enlazado…» / «Proveedor autorizado.» sobre algo que no ocurrió.
+interface CasoExtra {
+  nombre: string
+  tabla: string
+  /** Lo que el UPDATE debe escribir. */
+  patch: Record<string, unknown>
+  permisos: readonly string[]
+  ui: () => ReactElement
+  datos: () => void
+  vista?: () => void
+  clic: () => void
+}
+
+const DUPLICADO = {
+  gasto_id: 'g1', factura_id: 'f1', gasto_concepto: 'Cemento', gasto_fecha: '2026-10-01', gasto_monto: 100, gasto_contabilizado: true,
+  factura_numero: 'F-1', factura_fecha: '2026-10-01', factura_monto: 100, proveedor: 'Ferretería', razones: 'mismo monto', puntaje: 90,
+}
+
+const extras: CasoExtra[] = [
+  {
+    nombre: 'enlazar un gasto contabilizado a una factura', tabla: 'gastos_condominio', patch: { factura_id: 'f1', estado: 'anulado' },
+    permisos: [...VER_Y_EDITAR, 'platform.contabilidad.create'],
+    ui: compras, datos: () => { h.duplicados = [DUPLICADO] },
+    vista: () => fireEvent.click(screen.getByRole('radio', { name: /Posibles duplicados/ })),
+    clic: () => fireEvent.click(screen.getByText('Enlazar')),
+  },
+  {
+    nombre: 'autorizar un proveedor', tabla: 'proveedores', patch: { estado: 'autorizado' },
+    permisos: ['platform.contabilidad.view', 'platform.contabilidad.approve'],
+    ui: () => <ProveedoresTab companyId="c1" projectId={PROY} />,
+    datos: () => { h.proveedores = [{ ...FERRETERIA, estado: 'borrador' }]; h.prompt.mockResolvedValue({ vence: '' }) },
+    clic: () => fireEvent.click(screen.getByText('Autorizar')),
+  },
+]
+
+function arrancarExtra(c: CasoExtra) {
+  c.datos()
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  const invalidar = vi.spyOn(qc, 'invalidateQueries')
+  montarConSesion(c.ui(), { permisos: c.permisos, queryClient: qc })
+  c.vista?.()
+  return invalidar
+}
+
+describe('otras escrituras con efecto contable: cero filas NO es éxito', () => {
+  it('«Cancelar» en la confirmación de enlazar no escribe nada (enlazar anula un gasto contabilizado y reversa su asiento)', async () => {
+    h.confirm.mockResolvedValue({ isConfirmed: false })
+    arrancarExtra(extras[0])
+    extras[0].clic()
+    await waitFor(() => expect(h.confirm).toHaveBeenCalledTimes(1))
+    // un tick más para asegurar que nada se encadenó tras el diálogo
+    await Promise.resolve(); await Promise.resolve()
+    expect(h.parches).toEqual([])
+    expect(h.notify).not.toHaveBeenCalled()
+  })
+
+  it.each(extras)('$nombre: con cero filas muestra el error, ningún éxito y no invalida', async (c) => {
+    h.filas = []
+    const invalidar = arrancarExtra(c)
+    c.clic()
+    await waitFor(() => expect(textoDeAvisos('error')).toHaveLength(1))
+    expect(textoDeAvisos('error')[0]).toMatch(SIN_FILAS)
+    expect(textoDeAvisos('success')).toEqual([])
+    expect(invalidar).not.toHaveBeenCalled()
+    // el UPDATE sí se intentó, sobre la tabla y con lo que la acción escribe
+    expect(h.parches).toHaveLength(1)
+    expect(h.parches[0].tabla).toBe(c.tabla)
+    expect(h.parches[0].patch).toMatchObject(c.patch)
+  })
+
+  it.each(extras)('$nombre: con una fila afectada es éxito e invalida las consultas (control positivo)', async (c) => {
+    h.filas = [{ id: 'x' }]
+    const invalidar = arrancarExtra(c)
+    c.clic()
+    await waitFor(() => expect(textoDeAvisos('success')).toHaveLength(1))
+    expect(textoDeAvisos('error')).toEqual([])
+    expect(invalidar).toHaveBeenCalled()
+    expect(h.parches[0].tabla).toBe(c.tabla)
+    expect(h.parches[0].patch).toMatchObject(c.patch)
   })
 })

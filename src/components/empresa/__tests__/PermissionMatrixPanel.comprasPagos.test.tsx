@@ -2,7 +2,7 @@
 // decisiones, cada una con la etiqueta del catálogo, y cada casilla se concede o se bloquea por separado.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { LLAVES_ACCION_COMPRAS, PLATFORM_MODULE_GROUPS } from '../../../lib/platformPermissions'
+import { LLAVES_ACCION_COMPRAS, gruposPlataformaDisponibles } from '../../../lib/platformPermissions'
 import { PermissionMatrixPanel } from '../PermissionMatrixPanel'
 
 afterEach(cleanup)
@@ -17,14 +17,14 @@ const ETIQUETAS = new Map<string, string>([
   [K.anularPago, 'Compras y pagos — Anular un pago'],
 ])
 
-function montar(efectivas: string[] = [], alternar = vi.fn()) {
+function montar(efectivas: string[] = [], alternar = vi.fn(), catalogo: Map<string, string> = ETIQUETAS) {
   render(
     <PermissionMatrixPanel
-      sections={[{ label: 'Plataforma', groups: PLATFORM_MODULE_GROUPS }]}
+      sections={[{ label: 'Plataforma', groups: gruposPlataformaDisponibles(catalogo) }]}
       effective={new Set(efectivas)}
       grantedBy={new Map()}
       rolesById={new Map()}
-      permLabels={ETIQUETAS}
+      permLabels={catalogo}
       overrides={new Map()}
       redundantOverrides={new Set()}
       selectedCount={1}
@@ -33,7 +33,8 @@ function montar(efectivas: string[] = [], alternar = vi.fn()) {
       onSaveAsRole={vi.fn()}
     />,
   )
-  fireEvent.click(screen.getByRole('button', { name: /Plataforma: Compras y pagos/ }))
+  const grupo = screen.queryByRole('button', { name: /Plataforma: Compras y pagos/ })
+  if (grupo) fireEvent.click(grupo)
   return alternar
 }
 
@@ -62,3 +63,24 @@ describe('PermissionMatrixPanel · grupo «Compras y pagos»', () => {
     expect(alternar).toHaveBeenCalledWith(K.anularPago)
   })
 })
+
+// El frontend puede salir antes que la migración que siembra las cinco llaves (o en un entorno donde no se aplicó): el catálogo
+// cargado no las trae. Sin el filtro, las cinco líneas aparecían con el nombre de respaldo «compras» y, al guardar, la clave
+// foránea role_permissions → permissions las rechazaba.
+describe('PermissionMatrixPanel · catálogo SIN las cinco llaves nuevas (ventana de despliegue)', () => {
+  const sinLasCinco = new Map<string, string>([[K.aprobarOrdenCompra, 'Autorizar / Denegar — Órdenes compra']])
+
+  it('no ofrece ninguna casilla de las cinco ni líneas llamadas «compras»', () => {
+    montar([], vi.fn(), sinLasCinco)
+    const lineas = Array.from(document.querySelectorAll('[data-perm-key]')).map((el) => el.getAttribute('data-perm-key'))
+    expect(lineas).toEqual([K.aprobarOrdenCompra])
+    expect(Array.from(document.querySelectorAll('[data-perm-key]')).some((el) => /^\W*compras\W*$/.test(el.textContent ?? ''))).toBe(false)
+  })
+
+  it('con el catálogo vacío el grupo «Compras y pagos» ni aparece', () => {
+    montar([], vi.fn(), new Map())
+    expect(screen.queryByRole('button', { name: /Plataforma: Compras y pagos/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Plataforma: Contabilidad/ })).toBeTruthy()
+  })
+})
+

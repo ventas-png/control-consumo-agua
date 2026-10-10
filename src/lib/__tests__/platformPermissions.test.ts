@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { LLAVES_ACCION_COMPRAS, LLAVES_ACCION_COMPRAS_LISTA, PLATFORM_MODULE_GROUPS } from '../platformPermissions'
+import { dirMigraciones, leerMigraciones, permisosSembrados } from '../../test/sqlMigraciones'
+import { LLAVES_ACCION_COMPRAS, LLAVES_ACCION_COMPRAS_LISTA, PLATFORM_MODULE_GROUPS, gruposPlataformaDisponibles } from '../platformPermissions'
 import { MODULE_ACTIONS } from '../moduleConfig'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -60,24 +61,65 @@ describe('PLATFORM_MODULE_GROUPS · grupo «Compras y pagos»', () => {
   })
 })
 
+// ── La matriz solo ofrece lo que el catálogo cargado tiene ───────────────────
+
+describe('gruposPlataformaDisponibles · el grupo «Compras y pagos» según el catálogo cargado', () => {
+  const GENERICAS = PLATFORM_MODULE_GROUPS.filter((g) => g.key !== 'platform_compras_pagos')
+  const catalogo = (llaves: readonly string[]) => new Map(llaves.map((k) => [k, `etiqueta de ${k}`]))
+  const grupo = (grupos: ReturnType<typeof gruposPlataformaDisponibles>) => grupos.find((g) => g.key === 'platform_compras_pagos')
+
+  it('con las seis llaves en el catálogo, el grupo queda como está declarado (mismo orden)', () => {
+    const g = grupo(gruposPlataformaDisponibles(catalogo(LLAVES_ACCION_COMPRAS_LISTA)))
+    expect(g?.tabs).toEqual(LLAVES_ACCION_COMPRAS_LISTA)
+    expect(g?.label).toBe('Plataforma: Compras y pagos')
+  })
+
+  it('con el catálogo SIN las cinco llaves nuevas (la migración aún no está), el grupo solo trae la de la orden de compra, que sí existe', () => {
+    const g = grupo(gruposPlataformaDisponibles(catalogo([LLAVES_ACCION_COMPRAS.aprobarOrdenCompra])))
+    expect(g?.tabs).toEqual([LLAVES_ACCION_COMPRAS.aprobarOrdenCompra])
+  })
+
+  it('con el catálogo sin ninguna de las seis (o vacío, p. ej. si no cargó) el grupo se OCULTA', () => {
+    expect(grupo(gruposPlataformaDisponibles(catalogo([])))).toBeUndefined()
+    expect(grupo(gruposPlataformaDisponibles(catalogo(['platform.contabilidad.view'])))).toBeUndefined()
+  })
+
+  it('un catálogo parcial solo deja las llaves que tiene, sin reordenar', () => {
+    const k = LLAVES_ACCION_COMPRAS
+    const g = grupo(gruposPlataformaDisponibles(catalogo([k.anularPago, k.registrarRecepcion])))
+    expect(g?.tabs).toEqual([k.registrarRecepcion, k.anularPago])
+  })
+
+  it('los demás grupos de plataforma no cambian con el catálogo (ni con uno vacío)', () => {
+    for (const c of [catalogo([]), catalogo(LLAVES_ACCION_COMPRAS_LISTA)]) {
+      expect(gruposPlataformaDisponibles(c).filter((g) => g.key !== 'platform_compras_pagos')).toEqual(GENERICAS)
+    }
+  })
+
+  it('no modifica el grupo estático: una llamada con catálogo pobre no deja a la siguiente sin llaves', () => {
+    gruposPlataformaDisponibles(catalogo([]))
+    gruposPlataformaDisponibles(catalogo([LLAVES_ACCION_COMPRAS.anularPago]))
+    expect(PLATFORM_MODULE_GROUPS.find((g) => g.key === 'platform_compras_pagos')?.tabs).toEqual(LLAVES_ACCION_COMPRAS_LISTA)
+    expect(grupo(gruposPlataformaDisponibles(catalogo(LLAVES_ACCION_COMPRAS_LISTA)))?.tabs).toHaveLength(6)
+  })
+})
+
 // ── El catálogo que siembran las migraciones ────────────────────────────────
 
 interface FilaCatalogo { category: string; label: string }
 
 /**
- * Lee el catálogo tal como lo dejan las migraciones: las filas literales de `INSERT INTO public.permissions` (key,
- * category, label, description) y las acciones por pestaña que la 20260703000000 DERIVA de cada clave base
- * `condominios.tab.<id>` (create / edit / change_status / approve / delete, con la etiqueta «<Acción> — <base>»).
+ * Lee el catálogo tal como lo dejan las migraciones: las filas de los `INSERT INTO [public.]permissions` (key, category, label,
+ * description) —con `VALUES` o `SELECT`, con o sin `public.` y con o sin lista de columnas; ver `src/test/sqlMigraciones.ts`— y las
+ * acciones por pestaña que la 20260703000000 DERIVA de cada clave base `condominios.tab.<id>` (create / edit / change_status /
+ * approve / delete, con la etiqueta «<Acción> — <base>»). `MIGRACIONES_DIR` apunta a otra carpeta de migraciones (p. ej. una con
+ * la 20261027000900 aún sin integrar).
  */
 function catalogoSembrado(): Map<string, FilaCatalogo & { migracion: string }> {
-  const dir = resolve('supabase/migrations')
   const filas = new Map<string, FilaCatalogo & { migracion: string }>()
-  const tupla = /\(\s*'([a-z0-9_]+(?:\.[a-z0-9_]+)+)'\s*,\s*'([a-z_]+)'\s*,\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*\)/g
-  for (const f of readdirSync(dir).filter((n) => n.endsWith('.sql')).sort()) {
-    const sql = readFileSync(resolve(dir, f), 'utf8')
-    if (!/INSERT\s+INTO\s+public\.permissions/i.test(sql)) continue
-    for (const m of sql.matchAll(tupla)) {
-      if (!filas.has(m[1])) filas.set(m[1], { category: m[2], label: m[3].replace(/''/g, "'"), migracion: f })
+  for (const { nombre, sql } of leerMigraciones()) {
+    for (const p of permisosSembrados(sql)) {
+      if (!filas.has(p.key)) filas.set(p.key, { category: p.category, label: p.label, migracion: nombre })
     }
   }
   for (const [key, fila] of [...filas]) {
@@ -95,7 +137,7 @@ describe('PLATFORM_MODULE_GROUPS · grupo «Compras y pagos» · catálogo sembr
 
   it('la derivación de las acciones por pestaña (create / edit / change_status / approve / delete) sigue declarada en 20260703000000', () => {
     // La llave de la orden de compra (…ordenes_compra.approve) no está escrita en ninguna migración: la deriva esta.
-    const derivacion = readFileSync(resolve('supabase/migrations/20260703000000_rbac_action_granularity_y_contabilidad.sql'), 'utf8')
+    const derivacion = readFileSync(resolve(dirMigraciones(), '20260703000000_rbac_action_granularity_y_contabilidad.sql'), 'utf8')
     expect(derivacion).toMatch(/p\.key \|\| '\.' \|\| a\.akey/)
     expect(derivacion).toMatch(/\('approve',\s*'Autorizar \/ Denegar'\)/)
   })

@@ -5,6 +5,7 @@
 // vigencia, monto, quién autoriza) las prueba supabase/tests/compras_bloque_b/assert_contratos_compras.sql.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { PASOS_TODOS } from '../../../test/sesionPermisos'
 
 vi.mock('../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
 
@@ -72,8 +73,7 @@ import { ComprasTab } from '../ComprasTab'
 // («Autorizar / Denegar — Órdenes compra»). Aprobar y devolver cuelgan de esa llave; emitir y cancelar, de «Cambiar estado».
 const PERMISOS = {
   puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: true, puedeEliminar: true,
-  puedeAprobarOrdenCompra: true, puedeRegistrarRecepcion: true, puedeAprobarFactura: true, puedeAprobarOrdenPago: true,
-  puedeEjecutarPago: true, puedeAnularPago: true, puedeCambiarEstadoPaso: true,
+  ...PASOS_TODOS,
 }
 
 const NO_VIGENTE = new Error('COMPRAS_CONTRATO_NO_VIGENTE: no se puede aprobar la orden al amparo de su contrato (rebasa el monto máximo vigente de 1000.00)')

@@ -8,12 +8,29 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { PermissionsProvider } from '../components/shared/PermissionsContext'
 import { SessionProvider } from '../components/shared/SessionContext'
+import type { PasosCompras } from '../components/proveedores/permisos'
 import type { UserSession } from '../types'
 
 /** «Ver» y «Editar» de Contabilidad: lo que la política de UPDATE de las tablas de compras exige además de la llave del paso. */
 export const VER_Y_EDITAR = ['platform.contabilidad.view', 'platform.contabilidad.edit'] as const
 /** Los permisos GENÉRICOS que antes decidían los pasos (y que ya no deciden ninguno de las seis acciones). */
 export const GENERICOS_APROBAR = ['platform.contabilidad.approve', 'platform.contabilidad.change_status'] as const
+
+/**
+ * «Quien lo puede todo» en el circuito de compras y pagos: las siete banderas de paso encendidas. Para las pruebas que simulan
+ * `usePermisosContabilidad` / `usePermisosProveedor` enteros con `vi.mock` y no quieren decidir llave por llave. Está tipado con
+ * `PasosCompras`: si el hook gana una bandera nueva, `tsc` falla AQUÍ (falta la propiedad) en vez de dejarla `undefined` —y por
+ * tanto «nadie la ofrece»— en silencio en cada mock copiado a mano.
+ */
+export const PASOS_TODOS: PasosCompras = {
+  puedeAprobarOrdenCompra: true,
+  puedeRegistrarRecepcion: true,
+  puedeAprobarFactura: true,
+  puedeAprobarOrdenPago: true,
+  puedeEjecutarPago: true,
+  puedeAnularPago: true,
+  puedeCambiarEstadoPaso: true,
+}
 
 export function sesionCon(permisos: readonly string[], role: UserSession['role'] | string = 'operator'): UserSession {
   return {

@@ -6,6 +6,13 @@ import { LLAVES_ACCION_COMPRAS } from '../../lib/platformPermissions'
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { useSession } from '../shared/SessionContext'
 
+/**
+ * Los roles que el SERVIDOR deja pasar sin llave: son exactamente los de `user_has_permission` (super_admin, superadmin,
+ * company_owner, admin). Es una lista PROPIA a propósito, no `EXEMPT_ROLES` (lib/moduleConfig) ni `isExemptPlatformRole`
+ * (lib/permissions): `EXEMPT_ROLES` incluye `cliente` (el portal del residente no pasa por el sidebar de módulos) y no
+ * `superadmin`; `isExemptPlatformRole` tampoco trae `superadmin`. Unificarla con cualquiera de las dos ofrecería botones que el
+ * servidor rechaza (`cliente`) o escondería los que sí acepta (`superadmin`). Si cambia `user_has_permission`, cambia aquí.
+ */
 const ROLES_EXENTOS = ['super_admin', 'superadmin', 'company_owner', 'admin']
 
 /**
@@ -85,8 +92,6 @@ export interface PermisosProveedor extends PasosCompras {
   escribirCatalogo: boolean
   /** Habilita, suspende o autoriza (permiso de cambio de estado en Contabilidad). */
   cambiarEstado: boolean
-  /** «Autorizar / Denegar» genérico de Contabilidad. Ya no decide ningún paso de compras y pagos (ver `PasosCompras`). */
-  autorizar: boolean
   /** Ve la pestaña de contratos de Operaciones. */
   verContratos: boolean
   /** Ve órdenes de compra y recepciones (pestaña de Operaciones o Contabilidad). */
@@ -107,7 +112,6 @@ export function usePermisosProveedor(): PermisosProveedor {
     verContabilidad,
     escribirCatalogo: perms.canCreate('contabilidad') || perms.canEdit('contabilidad'),
     cambiarEstado: perms.canChangeStatus('contabilidad'),
-    autorizar: perms.canApprove('contabilidad'),
     verContratos: tab('proveedores'),
     verCompras: verContabilidad || tab('ordenes_compra'),
     verPapeleria: verContabilidad,

@@ -91,12 +91,13 @@ export function ImportarLineasOrdenModal({ orden, monedaBase, onClose }: Props) 
   }
 
   async function guardar(vista: VistaPreviaImportacionLineas) {
-    const ok = await confirm({
+    // confirm() devuelve { isConfirmed }: un objeto siempre es «verdadero», así que `if (!ok)` nunca frenaba «Cancelar».
+    const { isConfirmed } = await confirm({
       title: 'Guardar renglones',
       text: `Se agregarán ${vista.resumen.validas} renglones a ${orden.numero ?? 'la orden'} (total ${formatCurrency(total, moneda)}). La orden sigue en borrador: no se aprueba, emite, recibe ni contabiliza nada.`,
       confirmText: 'Guardar',
     })
-    if (!ok) return
+    if (!isConfirmed) return
     try {
       const r = await aplicar.mutateAsync(vista.lote_id)
       notify({

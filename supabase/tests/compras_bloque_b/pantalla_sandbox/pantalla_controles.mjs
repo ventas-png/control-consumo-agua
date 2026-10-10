@@ -1,5 +1,6 @@
 // Prueba de pantalla contra el SANDBOX (jwpmivhvlstslncrtokb): Operaciones › Órdenes compra. NUNCA producción.
-// Padrón 5b5b2000… (padron_ui_controles.sql.tpl). Ver README.md. Uso (desde la raíz del repo):
+// Padrón 5b5b2000… (padron_ui_controles.sql.tpl; uno ya sembrado se pone al día con padron_ui_controles_actualizacion.sql.tpl).
+// Ver README.md. Uso (desde la raíz del repo):
 //   VITE_SUPABASE_URL=… VITE_SUPABASE_ANON_KEY=… npx vite --port 5199 --host 127.0.0.1   (otra terminal)
 //   ZZ_UI_PW=… node supabase/tests/compras_bloque_b/pantalla_sandbox/pantalla_controles.mjs
 import { chromium } from '@playwright/test'
@@ -16,6 +17,8 @@ const PERFILES = {
   autoriza: { email: 'zz-ui-autoriza@example.com', nombre: 'Autorizar + Editar (sin Cambiar estado)' },
   estado: { email: 'zz-ui-estado@example.com', nombre: 'Cambiar estado + Editar (sin Autorizar, sin Eliminar)' },
   sinEditar: { email: 'zz-ui-sineditar@example.com', nombre: 'Autorizar SIN Editar' },
+  // «Autorizar» genérico de Contabilidad + Editar, SIN la llave de la orden de compra (D1): el servidor ya no deja aprobar ni devolver
+  soloGenerico: { email: 'zz-ui-sologenerico@example.com', nombre: 'Solo «Autorizar» genérico + Editar (SIN la llave de la orden de compra)' },
 }
 
 const ORDENES = {
@@ -24,7 +27,10 @@ const ORDENES = {
   aprobada: 'ZZ UI orden aprobada',
 }
 
-// Botones de paso que se esperan, por perfil y por orden (lo que el servidor va a aceptar).
+// Botones de paso que se esperan, por perfil y por orden (lo que el servidor va a aceptar). Aprobar una orden y devolver una
+// aprobada exigen la llave de la pestaña (`condominios.tab.ordenes_compra.approve`) y «Editar» de Contabilidad; el «Autorizar /
+// Denegar» genérico de Contabilidad ya no basta (D1). Emitir y cancelar siguen con «Cambiar estado» + «Editar».
+// La prueba de vitest `padronSandbox.test.tsx` contrasta este objeto con las filas del padrón y con la pantalla real.
 const ESPERADO = {
   admin: {
     nuevo: ['Aprobar', 'Cancelar OC', 'Eliminar', 'Editar'],
@@ -44,6 +50,13 @@ const ESPERADO = {
   sinEditar: {
     // «Autorizar» sin «Editar»: el servidor no cambiaría ninguna fila → no se ofrece ningún paso
     nuevo: ['Editar', 'Eliminar'],          // Editar/Eliminar dependen del permiso de la PESTAÑA (el servidor los rechaza: ver el aviso)
+    devuelto: ['Editar'],
+    aprobada: [],
+  },
+  soloGenerico: {
+    // «Autorizar» genérico + «Editar» pero SIN la llave de la orden: no se ofrece Aprobar ni Devolver (el servidor lo rechazaría).
+    // Editar/Eliminar dependen del permiso de la PESTAÑA, que este perfil sí tiene.
+    nuevo: ['Editar', 'Eliminar'],
     devuelto: ['Editar'],
     aprobada: [],
   },

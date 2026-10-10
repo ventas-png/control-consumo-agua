@@ -84,6 +84,15 @@ describe('decidirPasosCompras · roles exentos', () => {
     expect(verdaderas(p).sort()).toEqual([...BANDERAS, 'puedeCambiarEstadoPaso'].sort())
   })
 
+  // `cliente` SÍ está en EXEMPT_ROLES de moduleConfig (el portal del residente no pasa por el sidebar de módulos), pero el servidor
+  // (`user_has_permission`) solo exime a super_admin, superadmin, company_owner y admin: con `cliente` se ofrecería un botón que el
+  // servidor rechaza. Por eso las seis NO se derivan de EXEMPT_ROLES.
+  it('cliente NO es exento: con todas las banderas de la sesión pero sin llaves, no ve ninguna de las seis', () => {
+    const p = decidirPasosCompras({ rol: 'cliente', permisos: new Set(), puedeEditar: true, puedeCambiarEstado: true })
+    for (const b of BANDERAS) expect(p[b], b).toBe(false)
+    expect(p.puedeCambiarEstadoPaso).toBe(true) // este sí sale de las banderas de la sesión, no del rol
+  })
+
   it.each(['operator', 'viewer', 'collector', undefined, null])('%s NO es exento: sin llaves no ve nada', (rol) => {
     const p = decidirPasosCompras({ rol, permisos: new Set(), puedeEditar: true, puedeCambiarEstado: true })
     for (const b of BANDERAS) expect(p[b]).toBe(false)

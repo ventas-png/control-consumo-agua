@@ -41,11 +41,14 @@ export function useCambiarEstadoProveedorMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (vars: { id: string; input: ProveedorEstadoInput }) => {
-      await runQuery((signal) =>
+      // Autorizar, suspender o vetar: si la política de filas no deja tocar el proveedor, PostgREST contesta éxito con
+      // cero filas. `runAfectando` lo vuelve error (no se muestra «Proveedor autorizado.» sobre algo que no pasó).
+      await runAfectando((signal) =>
         supabase
           .from('proveedores')
           .update({ ...vars.input, updated_at: new Date().toISOString() })
           .eq('id', vars.id)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -404,7 +407,9 @@ export function useEnlazarGastoAFacturaMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (vars: { gastoId: string; facturaId: string; yaContabilizado: boolean }) => {
-      await runQuery((signal) =>
+      // Anula un gasto contabilizado y reversa su asiento: con cero filas afectadas no pasó nada de eso, y la pantalla
+      // no puede decir «Gasto enlazado y anulado».
+      await runAfectando((signal) =>
         supabase
           .from('gastos_condominio')
           .update({
@@ -412,6 +417,7 @@ export function useEnlazarGastoAFacturaMutation() {
             ...(vars.yaContabilizado ? { estado: 'anulado' } : {}),
           })
           .eq('id', vars.gastoId)
+          .select('id')
           .abortSignal(signal),
       )
     },

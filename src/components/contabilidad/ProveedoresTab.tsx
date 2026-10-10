@@ -479,8 +479,9 @@ function DocumentosProveedorModal({
                         style={btnLink}
                         aria-label={`Eliminar ${TIPO_DOC_PROVEEDOR_LABELS[d.tipo]}`}
                         onClick={async () => {
-                          const ok = await confirm({ title: 'Eliminar documento', text: '¿Eliminar este documento del expediente?', confirmText: 'Eliminar' })
-                          if (ok) await eliminar.mutateAsync(d.id)
+                          // confirm() devuelve { isConfirmed }: un objeto siempre es «verdadero», así que `if (ok)` eliminaba aunque se cancelara.
+                          const { isConfirmed } = await confirm({ title: 'Eliminar documento', text: '¿Eliminar este documento del expediente?', confirmText: 'Eliminar' })
+                          if (isConfirmed) await eliminar.mutateAsync(d.id)
                         }}
                       >✕</button>
                     )}

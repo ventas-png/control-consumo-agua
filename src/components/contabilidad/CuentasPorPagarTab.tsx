@@ -53,6 +53,9 @@ interface Props {
 
 type Vista = 'facturas' | 'ordenes' | 'antiguedad' | 'proyeccion'
 
+/** Cuánto dura un aviso de error largo (~270 caracteres) en pantalla; el de 3,5 s por omisión no alcanza para leerlo. */
+const DURACION_ERROR_LARGO_MS = 12_000
+
 const TONO_FACTURA = {
   registrada: 'info', aprobada: 'warning', pagada_parcial: 'warning', pagada: 'success', anulada: 'neutral',
 } as const
@@ -813,8 +816,13 @@ export function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: 
       onClose()
     } catch (e) {
       // Los mensajes del servidor (COMPRAS_FACTURA_*) están escritos para leerse tal cual:
-      // número repetido, clave ya usada con otro contenido, renglón ajeno, etc.
-      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? textoErrorServidor(e.message) : 'No se pudo registrar.' })
+      // número repetido, clave ya usada con otro contenido, renglón ajeno, etc. El de número repetido mide ~270
+      // caracteres (qué factura es la equivalente y cómo escribir el número): el aviso de 3,5 s por omisión no alcanza
+      // para leerlo, así que este error dura lo suficiente para entender qué hacer.
+      notify({
+        variant: 'error', title: 'Error', duration: DURACION_ERROR_LARGO_MS,
+        text: e instanceof Error ? textoErrorServidor(e.message) : 'No se pudo registrar.',
+      })
     }
   }
 
