@@ -10,9 +10,10 @@
 // nunca ejecuta un paso del circuito):
 //   1 creación de la orden (solicitante)            2 aprobación (aprobador) y emisión (quien cambia estado)
 //   3 recepción: la crea y registra el receptor     4 factura contra la orden (solicitante) y su aprobación (aprobador)
-//   5 pagos: parcial y resto, con REINTENTO tras un corte de red (se aborta la respuesta real, el servidor sí la procesó)
+//   5 pagos: parcial (5a) y resto (5b) con REINTENTO tras un corte de red (se aborta la respuesta real; el servidor sí la procesó),
+//     y reintento de «Marcar pagada» (5c)
 //   6 anulación del pago + quien no tiene la llave (botón y API directa)
-//   7 doble clic en «Crear orden» y en «Marcar pagada», y «cero filas» por permiso revocado en caliente
+//   7 doble clic en «Crear orden» (7a) y en «Marcar pagada» (7c), y «cero filas» por permiso revocado en caliente (7b)
 //   8 números de factura «1-23» y «12-3» (se aceptan), «123», «FAC001» (se rechazan)
 //   9 contrastes: llave sin asignación al proyecto A; permisos genéricos sin llave por acción
 //  10 conciliación final: saldos, asientos (uno por pago, reverso del anulado, sin huérfanos)
@@ -26,8 +27,9 @@ if (!PW) throw new Error('Falta ZZ_UI_PW (la contraseña de prueba del padrón 5
 const OUT = (process.env.ZZ_UI_SALIDA || '/tmp/pantalla-contabilidad') + '/'
 fs.mkdirSync(OUT, { recursive: true })
 const PROD = 'nnsqmeigtgewatameexo'
-const FASES_TODAS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
-const FASES = (process.env.FASE && process.env.FASE !== 'todas' ? process.env.FASE.split(',').map((s) => s.trim()) : FASES_TODAS)
+const FASES_TODAS = ['1', '2', '3', '4', '5', '6', '7a', '7b', '7c', '8', '9', '10']
+const FASES = (process.env.FASE && process.env.FASE !== 'todas' ? process.env.FASE.split(',').map((s) => s.trim()).flatMap((f) => (f === '7' ? ['7a', '7b', '7c'] : [f])) : FASES_TODAS)
+console.log(`Contabilidad › Compras y Cuentas por pagar · fases: ${FASES.join(', ')} · salida: ${OUT} · app: ${BASE}`)
 const ESTADO_PATH = OUT + 'estado.json'
 const E = fs.existsSync(ESTADO_PATH) && FASES[0] !== '1' ? JSON.parse(fs.readFileSync(ESTADO_PATH, 'utf8')) : {}
 const guardarEstado = () => fs.writeFileSync(ESTADO_PATH, JSON.stringify(E, null, 1))
@@ -795,9 +797,8 @@ async function contrasteGenericosOrdenPago(estadoActual) {
   ok((await ordenPorReferencia(REF3)).estado === estadoActual, `servidor · la orden de pago 3 sigue «${estadoActual}» tras los intentos de «genericos»`)
   await ctx.close()
 }
-async function fase7() {
-  paso('FASE 7 · DOBLE CLIC rápido en «Crear orden» y en «Marcar pagada»; «cero filas» al revocar un permiso con la sesión abierta')
-  // 7a · doble clic en «Crear orden» (saldo 400 tras la anulación)
+async function fase7a() {
+  paso('FASE 7a · DOBLE CLIC rápido en «Crear orden» (saldo 400 tras la anulación)')
   {
     const { ctx, page } = await abrir('solicitante', { tab: 'cxp', vista: /^Facturas/ })
     const frow = await esperarFila(page, NUM_FACTURA_OC)
@@ -810,45 +811,71 @@ async function fase7() {
     console.log(`    (avisos tras el doble clic: ${textoAvisos(as)})`)
     const ops = await ordenesPorReferencia(REF3)
     ok(ops.length === 1, 'servidor · el doble clic en «Crear orden» dejó UNA sola orden de pago', `${ops.length} fila(s)`)
-    ok(!as.some((a) => !a.exito), 'pantalla · el doble clic no muestra ningún error', textoAvisos(as))
     ok(as.some((a) => a.exito), 'pantalla · el doble clic termina con aviso de éxito', textoAvisos(as))
+    const errores = as.filter((a) => !a.exito)
+    ok(errores.length === 0, 'pantalla · el doble clic NO deja un error confuso junto al éxito', textoAvisos(errores))
+    if (errores.some((a) => /COMPRAS_PAGO_EXCEDE_SALDO/.test(a.texto))) {
+      hallazgo('DOBLE CLIC en «Crear orden» (monto = saldo total, el valor por omisión): junto al aviso de ÉXITO aparece un aviso de ERROR «COMPRAS_PAGO_EXCEDE_SALDO… ya hay 400.00 reservado en otras órdenes», porque la segunda petición (misma clave de idempotencia) topa con el control de saldo del trigger antes que con el índice único y la pantalla no recupera la orden por su clave. El servidor SÍ deja UNA sola orden. Misma causa que el reintento tras un corte de red con el saldo total (ver arriba).')
+    }
     E.op3 = ops[0]?.id
     const todas = await ordenesPagoDe(E.factura)
     ok(todas.length === 3, 'servidor · la factura tiene 3 órdenes de pago en total (1 anulada, 1 pagada, 1 nueva)', String(todas.length))
+    await foto(page, '7-doble-clic-crear')
     await ctx.close()
   }
   await contrasteGenericosOrdenPago('borrador')
   await aprobarOrdenPago(REF3)
   await contrasteGenericosOrdenPago('aprobada')
-  // 7b · «cero filas»: se le revoca «Editar» a quien anula, con su sesión abierta, y pulsa «Anular»
-  paso('FASE 7b · CERO FILAS: a quien tiene el botón «Anular» visible se le revoca «Editar» (y luego su llave) con la sesión abierta')
-  {
-    const { ctx, page } = await abrir('revoca', { tab: 'cxp', vista: /^Órdenes de pago/ })
-    const row = await filaOrdenPago(page, REF3)
-    const bs = row ? controles(await botones(row)) : []
-    ok(bs.includes('Anular'), 'revoca · antes de la revocación ve «Anular» en la orden de pago 3 (aprobada)', `botones [${bs.join(', ')}]`)
-    const adm = await admin()
-    const del = await api(adm, { metodo: 'DELETE', ruta: `role_permissions?role_id=eq.${ROL_REVOCA}&permission_key=eq.platform.contabilidad.edit`, cabeceras: { Prefer: 'return=representation' } })
-    ok(del.status < 300 && Array.isArray(del.json) && del.json.length === 1, 'admin · (preparación, vía API del editor de roles) quita «Editar» al rol de «revoca»', `${del.status} ${del.json?.length}`)
-    const n0 = await nAvisos(page)
+}
+
+/** Espera a que el botón de la fila esté (o no) visible: la pantalla se entera de un cambio de permisos por el canal en tiempo real. */
+async function esperarBoton(page, referencia, nombre, visible, ms = 20000) {
+  const fin = Date.now() + ms
+  while (Date.now() < fin) {
+    const row = await filaOrdenPago(page, referencia)
+    const hay = row ? (await botones(row)).includes(nombre) : false
+    if (hay === visible) return row
+    await esperar(1000)
+  }
+  return null
+}
+
+async function fase7b() {
+  paso('FASE 7b · CERO FILAS: con el diálogo de «Anular» abierto, un administrador le revoca «Editar» (y luego su llave) a quien lo pulsó')
+  const { ctx, page } = await abrir('revoca', { tab: 'cxp', vista: /^Órdenes de pago/ })
+  const adm = await admin()
+  const confirmarAnular = async () => { await page.getByRole('alertdialog').getByRole('button', { name: 'Anular', exact: true }).click() }
+
+  // A · se le quita «Editar»: el UPDATE ya no la deja tocar nada → 0 filas
+  let row = await filaOrdenPago(page, REF3)
+  let bs = row ? controles(await botones(row)) : []
+  ok(bs.includes('Anular'), 'revoca · antes de la revocación ve «Anular» en la orden de pago 3 (aprobada)', `botones [${bs.join(', ')}]`)
+  await row.getByRole('button', { name: 'Anular', exact: true }).click()
+  await page.getByRole('alertdialog').getByText('¿Anular orden?').waitFor()
+  const del = await api(adm, { metodo: 'DELETE', ruta: `role_permissions?role_id=eq.${ROL_REVOCA}&permission_key=eq.platform.contabilidad.edit`, cabeceras: { Prefer: 'return=representation' } })
+  ok(del.status < 300 && Array.isArray(del.json) && del.json.length === 1, 'admin · (preparación, vía API del editor de roles) quita «Editar» al rol de «revoca» con el diálogo ya abierto', `${del.status} ${del.json?.length}`)
+  const n0 = await nAvisos(page)
+  await confirmarAnular()
+  await esperar(4500)
+  const as = await avisosDesde(page, n0)
+  ok(!as.some((a) => a.exito), 'pantalla · el servidor NO cambió ninguna fila y la pantalla NO muestra aviso de éxito', textoAvisos(as))
+  ok(as.some((a) => !a.exito && /no aplicó el cambio/i.test(a.texto)), 'pantalla · AVISA «El servidor no aplicó el cambio…» (cero filas ≠ éxito)', textoAvisos(as))
+  let op = await ordenPorReferencia(REF3)
+  ok(op.estado === 'aprobada', 'servidor · la orden de pago 3 sigue «aprobada» (no se anuló)', op.estado)
+  await foto(page, '7-cero-filas-sin-editar')
+
+  // B · se restituye «Editar» y se quita la llave de la acción: el servidor la rechaza con el error de permiso
+  const ins = await api(adm, { metodo: 'POST', ruta: 'role_permissions', cuerpo: { role_id: ROL_REVOCA, permission_key: 'platform.contabilidad.edit', effect: 'allow' }, cabeceras: { Prefer: 'return=representation' } })
+  ok(ins.status < 300, 'admin · (preparación) restituye «Editar»', `${ins.status}`)
+  row = await esperarBoton(page, REF3, 'Anular', true)
+  ok(!!row, 'revoca · con «Editar» restituido la pantalla vuelve a ofrecer «Anular» (se entera por el canal en tiempo real)')
+  if (row) {
     await row.getByRole('button', { name: 'Anular', exact: true }).click()
-    await page.getByRole('alertdialog').getByRole('button', { name: 'Anular', exact: true }).click()
-    await esperar(4500)
-    const as = await avisosDesde(page, n0)
-    ok(!as.some((a) => a.exito), 'pantalla · el servidor NO cambió ninguna fila y la pantalla NO muestra aviso de éxito', textoAvisos(as))
-    ok(as.some((a) => !a.exito && /no aplicó el cambio/i.test(a.texto)), 'pantalla · AVISA «El servidor no aplicó el cambio…» (cero filas ≠ éxito)', textoAvisos(as))
-    let op = await ordenPorReferencia(REF3)
-    ok(op.estado === 'aprobada', 'servidor · la orden de pago 3 sigue «aprobada» (no se anuló)', op.estado)
-    await foto(page, '7-cero-filas-sin-editar')
-    // se restituye «Editar» y se quita la llave de la acción: ahora el servidor la rechaza con error de permiso
-    const ins = await api(adm, { metodo: 'POST', ruta: 'role_permissions', cuerpo: { role_id: ROL_REVOCA, permission_key: 'platform.contabilidad.edit', effect: 'allow' }, cabeceras: { Prefer: 'return=representation' } })
-    ok(ins.status < 300, 'admin · (preparación) restituye «Editar»', `${ins.status}`)
+    await page.getByRole('alertdialog').getByText('¿Anular orden?').waitFor()
     const del2 = await api(adm, { metodo: 'DELETE', ruta: `role_permissions?role_id=eq.${ROL_REVOCA}&permission_key=eq.platform.contabilidad.compras.pago_anular`, cabeceras: { Prefer: 'return=representation' } })
-    ok(del2.status < 300 && del2.json?.length === 1, 'admin · (preparación) quita la llave «Anular un pago»', `${del2.status} ${del2.json?.length}`)
-    const row2 = await filaOrdenPago(page, REF3)
+    ok(del2.status < 300 && del2.json?.length === 1, 'admin · (preparación) quita la llave «Anular un pago» con el diálogo ya abierto', `${del2.status} ${del2.json?.length}`)
     const n1 = await nAvisos(page)
-    await row2.getByRole('button', { name: 'Anular', exact: true }).click()
-    await page.getByRole('alertdialog').getByRole('button', { name: 'Anular', exact: true }).click()
+    await confirmarAnular()
     await esperar(4500)
     const as2 = await avisosDesde(page, n1)
     ok(!as2.some((a) => a.exito), 'pantalla · rechazada por permiso: NO hay aviso de éxito', textoAvisos(as2))
@@ -856,31 +883,35 @@ async function fase7() {
     op = await ordenPorReferencia(REF3)
     ok(op.estado === 'aprobada', 'servidor · la orden de pago 3 sigue «aprobada»', op.estado)
     await foto(page, '7-rechazo-sin-llave')
-    await ctx.close()
+    // la pantalla, al enterarse, deja de ofrecer el botón
+    const sinBoton = await esperarBoton(page, REF3, 'Anular', false)
+    ok(!!sinBoton, 'revoca · al enterarse de la revocación la pantalla deja de ofrecer «Anular»')
   }
-  // 7c · doble clic en «Marcar pagada»
-  {
-    const { ctx, page } = await abrir('pagador', { tab: 'cxp', vista: /^Órdenes de pago/ })
-    const row = await filaOrdenPago(page, REF3)
-    const n0 = await nAvisos(page)
-    await row.getByRole('button', { name: 'Marcar pagada', exact: true }).dblclick()
-    await esperar(5500)
-    const as = await avisosDesde(page, n0)
-    console.log(`    (avisos tras el doble clic en Marcar pagada: ${textoAvisos(as)})`)
-    const op = await ordenPorReferencia(REF3)
-    const asientos = await asientosDe('ordenes_pago', E.op3)
-    const f = await facturaDe(E.factura)
-    ok(op.estado === 'pagada', 'servidor · la orden de pago 3 quedó «pagada»', op.estado)
-    ok(asientos.length === 1 && asientos[0].estado === 'publicado' && dinero(asientos[0].total_debe) === 400 && cuadra(asientos[0]),
-      'servidor · el doble clic dejó UN SOLO asiento «orden_pago_pagada» por 400.00', asientos.map((a) => `${a.origen_evento}/${a.estado}/${a.total_debe}`).join(';'))
-    ok(f.estado === 'pagada' && dinero(f.monto_pagado) === 1000, 'servidor · el doble clic NO contó el pago dos veces: factura «pagada», monto_pagado 1000.00', `${f.estado} pagado=${f.monto_pagado}`)
-    E.pagado = 1000
-    ok(as.some((a) => a.exito), 'pantalla · aparece el aviso de éxito del pago', textoAvisos(as))
-    const errores = as.filter((a) => !a.exito)
-    ok(errores.length === 0, 'pantalla · el segundo clic NO deja un error confuso junto al éxito', textoAvisos(errores))
-    await foto(page, '7-doble-clic-pagar')
-    await ctx.close()
-  }
+  await ctx.close()
+}
+
+async function fase7c() {
+  paso('FASE 7c · DOBLE CLIC rápido en «Marcar pagada»')
+  const { ctx, page } = await abrir('pagador', { tab: 'cxp', vista: /^Órdenes de pago/ })
+  const row = await filaOrdenPago(page, REF3)
+  const n0 = await nAvisos(page)
+  await row.getByRole('button', { name: 'Marcar pagada', exact: true }).dblclick()
+  await esperar(5500)
+  const as = await avisosDesde(page, n0)
+  console.log(`    (avisos tras el doble clic en Marcar pagada: ${textoAvisos(as)})`)
+  const op = await ordenPorReferencia(REF3)
+  const asientos = await asientosDe('ordenes_pago', E.op3)
+  const f = await facturaDe(E.factura)
+  ok(op.estado === 'pagada', 'servidor · la orden de pago 3 quedó «pagada»', op.estado)
+  ok(asientos.length === 1 && asientos[0].estado === 'publicado' && dinero(asientos[0].total_debe) === 400 && cuadra(asientos[0]),
+    'servidor · el doble clic dejó UN SOLO asiento «orden_pago_pagada» por 400.00', asientos.map((a) => `${a.origen_evento}/${a.estado}/${a.total_debe}`).join(';'))
+  ok(f.estado === 'pagada' && dinero(f.monto_pagado) === 1000, 'servidor · el doble clic NO contó el pago dos veces: factura «pagada», monto_pagado 1000.00', `${f.estado} pagado=${f.monto_pagado}`)
+  E.pagado = 1000
+  ok(as.some((a) => a.exito), 'pantalla · aparece el aviso de éxito del pago', textoAvisos(as))
+  const errores = as.filter((a) => !a.exito)
+  ok(errores.length === 0, 'pantalla · el segundo clic NO deja un error confuso junto al éxito', textoAvisos(errores))
+  await foto(page, '7-doble-clic-pagar')
+  await ctx.close()
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -1011,13 +1042,17 @@ async function fase9() {
     ok(fuerte.status >= 400 ? /COMPRAS_ALCANCE_PROYECTO/.test(mensajeApi(fuerte)) : (Array.isArray(fuerte.json) && fuerte.json.length === 0),
       'sinasig · un PATCH amplio (por empresa) no anula nada: error COMPRAS_ALCANCE_PROYECTO o 0 filas', `${fuerte.status} ${String(fuerte.texto).slice(0, 150)}`)
     // Sondeo informativo: ¿puede quien no está asignada al proyecto A CREAR una orden de compra en borrador en ese proyecto?
-    const intruso = await api(page, { metodo: 'POST', ruta: 'ordenes_compra', cuerpo: { company_id: EMPRESA, project_id: PROY_A, proveedor_id: E.proveedor, proveedor_nombre: PROVEEDOR, concepto: 'ZZ UC intruso sin asignación' }, cabeceras: { Prefer: 'return=representation' } })
-    if (intruso.status < 300) {
-      E.intruso = Array.isArray(intruso.json) ? intruso.json[0]?.id : null
-      hallazgo('SONDEO · quien NO está asignada al proyecto A pudo CREAR por API una orden de compra en borrador en ese proyecto (la creación no exige asignación; las seis decisiones sí). Ver informe.')
-      ok(true, 'sinasig · sondeo informativo: la creación de un BORRADOR en el proyecto A por API fue aceptada (se anota como observación)', `${intruso.status}`)
+    // Se pide SIN devolver la fila (`return=minimal`): con `return=representation` PostgREST exige además que la fila nueva pase la
+    // política de SELECT y el rechazo sería de lectura, no de escritura.
+    const cuerpoIntruso = { company_id: EMPRESA, project_id: PROY_A, proveedor_id: E.proveedor, proveedor_nombre: PROVEEDOR, concepto: 'ZZ UC intruso sin asignación' }
+    const intruso = await api(page, { metodo: 'POST', ruta: 'ordenes_compra', cuerpo: cuerpoIntruso, cabeceras: { Prefer: 'return=minimal' } })
+    const creada = await leer(`ordenes_compra?concepto=eq.${encodeURIComponent(cuerpoIntruso.concepto)}&select=id,estado,project_id,created_by`)
+    if (intruso.status < 300 && creada.length) {
+      E.intruso = creada[0].id
+      hallazgo('SONDEO (observación, fuera de las seis acciones) · quien NO está asignada al proyecto A pudo CREAR por API (POST sin «return») una orden de compra en BORRADOR en ese proyecto: la política de INSERT de ordenes_compra no mira la asignación (la de SELECT sí, por eso la fila no le es visible). Las seis decisiones sí exigen asignación. Ver informe.')
+      ok(true, 'sinasig · sondeo informativo: la creación de un BORRADOR en el proyecto A por API fue aceptada (se anota como observación)', `${intruso.status}; la fila existe: ${creada[0].estado}`)
     } else {
-      ok(/COMPRAS_ALCANCE_PROYECTO|COMPRAS_PERMISO_ACCION/.test(mensajeApi(intruso)), 'sinasig · vía API no puede crear una orden de compra en el proyecto A (rechazada por alcance/permiso)', `${intruso.status} ${String(mensajeApi(intruso)).slice(0, 170)}`)
+      ok(intruso.status >= 400 && !creada.length, 'sinasig · vía API no puede crear una orden de compra en el proyecto A (el servidor la rechaza y no queda fila)', `${intruso.status} ${String(mensajeApi(intruso)).slice(0, 170)}`)
     }
     const dentro = await api(adm, { ruta: `ordenes_pago?factura_id=eq.${E.factura}&select=referencia,estado&order=created_at` })
     ok(JSON.stringify(dentro.json.map((o) => o.estado)) === JSON.stringify(['anulada', 'pagada', 'pagada']),
@@ -1063,7 +1098,7 @@ async function fase10() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-const TABLA = { 1: fase1, 2: fase2, 3: fase3, 4: fase4, 5: fase5, 6: fase6, 7: fase7, 8: fase8, 9: fase9, 10: fase10 }
+const TABLA = { 1: fase1, 2: fase2, 3: fase3, 4: fase4, 5: fase5, 6: fase6, '7a': fase7a, '7b': fase7b, '7c': fase7c, 8: fase8, 9: fase9, 10: fase10 }
 let abortada = null
 for (const n of FASES) {
   if (!TABLA[n]) { console.log(`(fase «${n}» desconocida; se omite)`); continue }

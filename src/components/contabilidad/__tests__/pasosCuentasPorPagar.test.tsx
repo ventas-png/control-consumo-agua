@@ -149,6 +149,33 @@ describe('Cuentas por pagar · órdenes de pago: aprobar, pagar y anular son tre
     await waitFor(() => expect(m.pagarOrden).toHaveBeenCalledWith({ ordenId: 'op1' }))
   })
 
+  it('doble clic en «Marcar pagada»: el paso se manda UNA vez y se avisa «Listo» UNA vez', async () => {
+    m.ordenes = [ordenPago('aprobada')]
+    let terminar: () => void = () => {}
+    m.pagarOrden.mockReturnValue(new Promise<void>((res) => { terminar = res }))
+    montar([...VER_Y_EDITAR, K.ejecutarPago])
+    verOrdenesDePago()
+    const boton = screen.getByText('Marcar pagada')
+    fireEvent.click(boton)
+    fireEvent.click(boton)
+    terminar()
+    await waitFor(() => expect(m.notify).toHaveBeenCalledTimes(1))
+    expect(m.pagarOrden).toHaveBeenCalledTimes(1)
+    expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }))
+  })
+
+  it('terminada una acción, la siguiente sí se manda (el candado no se queda puesto, tampoco si la acción falló)', async () => {
+    m.ordenes = [ordenPago('aprobada')]
+    m.pagarOrden.mockRejectedValueOnce(new Error('COMPRAS_PAGO_SIN_ASIENTO: no se pudo generar el asiento')).mockResolvedValueOnce(undefined)
+    montar([...VER_Y_EDITAR, K.ejecutarPago])
+    verOrdenesDePago()
+    fireEvent.click(screen.getByText('Marcar pagada'))
+    await waitFor(() => expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
+    fireEvent.click(screen.getByText('Marcar pagada'))
+    await waitFor(() => expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' })))
+    expect(m.pagarOrden).toHaveBeenCalledTimes(2)
+  })
+
   it.each(['borrador', 'aprobada', 'pagada'])('orden %s: SOLO la llave de anular pagos ofrece Anular (ni Aprobar ni Marcar pagada), y el clic anula', async (estado) => {
     m.ordenes = [ordenPago(estado)]
     montar([...VER_Y_EDITAR, K.anularPago])

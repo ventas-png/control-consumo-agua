@@ -24,8 +24,14 @@
 -- ORDEN: (1) empresa en cascada → (2) perfiles y personas de auth → (3) huellas de auditoría del prefijo → (4) comprobación:
 -- ninguna fila del prefijo en ninguna columna uuid de `public` ni de `auth`.
 -- Es idempotente: si el padrón ya no existe, no borra nada y lo dice. Todo ocurre en UNA transacción (un bloque DO): si algo
--- falla, no se borra nada. En el sandbox un DELETE suelto tarda más de 60 s y la herramienta lo corta; dentro de un DO una
--- empresa pequeña se purga en ~1 s.
+-- falla, no se borra nada.
+--
+-- CÓMO SE EJECUTA EN EL SANDBOX (medido el 2026-10-10): la herramienta SQL corta a los 60 s y, en este sandbox, un DELETE que corre
+-- directamente en la transacción —y, medido, siempre que antes se haya fijado un GUC en esa misma transacción, como hace la purga
+-- con `conta.allow_system_write`— NO termina en 60 s ni para UNA fila. El mismo DELETE dentro de un sub-bloque
+-- `BEGIN … EXCEPTION … END` (una subtransacción) termina en milisegundos y la cascada completa de la empresa en ~1,2 s. Por eso
+-- CADA `DELETE` de abajo va en su propio sub-bloque (`BEGIN … EXCEPTION WHEN OTHERS THEN RAISE; END`): no cambia ningún
+-- resultado (el error se vuelve a lanzar y deshace todo), solo evita ese comportamiento del sandbox.
 DO $retiro$
 DECLARE
   c constant uuid := '5b5b3000-0000-0000-0000-00000000000c';
@@ -47,25 +53,45 @@ BEGIN
 
   -- (1) Purga en cascada de la empresa del padrón.
   PERFORM set_config('conta.allow_system_write', 'on', true);
-  DELETE FROM public.companies WHERE id = c AND nombre = 'ZZ UI Contabilidad';
-  GET DIAGNOSTICS v_borradas = ROW_COUNT;
+  BEGIN
+    DELETE FROM public.companies WHERE id = c AND nombre = 'ZZ UI Contabilidad';
+    GET DIAGNOSTICS v_borradas = ROW_COUNT;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE;
+  END;
   PERFORM set_config('conta.allow_system_write', 'off', true);
 
   -- (2) Los perfiles y las personas del padrón (solo el prefijo 5b5b3000…).
-  DELETE FROM public.app_users WHERE id::text LIKE '5b5b3000-%' OR company_id::text LIKE '5b5b3000-%';
-  GET DIAGNOSTICS v_perfiles = ROW_COUNT;
-  DELETE FROM auth.users WHERE id::text LIKE '5b5b3000-%';
-  GET DIAGNOSTICS v_personas = ROW_COUNT;
+  BEGIN
+    DELETE FROM public.app_users WHERE id::text LIKE '5b5b3000-%' OR company_id::text LIKE '5b5b3000-%';
+    GET DIAGNOSTICS v_perfiles = ROW_COUNT;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE;
+  END;
+  BEGIN
+    DELETE FROM auth.users WHERE id::text LIKE '5b5b3000-%';
+    GET DIAGNOSTICS v_personas = ROW_COUNT;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE;
+  END;
 
   -- (3) Huellas de auditoría de esas entidades (la cascada también escribió las suyas)
-  DELETE FROM public.audit_log
-  WHERE company_id::text LIKE '5b5b3000-%' OR record_id::text LIKE '5b5b3000-%' OR actor_id::text LIKE '5b5b3000-%'
-     OR before::text LIKE '%5b5b3000-%' OR after::text LIKE '%5b5b3000-%';
-  GET DIAGNOSTICS v_aud1 = ROW_COUNT;
-  DELETE FROM public.permission_audit_log
-  WHERE actor_id::text LIKE '5b5b3000-%' OR target_user_id::text LIKE '5b5b3000-%' OR target_role_id::text LIKE '5b5b3000-%'
-     OR details::text LIKE '%5b5b3000-%';
-  GET DIAGNOSTICS v_aud2 = ROW_COUNT;
+  BEGIN
+    DELETE FROM public.audit_log
+    WHERE company_id::text LIKE '5b5b3000-%' OR record_id::text LIKE '5b5b3000-%' OR actor_id::text LIKE '5b5b3000-%'
+       OR before::text LIKE '%5b5b3000-%' OR after::text LIKE '%5b5b3000-%';
+    GET DIAGNOSTICS v_aud1 = ROW_COUNT;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE;
+  END;
+  BEGIN
+    DELETE FROM public.permission_audit_log
+    WHERE actor_id::text LIKE '5b5b3000-%' OR target_user_id::text LIKE '5b5b3000-%' OR target_role_id::text LIKE '5b5b3000-%'
+       OR details::text LIKE '%5b5b3000-%';
+    GET DIAGNOSTICS v_aud2 = ROW_COUNT;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE;
+  END;
 
   -- (4) Comprobación: ninguna columna uuid de `public` ni de `auth` conserva el prefijo.
   FOR r IN

@@ -7,7 +7,7 @@
 // escriben las líneas.
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { esClaveDuplicada, runAfectando, runQuery } from '../queryFetch'
+import { esClaveDuplicada, runAfectando, runQuery, tieneCodigoServidor } from '../queryFetch'
 import { comprasKeys } from './keys'
 import { cxpKeys } from '../cxp/keys'
 import { contabilidadKeys } from '../contabilidad/keys'
@@ -386,7 +386,24 @@ export function useCrearOrdenPagoDeContrasenaMutation(companyId?: string) {
         )
       } catch (e) {
         // El mismo intento ya se guardó: la orden existe, no hay nada más que crear.
-        if (vars.clave_idempotencia && esClaveDuplicada(e, 'uq_ordenes_pago_clave')) return
+        const claveGuardada = vars.clave_idempotencia
+        if (claveGuardada) {
+          if (esClaveDuplicada(e, 'uq_ordenes_pago_clave')) return
+          // La contraseña ya tiene su orden viva y el control lo avisa antes de que el índice de la clave actúe (VER-09):
+          // solo es el mismo intento si la orden guardada con ESA clave es de ESTA contraseña; si es de otra persona o
+          // de otro intento, el rechazo es verdadero y se muestra.
+          if (tieneCodigoServidor(e, 'COMPRAS_CONTRASENA_YA_TIENE_ORDEN')) {
+            const previas = await runQuery<Array<{ id: string; contrasena_pago_id: string | null }>>((signal) =>
+              supabase
+                .from('ordenes_pago')
+                .select('id, contrasena_pago_id')
+                .eq('company_id', companyId)
+                .eq('clave_idempotencia', claveGuardada)
+                .abortSignal(signal),
+            )
+            if (previas?.[0]?.contrasena_pago_id === vars.contrasena.id) return
+          }
+        }
         throw e
       }
     },

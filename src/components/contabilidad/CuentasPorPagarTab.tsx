@@ -88,13 +88,19 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
   const pagarOrden = useMarcarOrdenPagadaMutation(companyId)
   const anularOrden = useAnularOrdenMutation(companyId)
 
+  // Una acción de fila a la vez: un doble clic en «Marcar pagada» o «Aprobar» no manda el paso dos veces ni avisa «Listo» dos veces.
+  const accionEnCurso = useRef(false)
   async function accion(fn: () => Promise<unknown>, ok: string) {
+    if (accionEnCurso.current) return
+    accionEnCurso.current = true
     try {
       await fn()
       notify({ variant: 'success', title: 'Listo', text: ok })
     } catch (e) {
       // El rechazo de permiso o de alcance nombra lo que hay que pedir: se queda el tiempo de leerlo entero.
       notify({ variant: 'error', title: 'Error', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e, 'No se pudo completar la acción.') })
+    } finally {
+      accionEnCurso.current = false
     }
   }
 
@@ -981,7 +987,10 @@ function OrdenFormModal({ companyId, factura, monedaBase, onClose }: {
     notas: '',
   })
 
+  // Un solo envío a la vez: el doble clic en «Crear orden» no avisa «Solicitada» (ni cierra el formulario) dos veces.
+  const enviando = useRef(false)
   async function guardar() {
+    if (enviando.current) return
     const monto = parseFloat(o.monto)
     if (monto > saldo) {
       notify({ variant: 'warning', title: 'Atención', text: `El monto excede el saldo pendiente (${formatCurrency(saldo, factura.moneda ?? monedaBase)}).` })
@@ -1000,12 +1009,15 @@ function OrdenFormModal({ companyId, factura, monedaBase, onClose }: {
       notify({ variant: 'warning', title: 'Atención', text: parsed.error.issues[0]?.message ?? 'Datos inválidos.' })
       return
     }
+    enviando.current = true
     try {
       await crear.mutateAsync({ input: parsed.data, proveedorId: factura.proveedor_id, projectId: factura.project_id })
       notify({ variant: 'success', title: 'Solicitada', text: 'Orden de pago creada en borrador; apruébala y márcala pagada para contabilizar.' })
       onClose()
     } catch (e) {
       notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo crear la orden.' })
+    } finally {
+      enviando.current = false
     }
   }
 

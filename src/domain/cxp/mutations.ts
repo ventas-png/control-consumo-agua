@@ -7,7 +7,7 @@
 import { hoyLocalISO } from '../../lib/format'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { esClaveDuplicada, runAfectando, runQuery } from '../queryFetch'
+import { esClaveDuplicada, runAfectando, runQuery, tieneCodigoServidor } from '../queryFetch'
 import { cxpKeys } from './keys'
 import { contabilidadKeys } from '../contabilidad/keys'
 import type { FacturaCreada, OrdenPago, Proveedor } from '../../types/cxp'
@@ -177,17 +177,28 @@ export function useCrearOrdenPagoMutation(companyId?: string) {
         return rows?.[0] ?? null
       } catch (e) {
         // Reintento de una captura que YA se guardó (doble clic, reenvío tras un corte): se devuelve la misma orden.
-        if (vars.input.clave_idempotencia && esClaveDuplicada(e, 'uq_ordenes_pago_clave')) {
-          const claveGuardada = vars.input.clave_idempotencia
-          const previas = await runQuery<OrdenPago[]>((signal) =>
-            supabase
-              .from('ordenes_pago')
-              .select('*')
-              .eq('company_id', companyId)
-              .eq('clave_idempotencia', claveGuardada)
-              .abortSignal(signal),
-          )
-          if (previas?.[0]) return previas[0]
+        const claveGuardada = vars.input.clave_idempotencia
+        if (claveGuardada) {
+          const porIndice = esClaveDuplicada(e, 'uq_ordenes_pago_clave')
+          // El control de saldo cuenta la orden YA guardada como «reservada» antes de que el índice único llegue a actuar:
+          // el reintento de una orden por el saldo total se rechaza por saldo aunque la orden exista (VER-09c). Solo se
+          // trata como el mismo intento si la orden guardada con ESA clave es de la misma factura y del mismo monto; si no,
+          // es un exceso de verdad y se muestra.
+          const porSaldo = tieneCodigoServidor(e, 'COMPRAS_PAGO_EXCEDE_SALDO')
+          if (porIndice || porSaldo) {
+            const previas = await runQuery<OrdenPago[]>((signal) =>
+              supabase
+                .from('ordenes_pago')
+                .select('*')
+                .eq('company_id', companyId)
+                .eq('clave_idempotencia', claveGuardada)
+                .abortSignal(signal),
+            )
+            const previa = previas?.[0]
+            if (previa && (porIndice || (previa.factura_id === vars.input.factura_id && Number(previa.monto) === Number(vars.input.monto)))) {
+              return previa
+            }
+          }
         }
         throw e
       }

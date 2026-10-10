@@ -54,6 +54,16 @@ export function esClaveDuplicada(e: unknown, indice: string): boolean {
 }
 
 /**
+ * ¿El servidor rechazó con este código de negocio (`COMPRAS_…`)? Los controles de Compras lanzan su código al inicio del
+ * mensaje; sirve para distinguir un rechazo del usuario de uno que solo delata que el intento YA se guardó.
+ */
+export function tieneCodigoServidor(e: unknown, codigo: string): boolean {
+  const causa = e instanceof QueryError ? e.cause : null
+  const texto = `${causa?.message ?? ''} ${e instanceof Error ? e.message : ''}`
+  return texto.includes(codigo)
+}
+
+/**
  * El servidor aceptó la orden pero no cambió ninguna fila. En PostgREST un UPDATE o DELETE que la política de
  * filas (RLS) no deja tocar NO falla: devuelve éxito con cero filas. Mostrar «Listo» en ese caso es un éxito
  * falso sobre un documento o un movimiento de dinero que no se movió.
