@@ -472,7 +472,7 @@ async function fase4() {
     const row = await esperarFila(page, NUM_FACTURA_OC)
     const bs = row ? controles(await botones(row)) : []
     ok(bs.includes('Revisar y aprobar'), 'apruebafac · SÍ ve «Revisar y aprobar» (tiene su llave + Editar)', `botones [${bs.join(', ')}]`)
-    ok(!bs.includes('Pagar') || true, 'apruebafac · (sin «Pagar» en una factura registrada)')
+    ok(!bs.includes('Pagar'), 'apruebafac · NO ve «Pagar» en una factura registrada (solo se paga lo aprobado)')
     await row.getByRole('button', { name: 'Revisar y aprobar', exact: true }).click()
     const dlg = page.getByRole('dialog')
     await dlg.getByText('Cuadra', { exact: true }).first().waitFor({ timeout: 25000 })
@@ -752,6 +752,25 @@ async function fase6() {
 // FASE 7 · DOBLE CLIC y CERO FILAS por permiso revocado en caliente
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 const REF3 = 'ZZ-UC-PAGO-3'
+
+/**
+ * «genericos» (approve + change_status + crear + editar, asignado a A, SIN llave por acción) frente a la orden de pago 3
+ * mientras está en borrador (no la ve aprobable) o aprobada (no la ve pagable ni anulable): botón ausente y API rechazada.
+ */
+async function contrasteGenericosOrdenPago(estadoActual) {
+  const { ctx, page } = await abrir('genericos', { tab: 'cxp', vista: /^Órdenes de pago/ })
+  const row = await filaOrdenPago(page, REF3)
+  const bs = row ? controles(await botones(row)) : []
+  ok(!!row && !bs.includes('Aprobar') && !bs.includes('Marcar pagada') && !bs.includes('Anular'),
+    `genericos · la orden de pago 3 (${estadoActual}) NO ofrece Aprobar / Marcar pagada / Anular`, `botones [${bs.join(', ')}]`)
+  const destinos = estadoActual === 'borrador' ? ['aprobada', 'anulada'] : ['pagada', 'anulada']
+  for (const estado of destinos) {
+    const r = await api(page, { metodo: 'PATCH', ruta: `ordenes_pago?id=eq.${E.op3}`, cuerpo: { estado }, cabeceras: { Prefer: 'return=representation' } })
+    ok(r.status >= 400 && /COMPRAS_PERMISO_ACCION/.test(mensajeApi(r)), `genericos · vía API (PATCH a ordenes_pago ${estadoActual} → ${estado}) recibe COMPRAS_PERMISO_ACCION`, `${r.status} ${String(mensajeApi(r)).slice(0, 150)}`)
+  }
+  ok((await ordenPorReferencia(REF3)).estado === estadoActual, `servidor · la orden de pago 3 sigue «${estadoActual}» tras los intentos de «genericos»`)
+  await ctx.close()
+}
 async function fase7() {
   paso('FASE 7 · DOBLE CLIC rápido en «Crear orden» y en «Marcar pagada»; «cero filas» al revocar un permiso con la sesión abierta')
   // 7a · doble clic en «Crear orden» (saldo 400 tras la anulación)
@@ -774,7 +793,9 @@ async function fase7() {
     ok(todas.length === 3, 'servidor · la factura tiene 3 órdenes de pago en total (1 anulada, 1 pagada, 1 nueva)', String(todas.length))
     await ctx.close()
   }
+  await contrasteGenericosOrdenPago('borrador')
   await aprobarOrdenPago(REF3)
+  await contrasteGenericosOrdenPago('aprobada')
   // 7b · «cero filas»: se le revoca «Editar» a quien anula, con su sesión abierta, y pulsa «Anular»
   paso('FASE 7b · CERO FILAS: a quien tiene el botón «Anular» visible se le revoca «Editar» (y luego su llave) con la sesión abierta')
   {
@@ -931,10 +952,8 @@ async function fase9() {
     const orow = await filaOrdenPago(page, REF3)
     const ob = orow ? controles(await botones(orow)) : []
     ok(!!orow && !ob.includes('Aprobar') && !ob.includes('Marcar pagada') && !ob.includes('Anular'), 'genericos · NO ve Aprobar / Marcar pagada / Anular en la orden de pago', `botones [${ob.join(', ')}]`)
-    for (const [estado, ruta] of [['aprobada', E.op3], ['pagada', E.op3], ['anulada', E.op3]]) {
-      const r = await api(page, { metodo: 'PATCH', ruta: `ordenes_pago?id=eq.${ruta}`, cuerpo: { estado }, cabeceras: { Prefer: 'return=representation' } })
-      ok(r.status >= 400 && /COMPRAS_PERMISO_ACCION/.test(mensajeApi(r)), `genericos · vía API (PATCH a ordenes_pago → ${estado}) recibe COMPRAS_PERMISO_ACCION`, `${r.status} ${String(mensajeApi(r)).slice(0, 150)}`)
-    }
+    const r3 = await api(page, { metodo: 'PATCH', ruta: `ordenes_pago?id=eq.${E.op1}`, cuerpo: { estado: 'anulada' }, cabeceras: { Prefer: 'return=representation' } })
+    ok(r3.status >= 400, 'genericos · vía API (PATCH a ordenes_pago ya anulada → anulada) tampoco pasa (no hay éxito falso)', `${r3.status} ${String(mensajeApi(r3)).slice(0, 150)}`)
     ok((await ordenPorReferencia(REF3)).estado === 'pagada' && (await uno(`ordenes_compra?id=eq.${E.oc2}&select=estado`)).estado === 'borrador'
       && (await facturaDe(E.facturas_numeros['1-23'])).estado === 'registrada', 'servidor · los intentos de «genericos» no cambiaron nada (orden de pago, orden de compra y factura iguales)')
     await ctx.close()
@@ -967,6 +986,15 @@ async function fase9() {
     console.log(`    (PATCH amplio por company_id de sinasig → ${fuerte.status} ${String(fuerte.texto).slice(0, 200)})`)
     ok(fuerte.status >= 400 ? /COMPRAS_ALCANCE_PROYECTO/.test(mensajeApi(fuerte)) : (Array.isArray(fuerte.json) && fuerte.json.length === 0),
       'sinasig · un PATCH amplio (por empresa) no anula nada: error COMPRAS_ALCANCE_PROYECTO o 0 filas', `${fuerte.status} ${String(fuerte.texto).slice(0, 150)}`)
+    // Sondeo informativo: ¿puede quien no está asignada al proyecto A CREAR una orden de compra en borrador en ese proyecto?
+    const intruso = await api(page, { metodo: 'POST', ruta: 'ordenes_compra', cuerpo: { company_id: EMPRESA, project_id: PROY_A, proveedor_id: E.proveedor, proveedor_nombre: PROVEEDOR, concepto: 'ZZ UC intruso sin asignación' }, cabeceras: { Prefer: 'return=representation' } })
+    if (intruso.status < 300) {
+      E.intruso = Array.isArray(intruso.json) ? intruso.json[0]?.id : null
+      hallazgo('SONDEO · quien NO está asignada al proyecto A pudo CREAR por API una orden de compra en borrador en ese proyecto (la creación no exige asignación; las seis decisiones sí). Ver informe.')
+      ok(true, 'sinasig · sondeo informativo: la creación de un BORRADOR en el proyecto A por API fue aceptada (se anota como observación)', `${intruso.status}`)
+    } else {
+      ok(/COMPRAS_ALCANCE_PROYECTO|COMPRAS_PERMISO_ACCION/.test(mensajeApi(intruso)), 'sinasig · vía API no puede crear una orden de compra en el proyecto A (rechazada por alcance/permiso)', `${intruso.status} ${String(mensajeApi(intruso)).slice(0, 170)}`)
+    }
     const dentro = await api(adm, { ruta: `ordenes_pago?factura_id=eq.${E.factura}&select=referencia,estado&order=created_at` })
     ok(JSON.stringify(dentro.json.map((o) => o.estado)) === JSON.stringify(['anulada', 'pagada', 'pagada']),
       'servidor · tras los intentos de «sinasig» las órdenes de pago siguen: anulada, pagada, pagada', JSON.stringify(dentro.json))
@@ -992,6 +1020,7 @@ async function fase10() {
   const porEvento = {}
   for (const a of asientos) porEvento[a.origen_evento] = (porEvento[a.origen_evento] || 0) + 1
   console.log('    asientos por evento:', JSON.stringify(porEvento))
+  ok(asientos.length === 6, 'asientos · la empresa tiene exactamente SEIS asientos: recepción, devengo, tres pagos y un reverso', String(asientos.length))
   const pagos = asientos.filter((a) => a.origen_evento === 'orden_pago_pagada')
   ok(pagos.length === 3, 'asientos · hay exactamente TRES asientos «orden_pago_pagada» (uno por pago, ninguno duplicado)', String(pagos.length))
   const vivos = pagos.filter((a) => a.anulado_por_id === null)
