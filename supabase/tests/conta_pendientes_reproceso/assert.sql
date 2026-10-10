@@ -213,17 +213,26 @@ DELETE FROM public.conta_reglas_proveedor;
 INSERT INTO public.conta_mapeo_cuentas (company_id, project_id, evento, cuenta_id)
 VALUES (:A::uuid, NULL, 'gasto_otros', 'c0000000-0000-0000-0000-00000000a002');
 
+-- Desde 20261027000000 la captura de un renglón de factura rechaza una cuenta inactiva, agrupadora o
+-- de otra contabilidad. Lo que se prueba aquí es el DIAGNÓSTICO del generador contable ante renglones
+-- que YA existían así (datos históricos): se insertan sin triggers, como los dejó el pasado.
 SELECT public.factura(:F7A, 'Cuenta inactiva', 300);
+SET session_replication_role = replica;
 SELECT public.linea(:F7A, 1, 1, 100, 'c0000000-0000-0000-0000-00000000a004');   -- inactiva
+SET session_replication_role = origin;
 SELECT public.linea(:F7A, 2, 1, 200, NULL);                                      -- válida (mapeo)
 SELECT public.aprobar_id(:F7A);
 
 SELECT public.factura(:F7B, 'Cuenta agrupadora', 300);
+SET session_replication_role = replica;
 SELECT public.linea(:F7B, 1, 1, 300, 'c0000000-0000-0000-0000-00000000a001');
+SET session_replication_role = origin;
 SELECT public.aprobar_id(:F7B);
 
 SELECT public.factura(:F7C, 'Cuenta de otra contabilidad', 300);
+SET session_replication_role = replica;
 SELECT public.linea(:F7C, 1, 1, 300, 'c0000000-0000-0000-0000-00000000a101');   -- ledger A1
+SET session_replication_role = origin;
 SELECT public.aprobar_id(:F7C);
 
 SELECT public.chk_txt(public.reprocesar_como(:UA::uuid, :F7A)->>'codigo', 'cuenta_invalida',
@@ -266,6 +275,8 @@ INSERT INTO public.conta_mapeo_cuentas (company_id, project_id, evento, cuenta_i
 INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto, estado)
 VALUES ('0c000000-0000-0000-0000-000000000001', :A::uuid, NULL,
         'd0000000-0000-0000-0000-00000000a001', 'Proveedor A', 'Compra recibida', 'borrador');
+-- Fixture: el recibido lo fija el sistema (permiso de sistema), no una sesión de usuario ([EV-04]).
+SELECT set_config('conta.allow_system_write', 'on', false);
 INSERT INTO public.orden_compra_lineas
   (id, company_id, orden_compra_id, linea, descripcion, categoria, cantidad, precio_unitario, cantidad_recibida, iva_monto)
 VALUES ('0c100000-0000-0000-0000-000000000001', :A::uuid,
@@ -342,7 +353,11 @@ UPDATE public.facturas_proveedor SET estado = 'anulada' WHERE id = :FANU;
 
 SELECT public.factura(:FDEL, 'Pendiente que se borra', 130);
 SELECT public.aprobar_id(:FDEL);
+-- Desde 20261027000200 una factura aprobada no se borra por la API (se anula). Un pendiente cuyo documento
+-- ya no existe sigue siendo alcanzable (borrados anteriores a ese control): se apaga el guard SOLO aquí.
+ALTER TABLE public.facturas_proveedor DISABLE TRIGGER trg_compras_no_borrar;
 DELETE FROM public.facturas_proveedor WHERE id = :FDEL;
+ALTER TABLE public.facturas_proveedor ENABLE TRIGGER trg_compras_no_borrar;
 
 SELECT public.factura(:FREG, 'Registrada, sin aprobar', 140);
 
@@ -467,7 +482,21 @@ SELECT public.chk(
 
 SELECT public.chk_txt(public.reprocesar_como(:UA::uuid, :F6)->>'resultado', 'ya_contabilizada',
   '13 · (F6 está contabilizada)');
+-- Una factura contabilizada ya no se borra por la API (20261027000200): se prueba el rechazo y, aparte, la
+-- rama DELETE del trigger contable con el guard apagado SOLO aquí (p. ej. una purga).
+CREATE OR REPLACE FUNCTION public.intenta_borrar_factura(p_id uuid) RETURNS text LANGUAGE plpgsql AS $fn$
+BEGIN
+  DELETE FROM public.facturas_proveedor WHERE id = p_id;
+  RETURN 'SE BORRÓ';
+EXCEPTION WHEN OTHERS THEN
+  RETURN split_part(SQLERRM, ':', 1);
+END;
+$fn$;
+SELECT public.chk_txt(public.intenta_borrar_factura(:F6), 'COMPRAS_DOCUMENTO_NO_SE_BORRA',
+  '13 · una factura contabilizada no se borra por la vía normal');
+ALTER TABLE public.facturas_proveedor DISABLE TRIGGER trg_compras_no_borrar;
 DELETE FROM public.facturas_proveedor WHERE id = :F6;
+ALTER TABLE public.facturas_proveedor ENABLE TRIGGER trg_compras_no_borrar;
 SELECT public.chk(
   (SELECT count(*) FROM public.conta_asientos
     WHERE origen_id = :F6 AND origen_evento = 'factura_prov_aprobada_revertido'), 1,

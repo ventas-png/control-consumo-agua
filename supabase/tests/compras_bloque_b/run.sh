@@ -23,6 +23,7 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
+cd "$RAIZ"   # las pruebas de hallazgos que leen scripts/*.sql (SEP-5, RG-4.diagnostico) los buscan desde la raíz del repo
 MIGS="$RAIZ/supabase/migrations"
 PRIMERA=20261021000000
 NUESTRAS=$(ls "$MIGS" | grep -E '^2026102[12345]00[0-9]{4}_' | sed 's/\.sql$//' | sort)
@@ -88,6 +89,19 @@ bloque() {
   echo "$salida" | sed -n 's/.*NOTICE:  /  /p'
 }
 
+# Igual que bloque(), pero imprime solo cuántas comprobaciones pasaron (las pruebas de hallazgos son largas).
+bloque_resumen() {
+  local archivo="$1" etiqueta="$2" salida n
+  salida=$(psql -q -v ON_ERROR_STOP=1 -d $BD -f "$AQUI/$archivo" 2>&1) || {
+    echo "$salida" | sed -n 's/.*NOTICE:  /  /p' | tail -5
+    echo "❌ invariante incumplida en $archivo:"
+    echo "$salida" | grep -E '^psql:.*ERROR|^DETAIL|^CONTEXT' | head -6
+    exit 1
+  }
+  n=$(echo "$salida" | grep -c 'NOTICE:  .*✓' || true)
+  echo "  ✓ $etiqueta · $n comprobaciones"
+}
+
 echo "── 1/8 · andamiaje de plataforma"
 aplicar "$RAIZ/scripts/schema-drift/bootstrap.sql"
 
@@ -115,11 +129,20 @@ for base in $NUESTRAS; do
 done
 for f in "$MIGS"/*.sql; do
   base="$(basename "$f" .sql)"
-  if [[ "$base" > "$PRIMERA" ]] && ! grep -qx "$base" <<<"$NUESTRAS"; then aplicar "$f"; fi
+  if [[ "$base" > "$PRIMERA" ]] && ! grep -qx "$base" <<<"$NUESTRAS" && [[ "$base" != 20261027* ]]; then aplicar "$f"; fi
 done
+# Huella del catálogo ANTES de las migraciones 20261027…: la reversión (scripts/reversion-compras-controles.sql) debe devolverlo a esto.
+psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_previo.txt"
+for f in "$MIGS"/20261027*.sql; do
+  # Instantánea ANTES de la última migración del bloque (20261027000900): su sección de la reversión, sola, debe devolver ESTO.
+  if [[ "$(basename "$f")" == 20261027000900_* ]]; then psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_pre0900.txt"; fi
+  [ -e "$f" ] && aplicar "$f"
+done
+psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_migrado.txt"
 
 echo "── 4/8 · padrón: dos empresas, tres proyectos, usuarios con perfiles distintos"
 aplicar "$AQUI/fixture.sql"
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_fresca" -c "CREATE DATABASE ${BD}_fresca TEMPLATE $BD" >/dev/null   # plantilla sin suites para SEP-idempotencia y SEP-reversion
 
 echo "── 5/8 · invariantes de una sesión"
 bloque assert_ciclo.sql        "5a · ciclo de la orden: transiciones, congelamiento, devolución, historial"
@@ -138,6 +161,21 @@ bloque assert_seguimiento_pantalla.sql "5l · seguimiento filtrable: pendientes,
 bloque assert_correcciones_c.sql "5m · correcciones del bloque C: pendientes por renglón, respaldos validados en servidor, retiro del principal"
 bloque assert_contratos_compras.sql "5o · contratos conectados a las compras: vigencia, monto, excepción auditada, renovación, seguimiento, evaluaciones"
 bloque assert_contratos_coherencia.sql "5p · regresión: editar una orden en borrador no rompe la coherencia con el contrato; una excepción no se reutiliza si cambian las condiciones"
+bloque assert_controles_servidor.sql "5q · controles de servidor: aislamiento de referencias, pagos, sin borrado, permisos por acción, duplicados, trazabilidad"
+echo "── 5r · cierre de hallazgos adversariales: una prueba por hallazgo confirmado (rojas antes de 20261027000800, verdes después)"
+for f in "$AQUI"/hallazgos/*.sql; do
+  bloque_resumen "hallazgos/$(basename "$f")" "$(basename "$f" .sql)"
+done
+echo "── 5s · la migración 20261027000900 es idempotente y revertible: aplicada nueve veces, mismo catálogo y misma bitácora; revertir, trabajar sin ella y volver a aplicarla no deja la separación inconsistente"
+MIG0900="$(ls "$MIGS"/20261027000900_*.sql)"
+awk '/^-- ── 20261027000900_/ { d = 1; print; next } d && /^-- ── 2026/ { exit } d { print }' "$RAIZ/scripts/reversion-compras-controles.sql" > "$SALIDAS/reversion_0900.sql"
+[ -s "$SALIDAS/reversion_0900.sql" ] || { echo "❌ no se encontró la sección de 20261027000900 en scripts/reversion-compras-controles.sql"; exit 1; }
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_idem" -c "CREATE DATABASE ${BD}_idem TEMPLATE ${BD}_fresca" >/dev/null
+BD=${BD}_idem PIEZA="$MIG0900" bash "$AQUI/hallazgos/SEP-idempotencia.sh" || exit 1
+psql -q -d postgres -c "DROP DATABASE ${BD}_idem" >/dev/null
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_sepr" -c "CREATE DATABASE ${BD}_sepr TEMPLATE ${BD}_fresca" >/dev/null
+BD=${BD}_sepr PIEZA="$MIG0900" REVERSION="$SALIDAS/reversion_0900.sql" VIGILANCIA="$RAIZ/scripts/vigilancia-separacion-compras.sql" bash "$AQUI/hallazgos/SEP-reversion.sh" || exit 1
+psql -q -d postgres -c "DROP DATABASE ${BD}_sepr" >/dev/null
 echo "── 5n · la protección de inventario es obligatoria (con duplicados reales, siempre en transacciones que se revierten)"
 BD=$BD bash "$AQUI/indice_obligatorio.sh" || exit 1
 
@@ -388,6 +426,71 @@ ID_S=$(cat "$SALIDAS"/s1.txt "$SALIDAS"/s2.txt | grep -E '^[0-9a-f-]{36}$' | gre
 [ "$N_S" = "1" ] && [ "$ID_S" = "1" ] \
   && echo "  ✓ S · la misma ampliación (misma clave) a la vez: UNA ampliación y el mismo id para las dos sesiones" \
   || { echo "❌ S · ampliaciones=$N_S ids=$ID_S"; cat "$SALIDAS"/s1.txt "$SALIDAS"/s2.txt; exit 1; }
+
+# T · pagos: dos órdenes de pago de 700 sobre una factura de 1000, creadas a la vez. La factura se
+# bloquea al comprobar el saldo: la segunda espera, ve la reserva de la primera y se rechaza.
+aplicar "$AQUI/concurrencia_controles_prep.sql"
+FT=ce300000-0000-0000-0000-0000000000e1
+OP_T="INSERT INTO public.ordenes_pago (company_id, project_id, proveedor_id, factura_id, monto) VALUES ('$C', '$C1', 'e3000000-0000-0000-0000-000000000001', '$FT', 700);"
+par t "$OP_T" "$OP_T"
+N_T=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.ordenes_pago WHERE factura_id = '$FT'")
+RECH_T=$(cat "$SALIDAS"/t1.txt "$SALIDAS"/t2.txt | grep -c 'COMPRAS_PAGO_EXCEDE_SALDO' || true)
+[ "$N_T" = "1" ] && [ "$RECH_T" = "1" ] \
+  && echo "  ✓ T · dos órdenes de pago de 700 sobre una factura de 1000 a la vez: se creó UNA y la otra se rechazó por saldo" \
+  || { echo "❌ T · ordenes=$N_T rechazos=$RECH_T"; cat "$SALIDAS"/t1.txt "$SALIDAS"/t2.txt; exit 1; }
+
+# U · el mismo número de factura escrito de dos formas, registrado a la vez: UNA factura.
+par u "INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES ('$C', '$C1', 'e3000000-0000-0000-0000-000000000001', 'CE-CON-V1', 'a', 10);" \
+      "INSERT INTO public.facturas_proveedor (company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES ('$C', '$C1', 'e3000000-0000-0000-0000-000000000001', 'ce con v1', 'b', 10);"
+N_U=$(psql -q -t -A -d $BD -c "SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = 'e3000000-0000-0000-0000-000000000001' AND upper(regexp_replace(numero_factura, '[^A-Za-z0-9]', '', 'g')) = 'CECONV1'")
+DUP_U=$(cat "$SALIDAS"/u1.txt "$SALIDAS"/u2.txt | grep -c 'COMPRAS_FACTURA_NUMERO_DUPLICADO' || true)
+[ "$N_U" = "1" ] && [ "$DUP_U" = "1" ] \
+  && echo "  ✓ U · el mismo número de factura escrito de dos formas, a la vez: UNA factura y el otro intento se rechazó" \
+  || { echo "❌ U · facturas=$N_U rechazos=$DUP_U"; cat "$SALIDAS"/u1.txt "$SALIDAS"/u2.txt; exit 1; }
+
+# V… · cierre adversarial: sesiones REALES contra los defectos de concurrencia confirmados (cada fragmento se
+# verificó ROJO sobre la base sin 20261027000800: interbloqueo, doble pago, pago sin asiento…).
+echo "── 6b/8 · concurrencia del cierre adversarial (CONC-01…04, EV-05, EV-09)"
+export C C1 UA PGHOST PGPORT PGUSER BD SALIDAS
+export UC=c0c0c0c0-0000-0000-0000-00000000000c UQ=c0c0c0c0-0000-0000-0000-00000000001a US=c0c0c0c0-0000-0000-0000-00000000001b
+. "$AQUI/hallazgos/conc_lib.sh"
+for f in "$AQUI"/hallazgos/*.conc.sh; do
+  . "$f" || { echo "❌ concurrencia: $(basename "$f")"; exit 1; }
+done
+
+# Reversión: sentencias EJECUTABLES, generadas del catálogo (no la prosa de las cabeceras). Sobre una copia de la base con TODO el
+# bloque aplicado, devuelven triggers, funciones, índices, restricciones, políticas y columnas a lo que había antes de 20261027000000.
+echo "── 6c/8 · reversión de 20261027000000…0900 (scripts/reversion-compras-controles.sql)"
+# La bitácora de la separación es EVIDENCIA: la reversión la conserva si tiene cambios registrados. Las suites SEP dejan filas en ella, así que
+# esta comprobación declara a propósito que se puede descartar (compras.reversion_descartar_bitacora = 'si').
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_rev" -c "CREATE DATABASE ${BD}_rev TEMPLATE $BD" >/dev/null
+PGOPTIONS="-c client_min_messages=warning -c compras.reversion_descartar_bitacora=si" psql -q -v ON_ERROR_STOP=1 -d ${BD}_rev -f "$RAIZ/scripts/reversion-compras-controles.sql" >/dev/null \
+  || { echo "❌ la reversión falla al ejecutarse"; exit 1; }
+psql -q -t -A -d ${BD}_rev -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_revertido_total.txt"
+# Las suites dejan sus propios ayudantes en la base (chk, como, fa1_…): se ignora todo objeto que no existía ni antes ni después de las
+# migraciones 20261027…; lo que la reversión debe devolver EXACTO es cada objeto que había antes y la desaparición de los que ellas añadieron.
+cut -d'|' -f1,2 "$SALIDAS/catalogo_previo.txt" "$SALIDAS/catalogo_migrado.txt" | sort -u > "$SALIDAS/catalogo_claves.txt"
+awk -F'|' 'NR==FNR { k[$0]; next } (($1 "|" $2) in k)' "$SALIDAS/catalogo_claves.txt" "$SALIDAS/catalogo_revertido_total.txt" > "$SALIDAS/catalogo_revertido.txt"
+if diff -q "$SALIDAS/catalogo_previo.txt" "$SALIDAS/catalogo_revertido.txt" >/dev/null; then
+  echo "  ✓ la reversión devuelve el catálogo EXACTO a antes de 20261027000000 ($(wc -l < "$SALIDAS/catalogo_previo.txt") objetos comparados)"
+else
+  echo "❌ la reversión no deja el catálogo como estaba:"; diff "$SALIDAS/catalogo_previo.txt" "$SALIDAS/catalogo_revertido.txt" | head -20; exit 1
+fi
+psql -q -d postgres -c "DROP DATABASE ${BD}_rev" >/dev/null
+
+# Reversión PARCIAL: SOLO la sección de 20261027000900 (lo que se corre para volver al estado posterior a 0800 sin tocar lo anterior).
+psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_rev9" -c "CREATE DATABASE ${BD}_rev9 TEMPLATE $BD" >/dev/null
+PGOPTIONS="-c client_min_messages=warning -c compras.reversion_descartar_bitacora=si" psql -q -v ON_ERROR_STOP=1 -d ${BD}_rev9 -f "$SALIDAS/reversion_0900.sql" >/dev/null \
+  || { echo "❌ la sección de 20261027000900 de la reversión falla al ejecutarse"; exit 1; }
+psql -q -t -A -d ${BD}_rev9 -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_revertido_0900_bruto.txt"
+cut -d'|' -f1,2 "$SALIDAS/catalogo_pre0900.txt" "$SALIDAS/catalogo_migrado.txt" | sort -u > "$SALIDAS/catalogo_claves_0900.txt"
+awk -F'|' 'NR==FNR { k[$0]; next } (($1 "|" $2) in k)' "$SALIDAS/catalogo_claves_0900.txt" "$SALIDAS/catalogo_revertido_0900_bruto.txt" > "$SALIDAS/catalogo_revertido_0900.txt"
+if diff -q "$SALIDAS/catalogo_pre0900.txt" "$SALIDAS/catalogo_revertido_0900.txt" >/dev/null; then
+  echo "  ✓ la sección de 20261027000900, SOLA, devuelve el catálogo EXACTO al estado posterior a 20261027000800 ($(wc -l < "$SALIDAS/catalogo_pre0900.txt") objetos comparados)"
+else
+  echo "❌ la reversión parcial de 20261027000900 no deja el catálogo como estaba tras 0800:"; diff "$SALIDAS/catalogo_pre0900.txt" "$SALIDAS/catalogo_revertido_0900.txt" | head -20; exit 1
+fi
+psql -q -d postgres -c "DROP DATABASE ${BD}_rev9" >/dev/null
 
 echo "── 7/8 · las migraciones del bloque son append-only (no editan lo ya aplicado)"
 (cd "$RAIZ" && node scripts/migrations-append-only.mjs >/dev/null 2>&1) \

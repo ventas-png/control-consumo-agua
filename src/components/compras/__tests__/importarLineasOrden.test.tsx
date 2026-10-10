@@ -49,7 +49,8 @@ async function subir(texto = CSV) {
   await screen.findByLabelText('Vista previa de la importación')
 }
 
-beforeEach(() => { m.confirm.mockResolvedValue(true) })
+// confirm() devuelve Promise<{ isConfirmed }>, no un booleano: un mock `true` escondía que «Cancelar» nunca frenaba (un objeto siempre es verdadero).
+beforeEach(() => { m.confirm.mockResolvedValue({ isConfirmed: true }) })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('Importar renglones a una orden en borrador', () => {
@@ -97,6 +98,24 @@ describe('Importar renglones a una orden en borrador', () => {
     const aplicaciones = m.rpc.mock.calls.filter((c) => c[0] === 'compras_lineas_importar_aplicar')
     expect(aplicaciones).toHaveLength(1)
     expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success', text: expect.stringMatching(/2 renglones agregados/) }))
+  })
+
+  it('«Cancelar» en la confirmación NO guarda nada: ni llama a aplicar, ni cierra, ni avisa', async () => {
+    m.rpc.mockResolvedValueOnce({ data: vista(0), error: null })
+    m.confirm.mockResolvedValueOnce({ isConfirmed: false })
+    const { onClose } = abrir()
+    await subir()
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar y guardar 2 renglones/ }))
+    await waitFor(() => expect(m.confirm).toHaveBeenCalledTimes(1))
+    // un tick más para asegurar que nada se encadenó tras el diálogo
+    await Promise.resolve(); await Promise.resolve()
+    expect(m.rpc.mock.calls.filter((c) => c[0] === 'compras_lineas_importar_aplicar')).toHaveLength(0)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(m.notify).not.toHaveBeenCalled()
+    // sigue en la vista previa y se puede volver a intentar: confirmar ahora sí guarda
+    m.rpc.mockResolvedValueOnce({ data: { lote_id: 'L1', orden_compra_id: 'o1', renglones_creados: 2, linea_ids: ['a', 'b'], reutilizada: false }, error: null })
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar y guardar 2 renglones/ }))
+    await waitFor(() => expect(m.rpc).toHaveBeenCalledWith('compras_lineas_importar_aplicar', { p_lote_id: 'L1' }))
   })
 
   it('si el servidor rechaza al aplicar, lo dice y no cierra (no se guardó nada)', async () => {

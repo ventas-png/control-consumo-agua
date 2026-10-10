@@ -29,6 +29,8 @@ import {
   useAprobarFacturaConCuadreMutation,
   useCrearContrasenaMutation,
 } from '../../domain/compras/mutations'
+import { nuevaClaveIdempotencia } from '../../domain/compras/ordenCrear'
+import { DURACION_ERROR_LARGO_MS, mensajeAccionCompras } from '../../domain/compras/errores'
 import { contrasenaFormSchema } from '../../domain/compras/schemas'
 import { formatCurrency, formatDateShort, hoyLocalISO, sumarDiasCalendario } from '../../lib/format'
 import {
@@ -57,7 +59,12 @@ const TONO_FACTURA = {
 const TONO_ORDEN = { borrador: 'info', aprobada: 'warning', pagada: 'success', anulada: 'neutral' } as const
 
 export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) {
-  const { puedeCrear, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
+  // Cada PASO exige SU llave Y «Editar» (la política de UPDATE pide editar y el servidor además pide la llave de la
+  // acción): aprobar la factura, aprobar la orden de pago, pagar y anular el pago son cuatro permisos distintos. La
+  // combinación se decide una sola vez (`decidirPasosCompras`); anular la factura sigue con «Cambiar estado» + «Editar».
+  const {
+    puedeCrear, puedeAprobarFactura, puedeAprobarOrdenPago, puedeEjecutarPago, puedeAnularPago, puedeCambiarEstadoPaso,
+  } = usePermisosContabilidad()
   const [vista, setVista] = useState<Vista>('facturas')
   const [nuevaFactura, setNuevaFactura] = useState(false)
   const [ordenPara, setOrdenPara] = useState<FacturaProveedorConProveedor | null>(null)
@@ -86,7 +93,8 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
       await fn()
       notify({ variant: 'success', title: 'Listo', text: ok })
     } catch (e) {
-      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo completar la acción.' })
+      // El rechazo de permiso o de alcance nombra lo que hay que pedir: se queda el tiempo de leerlo entero.
+      notify({ variant: 'error', title: 'Error', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e, 'No se pudo completar la acción.') })
     }
   }
 
@@ -126,10 +134,10 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
           {/* Con orden de compra detrás, aprobar pasa por el cuadre de 3 vías:
               lo pedido, lo recibido y lo facturado tienen que coincidir. Sin
               orden (gasto directo, caja chica) se aprueba como siempre. */}
-          {f.estado === 'registrada' && puedeAutorizar && f.orden_compra_id && (
+          {f.estado === 'registrada' && puedeAprobarFactura && f.orden_compra_id && (
             <button onClick={(e) => { e.stopPropagation(); setCuadreDe(f) }} style={btnLink}>Revisar y aprobar</button>
           )}
-          {f.estado === 'registrada' && puedeAutorizar && !f.orden_compra_id && (
+          {f.estado === 'registrada' && puedeAprobarFactura && !f.orden_compra_id && (
             <button
               onClick={(e) => { e.stopPropagation(); void accion(() => aprobarFactura.mutateAsync(f.id), 'Factura aprobada: el gasto quedó devengado contra CxP.') }}
               style={btnLink}
@@ -140,7 +148,7 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
           {(f.estado === 'aprobada' || f.estado === 'pagada_parcial') && puedeCrear && (
             <button onClick={(e) => { e.stopPropagation(); setOrdenPara(f) }} style={btnLink}>Pagar</button>
           )}
-          {f.estado !== 'anulada' && f.monto_pagado === 0 && puedeCambiarEstado && (
+          {f.estado !== 'anulada' && f.monto_pagado === 0 && puedeCambiarEstadoPaso && (
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -189,15 +197,15 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
       header: '',
       render: (o) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          {o.estado === 'borrador' && puedeAutorizar && (
+          {o.estado === 'borrador' && puedeAprobarOrdenPago && (
             <button onClick={() => void accion(() => aprobarOrden.mutateAsync(o.id), 'Orden aprobada.')} style={btnLink}>Aprobar</button>
           )}
-          {o.estado === 'aprobada' && puedeCambiarEstado && (
+          {o.estado === 'aprobada' && puedeEjecutarPago && (
             <button onClick={() => void accion(() => pagarOrden.mutateAsync({ ordenId: o.id }), 'Orden pagada: asiento generado y saldo de la factura actualizado.')} style={btnLink}>
               Marcar pagada
             </button>
           )}
-          {o.estado !== 'anulada' && puedeCambiarEstado && (
+          {o.estado !== 'anulada' && puedeAnularPago && (
             <button
               onClick={() => {
                 void (async () => {
@@ -271,7 +279,7 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
           searchPlaceholder="Buscar orden…"
           emptyState={{
             title: 'Sin órdenes de pago',
-            description: 'Crea órdenes desde la pestaña Facturas (botón Pagar). Un operador puede solicitarlas; aprobar y marcar pagada es de administradores.',
+            description: 'Crea órdenes desde la pestaña Facturas (botón Pagar). Quien tiene el permiso de crear puede solicitarlas; aprobar la orden, marcarla pagada y anular el pago son permisos distintos.',
           }}
         />
       )}
@@ -429,7 +437,7 @@ function CuadreModal({ factura, monedaBase, onClose }: {
       })
       onClose()
     } catch (e) {
-      notify({ variant: 'error', title: 'No se pudo aprobar', text: e instanceof Error ? e.message : 'Error inesperado.' })
+      notify({ variant: 'error', title: 'No se pudo aprobar', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e, 'Error inesperado.') })
     }
   }
 
@@ -535,6 +543,8 @@ function ContrasenaFormModal({ companyId, projectId, monedaBase, facturas, onClo
   onClose: () => void
 }) {
   const crear = useCrearContrasenaMutation(companyId, projectId)
+  // Una clave por apertura del formulario (ver la nota de la orden de pago): un doble clic no emite dos contraseñas.
+  const claveIdempotencia = useRef(nuevaClaveIdempotencia('cp'))
   const [proveedorId, setProveedorId] = useState('')
   const [fechaPago, setFechaPago] = useState('')
   const [entregadaPor, setEntregadaPor] = useState('')
@@ -565,6 +575,7 @@ function ContrasenaFormModal({ companyId, projectId, monedaBase, facturas, onClo
       entregada_por: entregadaPor.trim() || null,
       recibida_por: recibidaPor.trim() || null,
       observaciones: null,
+      clave_idempotencia: claveIdempotencia.current,
       facturas: candidatas
         .filter((f) => elegidas[f.id])
         .map((f) => ({ factura_id: f.id, monto: saldoFactura(f) })),
@@ -803,8 +814,13 @@ export function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: 
       onClose()
     } catch (e) {
       // Los mensajes del servidor (COMPRAS_FACTURA_*) están escritos para leerse tal cual:
-      // número repetido, clave ya usada con otro contenido, renglón ajeno, etc.
-      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? textoErrorServidor(e.message) : 'No se pudo registrar.' })
+      // número repetido, clave ya usada con otro contenido, renglón ajeno, etc. El de número repetido mide ~270
+      // caracteres (qué factura es la equivalente y cómo escribir el número): el aviso de 3,5 s por omisión no alcanza
+      // para leerlo, así que este error dura lo suficiente para entender qué hacer.
+      notify({
+        variant: 'error', title: 'Error', duration: DURACION_ERROR_LARGO_MS,
+        text: e instanceof Error ? textoErrorServidor(e.message) : 'No se pudo registrar.',
+      })
     }
   }
 
@@ -954,6 +970,9 @@ function OrdenFormModal({ companyId, factura, monedaBase, onClose }: {
 }) {
   const crear = useCrearOrdenPagoMutation(companyId)
   const saldo = saldoFactura(factura)
+  // Una clave por apertura del formulario: el doble clic o el reintento tras un corte devuelven LA MISMA orden de
+  // pago en vez de crear (y luego pagar) otra. Si la creación falla, no queda nada y la misma clave sirve al reintento.
+  const claveIdempotencia = useRef(nuevaClaveIdempotencia('op'))
   const [o, setO] = useState({
     monto: String(saldo),
     metodo_pago: 'transferencia' as MetodoPagoCxP,
@@ -975,6 +994,7 @@ function OrdenFormModal({ companyId, factura, monedaBase, onClose }: {
       fecha_pago: o.fecha_pago || null,
       referencia: o.referencia.trim() || null,
       notas: o.notas.trim() || null,
+      clave_idempotencia: claveIdempotencia.current,
     })
     if (!parsed.success) {
       notify({ variant: 'warning', title: 'Atención', text: parsed.error.issues[0]?.message ?? 'Datos inválidos.' })

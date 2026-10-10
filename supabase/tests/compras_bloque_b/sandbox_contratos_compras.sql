@@ -193,6 +193,8 @@ BEGIN
   ev := ev || pg_temp.ck('4d · otra empresa no ve la orden: no autoriza nada',
     pg_temp.err(format($q$SELECT public.compras_oc_excepcion_contrato(%L, 'aprobar', 'Otra empresa autorizando una excepción')$q$, ov)), 'COMPRAS_EXCEPCION_ORDEN');
   RESET ROLE;
+  -- El interruptor de la separación lo cambia el sistema (o la RPC compras_separacion_configurar), no el usuario que quedó en la sesión.
+  PERFORM set_config('request.jwt.claim.sub', '', true);
   INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES (c, true) ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true;
   PERFORM set_config('request.jwt.claim.sub', ua::text, true);
   SET LOCAL ROLE authenticated;
@@ -205,6 +207,7 @@ BEGIN
   id2 := public.compras_oc_excepcion_contrato(ov, 'aprobar', 'Contrato en renovación; el servicio no puede parar');
   ev := ev || pg_temp.ck('4f · reintentar la excepción devuelve la misma', (id1 = id2)::text, 'true');
   RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub', '', true);
   UPDATE public.compras_config SET aprobacion_separada = false WHERE company_id = c;
   ev := ev || pg_temp.ckn('4g · una sola excepción registrada, a nombre de quien la autorizó', (SELECT count(*) FROM public.orden_compra_excepciones WHERE orden_compra_id = ov AND autorizado_por = ub), 1);
   ev := ev || pg_temp.ckn('4h · queda en el historial de la orden', (SELECT count(*) FROM public.orden_compra_eventos WHERE orden_compra_id = ov AND tipo = 'excepcion_contrato'), 1);

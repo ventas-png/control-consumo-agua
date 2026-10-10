@@ -7,7 +7,7 @@
 // escriben las líneas.
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { esClaveDuplicada, runAfectando, runQuery } from '../queryFetch'
 import { comprasKeys } from './keys'
 import { cxpKeys } from '../cxp/keys'
 import { contabilidadKeys } from '../contabilidad/keys'
@@ -41,11 +41,14 @@ export function useCambiarEstadoProveedorMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (vars: { id: string; input: ProveedorEstadoInput }) => {
-      await runQuery((signal) =>
+      // Autorizar, suspender o vetar: si la política de filas no deja tocar el proveedor, PostgREST contesta éxito con
+      // cero filas. `runAfectando` lo vuelve error (no se muestra «Proveedor autorizado.» sobre algo que no pasó).
+      await runAfectando((signal) =>
         supabase
           .from('proveedores')
           .update({ ...vars.input, updated_at: new Date().toISOString() })
           .eq('id', vars.id)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -79,8 +82,10 @@ export function useEliminarDocumentoProveedorMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (id: string) => {
-      await runQuery((signal) =>
-        supabase.from('proveedor_documentos').delete().eq('id', id).abortSignal(signal),
+      // Un DELETE que la política de filas no deja tocar contesta éxito con cero filas: sin `runAfectando` la papelería
+      // seguía mostrando el documento «eliminado» sin que el servidor lo hubiera borrado.
+      await runAfectando((signal) =>
+        supabase.from('proveedor_documentos').delete().eq('id', id).select('id').abortSignal(signal),
       )
     },
     onSuccess: () => invalidar(),
@@ -166,7 +171,7 @@ export function useCambiarEstadoOrdenCompraMutation() {
       // Devolver a borrador exige motivo y es una REVISIÓN (lo valida el servidor);
       // cancelar usa `motivo_anulacion`. El motivo va a la columna que corresponde.
       const campoMotivo = vars.estado === 'borrador' ? 'motivo_devolucion' : 'motivo_anulacion'
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('ordenes_compra')
           .update({
@@ -175,6 +180,7 @@ export function useCambiarEstadoOrdenCompraMutation() {
             updated_at: new Date().toISOString(),
           })
           .eq('id', vars.id)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -186,8 +192,8 @@ export function useEliminarOrdenCompraMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (id: string) => {
-      await runQuery((signal) =>
-        supabase.from('ordenes_compra').delete().eq('id', id).abortSignal(signal),
+      await runAfectando((signal) =>
+        supabase.from('ordenes_compra').delete().eq('id', id).select('id').abortSignal(signal),
       )
     },
     onSuccess: () => invalidar(),
@@ -259,7 +265,7 @@ export function useCambiarEstadoRecepcionMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (vars: { id: string; estado: 'registrada' | 'anulada'; motivo?: string }) => {
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('recepciones')
           .update({
@@ -268,6 +274,7 @@ export function useCambiarEstadoRecepcionMutation() {
             updated_at: new Date().toISOString(),
           })
           .eq('id', vars.id)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -283,13 +290,31 @@ export function useCrearContrasenaMutation(companyId?: string, projectId?: strin
     mutationFn: async (input: ContrasenaFormInput) => {
       if (!companyId) throw new Error('Falta companyId.')
       const { facturas, ...cabecera } = input
-      const filas = await runQuery<ContrasenaPago[]>((signal) =>
-        supabase
-          .from('contrasenas_pago')
-          .insert({ ...cabecera, company_id: companyId, project_id: projectId ?? null })
-          .select()
-          .abortSignal(signal),
-      )
+      let filas: ContrasenaPago[] | null
+      try {
+        filas = await runQuery<ContrasenaPago[]>((signal) =>
+          supabase
+            .from('contrasenas_pago')
+            .insert({ ...cabecera, company_id: companyId, project_id: projectId ?? null })
+            .select()
+            .abortSignal(signal),
+        )
+      } catch (e) {
+        // Reintento de una emisión que YA se guardó: se devuelve la misma contraseña (sus partidas las puso el primer intento).
+        if (cabecera.clave_idempotencia && esClaveDuplicada(e, 'uq_contrasenas_pago_clave')) {
+          const claveGuardada = cabecera.clave_idempotencia
+          const previas = await runQuery<ContrasenaPago[]>((signal) =>
+            supabase
+              .from('contrasenas_pago')
+              .select('*')
+              .eq('company_id', companyId)
+              .eq('clave_idempotencia', claveGuardada)
+              .abortSignal(signal),
+          )
+          if (previas?.[0]) return previas[0]
+        }
+        throw e
+      }
       const cp = filas?.[0]
       if (!cp) throw new Error('No se pudo emitir la contraseña.')
 
@@ -309,11 +334,12 @@ export function useAnularContrasenaMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (vars: { id: string; motivo: string }) => {
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('contrasenas_pago')
           .update({ estado: 'anulada', motivo_anulacion: vars.motivo, updated_at: new Date().toISOString() })
           .eq('id', vars.id)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -334,26 +360,35 @@ export function useCrearOrdenPagoDeContrasenaMutation(companyId?: string) {
       metodo_pago: string
       referencia: string | null
       notas: string | null
+      /** Identifica ESTE intento: un doble clic no crea otra orden de pago (uq_ordenes_pago_clave). */
+      clave_idempotencia?: string | null
     }) => {
       if (!companyId) throw new Error('Falta companyId.')
       const { data: auth } = await supabase.auth.getUser()
-      await runQuery((signal) =>
-        supabase
-          .from('ordenes_pago')
-          .insert({
-            company_id: companyId,
-            project_id: vars.contrasena.project_id,
-            proveedor_id: vars.contrasena.proveedor_id,
-            contrasena_pago_id: vars.contrasena.id,
-            monto: vars.contrasena.total,
-            metodo_pago: vars.metodo_pago,
-            referencia: vars.referencia,
-            notas: vars.notas,
-            estado: 'borrador',
-            solicitada_por: auth.user?.id ?? null,
-          })
-          .abortSignal(signal),
-      )
+      try {
+        await runQuery((signal) =>
+          supabase
+            .from('ordenes_pago')
+            .insert({
+              company_id: companyId,
+              project_id: vars.contrasena.project_id,
+              proveedor_id: vars.contrasena.proveedor_id,
+              contrasena_pago_id: vars.contrasena.id,
+              monto: vars.contrasena.total,
+              metodo_pago: vars.metodo_pago,
+              referencia: vars.referencia,
+              notas: vars.notas,
+              clave_idempotencia: vars.clave_idempotencia ?? null,
+              estado: 'borrador',
+              solicitada_por: auth.user?.id ?? null,
+            })
+            .abortSignal(signal),
+        )
+      } catch (e) {
+        // El mismo intento ya se guardó: la orden existe, no hay nada más que crear.
+        if (vars.clave_idempotencia && esClaveDuplicada(e, 'uq_ordenes_pago_clave')) return
+        throw e
+      }
     },
     onSuccess: () => invalidar(),
   })
@@ -374,7 +409,9 @@ export function useEnlazarGastoAFacturaMutation() {
   const invalidar = useInvalidarCompras()
   return useMutation({
     mutationFn: async (vars: { gastoId: string; facturaId: string; yaContabilizado: boolean }) => {
-      await runQuery((signal) =>
+      // Anula un gasto contabilizado y reversa su asiento: con cero filas afectadas no pasó nada de eso, y la pantalla
+      // no puede decir «Gasto enlazado y anulado».
+      await runAfectando((signal) =>
         supabase
           .from('gastos_condominio')
           .update({
@@ -382,6 +419,7 @@ export function useEnlazarGastoAFacturaMutation() {
             ...(vars.yaContabilizado ? { estado: 'anulado' } : {}),
           })
           .eq('id', vars.gastoId)
+          .select('id')
           .abortSignal(signal),
       )
     },
@@ -425,7 +463,7 @@ export function useAprobarFacturaConCuadreMutation() {
     mutationFn: async (vars: { facturaId: string; justificacion?: string }) => {
       // Solo se manda la justificación. El aprobador y el AUTORIZADOR de la excepción
       // los sella el servidor con auth.uid(): el cliente no puede firmar por otro.
-      await runQuery((signal) =>
+      await runAfectando((signal) =>
         supabase
           .from('facturas_proveedor')
           .update({
@@ -434,6 +472,7 @@ export function useAprobarFacturaConCuadreMutation() {
             updated_at: new Date().toISOString(),
           })
           .eq('id', vars.facturaId)
+          .select('id')
           .abortSignal(signal),
       )
     },

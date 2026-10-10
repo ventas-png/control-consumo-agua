@@ -35,7 +35,8 @@ const elegir = (f: File) => fireEvent.change(screen.getByLabelText('Archivo de e
 beforeEach(() => {
   m.respaldos = [respaldo()]
   m.adjuntar.mockResolvedValue({ respaldo: respaldo(), reutilizado: false })
-  m.confirm.mockResolvedValue(true)
+  // confirm() devuelve Promise<{ isConfirmed }>, no un booleano: un mock `true` escondía que «Cancelar» nunca frenaba.
+  m.confirm.mockResolvedValue({ isConfirmed: true })
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
@@ -82,6 +83,18 @@ describe('Respaldos de una recepción', () => {
     expect(screen.queryByText('Retirar')).toBeNull()
     expect(screen.getByText(/la evidencia no se edita ni se retira/)).toBeTruthy()
     expect(screen.getByText(/Adjuntar no cambia la recepción ni su asiento/)).toBeTruthy()
+  })
+
+  it('«Cancelar» en la confirmación NO retira el archivo (borra el registro y el almacenamiento): no se llama a retirar ni se avisa', async () => {
+    m.confirm.mockResolvedValueOnce({ isConfirmed: false })
+    abrir(R)
+    fireEvent.click(screen.getByText('Retirar'))
+    await waitFor(() => expect(m.confirm).toHaveBeenCalledTimes(1))
+    await Promise.resolve(); await Promise.resolve()
+    expect(m.retirar).not.toHaveBeenCalled()
+    expect(m.notify).not.toHaveBeenCalled()
+    // el archivo sigue en la lista
+    expect(screen.getByText('Remisión 123.pdf')).toBeTruthy()
   })
 
   it('retirar con éxito: avisa que se quitó de la recepción y del almacenamiento', async () => {

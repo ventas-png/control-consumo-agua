@@ -86,11 +86,14 @@ INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, factu
   ('f3000000-0000-0000-0000-000000000002', :C::uuid, :C2::uuid, :P1::uuid, 'f2000000-0000-0000-0000-000000000002', 112, 'transferencia', 'borrador'),
   ('f3000000-0000-0000-0000-000000000003', :C::uuid, NULL,      :P1::uuid, 'f2000000-0000-0000-0000-000000000003', 112, 'transferencia', 'borrador'),
   ('f3000000-0000-0000-0000-000000000004', :D::uuid, :D1::uuid, :PD::uuid, 'f2000000-0000-0000-0000-000000000004', 112, 'transferencia', 'borrador');
+-- Fixture: el número lo fija el sistema (histórico), no una sesión de usuario ([EV-08]).
+SELECT set_config('conta.allow_system_write', 'on', false);
 INSERT INTO public.contrasenas_pago (id, company_id, project_id, proveedor_id, numero, fecha_pago_programada, total) VALUES
   ('f4000000-0000-0000-0000-000000000001', :C::uuid, :C1::uuid, :P1::uuid, 'CP-LF-C1', CURRENT_DATE + 30, 112),
   ('f4000000-0000-0000-0000-000000000002', :C::uuid, :C2::uuid, :P1::uuid, 'CP-LF-C2', CURRENT_DATE + 30, 112),
   ('f4000000-0000-0000-0000-000000000003', :C::uuid, NULL,      :P1::uuid, 'CP-LF-E',  CURRENT_DATE + 30, 112),
   ('f4000000-0000-0000-0000-000000000004', :D::uuid, :D1::uuid, :PD::uuid, 'CP-LF-D',  CURRENT_DATE + 30, 112);
+SELECT set_config('conta.allow_system_write', 'off', false);
 INSERT INTO public.contrasena_pago_facturas (id, company_id, contrasena_id, factura_id, monto) VALUES
   ('f4100000-0000-0000-0000-000000000001', :C::uuid, 'f4000000-0000-0000-0000-000000000001', 'f2000000-0000-0000-0000-000000000001', 112),
   ('f4100000-0000-0000-0000-000000000002', :C::uuid, 'f4000000-0000-0000-0000-000000000002', 'f2000000-0000-0000-0000-000000000002', 112),

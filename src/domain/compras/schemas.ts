@@ -125,6 +125,8 @@ export const contrasenaFormSchema = z.object({
   entregada_por: z.string().trim().max(120).nullable(),
   recibida_por: z.string().trim().max(120).nullable(),
   observaciones: z.string().trim().max(500).nullable(),
+  /** Identifica ESTE intento de emisión: un doble clic o un reintento no crea otra contraseña (uq_contrasenas_pago_clave). */
+  clave_idempotencia: z.string().trim().min(8).max(200).nullable().default(null),
   facturas: z.array(z.object({
     factura_id: z.string().uuid(),
     monto: z.number().positive(),

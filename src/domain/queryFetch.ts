@@ -43,6 +43,44 @@ export async function runQuery<T>(
   return data
 }
 
+/**
+ * ¿El servidor rechazó el INSERT por la clave única de idempotencia `indice`? Es el reintento (doble clic, reenvío tras
+ * un corte) de algo que YA se creó: no es un error del usuario, el documento existe y hay que devolverlo.
+ */
+export function esClaveDuplicada(e: unknown, indice: string): boolean {
+  const causa = e instanceof QueryError ? e.cause : null
+  const texto = `${causa?.message ?? ''} ${causa?.details ?? ''} ${e instanceof Error ? e.message : ''}`
+  return (causa?.code === '23505' || texto.includes('duplicate key')) && texto.includes(indice)
+}
+
+/**
+ * El servidor aceptó la orden pero no cambió ninguna fila. En PostgREST un UPDATE o DELETE que la política de
+ * filas (RLS) no deja tocar NO falla: devuelve éxito con cero filas. Mostrar «Listo» en ese caso es un éxito
+ * falso sobre un documento o un movimiento de dinero que no se movió.
+ */
+export class SinFilasAfectadasError extends Error {
+  constructor(
+    message = 'El servidor no aplicó el cambio: tu usuario no tiene permiso para este paso, o el documento ya cambió o ya no está disponible. Actualiza la pantalla e inténtalo de nuevo.',
+  ) {
+    super(message)
+    this.name = 'SinFilasAfectadasError'
+  }
+}
+
+/**
+ * Como `runQuery`, para un UPDATE o DELETE que debe afectar al menos una fila. El builder DEBE pedir las filas
+ * de vuelta (`.select('id')` antes de `.abortSignal(signal)`); si no vuelve ninguna, lanza `SinFilasAfectadasError`
+ * en lugar de devolver éxito. Devuelve cuántas filas cambió.
+ */
+export async function runAfectando(
+  build: (signal: AbortSignal) => PromiseLike<{ data: unknown[] | null; error: PostgrestError | null }>,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<number> {
+  const filas = await runQuery<unknown[]>(build, timeoutMs)
+  if (!filas || filas.length === 0) throw new SinFilasAfectadasError()
+  return filas.length
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // Degradación VISIBLE (auditoría 2026-07-28 · PR-28)
 //

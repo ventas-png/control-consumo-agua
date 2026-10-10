@@ -6,7 +6,7 @@
 // leerse tal cual. Aquí no se replica ninguna.
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { runAfectando, runQuery } from '../queryFetch'
 import { uploadMedia, removeMedia } from '../shared/storage'
 import { BUCKET_CONTRATOS_RESPALDO } from '../shared/buckets'
 import { comprasKeys } from '../compras/keys'
@@ -168,11 +168,14 @@ export function useCambiarEstadoContratoMutation() {
   const invalidar = useInvalidarProveedores()
   return useMutation({
     mutationFn: async (vars: { id: string; estado: EstadoContratoProveedor; motivo: string | null }) => {
-      await runQuery((signal) =>
+      // De que el contrato esté activo depende poder aprobar una orden de compra bajo él: con cero filas afectadas
+      // (la política de filas no dejó tocarlo) no cambió nada y la pantalla no puede seguir como si hubiera cambiado.
+      await runAfectando((signal) =>
         supabase
           .from('contratos_proveedores')
           .update({ estado: vars.estado, motivo_estado: vars.motivo })
           .eq('id', vars.id)
+          .select('id')
           .abortSignal(signal),
       )
     },

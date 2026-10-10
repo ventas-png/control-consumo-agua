@@ -48,7 +48,11 @@ vi.mock('../../../domain/proveedores/queries', () => ({
 }))
 vi.mock('../ui', async (original) => {
   const real = await original<typeof import('../ui')>()
-  return { ...real, usePermisosContabilidad: () => ({ puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: true, puedeEliminar: true }) }
+  // quien lo puede todo: también las seis decisiones del circuito de compras y pagos (cada una con su llave)
+  const { PASOS_TODOS } = await import('../../../test/sesionPermisos')
+  return { ...real, usePermisosContabilidad: () => ({
+    puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: true, puedeEliminar: true, ...PASOS_TODOS,
+  }) }
 })
 
 import { ComprasTab } from '../ComprasTab'

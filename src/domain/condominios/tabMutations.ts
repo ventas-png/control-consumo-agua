@@ -16,6 +16,7 @@
 // P2 tipos: las funciones con tabla/RPC LITERAL usan el cliente tipado `db`;
 // los helpers genéricos (tabla como parámetro string) siguen en `supabase`.
 import { supabase, db } from '../../lib/supabase'
+import { SinFilasAfectadasError } from '../queryFetch'
 import type {
   ConsumoDeclarado, ResultadoConsumoInsumos,
   ResultadoGeneracionTurnos, ResultadoMaterializacionRutinas,
@@ -80,6 +81,33 @@ export async function deleteCondominioRow(
 ): Promise<{ error: RowError }> {
   const { error } = await supabase.from(table).delete().eq('id', id)
   return { error }
+}
+
+/**
+ * Como `updateCondominioRow`, pero exige que el servidor haya cambiado la fila: un UPDATE que la política de filas
+ * no deja tocar devuelve éxito con cero filas, y la pantalla lo mostraría como hecho. Úsala donde el cambio
+ * mueve dinero o un documento con efecto contable.
+ */
+export async function updateCondominioRowAfectando(
+  table: string,
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<{ error: RowError }> {
+  const { data, error } = await supabase.from(table).update(patch).eq('id', id).select('id')
+  if (error) return { error }
+  if (!data || data.length === 0) return { error: { message: new SinFilasAfectadasError().message, code: 'SIN_FILAS' } }
+  return { error: null }
+}
+
+/** Como `deleteCondominioRow`, pero exige que se haya borrado la fila (ver `updateCondominioRowAfectando`). */
+export async function deleteCondominioRowAfectando(
+  table: string,
+  id: string,
+): Promise<{ error: RowError }> {
+  const { data, error } = await supabase.from(table).delete().eq('id', id).select('id')
+  if (error) return { error }
+  if (!data || data.length === 0) return { error: { message: new SinFilasAfectadasError().message, code: 'SIN_FILAS' } }
+  return { error: null }
 }
 
 /** Elimina filas de `table` por una columna distinta de `id` (ej. encuesta_id). */

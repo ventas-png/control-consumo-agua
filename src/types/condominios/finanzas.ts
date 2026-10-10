@@ -599,6 +599,10 @@ export interface OrdenCompra {
   notas?: string | null
   created_by?: string | null
   created_at: string
+  /** Sube cada vez que una orden aprobada se devuelve a borrador; con > 0 el borrador ya no se puede borrar, solo cancelar. */
+  revision?: number | null
+  /** Sello de aprobación del servidor: una orden que se aprobó alguna vez no se borra. */
+  aprobada_at?: string | null
 }
 
 export interface AsambleaDigital {

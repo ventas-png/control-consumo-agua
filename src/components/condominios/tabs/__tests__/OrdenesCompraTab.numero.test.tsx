@@ -10,7 +10,11 @@ const h = vi.hoisted(() => ({
   prompt: vi.fn(),
   notify: vi.fn(),
   excepcion: vi.fn(),
+  confirm: vi.fn(),
+  borrar: vi.fn(),
   cambiarEstado: true,
+  // «Autorizar / Denegar — Órdenes compra»: la llave que el servidor exige para aprobar y devolver una orden.
+  aprobarOrden: true,
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
@@ -19,27 +23,29 @@ vi.mock('../../../../domain/proveedores/queries', () => ({ useAsignacionesQuery:
 vi.mock('../../../../domain/compras/queries', () => ({ useInsumosAlmacenQuery: () => ({ data: [], isLoading: false }) }))
 vi.mock('../../../../domain/compras/mutations', () => ({ crearOrdenTransaccional: vi.fn() }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
-  createCondominioRow: vi.fn(), updateCondominioRow: h.update, deleteCondominioRow: vi.fn(),
+  createCondominioRow: vi.fn(), updateCondominioRowAfectando: h.update, deleteCondominioRowAfectando: h.borrar,
 }))
 vi.mock('../../../compras/SeguimientoOrdenModal', () => ({ SeguimientoOrdenModal: () => null }))
 vi.mock('../../../proveedores/ContratoSeguimientoModal', () => ({ ContratoSeguimientoModal: () => null }))
 vi.mock('../../../proveedores/ContratoSelector', () => ({ ContratoSelector: () => null }))
-vi.mock('../../../proveedores/permisos', () => ({ usePermisosProveedor: () => ({ cambiarEstado: h.cambiarEstado }) }))
+vi.mock('../../../proveedores/permisos', () => ({
+  usePermisosProveedor: () => ({ cambiarEstado: h.cambiarEstado, puedeCambiarEstadoPaso: h.cambiarEstado, puedeAprobarOrdenCompra: h.aprobarOrden }),
+}))
 vi.mock('../../../../domain/proveedores/contratosCompras', async (orig) => ({
   ...(await orig<typeof import('../../../../domain/proveedores/contratosCompras')>()),
   useExcepcionContratoMutation: () => ({ mutateAsync: h.excepcion }),
 }))
 vi.mock('../../../shared/PromptDialog', () => ({ openPromptDialog: h.prompt }))
-vi.mock('../../../shared/Dialog', () => ({ confirm: vi.fn(), notify: h.notify }))
+vi.mock('../../../shared/Dialog', () => ({ confirm: h.confirm, notify: h.notify }))
 
-import OrdenesCompraTab from '../OrdenesCompraTab'
+import OrdenesCompraTab, { sePuedeEliminar } from '../OrdenesCompraTab'
 
 const orden = (id: string, numero: string | null, concepto: string) => ({
   id, company_id: 'c1', project_id: 'p1', correlativo: 1, numero, proveedor_id: null, proveedor_nombre: 'Prov',
   concepto, monto_estimado: null, estado: 'emitida', created_at: '2026-10-02T00:00:00Z',
 })
 
-beforeEach(() => { h.cambiarEstado = true })
+beforeEach(() => { h.cambiarEstado = true; h.aprobarOrden = true; h.confirm.mockResolvedValue({ isConfirmed: true }) })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('Operaciones · Órdenes de compra', () => {
@@ -121,5 +127,91 @@ describe('Operaciones · aprobar una orden amparada en un contrato', () => {
     fireEvent.click(screen.getByText(/Aprobar/))
     await waitFor(() => expect(h.notify).toHaveBeenCalled())
     expect(h.prompt).not.toHaveBeenCalled()
+  })
+})
+
+// El servidor exige un permiso distinto por paso: aprobar y devolver → «Autorizar / Denegar — Órdenes compra»
+// (condominios.tab.ordenes_compra.approve); emitir y cancelar → «Cambiar estado» de Contabilidad. La pantalla solo
+// ofrece lo que va a aceptar. Con las llaves reales de la sesión: OrdenesCompraTab.pasos.test.tsx.
+describe('Operaciones · cada paso se ofrece según su permiso', () => {
+  const montar = (estado: string) => {
+    render(<OrdenesCompraTab ordenes={[{ ...orden('o1', 'OC-000001', 'Compra X'), estado }] as never} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit onRefresh={vi.fn()} proveedores={[]} />)
+    fireEvent.click(screen.getByText('Compra X'))
+  }
+
+  it('sin la llave de aprobar órdenes no se ofrece aprobar una orden en borrador', () => {
+    h.aprobarOrden = false
+    montar('borrador')
+    expect(screen.queryByText(/Aprobar/)).toBeNull()
+    expect(screen.getByText(/Cancelar OC/)).toBeTruthy()      // cancelar es «Cambiar estado»
+  })
+
+  it('sin la llave de aprobar órdenes no se ofrece devolver a borrador, pero sí emitir', () => {
+    h.aprobarOrden = false
+    montar('aprobada')
+    expect(screen.queryByText(/Devolver a borrador/)).toBeNull()
+    expect(screen.getByText(/Emitir OC/)).toBeTruthy()
+  })
+
+  it('sin «Cambiar estado» no se ofrece emitir ni cancelar, pero sí aprobar y devolver', () => {
+    h.cambiarEstado = false
+    montar('aprobada')
+    expect(screen.queryByText(/Emitir OC/)).toBeNull()
+    expect(screen.queryByText(/Cancelar OC/)).toBeNull()
+    expect(screen.getByText(/Devolver a borrador/)).toBeTruthy()
+  })
+
+  it('con la llave de aprobar y «Cambiar estado» se ofrece todo el ciclo de una orden aprobada', () => {
+    montar('aprobada')
+    expect(screen.getByText(/Emitir OC/)).toBeTruthy()
+    expect(screen.getByText(/Cancelar OC/)).toBeTruthy()
+    expect(screen.getByText(/Devolver a borrador/)).toBeTruthy()
+  })
+})
+
+// Un botón que el servidor va a rechazar, o un cambio que no se aplicó, no pueden terminar en silencio ni en «éxito».
+describe('Operaciones · Eliminar y cancelar no fallan en silencio', () => {
+  const SIN_FILAS = { message: 'El servidor no aplicó el cambio: tu usuario no tiene permiso para este paso', code: 'SIN_FILAS' }
+  const montar = (extra: Record<string, unknown>) => {
+    render(<OrdenesCompraTab ordenes={[{ ...orden('o1', null, 'Compra X'), estado: 'borrador', ...extra }] as never} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit onRefresh={vi.fn()} proveedores={[]} />)
+    fireEvent.click(screen.getByText('Compra X'))
+  }
+
+  it('sePuedeEliminar: solo un borrador nuevo (sin número, sin revisiones y nunca aprobado)', () => {
+    expect(sePuedeEliminar({ numero: null, revision: 0, aprobada_at: null })).toBe(true)
+    expect(sePuedeEliminar({ numero: undefined, revision: undefined, aprobada_at: undefined })).toBe(true)
+    expect(sePuedeEliminar({ numero: 'OC-000009', revision: 0, aprobada_at: null })).toBe(false)
+    expect(sePuedeEliminar({ numero: null, revision: 2, aprobada_at: null })).toBe(false)
+    expect(sePuedeEliminar({ numero: null, revision: 0, aprobada_at: '2026-10-01T00:00:00Z' })).toBe(false)
+  })
+
+  it('un borrador nuevo ofrece Eliminar', () => {
+    montar({})
+    expect(screen.getByText(/Eliminar/)).toBeTruthy()
+  })
+
+  it('un borrador DEVUELTO (ya aprobado alguna vez) no ofrece Eliminar, pero sí Cancelar OC', () => {
+    montar({ numero: 'OC-000009', revision: 1, aprobada_at: '2026-10-01T00:00:00Z' })
+    expect(screen.queryByText(/Eliminar/)).toBeNull()
+    expect(screen.getByText(/Cancelar OC/)).toBeTruthy()
+  })
+
+  it('si el servidor no cambia ninguna fila al cancelar, se avisa y NO se refresca como si hubiera pasado', async () => {
+    h.update.mockResolvedValueOnce({ error: SIN_FILAS })
+    const onRefresh = vi.fn()
+    render(<OrdenesCompraTab ordenes={[{ ...orden('o1', null, 'Compra X'), estado: 'borrador' }] as never} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit onRefresh={onRefresh} proveedores={[]} />)
+    fireEvent.click(screen.getByText('Compra X'))
+    fireEvent.click(screen.getByText(/Cancelar OC/))
+    await waitFor(() => expect(h.notify).toHaveBeenCalled())
+    expect(h.notify.mock.calls[0][0]).toMatchObject({ variant: 'error' })
+    expect(onRefresh).not.toHaveBeenCalled()
+  })
+
+  it('si el servidor rechaza borrar el borrador, muestra el mensaje (COMPRAS_DOCUMENTO_NO_SE_BORRA) en vez de callar', async () => {
+    h.borrar.mockResolvedValueOnce({ error: { message: 'COMPRAS_DOCUMENTO_NO_SE_BORRA: cancélala indicando el motivo' } })
+    montar({})
+    fireEvent.click(screen.getByText(/Eliminar/))
+    await waitFor(() => expect(h.notify).toHaveBeenCalled())
+    expect(h.notify.mock.calls[0][0].text).toMatch(/COMPRAS_DOCUMENTO_NO_SE_BORRA/)
   })
 })
