@@ -41,7 +41,7 @@ const LLAVE_OC = LLAVES_ACCION_COMPRAS.aprobarOrdenCompra
 
 // ── Lectura de la plantilla del padrón ──────────────────────────────────────
 
-interface PerfilPadron { etiqueta: string; rol: string; permisos: Set<string> }
+interface PerfilPadron { etiqueta: string; rol: string; /** Variable PL/pgSQL del rol RBAC que se le asigna (`rq`, `r4`…). */ rolVar: string; permisos: Set<string> }
 
 /**
  * Perfiles que siembra la plantilla: etiqueta (`'admin'`, `'autoriza'`…) → rol de `app_users` y llaves RBAC del rol que se le asigna.
@@ -85,6 +85,7 @@ function leerPadron(plantilla: string): Map<string, PerfilPadron> {
     perfiles.set(etiqueta, {
       etiqueta,
       rol: rolDeUsuario.get(usuario) ?? '',
+      rolVar: rolVar ?? '',
       permisos: rolVar ? new Set(llavesDeRol.get(rolVar) ?? []) : new Set(),
     })
   }
@@ -109,7 +110,9 @@ function leerGuion(mjs: string): Guion {
   return new Function(`${mjs.slice(desde, hasta)}\nreturn { PERFILES, ORDENES, ESPERADO, ETIQUETA }`)() as Guion
 }
 
-const padron = leerPadron(readFileSync(resolve(DIR, 'padron_ui_controles.sql.tpl'), 'utf8'))
+const PLANTILLA = readFileSync(resolve(DIR, 'padron_ui_controles.sql.tpl'), 'utf8')
+const ACTUALIZACION = readFileSync(resolve(DIR, 'padron_ui_controles_actualizacion.sql.tpl'), 'utf8')
+const padron = leerPadron(PLANTILLA)
 const guion = leerGuion(readFileSync(resolve(DIR, 'pantalla_controles.mjs'), 'utf8'))
 
 // ── La pantalla real ────────────────────────────────────────────────────────
@@ -189,5 +192,127 @@ describe('la pantalla real ofrece a cada perfil del padrón exactamente lo que e
   )
   it.each(casos)('$perfil · orden $orden', ({ perfil, orden }) => {
     expect(botonesQueOfrece(padron.get(perfil)!, orden)).toEqual([...guion.ESPERADO[perfil][orden]].sort())
+  })
+})
+
+// ── La plantilla de ACTUALIZACIÓN pone al día lo mismo que la completa siembra ───────────────────────────────────────────
+// `padron_ui_controles_actualizacion.sql.tpl` existe porque la completa ABORTA si el padrón ya está sembrado (el del sandbox lo está). Tiene
+// sus propias listas (un `FOREACH` con las llaves del cuarto perfil y la llave de la orden para dos roles): si alguien añade una llave a un
+// rol en la completa y no en la de actualización, el padrón del sandbox, puesto al día, quedaría distinto del sembrado desde cero y nadie lo
+// vería hasta que el guion fallara contra el sandbox. Aquí se comparan las dos plantillas entre sí.
+
+const sinComentarios = (sql: string) => sql.replace(/--[^\n]*/g, '')
+const constantesUuid = (sql: string) =>
+  new Map([...sinComentarios(sql).matchAll(/\b(\w+)\s+constant\s+uuid\s*:=\s*'([^']+)'/g)].map((m) => [m[1], m[2]] as const))
+
+/** Lo que la plantilla de actualización añade, leído tal como está escrito. */
+function leerActualizacion(plantilla: string) {
+  const sql = sinComentarios(plantilla)
+  const lista = /FOREACH\s+k\s+IN\s+ARRAY\s+ARRAY\[([^\]]+)\]\s+LOOP\s+INSERT INTO public\.role_permissions[^;]*?SELECT\s+(\w+)\s*,\s*k\s*,\s*'allow'/.exec(sql)
+  const llave = /INSERT INTO public\.role_permissions[^;]*?SELECT\s+r\s*,\s*'([^']+)'\s*,\s*'allow'\s+FROM\s+unnest\(ARRAY\[([^\]]+)\]\)\s+r/.exec(sql)
+  const usuario = /INSERT INTO public\.app_users[^;]*?SELECT\s+(\w+)\s*,\s*c\s*,\s*'([^']*)'\s*,\s*'(\w+)'/.exec(sql)
+  const rol = /INSERT INTO public\.roles[^;]*?SELECT\s+(\w+)\s*,\s*c\s*,\s*'([^']*)'/.exec(sql)
+  const asignacion = /INSERT INTO public\.user_project_assignments[^;]*?SELECT\s+(\w+)\s*,\s*(\w+)\s*,\s*'(\w+)'/.exec(sql)
+  const correo = /'(zz-ui-\w+@example\.com)'/.exec(sql)
+  return {
+    foreach: lista ? { rol: lista[2], llaves: [...lista[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) } : null,
+    llaveDeLaOrden: llave ? { llave: llave[1], roles: llave[2].split(',').map((x) => x.trim()) } : null,
+    usuario: usuario ? { variable: usuario[1], nombre: usuario[2], rol: usuario[3] } : null,
+    rol: rol ? { variable: rol[1], nombre: rol[2] } : null,
+    asignacion: asignacion ? { tipo: asignacion[3] } : null,
+    correo: correo?.[1] ?? null,
+  }
+}
+
+/** Diferencias entre lo que la completa siembra y lo que la actualización añade (vacío = no divergen). */
+function diferenciasConLaActualizacion(completa: string, actualizacion: string): string[] {
+  const dif: string[] = []
+  const a = leerActualizacion(actualizacion)
+  const perfiles = leerPadron(completa)
+  const deRol = (variable: string) => [...perfiles.values()].find((p) => p.rolVar === variable)
+  if (!a.foreach) return ['la actualización ya no tiene el FOREACH de llaves del cuarto perfil']
+  if (!a.llaveDeLaOrden) return ['la actualización ya no da la llave de la orden a los roles que la tenían']
+
+  // 1 · el FOREACH de llaves del cuarto perfil = TODAS las llaves que la completa le siembra a ese rol (su FOREACH común + sus INSERT de Contabilidad)
+  const cuarto = deRol(a.foreach.rol)
+  if (!cuarto) dif.push(`el rol ${a.foreach.rol} de la actualización no existe en la plantilla completa`)
+  else {
+    const completaLlaves = [...cuarto.permisos].sort()
+    const actualizaLlaves = [...new Set(a.foreach.llaves)].sort()
+    for (const k of completaLlaves) if (!actualizaLlaves.includes(k)) dif.push(`${cuarto.etiqueta} (${a.foreach.rol}): la completa le da «${k}» y la actualización no`)
+    for (const k of actualizaLlaves) if (!completaLlaves.includes(k)) dif.push(`${cuarto.etiqueta} (${a.foreach.rol}): la actualización le da «${k}» y la completa no`)
+  }
+  // 2 · la llave de la orden: los mismos roles que la tienen en la completa (y ningún otro)
+  const conLlave = [...perfiles.values()].filter((p) => p.permisos.has(a.llaveDeLaOrden!.llave)).map((p) => p.rolVar).sort()
+  const dadaA = [...a.llaveDeLaOrden.roles].sort()
+  if (JSON.stringify(conLlave) !== JSON.stringify(dadaA)) {
+    dif.push(`«${a.llaveDeLaOrden.llave}»: la completa la da a [${conLlave.join(', ')}] y la actualización a [${dadaA.join(', ')}]`)
+  }
+  // 3 · identificadores y datos del cuarto perfil
+  const ca = constantesUuid(actualizacion)
+  const cc = constantesUuid(completa)
+  for (const [nombre, valor] of ca) if (cc.get(nombre) !== valor) dif.push(`constante ${nombre}: actualización ${valor} · completa ${cc.get(nombre) ?? '(no existe)'}`)
+  if (cuarto) {
+    const completaSql = sinComentarios(completa)
+    const usuario = new RegExp(`\\(\\s*${a.usuario?.variable}\\s*,\\s*c\\s*,\\s*'([^']*)'\\s*,\\s*'(\\w+)'\\s*\\)`).exec(completaSql)
+    if (!usuario || usuario[1] !== a.usuario?.nombre || usuario[2] !== a.usuario?.rol) dif.push(`app_users del cuarto perfil: completa «${usuario?.[1]}» / ${usuario?.[2]} · actualización «${a.usuario?.nombre}» / ${a.usuario?.rol}`)
+    const rolNombre = new RegExp(`\\(\\s*${a.rol?.variable}\\s*,\\s*c\\s*,\\s*'([^']*)'\\s*\\)`).exec(completaSql)
+    if (!rolNombre || rolNombre[1] !== a.rol?.nombre) dif.push(`nombre del rol del cuarto perfil: completa «${rolNombre?.[1]}» · actualización «${a.rol?.nombre}»`)
+    if (a.correo !== `zz-ui-${cuarto.etiqueta}@example.com`) dif.push(`correo del cuarto perfil: actualización ${a.correo} · la completa arma zz-ui-${cuarto.etiqueta}@example.com`)
+    if (!new RegExp(`\\(\\s*${a.usuario?.variable}\\s*,\\s*pj\\s*,\\s*'${a.asignacion?.tipo}'\\s*\\)`).test(completaSql)) dif.push(`asignación al proyecto del cuarto perfil: la completa no la siembra como '${a.asignacion?.tipo}'`)
+  }
+  return dif
+}
+
+describe('la plantilla de actualización pone al día lo MISMO que la completa siembra (sus listas no divergen)', () => {
+  it('lee de verdad las dos (sanidad: sin esto un verde podría ser vacío)', () => {
+    const a = leerActualizacion(ACTUALIZACION)
+    expect(a.foreach?.rol).toBe('r4')
+    expect(a.foreach?.llaves.length).toBeGreaterThanOrEqual(8)
+    expect(a.llaveDeLaOrden).toEqual({ llave: LLAVE_OC, roles: ['rq', 'rs'] })
+    expect(a.usuario).toEqual({ variable: 'u4', nombre: 'ZZ UI Solo generico', rol: 'operator' })
+    expect(a.rol).toEqual({ variable: 'r4', nombre: 'ZZ UI Solo generico' })
+    expect(a.correo).toBe('zz-ui-soloGenerico@example.com')
+    expect(constantesUuid(ACTUALIZACION).size).toBeGreaterThanOrEqual(5)
+  })
+
+  it('las llaves, la llave de la orden y los datos del cuarto perfil de la actualización son los de la completa', () => {
+    expect(diferenciasConLaActualizacion(PLANTILLA, ACTUALIZACION)).toEqual([])
+  })
+
+  it('el FOREACH de la actualización trae EXACTAMENTE las llaves del rol «solo genérico» de la completa', () => {
+    const a = leerActualizacion(ACTUALIZACION)
+    expect([...new Set(a.foreach!.llaves)].sort()).toEqual([...padron.get('soloGenerico')!.permisos].sort())
+  })
+
+  // Controles: la comparación se da cuenta de una divergencia (si no, la prueba anterior no probaría nada).
+  it('una llave que SOLO está en la completa se detecta', () => {
+    const completa = PLANTILLA.replace("'platform.condominios.view']", "'platform.condominios.view','platform.contabilidad.delete']")
+    expect(completa).not.toBe(PLANTILLA)
+    expect(diferenciasConLaActualizacion(completa, ACTUALIZACION).join('\n')).toMatch(/platform\.contabilidad\.delete.*la actualización no/)
+  })
+
+  it('una llave que SOLO está en la actualización se detecta', () => {
+    const actualizacion = ACTUALIZACION.replace("'platform.contabilidad.approve']", "'platform.contabilidad.approve','platform.contabilidad.change_status']")
+    expect(actualizacion).not.toBe(ACTUALIZACION)
+    expect(diferenciasConLaActualizacion(PLANTILLA, actualizacion).join('\n')).toMatch(/change_status.*la completa no/)
+  })
+
+  it('la llave de la orden dada a otro rol, o quitada a uno, se detecta', () => {
+    const aOtro = ACTUALIZACION.replace('unnest(ARRAY[rq, rs])', 'unnest(ARRAY[rq, rs, r4])')
+    expect(aOtro).not.toBe(ACTUALIZACION)
+    expect(diferenciasConLaActualizacion(PLANTILLA, aOtro).join('\n')).toMatch(/ordenes_compra\.approve/)
+    const quitada = ACTUALIZACION.replace('unnest(ARRAY[rq, rs])', 'unnest(ARRAY[rq])')
+    expect(diferenciasConLaActualizacion(PLANTILLA, quitada).join('\n')).toMatch(/ordenes_compra\.approve/)
+  })
+
+  it('un identificador, un nombre o un correo distinto del cuarto perfil se detecta', () => {
+    const uuid = ACTUALIZACION.replace("u4  constant uuid := '5b5b2000-0000-0000-0000-0000000000f5'", "u4  constant uuid := '5b5b2000-0000-0000-0000-0000000000f9'")
+    expect(uuid).not.toBe(ACTUALIZACION)
+    expect(diferenciasConLaActualizacion(PLANTILLA, uuid).join('\n')).toMatch(/constante u4/)
+    const correo = ACTUALIZACION.replace(/zz-ui-soloGenerico@example\.com/g, 'zz-ui-solo-generico@example.com')
+    expect(diferenciasConLaActualizacion(PLANTILLA, correo).join('\n')).toMatch(/correo del cuarto perfil/)
+    const nombre = ACTUALIZACION.replace("'ZZ UI Solo generico', 'operator'", "'ZZ UI Solo genérico', 'operator'")
+    expect(diferenciasConLaActualizacion(PLANTILLA, nombre).join('\n')).toMatch(/app_users del cuarto perfil/)
   })
 })
