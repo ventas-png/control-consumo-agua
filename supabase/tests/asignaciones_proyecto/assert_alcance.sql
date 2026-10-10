@@ -92,10 +92,20 @@ END $$;
 SELECT asgt.cero('[alcance 3] AP no se vuelve exento borrando sus 3 filas', 'AP', asgt.borrar_de('AP'),
   p_efecto_sql => $q$SELECT asgt.exento({AP})::text || '|' || asgt.alcance({AP})$q$, p_efecto => 'false|P1,P2,P3');
 
--- Borrar el proyecto del que depende su alcance: la baja en cascada de la fila PROPIA también la frena el trigger.
+-- Borrar un proyecto al que se está asignado: la baja EN CASCADA de la fila propia se permite mientras quede otra asignación (el alcance
+-- sólo se reduce; es un flujo legítimo del servidor) y se rechaza si fuera la ÚLTIMA (el administrador quedaría exento).
 SELECT asgt.err_propia('[alcance 3] AP (con sólo P1) no borra el proyecto P1 por la API: la cascada quitaría su última fila y lo volvería exento', 'AP',
   $q$DELETE FROM public.projects WHERE id = {P1}$q$,
   p_preparar => $q$DELETE FROM public.user_project_assignments WHERE user_id = {AP} AND project_id <> {P1}$q$);
+SELECT asgt.ok('[alcance 3] AP (P1, P2, P3) SÍ borra el proyecto P1: la cascada le quita esa fila, conserva P2 y P3 y SIGUE acotado', 'AP',
+  $q$DELETE FROM public.projects WHERE id = {P1}$q$, 1,
+  p_efecto_sql => $q$SELECT asgt.filas_de({AP}) || '|' || asgt.exento({AP})::text$q$, p_efecto => 'P2,P3|false');
+SELECT asgt.ok('[alcance 3] … y dos a la vez (P1 y P2), mientras le quede P3', 'AP',
+  $q$DELETE FROM public.projects WHERE id IN ({P1}, {P2})$q$, 2,
+  p_efecto_sql => $q$SELECT asgt.filas_de({AP}) || '|' || asgt.exento({AP})::text$q$, p_efecto => 'P3|false');
+SELECT asgt.err_propia('[alcance 3] pero no los dos únicos que tiene en una sola sentencia (se quedaría sin filas): no se borra ninguno', 'AP',
+  $q$DELETE FROM public.projects WHERE id IN ({P1}, {P2})$q$,
+  p_preparar => $q$DELETE FROM public.user_project_assignments WHERE user_id = {AP} AND project_id = {P3}$q$);
 SELECT asgt.ok('[alcance 3] el propietario SÍ puede borrar P1 (cascada incluida) y AP queda sin filas → exento: decisión del propietario, no de AP', 'OW',
   $q$DELETE FROM public.projects WHERE id = {P1}$q$, 1,
   p_efecto_sql => $q$SELECT asgt.exento({AP})::text || '|' || (SELECT count(*) FROM public.user_project_assignments WHERE project_id = {P1})$q$, p_efecto => 'true|0',

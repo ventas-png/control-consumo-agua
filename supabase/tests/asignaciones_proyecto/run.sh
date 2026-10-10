@@ -198,7 +198,7 @@ echo "   ✓ post-vuelo: si la migración cambiara UNA fila ABORTA («las filas 
 baja asg_post_vuelo
 
 echo "── 5/10 · DATOS COMO PRODUCCIÓN: las 43 filas y el alcance de cada persona, antes y después"
-psql -q -v ON_ERROR_STOP=1 -v tag=despues -d "$BD" -f "$AQUI/snapshot.sql" >/dev/null
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -v tag=despues -d "$BD" -f "$AQUI/snapshot.sql" >/dev/null
 bloque assert_datos_produccion.sql "5 · huella md5, fila a fila, can_access_project, user_is_project_exempt y lectura de las 39 personas"
 copia "$BD" "$BD_POST"
 # los flujos de la pantalla, con la migración: lo legítimo es IDÉNTICO, sólo cambia la autoedición
@@ -222,7 +222,8 @@ bloque assert_defensa.sql    "6f · los triggers SOLOS (con una política «true
   || { echo "❌ las suites dejaron la tabla cambiada"; exit 1; }
 echo "   ✓ tras todas las suites la tabla es IDÉNTICA a la inicial (ninguna prueba dejó residuos)"
 
-echo "── 7/10 · compatibilidad con las migraciones POSTERIORES a la serie (${POSTERIORES:+$(echo "$POSTERIORES" | wc -l) encontradas}${POSTERIORES:-ninguna en este árbol})"
+N_POST=0; [ -z "$POSTERIORES" ] || N_POST=$(echo "$POSTERIORES" | wc -l)
+echo "── 7/10 · compatibilidad con las migraciones POSTERIORES a la serie ($N_POST en este árbol)"
 if [ -n "$POSTERIORES" ]; then
   copia "$BD_POST" asg_posteriores
   for base in $POSTERIORES; do aplicar "$MIGS/$base.sql" asg_posteriores; done
@@ -387,6 +388,30 @@ R=$(filas 6 asg_conc); EX=$(q "SELECT asgt.exento('$(UID_ 6)')" asg_conc); R22=$
 sin_deadlock f && grep -q 'ASIGNACION_PROPIA_NO_PERMITIDA' "$SALIDAS/f1.txt" && [ "$R" = "P1,P2,P3" ] && [ "$EX" = "f" ] && [ "$R22" = "P2,P3,P4" ] \
   && echo "  ✓ B3 · AP intenta ampliarse mientras AX escribe a OP2: AP queda con {$R} (sin cambios, no exento) y OP2 con {$R22} (lo de AX sí se aplicó)" \
   || { echo "❌ B3 · R=$R EX=$EX R22=$R22"; cat "$SALIDAS/f1.txt" "$SALIDAS/f2.txt"; exit 1; }
+
+# D · el cambio de empresa de la persona (o del proyecto) CONCURRENTE con la asignación: el trigger de integridad espera (FOR SHARE) y ve la
+#     empresa nueva; sin el candado se comparaba contra la empresa vieja y quedaba una fila cruzada (carrera reproducida antes de cerrarla).
+cruces() { q "SELECT count(*) FROM public.user_project_assignments upa JOIN public.app_users u ON u.id = upa.user_id JOIN public.projects p ON p.id = upa.project_id WHERE u.company_id IS DISTINCT FROM p.company_id AND upa.user_id = '$(UID_ 8)'" "$1"; }   # filas cruzadas de la persona NUEVO (mover un proyecto con asignaciones ya hechas cruza las suyas por sí solo: eso no lo vigila este trigger, ver D-7)
+EMPRESA_D=a5c00000-0000-0000-0000-000000000002
+# D0 · control negativo: la misma migración SIN el candado FOR SHARE deja una fila cruzada (la carrera es real)
+copia "$BD_ANTES" asg_conc
+sed 's/ FOR SHARE OF [up];/;/' "$MIGS/$MIGRACION.sql" > "$SALIDAS/migracion_sin_candado.sql"
+! grep -q 'FOR SHARE OF' "$SALIDAS/migracion_sin_candado.sql" || { echo "❌ no se pudo quitar el candado"; exit 1; }
+aplicar "$SALIDAS/migracion_sin_candado.sql" asg_conc
+par asg_conc f0 SU "UPDATE public.app_users SET company_id = '$EMPRESA_D' WHERE id = '$(UID_ 8)';" AX "$(INS "$(v 8 1)")"
+[ "$(cruces asg_conc)" = "1" ] \
+  && echo "  ✓ D0 · control negativo: sin FOR SHARE la asignación pasa con la empresa vieja y queda 1 fila CRUZADA (la carrera es real)" \
+  || { echo "❌ D0 · sin el candado debía quedar 1 fila cruzada y hay $(cruces asg_conc)"; cat "$SALIDAS/f01.txt" "$SALIDAS/f02.txt"; exit 1; }
+copia "$BD_POST" asg_conc
+par asg_conc g SU "UPDATE public.app_users SET company_id = '$EMPRESA_D' WHERE id = '$(UID_ 8)';" AX "$(INS "$(v 8 1)")"
+sin_deadlock g && grep -q 'ASIGNACION_EMPRESA_DISTINTA' "$SALIDAS/g2.txt" && [ "$(cruces asg_conc)" = "0" ] && [ "$(filas 8 asg_conc)" = "" ] \
+  && echo "  ✓ D1 · cambio de empresa de la PERSONA concurrente con su asignación: la asignación espera, ve la empresa nueva y recibe ASIGNACION_EMPRESA_DISTINTA; 0 filas cruzadas" \
+  || { echo "❌ D1 · cruces=$(cruces asg_conc)"; cat "$SALIDAS/g1.txt" "$SALIDAS/g2.txt"; exit 1; }
+copia "$BD_POST" asg_conc
+par asg_conc h SU "UPDATE public.projects SET company_id = '$EMPRESA_D' WHERE id = '$(PID_ 1)';" AX "$(INS "$(v 8 1)")"
+sin_deadlock h && grep -q 'ASIGNACION_EMPRESA_DISTINTA' "$SALIDAS/h2.txt" && [ "$(cruces asg_conc)" = "0" ] \
+  && echo "  ✓ D2 · cambio de empresa del PROYECTO concurrente con una asignación: igual, 0 filas cruzadas" \
+  || { echo "❌ D2 · cruces=$(cruces asg_conc)"; cat "$SALIDAS/h1.txt" "$SALIDAS/h2.txt"; exit 1; }
 baja asg_conc
 
 # C · la migración contra una transacción larga sobre la tabla: lock_timeout (5 s) → falla limpio y no deja nada; reintentada después, aplica

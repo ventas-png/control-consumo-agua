@@ -61,11 +61,10 @@
 --      (ASIGNACION_PROPIA_NO_PERMITIDA, insufficient_privilege). Si una política
 --      permisiva futura reabriera el hueco, esto lo sigue cerrando. service_role y
 --      superusuario (auth.uid() nulo) pasan.
---      Efecto colateral deliberado: la baja EN CASCADA de la fila propia (un
---      administrador que borra por la API un proyecto al que él mismo está asignado)
---      también se rechaza; si fuera su último proyecto quedaría sin filas y pasaría a
---      ser exento. Lo borra el propietario o el superadministrador. La pantalla no
---      ofrece borrar proyectos.
+--      Baja en cascada: un administrador que borra por la API un proyecto al que él mismo está asignado
+--      SÍ puede (su alcance sólo se reduce y es un flujo legítimo del servidor) mientras conserve otra
+--      asignación; si fuera su ÚLTIMA fila quedaría sin asignaciones y pasaría a ser exento, y eso se rechaza
+--      (ASIGNACION_PROPIA_NO_PERMITIDA). Lo borra entonces el propietario o el superadministrador.
 --   5. Privilegios: anon pierde TODOS (la RLS no le daba nada, pero el privilegio
 --      estaba) y authenticated pierde TRUNCATE, TRIGGER y REFERENCES (TRUNCATE no
 --      pasa por RLS). Conserva SELECT, INSERT, UPDATE y DELETE, que la RLS gobierna
@@ -220,10 +219,12 @@ DECLARE
   v_hay_persona  boolean;
   v_hay_proyecto boolean;
 BEGIN
+  -- FOR SHARE: si otra transacción está cambiando la empresa de la persona o del proyecto, esta escritura ESPERA a que termine y ve
+  -- la empresa nueva (sin el candado se comparaba contra la empresa vieja y quedaba una fila cruzada: carrera reproducida y cerrada).
   SELECT true, u.company_id INTO v_hay_persona, v_emp_persona
-    FROM public.app_users u WHERE u.id = NEW.user_id;
+    FROM public.app_users u WHERE u.id = NEW.user_id FOR SHARE OF u;
   SELECT true, p.company_id INTO v_hay_proyecto, v_emp_proyecto
-    FROM public.projects p WHERE p.id = NEW.project_id;
+    FROM public.projects p WHERE p.id = NEW.project_id FOR SHARE OF p;
 
   IF v_hay_persona IS NOT TRUE OR v_emp_persona IS NULL
      OR v_hay_proyecto IS NOT TRUE OR v_emp_proyecto IS NULL
@@ -255,6 +256,14 @@ BEGIN
          OR (TG_OP IN ('INSERT', 'UPDATE') AND NEW.user_id = v_uid);
 
   IF v_toca AND NOT (public.is_super_admin() OR public.current_user_role() = 'company_owner') THEN
+    -- Baja EN CASCADA por borrar el proyecto (la fila padre ya no existe): se permite mientras la persona CONSERVE otra asignación, porque
+    -- entonces su alcance sólo se reduce (borrar un proyecto al que se está asignado es un flujo legítimo del servidor). Si fuera su última
+    -- fila quedaría sin asignaciones y, siendo administrador, pasaría a ser exento de proyecto: eso es justo lo que se impide.
+    IF TG_OP = 'DELETE'
+       AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = OLD.project_id)
+       AND EXISTS (SELECT 1 FROM public.user_project_assignments u WHERE u.user_id = OLD.user_id AND u.id <> OLD.id) THEN
+      RETURN OLD;
+    END IF;
     RAISE EXCEPTION 'ASIGNACION_PROPIA_NO_PERMITIDA: nadie cambia sus propias asignaciones de proyecto; lo hace otro administrador, el propietario o el superadministrador'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
