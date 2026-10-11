@@ -27,7 +27,10 @@
 #      sesiones (F1) y la de dos administradores que COMPARTEN sus dos proyectos, o la de un propietario contra un administrador (R2-1): sin el
 #      candado de bajas en cascada POR EMPRESA quedan con CERO filas y exentos; una escritura legítima que llega mientras la migración —o su
 #      reversión— está parada tras su pre-vuelo (F4, R02: esperan el LOCK TABLE y ya no hay un falso «las filas CAMBIARON»); la migración
-#      contra una transacción larga (lock_timeout); y el coste conocido del candado (R2-5: un interbloqueo que PostgreSQL resuelve sin dejar datos a medias).
+#      contra una transacción larga (lock_timeout); el coste conocido del candado (R2-5: un interbloqueo que PostgreSQL resuelve sin dejar datos a medias); y, de la cuarta
+#      verificación independiente, que la clave del candado sale de la empresa de la PERSONA y no de la del actor (un superadministrador de OTRA empresa que borra un proyecto
+#      se ordena con el administrador al que vacía la fila: H-05/M6), que las personas SIN empresa comparten la clave 'sin-empresa' (H-05/M7) y, como límite medido y no como deseo,
+#      que con una fila cruzada heredada el propietario de D retiene la clave de C (H-03).
 #      NINGUNA espera es un tiempo fijo: las sesiones se sincronizan con un candado «puerta» y se observa pg_stat_activity (wait_event_type = Lock);
 #   9. scripts/diagnostico-asignaciones-proyecto.sql corre en una transacción de SOLO LECTURA y dice lo que debe;
 #  10. PRIVILEGIOS RELATIVOS (P0): la migración se aplica con la ACL de Supabase Preview (authenticated SIN DML; una base construida sólo con
@@ -142,6 +145,12 @@ CANDADO_EN_TODA_BAJA='s/(\nBEGIN\n.*?\bEND IF;\n)/$1  IF TG_OP = \x27DELETE\x27 
 CANDADO_DENTRO_DEL_AND='s/(AND EXISTS \(SELECT 1 FROM public\.user_project_assignments)/AND (SELECT true FROM (SELECT pg_advisory_xact_lock(hashtextextended(\x27asg-cascada\x27, 0))) l)\n       $1/'
 # Sin el lock_timeout propio de la función (el cláusula SET de la cabecera): la baja espera hasta el statement_timeout de la sesión en vez de fallar a los 2 s.
 SIN_LOCK_TIMEOUT='s/\n\s*SET lock_timeout = \x272s\x27//'
+
+# M6 de la verificación de la ronda 4 (H-05): la clave sale de la empresa del ACTOR (get_my_company_id()) y no de la de la PERSONA cuya fila se borra. Un superadministrador de OTRA empresa que borra un
+# proyecto no serializaría con el administrador al que se le vacía la fila, y lo dejaría exento (defecto real si ocurriera).
+CLAVE_DEL_ACTOR='s/COALESCE\(v_empresa::text, \x27sin-empresa\x27\)/COALESCE((SELECT public.get_my_company_id())::text, \x27sin-empresa\x27)/'
+# M7: sin el COALESCE de «sin-empresa». Para una persona sin empresa la clave sería NULL y pg_advisory_xact_lock(NULL) no bloquea nada.
+SIN_COALESCE_SIN_EMPRESA='s/COALESCE\(v_empresa::text, \x27sin-empresa\x27\)/v_empresa::text/'
 
 # Sólo el PLAZO del lock_timeout (2 s → 60 s): con muchísimas sesiones a la vez las últimas de la cola pueden agotar los 2 s legítimamente; con el plazo largo la ronda debe ser EXACTA.
 LOCK_TIMEOUT_LARGO='s/SET lock_timeout = \x272s\x27/SET lock_timeout = \x2760s\x27/'
@@ -578,6 +587,12 @@ mutacion "V3-03 M-c · el candado se toma también en un borrado DIRECTO de una 
 mutacion "V3-01 · la función pierde su lock_timeout propio (la baja esperaría hasta el statement_timeout; la espera acotada de 2 s la prueba la sección 10 con una sesión real)" \
   "$(mutar_funcion asignacion_bloquear_propia "$SIN_LOCK_TIMEOUT")" \
   "assert_catalogo"
+mutacion "H-05/M6 · la clave sale de la empresa del ACTOR (get_my_company_id()) y no de la de la persona: un superadministrador de otra empresa retendría OTRA clave (la de la sección 10 lo ve con sesiones reales)" \
+  "$(mutar_funcion asignacion_bloquear_propia "$CLAVE_DEL_ACTOR")" \
+  "assert_catalogo"
+mutacion "H-05/M7 · sin el COALESCE de «sin-empresa»: la clave de una persona sin empresa es NULL y pg_advisory_xact_lock(NULL) no bloquea nada" \
+  "$(mutar_funcion asignacion_bloquear_propia "$SIN_COALESCE_SIN_EMPRESA")" \
+  "assert_catalogo"
 
 echo "── 10/10 · concurrencia: sesiones REALES simultáneas y la migración contra una transacción larga"
 N_MUT_CONC=0         # mutaciones probadas con sesiones reales (D0 sin FOR SHARE; F1 sin candado y con el candado dentro del AND; F4 sin LOCK TABLE)
@@ -856,6 +871,60 @@ PAR_PLAZO=80 par asg_conc ee DOW "DELETE FROM public.projects WHERE id = '$(PID_
   && echo "  ✓ V3-01 · mutación «sin lock_timeout propio»: tras ${T2:-4000} ms con la puerta cerrada la 2ª sigue esperando (sólo el statement_timeout la cortaría): la prueba ve la espera sin acotar" \
   || { echo "❌ V3-01 · sin lock_timeout la 2ª debía seguir esperando: ESTADO2=$ESTADO2 T2=${T2:-?}"; cat "$SALIDAS/ee1.txt" "$SALIDAS/ee2.txt"; exit 1; }
 N_MUT_CONC=$((N_MUT_CONC + 2))
+baja asg_conc
+
+# H-05 (ronda 4) · DOS MUTANTES DEL CANDADO SOBREVIVÍAN a toda esta sección porque todos los actores eran de la MISMA empresa que las personas de la cascada y ninguna fila era de una persona sin empresa.
+#   M6 · la clave sale de la empresa del ACTOR. Defecto REAL si ocurriera: SU2 (superadministrador de D) borra P1 de C; su cascada vacía la fila de ADM1 en P1. ADM1 {P1,P2} borra después P2. Con la clave de la
+#        PERSONA (C) las dos bajas comparten candado, ADM1 espera, ve que P1 ya no está y recibe ASIGNACION_PROPIA_NO_PERMITIDA. Con la del ACTOR (SU2 → D; ADM1 → C) no se ordenan, ADM1 ve su fila de P1 viva y,
+#        al confirmar las dos, queda con CERO filas y EXENTO.
+#   M7 · sin el COALESCE de «sin-empresa». Una persona sin empresa (company_id NULL) con filas HEREDADAS (el trigger de integridad hoy no deja crearlas: se montan con los disparadores apagados) comparte la
+#        clave 'sin-empresa' con TODAS las demás; con la clave NULL no se toma ningún candado.
+#   Mismo recurso que V3-01: una puerta, ningún tiempo fijo, y se observa pg_locks / pg_stat_activity.
+copia "$BD_POST" asg_conc; admins_xp asg_conc
+PAR_OBS_SQL="$OBS_ASG"; par asg_conc xe SU2 "DELETE FROM public.projects WHERE id = '$(PID_ 1)';" ADM1 "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"; unset PAR_OBS_SQL
+RES="$(q "SELECT asgt.filas_de('$(UID_ 90)')" asg_conc)|$(q "SELECT asgt.exento('$(UID_ 90)')" asg_conc)|$ESTADO2"
+sin_deadlock xe && [ "$RES" = "P2|f|esperando" ] && [ "$PAR_OBS" = "esperan=1;retiene_1=1" ] && ! grep -qi 'error' "$SALIDAS/xe1.txt" && grep -q 'ASIGNACION_PROPIA_NO_PERMITIDA' "$SALIDAS/xe2.txt" \
+  && echo "  ✓ H-05/M6 · el superadministrador de OTRA empresa (SU2, de D) borra P1 de C sin confirmar y ADM1 {P1,P2} borra P2: ADM1 ESPERA ($PAR_OBS), ve que P1 ya no está y recibe ASIGNACION_PROPIA_NO_PERMITIDA; conserva {P2}, no exento (la clave es la de la PERSONA)" \
+  || { echo "❌ H-05/M6 · SU2 contra ADM1: RES=$RES obs=$PAR_OBS (esperado P2|f|esperando y esperan=1;retiene_1=1)"; cat "$SALIDAS/xe1.txt" "$SALIDAS/xe2.txt"; exit 1; }
+copia "$BD_POST" asg_conc; admins_xp asg_conc
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$CLAVE_DEL_ACTOR")" >/dev/null
+PAR_OBS_SQL="$OBS_ASG"; par asg_conc xf SU2 "DELETE FROM public.projects WHERE id = '$(PID_ 1)';" ADM1 "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"; unset PAR_OBS_SQL
+RES="$(q "SELECT asgt.filas_de('$(UID_ 90)')" asg_conc)|$(q "SELECT asgt.exento('$(UID_ 90)')" asg_conc)|$ESTADO2"
+[ "$RES" = "|t|terminó" ] && [ "$PAR_OBS" = "esperan=0;retiene_1=1" ] && ! grep -qi 'error' "$SALIDAS/xf1.txt" "$SALIDAS/xf2.txt" \
+  && echo "  ✓ H-05/M6 · mutación «clave de la empresa del ACTOR»: SU2 retiene la clave de D, ADM1 (de C) no espera ($PAR_OBS) y queda con 0 filas y EXENTO (el defecto es real y la prueba lo ve)" \
+  || { echo "❌ H-05/M6 · con la clave del actor debía quedar |t|terminó y esperan=0;retiene_1=1 y hay RES=$RES obs=$PAR_OBS"; cat "$SALIDAS/xf1.txt" "$SALIDAS/xf2.txt"; exit 1; }
+N_MUT_CONC=$((N_MUT_CONC + 1))
+baja asg_conc
+
+sin_empresa_heredadas() {   # sin_empresa_heredadas BD — SINEMP (operador SIN empresa) con una fila en P4 de C y CLI (cliente SIN empresa) con una en D1 de D: filas HEREDADAS, sólo montables con los disparadores apagados
+  q "SET session_replication_role = replica;
+     INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES ('$(UID_ 11)', '$(PID_ 4)', 'total'), ('$(UID_ 9)', '$(PID_ 11)', 'total');" "$1" >/dev/null
+}
+copia "$BD_POST" asg_conc; sin_empresa_heredadas asg_conc
+PAR_OBS_SQL="$OBS_ASG"; par asg_conc xg DOW "DELETE FROM public.projects WHERE id = '$(PID_ 11)';" OW "DELETE FROM public.projects WHERE id = '$(PID_ 4)';"; unset PAR_OBS_SQL
+sin_deadlock xg && [ "$ESTADO2" = "esperando" ] && [ "$PAR_OBS" = "esperan=1;retiene_1=1" ] && ! grep -qi 'error' "$SALIDAS/xg1.txt" "$SALIDAS/xg2.txt" \
+  && [ "$(q "SELECT count(*) FROM public.projects WHERE id IN ('$(PID_ 4)', '$(PID_ 11)')" asg_conc)" = "0" ] \
+  && echo "  ✓ H-05/M7 · dos bajas cuya cascada vacía la fila de una persona SIN empresa (el propietario de D borra D1; el de C borra P4) comparten la clave 'sin-empresa': la 2ª ESPERA ($PAR_OBS) y al soltarse las dos terminan sin error. Es el límite documentado (H-03): esa clave la comparten todas las empresas" \
+  || { echo "❌ H-05/M7 · las bajas de personas sin empresa debían ordenarse: ESTADO2=$ESTADO2 obs=$PAR_OBS"; cat "$SALIDAS/xg1.txt" "$SALIDAS/xg2.txt"; exit 1; }
+copia "$BD_POST" asg_conc; sin_empresa_heredadas asg_conc
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$SIN_COALESCE_SIN_EMPRESA")" >/dev/null
+PAR_OBS_SQL="$OBS_ASG"; par asg_conc xh DOW "DELETE FROM public.projects WHERE id = '$(PID_ 11)';" OW "DELETE FROM public.projects WHERE id = '$(PID_ 4)';"; unset PAR_OBS_SQL
+[ "$ESTADO2" = "terminó" ] && [ "$PAR_OBS" = "esperan=0;retiene_1=0" ] && ! grep -qi 'error' "$SALIDAS/xh1.txt" "$SALIDAS/xh2.txt" \
+  && echo "  ✓ H-05/M7 · mutación «sin el COALESCE de sin-empresa»: la clave es NULL, ninguna baja toma candado ($PAR_OBS) y la 2ª no espera (la prueba ve que las personas sin empresa dejan de serializarse)" \
+  || { echo "❌ H-05/M7 · con la clave NULL ninguna baja debía esperar: ESTADO2=$ESTADO2 obs=$PAR_OBS"; cat "$SALIDAS/xh1.txt" "$SALIDAS/xh2.txt"; exit 1; }
+N_MUT_CONC=$((N_MUT_CONC + 1))
+baja asg_conc
+
+# H-03 (ronda 4) · LA CLAVE SALE DE LA EMPRESA DE LA PERSONA, también con una fila CRUZADA heredada (persona de C asignada a un proyecto de D; sólo montable con los disparadores apagados). «Un propietario sólo retiene el candado
+#        de SU empresa» vale con datos sanos (V3-01); con esa fila, el propietario de D que borra su proyecto retiene la clave de C (la de la persona de la fila) y la baja del propietario de C ESPERA. Se fija como límite medido,
+#        no como deseo: si algún día se limpian los datos cruzados o la clave cambia, este caso se invierte y hay que corregir el documento.
+copia "$BD_POST" asg_conc
+q "SET session_replication_role = replica; INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES ('$(UID_ 21)', '$(PID_ 11)', 'total');" asg_conc >/dev/null     # OP1 (persona de C) en D1 (proyecto de D)
+PAR_OBS_SQL="$OBS_ASG"; par asg_conc xi DOW "DELETE FROM public.projects WHERE id = '$(PID_ 11)';" OW "DELETE FROM public.projects WHERE id = '$(PID_ 3)';"; unset PAR_OBS_SQL
+sin_deadlock xi && [ "$ESTADO2" = "esperando" ] && [ "$PAR_OBS" = "esperan=1;retiene_1=1" ] && ! grep -qi 'error' "$SALIDAS/xi1.txt" "$SALIDAS/xi2.txt" \
+  && [ "$(q "SELECT count(*) FROM public.projects WHERE id IN ('$(PID_ 3)', '$(PID_ 11)')" asg_conc)" = "0" ] \
+  && echo "  ✓ H-03 · (límite medido) con una fila CRUZADA heredada (OP1 de C en D1 de D) el propietario de D retiene la clave de C y la baja del propietario de C ESPERA ($PAR_OBS); al soltarse terminan sin error. Con datos sanos no pasa (V3-01 arriba)" \
+  || { echo "❌ H-03 · con una fila cruzada la baja de C debía esperar a la de D: ESTADO2=$ESTADO2 obs=$PAR_OBS"; cat "$SALIDAS/xi1.txt" "$SALIDAS/xi2.txt"; exit 1; }
 baja asg_conc
 
 # R2-1 a ESCALA (2, 6 y 30 sesiones). K sesiones REALES a la vez (una puerta COMPARTIDA las suelta juntas): tres administradores (ADN1..3) comparten TODOS los K proyectos de la ronda y la

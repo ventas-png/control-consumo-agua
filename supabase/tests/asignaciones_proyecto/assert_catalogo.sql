@@ -168,6 +168,69 @@ BEGIN
     '[catálogo] y la baja de un proyecto de D retiene OTRA clave: el propietario de una empresa no retiene el candado de otra (V3-01)');
 END $$;
 
+-- La clave sale de la empresa de la PERSONA cuya fila se borra, no de la de quien borra (H-05, ronda 4: los mutantes M6 y M7 sobrevivían). Los casos de arriba usan actores de la MISMA
+-- empresa que las personas de la cascada, así que una clave tomada de la empresa del ACTOR (get_my_company_id()) daba lo mismo. Aquí el actor es de OTRA empresa (SU2, superadministrador
+-- de D, borra un proyecto de C) y las personas no tienen empresa; se compara la clave retenida sin repetir cómo se calcula.
+DO $$
+DECLARE
+  v_k_ow text;  v_k_su2 text;  v_k_se1 text;  v_k_se2 text;  v_n_su2 int;  v_n_se1 int;  v_n_se2 int;
+BEGIN
+  -- (a) OW (propietario de C) y SU2 (superadministrador de D) borran el MISMO proyecto de C (P3, con personas de C): retienen la MISMA clave, la de C
+  BEGIN
+    PERFORM asgt.poner_actor('OW');
+    DELETE FROM public.projects WHERE id = asgt.pid_de(3);
+    SELECT min(classid::text || ':' || objid::text) INTO v_k_ow FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted;
+    PERFORM asgt.poner_actor('SISTEMA');
+    RAISE EXCEPTION USING ERRCODE = 'AS999', MESSAGE = 'deshacer';
+  EXCEPTION WHEN SQLSTATE 'AS999' THEN NULL;
+  END;
+  BEGIN
+    PERFORM asgt.poner_actor('SU2');
+    DELETE FROM public.projects WHERE id = asgt.pid_de(3);
+    SELECT count(*), min(classid::text || ':' || objid::text) INTO v_n_su2, v_k_su2 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted;
+    PERFORM asgt.poner_actor('SISTEMA');
+    RAISE EXCEPTION USING ERRCODE = 'AS999', MESSAGE = 'deshacer';
+  EXCEPTION WHEN SQLSTATE 'AS999' THEN NULL;
+  END;
+  PERFORM asgt.poner_actor('SISTEMA');
+  PERFORM asgt.chk_bool(v_n_su2 = 1 AND v_k_ow IS NOT NULL AND v_k_su2 = v_k_ow, true,
+    '[catálogo] H-05/M6 · el superadministrador de OTRA empresa (SU2, de D) que borra un proyecto de C retiene la MISMA clave que el propietario de C: la clave sale de la empresa de la PERSONA, no de la del actor');
+
+  -- (b) personas SIN empresa con filas heredadas (el trigger de integridad hoy no deja crearlas; se montan con los disparadores apagados): la clave es la compartida «sin-empresa»,
+  --     UNA sola, la misma sea cual sea la empresa de quien borra (OW de C borra un proyecto de C con la fila de SINEMP; DOW de D borra uno de D con la de CLI), y distinta de la de C
+  BEGIN
+    PERFORM asgt.poner_actor('SISTEMA');
+    SET LOCAL session_replication_role = replica;
+    INSERT INTO public.projects (id, company_id, nombre) VALUES (asgt.pid_de(91), 'a5c00000-0000-0000-0000-000000000001', 'ASG Z sin empresa C');       -- un proyecto SOLO con la fila heredada
+    INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES (asgt.uid_de(11), asgt.pid_de(91), 'total');     -- SINEMP: operador sin empresa
+    SET LOCAL session_replication_role = origin;
+    PERFORM asgt.poner_actor('OW');
+    DELETE FROM public.projects WHERE id = asgt.pid_de(91);
+    SELECT count(*), min(classid::text || ':' || objid::text) INTO v_n_se1, v_k_se1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted;
+    PERFORM asgt.poner_actor('SISTEMA');
+    RAISE EXCEPTION USING ERRCODE = 'AS999', MESSAGE = 'deshacer';
+  EXCEPTION WHEN SQLSTATE 'AS999' THEN NULL;
+  END;
+  BEGIN
+    PERFORM asgt.poner_actor('SISTEMA');
+    SET LOCAL session_replication_role = replica;
+    INSERT INTO public.projects (id, company_id, nombre) VALUES (asgt.pid_de(92), 'a5c00000-0000-0000-0000-000000000002', 'ASG Z sin empresa D');
+    INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES (asgt.uid_de(9), asgt.pid_de(92), 'total');      -- CLI: cliente sin empresa
+    SET LOCAL session_replication_role = origin;
+    PERFORM asgt.poner_actor('DOW');
+    DELETE FROM public.projects WHERE id = asgt.pid_de(92);
+    SELECT count(*), min(classid::text || ':' || objid::text) INTO v_n_se2, v_k_se2 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted;
+    PERFORM asgt.poner_actor('SISTEMA');
+    RAISE EXCEPTION USING ERRCODE = 'AS999', MESSAGE = 'deshacer';
+  EXCEPTION WHEN SQLSTATE 'AS999' THEN NULL;
+  END;
+  PERFORM asgt.poner_actor('SISTEMA');
+  PERFORM asgt.chk_txt(COALESCE(v_n_se1::text, '?') || '|' || COALESCE(v_n_se2::text, '?'), '1|1',
+    '[catálogo] H-05/M7 · la baja en cascada de la fila de una persona SIN empresa también toma UN candado (con la clave NULL —sin el COALESCE de «sin-empresa»— pg_advisory_xact_lock no bloquea nada)');
+  PERFORM asgt.chk_bool(v_k_se1 IS NOT NULL AND v_k_se1 = v_k_se2 AND v_k_se1 <> v_k_ow, true,
+    '[catálogo] H-03/H-05 · las personas sin empresa comparten UNA clave («sin-empresa»), la misma para el propietario de C y el de D y distinta de la de C: es el límite documentado (el candado de una empresa estorba a otra sólo con datos heredados)');
+END $$;
+
 -- Un borrado DIRECTO de una asignación (el proyecto sigue existiendo) NO toma ningún candado (V3-03 M-c): sin esto, dos propietarios que editan a personas distintas se esperarían sin motivo
 -- (medido: 0,02 s → 1,5 s) y ninguna otra prueba lo notaba.
 DO $$
