@@ -127,7 +127,7 @@ index 8ca0e8f..8336c83 100644
    }
  
 diff --git a/src/components/contabilidad/ContabilidadSection.tsx b/src/components/contabilidad/ContabilidadSection.tsx
-index f5b7bc9..ef74e6f 100644
+index f5b7bc9..1a6a5a5 100644
 --- a/src/components/contabilidad/ContabilidadSection.tsx
 +++ b/src/components/contabilidad/ContabilidadSection.tsx
 @@ -1,7 +1,8 @@
@@ -141,7 +141,7 @@ index f5b7bc9..ef74e6f 100644
  import { useMonedaBaseQuery } from '../../domain/contabilidad/queries'
  import { CatalogoCuentasTab } from './CatalogoCuentasTab'
  import { AsientosTab } from './AsientosTab'
-@@ -58,10 +59,18 @@ const TABS: { id: SubTab; label: string; icon: string }[] = [
+@@ -58,10 +59,34 @@ const TABS: { id: SubTab; label: string; icon: string }[] = [
   * propios); los asientos automáticos nacen de los triggers de BD en el
   * ledger del documento.
   */
@@ -153,18 +153,34 @@ index f5b7bc9..ef74e6f 100644
 +const LEDGER_EMPRESA_ELEGIDA = 'empresa'
 +
 +/**
++ * El almacenamiento del navegador puede fallar (cuota llena, modo privado, acceso bloqueado por la configuración o ausente): NINGUNA lectura ni escritura puede
++ * tumbar la pantalla. Sin almacenamiento simplemente no se recuerda nada (la persona acotada abre su primer proyecto y la selección vive en memoria).
++ */
++function leerAlmacen(key: string): string | null {
++  try { return localStorage.getItem(key) } catch { return null }
++}
++/** `valor` null = quitar la llave. Si el navegador no deja escribir, la selección sigue en memoria y solo no se recuerda. */
++function escribirAlmacen(key: string, valor: string | null): void {
++  try {
++    if (valor === null) localStorage.removeItem(key)
++    else localStorage.setItem(key, valor)
++  } catch { /* cuota llena, modo privado o acceso bloqueado */ }
++}
++
++/**
 + * Contabilidad recordada de una empresa, en este navegador: un proyecto (`proyecto`), «Empresa» elegida a propósito (`empresaElegida`) o nada
 + * (`proyecto` null y `empresaElegida` false: sin llave). Solo la elección explícita de «Empresa» se guarda; abrir en «Empresa» por omisión no deja rastro.
++ * Sin almacenamiento utilizable, nada recordado.
 + */
 +function leerLedgerGuardado(companyId?: string | null): { proyecto: string | null; empresaElegida: boolean } {
 +  if (!companyId) return { proyecto: null, empresaElegida: false }
-+  const guardado = localStorage.getItem(`conta-ledger:${companyId}`)
++  const guardado = leerAlmacen(`conta-ledger:${companyId}`)
 +  if (guardado === LEDGER_EMPRESA_ELEGIDA) return { proyecto: null, empresaElegida: true }
 +  return { proyecto: guardado || null, empresaElegida: false }
  }
  
  export function ContabilidadSection() {
-@@ -70,30 +79,61 @@ export function ContabilidadSection() {
+@@ -70,40 +95,68 @@ export function ContabilidadSection() {
    const [tab, setTab] = useState<SubTab>('polizas')
  
    const { data: proyectos = [], isSuccess: proyectosCargados } = useProyectosQuery(companyId)
@@ -224,13 +240,13 @@ index f5b7bc9..ef74e6f 100644
    }, [companyId, ledger.empresa])
    useEffect(() => {
      if (!companyId || ledger.empresa !== companyId) return
-     const key = `conta-ledger:${companyId}`
-     if (ledger.proyecto) localStorage.setItem(key, ledger.proyecto)
-+    else if (ledger.empresaElegida) localStorage.setItem(key, LEDGER_EMPRESA_ELEGIDA)
-     else localStorage.removeItem(key)
+-    const key = `conta-ledger:${companyId}`
+-    if (ledger.proyecto) localStorage.setItem(key, ledger.proyecto)
+-    else localStorage.removeItem(key)
++    escribirAlmacen(`conta-ledger:${companyId}`, ledger.proyecto || (ledger.empresaElegida ? LEDGER_EMPRESA_ELEGIDA : null))
    }, [companyId, ledger])
    // Si el proyecto persistido no es de esta empresa (o ya no existe/accesible),
-@@ -101,9 +141,9 @@ export function ContabilidadSection() {
+   // volver a la empresa. La guarda corre en cuanto la lista resuelve, incluso
    // vacía: una empresa SIN proyectos conservaba el proyecto de la anterior.
    useEffect(() => {
      if (proyectosCargados && ledgerProjectId && !proyectos.some((p) => p.id === ledgerProjectId)) {
@@ -453,10 +469,10 @@ index 0000000..5741948
 +})
 diff --git a/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx b/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx
 new file mode 100644
-index 0000000..6371f52
+index 0000000..7db70a2
 --- /dev/null
 +++ b/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx
-@@ -0,0 +1,229 @@
+@@ -0,0 +1,323 @@
 +// D-8 del alcance de proyecto al capturar (propuesta de pendientes_decision/proyectos): con qué contabilidad abre Contabilidad.
 +//
 +// El servidor solo deja crear un documento de compras «sin proyecto» (la contabilidad de la EMPRESA) a una persona exenta de proyecto: a una persona ACOTADA
@@ -684,6 +700,100 @@ index 0000000..6371f52
 +    montar('company_owner')
 +    expect(selector().value).toBe('')
 +    expect(localStorage.getItem(llave)).toBeNull()
++  })
++})
++
++// V3-07 (tercera verificación independiente): el almacenamiento del navegador puede fallar (cuota llena, modo privado, acceso bloqueado por la
++// configuración del navegador o ausente). Antes del parche la pantalla de Contabilidad no escribía nada al montar; con la preselección del primer
++// proyecto sí escribe, y un `setItem` que lanzaba rompía el montaje de la persona acotada. Ninguna lectura ni escritura de `localStorage` puede
++// tumbar la pantalla: sin almacenamiento nada se recuerda, pero la persona acotada sigue abriendo su primer proyecto y puede cambiar de contabilidad.
++describe('sin almacenamiento utilizable (cuota llena, bloqueado o ausente) la pantalla funciona igual: solo no recuerda', () => {
++  const descriptorOriginal = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
++  const quota = () => { throw new DOMException('The quota has been exceeded.', 'QuotaExceededError') }
++  const bloqueado = () => { throw new DOMException('The operation is insecure.', 'SecurityError') }
++  const bloquearAcceso = () => Object.defineProperty(globalThis, 'localStorage', { configurable: true, get: bloqueado })
++  const quitarAlmacenamiento = () => Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: undefined, writable: true })
++
++  afterEach(() => {
++    vi.restoreAllMocks()
++    if (descriptorOriginal) Object.defineProperty(globalThis, 'localStorage', descriptorOriginal)
++  })
++
++  it('setItem que lanza (cuota llena): la persona ACOTADA monta, abre su primer proyecto y puede cambiar de contabilidad y volver a «Empresa»', () => {
++    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(quota)
++    expect(() => montar('operator')).not.toThrow()
++    expect(selector().value).toBe(P2)
++    expect(montadaCon()).toBe(P2)
++    fireEvent.change(selector(), { target: { value: P3 } })
++    expect(selector().value).toBe(P3)
++    expect(montadaCon()).toBe(P3)
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(selector().value).toBe('')
++    expect(montadaCon()).toBe('empresa')
++  })
++
++  it('setItem que lanza: la persona EXENTA también monta y elige proyecto sin error', () => {
++    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(quota)
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    expect(() => montar('company_owner')).not.toThrow()
++    expect(selector().value).toBe('')
++    fireEvent.change(selector(), { target: { value: P1 } })
++    expect(montadaCon()).toBe(P1)
++  })
++
++  it('removeItem que lanza: la persona exenta (nada recordado) monta en «Empresa»', () => {
++    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(bloqueado)
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    expect(() => montar('company_owner')).not.toThrow()
++    expect(selector().value).toBe('')
++    fireEvent.change(selector(), { target: { value: P1 } })
++    fireEvent.change(selector(), { target: { value: '' } })     // «Empresa» elegida: se guarda con setItem, no con removeItem
++    expect(montadaCon()).toBe('empresa')
++  })
++
++  it('getItem que lanza: nada recordado, así que la persona acotada abre su primer proyecto y la exenta «Empresa»', () => {
++    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(bloqueado)
++    const acotada = montar('operator')
++    expect(selector().value).toBe(P2)
++    expect(montadaCon()).toBe(P2)
++    acotada.unmount()
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    expect(() => montar('company_owner')).not.toThrow()
++    expect(selector().value).toBe('')
++  })
++
++  it('acceso bloqueado (leer `localStorage` lanza SecurityError): la persona acotada monta y abre su primer proyecto', () => {
++    bloquearAcceso()
++    expect(() => montar('operator')).not.toThrow()
++    expect(selector().value).toBe(P2)
++    fireEvent.change(selector(), { target: { value: P3 } })
++    expect(montadaCon()).toBe(P3)
++  })
++
++  it('almacenamiento ausente (`localStorage` indefinido): la persona acotada abre su primer proyecto y la exenta «Empresa»', () => {
++    quitarAlmacenamiento()
++    const acotada = montar('operator')
++    expect(selector().value).toBe(P2)
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(montadaCon()).toBe('empresa')
++    acotada.unmount()
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    expect(() => montar('company_owner')).not.toThrow()
++    expect(selector().value).toBe('')
++  })
++
++  it('sin almacenamiento no se recuerda nada: al remontar la persona acotada vuelve a su primer proyecto (aunque hubiera elegido «Empresa»)', () => {
++    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(quota)
++    const primera = montar('operator')
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(selector().value).toBe('')
++    primera.unmount()
++    montar('operator')
++    expect(selector().value).toBe(P2)
 +  })
 +})
 diff --git a/src/domain/compras/ordenCrear.ts b/src/domain/compras/ordenCrear.ts
