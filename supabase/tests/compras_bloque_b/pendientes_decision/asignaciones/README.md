@@ -1,3 +1,5 @@
+> **SUPERADO por el PR de seguridad separado [#928](https://github.com/ventas-png/control-consumo-agua/pull/928)** (migración `20261026000600_seguridad_asignaciones_proyecto.sql`, suite `supabase/tests/asignaciones_proyecto/`, reversión y diagnóstico propios). Esta carpeta se conserva solo como registro del hallazgo original y de su primera propuesta; la propuesta de aquí NO validaba a la persona ni conservaba las filas que un administrador acotado no ve, y **no debe usarse**.
+
 # PENDIENTE (fuera de la pieza de permisos y de la migración 0900) · cualquier usuario puede asignarse proyectos
 
 **Estado: NO corregido ni en la pieza de permisos ni en la 0900; entregado aparte para que alguien lo lleve como PR y despliegue propios.**
