@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Arma el paquete de «alcance de proyecto al capturar» sobre UN ÁRBOL del repositorio (el de la rama del PR #926 —medido sobre e9764d3a—, con o sin la
-# 20261026000600 del #928 —medido con la de b9b630b1, md5 2281d665…; si la 0600 cambia, repetir la corrida—)
+# Arma el paquete de «alcance de proyecto al capturar» sobre UN ÁRBOL del repositorio (el de la rama del PR #926 —medido sobre e9764d3a y, por el verificador de
+# la cuarta ronda, sobre 339ef1fb—, con o sin la 20261026000600 del #928 —la de ae49119f, «md5 del archivo en ae49119f» 049eb590de0d92dd1b91a0f33f2ab669: la
+# corrida completa se repitió con ella, rc = 0 y 988 líneas ✓; en la tercera ronda se midió con la de b9b630b1, md5 2281d665…; si la 0600 cambia, repetir la corrida—)
 # para reproducir la corrida completa. NO toca esta carpeta ni el checkout desde el que se invoca: solo escribe en el árbol que se le da.
 #
 # Uso:  bash armar_paquete.sh <ruta-del-arbol>

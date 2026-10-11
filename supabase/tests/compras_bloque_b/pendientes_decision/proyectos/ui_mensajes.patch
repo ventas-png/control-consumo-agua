@@ -127,7 +127,7 @@ index 8ca0e8f..8336c83 100644
    }
  
 diff --git a/src/components/contabilidad/ContabilidadSection.tsx b/src/components/contabilidad/ContabilidadSection.tsx
-index f5b7bc9..1a6a5a5 100644
+index f5b7bc9..5d79a38 100644
 --- a/src/components/contabilidad/ContabilidadSection.tsx
 +++ b/src/components/contabilidad/ContabilidadSection.tsx
 @@ -1,7 +1,8 @@
@@ -180,7 +180,7 @@ index f5b7bc9..1a6a5a5 100644
  }
  
  export function ContabilidadSection() {
-@@ -70,40 +95,68 @@ export function ContabilidadSection() {
+@@ -70,40 +95,71 @@ export function ContabilidadSection() {
    const [tab, setTab] = useState<SubTab>('polizas')
  
    const { data: proyectos = [], isSuccess: proyectosCargados } = useProyectosQuery(companyId)
@@ -248,9 +248,12 @@ index f5b7bc9..1a6a5a5 100644
    // Si el proyecto persistido no es de esta empresa (o ya no existe/accesible),
    // volver a la empresa. La guarda corre en cuanto la lista resuelve, incluso
    // vacía: una empresa SIN proyectos conservaba el proyecto de la anterior.
++  // Y devuelve la decisión a la omisión de arriba (V4-H3): si un refetch quita el proyecto abierto cuando la omisión ya estaba resuelta, la persona acotada
++  // pasa al primer proyecto que sí ve (la exenta conserva «Empresa») en vez de quedarse en el libro donde el servidor le rechaza capturar.
    useEffect(() => {
      if (proyectosCargados && ledgerProjectId && !proyectos.some((p) => p.id === ledgerProjectId)) {
 -      elegirLedger(null)
++      ledgerPorOmisionResuelto.current = null
 +      fijarLedger(null)
      }
 -  }, [ledgerProjectId, proyectos, proyectosCargados, elegirLedger])
@@ -469,10 +472,10 @@ index 0000000..5741948
 +})
 diff --git a/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx b/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx
 new file mode 100644
-index 0000000..7db70a2
+index 0000000..b91c11b
 --- /dev/null
 +++ b/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx
-@@ -0,0 +1,323 @@
+@@ -0,0 +1,402 @@
 +// D-8 del alcance de proyecto al capturar (propuesta de pendientes_decision/proyectos): con qué contabilidad abre Contabilidad.
 +//
 +// El servidor solo deja crear un documento de compras «sin proyecto» (la contabilidad de la EMPRESA) a una persona exenta de proyecto: a una persona ACOTADA
@@ -794,6 +797,85 @@ index 0000000..7db70a2
 +    primera.unmount()
 +    montar('operator')
 +    expect(selector().value).toBe(P2)
++  })
++})
++
++// V4-H3 (cuarta verificación independiente): la omisión se resolvía UNA sola vez por empresa y montaje. Si después un refetch (refetchOnWindowFocus, staleTime
++// de 60 s) quitaba el proyecto que la persona acotada tenía abierto (asignación revocada o proyecto eliminado), la guarda de «el proyecto ya no existe» la dejaba en
++// «Empresa» —el libro donde el servidor le rechaza capturar— aunque conservara otros proyectos, y la omisión no se volvía a evaluar. Ahora la guarda la devuelve
++// a la omisión: la persona acotada pasa al primer proyecto que sí ve, y la exenta conserva «Empresa».
++describe('si un refetch quita el proyecto abierto, la persona acotada pasa a otro suyo y no se queda en «Empresa»', () => {
++  function Envuelto() {
++    const [n, setN] = useState(0)
++    return <><button onClick={() => setN(n + 1)}>refrescar {n}</button><ContabilidadSection /></>
++  }
++  const refrescar = () => fireEvent.click(screen.getByRole('button', { name: /refrescar/ }))
++
++  it('le revocan el proyecto abierto y conserva otro: pasa al primero que sigue viendo (no «Empresa»)', () => {
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe(P2)
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P3, nombre: 'Gamma' }]
++    m.asignaciones = [P3]
++    refrescar()
++    expect(selector().value).toBe(P3)
++    expect(montadaCon()).toBe(P3)
++    expect(localStorage.getItem('conta-ledger:c1')).toBe(P3)
++  })
++
++  it('le quitan todos sus proyectos: queda en «Empresa» (no hay otra contabilidad) y no entra en un ciclo', () => {
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe(P2)
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }]
++    m.asignaciones = []
++    refrescar()
++    expect(selector().value).toBe('')
++    expect(montadaCon()).toBe('empresa')
++    refrescar()
++    expect(selector().value).toBe('')
++  })
++
++  it('el proyecto abierto lo elimina otra persona (ya no está en la lista) y conserva otro: pasa a ese', () => {
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe(P2)
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P3, nombre: 'Gamma' }]
++    m.asignaciones = [P2, P3]          // la fila de asignación sobrevive; el proyecto ya no existe
++    refrescar()
++    expect(selector().value).toBe(P3)
++  })
++
++  it('quien eligió «Empresa» a propósito no es movido por un refetch que cambia sus proyectos', () => {
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(selector().value).toBe('')
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P3, nombre: 'Gamma' }]
++    m.asignaciones = [P3]
++    refrescar()
++    expect(selector().value).toBe('')
++    expect(localStorage.getItem('conta-ledger:c1')).toBe('empresa')
++  })
++
++  it('el único reinicio es perder el proyecto abierto: quien abrió en «Empresa» por no ver ninguno no es movida cuando después le asignan uno (límite conocido)', () => {
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }]
++    m.asignaciones = []
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe('')
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P2, nombre: 'Beta' }]
++    m.asignaciones = [P2]
++    refrescar()
++    expect(selector().value).toBe('')          // la omisión se evalúa una vez por montaje; recargar la pantalla la vuelve a evaluar
++  })
++
++  it('la persona exenta que tenía un proyecto abierto y se lo eliminan conserva «Empresa» (no se le preselecciona nada)', () => {
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    montarConSesion(<Envuelto />, { role: 'company_owner' })
++    fireEvent.change(selector(), { target: { value: P2 } })
++    expect(selector().value).toBe(P2)
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P3, nombre: 'Gamma' }]
++    refrescar()
++    expect(selector().value).toBe('')
++    expect(montadaCon()).toBe('empresa')
++    expect(localStorage.getItem('conta-ledger:c1')).toBeNull()
 +  })
 +})
 diff --git a/src/domain/compras/ordenCrear.ts b/src/domain/compras/ordenCrear.ts
