@@ -93,3 +93,17 @@ SELECT asgt.err_priv('[privilegios] anon no lee ni cuenta', 'ANON', 'SELECT coun
 SELECT asgt.ok('[privilegios] el rol de servicio sí puede TRUNCATE (se deshace con el caso)', 'SERVICIO', 'TRUNCATE public.user_project_assignments', 0,
   p_efecto_sql => 'SELECT count(*) FROM public.user_project_assignments', p_efecto => '0');
 SELECT asgt.chk((SELECT count(*) FROM public.user_project_assignments), 43, '[privilegios] control: tras el TRUNCATE deshecho siguen las 43 filas');
+
+-- ═══ 5 · el candado por persona de la baja en cascada (F1) y el COALESCE del trigger (F3) ═══════════════════════════
+-- El comportamiento lo prueba run.sh con DOS sesiones reales; aquí sólo se fija DÓNDE está: en una sentencia PROPIA y ANTES de la comprobación de
+-- cascada (dentro del AND del IF no sirve: la instantánea ya está tomada cuando el candado se concede).
+SELECT asgt.chk_bool((SELECT strpos(p.prosrc, 'PERFORM pg_advisory_xact_lock(hashtextextended(') > 0
+                        AND strpos(p.prosrc, 'PERFORM pg_advisory_xact_lock(hashtextextended(') < strpos(p.prosrc, 'NOT EXISTS (SELECT 1 FROM public.projects')
+                        AND strpos(p.prosrc, 'NOT EXISTS (SELECT 1 FROM public.projects') > 0
+                        AND p.prosrc ~ 'IF TG_OP = ''DELETE'' THEN\s+PERFORM pg_advisory_xact_lock'
+                   FROM pg_proc p WHERE p.oid = 'public.asignacion_bloquear_propia()'::regprocedure),
+  true, '[catálogo] la baja en cascada se serializa por persona: PERFORM pg_advisory_xact_lock en sentencia propia, antes de la comprobación de cascada');
+SELECT asgt.chk_bool((SELECT p.prosrc ~ 'COALESCE\(public\.is_super_admin\(\), false\) OR COALESCE\(public\.current_user_role\(\) = ''company_owner'', false\)'
+                        AND p.prosrc !~ 'NOT \(public\.is_super_admin\(\) OR public\.current_user_role\(\)'
+                   FROM pg_proc p WHERE p.oid = 'public.asignacion_bloquear_propia()'::regprocedure),
+  true, '[catálogo] el trigger de autoasignación usa COALESCE en los dos lados (una sesión sin app_users no pasa por NULL)');
