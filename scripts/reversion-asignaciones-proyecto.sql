@@ -6,7 +6,8 @@
 --     producción el 2026-10-10: el texto de pg_get_expr coincide);
 --   · sin los triggers trg_asignacion_empresa y trg_asignacion_propia;
 --   · sin las funciones asignacion_puede_administrar(uuid, uuid), asignacion_validar_empresa() y asignacion_bloquear_propia();
---   · con los privilegios originales (anon: todos; authenticated: también TRUNCATE, TRIGGER y REFERENCES).
+--   · con los privilegios originales (anon: todos; authenticated: también TRUNCATE, TRIGGER y REFERENCES). El SELECT/INSERT/UPDATE/DELETE de
+--     authenticated NO se toca (la migración tampoco lo tocó): se conserva el que hubiera, sea cual sea la base.
 -- No toca ninguna fila (comprueba que el conteo y la huella sean los mismos al terminar). IDEMPOTENTE: se puede correr dos veces.
 --
 -- ⚠ QUIEN REVIERTE REABRE EL HUECO: cualquier usuario autenticado vuelve a poder asignarse proyectos y un administrador acotado a
@@ -23,6 +24,13 @@ SET LOCAL statement_timeout = '60s';
 
 DO $pre$
 BEGIN
+  -- bloqueo ANTES de medir (como la migración): una escritura legítima no puede colarse entre la medición y el post-vuelo
+  LOCK TABLE public.user_project_assignments IN ACCESS EXCLUSIVE MODE;
+  PERFORM set_config('app.asg_rev_dml', concat_ws(',',
+    CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'SELECT') THEN 'SELECT' END,
+    CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'INSERT') THEN 'INSERT' END,
+    CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'UPDATE') THEN 'UPDATE' END,
+    CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'DELETE') THEN 'DELETE' END), true);
   PERFORM set_config('app.asg_rev_n', (SELECT count(*) FROM public.user_project_assignments)::text, true);
   PERFORM set_config('app.asg_rev_huella',
     (SELECT md5(COALESCE(string_agg(u.id::text || '|' || u.user_id::text || '|' || u.project_id::text || '|' || u.permission_type, E'\n' ORDER BY u.id), ''))
@@ -109,10 +117,21 @@ BEGIN
                 ('asignacion_puede_administrar', 'asignacion_validar_empresa', 'asignacion_bloquear_propia')) THEN
     RAISE EXCEPTION 'reversion_asignaciones_proyecto: quedan triggers o funciones de la migración';
   END IF;
+  -- anon recupera los 7; authenticated recupera TRUNCATE, TRIGGER y REFERENCES, y su SELECT/INSERT/UPDATE/DELETE queda EXACTAMENTE como estaba
+  -- (relativo: exigirlo como absoluto abortaría en una base donde authenticated nunca lo tuvo, p. ej. Supabase Preview)
   IF EXISTS (SELECT 1 FROM unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) x
-              WHERE NOT has_table_privilege('anon', 'public.user_project_assignments', x)
-                 OR NOT has_table_privilege('authenticated', 'public.user_project_assignments', x)) THEN
-    RAISE EXCEPTION 'reversion_asignaciones_proyecto: los privilegios no quedaron como los originales';
+              WHERE NOT has_table_privilege('anon', 'public.user_project_assignments', x))
+     OR NOT has_table_privilege('authenticated', 'public.user_project_assignments', 'TRUNCATE')
+     OR NOT has_table_privilege('authenticated', 'public.user_project_assignments', 'REFERENCES')
+     OR NOT has_table_privilege('authenticated', 'public.user_project_assignments', 'TRIGGER')
+     OR concat_ws(',',
+          CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'SELECT') THEN 'SELECT' END,
+          CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'INSERT') THEN 'INSERT' END,
+          CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'UPDATE') THEN 'UPDATE' END,
+          CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'DELETE') THEN 'DELETE' END)
+        IS DISTINCT FROM current_setting('app.asg_rev_dml', true) THEN
+    RAISE EXCEPTION 'reversion_asignaciones_proyecto: los privilegios no quedaron como los originales (ACL %)',
+      (SELECT c.relacl::text FROM pg_class c WHERE c.oid = 'public.user_project_assignments'::regclass);
   END IF;
   RAISE NOTICE 'reversion_asignaciones_proyecto: hecha. 4 políticas originales, sin triggers ni funciones, privilegios originales, filas intactas.';
 END

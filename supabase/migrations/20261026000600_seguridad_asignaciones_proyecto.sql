@@ -65,10 +65,32 @@
 --      SÍ puede (su alcance sólo se reduce y es un flujo legítimo del servidor) mientras conserve otra
 --      asignación; si fuera su ÚLTIMA fila quedaría sin asignaciones y pasaría a ser exento, y eso se rechaza
 --      (ASIGNACION_PROPIA_NO_PERMITIDA). Lo borra entonces el propietario o el superadministrador.
+--      Esa comprobación («¿le queda otra fila?») se SERIALIZA por persona con un candado de aviso
+--      (pg_advisory_xact_lock) tomado ANTES de mirar: sin él, dos sesiones que borraran cada una uno de
+--      los dos únicos proyectos de un administrador veían cada una la fila de la otra como viva y lo dejaban
+--      con CERO filas (carrera reproducida con dos sesiones reales).
+--      Una sesión sin fila en app_users (rol NULL) tampoco pasa el trigger: la lógica trivaluada ya no
+--      lo deja «abierto».
 --   5. Privilegios: anon pierde TODOS (la RLS no le daba nada, pero el privilegio
 --      estaba) y authenticated pierde TRUNCATE, TRIGGER y REFERENCES (TRUNCATE no
---      pasa por RLS). Conserva SELECT, INSERT, UPDATE y DELETE, que la RLS gobierna
---      fila por fila. La misma higiene de 20261026000200 (compras y contabilidad).
+--      pasa por RLS). SELECT, INSERT, UPDATE y DELETE de authenticated NO SE TOCAN: la
+--      migración ni los concede ni los quita (la RLS los gobierna fila por fila donde
+--      existen). La misma higiene de 20261026000200 (compras y contabilidad).
+--      Por qué no se «exigen» como un absoluto: una base construida SÓLO con migraciones
+--      (Supabase Preview) deja a authenticated sin DML sobre esta tabla
+--      ({postgres=arwdDxtm, anon=Dxtm, authenticated=Dxtm, service_role=Dxtm}), mientras
+--      que producción tiene arwdDxtm; la primera versión de esta migración exigía el DML
+--      y abortó ahí. Ahora el pre-vuelo anota cuáles tenía y el post-vuelo exige que
+--      sigan IGUAL. (Que la cadena de migraciones no concede ese DML es una deuda previa,
+--      ajena a esta migración: docs/SEGURIDAD_ASIGNACIONES_PROYECTO.md, «Lección de ACL».)
+--
+-- QUÉ SUPONE DEL ENTORNO (y lo comprueba el pre-vuelo, con un mensaje claro)
+--   · existen los roles anon, authenticated y service_role, y auth.uid();
+--   · quien corre la migración es el propietario de la tabla (o miembro de su rol): sin eso
+--     DROP POLICY / REVOKE fallarían o no harían nada;
+--   · nada más: ni la ACL por defecto de las funciones (cada REVOKE/GRANT de función es
+--     explícito y converge al mismo estado), ni privilegios de esquema, ni que el
+--     propietario sea o no superusuario.
 --
 -- QUÉ NO CAMBIA
 --   · NINGUNA fila (la migración comprueba que el conteo y la huella md5 de
@@ -81,9 +103,12 @@
 --
 -- DESPLIEGUE: va en SU PROPIO push a main, ANTES de la serie 20261027… (PR #926) y
 -- de 20261028… (PR #927): apply-migrations-prod.yml aplica sólo los .sql añadidos en
--- cada push y con tope MAX_APPLY = 10. Tabla pequeña; DROP/CREATE POLICY toman
--- ACCESS EXCLUSIVE un instante (lock_timeout de 5 s: si hay una transacción larga
--- sobre la tabla, falla limpia y se reintenta). Verificación posterior:
+-- cada push y con tope MAX_APPLY = 10. Tabla pequeña; lo PRIMERO que hace es
+-- LOCK TABLE … ACCESS EXCLUSIVE (lock_timeout de 5 s: si hay una transacción larga
+-- sobre la tabla, falla limpia, sin dejar nada, y se reintenta) y sólo DESPUÉS mide
+-- el conteo y la huella: una escritura legítima ya no puede colarse entre la medición
+-- y el bloqueo (daba un falso «las filas CAMBIARON»). Antes de lanzarla conviene mirar
+-- pg_stat_activity (transacciones largas) y elegir un horario tranquilo. Verificación posterior:
 -- scripts/diagnostico-asignaciones-proyecto.sql. Tras el despliegue hay que
 -- RECAPTURAR scripts/schema-drift/huella-produccion.json (cambian los grants, las
 -- políticas y los triggers de esta tabla y hay tres funciones nuevas).
@@ -98,14 +123,17 @@ SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
 
 -- ── Pre-vuelo ────────────────────────────────────────────────────────────────
--- Exige lo que esta migración da por existente, guarda el conteo y la huella de la
--- tabla (set_config local a la transacción) e INFORMA —sin fallar— de lo que ya
--- hay en los datos y que esta migración no corrige.
+-- Exige lo que esta migración da por existente, BLOQUEA la tabla, guarda el conteo y
+-- la huella de la tabla y los privilegios DML de authenticated (set_config local a
+-- la transacción) e INFORMA —sin fallar— de lo que ya hay en los datos y que esta
+-- migración no corrige.
 DO $pre$
 DECLARE
   v_faltan    text[] := ARRAY[]::text[];
+  v_rol       text;
   v_n         bigint;
   v_huella    text;
+  v_dml       text;
   v_huerfanas bigint;
   v_cruces    bigint;
   v_sin_filas bigint;
@@ -119,10 +147,23 @@ BEGIN
   IF to_regclass('public.user_project_assignments') IS NULL THEN v_faltan := array_append(v_faltan, 'tabla user_project_assignments'); END IF;
   IF to_regclass('public.app_users')                IS NULL THEN v_faltan := array_append(v_faltan, 'tabla app_users'); END IF;
   IF to_regclass('public.projects')                 IS NULL THEN v_faltan := array_append(v_faltan, 'tabla projects'); END IF;
+  IF to_regprocedure('auth.uid()')                  IS NULL THEN v_faltan := array_append(v_faltan, 'auth.uid()'); END IF;
+  FOREACH v_rol IN ARRAY ARRAY['anon', 'authenticated', 'service_role'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_roles r WHERE r.rolname = v_rol) THEN v_faltan := array_append(v_faltan, 'rol ' || v_rol); END IF;
+  END LOOP;
   IF array_length(v_faltan, 1) IS NOT NULL THEN
     RAISE EXCEPTION 'seguridad_asignaciones_proyecto (pre-vuelo): faltan % — la cadena de migraciones anterior está incompleta',
       array_to_string(v_faltan, ', ');
   END IF;
+  -- quien corre la migración debe poder administrar la tabla (propietario o miembro de su rol); si no, DROP POLICY / REVOKE fallarían o no harían nada
+  IF NOT pg_has_role(current_user, (SELECT c.relowner FROM pg_class c WHERE c.oid = 'public.user_project_assignments'::regclass), 'USAGE') THEN
+    RAISE EXCEPTION 'seguridad_asignaciones_proyecto (pre-vuelo): % no es el propietario de user_project_assignments (% lo es) ni miembro de su rol; corre la migración con el rol propietario',
+      current_user, (SELECT pg_get_userbyid(c.relowner) FROM pg_class c WHERE c.oid = 'public.user_project_assignments'::regclass);
+  END IF;
+
+  -- BLOQUEO ANTES DE MEDIR: con la tabla ya bloqueada (ACCESS EXCLUSIVE, bajo el lock_timeout) ninguna escritura legítima puede confirmarse entre la
+  -- medición de abajo y el post-vuelo; antes se medía con ACCESS SHARE y el bloqueo llegaba después, con el primer DROP POLICY (falso «las filas CAMBIARON»).
+  LOCK TABLE public.user_project_assignments IN ACCESS EXCLUSIVE MODE;
 
   SELECT count(*),
          md5(COALESCE(string_agg(upa.id::text || '|' || upa.user_id::text || '|' || upa.project_id::text || '|' || upa.permission_type,
@@ -131,6 +172,15 @@ BEGIN
     FROM public.user_project_assignments upa;
   PERFORM set_config('app.asg_pre_n', v_n::text, true);
   PERFORM set_config('app.asg_pre_huella', v_huella, true);
+
+  -- Qué DML tiene authenticated HOY (esta migración no lo toca, así que el post-vuelo exige que siga igual). En producción son los cuatro; en una
+  -- base construida sólo con migraciones (Supabase Preview) pueden ser ninguno: eso es del entorno, no un defecto de esta migración.
+  v_dml := concat_ws(',',
+             CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'SELECT') THEN 'SELECT' END,
+             CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'INSERT') THEN 'INSERT' END,
+             CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'UPDATE') THEN 'UPDATE' END,
+             CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'DELETE') THEN 'DELETE' END);
+  PERFORM set_config('app.asg_pre_dml', v_dml, true);
 
   SELECT count(*) INTO v_huerfanas
     FROM public.user_project_assignments upa
@@ -146,6 +196,7 @@ BEGIN
      AND NOT EXISTS (SELECT 1 FROM public.user_project_assignments upa WHERE upa.user_id = u.id);
 
   RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): % filas, huella %', v_n, v_huella;
+  RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): authenticated tiene hoy [%] de SELECT/INSERT/UPDATE/DELETE; la migración no los toca', COALESCE(NULLIF(v_dml, ''), 'ninguno');
   RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): % filas HUÉRFANAS (user_id sin app_users): no se tocan', v_huerfanas;
   RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): % filas con empresa de la persona distinta de la del proyecto: no se tocan', v_cruces;
   RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): % administradores sin filas (exentos de proyecto)', v_sin_filas;
@@ -255,10 +306,20 @@ BEGIN
   v_toca := (TG_OP IN ('UPDATE', 'DELETE') AND OLD.user_id = v_uid)
          OR (TG_OP IN ('INSERT', 'UPDATE') AND NEW.user_id = v_uid);
 
-  IF v_toca AND NOT (public.is_super_admin() OR public.current_user_role() = 'company_owner') THEN
+  -- COALESCE en AMBOS lados: para una sesión sin fila en app_users current_user_role() es NULL y, sin COALESCE, `NOT (false OR NULL)` es NULL y el IF
+  -- no se cumplía: el trigger «fallaba abierto» justo para quien no es nadie. Con NULL = false, esa sesión no es propietaria ni superadministradora.
+  IF v_toca AND NOT (COALESCE(public.is_super_admin(), false) OR COALESCE(public.current_user_role() = 'company_owner', false)) THEN
     -- Baja EN CASCADA por borrar el proyecto (la fila padre ya no existe): se permite mientras la persona CONSERVE otra asignación, porque
     -- entonces su alcance sólo se reduce (borrar un proyecto al que se está asignado es un flujo legítimo del servidor). Si fuera su última
     -- fila quedaría sin asignaciones y, siendo administrador, pasaría a ser exento de proyecto: eso es justo lo que se impide.
+    --
+    -- SERIALIZADO POR PERSONA: dos sesiones que borraran cada una uno de los dos únicos proyectos de la persona verían, cada una, la fila de la
+    -- otra como viva (no está confirmada) y la dejarían con CERO filas. El candado va en una sentencia SEPARADA y ANTES de la comprobación: así la
+    -- comprobación de abajo toma una instantánea NUEVA, posterior a la espera, y ve lo que la otra sesión confirmó. (Dentro del AND del IF no
+    -- sirve: la instantánea ya está tomada cuando el candado se concede.) Se libera solo al terminar la transacción.
+    IF TG_OP = 'DELETE' THEN
+      PERFORM pg_advisory_xact_lock(hashtextextended('asg:' || OLD.user_id::text, 0));
+    END IF;
     IF TG_OP = 'DELETE'
        AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = OLD.project_id)
        AND EXISTS (SELECT 1 FROM public.user_project_assignments u WHERE u.user_id = OLD.user_id AND u.id <> OLD.id) THEN
@@ -296,6 +357,8 @@ DECLARE
   v_huella    text;
   v_cat       text;
   v_def       text;
+  v_acl       text;
+  v_dml       text;
 BEGIN
   SELECT count(*),
          md5(COALESCE(string_agg(upa.id::text || '|' || upa.user_id::text || '|' || upa.project_id::text || '|' || upa.permission_type,
@@ -345,17 +408,37 @@ BEGIN
     RAISE EXCEPTION 'seguridad_asignaciones_proyecto (post-vuelo): EXECUTE de asignacion_puede_administrar mal repartido';
   END IF;
 
-  -- privilegios
-  IF has_table_privilege('anon', 'public.user_project_assignments', 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
-     OR has_table_privilege('authenticated', 'public.user_project_assignments', 'TRUNCATE, REFERENCES, TRIGGER')
-     OR NOT (has_table_privilege('authenticated', 'public.user_project_assignments', 'SELECT')
-             AND has_table_privilege('authenticated', 'public.user_project_assignments', 'INSERT')
-             AND has_table_privilege('authenticated', 'public.user_project_assignments', 'UPDATE')
-             AND has_table_privilege('authenticated', 'public.user_project_assignments', 'DELETE')) THEN
-    RAISE EXCEPTION 'seguridad_asignaciones_proyecto (post-vuelo): privilegios de la tabla mal repartidos';
+  -- funciones de trigger: nadie las invoca (el REVOKE de arriba las deja sin EXECUTE para PUBLIC, anon y authenticated, sea cual sea la ACL por defecto)
+  IF has_function_privilege('anon', 'public.asignacion_validar_empresa()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.asignacion_validar_empresa()', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.asignacion_bloquear_propia()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.asignacion_bloquear_propia()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'seguridad_asignaciones_proyecto (post-vuelo): EXECUTE de las funciones de trigger mal repartido';
   END IF;
 
-  RAISE NOTICE 'asignaciones_proyecto (post-vuelo): % filas, huella % — idénticas a las de antes; 4 políticas, 2 triggers, 3 funciones, privilegios mínimos', v_n, v_huella;
+  -- privilegios de la tabla, RELATIVOS a lo que había: la migración sólo QUITA (anon todo; authenticated TRUNCATE, TRIGGER, REFERENCES) y no concede ni
+  -- retira el DML de authenticated; exigirlo como absoluto abortó en Supabase Preview (ahí authenticated no lo tenía).
+  SELECT c.relacl::text INTO v_acl FROM pg_class c WHERE c.oid = 'public.user_project_assignments'::regclass;
+  IF has_table_privilege('anon', 'public.user_project_assignments', 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+     OR EXISTS (SELECT 1 FROM pg_class c, aclexplode(c.relacl) a
+                 WHERE c.oid = 'public.user_project_assignments'::regclass AND a.grantee = 'anon'::regrole) THEN
+    RAISE EXCEPTION 'seguridad_asignaciones_proyecto (post-vuelo): anon conserva privilegios sobre user_project_assignments (ACL %)', v_acl;
+  END IF;
+  IF has_table_privilege('authenticated', 'public.user_project_assignments', 'TRUNCATE, REFERENCES, TRIGGER') THEN
+    RAISE EXCEPTION 'seguridad_asignaciones_proyecto (post-vuelo): authenticated conserva TRUNCATE, REFERENCES o TRIGGER sobre user_project_assignments (ACL %)', v_acl;
+  END IF;
+  v_dml := concat_ws(',',
+             CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'SELECT') THEN 'SELECT' END,
+             CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'INSERT') THEN 'INSERT' END,
+             CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'UPDATE') THEN 'UPDATE' END,
+             CASE WHEN has_table_privilege('authenticated', 'public.user_project_assignments', 'DELETE') THEN 'DELETE' END);
+  IF v_dml IS DISTINCT FROM current_setting('app.asg_pre_dml', true) THEN
+    RAISE EXCEPTION 'seguridad_asignaciones_proyecto (post-vuelo): el DML de authenticated CAMBIÓ (antes [%], ahora [%]) y esta migración no lo toca (ACL %)',
+      current_setting('app.asg_pre_dml', true), v_dml, v_acl;
+  END IF;
+
+  RAISE NOTICE 'asignaciones_proyecto (post-vuelo): % filas, huella % — idénticas a las de antes; 4 políticas, 2 triggers, 3 funciones; anon sin privilegios, authenticated sin TRUNCATE/TRIGGER/REFERENCES y con el mismo DML que tenía [%]',
+    v_n, v_huella, COALESCE(NULLIF(v_dml, ''), 'ninguno');
 END
 $post$;
 
