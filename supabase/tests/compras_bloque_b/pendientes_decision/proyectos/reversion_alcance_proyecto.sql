@@ -6,6 +6,11 @@
 -- varias veces) y sin pérdida de datos: los documentos y renglones creados mientras la propuesta estuvo puesta se conservan tal cual
 -- (también los que quedaron en proyectos que la persona ya no podría capturar: no se mueven ni se borran).
 --
+-- ORDEN: esta reversión va ANTES que la de la 0900 y que cualquier otra de la serie 20261027…: los 9 disparadores llaman a compras_sesion_usuario() (que crea la 0300 y borra la
+--   sección de la 0300 de scripts/reversion-compras-controles.sql); si se revierte la serie SIN quitar antes estos disparadores, esa función desaparece con ellos vivos y TODA
+--   inserción en las nueve tablas de compras falla (function public.compras_sesion_usuario() does not exist, 42883; reproducido). La misma sección está en
+--   scripts/reversion-compras-controles.sql, encima de la de la 0900 (reversion_script.patch), y run.sh §6c la prueba sola, junto con la 0900 y en la reversión total.
+--
 -- ⚠ REVERTIR REABRE LA BRECHA: una persona acotada vuelve a poder insertar borradores en proyectos que no tiene asignados, insertar o mover
 --   documentos de/hacia «sin proyecto» y agregar renglones a borradores ajenos. Comprobado en una base desechable: la huella del catálogo
 --   (disparadores, funciones con el hash de su definición, índices, restricciones, políticas y columnas; supabase/tests/compras_bloque_b/reversion_catalogo.sql)

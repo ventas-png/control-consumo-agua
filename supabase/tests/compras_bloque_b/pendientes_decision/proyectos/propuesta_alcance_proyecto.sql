@@ -1,10 +1,16 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- COMPRAS · ALCANCE DE PROYECTO AL CAPTURAR Y «SIN PROYECTO» SOLO PARA PERSONAS EXENTAS (PROPUESTA, NO ES MIGRACIÓN DEL PR #926)
 --
--- ⚠ ESTE ARCHIVO ESTÁ EN pendientes_decision/: NO se aplica con el PR #926 (tiene diez migraciones, el tope de MAX_APPLY = 10) ni
---   se despliega. Para llevarlo: copiarlo como supabase/migrations/<timestamp posterior a 20261027000900>_compras_alcance_proyecto_captura.sql
---   en un PR PROPIO, con su push y su corrida de apply-migrations-prod.yml DESPUÉS de la del PR #926 (depende de objetos de la 0900).
---   Decisiones que el dueño tiene que tomar ANTES: README.md §5 (D-1 … D-8). Probado con PRJ-1.sql; revertido con reversion_alcance_proyecto.sql.
+-- ⚠ ESTE ARCHIVO ESTÁ EN pendientes_decision/: NO se aplica con el PR #926 (tiene diez migraciones, el tope de MAX_APPLY = 10) ni se despliega.
+--   Para llevarlo: copiarlo como supabase/migrations/20261027001000_compras_alcance_proyecto_captura.sql en un PR PROPIO, con su push y su corrida de
+--   apply-migrations-prod.yml, en este orden de pushes a main (cada uno en SU push, cada uno por debajo del tope de diez):
+--       #928 (20261026000600) → #926 (20261027000000…0900) → ESTE PR (20261027001000) → #927 (20261028000000).
+--   La versión 20261027001000 NO es una preferencia: run.sh §3 aplica primero toda migración posterior a 20261021000000 que no sea 20261027* y DESPUÉS la serie
+--   20261027*; con una versión mayor (20261028…, 20261029…) esta se aplica ANTES de la 0900 y muere en su pre-vuelo (COMPRAS_MIGRACION_REQUISITOS; reproducido).
+--   Con 20261027001000 el historial de versiones queda monótono y esto no depende de #927 (housekeeping de evidencias que no toca compras): no hay que esperarlo.
+--   Decisiones que el dueño tiene que tomar ANTES: README.md §5 (D-1 … D-10). D-8 (la pantalla) es OBLIGATORIA junto con la migración: no desplegar solo el servidor.
+--   Probado con PRJ-1.sql; revertido con reversion_alcance_proyecto.sql; su sección de reversión va ENCIMA de la de la 0900 en scripts/reversion-compras-controles.sql
+--   (reversion_script.patch). Las adaptaciones de aserciones que necesita la batería existente están en adaptaciones_aserciones.patch; el arreglo de la pantalla, en ui_mensajes.patch.
 --
 -- QUÉ BRECHA CIERRA (reproducida en una base desechable con la cadena completa del PR #926; matriz completa en impacto.md)
 --   Una persona acotada al proyecto A (rol operator, o administrador CON asignaciones), con todas las llaves de compras:
@@ -34,15 +40,29 @@
 --   procesos de sistema (conta.allow_system_write) NO se bloquean, y la acción referencial de eliminar un proyecto (ON DELETE SET NULL)
 --   tampoco. No toca RLS, privilegios, datos, la comprobación de las seis acciones (compras_exigir_permiso) ni los mensajes de la 0900.
 --
+-- ALCANCE DECLARADO (F7): SOLO estas nueve tablas — ordenes_compra, recepciones, facturas_proveedor, ordenes_pago, contrasenas_pago y sus hijas
+--   orden_compra_lineas, recepcion_lineas, factura_proveedor_lineas, contrasena_pago_facturas. Las TABLAS VECINAS con project_id NO quedan cubiertas: p. ej. suministros_condominio y
+--   proformas_condominio (probado: una persona asignada solo a A inserta en B), obras_mejoras, movimientos_suministro, banco_movimientos, cuentas_bancarias, presupuestos /
+--   presupuesto_condominio, gastos_condominio y el resto de las tablas de condominios, cuya política INSERT no mira el proyecto. Cubrirlas pide la misma pieza por tabla (un disparador
+--   BEFORE INSERT con compras_puede_destinar_proyecto o el can_access_project en el WITH CHECK de su política, más la decisión de qué hacer con su project_id NULL) y su propia
+--   prueba: README.md §6.
+--
 -- QUÉ NO HACE (decisiones abiertas: README.md §5)
 --   · NO cambia los documentos que YA están sin proyecto (en producción: 0 en las siete tablas, medido el 2026-10-10) ni quién puede
---     actuar sobre ellos con las seis llaves: cualquier persona con la llave sigue pudiendo (D-4).
+--     actuar sobre ellos con las seis llaves: cualquier persona con la llave sigue pudiendo (D-4). Tampoco lee permission_type: una asignación
+--     'lectura' captura en su proyecto (en producción las 43 filas son 'total').
 --   · NO es «todo UPDATE» (P-PERM-2): editar columnas que no mueven el documento de un proyecto ajeno con una función SECURITY DEFINER
 --     o un UPDATE a ciegas sigue pasando; PRJ-1 lo deja documentado con una comprobación (D-6).
 --   · NO compara la empresa del documento con la de la sesión al insertar (R1 «empresa», D-5): en la API ya lo hacen la RLS y
 --     trg_00_compras_rls_empresa; una función SECURITY DEFINER no. Añadirlo rompe el montaje de UNA aserción existente
 --     (conta_reglas_imputacion/assert.sql:490-493, que siembra una factura de la empresa B con la sesión de A) y no se pidió: README.md §5.
---   · NO crea ninguna llave ni concede ninguna. NO cambia los privilegios de anon (que quedan para otra decisión: §8 del informe).
+--   · NO vuelve «exento» una marca explícita: sigue siendo no tener filas en user_project_assignments, así que un administrador acotado que le borra sus filas a
+--     OTRO administrador lo vuelve exento (D-9; la 0600 del PR #928 cierra que alguien se borre las SUYAS, no las de otro). La regla «NULL solo para exentos» es tan firme como esa exención.
+--   · NO cambia ON DELETE de project_id: al eliminar un proyecto, sus facturas, contraseñas y órdenes de pago quedan SIN proyecto (SET NULL) —y las ve y actúa todo el que tenga la llave—
+--     y sus órdenes de compra se borran (CASCADE) (D-10).
+--   · NO endurece el GUC conta.allow_system_write (heredado de la 0900, la guarda común): cualquier sesión authenticated puede fijarlo con SQL directo; no es alcanzable
+--     por la API pública hoy, pero es una puerta del diseño de la guarda: hardening APARTE (README.md §6, F6).
+--   · NO crea ninguna llave ni concede ninguna. NO cambia los privilegios de anon (que NO tiene SELECT, INSERT ni UPDATE sobre estas nueve tablas en producción).
 --
 -- DATOS EXISTENTES Y CONFLICTOS
 --   No crea ningún índice, restricción ni columna: ningún dato existente puede hacerla fallar ni se reescribe. El pre-vuelo informa
@@ -50,8 +70,11 @@
 --
 -- BLOQUEOS, TIEMPOS Y RECUPERACIÓN
 --   Una transacción con lock_timeout = 10 s y statement_timeout = 120 s. CREATE OR REPLACE TRIGGER (PostgreSQL ≥ 14; producción: 17) toma
---   SHARE ROW EXCLUSIVE sobre cada una de las 9 tablas (deja leer; bloquea escrituras unos milisegundos). Aplicar fuera de pagos,
---   aprobaciones y cierres. Idempotente. Reversión: reversion_alcance_proyecto.sql (exacta, sin pérdida de datos).
+--   SHARE ROW EXCLUSIVE sobre cada una de las 9 tablas (medido con pg_locks al final de la transacción: las 9 tablas con ShareRowExclusiveLock; deja leer, bloquea INSERT/UPDATE/DELETE
+--   unos milisegundos; los candados se toman en serie y se sueltan juntos al COMMIT, así que una transacción concurrente que toque varias de estas tablas en otro orden podría interbloquearse
+--   y PostgreSQL abortaría una de las dos). Aplicar fuera de pagos, aprobaciones y cierres; si falla por lock_timeout, no deja nada y se reintenta. Costo por escritura, medido
+--   (mediana de 5 corridas alternadas, 1 000 INSERT cada una): ≈ +0,3 ms por cabecera y +0,4 ms por renglón (impacto.md §7). Idempotente. Reversión: reversion_alcance_proyecto.sql
+--   (exacta, sin pérdida de datos) o la sección de 20261027001000 de scripts/reversion-compras-controles.sql (reversion_script.patch), que va ENCIMA de la de la 0900.
 -- ════════════════════════════════════════════════════════════════════════════
 BEGIN;
 SET LOCAL lock_timeout = '10s';

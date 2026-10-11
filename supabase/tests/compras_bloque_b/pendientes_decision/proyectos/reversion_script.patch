@@ -1,0 +1,143 @@
+diff --git a/scripts/reversion-compras-controles.sql b/scripts/reversion-compras-controles.sql
+index e786c9b..3f215e9 100644
+--- a/scripts/reversion-compras-controles.sql
++++ b/scripts/reversion-compras-controles.sql
+@@ -1,16 +1,58 @@
+ -- ════════════════════════════════════════════════════════════════════════════
+--- REVERSIÓN DE LAS MIGRACIONES 20261027000000…0900 (compras · controles de servidor)
++-- REVERSIÓN DE LAS MIGRACIONES 20261027000000…0900 Y 20261027001000 (compras · controles de servidor y alcance de proyecto al capturar)
+ -- GENERADO del catálogo de una cadena real de migraciones (no se edita a mano): cada sección deshace UNA migración
+ -- y supone que las posteriores ya están revertidas (por eso van de la última a la primera).
++-- La sección de 20261027001000 (alcance de proyecto al capturar: 3 funciones y 9 disparadores que LLAMAN a compras_sesion_usuario(), de 20261027000300)
++-- va ENCIMA de todas, porque se revierte la primera: si se revirtiera la serie sin ella, la función desaparecería con los 9 disparadores
++-- vivos y TODA inserción en las nueve tablas de compras fallaría (function public.compras_sesion_usuario() does not exist). Es idempotente
++-- y no hace nada si esa migración no se aplicó.
+ -- Cada bloque es una transacción: si algo falla, no queda nada a medias. Son funciones, disparadores, índices, restricciones y políticas
+ -- (y, en 0900, la tabla de la bitácora de la separación y los privilegios de compras_config); NO hay datos de negocio que borrar ni restaurar
+ -- (salvo las claves de idempotencia de 0800; la bitácora de la separación se CONSERVA si tiene cambios).
+ -- Revertir REABRE los defectos que cada migración cerraba. Verificado con 
+--- supabase/tests/compras_bloque_b/run.sh §6c (aplica la cadena, revierte TODO y revierte SOLO la sección de 0900; compara el catálogo).
++-- supabase/tests/compras_bloque_b/run.sh §6c (aplica la cadena, revierte TODO, revierte SOLO la sección de 20261027001000 y revierte las secciones
++-- de 20261027001000 + 0900 en ese orden; compara el catálogo en cada caso).
+ -- La sección de 20261027000900 está escrita con sus tres piezas (facturas, separación, permisos) y se puede correr SOLA para volver al
+ -- estado posterior a 0800. La bitácora de la separación se conserva si tiene cambios (ver su aviso).
+ -- ════════════════════════════════════════════════════════════════════════════
+ 
++-- ── 20261027001000_compras_alcance_proyecto_captura ───────────────────────
++BEGIN;
++SET LOCAL lock_timeout = '10s';
++SET LOCAL statement_timeout = '120s';
++-- Quita lo que añade la migración y SOLO eso: 9 disparadores (5 de captura, 4 de las hijas) y 3 funciones. No toca datos, ni la 0900
++-- (trg_zzcompras_mover_alcance y compras_exigir_permiso quedan como están), ni privilegios, ni políticas. Idempotente; sin pérdida de datos:
++-- los documentos y renglones creados mientras estuvo puesta se conservan tal cual. REABRE la brecha (una persona acotada vuelve a poder insertar
++-- borradores en proyectos que no tiene, insertar o mover documentos de/hacia «sin proyecto» y agregar renglones a borradores ajenos).
++-- DROP TRIGGER toma ACCESS EXCLUSIVE en cada una de las 9 tablas hasta el final de la transacción: con lock_timeout = 10 s falla entera si una
++-- está ocupada y se reintenta; correrla fuera de pagos y aprobaciones.
++DROP TRIGGER IF EXISTS trg_zzzcompras_alcance_captura ON public.ordenes_compra;
++DROP TRIGGER IF EXISTS trg_zzzcompras_alcance_captura ON public.recepciones;
++DROP TRIGGER IF EXISTS trg_zzzcompras_alcance_captura ON public.facturas_proveedor;
++DROP TRIGGER IF EXISTS trg_zzzcompras_alcance_captura ON public.ordenes_pago;
++DROP TRIGGER IF EXISTS trg_zzzcompras_alcance_captura ON public.contrasenas_pago;
++
++DROP TRIGGER IF EXISTS trg_zzzcompras_alcance_hija ON public.orden_compra_lineas;
++DROP TRIGGER IF EXISTS trg_zzzcompras_alcance_hija ON public.recepcion_lineas;
++DROP TRIGGER IF EXISTS trg_zzzcompras_alcance_hija ON public.factura_proveedor_lineas;
++DROP TRIGGER IF EXISTS trg_zzzcompras_alcance_hija ON public.contrasena_pago_facturas;
++
++DROP FUNCTION IF EXISTS public.compras_tg_alcance_captura();
++DROP FUNCTION IF EXISTS public.compras_tg_alcance_hija();
++DROP FUNCTION IF EXISTS public.compras_puede_destinar_proyecto(uuid);
++
++DO $reversion_1000$
++BEGIN
++  IF EXISTS (SELECT 1 FROM pg_trigger t WHERE NOT t.tgisinternal AND t.tgname IN ('trg_zzzcompras_alcance_captura', 'trg_zzzcompras_alcance_hija'))
++     OR to_regprocedure('public.compras_tg_alcance_captura()') IS NOT NULL
++     OR to_regprocedure('public.compras_tg_alcance_hija()') IS NOT NULL
++     OR to_regprocedure('public.compras_puede_destinar_proyecto(uuid)') IS NOT NULL THEN
++    RAISE EXCEPTION 'COMPRAS_REVERSION: quedó algo del alcance de proyecto al capturar (20261027001000); se revierte toda la transacción.' USING ERRCODE = 'internal_error';
++  END IF;
++END
++$reversion_1000$;
++COMMIT;
++
+ -- ── 20261027000900_compras_permisos_accion_separacion_y_numeros_factura ────
+ BEGIN;
+ SET LOCAL lock_timeout = '10s';
+diff --git a/supabase/tests/compras_bloque_b/run.sh b/supabase/tests/compras_bloque_b/run.sh
+index c45179c..34debbd 100755
+--- a/supabase/tests/compras_bloque_b/run.sh
++++ b/supabase/tests/compras_bloque_b/run.sh
+@@ -136,6 +136,8 @@ psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_prev
+ for f in "$MIGS"/20261027*.sql; do
+   # Instantánea ANTES de la última migración del bloque (20261027000900): su sección de la reversión, sola, debe devolver ESTO.
+   if [[ "$(basename "$f")" == 20261027000900_* ]]; then psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_pre0900.txt"; fi
++  # Instantánea ANTES de 20261027001000 (alcance de proyecto al capturar), si existe: su sección de la reversión, sola, debe devolver ESTO (el estado posterior a la 0900).
++  if [[ "$(basename "$f")" == 20261027001000_* ]]; then psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_pre1000.txt"; fi
+   [ -e "$f" ] && aplicar "$f"
+ done
+ psql -q -t -A -d $BD -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_migrado.txt"
+@@ -170,6 +172,16 @@ echo "── 5s · la migración 20261027000900 es idempotente y revertible: apl
+ MIG0900="$(ls "$MIGS"/20261027000900_*.sql)"
+ awk '/^-- ── 20261027000900_/ { d = 1; print; next } d && /^-- ── 2026/ { exit } d { print }' "$RAIZ/scripts/reversion-compras-controles.sql" > "$SALIDAS/reversion_0900.sql"
+ [ -s "$SALIDAS/reversion_0900.sql" ] || { echo "❌ no se encontró la sección de 20261027000900 en scripts/reversion-compras-controles.sql"; exit 1; }
++# La sección de 20261027001000 (alcance de proyecto al capturar) va ENCIMA de la de 0900 en el script: si la migración existe, su sección tiene que estar.
++HAY_1000=no
++if ls "$MIGS"/20261027001000_*.sql >/dev/null 2>&1; then
++  HAY_1000=si
++  awk '/^-- ── 20261027001000_/ { d = 1; print; next } d && /^-- ── 2026/ { exit } d { print }' "$RAIZ/scripts/reversion-compras-controles.sql" > "$SALIDAS/reversion_1000.sql"
++  [ -s "$SALIDAS/reversion_1000.sql" ] || { echo "❌ no se encontró la sección de 20261027001000 en scripts/reversion-compras-controles.sql"; exit 1; }
++  # …y ENCIMA de la de 0900, no debajo: revertir la 0900 antes dejaría los disparadores de la 1000 llamando a funciones que ya no están
++  [ "$(grep -n '^-- ── 20261027001000_' "$RAIZ/scripts/reversion-compras-controles.sql" | head -1 | cut -d: -f1)" -lt "$(grep -n '^-- ── 20261027000900_' "$RAIZ/scripts/reversion-compras-controles.sql" | head -1 | cut -d: -f1)" ] \
++    || { echo "❌ la sección de 20261027001000 debe ir ENCIMA de la de 20261027000900 en scripts/reversion-compras-controles.sql"; exit 1; }
++fi
+ psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_idem" -c "CREATE DATABASE ${BD}_idem TEMPLATE ${BD}_fresca" >/dev/null
+ BD=${BD}_idem PIEZA="$MIG0900" bash "$AQUI/hallazgos/SEP-idempotencia.sh" || exit 1
+ psql -q -d postgres -c "DROP DATABASE ${BD}_idem" >/dev/null
+@@ -460,7 +472,7 @@ done
+ 
+ # Reversión: sentencias EJECUTABLES, generadas del catálogo (no la prosa de las cabeceras). Sobre una copia de la base con TODO el
+ # bloque aplicado, devuelven triggers, funciones, índices, restricciones, políticas y columnas a lo que había antes de 20261027000000.
+-echo "── 6c/8 · reversión de 20261027000000…0900 (scripts/reversion-compras-controles.sql)"
++echo "── 6c/8 · reversión de 20261027000000…0900 y, si existe, 20261027001000 (scripts/reversion-compras-controles.sql)"
+ # La bitácora de la separación es EVIDENCIA: la reversión la conserva si tiene cambios registrados. Las suites SEP dejan filas en ella, así que
+ # esta comprobación declara a propósito que se puede descartar (compras.reversion_descartar_bitacora = 'si').
+ psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_rev" -c "CREATE DATABASE ${BD}_rev TEMPLATE $BD" >/dev/null
+@@ -478,15 +490,36 @@ else
+ fi
+ psql -q -d postgres -c "DROP DATABASE ${BD}_rev" >/dev/null
+ 
+-# Reversión PARCIAL: SOLO la sección de 20261027000900 (lo que se corre para volver al estado posterior a 0800 sin tocar lo anterior).
++# Reversión PARCIAL de 20261027001000, SOLA (si existe): vuelve al estado posterior a 20261027000900 sin tocar nada anterior.
++if [ "$HAY_1000" = si ]; then
++  psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_rev10" -c "CREATE DATABASE ${BD}_rev10 TEMPLATE $BD" >/dev/null
++  PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d ${BD}_rev10 -f "$SALIDAS/reversion_1000.sql" >/dev/null \
++    || { echo "❌ la sección de 20261027001000 de la reversión falla al ejecutarse"; exit 1; }
++  psql -q -t -A -d ${BD}_rev10 -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_revertido_1000_bruto.txt"
++  cut -d'|' -f1,2 "$SALIDAS/catalogo_pre1000.txt" "$SALIDAS/catalogo_migrado.txt" | sort -u > "$SALIDAS/catalogo_claves_1000.txt"
++  awk -F'|' 'NR==FNR { k[$0]; next } (($1 "|" $2) in k)' "$SALIDAS/catalogo_claves_1000.txt" "$SALIDAS/catalogo_revertido_1000_bruto.txt" > "$SALIDAS/catalogo_revertido_1000.txt"
++  if diff -q "$SALIDAS/catalogo_pre1000.txt" "$SALIDAS/catalogo_revertido_1000.txt" >/dev/null; then
++    echo "  ✓ la sección de 20261027001000, SOLA, devuelve el catálogo EXACTO al estado posterior a 20261027000900 ($(wc -l < "$SALIDAS/catalogo_pre1000.txt") objetos comparados)"
++  else
++    echo "❌ la reversión parcial de 20261027001000 no deja el catálogo como estaba tras 0900:"; diff "$SALIDAS/catalogo_pre1000.txt" "$SALIDAS/catalogo_revertido_1000.txt" | head -20; exit 1
++  fi
++  psql -q -d postgres -c "DROP DATABASE ${BD}_rev10" >/dev/null
++fi
++
++# Reversión PARCIAL: la sección de 20261027000900 (lo que se corre para volver al estado posterior a 0800 sin tocar lo anterior). Si existe 20261027001000, se
++# revierte ANTES (sus disparadores están encima de la 0900): las dos secciones, en ese orden, como están en el script.
+ psql -q -d postgres -c "DROP DATABASE IF EXISTS ${BD}_rev9" -c "CREATE DATABASE ${BD}_rev9 TEMPLATE $BD" >/dev/null
++if [ "$HAY_1000" = si ]; then
++  PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d ${BD}_rev9 -f "$SALIDAS/reversion_1000.sql" >/dev/null \
++    || { echo "❌ la sección de 20261027001000 de la reversión falla al ejecutarse (antes de la de 0900)"; exit 1; }
++fi
+ PGOPTIONS="-c client_min_messages=warning -c compras.reversion_descartar_bitacora=si" psql -q -v ON_ERROR_STOP=1 -d ${BD}_rev9 -f "$SALIDAS/reversion_0900.sql" >/dev/null \
+   || { echo "❌ la sección de 20261027000900 de la reversión falla al ejecutarse"; exit 1; }
+ psql -q -t -A -d ${BD}_rev9 -f "$AQUI/reversion_catalogo.sql" > "$SALIDAS/catalogo_revertido_0900_bruto.txt"
+ cut -d'|' -f1,2 "$SALIDAS/catalogo_pre0900.txt" "$SALIDAS/catalogo_migrado.txt" | sort -u > "$SALIDAS/catalogo_claves_0900.txt"
+ awk -F'|' 'NR==FNR { k[$0]; next } (($1 "|" $2) in k)' "$SALIDAS/catalogo_claves_0900.txt" "$SALIDAS/catalogo_revertido_0900_bruto.txt" > "$SALIDAS/catalogo_revertido_0900.txt"
+ if diff -q "$SALIDAS/catalogo_pre0900.txt" "$SALIDAS/catalogo_revertido_0900.txt" >/dev/null; then
+-  echo "  ✓ la sección de 20261027000900, SOLA, devuelve el catálogo EXACTO al estado posterior a 20261027000800 ($(wc -l < "$SALIDAS/catalogo_pre0900.txt") objetos comparados)"
++  echo "  ✓ la sección de 20261027000900$([ "$HAY_1000" = si ] && echo ' (revertida después de la de 20261027001000)'), SOLA, devuelve el catálogo EXACTO al estado posterior a 20261027000800 ($(wc -l < "$SALIDAS/catalogo_pre0900.txt") objetos comparados)"
+ else
+   echo "❌ la reversión parcial de 20261027000900 no deja el catálogo como estaba tras 0800:"; diff "$SALIDAS/catalogo_pre0900.txt" "$SALIDAS/catalogo_revertido_0900.txt" | head -20; exit 1
+ fi

@@ -30,7 +30,13 @@
 --      eliminar un proyecto (ON DELETE SET NULL) no lo frena.
 --   e. UN CERO NUNCA ES ÉXITO: cada celda dice si espera exactamente 1 fila, exactamente 0 filas o un error con SQLSTATE y mensaje;
 --      la autoprueba del arnés (PRJ-0) comprueba que 0 filas no pasa por éxito y que un error por el motivo equivocado no pasa.
---   f. LÍMITES QUE QUEDAN (documentados con una comprobación; cambian solo si el dueño decide D-4 / D-6, README.md §5).
+--   f. LÍMITES QUE QUEDAN (documentados con una comprobación; cambian solo si el dueño decide D-4 / D-6 / D-9 / D-10, o amplía el alcance a las
+--      tablas vecinas, README.md §5 y §6):
+--        D-4  un documento que YA está sin proyecto lo sigue pudiendo actuar quien tiene la llave, y user_has_project_access no lee permission_type;
+--        D-5  la empresa del INSERT no se compara (funciones definer) · D-6 «todo UPDATE» · D-0 la firmeza de user_project_assignments;
+--        D-9  «exento» = no tener filas de asignación: un administrador acotado puede dejar SIN filas a otro y hacerlo exento (con o sin la 0600 del PR #928);
+--        D-10 al eliminar un proyecto, sus facturas, contraseñas y órdenes de pago quedan «sin proyecto» y las ve y las actúa todo el que tenga la llave;
+--        F7   solo las 5 + 4 tablas del circuito: las tablas vecinas con project_id (suministros_condominio, proformas_condominio…) no se tocan.
 --
 -- Modo informe: PGOPTIONS="-c prj.continuar=si" cuenta las comprobaciones rojas sin detenerse (✗) y al final falla si hay alguna.
 -- Ids propios: md5('prj:PRJ-1:…') (prj_id). Se ejecuta con:  psql -X -v ON_ERROR_STOP=1 -d <BD con la cadena completa y fixture.sql> -f PRJ-1.sql
@@ -281,8 +287,79 @@ BEGIN
   RETURN 1;
 END;
 $$;
+-- Saca un renglón de la cabecera de B y lo pone en la de A por una función DEFINER, en las tres hijas que no son orden_compra_lineas. La de recepciones cambia TAMBIÉN el renglón
+-- de la orden (p_ref; si no, COMPRAS_RECEPCION_LINEA_AJENA —que dispara antes— lo para por su cuenta) y la de partidas cambia TAMBIÉN la factura (p_ref; si no, la partida queda con una
+-- factura de otra contabilidad y COMPRAS_CONTRASENA_OTRA_CONTABILIDAD lo para): en ambos casos el chequeo del ORIGEN de la propuesta no se ejercería.
+CREATE OR REPLACE FUNCTION public.prj_definer_mover_hija(p_tabla text, p_renglon uuid, p_cabecera uuid, p_ref uuid DEFAULT NULL)
+RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $$
+DECLARE n bigint;
+BEGIN
+  IF p_tabla = 'recepcion_lineas' THEN
+    UPDATE public.recepcion_lineas SET recepcion_id = p_cabecera, orden_compra_linea_id = COALESCE(p_ref, orden_compra_linea_id)
+     WHERE id = p_renglon AND company_id IN (SELECT id FROM public.companies WHERE nombre LIKE 'PRJ-1%');
+  ELSIF p_tabla = 'factura_proveedor_lineas' THEN
+    UPDATE public.factura_proveedor_lineas SET factura_id = p_cabecera
+     WHERE id = p_renglon AND company_id IN (SELECT id FROM public.companies WHERE nombre LIKE 'PRJ-1%');
+  ELSIF p_tabla = 'contrasena_pago_facturas' THEN
+    UPDATE public.contrasena_pago_facturas SET contrasena_id = p_cabecera, factura_id = COALESCE(p_ref, factura_id)
+     WHERE id = p_renglon AND company_id IN (SELECT id FROM public.companies WHERE nombre LIKE 'PRJ-1%');
+  ELSE
+    RAISE EXCEPTION 'prj_definer_mover_hija: tabla fuera de la ayuda de prueba';
+  END IF;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$;
+-- Lo mismo, pero con UN disparador PREVIO desactivado dentro de una subtransacción que SIEMPRE se deshace: ejerce el chequeo del ORIGEN de la propuesta aislado de la protección que
+-- dispara antes (hoy COMPRAS_CONTRASENA_PARTIDA_FIJA rechaza antes cualquier cambio de contraseña de una partida, así que sin esto ese chequeo es inalcanzable). Devuelve «OK filas=N» / «ERR sqlstate mensaje».
+CREATE OR REPLACE FUNCTION public.prj_definer_mover_hija_aislada(p_tabla text, p_desactivar text, p_renglon uuid, p_cabecera uuid, p_ref uuid DEFAULT NULL)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $$
+DECLARE
+  n bigint;
+  v text;
+BEGIN
+  BEGIN
+    IF p_tabla NOT IN ('recepcion_lineas', 'factura_proveedor_lineas', 'contrasena_pago_facturas') THEN
+      RAISE EXCEPTION 'prj_definer_mover_hija_aislada: tabla fuera de la ayuda de prueba';
+    END IF;
+    EXECUTE format('ALTER TABLE public.%I DISABLE TRIGGER %I', p_tabla, p_desactivar);
+    n := public.prj_definer_mover_hija(p_tabla, p_renglon, p_cabecera, p_ref);
+    v := 'OK filas=' || n;
+    RAISE EXCEPTION 'prj_deshacer' USING ERRCODE = 'P0999';
+  EXCEPTION
+    WHEN SQLSTATE 'P0999' THEN NULL;
+    WHEN OTHERS THEN v := 'ERR ' || SQLSTATE || ' ' || left(replace(SQLERRM, E'\n', ' '), 400);
+  END;
+  RETURN v;
+END;
+$$;
+-- Mueve la CABECERA de proyecto (como prj_definer_mover) con el disparador de mover de la 0900 DESACTIVADO dentro de una subtransacción que SIEMPRE se deshace: ejerce el chequeo
+-- «desde o hacia sin proyecto» de la propuesta aislado de la 0900 (que dispara antes y, para una sesión sin fila en app_users, rechaza primero por la empresa). Devuelve «OK filas=N» / «ERR sqlstate mensaje».
+CREATE OR REPLACE FUNCTION public.prj_definer_mover_aislada(p_tabla text, p_desactivar text, p_id uuid, p_proyecto uuid)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $$
+DECLARE
+  n bigint;
+  v text;
+BEGIN
+  BEGIN
+    IF p_tabla NOT IN ('ordenes_compra', 'facturas_proveedor', 'contrasenas_pago') THEN
+      RAISE EXCEPTION 'prj_definer_mover_aislada: tabla fuera de la ayuda de prueba';
+    END IF;
+    EXECUTE format('ALTER TABLE public.%I DISABLE TRIGGER %I', p_tabla, p_desactivar);
+    n := public.prj_definer_mover(p_tabla, p_id, p_proyecto);
+    v := 'OK filas=' || n;
+    RAISE EXCEPTION 'prj_deshacer' USING ERRCODE = 'P0999';
+  EXCEPTION
+    WHEN SQLSTATE 'P0999' THEN NULL;
+    WHEN OTHERS THEN v := 'ERR ' || SQLSTATE || ' ' || left(replace(SQLERRM, E'\n', ' '), 400);
+  END;
+  RETURN v;
+END;
+$$;
 GRANT EXECUTE ON FUNCTION public.prj_definer_mover(text, uuid, uuid), public.prj_definer_editar(uuid, text),
-  public.prj_definer_insertar(uuid, uuid, uuid), public.prj_definer_mover_renglon(uuid, uuid) TO authenticated;
+  public.prj_definer_insertar(uuid, uuid, uuid), public.prj_definer_mover_renglon(uuid, uuid),
+  public.prj_definer_mover_hija(text, uuid, uuid, uuid), public.prj_definer_mover_hija_aislada(text, text, uuid, uuid, uuid),
+  public.prj_definer_mover_aislada(text, text, uuid, uuid) TO authenticated;
 
 -- LA ESPECIFICACIÓN: qué se espera en cada celda.
 --   clase:  'servicio' (service_role) · 'exenta' · 'acotada' (con permiso de editar) · 'acotada_sin_edit' (operador sin llaves) · 'otra' (otra empresa) · 'anon'
@@ -295,7 +372,7 @@ DECLARE
   v_ancla text := '(ORDEN_AJENA|FACTURA_AJENA)';
   v_ins boolean := p_brecha LIKE 'INS\_%';
 BEGIN
-  IF p_clase = 'anon' THEN                                    -- con el DML que conserva en producción: ninguna política es suya
+  IF p_clase = 'anon' THEN                                    -- con el DML que se le concede SOLO en esta prueba (en producción no lo tiene): ninguna política es suya
     RETURN CASE WHEN v_ins THEN 'ERR:42501:(permission denied|row-level security)' ELSE 'OK0' END;
   END IF;
   IF p_clase = 'otra' THEN
@@ -364,6 +441,8 @@ $autoprueba$;
 --   uap operador cuyo proyecto está en app_users.project_id (A), sin asignaciones, con todas las llaves
 --   adm2 administrador CON asignaciones (A y G): NO es exento · AD administrador SIN asignaciones (exento) · ow propietario · su superadministrador
 --   su2 superadministrador cuya sesión es de la empresa F (actúa en cualquier empresa) · nc administrador SIN empresa (company_id NULL; exento por no tener asignaciones)
+--   adm3 administrador asignado SOLO a A (NO exento; D-9: otro administrador acotado le borra la fila y lo vuelve exento) · ol operador con asignación 'lectura' a A y todas las llaves
+--   (permission_type no limita la captura; F10). fan sesión autenticada SIN fila en app_users (rol NULL: can_access_project() devuelve NULL, no false). ua tiene además un rol con las llaves de dos tablas VECINAS (suministros_condominio, proformas_condominio; F7).
 --   Documentos de E en A, en B y SIN proyecto (los arma AD, exento): órdenes en borrador, recepciones en borrador, órdenes de pago en
 --   borrador, facturas de gasto directo y contraseñas sin partidas; anclas emitidas / facturas aprobadas para insertar recepciones y pagos.
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -377,6 +456,7 @@ DECLARE
   ua0 constant uuid := public.prj_id('ua0', 'u'); uap constant uuid := public.prj_id('uap', 'u');
   adm2 constant uuid := public.prj_id('adm2', 'u'); ow constant uuid := public.prj_id('ow', 'u'); su constant uuid := public.prj_id('su', 'u');
   su2 constant uuid := public.prj_id('su2', 'u'); nc constant uuid := public.prj_id('nc', 'u');
+  adm3 constant uuid := public.prj_id('adm3', 'u'); ol constant uuid := public.prj_id('ol', 'u'); fan constant uuid := public.prj_id('fan', 'u');
   v_llaves text[] := ARRAY['platform.contabilidad.view', 'platform.contabilidad.create', 'platform.contabilidad.edit',
     'platform.contabilidad.approve', 'platform.contabilidad.change_status', 'condominios.tab.ordenes_compra.approve',
     'platform.contabilidad.compras.recepcion_registrar', 'platform.contabilidad.compras.factura_aprobar',
@@ -399,6 +479,11 @@ BEGIN
   PERFORM public.prj_persona(su,  E, 'PRJ-1 su (superadministrador)', NULL, 'super_admin');
   PERFORM public.prj_persona(su2, F, 'PRJ-1 su2 (superadministrador cuya sesión es de OTRA empresa, F)', NULL, 'super_admin');
   PERFORM public.prj_persona(nc,  NULL, 'PRJ-1 nc (administrador SIN empresa: app_users.company_id es NULL)', NULL, 'admin');
+  PERFORM public.prj_persona(adm3, E, 'PRJ-1 adm3 (administrador solo A: NO exento, hasta que otro administrador acotado le borre la fila)', ARRAY[A], 'admin');
+  PERFORM public.prj_persona(ol,  E, 'PRJ-1 ol (operador con asignación «lectura» a A, todas las llaves)', ARRAY[A]); PERFORM public.prj_rol(ol, E, 'todas las llaves', v_llaves);
+  UPDATE public.user_project_assignments SET permission_type = 'lectura' WHERE user_id = ol;
+  INSERT INTO auth.users (id) VALUES (fan);      -- «fan» (fantasma): una sesión autenticada SIN fila en app_users: su rol es NULL y can_access_project() le devuelve NULL, no false
+  PERFORM public.prj_rol(ua, E, 'llaves de tablas vecinas', ARRAY['condominios.tab.suministros', 'condominios.tab.proformas']);
   -- documentos de E en A, en B y SIN proyecto, armados por el administrador exento AD
   PERFORM public.prj_como(AD);
   PERFORM public.prj_cadena('oc_a', E, A, P, 'oc_borrador');     PERFORM public.prj_cadena('oc_b', E, B, P, 'oc_borrador');     PERFORM public.prj_cadena('oc_n', E, NULL, P, 'oc_borrador');
@@ -496,7 +581,8 @@ DECLARE
   v_pe int; v_t int; v_p text; v_rol text; v_clase text; v_uid uuid; v_tabla text; v_ins text; v_x text; v_g text; v_id uuid; v_proj text; v_via text;
   v_sql text; v_n bigint := 0;
 BEGIN
-  -- anon: en producción conserva DML sobre estas tablas (§8 del informe); aquí se emula para que el rechazo sea el de la RLS, no el de los privilegios.
+  -- anon: en producción NO tiene SELECT, INSERT ni UPDATE sobre estas nueve tablas (verificado con SELECT sobre producción: 0 de 9), así que allí el rechazo es «permission denied»
+  -- (42501) antes de llegar a la RLS. Aquí se le CONCEDE el DML a propósito, dentro de esta prueba, para comprobar lo más exigente: que aunque lo tuviera la RLS lo detiene.
   PERFORM public.prj_como(NULL, 'sistema');
   GRANT SELECT, INSERT, UPDATE ON public.ordenes_compra, public.recepciones, public.facturas_proveedor, public.ordenes_pago, public.contrasenas_pago TO anon;
   BEGIN
@@ -828,6 +914,10 @@ BEGIN
   INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, factura_id, monto) VALUES (public.prj_id('g2', 'op'), E, G, P, public.prj_id('g2', 'fac'), 100);
   INSERT INTO public.contrasenas_pago (id, company_id, project_id, proveedor_id, fecha_pago_programada) VALUES (public.prj_id('g3', 'cp'), E, G, P, current_date + 30);
   INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto) VALUES (public.prj_id('g4', 'oc'), E, G, P, 'P', 'G borrador');
+  -- D-10 (antes): el proyecto G existe y ua (asignada solo a A) NO lo tiene: no ve ni toca las facturas de G
+  PERFORM public.prj_como(public.prj_id('ua', 'u'));
+  PERFORM public.prj_verifica(format('SELECT 1 FROM public.facturas_proveedor WHERE id = %L', public.prj_id('g1', 'fac')), 'OK0', '[D-10 · antes de eliminar G · ua] la factura de G no se ve (cero filas)');
+  PERFORM public.prj_verifica(format('UPDATE public.facturas_proveedor SET concepto = ''editada por ua'' WHERE id = %L', public.prj_id('g1', 'fac')), 'OK0', '[D-10 · antes de eliminar G · ua] ni se edita (cero filas)');
   PERFORM public.prj_como(adm2);
   PERFORM public.prj_igual(public.user_is_project_exempt()::text, 'false', '[purga] montaje: el administrador tiene asignaciones, NO es exento de proyecto');
   PERFORM public.prj_verifica(format('DELETE FROM public.projects WHERE id = %L', G), 'OK1',
@@ -839,6 +929,23 @@ BEGIN
   PERFORM public.prj_igual((SELECT count(*)::text FROM public.contrasenas_pago WHERE id = public.prj_id('g3', 'cp') AND project_id IS NULL), '1', '[purga] la contraseña sigue ahí, solo sin proyecto');
   -- ordenes_compra.project_id es ON DELETE CASCADE (previo, no de esta propuesta): el borrador de G se va con el proyecto; lo que importa es que nada lo frene
   PERFORM public.prj_igual((SELECT count(*)::text FROM public.ordenes_compra WHERE id = public.prj_id('g4', 'oc')), '0', '[purga] el borrador de orden de G se eliminó en cascada, como antes (FK ON DELETE CASCADE previa)');
+  PERFORM public.prj_igual((SELECT string_agg(DISTINCT c.confdeltype::text, ',') FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+                             WHERE c.contype = 'f' AND c.confrelid = 'public.projects'::regclass AND a.attname = 'project_id'
+                               AND c.conrelid = 'public.ordenes_compra'::regclass), 'c',
+    '[purga · D-10] ordenes_compra.project_id es ON DELETE CASCADE (confdeltype c)');
+  PERFORM public.prj_igual((SELECT string_agg(DISTINCT c.confdeltype::text, ',') FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+                             WHERE c.contype = 'f' AND c.confrelid = 'public.projects'::regclass AND a.attname = 'project_id'
+                               AND c.conrelid IN ('public.recepciones'::regclass, 'public.facturas_proveedor'::regclass, 'public.ordenes_pago'::regclass, 'public.contrasenas_pago'::regclass)), 'n',
+    '[purga · D-10] las otras cuatro tablas del circuito son ON DELETE SET NULL (confdeltype n)');
+  -- D-10 (después): lo que era de G ya no tiene proyecto y por eso lo ve y lo actúa ua, que nunca tuvo G (no es una brecha NUEVA de esta propuesta: es lo que hace SET NULL con can_access_project(NULL))
+  PERFORM public.prj_como(public.prj_id('ua', 'u'));
+  PERFORM public.prj_verifica(format('SELECT 1 FROM public.facturas_proveedor WHERE id = %L', public.prj_id('g1', 'fac')), 'OK1',
+    '[límite D-10 · ua] tras eliminar G, su factura quedó «sin proyecto» y ua, que nunca tuvo G, la VE (si se decide ON DELETE RESTRICT, o bloquear el borrado, esta comprobación pasa a cero filas)');
+  PERFORM public.prj_verifica(format('UPDATE public.facturas_proveedor SET concepto = ''editada por ua'' WHERE id = %L', public.prj_id('g1', 'fac')), 'OK1',
+    '[límite D-10 · ua] …y la EDITA (la llave de editar de Contabilidad basta: can_access_project(NULL) es verdadero)');
+  PERFORM public.prj_verifica(format('SELECT 1 FROM public.contrasenas_pago WHERE id = %L', public.prj_id('g3', 'cp')), 'OK1',
+    '[límite D-10 · ua] lo mismo con la contraseña de pago de G');
+  PERFORM public.prj_como(NULL, 'sistema');
 END;
 $purga$;
 
@@ -857,13 +964,148 @@ BEGIN
   PERFORM public.prj_verifica(format('UPDATE public.ordenes_compra SET project_id = %L WHERE id = %L', A, public.prj_id('oc_n', 'oc')), 'OK1', '[service_role · reclamar un documento sin proyecto para A] no se bloquea');
   PERFORM public.prj_como(NULL, 'sistema');
   PERFORM public.prj_verifica(format(v_ins, E, 'NULL', P), 'OK1', '[sistema · INSERT sin proyecto, sin sesión de usuario] no se bloquea');
-  -- un disparador de sistema (conta.allow_system_write = on) con la sesión de una persona acotada: es la guarda común de la 0900 (límite heredado, no de esta propuesta)
+  -- un disparador de sistema (conta.allow_system_write = on) con la sesión de una persona acotada: es la guarda común de la 0900 (límite heredado, no de esta propuesta).
+  -- El GUC lo puede fijar cualquier sesión authenticated con SQL directo (set_config); hoy NO es alcanzable por la API pública (ninguna función ejecutable por authenticated fija un GUC con
+  -- clave/valor del llamador ni ejecuta SQL dinámico de parámetro; PostgREST solo expone tablas y funciones), pero es una puerta del diseño de la guarda: hardening APARTE (README §6, F6).
   PERFORM public.prj_como(public.prj_id('ua', 'u'));
   PERFORM public.prj_verifica(format('SELECT set_config(''conta.allow_system_write'', ''on'', true); ' || v_ins, E, 'NULL', P), 'OK1',
-    '[ua con conta.allow_system_write = on] es un proceso de sistema, no una sesión de usuario: la misma guarda que ya usa la 0900 (límite heredado documentado)');
+    '[límite F6 · ua con conta.allow_system_write = on] es un proceso de sistema, no una sesión de usuario: la misma guarda que ya usa la 0900 (límite heredado; fijable con SQL directo, no por la API pública hoy)');
   PERFORM public.prj_como(NULL, 'sistema');
 END;
 $sistema$;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- g2 · EL ORIGEN DEL RENGLÓN QUE SE SACA DE UNA CABECERA AJENA: las tres hijas que no son orden_compra_lineas (F9)
+--      (sacar un renglón de un documento de B y ponerlo en uno de A por una función definer; el documento de ORIGEN también tiene que estar al alcance)
+-- ═══════════════════════════════════════════════════════════════════════════
+DO $origen$
+DECLARE
+  E constant uuid := public.prj_id('E', 'co');  P constant uuid := public.prj_id('P', 'pv');
+  ua constant uuid := public.prj_id('ua', 'u');  AD constant uuid := public.prj_id('AD', 'u');
+  v_rl_b uuid; v_fl_b uuid; v_par_b uuid := public.prj_id('par_b', 'par');
+  v_msg text := 'ERR:42501:agregar o mover renglones de un documento de compras tu perfil necesita estar asignado al proyecto del documento';
+BEGIN
+  PERFORM public.prj_como(NULL, 'sistema');
+  SELECT id INTO v_rl_b FROM public.recepcion_lineas WHERE recepcion_id = public.prj_id('rec_b', 'rec') ORDER BY id LIMIT 1;
+  SELECT id INTO v_fl_b FROM public.factura_proveedor_lineas WHERE factura_id = public.prj_id('gd_b', 'fac') ORDER BY id LIMIT 1;
+  -- una partida en la contraseña de B (la siembra el sistema)
+  INSERT INTO public.contrasena_pago_facturas (id, company_id, contrasena_id, factura_id, monto) VALUES (v_par_b, E, public.prj_id('cp_b', 'cp'), public.prj_id('fa_b', 'fac'), 10);
+  PERFORM public.prj_igual(((v_rl_b IS NOT NULL) AND (v_fl_b IS NOT NULL))::text, 'true', '[montaje] existen un renglón de la recepción de B y uno de la factura de B');
+
+  PERFORM public.prj_como(ua);
+  -- recepcion_lineas: si solo se cambia la recepción, COMPRAS_RECEPCION_LINEA_AJENA (existente, dispara antes) lo rechaza por su cuenta; si TAMBIÉN se cambia el renglón de la orden por uno de la orden de A,
+  -- el único que lo para es el chequeo del ORIGEN de la propuesta.
+  PERFORM public.prj_verifica(format('SELECT 1 FROM (SELECT public.prj_definer_mover_hija(''recepcion_lineas'', %L, %L) AS n) s WHERE s.n = 1', v_rl_b, public.prj_id('rec_a', 'rec')),
+    'ERR:23514:COMPRAS_RECEPCION_LINEA_AJENA', '[ua · recepcion_lineas · función definer · sacar el renglón de la recepción de B a la de A, SIN cambiar su renglón de orden] lo para antes la integridad existente (23514)');
+  PERFORM public.prj_verifica(format('SELECT 1 FROM (SELECT public.prj_definer_mover_hija(''recepcion_lineas'', %L, %L, %L) AS n) s WHERE s.n = 1', v_rl_b, public.prj_id('rec_a', 'rec'), public.prj_id('rec_a', 'ocl')),
+    v_msg, '[ua · recepcion_lineas · función definer · sacar el renglón de la recepción de B a la de A, cambiando también su renglón de orden] el ORIGEN (B) no está a su alcance: 42501');
+  -- factura_proveedor_lineas: nada previo lo para
+  PERFORM public.prj_verifica(format('SELECT 1 FROM (SELECT public.prj_definer_mover_hija(''factura_proveedor_lineas'', %L, %L) AS n) s WHERE s.n = 1', v_fl_b, public.prj_id('gd_a', 'fac')),
+    v_msg, '[ua · factura_proveedor_lineas · función definer · sacar el renglón de la factura de B a la de A] el ORIGEN (B) no está a su alcance: 42501');
+  -- contrasena_pago_facturas: COMPRAS_CONTRASENA_PARTIDA_FIJA (existente) rechaza ANTES cualquier cambio de contraseña de una partida …
+  PERFORM public.prj_verifica(format('SELECT 1 FROM (SELECT public.prj_definer_mover_hija(''contrasena_pago_facturas'', %L, %L) AS n) s WHERE s.n = 1', v_par_b, public.prj_id('cp_a', 'cp')),
+    'ERR:23514:COMPRAS_CONTRASENA_PARTIDA_FIJA', '[ua · contrasena_pago_facturas · función definer · pasar la partida de la contraseña de B a la de A] lo para antes COMPRAS_CONTRASENA_PARTIDA_FIJA (23514)');
+  -- … así que el chequeo del ORIGEN de la propuesta es defensa en profundidad: se ejerce con ese disparador desactivado dentro de una subtransacción que se deshace
+  PERFORM public.prj_resultado('[ua · contrasena_pago_facturas · función definer · la partida pasada a la contraseña Y a la factura de A, con trg_compras_bloqueo_partida_orden DESACTIVADO (se deshace)] el ORIGEN (B) no está a su alcance: 42501',
+    public.prj_evaluar(v_msg, public.prj_definer_mover_hija_aislada('contrasena_pago_facturas', 'trg_compras_bloqueo_partida_orden', v_par_b, public.prj_id('cp_a', 'cp'), public.prj_id('fa_a', 'fac'))));
+  -- y lo mismo para las otras dos, aisladas de sus protecciones previas: el ORIGEN decide
+  PERFORM public.prj_resultado('[ua · recepcion_lineas · función definer · solo la recepción, con trg_compras_integridad_recepcion_linea DESACTIVADO (se deshace)] el ORIGEN (B) no está a su alcance: 42501',
+    public.prj_evaluar(v_msg, public.prj_definer_mover_hija_aislada('recepcion_lineas', 'trg_compras_integridad_recepcion_linea', v_rl_b, public.prj_id('rec_a', 'rec'))));
+  -- control: la persona EXENTA sí puede (nada cambia para ella), también con el disparador de partida desactivado
+  PERFORM public.prj_como(AD);
+  PERFORM public.prj_resultado('[AD (exento) · contrasena_pago_facturas · función definer · la misma partida y factura de A, con trg_compras_bloqueo_partida_orden DESACTIVADO (se deshace)] el exento pasa',
+    public.prj_evaluar('OK1', public.prj_definer_mover_hija_aislada('contrasena_pago_facturas', 'trg_compras_bloqueo_partida_orden', v_par_b, public.prj_id('cp_a', 'cp'), public.prj_id('fa_a', 'fac'))));
+  PERFORM public.prj_como(NULL, 'sistema');
+END;
+$origen$;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- g3 · F7: LAS TABLAS VECINAS con project_id NO están cubiertas (alcance declarado: solo las 5 + 4 tablas del circuito de compras y pagos)
+-- ═══════════════════════════════════════════════════════════════════════════
+DO $vecinas$
+DECLARE
+  E constant uuid := public.prj_id('E', 'co');  A constant uuid := public.prj_id('A', 'pa');  B constant uuid := public.prj_id('B', 'pb');
+BEGIN
+  PERFORM public.prj_como(public.prj_id('ua', 'u'));
+  PERFORM public.prj_verifica(format('INSERT INTO public.suministros_condominio (company_id, project_id, nombre) VALUES (%L, %L, ''PRJ vecina'')', E, A), 'OK1',
+    '[F7 · ua · suministros_condominio · INSERT en A] el suyo pasa');
+  PERFORM public.prj_verifica(format('INSERT INTO public.suministros_condominio (company_id, project_id, nombre) VALUES (%L, %L, ''PRJ vecina'')', E, B), 'OK1',
+    '[límite F7 · ua · suministros_condominio · INSERT en B (no asignado)] FUERA DEL ALCANCE de la propuesta: su política INSERT no mira el proyecto y no hay disparador (hace falta otra pieza igual a esta)');
+  PERFORM public.prj_verifica(format('INSERT INTO public.proformas_condominio (company_id, project_id, proveedor_nombre, concepto) VALUES (%L, %L, ''P'', ''PRJ vecina'')', E, B), 'OK1',
+    '[límite F7 · ua · proformas_condominio · INSERT en B (no asignado)] ídem');
+  PERFORM public.prj_como(NULL, 'sistema');
+END;
+$vecinas$;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- g4 · F10: permission_type NO se lee (una asignación 'lectura' captura en su proyecto) · F1/D-9: «exento» = no tener filas de asignación
+-- ═══════════════════════════════════════════════════════════════════════════
+DO $permission_type$
+DECLARE
+  E constant uuid := public.prj_id('E', 'co');  A constant uuid := public.prj_id('A', 'pa');  B constant uuid := public.prj_id('B', 'pb');  P constant uuid := public.prj_id('P', 'pv');
+  ol constant uuid := public.prj_id('ol', 'u');  adm3 constant uuid := public.prj_id('adm3', 'u');
+  v_ins text := 'INSERT INTO public.ordenes_compra (company_id, project_id, proveedor_id, proveedor_nombre, concepto) VALUES (%L, %s, %L, ''P'', ''x'')';
+  v_borrar text;
+BEGIN
+  PERFORM public.prj_como(NULL, 'sistema');
+  PERFORM public.prj_igual((SELECT permission_type FROM public.user_project_assignments WHERE user_id = ol AND project_id = A), 'lectura', '[montaje] ol tiene una asignación de tipo «lectura» a A');
+  PERFORM public.prj_como(ol);
+  PERFORM public.prj_verifica(format(v_ins, E, quote_literal(A), P), 'OK1',
+    '[límite F10 · ol · asignación «lectura» · ordenes_compra · INSERT en A] user_has_project_access NO lee permission_type: una asignación de solo lectura captura en su proyecto (en producción las 43 filas son «total»)');
+  PERFORM public.prj_verifica(format(v_ins, E, quote_literal(B), P), 'ERR:42501:necesita estar asignado al proyecto del documento', '[ol · ordenes_compra · INSERT en B] en el que no tiene asignación: rechazado');
+  PERFORM public.prj_verifica(format(v_ins, E, 'NULL', P), 'ERR:42501:sin proyecto', '[ol · ordenes_compra · INSERT sin proyecto] rechazado');
+
+  -- D-9: adm3 (administrador solo A) NO es exento; adm2 (administrador A y G, también acotado) le borra la fila y entonces lo es: crea sin proyecto y en B
+  PERFORM public.prj_como(adm3);
+  PERFORM public.prj_igual(public.user_is_project_exempt()::text, 'false', '[D-9 · montaje] adm3 tiene una asignación (A): NO es exento');
+  PERFORM public.prj_verifica(format(v_ins, E, 'NULL', P), 'ERR:42501:sin proyecto', '[D-9 · adm3 · antes] no puede crear sin proyecto');
+  PERFORM public.prj_como(public.prj_id('adm2', 'u'));
+  v_borrar := format('DELETE FROM public.user_project_assignments WHERE user_id = %L', adm3) || '; SELECT set_config(''request.jwt.claim.sub'', %L, true); ';
+  PERFORM public.prj_verifica(format(v_borrar || v_ins, adm3, E, 'NULL', P), 'OK1',
+    '[límite D-9 · adm2 borra la fila de adm3 y adm3 crea SIN proyecto] otro administrador acotado lo deja sin filas y por eso EXENTO: la regla «NULL solo para exentos» es tan firme como esa exención (con o sin la 0600 del PR #928, que cierra el borrarse las propias, no las de otro)');
+  PERFORM public.prj_verifica(format(v_borrar || v_ins, adm3, E, quote_literal(B), P), 'OK1',
+    '[límite D-9 · adm2 borra la fila de adm3 y adm3 crea en B] …y en un proyecto que nunca tuvo');
+  PERFORM public.prj_como(NULL, 'sistema');
+END;
+$permission_type$;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- g5 · UNA SESIÓN AUTENTICADA SIN FILA EN app_users (rol NULL): can_access_project() y user_is_project_exempt() le devuelven NULL, no false. La regla de la propuesta es NULL-segura
+--      (COALESCE(…, false)): por una función definer (la RLS no rige) no abre ni un proyecto ni «sin proyecto», ni mueve renglones.
+-- ═══════════════════════════════════════════════════════════════════════════
+DO $fantasma$
+DECLARE
+  E constant uuid := public.prj_id('E', 'co');  A constant uuid := public.prj_id('A', 'pa');  B constant uuid := public.prj_id('B', 'pb');  P constant uuid := public.prj_id('P', 'pv');
+  fan constant uuid := public.prj_id('fan', 'u');
+BEGIN
+  PERFORM public.prj_como(fan);
+  PERFORM public.prj_igual((public.current_user_role() IS NULL AND public.user_is_project_exempt() IS NULL AND public.can_access_project(B) IS NULL)::text, 'true',
+    '[fan · montaje] sin fila en app_users: el rol es NULL y can_access_project(B) / user_is_project_exempt() devuelven NULL (la lógica trivaluada es el punto)');
+  PERFORM public.prj_verifica(format('SELECT 1 FROM (SELECT public.prj_definer_insertar(%L, %L, %L) AS n) s WHERE s.n = 1', E, B, P),
+    'ERR:42501:necesita estar asignado al proyecto del documento', '[fan · función definer · INSERT en B] la propuesta es NULL-segura: rechazado');
+  PERFORM public.prj_verifica(format('SELECT 1 FROM (SELECT public.prj_definer_insertar(%L, %L, %L) AS n) s WHERE s.n = 1', E, A, P),
+    'ERR:42501:necesita estar asignado al proyecto del documento', '[fan · función definer · INSERT en A] no tiene ninguno: rechazado');
+  PERFORM public.prj_verifica(format('SELECT 1 FROM (SELECT public.prj_definer_insertar(%L, NULL, %L) AS n) s WHERE s.n = 1', E, P),
+    'ERR:42501:sin proyecto', '[fan · función definer · INSERT sin proyecto] rechazado');
+  PERFORM public.prj_verifica(format('SELECT 1 FROM (SELECT public.prj_definer_mover_renglon(%L, %L) AS n) s WHERE s.n = 1', public.prj_id('oc_b', 'ocl'), public.prj_id('oc_a', 'oc')),
+    'ERR:42501:agregar o mover renglones', '[fan · función definer · sacar un renglón de B y ponerlo en A] rechazado');
+  -- La propuesta cierra «desde o hacia sin proyecto» POR SÍ SOLA, sin apoyarse en la 0900: con el disparador de mover de la 0900 desactivado (dentro de una subtransacción que se deshace),
+  -- la persona acotada y la sesión sin fila en app_users siguen sin poder sacar un documento a «sin proyecto» ni reclamar uno sin proyecto (la lógica trivaluada: user_is_project_exempt() es NULL).
+  PERFORM public.prj_resultado('[fan · función definer · A → sin proyecto, con trg_zzcompras_mover_alcance DESACTIVADO (se deshace)] la propuesta lo rechaza sola: NULL-segura',
+    public.prj_evaluar('ERR:42501:dejar un documento de compras sin proyecto', public.prj_definer_mover_aislada('ordenes_compra', 'trg_zzcompras_mover_alcance', public.prj_id('oc_a', 'oc'), NULL)));
+  PERFORM public.prj_resultado('[fan · función definer · sin proyecto → A, con trg_zzcompras_mover_alcance DESACTIVADO (se deshace)] la propuesta lo rechaza sola: NULL-segura',
+    public.prj_evaluar('ERR:42501:ponerle proyecto a un documento de compras que no lo tiene', public.prj_definer_mover_aislada('ordenes_compra', 'trg_zzcompras_mover_alcance', public.prj_id('oc_n', 'oc'), A)));
+  PERFORM public.prj_como(public.prj_id('ua', 'u'));
+  PERFORM public.prj_resultado('[ua · función definer · A → sin proyecto, con trg_zzcompras_mover_alcance DESACTIVADO (se deshace)] la propuesta lo rechaza sola',
+    public.prj_evaluar('ERR:42501:dejar un documento de compras sin proyecto', public.prj_definer_mover_aislada('ordenes_compra', 'trg_zzcompras_mover_alcance', public.prj_id('oc_a', 'oc'), NULL)));
+  PERFORM public.prj_resultado('[ua · función definer · sin proyecto → A, con trg_zzcompras_mover_alcance DESACTIVADO (se deshace)] la propuesta lo rechaza sola',
+    public.prj_evaluar('ERR:42501:ponerle proyecto a un documento de compras que no lo tiene', public.prj_definer_mover_aislada('ordenes_compra', 'trg_zzcompras_mover_alcance', public.prj_id('oc_n', 'oc'), A)));
+  -- …y lo que NO cierra por sí sola: ENTRE proyectos lo decide la 0900 (la propuesta no lo repite); sin ella, A → B pasaría
+  PERFORM public.prj_resultado('[límite · ua · función definer · A → B, con trg_zzcompras_mover_alcance DESACTIVADO (se deshace)] entre proyectos decide SOLO la 0900: sin ella pasa (la propuesta es aditiva, no la sustituye)',
+    public.prj_evaluar('OK1', public.prj_definer_mover_aislada('ordenes_compra', 'trg_zzcompras_mover_alcance', public.prj_id('oc_a', 'oc'), B)));
+  PERFORM public.prj_como(NULL, 'sistema');
+END;
+$fantasma$;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- h · LÍMITES QUE QUEDAN (a propósito; cambian solo si el dueño decide D-4 o D-6, README.md §5)
@@ -898,10 +1140,10 @@ BEGIN
   PERFORM public.prj_como(ua);
   PERFORM public.prj_verifica(format('INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES (%L, %L, ''total''); '
       || 'INSERT INTO public.ordenes_compra (company_id, project_id, proveedor_id, proveedor_nombre, concepto) VALUES (%L, %L, %L, ''P'', ''autoasignada'')', ua, B, E, B, P),
-    CASE WHEN v_abierta THEN 'OK1' ELSE 'ERR:42501:row-level security' END,
+    CASE WHEN v_abierta THEN 'OK1' ELSE 'ERR:42501:(row-level security|ASIGNACION_PROPIA_NO_PERMITIDA)' END,
     CASE WHEN v_abierta
       THEN '[límite D-0 · ua] la política de user_project_assignments TODAVÍA deja a cada persona asignarse proyectos (defecto previo): se asigna B y captura en B; esta propuesta es tan firme como esa tabla (se deshace)'
-      ELSE '[dependencia · ua] con la política de asignaciones cerrada, ua no puede asignarse B y no captura en B' END);
+      ELSE '[dependencia · ua] con la política de asignaciones cerrada (RLS o el disparador de autoasignación de la 0600 del PR #928), ua no puede asignarse B y no captura en B' END);
   PERFORM public.prj_como(NULL, 'sistema');
 END;
 $dependencia$;
@@ -928,6 +1170,12 @@ BEGIN
     '[estado final] las asignaciones de proyecto de ua (1), uab (2) y uo (1) no cambiaron: la propuesta no escribe asignaciones');
   PERFORM public.prj_igual((SELECT string_agg(project_id::text, ',') FROM public.user_project_assignments WHERE user_id = public.prj_id('adm2', 'u')), A::text,
     '[estado final] adm2 conserva A (G se llevó la suya porque el proyecto se eliminó; no se tocó nada más)');
+  -- las comprobaciones «aisladas» desactivan un disparador dentro de una subtransacción que se deshace: ninguno de los de las nueve tablas puede haber quedado desactivado
+  PERFORM public.prj_igual((SELECT count(*)::text FROM pg_trigger tg JOIN pg_class c ON c.oid = tg.tgrelid
+                             WHERE c.relnamespace = 'public'::regnamespace AND NOT tg.tgisinternal AND tg.tgenabled <> 'O'
+                               AND c.relname IN ('ordenes_compra', 'recepciones', 'facturas_proveedor', 'ordenes_pago', 'contrasenas_pago',
+                                                 'orden_compra_lineas', 'recepcion_lineas', 'factura_proveedor_lineas', 'contrasena_pago_facturas')), '0',
+    '[estado final] ningún disparador de las nueve tablas quedó desactivado: las comprobaciones aisladas se deshicieron');
 END;
 $final$;
 
@@ -951,6 +1199,9 @@ DROP FUNCTION IF EXISTS public.prj_definer_mover(text, uuid, uuid);
 DROP FUNCTION IF EXISTS public.prj_definer_editar(uuid, text);
 DROP FUNCTION IF EXISTS public.prj_definer_insertar(uuid, uuid, uuid);
 DROP FUNCTION IF EXISTS public.prj_definer_mover_renglon(uuid, uuid);
+DROP FUNCTION IF EXISTS public.prj_definer_mover_aislada(text, text, uuid, uuid);
+DROP FUNCTION IF EXISTS public.prj_definer_mover_hija_aislada(text, text, uuid, uuid, uuid);
+DROP FUNCTION IF EXISTS public.prj_definer_mover_hija(text, uuid, uuid, uuid);
 DROP FUNCTION IF EXISTS public.prj_cadena(text, uuid, uuid, uuid, text);
 DROP FUNCTION IF EXISTS public.prj_rol(uuid, uuid, text, text[]);
 DROP FUNCTION IF EXISTS public.prj_persona(uuid, uuid, text, uuid[], text);
