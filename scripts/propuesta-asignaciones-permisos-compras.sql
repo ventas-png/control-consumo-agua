@@ -51,8 +51,12 @@
 --       HOY puede las seis acciones. DESPUÉS de la 0900 conserva SOLO «aprobar orden de compra» (tiene la llave de la pestaña) y deja
 --       de poder registrar recepciones, aprobar facturas, aprobar órdenes de pago, ejecutar y anular pagos hasta que se le concedan.
 --   · QUÉ EXIGE HOY EL SERVIDOR (producción, antes de la 0900; verificado el 2026-10-11): SOLO platform.contabilidad.edit (políticas
---     UPDATE de las cuatro tablas). NO existen compras_exigir_accion ni los disparadores compras_tg_permiso_*; approve y change_status
---     solo gobiernan la pantalla. Por eso cualquier persona con `edit` puede hoy las seis acciones y, tras la 0900, las pierde: hoy
+--     UPDATE de las cuatro tablas). NO existen compras_exigir_accion ni los disparadores compras_tg_permiso_*; para las seis
+--     transiciones, approve y change_status solo gobiernan la pantalla (ni las políticas ni los disparadores de las tablas del
+--     circuito los consultan). OJO: NO son llaves muertas. En producción 15 funciones públicas las consultan, entre ellas
+--     compras_oc_excepcion_contrato (autorizar la excepción de contrato con que una orden se aprueba o se emite: exige solo
+--     change_status; Alexander la conserva con cualquier paquete). Lista completa: docs/COMPRAS_PROPUESTA_ASIGNACION_PERMISOS.md §1 [Q31].
+--     Por eso cualquier persona con `edit` puede hoy las seis acciones y, tras la 0900, las pierde: hoy
 --     solo Alexander tiene edit, approve y change_status (0 personas más). La columna «hoy_antes_0900» de V-3 mide las llaves
 --     genéricas (la pantalla y la cadena 0300–0800 de este PR), NO un control del servidor de producción. Una persona con `edit` y sin
 --     approve/change_status saldría «no → no» en V-3 aunque hoy pueda las seis: el día del despliegue correr además la fila

@@ -64,10 +64,11 @@ UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id IN
 RESET ROLE;
 SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'faa0000_-%' AND estado = 'aprobada'), 9,
   '[VER-09a] preparación: nueve facturas aprobadas de la empresa C');
--- Las filas que YA existían (las deja la suite de controles) no se tocan: su clave es NULL.
-SELECT public.chk((SELECT count(*) FROM public.ordenes_pago WHERE id::text NOT LIKE 'faa%' AND clave_idempotencia IS NOT NULL), 0,
+-- Las filas que YA existían (las deja la suite de controles) no se tocan: su clave es NULL. Se excluyen SOLO los ids fijos de esta prueba, con su forma
+-- completa «faaNNNNN-0000-0000-0000-…»: con NOT LIKE 'faa%' una fila preexistente de id aleatorio que empezara por «faa» (azar) quedaba fuera del conteo.
+SELECT public.chk((SELECT count(*) FROM public.ordenes_pago WHERE id::text NOT LIKE 'faa_____-0000-0000-0000-%' AND clave_idempotencia IS NOT NULL), 0,
   '[VER-09a] las órdenes de pago que ya existían quedan con clave NULL (cambio aditivo, nada se revalida)');
-SELECT public.chk((SELECT count(*) FROM public.contrasenas_pago WHERE id::text NOT LIKE 'faa%' AND clave_idempotencia IS NOT NULL), 0,
+SELECT public.chk((SELECT count(*) FROM public.contrasenas_pago WHERE id::text NOT LIKE 'faa_____-0000-0000-0000-%' AND clave_idempotencia IS NOT NULL), 0,
   '[VER-09a] las contraseñas que ya existían quedan con clave NULL');
 
 -- ── b · EL HALLAZGO: el mismo intento (misma clave) dos veces, cabe en el saldo (400 + 400 sobre 1 000) ──

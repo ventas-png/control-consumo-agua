@@ -1375,9 +1375,12 @@ SELECT public.chk_bool((SELECT p.provolatile = 's' FROM pg_proc p WHERE p.oid = 
 
 ROLLBACK;
 
--- El montaje se revirtió entero.
-SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fb4%'), 0,
+-- El montaje se revirtió entero. Se cuentan SOLO los ids fijos del montaje, con su forma completa «fb4NNNNN-0000-0000-0000-…» (más las facturas de los
+-- proveedores del montaje, que pudieron nacer con un id aleatorio): un uuid aleatorio (gen_random_uuid(), versión 4) nunca tiene «0000» en el grupo 3,
+-- así que ninguna fila de otra suite puede cumplirlo por azar. El filtro anterior, LIKE 'fb4%', lo cumplía por azar con ~6 % de probabilidad por
+-- corrida (244 ids no fijos en este punto de la corrida: 132 de facturas, 103 de usuarios y 9 de proveedores): falla intermitente sin residuo real.
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fb4_____-0000-0000-0000-%' OR proveedor_id::text LIKE 'fb4_____-0000-0000-0000-%'), 0,
   '[RG-4·limpieza] la prueba no deja residuo (facturas)');
-SELECT public.chk((SELECT count(*) FROM public.proveedores WHERE id::text LIKE 'fb4%') + (SELECT count(*) FROM public.app_users WHERE id::text LIKE 'fb4%')
+SELECT public.chk((SELECT count(*) FROM public.proveedores WHERE id::text LIKE 'fb4_____-0000-0000-0000-%') + (SELECT count(*) FROM public.app_users WHERE id::text LIKE 'fb4_____-0000-0000-0000-%')
                   + (SELECT count(*) FROM pg_class WHERE relname LIKE 'hx4\_%'), 0,
   '[RG-4·limpieza] ni proveedores, usuarios, tablas ni funciones de ayuda');

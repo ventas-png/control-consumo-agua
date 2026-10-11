@@ -6,7 +6,8 @@ index e786c9b..3f215e9 100644
  -- ════════════════════════════════════════════════════════════════════════════
 --- REVERSIÓN DE LAS MIGRACIONES 20261027000000…0900 (compras · controles de servidor)
 +-- REVERSIÓN DE LAS MIGRACIONES 20261027000000…0900 Y 20261027001000 (compras · controles de servidor y alcance de proyecto al capturar)
- -- GENERADO del catálogo de una cadena real de migraciones (no se edita a mano): cada sección deshace UNA migración
+--- GENERADO del catálogo de una cadena real de migraciones (no se edita a mano): cada sección deshace UNA migración
++-- GENERADO del catálogo de una cadena real de migraciones (no se edita a mano), SALVO la sección de 20261027001000, que está escrita a mano: cada sección deshace UNA migración
  -- y supone que las posteriores ya están revertidas (por eso van de la última a la primera).
 +-- La sección de 20261027001000 (alcance de proyecto al capturar: 3 funciones y 9 disparadores que LLAMAN a compras_sesion_usuario(), de 20261027000300)
 +-- va ENCIMA de todas, porque se revierte la primera: si se revirtiera la serie sin ella, la función desaparecería con los 9 disparadores

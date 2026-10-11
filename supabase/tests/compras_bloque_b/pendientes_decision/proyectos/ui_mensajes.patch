@@ -127,7 +127,7 @@ index 8ca0e8f..8336c83 100644
    }
  
 diff --git a/src/components/contabilidad/ContabilidadSection.tsx b/src/components/contabilidad/ContabilidadSection.tsx
-index f5b7bc9..3ffa00c 100644
+index f5b7bc9..ef74e6f 100644
 --- a/src/components/contabilidad/ContabilidadSection.tsx
 +++ b/src/components/contabilidad/ContabilidadSection.tsx
 @@ -1,7 +1,8 @@
@@ -141,7 +141,30 @@ index f5b7bc9..3ffa00c 100644
  import { useMonedaBaseQuery } from '../../domain/contabilidad/queries'
  import { CatalogoCuentasTab } from './CatalogoCuentasTab'
  import { AsientosTab } from './AsientosTab'
-@@ -70,6 +71,8 @@ export function ContabilidadSection() {
+@@ -58,10 +59,18 @@ const TABS: { id: SubTab; label: string; icon: string }[] = [
+  * propios); los asientos automáticos nacen de los triggers de BD en el
+  * ledger del documento.
+  */
+-/** Contabilidad recordada de una empresa (null = la de la empresa). */
+-function leerLedgerGuardado(companyId?: string | null): string | null {
+-  if (!companyId) return null
+-  return localStorage.getItem(`conta-ledger:${companyId}`) || null
++/** Lo que se guarda cuando la persona eligió «🏢 Empresa» a propósito (un id de proyecto nunca vale esto): distingue «Empresa elegida» de «nada recordado». */
++const LEDGER_EMPRESA_ELEGIDA = 'empresa'
++
++/**
++ * Contabilidad recordada de una empresa, en este navegador: un proyecto (`proyecto`), «Empresa» elegida a propósito (`empresaElegida`) o nada
++ * (`proyecto` null y `empresaElegida` false: sin llave). Solo la elección explícita de «Empresa» se guarda; abrir en «Empresa» por omisión no deja rastro.
++ */
++function leerLedgerGuardado(companyId?: string | null): { proyecto: string | null; empresaElegida: boolean } {
++  if (!companyId) return { proyecto: null, empresaElegida: false }
++  const guardado = localStorage.getItem(`conta-ledger:${companyId}`)
++  if (guardado === LEDGER_EMPRESA_ELEGIDA) return { proyecto: null, empresaElegida: true }
++  return { proyecto: guardado || null, empresaElegida: false }
+ }
+ 
+ export function ContabilidadSection() {
+@@ -70,30 +79,61 @@ export function ContabilidadSection() {
    const [tab, setTab] = useState<SubTab>('polizas')
  
    const { data: proyectos = [], isSuccess: proyectosCargados } = useProyectosQuery(companyId)
@@ -150,30 +173,75 @@ index f5b7bc9..3ffa00c 100644
  
    // Ledger activo: null = contabilidad de la EMPRESA; uuid = la del proyecto.
    // Persistido por empresa para volver donde el admin trabajaba. El estado
-@@ -85,6 +88,23 @@ export function ContabilidadSection() {
-     (proyecto: string | null) => setLedger({ empresa: companyId ?? null, proyecto }),
+   // guarda TAMBIÉN la empresa dueña de la selección: sin eso, el proyecto de
+   // una empresa se arrastraba (y se re-persistía) bajo la llave de otra cuando
+   // la sesión cambiaba de empresa o cuando aún no había resuelto al montar.
+-  const [ledger, setLedger] = useState<{ empresa: string | null; proyecto: string | null }>(() => ({
++  // `empresaElegida`: la persona eligió «Empresa» en el selector (no es la omisión ni una corrección del componente); se recuerda como tal.
++  const [ledger, setLedger] = useState<{ empresa: string | null; proyecto: string | null; empresaElegida: boolean }>(() => ({
+     empresa: companyId ?? null,
+-    proyecto: leerLedgerGuardado(companyId),
++    ...leerLedgerGuardado(companyId),
+   }))
+   const ledgerProjectId = ledger.empresa === (companyId ?? null) ? ledger.proyecto : null
++  // La persona elige en el selector: «Empresa» elegida a propósito se recuerda y NO se deshace al remontar ni al recargar.
+   const elegirLedger = useCallback(
+-    (proyecto: string | null) => setLedger({ empresa: companyId ?? null, proyecto }),
++    (proyecto: string | null) => setLedger({ empresa: companyId ?? null, proyecto, empresaElegida: proyecto === null }),
      [companyId],
    )
++  // Lo fija el propio componente (contabilidad por omisión o corrección de un proyecto que ya no existe): no es una elección de la persona.
++  const fijarLedger = useCallback(
++    (proyecto: string | null) => setLedger({ empresa: companyId ?? null, proyecto, empresaElegida: false }),
++    [companyId],
++  )
 +  // Sin una contabilidad recordada, una persona ACOTADA a proyectos abre el primero que ve y no «🏢 Empresa»: el servidor solo deja crear documentos de compras
-+  // «sin proyecto» a una persona exenta (COMPRAS_ALCANCE_PROYECTO) y no tiene sentido ofrecerle por omisión un libro donde no puede capturar. Una sola vez por empresa:
-+  // si después elige «Empresa» a propósito, no se le quita.
++  // «sin proyecto» a una persona exenta (COMPRAS_ALCANCE_PROYECTO) y no tiene sentido ofrecerle por omisión un libro donde no puede capturar. Una sola vez por empresa
++  // y por montaje. Si elige «Empresa» a propósito, esa elección SE RECUERDA (por empresa y por navegador, como un proyecto) y no se le quita al remontar ni al recargar:
++  // solo se preselecciona el primer proyecto cuando NO hay elección recordada.
 +  const ledgerPorOmisionResuelto = useRef<string | null>(null)
 +  useEffect(() => {
 +    if (!companyId || ledger.empresa !== companyId || ledgerPorOmisionResuelto.current === companyId) return
 +    if (!proyectosCargados || !(isCompanyWideRole(session.role) || asignacionesCargadas)) return
++    // Un proyecto recordado que ya no existe lo descarta la guarda de más abajo; se decide en el render siguiente, ya sin él (si no, la persona acotada quedaba en «Empresa»).
++    if (ledger.proyecto && !proyectos.some((p) => p.id === ledger.proyecto)) return
 +    ledgerPorOmisionResuelto.current = companyId
 +    const inicial = ledgerInicialPorAlcance({
 +      exento: isProjectExempt(session.role, session.assigned_role_ids, asignaciones),
 +      guardado: ledger.proyecto,
++      empresaElegida: ledger.empresaElegida,
 +      accesibles: filterProyectosByAssignment({
 +        proyectos, userId: session.user_id, role: session.role, assignedRoleIds: session.assigned_role_ids, assignments: asignaciones,
 +      }),
 +    })
-+    if (inicial !== ledger.proyecto) elegirLedger(inicial)
-+  }, [companyId, ledger, proyectos, proyectosCargados, asignaciones, asignacionesCargadas, session.role, session.user_id, session.assigned_role_ids, elegirLedger])
++    if (inicial !== ledger.proyecto) fijarLedger(inicial)
++  }, [companyId, ledger, proyectos, proyectosCargados, asignaciones, asignacionesCargadas, session.role, session.user_id, session.assigned_role_ids, fijarLedger])
    // Cambió la empresa: la contabilidad activa se relee de ESA empresa.
    useEffect(() => {
      if (ledger.empresa === (companyId ?? null)) return
+-    setLedger({ empresa: companyId ?? null, proyecto: leerLedgerGuardado(companyId) })
++    setLedger({ empresa: companyId ?? null, ...leerLedgerGuardado(companyId) })
+   }, [companyId, ledger.empresa])
+   useEffect(() => {
+     if (!companyId || ledger.empresa !== companyId) return
+     const key = `conta-ledger:${companyId}`
+     if (ledger.proyecto) localStorage.setItem(key, ledger.proyecto)
++    else if (ledger.empresaElegida) localStorage.setItem(key, LEDGER_EMPRESA_ELEGIDA)
+     else localStorage.removeItem(key)
+   }, [companyId, ledger])
+   // Si el proyecto persistido no es de esta empresa (o ya no existe/accesible),
+@@ -101,9 +141,9 @@ export function ContabilidadSection() {
+   // vacía: una empresa SIN proyectos conservaba el proyecto de la anterior.
+   useEffect(() => {
+     if (proyectosCargados && ledgerProjectId && !proyectos.some((p) => p.id === ledgerProjectId)) {
+-      elegirLedger(null)
++      fijarLedger(null)
+     }
+-  }, [ledgerProjectId, proyectos, proyectosCargados, elegirLedger])
++  }, [ledgerProjectId, proyectos, proyectosCargados, fijarLedger])
+ 
+   const { data: monedaBase = 'GTQ' } = useMonedaBaseQuery(companyId, ledgerProjectId)
+   // Identidad de la contabilidad activa (empresa + proyecto) para remontar las
 diff --git a/src/components/contabilidad/CuentasPorPagarTab.tsx b/src/components/contabilidad/CuentasPorPagarTab.tsx
 index 26e2f72..23ce954 100644
 --- a/src/components/contabilidad/CuentasPorPagarTab.tsx
@@ -385,10 +453,10 @@ index 0000000..5741948
 +})
 diff --git a/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx b/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx
 new file mode 100644
-index 0000000..3716cea
+index 0000000..6371f52
 --- /dev/null
 +++ b/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,229 @@
 +// D-8 del alcance de proyecto al capturar (propuesta de pendientes_decision/proyectos): con qué contabilidad abre Contabilidad.
 +//
 +// El servidor solo deja crear un documento de compras «sin proyecto» (la contabilidad de la EMPRESA) a una persona exenta de proyecto: a una persona ACOTADA
@@ -514,6 +582,110 @@ index 0000000..3716cea
 +    expect(montadaCon()).toBe('empresa')
 +  })
 +})
++
++// Elegir «Empresa» a propósito PERSISTE (por empresa y por navegador, como un proyecto). Antes se guardaba igual que «nada recordado» (se borraba la llave de
++// localStorage), así que al volver a entrar a Contabilidad (remontar) o al recargar la página la persona acotada regresaba al primer proyecto aunque hubiera
++// elegido «Empresa» (hallazgo V2-B1 de la segunda verificación independiente).
++describe('elegir «Empresa» a propósito se recuerda; sin elección recordada se preselecciona el primer proyecto', () => {
++  const llave = 'conta-ledger:c1'
++
++  it('al volver a entrar a Contabilidad (remontar), la persona acotada que eligió «Empresa» sigue en «Empresa»', () => {
++    const primera = montar('operator')
++    expect(selector().value).toBe(P2)
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(selector().value).toBe('')
++    primera.unmount()
++    montar('operator')
++    expect(selector().value).toBe('')
++    expect(montadaCon()).toBe('empresa')
++  })
++
++  it('tras recargar la página (las asignaciones llegan DESPUÉS del montaje) sigue en «Empresa» y no salta al primer proyecto', () => {
++    montar('operator')
++    fireEvent.change(selector(), { target: { value: '' } })
++    cleanup()
++    m.asignacionesCargadas = false
++    m.asignaciones = undefined
++    function Envuelto() {
++      const [n, setN] = useState(0)
++      return <><button onClick={() => setN(n + 1)}>refrescar {n}</button><ContabilidadSection /></>
++    }
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe('')
++    m.asignacionesCargadas = true
++    m.asignaciones = [P2, P3]
++    fireEvent.click(screen.getByRole('button', { name: /refrescar/ }))
++    expect(selector().value).toBe('')
++  })
++
++  it('«Empresa» se guarda con un valor propio (no se borra la llave): así se distingue de «nada recordado»', () => {
++    montar('operator')
++    expect(localStorage.getItem(llave)).toBe(P2)            // la preselección del primer proyecto sí se recuerda
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(localStorage.getItem(llave)).toBe('empresa')
++    expect(localStorage.getItem(llave)).not.toBeNull()
++  })
++
++  it('elegir después un proyecto reemplaza la elección de «Empresa», y también se recuerda', () => {
++    const primera = montar('operator')
++    fireEvent.change(selector(), { target: { value: '' } })
++    fireEvent.change(selector(), { target: { value: P3 } })
++    expect(localStorage.getItem(llave)).toBe(P3)
++    primera.unmount()
++    montar('operator')
++    expect(selector().value).toBe(P3)
++  })
++
++  it('sin elección recordada (nunca eligió, o la llave se borró) se preselecciona el primer proyecto, como antes', () => {
++    localStorage.removeItem(llave)
++    montar('operator')
++    expect(selector().value).toBe(P2)
++  })
++
++  it('la elección es por empresa: haber elegido «Empresa» en OTRA empresa no afecta a esta', () => {
++    localStorage.setItem('conta-ledger:otra-empresa', 'empresa')
++    montar('operator')
++    expect(selector().value).toBe(P2)
++  })
++
++  it('las personas exentas no cambian: sin elección recordada abren «Empresa» y no se escribe nada; su elección explícita también persiste', () => {
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    const primera = montar('company_owner')
++    expect(selector().value).toBe('')
++    expect(localStorage.getItem(llave)).toBeNull()          // abrir en «Empresa» por omisión no deja rastro (igual que antes)
++    fireEvent.change(selector(), { target: { value: P1 } })
++    expect(localStorage.getItem(llave)).toBe(P1)
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(localStorage.getItem(llave)).toBe('empresa')
++    primera.unmount()
++    montar('company_owner')
++    expect(selector().value).toBe('')
++  })
++
++  it('un administrador sin asignaciones (exento) tampoco cambia: «Empresa» por omisión, sin escribir nada', () => {
++    m.asignaciones = []
++    montar('admin')
++    expect(selector().value).toBe('')
++    expect(localStorage.getItem(llave)).toBeNull()
++  })
++
++  it('un proyecto recordado que YA NO EXISTE se descarta: la persona acotada abre su primer proyecto (no «Empresa»)', () => {
++    localStorage.setItem(llave, '99999999-9999-4999-8999-999999999999')
++    montar('operator')
++    expect(selector().value).toBe(P2)
++    expect(localStorage.getItem(llave)).toBe(P2)
++  })
++
++  it('...y la persona exenta con un proyecto recordado que ya no existe abre «Empresa» y la llave se limpia', () => {
++    localStorage.setItem(llave, '99999999-9999-4999-8999-999999999999')
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    montar('company_owner')
++    expect(selector().value).toBe('')
++    expect(localStorage.getItem(llave)).toBeNull()
++  })
++})
 diff --git a/src/domain/compras/ordenCrear.ts b/src/domain/compras/ordenCrear.ts
 index 92e3692..fab7fd5 100644
 --- a/src/domain/compras/ordenCrear.ts
@@ -548,10 +720,10 @@ index 92e3692..fab7fd5 100644
  }
 diff --git a/src/lib/__tests__/ledgerInicialPorAlcance.test.ts b/src/lib/__tests__/ledgerInicialPorAlcance.test.ts
 new file mode 100644
-index 0000000..efb5700
+index 0000000..f0b7f45
 --- /dev/null
 +++ b/src/lib/__tests__/ledgerInicialPorAlcance.test.ts
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,34 @@
 +// Con qué contabilidad abre Contabilidad: ver ledgerInicialPorAlcance (D-8 del alcance de proyecto al capturar).
 +import { describe, expect, it } from 'vitest'
 +import { ledgerInicialPorAlcance } from '../proyectosAccess'
@@ -576,12 +748,21 @@ index 0000000..efb5700
 +  it('la persona acotada que no ve ningún proyecto queda en «Empresa» (null): no hay otra contabilidad', () => {
 +    expect(ledgerInicialPorAlcance({ exento: false, guardado: null, accesibles: [] })).toBeNull()
 +  })
++
++  it('«Empresa» elegida a propósito (empresaElegida) se respeta también para la persona acotada: no se le preselecciona un proyecto', () => {
++    expect(ledgerInicialPorAlcance({ exento: false, guardado: null, empresaElegida: true, accesibles: [A, B] })).toBeNull()
++    expect(ledgerInicialPorAlcance({ exento: true, guardado: null, empresaElegida: true, accesibles: [A, B] })).toBeNull()
++  })
++
++  it('sin «Empresa» elegida (false o ausente) la persona acotada abre el primer proyecto', () => {
++    expect(ledgerInicialPorAlcance({ exento: false, guardado: null, empresaElegida: false, accesibles: [A, B] })).toBe('proyecto-a')
++  })
 +})
 diff --git a/src/lib/proyectosAccess.ts b/src/lib/proyectosAccess.ts
-index 2b81895..004301f 100644
+index 2b81895..2b87889 100644
 --- a/src/lib/proyectosAccess.ts
 +++ b/src/lib/proyectosAccess.ts
-@@ -97,6 +97,25 @@ export function filterProyectosByAssignment({
+@@ -97,6 +97,29 @@ export function filterProyectosByAssignment({
    return proyectos.filter((p) => allowed.has(p.id))
  }
  
@@ -592,14 +773,18 @@ index 2b81895..004301f 100644
 + * El servidor solo deja crear un documento de compras «sin proyecto» (la contabilidad de la Empresa) a una persona exenta
 + * de proyecto; a una persona acotada la rechaza al guardar (COMPRAS_ALCANCE_PROYECTO). Por eso, sin una contabilidad
 + * recordada, la persona acotada abre el PRIMER proyecto que ve (la lista ya viene ordenada por nombre) y la exenta
-+ * conserva «Empresa». Una contabilidad recordada se respeta siempre; si la persona no ve ningún proyecto, queda en «Empresa».
++ * conserva «Empresa». Una contabilidad recordada se respeta siempre, y también «Empresa» elegida a propósito (`empresaElegida`: la persona la eligió
++ * en el selector y se recordó): no se le preselecciona un proyecto aunque sea acotada (la pantalla le mostrará el rechazo del servidor, legible).
++ * Si la persona no ve ningún proyecto, queda en «Empresa».
 + */
-+export function ledgerInicialPorAlcance({ exento, guardado, accesibles }: {
++export function ledgerInicialPorAlcance({ exento, guardado, empresaElegida = false, accesibles }: {
 +  exento: boolean
 +  guardado: string | null
++  empresaElegida?: boolean
 +  accesibles: Pick<Proyecto, 'id'>[]
 +}): string | null {
 +  if (guardado) return guardado
++  if (empresaElegida) return null
 +  if (exento) return null
 +  return accesibles[0]?.id ?? null
 +}

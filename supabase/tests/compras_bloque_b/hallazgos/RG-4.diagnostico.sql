@@ -72,7 +72,7 @@ SELECT ('fb6' || lpad(to_hex(g), 5, '0') || '-0000-0000-0000-0000000000f1')::uui
   FROM generate_series(1, 330) g
 ON CONFLICT DO NOTHING;                                 -- el índice único exacto sigue vigente en carga masiva: los números idénticos de un proveedor no entran
 SET LOCAL session_replication_role = origin;
-SELECT public.chk_bool((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fb6%') BETWEEN 250 AND 330, true, '[RG-4·diag·montaje] unas 300 facturas de prueba (sin números idénticos del mismo proveedor)');
+SELECT public.chk_bool((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fb6_____-0000-0000-0000-%') BETWEEN 250 AND 330, true, '[RG-4·diag·montaje] unas 300 facturas de prueba (sin números idénticos del mismo proveedor)');
 
 -- huella de lo que el diagnóstico lee: no debe cambiar
 CREATE TEMP TABLE hx6_huella0 AS
@@ -168,6 +168,9 @@ SELECT public.chk((SELECT count(*) FROM hx6_ref r JOIN public.facturas_proveedor
 
 ROLLBACK;
 
-SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fb6%') + (SELECT count(*) FROM public.proveedores WHERE id::text LIKE 'fb6%'), 0,
+-- Solo se cuentan los ids fijos del montaje, con su forma completa «fb6NNNNN-0000-0000-0000-…» (más las facturas de los proveedores del montaje): un uuid
+-- aleatorio (gen_random_uuid(), versión 4) nunca tiene «0000» en el grupo 3, así que ninguna fila de otra suite lo cumple por azar. El filtro anterior,
+-- LIKE 'fb6%', lo cumplía por azar (~6 % por corrida) y hacía fallar la prueba sin ningún residuo.
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fb6_____-0000-0000-0000-%' OR proveedor_id::text LIKE 'fb6_____-0000-0000-0000-%') + (SELECT count(*) FROM public.proveedores WHERE id::text LIKE 'fb6_____-0000-0000-0000-%'), 0,
   '[RG-4·limpieza] la prueba no deja residuo (facturas ni proveedores)');
 SELECT public.chk((SELECT count(*) FROM pg_proc WHERE proname IN ('hx6_diag_fn', 'hx6_escribe', 'hx6_perfil_viejo')), 0, '[RG-4·limpieza] ni funciones de ayuda');

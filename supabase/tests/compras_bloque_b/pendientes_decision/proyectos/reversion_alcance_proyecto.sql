@@ -14,7 +14,8 @@
 -- ⚠ REVERTIR REABRE LA BRECHA: una persona acotada vuelve a poder insertar borradores en proyectos que no tiene asignados, insertar o mover
 --   documentos de/hacia «sin proyecto» y agregar renglones a borradores ajenos. Comprobado en una base desechable: la huella del catálogo
 --   (disparadores, funciones con el hash de su definición, índices, restricciones, políticas y columnas; supabase/tests/compras_bloque_b/reversion_catalogo.sql)
---   vuelve EXACTA a la de antes de aplicar la propuesta (9 805 objetos comparados).
+--   vuelve EXACTA a la de antes de aplicar la propuesta (objetos comparados según la base: 9 797 en la cadena del #926 sola, 9 805 con fixture.sql cargado;
+--   +5 con la 20261026000600 del #928: 9 802 y 9 810; README.md §7 e impacto.md §8).
 --
 -- BLOQUEOS: DROP TRIGGER toma ACCESS EXCLUSIVE sobre cada una de las 9 tablas hasta el final de la transacción (bloquea incluso las lecturas):
 --   por eso va con lock_timeout = 10 s (si una tabla está ocupada falla entera y se reintenta) y conviene correrla fuera de pagos y aprobaciones.

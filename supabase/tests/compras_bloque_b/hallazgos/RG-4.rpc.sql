@@ -190,7 +190,9 @@ RESET ROLE;
 
 ROLLBACK;
 
-SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fb5%') + (SELECT count(*) FROM public.facturas_proveedor WHERE proveedor_id = 'fb500000-0000-0000-0000-0000000000a1')
-                  + (SELECT count(*) FROM public.proveedores WHERE id::text LIKE 'fb5%') + (SELECT count(*) FROM public.app_users WHERE id::text LIKE 'fb5%')
+-- Solo se cuentan los ids fijos del montaje, con su forma completa «fb5NNNNN-0000-0000-0000-…»: un uuid aleatorio (gen_random_uuid(), versión 4) nunca tiene
+-- «0000» en el grupo 3, así que ninguna fila de otra suite lo cumple por azar. El filtro anterior, LIKE 'fb5%', lo cumplía por azar (~6 % por corrida).
+SELECT public.chk((SELECT count(*) FROM public.facturas_proveedor WHERE id::text LIKE 'fb5_____-0000-0000-0000-%' OR proveedor_id::text LIKE 'fb5_____-0000-0000-0000-%')
+                  + (SELECT count(*) FROM public.proveedores WHERE id::text LIKE 'fb5_____-0000-0000-0000-%') + (SELECT count(*) FROM public.app_users WHERE id::text LIKE 'fb5_____-0000-0000-0000-%')
                   + (SELECT count(*) FROM pg_class WHERE relname LIKE 'hx5\_%'), 0,
   '[RG-4·limpieza] la prueba no deja residuo');
