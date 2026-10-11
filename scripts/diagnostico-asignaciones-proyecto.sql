@@ -54,7 +54,7 @@ SELECT seccion, clave, valor FROM (
   UNION ALL SELECT '6 estado', 'política ' || p.polname::text || ' (' || p.polcmd::text || ')',
                    CASE WHEN COALESCE(pg_get_expr(p.polqual, p.polrelid), '') || COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') ~ 'asignacion_puede_administrar'
                           THEN 'usa asignacion_puede_administrar (corregida)'
-                        WHEN COALESCE(pg_get_expr(p.polqual, p.polrelid), '') || COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') ~ 'auth\.uid'
+                        WHEN COALESCE(pg_get_expr(p.polqual, p.polrelid), '') || COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') ~ E'\\m(auth\\.)?uid\\(\\)'     -- «auth.uid()» o, si auth está en el search_path de la sesión, «uid()»
                           THEN 'conserva «OR user_id = auth.uid()»' || CASE WHEN p.polcmd = 'r' THEN ' (correcto en SELECT)' ELSE ' (EL HUECO)' END
                         ELSE 'otra' END
                    FROM pg_policy p WHERE p.polrelid = 'public.user_project_assignments'::regclass

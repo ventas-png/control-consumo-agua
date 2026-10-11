@@ -1,13 +1,18 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- REVERSIÓN de supabase/migrations/20261026000600_seguridad_asignaciones_proyecto.sql
 --
--- Devuelve public.user_project_assignments EXACTAMENTE a como estaba en producción antes de la migración:
+-- Devuelve public.user_project_assignments a como estaba en PRODUCCIÓN antes de la migración (exacto con la ACL de producción: anon y authenticated con
+-- arwdDxt, más m en PostgreSQL 17; probado con 0 diferencias de huella, ACL incluida):
 --   · las CUATRO políticas con su texto original (el de 20260417000013_consolidate_rls_policies_part2.sql, idéntico al leído en
 --     producción el 2026-10-10: el texto de pg_get_expr coincide);
 --   · sin los triggers trg_asignacion_empresa y trg_asignacion_propia;
 --   · sin las funciones asignacion_puede_administrar(uuid, uuid), asignacion_validar_empresa() y asignacion_bloquear_propia();
 --   · con los privilegios originales (anon: todos; authenticated: también TRUNCATE, TRIGGER y REFERENCES). El SELECT/INSERT/UPDATE/DELETE de
 --     authenticated NO se toca (la migración tampoco lo tocó): se conserva el que hubiera, sea cual sea la base.
+-- LÍMITE (R2-4): le devuelve a anon los siete privilegios, que es lo que anon TENÍA en producción. En una base construida sólo con migraciones (la ACL de Supabase
+-- Preview: anon y authenticated sólo con TRUNCATE, REFERENCES y TRIGGER) eso es MÁS de lo que tenía: anon recupera SELECT, INSERT, UPDATE y DELETE que allí nunca tuvo.
+-- No hay exposición (la RLS no le da nada a anon y la migración, al volver a aplicarse, se los quita), y la reversión sólo está pensada para producción; en una base de
+-- Preview basta con reiniciar la rama. Se deja así a propósito para no meter lógica de privilegios por versión de PostgreSQL en un guion de emergencia.
 -- No toca ninguna fila (comprueba que el conteo y la huella sean los mismos al terminar). IDEMPOTENTE: se puede correr dos veces.
 --
 -- ⚠ QUIEN REVIERTE REABRE EL HUECO: cualquier usuario autenticado vuelve a poder asignarse proyectos y un administrador acotado a
@@ -100,6 +105,9 @@ GRANT TRUNCATE, TRIGGER, REFERENCES ON TABLE public.user_project_assignments TO 
 DO $post$
 DECLARE
   v_huella text;
+  -- «auth.uid()» tal como lo imprime pg_get_expr: calificado, salvo que el esquema auth esté en el search_path de la sesión (entonces sale «uid()»). Se
+  -- aceptan las dos formas; antes sólo «auth.uid» y la reversión abortaba con «las políticas no quedaron como las originales» si auth estaba en el search_path.
+  v_re_uid constant text := E'\\m(auth\\.)?uid\\(\\)';
 BEGIN
   SELECT md5(COALESCE(string_agg(u.id::text || '|' || u.user_id::text || '|' || u.project_id::text || '|' || u.permission_type, E'\n' ORDER BY u.id), ''))
     INTO v_huella FROM public.user_project_assignments u;
@@ -109,7 +117,7 @@ BEGIN
   END IF;
   IF (SELECT count(*) FROM pg_policy WHERE polrelid = 'public.user_project_assignments'::regclass) <> 4
      OR (SELECT count(*) FROM pg_policy p WHERE p.polrelid = 'public.user_project_assignments'::regclass
-           AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') || COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') ~ 'auth\.uid') <> 4 THEN
+           AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') || COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') ~ v_re_uid) <> 4 THEN
     RAISE EXCEPTION 'reversion_asignaciones_proyecto: las políticas no quedaron como las originales';
   END IF;
   IF EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid = 'public.user_project_assignments'::regclass AND NOT t.tgisinternal)

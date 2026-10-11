@@ -65,10 +65,17 @@
 --      SÍ puede (su alcance sólo se reduce y es un flujo legítimo del servidor) mientras conserve otra
 --      asignación; si fuera su ÚLTIMA fila quedaría sin asignaciones y pasaría a ser exento, y eso se rechaza
 --      (ASIGNACION_PROPIA_NO_PERMITIDA). Lo borra entonces el propietario o el superadministrador.
---      Esa comprobación («¿le queda otra fila?») se SERIALIZA por persona con un candado de aviso
---      (pg_advisory_xact_lock) tomado ANTES de mirar: sin él, dos sesiones que borraran cada una uno de
---      los dos únicos proyectos de un administrador veían cada una la fila de la otra como viva y lo dejaban
---      con CERO filas (carrera reproducida con dos sesiones reales).
+--      Esa comprobación («¿le queda otra fila?») se SERIALIZA con un candado de aviso GLOBAL de bajas en cascada
+--      (pg_advisory_xact_lock, una sola clave) tomado ANTES de mirar: sin él, dos sesiones que borraran cada una uno
+--      de los dos únicos proyectos de un administrador veían cada una la fila de la otra como viva y lo dejaban con
+--      CERO filas (carrera reproducida con dos sesiones reales). Es GLOBAL y no «por persona» porque la baja en
+--      cascada de un proyecto borra TAMBIÉN las filas de las demás personas asignadas a él, y esas filas ajenas no se
+--      comprueban: con dos administradores que comparten {P1, P2}, cada uno borraba un proyecto, la cascada de cada
+--      sesión vaciaba la fila del OTRO sin esperar y ambos quedaban con CERO filas y exentos (un candado por persona
+--      sólo ordena a las sesiones de la MISMA persona). Con una sola clave todas las bajas en cascada de la API —de
+--      cualquier actor— se ordenan, y la segunda ve lo que la primera confirmó. Cuesta: dos borrados de proyectos a la
+--      vez por la API se ejecutan uno tras otro (es una operación rara). Un candado por persona además sería
+--      redundante: sólo se tomaba en rutas que ya pasan por el candado global.
 --      Una sesión sin fila en app_users (rol NULL) tampoco pasa el trigger: la lógica trivaluada ya no
 --      lo deja «abierto».
 --   5. Privilegios: anon pierde TODOS (la RLS no le daba nada, pero el privilegio
@@ -88,9 +95,12 @@
 --   · existen los roles anon, authenticated y service_role, y auth.uid();
 --   · quien corre la migración es el propietario de la tabla (o miembro de su rol): sin eso
 --     DROP POLICY / REVOKE fallarían o no harían nada;
+--   · nada del search_path de la sesión: el texto de pg_get_expr cambia con él («auth.uid()»
+--     calificado, o «uid()» si auth está en el search_path) y el post-vuelo acepta las dos formas;
 --   · nada más: ni la ACL por defecto de las funciones (cada REVOKE/GRANT de función es
---     explícito y converge al mismo estado), ni privilegios de esquema, ni que el
---     propietario sea o no superusuario.
+--     explícito y converge al mismo estado; con la ACL por defecto de producción las dos funciones
+--     de trigger conservan EXECUTE para service_role, inofensivo: una función de trigger no se puede
+--     invocar directamente), ni privilegios de esquema, ni que el propietario sea o no superusuario.
 --
 -- QUÉ NO CAMBIA
 --   · NINGUNA fila (la migración comprueba que el conteo y la huella md5 de
@@ -115,7 +125,8 @@
 --
 -- CÓMO REVERTIR: scripts/reversion-asignaciones-proyecto.sql (devuelve las cuatro
 -- políticas a su texto original, quita triggers y funciones y restaura los
--- privilegios; idempotente). IMPACTO EN DATOS: ninguno.
+-- privilegios de PRODUCCIÓN: exacto con la ACL de producción; idempotente).
+-- IMPACTO EN DATOS: ninguno.
 -- ════════════════════════════════════════════════════════════════════════════
 
 BEGIN;
@@ -303,6 +314,16 @@ BEGIN
     RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
   END IF;
 
+  -- SERIALIZACIÓN GLOBAL DE LAS BAJAS EN CASCADA (R2-1). La baja en cascada de un proyecto borra las filas de TODAS las personas asignadas a él, y
+  -- sólo la de quien borra se comprueba (más abajo): dos administradores con los mismos dos proyectos, cada uno borrando uno distinto, vaciaban la fila
+  -- del otro sin esperar y ambos quedaban sin filas (exentos). Por eso el candado es GLOBAL (una clave): toda baja en cascada hecha con una sesión de la
+  -- API —también la del propietario o la del superadministrador, cuya baja le quita la fila a un tercero— espera a la anterior y, al entrar, la
+  -- comprobación de abajo ve lo que ésta confirmó. Va en una sentencia PROPIA y ANTES de cualquier lectura: dentro de un AND no sirve, porque la
+  -- instantánea ya está tomada cuando el candado se concede. Se libera solo al terminar la transacción.
+  IF TG_OP = 'DELETE' AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = OLD.project_id) THEN
+    PERFORM pg_advisory_xact_lock(hashtextextended('asg-cascada', 0));
+  END IF;
+
   v_toca := (TG_OP IN ('UPDATE', 'DELETE') AND OLD.user_id = v_uid)
          OR (TG_OP IN ('INSERT', 'UPDATE') AND NEW.user_id = v_uid);
 
@@ -311,15 +332,8 @@ BEGIN
   IF v_toca AND NOT (COALESCE(public.is_super_admin(), false) OR COALESCE(public.current_user_role() = 'company_owner', false)) THEN
     -- Baja EN CASCADA por borrar el proyecto (la fila padre ya no existe): se permite mientras la persona CONSERVE otra asignación, porque
     -- entonces su alcance sólo se reduce (borrar un proyecto al que se está asignado es un flujo legítimo del servidor). Si fuera su última
-    -- fila quedaría sin asignaciones y, siendo administrador, pasaría a ser exento de proyecto: eso es justo lo que se impide.
-    --
-    -- SERIALIZADO POR PERSONA: dos sesiones que borraran cada una uno de los dos únicos proyectos de la persona verían, cada una, la fila de la
-    -- otra como viva (no está confirmada) y la dejarían con CERO filas. El candado va en una sentencia SEPARADA y ANTES de la comprobación: así la
-    -- comprobación de abajo toma una instantánea NUEVA, posterior a la espera, y ve lo que la otra sesión confirmó. (Dentro del AND del IF no
-    -- sirve: la instantánea ya está tomada cuando el candado se concede.) Se libera solo al terminar la transacción.
-    IF TG_OP = 'DELETE' THEN
-      PERFORM pg_advisory_xact_lock(hashtextextended('asg:' || OLD.user_id::text, 0));
-    END IF;
+    -- fila quedaría sin asignaciones y, siendo administrador, pasaría a ser exento de proyecto: eso es justo lo que se impide. Esta lectura ya corre
+    -- tras el candado global de arriba, con una instantánea nueva.
     IF TG_OP = 'DELETE'
        AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = OLD.project_id)
        AND EXISTS (SELECT 1 FROM public.user_project_assignments u WHERE u.user_id = OLD.user_id AND u.id <> OLD.id) THEN
@@ -359,6 +373,10 @@ DECLARE
   v_def       text;
   v_acl       text;
   v_dml       text;
+  -- «auth.uid()» tal como lo imprime pg_get_expr: CALIFICADO («auth.uid()») salvo que el esquema auth esté en el search_path de la sesión (p. ej. un rol como
+  -- supabase_admin, o PGOPTIONS='-c search_path=auth,public'), y entonces sale SIN calificar («uid()»). El texto del catálogo depende del search_path de
+  -- quien corre la migración, así que la comprobación acepta las dos formas (antes sólo «auth.uid» y abortaba con un mensaje engañoso en el segundo caso).
+  v_re_uid    constant text := E'\\m(auth\\.)?uid\\(\\)';
 BEGIN
   SELECT count(*),
          md5(COALESCE(string_agg(upa.id::text || '|' || upa.user_id::text || '|' || upa.project_id::text || '|' || upa.permission_type,
@@ -380,14 +398,14 @@ BEGIN
       INTO v_def
       FROM pg_policy p
      WHERE p.polrelid = 'public.user_project_assignments'::regclass AND p.polname = 'user_project_assignments_' || v_cat;
-    IF v_def IS NULL OR v_def !~ 'asignacion_puede_administrar' OR v_def ~ 'auth\.uid' THEN
+    IF v_def IS NULL OR v_def !~ 'asignacion_puede_administrar' OR v_def ~ v_re_uid THEN
       RAISE EXCEPTION 'seguridad_asignaciones_proyecto (post-vuelo): la política % no usa la regla única o conserva la rama propia', v_cat;
     END IF;
   END LOOP;
   IF NOT EXISTS (
     SELECT 1 FROM pg_policy p
      WHERE p.polrelid = 'public.user_project_assignments'::regclass AND p.polname = 'user_project_assignments_select'
-       AND pg_get_expr(p.polqual, p.polrelid) ~ 'auth\.uid'
+       AND pg_get_expr(p.polqual, p.polrelid) ~ v_re_uid
   ) THEN
     RAISE EXCEPTION 'seguridad_asignaciones_proyecto (post-vuelo): la política SELECT no existe o perdió la lectura de las propias';
   END IF;
