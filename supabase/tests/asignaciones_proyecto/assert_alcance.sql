@@ -141,3 +141,11 @@ SELECT asgt.ok('[otros caminos] AP crea un proyecto en su empresa: no lo alcanza
   $q$INSERT INTO public.projects (id, company_id, nombre) VALUES ('a5d00000-0000-0000-0000-0000000000f1', {C}, 'ASG proyecto nuevo de AP')$q$, 1,
   p_efecto_sql => $q$SELECT asgt.puede({AP}, 'a5d00000-0000-0000-0000-0000000000f1'::uuid)::text$q$, p_efecto => 'false',
   p_preparar => 'SET session_replication_role = replica');
+-- c · F2-03 (RIESGO DOCUMENTADO, decisión abierta D-2/D-5/D-6; NO es una aserción de que esté bien): cualquier administrador puede dejar exento a OTRO administrador borrando
+--     el último proyecto de éste. El trigger de autoasignación sólo vigila las filas PROPIAS de quien borra; la cascada que vacía la fila de un TERCERO no se comprueba, y
+--     projects_delete deja borrar a `admin`. AX2 (administrador sin filas) recibe sólo P1; AP (acotado a P1, P2, P3) borra P1 por la API: AX2 pasa de acotado a EXENTO. Si esta
+--     decisión se cierra (ampliar el trigger o quitar projects_delete a admin), este caso debe INVERTIRSE: el DELETE debería rechazarse y AX2 seguir acotado.
+SELECT asgt.ok('[otros caminos] F2-03 (documentado): AP borra P1 y AX2, cuya única fila era P1, queda sin filas → EXENTO; AP conserva P2 y P3', 'AP',
+  $q$DELETE FROM public.projects WHERE id = {P1}$q$, 1,
+  p_efecto_sql => $q$SELECT asgt.exento({AX2})::text || '|[' || asgt.filas_de({AX2}) || ']|' || asgt.filas_de({AP})$q$, p_efecto => 'true|[]|P2,P3',
+  p_preparar => $q$INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES ({AX2}, {P1}, 'total')$q$);

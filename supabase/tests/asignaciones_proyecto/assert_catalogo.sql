@@ -2,6 +2,10 @@
 -- ============================================================================
 -- CATÁLOGO Y PRIVILEGIOS — la forma exacta que deja la migración 20261026000600
 -- ============================================================================
+-- El texto que imprimen pg_get_expr / pg_get_triggerdef DEPENDE del search_path de la sesión (con `auth` en el search_path «auth.uid()» sale como
+-- «uid()»; con el search_path vacío todo sale calificado). Estas aserciones comparan texto, así que fijan el suyo: pasan igual lanzadas con
+-- PGOPTIONS='-c search_path=auth,public' (run.sh lo comprueba en 4d). Lo que sí se prueba con otro search_path es la propia migración y su reversión.
+SET search_path = public, pg_catalog;
 
 -- ═══ 1 · políticas ════════════════════════════════════════════════════════════════════════════════════════════
 SELECT asgt.chk((SELECT count(*) FROM pg_policy WHERE polrelid = 'public.user_project_assignments'::regclass), 4,
@@ -94,16 +98,32 @@ SELECT asgt.ok('[privilegios] el rol de servicio sí puede TRUNCATE (se deshace 
   p_efecto_sql => 'SELECT count(*) FROM public.user_project_assignments', p_efecto => '0');
 SELECT asgt.chk((SELECT count(*) FROM public.user_project_assignments), 43, '[privilegios] control: tras el TRUNCATE deshecho siguen las 43 filas');
 
--- ═══ 5 · el candado por persona de la baja en cascada (F1) y el COALESCE del trigger (F3) ═══════════════════════════
--- El comportamiento lo prueba run.sh con DOS sesiones reales; aquí sólo se fija DÓNDE está: en una sentencia PROPIA y ANTES de la comprobación de
--- cascada (dentro del AND del IF no sirve: la instantánea ya está tomada cuando el candado se concede).
-SELECT asgt.chk_bool((SELECT strpos(p.prosrc, 'PERFORM pg_advisory_xact_lock(hashtextextended(') > 0
-                        AND strpos(p.prosrc, 'PERFORM pg_advisory_xact_lock(hashtextextended(') < strpos(p.prosrc, 'NOT EXISTS (SELECT 1 FROM public.projects')
-                        AND strpos(p.prosrc, 'NOT EXISTS (SELECT 1 FROM public.projects') > 0
-                        AND p.prosrc ~ 'IF TG_OP = ''DELETE'' THEN\s+PERFORM pg_advisory_xact_lock'
-                   FROM pg_proc p WHERE p.oid = 'public.asignacion_bloquear_propia()'::regprocedure),
-  true, '[catálogo] la baja en cascada se serializa por persona: PERFORM pg_advisory_xact_lock en sentencia propia, antes de la comprobación de cascada');
-SELECT asgt.chk_bool((SELECT p.prosrc ~ 'COALESCE\(public\.is_super_admin\(\), false\) OR COALESCE\(public\.current_user_role\(\) = ''company_owner'', false\)'
-                        AND p.prosrc !~ 'NOT \(public\.is_super_admin\(\) OR public\.current_user_role\(\)'
-                   FROM pg_proc p WHERE p.oid = 'public.asignacion_bloquear_propia()'::regprocedure),
-  true, '[catálogo] el trigger de autoasignación usa COALESCE en los dos lados (una sesión sin app_users no pasa por NULL)');
+-- ═══ 5 · la baja en cascada toma el candado global (R2-1), comprobado por COMPORTAMIENTO ═══════════════════════════════════
+-- Antes esto leía el texto de la función (strpos sobre prosrc): un refactor inocuo —p. ej. cambiar `NOT EXISTS` por `count(*) = 0`— ponía la suite en rojo
+-- sin que el comportamiento cambiara, y una mutación sí equivalente pasaba. Ahora se OBSERVA: tras borrar un proyecto con una sesión de la API, la
+-- transacción retiene un candado de aviso que antes del borrado no tenía; con el rol de servicio (sin auth.uid()) el trigger no interviene y no lo toma.
+-- Que el candado sirva de verdad —que la 2ª sesión espere y vea lo que la 1ª confirmó— lo prueban run.sh (F1, R2-1) con sesiones reales.
+-- El COALESCE del trigger (F3) se prueba en assert_defensa (una sesión sin app_users con una política permisiva «zz») y su mutación.
+DO $$
+DECLARE
+  a text;  v_res text := '';  v_antes boolean;  v_despues boolean;
+BEGIN
+  FOREACH a IN ARRAY ARRAY['AP', 'OW', 'SU', 'SERVICIO'] LOOP
+    v_antes := NULL;  v_despues := NULL;
+    BEGIN
+      PERFORM asgt.poner_actor(a);
+      v_antes := EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted);
+      DELETE FROM public.projects WHERE id = asgt.pid_de(3);
+      v_despues := EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted);
+      PERFORM asgt.poner_actor('SISTEMA');
+      RAISE EXCEPTION USING ERRCODE = 'AS999', MESSAGE = 'deshacer';
+    EXCEPTION WHEN SQLSTATE 'AS999' THEN NULL;
+    END;
+    PERFORM asgt.poner_actor('SISTEMA');
+    v_res := v_res || CASE WHEN v_res = '' THEN '' ELSE ', ' END || a || ':' || COALESCE(v_antes::text, '?') || '>' || COALESCE(v_despues::text, '?');
+  END LOOP;
+  PERFORM asgt.chk_txt(v_res, 'AP:false>true, OW:false>true, SU:false>true, SERVICIO:false>false',
+    '[catálogo] borrar un proyecto con una sesión de la API (administrador acotado, propietario, superadministrador) toma un candado de aviso que antes no tenía; el rol de servicio no');
+END $$;
+SELECT asgt.chk_bool(NOT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()), true,
+  '[catálogo] y tras deshacer los casos esta sesión no retiene ningún candado (sin residuos)');

@@ -803,7 +803,7 @@ jobs:
       # y la persona y el proyecto son de la MISMA empresa para todo actor. Datos con la
       # forma de producción (43 filas, 10 huérfanas, un administrador acotado): las filas
       # y el alcance de cada persona quedan idénticos. Incluye CONTROL NEGATIVO (sin la
-      # migración la matriz se pone en rojo), reversión exacta, mutaciones por pieza,
+      # migración la matriz se pone en rojo), reversión (exacta con la ACL de producción), mutaciones por pieza,
       # guardas del pre/post-vuelo, lock_timeout y concurrencia con sesiones reales.
       - name: Asignaciones de proyecto — seguridad (autoasignación, empresa, privilegios)
         env:

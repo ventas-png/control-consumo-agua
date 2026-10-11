@@ -10,20 +10,24 @@
 #   1. CONTROL NEGATIVO: sin la migración, la matriz, los flujos, el alcance y el catálogo DEBEN ponerse en ROJO (y se cuenta cuántos
 #      casos; los flujos legítimos dan el mismo resultado antes y después, sólo cambia la autoedición);
 #   2. la migración dos veces (idempotente: la huella del catálogo es idéntica), con sus guardas: pre-vuelo (falta una función → aborta y
-#      no deja nada), post-vuelo (si tocara una fila → aborta y no deja nada) y lock_timeout (una transacción larga sobre la tabla → falla limpio);
+#      no deja nada; quien corre no es el propietario → aborta con su mensaje), post-vuelo (si tocara una fila → aborta y no deja nada; independiente del
+#      search_path de la sesión: también con `auth` en él) y lock_timeout (una transacción larga sobre la tabla → falla limpio);
 #   3. DATOS COMO PRODUCCIÓN: las 43 filas son idénticas (huella md5 y fila a fila) y can_access_project / user_is_project_exempt /
 #      lo que cada persona lee devuelven LO MISMO para las 39 personas antes y después;
 #   4. invariantes de una sesión: catálogo y privilegios, matriz rol × operación × objetivo, flujos legítimos de administración,
 #      efecto sobre el alcance (290 intentos de autoasignación, 84 de borrar/cambiar lo propio), cada capa por separado
 #      (políticas solas / triggers solos);
 #   5. compatibilidad con las migraciones POSTERIORES a la serie (si las hay);
-#   6. REVERSIÓN exacta: scripts/reversion-asignaciones-proyecto.sql devuelve el catálogo de public a como estaba (0 diferencias de huella);
+#   6. REVERSIÓN: scripts/reversion-asignaciones-proyecto.sql devuelve el catálogo de public a como estaba (0 diferencias de huella) con la ACL de PRODUCCIÓN; con la de
+#      Supabase Preview le devuelve a anon el DML que nunca tuvo (R2-4, documentado y fijado en 4c(a): sin exposición, la RLS no le da nada a anon);
 #   7. MUTACIONES: se revierte a mano cada pieza (cada política, la regla, la visibilidad, cada trigger, los privilegios) y alguna aserción
 #      se pone ROJA;
 #   8. CONCURRENCIA con sesiones reales: dos administradores a la vez sobre la misma persona (disjuntos, solapados, por diferencias);
 #      una autoasignación mientras otro administrador asigna; la baja en cascada de los dos únicos proyectos de un administrador desde dos
-#      sesiones (F1: sin el candado por persona lo deja con CERO filas y exento); una escritura legítima que llega mientras la migración está
-#      parada tras su pre-vuelo (F4: ya no produce un falso «las filas CAMBIARON»); y la migración contra una transacción larga (lock_timeout).
+#      sesiones (F1) y la de dos administradores que COMPARTEN sus dos proyectos, o la de un propietario contra un administrador (R2-1): sin el
+#      candado GLOBAL de bajas en cascada quedan con CERO filas y exentos; una escritura legítima que llega mientras la migración —o su
+#      reversión— está parada tras su pre-vuelo (F4, R02: esperan el LOCK TABLE y ya no hay un falso «las filas CAMBIARON»); la migración
+#      contra una transacción larga (lock_timeout); y el coste conocido del candado (R2-5: un interbloqueo que PostgreSQL resuelve sin dejar datos a medias).
 #      NINGUNA espera es un tiempo fijo: las sesiones se sincronizan con un candado «puerta» y se observa pg_stat_activity (wait_event_type = Lock);
 #   9. scripts/diagnostico-asignaciones-proyecto.sql corre en una transacción de SOLO LECTURA y dice lo que debe;
 #  10. PRIVILEGIOS RELATIVOS (P0): la migración se aplica con la ACL de Supabase Preview (authenticated SIN DML; una base construida sólo con
@@ -32,7 +36,11 @@
 #
 # Uso:  bash supabase/tests/asignaciones_proyecto/run.sh      (PGPORT_TEST=<puerto> para elegir el puerto del clúster desechable)
 # ============================================================================
-set -euo pipefail
+set -Eeuo pipefail
+# Red de seguridad (F2-10): `set -e` termina el script en silencio cuando un paso que captura su salida (`X=$(psql … 2>&1)`) falla sin un `|| { … }`. Con esta
+# trampa cualquier terminación inesperada dice SIEMPRE en qué línea y con qué comando, aunque no haya un mensaje propio. No se dispara en los fallos
+# esperados (los que van en un `if`, un `&&`, un `||` o un `! cmd`), igual que `set -e`.
+trap 'rc=$?; echo "❌ run.sh terminó con rc=$rc en la línea $LINENO: $BASH_COMMAND" >&2' ERR
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
@@ -181,7 +189,8 @@ PGOPTIONS="-c asgt.mostrar=on" psql -q -d "$BD_ANTES" -f "$AQUI/assert_flujos.sq
 echo "  flujos de la pantalla sin la migración: $(wc -l < "$SALIDAS/flujos_antes.txt") resultados anotados"
 
 echo "── 4/10 · la migración, dos veces (la segunda debe ser limpia) y sus guardas"
-SALIDA_MIG=$(psql -q -v ON_ERROR_STOP=1 -d "$BD" -f "$MIGS/$MIGRACION.sql" 2>&1)
+SALIDA_MIG=$(psql -q -v ON_ERROR_STOP=1 -d "$BD" -f "$MIGS/$MIGRACION.sql" 2>&1) || {
+  echo "❌ la migración falló al aplicarse por primera vez:"; echo "$SALIDA_MIG" | grep -E 'ERROR|DETAIL|CONTEXT' | head -8; exit 1; }
 echo "$SALIDA_MIG" | sed -n 's/.*NOTICE:  asignaciones_proyecto/   asignaciones_proyecto/p'
 huella "$BD" > "$SALIDAS/huella_post1.txt"
 if aplicar "$MIGS/$MIGRACION.sql"; then
@@ -267,7 +276,7 @@ echo "   ✓ (a) ACL final {propietario, service_role=Dxt}: authenticated SIGUE 
 como_sb "$REVERSION" asg_acl_prev
 [ "$(privs asg_acl_prev)" = "anon=DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE authenticated=REFERENCES,TRIGGER,TRUNCATE service_role=REFERENCES,TRIGGER,TRUNCATE" ] \
   || { echo "❌ 4c(a) · la reversión dejó otros privilegios: $(privs asg_acl_prev)"; exit 1; }
-echo "   ✓ (a) la reversión también es relativa: devuelve a authenticated sólo TRUNCATE/TRIGGER/REFERENCES (no le inventa DML) y a anon lo de producción"
+echo "   ✓ (a) la reversión es relativa para authenticated (sólo TRUNCATE/TRIGGER/REFERENCES; no le inventa DML) y le devuelve a anon los siete de PRODUCCIÓN; con la ACL de Preview eso es MÁS de lo que anon tenía (R2-4, documentado): aquí no es exacta, sólo lo es con la ACL de producción (4c(b))"
 baja asg_acl_prev
 
 # (b) ACL de producción, mismo propietario no superusuario
@@ -303,6 +312,53 @@ huella asg_acl_prod > "$SALIDAS/huella_acl_post2.txt"
 diff -q "$SALIDAS/huella_acl_post.txt" "$SALIDAS/huella_acl_post2.txt" >/dev/null || { echo "❌ 4c(b) · migración → reversión → migración no cierra el ciclo"; exit 1; }
 echo "   ✓ (b) la reversión deja el catálogo EXACTO ($(wc -l < "$SALIDAS/huella_acl_antes.txt") grupos, 0 diferencias, ACL incluida) con propietario no superusuario, y migración → reversión → migración cierra el ciclo"
 baja asg_acl_prod
+
+# 4d · INDEPENDENCIA DEL search_path (R2-3). pg_get_expr imprime «auth.uid()» CALIFICADO salvo que el esquema `auth` esté en el search_path de la sesión (entonces sale
+#      «uid()»). El post-vuelo comparaba contra el texto «auth\.uid» y, ejecutado por un rol con `auth` en su search_path (supabase_admin, o PGOPTIONS='-c search_path=auth,public'),
+#      abortaba con un mensaje engañoso («la política SELECT no existe o perdió la lectura de las propias») sin que nada estuviera mal. Ahora acepta las dos formas.
+#      Aquí se aplica con auth en el search_path (y con uno vacío) y se MUTA el post-vuelo (la comprobación vieja) para ver que la prueba detecta el defecto.
+N_MUT_GUARDA=0       # mutaciones de las guardas (pre-vuelo del propietario, post-vuelo y reversión frente al search_path, LOCK de la reversión)
+aplicar_sp() {       # aplicar_sp ARCHIVO BD SEARCH_PATH — como aplicar, con otro search_path de sesión
+  PGOPTIONS="-c client_min_messages=warning -c search_path=$3" psql -q -v ON_ERROR_STOP=1 -d "$2" -f "$1" >/dev/null
+}
+perl -pe 's/~ v_re_uid/~ \x27auth\\.uid\x27/g' "$MIGS/$MIGRACION.sql" > "$SALIDAS/migracion_regex_vieja.sql"
+[ "$(grep -c "~ 'auth\\\\.uid'" "$SALIDAS/migracion_regex_vieja.sql")" -eq 2 ] || { echo "❌ 4d · no se pudo preparar la migración con la comprobación vieja"; exit 1; }
+copia "$BD_ANTES" asg_sp
+aplicar_sp "$MIGS/$MIGRACION.sql" asg_sp "auth,public" || { echo "❌ 4d · la migración abortó con auth en el search_path"; exit 1; }
+huella asg_sp > "$SALIDAS/huella_sp.txt"
+diff -q "$SALIDAS/huella_post2.txt" "$SALIDAS/huella_sp.txt" >/dev/null || { echo "❌ 4d · con auth en el search_path la migración dejó otro catálogo"; diff "$SALIDAS/huella_post2.txt" "$SALIDAS/huella_sp.txt" | head; exit 1; }
+copia "$BD_ANTES" asg_sp
+aplicar_sp "$MIGS/$MIGRACION.sql" asg_sp "" || { echo "❌ 4d · la migración abortó con un search_path vacío"; exit 1; }
+copia "$BD_ANTES" asg_sp
+SALIDA_SP=$(PGOPTIONS="-c search_path=auth,public" psql -q -v ON_ERROR_STOP=1 -d asg_sp -f "$SALIDAS/migracion_regex_vieja.sql" 2>&1) && { echo "❌ 4d · la comprobación vieja debía abortar con auth en el search_path"; exit 1; }
+echo "$SALIDA_SP" | grep -q 'la política SELECT no existe o perdió la lectura de las propias' || { echo "❌ 4d · la comprobación vieja abortó por otra cosa:"; echo "$SALIDA_SP" | grep ERROR | head -3; exit 1; }
+[ "$(q "SELECT count(*) FROM pg_proc WHERE proname LIKE 'asignacion\\_%'" asg_sp)" = "0" ] || { echo "❌ 4d · el aborto dejó funciones a medias"; exit 1; }
+copia "$BD_ANTES" asg_sp
+aplicar "$SALIDAS/migracion_regex_vieja.sql" asg_sp || { echo "❌ 4d · la comprobación vieja debía pasar con el search_path normal (si no, el defecto no es del search_path)"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
+baja asg_sp
+echo "   ✓ 4d · con auth en el search_path (y con uno vacío) la migración se aplica y deja el MISMO catálogo; la comprobación vieja ABORTA ahí («la política SELECT no existe…») y pasa con el search_path normal: el defecto era del search_path"
+
+# 4e · PRE-VUELO DEL PROPIETARIO (S15). Quien corre la migración debe ser el propietario de la tabla (o miembro de su rol); si no, DROP POLICY / REVOKE fallarían o no harían nada.
+#      Se corre como un rol que NO lo es (con USAGE sobre auth, para que la comprobación que falla sea ésa y no una anterior) y se espera el mensaje del pre-vuelo y 0 piezas.
+copia "$BD_ANTES" asg_noprop
+psql -q -v ON_ERROR_STOP=1 -d postgres -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'asg_intruso') THEN CREATE ROLE asg_intruso LOGIN NOSUPERUSER; END IF; END \$\$" >/dev/null
+psql -q -v ON_ERROR_STOP=1 -d asg_noprop -c "GRANT USAGE ON SCHEMA auth TO asg_intruso" >/dev/null
+SALIDA_NP=$(psql -q -v ON_ERROR_STOP=1 -U asg_intruso -d asg_noprop -f "$MIGS/$MIGRACION.sql" 2>&1) && { echo "❌ 4e · la migración no debía poder aplicarla un rol que no es el propietario"; exit 1; }
+echo "$SALIDA_NP" | grep -q 'seguridad_asignaciones_proyecto (pre-vuelo): asg_intruso no es el propietario de user_project_assignments' || { echo "❌ 4e · abortó, pero no con el mensaje del pre-vuelo:"; echo "$SALIDA_NP" | grep ERROR | head -3; exit 1; }
+[ "$(q "SELECT count(*) FROM pg_proc WHERE proname LIKE 'asignacion\\_%'" asg_noprop)" = "0" ] \
+  && [ "$(q "SELECT count(*) FROM pg_policy WHERE polrelid = 'public.user_project_assignments'::regclass AND pg_get_expr(COALESCE(polqual, polwithcheck), polrelid) ~ 'asignacion_puede_administrar'" asg_noprop)" = "0" ] \
+  || { echo "❌ 4e · el pre-vuelo abortó pero dejó piezas a medias"; exit 1; }
+# mutación: sin la comprobación del propietario el aborto, si lo hay, ya NO es el del pre-vuelo (falla más tarde y con otro mensaje) → la prueba de arriba la detecta
+perl -0pe 's/  IF NOT pg_has_role\(current_user.*?  END IF;\n//s' "$MIGS/$MIGRACION.sql" > "$SALIDAS/migracion_sin_propietario.sql"
+! grep -q 'pg_has_role(current_user' "$SALIDAS/migracion_sin_propietario.sql" || { echo "❌ 4e · no se pudo quitar la comprobación del propietario"; exit 1; }
+copia "$BD_ANTES" asg_noprop
+SALIDA_NP=$(psql -q -v ON_ERROR_STOP=1 -U asg_intruso -d asg_noprop -f "$SALIDAS/migracion_sin_propietario.sql" 2>&1 || true)
+! echo "$SALIDA_NP" | grep -q 'no es el propietario de user_project_assignments' || { echo "❌ 4e · la migración sin la comprobación seguía diciendo que no es el propietario"; exit 1; }
+echo "$SALIDA_NP" | grep -q 'ERROR' || { echo "❌ 4e · la migración sin la comprobación debía fallar igualmente (privilegios), pero con OTRO mensaje"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
+baja asg_noprop
+echo "   ✓ 4e · un rol que NO es el propietario recibe «asg_intruso no es el propietario de user_project_assignments» y no deja ninguna pieza; mutación «sin la comprobación»: falla después con otro mensaje (la prueba la ve)"
 
 echo "── 5/10 · DATOS COMO PRODUCCIÓN: las 43 filas y el alcance de cada persona, antes y después"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -v tag=despues -d "$BD" -f "$AQUI/snapshot.sql" >/dev/null
@@ -341,7 +397,7 @@ else
   echo "   (nada que aplicar: la serie es la última del árbol)"
 fi
 
-echo "── 8/10 · REVERSIÓN exacta (scripts/reversion-asignaciones-proyecto.sql)"
+echo "── 8/10 · REVERSIÓN (scripts/reversion-asignaciones-proyecto.sql): exacta con la ACL de producción"
 copia "$BD_POST" asg_rev
 aplicar "$REVERSION" asg_rev
 aplicar "$REVERSION" asg_rev          # idempotente
@@ -366,6 +422,24 @@ aplicar "$MIGS/$MIGRACION.sql" asg_rev
 huella asg_rev > "$SALIDAS/huella_rev_reaplicada.txt"
 diff -q "$SALIDAS/huella_post2.txt" "$SALIDAS/huella_rev_reaplicada.txt" >/dev/null || { echo "❌ reaplicar tras revertir no deja el catálogo de la migración"; exit 1; }
 echo "   ✓ y volver a aplicar la migración tras revertir deja el catálogo IDÉNTICO al de la migración (ciclo completo)"
+
+# 8b · la reversión también es independiente del search_path (R2-3): su post-vuelo contaba las políticas con «auth\.uid» y, con auth en el search_path, abortaba con
+#      «las políticas no quedaron como las originales» sin que nada estuviera mal. Se revierte con auth en el search_path y se MUTA la comprobación (la vieja).
+copia "$BD_POST" asg_rev_sp
+aplicar_sp "$REVERSION" asg_rev_sp "auth,public" || { echo "❌ 8b · la reversión abortó con auth en el search_path"; exit 1; }
+huella asg_rev_sp > "$SALIDAS/huella_rev_sp.txt"
+diff -q "$SALIDAS/huella_antes.txt" "$SALIDAS/huella_rev_sp.txt" >/dev/null || { echo "❌ 8b · con auth en el search_path la reversión no deja el catálogo como estaba"; diff "$SALIDAS/huella_antes.txt" "$SALIDAS/huella_rev_sp.txt" | head; exit 1; }
+perl -pe 's/~ v_re_uid\)/~ \x27auth\\.uid\x27)/' "$REVERSION" > "$SALIDAS/reversion_regex_vieja.sql"
+[ "$(grep -c "~ 'auth\\\\.uid'" "$SALIDAS/reversion_regex_vieja.sql")" -eq 1 ] || { echo "❌ 8b · no se pudo preparar la reversión con la comprobación vieja"; exit 1; }
+copia "$BD_POST" asg_rev_sp
+SALIDA_RSP=$(PGOPTIONS="-c search_path=auth,public" psql -q -v ON_ERROR_STOP=1 -d asg_rev_sp -f "$SALIDAS/reversion_regex_vieja.sql" 2>&1) && { echo "❌ 8b · la reversión con la comprobación vieja debía abortar con auth en el search_path"; exit 1; }
+echo "$SALIDA_RSP" | grep -q 'las políticas no quedaron como las originales' || { echo "❌ 8b · abortó por otra cosa:"; echo "$SALIDA_RSP" | grep ERROR | head -3; exit 1; }
+[ "$(q "SELECT count(*) FROM pg_proc WHERE proname LIKE 'asignacion\\_%'" asg_rev_sp)" = "3" ] || { echo "❌ 8b · el aborto de la reversión no dejó el estado migrado intacto (3 funciones)"; exit 1; }
+copia "$BD_POST" asg_rev_sp
+aplicar "$SALIDAS/reversion_regex_vieja.sql" asg_rev_sp || { echo "❌ 8b · la reversión vieja debía pasar con el search_path normal"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
+baja asg_rev_sp
+echo "   ✓ 8b · con auth en el search_path la reversión se aplica y deja el MISMO catálogo que antes de la migración; la comprobación vieja ABORTA ahí («las políticas no quedaron como las originales») sin deshacer nada y pasa con el search_path normal"
 baja asg_rev
 
 echo "── 9/10 · MUTACIONES: se revierte a mano cada pieza y alguna aserción se pone ROJA"
@@ -426,14 +500,21 @@ mutacion "se revierte TODO (las políticas originales y sin triggers: lo que har
   "DROP TRIGGER trg_asignacion_empresa ON public.user_project_assignments; DROP TRIGGER trg_asignacion_propia ON public.user_project_assignments; DROP POLICY user_project_assignments_insert ON public.user_project_assignments; DROP POLICY user_project_assignments_update ON public.user_project_assignments; DROP POLICY user_project_assignments_delete ON public.user_project_assignments; CREATE POLICY user_project_assignments_insert ON public.user_project_assignments FOR INSERT TO authenticated WITH CHECK ($POL_ORIGINAL); CREATE POLICY user_project_assignments_update ON public.user_project_assignments FOR UPDATE TO authenticated USING ($POL_ORIGINAL) WITH CHECK ($POL_ORIGINAL); CREATE POLICY user_project_assignments_delete ON public.user_project_assignments FOR DELETE TO authenticated USING ($POL_ORIGINAL)" \
   "assert_catalogo assert_matriz assert_flujos assert_alcance assert_capas assert_defensa"
 # Mutaciones de la ronda de correcciones: cada una se obtiene MUTANDO la función de la propia migración (no una copia de su cuerpo).
+# Quita el candado GLOBAL de las bajas en cascada (el bloque `IF TG_OP = 'DELETE' AND NOT EXISTS (… projects …) THEN PERFORM pg_advisory_xact_lock(…); END IF;` de antes de v_toca).
+QUITAR_CANDADO='s/\n\s*IF TG_OP = \x27DELETE\x27 AND NOT EXISTS \(SELECT 1 FROM public\.projects p WHERE p\.id = OLD\.project_id\) THEN\n\s*PERFORM pg_advisory_xact_lock\([^\n]*\n\s*END IF;//'
+# El candado POR PERSONA de la ronda anterior (d1aeb94a), dentro de la rama de autoasignación: sólo ordena a las sesiones de la MISMA persona.
+CANDADO_POR_PERSONA='s/(IF v_toca AND NOT [^\n]*THEN\n)/$1    IF TG_OP = \x27DELETE\x27 THEN PERFORM pg_advisory_xact_lock(hashtextextended(\x27asg:\x27 || OLD.user_id::text, 0)); END IF;\n/'
+# El candado GLOBAL, pero tomado sólo DENTRO de la rama de autoasignación (cuando quien borra es dueño de la fila): una baja del propietario o del superadministrador no lo toma.
+CANDADO_SOLO_SI_PROPIA='s/(IF v_toca AND NOT [^\n]*THEN\n)/$1    PERFORM pg_advisory_xact_lock(hashtextextended(\x27asg-cascada\x27, 0));\n/'
+
 mutacion "F-08 · la baja en cascada se permite SIN comprobar que el proyecto ya no existe: borrar UNA fila propia pasa mientras quede otra" \
   "$(mutar_funcion asignacion_bloquear_propia 's/\n\s*AND NOT EXISTS \(SELECT 1 FROM public\.projects p WHERE p\.id = OLD\.project_id\)//')" \
   "assert_defensa"
 mutacion "F3 · el trigger de autoasignación sin COALESCE: para una sesión sin app_users (rol NULL) el IF da NULL y falla ABIERTO" \
   "$(mutar_funcion asignacion_bloquear_propia 's/COALESCE\(public\.is_super_admin\(\), false\) OR COALESCE\(public\.current_user_role\(\) = \x27company_owner\x27, false\)/public.is_super_admin() OR public.current_user_role() = \x27company_owner\x27/')" \
   "assert_defensa"
-mutacion "F1 · se quita el candado por persona de la baja en cascada (la carrera de abajo, en la sección 10, lo detecta con sesiones reales; aquí lo ve el catálogo)" \
-  "$(mutar_funcion asignacion_bloquear_propia 's/\n\s*IF TG_OP = \x27DELETE\x27 THEN\n\s*PERFORM pg_advisory_xact_lock\([^\n]*\n\s*END IF;//')" \
+mutacion "F1/R2-1 · se quita el candado global de la baja en cascada (las carreras de abajo, en la sección 10, lo detectan con sesiones reales; aquí lo ve el comportamiento: la baja ya no retiene ningún candado)" \
+  "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO")" \
   "assert_catalogo"
 
 echo "── 10/10 · concurrencia: sesiones REALES simultáneas y la migración contra una transacción larga"
@@ -582,7 +663,7 @@ baja asg_conc
 
 # F1 · BAJA EN CASCADA CONCURRENTE: dos sesiones, cada una borra UNO de los DOS únicos proyectos de un administrador acotado (AP queda con sólo P1 y P2).
 #      Cada sesión, por separado, tiene permiso (le queda la otra fila); juntas lo dejarían con CERO filas y, siendo administrador, EXENTO (ve toda la empresa).
-#      Con el candado por persona la 2ª ESPERA a la 1ª, ve lo que ésta confirmó y recibe ASIGNACION_PROPIA_NO_PERMITIDA.
+#      Con el candado global de bajas en cascada la 2ª ESPERA a la 1ª, ve lo que ésta confirmó y recibe ASIGNACION_PROPIA_NO_PERMITIDA.
 carrera_f1() {       # carrera_f1 BD NOMBRE — deja en RES «filas de AP|exento|estado observado de la 2ª sesión antes de soltar la puerta»
   q "DELETE FROM public.user_project_assignments WHERE user_id = '$(UID_ 6)' AND project_id = '$(PID_ 3)'" "$1" >/dev/null
   par "$1" "$2" AP "DELETE FROM public.projects WHERE id = '$(PID_ 1)';" AP "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"
@@ -591,18 +672,18 @@ carrera_f1() {       # carrera_f1 BD NOMBRE — deja en RES «filas de AP|exento
 copia "$BD_POST" asg_conc
 carrera_f1 asg_conc ca
 sin_deadlock ca && [ "$RES" = "1|f|esperando" ] && ! grep -qi 'error' "$SALIDAS/ca1.txt" && grep -q 'ASIGNACION_PROPIA_NO_PERMITIDA' "$SALIDAS/ca2.txt" \
-  && echo "  ✓ F1 · dos sesiones borran cada una uno de los 2 únicos proyectos de AP: la 2ª ESPERA (candado por persona), recibe ASIGNACION_PROPIA_NO_PERMITIDA, AP conserva 1 fila y NO es exento" \
+  && echo "  ✓ F1 · dos sesiones borran cada una uno de los 2 únicos proyectos de AP: la 2ª ESPERA (candado global), recibe ASIGNACION_PROPIA_NO_PERMITIDA, AP conserva 1 fila y NO es exento" \
   || { echo "❌ F1 · RES=$RES"; cat "$SALIDAS/ca1.txt" "$SALIDAS/ca2.txt"; exit 1; }
 # control negativo: SIN el candado (la función de la migración mutada) la carrera es real: AP se queda con CERO filas y exento
 copia "$BD_POST" asg_conc
-psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia 's/\n\s*IF TG_OP = \x27DELETE\x27 THEN\n\s*PERFORM pg_advisory_xact_lock\([^\n]*\n\s*END IF;//')" >/dev/null
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO")" >/dev/null
 carrera_f1 asg_conc cb
 [ "$RES" = "0|t|terminó" ] && ! grep -qi 'error' "$SALIDAS/cb1.txt" "$SALIDAS/cb2.txt" \
   && echo "  ✓ F1 · mutación «sin el candado»: las dos sesiones terminan sin error y AP se queda con 0 filas y EXENTO (la carrera es real y la prueba la ve)" \
   || { echo "❌ F1 · sin el candado debía quedar 0|t|terminó y hay $RES"; cat "$SALIDAS/cb1.txt" "$SALIDAS/cb2.txt"; exit 1; }
 # control negativo 2: el candado DENTRO del AND de la condición (el primer parche que se probó) espera, pero compara con la instantánea vieja y tampoco sirve
 copia "$BD_POST" asg_conc
-psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia 's/\n\s*IF TG_OP = \x27DELETE\x27 THEN\n\s*PERFORM pg_advisory_xact_lock\([^\n]*\n\s*END IF;//; s/(AND NOT EXISTS \(SELECT 1 FROM public\.projects p WHERE p\.id = OLD\.project_id\))/AND (SELECT true FROM (SELECT pg_advisory_xact_lock(hashtextextended(\x27asg:\x27 || OLD.user_id::text, 0))) l)\n       $1/')" >/dev/null
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO; "'s/(AND NOT EXISTS \(SELECT 1 FROM public\.projects p WHERE p\.id = OLD\.project_id\))/AND (SELECT true FROM (SELECT pg_advisory_xact_lock(hashtextextended(\x27asg-cascada\x27, 0))) l)\n       $1/')" >/dev/null
 carrera_f1 asg_conc cc
 [ "$RES" = "0|t|esperando" ] \
   && echo "  ✓ F1 · mutación «candado dentro del AND»: la 2ª sí espera, pero decide con la instantánea de antes de esperar y AP termina con 0 filas y EXENTO: el candado tiene que ir en una sentencia ANTES" \
@@ -610,12 +691,82 @@ carrera_f1 asg_conc cc
 N_MUT_CONC=$((N_MUT_CONC + 2))
 baja asg_conc
 
+# R2-1 · BAJA EN CASCADA CRUZADA. El candado «por persona» (la primera corrección de F1) sólo ordenaba a las sesiones de la MISMA persona. Dos administradores ADM1 y ADM2 que
+#        COMPARTEN sus dos únicos proyectos {P1, P2}: ADM1 borra P1 y ADM2 borra P2. La cascada de cada sesión vacía TAMBIÉN la fila del otro —y la fila ajena no se comprueba—,
+#        así que, con candados distintos, ninguna esperaba a la otra y ambos acababan con CERO filas y exentos (un resultado que no equivale a ningún orden en serie: en serie
+#        la 2ª recibe ASIGNACION_PROPIA_NO_PERMITIDA y ambos conservan P2). Con una sola clave para todas las bajas en cascada la 2ª espera y rechaza.
+admins_xp() {        # admins_xp BD — ADM1 y ADM2 (administradores de C) con EXACTAMENTE {P1, P2} cada uno
+  q "INSERT INTO auth.users (id) VALUES ('$(UID_ 90)'), ('$(UID_ 91)');
+     INSERT INTO public.app_users (id, company_id, full_name, role) VALUES ('$(UID_ 90)', 'a5c00000-0000-0000-0000-000000000001', 'ASG ADM1', 'admin'), ('$(UID_ 91)', 'a5c00000-0000-0000-0000-000000000001', 'ASG ADM2', 'admin');
+     INSERT INTO asgt.ids VALUES ('ADM1', '$(UID_ 90)', 'persona'), ('ADM2', '$(UID_ 91)', 'persona');
+     INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) SELECT u, asgt.pid_de(p), 'total' FROM unnest(ARRAY['$(UID_ 90)', '$(UID_ 91)']::uuid[]) u, generate_series(1, 2) p;" "$1" >/dev/null
+}
+resumen_xp() { echo "$(q "SELECT asgt.filas_de('$(UID_ 90)')" "$1")|$(q "SELECT asgt.exento('$(UID_ 90)')" "$1")|$(q "SELECT asgt.filas_de('$(UID_ 91)')" "$1")|$(q "SELECT asgt.exento('$(UID_ 91)')" "$1")|$ESTADO2"; }
+carrera_cruzada() {  # carrera_cruzada BD NOMBRE — ADM1 borra P1 (se detiene SIN confirmar); ADM2 borra P2
+  admins_xp "$1"
+  par "$1" "$2" ADM1 "DELETE FROM public.projects WHERE id = '$(PID_ 1)';" ADM2 "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"
+  RES="$(resumen_xp "$1")"
+}
+copia "$BD_POST" asg_conc
+carrera_cruzada asg_conc xa
+sin_deadlock xa && [ "$RES" = "P2|f|P2|f|esperando" ] && ! grep -qi 'error' "$SALIDAS/xa1.txt" && [ "$(grep -c 'ASIGNACION_PROPIA_NO_PERMITIDA' "$SALIDAS/xa2.txt")" -ge 1 ] \
+  && echo "  ✓ R2-1 · ADM1 y ADM2 comparten {P1,P2}: ADM1 borra P1 y ADM2 borra P2 a la vez: la 2ª ESPERA, recibe ASIGNACION_PROPIA_NO_PERMITIDA y ambos conservan {P2}, ninguno exento (como en serie)" \
+  || { echo "❌ R2-1 · RES=$RES (esperado P2|f|P2|f|esperando)"; cat "$SALIDAS/xa1.txt" "$SALIDAS/xa2.txt"; exit 1; }
+# control negativo 1: el candado POR PERSONA de la ronda anterior (d1aeb94a): la 2ª sesión NO espera y ambos quedan con CERO filas y exentos
+copia "$BD_POST" asg_conc
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO; $CANDADO_POR_PERSONA")" >/dev/null
+carrera_cruzada asg_conc xb
+[ "$RES" = "|t||t|terminó" ] && ! grep -qi 'error' "$SALIDAS/xb1.txt" "$SALIDAS/xb2.txt" \
+  && echo "  ✓ R2-1 · mutación «candado por persona» (d1aeb94a): la 2ª sesión no espera, las dos terminan sin error y AMBOS administradores quedan con 0 filas y EXENTOS (la carrera es real y la prueba la ve)" \
+  || { echo "❌ R2-1 · con el candado por persona debía quedar |t||t|terminó y hay $RES"; cat "$SALIDAS/xb1.txt" "$SALIDAS/xb2.txt"; exit 1; }
+# propietario contra administrador: la baja en cascada del PROPIETARIO (su cascada vacía la fila de ADM1 en P1) tampoco se comprueba; ADM1 borra después P2 con la fila de P1 aún «viva»
+copia "$BD_POST" asg_conc
+admins_xp asg_conc
+par asg_conc xc OW "DELETE FROM public.projects WHERE id = '$(PID_ 1)';" ADM1 "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"
+RES="$(q "SELECT asgt.filas_de('$(UID_ 90)')" asg_conc)|$(q "SELECT asgt.exento('$(UID_ 90)')" asg_conc)|$ESTADO2"
+sin_deadlock xc && [ "$RES" = "P2|f|esperando" ] && ! grep -qi 'error' "$SALIDAS/xc1.txt" && grep -q 'ASIGNACION_PROPIA_NO_PERMITIDA' "$SALIDAS/xc2.txt" \
+  && echo "  ✓ R2-1 · el PROPIETARIO borra P1 (sin confirmar) y ADM1 {P1,P2} borra P2: ADM1 ESPERA, ve que P1 ya no está y recibe ASIGNACION_PROPIA_NO_PERMITIDA; conserva {P2}, no exento" \
+  || { echo "❌ R2-1 · propietario contra administrador: RES=$RES (esperado P2|f|esperando)"; cat "$SALIDAS/xc1.txt" "$SALIDAS/xc2.txt"; exit 1; }
+# control negativo 2: el candado global tomado sólo DENTRO de la rama de autoasignación (la baja del propietario no lo toma): ADM1 no espera y queda exento
+copia "$BD_POST" asg_conc
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO; $CANDADO_SOLO_SI_PROPIA")" >/dev/null
+admins_xp asg_conc
+par asg_conc xd OW "DELETE FROM public.projects WHERE id = '$(PID_ 1)';" ADM1 "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"
+RES="$(q "SELECT asgt.filas_de('$(UID_ 90)')" asg_conc)|$(q "SELECT asgt.exento('$(UID_ 90)')" asg_conc)|$ESTADO2"
+[ "$RES" = "|t|terminó" ] && ! grep -qi 'error' "$SALIDAS/xd1.txt" "$SALIDAS/xd2.txt" \
+  && echo "  ✓ R2-1 · mutación «candado sólo en la rama de autoasignación»: la baja del propietario no lo toma, ADM1 no espera y queda con 0 filas y EXENTO (el candado tiene que ir ANTES de mirar quién borra)" \
+  || { echo "❌ R2-1 · con el candado sólo en la rama propia debía quedar |t|terminó y hay $RES"; cat "$SALIDAS/xd1.txt" "$SALIDAS/xd2.txt"; exit 1; }
+N_MUT_CONC=$((N_MUT_CONC + 2))
+baja asg_conc
+
+# R2-5 · COSTE CONOCIDO del candado global, medido: en una transacción de VARIAS sentencias que combine «borrar un proyecto» con «asignar sobre un proyecto que otra transacción está
+#        borrando» pueden cruzarse el candado de aviso y el FOR SHARE del trigger de integridad. PostgreSQL lo detecta (deadlock_timeout = 1 s) y aborta UNA de las dos; la otra termina y
+#        nada queda a medias. Por PostgREST (una sentencia por transacción) no es alcanzable. Lo que se comprueba es que el desenlace es SEGURO sea cual sea la víctima.
+#        s1 (AX): borra P1, espera la puerta y luego asigna NUEVO→P2; s2 (AX2): borra P2 (espera el candado con la fila de P2 ya tomada) → s1 espera a s2 y s2 a s1.
+copia "$BD_POST" asg_conc
+par asg_conc di AX "DELETE FROM public.projects WHERE id = '$(PID_ 1)'; SELECT pg_advisory_xact_lock($PUERTA, 1); $(INS "$(v 8 2)")" AX2 "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"
+INTERBLOQUEOS=$(cat "$SALIDAS/di1.txt" "$SALIDAS/di2.txt" | grep -ci 'deadlock detected' || true)
+RESTAN=$(q "SELECT count(*) FROM public.projects WHERE id IN ('$(PID_ 1)', '$(PID_ 2)')" asg_conc)
+[ "$ESTADO2" = "esperando" ] && [ "$INTERBLOQUEOS" = "1" ] && [ "$RESTAN" = "1" ] \
+  && [ "$(q "SELECT asgt.exento('$(UID_ 6)')" asg_conc)" = "f" ] && [ "$(q "SELECT count(*) FROM public.user_project_assignments u WHERE NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = u.project_id)" asg_conc)" = "0" ] \
+  && echo "  ✓ R2-5 · transacción de varias sentencias que cruza el candado y el FOR SHARE: PostgreSQL detecta el interbloqueo y aborta UNA sola (1 «deadlock detected»); la otra termina; de P1/P2 se borra exactamente uno, AP sigue acotado y ninguna asignación queda huérfana" \
+  || { echo "❌ R2-5 · ESTADO2=$ESTADO2 interbloqueos=$INTERBLOQUEOS restan=$RESTAN"; cat "$SALIDAS/di1.txt" "$SALIDAS/di2.txt"; exit 1; }
+# contraste: SIN el candado global la 2ª sesión confirma de inmediato y no hay interbloqueo (la 1ª recibe un error limpio al asignar sobre un proyecto ya borrado)
+copia "$BD_POST" asg_conc
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO")" >/dev/null
+par asg_conc dj AX "DELETE FROM public.projects WHERE id = '$(PID_ 1)'; SELECT pg_advisory_xact_lock($PUERTA, 1); $(INS "$(v 8 2)")" AX2 "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"
+[ "$ESTADO2" = "terminó" ] && sin_deadlock dj \
+  && echo "  ✓ R2-5 · contraste: sin el candado global esa misma transacción no se interbloquea (la 2ª sesión confirma sin esperar): el interbloqueo es el precio de serializar" \
+  || { echo "❌ R2-5 · contraste: ESTADO2=$ESTADO2"; cat "$SALIDAS/dj1.txt" "$SALIDAS/dj2.txt"; exit 1; }
+baja asg_conc
+
 # F4 · UNA ESCRITURA LEGÍTIMA que llega mientras la migración está PARADA tras su pre-vuelo (se inyecta una puerta justo después de medir). Antes la medición
 #      se hacía con ACCESS SHARE y el bloqueo llegaba después, con el primer DROP POLICY: la escritura se confirmaba en la ventana y el post-vuelo abortaba con un
 #      falso «las filas CAMBIARON». Ahora el bloqueo va ANTES de medir: la escritura ESPERA, la migración pasa y la escritura se aplica después.
-escritura_en_migracion() {   # escritura_en_migracion BD ARCHIVO NOMBRE — deja ESTADO2 (de la escritura), MIG_RC y MIG_TXT
-  local bd="$1" arch="$2" n="$3" finm="$SALIDAS/$3.finm" finw="$SALIDAS/$3.finw"
-  sed '/^-- ── 1\. Regla única/i SELECT pg_advisory_xact_lock(9100, 2);' "$arch" > "$SALIDAS/${n}_pausada.sql"
+escritura_en_migracion() {   # escritura_en_migracion BD ARCHIVO NOMBRE [REGEX] — deja ESTADO2 (de la escritura), MIG_RC y MIG_TXT. REGEX = la línea ANTES de la cual se inyecta la pausa
+                             # (por omisión, el primer paso de la migración; para la reversión, el primero de las políticas)
+  local bd="$1" arch="$2" n="$3" marca="${4:-^-- ── 1\\. Regla única}" finm="$SALIDAS/$3.finm" finw="$SALIDAS/$3.finw"
+  sed "/$marca/i SELECT pg_advisory_xact_lock(9100, 2);" "$arch" > "$SALIDAS/${n}_pausada.sql"
   grep -q 'pg_advisory_xact_lock(9100, 2)' "$SALIDAS/${n}_pausada.sql" || { echo "❌ F4 · no se pudo inyectar la pausa"; exit 1; }
   rm -f "$finm" "$finw"
   ctl_abrir "$bd" "$n" 2
@@ -647,6 +798,27 @@ escritura_en_migracion asg_conc "$SALIDAS/migracion_sin_lock.sql" f4b
   && echo "  ✓ F4 · mutación «sin el LOCK TABLE inicial»: la escritura se confirma durante la pausa y la migración ABORTA con el falso «las filas … CAMBIARON» (y no deja nada): la prueba ve el defecto" \
   || { echo "❌ F4 · sin el LOCK debía abortar con CAMBIARON: ESTADO2=$ESTADO2 MIG_RC=$MIG_RC"; cat "$MIG_TXT"; exit 1; }
 N_MUT_CONC=$((N_MUT_CONC + 1))
+baja asg_conc
+
+# R02 · LA REVERSIÓN TAMBIÉN NECESITA SU LOCK TABLE. Es el mismo defecto de F4 en el otro script: si la reversión midiera sin bloquear, una escritura legítima confirmada entre su
+#       medición y su post-vuelo la abortaría con un falso «las filas CAMBIARON». Se la pausa justo después de su pre-vuelo (antes de la primera política) y se hace llegar una escritura.
+copia "$BD_POST" asg_conc
+escritura_en_migracion asg_conc "$REVERSION" r02a '^-- ── 1 · las cuatro políticas'
+[ "$ESTADO2" = "esperando" ] && [ "$MIG_RC" = "0" ] && ! grep -q 'CAMBIARON' "$MIG_TXT" && ! grep -qi 'error' "$SALIDAS/r02a_esc.txt" \
+  && [ "$(q "SELECT count(*) FROM public.user_project_assignments" asg_conc)" = "44" ] && [ "$(q "SELECT asgt.filas_de('$(UID_ 8)')" asg_conc)" = "P1" ] \
+  && [ "$(q "SELECT count(*) FROM pg_proc WHERE proname LIKE 'asignacion\\_%'" asg_conc)" = "0" ] \
+  && echo "  ✓ R02 · una escritura legítima llega con la REVERSIÓN parada tras su pre-vuelo: ESPERA el bloqueo, la reversión pasa (sin «CAMBIARON»), deja 0 funciones y la escritura se aplica después (44 filas)" \
+  || { echo "❌ R02 · ESTADO2=$ESTADO2 MIG_RC=$MIG_RC"; cat "$MIG_TXT" "$SALIDAS/r02a_esc.txt"; exit 1; }
+# control negativo: SIN el LOCK TABLE de la reversión la escritura se confirma en la ventana y el post-vuelo aborta con el falso «CAMBIARON» (y la reversión no deshace nada)
+copia "$BD_POST" asg_conc
+sed '/^  LOCK TABLE public\.user_project_assignments IN ACCESS EXCLUSIVE MODE;/d' "$REVERSION" > "$SALIDAS/reversion_sin_lock.sql"
+! grep -q 'LOCK TABLE public.user_project_assignments' "$SALIDAS/reversion_sin_lock.sql" || { echo "❌ R02 · no se pudo quitar el LOCK TABLE de la reversión"; exit 1; }
+escritura_en_migracion asg_conc "$SALIDAS/reversion_sin_lock.sql" r02b '^-- ── 1 · las cuatro políticas'
+[ "$ESTADO2" = "terminó" ] && [ "$MIG_RC" != "0" ] && grep -q 'reversion_asignaciones_proyecto: las filas CAMBIARON' "$MIG_TXT" \
+  && [ "$(q "SELECT count(*) FROM pg_proc WHERE proname LIKE 'asignacion\\_%'" asg_conc)" = "3" ] \
+  && echo "  ✓ R02 · mutación «reversión sin el LOCK TABLE»: la escritura se confirma durante la pausa y la reversión ABORTA con el falso «las filas … CAMBIARON» sin deshacer nada (siguen las 3 funciones): la prueba ve el defecto" \
+  || { echo "❌ R02 · sin el LOCK la reversión debía abortar con CAMBIARON: ESTADO2=$ESTADO2 MIG_RC=$MIG_RC"; cat "$MIG_TXT"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
 baja asg_conc
 
 # C · la migración contra una transacción larga sobre la tabla: lock_timeout (5 s) → falla limpio y no deja nada; reintentada después, aplica.
@@ -690,4 +862,4 @@ fi
 echo "   ✓ una sentencia; corre con default_transaction_read_only=on (control: un DELETE ahí falla); antes: 10 huérfanas, EL HUECO señalado; después: «corregida», anon sin privilegios; la sección «tabla» es idéntica"
 
 echo ""
-echo "══ TOTAL: $TOTAL comprobaciones ✓ en bloques de una sesión + los controles negativos, la reversión, $((N_MUT + N_MUT_CONC + N_MUT_ACL)) mutaciones ($N_MUT de catálogo + $N_MUT_CONC de concurrencia + $N_MUT_ACL de privilegios), la concurrencia y el diagnóstico ══"
+echo "══ TOTAL: $TOTAL comprobaciones ✓ en bloques de una sesión + los controles negativos, la reversión, $((N_MUT + N_MUT_CONC + N_MUT_ACL + N_MUT_GUARDA)) mutaciones ($N_MUT de catálogo + $N_MUT_CONC de concurrencia + $N_MUT_ACL de privilegios + $N_MUT_GUARDA de guardas), la concurrencia y el diagnóstico ══"
