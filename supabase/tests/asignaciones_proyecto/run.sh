@@ -223,8 +223,11 @@ baja asg_post_vuelo
 #      tabla mal repartidos»). Aquí se monta esa ACL EXACTA y la de producción, y la migración se aplica en ambas COMO UN PROPIETARIO NO SUPERUSUARIO con BYPASSRLS
 #      (el postgres de Supabase), sin ayuda de la ACL por defecto de funciones de este arnés (las funciones nacen con PUBLIC=EXECUTE, como en Supabase).
 SB="$AQUI/propietario_supabase.sql"
-acl_tabla() {        # ACL de la tabla ORDENADA (el orden de las entradas cambia al revocar y volver a conceder) y sin MAINTAIN (PG17)
-  q "SELECT '{' || COALESCE((SELECT string_agg(a, ',' ORDER BY a COLLATE \"C\") FROM unnest(c.relacl::text[]) a), '') || '}' FROM pg_class c WHERE c.oid = 'public.user_project_assignments'::regclass" "$1" | sed -E 's/(=[A-Za-z*]*)m\//\1\//g'
+acl_tabla() {        # ACL de la tabla ORDENADA (el orden de las entradas cambia al revocar y volver a conceder) y SIN MAINTAIN (PG17): una entrada que sólo tuviera «m» desaparece
+  q "SELECT '{' || COALESCE((SELECT string_agg(e, ',' ORDER BY e COLLATE \"C\")
+                               FROM (SELECT regexp_replace(a, '(=[A-Za-z*]*)m/', '\1/') AS e FROM unnest(c.relacl::text[]) a) t
+                              WHERE e !~ '^[^=]*=/'), '') || '}'
+       FROM pg_class c WHERE c.oid = 'public.user_project_assignments'::regclass" "$1"
 }
 privs()     { q "SELECT string_agg(r || '=' || (SELECT COALESCE(string_agg(p, ',' ORDER BY p), '-') FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p
                                                  WHERE has_table_privilege(r, 'public.user_project_assignments', p)), ' ' ORDER BY r)
