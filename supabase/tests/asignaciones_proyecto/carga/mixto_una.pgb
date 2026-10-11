@@ -1,0 +1,16 @@
+-- Carga mixta de UNA sentencia por transacción (como PostgREST): borrar un proyecto o asignar a OP2 sobre un proyecto, al azar; siempre se deshace.
+\set a random(1,4)
+\set k random(1,2)
+\if :k = 1
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', 'a5e00000-0000-0000-0000-000000000003', true);
+DELETE FROM public.projects WHERE id = ('b3f00000-0000-0000-0000-00000000000' || :a)::uuid;
+ROLLBACK;
+\else
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', 'a5e00000-0000-0000-0000-000000000003', true);
+INSERT INTO public.user_project_assignments (user_id, project_id) VALUES ('a5e00000-0000-0000-0000-000000000022', ('b3f00000-0000-0000-0000-00000000000' || :a)::uuid) ON CONFLICT DO NOTHING;
+ROLLBACK;
+\endif

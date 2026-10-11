@@ -45,7 +45,7 @@ SELECT asgt.chk_txt((SELECT p.prosecdef::text || '|' || p.provolatile::text || '
 SELECT asgt.chk_txt((SELECT p.prosecdef::text || '|' || COALESCE(array_to_string(p.proconfig, ','), '') FROM pg_proc p WHERE p.oid = 'public.asignacion_validar_empresa()'::regprocedure),
   'true|search_path=""', '[catálogo] asignacion_validar_empresa: SECURITY DEFINER, search_path vacío');
 SELECT asgt.chk_txt((SELECT p.prosecdef::text || '|' || COALESCE(array_to_string(p.proconfig, ','), '') FROM pg_proc p WHERE p.oid = 'public.asignacion_bloquear_propia()'::regprocedure),
-  'true|search_path=""', '[catálogo] asignacion_bloquear_propia: SECURITY DEFINER, search_path vacío');
+  'true|search_path="",lock_timeout=2s', '[catálogo] asignacion_bloquear_propia: SECURITY DEFINER, search_path vacío y lock_timeout propio de 2 s (la espera del candado de bajas en cascada es corta)');
 SELECT asgt.chk_txt((SELECT string_agg(r || '=' || has_function_privilege(r, 'public.asignacion_puede_administrar(uuid,uuid)', 'EXECUTE')::text, ', ' ORDER BY r)
                        FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) r),
   'anon=false, authenticated=true, service_role=true', '[catálogo] EXECUTE de la regla: authenticated y service_role; anon NO (ni PUBLIC)');
@@ -98,7 +98,7 @@ SELECT asgt.ok('[privilegios] el rol de servicio sí puede TRUNCATE (se deshace 
   p_efecto_sql => 'SELECT count(*) FROM public.user_project_assignments', p_efecto => '0');
 SELECT asgt.chk((SELECT count(*) FROM public.user_project_assignments), 43, '[privilegios] control: tras el TRUNCATE deshecho siguen las 43 filas');
 
--- ═══ 5 · la baja en cascada toma el candado global (R2-1), comprobado por COMPORTAMIENTO ═══════════════════════════════════
+-- ═══ 5 · la baja en cascada toma el candado POR EMPRESA (R2-1, V3-01), comprobado por COMPORTAMIENTO ═══════════════════════
 -- Antes esto leía el texto de la función (strpos sobre prosrc): un refactor inocuo —p. ej. cambiar `NOT EXISTS` por `count(*) = 0`— ponía la suite en rojo
 -- sin que el comportamiento cambiara, y una mutación sí equivalente pasaba. Ahora se OBSERVA: tras borrar un proyecto con una sesión de la API, la
 -- transacción retiene un candado de aviso que antes del borrado no tenía; con el rol de servicio (sin auth.uid()) el trigger no interviene y no lo toma.
@@ -124,6 +124,98 @@ BEGIN
   END LOOP;
   PERFORM asgt.chk_txt(v_res, 'AP:false>true, OW:false>true, SU:false>true, SERVICIO:false>false',
     '[catálogo] borrar un proyecto con una sesión de la API (administrador acotado, propietario, superadministrador) toma un candado de aviso que antes no tenía; el rol de servicio no');
+END $$;
+
+-- La CLAVE (V3-01). Una sola por baja, la MISMA para cualquier actor de una empresa y DISTINTA entre empresas: así un propietario sólo estorba a las bajas de SU empresa. Se compara la clave retenida
+-- (classid:objid del candado en pg_locks) sin repetir aquí cómo se calcula: borrar P3 (7 personas de C asignadas, entre ellas un administrador acotado) como AP, OW y SU debe dejar el MISMO candado único, y
+-- borrar D1 (una persona de D) como el propietario de D, uno DISTINTO. El candado global de la ronda anterior da la misma clave en las dos empresas; uno por persona da una clave por cada fila de la cascada.
+DO $$
+DECLARE
+  a text;  v_n text := '';  v_k text;  v_claves text[] := '{}';  v_cnt int;  v_kd text;  v_cnt_d int;
+BEGIN
+  FOREACH a IN ARRAY ARRAY['AP', 'OW', 'SU'] LOOP
+    v_k := NULL;  v_cnt := NULL;
+    BEGIN
+      PERFORM asgt.poner_actor(a);
+      DELETE FROM public.projects WHERE id = asgt.pid_de(3);
+      SELECT count(*), min(classid::text || ':' || objid::text) INTO v_cnt, v_k
+        FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted;
+      PERFORM asgt.poner_actor('SISTEMA');
+      RAISE EXCEPTION USING ERRCODE = 'AS999', MESSAGE = 'deshacer';
+    EXCEPTION WHEN SQLSTATE 'AS999' THEN NULL;
+    END;
+    PERFORM asgt.poner_actor('SISTEMA');
+    v_n := v_n || CASE WHEN v_n = '' THEN '' ELSE ', ' END || a || '=' || COALESCE(v_cnt::text, '?');
+    v_claves := v_claves || COALESCE(v_k, '?');
+  END LOOP;
+  BEGIN
+    PERFORM asgt.poner_actor('SISTEMA');
+    INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES (asgt.uid_de(12), asgt.pid_de(11), 'total');        -- DOP (operador de D) en D1
+    PERFORM asgt.poner_actor('DOW');
+    DELETE FROM public.projects WHERE id = asgt.pid_de(11);
+    SELECT count(*), min(classid::text || ':' || objid::text) INTO v_cnt_d, v_kd
+      FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted;
+    PERFORM asgt.poner_actor('SISTEMA');
+    RAISE EXCEPTION USING ERRCODE = 'AS999', MESSAGE = 'deshacer';
+  EXCEPTION WHEN SQLSTATE 'AS999' THEN NULL;
+  END;
+  PERFORM asgt.poner_actor('SISTEMA');
+  PERFORM asgt.chk_txt(v_n || ', DOW=' || COALESCE(v_cnt_d::text, '?'), 'AP=1, OW=1, SU=1, DOW=1',
+    '[catálogo] cada baja en cascada retiene UN solo candado (no uno por fila ni por persona de la cascada)');
+  PERFORM asgt.chk_bool(v_claves[1] <> '?' AND v_claves[1] = v_claves[2] AND v_claves[2] = v_claves[3], true,
+    '[catálogo] la baja de un proyecto de C retiene la MISMA clave sea quien sea el actor (administrador acotado, propietario, superadministrador): se ordenan entre sí');
+  PERFORM asgt.chk_bool(v_kd IS NOT NULL AND v_kd <> v_claves[1], true,
+    '[catálogo] y la baja de un proyecto de D retiene OTRA clave: el propietario de una empresa no retiene el candado de otra (V3-01)');
+END $$;
+
+-- Un borrado DIRECTO de una asignación (el proyecto sigue existiendo) NO toma ningún candado (V3-03 M-c): sin esto, dos propietarios que editan a personas distintas se esperarían sin motivo
+-- (medido: 0,02 s → 1,5 s) y ninguna otra prueba lo notaba.
+DO $$
+DECLARE
+  a text;  v_res text := '';  v_despues boolean;  v_n bigint;
+BEGIN
+  FOREACH a IN ARRAY ARRAY['OW', 'SU', 'AX'] LOOP
+    v_despues := NULL;  v_n := NULL;
+    BEGIN
+      PERFORM asgt.poner_actor(a);
+      DELETE FROM public.user_project_assignments WHERE user_id = asgt.uid_de(21) AND project_id = asgt.pid_de(1);
+      GET DIAGNOSTICS v_n = ROW_COUNT;
+      v_despues := EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted);
+      PERFORM asgt.poner_actor('SISTEMA');
+      RAISE EXCEPTION USING ERRCODE = 'AS999', MESSAGE = 'deshacer';
+    EXCEPTION WHEN SQLSTATE 'AS999' THEN NULL;
+    END;
+    PERFORM asgt.poner_actor('SISTEMA');
+    v_res := v_res || CASE WHEN v_res = '' THEN '' ELSE ', ' END || a || ':' || COALESCE(v_n::text, '?') || '>' || COALESCE(v_despues::text, '?');
+  END LOOP;
+  PERFORM asgt.chk_txt(v_res, 'OW:1>false, SU:1>false, AX:1>false',
+    '[catálogo] borrar DIRECTAMENTE una asignación (OP1 en P1; el proyecto sigue existiendo) afecta 1 fila y NO retiene ningún candado: sólo lo toma la baja en cascada');
+END $$;
+
+-- Una fila HUÉRFANA (la persona no existe en app_users) no toma candado: sin rol no puede quedar exenta. Se monta una asignación huérfana a un proyecto nuevo (con los disparadores
+-- apagados sólo para montarla: hoy el trigger de integridad no deja escribir una) y se borra el proyecto con la API.
+DO $$
+DECLARE
+  v_antes boolean;  v_despues boolean;  v_n bigint;  v_cnt int;
+BEGIN
+  BEGIN
+    PERFORM asgt.poner_actor('SISTEMA');
+    SET LOCAL session_replication_role = replica;      -- sin el tope de proyectos del plan ni el trigger de integridad, sólo para montar el caso
+    INSERT INTO public.projects (id, company_id, nombre) VALUES (asgt.pid_de(90), 'a5c00000-0000-0000-0000-000000000001', 'ASG Z huérfano');
+    INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES (asgt.uid_de(51), asgt.pid_de(90), 'total');    -- ORF1: no existe en app_users
+    SET LOCAL session_replication_role = origin;
+    PERFORM asgt.poner_actor('OW');
+    DELETE FROM public.projects WHERE id = asgt.pid_de(90);
+    GET DIAGNOSTICS v_n = ROW_COUNT;
+    v_despues := EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted);
+    PERFORM asgt.poner_actor('SISTEMA');
+    SELECT count(*) INTO v_cnt FROM public.user_project_assignments WHERE project_id = asgt.pid_de(90);
+    RAISE EXCEPTION USING ERRCODE = 'AS999', MESSAGE = 'deshacer';
+  EXCEPTION WHEN SQLSTATE 'AS999' THEN NULL;
+  END;
+  PERFORM asgt.poner_actor('SISTEMA');
+  PERFORM asgt.chk_txt(COALESCE(v_n::text, '?') || '|' || COALESCE(v_cnt::text, '?') || '|' || COALESCE(v_despues::text, '?'), '1|0|false',
+    '[catálogo] la baja en cascada de un proyecto cuya única asignación es HUÉRFANA (la persona no existe en app_users) la borra y NO toma candado: sin rol no puede quedar exenta');
 END $$;
 SELECT asgt.chk_bool(NOT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()), true,
   '[catálogo] y tras deshacer los casos esta sesión no retiene ningún candado (sin residuos)');

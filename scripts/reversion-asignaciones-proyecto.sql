@@ -44,13 +44,15 @@ END
 $pre$;
 
 -- ── 1 · las cuatro políticas, con su texto original ─────────────────────────
+-- Los nombres van CALIFICADOS (public.…): CREATE POLICY resuelve los nombres al crearla y con un search_path vacío (o sin public) «is_super_admin()» no existe (V3-04). El árbol que
+-- queda guardado es el mismo —lo que se imprime con pg_get_expr depende del search_path de quien lo mira, no de cómo se escribió—, y la suite lo comprueba (md5 por política).
 DROP POLICY IF EXISTS "user_project_assignments_select" ON public.user_project_assignments;
 CREATE POLICY "user_project_assignments_select" ON public.user_project_assignments
   FOR SELECT TO authenticated
   USING (
-    is_super_admin()
-    OR (current_user_role() = ANY(ARRAY['company_owner','admin'])
-        AND project_id IN (SELECT id FROM projects WHERE company_id = get_my_company_id()))
+    public.is_super_admin()
+    OR (public.current_user_role() = ANY(ARRAY['company_owner','admin'])
+        AND project_id IN (SELECT id FROM public.projects WHERE company_id = public.get_my_company_id()))
     OR user_id = (SELECT auth.uid())
   );
 
@@ -58,9 +60,9 @@ DROP POLICY IF EXISTS "user_project_assignments_insert" ON public.user_project_a
 CREATE POLICY "user_project_assignments_insert" ON public.user_project_assignments
   FOR INSERT TO authenticated
   WITH CHECK (
-    is_super_admin()
-    OR (current_user_role() = ANY(ARRAY['company_owner','admin'])
-        AND project_id IN (SELECT id FROM projects WHERE company_id = get_my_company_id()))
+    public.is_super_admin()
+    OR (public.current_user_role() = ANY(ARRAY['company_owner','admin'])
+        AND project_id IN (SELECT id FROM public.projects WHERE company_id = public.get_my_company_id()))
     OR user_id = (SELECT auth.uid())
   );
 
@@ -68,15 +70,15 @@ DROP POLICY IF EXISTS "user_project_assignments_update" ON public.user_project_a
 CREATE POLICY "user_project_assignments_update" ON public.user_project_assignments
   FOR UPDATE TO authenticated
   USING (
-    is_super_admin()
-    OR (current_user_role() = ANY(ARRAY['company_owner','admin'])
-        AND project_id IN (SELECT id FROM projects WHERE company_id = get_my_company_id()))
+    public.is_super_admin()
+    OR (public.current_user_role() = ANY(ARRAY['company_owner','admin'])
+        AND project_id IN (SELECT id FROM public.projects WHERE company_id = public.get_my_company_id()))
     OR user_id = (SELECT auth.uid())
   )
   WITH CHECK (
-    is_super_admin()
-    OR (current_user_role() = ANY(ARRAY['company_owner','admin'])
-        AND project_id IN (SELECT id FROM projects WHERE company_id = get_my_company_id()))
+    public.is_super_admin()
+    OR (public.current_user_role() = ANY(ARRAY['company_owner','admin'])
+        AND project_id IN (SELECT id FROM public.projects WHERE company_id = public.get_my_company_id()))
     OR user_id = (SELECT auth.uid())
   );
 
@@ -84,9 +86,9 @@ DROP POLICY IF EXISTS "user_project_assignments_delete" ON public.user_project_a
 CREATE POLICY "user_project_assignments_delete" ON public.user_project_assignments
   FOR DELETE TO authenticated
   USING (
-    is_super_admin()
-    OR (current_user_role() = ANY(ARRAY['company_owner','admin'])
-        AND project_id IN (SELECT id FROM projects WHERE company_id = get_my_company_id()))
+    public.is_super_admin()
+    OR (public.current_user_role() = ANY(ARRAY['company_owner','admin'])
+        AND project_id IN (SELECT id FROM public.projects WHERE company_id = public.get_my_company_id()))
     OR user_id = (SELECT auth.uid())
   );
 

@@ -25,7 +25,7 @@
 #   8. CONCURRENCIA con sesiones reales: dos administradores a la vez sobre la misma persona (disjuntos, solapados, por diferencias);
 #      una autoasignación mientras otro administrador asigna; la baja en cascada de los dos únicos proyectos de un administrador desde dos
 #      sesiones (F1) y la de dos administradores que COMPARTEN sus dos proyectos, o la de un propietario contra un administrador (R2-1): sin el
-#      candado GLOBAL de bajas en cascada quedan con CERO filas y exentos; una escritura legítima que llega mientras la migración —o su
+#      candado de bajas en cascada POR EMPRESA quedan con CERO filas y exentos; una escritura legítima que llega mientras la migración —o su
 #      reversión— está parada tras su pre-vuelo (F4, R02: esperan el LOCK TABLE y ya no hay un falso «las filas CAMBIARON»); la migración
 #      contra una transacción larga (lock_timeout); y el coste conocido del candado (R2-5: un interbloqueo que PostgreSQL resuelve sin dejar datos a medias).
 #      NINGUNA espera es un tiempo fijo: las sesiones se sincronizan con un candado «puerta» y se observa pg_stat_activity (wait_event_type = Lock);
@@ -94,7 +94,9 @@ trap limpiar EXIT
 if [ -n "$COMO" ]; then chown -R postgres "$DATA" "$SOCK"; fi
 
 correr "initdb -D $DATA -U postgres --auth=trust" >/dev/null
-correr "pg_ctl -D $DATA -o '-p $PUERTO -k $SOCK' -l $DATA/pg.log start" >/dev/null
+# fsync apagado: es un clúster DESECHABLE (se borra al terminar); con fsync cada commit cuesta decenas de ms en una máquina cargada y las rondas de muchas sesiones simultáneas (R2-1 a escala)
+# harían esperar a las últimas más de los 2 s del lock_timeout del candado sin que el código estuviera mal. No cambia ninguna semántica de las pruebas.
+correr "pg_ctl -D $DATA -o '-p $PUERTO -k $SOCK -c fsync=off -c synchronous_commit=off -c full_page_writes=off' -l $DATA/pg.log start" >/dev/null
 for _ in $(seq 1 200); do PGHOST="$SOCK" PGPORT="$PUERTO" psql -q -U postgres -d postgres -c 'SELECT 1' >/dev/null 2>&1 && break; sleep 0.1; done      # listo cuando acepta conexiones (no un plazo fijo)
 
 export PGHOST="$SOCK" PGPORT="$PUERTO" PGUSER=postgres
@@ -120,6 +122,29 @@ mutar_funcion() {    # mutar_funcion NOMBRE 'expresión perl s///'
   [ "$orig" != "$mut" ] || { echo "❌ mutar_funcion: la sustitución no cambió $1 (¿cambió su texto?)" >&2; exit 1; }
   printf '%s\n' "$mut"
 }
+
+# Mutaciones de la ronda de correcciones: cada una se obtiene MUTANDO la función de la propia migración (no una copia de su cuerpo).
+# Los mutadores NO dependen del texto de la guarda que decide cuándo se toma el candado (V3-03 c): sólo de tres anclas estructurales que cualquier versión
+# de la función conserva —la sentencia `PERFORM pg_advisory_xact_lock(…);`, el `BEGIN` de la función con su primer `END IF;` (el retorno temprano de
+# service_role) y la línea `IF v_toca AND NOT … THEN` (la rama de autoasignación)— y `mutar_funcion` exige que cada sustitución cambie algo, así que un refactor
+# que las perdiera rompe la suite en voz alta en vez de dejar pasar una mutación que ya no muta.
+# Quita el candado de las bajas en cascada (cualquiera que sea la guarda que lo rodee).
+QUITAR_CANDADO='s/PERFORM\s+pg_advisory_xact_lock\([^;]*;//'
+# El candado GLOBAL de la ronda anterior (b9b630b1): una sola clave para toda la base, sea cual sea la empresa (V3-01).
+CANDADO_GLOBAL='s/(PERFORM\s+pg_advisory_xact_lock\()[^;]*(;)/$1hashtextextended(\x27asg-cascada\x27, 0));/'
+# El candado POR PERSONA de la ronda de d1aeb94a, dentro de la rama de autoasignación: sólo ordena a las sesiones de la MISMA persona.
+CANDADO_POR_PERSONA='s/(IF v_toca AND NOT [^\n]*THEN\n)/$1    IF TG_OP = \x27DELETE\x27 THEN PERFORM pg_advisory_xact_lock(hashtextextended(\x27asg:\x27 || OLD.user_id::text, 0)); END IF;\n/'
+# El candado GLOBAL, pero tomado sólo DENTRO de la rama de autoasignación (cuando quien borra es dueño de la fila): una baja del propietario o del superadministrador no lo toma.
+CANDADO_SOLO_SI_PROPIA='s/(IF v_toca AND NOT [^\n]*THEN\n)/$1    PERFORM pg_advisory_xact_lock(hashtextextended(\x27asg-cascada\x27, 0));\n/'
+# El candado tomado en TODA baja de una asignación hecha con la API, también en un borrado DIRECTO (el proyecto sigue existiendo), justo tras el retorno temprano de service_role (V3-03 M-c).
+CANDADO_EN_TODA_BAJA='s/(\nBEGIN\n.*?\bEND IF;\n)/$1  IF TG_OP = \x27DELETE\x27 THEN PERFORM pg_advisory_xact_lock(hashtextextended(\x27asg-cascada:\x27 || COALESCE((SELECT u.company_id::text FROM public.app_users u WHERE u.id = OLD.user_id), \x27sin-empresa\x27), 0)); END IF;\n/s'
+# El candado dentro del AND de la comprobación «¿le queda otra fila?» (el primer parche que se probó): espera, pero compara con la instantánea de antes de esperar.
+CANDADO_DENTRO_DEL_AND='s/(AND EXISTS \(SELECT 1 FROM public\.user_project_assignments)/AND (SELECT true FROM (SELECT pg_advisory_xact_lock(hashtextextended(\x27asg-cascada\x27, 0))) l)\n       $1/'
+# Sin el lock_timeout propio de la función (el cláusula SET de la cabecera): la baja espera hasta el statement_timeout de la sesión en vez de fallar a los 2 s.
+SIN_LOCK_TIMEOUT='s/\n\s*SET lock_timeout = \x272s\x27//'
+
+# Sólo el PLAZO del lock_timeout (2 s → 60 s): con muchísimas sesiones a la vez las últimas de la cola pueden agotar los 2 s legítimamente; con el plazo largo la ronda debe ser EXACTA.
+LOCK_TIMEOUT_LARGO='s/SET lock_timeout = \x272s\x27/SET lock_timeout = \x2760s\x27/'
 
 # Corre una suite y exige que TERMINE bien; muestra sus ✓.
 bloque() {           # bloque ARCHIVO ETIQUETA [BD]
@@ -364,6 +389,21 @@ echo "── 5/10 · DATOS COMO PRODUCCIÓN: las 43 filas y el alcance de cada p
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -v tag=despues -d "$BD" -f "$AQUI/snapshot.sql" >/dev/null
 bloque assert_datos_produccion.sql "5 · huella md5, fila a fila, can_access_project, user_is_project_exempt y lectura de las 39 personas"
 copia "$BD" "$BD_POST"
+if [ "${ASG_CARGA:-}" = "1" ]; then
+  # Mediciones de carga (V3-01, D-15), NO la suite: tres variantes del candado sobre copias de la base con la migración —«empresa» (la migración), «global» (la versión b9b630b1) y «sin» (sin candado)—
+  # y los escenarios de carga/medir.sh. Cifras de referencia que se pueden repetir con este mismo comando.
+  echo "── MEDICIONES DE CARGA (ASG_CARGA=1; no forma parte de la suite)"
+  for variante in empresa global sin; do
+    copia "$BD_POST" "asg_carga_$variante"
+    case "$variante" in
+      global) psql -q -v ON_ERROR_STOP=1 -d asg_carga_global -c "$(mutar_funcion asignacion_bloquear_propia "$CANDADO_GLOBAL; $SIN_LOCK_TIMEOUT")" >/dev/null ;;     # como b9b630b1: una clave y sin lock_timeout propio
+      sin)    psql -q -v ON_ERROR_STOP=1 -d asg_carga_sin    -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO")" >/dev/null ;;
+    esac
+    # shellcheck disable=SC2086
+    PGDATABASE="asg_carga_$variante" ASG_CARGA_ETIQUETA="$variante" bash "$AQUI/carga/medir.sh" ${ASG_CARGA_ESCENARIOS:-dos-empresas misma-empresa costo interbloqueos}
+  done
+  exit 0
+fi
 # los flujos de la pantalla, con la migración: lo legítimo es IDÉNTICO, sólo cambia la autoedición
 PGOPTIONS="-c asgt.mostrar=on" psql -q -d "$BD_POST" -f "$AQUI/assert_flujos.sql" 2>&1 | sed -n 's/.*NOTICE:  MUESTRA|//p' > "$SALIDAS/flujos_despues.txt"
 DISTINTOS=$(diff "$SALIDAS/flujos_antes.txt" "$SALIDAS/flujos_despues.txt" | grep -c '^<' || true)
@@ -440,6 +480,27 @@ aplicar "$SALIDAS/reversion_regex_vieja.sql" asg_rev_sp || { echo "❌ 8b · la 
 N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
 baja asg_rev_sp
 echo "   ✓ 8b · con auth en el search_path la reversión se aplica y deja el MISMO catálogo que antes de la migración; la comprobación vieja ABORTA ahí («las políticas no quedaron como las originales») sin deshacer nada y pasa con el search_path normal"
+# 8c · y con un search_path VACÍO o sin public (V3-04): CREATE POLICY resuelve los nombres al crearla, así que el texto original va CALIFICADO (public.is_super_admin()…). Se prueba con varios search_path
+#      y se MUTA la reversión (los nombres sin calificar, como estaban): con un search_path vacío ABORTA con «function is_super_admin() does not exist» y con auth,public pasa.
+for SP in "" "public" "pg_catalog" '"$user",public' "auth,public,extensions"; do
+  copia "$BD_POST" asg_rev_sp
+  aplicar_sp "$REVERSION" asg_rev_sp "$SP" || { echo "❌ 8c · la reversión abortó con search_path='$SP'"; exit 1; }
+  huella asg_rev_sp > "$SALIDAS/huella_rev_sp2.txt"
+  diff -q "$SALIDAS/huella_antes.txt" "$SALIDAS/huella_rev_sp2.txt" >/dev/null || { echo "❌ 8c · con search_path='$SP' la reversión no deja el catálogo como estaba"; diff "$SALIDAS/huella_antes.txt" "$SALIDAS/huella_rev_sp2.txt" | head; exit 1; }
+  [ "$(q "SELECT string_agg(polname || '=' || md5(COALESCE(pg_get_expr(polqual, polrelid), '') || '|' || COALESCE(pg_get_expr(polwithcheck, polrelid), '')), ',' ORDER BY polname) FROM pg_policy WHERE polrelid = 'public.user_project_assignments'::regclass" asg_rev_sp)" = "$POLITICAS_ANTES" ] \
+    || { echo "❌ 8c · con search_path='$SP' el árbol de las políticas revertidas no es el original"; exit 1; }
+done
+perl -pe 's/\bpublic\.(is_super_admin|current_user_role|get_my_company_id)\(/$1(/g; s/FROM public\.projects WHERE company_id/FROM projects WHERE company_id/' "$REVERSION" > "$SALIDAS/reversion_sin_calificar.sql"
+[ "$(grep -c 'public\.is_super_admin()' "$SALIDAS/reversion_sin_calificar.sql")" -eq 0 ] && [ "$(grep -c 'FROM projects WHERE company_id' "$SALIDAS/reversion_sin_calificar.sql")" -eq 5 ] || { echo "❌ 8c · no se pudo preparar la reversión sin calificar"; exit 1; }
+copia "$BD_POST" asg_rev_sp
+SALIDA_RSQ=$(PGOPTIONS="-c search_path=" psql -q -v ON_ERROR_STOP=1 -d asg_rev_sp -f "$SALIDAS/reversion_sin_calificar.sql" 2>&1) && { echo "❌ 8c · la reversión sin calificar debía abortar con un search_path vacío"; exit 1; }
+echo "$SALIDA_RSQ" | grep -q 'function is_super_admin() does not exist' || { echo "❌ 8c · abortó por otra cosa:"; echo "$SALIDA_RSQ" | grep ERROR | head -3; exit 1; }
+[ "$(q "SELECT count(*) FROM pg_proc WHERE proname LIKE 'asignacion\\_%'" asg_rev_sp)" = "3" ] || { echo "❌ 8c · el aborto de la reversión sin calificar no dejó el estado migrado intacto (3 funciones)"; exit 1; }
+copia "$BD_POST" asg_rev_sp
+aplicar_sp "$SALIDAS/reversion_sin_calificar.sql" asg_rev_sp "auth,public" || { echo "❌ 8c · la reversión sin calificar debía pasar con auth,public (el defecto era del search_path vacío)"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
+baja asg_rev_sp
+echo "   ✓ 8c · la reversión se aplica con search_path vacío, «public», «pg_catalog», «\"\$user\", public» y «auth,public,extensions» y deja el MISMO catálogo (y el mismo árbol de políticas) que antes de la migración; sin calificar los nombres (V3-04) ABORTA con search_path vacío («function is_super_admin() does not exist») y pasa con auth,public"
 baja asg_rev
 
 echo "── 9/10 · MUTACIONES: se revierte a mano cada pieza y alguna aserción se pone ROJA"
@@ -499,22 +560,23 @@ mutacion "la política SELECT pierde la lectura de las propias" \
 mutacion "se revierte TODO (las políticas originales y sin triggers: lo que haría un revert completo)" \
   "DROP TRIGGER trg_asignacion_empresa ON public.user_project_assignments; DROP TRIGGER trg_asignacion_propia ON public.user_project_assignments; DROP POLICY user_project_assignments_insert ON public.user_project_assignments; DROP POLICY user_project_assignments_update ON public.user_project_assignments; DROP POLICY user_project_assignments_delete ON public.user_project_assignments; CREATE POLICY user_project_assignments_insert ON public.user_project_assignments FOR INSERT TO authenticated WITH CHECK ($POL_ORIGINAL); CREATE POLICY user_project_assignments_update ON public.user_project_assignments FOR UPDATE TO authenticated USING ($POL_ORIGINAL) WITH CHECK ($POL_ORIGINAL); CREATE POLICY user_project_assignments_delete ON public.user_project_assignments FOR DELETE TO authenticated USING ($POL_ORIGINAL)" \
   "assert_catalogo assert_matriz assert_flujos assert_alcance assert_capas assert_defensa"
-# Mutaciones de la ronda de correcciones: cada una se obtiene MUTANDO la función de la propia migración (no una copia de su cuerpo).
-# Quita el candado GLOBAL de las bajas en cascada (el bloque `IF TG_OP = 'DELETE' AND NOT EXISTS (… projects …) THEN PERFORM pg_advisory_xact_lock(…); END IF;` de antes de v_toca).
-QUITAR_CANDADO='s/\n\s*IF TG_OP = \x27DELETE\x27 AND NOT EXISTS \(SELECT 1 FROM public\.projects p WHERE p\.id = OLD\.project_id\) THEN\n\s*PERFORM pg_advisory_xact_lock\([^\n]*\n\s*END IF;//'
-# El candado POR PERSONA de la ronda anterior (d1aeb94a), dentro de la rama de autoasignación: sólo ordena a las sesiones de la MISMA persona.
-CANDADO_POR_PERSONA='s/(IF v_toca AND NOT [^\n]*THEN\n)/$1    IF TG_OP = \x27DELETE\x27 THEN PERFORM pg_advisory_xact_lock(hashtextextended(\x27asg:\x27 || OLD.user_id::text, 0)); END IF;\n/'
-# El candado GLOBAL, pero tomado sólo DENTRO de la rama de autoasignación (cuando quien borra es dueño de la fila): una baja del propietario o del superadministrador no lo toma.
-CANDADO_SOLO_SI_PROPIA='s/(IF v_toca AND NOT [^\n]*THEN\n)/$1    PERFORM pg_advisory_xact_lock(hashtextextended(\x27asg-cascada\x27, 0));\n/'
-
 mutacion "F-08 · la baja en cascada se permite SIN comprobar que el proyecto ya no existe: borrar UNA fila propia pasa mientras quede otra" \
   "$(mutar_funcion asignacion_bloquear_propia 's/\n\s*AND NOT EXISTS \(SELECT 1 FROM public\.projects p WHERE p\.id = OLD\.project_id\)//')" \
   "assert_defensa"
 mutacion "F3 · el trigger de autoasignación sin COALESCE: para una sesión sin app_users (rol NULL) el IF da NULL y falla ABIERTO" \
   "$(mutar_funcion asignacion_bloquear_propia 's/COALESCE\(public\.is_super_admin\(\), false\) OR COALESCE\(public\.current_user_role\(\) = \x27company_owner\x27, false\)/public.is_super_admin() OR public.current_user_role() = \x27company_owner\x27/')" \
   "assert_defensa"
-mutacion "F1/R2-1 · se quita el candado global de la baja en cascada (las carreras de abajo, en la sección 10, lo detectan con sesiones reales; aquí lo ve el comportamiento: la baja ya no retiene ningún candado)" \
+mutacion "F1/R2-1 · se quita el candado de la baja en cascada (las carreras de abajo, en la sección 10, lo detectan con sesiones reales; aquí lo ve el comportamiento: la baja ya no retiene ningún candado)" \
   "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO")" \
+  "assert_catalogo"
+mutacion "V3-01 · el candado vuelve a ser GLOBAL (una sola clave para todas las empresas: un propietario retiene las bajas de las demás; aquí lo ve la clave retenida, que ya no cambia de empresa a empresa)" \
+  "$(mutar_funcion asignacion_bloquear_propia "$CANDADO_GLOBAL")" \
+  "assert_catalogo"
+mutacion "V3-03 M-c · el candado se toma también en un borrado DIRECTO de una asignación (el proyecto sigue existiendo): ninguna otra prueba lo notaba" \
+  "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO; $CANDADO_EN_TODA_BAJA")" \
+  "assert_catalogo"
+mutacion "V3-01 · la función pierde su lock_timeout propio (la baja esperaría hasta el statement_timeout; la espera acotada de 2 s la prueba la sección 10 con una sesión real)" \
+  "$(mutar_funcion asignacion_bloquear_propia "$SIN_LOCK_TIMEOUT")" \
   "assert_catalogo"
 
 echo "── 10/10 · concurrencia: sesiones REALES simultáneas y la migración contra una transacción larga"
@@ -571,16 +633,28 @@ SQL
 }
 par() {              # par BASE NOMBRE ACTOR1 SQL1 ACTOR2 SQL2 — la 1 hace lo suyo y se detiene SIN confirmar; la 2 arranca y se ESPERA a que termine o quede
                      # esperando un bloqueo; sólo entonces se suelta la puerta. Deja en ESTADO2 lo observado de la 2 antes de soltar: «terminó» | «esperando».
+                     # Opcionales (variables de entorno de UNA llamada): PAR_OBS_SQL = un SELECT que se evalúa con las dos sesiones en ese estado, ANTES de soltar la puerta
+                     # (su resultado queda en PAR_OBS); PAR_PLAZO = N sondeos de 50 ms durante los cuales se deja la puerta CERRADA aunque la 2 ya esté esperando, para ver
+                     # si la espera termina sola (lock_timeout): ESTADO2 pasa a «terminó» si acabó dentro del plazo y T2 guarda cuántos ms pasaron desde que arrancó la 2.
   local bd="$1" n="$2" fin1="$SALIDAS/$2.fin1" fin2="$SALIDAS/$2.fin2"
   rm -f "$fin1" "$fin2"
   ctl_abrir "$bd" "$n" 1
   ( sesion "$bd" "$3" "asg_${n}_1" 1 <<<"$4" > "$SALIDAS/${n}1.txt" 2>&1 || true; touch "$fin1" ) &
   local p1=$!
   esperar_o_fin "$bd" "$(en_puerta 1)" "$fin1"
+  local t_ini=$(date +%s%N)
   ( sesion "$bd" "$5" "asg_${n}_2" - <<<"$6" > "$SALIDAS/${n}2.txt" 2>&1 || true; touch "$fin2" ) &
   local p2=$!
   esperar_o_fin "$bd" "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = 'asg_${n}_2' AND wait_event_type = 'Lock')" "$fin2"
   if [ -e "$fin2" ]; then ESTADO2=terminó; else ESTADO2=esperando; fi
+  PAR_OBS=""; [ -z "${PAR_OBS_SQL:-}" ] || PAR_OBS=$(q "$PAR_OBS_SQL" "$bd")
+  T2=""
+  if [ "$ESTADO2" = esperando ] && [ -n "${PAR_PLAZO:-}" ]; then
+    local i
+    for i in $(seq 1 "$PAR_PLAZO"); do [ -e "$fin2" ] && break; sleep 0.05; done
+    T2=$(( ($(date +%s%N) - t_ini) / 1000000 ))
+    if [ -e "$fin2" ]; then ESTADO2=terminó; fi
+  fi
   ctl_soltar 1
   wait $p1 $p2 || true
 }
@@ -663,7 +737,7 @@ baja asg_conc
 
 # F1 · BAJA EN CASCADA CONCURRENTE: dos sesiones, cada una borra UNO de los DOS únicos proyectos de un administrador acotado (AP queda con sólo P1 y P2).
 #      Cada sesión, por separado, tiene permiso (le queda la otra fila); juntas lo dejarían con CERO filas y, siendo administrador, EXENTO (ve toda la empresa).
-#      Con el candado global de bajas en cascada la 2ª ESPERA a la 1ª, ve lo que ésta confirmó y recibe ASIGNACION_PROPIA_NO_PERMITIDA.
+#      Con el candado de bajas en cascada (por empresa) la 2ª ESPERA a la 1ª, ve lo que ésta confirmó y recibe ASIGNACION_PROPIA_NO_PERMITIDA.
 carrera_f1() {       # carrera_f1 BD NOMBRE — deja en RES «filas de AP|exento|estado observado de la 2ª sesión antes de soltar la puerta»
   q "DELETE FROM public.user_project_assignments WHERE user_id = '$(UID_ 6)' AND project_id = '$(PID_ 3)'" "$1" >/dev/null
   par "$1" "$2" AP "DELETE FROM public.projects WHERE id = '$(PID_ 1)';" AP "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"
@@ -672,7 +746,7 @@ carrera_f1() {       # carrera_f1 BD NOMBRE — deja en RES «filas de AP|exento
 copia "$BD_POST" asg_conc
 carrera_f1 asg_conc ca
 sin_deadlock ca && [ "$RES" = "1|f|esperando" ] && ! grep -qi 'error' "$SALIDAS/ca1.txt" && grep -q 'ASIGNACION_PROPIA_NO_PERMITIDA' "$SALIDAS/ca2.txt" \
-  && echo "  ✓ F1 · dos sesiones borran cada una uno de los 2 únicos proyectos de AP: la 2ª ESPERA (candado global), recibe ASIGNACION_PROPIA_NO_PERMITIDA, AP conserva 1 fila y NO es exento" \
+  && echo "  ✓ F1 · dos sesiones borran cada una uno de los 2 únicos proyectos de AP: la 2ª ESPERA (candado de la empresa), recibe ASIGNACION_PROPIA_NO_PERMITIDA, AP conserva 1 fila y NO es exento" \
   || { echo "❌ F1 · RES=$RES"; cat "$SALIDAS/ca1.txt" "$SALIDAS/ca2.txt"; exit 1; }
 # control negativo: SIN el candado (la función de la migración mutada) la carrera es real: AP se queda con CERO filas y exento
 copia "$BD_POST" asg_conc
@@ -683,7 +757,7 @@ carrera_f1 asg_conc cb
   || { echo "❌ F1 · sin el candado debía quedar 0|t|terminó y hay $RES"; cat "$SALIDAS/cb1.txt" "$SALIDAS/cb2.txt"; exit 1; }
 # control negativo 2: el candado DENTRO del AND de la condición (el primer parche que se probó) espera, pero compara con la instantánea vieja y tampoco sirve
 copia "$BD_POST" asg_conc
-psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO; "'s/(AND NOT EXISTS \(SELECT 1 FROM public\.projects p WHERE p\.id = OLD\.project_id\))/AND (SELECT true FROM (SELECT pg_advisory_xact_lock(hashtextextended(\x27asg-cascada\x27, 0))) l)\n       $1/')" >/dev/null
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO; $CANDADO_DENTRO_DEL_AND")" >/dev/null
 carrera_f1 asg_conc cc
 [ "$RES" = "0|t|esperando" ] \
   && echo "  ✓ F1 · mutación «candado dentro del AND»: la 2ª sí espera, pero decide con la instantánea de antes de esperar y AP termina con 0 filas y EXENTO: el candado tiene que ir en una sentencia ANTES" \
@@ -727,7 +801,7 @@ RES="$(q "SELECT asgt.filas_de('$(UID_ 90)')" asg_conc)|$(q "SELECT asgt.exento(
 sin_deadlock xc && [ "$RES" = "P2|f|esperando" ] && ! grep -qi 'error' "$SALIDAS/xc1.txt" && grep -q 'ASIGNACION_PROPIA_NO_PERMITIDA' "$SALIDAS/xc2.txt" \
   && echo "  ✓ R2-1 · el PROPIETARIO borra P1 (sin confirmar) y ADM1 {P1,P2} borra P2: ADM1 ESPERA, ve que P1 ya no está y recibe ASIGNACION_PROPIA_NO_PERMITIDA; conserva {P2}, no exento" \
   || { echo "❌ R2-1 · propietario contra administrador: RES=$RES (esperado P2|f|esperando)"; cat "$SALIDAS/xc1.txt" "$SALIDAS/xc2.txt"; exit 1; }
-# control negativo 2: el candado global tomado sólo DENTRO de la rama de autoasignación (la baja del propietario no lo toma): ADM1 no espera y queda exento
+# control negativo 2: el candado tomado sólo DENTRO de la rama de autoasignación (la baja del propietario no lo toma): ADM1 no espera y queda exento
 copia "$BD_POST" asg_conc
 psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO; $CANDADO_SOLO_SI_PROPIA")" >/dev/null
 admins_xp asg_conc
@@ -739,7 +813,156 @@ RES="$(q "SELECT asgt.filas_de('$(UID_ 90)')" asg_conc)|$(q "SELECT asgt.exento(
 N_MUT_CONC=$((N_MUT_CONC + 2))
 baja asg_conc
 
-# R2-5 · COSTE CONOCIDO del candado global, medido: en una transacción de VARIAS sentencias que combine «borrar un proyecto» con «asignar sobre un proyecto que otra transacción está
+# V3-01 · EL CANDADO ES POR EMPRESA. La versión anterior (b9b630b1) usaba UNA clave para toda la base: el propietario de CUALQUIER empresa —signup-company es público— retenía con una baja pesada las
+#         bajas de proyecto de todas las demás (medido con pgbench: la víctima de otra empresa pasaba de 220 a 0,5 transacciones/s). Ahora la clave sale de la empresa de la PERSONA cuya fila se
+#         borra: las bajas de D no hacen esperar a las de C, las de la misma empresa sí se ordenan (R2-1) y, si la espera pasa de 2 s, fallan limpias (lock_timeout de la propia función).
+#         Todo con sesiones reales y la puerta; ninguna espera es un tiempo fijo salvo el plazo de PAR_PLAZO, que sólo se agota cuando el código está mal.
+OBS_ASG="SELECT 'esperan=' || (SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND classid <> $PUERTA AND NOT granted)
+            || ';retiene_1=' || (SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a USING (pid) WHERE l.locktype = 'advisory' AND l.classid <> $PUERTA AND l.granted AND a.application_name LIKE '%\_1')"
+dop_en_d() { q "INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES ('$(UID_ 12)', '$(PID_ 11)', 'total'), ('$(UID_ 12)', '$(PID_ 12)', 'total')" "$1" >/dev/null; }   # DOP (operador de D) en D1 y D2: su baja en cascada ES una fila con candado
+copia "$BD_POST" asg_conc; dop_en_d asg_conc
+PAR_OBS_SQL="$OBS_ASG"; par asg_conc ea DOW "DELETE FROM public.projects WHERE id = '$(PID_ 11)';" OW "DELETE FROM public.projects WHERE id = '$(PID_ 3)';"; unset PAR_OBS_SQL
+sin_deadlock ea && [ "$ESTADO2" = "terminó" ] && [ "$PAR_OBS" = "esperan=0;retiene_1=1" ] && ! grep -qi 'error' "$SALIDAS/ea1.txt" "$SALIDAS/ea2.txt" \
+  && [ "$(q "SELECT count(*) FROM public.projects WHERE id IN ('$(PID_ 3)', '$(PID_ 11)')" asg_conc)" = "0" ] \
+  && echo "  ✓ V3-01 · el propietario de D borra D1 (retiene SU candado, sin confirmar) y el de C borra P3: la baja de C TERMINA sin esperar y ninguna sesión espera ningún candado de aviso ($PAR_OBS)" \
+  || { echo "❌ V3-01 · una baja de la empresa D hizo esperar a una de la empresa C: ESTADO2=$ESTADO2 obs=$PAR_OBS"; cat "$SALIDAS/ea1.txt" "$SALIDAS/ea2.txt"; exit 1; }
+# la misma empresa SÍ se ordena (y un atacante de D sólo afecta a D): el propietario de D contra sí mismo en dos pestañas
+copia "$BD_POST" asg_conc; dop_en_d asg_conc
+PAR_OBS_SQL="$OBS_ASG"; par asg_conc eb DOW "DELETE FROM public.projects WHERE id = '$(PID_ 11)';" DOW "DELETE FROM public.projects WHERE id = '$(PID_ 12)';"; unset PAR_OBS_SQL
+sin_deadlock eb && [ "$ESTADO2" = "esperando" ] && [ "$PAR_OBS" = "esperan=1;retiene_1=1" ] && ! grep -qi 'error' "$SALIDAS/eb1.txt" "$SALIDAS/eb2.txt" \
+  && [ "$(q "SELECT count(*) FROM public.projects WHERE id IN ('$(PID_ 11)', '$(PID_ 12)')" asg_conc)" = "0" ] \
+  && echo "  ✓ V3-01 · dos bajas de la MISMA empresa D sí se ordenan: la 2ª ESPERA el candado de D ($PAR_OBS), y al soltarse las dos terminan sin error (D1 y D2 borrados): quien retiene el candado sólo estorba a su propia empresa" \
+  || { echo "❌ V3-01 · dos bajas de la misma empresa debían ordenarse: ESTADO2=$ESTADO2 obs=$PAR_OBS"; cat "$SALIDAS/eb1.txt" "$SALIDAS/eb2.txt"; exit 1; }
+# la espera está ACOTADA: la puerta sigue cerrada y la 2ª falla sola a los 2 s con lock_not_available, sin dejar nada
+copia "$BD_POST" asg_conc; dop_en_d asg_conc
+PAR_PLAZO=120 par asg_conc ec DOW "DELETE FROM public.projects WHERE id = '$(PID_ 11)';" DOW "DELETE FROM public.projects WHERE id = '$(PID_ 12)';"; unset PAR_PLAZO
+sin_deadlock ec && [ "$ESTADO2" = "terminó" ] && [ "${T2:-0}" -ge 1900 ] && grep -q 'canceling statement due to lock timeout' "$SALIDAS/ec2.txt" && ! grep -qi 'error' "$SALIDAS/ec1.txt" \
+  && [ "$(q "SELECT count(*) FROM public.projects WHERE id = '$(PID_ 12)'" asg_conc)" = "1" ] && [ "$(q "SELECT count(*) FROM public.projects WHERE id = '$(PID_ 11)'" asg_conc)" = "0" ] \
+  && echo "  ✓ V3-01 · con la puerta cerrada, la baja que espera el candado FALLA SOLA a los $T2 ms («canceling statement due to lock timeout», 55P03, lock_timeout de 2 s de la función); D2 sigue en pie y la 1ª confirma D1" \
+  || { echo "❌ V3-01 · la espera del candado no se acotó a 2 s: ESTADO2=$ESTADO2 T2=${T2:-?} ms"; cat "$SALIDAS/ec1.txt" "$SALIDAS/ec2.txt"; exit 1; }
+baja asg_conc
+
+# controles negativos de V3-01: (1) el candado GLOBAL de la ronda anterior (la baja de C espera a la de D), (2) sin lock_timeout propio (la espera no termina sola)
+copia "$BD_POST" asg_conc; dop_en_d asg_conc
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$CANDADO_GLOBAL")" >/dev/null
+PAR_OBS_SQL="$OBS_ASG"; par asg_conc ed DOW "DELETE FROM public.projects WHERE id = '$(PID_ 11)';" OW "DELETE FROM public.projects WHERE id = '$(PID_ 3)';"; unset PAR_OBS_SQL
+[ "$ESTADO2" = "esperando" ] && [ "$PAR_OBS" = "esperan=1;retiene_1=1" ] \
+  && echo "  ✓ V3-01 · mutación «candado GLOBAL» (b9b630b1): la baja de la empresa C ESPERA a la de D ($PAR_OBS): la prueba ve la denegación de servicio entre empresas" \
+  || { echo "❌ V3-01 · con el candado global la baja de C debía esperar a la de D: ESTADO2=$ESTADO2 obs=$PAR_OBS"; cat "$SALIDAS/ed1.txt" "$SALIDAS/ed2.txt"; exit 1; }
+copia "$BD_POST" asg_conc; dop_en_d asg_conc
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$SIN_LOCK_TIMEOUT")" >/dev/null
+PAR_PLAZO=80 par asg_conc ee DOW "DELETE FROM public.projects WHERE id = '$(PID_ 11)';" DOW "DELETE FROM public.projects WHERE id = '$(PID_ 12)';"; unset PAR_PLAZO
+[ "$ESTADO2" = "esperando" ] \
+  && echo "  ✓ V3-01 · mutación «sin lock_timeout propio»: tras ${T2:-4000} ms con la puerta cerrada la 2ª sigue esperando (sólo el statement_timeout la cortaría): la prueba ve la espera sin acotar" \
+  || { echo "❌ V3-01 · sin lock_timeout la 2ª debía seguir esperando: ESTADO2=$ESTADO2 T2=${T2:-?}"; cat "$SALIDAS/ee1.txt" "$SALIDAS/ee2.txt"; exit 1; }
+N_MUT_CONC=$((N_MUT_CONC + 2))
+baja asg_conc
+
+# R2-1 a ESCALA (2, 6 y 30 sesiones). K sesiones REALES a la vez (una puerta COMPARTIDA las suelta juntas): tres administradores (ADN1..3) comparten TODOS los K proyectos de la ronda y la
+#        sesión i (actor ADN(1+i%3)) borra el proyecto i. El resultado debe equivaler a un orden en serie, sea cual sea el entrelazado: sobrevive EXACTAMENTE un proyecto, cada administrador
+#        conserva 1 fila (ninguno exento), se rechaza UNA baja (la última, que lo dejaría sin filas) y no hay interbloqueos ni otros errores. Sin el candado quedan exentos casi siempre.
+personas_n() {       # personas_n BD — ADN1..3: administradores de C sin filas
+  q "INSERT INTO auth.users (id) VALUES ('$(UID_ 93)'), ('$(UID_ 94)'), ('$(UID_ 95)');
+     INSERT INTO public.app_users (id, company_id, full_name, role) VALUES ('$(UID_ 93)', 'a5c00000-0000-0000-0000-000000000001', 'ASG ADN1', 'admin'), ('$(UID_ 94)', 'a5c00000-0000-0000-0000-000000000001', 'ASG ADN2', 'admin'), ('$(UID_ 95)', 'a5c00000-0000-0000-0000-000000000001', 'ASG ADN3', 'admin');
+     INSERT INTO asgt.ids VALUES ('ADN1', '$(UID_ 93)', 'persona'), ('ADN2', '$(UID_ 94)', 'persona'), ('ADN3', '$(UID_ 95)', 'persona')" "$1" >/dev/null
+}
+PN="a5d00000-0000-0000-0001-"           # proyectos de la ronda: a5d00000-0000-0000-0001-<12 dígitos>
+ronda_lista() {      # ronda_lista BD K — los K proyectos de la ronda, cada uno con los tres administradores; sin restos de la ronda anterior
+  q "DELETE FROM public.user_project_assignments WHERE project_id::text LIKE '$PN%'; DELETE FROM public.projects WHERE id::text LIKE '$PN%';
+     SET session_replication_role = replica;
+     INSERT INTO public.projects (id, company_id, nombre) SELECT ('$PN' || lpad(g::text, 12, '0'))::uuid, 'a5c00000-0000-0000-0000-000000000001', 'ASG N' || g FROM generate_series(1, $2) g;
+     SET session_replication_role = origin;
+     INSERT INTO public.user_project_assignments (user_id, project_id, permission_type)
+       SELECT u, ('$PN' || lpad(g::text, 12, '0'))::uuid, 'total' FROM unnest(ARRAY['$(UID_ 93)', '$(UID_ 94)', '$(UID_ 95)']::uuid[]) u, generate_series(1, $2) g" "$1" >/dev/null
+}
+ronda_n() {          # ronda_n BD K — las K sesiones a la vez
+  local bd="$1" k="$2" i pids=()
+  rm -f "$SALIDAS"/rn_*.txt
+  ctl_abrir "$bd" rn 7
+  for i in $(seq 1 "$k"); do
+    ( PGAPPNAME="asg_rn_$i" psql -q -X -t -A -d "$bd" > "$SALIDAS/rn_$i.txt" 2>&1 <<SQL || true
+SELECT pg_advisory_lock_shared($PUERTA, 7);
+SELECT pg_advisory_unlock_shared($PUERTA, 7);
+BEGIN;
+SELECT asgt.poner_actor('ADN$((1 + i % 3))');
+DELETE FROM public.projects WHERE id = '$PN$(printf '%012d' "$i")';
+COMMIT;
+SQL
+    ) &
+    pids+=($!)
+  done
+  esperar "$bd" "SELECT count(*) = $k FROM pg_locks WHERE locktype = 'advisory' AND classid = $PUERTA AND objid = 7 AND objsubid = 2 AND NOT granted" "las $k sesiones esperando la salida"
+  ctl_soltar 7
+  wait "${pids[@]}" || true
+}
+resumen_n() {        # «administradores sin filas|proyectos que quedan|filas de cada administrador|bajas rechazadas|esperas agotadas (lock timeout)|otros errores»
+  local bd="$1" rech lt err
+  rech=$(cat "$SALIDAS"/rn_*.txt | grep -c 'ASIGNACION_PROPIA_NO_PERMITIDA' || true)
+  lt=$(cat "$SALIDAS"/rn_*.txt | grep -c 'canceling statement due to lock timeout' || true)
+  err=$(cat "$SALIDAS"/rn_*.txt | grep 'ERROR' | grep -v 'ASIGNACION_PROPIA_NO_PERMITIDA' | grep -vc 'canceling statement due to lock timeout' || true)
+  echo "$(q "SELECT count(*) FROM public.app_users a WHERE a.id IN ('$(UID_ 93)', '$(UID_ 94)', '$(UID_ 95)') AND NOT EXISTS (SELECT 1 FROM public.user_project_assignments u WHERE u.user_id = a.id)" "$bd")|$(q "SELECT count(*) FROM public.projects WHERE id::text LIKE '$PN%'" "$bd")|$(q "SELECT string_agg(n::text, ',' ORDER BY id) FROM (SELECT a.id, (SELECT count(*) FROM public.user_project_assignments u WHERE u.user_id = a.id) n FROM public.app_users a WHERE a.id IN ('$(UID_ 93)', '$(UID_ 94)', '$(UID_ 95)')) x" "$bd")|$rech|$lt|$err"
+}
+# Una ronda es EXACTA si equivale a un orden en serie sin esperas agotadas: 0 exentos, 1 proyecto, 1 fila por administrador, 1 baja rechazada, 0 otros errores. Con MUCHAS sesiones a la vez las últimas de la cola pueden agotar
+# legítimamente los 2 s del lock_timeout (fallan limpias con 55P03 y no cambian nada): esa ronda es SEGURA si, aun así, nadie quedó exento, todos conservan tantas filas como proyectos quedan (≥ 1),
+# hubo a lo sumo una baja rechazada y no hay interbloqueos ni otros errores. Lo que importa para la seguridad es lo segundo; lo primero sólo falla si el código está mal o la máquina no da más.
+rondas_n() {         # rondas_n BD K RONDAS — imprime «malas exentas exactas con_esperas_agotadas»
+  local bd="$1" k="$2" r="$3" i res malas=0 exentas=0 exactas=0 conlt=0 ex pr fi re lt er n1
+  for i in $(seq 1 "$r"); do
+    ronda_lista "$bd" "$k"; ronda_n "$bd" "$k"; res=$(resumen_n "$bd")
+    IFS='|' read -r ex pr fi re lt er <<<"$res"
+    n1="$pr,$pr,$pr"
+    if [ "$res" = "0|1|1,1,1|1|0|0" ]; then exactas=$((exactas + 1))
+    elif [ "$ex" = "0" ] && [ "$pr" -ge 1 ] && [ "$fi" = "$n1" ] && [ "$re" -le 1 ] && [ "$er" = "0" ] && [ "$lt" -ge 1 ]; then conlt=$((conlt + 1))
+    else malas=$((malas + 1)); [ "$ex" = "0" ] || exentas=$((exentas + 1)); echo "     ronda $i de $k sesiones: $res" >&2
+    fi
+  done
+  echo "$malas $exentas $exactas $conlt"
+}
+copia "$BD_POST" asg_conc; personas_n asg_conc
+for kr in "2 8" "6 5" "30 4"; do
+  set -- $kr; K=$1; RN=$2
+  R=$(rondas_n asg_conc "$K" "$RN"); set -- $R; MALAS=$1; EXENTAS=$2; EXACTAS=$3; CONLT=$4
+  if [ "$K" -le 6 ]; then
+    [ "$MALAS" = 0 ] && [ "$EXACTAS" = "$RN" ] \
+      && echo "  ✓ R2-1 a escala · $K sesiones a la vez × $RN rondas (3 administradores comparten $K proyectos, cada sesión borra uno): TODAS terminan como un orden en serie —1 proyecto, 1 fila por administrador, 1 baja rechazada, 0 exentos, 0 interbloqueos, 0 otros errores—" \
+      || { echo "❌ R2-1 a escala · $K sesiones × $RN rondas: (malas exentas exactas con_esperas_agotadas) = $R"; exit 1; }
+  else
+    [ "$MALAS" = 0 ] \
+      && echo "  ✓ R2-1 a escala · $K sesiones a la vez × $RN rondas (3 administradores comparten $K proyectos): en TODAS nadie queda exento y cada administrador conserva tantas filas como proyectos quedan, a lo sumo 1 baja rechazada, 0 interbloqueos, 0 otros errores ($EXACTAS rondas exactas como un orden en serie; $CONLT con esperas agotadas del lock_timeout de 2 s, que fallan limpias y no cambian nada)" \
+      || { echo "❌ R2-1 a escala · $K sesiones × $RN rondas: (malas exentas exactas con_esperas_agotadas) = $R"; exit 1; }
+  fi
+done
+# con 30 sesiones a la vez la cola del candado dura más de 2 s (cada baja recorre todas las llaves foráneas del proyecto): las últimas agotan el lock_timeout y fallan limpias. Con SÓLO el plazo
+# alargado (60 s) las 4 rondas deben ser EXACTAS: el único desvío respecto de un orden en serie eran esas esperas agotadas.
+copia "$BD_POST" asg_conc; personas_n asg_conc
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$LOCK_TIMEOUT_LARGO")" >/dev/null
+R=$(rondas_n asg_conc 30 4); set -- $R
+[ "$1" = 0 ] && [ "$3" = 4 ] \
+  && echo "  ✓ R2-1 a escala · 30 sesiones a la vez × 4 rondas con el plazo del candado alargado a 60 s: las 4 rondas son EXACTAS como un orden en serie (1 proyecto, 1 fila por administrador, 1 baja rechazada, 0 exentos, 0 esperas agotadas): las esperas agotadas de arriba eran el único desvío" \
+  || { echo "❌ R2-1 a escala · 30 sesiones con lock_timeout de 60 s: (malas exentas exactas con_esperas_agotadas) = $R"; exit 1; }
+# control negativo: SIN el candado y con 6 sesiones a la vez la carrera es real (alguna ronda deja administradores exentos)
+copia "$BD_POST" asg_conc; personas_n asg_conc
+psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO")" >/dev/null
+R=$(rondas_n asg_conc 6 5 2>/dev/null); set -- $R
+[ "$2" -ge 1 ] \
+  && echo "  ✓ R2-1 a escala · mutación «sin el candado»: con 6 sesiones a la vez $2 de 5 rondas dejan administradores EXENTOS (la carrera es real y la prueba la ve)" \
+  || { echo "❌ R2-1 a escala · sin el candado alguna de 5 rondas debía dejar administradores exentos y (malas exentas exactas con_esperas_agotadas) = $R"; exit 1; }
+N_MUT_CONC=$((N_MUT_CONC + 1))
+baja asg_conc
+
+# V3-06 · CARRERA RESIDUAL, DOCUMENTADA Y NO CERRADA (decisión D-6/D-15): quien borra con service_role o como superusuario no pasa por el trigger ni toma el candado, así que NO ordena a una baja
+#         hecha por la API. ADM1 {P1,P2}: el rol de servicio borra P1 (sin confirmar) y ADM1 borra P2 por la API; ADM1 ve su fila de P1 viva, no espera, y al confirmar las dos queda con CERO filas y exento.
+#         Ninguna ruta de la aplicación borra proyectos con service_role salvo delete-company (que borra la empresa entera, y con ella al administrador). Si algún día el rol de servicio toma el candado,
+#         este caso cambia a «esperando» y hay que invertirlo.
+copia "$BD_POST" asg_conc; admins_xp asg_conc
+par asg_conc sv SERVICIO "DELETE FROM public.projects WHERE id = '$(PID_ 1)';" ADM1 "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"
+RES="$(q "SELECT asgt.filas_de('$(UID_ 90)')" asg_conc)|$(q "SELECT asgt.exento('$(UID_ 90)')" asg_conc)|$ESTADO2"
+sin_deadlock sv && [ "$RES" = "|t|terminó" ] && ! grep -qi 'error' "$SALIDAS/sv1.txt" "$SALIDAS/sv2.txt" \
+  && echo "  ✓ V3-06 · (residual, documentado) el rol de servicio borra P1 sin confirmar y ADM1 {P1,P2} borra P2 por la API: ADM1 NO espera (el servicio no toma candado) y queda con 0 filas y EXENTO. No se cierra: ver D-6 y D-15" \
+  || { echo "❌ V3-06 · el caso residual cambió (¿el rol de servicio ya toma el candado?): RES=$RES"; cat "$SALIDAS/sv1.txt" "$SALIDAS/sv2.txt"; exit 1; }
+baja asg_conc
+
+# R2-5 · COSTE CONOCIDO del candado, medido: en una transacción de VARIAS sentencias que combine «borrar un proyecto» con «asignar sobre un proyecto que otra transacción está
 #        borrando» pueden cruzarse el candado de aviso y el FOR SHARE del trigger de integridad. PostgreSQL lo detecta (deadlock_timeout = 1 s) y aborta UNA de las dos; la otra termina y
 #        nada queda a medias. Por PostgREST (una sentencia por transacción) no es alcanzable. Lo que se comprueba es que el desenlace es SEGURO sea cual sea la víctima.
 #        s1 (AX): borra P1, espera la puerta y luego asigna NUEVO→P2; s2 (AX2): borra P2 (espera el candado con la fila de P2 ya tomada) → s1 espera a s2 y s2 a s1.
@@ -751,12 +974,12 @@ RESTAN=$(q "SELECT count(*) FROM public.projects WHERE id IN ('$(PID_ 1)', '$(PI
   && [ "$(q "SELECT asgt.exento('$(UID_ 6)')" asg_conc)" = "f" ] && [ "$(q "SELECT count(*) FROM public.user_project_assignments u WHERE NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = u.project_id)" asg_conc)" = "0" ] \
   && echo "  ✓ R2-5 · transacción de varias sentencias que cruza el candado y el FOR SHARE: PostgreSQL detecta el interbloqueo y aborta UNA sola (1 «deadlock detected»); la otra termina; de P1/P2 se borra exactamente uno, AP sigue acotado y ninguna asignación queda huérfana" \
   || { echo "❌ R2-5 · ESTADO2=$ESTADO2 interbloqueos=$INTERBLOQUEOS restan=$RESTAN"; cat "$SALIDAS/di1.txt" "$SALIDAS/di2.txt"; exit 1; }
-# contraste: SIN el candado global la 2ª sesión confirma de inmediato y no hay interbloqueo (la 1ª recibe un error limpio al asignar sobre un proyecto ya borrado)
+# contraste: SIN el candado la 2ª sesión confirma de inmediato y no hay interbloqueo (la 1ª recibe un error limpio al asignar sobre un proyecto ya borrado)
 copia "$BD_POST" asg_conc
 psql -q -v ON_ERROR_STOP=1 -d asg_conc -c "$(mutar_funcion asignacion_bloquear_propia "$QUITAR_CANDADO")" >/dev/null
 par asg_conc dj AX "DELETE FROM public.projects WHERE id = '$(PID_ 1)'; SELECT pg_advisory_xact_lock($PUERTA, 1); $(INS "$(v 8 2)")" AX2 "DELETE FROM public.projects WHERE id = '$(PID_ 2)';"
 [ "$ESTADO2" = "terminó" ] && sin_deadlock dj \
-  && echo "  ✓ R2-5 · contraste: sin el candado global esa misma transacción no se interbloquea (la 2ª sesión confirma sin esperar): el interbloqueo es el precio de serializar" \
+  && echo "  ✓ R2-5 · contraste: sin el candado esa misma transacción no se interbloquea (la 2ª sesión confirma sin esperar): el interbloqueo es el precio de serializar" \
   || { echo "❌ R2-5 · contraste: ESTADO2=$ESTADO2"; cat "$SALIDAS/dj1.txt" "$SALIDAS/dj2.txt"; exit 1; }
 baja asg_conc
 

@@ -1,0 +1,8 @@
+-- Propietario de la empresa C (OW) borrando un proyecto PEQUEÑO de C (una asignación). La víctima de OTRA empresa que el atacante.
+\set pj random(1,2)
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL statement_timeout = '8s';
+SELECT set_config('request.jwt.claim.sub', 'a5e00000-0000-0000-0000-000000000003', true);
+DELETE FROM public.projects WHERE id = ('b3f00000-0000-0000-0000-00000000000' || :pj)::uuid;
+ROLLBACK;

@@ -65,17 +65,25 @@
 --      SÍ puede (su alcance sólo se reduce y es un flujo legítimo del servidor) mientras conserve otra
 --      asignación; si fuera su ÚLTIMA fila quedaría sin asignaciones y pasaría a ser exento, y eso se rechaza
 --      (ASIGNACION_PROPIA_NO_PERMITIDA). Lo borra entonces el propietario o el superadministrador.
---      Esa comprobación («¿le queda otra fila?») se SERIALIZA con un candado de aviso GLOBAL de bajas en cascada
---      (pg_advisory_xact_lock, una sola clave) tomado ANTES de mirar: sin él, dos sesiones que borraran cada una uno
---      de los dos únicos proyectos de un administrador veían cada una la fila de la otra como viva y lo dejaban con
---      CERO filas (carrera reproducida con dos sesiones reales). Es GLOBAL y no «por persona» porque la baja en
---      cascada de un proyecto borra TAMBIÉN las filas de las demás personas asignadas a él, y esas filas ajenas no se
---      comprueban: con dos administradores que comparten {P1, P2}, cada uno borraba un proyecto, la cascada de cada
---      sesión vaciaba la fila del OTRO sin esperar y ambos quedaban con CERO filas y exentos (un candado por persona
---      sólo ordena a las sesiones de la MISMA persona). Con una sola clave todas las bajas en cascada de la API —de
---      cualquier actor— se ordenan, y la segunda ve lo que la primera confirmó. Cuesta: dos borrados de proyectos a la
---      vez por la API se ejecutan uno tras otro (es una operación rara). Un candado por persona además sería
---      redundante: sólo se tomaba en rutas que ya pasan por el candado global.
+--      Esa comprobación («¿le queda otra fila?») se SERIALIZA con un candado de aviso POR EMPRESA (pg_advisory_xact_lock sobre
+--      'asg-cascada:' || la empresa de la PERSONA cuya fila se borra, leída de app_users) tomado ANTES de mirar: sin él, dos sesiones que
+--      borraran cada una uno de los dos únicos proyectos de un administrador veían cada una la fila de la otra como viva y lo dejaban con CERO
+--      filas (carrera reproducida con dos sesiones reales). Por qué esa clave y no otra:
+--        · NO por persona: la baja en cascada de un proyecto borra TAMBIÉN las filas de las demás personas asignadas a él, y esas filas ajenas no se
+--          comprueban; con dos administradores que comparten {P1, P2}, cada uno borraba un proyecto, la cascada de cada sesión vaciaba la fila del
+--          OTRO sin esperar y ambos quedaban con CERO filas y exentos (un candado por persona sólo ordena a las sesiones de la MISMA persona; tomar
+--          además el de cada persona afectada exigiría varias claves en el orden en que la cascada recorra las filas, que no controlamos: con un retardo inyectado
+--          tras cada candado, dos cascadas que recorren a dos administradores en orden inverso se interbloquean);
+--        · NO global (la ronda anterior): una sola clave para toda la base dejaba a un propietario de CUALQUIER empresa —signup-company es público—
+--          retener con una baja pesada las bajas de proyecto de TODAS las demás (medido con pgbench: la víctima de otra empresa pasaba de 212 a 0,5 transacciones/s; con la clave por empresa, de 209 a 193);
+--        · SÍ por empresa de la persona: la integridad de empresa (trg_asignacion_empresa) garantiza que persona y proyecto son de la misma
+--          empresa, y dos bajas que quitan filas de la MISMA persona comparten siempre esa clave (también con una fila cruzada anterior a este
+--          trigger: la clave sale de la persona, no del proyecto). Un propietario sólo puede retener el candado de SU empresa.
+--      Una fila HUÉRFANA (la persona no existe en app_users) no toma candado: sin rol no puede quedar exenta. Si una baja espera el candado más de
+--      2 s (lock_timeout de la propia función, no del resto de la sesión) falla limpio con lock_not_available (55P03) en vez de ocupar una conexión hasta
+--      el statement_timeout. Quien borra con service_role o como superusuario no pasa por el trigger ni toma el candado (D-6, V3-06): puede tomarlo a mano
+--      con pg_advisory_xact_lock(hashtextextended('asg-cascada:' || <empresa>, 0)) si quiere ordenarse con las bajas hechas por la API.
+--      Cuesta: dos bajas de proyecto de la MISMA empresa a la vez por la API se ejecutan una tras otra (es una operación rara).
 --      Una sesión sin fila en app_users (rol NULL) tampoco pasa el trigger: la lógica trivaluada ya no
 --      lo deja «abierto».
 --   5. Privilegios: anon pierde TODOS (la RLS no le daba nada, pero el privilegio
@@ -304,24 +312,33 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
+SET lock_timeout = '2s'
 AS $$
 DECLARE
-  v_uid   uuid := (SELECT auth.uid());
-  v_toca  boolean;
+  v_uid     uuid := (SELECT auth.uid());
+  v_toca    boolean;
+  v_hay     boolean;
+  v_empresa uuid;
 BEGIN
   -- service_role, superusuario y migraciones: sin sesión de la API
   IF v_uid IS NULL THEN
     RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
   END IF;
 
-  -- SERIALIZACIÓN GLOBAL DE LAS BAJAS EN CASCADA (R2-1). La baja en cascada de un proyecto borra las filas de TODAS las personas asignadas a él, y
-  -- sólo la de quien borra se comprueba (más abajo): dos administradores con los mismos dos proyectos, cada uno borrando uno distinto, vaciaban la fila
-  -- del otro sin esperar y ambos quedaban sin filas (exentos). Por eso el candado es GLOBAL (una clave): toda baja en cascada hecha con una sesión de la
-  -- API —también la del propietario o la del superadministrador, cuya baja le quita la fila a un tercero— espera a la anterior y, al entrar, la
-  -- comprobación de abajo ve lo que ésta confirmó. Va en una sentencia PROPIA y ANTES de cualquier lectura: dentro de un AND no sirve, porque la
-  -- instantánea ya está tomada cuando el candado se concede. Se libera solo al terminar la transacción.
+  -- SERIALIZACIÓN POR EMPRESA DE LAS BAJAS EN CASCADA (R2-1, V3-01). La baja en cascada de un proyecto borra las filas de TODAS las personas asignadas a él,
+  -- y sólo la de quien borra se comprueba (más abajo): dos administradores con los mismos dos proyectos, cada uno borrando uno distinto, vaciaban la fila
+  -- del otro sin esperar y ambos quedaban sin filas (exentos). Por eso toda baja en cascada hecha con una sesión de la API —también la del propietario o la
+  -- del superadministrador, cuya baja le quita la fila a un tercero— toma el candado de la EMPRESA de la persona cuya fila se borra, antes de mirar nada
+  -- más: dos bajas que quitan filas de la misma persona comparten siempre la clave, y la segunda espera a la primera y, al entrar, la comprobación de
+  -- abajo ve lo que ésta confirmó. La clave NO es global (la versión anterior lo era y un propietario de cualquier empresa podía retener las bajas de
+  -- todas las demás) ni por persona (no ordena la fila ajena). Una fila huérfana (sin app_users) no toma candado: sin rol no puede quedar exenta.
+  -- Va en sentencias PROPIAS y ANTES de la lectura que decide (la de «¿le queda otra fila?»): dentro de un AND no sirve, porque la instantánea ya está
+  -- tomada cuando el candado se concede. Se libera solo al terminar la transacción; si no se concede en 2 s (lock_timeout de la función) falla con 55P03.
   IF TG_OP = 'DELETE' AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = OLD.project_id) THEN
-    PERFORM pg_advisory_xact_lock(hashtextextended('asg-cascada', 0));
+    SELECT true, u.company_id INTO v_hay, v_empresa FROM public.app_users u WHERE u.id = OLD.user_id;
+    IF v_hay THEN
+      PERFORM pg_advisory_xact_lock(hashtextextended('asg-cascada:' || COALESCE(v_empresa::text, 'sin-empresa'), 0));
+    END IF;
   END IF;
 
   v_toca := (TG_OP IN ('UPDATE', 'DELETE') AND OLD.user_id = v_uid)
@@ -333,7 +350,7 @@ BEGIN
     -- Baja EN CASCADA por borrar el proyecto (la fila padre ya no existe): se permite mientras la persona CONSERVE otra asignación, porque
     -- entonces su alcance sólo se reduce (borrar un proyecto al que se está asignado es un flujo legítimo del servidor). Si fuera su última
     -- fila quedaría sin asignaciones y, siendo administrador, pasaría a ser exento de proyecto: eso es justo lo que se impide. Esta lectura ya corre
-    -- tras el candado global de arriba, con una instantánea nueva.
+    -- tras el candado de arriba, con una instantánea nueva.
     IF TG_OP = 'DELETE'
        AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = OLD.project_id)
        AND EXISTS (SELECT 1 FROM public.user_project_assignments u WHERE u.user_id = OLD.user_id AND u.id <> OLD.id) THEN

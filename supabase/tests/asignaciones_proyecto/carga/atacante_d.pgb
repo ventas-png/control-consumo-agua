@@ -1,0 +1,8 @@
+-- Propietario de la empresa D (DOW) borrando en bucle un proyecto PESADO suyo (cascada de N filas en amenidades); la baja se deshace (ROLLBACK) para poder repetirla.
+-- Imita una petición de PostgREST: rol authenticated, statement_timeout de 8 s (el de producción) y el claim `sub`.
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL statement_timeout = '8s';
+SELECT set_config('request.jwt.claim.sub', 'a5e00000-0000-0000-0000-000000000004', true);
+DELETE FROM public.projects WHERE id = 'b3f00000-0000-0000-0000-0000000000dd';
+ROLLBACK;
