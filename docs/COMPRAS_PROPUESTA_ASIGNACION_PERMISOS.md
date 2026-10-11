@@ -1,19 +1,21 @@
 # Compras · propuesta de asignación de permisos (Alexander Monterroso y plantillas)
 
-> **Lecturas de producción del 2026-10-10 · SOLO LECTURA.** Cada cifra de este documento sale de un `SELECT` contra producción (`nnsqmeigtgewatameexo`) y la consulta que la produjo está citada (`[Q#]`, texto completo en el **Apéndice**). **No se escribió nada** en producción, en el sandbox ni en la base de preview, y **este documento no concede ningún permiso**: es la propuesta que una persona con autoridad debe aceptar o rechazar con las decisiones de §7. Se refiere a la migración `20261027000900` del PR #926 (en **borrador**), que por diseño **no concede ninguna llave** a nadie. La propuesta ejecutable, siempre comentada y con `ROLLBACK` por defecto, es `scripts/propuesta-asignaciones-permisos-compras.sql`.
+> **Lecturas de producción del 2026-10-10, releídas el 2026-10-11 en lo que cambia esta revisión · SOLO LECTURA.** Cada cifra de este documento sale de un `SELECT` contra producción (`nnsqmeigtgewatameexo`) y la consulta que la produjo está citada (`[Q#]`, texto completo en el **Apéndice**). **No se escribió nada** en producción, en el sandbox ni en la base de preview, y **este documento no concede ningún permiso**: es la propuesta que una persona con autoridad debe aceptar o rechazar con las decisiones de §7. Se refiere a la migración `20261027000900` del PR #926 (en **borrador**, y **sigue en borrador hasta que se responda A-1**), que por diseño **no concede ninguna llave** a nadie. La propuesta ejecutable es `scripts/propuesta-asignaciones-permisos-compras.sql`: siempre comentada, con tres seguros (comentario, una excepción que exige confirmar, `ROLLBACK`) y **probada** en una base desechable con el esquema real de las diez migraciones (§10).
 
 ## 0. Lectura rápida
 
 | Pregunta | Respuesta |
 |---|---|
 | ¿Se concedió algo? | **No.** Ni a personas, ni a roles, ni a plantillas. |
+| ¿Qué exige HOY el servidor, en producción? | **Solo `platform.contabilidad.edit`** (políticas `UPDATE`). **No existen** `compras_exigir_accion` ni los disparadores `compras_tg_permiso_*` (los trae este PR en la 0300): `approve` y `change_status` solo gobiernan la pantalla. Por eso hoy **cualquier** persona con `edit` puede las seis acciones y, tras la 0900, las pierde; hoy solo Alexander tiene `edit`, `approve` y `change_status` (0 personas más) `[Q29]`. Las columnas «hoy» de las matrices miden las llaves genéricas de la pantalla y de la cadena 0300–0800 de este PR, **no** un control del servidor de producción (§1) |
 | ¿Quién pierde acciones al aplicar la 0900? | **1 persona** (Alexander Monterroso: pierde 5 de las 6 acciones y conserva «aprobar orden de compra»), **2 plantillas de sistema** («Admin Plataforma» y «Finanzas / Contador», sin ninguna persona asignada) y **1 rol de empresa** (la copia «Finanzas / Contador» de Prestadora de Servicios S.A., con 1 persona: Alexander) `[Q1]`. **Gana** 1 plantilla («Administrador General», acción 1, sin efecto práctico: §4) |
 | ¿Quién más puede las seis acciones sin ninguna llave? | **3 cuentas por perfil:** Marco Santos Godoy (`admin`, solo en sus 3 proyectos), la cuenta propietaria (`company_owner`) y el superadministrador (`super_admin`), estas dos sin límite de proyecto `[Q7]`. Ninguna llave les quita nada |
-| ¿Hay uso real de las seis acciones? | **Prácticamente no.** 1 orden de compra histórica sin autor; 1 factura (anulada) creada y aprobada por la cuenta propietaria con 10,5 s de diferencia; **0** recepciones, órdenes de pago, contraseñas, pagos y asientos. Alexander **no figura como autor de ninguna fila de negocio** y su último inicio de sesión registrado es del 2026-08-13 `[Q8–Q11]` (§3) |
-| Propuesta recomendada | A Alexander: **conceder** `recepcion_registrar`, `factura_aprobar` y `orden_pago_aprobar`; **no conceder** `pago_ejecutar` ni `pago_anular`. Plantillas y rol de empresa: **no conceder nada ahora**. La concesión, desde el panel «Ajustes individuales», **después** del despliegue de la 0900 (§5, §6) |
-| Alternativa | «Continuidad total» = lo que Alexander puede hoy: las **cinco** llaves. La diferencia con la recomendada es **exactamente dos llaves**: `pago_ejecutar` y `pago_anular` |
+| ¿Hay uso real de las seis acciones? | **Prácticamente no.** 1 orden de compra histórica sin autor; 1 factura (anulada) creada y aprobada por la cuenta propietaria con 10,5 s de diferencia; **0** recepciones, órdenes de pago, contraseñas, pagos y asientos. Alexander **no figura como autor de ninguna fila de negocio** y su último inicio de sesión registrado es del 2026-08-13 `[Q8–Q11, Q30]` (§3) |
+| Tres paquetes (§5) | **A · ninguna llave por ahora:** 0 usos y 58 días sin sesión (a la lectura del 2026-10-10); se concede en un minuto cuando vuelva a operar; **el PR puede fusionarse igual** aceptando el efecto transitorio. **B · recepción + factura + orden de pago (RECOMENDADA):** `recepcion_registrar`, `factura_aprobar` y `orden_pago_aprobar`; **no** `pago_ejecutar` ni `pago_anular` (pago y anulación = movimiento irreversible de dinero). **C · continuidad total** (= lo que Alexander puede hoy): las **cinco** llaves. Diferencia B–C: exactamente dos llaves; A–B: tres. Plantillas y rol de empresa: **no conceder nada ahora** en ningún paquete. La concesión, desde el panel por Marco, **después** del despliegue de la 0900 (§5, §6) |
+| ¿Qué falta para avanzar? | Responder **A-1** (§7): qué paquete. El PR #926 **sigue en borrador hasta entonces**; **A es una respuesta válida**. Además, dos decisiones que la base no puede dar: qué **persona** hay detrás de la cuenta propietaria y quién **paga** en Cascadas de Vista Hermosa, La Arboleda CVH y Viñas del Sur Condominio 3 (§5.4) |
 | Proyectos | Las concesiones **no tocan** `user_project_assignments`: Alexander conserva sus 6 proyectos y Marco sus 3 (§6.4) |
-| Hallazgos inesperados | (1) el rol de empresa de Alexander tiene **1 193 de las 1 201 llaves** del catálogo (la plantilla, 63), concedidas en bloque el 2026-08-13; (2) «Monterroso» coincide con **3 cuentas** y la propuesta anterior filtraba por nombre; (3) las copias de empresa son fotografías: no se refrescan; (4) nada impide aprobar una factura que uno mismo creó (solo existe esa regla para la orden de compra, y apagada). Detalle en §9 |
+| Orden de despliegue | **#928** (`20261026000600`) → **#926** (`20261027000000…0900`) → futuro PR de **alcance por proyecto** (`20261027001000`, justo tras la 0900) → **#927** (`20261028000000`), cada uno en su propio *push* a `main` (§6.1) |
+| Hallazgos inesperados | (1) el rol de empresa de Alexander tiene **1 193 de las 1 201 llaves** del catálogo (la plantilla, 63): **1 106 concedidas en bloque por la cuenta propietaria el 2026-08-13 21:52:53** y **87 sin actor** entre 2026-06-12 y 2026-09-10; (2) «Monterroso» y «Santos» coinciden con **3 cuentas cada uno** y hay dos empresas de nombre casi igual: la propuesta anterior filtraba por nombre; (3) las copias de empresa son fotografías: no se refrescan; (4) nada impide aprobar una factura que uno mismo creó (solo existe esa regla para la orden de compra, y apagada); (5) **con cualquier paquete** Alexander conserva `approve` y `change_status` genéricos y con ellos puede anular facturas (sin pagos aplicados), recepciones y contraseñas y cancelar o cerrar órdenes (§5.3). Detalle en §9 |
 
 ---
 
@@ -21,7 +23,9 @@
 
 Fuente: `supabase/migrations/20261027000900_…` (comprobación común `compras_exigir_permiso`: empresa → permiso → proyecto), las políticas RLS de producción `[Q14]` y las definiciones de las funciones en producción `[Q16]`.
 
-| # | Acción | Llave que exige la 0900 | Llave que exigía antes (0300/0700) | Transición que protege |
+> **Qué exige HOY el servidor en producción (releído el 2026-10-11 `[Q29]`).** Producción está en la migración `20261026000500` (0 versiones `≥ 20261027`). **No existen** `compras_exigir_accion`, `compras_exigir_permiso` ni `compras_sesion_usuario`, ni ningún disparador `compras_tg_permiso_*`: ninguno de los 31 disparadores de las cinco tablas del circuito, ni las funciones que ejecutan, consulta `approve`, `change_status`, `user_has_permission` ni `conta_puede_escribir`, y ninguna política `UPDATE` de esas tablas los menciona. Las políticas `UPDATE` piden **solo `platform.contabilidad.edit`** (o los perfiles `admin`/`company_owner`/`super_admin`). Es decir: **`approve` y `change_status` solo gobiernan la pantalla**, y hoy cualquier persona con `edit` puede las seis acciones por la API (hoy solo Alexander tiene `edit`, `approve` y `change_status`: 0 personas más). La cadena `…0300` a `…0800` **de este PR** es la que empieza a exigir `approve`/`change_status` en el servidor, y la 0900 las sustituye por la llave de cada acción. (Otras funciones de Contabilidad ajenas a las seis acciones —publicar o anular un asiento manual, conciliar un movimiento bancario— sí consultan `change_status` en producción; no forman parte de este circuito.) **Por eso la columna «Llave que exigía antes» describe la cadena 0300–0800 de este PR, no producción**: hoy el servidor solo pide `edit`, y con la 0900 pasa a pedir además la llave de cada acción.
+
+| # | Acción | Llave que exige la 0900 | Llave que exigía antes: cadena 0300–0800 de este PR y pantalla (**NO producción**: allí solo `edit`) | Transición que protege |
 |---|---|---|---|---|
 | 1 | Aprobar orden de compra | `condominios.tab.ordenes_compra.approve` (ya existía) | `platform.contabilidad.approve` | borrador → aprobada; devolver una aprobada; nacer aprobada o emitida |
 | 2 | Registrar recepción | `platform.contabilidad.compras.recepcion_registrar` (nueva) | `platform.contabilidad.change_status` | borrador → registrada |
@@ -52,7 +56,7 @@ Fuente: `supabase/migrations/20261027000900_…` (comprobación común `compras_
 | Roles asignados (`user_roles`) | **1:** «Finanzas / Contador» de la empresa (`d915897c-b350-431a-8447-b37c61f97e8a`), clonado de la plantilla `00000000-0000-0000-0000-000000000003`, `service = condominios`, asignado el 2026-08-13 21:52:57 sin autor, **sin vencimiento**, 1 193 `allow` y 0 `deny` | **3**, todos de la empresa, sin vencimiento, 0 `deny`: «Admin Agua» (66 `allow`, clon de `…0101`), «Admin Plataforma» (90, clon de `…0201`) y «Administrador General» (189, clon de `…0001`) |
 | Rol de ajustes individuales | **no tiene** (hay 0 en toda la base) | no tiene |
 
-**El nombre no identifica:** `full_name ILIKE '%Monterroso%'` devuelve **3 cuentas** (Alexander Monterroso `operator`; Alex Monterroso e Isabel Monterroso, `cliente`, sin empresa) `[Q2]`. Por eso el script usa el **id** y exige perfil, empresa y estado.
+**El nombre no identifica:** `full_name ILIKE '%Monterroso%'` devuelve **3 cuentas** (Alexander Monterroso `operator`; Alex Monterroso e Isabel Monterroso, `cliente`, sin empresa) `[Q2]`, y `ILIKE '%Santos%'` otras **3**: Marco Santos Godoy (`admin`), **«Marco Santos»** (una cuenta `cliente` **sin empresa**) y **«Eduardo Santos»** (`viewer` de la misma empresa) `[Q27]`. Además existen **dos empresas de nombre casi igual** —«Prestadora de Servicios S.A.» (22 usuarios, 18 roles, 8 proyectos) y «Prestadora de Servicios» (0, 0, 0)— y la cuenta propietaria se llama «Prestadora de Servicios Básicos S.A.» `[Q27]`. Por eso el script usa el **id** y exige perfil, empresa y estado; y por la pantalla hay que abrir la fila de Alexander Monterroso **de la empresa «Prestadora de Servicios S.A.»** y comprobar su id (`327ffeda…`), nunca buscar por nombre.
 
 ### 2.2 Las llaves relacionadas de Alexander `[Q4a, Q4b, Q4c, Q5]`
 
@@ -64,7 +68,7 @@ Su rol de empresa tiene `allow` (y ningún `deny`) en las 48 llaves de Contabili
 
 No tiene ninguna de las cinco llaves nuevas: **no existen todavía en el catálogo de producción** (0 filas `platform.contabilidad.compras.%` en `permissions`) y hay **0 concesiones** en `role_permissions` `[Q17, Q22]`. Del catálogo de 1 201 llaves `[Q7b]`, a ese rol le faltan solo 8 (`agua.{contadores,dashboard,lecturas,rutas,tabla,tarifas}.delete`, `condominios.areas.manage`, `platform.clientes.delete`) `[Q4b]`.
 
-> **Hallazgo.** La plantilla de sistema «Finanzas / Contador» trae **63** llaves `allow` y la copia de Alexander **1 193**. La bitácora `permission_audit_log` muestra **1 106 `grant_permission` en el mismo segundo** (2026-08-13 21:52:53) hechos por la **cuenta propietaria** de la empresa, más 2 `update_role` entre las 21:52 y las 21:54 `[Q5]`; las otras 87 tienen el actor vacío (copia de la plantilla y migraciones de catálogo, del 2026-06-12 al 2026-09-10). En la práctica el rol es «casi todo el catálogo»: las llaves que decide esta propuesta son una parte pequeña de lo que ese rol ya le da. No se propone aquí recortarlo (decisión A-6).
+> **Hallazgo.** La plantilla de sistema «Finanzas / Contador» trae **63** llaves `allow` y la copia de Alexander **1 193**. La bitácora `permission_audit_log` muestra **1 106 `grant_permission` en el mismo segundo** (2026-08-13 21:52:53) hechos por la **cuenta propietaria** de la empresa, más 2 `update_role` entre las 21:52 y las 21:54 `[Q5]`; las otras 87 tienen el actor vacío (copia de la plantilla y migraciones de catálogo, del 2026-06-12 al 2026-09-10): 1 106 + 87 = 1 193 `[Q30]`. En la práctica el rol es «casi todo el catálogo»: las llaves que decide esta propuesta son una parte pequeña de lo que ese rol ya le da. No se propone aquí recortarlo (decisión A-6).
 
 ### 2.3 Roles y plantillas con llaves relacionadas, y cuántas personas las tienen `[Q6, Q18, Q19, Q20]`
 
@@ -100,20 +104,20 @@ Entre las **30 personas activas no exentas** `[Q1]` solo Alexander y Marco tiene
 
 `scripts/diagnostico-permisos-compras.sql` (md5 `e845d06064bd9d245272c19207ee4d5c`), ejecutado **tal cual** como un único `SELECT`. Resultado: fila `resumen` = «30 personas activas no exentas» y «1 persona(s) pierden alguna acción; 2 plantilla(s) de sistema y 1 rol(es) de empresa pierden alguna». Las filas coinciden con la matriz de `COMPRAS_CONTROLES_SERVIDOR.md §5.2`.
 
-### 2.6 Proyectos `[Q12]`
+### 2.6 Proyectos `[Q12, Q28]`
 
-| Proyecto | Alexander | Marco | Personas asignadas | OC / facturas |
-|---|---|---|---|---|
-| 21B+ | sí | sí | 13 | 1 / 1 |
-| Edificio SQ | sí | sí | 12 | 0 / 0 |
-| Parajes Vermont | sí | sí | 6 | 0 / 0 |
-| Cascadas de Vista Hermosa | sí | **no** | 5 | 0 / 0 |
-| La Arboleda CVH | sí | **no** | 3 | 0 / 0 |
-| Viñas del Sur Condominio 3 | sí | **no** | 4 | 0 / 0 |
-| «test» (suspendido) | no | no | 0 | 0 / 0 |
-| «VSC General» | no | no | 0 | 0 / 0 |
+| Proyecto | Alexander | Marco | Filas de asignación (incluyen huérfanas) | Personas reales | OC / facturas |
+|---|---|---|---|---|---|
+| 21B+ | sí | sí | 13 | 9 | 1 / 1 |
+| Edificio SQ | sí | sí | 12 | 10 | 0 / 0 |
+| Parajes Vermont | sí | sí | 6 | 5 | 0 / 0 |
+| Cascadas de Vista Hermosa | sí | **no** | 5 | 3 | 0 / 0 |
+| La Arboleda CVH | sí | **no** | 3 | 3 | 0 / 0 |
+| Viñas del Sur Condominio 3 | sí | **no** | 4 | 3 | 0 / 0 |
+| «test» (suspendido) | no | no | 0 | 0 | 0 / 0 |
+| «VSC General» | no | no | 0 | 0 | 0 / 0 |
 
-Los 3 proyectos de Marco están dentro de los 6 de Alexander. En **Cascadas de Vista Hermosa, La Arboleda CVH y Viñas del Sur Condominio 3** la única persona no exenta con alcance es Alexander; ahí cualquier acción que él no tenga solo la pueden hacer la cuenta propietaria o el superadministrador.
+`user_project_assignments` tiene **43 filas**, de las cuales **10 son huérfanas** (6 usuarios sin fila en `app_users`): las columnas «filas» cuentan esas 10; «personas reales» no. Los 3 proyectos de Marco están dentro de los 6 de Alexander. En **Cascadas de Vista Hermosa, La Arboleda CVH y Viñas del Sur Condominio 3** Alexander es la **única persona con alcance y con `edit` en Contabilidad**: hay otras 2 personas con alcance en cada uno (2 `operator`, 2 `operator` y 2 `viewer`), pero ninguna tiene `edit` ni llave alguna, así que no pueden ninguna de las seis acciones. Ahí cualquier acción que él no tenga solo la pueden hacer la cuenta propietaria o el superadministrador (Marco no está asignado).
 
 ---
 
@@ -132,7 +136,7 @@ También **0** contraseñas de pago, **0** intentos de contabilización y **0** 
 
 **Actividad de las dos personas** `[Q10, Q11]`:
 
-* **Alexander:** barrido de todas las columnas `uuid` de autoría de las tablas base de `public` (`created_by`, `creado_por`, `*_por`, `actor*`, `updated_by`, `user_id`, `registrado*`, `solicitad*`, `aprobad*`, `recibid*`, `pagad*`, `autoriz*`): **0 filas de negocio** a su nombre. Solo aparece en `security_logs` (15), `permission_audit_log` como destinatario (15), `user_notifications` (13), `user_project_assignments` (6), `user_roles` (1) y `user_presence` (1). `security_logs`: **12** inicios de sesión entre 2026-06-15 y 2026-08-13 21:54 y 3 cierres (el último 2026-08-13 21:58); **ningún inicio de sesión registrado después del 2026-08-13** (58 días a la fecha de la lectura).
+* **Alexander:** barrido de todas las columnas `uuid` de autoría de las tablas base de `public` (`created_by`, `creado_por`, `*_por`, `actor*`, `updated_by`, `user_id`, `registrado*`, `solicitad*`, `aprobad*`, `recibid*`, `pagad*`, `autoriz*`): **0 filas de negocio** a su nombre. Solo aparece en `security_logs` (15), `permission_audit_log` como destinatario (15), `user_notifications` (13), `user_project_assignments` (6), `user_roles` (1) y `user_presence` (1). `security_logs`: **12** inicios de sesión entre 2026-06-15 y 2026-08-13 21:54 y 3 cierres (el último 2026-08-13 21:58); **ningún inicio de sesión registrado después del 2026-08-13** (58 días a la lectura del 2026-10-10; 59 a la relectura del 2026-10-11). Lo confirman `auth.users.last_sign_in_at` = 2026-08-13 21:54:15 UTC, **0 filas** en `auth.sessions` y `user_presence.last_seen` = 2026-08-13 21:58:15 `[Q30]`; su rol de 1 193 llaves se le reasignó a las 21:52:57 y sus 6 proyectos a las 21:53:50 de ese mismo día, minutos antes de su último acceso.
 * **Marco:** 36 inicios de sesión hasta 2026-09-30; filas a su nombre solo en reservas de amenidades (11 creadas, 10 aprobadas), cuotas de condominio (7), reservas STR (7) y 1 unidad: **ninguna del circuito de compras**.
 
 **Límites de esta evidencia:** el `audit_log` genérico **no cubre** las tablas del circuito (solo `cuotas_condominio`, `tickets_mantenimiento`, `subscriptions` y `companies`) `[Q24]`; el barrido ve columnas `uuid` con nombres de autoría, no autoría guardada con otros nombres o como texto; y `security_logs` registra lo que registra (un acceso por otro camino no aparecería). Lo que sí es concluyente: **las tablas del circuito casi no tienen filas**, así que no hay historia que demuestre quién usa cada acción.
@@ -142,6 +146,8 @@ También **0** contraseñas de pago, **0** intentos de contabilización y **0** 
 ## 4. (A) Tabla exacta: HOY → DESPUÉS DE LA 0900 SIN CONCEDER → PROPUESTA
 
 Cada celda se lee **HOY (antes de la 0900) → DESPUÉS DE LA 0900 sin conceder → PROPUESTA**. «HOY» y «DESPUÉS» son las columnas del diagnóstico `[Q1]` (llave genérica contra llave de la acción, **más** `platform.contabilidad.edit` para las personas; para roles y plantillas se mide solo la llave, y `edit` va en su columna). Propuesta: **CONCEDER** · **NO CONCEDER** · **YA LO TIENE**. La columna `edit` es la llave `platform.contabilidad.edit`, imprescindible para las seis (§1).
+
+**Cómo leer «HOY».** Es el estado de la pantalla y de la cadena 0300–0800 de este PR (llave genérica `approve`/`change_status` **más** `edit`); en producción el servidor hoy exige solo `edit` (§1). Las celdas «sí» de HOY coinciden igual, porque Alexander tiene `edit`, pero el motivo no es que el servidor pida `approve`/`change_status`. **La columna «propuesta» de Alexander muestra el paquete B (recomendado):** el paquete A deja en NO CONCEDER todas sus celdas 2 a 6 y el C pone CONCEDER también en las celdas 5 y 6 (§5.2). Las celdas se reprodujeron exactas en una revisión independiente (diagnóstico del repo y comportamiento real en una base desechable) y no cambian en esta versión.
 
 | Principal | 1 Aprobar OC · `…ordenes_compra.approve` | 2 Recepción · `recepcion_registrar` | 3 Factura · `factura_aprobar` | 4 Orden de pago · `orden_pago_aprobar` | 5 Pago · `pago_ejecutar` | 6 Anular · `pago_anular` | `edit` |
 |---|---|---|---|---|---|---|---|
@@ -158,10 +164,10 @@ Cada celda se lee **HOY (antes de la 0900) → DESPUÉS DE LA 0900 sin conceder 
 **Por qué, una frase por grupo de celdas**
 
 1. **Alexander · 1 Aprobar OC (YA LO TIENE):** su rol trae la llave de la pestaña de órdenes y `edit`; la 0900 no le quita ni le añade nada (hoy lo hacía con `approve` genérica y seguirá pudiendo con la llave de la pestaña).
-2. **Alexander · 2 Recepción (CONCEDER):** es una acción de su función que hoy hace con `change_status`, no amplía lo que hoy puede, y en 3 de sus 6 proyectos nadie más con alcance parcial podría hacerla (§2.6).
-3. **Alexander · 3 Factura (CONCEDER):** aprobar la factura es el núcleo de un rol «Finanzas / Contador» y hoy lo hace con `approve`; concederla mantiene la continuidad sin ampliar nada respecto de hoy.
-4. **Alexander · 4 Orden de pago (CONCEDER):** aprobar la orden prepara y reserva lo que se va a pagar pero **no mueve dinero**; mantiene su flujo de preparación y deja el paso de salida de dinero a otra mano.
-5. **Alexander · 5 Pago y 6 Anular (NO CONCEDER en la recomendada):** son los dos pasos en que sale o se revierte dinero (anular alcanza incluso un pago ya hecho), no hay un solo uso demostrado en producción (0 órdenes de pago) y retenerlas pone a una segunda cuenta —administrador o propietario— antes de que el dinero salga; se conceden en un minuto desde el panel si se decide lo contrario (en la alternativa «continuidad total» sí se conceden, igual que hoy).
+2. **Alexander · 2 Recepción (CONCEDER en B y C):** es una de las tres acciones que su rol «Finanzas / Contador» le asigna y que no mueven dinero; hoy la hace (con `edit`), no amplía lo que hoy puede, y en 3 de sus 6 proyectos nadie más con alcance y `edit` podría hacerla (§2.6). No hay uso registrado (§3).
+3. **Alexander · 3 Factura (CONCEDER en B y C):** aprobar la factura es el núcleo de un rol «Finanzas / Contador»; hoy puede hacerlo y concederla mantiene la continuidad sin ampliar nada respecto de hoy. No hay uso registrado (§3).
+4. **Alexander · 4 Orden de pago (CONCEDER en B y C):** aprobar la orden prepara y reserva lo que se va a pagar pero **no mueve dinero**; mantiene su flujo de preparación y deja el paso de salida de dinero a otra mano. No hay uso registrado (§3).
+5. **Alexander · 5 Pago y 6 Anular (NO CONCEDER en A y B; CONCEDER en C):** son los dos pasos en que sale o se revierte dinero (anular alcanza incluso un pago ya hecho): **movimiento irreversible de dinero**. No hay un solo uso demostrado en producción (0 órdenes de pago) y retenerlas pone a una segunda cuenta —administrador o propietario— antes de que el dinero salga; se conceden en un minuto desde el panel si se decide lo contrario (el paquete C las concede, igual que hoy).
 6. **Alexander · edit (YA LO TIENE):** sin esta llave ninguna de las seis acciones funciona (política `UPDATE`); ya la tiene y no se toca.
 7. **Rol de empresa «Finanzas / Contador» (NO CONCEDER):** concederle una llave se la da a quien lo tenga mañana, y editarlo desde la pantalla reemplazaría el conjunto completo de 1 193 llaves (`set_role_permissions`); lo propuesto va a la persona, no al rol.
 8. **Plantilla «Finanzas / Contador» (NO CONCEDER ahora):** tiene 0 personas, solo llega a copias futuras (la copia de Alexander ya existe y no se refresca), no se copia sola a empresas nuevas y la pantalla no la edita; se decide cuando haya una segunda empresa o se asigne a otra persona (A-2.1).
@@ -171,49 +177,58 @@ Cada celda se lee **HOY (antes de la 0900) → DESPUÉS DE LA 0900 sin conceder 
 12. **Las otras 13 plantillas y 15 roles:** no tienen ninguna de las cuatro llaves; no cambian.
 13. **Marco, cuenta propietaria y superadministrador (YA LO TIENEN):** pasan toda llave por su perfil y ninguna asignación los toca; Marco sigue limitado a sus 3 proyectos.
 
-**Alternativa «continuidad total»** — idéntica salvo para Alexander: las celdas 5 y 6 pasan a **CONCEDER**. Con ella el diagnóstico de la persona sale «sí → sí» en las seis.
+**Paquetes A y C** — idénticos al B salvo para Alexander. En el **A** sus celdas 2 a 6 pasan a **NO CONCEDER** (el diagnóstico de la persona sale «sí → sí» solo en la 1 y «sí → no» en las otras cinco); en el **C** sus celdas 5 y 6 pasan a **CONCEDER** (el diagnóstico sale «sí → sí» en las seis).
 
 ---
 
-## 5. (B) Recomendación
+## 5. (B) Recomendación: tres paquetes
 
-### 5.1 Criterio (explícito)
+### 5.1 Criterios (explícitos)
 
-1. **Mínimo privilegio.** Se concede solo lo que (a) corresponde a la función demostrada de la persona y (b) **no amplía** nada de lo que hoy puede. Como en producción **nadie** ha usado las acciones nuevas (§3), la prueba para conceder es la función, no el historial; y lo que no es indispensable queda sin conceder, porque conceder es reversible en un minuto y un pago no.
-2. **Continuidad operativa.** No dejar sin camino una acción que hoy solo Alexander puede hacer en un proyecto concreto. Ya hay tres proyectos (Cascadas de Vista Hermosa, La Arboleda CVH y Viñas del Sur Condominio 3) donde él es la única persona no exenta con alcance (§2.6); las cuentas exentas (propietaria y superadministrador) siempre pueden.
-3. **Separación de funciones real, sin inventar nada.** Se reparte *qué llave tiene quién*; **no** se escribe ninguna prohibición entre personas ni umbral por monto. Las llaves solo pueden separar a Alexander de las tres cuentas que pasan por perfil: a estas no se les puede quitar ninguna.
+1. **Mínimo privilegio, con un solo criterio aplicado a las cinco llaves.** Se concede lo que (a) corresponde a la **función asignada por su rol** («Finanzas / Contador» de la empresa) y (b) **no amplía** nada de lo que hoy puede. **No hay uso registrado** de ninguna de las cinco acciones por parte de Alexander (§3: 0 filas de negocio), de modo que ni la función ni el historial *demuestran* nada: la prueba es la función asignada, y por eso un paquete que no concede ninguna (el A) es tan defendible como el que concede las que su rol le asigna. Lo único que separa a `pago_ejecutar` y `pago_anular` de las otras tres es que son un **movimiento irreversible de dinero** (sale, o se reversa un egreso ya hecho): no se conceden en la recomendada. Conceder es reversible en un minuto; un pago no.
+2. **Continuidad operativa.** No dejar sin camino una acción que hoy solo Alexander puede hacer en un proyecto concreto. En Cascadas de Vista Hermosa, La Arboleda CVH y Viñas del Sur Condominio 3 él es la **única persona con alcance y con `edit` en Contabilidad** (§2.6); las cuentas exentas (propietaria y superadministrador) siempre pueden. Este criterio pesa completo en el **C**, solo para las tres aprobaciones en el **B** (pagar y anular quedan con otras cuentas, §5.4) y no pesa en el **A** (se acepta el efecto transitorio).
+3. **Reparto de llaves (no hay separación entre personas salvo el pago).** Se reparte *qué llave tiene quién*; **no** se escribe ninguna prohibición entre personas ni umbral por monto. Las llaves solo pueden separar a Alexander de las tres cuentas que pasan por perfil: a estas no se les puede quitar ninguna. Con el B una sola persona puede crear la orden, aprobarla, recibir, aprobar la factura y aprobar la orden de pago; **la única separación es que ejecutar y anular el pago exigen a otra cuenta**.
 
-### 5.2 La propuesta recomendada
+### 5.2 Los tres paquetes
 
-* **Alexander:** CONCEDER `recepcion_registrar`, `factura_aprobar`, `orden_pago_aprobar`. NO CONCEDER `pago_ejecutar` ni `pago_anular`.
-* **Rol de empresa «Finanzas / Contador», plantillas «Finanzas / Contador», «Admin Plataforma» y «Administrador General», demás roles:** no conceder nada (A-2). Marco: nada.
-* **Cómo:** por el rol de «Ajustes individuales» de Alexander, desde el panel, **después** del despliegue de la 0900 (§6).
-
-**Quién puede qué después de la propuesta recomendada:**
-
-| Acción | Alexander (6 proyectos) | Marco (3 proyectos) | Cuenta propietaria y superadministrador (todos) |
+| | **A · ninguna llave por ahora** | **B · recepción + factura + orden de pago (RECOMENDADA)** | **C · continuidad total** |
 |---|---|---|---|
-| 1 Aprobar orden de compra | sí | sí | sí |
-| 2 Registrar recepción | sí | sí | sí |
-| 3 Aprobar factura | sí | sí | sí |
-| 4 Aprobar orden de pago | sí | sí | sí |
-| 5 Ejecutar pago | **no** | sí | sí |
-| 6 Anular pago | **no** | sí | sí |
+| Llaves que se conceden a Alexander | ninguna | `recepcion_registrar`, `factura_aprobar`, `orden_pago_aprobar` | las cinco: B + `pago_ejecutar` + `pago_anular` |
+| Bloques del script | ninguno | `P-1.1`, `P-1.2`, `P-1.3` | `P-1.1` a `P-1.5` |
+| De las seis acciones, Alexander puede | solo la 1 | 1, 2, 3 y 4 | las seis (como hoy) |
+| Cambio en la base | ninguno | `role_permissions` +3, `user_roles` +1, `roles` +1 | +5, +1, +1 |
+| Por qué | **0 usos**, **58 días sin sesión** (a la lectura del 2026-10-10): no hay nada que continuar. Se concede **en un minuto** desde el panel cuando vuelva a operar. **El PR puede fusionarse igual** aceptando el efecto transitorio: desde el despliegue de la 0900 y hasta que se conceda, Alexander conserva solo «aprobar orden de compra» y el servidor rechaza las otras cinco con `COMPRAS_PERMISO_ACCION` | Un solo criterio: se conceden las tres acciones que su rol le asigna y **no mueven dinero** (recepcionar; aprobar la factura; aprobar la orden de pago, que solo reserva lo que se va a pagar) y se retienen las dos que **mueven o reversan dinero**. Sigue sin uso registrado | Reproduce **exactamente** lo que hoy puede; elimina cualquier efecto transitorio. Es lo único que mantiene a Alexander como persona de pago en los tres proyectos donde nadie más con `edit` tiene alcance |
+| Costo | si vuelve a operar sin que se le haya concedido, alguien (Marco, la cuenta propietaria o el superadministrador) debe concederle o hacer la acción | pagar y anular dependen de otra cuenta (§5.4) | no hay ninguna segunda persona en todo el ciclo (§5.3) |
 
-Ejecutar y anular pagos queda en **21B+, Edificio SQ y Parajes Vermont** para Marco, la cuenta propietaria y el superadministrador, y en **Cascadas de Vista Hermosa, La Arboleda CVH, Viñas del Sur Condominio 3, «test» y «VSC General»** solo para la cuenta propietaria y el superadministrador (Marco no está asignado).
+**Quién puede qué después de cada paquete** (Marco, la cuenta propietaria y el superadministrador no cambian):
+
+| Acción | Alexander · A | Alexander · B | Alexander · C | Marco (3 proyectos) | Cuenta propietaria y superadministrador (todos) |
+|---|---|---|---|---|---|
+| 1 Aprobar orden de compra | sí | sí | sí | sí | sí |
+| 2 Registrar recepción | **no** | sí | sí | sí | sí |
+| 3 Aprobar factura | **no** | sí | sí | sí | sí |
+| 4 Aprobar orden de pago | **no** | sí | sí | sí | sí |
+| 5 Ejecutar pago | **no** | **no** | sí | sí | sí |
+| 6 Anular pago | **no** | **no** | sí | sí | sí |
+
+Con A o B, ejecutar y anular pagos queda en **21B+, Edificio SQ y Parajes Vermont** para Marco, la cuenta propietaria y el superadministrador, y en **Cascadas de Vista Hermosa, La Arboleda CVH, Viñas del Sur Condominio 3, «test» y «VSC General»** solo para la cuenta propietaria y el superadministrador (Marco no está asignado). Plantillas, rol de empresa «Finanzas / Contador», demás roles y Marco: no conceder nada (A-2, A-3) en ningún paquete.
+
+**Verificado con los bloques reales del script (§10):** en una base desechable con las diez migraciones y el padrón de Alexander, ejecutadas las concesiones de cada paquete, Alexander (como `authenticated`, bajo RLS) pasa las acciones 1 a 6 así: A → solo la 1; B → 1, 2, 3 y 4, y las acciones 5 y 6 se rechazan con `COMPRAS_PERMISO_ACCION` (42501); C → las seis.
 
 ### 5.3 Qué concentración queda si Alexander es la única persona de finanzas
 
-* **Con la recomendada:** Alexander puede, **él solo**, llevar una compra desde la orden de compra aprobada hasta una **orden de pago aprobada** (acciones 1 a 4: aprobar la orden, registrar la recepción, aprobar la factura, aprobar la orden de pago), y no puede ejecutar ni anular el pago. Lo que sí queda es una **concentración en una persona de cuatro aprobaciones**: quien aprueba la factura y quien aprueba la orden de pago es la misma persona, y las llaves no pueden separarlo mientras él sea el único no administrador con ellas. El control que se gana es uno solo, y está donde sale el dinero: ejecutar el pago exige a otra cuenta.
-* **Con la alternativa «continuidad total» (las cinco):** puede hacer las **seis** y, siendo `operator`, además **crear** la orden de compra: el ciclo completo, de la creación al pago y su anulación, **sin ninguna segunda persona** (que es exactamente lo que ocurre hoy).
+* **Con el B:** Alexander puede, **él solo**, llevar una compra **desde la creación de la orden hasta una orden de pago aprobada**. Siendo `operator` **crea sin ninguna llave** la orden de compra, la recepción, la factura y la orden de pago (las políticas `INSERT` aceptan al perfil `operator`), y aprueba con llave la orden (ya la tiene), registra la recepción, aprueba la factura y aprueba la orden de pago (acciones 1 a 4). No puede ejecutar ni anular el pago. Lo que queda es una **concentración en una persona de cuatro aprobaciones**: quien aprueba la factura y quien aprueba la orden de pago es la misma persona, y las llaves no pueden separarlo mientras él sea el único no administrador con ellas. El control que se gana es uno solo, y está donde sale el dinero: ejecutar el pago exige a otra cuenta.
+* **Lo que NO cambia (con cualquier paquete, también con el A).** Alexander conserva `platform.contabilidad.approve` y `platform.contabilidad.change_status` **genéricos** (su rol de 1 193 llaves) y con ellos la 0900 le sigue dejando hacer lo que **no** es una de las seis acciones. Probado como él, bajo RLS, en la base desechable de §10: **emitir, cancelar y cerrar una orden de compra; anular una recepción registrada; anular una factura aprobada sin pagos aplicados** —**incluso una que ya tiene una orden de pago aprobada** (la orden queda aprobada con su factura anulada; pagarla después se rechaza con `COMPRAS_FACTURA_NO_PAGABLE`)— **y anular una contraseña de pago**. Siguen rechazadas: anular la orden de pago (`pago_anular`, 42501) y anular una factura con pagos aplicados (`CXP_BLOQUEADO`, 23514). Es decir, anular documentos del circuito (no mover dinero) **no depende de ninguna de las cinco llaves**; si eso no es aceptable, es una decisión sobre el rol de 1 193 llaves (A-6), no sobre estas cinco. Está también en `COMPRAS_CONTROLES_SERVIDOR.md §5.1`.
+* **Con el C (las cinco):** puede hacer las **seis** y, siendo `operator`, además **crear** la orden de compra: el ciclo completo, de la creación al pago y su anulación, **sin ninguna segunda persona** (que es exactamente lo que ocurre hoy).
 * **Quienes pasan por perfil** (Marco en sus 3 proyectos, la cuenta propietaria y el superadministrador) pueden las seis acciones y **ninguna llave los frena**. Un caso real lo muestra: la única factura de producción la **creó y la aprobó la cuenta propietaria con 10,5 s de diferencia** y el servidor lo permitió, porque para la factura no existe ninguna regla entre personas.
 * **Lo que mitiga el interruptor `aprobacion_separada` y lo que no.** Apagado (hoy, y en todas las empresas), quien crea una orden puede aprobarla: Alexander, siendo `operator`, puede **crear y aprobar** su propia orden. Encendido, el servidor rechaza solo ese caso (`created_by = auth.uid()` al pasar de borrador a aprobada o al nacer aprobada, `COMPRAS_OC_AUTOAPROBACION`), y solo para la acción 1. **No mitiga** recepción, factura, orden de pago, pago ni anulación; **no** frena a una orden sin autor (`created_by` vacío); y los procesos de sistema (`service_role`) pueden cambiarlo con rastro. Encenderlo tiene un costo concreto: como Alexander es el único no administrador con la llave de aprobar órdenes, las que él mismo cree las tendría que aprobar Marco (en sus 3 proyectos) o la cuenta propietaria/superadministrador (en los otros). Hoy, mientras ningún otro `operator` tenga la llave, las órdenes creadas **por otras personas** ya las aprueba de hecho alguien distinto de quien las crea. Encenderlo no se recomienda ni se desaconseja aquí (A-7).
 
-**Costo de la recomendada, dicho sin adornos:** en los tres proyectos donde solo Alexander tiene alcance, pagar y anular depende de la cuenta propietaria o del superadministrador (desde la base no se puede saber qué persona hay detrás de la cuenta propietaria: su nombre es el de la empresa, y por eso la bitácora no atribuye a una persona lo que ella hace). Es aceptable hoy porque hay **0 órdenes de pago**; si el negocio lo considera un freno, la alternativa lo elimina a cambio de la concentración descrita.
+**Costo de los paquetes A y B, dicho sin adornos:** en los tres proyectos donde solo Alexander tiene alcance y `edit`, pagar y anular depende de la cuenta propietaria o del superadministrador. Desde la base **no se puede saber qué persona hay detrás de la cuenta propietaria**: su nombre es el de la empresa, y por eso la bitácora no atribuye a una persona lo que ella hace. Es aceptable hoy porque hay **0 órdenes de pago**; si el negocio lo considera un freno, el paquete C lo elimina a cambio de la concentración descrita.
 
-### 5.4 La alternativa («continuidad total») y su diferencia exacta
+### 5.4 Dos decisiones que ninguna consulta contesta
 
-Conceder a Alexander **las cinco** (`recepcion_registrar`, `factura_aprobar`, `orden_pago_aprobar`, `pago_ejecutar`, `pago_anular`): reproduce **exactamente** lo que hoy puede (A-1 de `COMPRAS_CONTROLES_SERVIDOR.md §5.3`). **Diferencia con la recomendada: dos llaves, `platform.contabilidad.compras.pago_ejecutar` y `platform.contabilidad.compras.pago_anular`.** Es también la que elimina cualquier efecto transitorio para Alexander. No existe una tercera opción más estricta en esta propuesta; cada llave es independiente y se decide por separado (§7), de modo que, por ejemplo, retener también `orden_pago_aprobar` es una decisión posible que traslada la aprobación de la orden de pago al administrador y a la cuenta propietaria.
+1. **¿Quién, con nombre y apellido, está detrás de la cuenta propietaria?** Es la cuenta que creó y aprobó la única factura en 10,5 s y concedió las 1 106 llaves en un segundo, y en A y B es una de las dos únicas que pagan en tres de los proyectos. Mientras no se sepa, «otra cuenta paga» no identifica a ninguna persona (A-1.8).
+2. **¿Quién paga en Cascadas de Vista Hermosa, La Arboleda CVH y Viñas del Sur Condominio 3?** Marco no está asignado ahí. Opciones: la cuenta propietaria o el superadministrador (lo que pasa sin hacer nada), el paquete C, o designar a otra persona (lo que exigiría asignarle proyecto y llave: no se propone aquí) (A-1.6).
 
 ---
 
@@ -221,39 +236,45 @@ Conceder a Alexander **las cinco** (`recepcion_registrar`, `factura_aprobar`, `o
 
 ### 6.1 Orden y precondiciones
 
-Orden de despliegue acordado en `COMPRAS_CONTROLES_SERVIDOR.md §10.2`: (1) PR de seguridad de `user_project_assignments`, (2) este PR (#926, las diez), (3) #927, (4) —futuro, si se aprueba— el PR de alcance por proyecto (§8). **Las concesiones van después del paso (2)**, nunca antes: las cinco llaves no existen hasta que la 0900 las siembra y `role_permissions.permission_key` es llave foránea de `permissions(key)` `[Q25]`.
+Orden de despliegue acordado en `COMPRAS_CONTROLES_SERVIDOR.md §10.2`, **cada uno en su propio *push* a `main`**: **(1) PR #928** de seguridad de `user_project_assignments` (`20261026000600`), **(2) este PR #926** (`20261027000000…0900`, las diez), **(3)** —futuro, si se aprueba— el PR de **alcance por proyecto** (§8; migración `20261027001000`, justo tras la 0900) y **(4) PR #927** (`20261028000000`). **Las concesiones van después del paso (2)**, nunca antes: las cinco llaves no existen hasta que la 0900 las siembra y `role_permissions.permission_key` es llave foránea de `permissions(key)` `[Q25]`. Con el paquete A no hay concesión que hacer en este momento.
 
-Antes de conceder: (a) respuestas **por escrito** a A-1.1…A-1.7 (§7); (b) volver a correr `scripts/diagnostico-permisos-compras.sql` `[Q1]` y confirmar que la columna `pierde` sigue siendo la de §0; (c) correr en el script `P-0.1`–`P-0.4` y `V-1`, `V-3`, `V-4` y **guardar la salida** (huellas de §2.1 y V-4).
+Antes de conceder: (a) respuesta **por escrito** a A-1 (qué paquete) y, según el caso, a A-1.6, A-1.7 y A-1.8 (§7); (b) volver a correr `scripts/diagnostico-permisos-compras.sql` `[Q1]` y confirmar que la columna `pierde` sigue siendo la de §0, **y correr además, el día del despliegue, la fila `perfil_afectado` de `scripts/diagnostico-compras-controles.sql` (debe seguir en 0)**: `[Q1]` y `V-3` miden las llaves genéricas, no el servidor de producción, y una persona con `edit` y sin `approve`/`change_status` hoy puede las seis acciones y no figuraría como «pierde» en esas columnas aunque las vaya a perder todas; hoy hay 0 personas así (solo Alexander tiene `edit`, `approve` y `change_status`) `[Q29]`; (c) correr en el script `P-0.1`–`P-0.4` y `V-1`, `V-3`, `V-4` y **guardar la salida** (huellas de §2.1 y V-4).
 
 ### 6.2 Ruta recomendada: la pantalla del producto
 
-La hace **Marco Santos Godoy** (`admin` de la misma empresa) o la cuenta propietaria; las políticas de `roles`, `role_permissions` y `user_roles` exigen `company_owner` o `admin` de la empresa de la persona. No la puede hacer un `operator`.
+La hace **Marco Santos Godoy** (cuenta personal, `admin` de la misma empresa) **desde la pantalla**, para que la bitácora nombre a una persona: probado bajo RLS en una base desechable, `permission_audit_log` registra como actor a quien guarda (Marco) en `create_role`, `assign_role` y cada `grant_permission`, y un `operator` es rechazado (`new row violates row-level security policy`). La cuenta propietaria también puede, pero su nombre es el de la empresa y la bitácora no atribuiría lo hecho a ninguna persona; **por SQL el actor queda vacío (`NULL`) en todas las filas**. Las políticas de `roles`, `role_permissions` y `user_roles` exigen `company_owner` o `admin` de la empresa de la persona.
 
 1. **Empresa › Usuarios**, fila de Alexander Monterroso, botón **Roles y permisos** (icono de llave) (`EmpresaUsuariosSection` → `RolPermisosModal`).
-2. En el panel de **permisos efectivos / «Ajustes individuales»** (el mecanismo «Ajustes finos»), abrir el grupo **«Plataforma: Compras y pagos»** (aparece solo cuando el catálogo ya tiene las llaves, es decir, después de la 0900) y marcar **solo** las casillas decididas: «Registrar una recepción», «Aprobar una factura de proveedor» y «Aprobar una orden de pago» (en la recomendada); y además «Ejecutar un pago» y «Anular un pago» (en la alternativa). **No** tocar los roles asignados ni sus vencimientos.
+2. En el panel de **permisos efectivos / «Ajustes individuales»** (el mecanismo «Ajustes finos»), abrir el grupo **«Plataforma: Compras y pagos»** (aparece solo cuando el catálogo ya tiene las llaves, es decir, después de la 0900) y marcar **solo** las casillas decididas: «Registrar una recepción», «Aprobar una factura de proveedor» y «Aprobar una orden de pago» (paquete B); y además «Ejecutar un pago» y «Anular un pago» (paquete C). Con el paquete A no se marca ninguna. **No** tocar los roles asignados ni sus vencimientos.
 3. **Guardar.** El producto, en `handleSave`: crea el rol oculto de ajustes `Ajustes individuales — Alexander Monterroso (327ffeda)` (`is_system = false`, `user_override_for` = su id, color `#7E9389`), se lo asigna con `expires_at = NULL` (la expiración no aplica a los ajustes) e inserta una fila `role_permissions` con `effect = allow` por casilla marcada. Cada paso deja huella en `permission_audit_log` con **la persona administradora como actor** (`create_role`, `assign_role`, `grant_permission` ×N) `[V-5]`.
 
 ### 6.3 Ruta alternativa: SQL (`scripts/propuesta-asignaciones-permisos-compras.sql`)
 
-Para una persona con acceso al editor SQL (rol de la base, no `authenticated`): extraer **un bloque** `P-1.x` por llave decidida, quitar el prefijo `--SQL `, ejecutarlo y revisar el `SELECT` de verificación; el bloque **termina en `ROLLBACK;`** y solo se confirma editando esa línea a `COMMIT;`. Hace lo mismo que la pantalla (mismo nombre, color y campos del rol de ajustes), pero **sin actor** en la bitácora (`auth.uid()` es nulo) y sin probarse en esta sesión (§10). Preferir la pantalla.
+Para una persona con acceso al editor SQL (rol de la base, no `authenticated`): extraer **un bloque** `P-1.x` por llave decidida **a un archivo** (`sed -n '/^-- ▶ P-1.2/,/^-- ◀ P-1.2/p' … | sed 's/^--SQL //' > bloque.sql`) y ejecutarlo **entero en una sola conexión** (`psql … -f bloque.sql`). Hace lo mismo que la pantalla (mismo nombre, color y campos del rol de ajustes), pero **sin actor** en la bitácora (`auth.uid()` es nulo). **Preferir la pantalla.** Tiene **tres seguros**:
+
+1. **Todo viene comentado** (`--SQL `): ejecutar el archivo completo solo corre `SELECT` de lectura.
+2. **La escritura va dentro de un `DO` que levanta excepción** salvo que la transacción tenga `prop.confirmar = 'si'`. La línea que lo fija viene **comentada** (`-- SET LOCAL prop.confirmar = 'si';`) y quien confirma por escrito le quita el `-- `. Es `SET LOCAL` a propósito: vale solo dentro de esa transacción, así que un cliente que parte el bloque en sentencias sueltas, abre una conexión por sentencia o corta en cada `;` **no escribe nada** (el `INSERT` va dentro de una cadena del `DO`: ni siquiera existe como sentencia suelta).
+3. **El bloque termina en `ROLLBACK;`.** Para confirmarlo hay que editar a mano esa línea y ponerla en `COMMIT;` después de revisar el `SELECT` de verificación del bloque.
+
+**Advertencia: ejecutar el bloque COMPLETO en UNA sola sesión.** El `ROLLBACK` solo deshace lo hecho en su propia transacción. En la versión anterior del script (sin el segundo seguro), un cliente que ejecutara las sentencias una por una, cada una en su conexión o en *autocommit* (un editor que parte el script, un *pooler* en modo sentencia, o pegar solo el `INSERT`), **dejaba confirmado el `INSERT` suelto y el `ROLLBACK` posterior no hacía nada**: reproducido en la base desechable (`role_permissions` 2 922 → 2 923, `user_roles` 5 → 6, `roles` 18 → 19). Con el segundo seguro ese caso no escribe nada (§10), pero no es excusa: nunca pegar solo una parte del bloque.
 
 ### 6.4 Comprobación posterior (debe dar «sí → sí» donde corresponde)
 
 * **`V-3` del script / `[Q15]`** (o la fila `usuario` de `[Q1]`):
 
-| Alexander | recomendada | alternativa |
-|---|---|---|
-| 1 Aprobar orden de compra | sí → sí | sí → sí |
-| 2 Registrar recepción | **sí → sí** | **sí → sí** |
-| 3 Aprobar factura | **sí → sí** | **sí → sí** |
-| 4 Aprobar orden de pago | **sí → sí** | **sí → sí** |
-| 5 Ejecutar pago | sí → **no** | **sí → sí** |
-| 6 Anular pago | sí → **no** | **sí → sí** |
+| Alexander | A · ninguna | B · recomendada | C · continuidad total |
+|---|---|---|---|
+| 1 Aprobar orden de compra | sí → sí | sí → sí | sí → sí |
+| 2 Registrar recepción | sí → **no** | **sí → sí** | **sí → sí** |
+| 3 Aprobar factura | sí → **no** | **sí → sí** | **sí → sí** |
+| 4 Aprobar orden de pago | sí → **no** | **sí → sí** | **sí → sí** |
+| 5 Ejecutar pago | sí → **no** | sí → **no** | **sí → sí** |
+| 6 Anular pago | sí → **no** | sí → **no** | **sí → sí** |
 
-  En el diagnóstico completo la fila de Alexander debe mostrar `roles_asignados` = «Ajustes individuales — Alexander Monterroso (327ffeda); Finanzas / Contador»; la fila `resumen` sigue diciendo «1 persona(s) pierden alguna acción» con la recomendada y «**0** persona(s)…» con la alternativa; Marco queda «sí → sí» en las seis.
-* **Contadores `V-4`:** con la recomendada, `role_permissions` +3, `user_roles` +1 y `roles` +1 (el rol de ajustes); con la alternativa +5, +1 y +1; `concesiones_de_las_cinco_llaves` = 3 (o 5). Lectura previa del 2026-10-10: 3 661, 26 y 34 (si otra persona cambió roles en el intervalo, comparar contra una lectura hecha justo antes).
-* **`V-1` y `V-4`, proyectos:** las huellas de §2.1 y la global (43 filas, md5 `d32daf1d38d862b1cdd938a59ad2ff5f`) **no deben cambiar**: ninguna concesión toca `user_project_assignments`. Alexander **conserva sus 6 proyectos** y Marco **sus 3**.
-* **Reversión:** desmarcar las casillas en el mismo panel (el producto borra el rol oculto si no quedan ajustes) o borrar las filas concedidas en `role_permissions`. Las llaves de `permissions` no se borran (borrarlas elimina en cascada toda concesión).
+  Esta tabla se obtuvo ejecutando el `V-3` real del script, y el comportamiento (`user_has_permission` y las seis transiciones como `authenticated`), en la base desechable tras cada paquete (§10). En el diagnóstico completo la fila de Alexander debe mostrar `roles_asignados` = «Ajustes individuales — Alexander Monterroso (327ffeda); Finanzas / Contador» (B y C); la fila `resumen` sigue diciendo «1 persona(s) pierden alguna acción» con A y con B y «**0** persona(s)…» con C; Marco queda «sí → sí» en las seis.
+* **Contadores `V-4`:** A, sin cambios; B, `role_permissions` +3, `user_roles` +1 y `roles` +1 (el rol de ajustes); C, +5, +1 y +1; `concesiones_de_las_cinco_llaves` = 0, 3 o 5. La bitácora suma 5 filas con B (`create_role`, `assign_role` y 3 `grant_permission`) y 7 con C. Lectura previa del 2026-10-10: 3 661, 26 y 34 (si otra persona cambió roles en el intervalo, comparar contra una lectura hecha justo antes).
+* **`V-1` y `V-4`, proyectos:** las huellas de §2.1 y la global (43 filas, md5 `d32daf1d38d862b1cdd938a59ad2ff5f`) **no deben cambiar**: ninguna concesión toca `user_project_assignments` (comprobado: md5 de las asignaciones idéntico antes y después de cada paquete y de la reversión). Alexander **conserva sus 6 proyectos** y Marco **sus 3**.
+* **Reversión exacta:** **desmarcar las casillas en el mismo panel** (el producto borra el rol oculto si no quedan ajustes) **o** `DELETE FROM roles WHERE user_override_for = <id>` (bloque `P-9` del script, con los mismos tres seguros): la asignación (`user_roles`) y las filas de `role_permissions` del rol de ajustes caen en cascada. **Borrar solo las filas de `role_permissions` NO basta**: deja un rol de ajustes **vacío** y su asignación (`roles` +1 y `user_roles` +1 respecto del estado previo). Comprobado en la base desechable: con `P-9` los md5 de `role_permissions`, `user_roles`, `roles` y `user_project_assignments` quedan **idénticos** a los del estado previo; la bitácora (que solo se añade) conserva el rastro y **no se borra** (con C: +7 filas de `revoke_permission`, `remove_role` y `delete_role`). Las llaves de `permissions` no se borran (borrarlas elimina en cascada toda concesión).
 
 ### 6.5 Efecto en proyectos
 
@@ -262,7 +283,7 @@ Las concesiones **no cambian ni amplían** ninguna asignación de proyecto. La c
 ### 6.6 Plantillas: cómo funcionan de verdad en el producto
 
 * Las plantillas son los roles `is_system = true` (sin empresa). **No se asignan**: «Usar plantilla» (y crear un usuario con un rol de sistema) llama a `ensureCompanyRoleFromTemplate`, que **busca o crea la copia de empresa** (nombre de la plantilla, `cloned_from_role_id`) y **copia sus `role_permissions` en ese momento**. Una copia fiel que ya existe **se reutiliza y nunca se refresca**.
-* **No hay copia automática al crear una empresa nueva** (ninguna migración ni función de borde siembra roles de empresa a partir de plantillas: la copia nace solo en la pantalla). Una plantilla con llaves nuevas llega a las copias que se creen **después**; las existentes (la de Alexander, la de Marco) no cambian.
+* **No hay copia automática al crear una empresa nueva:** ninguna migración o función siembra copias al crear una empresa; **la única siembra fue la conversión única `20260612100300_rbac_assignments_to_company_roles.sql`**, que creó una copia por cada (empresa, plantilla en uso) y re-apuntó `user_roles` —es el origen de las copias de Alexander y de Marco, todas con `created_at` = 2026-06-12 17:36:18 `[Q30]`—. Después, la copia nace solo en la pantalla. Una plantilla con llaves nuevas llega a las copias que se creen **después**; las existentes (la de Alexander, la de Marco) no cambian.
 * **Excepción que importa saber:** las funciones de borde `create-user` y `accept-invitation` asignan **directamente la plantilla de plataforma** que corresponde al perfil, sin copia (`admin` → «Admin Plataforma», `operator` → «Operador Plataforma», `viewer` → «Visualizador Plataforma», `collector` → «Cobrador Plataforma»; `supabase/functions/*/validate.ts`). Ese vínculo **sí es vivo** (un cambio en la plantilla llega de inmediato; la pantalla lo muestra como «heredada»). Hoy hay **0** asignaciones directas a plantillas `[Q7b]`. Para las seis acciones solo importa «Admin Plataforma», y quien la recibe es un `admin`, que ya pasa toda llave por su perfil: por eso conceder llaves a esa plantilla no cambia a nadie.
 * La pantalla **no edita plantillas** («Usar plantilla» y «Personalizar» clonan); su `role_permissions` solo lo escribe el superadministrador (la política de `INSERT` exige `is_super_admin()` para un rol de sistema) o una migración. Por eso conceder a una plantilla es una decisión de producto (A-2.1), no una urgencia: no cambia a ninguna persona actual. Si se decide, es el bloque `P-5` del script (con `ROLLBACK` por defecto) y, para que figure en el historial, mejor en una migración propia dentro de su despliegue (**no** en el PR #926, que está en el tope de diez).
 
@@ -270,24 +291,28 @@ Las concesiones **no cambian ni amplían** ninguna asignación de proyecto. La c
 
 ## 7. (D) Decisiones que necesita el usuario (responder sí/no)
 
+**El PR #926 sigue en borrador hasta que se responda A-1.** A-1.0 elige uno de tres paquetes; **A («ninguna llave por ahora») es una respuesta válida y permite fusionar igual**. A-1.1 a A-1.5 se contestan solas según el paquete (A: NO ×5 · B: SÍ, SÍ, SÍ, NO, NO · C: SÍ ×5).
+
 | Ref. | Pregunta | Recomendación |
 |---|---|---|
-| **A-1.1** | ¿Conceder a Alexander Monterroso **registrar recepciones** (`platform.contabilidad.compras.recepcion_registrar`)? | **SÍ** |
-| **A-1.2** | ¿Conceder a Alexander **aprobar facturas de proveedor** (`…factura_aprobar`)? | **SÍ** |
-| **A-1.3** | ¿Conceder a Alexander **aprobar órdenes de pago** (`…orden_pago_aprobar`)? | **SÍ** |
-| **A-1.4** | ¿Conceder a Alexander **ejecutar pagos** (`…pago_ejecutar`)? | **NO** (alternativa «continuidad total»: SÍ) |
-| **A-1.5** | ¿Conceder a Alexander **anular pagos** (`…pago_anular`)? | **NO** (alternativa: SÍ) |
-| **A-1.6** | Si A-1.4 o A-1.5 es NO: ¿se acepta que ejecutar y anular pagos en Cascadas de Vista Hermosa, La Arboleda CVH y Viñas del Sur Condominio 3 (donde Marco no está asignado) los haga solo la cuenta propietaria o el superadministrador? Si no, hay que conceder A-1.4/A-1.5 a Alexander o asignar a otra persona. | **SÍ**, mientras no haya órdenes de pago |
-| **A-1.7** | ¿La concesión se hace desde la pantalla («Ajustes individuales», actor registrado) por Marco o por la cuenta propietaria, y no por SQL? | **SÍ** |
+| **A-1.0** | **¿Qué paquete?** **A** ninguna llave por ahora · **B** recepción + factura + orden de pago · **C** continuidad total (las cinco, = lo que Alexander puede hoy) (§5.2) | **B** (A es válida y no bloquea la fusión) |
+| **A-1.1** | ¿Conceder a Alexander Monterroso **registrar recepciones** (`platform.contabilidad.compras.recepcion_registrar`)? | **SÍ** (B y C) |
+| **A-1.2** | ¿Conceder a Alexander **aprobar facturas de proveedor** (`…factura_aprobar`)? | **SÍ** (B y C) |
+| **A-1.3** | ¿Conceder a Alexander **aprobar órdenes de pago** (`…orden_pago_aprobar`)? | **SÍ** (B y C) |
+| **A-1.4** | ¿Conceder a Alexander **ejecutar pagos** (`…pago_ejecutar`)? | **NO** (solo el paquete C: SÍ) |
+| **A-1.5** | ¿Conceder a Alexander **anular pagos** (`…pago_anular`)? | **NO** (solo el paquete C: SÍ) |
+| **A-1.6** | Si A-1.4 o A-1.5 es NO: **¿quién paga y anula** en Cascadas de Vista Hermosa, La Arboleda CVH y Viñas del Sur Condominio 3 (donde Marco no está asignado y Alexander es la única persona con alcance y con `edit`)? ¿Se acepta que lo haga solo la cuenta propietaria o el superadministrador? Si no: paquete C, o designar a otra persona (exigiría asignarle proyecto y llave: no se propone aquí). | **SÍ** se acepta, mientras no haya órdenes de pago |
+| **A-1.7** | ¿La concesión se hace desde la pantalla («Ajustes individuales») **por Marco Santos Godoy (cuenta personal), para que la bitácora nombre a una persona**, y no por SQL (donde el actor queda vacío) ni por la cuenta propietaria (cuyo nombre es el de la empresa)? | **SÍ** |
+| **A-1.8** | **¿Qué persona concreta está detrás de la cuenta propietaria** (la que creó y aprobó la única factura en 10,5 s y concedió las 1 106 llaves en un segundo)? Sin ese dato, «otra cuenta paga» no identifica a nadie. | Dato del negocio; no se puede leer en la base |
 | **A-2.1** | ¿Se conceden llaves nuevas a las **plantillas de sistema** «Finanzas / Contador» y «Admin Plataforma» ahora? | **NO** (0 personas; solo afectaría copias futuras; decidir antes de crear una segunda empresa o de asignar la plantilla a otra persona) |
 | **A-2.2** | ¿Se conceden llaves nuevas al **rol de empresa** «Finanzas / Contador»? | **NO** (se concede a la persona) |
 | **A-2.3** | ¿Se deja la plantilla «Administrador General» como está (trae la llave de la pestaña de órdenes y por eso «gana» la acción 1, sin efecto práctico)? | **SÍ** |
 | **A-3** | Marco Santos Godoy: nada que conceder (es `admin`, conserva las seis en sus 3 proyectos). ¿Se confirma? | **SÍ** |
-| **A-4** | **P-PERM-1 · R1.** ¿Se aprueba preparar, como migración y PR propios (después del despliegue de #926; **no** como undécima migración), que la captura directa exija el proyecto asignado y la empresa de la sesión? (§8) | **SÍ** |
+| **A-4** | **P-PERM-1 · R1.** ¿Se aprueba preparar, como migración y PR propios (`20261027001000`, justo tras la 0900; después del despliegue de #926; **no** como undécima migración), que la captura directa exija el proyecto asignado y la empresa de la sesión? (§8) | **SÍ** |
 | **A-5** | **P-PERM-1 · R2.** ¿Se prohíbe a quien **no** es exento de proyecto crear, aprobar o pagar documentos **sin proyecto** y sacar su propio documento de su proyecto dejándolo sin proyecto? (§8) | **SÍ** |
-| **A-6** | ¿Se revisa el rol de empresa «Finanzas / Contador» (1 193 de 1 201 llaves, concedidas en bloque el 2026-08-13) para acercarlo a la plantilla (63)? Esta propuesta **no** recorta nada. | Decisión del negocio |
+| **A-6** | ¿Se revisa el rol de empresa «Finanzas / Contador» (**1 193 llaves, 1 106 de ellas concedidas en bloque por la cuenta propietaria el 2026-08-13 21:52:53; 87 sin actor entre 2026-06-12 y 2026-09-10**) para acercarlo a la plantilla (63)? Esta propuesta **no** recorta nada. Es también donde viven `approve` y `change_status`, con los que Alexander puede anular documentos con cualquier paquete (§5.3). | Decisión del negocio |
 | **A-7** | ¿Se enciende el interruptor de separación solicitante/aprobador (`aprobacion_separada`) en Prestadora de Servicios S.A.? (cubre solo la acción 1; costo en §5.3) | Sin recomendación |
-| **A-8** | ¿Se concede **inmediatamente** tras desplegar la 0900, aunque A-4/A-5 y el PR de asignaciones aún no estén en producción? | **SÍ** con la recomendada: no amplía nada de lo que hoy puede y hoy hay 0 documentos sin proyecto |
+| **A-8** | ¿Se concede **inmediatamente** tras desplegar la 0900, aunque A-4/A-5 (el PR de alcance por proyecto, paso 3) aún no estén en producción? El orden acordado pone #928 antes de #926, así que solo A-4/A-5 quedan pendientes; si por algún motivo se invirtiera, la asignación de proyecto seguiría siendo autoasignable (§6.5). | **SÍ** con el paquete B (o el A, que no concede nada): no amplía nada de lo que hoy puede y hoy hay 0 documentos sin proyecto |
 
 *Opcional (no es sí/no):* si la recepción debe quedar en una persona de operación y no en finanzas, la llave `recepcion_registrar` se concede a esa persona en vez de a Alexander; no se propone porque exigiría designar a alguien.
 
@@ -304,7 +329,7 @@ Las concesiones **no cambian ni amplían** ninguna asignación de proyecto. La c
 | V3 · **Mover** el propio documento a «sin proyecto» (`UPDATE … SET project_id = NULL`) | Permitido: lo ve y puede actuar sobre él **toda** la empresa con la llave | quien tiene `edit` y el proyecto de origen |
 | V4 · `INSERT` por una función `SECURITY DEFINER` con `company_id` ajeno | Un borrador de otra empresa pasa (la RLS no rige al dueño de la función); hoy no existe ninguna función así | — |
 
-**Propuesta** (en migración y PR propios, **después** del despliegue de #926; no es una undécima migración del #926 y no se sube `MAX_APPLY`):
+**Propuesta** (en migración y PR propios, **después** del despliegue de #926 —orden #928 → #926 → este PR → #927—; migración `20261027001000`, justo tras la 0900; no es una undécima migración del #926 y no se sube `MAX_APPLY`):
 
 * **R1 (bajo riesgo; A-4).** Un disparador `BEFORE INSERT` en las cinco tablas, solo para sesiones de usuario: si `NEW.project_id IS NOT NULL`, exigir `can_access_project(NEW.project_id)` (`COMPRAS_ALCANCE_PROYECTO`, 42501) **y** que `NEW.company_id` sea la empresa de la sesión salvo el superadministrador. Cierra V1 y V4 y no cambia ninguna pantalla.
 * **R2 (decisión de fondo; A-5).** Para quien **no** es exento de proyecto (`NOT user_is_project_exempt()`): exigir `NEW.project_id IS NOT NULL` en el `INSERT`, y rechazar el `UPDATE` de `project_id` de un valor a `NULL` (`OLD.project_id IS NOT NULL AND NEW.project_id IS NULL`), conservando la excepción de la acción referencial `ON DELETE SET NULL` cuando el proyecto ya no existe. Cierra V2 y V3. Afecta a Marco (administrador **con** asignaciones, no exento) igual que a Alexander. No hay datos que migrar: hoy hay 0 documentos sin proyecto.
@@ -316,33 +341,42 @@ Las concesiones **no cambian ni amplían** ninguna asignación de proyecto. La c
 
 ## 9. Hallazgos inesperados
 
-1. **El rol de Alexander tiene 1 193 de las 1 201 llaves del catálogo** (la plantilla trae 63), concedidas en bloque por la cuenta propietaria el 2026-08-13 `[Q4, Q5, Q6]`. El texto anterior del script describía solo ~10 llaves.
-2. **El nombre no identifica:** `ILIKE '%Monterroso%'` coincide con 3 cuentas (2 `cliente` sin empresa) `[Q2]`. La versión anterior de `propuesta-asignaciones-permisos-compras.sql` filtraba por nombre **dentro de los bloques de concesión**; su comprobación previa devolvería 3 filas y lo advertía, pero un bloque ejecutado habría intentado crear roles de ajustes para las tres cuentas. Las dos `cliente` no tienen empresa y la restricción `roles_company_or_system_chk` (un rol que no es de sistema exige empresa) habría hecho fallar la sentencia entera, así que no se habría escrito nada, pero por una casualidad de la restricción y no por diseño. Ahora el filtro es por id, perfil, empresa y estado.
+1. **El rol de Alexander tiene 1 193 de las 1 201 llaves del catálogo** (la plantilla trae 63): **1 106 concedidas en bloque por la cuenta propietaria el 2026-08-13 21:52:53 y 87 sin actor** entre 2026-06-12 y 2026-09-10 `[Q4, Q5, Q6, Q30]`. El texto anterior del script describía solo ~10 llaves.
+2. **El nombre no identifica:** `ILIKE '%Monterroso%'` coincide con 3 cuentas (2 `cliente` sin empresa) `[Q2]`, `ILIKE '%Santos%'` con otras 3 (Marco Santos Godoy `admin`, una cuenta `cliente` «Marco Santos» sin empresa y «Eduardo Santos» `viewer`) y hay dos empresas de nombre casi igual `[Q27]`. La versión anterior de `propuesta-asignaciones-permisos-compras.sql` filtraba por nombre **dentro de los bloques de concesión**; su comprobación previa devolvería 3 filas y lo advertía, pero un bloque ejecutado habría intentado crear roles de ajustes para las tres cuentas. Las dos `cliente` no tienen empresa y la restricción `roles_company_or_system_chk` (un rol que no es de sistema exige empresa) habría hecho fallar la sentencia entera, así que no se habría escrito nada, pero por una casualidad de la restricción y no por diseño. Ahora el filtro es por id, perfil, empresa y estado.
 3. **Las copias de empresa son fotografías que divergen de su plantilla** (90 contra 96, 189 contra 1 104, 1 193 contra 63) y la plantilla nunca las refresca; no hay copia automática al crear una empresa `[Q6]`. Además, `create-user` y `accept-invitation` siguen asignando la plantilla de plataforma **directamente** (vínculo vivo, sin copia) según el perfil, aunque hoy no haya ninguna asignación así `[Q7b]`.
 4. **La única factura se creó y se aprobó por la misma cuenta en 10,5 s** `[Q9]`: para la factura (y la recepción, la orden de pago y el pago) no existe ninguna regla entre personas; la del interruptor es solo para la orden de compra y está apagada.
 5. **Alexander no tiene ningún inicio de sesión registrado desde el 2026-08-13 ni filas de negocio a su nombre** `[Q10, Q11]`: la «continuidad operativa» es una expectativa de función, no un hecho de uso.
 6. **`role_permissions` no tiene política ni bitácora de `UPDATE`:** el `ON CONFLICT … DO UPDATE SET effect = 'allow'` de la versión anterior del script habría **volteado en silencio un `deny`** y sin rastro. En producción `role_permissions` solo tiene políticas de `SELECT`, `INSERT` y `DELETE` y un disparador de bitácora `AFTER INSERT OR DELETE` `[Q26]`. Hoy hay 0 `deny` en toda la base `[Q7b]`; ahora los bloques usan `DO NOTHING` y `P-0.4` descarta antes cualquier `deny`.
 7. **La pantalla de roles guarda con `set_role_permissions`, que deja el rol *exactamente* con la lista enviada:** editar así un rol de 1 193 llaves y guardar una lista incompleta lo recortaría. Otra razón para conceder por ajustes individuales.
 8. **«Ganar» la acción 1 es teórico para «Administrador General»:** la plantilla trae la llave de la pestaña pero no `platform.contabilidad.edit`, que las cuatro políticas `UPDATE` exigen; y no tiene personas.
-9. **Tres proyectos dependen solo de Alexander** (entre las personas no exentas) y dos proyectos («test», «VSC General») no tienen a nadie asignado `[Q12]`.
+9. **Tres proyectos dependen solo de Alexander** (entre las personas con alcance **y** con `edit`; hay otras 2 personas con alcance en cada uno, sin ninguna llave) y dos proyectos («test», «VSC General») no tienen a nadie asignado `[Q12, Q28]`.
+10. **Con cualquier paquete Alexander conserva `approve` y `change_status` genéricos** (su rol de 1 193 llaves) y con ellos puede cancelar y cerrar órdenes, anular recepciones, contraseñas y facturas sin pagos aplicados, incluso una factura que tiene una orden de pago aprobada (probado en la base desechable, §5.3). Las cinco llaves no cambian eso; es una decisión sobre el rol (A-6).
+11. **El servidor de producción hoy solo exige `edit`** para las seis acciones; `approve` y `change_status` solo gobiernan la pantalla `[Q29]` (§1). La cadena 0300–0800 de este PR ya había hecho valer `approve`/`change_status`; la 0900 las sustituye por la llave de cada acción.
 
 ---
 
-## 10. Lo que NO se hizo
+## 10. Lo que se probó y lo que NO se hizo
 
-* **No se concedió, creó ni borró nada** en ninguna base. Todo lo anterior son `SELECT`.
-* Las **sentencias de concesión del script no se ejecutaron en ninguna base** en esta sesión: no se asignó una base desechable y el sandbox y la preview están vedados para escritura. Según el informe de la ronda anterior, la versión anterior de esos bloques se probó en una copia desechable (registro en el *scratchpad* de aquella sesión, no en el repositorio, y no revisado de nuevo aquí); esta versión cambia el filtro (id, perfil, empresa, estado), el nombre del rol (idéntico al de la pantalla) y el tratamiento del conflicto (`DO NOTHING`). Lo que sí se verificó contra producción, solo con `SELECT`: las comprobaciones `P-0.1`–`P-0.4`, `V-1`–`V-5` (se ejecutan y devuelven lo indicado), el predicado de los bloques (la persona se identifica con una sola fila, el nombre de rol que se crearía no choca con ninguno existente y no hay rol de ajustes previo) y que las claves de conflicto (`user_roles` y `role_permissions`, llaves primarias) existen `[Q25]`. **Antes de activar un bloque hay que correrlo en una base desechable o en el sandbox con una persona de prueba.**
+* **No se concedió, creó ni borró nada** en producción, en el sandbox ni en la base de preview. Todo lo de producción son `SELECT` (`[Q1]`–`[Q30]`).
+* **El script se probó en una base desechable local** (PostgreSQL 16, cadena de migraciones del PR #926 aplicada hasta la `…0900` con el mecanismo de `supabase/tests/compras_bloque_b/run.sh`, y un padrón con los ids reales de Alexander, de Marco, de los 8 proyectos y de su rol de 1 193 llaves; la base y los *scripts* de prueba no están en el repositorio). Resultados, comando por comando:
+  * **Archivo completo, una sesión, tal cual:** 0 errores, 0 cambios (huella md5 de `role_permissions`, `user_roles`, `roles`, `user_project_assignments` y conteo de la bitácora idénticos) y cero sentencias de escritura sin comentar.
+  * **Cada bloque (`P-1.1` a `P-1.5`, `P-3`, `P-4`, `P-5`, `P-9`) SIN confirmar:** el bloque completo en una sesión levanta `SIN CONFIRMAR` y deja 0 cambios; **una conexión de `psql` por sentencia**, partido tanto con un separador que respeta `$$` como con uno que corta en cada `;`, deja 0 cambios; con la confirmación descomentada pero **una conexión por sentencia**, 0 cambios (el `SET LOCAL` no sobrevive a la conexión); con la confirmación pero **sin el `BEGIN`** (*autocommit*, una sola sesión), rechazado y 0 cambios.
+  * **Confirmado + `ROLLBACK`**, bloque completo en una sesión: el `SELECT` de verificación ve la fila dentro de la transacción y al final 0 cambios.
+  * **Confirmado + `COMMIT`:** paquete B → `role_permissions` 2 922 → 2 925, `user_roles` 5 → 6, `roles` 18 → 19, bitácora +5 con actor vacío; paquete C → 2 927 / 6 / 19, bitácora +7; repetir `P-1.1` no cambia nada. `V-3` tras B: Alexander «sí» en 1 a 4 y «no» en 5 y 6; tras C: «sí → sí» en las seis; Marco «sí → sí». `user_has_permission` de Alexander: B → `t,t,t,f,f` para recepción, factura, orden de pago, pago y anulación; C → `t` en las cinco. Huella md5 de `user_project_assignments` idéntica en todo. `P-3` (con los marcadores sustituidos), `P-4` y `P-5`: +5/+1/+1, +1 y +3. **`P-9` (reversión):** `role_permissions`, `user_roles`, `roles` y `user_project_assignments` vuelven a los md5 originales; la bitácora crece (+7 con C).
+  * **Filtros:** con Alexander cambiado a `viewer`, inactivo o de otra empresa, y `P-3` con el id de la cuenta `cliente` «Marco Santos» (sin empresa), el bloque no escribe nada **aunque esté confirmado y con `COMMIT`**; un `deny` previo en su rol de ajustes no se voltea; antes de la 0900 (llaves ausentes) el bloque falla por `role_permissions_permission_key_fkey` sin dejar residuo.
+  * **Comportamiento real** de Alexander (`authenticated`, bajo RLS) tras cada paquete, sobre documentos de un proyecto suyo: A → pasa solo la acción 1; B → pasan 1 a 4 y 5 y 6 se rechazan con `COMPRAS_PERMISO_ACCION` (42501); C → pasan las seis. Con **cualquier** paquete pasan emitir, cancelar y cerrar una orden, anular una recepción, anular una factura (con o sin orden de pago aprobada) y anular una contraseña, y crear la orden, la recepción, la factura y la orden de pago; se rechazan anular una factura con pagos aplicados (`CXP_BLOQUEADO`, 23514) y pagar una orden cuya factura se anuló (`COMPRAS_FACTURA_NO_PAGABLE`, 23514). Como Marco (`admin`) bajo RLS, crear el rol de ajustes, asignarlo y conceder deja `actor = Marco` en la bitácora; como Alexander (`operator`) el mismo `INSERT` en `roles` es rechazado por RLS.
+  * **La versión anterior de los bloques** (sin el segundo seguro) se reprodujo con una conexión por sentencia: dejó `role_permissions` 2 922 → 2 923, `user_roles` 5 → 6 y `roles` 18 → 19 a pesar del `ROLLBACK`. Con el segundo seguro, 0.
+* **Lo que NO se pudo probar:** (1) un *pooler* real (pgbouncer en modo sentencia o transacción, el *pooler* de Supabase) ni el editor SQL de Supabase: no hay uno disponible, y «una conexión por sentencia» se simuló con una invocación de `psql` por sentencia; (2) PostgreSQL 17 (producción): la base desechable es 16; (3) la pantalla React real («Roles y permisos»): su ruta se simuló con las mismas sentencias que guarda `handleSave`, bajo RLS como Marco; no se verificaron los textos visibles de las casillas; (4) la cadena con el PR #928 (`20261026000600`) intercalado; (5) la propuesta de §8, que sigue siendo un prototipo no aplicado ni repetido en esta sesión.
 * No se editó `COMPRAS_CONTROLES_SERVIDOR.md`, ninguna migración ni ningún permiso; no se hizo `commit`.
-* La propuesta de §8 no está implementada ni probada en esta sesión.
 
 ---
 
 ## 11. (E) Bloque para el cuerpo del PR
 
 ````markdown
-### Permisos por acción: matriz propuesta (SIN conceder; lectura de producción 2026-10-10)
+### Permisos por acción: matriz propuesta (SIN conceder; lectura de producción 2026-10-10, releída 2026-10-11)
 
-Detalle, consultas y pasos: `docs/COMPRAS_PROPUESTA_ASIGNACION_PERMISOS.md`. La 0900 no concede nada. Celda = «hoy → tras la 0900 sin conceder» y, al final, la propuesta (**C** = conceder · **N** = no conceder · ya = ya lo tiene).
+Detalle, consultas y pasos: `docs/COMPRAS_PROPUESTA_ASIGNACION_PERMISOS.md`. La 0900 no concede nada. Celda = «hoy → tras la 0900 sin conceder» y, al final, la propuesta del paquete B (**C** = conceder · **N** = no conceder · ya = ya lo tiene). «Hoy» mide las llaves genéricas de la pantalla y de la cadena 0300–0800 de este PR: **en producción el servidor hoy exige solo `platform.contabilidad.edit`** (no existen `compras_exigir_accion` ni `compras_tg_permiso_*`) y solo Alexander tiene `edit`, `approve` y `change_status`.
 
 | Principal | OC | Recep. | Factura | O. pago | Pago | Anular | edit |
 |---|---|---|---|---|---|---|---|
@@ -353,17 +387,20 @@ Detalle, consultas y pasos: `docs/COMPRAS_PROPUESTA_ASIGNACION_PERMISOS.md`. La 
 | Plantilla «Administrador General» (0 pers.) | no→sí ya | no→no N | no→no N | no→no N | no→no N | no→no N | no N |
 | Marco Santos Godoy (admin, 3 proy.) | sí→sí ya | sí→sí ya | sí→sí ya | sí→sí ya | sí→sí ya | sí→sí ya | sí ya |
 
-- **Recomendada:** a Alexander, por «Ajustes individuales» y tras la 0900, recepción + factura + orden de pago; **no** pago ni anulación (quedan con administrador/propietario). Plantillas y rol de empresa: nada ahora. **Alternativa «continuidad total»** (= hoy): +`pago_ejecutar` y `pago_anular` (diferencia exacta: 2 llaves).
-- Concentración que queda: Alexander puede por sí solo aprobar la orden, recibir, aprobar la factura y aprobar la orden de pago; el interruptor de separación (apagado en todas las empresas) solo cubre «quien solicita no aprueba la orden de compra».
-- Uso real en producción: 1 OC histórica sin autor, 1 factura anulada creada y aprobada por la cuenta propietaria en 10,5 s; 0 recepciones, órdenes de pago, pagos y asientos. Alexander: 0 filas de negocio, sin inicio de sesión registrado desde 2026-08-13.
-- Proyectos sin cambios: Alexander 6, Marco 3 (huellas antes/después en el documento). Marco, la cuenta propietaria y el superadministrador pasan toda llave por perfil.
-- Hallazgos: el rol de Alexander tiene 1 193 de 1 201 llaves (plantilla: 63); «Monterroso» coincide con 3 cuentas (el script usa el id); las plantillas no se propagan a copias existentes ni a empresas nuevas.
-- Decisiones: A-1.1…A-1.7 (llaves de Alexander), A-2.1…A-2.3 (plantillas/rol), A-4/A-5 (proyecto sin asignar y `project_id` vacío: PR propio posterior), A-6 (recorte del rol), A-7 (interruptor), A-8 (cuándo conceder).
+- **Tres paquetes (decisión A-1; el PR sigue en borrador hasta responderla, y A es una respuesta válida):** **A** ninguna llave por ahora (0 usos, 58 días sin sesión; se concede en un minuto cuando vuelva a operar; el PR puede fusionarse igual aceptando el efecto transitorio) · **B (recomendada)** recepción + factura + orden de pago; no pago ni anulación (movimiento irreversible de dinero) · **C** continuidad total (= hoy): las cinco; B–C difieren en exactamente 2 llaves. La tabla muestra el paquete B. Se concede desde el panel «Ajustes individuales», **por Marco** (la bitácora nombra a una persona; por SQL el actor queda vacío), después de la 0900. Plantillas y rol de empresa: nada ahora.
+- Concentración: con B, Alexander (operator) crea sin llave y recorre solo la cadena hasta «orden de pago aprobada». Con **cualquier** paquete conserva `approve`/`change_status` genéricos y puede cancelar/cerrar órdenes y anular recepciones, contraseñas y facturas sin pagos. El interruptor de separación (apagado en todas las empresas) solo cubre «quien solicita no aprueba la orden».
+- Dos decisiones de personas: quién está detrás de la cuenta propietaria y quién paga en Cascadas, La Arboleda y Viñas (ahí Alexander es la única persona con alcance y con `edit`).
+- Uso real: 1 OC histórica sin autor, 1 factura anulada creada y aprobada por la cuenta propietaria en 10,5 s; 0 recepciones, órdenes de pago, pagos y asientos. Alexander: 0 filas de negocio, sin acceso desde 2026-08-13.
+- Proyectos sin cambios: Alexander 6, Marco 3. Marco, la cuenta propietaria y el superadministrador pasan toda llave por perfil.
+- Hallazgos: el rol de Alexander tiene 1 193 de 1 201 llaves (1 106 en bloque por la cuenta propietaria el 2026-08-13; 87 sin actor); «Monterroso» y «Santos» coinciden con 3 cuentas cada uno (el script usa el id); las plantillas no se propagan a copias existentes ni a empresas nuevas.
+- Script probado en una base desechable: sin confirmar → 0 cambios (también sentencia por sentencia); confirmado + ROLLBACK → 0; confirmado + COMMIT → +3/+1/+1 (B) o +5/+1/+1 (C); reversión exacta con `P-9`.
+- Orden de despliegue, cada uno en su push: #928 (`20261026000600`) → #926 → PR de alcance por proyecto (`20261027001000`) → #927 (`20261028000000`).
+- Decisiones: A-1 (paquete) y A-1.6…A-1.8, A-2.1…A-2.3, A-4/A-5 (PR propio posterior), A-6 (recorte del rol), A-7 (interruptor), A-8 (cuándo conceder).
 ````
 
 ---
 
-## Apéndice · Consultas citadas (producción, solo `SELECT`, 2026-10-10)
+## Apéndice · Consultas citadas (producción, solo `SELECT`, 2026-10-10 y 2026-10-11)
 
 Todas se ejecutaron tal cual contra `nnsqmeigtgewatameexo` con la herramienta SQL (una sentencia de solo lectura cada una).
 
@@ -536,7 +573,7 @@ SELECT u.full_name, u.role, u.activo, c.k,
   FROM public.app_users u CROSS JOIN claves c
  WHERE EXISTS (SELECT 1 FROM public.user_roles ur JOIN public.role_permissions rp ON rp.role_id=ur.role_id WHERE ur.user_id=u.id AND rp.permission_key=c.k AND rp.effect='allow')
  ORDER BY u.full_name, c.k;
--- resultado: solo Alexander (11 llaves de Contabilidad/órdenes) y Marco (solo la visibilidad de la pestaña de órdenes)
+-- resultado: solo Alexander (las 12 llaves de la lista: 6 de Contabilidad y 6 de la pestaña de órdenes) y Marco (solo la visibilidad de la pestaña de órdenes)
 ```
 
 **`[Q14]`** Políticas RLS de las cinco tablas
@@ -645,4 +682,60 @@ ORDER BY 1,2;
 -- resultado: role_permissions_delete (DELETE), role_permissions_insert (INSERT), role_permissions_select (SELECT); trg_audit_role_permissions AFTER INSERT OR DELETE
 ```
 
-**Archivos del repositorio leídos:** `supabase/migrations/20260817000000_set_role_permissions_rpc.sql`, `20260612100000_roles_template_lineage.sql`, `20260612100100_roles_user_override.sql`, `20260612100300_rbac_assignments_to_company_roles.sql`, `20260518000004_rbac_schema.sql` y `20260518000008_rbac_helpers_and_sync.sql` (políticas y bitácora de roles), `20261027000900_…` (la comprobación común y las seis llaves), `20261021000600_compras_correcciones_revision.sql` (la regla del interruptor), `src/domain/empresa/roles.ts` (`ensureCompanyRoleFromTemplate`, `createOverrideRole`, `setRolePermissions`), `src/components/empresa/RolPermisosModal.tsx` y `EmpresaUsuariosSection.tsx` (el flujo de la pantalla), `src/lib/platformPermissions.ts` (el grupo «Plataforma: Compras y pagos») y `supabase/functions/create-user/validate.ts` y `accept-invitation/validate.ts` (la plantilla de plataforma que se asigna según el perfil).
+**`[Q27]`** Homónimos y empresas de nombre casi igual (2026-10-11)
+```sql
+SELECT u.full_name, u.role, COALESCE(c.nombre, '(sin empresa)') AS empresa, u.activo
+  FROM public.app_users u LEFT JOIN public.companies c ON c.id = u.company_id
+ WHERE u.full_name ILIKE '%Santos%' OR u.full_name ILIKE '%Monterroso%' OR u.full_name ILIKE '%Marco%' ORDER BY u.full_name;
+SELECT c.nombre, (SELECT count(*) FROM public.app_users x WHERE x.company_id = c.id) AS usuarios, (SELECT count(*) FROM public.roles r WHERE r.company_id = c.id) AS roles, (SELECT count(*) FROM public.projects p WHERE p.company_id = c.id) AS proyectos
+  FROM public.companies c ORDER BY c.created_at;
+SELECT u.role, u.full_name FROM public.app_users u WHERE u.role IN ('company_owner', 'super_admin', 'superadmin');
+-- resultado: «Santos» → Eduardo Santos (viewer, Prestadora de Servicios S.A.), Marco Santos (cliente, sin empresa), Marco Santos Godoy (admin); «Monterroso» → Alex Monterroso (cliente), Alexander Monterroso (operator), Isabel Monterroso (cliente)
+--   empresas: Mi Empresa Agua S.A. 0/0/0 · Mi Empresa 1/0/0 · Prestadora de Servicios S.A. 22/18/8 · g&e 0/0/0 · Prestadora de Servicios 0/0/0; la cuenta propietaria se llama «Prestadora de Servicios Básicos S.A.»
+```
+
+**`[Q28]`** Filas de asignación contra personas reales, por proyecto (2026-10-11)
+```sql
+SELECT p.nombre, count(*) AS filas_asignacion, count(*) FILTER (WHERE u.id IS NULL) AS huerfanas, count(DISTINCT u.id) AS personas_reales,
+       count(DISTINCT u.id) FILTER (WHERE u.role = 'operator') AS operators, count(DISTINCT u.id) FILTER (WHERE u.role = 'viewer') AS viewers, count(DISTINCT u.id) FILTER (WHERE u.role = 'admin') AS admins
+  FROM public.user_project_assignments a JOIN public.projects p ON p.id = a.project_id LEFT JOIN public.app_users u ON u.id = a.user_id
+ GROUP BY p.nombre ORDER BY filas_asignacion DESC, p.nombre;
+SELECT count(*) AS filas_total, count(*) FILTER (WHERE u.id IS NULL) AS huerfanas, count(DISTINCT a.user_id) FILTER (WHERE u.id IS NULL) AS usuarios_huerfanos,
+       (SELECT md5(string_agg(id::text, ',' ORDER BY id)) FROM public.user_project_assignments) AS huella
+  FROM public.user_project_assignments a LEFT JOIN public.app_users u ON u.id = a.user_id;
+-- resultado: 21B+ 13/4/9 · Edificio SQ 12/2/10 · Parajes Vermont 6/1/5 · Cascadas de Vista Hermosa 5/2/3 (3 operators) · Viñas del Sur Condominio 3 4/1/3 (1 operator, 2 viewers) · La Arboleda CVH 3/0/3 (3 operators); total 43 filas, 10 huérfanas, 6 usuarios, huella d32daf1d38d862b1cdd938a59ad2ff5f
+```
+
+**`[Q29]`** Qué exige HOY el servidor en producción, y quién tiene `edit`/`approve`/`change_status` (2026-10-11)
+```sql
+SELECT (SELECT max(version) FROM supabase_migrations.schema_migrations) AS max_migracion,
+       (SELECT count(*) FROM supabase_migrations.schema_migrations WHERE version >= '20261027') AS versiones_ge_20261027,
+       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND (p.proname LIKE 'compras\_exigir%' OR p.proname LIKE 'compras\_tg\_permiso%' OR p.proname = 'compras_sesion_usuario')) AS funciones_exigir,
+       (SELECT count(*) FROM pg_trigger t WHERE NOT t.tgisinternal AND t.tgname LIKE 'compras\_tg\_permiso%') AS triggers_permiso;
+WITH tg AS (SELECT DISTINCT p.oid AS fn, p.proname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace JOIN pg_proc p ON p.oid = t.tgfoid
+             WHERE NOT t.tgisinternal AND n.nspname = 'public' AND c.relname IN ('ordenes_compra','recepciones','facturas_proveedor','ordenes_pago','contrasenas_pago'))
+SELECT (SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE NOT t.tgisinternal AND n.nspname = 'public' AND c.relname IN ('ordenes_compra','recepciones','facturas_proveedor','ordenes_pago','contrasenas_pago')) AS triggers_no_internos,
+       (SELECT string_agg(proname, ', ') FROM tg WHERE pg_get_functiondef(fn) ~ '(contabilidad\.approve|contabilidad\.change_status|ordenes_compra\.approve)') AS funciones_que_mencionan_approve_change_status,
+       (SELECT string_agg(proname, ', ') FROM tg WHERE pg_get_functiondef(fn) ~ '(user_has_permission|conta_puede_escribir)') AS funciones_que_consultan_permisos,
+       (SELECT string_agg(tablename || '.' || policyname, ', ') FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('ordenes_compra','recepciones','facturas_proveedor','ordenes_pago','contrasenas_pago') AND cmd = 'UPDATE' AND (qual ~ '(approve|change_status)' OR with_check ~ '(approve|change_status)')) AS politicas_update_que_las_mencionan;
+-- y, tal cual, el CTE `perfiles` y la rama `perfil_afectado` de scripts/diagnostico-compras-controles.sql, más conteos de quién tiene edit / approve / change_status
+-- resultado: max_migracion 20261026000500; 0 versiones ≥ 20261027; 0 funciones compras_exigir*/compras_tg_permiso*/compras_sesion_usuario; 0 disparadores compras_tg_permiso_*; 31 disparadores no internos en las 5 tablas, ninguna de sus funciones menciona approve/change_status ni consulta user_has_permission/conta_puede_escribir; 0 políticas UPDATE que las mencionen (piden solo conta_puede_escribir('edit') o user_has_permission('platform.contabilidad.edit'), ver [Q14])
+--   perfil_afectado: 0 filas · personas activas no exentas ni admin: 29 (30 con Marco) · con edit: 1 · con approve: 1 · con change_status: 1 · con las tres: 1 (Alexander Monterroso, operator)
+--   funciones públicas que sí consultan platform.contabilidad.change_status (ajenas al circuito): banco_conciliar_movimiento, banco_desconciliar_movimiento, conta_anular_asiento, conta_publicar_asiento
+```
+
+**`[Q30]`** Reparto de las 1 193 llaves, último acceso de Alexander, siembra de copias y documentos sin proyecto (2026-10-11)
+```sql
+SELECT count(*) FILTER (WHERE actor_id IS NOT NULL) AS con_actor, min(occurred_at) FILTER (WHERE actor_id IS NOT NULL) AS desde_con_actor, max(occurred_at) FILTER (WHERE actor_id IS NOT NULL) AS hasta_con_actor,
+       count(*) FILTER (WHERE actor_id IS NULL) AS sin_actor, min(occurred_at) FILTER (WHERE actor_id IS NULL) AS desde_sin_actor, max(occurred_at) FILTER (WHERE actor_id IS NULL) AS hasta_sin_actor
+  FROM public.permission_audit_log WHERE target_role_id = 'd915897c-b350-431a-8447-b37c61f97e8a' AND action = 'grant_permission';
+SELECT (SELECT last_sign_in_at FROM auth.users WHERE id = '327ffeda-85e8-4ea4-9423-af9b206ee886') AS last_sign_in_at,
+       (SELECT count(*) FROM auth.sessions WHERE user_id = '327ffeda-85e8-4ea4-9423-af9b206ee886') AS sesiones,
+       (SELECT max(last_seen) FROM public.user_presence WHERE user_id = '327ffeda-85e8-4ea4-9423-af9b206ee886') AS last_seen,
+       (SELECT max("timestamp") FROM public.security_logs WHERE user_id = '327ffeda-85e8-4ea4-9423-af9b206ee886' AND event_type = 'login_success') AS ultimo_login, now() AS ahora;
+SELECT r.name, left(r.id::text, 8), r.created_at FROM public.roles r WHERE r.company_id = '24aad0e6-e4fe-4d9a-810b-f2bf3aa61a31' AND r.name IN ('Finanzas / Contador','Admin Plataforma','Administrador General','Admin Agua');
+-- Q21 repetida: documentos sin proyecto
+-- resultado: 1 106 con actor, todas en 2026-08-13 21:52:53.879461+00; 87 sin actor entre 2026-06-12 17:36:18.803843 y 2026-09-10 17:38:27.732876 (1 106 + 87 = 1 193); último acceso 2026-08-13 21:54:15 (UTC), 0 sesiones, last_seen 2026-08-13 21:58:15, 12 login_success hasta 21:54:17 y 3 logout hasta 21:58:26; a «ahora» (2026-10-11 01:04 UTC) son 59 días; las cuatro copias de empresa de Alexander y Marco: created_at 2026-06-12 17:36:18.803843; 0 documentos sin proyecto de 2; Alexander 6 / 89b81779cee9b2b1b7aeaf4ad42362fb y Marco 3 / 1d3dc6bd1682b02e445d9cbe567fcc38; 3 661-26-34 en role_permissions-user_roles-roles; catálogo 1 201, 0 llaves nuevas
+```
+
+**Archivos del repositorio leídos:** `supabase/migrations/20260817000000_set_role_permissions_rpc.sql`, `20260612100000_roles_template_lineage.sql`, `20260612100100_roles_user_override.sql`, `20260612100300_rbac_assignments_to_company_roles.sql`, `20260518000004_rbac_schema.sql` y `20260518000008_rbac_helpers_and_sync.sql` (políticas y bitácora de roles), `20261027000300_…` y `20261027000900_…` (la cadena que ya exige `approve`/`change_status`, la comprobación común y las seis llaves), `20261021000600_compras_correcciones_revision.sql` (la regla del interruptor), `src/domain/empresa/roles.ts` (`ensureCompanyRoleFromTemplate`, `createOverrideRole`, `setRolePermissions`), `src/components/empresa/RolPermisosModal.tsx` y `EmpresaUsuariosSection.tsx` (el flujo de la pantalla), `src/lib/platformPermissions.ts` (el grupo «Plataforma: Compras y pagos») y `supabase/functions/create-user/validate.ts` y `accept-invitation/validate.ts` (la plantilla de plataforma que se asigna según el perfil).
