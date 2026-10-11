@@ -5,18 +5,28 @@
 // pantalla no ofrece lo que será rechazado y explica por qué. El propietario y el superadministrador sí pueden con su fila.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
+import { useEffect } from 'react'
+
+const montajes = vi.hoisted(() => ({ ids: [] as string[], desmontajes: [] as string[] }))
 
 vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}), auth: {} } }))
 // El modal simulado expone sus callbacks con botones (fuera del div con el texto, que otras pruebas comparan exacto): así se comprueba que la Sección
 // se los PASA y que cada uno recarga la lista de atrás (F2-08: M19 «no cablea onReload», M20 «no recarga tras guardar»).
 vi.mock('../AsignacionModal', () => ({
-  AsignacionModal: (p: { usuario: { id: string }; actor?: { id: string; role: string }; onSaved?: () => void; onReload?: () => void }) => (
-    <>
-      <div data-testid="modal-asignacion">{`${p.usuario.id}|${p.actor?.id}|${p.actor?.role}`}</div>
-      <button type="button" data-testid="modal-simula-guardado" onClick={() => p.onSaved?.()}>simula guardado</button>
-      <button type="button" data-testid="modal-simula-parcial" onClick={() => p.onReload?.()}>simula parcial</button>
-    </>
-  ),
+  AsignacionModal: (p: { usuario: { id: string }; actor?: { id: string; role: string }; onSaved?: () => void; onReload?: () => void }) => {
+    // cuenta cuántas veces se MONTA (y desmonta) el modal: cambiar de persona debe remontarlo (H3 de la ronda 4, `key={usuario.id}` en la Sección)
+    useEffect(() => {
+      montajes.ids.push(p.usuario.id)
+      return () => { montajes.desmontajes.push(p.usuario.id) }
+    }, [])
+    return (
+      <>
+        <div data-testid="modal-asignacion">{`${p.usuario.id}|${p.actor?.id}|${p.actor?.role}`}</div>
+        <button type="button" data-testid="modal-simula-guardado" onClick={() => p.onSaved?.()}>simula guardado</button>
+        <button type="button" data-testid="modal-simula-parcial" onClick={() => p.onReload?.()}>simula parcial</button>
+      </>
+    )
+  },
 }))
 vi.mock('../RolPermisosModal', () => ({ RolPermisosModal: () => null }))
 vi.mock('../CustomRoleEditor', () => ({ CustomRoleEditor: () => null }))
@@ -45,7 +55,7 @@ function montar(rol: string, onReload: () => void = () => {}) {
   return screen.getAllByRole('button', { name: /Acceso/ }) as HTMLButtonElement[]
 }
 
-beforeEach(() => cleanup())
+beforeEach(() => { cleanup(); montajes.ids = []; montajes.desmontajes = [] })
 
 describe('EmpresaUsuariosSection · botón Acceso', () => {
   it('un administrador NO puede abrir los proyectos de SU fila (deshabilitado, con la explicación)', () => {
@@ -96,5 +106,46 @@ describe('EmpresaUsuariosSection · lo que le pasa al modal de asignaciones (F2-
     expect(id).toBeTruthy()
     expect(document.getElementById(id as string)?.textContent).toMatch(/Tus proyectos los cambia otro administrador, el propietario o el superadministrador/)
     expect(ajeno.hasAttribute('aria-describedby')).toBe(false)
+  })
+})
+
+describe('EmpresaUsuariosSection · cambiar de persona REMONTA el modal de asignaciones (H3, ronda 4)', () => {
+  // El modal conserva su estado (casillas, `inicial`, «guardando») entre renders. Si el padre le cambiara `usuario` sin desmontarlo, durante un render quedarían las casillas de
+  // la persona anterior bajo el nombre de la nueva y un clic en Guardar escribiría la selección de A sobre B (la ventana medida por el verificador). La app hoy no lo hace (el
+  // fondo del modal tapa los botones «Acceso»), pero la defensa estructural es `key={usuario.id}`: otra persona = otra instancia, con el estado de cero.
+  const TRES = [
+    { id: 'u-yo', full_name: 'Yo Mismo', role: 'company_owner', activo: true },
+    { id: 'u-a', full_name: 'Persona A', role: 'operator', activo: true },
+    { id: 'u-b', full_name: 'Persona B', role: 'operator', activo: true },
+  ]
+  function montarTres() {
+    render(
+      <EmpresaUsuariosSection
+        currentUser={{ user_id: 'u-yo', email: '', name: 'Yo Mismo', role: 'company_owner', company_id: 'c1', login_time: '', expires_at: '' } as never}
+        usuarios={TRES}
+        proyectos={[]}
+        onReload={() => {}}
+      />,
+    )
+    return screen.getAllByRole('button', { name: /Acceso/ }) as HTMLButtonElement[]
+  }
+
+  it('abrir A y luego B (sin cerrar) desmonta la instancia de A y monta otra para B', () => {
+    const [, a, b] = montarTres()
+    fireEvent.click(a)
+    expect(screen.getByTestId('modal-asignacion').textContent).toBe('u-a|u-yo|company_owner')
+    expect(montajes.ids).toEqual(['u-a'])
+    fireEvent.click(b)
+    expect(screen.getByTestId('modal-asignacion').textContent).toBe('u-b|u-yo|company_owner')
+    expect(montajes.desmontajes).toEqual(['u-a'])           // A se desmontó…
+    expect(montajes.ids).toEqual(['u-a', 'u-b'])            // …y B es una instancia NUEVA
+  })
+
+  it('volver a abrir a la MISMA persona (sin cerrar) no remonta: mismo `key`, mismo estado', () => {
+    const [, a] = montarTres()
+    fireEvent.click(a)
+    fireEvent.click(a)
+    expect(montajes.ids).toEqual(['u-a'])
+    expect(montajes.desmontajes).toEqual([])
   })
 })

@@ -3,6 +3,7 @@ import {
   fetchUserProjectAssignments,
   guardarAsignacionesProyecto,
   puedeEditarAsignaciones,
+  reconciliarCasillas,
 } from '../../domain/empresa/usuarios'
 import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
@@ -48,9 +49,19 @@ async function leerAsignados(userId: string): Promise<string[] | null> {
 
 export function AsignacionModal({ usuario, proyectos, onClose, onSaved, onReload, actor }: AsignacionModalProps) {
   const permiso = puedeEditarAsignaciones(actor, usuario)
+  // El componente supone UNA instancia por persona: quien lo monta debe pasarle `key={usuario.id}` (EmpresaUsuariosSection lo hace), de modo que cambiar de persona lo
+  // REMONTE con el estado de cero. Sin eso, durante un render quedarían las casillas y el `inicial` de la persona anterior bajo el nombre de la nueva (H3, ronda 4).
+  //
   // `inicial` es lo que había al ABRIR: la diferencia se calcula contra eso (nunca contra una lectura nueva al guardar), de modo que sólo se
   // escribe lo que esta persona cambió en pantalla y no se deshace lo que otro administrador haya hecho mientras tanto. Tras un guardado
   // PARCIAL se vuelve a fijar con lo que HAY en la base (F2-01): la parte que sí se aplicó ya forma parte del «antes» del siguiente guardado.
+  //
+  // REGLA DE LAS CASILLAS TRAS ESA RELECTURA (H1, ronda 4): fusión de TRES vías, `reconciliarCasillas` en domain/empresa/usuarios.ts.
+  //     casillas nuevas = (inicial NUEVO \ lo que la persona QUITÓ) ∪ (lo que la persona AÑADIÓ), limitada a los proyectos editables
+  //     quitó = inicial ANTERIOR \ casillas       añadió = casillas \ inicial ANTERIOR
+  // Renovar sólo `inicial` no basta: si otro administrador cambió a la misma persona entre la apertura y la relectura, las casillas seguían reflejando la apertura y el siguiente
+  // «Guardar» sin tocar nada lo DESHACÍA —borraba una asignación ajena que la persona nunca vio, o reinsertaba una que el otro acababa de revocar (acceso restituido)—. Con la
+  // fusión, lo que la persona no tocó refleja lo que HAY y lo que sí tocó conserva su elección (lo que falta por escribir es la diferencia contra el `inicial` nuevo).
   const [inicial, setInicial] = useState<string[]>([])
   const [asignados, setAsignados] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -60,6 +71,8 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved, onReload
   // «Versión» de la pantalla: sube con cada carga (otra persona, Reintentar). Cualquier respuesta que llegue con otra versión es de una pantalla que ya no está: no debe
   // tocar `inicial` ni el error de carga de la persona que se ve ahora (V3-05). Sirve a la carga y a la relectura posterior a un guardado fallido.
   const versionRef = useRef(0)
+  // Sube la versión: lo que esté en vuelo deja de ser de la pantalla vigente. (Es un contador, no un nodo del DOM: la regla de hooks que avisa de leer `ref.current` en una limpieza no aplica.)
+  const invalidarPantalla = () => { versionRef.current++ }
 
   useEffect(() => {
     const version = ++versionRef.current
@@ -81,13 +94,16 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved, onReload
       setLoading(false)
     }
     void cargarAsignaciones()
-    // Sin `return` de limpieza: la siguiente ejecución del efecto (otra persona, Reintentar) sube `versionRef` y eso invalida lo que quedaba en vuelo; al desmontar, una respuesta
-    // tardía llama a un `setState` de un componente desmontado, que React 18 ignora.
+    // La limpieza también sube `versionRef`: se ejecuta antes de la siguiente carga (otra persona, Reintentar) y, sobre todo, AL DESMONTAR (otra persona con `key`, Cancelar, ×,
+    // Escape). Lo que quedaba en vuelo de esta pantalla —la carga, la relectura de un guardado, un guardado que termina bien— ya no es de la pantalla que se ve y no debe cerrar
+    // ni dar por guardada a la siguiente (H2, ronda 4: antes, un guardado de A que terminaba bien llamaba a `onClose` aunque ya se viera B).
+    return () => invalidarPantalla()
   }, [usuario.id, intento])
 
   async function guardar() {
     if (!permiso.permitido || errorCarga || loading || saving) return
     const version = versionRef.current          // la pantalla (persona y carga) en la que se pulsó Guardar
+    const vigente = () => versionRef.current === version
     setSaving(true)
     try {
       // Sólo cuenta lo marcado ENTRE los proyectos que la pantalla muestra; una asignación a un proyecto que no se muestra no se toca.
@@ -109,11 +125,22 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved, onReload
           // SIN respuesta de la base (`incierto`): pudo aplicarse. V3-05: si mientras tanto la pantalla pasó a otra persona (o se recargó) la respuesta ya no es de esta
           // pantalla y no se toca `inicial` (el de la persona nueva es el que cargó su propio efecto).
           const actuales = await leerAsignados(usuario.id)
-          if (versionRef.current === version) {
+          if (vigente()) {
             if (actuales === null) setErrorCarga(true)
-            else setInicial(actuales)
+            else {
+              setInicial(actuales)
+              // H1: y las casillas se fusionan a tres vías (ver arriba), sobre las casillas de AHORA (`prev`: la persona pudo marcar o desmarcar mientras el guardado estaba en vuelo)
+              // y contra el `inicial` con el que se calculó este guardado. Lo que otro administrador cambió entretanto aparece reflejado y no se deshace al reintentar.
+              setAsignados(prev => reconciliarCasillas(inicial, actuales, prev, editables))
+            }
           }
         }
+        return
+      }
+      // H2: si mientras se guardaba la pantalla pasó a otra persona (o el modal se cerró) este éxito es de una pantalla que ya no está: NO se cierra ni se da por guardada la actual.
+      // Sí se recarga la lista de atrás, porque la base cambió.
+      if (!vigente()) {
+        onReload?.()
         return
       }
       onSaved()

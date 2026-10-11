@@ -161,6 +161,10 @@ describe('guardarAsignacionesProyecto · fallos SIN respuesta de la base (V3-02)
     ['un AbortError devuelto como error', { data: null, error: { code: '', message: 'AbortError: The operation was aborted.' }, status: 0 }],
     ['una pasarela que contesta 502 con HTML y sin código de la base', { data: null, error: { code: '', message: '<html>502 Bad Gateway</html>' }, status: 502 }],
     ['status 0 aunque el error traiga un código', { data: null, error: { code: '42501', message: 'x' }, status: 0 }],
+    // H5 (ronda 4): un `code` que no es de la base —el de una pasarela, numérico o con palabras— tampoco es una respuesta definitiva de la base
+    ['una pasarela que contesta 504 con un código NUMÉRICO propio', { data: null, error: { code: 504, message: 'Gateway Timeout' }, status: 504 }],
+    ['una pasarela que contesta 504 con el código «504» como texto', { data: null, error: { code: '504', message: 'Gateway Timeout' }, status: 504 }],
+    ['una pasarela con un código propio en palabras', { data: null, error: { code: 'upstream_timeout', message: 'x' }, status: 504 }],
   ])('el upsert que falla así (%s) es AMBIGUO: parcial e incierto, sin borrar nada', async (_caso, respuesta) => {
     h.respuestas = [respuesta]
     const r = await guardarAsignacionesProyecto('u1', ['a'], ['c'], ['a', 'c'])
@@ -223,5 +227,26 @@ describe('escrituraAmbigua', () => {
     [{ code: '42501', message: 'x' }, 0, true],      // un status 0 no es una respuesta de la base
   ])('%j (status %s) → %s', (error, status, esperado) => {
     expect(escrituraAmbigua(error, status)).toBe(esperado)
+  })
+
+  // H5 (ronda 4): sólo es respuesta DEFINITIVA de la base un SQLSTATE (5 caracteres: dígitos y mayúsculas) o un código de PostgREST («PGRST» + 3 dígitos). Cualquier otro
+  // `code` —el numérico o en palabras de una pasarela, un nombre de función…— no prueba que la sentencia llegara a la base y se deshiciera: es ambiguo.
+  it.each([
+    ['42501', false], ['23514', false], ['23505', false], ['55P03', false], ['57014', false], ['P0001', false], ['XX000', false], ['0A000', false],
+    ['PGRST301', false], ['PGRST116', false], ['PGRST000', false],
+  ])('el código %s es de la base → no ambiguo (%s)', (code, esperado) => {
+    expect(escrituraAmbigua({ code, message: 'x' }, 400)).toBe(esperado)
+    expect(escrituraAmbigua({ code, message: 'x' }, 500)).toBe(esperado)
+  })
+
+  it.each<[unknown, string]>([
+    [504, 'un número'], [42501, 'un número con la forma de un SQLSTATE (postgrest-js siempre lo da como texto)'], ['504', 'tres dígitos como texto'], ['502', 'otro de pasarela'], ['upstream_timeout', 'palabras'], ['gateway', 'palabras'],
+    ['4250', 'cuatro caracteres'], ['425011', 'seis caracteres'], ['4250!', 'cinco con un símbolo'], ['abcde', 'cinco en minúsculas'],
+    ['PGRST30', 'PGRST con dos dígitos'], ['PGRST3011', 'PGRST con cuatro dígitos'], ['PGRSTabc', 'PGRST con letras'],
+    ['pgrst301', 'PGRST en minúsculas'], [' 42501', 'con un espacio'], ['42501 ', 'con un espacio detrás'], [{ n: 1 }, 'un objeto'], [true, 'un booleano'],
+  ])('el código %j (%s) NO es de la base → ambiguo', (code, _porque) => {
+    expect(escrituraAmbigua({ code: code as never, message: 'x' }, 504)).toBe(true)
+    expect(escrituraAmbigua({ code: code as never, message: 'x' }, 400)).toBe(true)
+    expect(escrituraAmbigua({ code: code as never, message: 'x' }, undefined)).toBe(true)
   })
 })

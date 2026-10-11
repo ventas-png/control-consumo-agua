@@ -447,9 +447,11 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
         )}
       </div>
 
-      {/* Modal de asignación de proyectos */}
+      {/* Modal de asignación de proyectos. `key`: otra persona = otra instancia, con el estado de cero (casillas, `inicial`, «guardando»): el modal no debe conservar
+          nada de la persona anterior durante el render en que cambia `usuario` (H3, ronda 4). */}
       {usuarioAsignar && (
         <AsignacionModal
+          key={usuarioAsignar.id}
           usuario={usuarioAsignar}
           proyectos={proyectos}
           actor={{ id: currentUser.user_id, role: currentUser.role }}

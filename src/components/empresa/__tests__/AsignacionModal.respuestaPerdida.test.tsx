@@ -53,7 +53,7 @@ vi.mock('../../../lib/supabase', () => {
         return { data: null, error: null, status: 201 }
       }
       db.deletes++
-      if (db.del === 'falla') return { data: null, error: { code: '500', message: 'boom' }, status: 500 }
+      if (db.del === 'falla') return { data: null, error: { code: 'XX000', message: 'boom' }, status: 500 }          // una respuesta DEFINITIVA de la base (SQLSTATE internal_error): la sentencia se deshizo
       const borradas = db.rows.filter(coincide)
       db.rows = db.rows.filter(r => !borradas.includes(r))
       if (db.del === 'aplica_y_lanza') throw new TypeError('Failed to fetch')

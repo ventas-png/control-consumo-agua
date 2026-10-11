@@ -133,6 +133,35 @@ export function diferenciaAsignaciones(
 }
 
 /**
+ * Las casillas que debe mostrar el modal tras RELEER lo que hay en la base después de un guardado parcial o incierto (H1, ronda 4). Fusión de TRES vías:
+ *
+ *   casillas nuevas = (inicial NUEVO \ lo que la persona QUITÓ) ∪ (lo que la persona AÑADIÓ), limitada a los proyectos `editables`
+ *   quitó = `inicialAnterior` \ `casillas`        añadió = `casillas` \ `inicialAnterior`
+ *
+ * Es decir: un proyecto que la persona NO tocó (su casilla sigue igual que en el `inicial` con el que se abrió) toma lo que HAY ahora en la base, con lo que un cambio hecho por
+ * OTRO administrador entretanto aparece reflejado y el siguiente «Guardar» sin tocar nada no lo deshace (ni borra una asignación ajena que la persona nunca vio, ni reinserta una
+ * que el otro acababa de revocar); y uno que SÍ tocó conserva su elección, apliqué o no el servidor esa escritura (lo que falta por escribir es justo la diferencia contra el
+ * `inicial` nuevo). Sólo cuentan los `editables` (los que la pantalla muestra): una asignación a un proyecto que no se muestra no se pinta ni se toca. No muta sus entradas.
+ */
+export function reconciliarCasillas(
+  inicialAnterior: readonly string[],
+  inicialNuevo: readonly string[],
+  casillas: ReadonlySet<string> | readonly string[],
+  editables: readonly string[],
+): Set<string> {
+  const antes = new Set(inicialAnterior)
+  const ahora = new Set(inicialNuevo)
+  const marcadas = new Set(casillas)
+  const resultado = new Set<string>()
+  for (const id of editables) {
+    const quito = antes.has(id) && !marcadas.has(id)
+    const anadio = !antes.has(id) && marcadas.has(id)
+    if ((ahora.has(id) && !quito) || anadio) resultado.add(id)
+  }
+  return resultado
+}
+
+/**
  * Resultado del guardado. `parcial` = la base PUDO cambiar aunque el guardado falló (una parte de los cambios SÍ se aplicó, o una escritura terminó sin respuesta y
  * pudo aplicarse): la lista de atrás debe recargarse, quien llama debe RELEER lo que hay (ése es el nuevo «antes») y se puede volver a guardar.
  * `incierto` (sólo con `parcial`) = ninguna escritura se confirmó pero una terminó sin respuesta de la base: no se sabe si se aplicó.
@@ -149,18 +178,27 @@ interface RespuestaEscritura {
   status?: number | null
 }
 
+/** Un SQLSTATE: cinco caracteres, dígitos y letras MAYÚSCULAS ASCII («42501», «23514», «55P03», «57014»…). */
+const SQLSTATE = /^[0-9A-Z]{5}$/
+/** Un código de error de PostgREST: «PGRST» y tres dígitos («PGRST301», «PGRST116»…). */
+const CODIGO_POSTGREST = /^PGRST\d{3}$/
+
 /**
- * ¿Una escritura que devolvió `error` pudo haberse aplicado de todos modos? Sólo una respuesta de la base con CÓDIGO deja claro que no: una sentencia que falla se deshace entera
- * (la RLS 42501, los triggers 23514/42501, 23505, un tiempo agotado 57014/55P03…). Si no hubo respuesta de la base —`status` 0, un error SIN código como el
- * «TypeError: Failed to fetch» que postgrest-js DEVUELVE (no lanza) ante un fallo de red, un AbortError, una pasarela que contesta 502/504 con HTML— la petición pudo llegar y
- * aplicarse antes de perderse la respuesta: es AMBIGUO (V3-02, misma familia que F2-01). Quien lo recibe no debe suponer que «no se aplicó nada».
+ * ¿Una escritura que devolvió `error` pudo haberse aplicado de todos modos? Sólo una respuesta DEFINITIVA de la base deja claro que no: una sentencia que falla se deshace entera
+ * (la RLS 42501, los triggers 23514/42501, 23505, un tiempo agotado 57014/55P03…), y esa respuesta trae un código con forma de SQLSTATE (cinco caracteres, dígitos y mayúsculas) o
+ * de PostgREST (`PGRSTnnn`). CUALQUIER otro `code` no prueba nada (H5, ronda 4): el de una pasarela o un proxy —numérico como 504, o en palabras como «upstream_timeout»— no
+ * viene de la base, y la petición pudo llegar y aplicarse antes de perderse la respuesta. Tampoco lo prueban `status` 0, un error SIN código como el «TypeError: Failed to
+ * fetch» que postgrest-js DEVUELVE (no lanza) ante un fallo de red, un AbortError, ni una pasarela que contesta 502/504 con HTML: todo eso es AMBIGUO (V3-02, misma familia que
+ * F2-01). Quien lo recibe no debe suponer que «no se aplicó nada».
  */
 export function escrituraAmbigua(error: RespuestaEscritura['error'] | undefined, status?: number | null): boolean {
   if (!error) return false
-  return status === 0 || !error.code
+  if (status === 0) return true
+  const code: unknown = error.code
+  return !(typeof code === 'string' && (SQLSTATE.test(code) || CODIGO_POSTGREST.test(code)))
 }
 
-/** Ejecuta una escritura sin dejar que lance y dice si su desenlace es ambiguo (excepción de red, `status` 0 o error sin código). */
+/** Ejecuta una escritura sin dejar que lance y dice si su desenlace es ambiguo (excepción de red, `status` 0, error sin código o con un código que no es de la base: `escrituraAmbigua`). */
 async function escribir(peticion: () => PromiseLike<RespuestaEscritura>): Promise<{ error: RespuestaEscritura['error']; ambiguo: boolean }> {
   try {
     const { error, status } = await peticion()
