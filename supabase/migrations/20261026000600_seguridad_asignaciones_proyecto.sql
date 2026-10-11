@@ -77,13 +77,33 @@
 --        · NO global (la ronda anterior): una sola clave para toda la base dejaba a un propietario de CUALQUIER empresa —signup-company es público—
 --          retener con una baja pesada las bajas de proyecto de TODAS las demás (medido con pgbench: la víctima de otra empresa pasaba de 212 a 0,5 transacciones/s; con la clave por empresa, de 209 a 193);
 --        · SÍ por empresa de la persona: la integridad de empresa (trg_asignacion_empresa) garantiza que persona y proyecto son de la misma
---          empresa, y dos bajas que quitan filas de la MISMA persona comparten siempre esa clave (también con una fila cruzada anterior a este
---          trigger: la clave sale de la persona, no del proyecto). Un propietario sólo puede retener el candado de SU empresa.
+--          empresa, y dos bajas que quitan filas de la MISMA persona comparten siempre esa clave. La clave sale de la PERSONA, no del actor ni del
+--          proyecto. «Un propietario sólo puede retener el candado de SU empresa» vale con datos SANOS (medido); con datos heredados NO vale:
+--          (a) con una fila cruzada anterior a este trigger (persona de C asignada a un proyecto de D) el propietario de D que borra ese proyecto retiene la clave
+--          de C y las bajas del propietario de C esperan y fallan a los 2 s con 55P03 (denegación de servicio entre empresas, medida); (b) las personas SIN
+--          empresa (company_id NULL) comparten UNA clave, 'asg-cascada:sin-empresa', entre TODAS las empresas, y el propietario de D bloquea al de C si
+--          ambos borran proyectos con filas heredadas de personas sin empresa (medido); (c) con filas cruzadas una baja puede tomar DOS claves, en el orden en que
+--          la cascada recorre las filas, y dos bajas con el orden inverso se interbloquean candado contra candado (40P01: PostgreSQL aborta una, no queda nada a
+--          medias; medido con UNA sentencia por transacción). Los inquilinos no pueden fabricar esas filas (la RLS de app_users y projects y el trigger de
+--          integridad lo rechazan): hace falta un dato heredado o al superadministrador. Producción, medido: 0 cruces; se ignora si las 9 personas sin empresa tienen filas.
 --      Una fila HUÉRFANA (la persona no existe en app_users) no toma candado: sin rol no puede quedar exenta. Si una baja espera el candado más de
 --      2 s (lock_timeout de la propia función, no del resto de la sesión) falla limpio con lock_not_available (55P03) en vez de ocupar una conexión hasta
 --      el statement_timeout. Quien borra con service_role o como superusuario no pasa por el trigger ni toma el candado (D-6, V3-06): puede tomarlo a mano
 --      con pg_advisory_xact_lock(hashtextextended('asg-cascada:' || <empresa>, 0)) si quiere ordenarse con las bajas hechas por la API.
 --      Cuesta: dos bajas de proyecto de la MISMA empresa a la vez por la API se ejecutan una tras otra (es una operación rara).
+--      LÍMITES MEDIDOS del candado (cuarta verificación independiente; docs/SEGURIDAD_ASIGNACIONES_PROYECTO.md, «Quinta ronda»). No son defectos que esta migración cierre:
+--        · INTERBLOQUEO también con UNA sentencia por transacción. «0 interbloqueos» fue lo medido en las cargas probadas, NO una garantía. Con TRES peticiones de una sola
+--          sentencia hay un ciclo determinista: una transacción ajena retiene la fila de app_users de la persona; (1) un UPDATE que mueve la asignación (persona, P1) a P2 bloquea esa
+--          fila de la asignación y espera el FOR SHARE de app_users; (2) el DELETE de P1 toma el candado de la empresa y espera la fila de la asignación; (3) el DELETE de P2 espera
+--          el candado; al confirmar la ajena, (1) pide FOR SHARE sobre projects(P2), que (3) tiene en borrado, y el ciclo se cierra. Desenlace limpio: 40P01 y ASIGNACION_EMPRESA_DISTINTA,
+--          nada a medias (queda uno de P1/P2). Sin el candado ese entrelazado no se interbloquea. Alcanzable con peticiones legítimas simultáneas; exige una transacción ajena que retenga la fila de app_users.
+--        · AISLAMIENTO REPEATABLE READ / SERIALIZABLE: el candado se toma, pero «¿le queda otra fila?» lee con la instantánea tomada ANTES de esperar. Un administrador, él solo con dos
+--          sesiones, queda con 0 filas y exento (en SERIALIZABLE tampoco hay error 40001). Con READ COMMITTED (el valor por omisión) se rechaza bien. No es alcanzable por PostgREST (que no fija el
+--          aislamiento por petición: por su documentación, no medido) pero sí con una conexión directa que lo elija. DECISIÓN ABIERTA, NO implementada: rechazar si
+--          current_setting('transaction_isolation') <> 'read committed', o bloquear con FOR UPDATE las filas de la persona.
+--        · El lock_timeout de 2 s es fijo en la función: ignora un lock_timeout MÁS ESTRICTO del llamador (con 200 ms en la sesión la espera falló a los 2 011 ms). Informativo.
+--        · Sólo la baja EN CASCADA toma el candado: un UPDATE de user_id/project_id o un DELETE directo de una asignación no lo toman, y la carrera de uno de ellos con la baja en cascada
+--          de otro administrador deja a la persona con 0 filas y exenta (medido). Es la clase ya documentada (D-2: otro administrador puede hacerlo él solo en serie).
 --      Una sesión sin fila en app_users (rol NULL) tampoco pasa el trigger: la lógica trivaluada ya no
 --      lo deja «abierto».
 --   5. Privilegios: anon pierde TODOS (la RLS no le daba nada, pero el privilegio
