@@ -373,7 +373,7 @@ describe('AsignacionModal · si la lectura inicial FALLA no se borra nada', () =
 })
 
 describe('AsignacionModal · fallos al guardar', () => {
-  it('S2 · una EXCEPCIÓN (no un error devuelto) en el insert se captura: mensaje claro, sin rechazos sin manejar y el botón vuelve a «Guardar»', async () => {
+  it('S2 · una EXCEPCIÓN (no un error devuelto) en el insert se captura: mensaje claro, sin rechazos sin manejar y el botón vuelve a «Guardar»; como pudo aplicarse, se relee y se recarga la lista (V3-02)', async () => {
     db.lanzaEn = 'upsert'
     const rechazos: unknown[] = []
     const h = (e: unknown) => rechazos.push(e)
@@ -388,7 +388,9 @@ describe('AsignacionModal · fallos al guardar', () => {
     expect(rechazos).toEqual([])
     expect(notifyMock.mock.calls[0][0]).toMatchObject({ variant: 'error', text: expect.stringMatching(/No se pudieron guardar las asignaciones/) })
     expect(onSaved).not.toHaveBeenCalled()
-    expect(onReload).not.toHaveBeenCalled()                          // no se aplicó nada: no hay nada que recargar
+    expect(notifyMock.mock.calls[0][0]).toMatchObject({ title: 'No se pudo confirmar el guardado', text: expect.stringMatching(/No se pudo confirmar si los cambios se aplicaron/) })
+    expect(onReload).toHaveBeenCalledTimes(1)                        // la petición pudo llegar y aplicarse aunque aquí no fue así: la lista de atrás se recarga y el modal relee
+    expect(db.lecturas).toBe(2)                                      // carga inicial + relectura (ahora ése es el «antes»)
     expect(db.rows.map(r => r.id)).toEqual(['f1', 'f2'])
     await waitFor(() => expect(screen.getByRole('button', { name: /^Guardar$/ })).toBeTruthy())
   })

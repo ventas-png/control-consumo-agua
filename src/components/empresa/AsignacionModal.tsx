@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   fetchUserProjectAssignments,
   guardarAsignacionesProyecto,
@@ -57,14 +57,18 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved, onReload
   const [errorCarga, setErrorCarga] = useState(false)
   const [intento, setIntento] = useState(0)
   const [saving, setSaving] = useState(false)
+  // «Versión» de la pantalla: sube con cada carga (otra persona, Reintentar). Cualquier respuesta que llegue con otra versión es de una pantalla que ya no está: no debe
+  // tocar `inicial` ni el error de carga de la persona que se ve ahora (V3-05). Sirve a la carga y a la relectura posterior a un guardado fallido.
+  const versionRef = useRef(0)
 
   useEffect(() => {
-    let vigente = true
+    const version = ++versionRef.current
+    const vigente = () => versionRef.current === version
     async function cargarAsignaciones() {
       setLoading(true)
       setErrorCarga(false)
       const ids = await leerAsignados(usuario.id)
-      if (!vigente) return
+      if (!vigente()) return
       // Si la lectura falla NO se muestra una pantalla «vacía» con Guardar activo: eso borraría lo que sí existe. Se avisa y se bloquea Guardar.
       if (ids === null) {
         setInicial([])
@@ -77,32 +81,38 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved, onReload
       setLoading(false)
     }
     void cargarAsignaciones()
-    return () => { vigente = false }
+    // Sin `return` de limpieza: la siguiente ejecución del efecto (otra persona, Reintentar) sube `versionRef` y eso invalida lo que quedaba en vuelo; al desmontar, una respuesta
+    // tardía llama a un `setState` de un componente desmontado, que React 18 ignora.
   }, [usuario.id, intento])
 
   async function guardar() {
     if (!permiso.permitido || errorCarga || loading || saving) return
+    const version = versionRef.current          // la pantalla (persona y carga) en la que se pulsó Guardar
     setSaving(true)
     try {
       // Sólo cuenta lo marcado ENTRE los proyectos que la pantalla muestra; una asignación a un proyecto que no se muestra no se toca.
       const editables = proyectos.map(p => p.id)
       const deseadas = editables.filter(id => asignados.has(id))
-      const { error, parcial } = await guardarAsignacionesProyecto(usuario.id, inicial, deseadas, editables)
+      const { error, parcial, incierto } = await guardarAsignacionesProyecto(usuario.id, inicial, deseadas, editables)
       if (error) {
         notify({
-          title: parcial ? 'Asignaciones guardadas a medias' : 'Asignaciones sin guardar',
+          title: incierto ? 'No se pudo confirmar el guardado' : parcial ? 'Asignaciones guardadas a medias' : 'Asignaciones sin guardar',
           text: error,
           variant: 'error',
           duration: 9000,
         })
         if (parcial) {
-          onReload?.()                 // la lista de atrás debe reflejar lo que SÍ se aplicó; el diálogo sigue abierto para volver a guardar
+          onReload?.()                 // la lista de atrás debe reflejar lo que SÍ se aplicó (o pudo aplicarse); el diálogo sigue abierto para volver a guardar
           // F2-01: lo que se aplicó ya está en la base. Si `inicial` no se renueva, quien cambia de idea y guarda otra vez calcula contra un estado que ya no
           // es cierto: la fila ya insertada se quedaba y la pantalla decía «guardado». Se relee y ése es el nuevo «antes». Si no se puede leer, no se sabe qué
-          // hay: se pasa a la pantalla de error con «Reintentar» y Guardar deshabilitado (nunca se guarda a ciegas).
+          // hay: se pasa a la pantalla de error con «Reintentar» y Guardar deshabilitado (nunca se guarda a ciegas). V3-02: lo mismo cuando una escritura terminó
+          // SIN respuesta de la base (`incierto`): pudo aplicarse. V3-05: si mientras tanto la pantalla pasó a otra persona (o se recargó) la respuesta ya no es de esta
+          // pantalla y no se toca `inicial` (el de la persona nueva es el que cargó su propio efecto).
           const actuales = await leerAsignados(usuario.id)
-          if (actuales === null) setErrorCarga(true)
-          else setInicial(actuales)
+          if (versionRef.current === version) {
+            if (actuales === null) setErrorCarga(true)
+            else setInicial(actuales)
+          }
         }
         return
       }

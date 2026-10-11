@@ -78,6 +78,12 @@ export const MOTIVO_AUTOASIGNACION =
 /** Lo que se dice cuando una parte de los cambios SÍ se aplicó y otra no. */
 export const AVISO_GUARDADO_PARCIAL = 'Se aplicó una parte de los cambios y otra no. Vuelve a guardar para completar el resto.'
 
+/** Lo que se dice cuando una escritura terminó SIN respuesta de la base: la petición pudo llegar y aplicarse (V3-02). */
+export const AVISO_RESULTADO_INCIERTO =
+  'No se pudo confirmar si los cambios se aplicaron. Se vuelve a leer lo que hay guardado: revisa las casillas y guarda de nuevo.'
+
+const MENSAJE_ERROR_RED = 'No se pudieron guardar las asignaciones. Revisa tu conexión e intenta de nuevo.'
+
 /**
  * ¿Puede `actor` editar las asignaciones de proyecto de `objetivo`? Espeja la regla del servidor
  * (public.asignacion_puede_administrar, migración 20261026000600): un administrador no se edita a sí mismo, porque ampliaría su alcance
@@ -126,10 +132,42 @@ export function diferenciaAsignaciones(
   }
 }
 
-/** Resultado del guardado: `parcial` = una parte de los cambios SÍ se aplicó (la lista de atrás debe recargarse y se puede volver a guardar). */
+/**
+ * Resultado del guardado. `parcial` = la base PUDO cambiar aunque el guardado falló (una parte de los cambios SÍ se aplicó, o una escritura terminó sin respuesta y
+ * pudo aplicarse): la lista de atrás debe recargarse, quien llama debe RELEER lo que hay (ése es el nuevo «antes») y se puede volver a guardar.
+ * `incierto` (sólo con `parcial`) = ninguna escritura se confirmó pero una terminó sin respuesta de la base: no se sabe si se aplicó.
+ */
 export interface ResultadoGuardadoAsignaciones {
   error: string | null
   parcial: boolean
+  incierto?: boolean
+}
+
+/** Lo que una escritura de @supabase/postgrest-js resuelve: `status` 0 y un error SIN código («TypeError: Failed to fetch») ante un fallo de red (no lanza). */
+interface RespuestaEscritura {
+  error: { code?: string | null; message?: string | null } | null
+  status?: number | null
+}
+
+/**
+ * ¿Una escritura que devolvió `error` pudo haberse aplicado de todos modos? Sólo una respuesta de la base con CÓDIGO deja claro que no: una sentencia que falla se deshace entera
+ * (la RLS 42501, los triggers 23514/42501, 23505, un tiempo agotado 57014/55P03…). Si no hubo respuesta de la base —`status` 0, un error SIN código como el
+ * «TypeError: Failed to fetch» que postgrest-js DEVUELVE (no lanza) ante un fallo de red, un AbortError, una pasarela que contesta 502/504 con HTML— la petición pudo llegar y
+ * aplicarse antes de perderse la respuesta: es AMBIGUO (V3-02, misma familia que F2-01). Quien lo recibe no debe suponer que «no se aplicó nada».
+ */
+export function escrituraAmbigua(error: RespuestaEscritura['error'] | undefined, status?: number | null): boolean {
+  if (!error) return false
+  return status === 0 || !error.code
+}
+
+/** Ejecuta una escritura sin dejar que lance y dice si su desenlace es ambiguo (excepción de red, `status` 0 o error sin código). */
+async function escribir(peticion: () => PromiseLike<RespuestaEscritura>): Promise<{ error: RespuestaEscritura['error']; ambiguo: boolean }> {
+  try {
+    const { error, status } = await peticion()
+    return { error: error ?? null, ambiguo: escrituraAmbigua(error, status) }
+  } catch (e) {
+    return { error: { code: '', message: e instanceof Error ? e.message : 'sin respuesta' }, ambiguo: true }
+  }
 }
 
 /**
@@ -148,49 +186,57 @@ export async function guardarAsignacionesProyecto(
   const { insertar, borrar } = diferenciaAsignaciones(inicial, deseadas, editables)
   if (insertar.length === 0 && borrar.length === 0) return { error: null, parcial: false }
 
-  let escribio = false      // ¿alguna escritura ya se confirmó? (si algo falla después, el guardado es PARCIAL)
-  const fallo = (mensaje: string): ResultadoGuardadoAsignaciones =>
-    escribio ? { error: `${mensaje} ${AVISO_GUARDADO_PARCIAL}`, parcial: true } : { error: mensaje, parcial: false }
-  try {
-    // 1 · primero lo que FALTA: si esto falla no se ha borrado nada y la persona conserva lo que tenía.
-    if (insertar.length > 0) {
-      const { error } = await supabase
-        .from('user_project_assignments')
-        .upsert(
-          insertar.map(project_id => ({ user_id: userId, project_id, permission_type: 'total' })),
-          { onConflict: 'user_id,project_id', ignoreDuplicates: true },
-        )
-      if (error) return fallo(mensajeErrorAsignacion(error) ?? 'No se pudieron guardar las asignaciones. Intenta de nuevo.')
-      escribio = true
-    }
-    // 2 · después lo que SOBRA, sólo esas filas.
-    if (borrar.length > 0) {
-      const { error } = await supabase
-        .from('user_project_assignments')
-        .delete()
-        .eq('user_id', userId)
-        .in('project_id', borrar)
-      if (error) return fallo(mensajeErrorAsignacion(error) ?? 'No se pudieron guardar las asignaciones. Intenta de nuevo.')
-      escribio = true
-    }
-    // 3 · lectura posterior: la RLS filtra un DELETE sin error (0 filas) y un INSERT … ON CONFLICT DO NOTHING no avisa.
-    const despues = await fetchUserProjectAssignments(userId)
-    if (despues.error || !despues.data) {
-      return fallo('No se pudo comprobar que los cambios se aplicaran. Recarga e intenta de nuevo.')
-    }
-    const finales = new Set(despues.data.map(a => a.project_id))
-    if (insertar.some(id => !finales.has(id)) || borrar.some(id => finales.has(id))) {
-      // Algo se escribió pero no todo quedó como se pidió (p. ej. la RLS filtró un DELETE): el estado es mixto.
-      return {
-        error: 'No se aplicaron todos los cambios: puede que no tengas permiso sobre alguno de esos proyectos. Recarga e intenta de nuevo.',
-        parcial: true,
-      }
-    }
-    return { error: null, parcial: false }
-  } catch {
-    // Excepción de red (no un error de la base): si ya se escribió algo es parcial; si no, no se sabe que se haya aplicado nada.
-    return fallo('No se pudieron guardar las asignaciones. Revisa tu conexión e intenta de nuevo.')
+  let escribio = false      // ¿alguna escritura ya se confirmó con una respuesta de la base? (si algo falla después, el guardado es PARCIAL)
+  // Un fallo AMBIGUO (sin respuesta de la base) de la PRIMERA escritura —o de un DELETE sin INSERT previo— tampoco puede presentarse como «no se aplicó nada»: pudo aplicarse y
+  // quien llama debe releer (`parcial`); si no, `inicial` queda desfasado y la pantalla dice «guardado» con la base distinta (V3-02).
+  const fallo = (mensaje: string, ambiguo = false): ResultadoGuardadoAsignaciones => {
+    if (escribio) return { error: `${mensaje} ${AVISO_GUARDADO_PARCIAL}`, parcial: true }
+    if (ambiguo) return { error: `${mensaje} ${AVISO_RESULTADO_INCIERTO}`, parcial: true, incierto: true }
+    return { error: mensaje, parcial: false }
   }
+  const mensajeDe = (r: { error: RespuestaEscritura['error']; ambiguo: boolean }): string =>
+    r.ambiguo ? MENSAJE_ERROR_RED : (mensajeErrorAsignacion(r.error) ?? 'No se pudieron guardar las asignaciones. Intenta de nuevo.')
+
+  // 1 · primero lo que FALTA: si esto falla con una respuesta de la base no se ha borrado nada y la persona conserva lo que tenía.
+  if (insertar.length > 0) {
+    const r = await escribir(() => supabase
+      .from('user_project_assignments')
+      .upsert(
+        insertar.map(project_id => ({ user_id: userId, project_id, permission_type: 'total' })),
+        { onConflict: 'user_id,project_id', ignoreDuplicates: true },
+      ))
+    if (r.error) return fallo(mensajeDe(r), r.ambiguo)
+    escribio = true
+  }
+  // 2 · después lo que SOBRA, sólo esas filas.
+  if (borrar.length > 0) {
+    const r = await escribir(() => supabase
+      .from('user_project_assignments')
+      .delete()
+      .eq('user_id', userId)
+      .in('project_id', borrar))
+    if (r.error) return fallo(mensajeDe(r), r.ambiguo)
+    escribio = true
+  }
+  // 3 · lectura posterior: la RLS filtra un DELETE sin error (0 filas) y un INSERT … ON CONFLICT DO NOTHING no avisa. Llegados aquí ya se escribió (al menos una escritura).
+  let despues: Awaited<ReturnType<typeof fetchUserProjectAssignments>>
+  try {
+    despues = await fetchUserProjectAssignments(userId)
+  } catch {
+    despues = { data: null, error: 'sin respuesta' }
+  }
+  if (despues.error || !despues.data) {
+    return fallo('No se pudo comprobar que los cambios se aplicaran. Recarga e intenta de nuevo.')
+  }
+  const finales = new Set(despues.data.map(a => a.project_id))
+  if (insertar.some(id => !finales.has(id)) || borrar.some(id => finales.has(id))) {
+    // Algo se escribió pero no todo quedó como se pidió (p. ej. la RLS filtró un DELETE): el estado es mixto.
+    return {
+      error: 'No se aplicaron todos los cambios: puede que no tengas permiso sobre alguno de esos proyectos. Recarga e intenta de nuevo.',
+      parcial: true,
+    }
+  }
+  return { error: null, parcial: false }
 }
 
 // ── Alta/baja de usuario vía edge functions (requieren service role) ──

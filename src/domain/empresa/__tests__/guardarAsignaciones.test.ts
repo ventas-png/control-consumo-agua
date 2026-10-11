@@ -38,7 +38,7 @@ vi.mock('../../../lib/supabase', () => ({
   },
 }))
 
-import { guardarAsignacionesProyecto, AVISO_GUARDADO_PARCIAL } from '../usuarios'
+import { guardarAsignacionesProyecto, escrituraAmbigua, AVISO_GUARDADO_PARCIAL, AVISO_RESULTADO_INCIERTO } from '../usuarios'
 
 const ops = () => h.peticiones.map(p => p.op)
 beforeEach(() => { h.peticiones = []; h.respuestas = []; h.lectura = [] })
@@ -104,11 +104,14 @@ describe('guardarAsignacionesProyecto · fallos', () => {
     expect(r.error).toContain(AVISO_GUARDADO_PARCIAL)
   })
 
-  it('una excepción de red en el upsert NO lanza: error claro y no parcial', async () => {
+  it('una excepción de red en el upsert NO lanza: el resultado es AMBIGUO (la petición pudo aplicarse) → parcial e incierto, para que quien llama relea (V3-02)', async () => {
     h.respuestas = ['lanza']
     const r = await guardarAsignacionesProyecto('u1', ['a'], ['c'], ['a', 'c'])
-    expect(r).toMatchObject({ parcial: false })
+    expect(r).toMatchObject({ parcial: true, incierto: true })
     expect(r.error).toMatch(/No se pudieron guardar las asignaciones/)
+    expect(r.error).toContain(AVISO_RESULTADO_INCIERTO)
+    expect(r.error).not.toContain(AVISO_GUARDADO_PARCIAL)              // no se confirmó ninguna escritura: no se dice «se aplicó una parte»
+    expect(ops()).toEqual(['upsert'])                                   // y no se sigue escribiendo a ciegas
   })
 
   it('una excepción de red en el delete tras un upsert que valió → parcial', async () => {
@@ -144,5 +147,81 @@ describe('guardarAsignacionesProyecto · fallos', () => {
     const r = await guardarAsignacionesProyecto('u1', ['a', 'b'], ['a'], ['a', 'b'])
     expect(r.error).toMatch(/No se aplicaron todos los cambios/)
     expect(r.parcial).toBe(true)
+  })
+})
+
+describe('guardarAsignacionesProyecto · fallos SIN respuesta de la base (V3-02)', () => {
+  // @supabase/postgrest-js NO lanza ante un fallo de red: devuelve { error: { message: 'TypeError: Failed to fetch', code: '' }, status: 0 }. Sólo una respuesta de la base CON
+  // código (RLS 42501, triggers 23514, 23505, 55P03…) deja claro que la sentencia se deshizo; todo lo demás pudo haberse aplicado antes de perderse la respuesta.
+  const ERROR_DE_RED = { code: '', message: 'TypeError: Failed to fetch', details: '', hint: '' }
+
+  it.each([
+    ['postgrest-js devuelve el fallo de red (status 0, código vacío)', { data: null, error: ERROR_DE_RED, status: 0 }],
+    ['un error sin código aunque no traiga status', { data: null, error: { message: 'TypeError: Failed to fetch' } }],
+    ['un AbortError devuelto como error', { data: null, error: { code: '', message: 'AbortError: The operation was aborted.' }, status: 0 }],
+    ['una pasarela que contesta 502 con HTML y sin código de la base', { data: null, error: { code: '', message: '<html>502 Bad Gateway</html>' }, status: 502 }],
+    ['status 0 aunque el error traiga un código', { data: null, error: { code: '42501', message: 'x' }, status: 0 }],
+  ])('el upsert que falla así (%s) es AMBIGUO: parcial e incierto, sin borrar nada', async (_caso, respuesta) => {
+    h.respuestas = [respuesta]
+    const r = await guardarAsignacionesProyecto('u1', ['a'], ['c'], ['a', 'c'])
+    expect(r).toMatchObject({ parcial: true, incierto: true })
+    expect(r.error).toContain(AVISO_RESULTADO_INCIERTO)
+    expect(r.error).toMatch(/Revisa tu conexión/)
+    expect(ops()).toEqual(['upsert'])
+  })
+
+  it.each([
+    ['la RLS (42501)', { code: '42501', message: 'new row violates row-level security policy' }, 403],
+    ['el trigger de autoasignación (42501)', { code: '42501', message: 'ASIGNACION_PROPIA_NO_PERMITIDA: nadie cambia sus propias asignaciones' }, 403],
+    ['el trigger de integridad (23514)', { code: '23514', message: 'ASIGNACION_EMPRESA_DISTINTA: la persona y el proyecto deben pertenecer a la misma empresa' }, 400],
+    ['el candado de bajas en cascada (55P03, lock timeout)', { code: '55P03', message: 'canceling statement due to lock timeout' }, 409],
+    ['el tiempo agotado (57014)', { code: '57014', message: 'canceling statement due to statement timeout' }, 500],
+  ])('CON respuesta de la base (%s) la sentencia se deshizo: NO es ambiguo ni parcial', async (_caso, error, status) => {
+    h.respuestas = [{ data: null, error, status }]
+    const r = await guardarAsignacionesProyecto('u1', ['a'], ['c'], ['a', 'c'])
+    expect(r.parcial).toBe(false)
+    expect(r.incierto).toBeUndefined()
+    expect(r.error).not.toContain(AVISO_RESULTADO_INCIERTO)
+    expect(r.error).not.toContain(AVISO_GUARDADO_PARCIAL)
+  })
+
+  it('un DELETE solo (sin insert previo) sin respuesta es igual de ambiguo: pudo borrar', async () => {
+    h.respuestas = [{ data: null, error: ERROR_DE_RED, status: 0 }]
+    const r = await guardarAsignacionesProyecto('u1', ['a', 'b'], ['a'], ['a', 'b'])
+    expect(ops()).toEqual(['delete'])
+    expect(r).toMatchObject({ parcial: true, incierto: true })
+  })
+
+  it('un DELETE que lanza tras un upsert que SÍ valió es «parcial» (hubo una escritura confirmada) y no «incierto»', async () => {
+    h.respuestas = [{ data: null, error: null, status: 201 }, 'lanza']
+    const r = await guardarAsignacionesProyecto('u1', ['a', 'b'], ['a', 'c'], ['a', 'b', 'c'])
+    expect(r.parcial).toBe(true)
+    expect(r.incierto).toBeUndefined()
+    expect(r.error).toContain(AVISO_GUARDADO_PARCIAL)
+  })
+
+  it('una excepción en la lectura de comprobación (tras escribir bien) no lanza y es parcial', async () => {
+    h.respuestas = [{ data: null, error: null, status: 201 }, 'lanza']      // 2ª petición = el SELECT posterior (no hay nada que borrar)
+    const r = await guardarAsignacionesProyecto('u1', ['a'], ['a', 'c'], ['a', 'c'])
+    expect(ops()).toEqual(['upsert', 'select'])
+    expect(r.parcial).toBe(true)
+    expect(r.error).toMatch(/No se pudo comprobar/)
+  })
+})
+
+describe('escrituraAmbigua', () => {
+  it.each([
+    [null, 200, false],
+    [undefined, undefined, false],
+    [{ code: '42501', message: 'x' }, 403, false],
+    [{ code: '23514', message: 'x' }, undefined, false],
+    [{ code: 'PGRST301', message: 'JWT expired' }, 401, false],
+    [{ code: '', message: 'TypeError: Failed to fetch' }, 0, true],
+    [{ code: '', message: 'TypeError: Failed to fetch' }, undefined, true],
+    [{ code: null, message: 'x' }, 502, true],
+    [{ message: 'sin código' }, undefined, true],
+    [{ code: '42501', message: 'x' }, 0, true],      // un status 0 no es una respuesta de la base
+  ])('%j (status %s) → %s', (error, status, esperado) => {
+    expect(escrituraAmbigua(error, status)).toBe(esperado)
   })
 })
