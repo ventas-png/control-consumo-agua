@@ -24,43 +24,79 @@ interface AsignacionModalProps {
   proyectos: Proyecto[]
   onClose: () => void
   onSaved: () => void
-  /** Quien edita. Un administrador no puede editarse a sí mismo (el servidor lo rechaza): se deshabilita Guardar con la explicación. */
-  actor?: { id: string; role: string }
+  /** Se llama cuando el guardado quedó A MEDIAS (una parte se aplicó): quien muestra la lista debe recargarla. */
+  onReload?: () => void
+  /**
+   * Quien edita. OBLIGATORIO: sin él no habría compuerta y se ofrecería al administrador editarse a sí mismo (el servidor lo rechaza:
+   * se deshabilita Guardar con la explicación).
+   */
+  actor: { id: string; role: string }
 }
 
-export function AsignacionModal({ usuario, proyectos, onClose, onSaved, actor }: AsignacionModalProps) {
-  const permiso = actor ? puedeEditarAsignaciones(actor, usuario) : { permitido: true, motivo: null }
+const MENSAJE_LECTURA_FALLIDA = 'No se pudieron cargar las asignaciones actuales. Por seguridad no se puede guardar sin ellas: reintenta la carga.'
+const MENSAJE_ERROR_GENERICO = 'No se pudieron guardar las asignaciones. Intenta de nuevo.'
+
+export function AsignacionModal({ usuario, proyectos, onClose, onSaved, onReload, actor }: AsignacionModalProps) {
+  const permiso = puedeEditarAsignaciones(actor, usuario)
+  // `inicial` es lo que había al ABRIR: la diferencia se calcula contra eso (nunca contra una lectura nueva al guardar), de modo que sólo se
+  // escribe lo que esta persona cambió en pantalla y no se deshace lo que otro administrador haya hecho mientras tanto.
+  const [inicial, setInicial] = useState<string[]>([])
   const [asignados, setAsignados] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [errorCarga, setErrorCarga] = useState(false)
+  const [intento, setIntento] = useState(0)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
+    let vigente = true
     async function cargarAsignaciones() {
-      const { data } = await fetchUserProjectAssignments(usuario.id)
-      if (data) {
-        setAsignados(new Set(data.map(a => a.project_id)))
+      setLoading(true)
+      setErrorCarga(false)
+      let ids: string[] | null = null
+      try {
+        const { data, error } = await fetchUserProjectAssignments(usuario.id)
+        if (!error && data) ids = data.map(a => a.project_id)
+      } catch {
+        ids = null
+      }
+      if (!vigente) return
+      // Si la lectura falla NO se muestra una pantalla «vacía» con Guardar activo: eso borraría lo que sí existe. Se avisa y se bloquea Guardar.
+      if (ids === null) {
+        setInicial([])
+        setAsignados(new Set())
+        setErrorCarga(true)
+      } else {
+        setInicial(ids)
+        setAsignados(new Set(ids))
       }
       setLoading(false)
     }
     void cargarAsignaciones()
-  }, [usuario.id])
+    return () => { vigente = false }
+  }, [usuario.id, intento])
 
   async function guardar() {
-    if (!permiso.permitido) return
+    if (!permiso.permitido || errorCarga || loading || saving) return
     setSaving(true)
     try {
-      // Inserta las que faltan y borra sólo las que sobran (las filas que no cambian no se tocan) y lo comprueba leyendo de vuelta.
-      const { error } = await guardarAsignacionesProyecto(
-        usuario.id,
-        Array.from(asignados),
-        proyectos.map(p => p.id),
-      )
+      // Sólo cuenta lo marcado ENTRE los proyectos que la pantalla muestra; una asignación a un proyecto que no se muestra no se toca.
+      const editables = proyectos.map(p => p.id)
+      const deseadas = editables.filter(id => asignados.has(id))
+      const { error, parcial } = await guardarAsignacionesProyecto(usuario.id, inicial, deseadas, editables)
       if (error) {
-        notify({ title: 'Asignaciones sin guardar', text: error, variant: 'error', duration: 9000 })
+        notify({
+          title: parcial ? 'Asignaciones guardadas a medias' : 'Asignaciones sin guardar',
+          text: error,
+          variant: 'error',
+          duration: 9000,
+        })
+        if (parcial) onReload?.()      // la lista de atrás debe reflejar lo que SÍ se aplicó; el diálogo sigue abierto para volver a guardar
         return
       }
       onSaved()
       onClose()
+    } catch {
+      notify({ title: 'Asignaciones sin guardar', text: MENSAJE_ERROR_GENERICO, variant: 'error', duration: 9000 })
     } finally {
       setSaving(false)
     }
@@ -98,7 +134,7 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved, actor }:
             onClick={() => void guardar()}
             loading={saving}
             loadingText="Guardando..."
-            disabled={!permiso.permitido}
+            disabled={!permiso.permitido || loading || errorCarga}
           >
             Guardar
           </Button>
@@ -118,6 +154,18 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved, actor }:
       )}
       {loading ? (
         <div style={{ color: 'var(--at-ink-3)', textAlign: 'center', padding: '20px' }}>Cargando...</div>
+      ) : errorCarga ? (
+        <div
+          role="alert"
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '16px', borderRadius: '10px',
+            fontSize: '13px', lineHeight: 1.4, textAlign: 'center', color: 'var(--at-ink)',
+            background: 'var(--at-surface-2)', border: '1px solid var(--at-line-strong)',
+          }}
+        >
+          <span>{MENSAJE_LECTURA_FALLIDA}</span>
+          <Button variant="ghost" onClick={() => setIntento(n => n + 1)}>Reintentar</Button>
+        </div>
       ) : proyectos.length === 0 ? (
         <div style={{ color: 'var(--at-ink-3)', textAlign: 'center', padding: '20px' }}>
           No hay proyectos en esta empresa.

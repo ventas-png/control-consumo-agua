@@ -455,6 +455,7 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
           actor={{ id: currentUser.user_id, role: currentUser.role }}
           onClose={() => setUsuarioAsignar(null)}
           onSaved={() => onReload()}
+          onReload={() => onReload()}
         />
       )}
 
