@@ -460,3 +460,81 @@ describe('AsignacionModal · fallos al guardar', () => {
     expect(sinActor).toBeTruthy()
   })
 })
+
+describe('AsignacionModal · tras un guardado PARCIAL el conjunto inicial se refresca (F2-01)', () => {
+  // Antes `inicial` se fijaba sólo al abrir. Tras un parcial (el insert de p3 valió y el DELETE de p2 falló) la base ya tiene {p1,p2,p3}, pero el modal seguía creyendo {p1,p2}:
+  // si la persona cambiaba de idea y volvía a guardar, la diferencia se calculaba contra un estado que ya no era cierto y la fila ya insertada se quedaba, con el aviso «guardado».
+  async function parcial() {
+    db.lanzaEn = 'delete'
+    const m = montar()
+    await esperarCarga()
+    fireEvent.click(screen.getByLabelText('Torre Sur'))     // quita p2 …
+    fireEvent.click(screen.getByLabelText('Torre Este'))    // … y añade p3: el upsert vale, el DELETE lanza una excepción de red
+    guardar()
+    await waitFor(() => expect(notifyMock).toHaveBeenCalled())
+    expect((notifyMock.mock.calls[0][0] as { title: string }).title).toMatch(/a medias/)
+    expect(db.rows.map(r => r.project_id).sort()).toEqual(['p1', 'p2', 'p3'])      // p3 YA está en la base y p2 sigue
+    db.lanzaEn = null
+    notifyMock.mockReset()
+    return m
+  }
+
+  it('la persona deshace su cambio (re-marca p2, desmarca p3) y guarda: p3, que ya se había insertado, se QUITA y la base queda como la pantalla {p1,p2}', async () => {
+    const { onSaved } = await parcial()
+    fireEvent.click(screen.getByLabelText('Torre Sur'))     // re-marca p2
+    fireEvent.click(screen.getByLabelText('Torre Este'))    // desmarca p3
+    expect((screen.getByLabelText('Torre Sur') as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByLabelText('Torre Este') as HTMLInputElement).checked).toBe(false)
+    guardar()
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(db.rows.map(r => r.project_id).sort()).toEqual(['p1', 'p2'])
+    expect(notifyMock).not.toHaveBeenCalled()
+  })
+
+  it('deja p2 desmarcado y desmarca p3: se borran las DOS (antes sólo p2 y p3 quedaba asignado con la pantalla diciendo «guardado»)', async () => {
+    const { onSaved } = await parcial()
+    fireEvent.click(screen.getByLabelText('Torre Este'))    // desmarca p3 (p2 ya estaba desmarcado)
+    guardar()
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(db.rows.map(r => r.project_id).sort()).toEqual(['p1'])
+  })
+
+  it('sin cambiar la selección, reintentar sigue convergiendo (sólo falta el DELETE de p2)', async () => {
+    const { onSaved } = await parcial()
+    guardar()
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(db.rows.map(r => r.project_id).sort()).toEqual(['p1', 'p3'])
+    expect(escrituras()).toEqual(['upsert', 'delete', 'delete'])        // ni vuelve a insertar p3 ni toca otra cosa: sólo el DELETE de p2
+  })
+
+  it('si la relectura posterior al parcial FALLA no se sabe qué hay en la base: error con «Reintentar» y Guardar DESHABILITADO (nunca se guarda a ciegas)', async () => {
+    db.lanzaEn = 'delete'
+    montar()
+    await esperarCarga()
+    fireEvent.click(screen.getByLabelText('Torre Sur'))
+    fireEvent.click(screen.getByLabelText('Torre Este'))
+    db.fallaLectura = { 2: { code: '', message: 'TypeError: Failed to fetch' } }      // 1 = carga inicial; 2 = la relectura que sigue al parcial
+    guardar()
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
+    expect(screen.getByRole('alert').textContent).toMatch(/No se pudieron cargar las asignaciones actuales/)
+    expect((screen.getByRole('button', { name: /Guardar/ }) as HTMLButtonElement).disabled).toBe(true)
+    db.lanzaEn = null
+    const antes = escrituras().length
+    fireEvent.click(screen.getByRole('button', { name: /Reintentar/ }))
+    await esperarCarga()
+    expect((screen.getByLabelText('Torre Este') as HTMLInputElement).checked).toBe(true)         // lo que HAY en la base ahora (p3 entró)
+    expect((screen.getByLabelText('Torre Sur') as HTMLInputElement).checked).toBe(true)          // y p2 sigue
+    expect((screen.getByRole('button', { name: /Guardar/ }) as HTMLButtonElement).disabled).toBe(false)
+    expect(escrituras().length).toBe(antes)                                                      // Reintentar sólo lee
+  })
+
+  it('un fallo en el que NO se aplicó nada no relee ni cambia el conjunto inicial (una sola lectura: la de la carga)', async () => {
+    db.failWrite = { code: '42501', message: 'new row violates row-level security policy for table "user_project_assignments"' }
+    montar()
+    await esperarCarga()
+    fireEvent.click(screen.getByLabelText('Torre Este'))
+    guardar()
+    await waitFor(() => expect(notifyMock).toHaveBeenCalled())
+    expect(db.lecturas).toBe(1)
+  })
+})

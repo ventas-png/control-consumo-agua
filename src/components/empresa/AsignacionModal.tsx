@@ -36,10 +36,21 @@ interface AsignacionModalProps {
 const MENSAJE_LECTURA_FALLIDA = 'No se pudieron cargar las asignaciones actuales. Por seguridad no se puede guardar sin ellas: reintenta la carga.'
 const MENSAJE_ERROR_GENERICO = 'No se pudieron guardar las asignaciones. Intenta de nuevo.'
 
+/** Lee los proyectos asignados a la persona; `null` si la lectura falla (por error devuelto o por excepción de red): nunca se confunde «no se pudo leer» con «no tiene ninguno». */
+async function leerAsignados(userId: string): Promise<string[] | null> {
+  try {
+    const { data, error } = await fetchUserProjectAssignments(userId)
+    return !error && data ? data.map(a => a.project_id) : null
+  } catch {
+    return null
+  }
+}
+
 export function AsignacionModal({ usuario, proyectos, onClose, onSaved, onReload, actor }: AsignacionModalProps) {
   const permiso = puedeEditarAsignaciones(actor, usuario)
   // `inicial` es lo que había al ABRIR: la diferencia se calcula contra eso (nunca contra una lectura nueva al guardar), de modo que sólo se
-  // escribe lo que esta persona cambió en pantalla y no se deshace lo que otro administrador haya hecho mientras tanto.
+  // escribe lo que esta persona cambió en pantalla y no se deshace lo que otro administrador haya hecho mientras tanto. Tras un guardado
+  // PARCIAL se vuelve a fijar con lo que HAY en la base (F2-01): la parte que sí se aplicó ya forma parte del «antes» del siguiente guardado.
   const [inicial, setInicial] = useState<string[]>([])
   const [asignados, setAsignados] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -52,13 +63,7 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved, onReload
     async function cargarAsignaciones() {
       setLoading(true)
       setErrorCarga(false)
-      let ids: string[] | null = null
-      try {
-        const { data, error } = await fetchUserProjectAssignments(usuario.id)
-        if (!error && data) ids = data.map(a => a.project_id)
-      } catch {
-        ids = null
-      }
+      const ids = await leerAsignados(usuario.id)
       if (!vigente) return
       // Si la lectura falla NO se muestra una pantalla «vacía» con Guardar activo: eso borraría lo que sí existe. Se avisa y se bloquea Guardar.
       if (ids === null) {
@@ -90,7 +95,15 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved, onReload
           variant: 'error',
           duration: 9000,
         })
-        if (parcial) onReload?.()      // la lista de atrás debe reflejar lo que SÍ se aplicó; el diálogo sigue abierto para volver a guardar
+        if (parcial) {
+          onReload?.()                 // la lista de atrás debe reflejar lo que SÍ se aplicó; el diálogo sigue abierto para volver a guardar
+          // F2-01: lo que se aplicó ya está en la base. Si `inicial` no se renueva, quien cambia de idea y guarda otra vez calcula contra un estado que ya no
+          // es cierto: la fila ya insertada se quedaba y la pantalla decía «guardado». Se relee y ése es el nuevo «antes». Si no se puede leer, no se sabe qué
+          // hay: se pasa a la pantalla de error con «Reintentar» y Guardar deshabilitado (nunca se guarda a ciegas).
+          const actuales = await leerAsignados(usuario.id)
+          if (actuales === null) setErrorCarga(true)
+          else setInicial(actuales)
+        }
         return
       }
       onSaved()

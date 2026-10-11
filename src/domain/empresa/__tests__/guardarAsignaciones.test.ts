@@ -124,6 +124,21 @@ describe('guardarAsignacionesProyecto · fallos', () => {
     expect(r.parcial).toBe(true)
   })
 
+  it('un upsert que «vale» pero cuya fila NO aparece en la lectura de comprobación (la quitó otro administrador, o no se insertó) → no se presenta como guardado y es parcial', async () => {
+    h.lectura = ['a']               // 'c' debía aparecer y no está; no hay nada que borrar: sólo la comprobación de lo INSERTADO puede verlo
+    const r = await guardarAsignacionesProyecto('u1', ['a'], ['a', 'c'], ['a', 'c'])
+    expect(r.error).toMatch(/No se aplicaron todos los cambios/)
+    expect(r.parcial).toBe(true)
+    expect(ops()).toEqual(['upsert', 'select'])
+  })
+
+  it('insertar y borrar a la vez: si falta lo insertado aunque lo borrado sí desapareció, tampoco es guardado', async () => {
+    h.lectura = ['a']               // 'b' se borró bien; 'c' no está
+    const r = await guardarAsignacionesProyecto('u1', ['a', 'b'], ['a', 'c'], ['a', 'b', 'c'])
+    expect(r.error).toMatch(/No se aplicaron todos los cambios/)
+    expect(r.parcial).toBe(true)
+  })
+
   it('un DELETE que la RLS filtró (la fila sigue ahí) → no se presenta como guardado y es parcial/mixto', async () => {
     h.lectura = ['a', 'b']          // 'b' debía desaparecer y sigue
     const r = await guardarAsignacionesProyecto('u1', ['a', 'b'], ['a'], ['a', 'b'])
