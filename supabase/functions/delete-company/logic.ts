@@ -208,7 +208,12 @@ export function parsePurgeResult(raw: unknown): PurgeResult | null {
 /**
  * `true` si `auth.admin.deleteUser` falló porque la identidad ya no existe:
  * para la purga eso es éxito (idempotente), no una identidad pendiente.
+ * `message` está en el tipo porque el handler también le pasa el error de una
+ * promesa rechazada (`{ message }`, sin status ni code → no "gone"); sin él, TS
+ * lo rechaza por no compartir propiedades con `{ status?, code? }` (TS2345).
  */
-export function isAuthUserGone(err: { status?: number; code?: string } | null | undefined): boolean {
+export function isAuthUserGone(
+  err: { status?: number; code?: string; message?: string } | null | undefined,
+): boolean {
   return !!err && (err.status === 404 || err.code === 'user_not_found')
 }
