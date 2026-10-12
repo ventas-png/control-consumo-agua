@@ -122,7 +122,7 @@ for base in $NUESTRAS; do
     echo "   ✓ $base: segunda pasada limpia"
   else
     SALIDA=$(PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 -d $BD -f "$MIGS/$base.sql" 2>&1 || true)
-    echo "$SALIDA" | grep -q 'already exists' \
+    grep -q 'already exists' <<<"$SALIDA" \
       || { echo "❌ $base: la segunda pasada falló por algo distinto de «already exists»:"; echo "$SALIDA"; exit 1; }
     echo "   ✓ $base: segunda pasada rechazada por «already exists», como corresponde"
   fi
