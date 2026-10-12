@@ -327,8 +327,10 @@ SELECT asgt.err_rls('[sin app_users] no asigna proyectos', 'SINAPP', asgt.ins('N
 
 -- ═══ 8 · app_users.project_id: el proyecto de una persona es de SU empresa, para CUALQUIER actor (H-01 de la quinta verificación) ═══════════════════════
 -- user_has_project_access() y has_admin_project_access() leen app_users.project_id sin comprobar la empresa del proyecto: el propietario (app_users_update) podía fijarle a una persona
--- de SU empresa el proyecto de OTRA y darle acceso a las tablas con alcance por proyecto de la otra empresa. La 0700 añade trg_validar_proyecto_app_users (BEFORE INSERT OR UPDATE OF
+-- de SU empresa el proyecto de OTRA y darle acceso a las tablas con alcance por proyecto de la otra empresa. La 0700 añade trg_validar_proyecto_app_users (AFTER INSERT OR UPDATE OF
 -- project_id, company_id): el proyecto debe existir y ser de la empresa de la persona, también para el rol de servicio y el superusuario; NULL pasa; lo existente no se toca.
+-- AFTER y no BEFORE (SQL-01 de la octava verificación): el trigger se dispara cuando la RLS ya aceptó la fila, así que a quien la RLS rechaza le responde ella (42501), siempre igual
+-- (§ 8b), y para quien sí escribe valida la fila FINAL, después de todos los BEFORE.
 -- Actores: el sistema (superusuario sin sesión), el rol de servicio (las funciones de borde), el superadministrador de C y el de D (otra empresa) y el propietario de C.
 DO $$
 DECLARE
@@ -349,10 +351,20 @@ BEGIN
       $q$UPDATE public.app_users SET project_id = NULL WHERE id = {AX}$q$, 'ok', p_filas => 1,
       p_preparar => $q$UPDATE public.app_users SET project_id = {P1} WHERE id = {AX}$q$,
       p_efecto_sql => $q$SELECT (project_id IS NULL)::text FROM public.app_users WHERE id = {AX}$q$, p_efecto => 'true');
-    PERFORM asgt.caso('[app_users·5] ' || a || ' · cambiar la EMPRESA de una persona que tiene proyecto lo dejaría con el proyecto de la anterior', a,
-      $q$UPDATE public.app_users SET company_id = {D} WHERE id = {AX}$q$, 'error',
-      p_sqlstate => '23514', p_patron => 'APP_USERS_PROYECTO_EMPRESA_DISTINTA', p_control => false,
-      p_preparar => $q$UPDATE public.app_users SET project_id = {P1} WHERE id = {AX}$q$);
+    -- El propietario de C no puede mover a una persona a OTRA empresa: el WITH CHECK de app_users_update exige company_id = la suya. Con el trigger BEFORE respondía el trigger
+    -- (23514) antes que la RLS; con AFTER responde la RLS (42501), que es lo que de verdad le impide la escritura. El control como SISTEMA no se hace en ninguno de los dos: ahí
+    -- la misma sentencia la rechaza el trigger. Que el trigger sí mire company_id lo prueban el sistema, el servicio y los superadministradores (la RLS no los frena).
+    IF a = 'OW' THEN
+      PERFORM asgt.caso('[app_users·5] OW · cambiar la EMPRESA de una persona que tiene proyecto: el propietario no saca a nadie de su empresa (la RLS responde antes que el trigger)', a,
+        $q$UPDATE public.app_users SET company_id = {D} WHERE id = {AX}$q$, 'error',
+        p_sqlstate => '42501', p_patron => 'row-level security policy for table "app_users"', p_control => false,
+        p_preparar => $q$UPDATE public.app_users SET project_id = {P1} WHERE id = {AX}$q$);
+    ELSE
+      PERFORM asgt.caso('[app_users·5] ' || a || ' · cambiar la EMPRESA de una persona que tiene proyecto lo dejaría con el proyecto de la anterior', a,
+        $q$UPDATE public.app_users SET company_id = {D} WHERE id = {AX}$q$, 'error',
+        p_sqlstate => '23514', p_patron => 'APP_USERS_PROYECTO_EMPRESA_DISTINTA', p_control => false,
+        p_preparar => $q$UPDATE public.app_users SET project_id = {P1} WHERE id = {AX}$q$);
+    END IF;
     IF a <> 'OW' THEN          -- el propietario de C no alcanza a una persona sin empresa (la RLS la filtra: 0 filas), así que el trigger ni se evalúa
       PERFORM asgt.caso('[app_users·6] ' || a || ' · … y una persona SIN empresa (SINEMP) no recibe ningún proyecto', a,
         $q$UPDATE public.app_users SET project_id = {P1} WHERE id = {SINEMP}$q$, 'error',
@@ -378,7 +390,8 @@ SELECT asgt.caso('[app_users·10] … y no al de C (P1): DOP es de D', 'DOW',
 -- un administrador, un operador y un visor no escriben app_users ajenos (la RLS ya lo decía: no cambia)
 SELECT asgt.caso('[app_users·11] un administrador NO fija el project_id de otra persona (0 filas; app_users_update es del propietario)', 'AP',
   $q$UPDATE public.app_users SET project_id = {P1} WHERE id = {AX}$q$, 'cero');
--- AUTOEDICIÓN: trg_lock_app_users_self_privilege restituye project_id; el trigger nuevo se dispara DESPUÉS (orden alfabético) y valida la fila ya restituida
+-- AUTOEDICIÓN: trg_lock_app_users_self_privilege (BEFORE UPDATE) restituye project_id; el trigger nuevo es AFTER, así que siempre ve la fila FINAL, ya restituida (no depende del
+-- orden alfabético de los nombres, como cuando los dos eran BEFORE)
 SELECT asgt.caso('[app_users·12] un operador que intenta fijarse el proyecto de OTRA empresa: la autoedición se restituye y la escritura no falla', 'OP1',
   $q$UPDATE public.app_users SET project_id = {D1} WHERE id = {OP1}$q$, 'ok', p_filas => 1,
   p_efecto_sql => $q$SELECT (project_id IS NULL)::text FROM public.app_users WHERE id = {OP1}$q$, p_efecto => 'true');
@@ -404,6 +417,29 @@ SELECT asgt.caso('[app_users·17] SERVICIO · … sólo company_id = NULL con un
   p_preparar => $q$UPDATE public.app_users SET project_id = {P1} WHERE id = {SU}$q$);
 SELECT asgt.caso('[app_users·18] SERVICIO · sin proyecto, desligar al superadministrador (company_id = NULL) pasa', 'SERVICIO',
   $q$UPDATE public.app_users SET company_id = NULL WHERE id = {SU}$q$, 'ok', p_filas => 1);
+
+-- ═══ 8b · SQL-01: quien NO puede escribir app_users no averigua de qué empresa es un proyecto ═══════════════════════════════════════════════════════════════
+-- Con el trigger BEFORE (898b25b7) el trigger corría ANTES del WITH CHECK de la RLS y leía projects sin RLS: a quien la RLS iba a rechazar le contestaba 23514
+-- (APP_USERS_PROYECTO_EMPRESA_DISTINTA) si el par (empresa, proyecto) NO casaba y 42501 si casaba. Medido con esa versión: anon —que conserva INSERT sobre app_users—, un visor, un
+-- cliente, una sesión sin app_users, un operador y un administrador recibían 23514 con el proyecto de otra empresa y con uno inexistente, y 42501 con el par real: sabían, sin permiso,
+-- si el proyecto Y es de la empresa X. Con AFTER la RLS responde primero y la respuesta es la MISMA en los tres casos (42501 «row-level security», nunca 23514 ni el texto del trigger).
+-- La persona es NUEVA y de la empresa D; el project_id es D1 (par real), P1 (proyecto de C: par cruzado) o un uuid que no existe. El control «la misma sentencia como SISTEMA sí escribe»
+-- sólo vale para el par real (se prepara su fila de auth.users, como en app_users·7); con el cruzado o el inexistente, como SISTEMA la rechazaría el trigger.
+DO $$
+DECLARE
+  a text;
+  v_p text := $q$INSERT INTO auth.users (id) VALUES ('a5e00000-0000-0000-0000-0000000000b3')$q$;
+  v_ins constant text := $q$INSERT INTO public.app_users (id, company_id, full_name, role, project_id) VALUES ('a5e00000-0000-0000-0000-0000000000b3', {D}, 'ASG persona nueva de D', 'operator', %s)$q$;
+BEGIN
+  FOREACH a IN ARRAY ARRAY['ANON', 'VW1', 'CLI', 'SINAPP', 'OP1', 'AP'] LOOP
+    PERFORM asgt.caso('[SQL-01·real] ' || a || ' · INSERT de una persona de D con project_id = D1 (el par casa): lo rechaza la RLS', a,
+      format(v_ins, '{D1}'), 'error', p_sqlstate => '42501', p_patron => 'row-level security policy for table "app_users"', p_preparar => v_p);
+    PERFORM asgt.caso('[SQL-01·cruzado] ' || a || ' · … con project_id = P1 (proyecto de C): la MISMA respuesta, no 23514', a,
+      format(v_ins, '{P1}'), 'error', p_sqlstate => '42501', p_patron => 'row-level security policy for table "app_users"', p_preparar => v_p, p_control => false);
+    PERFORM asgt.caso('[SQL-01·inexistente] ' || a || ' · … con un project_id que no existe: la MISMA respuesta, no 23514', a,
+      format(v_ins, $q$'a5d00000-0000-0000-0000-0000000000ee'$q$), 'error', p_sqlstate => '42501', p_patron => 'row-level security policy for table "app_users"', p_preparar => v_p, p_control => false);
+  END LOOP;
+END $$;
 
 SELECT asgt.chk((SELECT count(*) FROM asgt.fallos), 0, '[principal] ningún veredicto fallido anotado');
 SELECT asgt.chk((SELECT count(*) FROM public.user_project_assignments), 43, '[principal] tras deshacer los casos siguen las 43 filas');

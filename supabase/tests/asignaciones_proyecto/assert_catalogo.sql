@@ -333,16 +333,20 @@ SELECT asgt.chk_bool((SELECT pg_get_expr(p.polqual, p.polrelid) ~ '''admin''' FR
 SELECT asgt.chk((SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ('is_company_owner', 'is_super_admin', 'current_user_role', 'get_my_company_id')), 4,
   '[0700] no se creó ninguna función: la regla usa las que ya existían (is_super_admin, is_company_owner, current_user_role, get_my_company_id)');
 
--- ═══ 7 · la 20261026000700: el trigger de integridad de app_users.project_id (H-01 de la quinta verificación) ═════════════════════════════════════════
--- BEFORE INSERT OR UPDATE OF project_id, company_id, por fila, habilitado. Se dispara después de trg_lock_app_users_self_privilege (orden alfabético) para validar la fila ya restituida.
+-- ═══ 7 · la 20261026000700: el trigger de integridad de app_users.project_id (H-01 de la quinta verificación; AFTER desde SQL-01 de la octava) ═══════════════════
+-- AFTER INSERT OR UPDATE OF project_id, company_id, por fila, habilitado. AFTER y no BEFORE (SQL-01 de la octava verificación): un BEFORE se ejecutaba ANTES del WITH CHECK de la RLS
+-- y, como lee projects sin RLS, a quien la RLS iba a rechazar (anon conserva INSERT sobre app_users) le contestaba 23514 o 42501 según el par (empresa, proyecto) casara o no: un oráculo
+-- de un bit. AFTER se dispara cuando la RLS ya aceptó la fila (a quien no puede escribir le responde la RLS, siempre igual: assert_principal § 8) y valida la fila FINAL, después de
+-- todos los BEFORE, también de trg_lock_app_users_self_privilege (que restituye las columnas de una autoedición): el orden alfabético de los nombres ya no importa.
 SELECT asgt.chk_txt((SELECT string_agg(tgname::text || ':' || tgenabled::text, ', ' ORDER BY tgname) FROM pg_trigger WHERE tgrelid = 'public.app_users'::regclass AND NOT tgisinternal),
   'trg_cliente_sin_company_id:O, trg_lock_app_users_self_privilege:O, trg_validar_proyecto_app_users:O',
   '[0700] app_users tiene sus 2 triggers de siempre y el nuevo trg_validar_proyecto_app_users, los tres habilitados (origen)');
 SELECT asgt.chk_txt((SELECT pg_get_triggerdef(oid) FROM pg_trigger WHERE tgrelid = 'public.app_users'::regclass AND tgname = 'trg_validar_proyecto_app_users'),
-  'CREATE TRIGGER trg_validar_proyecto_app_users BEFORE INSERT OR UPDATE OF project_id, company_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION app_users_validar_proyecto()',
+  'CREATE TRIGGER trg_validar_proyecto_app_users AFTER INSERT OR UPDATE OF project_id, company_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION app_users_validar_proyecto()',
   '[0700] el trigger sólo se dispara al escribir project_id / company_id (no mira filas existentes ni otras columnas)');
-SELECT asgt.chk_bool((SELECT 'trg_validar_proyecto_app_users' > 'trg_lock_app_users_self_privilege' COLLATE "C"), true,
-  '[0700] y su nombre lo ordena DESPUÉS del trigger que restituye las columnas privilegiadas de una autoedición (valida la fila que de verdad se escribiría)');
+-- tgtype: ROW 1 + INSERT 4 + UPDATE 16 = 21, sin el bit BEFORE (2) ni DELETE (8) ni TRUNCATE (32). Se fija el número y no sólo el texto: un BEFORE reabriría el oráculo de arriba.
+SELECT asgt.chk((SELECT tgtype::bigint FROM pg_trigger WHERE tgrelid = 'public.app_users'::regclass AND tgname = 'trg_validar_proyecto_app_users'), 21,
+  '[0700] y es AFTER por fila para INSERT y UPDATE (tgtype = 21, sin el bit BEFORE): la RLS responde antes que el trigger, así que quien no puede escribir app_users no averigua de qué empresa es un proyecto');
 SELECT asgt.chk_txt((SELECT p.prosecdef::text || '|' || p.provolatile::text || '|' || COALESCE(array_to_string(p.proconfig, ','), '') FROM pg_proc p WHERE p.oid = 'public.app_users_validar_proyecto()'::regprocedure),
   'true|v|search_path=""', '[0700] app_users_validar_proyecto: SECURITY DEFINER (la validación no depende de qué proyectos ve quien escribe) y search_path vacío');
 SELECT asgt.chk_txt((SELECT string_agg(r || '=' || has_function_privilege(r, 'public.app_users_validar_proyecto()', 'EXECUTE')::text, ', ' ORDER BY r)

@@ -28,7 +28,7 @@
 #   7. MUTACIONES: se revierte a mano cada pieza (cada política, la regla, la visibilidad, cada trigger, los privilegios) y alguna aserción
 #      se pone ROJA;
 #   8. CONCURRENCIA con sesiones reales: dos administradores a la vez sobre la misma persona (disjuntos, solapados, por diferencias);
-#      una autoasignación mientras otro administrador asigna; la baja en cascada de los dos únicos proyectos de un administrador desde dos
+#      una autoasignación mientras otro administrador asigna; el cambio de empresa o la baja de un proyecto mientras se fija app_users.project_id (D3/D4); la baja en cascada de los dos únicos proyectos de un administrador desde dos
 #      sesiones (F1) y la de dos administradores que COMPARTEN sus dos proyectos, o la de un propietario contra un administrador (R2-1): sin el
 #      candado de bajas en cascada POR EMPRESA quedan con CERO filas y exentos; una escritura legítima que llega mientras la migración —o su
 #      reversión— está parada tras su pre-vuelo (F4, R02: esperan el LOCK TABLE y ya no hay un falso «las filas CAMBIARON»); la migración
@@ -578,12 +578,15 @@ echo "   ✓ 4f(g) · mutación «sin la comprobación del REQUISITO»: la 0700 
 
 # 4f(h) H-04: una 0600 ANTERIOR ya registrada (Supabase Preview del #928 en 8d34392b: la versión está registrada y el archivo nuevo NO se reaplica) → la 0700 ABORTA en vez de pasar en silencio
 #      Se aplica la 0600 de 8d34392b (copia exacta en migracion_0600_8d34392b.sql: regla que admite al administrador y user_is_project_exempt) y luego la 0700 vigente.
+#      Los mensajes de la DERIVA (SQL-02 de la octava verificación: la comprobación es EXACTA —md5 del cuerpo de la regla y las tres políticas de escritura normalizadas—, no por palabras):
+DERIVA_REGLA='DERIVA: public.asignacion_puede_administrar no codifica la regla del principal: su cuerpo (md5'
+DERIVA_POLITICAS='DERIVA: las políticas de escritura de user_project_assignments (insert, update, delete) deben usar asignacion_puede_administrar exactamente como la 20261026000600 vigente'
 copia "$BD_ANTES" asg_vieja
 aplicar "$AQUI/migracion_0600_8d34392b.sql" asg_vieja
 [ "$(q "SELECT (prosrc ~ 'user_is_project_exempt' AND prosrc ~ '''admin''' AND prosrc !~ 'is_company_owner')::text FROM pg_proc WHERE proname = 'asignacion_puede_administrar'" asg_vieja)" = "true" ] || { echo "❌ 4f(h) · la 0600 anterior no dejó la regla anterior"; exit 1; }
 PMD5_VIEJA=$(pol_md5 asg_vieja)
 SALIDA_V=$(psql -q -v ON_ERROR_STOP=1 -d asg_vieja -f "$MIGS/$MIGRACION2.sql" 2>&1) && { echo "❌ 4f(h) · la 0700 debía ABORTAR sobre una 0600 anterior ya registrada"; exit 1; }
-echo "$SALIDA_V" | grep -q 'DERIVA: public.asignacion_puede_administrar no codifica la regla del principal' || { echo "❌ 4f(h) · abortó por otra cosa:"; echo "$SALIDA_V" | grep -E 'ERROR' | head -3; exit 1; }
+echo "$SALIDA_V" | grep -qF "$DERIVA_REGLA" || { echo "❌ 4f(h) · abortó por otra cosa:"; echo "$SALIDA_V" | grep -E 'ERROR' | head -3; exit 1; }
 [ "$(pol_md5 asg_vieja)" = "$PMD5_VIEJA" ] && [ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_vieja)" = "0" ] || { echo "❌ 4f(h) · el aborto dejó piezas a medias"; exit 1; }
 echo "   ✓ 4f(h) · H-04: sobre la 0600 de 8d34392b ya registrada la 0700 ABORTA («DERIVA: public.asignacion_puede_administrar no codifica la regla del principal») sin cambiar una política ni crear el trigger"
 # con la 0600 vigente encima (lo que hace recrear la rama) la 0700 pasa y CONVERGE al catálogo de la cadena limpia
@@ -603,26 +606,82 @@ grep -q '✗.*\[A1\] AX' <<<"$SALIDA_AX" || { echo "❌ 4f(h) · sin el REQUISIT
 N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
 baja asg_vieja
 echo "   ✓ 4f(h) · mutación «sin el REQUISITO»: la 0700 pasa SIN avisar sobre la 0600 anterior y el administrador (AX) sigue asignando proyectos: assert_principal se pone ROJA (la prueba ve el defecto)"
-# DERIVA por cuerpo: cada forma de la regla que admite al administrador o a los exentos hace abortar a la 0700 (sobre la cadena con la 0600 vigente)
+# DERIVA por cuerpo: cada forma de la regla que no es la vigente hace abortar a la 0700 (sobre la cadena con la 0600 vigente), sin cambiar una política ni crear el trigger.
+#   · cuatro reglas escritas aquí (user_is_project_exempt, 'admin', current_user_role() sin is_company_owner(), sin is_super_admin());
+#   · tres MUTADAS desde el cuerpo vigente de la 0600 (SQL-02 de la octava verificación). Medido con la 0700 de 898b25b7, cuya comprobación era por palabras: (a) la detectaba (nombra 'admin'),
+#     pero (b) —una rama de administrador que no nombra 'admin' ni user_is_project_exempt()— y (c) —el mismo cuerpo con un comentario— pasaban EN SILENCIO. (c) no cambia el comportamiento:
+#     demuestra que la comprobación es EXACTA (cualquier cambio del cuerpo aborta; si la 0600 cambia, el md5 de la 0700 cambia con ella).
+deriva_aborta() {    # deriva_aborta ETIQUETA "SQL que monta la deriva" MENSAJE — sobre una copia de BD_0600, la 0700 debe ABORTAR con MENSAJE y no dejar ni una política cambiada ni el trigger
+  copia "$BD_0600" asg_deriva
+  psql -q -v ON_ERROR_STOP=1 -d asg_deriva -c "$2" >/dev/null
+  local pmd5; pmd5=$(pol_md5 asg_deriva)
+  SALIDA_D=$(psql -q -v ON_ERROR_STOP=1 -d asg_deriva -f "$MIGS/$MIGRACION2.sql" 2>&1) && { echo "❌ 4f(h) · la 0700 debía abortar con «$1»"; exit 1; }
+  echo "$SALIDA_D" | grep -qF "$3" || { echo "❌ 4f(h) · abortó por otra cosa con «$1»:"; echo "$SALIDA_D" | grep ERROR | head -2; exit 1; }
+  [ "$(pol_md5 asg_deriva)" = "$pmd5" ] && [ "$(pol_md5 asg_deriva)" = "$(pol_md5 "$BD_0600")" ] && [ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_deriva)" = "0" ] \
+    || { echo "❌ 4f(h) · el aborto con «$1» dejó políticas cambiadas o el trigger"; exit 1; }
+  baja asg_deriva
+}
 REGLA_CAB0="CREATE OR REPLACE FUNCTION public.asignacion_puede_administrar(p_user_id uuid, p_project_id uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS \$\$"
 for CUERPO in "SELECT COALESCE(public.is_super_admin() OR (public.user_is_project_exempt() AND public.is_company_owner()), false)" \
               "SELECT COALESCE(public.is_super_admin() OR public.current_user_role() = ANY (ARRAY['company_owner','admin']), false)" \
               "SELECT COALESCE(public.is_super_admin() OR (public.current_user_role() = 'company_owner'), false)" \
               "SELECT COALESCE(public.is_company_owner(), false)"; do
-  copia "$BD_0600" asg_deriva
-  psql -q -v ON_ERROR_STOP=1 -d asg_deriva -c "$REGLA_CAB0 $CUERPO \$\$" >/dev/null
-  SALIDA_D=$(psql -q -v ON_ERROR_STOP=1 -d asg_deriva -f "$MIGS/$MIGRACION2.sql" 2>&1) && { echo "❌ 4f(h) · la 0700 debía abortar con la regla «$CUERPO»"; exit 1; }
-  echo "$SALIDA_D" | grep -q 'DERIVA: public.asignacion_puede_administrar no codifica la regla del principal' || { echo "❌ 4f(h) · abortó por otra cosa con «$CUERPO»:"; echo "$SALIDA_D" | grep ERROR | head -2; exit 1; }
-  [ "$(pol_md5 asg_deriva)" = "$(pol_md5 "$BD_0600")" ] || { echo "❌ 4f(h) · el aborto dejó políticas cambiadas"; exit 1; }
-  baja asg_deriva
+  deriva_aborta "regla $CUERPO" "$REGLA_CAB0 $CUERPO \$\$" "$DERIVA_REGLA"
 done
-# … y una política de escritura de las asignaciones que ya no usa la regla (se reabrió el hueco original a mano)
+# las mutaciones del cuerpo vigente (perl sobre el CREATE OR REPLACE FUNCTION de la 0600; mutar_funcion exige que cambien algo): una rama más dentro del COALESCE, o un comentario
+REGLA_MAS_ADMIN='s/\),\n    false\n  \)/)\n    OR public.current_user_role() = \x27admin\x27,\n    false\n  )/'
+REGLA_MAS_SIN_ADMIN='s/\),\n    false\n  \)/)\n    OR public.has_admin_project_access(p_project_id),\n    false\n  )/'
+REGLA_MAS_COMENTARIO='s/(\n  SELECT COALESCE\()/\n  -- un comentario añadido: el comportamiento es idéntico, el cuerpo no$1/'
+deriva_aborta "(a) el cuerpo vigente + OR current_user_role() = 'admin'" "$(mutar_funcion asignacion_puede_administrar "$REGLA_MAS_ADMIN")" "$DERIVA_REGLA"
+deriva_aborta "(b) el cuerpo vigente + OR has_admin_project_access(p_project_id) (una rama de administrador que no nombra 'admin')" "$(mutar_funcion asignacion_puede_administrar "$REGLA_MAS_SIN_ADMIN")" "$DERIVA_REGLA"
+deriva_aborta "(c) el cuerpo vigente con un comentario añadido" "$(mutar_funcion asignacion_puede_administrar "$REGLA_MAS_COMENTARIO")" "$DERIVA_REGLA"
+echo "   ✓ 4f(h) · la 0700 ABORTA con DERIVA («su cuerpo (md5 …) no es el de la 20261026000600 vigente») ante cuatro reglas que no son la del principal y ante tres mutaciones del cuerpo vigente: (a) + OR current_user_role() = 'admin', (b) + OR has_admin_project_access() —sin nombrar 'admin'— y (c) un comentario añadido: la comprobación es EXACTA, cualquier cambio del cuerpo aborta; ninguna política cambia y el trigger no se crea"
+# DERIVA por políticas: las de escritura de user_project_assignments (FOR ALL incluida) deben ser EXACTAMENTE las tres de la 0600. Medido con la 0700 de 898b25b7 (miraba sólo a/w/d y que la
+# expresión CONTUVIERA el nombre): la primera abortaba y las otras cuatro pasaban EN SILENCIO —«regla OR true», una FOR ALL nueva, «true OR regla» en DELETE y una copia «_v2» de la regla con OR true—.
+deriva_aborta "INSERT con WITH CHECK (user_id = auth.uid()): el hueco original reabierto a mano" \
+  "ALTER POLICY user_project_assignments_insert ON public.user_project_assignments WITH CHECK (user_id = (SELECT auth.uid()))" "$DERIVA_POLITICAS"
+deriva_aborta "INSERT con WITH CHECK (asignacion_puede_administrar(…) OR true)" \
+  "ALTER POLICY user_project_assignments_insert ON public.user_project_assignments WITH CHECK (public.asignacion_puede_administrar(user_id, project_id) OR true)" "$DERIVA_POLITICAS"
+deriva_aborta "una política nueva FOR ALL USING (true) WITH CHECK (true)" \
+  "CREATE POLICY zz_asg_todo ON public.user_project_assignments FOR ALL TO authenticated USING (true) WITH CHECK (true)" "$DERIVA_POLITICAS"
+deriva_aborta "DELETE con USING (true OR asignacion_puede_administrar(…))" \
+  "ALTER POLICY user_project_assignments_delete ON public.user_project_assignments USING (true OR public.asignacion_puede_administrar(user_id, project_id))" "$DERIVA_POLITICAS"
+REGLA_V2='s/public\.asignacion_puede_administrar\(/public.asignacion_puede_administrar_v2(/; s/\),\n    false\n  \)/)\n    OR true,\n    false\n  )/'
+deriva_aborta "UPDATE con una copia asignacion_puede_administrar_v2 de la regla (+ OR true)" \
+  "$(mutar_funcion asignacion_puede_administrar "$REGLA_V2"); ALTER POLICY user_project_assignments_update ON public.user_project_assignments USING (public.asignacion_puede_administrar_v2(user_id, project_id)) WITH CHECK (public.asignacion_puede_administrar_v2(user_id, project_id))" "$DERIVA_POLITICAS"
+echo "   ✓ 4f(h) · la 0700 ABORTA con DERIVA («… exactamente como la 20261026000600 vigente, y no puede haber otras de escritura») ante cinco políticas de escritura de las asignaciones que no son las de la 0600: user_id = auth.uid(), «regla OR true», una FOR ALL USING (true), «true OR regla» en DELETE y una regla «_v2» con OR true en UPDATE; ninguna política cambia y el trigger no se crea"
+# mutación 1: SIN la comprobación del md5 del cuerpo, la regla (a) —un administrador escribe asignaciones— pasa en silencio y assert_principal se pone ROJA (AX asigna proyectos: A1)
+perl -0pe 's/  IF md5\(v_regla\) <> \x27[0-9a-f]{32}\x27 THEN\n.*?\n  END IF;\n//s' "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_sin_md5.sql"
+! grep -q 'IF md5(v_regla)' "$SALIDAS/migracion0700_sin_md5.sql" && grep -q 'IF v_pol_asg IS DISTINCT FROM v_pol_asg_esp' "$SALIDAS/migracion0700_sin_md5.sql" || { echo "❌ 4f(h) · no se pudo quitar sólo la comprobación del md5 del cuerpo"; exit 1; }
 copia "$BD_0600" asg_deriva
-psql -q -v ON_ERROR_STOP=1 -d asg_deriva -c "ALTER POLICY user_project_assignments_insert ON public.user_project_assignments WITH CHECK (user_id = (SELECT auth.uid()))" >/dev/null
-SALIDA_D=$(psql -q -v ON_ERROR_STOP=1 -d asg_deriva -f "$MIGS/$MIGRACION2.sql" 2>&1) && { echo "❌ 4f(h) · la 0700 debía abortar con la política INSERT de las asignaciones sin la regla"; exit 1; }
-echo "$SALIDA_D" | grep -q 'las políticas de escritura de user_project_assignments (insert, update, delete) deben usar asignacion_puede_administrar' || { echo "❌ 4f(h) · abortó por otra cosa:"; echo "$SALIDA_D" | grep ERROR | head -2; exit 1; }
+psql -q -v ON_ERROR_STOP=1 -d asg_deriva -c "$(mutar_funcion asignacion_puede_administrar "$REGLA_MAS_ADMIN")" >/dev/null
+aplicar "$SALIDAS/migracion0700_sin_md5.sql" asg_deriva || { echo "❌ 4f(h) · sin la comprobación del md5 la 0700 debía pasar en silencio con la regla (a)"; exit 1; }
+SALIDA_AX=$(PGOPTIONS="-c asgt.continuar=on" psql -q -d asg_deriva -f "$AQUI/assert_principal.sql" 2>&1 || true)
+grep -q '✗.*\[A1\] AX' <<<"$SALIDA_AX" || { echo "❌ 4f(h) · sin la comprobación del md5 y con la regla (a), assert_principal debía ver al administrador asignando proyectos (A1 de AX)"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
 baja asg_deriva
-echo "   ✓ 4f(h) · la 0700 ABORTA con DERIVA ante cuatro formas de regla que no son la del principal (user_is_project_exempt, 'admin', current_user_role() sin is_company_owner(), sin is_super_admin()) y ante una política de escritura de las asignaciones que ya no usa la regla"
+echo "   ✓ 4f(h) · mutación «sin la comprobación del md5 del cuerpo»: con la regla (a) la 0700 pasa SIN avisar y el administrador (AX) asigna proyectos: assert_principal se pone ROJA (la prueba ve el defecto)"
+# mutación 2: la comprobación de políticas VIEJA (la de 898b25b7: sólo a/w/d y que la expresión contenga el nombre de la regla; se adapta sólo el tipo de v_pol_asg, text): con «regla OR true» en
+# INSERT la 0700 pasa en silencio y assert_principal se pone ROJA (AX asigna proyectos: A1)
+POL_VIEJA="  SELECT string_agg(p.polname::text, ', ' ORDER BY p.polname) INTO v_pol_asg
+    FROM pg_policy p
+   WHERE p.polrelid = to_regclass('public.user_project_assignments')
+     AND p.polcmd IN ('a', 'w', 'd')
+     AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') || ' ' || COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') !~ 'asignacion_puede_administrar';
+  IF v_pol_asg IS NOT NULL OR (SELECT count(*) FROM pg_policy p WHERE p.polrelid = to_regclass('public.user_project_assignments') AND p.polcmd IN ('a', 'w', 'd')) <> 3 THEN
+    RAISE EXCEPTION 'autoridad_principal_empresa (pre-vuelo): DERIVA (comprobación vieja): %', COALESCE(v_pol_asg, 'no hay exactamente tres');
+  END IF;
+" perl -0pe 's/  SELECT string_agg\(p\.polname \|\| \x27:\x27.*?\n  END IF;\n/$ENV{POL_VIEJA}/s' "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_politicas_viejas.sql"
+! grep -q 'v_pol_asg IS DISTINCT FROM v_pol_asg_esp' "$SALIDAS/migracion0700_politicas_viejas.sql" && grep -q "AND p.polcmd IN ('a', 'w', 'd')" "$SALIDAS/migracion0700_politicas_viejas.sql" && grep -q 'IF md5(v_regla)' "$SALIDAS/migracion0700_politicas_viejas.sql" \
+  || { echo "❌ 4f(h) · no se pudo poner la comprobación de políticas vieja"; exit 1; }
+copia "$BD_0600" asg_deriva
+psql -q -v ON_ERROR_STOP=1 -d asg_deriva -c "ALTER POLICY user_project_assignments_insert ON public.user_project_assignments WITH CHECK (public.asignacion_puede_administrar(user_id, project_id) OR true)" >/dev/null
+aplicar "$SALIDAS/migracion0700_politicas_viejas.sql" asg_deriva || { echo "❌ 4f(h) · con la comprobación de políticas vieja la 0700 debía pasar en silencio con «regla OR true»"; exit 1; }
+SALIDA_AX=$(PGOPTIONS="-c asgt.continuar=on" psql -q -d asg_deriva -f "$AQUI/assert_principal.sql" 2>&1 || true)
+grep -q '✗.*\[A1\] AX' <<<"$SALIDA_AX" || { echo "❌ 4f(h) · con la comprobación de políticas vieja y «regla OR true», assert_principal debía ver al administrador asignando proyectos (A1 de AX)"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
+baja asg_deriva
+echo "   ✓ 4f(h) · mutación «la comprobación de políticas vieja» (sólo a/w/d y que la expresión nombre la regla): con «regla OR true» en INSERT la 0700 pasa SIN avisar y el administrador (AX) asigna proyectos: assert_principal se pone ROJA (la prueba ve el defecto)"
 
 echo "── 5/10 · DATOS COMO PRODUCCIÓN: las 43 filas y el alcance de cada persona, antes y después"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -v tag=despues -d "$BD" -f "$AQUI/snapshot.sql" >/dev/null
@@ -951,7 +1010,8 @@ mutacion "H-05/m21 · user_invitations_update USING(true): el propietario toca l
   "assert_principal"
 
 
-# app_users.project_id (H-01): el trigger de integridad de la 0700. Cada mutante lo desarma por una vía distinta y assert_principal (§ 8) se pone ROJA.
+# app_users.project_id (H-01): el trigger de integridad de la 0700 (AFTER INSERT OR UPDATE OF project_id, company_id desde SQL-01). Cada mutante lo desarma por una vía distinta y
+# assert_principal (§ 8 y 8b) se pone ROJA; los que cambian su definición, también assert_catalogo.
 funcion_mig7() {     # funcion_mig7 NOMBRE — como funcion_mig, pero de la 0700
   awk -v n="CREATE OR REPLACE FUNCTION public.$1(" 'index($0, n) == 1 { on = 1 } on { print } on && $0 == "$$;" { exit }' "$MIGS/$MIGRACION2.sql"
 }
@@ -978,14 +1038,20 @@ mutacion "H-01 · el trigger deja pasar a una persona sin empresa con proyecto" 
   "$(mutar_funcion7 app_users_validar_proyecto 's/ OR NEW\.company_id IS NULL//')" \
   "assert_principal"
 mutacion "H-01 · el trigger sólo se dispara al escribir project_id (cambiar la EMPRESA de una persona con proyecto lo deja con el de la anterior)" \
-  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users BEFORE INSERT OR UPDATE OF project_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
+  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users AFTER INSERT OR UPDATE OF project_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
   "assert_catalogo assert_principal"
 mutacion "H-01 · el trigger se dispara en TODO UPDATE (sin la lista OF): un dato heredado que ya cruza empresa impediría editar otras columnas" \
-  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users BEFORE INSERT OR UPDATE ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
+  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users AFTER INSERT OR UPDATE ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
+  "assert_catalogo assert_principal"
+# SQL-01 (octava verificación): el trigger vuelve a ser BEFORE, como en 898b25b7. Se ejecuta antes del WITH CHECK de la RLS y, como lee projects sin RLS, a quien la RLS rechaza le contesta
+# 23514 si el par (empresa, proyecto) no casa y 42501 si casa (el oráculo): assert_principal (§ 8b: anon, visor, cliente, sin app_users, operador y administrador reciben 23514 con el par
+# cruzado) y assert_catalogo (definición y tgtype del trigger) se ponen rojas. CREATE OR REPLACE TRIGGER cambia el momento del trigger existente sin quitarlo.
+mutacion "SQL-01 · el trigger de app_users.project_id vuelve a BEFORE (la versión de 898b25b7): quien no puede escribir app_users averigua de qué empresa es un proyecto" \
+  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users BEFORE INSERT OR UPDATE OF project_id, company_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
   "assert_catalogo assert_principal"
 
 echo "── 10/10 · concurrencia: sesiones REALES simultáneas y la migración contra una transacción larga"
-N_MUT_CONC=0         # mutaciones probadas con sesiones reales (D0 sin FOR SHARE; F1 sin candado y con el candado dentro del AND; F4 sin LOCK TABLE)
+N_MUT_CONC=0         # mutaciones probadas con sesiones reales (D0 sin FOR SHARE en la 0600; D3/D4 sin FOR SHARE en la 0700; F1 sin candado y con el candado dentro del AND; F4 sin LOCK TABLE)
 # ── Sincronización DETERMINISTA de sesiones reales (sin pg_sleep ni plazos fijos) ───────────────────────────────────────────────────────
 # Una «puerta» es un candado de aviso (clase, objeto) que toma una sesión de CONTROL y suelta cuando se le ordena por una tubería. Una sesión que
 # pide la puerta se queda parada con todo lo suyo SIN confirmar; el orquestador observa pg_locks / pg_stat_activity (wait_event_type = 'Lock') en
@@ -1142,6 +1208,49 @@ par asg_conc h SU "UPDATE public.projects SET company_id = '$EMPRESA_D' WHERE id
 sin_deadlock h && [ "$ESTADO2" = "esperando" ] && grep -q 'ASIGNACION_EMPRESA_DISTINTA' "$SALIDAS/h2.txt" && [ "$(cruces asg_conc)" = "0" ] \
   && echo "  ✓ D2 · cambio de empresa del PROYECTO concurrente con una asignación: igual, 0 filas cruzadas" \
   || { echo "❌ D2 · cruces=$(cruces asg_conc)"; cat "$SALIDAS/h1.txt" "$SALIDAS/h2.txt"; exit 1; }
+baja asg_conc
+
+# D3 · D4 · lo mismo para app_users.project_id (trigger de la 0700, AFTER): el superadministrador cambia la empresa de un proyecto de C (D3) o lo BORRA (D4) y se detiene SIN confirmar; el
+#     propietario fija ese proyecto como el de una persona de C (NUEVO, que ya tenía P2). Con el FOR SHARE del trigger la escritura del propietario ESPERA (Lock), ve el estado nuevo y recibe
+#     APP_USERS_PROYECTO_EMPRESA_DISTINTA: NUEVO conserva P2 y ninguna persona de C queda con un proyecto que no es de C. El proyecto es P9, de C y SIN asignaciones: su baja no arrastra
+#     cascadas de user_project_assignments (ni el candado de bajas de la 0600), así que lo único que se ordena es el trigger de app_users.
+#     Control negativo: la 0700 sin «FOR SHARE OF p» (sobre la cadena con la 0600): la escritura NO espera, se confirma con el proyecto todavía de C y, al confirmar el superadministrador, NUEVO
+#     queda con un proyecto de D (D3) o con uno que ya no existe (D4).
+EMPRESA_C=a5c00000-0000-0000-0000-000000000001
+cruces_app_users() { q "SELECT count(*) FROM public.app_users u WHERE u.company_id = '$EMPRESA_C' AND u.project_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = u.project_id AND p.company_id = u.company_id)" "$1"; }   # personas de C con un proyecto de otra empresa o inexistente
+proyecto_de() { q "SELECT COALESCE((SELECT i.alias FROM asgt.ids i WHERE i.id = u.project_id), u.project_id::text, '') FROM public.app_users u WHERE u.id = '$(UID_ "$1")'" "$2"; }   # app_users.project_id de la persona n (alias, o el uuid si no tiene)
+preparar_d34() {     # preparar_d34 BD — NUEVO con P2 como proyecto y P9: un proyecto de C sin asignaciones (sin el tope del plan: sólo para montar el caso)
+  q "UPDATE public.app_users SET project_id = '$(PID_ 2)' WHERE id = '$(UID_ 8)';
+     SET session_replication_role = replica;
+     INSERT INTO public.projects (id, company_id, nombre) VALUES ('$(PID_ 9)', '$EMPRESA_C', 'ASG C9 sin asignaciones');" "$1" >/dev/null
+}
+FIJAR_P9="UPDATE public.app_users SET project_id = '$(PID_ 9)' WHERE id = '$(UID_ 8)';"
+copia "$BD_POST" asg_conc; preparar_d34 asg_conc
+par asg_conc pa SU "UPDATE public.projects SET company_id = '$EMPRESA_D' WHERE id = '$(PID_ 9)';" OW "$FIJAR_P9"
+sin_deadlock pa && [ "$ESTADO2" = "esperando" ] && ! grep -qi 'error' "$SALIDAS/pa1.txt" && grep -q 'APP_USERS_PROYECTO_EMPRESA_DISTINTA' "$SALIDAS/pa2.txt" \
+  && [ "$(proyecto_de 8 asg_conc)" = "P2" ] && [ "$(cruces_app_users asg_conc)" = "0" ] && [ "$(q "SELECT company_id FROM public.projects WHERE id = '$(PID_ 9)'" asg_conc)" = "$EMPRESA_D" ] \
+  && echo "  ✓ D3 · el superadministrador mueve P9 de C a D (sin confirmar) y el propietario fija P9 como proyecto de NUEVO: la escritura ESPERA (FOR SHARE del trigger de app_users), ve la empresa nueva y recibe APP_USERS_PROYECTO_EMPRESA_DISTINTA; NUEVO conserva P2 y 0 personas de C con un proyecto que no es de C" \
+  || { echo "❌ D3 · ESTADO2=$ESTADO2 proyecto de NUEVO=$(proyecto_de 8 asg_conc) cruces=$(cruces_app_users asg_conc)"; cat "$SALIDAS/pa1.txt" "$SALIDAS/pa2.txt"; exit 1; }
+copia "$BD_POST" asg_conc; preparar_d34 asg_conc
+par asg_conc pb SU "DELETE FROM public.projects WHERE id = '$(PID_ 9)';" OW "$FIJAR_P9"
+sin_deadlock pb && [ "$ESTADO2" = "esperando" ] && ! grep -qi 'error' "$SALIDAS/pb1.txt" && grep -q 'APP_USERS_PROYECTO_EMPRESA_DISTINTA' "$SALIDAS/pb2.txt" \
+  && [ "$(proyecto_de 8 asg_conc)" = "P2" ] && [ "$(cruces_app_users asg_conc)" = "0" ] && [ "$(q "SELECT count(*) FROM public.projects WHERE id = '$(PID_ 9)'" asg_conc)" = "0" ] \
+  && echo "  ✓ D4 · el superadministrador BORRA P9 (sin confirmar) y el propietario fija P9 como proyecto de NUEVO: la escritura ESPERA, ve que el proyecto ya no existe y recibe APP_USERS_PROYECTO_EMPRESA_DISTINTA; NUEVO conserva P2 y 0 personas de C con un proyecto que no es de C" \
+  || { echo "❌ D4 · ESTADO2=$ESTADO2 proyecto de NUEVO=$(proyecto_de 8 asg_conc) cruces=$(cruces_app_users asg_conc)"; cat "$SALIDAS/pb1.txt" "$SALIDAS/pb2.txt"; exit 1; }
+# control negativo: la 0700 sin «FOR SHARE OF p» (el sed de D0 sólo toca la 0600: aquí se muta la 0700 y se aplica sobre la cadena con la 0600)
+sed 's/ FOR SHARE OF p;/;/' "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_sin_candado.sql"
+! grep -q 'FOR SHARE OF' "$SALIDAS/migracion0700_sin_candado.sql" || { echo "❌ D3/D4 · no se pudo quitar el FOR SHARE de la 0700"; exit 1; }
+copia "$BD_0600" asg_conc; aplicar "$SALIDAS/migracion0700_sin_candado.sql" asg_conc; preparar_d34 asg_conc
+par asg_conc pc SU "UPDATE public.projects SET company_id = '$EMPRESA_D' WHERE id = '$(PID_ 9)';" OW "$FIJAR_P9"
+[ "$ESTADO2" = "terminó" ] && ! grep -qi 'error' "$SALIDAS/pc1.txt" "$SALIDAS/pc2.txt" && [ "$(proyecto_de 8 asg_conc)" = "$(PID_ 9)" ] && [ "$(cruces_app_users asg_conc)" = "1" ] \
+  || { echo "❌ D3 · sin el FOR SHARE la escritura debía terminar sin esperar y dejar a NUEVO con el proyecto movido: ESTADO2=$ESTADO2 proyecto de NUEVO=$(proyecto_de 8 asg_conc) cruces=$(cruces_app_users asg_conc)"; cat "$SALIDAS/pc1.txt" "$SALIDAS/pc2.txt"; exit 1; }
+copia "$BD_0600" asg_conc; aplicar "$SALIDAS/migracion0700_sin_candado.sql" asg_conc; preparar_d34 asg_conc
+par asg_conc pd SU "DELETE FROM public.projects WHERE id = '$(PID_ 9)';" OW "$FIJAR_P9"
+[ "$ESTADO2" = "terminó" ] && ! grep -qi 'error' "$SALIDAS/pd1.txt" "$SALIDAS/pd2.txt" && [ "$(proyecto_de 8 asg_conc)" = "$(PID_ 9)" ] && [ "$(cruces_app_users asg_conc)" = "1" ] \
+  && [ "$(q "SELECT count(*) FROM public.projects WHERE id = '$(PID_ 9)'" asg_conc)" = "0" ] \
+  && echo "  ✓ D3/D4 · mutación «la 0700 sin FOR SHARE OF p»: la escritura del propietario TERMINA sin esperar en los dos casos y NUEVO queda con un proyecto que ya es de D (D3) o que ya no existe (D4): 1 persona de C con un proyecto que no es de C (la carrera es real y la prueba la ve)" \
+  || { echo "❌ D4 · sin el FOR SHARE la escritura debía terminar sin esperar y dejar a NUEVO con el proyecto borrado: ESTADO2=$ESTADO2 proyecto de NUEVO=$(proyecto_de 8 asg_conc) cruces=$(cruces_app_users asg_conc)"; cat "$SALIDAS/pd1.txt" "$SALIDAS/pd2.txt"; exit 1; }
+N_MUT_CONC=$((N_MUT_CONC + 1))
 baja asg_conc
 
 # F1 · BAJA EN CASCADA CONCURRENTE (actor «!AP»: el rol propietario de la base con la sesión de AP; ver arriba): dos sesiones, cada una borra UNO de los DOS únicos proyectos de un administrador acotado (AP queda con sólo P1 y P2).
