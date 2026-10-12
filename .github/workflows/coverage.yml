@@ -798,6 +798,20 @@ jobs:
           PGPORT_TEST: 55531
         run: supabase/tests/compras_cierre_tecnico/run.sh
 
+      # Sesión de la API SIN perfil (sin fila en app_users, anon, cliente sin
+      # empresa): ya no pasa las guardas por NULL (20261029000000). Una matriz
+      # función × sesión sobre TODAS las SECURITY DEFINER ejecutables por
+      # authenticated, antes y después: 39 fugas medidas y cerradas con la misma
+      # respuesta que un usuario de otra empresa; ninguna sesión legítima ni de
+      # backend (service_role, sistema) cambia de resultado; y el tope de plan
+      # deja de responder con el límite de otra empresa. CONTROL NEGATIVO,
+      # idempotencia, huella exacta y mutaciones.
+      - name: Sesión sin perfil — las guardas ya no pasan por NULL
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55541
+        run: supabase/tests/fail_open_sin_perfil/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
