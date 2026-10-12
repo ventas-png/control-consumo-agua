@@ -333,18 +333,22 @@ SELECT asgt.chk_bool((SELECT pg_get_expr(p.polqual, p.polrelid) ~ '''admin''' FR
 SELECT asgt.chk((SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ('is_company_owner', 'is_super_admin', 'current_user_role', 'get_my_company_id')), 4,
   '[0700] no se creó ninguna función: la regla usa las que ya existían (is_super_admin, is_company_owner, current_user_role, get_my_company_id)');
 
--- ═══ 7 · la 20261026000700: el trigger de integridad de app_users.project_id (H-01 de la quinta verificación; AFTER desde SQL-01 de la octava) ═══════════════════
--- AFTER INSERT OR UPDATE OF project_id, company_id, por fila, habilitado. AFTER y no BEFORE (SQL-01 de la octava verificación): un BEFORE se ejecutaba ANTES del WITH CHECK de la RLS
--- y, como lee projects sin RLS, a quien la RLS iba a rechazar (anon conserva INSERT sobre app_users) le contestaba 23514 o 42501 según el par (empresa, proyecto) casara o no: un oráculo
--- de un bit. AFTER se dispara cuando la RLS ya aceptó la fila (a quien no puede escribir le responde la RLS, siempre igual: assert_principal § 8) y valida la fila FINAL, después de
--- todos los BEFORE, también de trg_lock_app_users_self_privilege (que restituye las columnas de una autoedición): el orden alfabético de los nombres ya no importa.
+-- ═══ 7 · la 20261026000700: el trigger de integridad de app_users.project_id (H-01 de la quinta verificación; AFTER desde SQL-01 de la octava; sin lista de columnas desde VSQL-02 de la novena) ═══
+-- AFTER INSERT OR UPDATE, por fila, habilitado. AFTER y no BEFORE (SQL-01 de la octava verificación): un BEFORE se ejecutaba ANTES del WITH CHECK de la RLS y, como lee projects sin RLS,
+-- a quien la RLS iba a rechazar (anon conserva INSERT sobre app_users) le contestaba 23514 o 42501 según el par (empresa, proyecto) casara o no: un oráculo de un bit. AFTER se dispara
+-- cuando la RLS ya aceptó la fila (a quien no puede escribir le responde la RLS, siempre igual: assert_principal § 8b) y valida la fila FINAL, después de todos los BEFORE, también de
+-- trg_lock_app_users_self_privilege (que restituye las columnas de una autoedición): el orden alfabético de los nombres ya no importa.
+-- SIN la lista «OF project_id, company_id» (VSQL-02 de la novena verificación): esa lista la decide la lista SET de la sentencia, no la fila final, y trg_cliente_sin_company_id (BEFORE)
+-- le quita la empresa a quien pasa a role 'cliente': un UPDATE SET role = 'cliente' dejaba a una persona con proyecto y sin empresa sin evaluar el trigger. Ahora se dispara en todo
+-- UPDATE y la función compara NEW con OLD (sólo valida si cambian project_id o company_id: assert_principal app_users·13 y app_users·19).
 SELECT asgt.chk_txt((SELECT string_agg(tgname::text || ':' || tgenabled::text, ', ' ORDER BY tgname) FROM pg_trigger WHERE tgrelid = 'public.app_users'::regclass AND NOT tgisinternal),
   'trg_cliente_sin_company_id:O, trg_lock_app_users_self_privilege:O, trg_validar_proyecto_app_users:O',
   '[0700] app_users tiene sus 2 triggers de siempre y el nuevo trg_validar_proyecto_app_users, los tres habilitados (origen)');
 SELECT asgt.chk_txt((SELECT pg_get_triggerdef(oid) FROM pg_trigger WHERE tgrelid = 'public.app_users'::regclass AND tgname = 'trg_validar_proyecto_app_users'),
-  'CREATE TRIGGER trg_validar_proyecto_app_users AFTER INSERT OR UPDATE OF project_id, company_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION app_users_validar_proyecto()',
-  '[0700] el trigger sólo se dispara al escribir project_id / company_id (no mira filas existentes ni otras columnas)');
--- tgtype: ROW 1 + INSERT 4 + UPDATE 16 = 21, sin el bit BEFORE (2) ni DELETE (8) ni TRUNCATE (32). Se fija el número y no sólo el texto: un BEFORE reabriría el oráculo de arriba.
+  'CREATE TRIGGER trg_validar_proyecto_app_users AFTER INSERT OR UPDATE ON public.app_users FOR EACH ROW EXECUTE FUNCTION app_users_validar_proyecto()',
+  '[0700] el trigger se dispara en todo INSERT y UPDATE, SIN lista de columnas (la decidiría la lista SET de la sentencia, no la fila final: VSQL-02); la función decide comparando NEW con OLD');
+-- tgtype: ROW 1 + INSERT 4 + UPDATE 16 = 21, sin el bit BEFORE (2) ni DELETE (8) ni TRUNCATE (32); la lista de columnas no cambia tgtype (va en tgattr), así que sigue siendo 21 (medido con
+-- la definición de 9471b057 y con la de ahora). Se fija el número y no sólo el texto: un BEFORE reabriría el oráculo de arriba.
 SELECT asgt.chk((SELECT tgtype::bigint FROM pg_trigger WHERE tgrelid = 'public.app_users'::regclass AND tgname = 'trg_validar_proyecto_app_users'), 21,
   '[0700] y es AFTER por fila para INSERT y UPDATE (tgtype = 21, sin el bit BEFORE): la RLS responde antes que el trigger, así que quien no puede escribir app_users no averigua de qué empresa es un proyecto');
 SELECT asgt.chk_txt((SELECT p.prosecdef::text || '|' || p.provolatile::text || '|' || COALESCE(array_to_string(p.proconfig, ','), '') FROM pg_proc p WHERE p.oid = 'public.app_users_validar_proyecto()'::regprocedure),

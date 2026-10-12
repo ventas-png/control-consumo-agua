@@ -518,6 +518,22 @@ N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
 baja asg_post_vuelo
 echo "   ✓ 4f(c2) · post-vuelo: si la 0700 cambiara UNA persona de app_users ABORTA («las filas de app_users … CAMBIARON») y no deja nada ni el trigger; mutación «sin la comprobación de filas»: la persona tocada se confirma (la prueba lo ve)"
 
+# 4f(c3) el post-vuelo exige la definición EXACTA del trigger de app_users (VSQL-02): una 0700 cuyo CREATE TRIGGER volviera a la lista «OF project_id, company_id» (la de 9471b057) ABORTA y no deja nada
+copia "$BD_0600" asg_post_vuelo
+perl -0pe 's/(CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users\n  AFTER INSERT OR UPDATE) ON public\.app_users/$1 OF project_id, company_id ON public.app_users/' "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_trigger_con_lista.sql"
+grep -q '^  AFTER INSERT OR UPDATE OF project_id, company_id ON public.app_users$' "$SALIDAS/migracion0700_trigger_con_lista.sql" || { echo "❌ 4f(c3) · no se pudo preparar la 0700 con la lista OF"; exit 1; }
+SALIDA_POST=$(psql -q -v ON_ERROR_STOP=1 -d asg_post_vuelo -f "$SALIDAS/migracion0700_trigger_con_lista.sql" 2>&1) && { echo "❌ 4f(c3) · el post-vuelo debía abortar con el trigger con la lista OF"; exit 1; }
+echo "$SALIDA_POST" | grep -q 'o no es AFTER INSERT OR UPDATE ON public.app_users FOR EACH ROW, sin lista de columnas' || { echo "❌ 4f(c3) · el post-vuelo abortó por otra cosa:"; echo "$SALIDA_POST" | grep -E 'ERROR' | head -3; exit 1; }
+[ "$(pol_md5 asg_post_vuelo)" = "$(pol_md5 "$BD_0600")" ] && [ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_post_vuelo)" = "0" ] || { echo "❌ 4f(c3) · el aborto dejó piezas a medias"; exit 1; }
+# mutación: sin la comprobación de la definición en el post-vuelo, la 0700 con la lista OF se aplica (y deja el hueco de VSQL-02)
+perl -0pe 's/  IF v_def IS NULL\n     OR v_def !~ [^\n]*\n    RAISE EXCEPTION[^\n]*\n  END IF;\n//' "$SALIDAS/migracion0700_trigger_con_lista.sql" > "$SALIDAS/migracion0700_sin_chequeo_trigger.sql"
+! grep -q 'IF v_def IS NULL' "$SALIDAS/migracion0700_sin_chequeo_trigger.sql" || { echo "❌ 4f(c3) · no se pudo quitar la comprobación del trigger"; exit 1; }
+aplicar "$SALIDAS/migracion0700_sin_chequeo_trigger.sql" asg_post_vuelo || { echo "❌ 4f(c3) · sin la comprobación del trigger la 0700 con la lista OF debía aplicarse"; exit 1; }
+[ "$(q "SELECT pg_get_triggerdef(oid) ~ 'UPDATE OF project_id, company_id' FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_post_vuelo)" = "t" ] || { echo "❌ 4f(c3) · la mutación no dejó el trigger con la lista OF"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
+baja asg_post_vuelo
+echo "   ✓ 4f(c3) · post-vuelo: una 0700 cuyo trigger volviera a «UPDATE OF project_id, company_id» ABORTA («… o no es AFTER INSERT OR UPDATE ON public.app_users FOR EACH ROW, sin lista de columnas») sin cambiar una política ni dejar el trigger; mutación «sin la comprobación de la definición»: se aplica con la lista (la prueba lo ve)"
+
 # 4f(d) quien corre debe ser el propietario de las cinco tablas
 copia "$BD_0600" asg_noprop
 psql -q -v ON_ERROR_STOP=1 -d asg_noprop -c "GRANT USAGE ON SCHEMA auth TO asg_intruso" >/dev/null
@@ -611,15 +627,29 @@ echo "   ✓ 4f(h) · mutación «sin el REQUISITO»: la 0700 pasa SIN avisar so
 #   · tres MUTADAS desde el cuerpo vigente de la 0600 (SQL-02 de la octava verificación). Medido con la 0700 de 898b25b7, cuya comprobación era por palabras: (a) la detectaba (nombra 'admin'),
 #     pero (b) —una rama de administrador que no nombra 'admin' ni user_is_project_exempt()— y (c) —el mismo cuerpo con un comentario— pasaban EN SILENCIO. (c) no cambia el comportamiento:
 #     demuestra que la comprobación es EXACTA (cualquier cambio del cuerpo aborta; si la 0600 cambia, el md5 de la 0700 cambia con ella).
-deriva_aborta() {    # deriva_aborta ETIQUETA "SQL que monta la deriva" MENSAJE — sobre una copia de BD_0600, la 0700 debe ABORTAR con MENSAJE y no dejar ni una política cambiada ni el trigger
+deriva_aborta() {    # deriva_aborta ETIQUETA "SQL que monta la deriva" MENSAJE [misma_firma] — sobre una copia de BD_0600, la 0700 debe ABORTAR con MENSAJE y no dejar ni una política cambiada
+                     # ni el trigger. Con «misma_firma», antes exige que la deriva se LEA igual que la 0600 (firma_asg idéntica): es lo que la hacía invisible a la comprobación por texto.
   copia "$BD_0600" asg_deriva
   psql -q -v ON_ERROR_STOP=1 -d asg_deriva -c "$2" >/dev/null
+  if [ "${4:-}" = misma_firma ] && [ "$(firma_asg asg_deriva)" != "$(firma_asg "$BD_0600")" ]; then
+    echo "❌ 4f(h) · «$1» debía leerse IGUAL que la 0600 (la firma normalizada) y se lee distinto:"; diff <(firma_asg "$BD_0600") <(firma_asg asg_deriva) | head -4; exit 1
+  fi
   local pmd5; pmd5=$(pol_md5 asg_deriva)
   SALIDA_D=$(psql -q -v ON_ERROR_STOP=1 -d asg_deriva -f "$MIGS/$MIGRACION2.sql" 2>&1) && { echo "❌ 4f(h) · la 0700 debía abortar con «$1»"; exit 1; }
   echo "$SALIDA_D" | grep -qF "$3" || { echo "❌ 4f(h) · abortó por otra cosa con «$1»:"; echo "$SALIDA_D" | grep ERROR | head -2; exit 1; }
   [ "$(pol_md5 asg_deriva)" = "$pmd5" ] && [ "$(pol_md5 asg_deriva)" = "$(pol_md5 "$BD_0600")" ] && [ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_deriva)" = "0" ] \
     || { echo "❌ 4f(h) · el aborto con «$1» dejó políticas cambiadas o el trigger"; exit 1; }
   baja asg_deriva
+}
+# la firma de las políticas de escritura de user_project_assignments como la lee la 0700 por TEXTO (nombre:comando:permisiva:roles:USING|WITH CHECK, sin «public.»/«auth.», espacios colapsados)
+firma_asg() {        # firma_asg BD
+  psql -q -t -A -d "$1" <<'SQL'
+SELECT string_agg(p.polname || ':' || p.polcmd::text || ':' || p.polpermissive::text || ':' || p.polroles::regrole[]::text || ':'
+                  || regexp_replace(regexp_replace(COALESCE(pg_get_expr(p.polqual, p.polrelid), ''), E'\\m(public|auth)\\.', '', 'g'), '\s+', ' ', 'g') || '|'
+                  || regexp_replace(regexp_replace(COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), ''), E'\\m(public|auth)\\.', '', 'g'), '\s+', ' ', 'g'),
+                  ', ' ORDER BY p.polname)
+  FROM pg_policy p WHERE p.polrelid = 'public.user_project_assignments'::regclass AND p.polcmd <> 'r';
+SQL
 }
 REGLA_CAB0="CREATE OR REPLACE FUNCTION public.asignacion_puede_administrar(p_user_id uuid, p_project_id uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS \$\$"
 for CUERPO in "SELECT COALESCE(public.is_super_admin() OR (public.user_is_project_exempt() AND public.is_company_owner()), false)" \
@@ -682,6 +712,55 @@ grep -q '✗.*\[A1\] AX' <<<"$SALIDA_AX" || { echo "❌ 4f(h) · con la comproba
 N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
 baja asg_deriva
 echo "   ✓ 4f(h) · mutación «la comprobación de políticas vieja» (sólo a/w/d y que la expresión nombre la regla): con «regla OR true» en INSERT la 0700 pasa SIN avisar y el administrador (AX) asigna proyectos: assert_principal se pone ROJA (la prueba ve el defecto)"
+# DERIVA por el CATÁLOGO (VSQL-01 de la novena verificación). La firma por texto normaliza quitando «auth.» y «public.», así que una política que llama a OTRA función del mismo nombre se
+# leía igual que la regla; y la firma no miraba relrowsecurity ni los roles de la política. Medido con la 0700 de 9471b057: las cuatro de abajo pasaban EN SILENCIO (rc 0, trigger creado).
+#   · auth.asignacion_puede_administrar(uuid, uuid) = «SELECT true», usada por las tres políticas: pg_get_expr imprime «auth.asignacion_puede_administrar(user_id, project_id)»;
+#   · una sobrecarga public.asignacion_puede_administrar(uuid, uuid, boolean DEFAULT true) usada por la de INSERT (se monta con la regla renombrada un momento): con las dos, el nombre con dos
+#     uuid es ambiguo y pg_get_expr imprime las TRES calificadas, «public.asignacion_puede_administrar(user_id, project_id)», que normalizado es la regla;
+#   · la RLS de la tabla DESACTIVADA (las políticas siguen intactas, pero no se aplican);
+#   · la política de INSERT TO public (la 0600 las crea TO authenticated; la firma ahora lleva polroles).
+# Las tres primeras se leen IGUAL que la 0600 (deriva_aborta … misma_firma lo exige antes de aplicar). Ahora cada una ABORTA con su DERIVA sin cambiar una política ni crear el trigger.
+DERIVA_DEPEND='DERIVA: cada política de escritura de user_project_assignments debe llamar a public.asignacion_puede_administrar(uuid, uuid) y a ninguna otra función (pg_depend)'
+DERIVA_RLS='DERIVA: user_project_assignments tiene la seguridad por filas DESACTIVADA (relrowsecurity = false)'
+REGLA_EN_AUTH="CREATE FUNCTION auth.asignacion_puede_administrar(p_user_id uuid, p_project_id uuid) RETURNS boolean LANGUAGE sql STABLE AS \$\$ SELECT true \$\$;
+GRANT EXECUTE ON FUNCTION auth.asignacion_puede_administrar(uuid, uuid) TO authenticated;
+ALTER POLICY user_project_assignments_insert ON public.user_project_assignments WITH CHECK (auth.asignacion_puede_administrar(user_id, project_id));
+ALTER POLICY user_project_assignments_update ON public.user_project_assignments USING (auth.asignacion_puede_administrar(user_id, project_id)) WITH CHECK (auth.asignacion_puede_administrar(user_id, project_id));
+ALTER POLICY user_project_assignments_delete ON public.user_project_assignments USING (auth.asignacion_puede_administrar(user_id, project_id));"
+REGLA_SOBRECARGA="CREATE FUNCTION public.asignacion_puede_administrar(p_user_id uuid, p_project_id uuid, p_todo boolean DEFAULT true) RETURNS boolean LANGUAGE sql STABLE AS \$\$ SELECT p_todo \$\$;
+GRANT EXECUTE ON FUNCTION public.asignacion_puede_administrar(uuid, uuid, boolean) TO authenticated;
+ALTER FUNCTION public.asignacion_puede_administrar(uuid, uuid) RENAME TO asignacion_puede_administrar_tmp;
+ALTER POLICY user_project_assignments_insert ON public.user_project_assignments WITH CHECK (public.asignacion_puede_administrar(user_id, project_id));
+ALTER FUNCTION public.asignacion_puede_administrar_tmp(uuid, uuid) RENAME TO asignacion_puede_administrar;"
+RLS_DESACTIVADA="ALTER TABLE public.user_project_assignments DISABLE ROW LEVEL SECURITY"
+INSERT_TO_PUBLIC="ALTER POLICY user_project_assignments_insert ON public.user_project_assignments TO public"
+deriva_aborta "auth.asignacion_puede_administrar(uuid, uuid) = SELECT true en las tres políticas" "$REGLA_EN_AUTH" "$DERIVA_DEPEND" misma_firma
+deriva_aborta "sobrecarga public.asignacion_puede_administrar(uuid, uuid, boolean DEFAULT true) en la de INSERT" "$REGLA_SOBRECARGA" "$DERIVA_DEPEND" misma_firma
+deriva_aborta "RLS de user_project_assignments desactivada" "$RLS_DESACTIVADA" "$DERIVA_RLS" misma_firma
+deriva_aborta "la política de INSERT TO public" "$INSERT_TO_PUBLIC" "$DERIVA_POLITICAS"
+echo "   ✓ 4f(h) · VSQL-01: la 0700 ABORTA con DERIVA ante auth.asignacion_puede_administrar en las tres políticas y ante una sobrecarga (uuid, uuid, boolean DEFAULT true) en la de INSERT («… y a ninguna otra función (pg_depend)»), ante la RLS desactivada («relrowsecurity = false») —las tres se LEEN igual que la 0600— y ante la política de INSERT TO public (la firma lleva los roles); ninguna política cambia y el trigger no se crea"
+# mutaciones de esas guardas: sin cada comprobación, su deriva pasa EN SILENCIO (la 0700 se aplica y crea el trigger); con las dos primeras, además, el administrador (AX) asigna proyectos
+mutacion_guarda_0700() {   # mutacion_guarda_0700 ETIQUETA "perl s///" "patrón que debe desaparecer" "SQL de la deriva" [A1] — la 0700 mutada se aplica sobre la deriva; con A1, AX asigna P1 (assert_principal ✗ A1 AX)
+  perl -0pe "$2" "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_mutada.sql"
+  ! grep -qF "$3" "$SALIDAS/migracion0700_mutada.sql" || { echo "❌ 4f(h) · no se pudo preparar la mutación «$1»"; exit 1; }
+  copia "$BD_0600" asg_deriva
+  psql -q -v ON_ERROR_STOP=1 -d asg_deriva -c "$4" >/dev/null
+  aplicar "$SALIDAS/migracion0700_mutada.sql" asg_deriva || { echo "❌ 4f(h) · con la mutación «$1» la 0700 debía pasar en silencio sobre su deriva"; exit 1; }
+  [ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_deriva)" = "1" ] || { echo "❌ 4f(h) · la mutación «$1» no dejó el trigger"; exit 1; }
+  if [ "${5:-}" = A1 ]; then
+    SALIDA_AX=$(PGOPTIONS="-c asgt.continuar=on" psql -q -d asg_deriva -f "$AQUI/assert_principal.sql" 2>&1 || true)
+    grep -q '✗.*\[A1\] AX' <<<"$SALIDA_AX" || { echo "❌ 4f(h) · con la mutación «$1», assert_principal debía ver al administrador asignando proyectos (A1 de AX)"; exit 1; }
+  fi
+  N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
+  baja asg_deriva
+}
+mutacion_guarda_0700 "sin la comprobación de pg_depend" \
+  's/  -- \(3\) qué función llama de verdad.*?\n  IF v_dep_mal IS NOT NULL THEN\n.*?\n  END IF;\n//s' 'IF v_dep_mal IS NOT NULL' "$REGLA_EN_AUTH" A1
+mutacion_guarda_0700 "sin la comprobación de relrowsecurity" \
+  's/  -- \(4\) la RLS de la tabla, activa\n.*?\n  END IF;\n//s' 'c.relrowsecurity' "$RLS_DESACTIVADA" A1
+mutacion_guarda_0700 "sin los roles (polroles) en la firma" \
+  's/ \|\| p\.polroles::regrole\[\]::text \|\| \x27:\x27//; s/:\{authenticated\}:/:/g' 'p.polroles::regrole[]::text' "$INSERT_TO_PUBLIC"
+echo "   ✓ 4f(h) · mutaciones «sin la comprobación de pg_depend» (auth.asignacion_puede_administrar pasa y AX asigna proyectos: assert_principal ROJA), «sin relrowsecurity» (la RLS desactivada pasa y AX asigna proyectos) y «sin los roles en la firma» (la política TO public pasa): cada guarda nueva la ve su prueba"
 
 echo "── 5/10 · DATOS COMO PRODUCCIÓN: las 43 filas y el alcance de cada persona, antes y después"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -v tag=despues -d "$BD" -f "$AQUI/snapshot.sql" >/dev/null
@@ -859,8 +938,8 @@ echo "── 9/10 · MUTACIONES: se revierte a mano cada pieza y alguna aserció
 ARCHIVOS_MUT="assert_catalogo assert_matriz assert_flujos assert_alcance assert_capas assert_defensa assert_principal"
 POL_ORIGINAL='is_super_admin() OR (current_user_role() = ANY(ARRAY['"'"'company_owner'"'"','"'"'admin'"'"']) AND project_id IN (SELECT id FROM projects WHERE company_id = get_my_company_id())) OR user_id = (SELECT auth.uid())'
 N_MUT=0              # mutaciones de catálogo ejecutadas (se cuentan al correrlas: no se cuentan líneas del archivo)
-mutacion() {         # mutacion ETIQUETA "SQL" "archivos que DEBEN ponerse rojos"
-  local etq="$1" sql="$2" esperados="$3" bd=asg_mut rojas="" f
+mutacion() {         # mutacion ETIQUETA "SQL" "archivos que DEBEN ponerse rojos" ["patrón (ERE) de un caso de assert_principal que DEBE quedar ✗"]
+  local etq="$1" sql="$2" esperados="$3" caso="${4:-}" bd=asg_mut rojas="" f extra=""
   N_MUT=$((N_MUT + 1))
   copia "$BD_POST" "$bd"
   psql -q -v ON_ERROR_STOP=1 -d "$bd" -c "$sql" >/dev/null
@@ -870,7 +949,12 @@ mutacion() {         # mutacion ETIQUETA "SQL" "archivos que DEBEN ponerse rojos
   for f in $esperados; do
     [[ " $rojas " == *" $f "* ]] || { echo "❌ mutación «$etq»: $f debía ponerse ROJA y pasó (rojas:${rojas:- ninguna})"; exit 1; }
   done
-  echo "  ✓ mutación «$etq» → rojas:${rojas// / }"
+  if [ -n "$caso" ]; then          # el caso concreto que la ve (assert_principal anota cada veredicto fallido y sigue)
+    local sal; sal=$(PGOPTIONS="-c asgt.continuar=on" psql -q -d "$bd" -f "$AQUI/assert_principal.sql" 2>&1 || true)
+    grep -qE "✗.*$caso" <<<"$sal" || { echo "❌ mutación «$etq»: en assert_principal debía quedar ROJO el caso /$caso/"; exit 1; }
+    extra=" · caso rojo /$caso/"
+  fi
+  echo "  ✓ mutación «$etq» → rojas:${rojas// / }$extra"
   baja "$bd"
 }
 mutacion "política INSERT vuelve a la original (OR user_id = auth.uid())" \
@@ -1010,8 +1094,8 @@ mutacion "H-05/m21 · user_invitations_update USING(true): el propietario toca l
   "assert_principal"
 
 
-# app_users.project_id (H-01): el trigger de integridad de la 0700 (AFTER INSERT OR UPDATE OF project_id, company_id desde SQL-01). Cada mutante lo desarma por una vía distinta y
-# assert_principal (§ 8 y 8b) se pone ROJA; los que cambian su definición, también assert_catalogo.
+# app_users.project_id (H-01): el trigger de integridad de la 0700 (AFTER desde SQL-01; AFTER INSERT OR UPDATE sin lista de columnas, con la comparación con OLD en la función, desde VSQL-02).
+# Cada mutante lo desarma por una vía distinta y assert_principal (§ 8 y 8b) se pone ROJA; los que cambian su definición, también assert_catalogo.
 funcion_mig7() {     # funcion_mig7 NOMBRE — como funcion_mig, pero de la 0700
   awk -v n="CREATE OR REPLACE FUNCTION public.$1(" 'index($0, n) == 1 { on = 1 } on { print } on && $0 == "$$;" { exit }' "$MIGS/$MIGRACION2.sql"
 }
@@ -1037,18 +1121,28 @@ mutacion "H-01 · el trigger exime al rol de servicio y al superusuario (sin aut
 mutacion "H-01 · el trigger deja pasar a una persona sin empresa con proyecto" \
   "$(mutar_funcion7 app_users_validar_proyecto 's/ OR NEW\.company_id IS NULL//')" \
   "assert_principal"
-mutacion "H-01 · el trigger sólo se dispara al escribir project_id (cambiar la EMPRESA de una persona con proyecto lo deja con el de la anterior)" \
-  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users AFTER INSERT OR UPDATE OF project_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
-  "assert_catalogo assert_principal"
-mutacion "H-01 · el trigger se dispara en TODO UPDATE (sin la lista OF): un dato heredado que ya cruza empresa impediría editar otras columnas" \
-  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users AFTER INSERT OR UPDATE ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
-  "assert_catalogo assert_principal"
-# SQL-01 (octava verificación): el trigger vuelve a ser BEFORE, como en 898b25b7. Se ejecuta antes del WITH CHECK de la RLS y, como lee projects sin RLS, a quien la RLS rechaza le contesta
-# 23514 si el par (empresa, proyecto) no casa y 42501 si casa (el oráculo): assert_principal (§ 8b: anon, visor, cliente, sin app_users, operador y administrador reciben 23514 con el par
-# cruzado) y assert_catalogo (definición y tgtype del trigger) se ponen rojas. CREATE OR REPLACE TRIGGER cambia el momento del trigger existente sin quitarlo.
+# VSQL-02 (novena verificación): el trigger es AFTER INSERT OR UPDATE SIN lista de columnas y la FUNCIÓN decide comparando la fila FINAL con la anterior. Cada mutante deshace una pieza de ese
+# diseño y se exige, además del archivo rojo, el CASO de assert_principal que lo ve (4º argumento): la lista OF vuelve (la definición de 9471b057) → app_users·19 (pasar a 'cliente');
+# sin comparar con OLD → app_users·13 (editar otras columnas de una fila heredada); sólo project_id → app_users·19; sólo company_id → app_users·1 (fijar el proyecto de otra empresa).
+mutacion "VSQL-02 · el trigger vuelve a la lista OF project_id, company_id (la definición de 9471b057): un UPDATE SET role = 'cliente' deja a una persona con proyecto y SIN empresa" \
+  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users AFTER INSERT OR UPDATE OF project_id, company_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
+  "assert_catalogo assert_principal" '\[app_users·19\] (SISTEMA|SERVICIO|SU|SU2) · UPDATE SET role'
+mutacion "VSQL-02 · la función no compara con OLD (valida en TODO UPDATE): un dato heredado que ya cruza empresa impide editar sus otras columnas" \
+  "$(mutar_funcion7 app_users_validar_proyecto 's/\n  IF TG_OP = \x27UPDATE\x27 AND [^\n]*\n    RETURN NEW;\n  END IF;//')" \
+  "assert_principal" '\[app_users·13\]'
+mutacion "VSQL-02 · la función sólo compara project_id: un cambio de EMPRESA con proyecto puesto (también el de SET role = 'cliente', que se la quita) no se valida" \
+  "$(mutar_funcion7 app_users_validar_proyecto 's/ OR NEW\.company_id IS DISTINCT FROM OLD\.company_id//')" \
+  "assert_principal" '\[app_users·19\] (SISTEMA|SERVICIO|SU|SU2) · UPDATE SET role'
+mutacion "VSQL-02 · la función sólo compara company_id: fijar el proyecto de OTRA empresa sin cambiar la empresa no se valida" \
+  "$(mutar_funcion7 app_users_validar_proyecto 's/NEW\.project_id IS DISTINCT FROM OLD\.project_id OR //')" \
+  "assert_principal" '\[app_users·1\]'
+# SQL-01 (octava verificación): el trigger vuelve a ser BEFORE, como en 898b25b7 (aquí sin la lista OF, con el diseño de ahora). Se ejecuta antes del WITH CHECK de la RLS y, como lee projects
+# sin RLS, a quien la RLS rechaza le contesta 23514 si el par (empresa, proyecto) no casa y 42501 si casa (el oráculo): assert_principal (§ 8b: por INSERT, anon, visor, cliente, sin app_users,
+# operador y administrador; por UPDATE, el propietario que mueve a una persona a D reciben 23514 con el par cruzado) y assert_catalogo (definición y tgtype del trigger) se ponen rojas.
+# CREATE OR REPLACE TRIGGER cambia el momento del trigger existente sin quitarlo.
 mutacion "SQL-01 · el trigger de app_users.project_id vuelve a BEFORE (la versión de 898b25b7): quien no puede escribir app_users averigua de qué empresa es un proyecto" \
-  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users BEFORE INSERT OR UPDATE OF project_id, company_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
-  "assert_catalogo assert_principal"
+  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users BEFORE INSERT OR UPDATE ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
+  "assert_catalogo assert_principal" '\[SQL-01·cruzado·UPDATE\] OW'
 
 echo "── 10/10 · concurrencia: sesiones REALES simultáneas y la migración contra una transacción larga"
 N_MUT_CONC=0         # mutaciones probadas con sesiones reales (D0 sin FOR SHARE en la 0600; D3/D4 sin FOR SHARE en la 0700; F1 sin candado y con el candado dentro del AND; F4 sin LOCK TABLE)

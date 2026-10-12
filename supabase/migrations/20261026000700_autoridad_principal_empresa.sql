@@ -39,12 +39,12 @@
 --      la guarda en la lectura un administrador leía el token de la invitación 'admin' que el propietario emitió para otra persona y la completaba él con una
 --      contraseña que elige. Lo que sí sigue viendo (no se puede cerrar por RLS, y invite-user ya lo dice con su 409): que hay una invitación pendiente para un correo
 --      que ÉL elige, porque el índice único parcial de correos pendientes rechaza la suya (23505); no ve el token ni descubre correos que no conozca.
---   4. Integridad de app_users.project_id (trigger trg_validar_proyecto_app_users, AFTER INSERT OR UPDATE OF project_id, company_id): el proyecto de una persona
+--   4. Integridad de app_users.project_id (trigger trg_validar_proyecto_app_users, AFTER INSERT OR UPDATE, sin lista de columnas): el proyecto de una persona
 --      debe existir y ser de SU empresa, para cualquier actor, también service_role y el superusuario (NEW.project_id NULL pasa). Es la columna hermana de
 --      user_project_assignments: user_has_project_access() y has_admin_project_access() leen app_users.project_id SIN comprobar la empresa del proyecto, y el
 --      propietario podía fijarle a una persona de su empresa el proyecto de OTRA (preexistente; producción hoy: 0 filas con project_id). Sólo valida lo que se
---      escribe: no mira ni toca las filas existentes (el pre-vuelo cuenta, y sólo informa, las que ya crucen empresa). NO cubre app_users.cliente_id: decisión
---      abierta D-20 del documento.
+--      escribe —todo INSERT y el UPDATE cuya fila FINAL cambia project_id o company_id respecto de la anterior—: no mira ni toca las filas existentes (el pre-vuelo
+--      cuenta, y sólo informa, las que ya crucen empresa). NO cubre app_users.cliente_id: decisión abierta D-20 del documento.
 --   Los demás SELECT de esas tablas (projects, roles, role_permissions, user_roles) y app_users_* (que ya eran sólo del propietario) NO cambian.
 --   Los administradores conservan, por perfil, todas las llaves (user_has_permission() los deja pasar): eso NO cambia aquí.
 --
@@ -55,10 +55,11 @@
 -- QUÉ SUPONE DEL ENTORNO (y lo comprueba el pre-vuelo, con un mensaje claro)
 --   · existen is_super_admin(), is_company_owner(), current_user_role(), get_my_company_id() y las seis tablas con sus políticas;
 --   · la 20261026000600 ESTÁ APLICADA Y ES LA VIGENTE (REQUISITO/DERIVA), comprobado de forma EXACTA y no por palabras: el cuerpo de
---     public.asignacion_puede_administrar tiene el md5 del de la 0600 vigente y las políticas de user_project_assignments que no son de lectura son EXACTAMENTE sus tres
---     (nombre, comando, permisiva y expresiones, normalizadas como las 18 de abajo). Una base que ya registró una versión ANTERIOR de la 0600 (la rama de Preview del
---     #928 en 8d34392b: Supabase no reaplica un archivo cuya versión ya está registrada) NO la tiene, y sin esta comprobación la 0700 pasaba en silencio dejando que
---     un administrador siguiera escribiendo asignaciones;
+--     public.asignacion_puede_administrar tiene el md5 del de la 0600 vigente; las políticas de user_project_assignments que no son de lectura son EXACTAMENTE sus tres
+--     (nombre, comando, permisiva, roles TO authenticated y expresiones, normalizadas como las 18 de abajo) y, por el catálogo (pg_depend), cada una llama a
+--     public.asignacion_puede_administrar(uuid, uuid) y a NINGUNA otra función; y la RLS de la tabla está activa. Una base que ya registró una versión ANTERIOR de la
+--     0600 (la rama de Preview del #928 en 8d34392b: Supabase no reaplica un archivo cuya versión ya está registrada) NO la tiene, y sin esta comprobación la 0700
+--     pasaba en silencio dejando que un administrador siguiera escribiendo asignaciones;
 --   · cada una de las 18 políticas de las cinco tablas con políticas tiene el texto de producción (o ya el nuevo, si se corre dos veces): si hubiera deriva,
 --     aborta en vez de sobrescribir un predicado que no es el que se leyó;
 --   · quien corre la migración es el propietario de las seis tablas (o miembro de su rol);
@@ -132,11 +133,14 @@ $json$::jsonb;
   v_adm_sin_prop bigint;
   v_inv_admin bigint;
   v_regla   text;
+  v_regla_oid oid;
   v_pol_asg text;
-  -- las políticas de user_project_assignments que no son de lectura, tal como las deja la 0600 vigente (nombre:comando:permisiva:USING|WITH CHECK, normalizadas)
-  v_pol_asg_esp constant text := 'user_project_assignments_delete:d:true:asignacion_puede_administrar(user_id, project_id)|, '
-                              || 'user_project_assignments_insert:a:true:|asignacion_puede_administrar(user_id, project_id), '
-                              || 'user_project_assignments_update:w:true:asignacion_puede_administrar(user_id, project_id)|asignacion_puede_administrar(user_id, project_id)';
+  v_dep_mal text;
+  -- las políticas de user_project_assignments que no son de lectura, tal como las deja la 0600 vigente (nombre:comando:permisiva:roles:USING|WITH CHECK, normalizadas;
+  -- la 0600 las crea TO authenticated)
+  v_pol_asg_esp constant text := 'user_project_assignments_delete:d:true:{authenticated}:asignacion_puede_administrar(user_id, project_id)|, '
+                              || 'user_project_assignments_insert:a:true:{authenticated}:|asignacion_puede_administrar(user_id, project_id), '
+                              || 'user_project_assignments_update:w:true:{authenticated}:asignacion_puede_administrar(user_id, project_id)|asignacion_puede_administrar(user_id, project_id)';
   v_con_proy  bigint;
   v_cruzan    bigint;
 BEGIN
@@ -164,9 +168,15 @@ BEGIN
   -- limpia sobre ella y el administrador seguía escribiendo asignaciones sin ningún aviso.
   -- Comprobación EXACTA, no por palabras (SQL-02 de la octava verificación: una regla con una rama de administrador que no nombrara 'admin' ni user_is_project_exempt(),
   -- una política «… OR true» o una FOR ALL añadida pasaban la heurística anterior): (1) el cuerpo de la regla es el de la 0600 vigente —prosrc se guarda tal cual
-  -- (medido: el mismo md5 en PostgreSQL 16 y en la rama de Preview, 17.11)— y (2) las políticas de user_project_assignments que no son de lectura (FOR ALL incluida)
-  -- son EXACTAMENTE las tres de la 0600, normalizadas como las 18 de abajo (sin «public.»/«auth.», espacios colapsados). Si la 0600 cambia, este md5 cambia con ella.
-  v_regla := (SELECT p.prosrc FROM pg_proc p WHERE p.oid = to_regprocedure('public.asignacion_puede_administrar(uuid,uuid)'));
+  -- (medido: el mismo md5 en PostgreSQL 16 y en la rama de Preview, 17.11)—; (2) las políticas de user_project_assignments que no son de lectura (FOR ALL incluida)
+  -- son EXACTAMENTE las tres de la 0600: nombre, comando, permisiva, roles de base de datos (TO authenticated) y expresiones normalizadas como las 18 de abajo (sin
+  -- «public.»/«auth.», espacios colapsados); (3) POR EL CATÁLOGO y no por el texto (VSQL-01 de la novena verificación: como la normalización quita «auth.» y «public.»,
+  -- una política que llamara a auth.asignacion_puede_administrar(…) —o a una sobrecarga public.asignacion_puede_administrar(uuid, uuid, boolean DEFAULT true), que
+  -- pg_get_expr imprime con los mismos dos argumentos— se leía igual que la regla y pasaba): cada una de esas políticas depende (pg_depend) de
+  -- public.asignacion_puede_administrar(uuid, uuid) y de NINGUNA otra función; y (4) la RLS de la tabla está ACTIVA (relrowsecurity): desactivada, las políticas no se
+  -- aplican y quien tenga DML escribe asignaciones sin pasar por la regla. Si la 0600 cambia, este md5 cambia con ella.
+  v_regla_oid := to_regprocedure('public.asignacion_puede_administrar(uuid,uuid)');
+  v_regla := (SELECT p.prosrc FROM pg_proc p WHERE p.oid = v_regla_oid);
   IF v_regla IS NULL THEN
     RAISE EXCEPTION 'autoridad_principal_empresa (pre-vuelo): REQUISITO: falta public.asignacion_puede_administrar(uuid, uuid): la 20261026000600 debe estar aplicada ANTES (van en el mismo push y la 0700 la complementa)';
   END IF;
@@ -174,7 +184,7 @@ BEGIN
     RAISE EXCEPTION 'autoridad_principal_empresa (pre-vuelo): DERIVA: public.asignacion_puede_administrar no codifica la regla del principal: su cuerpo (md5 %) no es el de la 20261026000600 vigente (dca52dfdabe4de1253591cb9735a1b41); es una versión anterior que ya quedó registrada o se cambió a mano. Recrea la base (rama de Preview) o aplica a mano el CREATE OR REPLACE FUNCTION de la 20261026000600 vigente antes de esta migración',
       md5(v_regla);
   END IF;
-  SELECT string_agg(p.polname || ':' || p.polcmd::text || ':' || p.polpermissive::text || ':'
+  SELECT string_agg(p.polname || ':' || p.polcmd::text || ':' || p.polpermissive::text || ':' || p.polroles::regrole[]::text || ':'
                     || regexp_replace(regexp_replace(COALESCE(pg_get_expr(p.polqual, p.polrelid), ''), v_re, '', 'g'), '\s+', ' ', 'g') || '|'
                     || regexp_replace(regexp_replace(COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), ''), v_re, '', 'g'), '\s+', ' ', 'g'),
                     ', ' ORDER BY p.polname)
@@ -185,6 +195,26 @@ BEGIN
   IF v_pol_asg IS DISTINCT FROM v_pol_asg_esp THEN
     RAISE EXCEPTION 'autoridad_principal_empresa (pre-vuelo): DERIVA: las políticas de escritura de user_project_assignments (insert, update, delete) deben usar asignacion_puede_administrar exactamente como la 20261026000600 vigente, y no puede haber otras de escritura; hay: %',
       COALESCE(v_pol_asg, '(ninguna)');
+  END IF;
+  -- (3) qué función llama de verdad cada política: la que dice pg_depend (classid pg_policy → refclassid pg_proc), no la que se lee en el texto normalizado
+  SELECT string_agg(x.polname || ' → ' || x.funciones, '; ' ORDER BY x.polname)
+    INTO v_dep_mal
+    FROM (SELECT p.polname::text AS polname,
+                 COALESCE((SELECT string_agg(DISTINCT pr.pronamespace::regnamespace::text || '.' || pr.proname || '(' || pg_get_function_identity_arguments(pr.oid) || ')', ' + ')
+                             FROM pg_depend d JOIN pg_proc pr ON pr.oid = d.refobjid
+                            WHERE d.classid = 'pg_catalog.pg_policy'::regclass AND d.objid = p.oid AND d.refclassid = 'pg_catalog.pg_proc'::regclass), '(ninguna función)') AS funciones,
+                 ARRAY(SELECT DISTINCT d.refobjid FROM pg_depend d
+                        WHERE d.classid = 'pg_catalog.pg_policy'::regclass AND d.objid = p.oid AND d.refclassid = 'pg_catalog.pg_proc'::regclass) AS oids
+            FROM pg_policy p
+           WHERE p.polrelid = to_regclass('public.user_project_assignments') AND p.polcmd <> 'r') x
+   WHERE x.oids IS DISTINCT FROM ARRAY[v_regla_oid];
+  IF v_dep_mal IS NOT NULL THEN
+    RAISE EXCEPTION 'autoridad_principal_empresa (pre-vuelo): DERIVA: cada política de escritura de user_project_assignments debe llamar a public.asignacion_puede_administrar(uuid, uuid) y a ninguna otra función (pg_depend), aunque su texto normalizado se lea igual; hay: %',
+      v_dep_mal;
+  END IF;
+  -- (4) la RLS de la tabla, activa
+  IF NOT COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.user_project_assignments')), false) THEN
+    RAISE EXCEPTION 'autoridad_principal_empresa (pre-vuelo): DERIVA: user_project_assignments tiene la seguridad por filas DESACTIVADA (relrowsecurity = false): sus políticas no se aplican y quien tenga DML sobre la tabla escribe asignaciones sin pasar por la regla del principal; actívala (ALTER TABLE public.user_project_assignments ENABLE ROW LEVEL SECURITY) antes de esta migración';
   END IF;
 
   -- BLOQUEO ANTES DE MEDIR (como la 0600): con las tablas ya bloqueadas ninguna escritura legítima puede confirmarse entre la medición y el post-vuelo.
@@ -362,13 +392,19 @@ ALTER POLICY "user_invitations_delete" ON public.user_invitations
 -- depende de qué proyectos ve quien escribe) y vale para service_role y el superusuario (no hay excepción por actor). NEW.project_id NULL pasa (la mayoría de las personas
 -- no tiene proyecto «principal»; también es lo que escribe un SET NULL en cascada si algún día se añadiera la llave foránea). Si no, el proyecto debe EXISTIR y ser de la
 -- empresa de la persona (NEW.company_id): un proyecto inexistente, de otra empresa o una persona sin empresa se rechazan. FOR SHARE: si otra transacción cambia la
--- empresa del proyecto o lo borra, esta escritura ESPERA y ve el estado nuevo (como en la 0600). Valida SÓLO lo que se escribe (INSERT o UPDATE OF project_id,
--- company_id); no mira ni toca las filas existentes, y una escritura que no toque esas columnas ni lo evalúa.
+-- empresa del proyecto o lo borra, esta escritura ESPERA y ve el estado nuevo (como en la 0600). Valida SÓLO lo que se escribe: todo INSERT y, en UPDATE, sólo si la fila
+-- FINAL cambia project_id o company_id respecto de la anterior (OLD); no mira ni toca las filas existentes, y una edición de otras columnas de una fila heredada que ya
+-- cruce empresa sigue pasando.
 -- AFTER y no BEFORE (SQL-01 de la octava verificación): un trigger BEFORE se ejecuta ANTES del WITH CHECK de la RLS, y como lee projects sin RLS, a quien la RLS iba a
 -- rechazar le contestaba 23514 si el par (empresa, proyecto) no casaba y 42501 si casaba: anon —que conserva INSERT sobre app_users— y cualquier sesión sabían, sin
 -- permiso, si el proyecto Y es de la empresa X (conociendo los dos uuid). AFTER se dispara cuando la RLS ya aceptó la fila: a quien no puede escribir le responde la RLS
 -- (42501) siempre igual, y para quien sí puede valida lo mismo, sobre la fila FINAL (después de todos los BEFORE, también de trg_lock_app_users_self_privilege, que
 -- restituye las columnas de una autoedición). La función no modifica NEW. NO cubre app_users.cliente_id (decisión abierta D-20).
+-- SIN LISTA DE COLUMNAS (VSQL-02 de la novena verificación): la lista de un «UPDATE OF project_id, company_id» la decide la lista SET de la SENTENCIA, no la fila final, y
+-- trg_cliente_sin_company_id (BEFORE) pone company_id = NULL cuando role = 'cliente': un UPDATE que sólo cambiaba role a 'cliente' dejaba a una persona con project_id y sin
+-- empresa sin que el trigger se evaluara (lo alcanzan el superadministrador por la API y service_role). Por eso el trigger se dispara en TODO INSERT y UPDATE, y es la
+-- función la que compara NEW con OLD: lo que decide es la fila FINAL, tras cualquier BEFORE. Coste: cada UPDATE de app_users encola un evento AFTER y llama a la función,
+-- que vuelve enseguida si no cambian ni el proyecto ni la empresa. (OLD es NULL en un INSERT —PostgreSQL 11+—, y el TG_OP lo descarta antes.)
 CREATE OR REPLACE FUNCTION public.app_users_validar_proyecto()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -379,6 +415,10 @@ DECLARE
   v_emp_proyecto uuid;
   v_hay_proyecto boolean;
 BEGIN
+  -- en UPDATE, sólo si la fila FINAL cambia el proyecto o la empresa de la persona (OLD: la fila de antes; NEW: la que quedó tras todos los BEFORE)
+  IF TG_OP = 'UPDATE' AND NOT (NEW.project_id IS DISTINCT FROM OLD.project_id OR NEW.company_id IS DISTINCT FROM OLD.company_id) THEN
+    RETURN NEW;
+  END IF;
   IF NEW.project_id IS NULL THEN
     RETURN NEW;
   END IF;
@@ -397,8 +437,9 @@ REVOKE ALL ON FUNCTION public.app_users_validar_proyecto() FROM PUBLIC, anon, au
 
 -- CREATE OR REPLACE TRIGGER (PostgreSQL 14+) y no DROP + CREATE: DROP TRIGGER (también con IF EXISTS, en cuanto el trigger ya existe: una segunda pasada o un reintento) pide ACCESS EXCLUSIVE
 -- sobre app_users, y esa tabla la consulta la RLS de todo el sistema; CREATE OR REPLACE TRIGGER sólo pide SHARE ROW EXCLUSIVE (la tabla se sigue leyendo) y es idempotente igual.
+-- También reemplaza en su sitio la versión anterior de este trigger (AFTER INSERT OR UPDATE OF project_id, company_id) en una base que ya la tuviera.
 CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users
-  AFTER INSERT OR UPDATE OF project_id, company_id ON public.app_users
+  AFTER INSERT OR UPDATE ON public.app_users
   FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto();
 
 -- ── Post-vuelo: las filas son IDÉNTICAS, las 18 políticas quedaron como se esperaba y el trigger de app_users existe ──
@@ -441,13 +482,15 @@ BEGIN
            OR regexp_replace(regexp_replace(COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), ''), v_re, '', 'g'), '\s+', ' ', 'g') <> e->'n'->>1);
   END IF;
 
-  -- el trigger de integridad de app_users.project_id: existe, habilitado, AFTER por fila para INSERT y UPDATE OF project_id, company_id; su función es SECURITY DEFINER con
-  -- search_path vacío y nadie (anon, authenticated) la invoca directamente
+  -- el trigger de integridad de app_users.project_id: existe, habilitado, AFTER por fila para INSERT y UPDATE SIN lista de columnas (la definición EXACTA; la función sale
+  -- calificada o no según el search_path de la sesión, la tabla siempre calificada); su función es SECURITY DEFINER con search_path vacío y nadie (anon, authenticated) la
+  -- invoca directamente
   SELECT pg_get_triggerdef(t.oid) INTO v_def
     FROM pg_trigger t
    WHERE t.tgrelid = 'public.app_users'::regclass AND t.tgname = 'trg_validar_proyecto_app_users' AND NOT t.tgisinternal AND t.tgenabled = 'O';
-  IF v_def IS NULL OR v_def !~ 'AFTER INSERT OR UPDATE OF project_id, company_id ON' OR v_def !~ 'FOR EACH ROW' OR v_def !~ 'app_users_validar_proyecto' THEN
-    RAISE EXCEPTION 'autoridad_principal_empresa (post-vuelo): falta el trigger trg_validar_proyecto_app_users de app_users (o no es AFTER INSERT OR UPDATE OF project_id, company_id): %', COALESCE(v_def, 'no existe');
+  IF v_def IS NULL
+     OR v_def !~ '^CREATE TRIGGER trg_validar_proyecto_app_users AFTER INSERT OR UPDATE ON public\.app_users FOR EACH ROW EXECUTE FUNCTION (public\.)?app_users_validar_proyecto\(\)$' THEN
+    RAISE EXCEPTION 'autoridad_principal_empresa (post-vuelo): falta el trigger trg_validar_proyecto_app_users de app_users (o no es AFTER INSERT OR UPDATE ON public.app_users FOR EACH ROW, sin lista de columnas): %', COALESCE(v_def, 'no existe');
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc p
                   WHERE p.oid = to_regprocedure('public.app_users_validar_proyecto()') AND p.prosecdef AND COALESCE(array_to_string(p.proconfig, ','), '') = 'search_path=""') THEN

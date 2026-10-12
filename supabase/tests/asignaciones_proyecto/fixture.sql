@@ -228,7 +228,8 @@ BEGIN
     IF p_efecto_sql IS NOT NULL AND v_efecto IS DISTINCT FROM p_efecto THEN
       PERFORM asgt.falla(format('[%s] (%s) efecto posterior «%s», se esperaba «%s»', p_etq, p_actor, v_efecto, p_efecto)); RETURN;
     END IF;
-    RAISE NOTICE '✓ % (% · 0 filas, tabla intacta, el control sí afecta %)', p_etq, p_actor, v_ctrl;
+    RAISE NOTICE '✓ % (% · 0 filas, tabla intacta, %)', p_etq, p_actor,
+      CASE WHEN p_control THEN 'el control sí afecta ' || v_ctrl ELSE 'sin control: como SISTEMA la misma sentencia tampoco es posible' END;
   ELSIF p_esperado = 'error' THEN
     IF v_res <> 'error' THEN PERFORM asgt.falla(format('[%s] (%s) NO falló (%s filas) y tenía que fallar con %s «%s»', p_etq, p_actor, v_n, p_sqlstate, p_patron)); RETURN; END IF;
     IF v_ss IS DISTINCT FROM p_sqlstate OR v_msg !~ p_patron THEN
