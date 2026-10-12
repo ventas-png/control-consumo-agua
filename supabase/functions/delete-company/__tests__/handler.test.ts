@@ -393,6 +393,7 @@ describe('delete-company · si la purga falla, no se borra NADA (ni en auth)', (
   it.each([
     ['PURGA_EN_GRACIA', '55000', 409],
     ['PURGA_EMPRESA_ACTIVA', '55000', 409],
+    ['PURGA_RETENCION', '55000', 409],
     ['PURGA_NOMBRE_NO_COINCIDE', '22023', 400],
     ['PURGA_SOLO_SUPERADMIN', '42501', 403],
     ['PURGA_EMPRESA_NO_ENCONTRADA', 'P0002', 404],
@@ -484,6 +485,19 @@ describe('delete-company · Stripe: ensayo, cancelación, purga', () => {
     ]
     const res = await request()
     expect(res.status).toBe(409)
+    expect(h.stripe.cancels).toEqual([])
+    expect(rpcsPurga()).toHaveLength(1)
+    expect(h.state.authAdminDeletes).toEqual([])
+  })
+
+  it('el ensayo choca con la retención → 409 con el motivo y Stripe NO se toca', async () => {
+    fixture(h.state, { subs: SUB })
+    h.state.rpcQueues.purgar_empresa = [
+      { data: null, error: { code: '55000', message: 'PURGA_RETENCION: la empresa tiene historia que se conserva: anticipos (2). Queda suspendida; no se purgó nada.' } },
+    ]
+    const res = await request()
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toContain('anticipos (2)')
     expect(h.stripe.cancels).toEqual([])
     expect(rpcsPurga()).toHaveLength(1)
     expect(h.state.authAdminDeletes).toEqual([])

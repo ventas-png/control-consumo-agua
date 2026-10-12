@@ -22,6 +22,28 @@ EXCEPTION WHEN OTHERS THEN
   RETURN v_st || ' ' || v_msg;
 END $$;
 
+-- Las tablas de la política (20261030000000) para una empresa: una fila por
+-- tabla, con su conteo. La usan las dos huellas.
+CREATE FUNCTION pg_temp.politica_de(p_empresa uuid) RETURNS jsonb LANGUAGE sql AS $$
+  SELECT jsonb_build_object(
+    'conversation_access_rules', (SELECT count(*) FROM public.conversation_access_rules WHERE company_id = p_empresa),
+    'conta_diferenciales',       (SELECT count(*) FROM public.conta_diferenciales_cambiarios WHERE company_id = p_empresa),
+    'report_runs',               (SELECT count(*) FROM public.report_runs WHERE company_id = p_empresa),
+    'bloques_turno',             (SELECT count(*) FROM public.bloques_turno WHERE company_id = p_empresa),
+    'conversations',             (SELECT jsonb_agg(jsonb_build_array(id, project_id, cliente_id) ORDER BY id) FROM public.conversations WHERE company_id = p_empresa),
+    'conversation_messages',     (SELECT count(*) FROM public.conversation_messages m JOIN public.conversations c ON c.id = m.conversation_id WHERE c.company_id = p_empresa),
+    'broadcasts',                (SELECT count(*) FROM public.broadcasts WHERE company_id = p_empresa),
+    'broadcast_recipients',      (SELECT count(*) FROM public.broadcast_recipients r JOIN public.broadcasts b ON b.id = r.broadcast_id WHERE b.company_id = p_empresa),
+    'solicitud_mudanza_unidad',  (SELECT count(*) FROM public.solicitud_mudanza_unidad WHERE company_id = p_empresa),
+    'solicitud_renta_unidad',    (SELECT count(*) FROM public.solicitud_renta_unidad WHERE company_id = p_empresa),
+    'registro_recordatorios_log',(SELECT count(*) FROM public.registro_recordatorios_log WHERE company_id = p_empresa),
+    'documentos_fiscales',       (SELECT count(*) FROM public.documentos_fiscales WHERE company_id = p_empresa),
+    'conta_reglas_compra',       (SELECT count(*) FROM public.conta_reglas_compra WHERE company_id = p_empresa),
+    'cuentas_bancarias',         (SELECT count(*) FROM public.cuentas_bancarias WHERE company_id = p_empresa),
+    'conta_asientos',            (SELECT count(*) FROM public.conta_asientos WHERE company_id = p_empresa),
+    'conta_asiento_lineas',      (SELECT count(*) FROM public.conta_asiento_lineas WHERE company_id = p_empresa));
+$$;
+
 -- Todo lo que la purga de X puede tocar. Dos huellas iguales = nada cambió.
 CREATE FUNCTION pg_temp.huella_x() RETURNS jsonb LANGUAGE sql AS $$
   SELECT jsonb_build_object(
@@ -47,7 +69,10 @@ CREATE FUNCTION pg_temp.huella_x() RETURNS jsonb LANGUAGE sql AS $$
       (SELECT count(*) FROM public.areas_condominio       WHERE company_id = 'e1000000-0000-4000-8000-000000000001'),
       (SELECT count(*) FROM public.mensajes_portal        WHERE company_id = 'e1000000-0000-4000-8000-000000000001'),
       (SELECT count(*) FROM public.plantillas_tarea_cargo WHERE company_id = 'e1000000-0000-4000-8000-000000000001'),
-      (SELECT count(*) FROM public.rutas_ronda            WHERE company_id = 'e1000000-0000-4000-8000-000000000001')));
+      (SELECT count(*) FROM public.rutas_ronda            WHERE company_id = 'e1000000-0000-4000-8000-000000000001')),
+    -- Lo que sembró fixture_politica.sql (si no se cargó, todo en 0).
+    'politica',     pg_temp.politica_de('e1000000-0000-4000-8000-000000000001'),
+    'registros',    (SELECT count(*) FROM public.registros));
 $$;
 
 -- Lo de Y (y Z): la purga de X no puede tocar ni una fila.
@@ -70,7 +95,9 @@ CREATE FUNCTION pg_temp.huella_vecinos() RETURNS jsonb LANGUAGE sql AS $$
       (SELECT count(*) FROM public.areas_condominio       WHERE company_id IN (SELECT id FROM v)),
       (SELECT count(*) FROM public.mensajes_portal        WHERE company_id IN (SELECT id FROM v)),
       (SELECT count(*) FROM public.plantillas_tarea_cargo WHERE company_id IN (SELECT id FROM v)),
-      (SELECT count(*) FROM public.rutas_ronda            WHERE company_id IN (SELECT id FROM v))));
+      (SELECT count(*) FROM public.rutas_ronda            WHERE company_id IN (SELECT id FROM v))),
+    'politica',   pg_temp.politica_de('e2000000-0000-4000-8000-000000000002'),
+    'registros_y', (SELECT count(*) FROM public.registros WHERE project_id = 'f2000000-0000-4000-8000-000000000001'));
 $$;
 
 -- La llamada de la purga de X por el actor, con lo que se le pase.

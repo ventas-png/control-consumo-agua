@@ -118,8 +118,10 @@ BEGIN
   PERFORM pg_temp.chk(pg_temp.huella_x() = antes, 'sin desligar al superadministrador no se borra nada');
 END $$;
 
--- 3e. Un bloqueo REAL que la purga no rodea: una bitácora inmutable de la
---     pasarela que referencia (RESTRICT) una solicitud de pago de X.
+-- 3e. Historia que la purga no rodea: una bitácora inmutable de la pasarela
+--     que referencia (RESTRICT) una solicitud de pago de X. Desde
+--     20261030000000 la detiene la compuerta de retención, antes de escribir
+--     nada, con el nombre de la bitácora (antes: 23503 a mitad de la purga).
 DO $$
 DECLARE antes jsonb; r text;
 BEGIN
@@ -129,8 +131,9 @@ BEGIN
       FROM public.payment_requests WHERE company_id = 'e1000000-0000-4000-8000-000000000001';
     antes := pg_temp.huella_x();
     r := pg_temp.intento(pg_temp.purga_x());
-    PERFORM pg_temp.chk(r LIKE '23503 %', format('bitácora inmutable de la pasarela → la purga falla por FK (recibido: %s)', left(r, 110)));
-    PERFORM pg_temp.chk(pg_temp.huella_x() = antes, 'bloqueo real a mitad de la purga: nada cambió');
+    PERFORM pg_temp.chk(r LIKE '55000 PURGA_RETENCION:%pasarela_eventos (1)%',
+      format('bitácora inmutable de la pasarela → PURGA_RETENCION que la nombra (recibido: %s)', left(r, 140)));
+    PERFORM pg_temp.chk(pg_temp.huella_x() = antes, 'historia inmutable: nada cambió');
     RAISE EXCEPTION 'DESHACER';
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM <> 'DESHACER' THEN RAISE; END IF;
@@ -166,8 +169,9 @@ BEGIN
   PERFORM pg_temp.chk(r->'usuarios_auth' = '["a0000000-0000-4000-8000-0000000000a1","a0000000-0000-4000-8000-0000000000a2","a0000000-0000-4000-8000-0000000000a3","a0000000-0000-4000-8000-0000000000c1"]'::jsonb,
     'usuarios_auth = owner, admin y operador de X + la cuenta del cliente exclusivo (ni superadmins ni la cuenta compartida)');
   PERFORM pg_temp.chk((r->>'personas')::int = 3 AND (r->>'cuentas_cliente')::int = 1 AND (r->>'clientes')::int = 2
-                      AND (r->>'proyectos')::int = 2 AND (r->>'unidades')::int = 1 AND (r->>'superadmins_desligados')::int = 1,
-    'conteos devueltos: 3 personas, 1 cuenta cliente, 2 clientes, 2 proyectos, 1 unidad, 1 superadmin desligado');
+                      AND (r->>'proyectos')::int = 2 AND (r->>'unidades')::int = 1 AND (r->>'superadmins_desligados')::int = 1
+                      AND (r->>'pagos')::int = 3 AND (r->>'registros')::int = 1,
+    'conteos devueltos: 3 personas, 1 cuenta cliente, 2 clientes, 2 proyectos, 1 unidad, 1 superadmin desligado, 3 cobros, 1 lectura');
   PERFORM pg_temp.chk(r->>'logo_url' = 'logos/x.png', 'devuelve el logo para que el edge lo borre de storage');
 
   -- La empresa y sus datos
@@ -227,7 +231,7 @@ BEGIN
     'auditoría: fila de la empresa, gracia y suscripción cancelada');
   PERFORM pg_temp.chk(a.before->'usuarios_auth' = r->'usuarios_auth'
                       AND a.before->'superadmins_desligados' = '["a0000000-0000-4000-8000-00000000005a"]'::jsonb
-                      AND a.before->'deleted_counts' = '{"projects":2,"unidades":1,"usuarios":3,"cuentas_cliente":1,"clientes":2}'::jsonb,
+                      AND a.before->'deleted_counts' = '{"projects":2,"unidades":1,"usuarios":3,"cuentas_cliente":1,"clientes":2,"pagos":3,"registros":1}'::jsonb,
     'auditoría: identidades a borrar de auth, superadmins desligados y conteos');
 
   -- Vecinos

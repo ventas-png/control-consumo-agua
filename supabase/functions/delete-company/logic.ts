@@ -148,6 +148,11 @@ export function mapPurgeRpcError(err: RpcError): { status: number; error: string
     case 'PURGA_EMPRESA_ACTIVA':
     case 'PURGA_EN_GRACIA':
       return { status: 409, error: detalle }
+    // La empresa tiene historia financiera, fiscal o laboral que se conserva
+    // (docs/PURGA_EMPRESA.md › Política de retención y purga): se queda
+    // suspendida. El detalle nombra lo que la retiene.
+    case 'PURGA_RETENCION':
+      return { status: 409, error: detalle }
   }
   // Una FK que la purga no pudo despejar (23503) o un guard de inmutabilidad
   // (23514 check_violation, 23001 restrict_violation): la empresa tiene datos

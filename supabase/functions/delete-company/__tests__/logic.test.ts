@@ -192,6 +192,7 @@ describe('delete-company/mapPurgeRpcError', () => {
     ['PURGA_EMPRESA_NO_ENCONTRADA', 404],
     ['PURGA_EMPRESA_ACTIVA', 409],
     ['PURGA_EN_GRACIA', 409],
+    ['PURGA_RETENCION', 409],
   ])('%s → %i', (prefijo, status) => {
     const r = mapPurgeRpcError({ code: 'P0001', message: `${prefijo}: detalle de la base.` })
     expect(r.status).toBe(status)
@@ -200,6 +201,16 @@ describe('delete-company/mapPurgeRpcError', () => {
   it('el detalle sale sin el prefijo técnico', () => {
     expect(mapPurgeRpcError({ code: '55000', message: 'PURGA_EN_GRACIA: la empresa debe llevar al menos 90 días.' }))
       .toEqual({ status: 409, error: 'la empresa debe llevar al menos 90 días.' })
+  })
+
+  it('retención: 409 con lo que retiene a la empresa, sin el prefijo técnico', () => {
+    expect(mapPurgeRpcError({
+      code: '55000',
+      message: 'PURGA_RETENCION: la empresa tiene historia que se conserva: turnos ya ocurridos (1). Queda suspendida; no se purgó nada.',
+    })).toEqual({
+      status: 409,
+      error: 'la empresa tiene historia que se conserva: turnos ya ocurridos (1). Queda suspendida; no se purgó nada.',
+    })
   })
 
   it('una FK que no se pudo despejar (23503) → 409 nombrando la tabla, «no se borró nada»', () => {
