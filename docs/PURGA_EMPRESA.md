@@ -5,10 +5,36 @@ producción y por qué importan, qué pasa con las cuentas cliente y qué sigue
 bloqueando la purga a propósito.
 
 - Edge: `supabase/functions/delete-company/index.ts` (lógica pura en `logic.ts`).
-- RPC: `public.purgar_empresa` — `supabase/migrations/20261027000000_purgar_empresa_atomica.sql`.
+- RPC: `public.purgar_empresa` — `supabase/migrations/20261029000100_purgar_empresa_atomica.sql`.
 - Pruebas: `supabase/functions/delete-company/__tests__/` (vitest, handler y lógica) y
   `supabase/tests/purgar_empresa/run.sh` (Postgres real, en CI: `coverage.yml › rls-sandbox`).
 - Inventario completo de llaves de producción: [`PURGA_EMPRESA_FK_PRODUCCION.tsv`](PURGA_EMPRESA_FK_PRODUCCION.tsv).
+
+### Versión de la migración (renumerada antes de fusionar)
+
+La migración nació como `20261027000000`, la **misma versión** que
+`20261027000000_compras_aislamiento_referencias` de #926. `schema_migrations` se indexa
+por versión y `apply-migrations-prod.yml` registra con `ON CONFLICT (version) DO NOTHING`:
+la segunda en llegar se aplicaría sin quedar registrada. Antes de renumerar se comprobó
+dónde estaba aplicada cada una (2026-10-12):
+
+| Entorno | `20261027000000` de #926 (compras) | `20261027000000` de este PR (purga) |
+|---|---|---|
+| Producción | No (última corrida de `apply-migrations-prod.yml`: #924, `20261026000500`) | No |
+| Sandbox `control-agua-rls-sandbox` | **Sí** (`apply-migrations-sandbox.yml`, corrida 37808159930, 2026-10-08, sobre `7c5d4d8d`) | No (ninguna corrida desde esta rama) |
+| Supabase Preview del PR | Sí, en la rama de #926 | Sí, en la rama de este PR (`cuydavbqhtctimljsbyy`) |
+
+La de #926 ya está desplegada en el sandbox y no se toca. Esta pasa a
+**`20261029000100`**: posterior a todo lo aplicado en cualquier entorno (máxima del
+sandbox: `20261028000100`, de #927), posterior a `20261029000000` de #930 y anterior a
+`20261030000000` de #933, que la sigue. Orden de fusión: 929 → 928 → 926 → 927 → 930 →
+**931** → 932 → 933.
+
+**Preview de este PR.** Su rama de Supabase tiene registrada `20261027000000` y el repo ya
+no la tiene: el check «Supabase Preview» fallará con `Remote migration versions not found
+in local migrations directory` hasta que se **recree esa rama de preview** (borrarla en el
+panel o cerrar y reabrir el PR). Recrearla destruye su historial efímero: **pendiente de
+autorización**; no se hizo. No afecta a producción ni al sandbox.
 
 ## Qué estaba mal
 

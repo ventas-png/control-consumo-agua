@@ -4,7 +4,7 @@
 # PostgreSQL REAL (local, efímero). NO toca ningún entorno remoto.
 #
 # Aplica la cadena ENTERA de migraciones sobre una base vacía y prueba
-# 20261027000000_purgar_empresa_atomica:
+# 20261029000100_purgar_empresa_atomica:
 #   1. andamiaje + migraciones anteriores (plantilla «antes»);
 #   2. la migración, dos veces (idempotencia);
 #   3. FORMA DEL REPOSITORIO: compuertas, todo-o-nada con fallos inyectados en
@@ -25,7 +25,7 @@ set -euo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-NUESTRA=20261027000000_purgar_empresa_atomica
+NUESTRA=20261029000100_purgar_empresa_atomica
 MIG="$MIGS/$NUESTRA.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done

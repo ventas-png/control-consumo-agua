@@ -8,7 +8,7 @@
 // traducción de los errores de `purgar_empresa` a HTTP y la lectura de su
 // respuesta. Lo que la purga escribe (personas, datos, auditoría) ya no se
 // decide aquí: lo hace la RPC `purgar_empresa`, en una sola transacción
-// (supabase/migrations/20261027000000_purgar_empresa_atomica.sql).
+// (supabase/migrations/20261029000100_purgar_empresa_atomica.sql).
 
 export const DEFAULT_GRACE_DAYS = 90
 

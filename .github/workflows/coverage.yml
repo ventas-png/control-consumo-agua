@@ -798,7 +798,7 @@ jobs:
           PGPORT_TEST: 55531
         run: supabase/tests/compras_cierre_tecnico/run.sh
 
-      # 20261027000000: purgar_empresa, la purga atómica del edge
+      # 20261029000100: purgar_empresa, la purga atómica del edge
       # delete-company. Todo o nada con fallos inyectados en cada punto (el
       # DELETE final de companies, después de borrarla, la auditoría, el UPDATE
       # del superadministrador) y con un bloqueo real; contra la forma de llaves
