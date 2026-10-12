@@ -81,8 +81,8 @@ Deno.serve(async (req) => {
 
     const targetRow = target as TargetUserRow
 
-    // Non-superadmins: only within their own company, and never an owner/superadmin.
-    const gate = checkDeleteTargetGate({ isSuperAdmin, callerCompanyId, target: targetRow })
+    // Non-superadmins: only within their own company, never an owner/superadmin, and (E-07) an admin never deletes another admin: only the company owner does.
+    const gate = checkDeleteTargetGate({ isSuperAdmin, callerRole, callerCompanyId, target: targetRow })
     if (!gate.ok) {
       return new Response(JSON.stringify({ error: gate.error }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

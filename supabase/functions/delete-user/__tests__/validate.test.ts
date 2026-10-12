@@ -6,9 +6,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   DELETABLE_ROLES,
+  MSG_SOLO_PRINCIPAL_ELIMINAR_ADMIN,
+  ROLES_SOLO_PRINCIPAL_ELIMINAR,
   buildUserDeletedAudit,
   canManageUsers,
   checkDeleteTargetGate,
+  isPrincipalRole,
   isSuperAdminRole,
 } from '../validate.ts'
 import { ALLOWED_ROLES_FOR_NON_SUPER } from '../../create-user/validate.ts'
@@ -43,10 +46,20 @@ describe('delete-user/canManageUsers · isSuperAdminRole', () => {
   })
 })
 
+describe('delete-user/isPrincipalRole', () => {
+  it('el principal es el propietario o el superadministrador (ambas grafías); un administrador no', () => {
+    expect(isPrincipalRole('company_owner')).toBe(true)
+    expect(isPrincipalRole('super_admin')).toBe(true)
+    expect(isPrincipalRole('superadmin')).toBe(true)
+    for (const role of ['admin', 'operator', 'viewer', 'collector', 'cliente', '', 'Company_Owner', 'owner']) expect(isPrincipalRole(role)).toBe(false)
+  })
+})
+
 describe('delete-user/checkDeleteTargetGate', () => {
   it('super_admin puede borrar a cualquiera, incluso cross-tenant y owners', () => {
     expect(checkDeleteTargetGate({
       isSuperAdmin: true,
+      callerRole: 'super_admin',
       callerCompanyId: null,
       target: { role: 'company_owner', company_id: 'otra-empresa' },
     })).toEqual({ ok: true })
@@ -55,6 +68,7 @@ describe('delete-user/checkDeleteTargetGate', () => {
   it('no-super NO puede borrar usuarios de otra empresa (cross-tenant)', () => {
     const gate = checkDeleteTargetGate({
       isSuperAdmin: false,
+      callerRole: 'admin',
       callerCompanyId: 'empresa-a',
       target: { role: 'viewer', company_id: 'empresa-b' },
     })
@@ -65,6 +79,7 @@ describe('delete-user/checkDeleteTargetGate', () => {
     for (const role of ['company_owner', 'super_admin', 'superadmin']) {
       const gate = checkDeleteTargetGate({
         isSuperAdmin: false,
+        callerRole: 'company_owner',
         callerCompanyId: 'empresa-a',
         target: { role, company_id: 'empresa-a' },
       })
@@ -72,19 +87,50 @@ describe('delete-user/checkDeleteTargetGate', () => {
     }
   })
 
-  it('no-super SÍ puede borrar roles gestionables de su propia empresa', () => {
+  it('el PROPIETARIO SÍ puede borrar todos los roles gestionables de su propia empresa, también al administrador', () => {
     for (const role of DELETABLE_ROLES) {
       expect(checkDeleteTargetGate({
         isSuperAdmin: false,
+        callerRole: 'company_owner',
         callerCompanyId: 'empresa-a',
         target: { role, company_id: 'empresa-a' },
       })).toEqual({ ok: true })
     }
   })
 
+  it('un ADMINISTRADOR borra los roles gestionables de su empresa MENOS el de administrador (E-07: lo elimina el principal)', () => {
+    for (const role of DELETABLE_ROLES.filter(r => !ROLES_SOLO_PRINCIPAL_ELIMINAR.includes(r))) {
+      expect(checkDeleteTargetGate({
+        isSuperAdmin: false,
+        callerRole: 'admin',
+        callerCompanyId: 'empresa-a',
+        target: { role, company_id: 'empresa-a' },
+      })).toEqual({ ok: true })
+    }
+    expect(ROLES_SOLO_PRINCIPAL_ELIMINAR).toEqual(['admin'])
+    expect(checkDeleteTargetGate({
+      isSuperAdmin: false,
+      callerRole: 'admin',
+      callerCompanyId: 'empresa-a',
+      target: { role: 'admin', company_id: 'empresa-a' },
+    })).toEqual({ ok: false, error: MSG_SOLO_PRINCIPAL_ELIMINAR_ADMIN })
+  })
+
+  it('un rol desconocido o vacío como llamador tampoco elimina administradores (el gate no depende de un valor por omisión)', () => {
+    for (const callerRole of ['', 'operator', 'viewer', 'superadministrador', 'Company_Owner']) {
+      expect(checkDeleteTargetGate({
+        isSuperAdmin: false,
+        callerRole,
+        callerCompanyId: 'empresa-a',
+        target: { role: 'admin', company_id: 'empresa-a' },
+      })).toEqual({ ok: false, error: MSG_SOLO_PRINCIPAL_ELIMINAR_ADMIN })
+    }
+  })
+
   it('el check de empresa gana al de rol: owner de OTRA empresa → error cross-tenant', () => {
     const gate = checkDeleteTargetGate({
       isSuperAdmin: false,
+      callerRole: 'admin',
       callerCompanyId: 'empresa-a',
       target: { role: 'company_owner', company_id: 'empresa-b' },
     })
@@ -94,11 +140,13 @@ describe('delete-user/checkDeleteTargetGate', () => {
   it('caller sin empresa (company_id null) solo alcanza targets sin empresa', () => {
     expect(checkDeleteTargetGate({
       isSuperAdmin: false,
+      callerRole: 'admin',
       callerCompanyId: null,
       target: { role: 'viewer', company_id: 'empresa-a' },
     })).toEqual({ ok: false, error: 'No puedes eliminar usuarios de otra empresa' })
     expect(checkDeleteTargetGate({
       isSuperAdmin: false,
+      callerRole: 'admin',
       callerCompanyId: null,
       target: { role: 'viewer', company_id: null },
     })).toEqual({ ok: true })

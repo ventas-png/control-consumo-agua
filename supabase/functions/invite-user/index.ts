@@ -11,8 +11,10 @@
 //      directo (INSERT en user_invitations por la API) es la política RLS
 //      user_invitations_insert de la migración 20261026000700.
 //   3. Genera un token aleatorio seguro (crypto) con expiración (7 días).
-//   4. Inserta la fila en user_invitations (service_role; revoca cualquier
-//      pending previo al mismo correo en la company).
+//   4. Inserta la fila en user_invitations (service_role; revoca los pending
+//      previos al MISMO correo en la company — comparación exacta del correo en
+//      minúsculas, sin comodines —, y si quien llama no es el principal NO revoca
+//      los de rol 'admin': son del propietario).
 //   5. Envía el correo de invitación reusando send-email (template genérico
 //      `notificacion_empresa` con CTA → /aceptar-invitacion?token=...), desde
 //      la cuenta de Gmail de la empresa. Fire-and-forget: si falla el correo
@@ -38,7 +40,10 @@ import {
   canInviteRole,
   computeExpiresAt,
   generateToken,
+  idsPendientesARevocar,
   isInvitableRole,
+  isPrincipalRole,
+  isTextOrAbsent,
   isValidEmail,
   roleLabel as labelForRole,
 } from './validate.ts'
@@ -85,11 +90,33 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const body = await req.json() as {
-      email?: string
-      role?: string
-      company_id?: string
-      full_name?: string
+    // El cuerpo llega de la red: un campo que no sea texto (arreglo, objeto, número…) o un cuerpo que no sea un objeto JSON es una petición mal formada → 400, nunca un
+    // TypeError en .trim() (500 «Internal server error»). Se valida ANTES de recortar y de decidir nada con el rol.
+    const body = await req.json().catch(() => null) as {
+      email?: unknown
+      role?: unknown
+      company_id?: unknown
+      full_name?: unknown
+    } | null
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: 'Cuerpo inválido' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!isTextOrAbsent(body.email)) {
+      return new Response(JSON.stringify({ error: 'Correo electrónico inválido' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!isTextOrAbsent(body.role)) {
+      return new Response(JSON.stringify({ error: 'Rol inválido. Solo admin/operador/visualizador/cobros' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!isTextOrAbsent(body.full_name) || !isTextOrAbsent(body.company_id)) {
+      return new Response(JSON.stringify({ error: 'Datos inválidos' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const email = (body.email ?? '').trim().toLowerCase()
@@ -140,14 +167,29 @@ Deno.serve(async (req: Request) => {
     }, corsHeaders)
     if (rl) return rl
 
-    // 2. Revoca cualquier pending previo al mismo correo en la company (evita
-    // chocar con el índice único parcial y permite re-invitar limpio).
-    await adminClient
+    // 2. Revoca los pending previos al MISMO correo en la company (evita chocar con el índice único parcial y permite re-invitar limpio).
+    // Se leen las pendientes de la empresa y se comparan en código (correo recortado y en minúsculas, igualdad exacta) para revocarlas por id: un filtro
+    // ilike con el correo del cuerpo interpretaría % _ \ — y el * de PostgREST — como comodines, y '%@%.%' (pasa isValidEmail) revocaba TODAS las
+    // pendientes de la empresa. Y quien NO es el principal no revoca las invitaciones 'admin': son del propietario (esta escritura es con service_role,
+    // sin RLS; un administrador no debe poder anular por aquí lo que la política user_invitations_update ya le impide).
+    const { data: pendientes } = await adminClient
       .from('user_invitations')
-      .update({ status: 'revoked' })
+      .select('id, email, role')
       .eq('company_id', companyId)
       .eq('status', 'pending')
-      .ilike('email', email)
+    const idsRevocar = idsPendientesARevocar(
+      (pendientes ?? []) as Array<{ id: string; email: string | null; role: string | null }>,
+      email,
+      isPrincipalRole(callerRole),
+    )
+    if (idsRevocar.length > 0) {
+      await adminClient
+        .from('user_invitations')
+        .update({ status: 'revoked' })
+        .eq('company_id', companyId)
+        .eq('status', 'pending')
+        .in('id', idsRevocar)
+    }
 
     // 3. Crea la invitación con token + expiración.
     const token = generateToken()
@@ -167,6 +209,12 @@ Deno.serve(async (req: Request) => {
       .select('id')
       .single()
 
+    // Índice único (empresa, correo) entre las pendientes: si queda una que este llamador no podía revocar (la invitación 'admin' del propietario), es un conflicto, no un 500.
+    if ((insertErr as { code?: string } | null)?.code === '23505') {
+      return new Response(JSON.stringify({ error: 'Ya hay una invitación pendiente para ese correo; la gestiona el propietario de la empresa.' }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     if (insertErr || !invitation) {
       return new Response(JSON.stringify({ error: insertErr?.message ?? 'No se pudo crear la invitación' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

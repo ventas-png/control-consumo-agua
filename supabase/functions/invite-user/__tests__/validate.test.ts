@@ -15,8 +15,10 @@ import {
   canInviteRole,
   computeExpiresAt,
   generateToken,
+  idsPendientesARevocar,
   isInvitableRole,
   isPrincipalRole,
+  isTextOrAbsent,
   isValidEmail,
   roleLabel,
 } from '../validate.ts'
@@ -146,5 +148,36 @@ describe('invite-user/computeExpiresAt', () => {
     const now = Date.now()
     const exp = Date.parse(computeExpiresAt(now))
     expect(exp).toBeGreaterThan(now)
+  })
+})
+
+describe('invite-user/isTextOrAbsent (el cuerpo llega de la red: sólo texto o ausente se recorta)', () => {
+  it('texto, undefined y null pasan', () => {
+    for (const v of ['', 'admin', ' admin ', undefined, null]) expect(isTextOrAbsent(v)).toBe(true)
+  })
+  it('arreglo, objeto, número y booleano NO (recortarlos lanzaba TypeError → 500)', () => {
+    for (const v of [['admin'], {}, { role: 'admin' }, 0, 7, true, false, () => 'admin']) expect(isTextOrAbsent(v)).toBe(false)
+  })
+})
+
+describe('invite-user/idsPendientesARevocar (qué pendientes revoca invitar de nuevo al mismo correo)', () => {
+  const pendientes = [
+    { id: 'a', email: 'ana@ejemplo.com', role: 'operator' },
+    { id: 'b', email: 'Ana@Ejemplo.com ', role: 'admin' },
+    { id: 'c', email: 'otra@ejemplo.com', role: 'operator' },
+    { id: 'd', email: null, role: 'viewer' },
+  ]
+  it('el principal revoca todas las del mismo correo (recortado y en minúsculas), también la de admin', () => {
+    expect(idsPendientesARevocar(pendientes, 'ana@ejemplo.com', true)).toEqual(['a', 'b'])
+  })
+  it('quien NO es el principal no revoca las de rol admin', () => {
+    expect(idsPendientesARevocar(pendientes, 'ana@ejemplo.com', false)).toEqual(['a'])
+  })
+  it('comodines de LIKE y de PostgREST no amplían nada: la comparación es de igualdad exacta', () => {
+    for (const patron of ['%@%.%', '_@_._', '*@*.*', 'ana@ejemplo.%', 'a\\%']) expect(idsPendientesARevocar(pendientes, patron, true)).toEqual([])
+  })
+  it('sin pendientes o con filas sin correo no revoca nada', () => {
+    expect(idsPendientesARevocar([], 'ana@ejemplo.com', true)).toEqual([])
+    expect(idsPendientesARevocar([{ id: 'd', email: null, role: null }], '', true)).toEqual([])
   })
 })

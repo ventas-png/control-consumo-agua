@@ -50,6 +50,28 @@ export function canInviteRole(callerRole: string, targetRole: string): boolean {
   return true
 }
 
+/** `true` si el valor es texto o falta (undefined / null): el cuerpo llega de la red y un arreglo, un objeto o un número no se recortan (TypeError → 500): se rechazan con 400. */
+export function isTextOrAbsent(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || typeof value === 'string'
+}
+
+/**
+ * Ids de las invitaciones PENDIENTES que invitar de nuevo a `email` debe revocar: las del MISMO correo (recortado y en minúsculas, igualdad exacta: sin
+ * comodines de LIKE) y, si quien invita no es el principal, SIN las de rol 'admin' (son del propietario).
+ */
+export function idsPendientesARevocar(
+  pendientes: ReadonlyArray<{ id: string; email: string | null; role: string | null }>,
+  email: string,
+  invitaElPrincipal: boolean,
+): string[] {
+  const objetivo = email.trim().toLowerCase()
+  if (objetivo === '') return []
+  return pendientes
+    .filter(p => (p.email ?? '').trim().toLowerCase() === objetivo)
+    .filter(p => invitaElPrincipal || !ROLES_SOLO_PRINCIPAL.includes(p.role ?? ''))
+    .map(p => p.id)
+}
+
 /** Etiqueta legible del rol; cae al propio rol si no hay mapeo. */
 export function roleLabel(role: string): string {
   return ROLE_LABEL[role] ?? role
