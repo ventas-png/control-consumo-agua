@@ -1,19 +1,22 @@
 // Tests de la lógica pura de delete-company (infra:I22 · Track T8/T5). Como el
 // resto de tests de edge fns, corre bajo vitest (no Deno) tratando el módulo
 // como TS normal. Cubre: gates de confirmación y período de gracia de la purga,
-// resolución de días de gracia, clasificación del error de Stripe, partición de
-// usuarios (super_admins se desligan, no se purgan) y snapshot de auditoría.
+// resolución de días de gracia, validación del cuerpo, clasificación del error
+// de Stripe, traducción de los errores de la RPC `purgar_empresa` y lectura de
+// su respuesta. Qué se borra y en qué orden lo fija la RPC
+// (supabase/tests/purgar_empresa); el handler entero, handler.test.ts.
 
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_GRACE_DAYS,
-  buildPurgeAuditBefore,
   checkPurgeGates,
+  isAuthUserGone,
   isBenignStripeCancelError,
   isSuperAdminRole,
-  partitionCompanyUsers,
+  mapPurgeRpcError,
+  parsePurgeBody,
+  parsePurgeResult,
   resolveGraceDays,
-  type CompanyRow,
 } from '../logic.ts'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -34,9 +37,14 @@ describe('delete-company/resolveGraceDays', () => {
     expect(resolveGraceDays('noventa')).toBe(90)
   })
 
-  it('un entero válido se respeta; 0 cae al default (|| fallback)', () => {
+  it('un entero válido se respeta; 0 cae al default', () => {
     expect(resolveGraceDays('45')).toBe(45)
     expect(resolveGraceDays('0')).toBe(90)
+  })
+
+  it('un negativo NO pasa: -5 días harían elegible una empresa suspendida hace un minuto', () => {
+    expect(resolveGraceDays('-5')).toBe(90)
+    expect(resolveGraceDays('-1')).toBe(90)
   })
 })
 
@@ -125,67 +133,133 @@ describe('delete-company/isBenignStripeCancelError', () => {
   })
 })
 
-describe('delete-company/partitionCompanyUsers', () => {
-  it('super_admins (ambas grafías) se separan del resto — se desligan, no se purgan', () => {
-    const users = [
-      { id: 'u1', role: 'super_admin', full_name: 'SA 1' },
-      { id: 'u2', role: 'superadmin', full_name: 'SA 2' },
-      { id: 'u3', role: 'company_owner', full_name: 'Owner' },
-      { id: 'u4', role: 'admin', full_name: 'Admin' },
-      { id: 'u5', role: 'cliente', full_name: null },
-    ]
-    const { superAdmins, deletables } = partitionCompanyUsers(users)
-    expect(superAdmins.map(u => u.id)).toEqual(['u1', 'u2'])
-    expect(deletables.map(u => u.id)).toEqual(['u3', 'u4', 'u5'])
-  })
-
-  it('la partición es total: nadie se pierde ni se duplica', () => {
-    const users = [
-      { id: 'a', role: 'operador', full_name: null },
-      { id: 'b', role: 'superadmin', full_name: null },
-    ]
-    const { superAdmins, deletables } = partitionCompanyUsers(users)
-    expect(superAdmins.length + deletables.length).toBe(users.length)
-  })
-
-  it('el company_owner SÍ se purga junto con su empresa', () => {
-    const { deletables } = partitionCompanyUsers([{ id: 'o', role: 'company_owner', full_name: 'O' }])
-    expect(deletables).toHaveLength(1)
-  })
-
-  it('isSuperAdminRole reconoce ambas grafías (gate del caller)', () => {
+describe('delete-company/isSuperAdminRole', () => {
+  it('reconoce ambas grafías (gate del caller)', () => {
     expect(isSuperAdminRole('super_admin')).toBe(true)
     expect(isSuperAdminRole('superadmin')).toBe(true)
     expect(isSuperAdminRole('company_owner')).toBe(false)
+    expect(isSuperAdminRole('')).toBe(false)
   })
 })
 
-describe('delete-company/buildPurgeAuditBefore', () => {
-  const company: CompanyRow = {
-    id: 'c-1',
-    nombre: 'Residencial Mayan',
-    activa: false,
-    suspended_at: '2026-03-01T00:00:00.000Z',
-    suspended_reason: 'impago',
-    logo_url: 'logos/c-1.png',
-    created_at: '2025-01-01T00:00:00.000Z',
-  }
+describe('delete-company/parsePurgeBody', () => {
+  const UUID = 'e1000000-0000-4000-8000-000000000001'
 
-  it('preserva la fila completa + conteos + parámetros de la purga', () => {
-    const before = buildPurgeAuditBefore(company, { projects: 3, unidades: 120, usuarios: 5 }, 90, 'sub_123')
-    expect(before).toMatchObject({
-      id: 'c-1',
-      nombre: 'Residencial Mayan',
-      suspended_reason: 'impago',
-      deleted_counts: { projects: 3, unidades: 120, usuarios: 5 },
-      grace_days: 90,
-      stripe_subscription_canceled: 'sub_123',
-    })
+  it('objeto válido → company_id y confirm_name recortados', () => {
+    expect(parsePurgeBody({ company_id: ` ${UUID} `, confirm_name: ' Residencial Mayan ' }))
+      .toEqual({ ok: true, companyId: UUID, confirmName: 'Residencial Mayan' })
   })
 
-  it('conteos null (head:true sin filas) → 0, y sin suscripción Stripe queda null', () => {
-    const before = buildPurgeAuditBefore(company, { projects: null, unidades: null, usuarios: 0 }, 90, null)
-    expect(before.deleted_counts).toEqual({ projects: 0, unidades: 0, usuarios: 0 })
-    expect(before.stripe_subscription_canceled).toBeNull()
+  it.each([
+    ['null (JSON roto o cuerpo vacío)', null],
+    ['un arreglo', [UUID, 'Residencial Mayan']],
+    ['un número', 42],
+    ['un texto', 'hola'],
+  ])('%s → error, no excepción', (_desc, raw) => {
+    const r = parsePurgeBody(raw)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toMatch(/objeto JSON/)
+  })
+
+  it('company_id numérico → «debe ser texto» (antes: .trim() de un número → 500)', () => {
+    expect(parsePurgeBody({ company_id: 123, confirm_name: 'X' }))
+      .toEqual({ ok: false, error: 'company_id debe ser texto' })
+  })
+
+  it('confirm_name no texto → «debe ser texto»', () => {
+    expect(parsePurgeBody({ company_id: UUID, confirm_name: { a: 1 } }))
+      .toEqual({ ok: false, error: 'confirm_name debe ser texto' })
+  })
+
+  it('faltan o vienen vacíos → «Faltan company_id o confirm_name»', () => {
+    expect(parsePurgeBody({})).toEqual({ ok: false, error: 'Faltan company_id o confirm_name' })
+    expect(parsePurgeBody({ company_id: UUID, confirm_name: '   ' }))
+      .toEqual({ ok: false, error: 'Faltan company_id o confirm_name' })
+  })
+
+  it('company_id que no es UUID → error (no llega a Postgres como 22P02)', () => {
+    expect(parsePurgeBody({ company_id: 'no-es-uuid', confirm_name: 'X' }))
+      .toEqual({ ok: false, error: 'company_id no es un identificador válido' })
+  })
+})
+
+describe('delete-company/mapPurgeRpcError', () => {
+  it.each([
+    ['PURGA_PARAMETROS', 400],
+    ['PURGA_NOMBRE_NO_COINCIDE', 400],
+    ['PURGA_ACTOR_DE_LA_EMPRESA', 400],
+    ['PURGA_SOLO_SUPERADMIN', 403],
+    ['PURGA_EMPRESA_NO_ENCONTRADA', 404],
+    ['PURGA_EMPRESA_ACTIVA', 409],
+    ['PURGA_EN_GRACIA', 409],
+  ])('%s → %i', (prefijo, status) => {
+    const r = mapPurgeRpcError({ code: 'P0001', message: `${prefijo}: detalle de la base.` })
+    expect(r.status).toBe(status)
+  })
+
+  it('el detalle sale sin el prefijo técnico', () => {
+    expect(mapPurgeRpcError({ code: '55000', message: 'PURGA_EN_GRACIA: la empresa debe llevar al menos 90 días.' }))
+      .toEqual({ status: 409, error: 'la empresa debe llevar al menos 90 días.' })
+  })
+
+  it('una FK que no se pudo despejar (23503) → 409 nombrando la tabla, «no se borró nada»', () => {
+    const r = mapPurgeRpcError({
+      code: '23503',
+      message: 'update or delete on table "companies" violates foreign key constraint "x_fkey" on table "x"',
+    })
+    expect(r.status).toBe(409)
+    expect(r.error).toContain('x_fkey')
+    expect(r.error).toContain('No se borró nada')
+  })
+
+  it('un guard de inmutabilidad (23514) → 409 con su mensaje', () => {
+    const r = mapPurgeRpcError({ code: '23514', message: 'BITACORA_INMUTABLE: pasarela_eventos sólo admite inserciones.' })
+    expect(r.status).toBe(409)
+    expect(r.error).toContain('BITACORA_INMUTABLE')
+  })
+
+  it('cualquier otro error → 500 genérico, sin filtrar el mensaje de Postgres', () => {
+    const r = mapPurgeRpcError({ code: 'XX000', message: 'internal: secreto' })
+    expect(r.status).toBe(500)
+    expect(r.error).not.toContain('secreto')
+  })
+
+  it('sin mensaje ni código → 500', () => {
+    expect(mapPurgeRpcError({}).status).toBe(500)
+  })
+})
+
+describe('delete-company/parsePurgeResult', () => {
+  const ok = {
+    company_id: 'c-1', nombre: 'X', logo_url: 'logos/x.png', usuarios_auth: ['u1', 'u2'],
+    personas: 1, cuentas_cliente: 1, clientes: 2, proyectos: 2, unidades: 3, superadmins_desligados: 1,
+  }
+
+  it('respuesta completa → se lee tal cual', () => {
+    expect(parsePurgeResult(ok)).toEqual(ok)
+  })
+
+  it('sin usuarios_auth, o con algo que no es texto → null (el handler lo dice, no adivina)', () => {
+    expect(parsePurgeResult({ ...ok, usuarios_auth: undefined })).toBeNull()
+    expect(parsePurgeResult({ ...ok, usuarios_auth: [1] })).toBeNull()
+    expect(parsePurgeResult(null)).toBeNull()
+    expect(parsePurgeResult([ok])).toBeNull()
+  })
+
+  it('logo vacío → null; conteos ausentes → 0', () => {
+    const r = parsePurgeResult({ company_id: 'c', nombre: 'n', logo_url: '', usuarios_auth: [] })
+    expect(r).toMatchObject({ logo_url: null, personas: 0, proyectos: 0 })
+  })
+})
+
+describe('delete-company/isAuthUserGone', () => {
+  it('404 o user_not_found → ya no existe: la purga es idempotente', () => {
+    expect(isAuthUserGone({ status: 404 })).toBe(true)
+    expect(isAuthUserGone({ code: 'user_not_found' })).toBe(true)
+  })
+
+  it('cualquier otro fallo o ningún error → false', () => {
+    expect(isAuthUserGone({ status: 500 })).toBe(false)
+    expect(isAuthUserGone(null)).toBe(false)
   })
 })

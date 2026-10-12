@@ -832,6 +832,18 @@ jobs:
           PGPORT_TEST: 55541
         run: supabase/tests/fail_open_sin_perfil/run.sh
 
+      # 20261029000100: purgar_empresa, la purga atómica del edge
+      # delete-company. Todo o nada con fallos inyectados en cada punto (el
+      # DELETE final de companies, después de borrarla, la auditoría, el UPDATE
+      # del superadministrador) y con un bloqueo real; contra la forma de llaves
+      # del repositorio Y la medida en producción. CONTROL NEGATIVO por
+      # mutantes: sin cada compuerta o paso de la RPC la suite debe fallar.
+      - name: Empresas — purga atómica (delete-company)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55561
+        run: supabase/tests/purgar_empresa/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
