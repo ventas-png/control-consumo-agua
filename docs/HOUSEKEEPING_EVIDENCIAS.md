@@ -269,9 +269,9 @@ filas, 23 objetos con `cacheControl` `max-age=0`. Tras la dueña: 0 servicios, 0
 Para la prueba se dio a los usuarios su asignación de proyecto y los permisos `….create/.edit`; después se
 volvieron a bloquear.
 
-### Datos de prueba que quedaron en el sandbox
-Fotos, servicios y archivos se borraron por las RPC y la limpieza (bucket y cola en 0). Los usuarios están
-**bloqueados** (`banned_until` 2999, contraseña aleatoria desconocida). Inventario exacto (12/10):
+### Datos de prueba del sandbox (retirados el 12/10)
+Fotos, servicios y archivos se borraron por las RPC y la limpieza (bucket y cola en 0). Los usuarios quedaron
+**bloqueados** (`banned_until` 2999, contraseña aleatoria) hasta su retirada. Inventario exacto que se retiró:
 
 | Tabla | Filas | Identificadores |
 |---|---|---|
@@ -299,10 +299,26 @@ insertan filas al borrar y las FK de `permission_audit_log` ponen `target_*` a N
 los usuarios exactos de `details`); verificación de que no queda nada de la prueba y de que el número de filas
 ajenas no cambia. `modo := 'ensayo'` revierte y devuelve el informe; `'aplicar'` confirma.
 
-**Autorizado el 12/10, pendiente de confirmación en la herramienta:** la herramienta SQL de Supabase retiene los
-`DELETE` hasta que una persona los confirma; dos intentos (ensayo y aplicar) caducaron a los 60 s sin llegar a la
-base (los conteos siguen iguales). Se puede confirmar en el siguiente intento o pegar el script con
-`modo := 'aplicar'` en el editor SQL del panel del **sandbox**.
+**Ejecutado el 12/10 (~21:10 UTC) con autorización**, por la persona responsable en el editor SQL del panel del
+sandbox con `modo := 'aplicar'` (la herramienta SQL de la sesión retenía los `DELETE` y su confirmación no llegaba
+al cliente; cinco intentos caducaron sin tocar la base). Resultado del propio script: `objetos_hk 0, cola_hk 0,
+fotos_hk 0, ajeno_intacto 1` (el bloque aborta entero si una guarda falla).
+
+Verificación posterior (solo lectura):
+- **Cero residuos**: los 10 identificadores no aparecen en ninguna de 1503 columnas uuid/texto de id de `public`,
+  `auth`, `storage`, `net`, `cron`, `vault`, `supabase_migrations` y `realtime`; 0 filas de auditoría por
+  `details`; 0 correos `zz-hk-e2e-*` y 0 empresas `ZZ HK E2E%`; bucket `housekeeping-evidencias`, cola, fotos y
+  servicios de housekeeping en 0.
+- **Datos ajenos sin cambios**: huella tomada a las 20:58 UTC (conteo + md5 de identificadores, 16 tablas). Sin
+  cambios en `companies`, `projects`, `roles`, `role_permissions`, `subscriptions`, `user_presence`,
+  `user_project_assignments` ni en las 4 filas ajenas con id «e2e…». En `app_users`, `auth.users`,
+  `auth.identities`, `audit_log`, `bitacora_acciones`, `permission_audit_log` y `user_roles` las filas anteriores
+  a la huella dan **el mismo md5**; solo hay filas nuevas de la suite E2E compartida que corrió a la vez
+  (run 469, 21:01–21:05: «QA Invitado E2E», cuotas y bitácora de la empresa E2E `e4668da9-…`).
+- `auth.sessions`: 20 sesiones anteriores ya no están. Las de los usuarios de fixture que esa corrida usó
+  («RLS Dueña», «RLS Operador de paquetería») tienen ahora solo sesiones nuevas: `cli.auth.signOut()` de
+  supabase-js (alcance `global` por defecto) en `scripts/seed-rls-sandbox.mjs` revoca todas las sesiones del
+  usuario. El script de limpieza solo borra sesiones de los 4 usuarios ZZ (excluidos de la huella).
 
 ## Límites conocidos
 - Los residentes ven los **textos** (`hallazgos_ingreso`, `observaciones_cierre`) del servicio de su unidad

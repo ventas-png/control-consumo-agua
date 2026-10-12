@@ -10,7 +10,7 @@
 -- Orden: los disparadores de auditoría de roles, role_permissions, user_roles y subscriptions
 -- INSERTAN filas al borrar (y las FK de permission_audit_log ponen target_* a NULL), así que la
 -- auditoría se borra AL FINAL, por el rol/usuario exacto de `details` y por company_id exacto.
--- Ejecutado el 2026-10-12 con autorización (ver docs/HOUSEKEEPING_EVIDENCIAS.md §Datos de prueba).
+-- Ejecutado el 2026-10-12 con autorización en el editor SQL del sandbox (ver docs/HOUSEKEEPING_EVIDENCIAS.md §Datos de prueba).
 -- ════════════════════════════════════════════════════════════════════════════
 CREATE TEMP TABLE IF NOT EXISTS e2e_informe (paso int, tabla text, filas bigint);
 TRUNCATE e2e_informe;
