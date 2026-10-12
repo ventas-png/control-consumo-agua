@@ -337,12 +337,16 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
     })
     if (!result) return
     setBusy(true)
-    const { ok, error } = await deleteEmpresa(emp.id, result.confirmacion)
+    const { ok, error, aviso } = await deleteEmpresa(emp.id, result.confirmacion)
     setBusy(false)
     if (!ok) {
       notify({ variant: 'error', title: 'No se pudo eliminar', text: error ?? 'Error desconocido' })
     } else {
-      notify({ variant: 'success', title: 'Empresa eliminada', text: `"${emp.nombre}" fue purgada definitivamente.`, duration: 2500 })
+      if (aviso) {
+        notify({ variant: 'warning', title: 'Empresa eliminada, con accesos pendientes', text: aviso })
+      } else {
+        notify({ variant: 'success', title: 'Empresa eliminada', text: `"${emp.nombre}" fue purgada definitivamente.`, duration: 2500 })
+      }
       onChanged()
       onClose()
     }

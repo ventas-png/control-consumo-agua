@@ -107,11 +107,15 @@ export async function exportEmpresaData(
  * Purga definitiva de una empresa vía el edge `delete-company` (requiere
  * service role; el edge valida super_admin + nombre de confirmación + período
  * de gracia de suspensión). NO lanza: quien llama inspecciona `ok`.
+ *
+ * `aviso` llega cuando la empresa SÍ se purgó pero alguna identidad de auth no
+ * se pudo eliminar después (el edge las lista en `auth_pendientes`): la purga
+ * no se deshace, pero quien la hizo tiene que enterarse.
  */
 export async function deleteEmpresa(
   companyId: string,
   confirmName: string,
-): Promise<{ ok: boolean; error: string | null }> {
+): Promise<{ ok: boolean; error: string | null; aviso: string | null }> {
   const { data: session } = await supabase.auth.getSession()
   const token = session.session?.access_token
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
@@ -125,9 +129,10 @@ export async function deleteEmpresa(
   })
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string }
-    return { ok: false, error: err.error ?? 'Error desconocido' }
+    return { ok: false, error: err.error ?? 'Error desconocido', aviso: null }
   }
-  return { ok: true, error: null }
+  const body = (await res.json().catch(() => ({}))) as { aviso?: string }
+  return { ok: true, error: null, aviso: body.aviso ?? null }
 }
 
 /** Datos del company_owner a crear junto con la empresa. */
