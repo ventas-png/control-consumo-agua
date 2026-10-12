@@ -297,6 +297,21 @@ retenida si se suspendiera (1 turno ya ocurrido, además de su facturación).
    cobro rechazado o una lectura sin facturar no retienen; una factura de
    proveedor en cualquier estado sí). Cambiarla es tocar una categoría de
    `purgar_empresa_retencion` y su prueba.
+5. **Tablas nuevas de los PR que se fusionan antes (medido sobre la cadena combinada
+   929 → 928 → 926 → 927 → 930 → 931 → 932 → 933, 2026-10-12).** La invariante «toda
+   columna `company_id`/`project_id`/`cliente_id` tiene llave o una razón escrita» falla
+   en el orden real con tres columnas que aquí no existen:
+   - `hk_limpieza_storage.company_id` y `.project_id` (#927): **sin llave a propósito**
+     —la cola de borrado del bucket sobrevive a la empresa para retirar sus archivos—, lo
+     dice su propia migración. Ya están en la lista de razones de `assert_politica.sql`.
+   - `compras_config_separacion_bitacora.company_id` (#926, `NOT NULL`, sin llave):
+     bitácora *append-only* con guard que impide `UPDATE`/`DELETE`. **Decisión pendiente**:
+     (a) tratarla como `audit_log` —sobrevive a la purga, se añade a la lista de razones—;
+     o (b) llave `ON DELETE CASCADE` a `companies`, de modo que su guard aborte la purga
+     (categoría D: retiene a la empresa que haya cambiado el interruptor). Hasta decidir,
+     la suite de este PR queda en rojo **sobre la cadena combinada** (en solitario, sobre
+     `main`, pasa: la tabla no existe). Con la opción (a) aplicada en local, la suite
+     completa pasa en el orden real (rc 0).
 
 ## La empresa elegible hoy (medido el 2026-10-12)
 

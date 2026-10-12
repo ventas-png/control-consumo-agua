@@ -66,7 +66,10 @@ BEGIN
        ('audit_log', 'company_id'), ('audit_log', 'project_id'),
        -- Sólo en la forma de producción (drift #826): caen con el proyecto
        -- (project_id NOT NULL, ON DELETE CASCADE).
-       ('plantillas_tarea_cargo', 'company_id'), ('rutas_ronda', 'company_id'));
+       ('plantillas_tarea_cargo', 'company_id'), ('rutas_ronda', 'company_id'),
+       -- A propósito (20261028000000, #927): la cola de borrado del bucket de
+       -- housekeeping sobrevive a la empresa/proyecto para retirar sus archivos.
+       ('hk_limpieza_storage', 'company_id'), ('hk_limpieza_storage', 'project_id'));
   PERFORM pg_temp.chk(v_faltan IS NULL,
     format('toda columna company_id/project_id/cliente_id de public tiene llave foránea o una razón escrita (faltan: %s)', v_faltan));
 
