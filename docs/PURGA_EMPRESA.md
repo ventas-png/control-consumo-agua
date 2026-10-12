@@ -1,11 +1,14 @@
 # Purga de empresa (`delete-company` + `purgar_empresa`)
 
 Qué hace la purga definitiva de una empresa, qué llaves foráneas existen en
-producción y por qué importan, qué pasa con las cuentas cliente y qué sigue
-bloqueando la purga a propósito.
+producción y por qué importan, qué pasa con las cuentas cliente y la política de
+retención: qué se borra con la empresa, qué impide purgarla y qué sobrevive a
+propósito.
 
 - Edge: `supabase/functions/delete-company/index.ts` (lógica pura en `logic.ts`).
-- RPC: `public.purgar_empresa` — `supabase/migrations/20261027000000_purgar_empresa_atomica.sql`.
+- RPC: `public.purgar_empresa` — `supabase/migrations/20261027000000_purgar_empresa_atomica.sql`;
+  política de retención, llaves que faltaban y orden de borrado en
+  `supabase/migrations/20261030000000_purga_empresa_retencion_y_huerfanas.sql`.
 - Pruebas: `supabase/functions/delete-company/__tests__/` (vitest, handler y lógica) y
   `supabase/tests/purgar_empresa/run.sh` (Postgres real, en CI: `coverage.yml › rls-sandbox`).
 - Inventario completo de llaves de producción: [`PURGA_EMPRESA_FK_PRODUCCION.tsv`](PURGA_EMPRESA_FK_PRODUCCION.tsv).
@@ -50,12 +53,16 @@ bloqueando la purga a propósito.
    ensayo pasa se cancela en Stripe. Si la purga no va a poder completarse, Stripe no
    se toca.
 3. **`purgar_empresa`**: todas las escrituras de base de datos en **una transacción**.
-   Repite las compuertas con la empresa bloqueada (`FOR UPDATE`); desliga a los
-   superadministradores (`company_id = NULL, project_id = NULL`); borra de
-   `app_users` a las personas de la empresa y a las cuentas cliente exclusivas;
-   escribe la fila `DELETE` en `audit_log`; vacía las tablas con FK `NO ACTION`/
-   `RESTRICT` (las lee del catálogo); borra `projects` y `companies`; borra los
-   clientes exclusivos. **Cualquier fallo revierte todo**, auditoría incluida.
+   Repite las compuertas con la empresa bloqueada (`FOR UPDATE`); **compuerta de
+   retención** (abajo: si la empresa tiene historia que se conserva, `PURGA_RETENCION`
+   y no se escribe nada); desliga a los superadministradores (`company_id = NULL,
+   project_id = NULL`); borra de `app_users` a las personas de la empresa y a las
+   cuentas cliente exclusivas; escribe la fila `DELETE` en `audit_log`; borra los
+   cobros, lecturas y documentos fiscales que no retienen; borra lo que bloquearía
+   el `DELETE` de `projects` por orden de llaves (`purgar_empresa_previos`); vacía
+   las tablas con FK `NO ACTION`/`RESTRICT` (las lee del catálogo); borra `projects`
+   y `companies`; borra los clientes exclusivos. **Cualquier fallo revierte todo**,
+   auditoría incluida.
 4. **Después del COMMIT**, el edge borra en `auth` exactamente las identidades que
    devolvió la RPC (`usuarios_auth`). Una que ya no existe (404) cuenta como borrada;
    las que fallen se devuelven en `auth_pendientes` con un `aviso`, y la lista
@@ -64,9 +71,10 @@ bloqueando la purga a propósito.
 
 Códigos de la RPC → HTTP (`mapPurgeRpcError`): `PURGA_PARAMETROS`,
 `PURGA_NOMBRE_NO_COINCIDE`, `PURGA_ACTOR_DE_LA_EMPRESA` → 400; `PURGA_SOLO_SUPERADMIN`
-→ 403; `PURGA_EMPRESA_NO_ENCONTRADA` → 404; `PURGA_EMPRESA_ACTIVA`, `PURGA_EN_GRACIA`
-y cualquier FK/guard que bloquee (`23503`, `23514`, `23001`) → 409 con el mensaje de
-Postgres; el resto → 500 genérico. En todos, **no se borró nada**.
+→ 403; `PURGA_EMPRESA_NO_ENCONTRADA` → 404; `PURGA_EMPRESA_ACTIVA`, `PURGA_EN_GRACIA`,
+`PURGA_RETENCION` (con lo que retiene a la empresa) y cualquier FK/guard que bloquee
+(`23503`, `23514`, `23001`) → 409 con el mensaje de Postgres; el resto → 500 genérico.
+En todos, **no se borró nada**.
 
 ## Llaves foráneas en producción (medido el 2026-10-12)
 
@@ -149,25 +157,33 @@ antes porque sus tareas la referencian con RESTRICT, ni cae con el proyecto). En
 forma del repositorio la purga falla **entera**. `run.sh` prueba las dos formas:
 `forma_produccion.sql` deforma el esquema reconstruido hasta la forma medida.
 
-### Columnas sin llave foránea (sobreviven a la purga)
+### Columnas sin llave foránea (antes de 20261030000000)
 
-Estas columnas de producción **no tienen FK**, así que nada las borra en cascada y
-la purga no las toca:
+Medidas el 2026-10-12, **sólo con `SELECT`** sobre `pg_constraint`. Fuera de
+`app_users` y `audit_log` (que la purga trata a propósito), estas columnas de
+producción **no tenían FK**, así que nada las borraba en cascada:
 
 | Tabla | Columnas sin FK |
 | --- | --- |
 | `app_users` | `company_id`, `project_id`, `cliente_id` — la RPC las trata explícitamente |
 | `audit_log` | `company_id`, `project_id` — a propósito: la auditoría sobrevive |
-| `amenidades_bloqueos`, `broadcasts`, `conversation_access_rules`, `cuota_recordatorios_log`, `pasarela_eventos`, `pasarela_reembolsos`, `plantillas_tarea_cargo`, `registro_recordatorios_log`, `report_runs`, `rutas_ronda` | `company_id` |
+| `amenidades_bloqueos`, `bloques_turno`, `broadcasts`, `conversation_access_rules`, `cuota_recordatorios_log`, `pasarela_eventos`, `pasarela_reembolsos`, `plantillas_tarea_cargo`, `registro_recordatorios_log`, `report_runs`, `rutas_ronda` | `company_id` |
 | `broadcast_recipients` | `company_id`, `cliente_id` |
 | `conversations`, `solicitud_mudanza_unidad`, `solicitud_renta_unidad` | `company_id`, `project_id`, `cliente_id` |
 | `conta_ajustes_eventos`, `conta_ajustes_respaldos`, `conta_borradores_tc_resoluciones`, `conta_cargo_anulaciones`, `conta_cuota_anulaciones`, `conta_diferenciales_cambiarios`, `conta_sf_cuota_estado_eventos`, `conta_tasas_manuales` | `company_id`, `project_id` |
 | `conta_anticipos`, `conta_notas_credito`, `conta_saldo_favor_aplicaciones`, `conta_saldo_favor_origenes` | `cliente_id` |
 
-Además, con `ON DELETE SET NULL` hacia `projects` y sin FK hacia `companies`,
-`pagos` y `registros` de la empresa sobreviven con `project_id = NULL` salvo que
-caigan por otra vía (los `pagos` de un cliente exclusivo caen con él). Qué hacer con
-estas filas es una decisión aparte: varias son bitácoras inmutables.
+(`bloques_turno.company_id` faltaba en la primera versión de esta lista.) No todas
+dejaban filas: varias tablas caen por otra llave (`amenidades_bloqueos`,
+`plantillas_tarea_cargo` y `rutas_ronda` con el proyecto en producción;
+`solicitud_mudanza_unidad` con la unidad; `cuota_recordatorios_log` con la cuota;
+`broadcast_recipients` con la difusión). Las que **sí** sobrevivían: `broadcasts`,
+`conversations` (con sus mensajes), `conversation_access_rules`,
+`solicitud_renta_unidad`, `conta_diferenciales_cambiarios`, las bitácoras
+contables sin llave y, por `ON DELETE SET NULL` hacia `projects`, `pagos` y
+`registros` (con `registro_recordatorios_log`). El mismo día **no había ninguna
+fila huérfana** en producción y sólo 2 `conversations.cliente_id` apuntaban a un
+cliente ya borrado. Qué pasa ahora con cada una: «Política de retención y purga».
 
 ## Cuentas cliente (decisión)
 
@@ -191,21 +207,70 @@ es de la empresa y que no está vinculado a ninguna otra en `company_clientes`.
   la purgada (`company_clientes` cae en cascada, `clientes.project_id` queda `NULL`
   por su FK y `app_users.project_id` lo pone a `NULL` la RPC).
 
-## Lo que sigue bloqueando la purga, a propósito
+## Política de retención y purga (propuesta, `20261030000000`)
 
-`conta.allow_system_write` se enciende **sólo dentro de la transacción de la purga**:
-es el mecanismo que el esquema reserva a las funciones `SECURITY DEFINER` para las
-escrituras de sistema (cuentas de catálogo, asientos publicados, presupuestos
-aprobados, contratos fuera de borrador). Sin él, ninguna empresa con Contabilidad se
-podría purgar.
+> **Para el dueño de producto.** Es la propuesta implementada; cada fila es una
+> decisión que puede cambiarse. Las preguntas que quedan abiertas están al final.
 
-Los guards **sin** ese escape siguen abortando la purga, entera y con su mensaje
-(409): bitácoras inmutables (`conta_tg_bitacora_inmutable`: `pasarela_eventos`,
-`pasarela_reembolsos`, `conta_notas_credito`, `conta_ajustes_*`, `conta_*_anulaciones`,
-`conta_tasas_manuales`…), aplicaciones de saldo a favor, anticipos, turnos ya
-iniciados, recepciones fuera de borrador y reglas de compra vigentes. Que una empresa
-con historia financiera inmutable se pueda purgar —o se archive en vez de purgarse—
-es una **decisión de negocio** que esta purga no toma.
+**Principio.** La purga es para una empresa que **no llegó a operar** (prueba
+abandonada, alta por error: la única elegible hoy) y la borra entera, **sin dejar
+huérfanos**. Una empresa con **historia financiera, fiscal o laboral** —lo que la
+propia aplicación ya trata como «se anula, no se borra»— **no se purga**: queda
+suspendida, que en la práctica es un archivo (nadie entra, nada se toca), y la RPC
+responde `PURGA_RETENCION` (409) con la lista de lo que la retiene. Retener es
+reversible; borrar historia no.
+
+Por qué así y no «purgar todo»: además de los guards sin escape, **la purga de
+`20261027000000` ya fallaba** para cualquier empresa con contabilidad publicada,
+por orden de llaves (las líneas de póliza sobreviven al `DELETE` de `projects` con
+`SET NULL` y bloquean con `RESTRICT` el borrado de las cuentas del proyecto;
+reproducido). Hacer purgable la historia exigía romper a propósito varios guards
+y borrar libros, facturas y marcajes: eso es una decisión legal, no técnica.
+
+| Grupo | Tablas | Política | Cómo |
+| --- | --- | --- | --- |
+| **A. Operación y configuración** | `conversation_access_rules`, `report_runs`, `bloques_turno` (turnos futuros pendientes), `conta_diferenciales_cambiarios`, `cuota_recordatorios_log`, `registro_recordatorios_log`, `amenidades_bloqueos` | Se borran con la empresa | FK `ON DELETE CASCADE` hacia empresa (y proyecto) |
+| **B. Comunicaciones y solicitudes** (datos personales) | `conversations` (+ mensajes, asignaciones), `broadcasts` (+ destinatarios), `solicitud_mudanza_unidad`, `solicitud_renta_unidad` | Se borran con la empresa. Si se borra un **cliente**: su fila de destinatario se va; la conversación y las solicitudes (que son de la empresa) quedan sin el vínculo | FK `CASCADE` hacia empresa/proyecto; hacia `clientes`, `CASCADE` en `broadcast_recipients` y `SET NULL` en el resto. Las 2 conversaciones con cliente inexistente pasan a `NULL` |
+| **C. Movimientos que no retienen** | cobros pendientes o rechazados, lecturas sin facturar, documentos fiscales en borrador o rechazados | Se borran en la purga (antes sobrevivían con `project_id = NULL`) | Paso `movimientos` de la RPC, **antes** de `projects` |
+| **D. Historia (retención)** | pólizas publicadas o anuladas; bitácoras de sólo inserción (`conta_tg_bitacora_inmutable`: `pasarela_eventos`, `pasarela_reembolsos`, `conta_notas_credito`, `conta_ajustes_*`, `conta_*_anulaciones`, `conta_tasas_manuales`, `conta_borradores_tc_resoluciones`, `conta_sf_cuota_estado_eventos`) y aplicaciones de saldo a favor (leídas del catálogo); anticipos; cobros verificados, aplicados o de cargos adicionales; lecturas facturadas, cobradas o en mora; documentos fiscales por timbrar, timbrados o cancelados; facturas de proveedor; recepciones registradas; turnos ya ocurridos y marcajes de presencia | **La empresa no se purga**: `PURGA_RETENCION` | Compuerta `purgar_empresa_retencion`, antes de escribir nada (también en el ensayo: Stripe no se toca). Además, FK `CASCADE` hacia empresa/proyecto en las bitácoras: su guard aborta la cascada, así que **ningún camino** (ni un `DELETE` directo) las deja huérfanas. `cliente_id` de anticipos, notas de crédito y saldos a favor: `RESTRICT` |
+| **E. Sobrevive a propósito** | `audit_log`, `billing_sync_log` (`SET NULL`), `legal_acceptances` (`SET NULL`) | Se conservan: son registros de la plataforma (auditoría, facturación del SaaS a la empresa, aceptación de términos) | Sin cambio. `notification_preferences` cae con la identidad en `auth` |
+| **F. Configuración que bloqueaba** | reglas de compra vigentes | Caen en la cascada de su empresa o proyecto, como ya hacían cuotas y cargos | `conta_reglas_compra_borrado_tg` permite el nivel > 1; fuera de la cascada no cambia |
+| **G. Pendiente de #826** | `plantillas_tarea_cargo`, `rutas_ronda` (`company_id`) | En producción ya caen con el proyecto (`project_id NOT NULL CASCADE`) | Sin cambio: su forma la alinea #826 |
+
+**Orden de borrado.** Además del paso de movimientos, `purgar_empresa_previos`
+borra **antes** de `projects` las filas que caen con la empresa pero no con el
+proyecto y referencian con `RESTRICT` algo que sí cae con el proyecto (cuentas
+bancarias, partidas de presupuesto, líneas de órdenes de compra, líneas de pólizas
+en borrador → cuentas contables del proyecto). Sólo reordena filas que la cascada
+de `companies` borraba igual; sin él, una cuenta bancaria configurada hacía fallar
+la purga (`BANCO_LEDGER`, reproducido).
+
+**Lo que sigue abortando sin compuerta (fail-closed, 409 con el mensaje del
+guard):** un turno futuro pendiente que ya tiene tareas o revisiones, una
+contraseña de pago cerrada, movimientos bancarios importados y cualquier guard
+nuevo. La purga se revierte entera y no se borra nada.
+
+**Medido en producción el 2026-10-12 (sólo `SELECT`, sin nombres):** las 10
+bitácoras inmutables, anticipos, notas de crédito, saldos a favor y `pagos` están
+vacíos. De las 5 empresas, la elegible hoy se purga (sólo tiene catálogo); la
+única con operación (6 939 lecturas, 12 conversaciones, 120 turnos) quedaría
+retenida si se suspendiera (1 turno ya ocurrido, además de su facturación).
+
+**Preguntas abiertas para el dueño de producto**
+
+1. **Plazo de retención.** ¿Cuánto se conserva la historia de una empresa
+   retenida (p. ej. el plazo fiscal del país) y qué pasa al vencer? Purgarla
+   exige un escape auditado en los guards y, probablemente, entregarle antes una
+   exportación a la empresa. Nada de eso existe todavía.
+2. **Datos personales de una empresa retenida.** Los residentes de una empresa
+   retenida conservan nombre, contacto, conversaciones y solicitudes. ¿Se
+   anonimizan al retener (conservando sólo lo que la historia necesita)?
+3. **`audit_log`.** Sobrevive a la purga y guarda, por `audit_trigger_func`, la
+   fila completa de cada cobro o cuota borrados. ¿Tiene su propio plazo?
+4. **¿Qué cuenta como historia?** La lista de D es conservadora a propósito (un
+   cobro rechazado o una lectura sin facturar no retienen; una factura de
+   proveedor en cualquier estado sí). Cambiarla es tocar una categoría de
+   `purgar_empresa_retencion` y su prueba.
 
 ## La empresa elegible hoy (medido el 2026-10-12)
 
@@ -219,3 +284,20 @@ bitácoras inmutables.
 La suite la reproduce tal cual (empresa «Q» de `supabase/tests/purgar_empresa/fixture.sql`)
 y fija las dos cosas: el `DELETE` directo con el que terminaba la purga anterior
 falla con `CUENTA_DE_SISTEMA`, y `purgar_empresa` la borra entera, con su auditoría.
+No tiene nada de la categoría D: la política no cambia su caso.
+
+## Pruebas de la política
+
+`supabase/tests/purgar_empresa/run.sh` aplica `20261030000000` sobre la forma de
+llaves del repositorio **y** sobre la medida en producción (`forma_produccion.sql`
+antes de la migración, como pasará al desplegar), después de sembrar lo que su
+limpieza previa arregla (`pre_migracion.sql`). `fixture_politica.sql` da a X una
+fila en cada grupo A–C y la configuración que bloqueaba, y a Y lo mismo (que no se
+toca). `assert_politica.sql` comprueba: que **toda** columna `company_id`/
+`project_id`/`cliente_id` de `public` tiene llave o una razón escrita (una tabla
+nueva sin llave rompe la suite); cada categoría de retención por separado, con su
+motivo y sin cambiar nada; que una bitácora no se borra ni con `DELETE` directo; el
+`RESTRICT`/`SET NULL`/`CASCADE` hacia el cliente; y que, tras purgar X, **ninguna
+tabla** conserva una fila de X, de sus proyectos o de sus clientes exclusivos
+(salvo `audit_log`). Los 31 bloques marcados de la migración se quitan uno por uno
+y la suite falla sin cada uno.

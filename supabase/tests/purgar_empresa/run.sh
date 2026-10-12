@@ -1,22 +1,30 @@
 #!/usr/bin/env bash
 # ============================================================================
-# PURGA DE EMPRESA ATÓMICA — `purgar_empresa` (edge delete-company) contra un
-# PostgreSQL REAL (local, efímero). NO toca ningún entorno remoto.
+# PURGA DE EMPRESA — `purgar_empresa` (edge delete-company) y su política de
+# retención, contra un PostgreSQL REAL (local, efímero). NO toca ningún entorno
+# remoto.
 #
-# Aplica la cadena ENTERA de migraciones sobre una base vacía y prueba
-# 20261027000000_purgar_empresa_atomica:
-#   1. andamiaje + migraciones anteriores (plantilla «antes»);
-#   2. la migración, dos veces (idempotencia);
-#   3. FORMA DEL REPOSITORIO: compuertas, todo-o-nada con fallos inyectados en
-#      cada punto (DELETE final, después de la empresa, auditoría, UPDATE del
-#      superadministrador), un bloqueo real (bitácora inmutable), el ensayo y
-#      la purga completa (assert.sql); y el área con tareas, que en esta forma
-#      no se puede purgar y tiene que fallar ENTERA (assert_areas.sql);
-#   4. FORMA DE PRODUCCIÓN (forma_produccion.sql, medida el 2026-10-12): la
-#      misma suite, y el área con tareas, que aquí SÍ se purga;
+# Aplica la cadena ENTERA de migraciones sobre una base vacía y prueba la
+# ÚLTIMA definición de la purga, 20261030000000_purga_empresa_retencion_y_huerfanas
+# (que sigue a 20261027000000_purgar_empresa_atomica):
+#   1. andamiaje + migraciones anteriores (plantilla «antes»), y la misma base
+#      deformada hasta la forma de llaves MEDIDA en producción
+#      (forma_produccion.sql, 2026-10-12): «antes_prod»;
+#   2. lo que la limpieza previa de la migración tiene que arreglar
+#      (pre_migracion.sql) y la migración, dos veces (idempotencia), sobre las
+#      DOS formas: en producción se aplica sobre la forma medida, no sobre la
+#      del repositorio;
+#   3. FORMA DEL REPOSITORIO: el área con tareas, que en esta forma no se
+#      puede purgar y tiene que fallar ENTERA (assert_areas.sql); la política
+#      —llaves, retención por categoría, cliente, purga sin restos—
+#      (assert_politica.sql); compuertas, todo-o-nada con fallos inyectados,
+#      ensayo y purga completa (assert.sql);
+#   4. FORMA DE PRODUCCIÓN: la misma suite, y el área con tareas, que aquí SÍ
+#      se purga;
 #   5. CONTROL NEGATIVO POR MUTANTES: quita de la migración, uno por uno, cada
-#      bloque marcado `[compuerta:…]` / `[paso:…]` y exige que la suite FALLE.
-#      Si alguno pasara, la suite no estaría probando ese bloque.
+#      bloque marcado `[compuerta:…]` / `[paso:…]` y exige que la suite FALLE
+#      (o que la migración no aplique). Si alguno pasara, la suite no estaría
+#      probando ese bloque.
 #
 # Uso:  bash supabase/tests/purgar_empresa/run.sh
 # ============================================================================
@@ -25,7 +33,7 @@ set -euo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-NUESTRA=20261027000000_purgar_empresa_atomica
+NUESTRA=20261030000000_purga_empresa_retencion_y_huerfanas
 MIG="$MIGS/$NUESTRA.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -75,6 +83,14 @@ aplicar() {
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d "$2" -f "$1" >/dev/null
 }
 nueva_bd() { PGOPTIONS="-c client_min_messages=warning" psql -q -d postgres -c "DROP DATABASE IF EXISTS $1" -c "CREATE DATABASE $1 TEMPLATE $2" >/dev/null; }
+posteriores() {  # las migraciones posteriores a la nuestra, si las hay
+  for f in "$MIGS"/*.sql; do
+    base="$(basename "$f" .sql)"
+    [[ "$base" > "$NUESTRA" ]] && aplicar "$f" "$1"
+  done
+  return 0
+}
+fixtures() { aplicar "$AQUI/fixture.sql" "$1"; aplicar "$AQUI/fixture_politica.sql" "$1"; }
 
 # Corre los helpers + una suite en UNA sesión (los helpers viven en pg_temp).
 suite() {   # suite BD ARCHIVO [psql args…]
@@ -104,30 +120,36 @@ for f in "$MIGS"/*.sql; do
   N=$((N + 1))
 done
 echo "   $N migraciones aplicadas sobre una base vacía"
+nueva_bd antes_prod antes
+aplicar "$AQUI/forma_produccion.sql" antes_prod
+echo "   y la forma de llaves medida en producción (forma_produccion.sql)"
+for b in antes antes_prod; do aplicar "$AQUI/pre_migracion.sql" "$b"; done
 
-echo "── 2/5 · la migración, dos veces (la segunda debe ser limpia)"
+echo "── 2/5 · la migración, dos veces, sobre las dos formas (la segunda debe ser limpia)"
 nueva_bd plantilla antes
 aplicar "$MIG" plantilla
-aplicar "$MIG" plantilla && echo "   ✓ segunda pasada limpia"
-for f in "$MIGS"/*.sql; do   # y las posteriores, si las hay
-  base="$(basename "$f" .sql)"
-  [[ "$base" > "$NUESTRA" ]] && aplicar "$f" plantilla
-done
+aplicar "$MIG" plantilla && echo "   ✓ repositorio: segunda pasada limpia"
+posteriores plantilla
+nueva_bd plantilla_prod antes_prod
+aplicar "$MIG" plantilla_prod
+aplicar "$MIG" plantilla_prod && echo "   ✓ producción: segunda pasada limpia"
+posteriores plantilla_prod
 
 echo "── 3/5 · forma de llaves del REPOSITORIO"
 nueva_bd repo plantilla
-aplicar "$AQUI/fixture.sql" repo
+fixtures repo
 nueva_bd repo_areas repo
 bloque repo_areas assert_areas.sql "3a · área con tareas: falla ENTERA (drift #826)" -v forma=repositorio
-bloque repo assert.sql "3b · compuertas, todo o nada, ensayo y purga completa"
+bloque repo assert_politica.sql "3b · política: llaves, retención por categoría, cliente y purga sin restos"
+bloque repo assert.sql "3c · compuertas, todo o nada, ensayo y purga completa"
 
 echo "── 4/5 · forma de llaves de PRODUCCIÓN"
-nueva_bd prod plantilla
-aplicar "$AQUI/forma_produccion.sql" prod
-aplicar "$AQUI/fixture.sql" prod
+nueva_bd prod plantilla_prod
+fixtures prod
 nueva_bd prod_areas prod
 bloque prod_areas assert_areas.sql "4a · área con tareas: se purga" -v forma=produccion
-bloque prod assert.sql "4b · compuertas, todo o nada, ensayo y purga completa"
+bloque prod assert_politica.sql "4b · política: llaves, retención por categoría, cliente y purga sin restos"
+bloque prod assert.sql "4c · compuertas, todo o nada, ensayo y purga completa"
 
 echo "── 5/5 · CONTROL NEGATIVO: sin cada bloque de la migración, la suite DEBE fallar"
 MARCAS=$(grep -oE '\-\- \[(compuerta|paso):[a-z_]+\]' "$MIG" | sed -E 's/^-- \[(.*)\]$/\1/')
@@ -141,12 +163,16 @@ for marca in $MARCAS; do
     index($0, fin) { dentro = 0 }' "$MIG" > "$mutante"
   if cmp -s "$mutante" "$MIG"; then echo "❌ $marca: el mutante es idéntico a la migración"; exit 1; fi
   nueva_bd mutante antes
-  aplicar "$mutante" mutante
-  aplicar "$AQUI/fixture.sql" mutante
-  if salida=$(suite mutante assert.sql); then
+  if ! salida=$(PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d mutante -f "$mutante" 2>&1 >/dev/null); then
+    echo "  ✓ sin [$marca] la migración no aplica: $(echo "$salida" | grep -E 'ERROR' | head -1 | sed 's/.*ERROR:  //' | cut -c1-100)"
+    continue
+  fi
+  posteriores mutante
+  fixtures mutante
+  if salida=$(suite mutante assert_politica.sql) && salida=$(suite mutante assert.sql); then
     echo "❌ $marca: la suite PASÓ sin ese bloque, así que no lo prueba."; exit 1
   fi
   echo "  ✓ sin [$marca] la suite falla: $(echo "$salida" | grep -E 'ERROR' | head -1 | sed 's/.*ERROR:  //' | cut -c1-100)"
 done
 
-echo "✅ purgar_empresa: todo o nada, en las dos formas de llaves, y cada bloque probado"
+echo "✅ purgar_empresa: todo o nada, política de retención sin huérfanos, en las dos formas de llaves, y cada bloque probado"
