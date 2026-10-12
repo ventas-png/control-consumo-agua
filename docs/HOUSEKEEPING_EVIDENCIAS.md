@@ -94,14 +94,11 @@ preview tiene registrada `20261023000001_housekeeping_evidencias` y el repo ya n
 confirman los `workflow_run_logs` de la rama (`ERROR Remote migration versions not found…`, tras «Remote DB/
 API/Auth/Storage config is up to date»). La rama figura con estado `MIGRATIONS_FAILED` desde su creación.
 
-Síntoma nuevo (pushes del 12/10): el check falla en ~1 s con `Failed to update config for branch:
-claude/cleaning-documentation-images-85lefu` y **no deja ningún `workflow_run_logs`** en esa ventana (sí los
-hay de las corridas del 10/10): falla en el orquestador de Supabase, antes de clonar el repo. `supabase/config.toml`
-no cambió entre el 10/10 (config aplicada sin error) y el 12/10, y la rama de #926, sobre el mismo proyecto
-padre, pasó su `Supabase Preview` el 12/10 a las 16:05. No hay más detalle accesible desde aquí (el log del
-orquestador solo está en el panel Branches). Hipótesis no verificada: la rama quedó en un estado que el
-orquestador ya no actualiza. Ni un push nuevo ni la reconciliación de abajo garantizan arreglarlo; recrear
-la rama (cerrar y reabrir la PR, o borrar solo esta rama de preview) sí rehace su configuración.
+Episodio aislado (push de las 16:22 del 12/10): el check falló en ~1 s con `Failed to update config for
+branch` y sin ningún `workflow_run_logs` (falla del orquestador de Supabase antes de clonar). Fue
+**transitorio**: los pushes de las 16:57 y 17:30 volvieron a pasar «Configurations ✅» y a fallar solo en
+«Migrations» con el mismo `Remote migration versions not found`. La causa vigente es, por tanto, únicamente
+el registro `20261023000001` sin archivo en el repo.
 
 Reconciliación **sin resetear** el branch. Requiere autorización explícita porque borra una fila del
 registro de migraciones y escribe en la base del preview; por eso no se ha ejecutado:
@@ -126,8 +123,9 @@ SELECT (SELECT count(*) FROM supabase_migrations.schema_migrations WHERE name LI
          WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname LIKE 'hk\_evidencias\_%');
 ```
 
-Alternativa sin tocar el registro: cerrar y reabrir la PR (el worker recrea el branch desde cero con los
-archivos actuales). No se hace sin autorización: destruye el estado del preview.
+Alternativa sin tocar el registro: cerrar y reabrir la PR, o borrar solo esta rama de preview (el worker la
+recrea desde cero con los archivos actuales; así se resolvió la de #926). No se hace sin autorización:
+destruye el estado del preview.
 
 Producción no necesita reconciliación: nunca tuvo la versión antigua.
 
