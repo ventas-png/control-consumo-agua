@@ -106,8 +106,11 @@ Evidencia actual (`workflow_run_logs` de la rama, 12/10 a las 16:57, 17:30 y 17:
 Storage config is up to date» seguido de `ERROR Remote migration versions not found in local migrations
 directory.`; el registro del preview conserva `20261023000001 housekeeping_evidencias` (558 versiones).
 
-Dos salidas, **ambas limitadas a la rama efímera de esta PR** (`xycrwolnonmgcygfuebe`, branch
-`e13b7d2b-7cbc-4204-8d5c-2a1f936108ec`), ninguna toca producción ni el sandbox, y ninguna se ha ejecutado:
+**Resuelto por recreación (autorizada, 2026-10-12 ~20:05 UTC):** se confirmó el identificador
+(`e13b7d2b-7cbc-4204-8d5c-2a1f936108ec`, proyecto `xycrwolnonmgcygfuebe`, git
+`claude/cleaning-documentation-images-85lefu`, PR 927, no persistente, no default) y se borró **solo** esa rama;
+las de #926, #928, #929 y `main` quedaron intactas. El push siguiente la crea desde cero. Las dos salidas que
+se habían preparado, limitadas a esa rama efímera:
 
 1. **Reconciliar sin resetear** — `supabase/tests/housekeeping_evidencias/reconciliar_preview_pr927.sql`:
    guarda (aborta si la base no tiene `20261023000001` o si ya tiene una versión definitiva, así que en
@@ -161,8 +164,21 @@ tal cual (todas son idempotentes).
 (cron `hk_limpieza_storage_hourly`, `17 * * * *`: drena la cola de housekeeping) y `run_purga_fotos_storage`
 (cron `purgar_fotos_storage_monthly`, `30 3 1 * *`: retención de fotos de lecturas `registros` > 90 d,
 fotos de fichajes `presencia_personal` > 365 d —anula también el GPS—, fotos de housekeeping > 90 d, cola y
-barrido de huérfanos de housekeeping). Medido en el sandbox el 12/10: 0 filas y 0 objetos afectados en las
-tres retenciones, cola en 0. `purgar_datos_expirados` (solo SQL) ya está activo y no depende de la key.
+barrido de huérfanos de housekeeping). Ninguna otra función ni cron lee esa key (revisado `pg_proc` y `cron.job`: 21 jobs; los demás no
+dependen de ella). `purgar_datos_expirados` (solo SQL, `0 3 1 * *`) ya está activo y no depende de la key.
+
+Lo que se eliminaría HOY en el sandbox (medido el 12/10 ~20:05 UTC; la purga anula columnas, nunca borra filas):
+
+| Objetivo | Criterio | Afectado hoy |
+|---|---|---|
+| `registros.foto` → objeto en `registro-fotos` | `fecha` > 90 d, sin base64 (`data:%` se excluye) | 0 (0 fotos en total) |
+| `presencia_personal.foto_entrada/_salida` → `presencia-evidencias` | `fecha` > 365 d; anula también `gps_entrada/_salida` | 0 fotos, 0 GPS (0 fotos en total) |
+| `servicio_housekeeping_fotos.path` → `housekeeping-evidencias` | `created_at` > 90 d | 0 (0 filas) |
+| huérfanos de `housekeeping-evidencias` | objeto sin fila, > 1 día | 0 |
+| cola `hk_limpieza_storage` | filas pendientes | 0 |
+
+Los tres buckets están vacíos. En producción, en cambio, la primera ejecución del día 1 sí retiraría las fotos de
+lecturas de más de 90 días y las de fichajes de más de 365: medirlo allí antes de cargar la key.
 
 ## Verificación en el sandbox existente (sin resetearlo)
 ### Versión aplicada, funciones, cron y Vault (2026-10-12)
@@ -262,11 +278,24 @@ Fotos, servicios y archivos se borraron por las RPC y la limpieza (bucket y cola
 | `servicios_housekeeping` / fotos / objetos / cola | 0 | — |
 
 **No** son de la prueba (otra empresa, `e4668da9-…`, id aleatorio que empieza por «e2e»): `conta_asientos
-e2eace36-…` y sus 2 líneas, y 3 filas de `bitacora_acciones`. Por eso la retirada usa ids exactos, nunca
-`LIKE`: `supabase/tests/housekeeping_evidencias/limpieza_datos_e2e_sandbox.sql` (guarda por nombre de las dos
-empresas y por ausencia de servicios/objetos; borra hijos→padres; verifica que todo queda en 0, que bucket y
-cola siguen en 0 y que la fila ajena sigue; termina en `ROLLBACK` hasta cambiarlo a `COMMIT`). **No se ha
-ejecutado**: requiere autorización.
+e2eace36-…` y sus 2 líneas, y 3 filas de `bitacora_acciones`. Por eso la retirada usa ids exactos, nunca `LIKE`.
+
+Comprobado antes de borrar (12/10): barrido de **todas** las columnas uuid/texto de id en `public`, `auth`,
+`storage`, `net`, `cron`, `vault`: los 10 ids solo aparecen en las 16 tablas del inventario; las filas mixtas
+(`permission_audit_log`, `user_roles`, `user_project_assignments`, `audit_log`, `subscriptions`, `bitacora_acciones`,
+`user_presence`) solo cruzan ids de la prueba entre sí (`actor_id` nulo).
+
+`supabase/tests/housekeeping_evidencias/limpieza_datos_e2e_sandbox.sql` (un bloque atómico): guardas (nombres
+exactos de empresas, rol y correos; sin servicios, objetos ni cola de prueba), borrado hijos→padres y **la
+auditoría al final**, porque los disparadores de `roles`, `role_permissions`, `user_roles` y `subscriptions`
+insertan filas al borrar y las FK de `permission_audit_log` ponen `target_*` a NULL (se identifican por el rol y
+los usuarios exactos de `details`); verificación de que no queda nada de la prueba y de que el número de filas
+ajenas no cambia. `modo := 'ensayo'` revierte y devuelve el informe; `'aplicar'` confirma.
+
+**Autorizado el 12/10, pendiente de confirmación en la herramienta:** la herramienta SQL de Supabase retiene los
+`DELETE` hasta que una persona los confirma; dos intentos (ensayo y aplicar) caducaron a los 60 s sin llegar a la
+base (los conteos siguen iguales). Se puede confirmar en el siguiente intento o pegar el script con
+`modo := 'aplicar'` en el editor SQL del panel del **sandbox**.
 
 ## Límites conocidos
 - Los residentes ven los **textos** (`hallazgos_ingreso`, `observaciones_cierre`) del servicio de su unidad
