@@ -325,5 +325,5 @@ nueva sin llave rompe la suite); cada categoría de retención por separado, con
 motivo y sin cambiar nada; que una bitácora no se borra ni con `DELETE` directo; el
 `RESTRICT`/`SET NULL`/`CASCADE` hacia el cliente; y que, tras purgar X, **ninguna
 tabla** conserva una fila de X, de sus proyectos o de sus clientes exclusivos
-(salvo `audit_log`). Los 31 bloques marcados de la migración se quitan uno por uno
+(salvo `audit_log`). Los 30 bloques marcados de la migración se quitan uno por uno
 y la suite falla sin cada uno.
