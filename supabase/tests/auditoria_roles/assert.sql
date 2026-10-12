@@ -18,6 +18,9 @@ DECLARE
   tmpu uuid := gen_random_uuid();
   urole uuid := gen_random_uuid();
   k text;
+  actor_role text;
+  owner_id uuid := gen_random_uuid();
+  borrador uuid;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.app_users WHERE id=uid AND company_id=cid) THEN
     RAISE EXCEPTION 'AUDIT_FIXTURE_MISSING';
@@ -126,17 +129,34 @@ BEGIN
   INSERT INTO public.roles(id,company_id,name) VALUES
     (other_role,other_cid,'Audit aislado '||other_role),
     (owned_role,cid,'Audit administrador '||owned_role);
-  -- La corrección no debe ampliar el acceso: el admin normal sólo borra su empresa.
+  -- La corrección no debe ampliar el acceso: sólo se borra dentro de la propia empresa. Desde 20261026000700 (decisión del dueño del negocio, 2026-10-11) borrar los
+  -- roles de la empresa es del PRINCIPAL (el propietario de su empresa o el superadministrador): un administrador recibe 0 filas, SIN error (la RLS filtra la fila),
+  -- y el borrado que queda auditado lo hace el propietario. Si el actor configurado ya es principal (sandbox), borra él mismo.
+  SELECT role INTO actor_role FROM public.app_users WHERE id=uid;
   EXECUTE 'SET LOCAL ROLE authenticated';
   DELETE FROM public.roles WHERE id=other_role;
   GET DIAGNOSTICS affected=ROW_COUNT;
   IF affected<>0 THEN RAISE EXCEPTION 'AUDIT_CROSS_COMPANY_DELETE'; END IF;
   DELETE FROM public.roles WHERE id=owned_role;
   GET DIAGNOSTICS affected=ROW_COUNT;
-  IF affected<>1 THEN RAISE EXCEPTION 'AUDIT_ADMIN_DELETE_FAILED'; END IF;
+  IF actor_role IN ('company_owner','super_admin','superadmin') THEN
+    IF affected<>1 THEN RAISE EXCEPTION 'AUDIT_ADMIN_DELETE_FAILED'; END IF;
+    borrador := uid;
+  ELSE
+    IF affected<>0 THEN RAISE EXCEPTION 'AUDIT_NON_PRINCIPAL_DELETE_ALLOWED'; END IF;
+    EXECUTE 'RESET ROLE';
+    INSERT INTO auth.users(id) VALUES (owner_id);
+    INSERT INTO public.app_users(id,company_id,full_name,role) VALUES (owner_id,cid,'Audit propietario temporal','company_owner');
+    PERFORM set_config('request.jwt.claim.sub', owner_id::text, true);
+    EXECUTE 'SET LOCAL ROLE authenticated';
+    DELETE FROM public.roles WHERE id=owned_role;
+    GET DIAGNOSTICS affected=ROW_COUNT;
+    IF affected<>1 THEN RAISE EXCEPTION 'AUDIT_OWNER_DELETE_FAILED'; END IF;
+    borrador := owner_id;
+  END IF;
   EXECUTE 'RESET ROLE';
   IF NOT EXISTS (SELECT 1 FROM public.permission_audit_log
-    WHERE action='delete_role' AND actor_id=uid AND details->>'role_id'=owned_role::text) THEN
+    WHERE action='delete_role' AND actor_id=borrador AND details->>'role_id'=owned_role::text) THEN
     RAISE EXCEPTION 'AUDIT_ADMIN_ACTOR_LOST';
   END IF;
   FOREACH k IN ARRAY ARRAY['audit_roles_changes','audit_role_permissions_changes','audit_user_roles_changes'] LOOP
@@ -145,7 +165,7 @@ BEGIN
       RAISE EXCEPTION 'AUDIT_EXPOSED_FUNCTION: %',k;
     END IF;
   END LOOP;
-  RAISE NOTICE 'AUDIT_ROLES_OK: creación, edición, retiro directo, cascada, snapshots, actor, FK, ACL y RLS de empresa';
+  RAISE NOTICE 'AUDIT_ROLES_OK: creación, edición, retiro directo, cascada, snapshots, actor, FK, ACL y RLS de empresa (el borrado de roles, del principal)';
 END;
 $$;
 -- El veredicto va ANTES del ROLLBACK a propósito: si el DO falló, la transacción está abortada y este SELECT no imprime nada,
