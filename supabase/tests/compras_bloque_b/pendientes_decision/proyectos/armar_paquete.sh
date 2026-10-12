@@ -2,7 +2,7 @@
 # ============================================================================
 # Arma el paquete de «alcance de proyecto al capturar» sobre UN ÁRBOL del repositorio (el de la rama del PR #926 —medido sobre 65f63375 en la quinta verificación; antes
 # sobre e9764d3a y 339ef1fb—, con la 20261026000600 y la 20261026000700 del #928 puestas en «main» ANTES del #926, que es el orden de despliegue real: las de 7bf85221
-# —0600 editada, «md5 del archivo» dde34c0a35913af299fed915777fab49; 0700 nueva, c45aa559f47d1de2dd66c25e96633283—: run.sh rc = 0 y 989 líneas ✓ con la PRJ-1.sql corregida
+# —0600 editada y 0700 nueva; «md5 del archivo en aaa787c6» (iguales en 7bf85221): 0600 dde34c0a35913af299fed915777fab49, 0700 c45aa559f47d1de2dd66c25e96633283; no se promete que sean los de la rama final de #928—: run.sh rc = 0 y 989 líneas ✓ con la PRJ-1.sql corregida
 # (con la anterior, run.sh termina en rc = 1 en hallazgos/PRJ-1.sql: README.md §0.4). Las del tip anterior (0600 de 8d34392b, md5 8fd421b0…, sin 0700) y las de
 # ae49119f (049eb590…), b9b630b1 (2281d665…) y d1aeb94a (194f59f0…) son históricas. Si la 0600 o la 0700 cambian, repetir la corrida—)
 # para reproducir la corrida completa. NO toca esta carpeta ni el checkout desde el que se invoca: solo escribe en el árbol que se le da.
