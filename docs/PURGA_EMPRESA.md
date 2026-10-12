@@ -6,12 +6,38 @@ retención: qué se borra con la empresa, qué impide purgarla y qué sobrevive 
 propósito.
 
 - Edge: `supabase/functions/delete-company/index.ts` (lógica pura en `logic.ts`).
-- RPC: `public.purgar_empresa` — `supabase/migrations/20261027000000_purgar_empresa_atomica.sql`;
+- RPC: `public.purgar_empresa` — `supabase/migrations/20261029000100_purgar_empresa_atomica.sql`;
   política de retención, llaves que faltaban y orden de borrado en
   `supabase/migrations/20261030000000_purga_empresa_retencion_y_huerfanas.sql`.
 - Pruebas: `supabase/functions/delete-company/__tests__/` (vitest, handler y lógica) y
   `supabase/tests/purgar_empresa/run.sh` (Postgres real, en CI: `coverage.yml › rls-sandbox`).
 - Inventario completo de llaves de producción: [`PURGA_EMPRESA_FK_PRODUCCION.tsv`](PURGA_EMPRESA_FK_PRODUCCION.tsv).
+
+### Versión de la migración (renumerada antes de fusionar)
+
+La migración nació como `20261027000000`, la **misma versión** que
+`20261027000000_compras_aislamiento_referencias` de #926. `schema_migrations` se indexa
+por versión y `apply-migrations-prod.yml` registra con `ON CONFLICT (version) DO NOTHING`:
+la segunda en llegar se aplicaría sin quedar registrada. Antes de renumerar se comprobó
+dónde estaba aplicada cada una (2026-10-12):
+
+| Entorno | `20261027000000` de #926 (compras) | `20261027000000` de #931 (purga) |
+|---|---|---|
+| Producción | No (última corrida de `apply-migrations-prod.yml`: #924, `20261026000500`) | No |
+| Sandbox `control-agua-rls-sandbox` | **Sí** (`apply-migrations-sandbox.yml`, corrida 37808159930, 2026-10-08, sobre `7c5d4d8d`) | No (ninguna corrida desde esta rama) |
+| Supabase Preview de cada PR | Sí, en la rama de #926 | Sí, en la rama de #931 (`cuydavbqhtctimljsbyy`) |
+
+La de #926 ya está desplegada en el sandbox y no se toca. Esta pasa a
+**`20261029000100`**: posterior a todo lo aplicado en cualquier entorno (máxima del
+sandbox: `20261028000100`, de #927), posterior a `20261029000000` de #930 y anterior a
+`20261030000000` de #933, que la sigue. Orden de fusión: 929 → 928 → 926 → 927 → 930 →
+**931** → 932 → 933.
+
+**Preview de #931.** Su rama de Supabase tiene registrada `20261027000000` y el repo ya
+no la tiene: el check «Supabase Preview» fallará con `Remote migration versions not found
+in local migrations directory` hasta que se **recree esa rama de preview** (borrarla en el
+panel o cerrar y reabrir el PR). Recrearla destruye su historial efímero: **pendiente de
+autorización**; no se hizo. No afecta a producción ni al sandbox.
 
 ## Qué estaba mal
 
@@ -221,7 +247,7 @@ responde `PURGA_RETENCION` (409) con la lista de lo que la retiene. Retener es
 reversible; borrar historia no.
 
 Por qué así y no «purgar todo»: además de los guards sin escape, **la purga de
-`20261027000000` ya fallaba** para cualquier empresa con contabilidad publicada,
+`20261029000100` ya fallaba** para cualquier empresa con contabilidad publicada,
 por orden de llaves (las líneas de póliza sobreviven al `DELETE` de `projects` con
 `SET NULL` y bloquean con `RESTRICT` el borrado de las cuentas del proyecto;
 reproducido). Hacer purgable la historia exigía romper a propósito varios guards

@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- PURGA DE EMPRESA: POLÍTICA DE RETENCIÓN Y FILAS HUÉRFANAS
--- (sigue a 20261027000000_purgar_empresa_atomica; política completa en
+-- (sigue a 20261029000100_purgar_empresa_atomica; política completa en
 -- docs/PURGA_EMPRESA.md › «Política de retención y purga»)
 --
 -- QUÉ QUEDABA ABIERTO
@@ -84,7 +84,7 @@
 --     repositorio, que ya existía).
 --   · Guard de reglas: volver a aplicar su definición de
 --     20261020000300_compras_reglas_cuenta.sql.
---   · Funciones: volver a aplicar purgar_empresa de 20261027000000 y
+--   · Funciones: volver a aplicar purgar_empresa de 20261029000100 y
 --     DROP FUNCTION public.purgar_empresa_retencion(uuid, uuid[], uuid[]),
 --     public.purgar_empresa_previos(uuid).
 --   La limpieza previa no se revierte (eran referencias a filas inexistentes).
@@ -489,7 +489,7 @@ $$;
 REVOKE ALL ON FUNCTION public.purgar_empresa_previos(uuid) FROM PUBLIC, anon, authenticated, service_role;
 
 -- ── 6. La purga ─────────────────────────────────────────────────────────────
--- Misma firma, mismos códigos y mismo orden que 20261027000000, más:
+-- Misma firma, mismos códigos y mismo orden que 20261029000100, más:
 --   · [compuerta:retencion] — PURGA_RETENCION (55000) con los motivos, ANTES de
 --     escribir nada (también en el ensayo, así que el edge no toca Stripe);
 --   · [paso:movimientos] — cobros, lecturas y documentos fiscales que quedan
@@ -624,7 +624,7 @@ BEGIN
   END IF;
   -- [/compuerta:retencion]
 
-  -- Escritura de sistema, sólo en esta transacción (ver 20261027000000).
+  -- Escritura de sistema, sólo en esta transacción (ver 20261029000100).
   -- [paso:escritura_sistema]
   PERFORM set_config('conta.allow_system_write', 'on', true);
   -- [/paso:escritura_sistema]

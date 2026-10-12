@@ -798,7 +798,7 @@ jobs:
           PGPORT_TEST: 55531
         run: supabase/tests/compras_cierre_tecnico/run.sh
 
-      # 20261027000000 + 20261030000000: purgar_empresa, la purga atómica del
+      # 20261029000100 + 20261030000000: purgar_empresa, la purga atómica del
       # edge delete-company, y su política de retención. Todo o nada con fallos
       # inyectados en cada punto; cada categoría de retención detiene la purga
       # sin cambiar nada; tras purgar una empresa sin historia, ninguna tabla

@@ -6,7 +6,7 @@
 #
 # Aplica la cadena ENTERA de migraciones sobre una base vacía y prueba la
 # ÚLTIMA definición de la purga, 20261030000000_purga_empresa_retencion_y_huerfanas
-# (que sigue a 20261027000000_purgar_empresa_atomica):
+# (que sigue a 20261029000100_purgar_empresa_atomica):
 #   1. andamiaje + migraciones anteriores (plantilla «antes»), y la misma base
 #      deformada hasta la forma de llaves MEDIDA en producción
 #      (forma_produccion.sql, 2026-10-12): «antes_prod»;

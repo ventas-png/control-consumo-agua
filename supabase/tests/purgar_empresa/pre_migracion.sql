@@ -3,7 +3,7 @@
 -- que arreglar para que las llaves nuevas validen. Es la forma que se midió en
 -- producción el 2026-10-12 (2 conversaciones con un cliente ya borrado) más un
 -- caso que puede aparecer antes del despliegue (filas de una empresa purgada
--- por 20261027000000 en tablas que todavía no tenían llave).
+-- por 20261029000100 en tablas que todavía no tenían llave).
 --
 --   P  «Preexistente»: su conversación apunta a un cliente que ya no existe
 --      → la conversación se conserva con cliente_id NULL.
