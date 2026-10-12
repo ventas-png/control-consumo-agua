@@ -109,8 +109,15 @@ directory.`; el registro del preview conserva `20261023000001 housekeeping_evide
 **Resuelto por recreación (autorizada, 2026-10-12 ~20:05 UTC):** se confirmó el identificador
 (`e13b7d2b-7cbc-4204-8d5c-2a1f936108ec`, proyecto `xycrwolnonmgcygfuebe`, git
 `claude/cleaning-documentation-images-85lefu`, PR 927, no persistente, no default) y se borró **solo** esa rama;
-las de #926, #928, #929 y `main` quedaron intactas. El push siguiente la crea desde cero. Las dos salidas que
-se habían preparado, limitadas a esa rama efímera:
+las de #926, #928, #929 y `main` quedaron intactas. Un push no basta para recrearla (la integración marca el
+check como *skipped*: «This git branch is not associated with any Supabase Branch. You can open a PR to create a
+new branch»), así que se cerró y reabrió la PR (sigue en borrador). Rama nueva: `4b83fb3e-c96f-4f3f-bdd8-344228780e54`,
+proyecto `ptuysryhfejssnnsglll`. Verificado en ella (solo lectura, 20:11 UTC): registro con `20261028000000` y
+`20261028000100` (última de 559; `20261023000001` ausente), `hk_acceso`, tabla de fotos, cola, policies
+`hk_evidencias_insert/select`, 4 policies del servicio por proyecto, bucket privado, RPC de borrado y
+`run_hk_limpieza_storage`; Edge Functions `housekeeping-limpieza` (v1) y `purgar-fotos-registros` desplegadas en
+ese build, ambas `verify_jwt = false`. Check «Supabase Preview» ✅ en `5fc305c`. Las dos salidas que se habían
+preparado, limitadas a esa rama efímera:
 
 1. **Reconciliar sin resetear** — `supabase/tests/housekeeping_evidencias/reconciliar_preview_pr927.sql`:
    guarda (aborta si la base no tiene `20261023000001` o si ya tiene una versión definitiva, así que en
