@@ -1,7 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- SEGURIDAD · NADIE SE ASIGNA NI SE QUITA PROYECTOS A SÍ MISMO
--- user_project_assignments: escritura sólo por quien administra, dentro de SU
--- empresa, y nunca sobre su propio alcance (salvo propietario y superadministrador).
+-- user_project_assignments: escritura sólo por el PRINCIPAL de la empresa (su propietario,
+-- dentro de SU empresa, o el superadministrador). Un administrador —acotado o sin filas— no
+-- escribe esta tabla, y nadie toca su propio alcance salvo el propietario y el superadministrador.
 --
 -- QUÉ FALLABA (preexistente; producción = repositorio, verificado en solo lectura el 2026-10-10)
 -- Las políticas INSERT / UPDATE / DELETE de public.user_project_assignments
@@ -23,29 +24,32 @@
 --
 -- QUÉ CAMBIA
 --   1. public.asignacion_puede_administrar(p_user_id, p_project_id): UNA sola regla
---      (SECURITY DEFINER, search_path vacío) que usan las tres políticas de
---      escritura:
---        · super_admin / superadmin  → cualquiera;
+--      (SECURITY DEFINER, STABLE, search_path vacío) que usan las tres políticas de
+--      escritura. Decisión del dueño del negocio (2026-10-11): quién ve qué proyecto lo decide
+--      «el que tiene los permisos de la empresa y todos los proyectos», es decir, el PRINCIPAL:
+--        · super_admin / superadmin  → cualquiera (cualquier empresa);
 --        · company_owner             → persona Y proyecto de SU empresa (también a sí
 --                                      mismo: es exento, su alcance no cambia);
---        · admin                     → persona Y proyecto de SU empresa, a OTRAS
---                                      personas (nunca a sí mismo) y sólo sobre los
---                                      proyectos que él mismo ve. ESTO ÚLTIMO CONSERVA
---                                      LO QUE HACÍA LA POLÍTICA ANTERIOR: su subconsulta
---                                      `project_id IN (SELECT id FROM projects …)` corría
---                                      bajo la RLS de projects, de modo que un
---                                      administrador acotado sólo repartía (y sólo
---                                      podía borrar) filas de SUS proyectos. Si la
---                                      función sólo comparara la empresa, el
---                                      «borrar todas y volver a insertar» de la pantalla
---                                      de un administrador acotado borraría también las
---                                      asignaciones de la persona a proyectos que ese
---                                      administrador no ve, y no podría restituirlas.
---        · cualquier otro rol        → nada.
+--        · cualquier otro rol        → nada: ni el administrador (acotado o sin filas), ni
+--                                      el operador, el visor, el cliente, una sesión sin fila en
+--                                      app_users, ni quien sólo tenga un rol RBAC de «administrador».
+--      PRINCIPAL = app_users.role, nunca «no tener filas». Un administrador sin filas es exento
+--      de proyecto (user_is_project_exempt()) sólo por omisión, y ese estado se fabrica sin ser
+--      principal: create-user, invite-user o un INSERT directo en user_invitations crean
+--      administradores que nacen sin filas; otro administrador deja exento a uno borrando sus filas
+--      o su último proyecto; y un administrador acotado con dos sesiones REPEATABLE READ se deja a
+--      sí mismo sin filas (D-16). Si «sin filas» contara como principal, cada una de esas rutas
+--      fabricaría un principal. Se usan las funciones que ya existen (is_super_admin(),
+--      is_company_owner(), get_my_company_id()); no se crea ninguna.
+--      Desaparecen la rama de administrador, su exclusión «nunca a sí mismo» (la cubren el trigger
+--      de autoasignación y la política) y la condición «sólo proyectos que él ve» (D-1): sin
+--      administradores que escriban no hay una vista parcial que reconciliar.
 --      «Persona de su empresa» = existe en app_users con su misma company_id. Las
---      filas HUÉRFANAS (user_id sin app_users) no son administrables por un
---      administrador ni por el propietario: sólo por el superadministrador o el
---      rol de servicio. No se tocan ni se «arreglan» aquí.
+--      filas HUÉRFANAS (user_id sin app_users) no son administrables por el
+--      propietario: sólo por el superadministrador o el rol de servicio. No se tocan ni se
+--      «arreglan» aquí. Una empresa sin propietario sólo la administra el superadministrador.
+--      El resto del cierre de D-2 (invitaciones, proyectos, roles y permisos de la empresa, funciones
+--      de borde) va en la migración 20261026000700_autoridad_principal_empresa.sql.
 --   2. Se reescriben SÓLO las políticas INSERT, UPDATE (USING y WITH CHECK) y DELETE,
 --      con los mismos nombres, usando esa función. La política SELECT NO se toca
 --      (cada persona sigue leyendo las suyas). Un UPSERT (INSERT … ON CONFLICT DO
@@ -139,7 +143,7 @@
 --     para decidir acceso), user_has_project_access / can_access_project /
 --     user_is_project_exempt, ni ninguna otra tabla.
 --
--- DESPLIEGUE: va en SU PROPIO push a main, ANTES de la serie 20261027… (PR #926) y
+-- DESPLIEGUE: va en SU PROPIO push a main —junto con 20261026000700_autoridad_principal_empresa.sql (2 archivos)—, ANTES de la serie 20261027… (PR #926) y
 -- de 20261028… (PR #927): apply-migrations-prod.yml aplica sólo los .sql añadidos en
 -- cada push y con tope MAX_APPLY = 10. Tabla pequeña; lo PRIMERO que hace es
 -- LOCK TABLE … ACCESS EXCLUSIVE (lock_timeout de 5 s: si hay una transacción larga
@@ -176,8 +180,15 @@ DECLARE
   v_huerfanas bigint;
   v_cruces    bigint;
   v_sin_filas bigint;
+  v_admins    bigint;
+  v_propiet   bigint;
+  v_superad   bigint;
+  v_emp_prop  bigint;
+  v_sin_prop  bigint;
+  v_filas_sin_prop bigint;
 BEGIN
   IF to_regprocedure('public.is_super_admin()')           IS NULL THEN v_faltan := array_append(v_faltan, 'is_super_admin()'); END IF;
+  IF to_regprocedure('public.is_company_owner()')         IS NULL THEN v_faltan := array_append(v_faltan, 'is_company_owner()'); END IF;
   IF to_regprocedure('public.current_user_role()')        IS NULL THEN v_faltan := array_append(v_faltan, 'current_user_role()'); END IF;
   IF to_regprocedure('public.get_my_company_id()')        IS NULL THEN v_faltan := array_append(v_faltan, 'get_my_company_id()'); END IF;
   IF to_regprocedure('public.can_access_project(uuid)')   IS NULL THEN v_faltan := array_append(v_faltan, 'can_access_project(uuid)'); END IF;
@@ -233,16 +244,29 @@ BEGIN
     FROM public.app_users u
    WHERE u.role = 'admin'
      AND NOT EXISTS (SELECT 1 FROM public.user_project_assignments upa WHERE upa.user_id = u.id);
+  SELECT count(*) INTO v_admins FROM public.app_users u WHERE u.role = 'admin';
+  SELECT count(*) INTO v_propiet FROM public.app_users u WHERE u.role = 'company_owner';
+  SELECT count(*) INTO v_superad FROM public.app_users u WHERE u.role IN ('super_admin', 'superadmin');
+  SELECT count(DISTINCT u.company_id) INTO v_emp_prop FROM public.app_users u WHERE u.role = 'company_owner' AND u.company_id IS NOT NULL;
+  -- empresas con filas de asignación (por la empresa del PROYECTO) y SIN propietario: tras esta migración sólo las administra el superadministrador
+  SELECT count(DISTINCT p.company_id), count(*) INTO v_sin_prop, v_filas_sin_prop
+    FROM public.user_project_assignments upa
+    JOIN public.projects p ON p.id = upa.project_id
+   WHERE NOT EXISTS (SELECT 1 FROM public.app_users o WHERE o.company_id = p.company_id AND o.role = 'company_owner');
 
   RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): % filas, huella %', v_n, v_huella;
   RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): authenticated tiene hoy [%] de SELECT/INSERT/UPDATE/DELETE; la migración no los toca', COALESCE(NULLIF(v_dml, ''), 'ninguno');
   RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): % filas HUÉRFANAS (user_id sin app_users): no se tocan', v_huerfanas;
   RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): % filas con empresa de la persona distinta de la del proyecto: no se tocan', v_cruces;
-  RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): % administradores sin filas (exentos de proyecto)', v_sin_filas;
+  RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): PRINCIPALES (los únicos que escribirán la tabla): % propietarios en % empresas y % superadministradores', v_propiet, v_emp_prop, v_superad;
+  RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): % empresas con filas de asignación y SIN propietario (% filas): sólo las alcanzaría el superadministrador', v_sin_prop, v_filas_sin_prop;
+  RAISE NOTICE 'asignaciones_proyecto (pre-vuelo): % administradores (% acotados con filas y % sin filas, exentos): ninguno escribirá la tabla; no son principales', v_admins, v_admins - v_sin_filas, v_sin_filas;
 END
 $pre$;
 
 -- ── 1. Regla única: quién puede administrar una asignación ──────────────────
+-- Sólo el principal de la empresa: el superadministrador, o el propietario sobre personas y proyectos de SU empresa. COALESCE: una sesión sin fila en app_users
+-- (rol NULL) o sin sesión da false, nunca NULL.
 CREATE OR REPLACE FUNCTION public.asignacion_puede_administrar(p_user_id uuid, p_project_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -253,28 +277,24 @@ AS $$
   SELECT COALESCE(
     public.is_super_admin()
     OR (
-      public.current_user_role() = ANY (ARRAY['company_owner', 'admin'])
-      -- un administrador nunca toca sus propias asignaciones; el propietario sí (es exento)
-      AND (public.current_user_role() = 'company_owner' OR p_user_id IS DISTINCT FROM (SELECT auth.uid()))
+      public.is_company_owner()
       -- la persona es de SU empresa (una huérfana o sin empresa no lo es)
       AND EXISTS (
         SELECT 1 FROM public.app_users u
          WHERE u.id = p_user_id AND u.company_id = public.get_my_company_id()
       )
-      -- el proyecto es de SU empresa …
+      -- … y el proyecto también
       AND EXISTS (
         SELECT 1 FROM public.projects pr
          WHERE pr.id = p_project_id AND pr.company_id = public.get_my_company_id()
       )
-      -- … y es uno de los que él ve (como la RLS de projects acotaba la política anterior)
-      AND (public.user_is_project_exempt() OR public.user_has_project_access(p_project_id))
     ),
     false
   )
 $$;
 
 COMMENT ON FUNCTION public.asignacion_puede_administrar(uuid, uuid) IS
-  'Regla de las políticas de escritura de user_project_assignments: superadministrador cualquiera; propietario de su empresa (también a sí mismo); administrador de su empresa a OTRAS personas y sólo en proyectos que él ve; nadie más. La persona y el proyecto deben ser de la empresa de quien administra.';
+  'Regla de las políticas de escritura de user_project_assignments: sólo el PRINCIPAL de la empresa. Superadministrador: cualquiera. Propietario (company_owner): personas y proyectos de SU empresa, también a sí mismo. Nadie más: ni el administrador (acotado o sin filas), ni operadores, visores, clientes ni una sesión sin app_users. La persona y el proyecto deben ser de la empresa de quien administra.';
 
 REVOKE ALL ON FUNCTION public.asignacion_puede_administrar(uuid, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.asignacion_puede_administrar(uuid, uuid) TO authenticated, service_role;
@@ -457,6 +477,11 @@ BEGIN
      OR to_regprocedure('public.asignacion_validar_empresa()') IS NULL
      OR to_regprocedure('public.asignacion_bloquear_propia()') IS NULL THEN
     RAISE EXCEPTION 'seguridad_asignaciones_proyecto (post-vuelo): faltan funciones';
+  END IF;
+  -- la regla es la del principal: usa is_company_owner() y ya no nombra al administrador (un cuerpo viejo, o uno que lo readmitiera, aborta aquí)
+  IF (SELECT p.prosrc FROM pg_proc p WHERE p.oid = 'public.asignacion_puede_administrar(uuid,uuid)'::regprocedure) !~ 'is_company_owner'
+     OR (SELECT p.prosrc FROM pg_proc p WHERE p.oid = 'public.asignacion_puede_administrar(uuid,uuid)'::regprocedure) ~ '''admin''' THEN
+    RAISE EXCEPTION 'seguridad_asignaciones_proyecto (post-vuelo): asignacion_puede_administrar no es la regla del principal (debe usar is_company_owner() y no nombrar al administrador)';
   END IF;
   IF has_function_privilege('anon', 'public.asignacion_puede_administrar(uuid,uuid)', 'EXECUTE')
      OR NOT has_function_privilege('authenticated', 'public.asignacion_puede_administrar(uuid,uuid)', 'EXECUTE') THEN
