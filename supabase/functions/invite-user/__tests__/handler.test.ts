@@ -1,5 +1,5 @@
 // HANDLER completo de invite-user (index.ts, con el cliente del llamador y el de servicio simulados): «el rol admin sólo lo invita el principal de la empresa», la
-// validación de tipos del cuerpo y la revocación de invitaciones pendientes. El control real del camino directo (INSERT en user_invitations por la API) son las políticas
+// validación de tipos del cuerpo, la revocación de invitaciones pendientes y que los fallos de la base de datos fallen cerrados y sin filtrar detalles. El control real del camino directo (INSERT en user_invitations por la API) son las políticas
 // RLS de la migración 20261026000700; este archivo prueba el camino por service_role, que la RLS no frena.
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { estadoVacio, type EstadoDosClientes } from '../../_shared/__tests__/fakeSupabaseDosClientes.ts'
@@ -237,5 +237,76 @@ describe('invite-user · la revocación de pendientes del mismo correo (service_
     expect(r.status).toBe(409)
     expect(((await r.json()) as { error: string }).error).toMatch(/propietario/)
     expect(updates()).toHaveLength(0)
+  })
+
+  // V8-07 B2: el principal revoca TODAS las pendientes del correo, así que si aun así choca es que otra petición creó una entre su revocación y su INSERT; decirle
+  // «la gestiona el propietario de la empresa» al propio propietario es falso y no le dice qué hacer.
+  for (const [rol, empresa] of [['company_owner', C], ['super_admin', null], ['superadmin', null]] as Array<[string, string | null]>) {
+    it(`${rol} (principal) que choca con el índice único: 409 que dice que otra invitación acaba de crearse y que recargue, sin culpar al propietario`, async () => {
+      como(rol, empresa)
+      h.st.lecturas.user_invitations = { data: [], error: null }
+      h.st.escrituras.user_invitations = { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "uq_user_invitations_pending_email"' } }
+      const r = await llamar(cuerpo('operator', empresa ? {} : { company_id: D }))
+      expect(r.status).toBe(409)
+      const { error } = (await r.json()) as { error: string }
+      expect(error).toBe('Otra invitación pendiente para ese correo acaba de crearse. Recarga la página e inténtalo de nuevo.')
+      expect(error).not.toMatch(/propietario/)
+    })
+  }
+})
+
+describe('invite-user · los fallos de la base de datos fallan CERRADO y no filtran detalles (V8-07 B4, V8-08)', () => {
+  it('si la lectura de las invitaciones pendientes falla: 500 genérico, sin revocar ni insertar nada (antes se trataba como «no hay pendientes» y se insertaba)', async () => {
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      for (const [rol, empresa] of [['admin', C], ['company_owner', C], ['super_admin', null]] as Array<[string, string | null]>) {
+        Object.assign(h.st, estadoVacio())
+        h.st.escrituras.user_invitations = { data: { id: 'inv-1' }, error: null }
+        como(rol, empresa)
+        h.st.lecturas.user_invitations = { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout (detalle interno)' } }
+        const r = await llamar(cuerpo('operator', empresa ? {} : { company_id: D }))
+        expect(r.status).toBe(500)
+        const texto = await r.text()
+        expect(JSON.parse(texto)).toEqual({ error: 'No se pudo crear la invitación. Intenta de nuevo.' })
+        expect(texto).not.toMatch(/timeout|detalle interno|57014/)
+        expect(h.st.writes).toHaveLength(0)
+      }
+      expect(consola).toHaveBeenCalled()
+    } finally {
+      consola.mockRestore()
+    }
+  })
+
+  it('cualquier otro fallo del INSERT: 500 con un mensaje genérico (no el insertErr.message crudo); el detalle va a console.error sin el correo invitado', async () => {
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      como('company_owner')
+      h.st.lecturas.user_invitations = { data: [], error: null }
+      h.st.escrituras.user_invitations = { data: null, error: { code: '23503', message: 'insert or update on table "user_invitations" violates foreign key constraint "user_invitations_company_id_fkey"', details: 'Key (email)=(nuevo@ejemplo.com) is not present' } }
+      const r = await llamar(cuerpo('operator'))
+      expect(r.status).toBe(500)
+      const texto = await r.text()
+      expect(JSON.parse(texto)).toEqual({ error: 'No se pudo crear la invitación. Intenta de nuevo.' })
+      expect(texto).not.toMatch(/foreign key|user_invitations|23503|nuevo@ejemplo\.com/)
+      expect(consola).toHaveBeenCalled()
+      const registrado = JSON.stringify(consola.mock.calls)
+      expect(registrado).toMatch(/23503/)
+      expect(registrado).not.toMatch(/nuevo@ejemplo\.com/i)
+    } finally {
+      consola.mockRestore()
+    }
+  })
+
+  it('INSERT sin error pero sin fila devuelta: 500 con el mismo mensaje genérico', async () => {
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      como('company_owner')
+      h.st.escrituras.user_invitations = { data: null, error: null }
+      const r = await llamar(cuerpo('operator'))
+      expect(r.status).toBe(500)
+      expect(await r.json()).toEqual({ error: 'No se pudo crear la invitación. Intenta de nuevo.' })
+    } finally {
+      consola.mockRestore()
+    }
   })
 })

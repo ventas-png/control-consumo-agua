@@ -8,6 +8,7 @@ import {
   canManageUsers,
   checkDeleteTargetGate,
   isSuperAdminRole,
+  isTextOrAbsent,
   type TargetUserRow,
 } from './validate.ts'
 
@@ -45,7 +46,19 @@ Deno.serve(async (req) => {
       })
     }
 
-    const body = await req.json() as { user_id?: string }
+    // El cuerpo llega de la red: un user_id que no sea texto (arreglo, objeto, número…) o un cuerpo que no sea un objeto JSON es una petición mal formada → 400,
+    // nunca un TypeError en .trim() (500 «Internal server error»). Mismo criterio que invite-user (V8-08).
+    const body = await req.json().catch(() => null) as { user_id?: unknown } | null
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: 'Cuerpo inválido' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!isTextOrAbsent(body.user_id)) {
+      return new Response(JSON.stringify({ error: 'user_id inválido' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     const targetId = (body.user_id ?? '').trim()
 
     if (!targetId) {
@@ -82,6 +95,7 @@ Deno.serve(async (req) => {
     const targetRow = target as TargetUserRow
 
     // Non-superadmins: only within their own company, never an owner/superadmin, and (E-07) an admin never deletes another admin: only the company owner does.
+    // Un llamador no superadministrador SIN empresa (company_id null o vacío) se deniega siempre (V8-06 b: null === null dejaba pasar el borrado).
     const gate = checkDeleteTargetGate({ isSuperAdmin, callerRole, callerCompanyId, target: targetRow })
     if (!gate.ok) {
       return new Response(JSON.stringify({ error: gate.error }), {

@@ -3,7 +3,8 @@
 // como TS normal. Cubre: universo de roles que un no-super puede crear (la
 // barrera anti-escalada), QUIÉN puede crear cada uno (canCreateRole: el rol
 // 'admin' solo lo otorga el principal de la empresa), gate del caller,
-// normalización de email, campos requeridos y el mapping de roles RBAC de plataforma.
+// validación de tipos del cuerpo, normalización de email, campos requeridos y el
+// mapping de roles RBAC de plataforma.
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -20,10 +21,11 @@ import {
   isPrincipalRole,
   isRoleAllowedForNonSuper,
   isSuperAdminRole,
+  isTextOrAbsent,
   normalizeEmail,
   platformRoleIdFor,
 } from '../validate.ts'
-import { INVITABLE_ROLES, ROLES_SOLO_PRINCIPAL as INVITE_SOLO_PRINCIPAL, canInviteRole } from '../../invite-user/validate.ts'
+import { INVITABLE_ROLES, ROLES_SOLO_PRINCIPAL as INVITE_SOLO_PRINCIPAL, canInviteRole, isTextOrAbsent as isTextOrAbsentInvite } from '../../invite-user/validate.ts'
 
 describe('create-user/isRoleAllowedForNonSuper (el UNIVERSO que algún no-super puede otorgar; quién, ver canCreateRole)', () => {
   it('acepta los roles del universo', () => {
@@ -156,6 +158,17 @@ describe('create-user/normalizeEmail', () => {
 
   it('un email de solo espacios queda vacío', () => {
     expect(normalizeEmail('   ')).toBe('')
+  })
+})
+
+describe('create-user/isTextOrAbsent (el cuerpo llega de la red: sólo texto o ausente llega a createUser / app_users)', () => {
+  it('texto, undefined y null pasan; arreglo, objeto, número, booleano y función NO', () => {
+    for (const v of ['', 'Abcdef12', ' a@b.co ', undefined, null]) expect(isTextOrAbsent(v)).toBe(true)
+    for (const v of [['x'], {}, { v: 'x' }, 0, 7, true, false, () => 'x']) expect(isTextOrAbsent(v)).toBe(false)
+  })
+
+  it('espeja el de invite-user (misma regla en las tres funciones de usuarios)', () => {
+    for (const v of ['', 'x', undefined, null, ['x'], {}, 0, 7, true, false]) expect(isTextOrAbsent(v)).toBe(isTextOrAbsentInvite(v))
   })
 })
 

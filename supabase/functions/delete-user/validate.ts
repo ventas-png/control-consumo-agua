@@ -33,6 +33,14 @@ export function canManageUsers(role: string): boolean {
   return isSuperAdminRole(role) || role === 'company_owner' || role === 'admin'
 }
 
+/**
+ * `true` si el valor es texto o falta (undefined / null): el cuerpo llega de la red y un arreglo, un objeto o un número no se recortan (TypeError → 500):
+ * se rechazan con 400. Espejo de isTextOrAbsent de invite-user/validate.ts (cada función se despliega con lo suyo; la prueba fija que coinciden).
+ */
+export function isTextOrAbsent(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || typeof value === 'string'
+}
+
 /** Fila mínima del usuario objetivo (lo que el handler lee de app_users). */
 export interface TargetUserRow {
   id: string
@@ -50,7 +58,10 @@ export type DeleteGate = { ok: true } | { ok: false; error: string }
  * y nunca a un owner/superadmin, y un administrador tampoco a otro administrador
  * (ROLES_SOLO_PRINCIPAL_ELIMINAR: lo elimina el propietario). El check de empresa
  * va PRIMERO (mismo orden que el handler): un owner de otra empresa produce el
- * error de cross-tenant, no el de rol.
+ * error de cross-tenant, no el de rol. Un llamador no super_admin SIN empresa
+ * (company_id null o vacío) no tiene «su propia empresa»: se deniega siempre. Antes
+ * se comparaba sólo target.company_id !== callerCompanyId, y con los dos en null
+ * la comparación era falsa y se borraba con service_role (V8-06 b).
  */
 export function checkDeleteTargetGate(input: {
   isSuperAdmin: boolean
@@ -59,7 +70,7 @@ export function checkDeleteTargetGate(input: {
   target: Pick<TargetUserRow, 'role' | 'company_id'>
 }): DeleteGate {
   if (!input.isSuperAdmin) {
-    if (input.target.company_id !== input.callerCompanyId) {
+    if (!input.callerCompanyId || input.target.company_id !== input.callerCompanyId) {
       return { ok: false, error: 'No puedes eliminar usuarios de otra empresa' }
     }
     if (!DELETABLE_ROLES.includes(input.target.role)) {

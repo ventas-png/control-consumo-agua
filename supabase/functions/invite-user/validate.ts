@@ -16,6 +16,30 @@ export const ROLES_SOLO_PRINCIPAL = ['admin']
 
 export const MSG_SOLO_PRINCIPAL_ADMIN = 'Solo el propietario de la empresa puede invitar administradores.'
 
+// Fallo de la base de datos al leer las pendientes o al insertar: mensaje genérico al cliente (el detalle va al registro con registroErrorBd).
+export const MSG_NO_SE_PUDO_CREAR = 'No se pudo crear la invitación. Intenta de nuevo.'
+
+// 409 por el índice único (empresa, correo) entre las pendientes. Para quien NO es el principal, la que queda es la invitación 'admin' del propietario (no
+// puede revocarla); para el PRINCIPAL, que revoca todas las del correo, sólo puede ser otra creada entre su revocación y su INSERT (V8-07 B2).
+export const MSG_PENDIENTE_DEL_PROPIETARIO = 'Ya hay una invitación pendiente para ese correo; la gestiona el propietario de la empresa.'
+export const MSG_PENDIENTE_RECIEN_CREADA = 'Otra invitación pendiente para ese correo acaba de crearse. Recarga la página e inténtalo de nuevo.'
+
+/** Mensaje del 409 por invitación pendiente duplicada según quién invita (ver MSG_PENDIENTE_*). */
+export function msgConflictoPendiente(invitaElPrincipal: boolean): string {
+  return invitaElPrincipal ? MSG_PENDIENTE_RECIEN_CREADA : MSG_PENDIENTE_DEL_PROPIETARIO
+}
+
+/**
+ * Lo que se registra de un error de la base de datos: código y mensaje. NO `details` ni `hint`: en una violación de unicidad o de clave foránea `details`
+ * repite los valores de la fila («Key (company_id, email)=(…, ana@…)»), es decir, el correo de la persona invitada.
+ */
+export function registroErrorBd(err: { code?: unknown; message?: unknown }): { code: string | null; message: string | null } {
+  return {
+    code: typeof err.code === 'string' ? err.code : null,
+    message: typeof err.message === 'string' ? err.message : null,
+  }
+}
+
 // Etiqueta legible del rol para el correo (es-MX).
 export const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrador',

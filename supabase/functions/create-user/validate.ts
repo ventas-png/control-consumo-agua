@@ -66,6 +66,15 @@ export function canCreateRole(callerRole: string, targetRole: string): boolean {
 }
 
 /**
+ * `true` si el valor es texto o falta (undefined / null): el cuerpo llega de la red y un arreglo, un objeto o un número no deben llegar a
+ * auth.admin.createUser ni a app_users (ni recortarse: TypeError → 500): se rechazan con 400. Espejo de isTextOrAbsent de invite-user/validate.ts
+ * (cada función se despliega con lo suyo; la prueba fija que coinciden).
+ */
+export function isTextOrAbsent(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || typeof value === 'string'
+}
+
+/**
  * Normaliza el email (trim + lowercase). El login normaliza el email, así que
  * el valor almacenado debe estar normalizado también: un espacio final o una
  * mayúscula crearía una cuenta a la que luego no se puede entrar.

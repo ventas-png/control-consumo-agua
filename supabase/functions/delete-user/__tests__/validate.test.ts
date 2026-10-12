@@ -1,7 +1,8 @@
 // Tests de la lógica pura de delete-user (infra:I22 · Track T8/T5). Como el
 // resto de tests de edge fns, corre bajo vitest (no Deno) tratando el módulo
 // como TS normal. Cubre: quién puede borrar a quién (gate del caller + gate del
-// target: cross-tenant y jerarquía de roles) y la fila de auditoría post-borrado.
+// target: cross-tenant, llamador sin empresa y jerarquía de roles), la validación
+// de tipos del cuerpo y la fila de auditoría post-borrado.
 
 import { describe, it, expect } from 'vitest'
 import {
@@ -13,8 +14,10 @@ import {
   checkDeleteTargetGate,
   isPrincipalRole,
   isSuperAdminRole,
+  isTextOrAbsent,
 } from '../validate.ts'
 import { ALLOWED_ROLES_FOR_NON_SUPER } from '../../create-user/validate.ts'
+import { isTextOrAbsent as isTextOrAbsentInvite } from '../../invite-user/validate.ts'
 
 describe('delete-user/DELETABLE_ROLES', () => {
   it('NUNCA incluye super_admin ni company_owner (un admin no puede borrar hacia arriba)', () => {
@@ -137,19 +140,39 @@ describe('delete-user/checkDeleteTargetGate', () => {
     expect(gate).toEqual({ ok: false, error: 'No puedes eliminar usuarios de otra empresa' })
   })
 
-  it('caller sin empresa (company_id null) solo alcanza targets sin empresa', () => {
+  it('un llamador NO superadministrador SIN empresa (company_id null o vacío) no elimina a nadie: tampoco a un objetivo sin empresa (V8-06 b: null === null dejaba pasar)', () => {
+    for (const callerRole of ['admin', 'company_owner']) {
+      for (const callerCompanyId of [null, '']) {
+        for (const company_id of [null, '', 'empresa-a']) {
+          expect(checkDeleteTargetGate({
+            isSuperAdmin: false,
+            callerRole,
+            callerCompanyId,
+            target: { role: 'viewer', company_id },
+          })).toEqual({ ok: false, error: 'No puedes eliminar usuarios de otra empresa' })
+        }
+      }
+    }
+  })
+
+  it('el superadministrador (sin empresa, como es lo normal) sí elimina a un objetivo sin empresa', () => {
     expect(checkDeleteTargetGate({
-      isSuperAdmin: false,
-      callerRole: 'admin',
-      callerCompanyId: null,
-      target: { role: 'viewer', company_id: 'empresa-a' },
-    })).toEqual({ ok: false, error: 'No puedes eliminar usuarios de otra empresa' })
-    expect(checkDeleteTargetGate({
-      isSuperAdmin: false,
-      callerRole: 'admin',
+      isSuperAdmin: true,
+      callerRole: 'superadmin',
       callerCompanyId: null,
       target: { role: 'viewer', company_id: null },
     })).toEqual({ ok: true })
+  })
+})
+
+describe('delete-user/isTextOrAbsent (el cuerpo llega de la red: sólo texto o ausente se recorta)', () => {
+  it('texto, undefined y null pasan; arreglo, objeto, número, booleano y función NO', () => {
+    for (const v of ['', 'u-1', ' u-1 ', undefined, null]) expect(isTextOrAbsent(v)).toBe(true)
+    for (const v of [['u-1'], {}, { id: 'u-1' }, 0, 7, true, false, () => 'u-1']) expect(isTextOrAbsent(v)).toBe(false)
+  })
+
+  it('espeja el de invite-user (misma regla en las tres funciones de usuarios)', () => {
+    for (const v of ['', 'x', undefined, null, ['x'], {}, 0, 7, true, false]) expect(isTextOrAbsent(v)).toBe(isTextOrAbsentInvite(v))
   })
 })
 

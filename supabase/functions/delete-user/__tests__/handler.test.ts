@@ -25,15 +25,16 @@ beforeAll(async () => {
 
 beforeEach(() => { Object.assign(h.st, estadoVacio()) })
 
-function eliminar(userId: string): Promise<Response> {
+function llamar(cuerpoCrudo: string): Promise<Response> {
   return h.served.handler!(new Request('https://edge.test/delete-user', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok', Origin: 'https://administratodo.com' },
-    body: JSON.stringify({ user_id: userId }),
+    body: cuerpoCrudo,
   }))
 }
+const eliminar = (userId: string) => llamar(JSON.stringify({ user_id: userId }))
 function como(role: string, company: string | null = 'C') { h.st.user = { id: 'u-llamador' }; h.st.perfilLlamador = { role, company_id: company } }
-function objetivo(role: string, company = 'C') { h.st.lecturas.app_users = { data: { id: 'u-objetivo', role, company_id: company, full_name: 'Objetivo' }, error: null } }
+function objetivo(role: string, company: string | null = 'C') { h.st.lecturas.app_users = { data: { id: 'u-objetivo', role, company_id: company, full_name: 'Objetivo' }, error: null } }
 const borra = (t: string) => h.st.writes.filter(w => w.table === t && w.op === 'delete')
 
 describe('delete-user · un administrador NO elimina a otro administrador (E-07)', () => {
@@ -105,5 +106,72 @@ describe('delete-user · lo que el administrador sigue pudiendo y lo que no', ()
     expect((await eliminar('u-llamador')).status).toBe(400)
     como('admin')
     expect((await eliminar('u-llamador')).status).toBe(400)
+  })
+
+  it('el rol del llamador sale de app_users por SU cliente con JWT, no de sus claims: app_metadata/user_metadata falsos no convierten a un administrador en principal (V8-09 M21)', async () => {
+    h.st.user = { id: 'u-llamador', app_metadata: { role: 'company_owner' }, user_metadata: { role: 'super_admin', rol: 'company_owner' }, role: 'authenticated' }
+    h.st.perfilLlamador = { role: 'admin', company_id: 'C' }
+    objetivo('admin')
+    const r = await eliminar('u-objetivo')
+    expect(r.status).toBe(403)
+    expect(((await r.json()) as { error: string }).error).toMatch(/propietario.*administradores/i)
+    expect(h.st.lecturasLlamador.some(l => l.table === 'app_users')).toBe(true)
+    expect(h.st.writes).toHaveLength(0)
+    expect(h.st.deleteUser).toHaveLength(0)
+  })
+})
+
+describe('delete-user · un llamador NO superadministrador sin empresa no elimina a nadie (V8-06 b)', () => {
+  // Antes la compuerta comparaba target.company_id !== callerCompanyId: con los dos en null (un perfil de propietario o de administrador sin empresa y un objetivo
+  // sin empresa) la comparación era falsa y se borraba con service_role (200).
+  for (const [rol, empresa] of [['admin', null], ['company_owner', null], ['admin', ''], ['company_owner', '']] as Array<[string, string | null]>) {
+    it(`${rol} con company_id ${JSON.stringify(empresa)} → objetivo sin empresa: 403 y no se borra nada`, async () => {
+      como(rol, empresa); objetivo('viewer', empresa)
+      const r = await eliminar('u-objetivo')
+      expect(r.status).toBe(403)
+      expect(((await r.json()) as { error: string }).error).toBe('No puedes eliminar usuarios de otra empresa')
+      expect(h.st.writes).toHaveLength(0)
+      expect(h.st.deleteUser).toHaveLength(0)
+    })
+  }
+
+  it('el superadministrador sin empresa sí elimina a un objetivo sin empresa (se conserva)', async () => {
+    como('super_admin', null); objetivo('viewer', null)
+    expect((await eliminar('u-objetivo')).status).toBe(200)
+    expect(h.st.deleteUser).toEqual(['u-objetivo'])
+  })
+})
+
+describe('delete-user · un cuerpo mal formado es un 400, nunca un 500 ni una escritura (V8-08)', () => {
+  it('user_id que no es texto (arreglo, objeto, número, booleano): 400 sin escribir', async () => {
+    for (const user_id of [['u-objetivo'], { id: 'u-objetivo' }, 7, true]) {
+      como('company_owner'); objetivo('operator')
+      const r = await llamar(JSON.stringify({ user_id }))
+      expect(r.status).toBe(400)
+    }
+    expect(h.st.writes).toHaveLength(0)
+    expect(h.st.deleteUser).toHaveLength(0)
+  })
+
+  it('cuerpo que no es un objeto JSON (null, arreglo, número, texto, JSON roto): 400 sin escribir', async () => {
+    como('company_owner'); objetivo('operator')
+    for (const crudo of ['null', '[]', '7', '"u-objetivo"', '{no es json']) expect((await llamar(crudo)).status).toBe(400)
+    expect(h.st.writes).toHaveLength(0)
+    expect(h.st.deleteUser).toHaveLength(0)
+  })
+
+  it('user_id ausente, null o sólo espacios: 400 «Missing user_id» (se conserva)', async () => {
+    como('company_owner'); objetivo('operator')
+    for (const crudo of ['{}', '{"user_id":null}', '{"user_id":"   "}']) {
+      const r = await llamar(crudo)
+      expect(r.status).toBe(400)
+      expect(((await r.json()) as { error: string }).error).toBe('Missing user_id')
+    }
+    expect(h.st.writes).toHaveLength(0)
+  })
+
+  it('un llamador sin permiso recibe 403 antes de mirar el cuerpo (el orden no cambia)', async () => {
+    como('operator')
+    expect((await llamar('{no es json')).status).toBe(403)
   })
 })

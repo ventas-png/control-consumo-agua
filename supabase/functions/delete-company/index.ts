@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
 import { requireUser } from '../_shared/auth.ts'
-import { getCorsHeaders } from '../_shared/cors.ts'
+import { getCorsHeaders, isOriginAllowed } from '../_shared/cors.ts'
 // Lógica pura (gates de confirmación/gracia, partición de usuarios, snapshot
 // de auditoría) extraída a ./logic.ts para testearla en vitest (infra:I22).
 import {
@@ -47,8 +47,10 @@ Deno.serve(async (req) => {
 
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const allowed = getAllowedOrigins()
-  if (!origin || !allowed.includes(origin)) {
+  // isOriginAllowed (exportada por _shared/cors.ts) y no getAllowedOrigins(): esa no se exporta ni se importaba, y en Deno era un ReferenceError fuera del try,
+  // es decir, un 500 para TODA petición que no fuera OPTIONS (lo destapó la prueba de manejador, V8-09 X01). Misma respuesta 403; la lista es la misma del
+  // resto de funciones (que además acepta los previews de Vercel sólo donde ALLOW_VERCEL_PREVIEW_ORIGINS=true, el sandbox).
+  if (!origin || !isOriginAllowed(origin)) {
     return jsonResponse({ error: 'Origin not allowed' }, 403, corsHeaders)
   }
 

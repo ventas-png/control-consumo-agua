@@ -160,6 +160,49 @@ describe('create-user · lo legítimo sigue funcionando', () => {
   })
 })
 
+describe('create-user · un cuerpo mal formado es un 400, nunca un 500 ni una escritura (V8-08)', () => {
+  // Antes: un email que no era texto reventaba en normalizeEmail (TypeError → 500); un password o un full_name no texto (verdaderos) pasaban
+  // hasMissingRequiredFields y llegaban a auth.admin.createUser / app_users.insert; un company_id objeto llegaba al insert del superadministrador.
+  const malos: Array<[string, unknown]> = [['arreglo', ['x']], ['objeto', { v: 'x' }], ['número', 7], ['booleano', true]]
+  for (const campo of ['email', 'password', 'full_name', 'role', 'company_id']) {
+    for (const [etq, valor] of malos) {
+      it(`${campo} ${etq}: 400 y no se crea nada (propietario y superadministrador)`, async () => {
+        for (const [rol, empresa] of [['company_owner', C], ['super_admin', null]] as Array<[string, string | null]>) {
+          como(rol, empresa)
+          const r = await llamar(cuerpo('operator', { [campo]: valor }))
+          expect(r.status).toBe(400)
+        }
+        expect(h.st.createUser).toHaveLength(0)
+        expect(h.st.writes).toHaveLength(0)
+      })
+    }
+  }
+
+  it('cuerpo que no es un objeto JSON (null, arreglo, número, texto, JSON roto): 400 sin escribir', async () => {
+    como('company_owner')
+    for (const crudo of ['null', '[]', '7', '"texto"', '{no es json']) expect((await llamar(crudo)).status).toBe(400)
+    expect(h.st.createUser).toHaveLength(0)
+    expect(h.st.writes).toHaveLength(0)
+  })
+
+  it('campos ausentes o null siguen siendo «Missing required fields» (400, se conserva)', async () => {
+    como('company_owner')
+    for (const campo of ['email', 'password', 'full_name', 'role', 'company_id']) {
+      for (const valor of [undefined, null, '']) {
+        const r = await llamar(cuerpo('operator', { [campo]: valor }))
+        expect(r.status).toBe(400)
+        expect(((await r.json()) as { error: string }).error).toBe('Missing required fields')
+      }
+    }
+    expect(h.st.createUser).toHaveLength(0)
+  })
+
+  it('un llamador sin permiso recibe 403 antes de mirar el cuerpo (el orden no cambia)', async () => {
+    como('operator')
+    expect((await llamar('{no es json')).status).toBe(403)
+  })
+})
+
 describe('create-user · flujo del superadministrador (alta del propietario de una empresa nueva)', () => {
   for (const grafia of ['super_admin', 'superadmin']) {
     it(`${grafia} crea un company_owner en la empresa D: app_users company_owner y SIN rol de plataforma`, async () => {

@@ -2,7 +2,8 @@
 // tests de edge fns, corre bajo vitest (no Deno) tratando el módulo como TS normal.
 // Cubre: universo de roles invitables, QUIÉN puede invitar cada uno (canInviteRole: el rol
 // 'admin' solo lo invita el principal de la empresa), etiqueta de rol, validación de email,
-// generación de token (URL-safe + entropía) y cómputo de expiración (7 días).
+// generación de token (URL-safe + entropía), cómputo de expiración (7 días) y los mensajes
+// y el registro de los fallos del INSERT.
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -10,6 +11,8 @@ import { describe, it, expect } from 'vitest'
 import {
   INVITABLE_ROLES,
   INVITATION_TTL_MS,
+  MSG_PENDIENTE_DEL_PROPIETARIO,
+  MSG_PENDIENTE_RECIEN_CREADA,
   MSG_SOLO_PRINCIPAL_ADMIN,
   ROLES_SOLO_PRINCIPAL,
   canInviteRole,
@@ -20,6 +23,8 @@ import {
   isPrincipalRole,
   isTextOrAbsent,
   isValidEmail,
+  msgConflictoPendiente,
+  registroErrorBd,
   roleLabel,
 } from '../validate.ts'
 
@@ -157,6 +162,21 @@ describe('invite-user/isTextOrAbsent (el cuerpo llega de la red: sólo texto o a
   })
   it('arreglo, objeto, número y booleano NO (recortarlos lanzaba TypeError → 500)', () => {
     for (const v of [['admin'], {}, { role: 'admin' }, 0, 7, true, false, () => 'admin']) expect(isTextOrAbsent(v)).toBe(false)
+  })
+})
+
+describe('invite-user/msgConflictoPendiente · registroErrorBd (409 y 500 del INSERT)', () => {
+  it('al principal no se le dice que «la gestiona el propietario»: se le pide recargar; al no principal, sí (V8-07 B2)', () => {
+    expect(msgConflictoPendiente(true)).toBe(MSG_PENDIENTE_RECIEN_CREADA)
+    expect(msgConflictoPendiente(true)).not.toMatch(/propietario/)
+    expect(msgConflictoPendiente(false)).toBe(MSG_PENDIENTE_DEL_PROPIETARIO)
+    expect(MSG_PENDIENTE_DEL_PROPIETARIO).toMatch(/propietario/)
+  })
+  it('del error de la base de datos se registra código y mensaje, NO details ni hint (repiten el correo invitado) (V8-08)', () => {
+    const r = registroErrorBd({ code: '23505', message: 'duplicate key', details: 'Key (company_id, email)=(c, ana@ejemplo.com) already exists.', hint: 'h' } as { code: string; message: string })
+    expect(r).toEqual({ code: '23505', message: 'duplicate key' })
+    expect(JSON.stringify(r)).not.toContain('ana@ejemplo.com')
+    expect(registroErrorBd({})).toEqual({ code: null, message: null })
   })
 })
 

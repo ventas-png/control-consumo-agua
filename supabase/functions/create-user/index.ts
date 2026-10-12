@@ -9,6 +9,7 @@ import {
   createRoleDenial,
   hasMissingRequiredFields,
   isSuperAdminRole,
+  isTextOrAbsent,
   normalizeEmail,
   platformRoleIdFor,
 } from './validate.ts'
@@ -47,15 +48,32 @@ Deno.serve(async (req) => {
       })
     }
 
-    const body = await req.json() as {
-      email: string
-      password: string
-      full_name: string
-      role: string
-      company_id: string
+    // El cuerpo llega de la red: un campo que no sea texto (arreglo, objeto, número…) o un cuerpo que no sea un objeto JSON es una petición mal formada → 400.
+    // Antes un email no texto reventaba en normalizeEmail (TypeError → 500) y un password o un full_name no texto pasaban hasMissingRequiredFields y llegaban a
+    // auth.admin.createUser / app_users.insert (V8-08). Mismo criterio que invite-user; los ausentes o null siguen cayendo en «Missing required fields».
+    const body = await req.json().catch(() => null) as {
+      email?: unknown
+      password?: unknown
+      full_name?: unknown
+      role?: unknown
+      company_id?: unknown
+    } | null
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: 'Cuerpo inválido' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (![body.email, body.password, body.full_name, body.role, body.company_id].every(isTextOrAbsent)) {
+      return new Response(JSON.stringify({ error: 'Datos inválidos' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    const { email: rawEmail, password, full_name, role, company_id } = body
+    const rawEmail = body.email as string | null | undefined
+    const password = (body.password ?? '') as string
+    const full_name = (body.full_name ?? '') as string
+    const role = (body.role ?? '') as string
+    const company_id = (body.company_id ?? '') as string
 
     // Normalize email (trim + lowercase) so a stray trailing space or different
     // capitalization can't create an account the user is then unable to log in to:

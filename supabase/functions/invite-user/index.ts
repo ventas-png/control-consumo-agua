@@ -14,7 +14,8 @@
 //   4. Inserta la fila en user_invitations (service_role; revoca los pending
 //      previos al MISMO correo en la company — comparación exacta del correo en
 //      minúsculas, sin comodines —, y si quien llama no es el principal NO revoca
-//      los de rol 'admin': son del propietario).
+//      los de rol 'admin': son del propietario). Si la lectura de pendientes o el
+//      INSERT fallan, 500 con un mensaje genérico (el detalle, al registro).
 //   5. Envía el correo de invitación reusando send-email (template genérico
 //      `notificacion_empresa` con CTA → /aceptar-invitacion?token=...), desde
 //      la cuenta de Gmail de la empresa. Fire-and-forget: si falla el correo
@@ -36,6 +37,7 @@ import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 // Lógica pura (whitelist de roles, token, expiración, validación de email)
 // extraída a ./validate.ts para poder testearla en vitest (infra:I22).
 import {
+  MSG_NO_SE_PUDO_CREAR,
   MSG_SOLO_PRINCIPAL_ADMIN,
   canInviteRole,
   computeExpiresAt,
@@ -45,6 +47,8 @@ import {
   isPrincipalRole,
   isTextOrAbsent,
   isValidEmail,
+  msgConflictoPendiente,
+  registroErrorBd,
   roleLabel as labelForRole,
 } from './validate.ts'
 
@@ -172,11 +176,19 @@ Deno.serve(async (req: Request) => {
     // ilike con el correo del cuerpo interpretaría % _ \ — y el * de PostgREST — como comodines, y '%@%.%' (pasa isValidEmail) revocaba TODAS las
     // pendientes de la empresa. Y quien NO es el principal no revoca las invitaciones 'admin': son del propietario (esta escritura es con service_role,
     // sin RLS; un administrador no debe poder anular por aquí lo que la política user_invitations_update ya le impide).
-    const { data: pendientes } = await adminClient
+    // Si esa lectura falla se aborta (falla CERRADO): tratarla como «no hay pendientes» (data ?? []) insertaba igualmente y dejaba el resultado en manos del
+    // índice único o, sin él, en dos pendientes para el mismo correo (V8-07 B4).
+    const { data: pendientes, error: pendientesErr } = await adminClient
       .from('user_invitations')
       .select('id, email, role')
       .eq('company_id', companyId)
       .eq('status', 'pending')
+    if (pendientesErr) {
+      console.error('[invite-user] no se pudieron leer las invitaciones pendientes:', registroErrorBd(pendientesErr))
+      return new Response(JSON.stringify({ error: MSG_NO_SE_PUDO_CREAR }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     const idsRevocar = idsPendientesARevocar(
       (pendientes ?? []) as Array<{ id: string; email: string | null; role: string | null }>,
       email,
@@ -210,13 +222,17 @@ Deno.serve(async (req: Request) => {
       .single()
 
     // Índice único (empresa, correo) entre las pendientes: si queda una que este llamador no podía revocar (la invitación 'admin' del propietario), es un conflicto, no un 500.
+    // El principal revoca TODAS las pendientes del correo: si aun así choca, otra petición creó una entre su revocación y su INSERT, y decirle que «la gestiona
+    // el propietario» al propio propietario es falso (V8-07 B2): se le dice que recargue e intente de nuevo.
     if ((insertErr as { code?: string } | null)?.code === '23505') {
-      return new Response(JSON.stringify({ error: 'Ya hay una invitación pendiente para ese correo; la gestiona el propietario de la empresa.' }), {
+      return new Response(JSON.stringify({ error: msgConflictoPendiente(isPrincipalRole(callerRole)) }), {
         status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+    // Cualquier otro fallo: mensaje genérico al cliente; el detalle (código y mensaje de la base de datos, sin el correo invitado) sólo al registro (V8-08).
     if (insertErr || !invitation) {
-      return new Response(JSON.stringify({ error: insertErr?.message ?? 'No se pudo crear la invitación' }), {
+      console.error('[invite-user] no se pudo insertar la invitación:', insertErr ? registroErrorBd(insertErr) : 'sin fila devuelta')
+      return new Response(JSON.stringify({ error: MSG_NO_SE_PUDO_CREAR }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
