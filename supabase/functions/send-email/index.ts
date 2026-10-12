@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { isRetriable } from '../_shared/emailRetryable.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
@@ -60,7 +60,7 @@ interface TokenRefreshResponse {
 
 async function refreshAccessToken(
   refreshToken: string,
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   configId: string
 ): Promise<string | null> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -92,7 +92,7 @@ async function sendViaGmail(
   to: string,
   subject: string,
   htmlBody: string,
-  supabase: ReturnType<typeof createClient>
+  supabase: SupabaseClient
 ): Promise<string | null> {
   let accessToken = config.access_token
   const isExpired = isTokenExpired(config.token_expiry)

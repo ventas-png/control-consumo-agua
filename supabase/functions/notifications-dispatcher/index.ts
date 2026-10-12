@@ -28,7 +28,7 @@
 // Disparo: pg_cron cada minuto via run_notifications_dispatcher() (ver
 // migracion 20260604100000_notifications_outbox.sql).
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { assertEmailAddress } from '../_shared/emailHeaders.ts'
@@ -111,7 +111,7 @@ function getCorsHeaders(origin: string | null) {
 }
 
 // deno-lint-ignore no-explicit-any
-type Client = ReturnType<typeof createClient>
+type Client = SupabaseClient
 
 interface OutboxRow {
   id: string

@@ -13,9 +13,14 @@
 // estructural (`RpcClient`) para que el archivo sea importable tanto desde Deno (edge)
 // como desde vitest (los tests corren en Node/jsdom).
 
-/** Cliente mínimo: cualquier cosa con `.rpc()` (el admin client de supabase-js encaja). */
+/**
+ * Cliente mínimo: cualquier cosa con `.rpc()` (el admin client de supabase-js encaja).
+ * `PromiseLike` y no `Promise`: `.rpc()` devuelve un `PostgrestFilterBuilder`, que
+ * sólo implementa `then` (sin `catch`/`finally`), así que con `Promise` el cliente
+ * real no encajaba en el tipo y sólo lo aceptaban los mocks.
+ */
 export interface RpcClient {
-  rpc(fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }>
+  rpc(fn: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }>
 }
 
 /**

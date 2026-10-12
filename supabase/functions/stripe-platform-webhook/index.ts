@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
 import { captureEdgeException } from '../_shared/sentry.ts'
 // Lógica pura (mapeos de status, construcción de rows, decisión del update de
@@ -44,7 +44,7 @@ const STRIPE_PLATFORM_SECRET_KEY = Deno.env.get('STRIPE_PLATFORM_SECRET_KEY') ??
 const STRIPE_PLATFORM_WEBHOOK_SECRET = Deno.env.get('STRIPE_PLATFORM_WEBHOOK_SECRET') ?? ''
 
 async function upsertSubscriptionFromStripe(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   stripeSub: Stripe.Subscription,
 ): Promise<void> {
   const companyId = stripeSub.metadata?.company_id
@@ -140,7 +140,7 @@ async function upsertSubscriptionFromStripe(
 }
 
 async function upsertInvoiceFromStripe(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   stripeInvoice: Stripe.Invoice,
 ): Promise<void> {
   // Encuentra la subscription correspondiente (necesitamos su id local +
@@ -187,7 +187,7 @@ async function upsertInvoiceFromStripe(
 // Best-effort: si no hay owner o falla el encolado, se loguea y sigue — Stripe
 // además manda su propio correo de pago fallido y reintenta el cobro.
 async function enqueueDunningEmail(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   companyId: string,
 ): Promise<void> {
   try {

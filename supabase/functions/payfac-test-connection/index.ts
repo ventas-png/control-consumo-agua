@@ -93,7 +93,10 @@ Deno.serve(async (req: Request) => {
     const ambiente: AmbientePago = parseAmbiente(body.ambiente)
 
     // ── 1) Resolver el tenant ──
-    let projectRow: { company_id?: string | null; proveedor_pago?: string | null } | null = null
+    // Alias con nombre y no `typeof projectRow`: tras `= null`, TS estrecha la
+    // variable a `null` y el cast la dejaba en `null` (el resto, en `never`).
+    type ProjectRow = { company_id?: string | null; proveedor_pago?: string | null }
+    let projectRow: ProjectRow | null = null
     if (projectId) {
       const { data: proj, error: projErr } = await admin
         .from('projects')
@@ -102,7 +105,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle()
       if (projErr) return json({ error: projErr.message }, 500)
       if (!proj) return json({ error: 'Locación (proyecto) no encontrada' }, 404)
-      projectRow = proj as typeof projectRow
+      projectRow = proj as ProjectRow
     }
 
     const companyId = resolverCompanyId(projectRow?.company_id ?? null, body.company_id, callerCompanyId)
