@@ -333,6 +333,8 @@ INSERT INTO asgt.ids SELECT 'ORF' || k, asgt.uid_de(50 + k), 'huerfana' FROM gen
 -- ── RBAC de la empresa C (lo escribe assert_principal.sql): un rol de empresa, sin personas ni asignaciones nuevas ────────────────────────────────────────
 INSERT INTO public.roles (id, company_id, name, is_system) VALUES ('a5b00000-0000-0000-0000-000000000001', 'a5c00000-0000-0000-0000-000000000001', 'ASG rol de empresa', false);
 INSERT INTO asgt.ids VALUES ('ROLC', 'a5b00000-0000-0000-0000-000000000001', 'rol');
+-- … y el rol de SISTEMA «Admin Plataforma» (el que create-user asigna a un administrador; 96 llaves): sobre él se prueba que el propietario NO escribe llaves de roles de sistema
+INSERT INTO asgt.ids VALUES ('ROLS', '00000000-0000-0000-0000-000000000201', 'rol');
 
 -- ── Las 43 filas (todas «total») ─────────────────────────────────────────────
 --   AP: 3 (P1,P2,P3) · OP1..OP7: 14 (OPk → Pk y Pk+1) · VW1..VW3: 2 filas c/u, VW4..VW13: 1 c/u = 16 · ORF1..ORF4: 2 c/u, ORF5..ORF6: 1 c/u = 10

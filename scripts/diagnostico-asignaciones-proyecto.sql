@@ -10,7 +10,10 @@
 --   · «principales» cuenta quién escribirá la tabla (propietarios y superadministradores) y qué empresas con personas no tienen propietario;
 --   · «administrables» cuenta las filas que el propietario de su empresa alcanza con la regla (esperado en producción: 33 de 43; las otras 10, las
 --     huérfanas, sólo las alcanzan el superadministrador y el rol de servicio);
---   · «0700» dice, política por política, si ya es del principal («sólo el principal») o todavía admite al administrador (texto de producción).
+--   · «0700» dice, política por política, si ya es del principal («sólo el principal») o todavía admite al administrador (texto de producción): son 13 (las 11 de escritura más
+--     user_invitations_select y user_invitations_delete, que desde la guarda de lectura también llevan «role admin sólo del principal»);
+--   · «app_users.project_id» cuenta las personas con proyecto y las que lo tienen de OTRA empresa, inexistente o sin empresa (esperado en producción: 0 y 0; la 0700 sólo valida lo
+--     que se escribe a partir de ahora) y dice si el trigger trg_validar_proyecto_app_users está puesto.
 -- Sin correos ni nombres: sólo conteos e identificadores.
 --
 -- Salida: tres columnas (seccion, clave, valor), ordenadas.
@@ -47,6 +50,10 @@ SELECT seccion, clave, valor FROM (
   UNION ALL SELECT '3 cruces', 'filas con empresa de la persona distinta de la del proyecto (o sin empresa)', count(*)::text
                    FROM filas WHERE NOT huerfana AND emp_persona IS DISTINCT FROM emp_proyecto
   UNION ALL SELECT '3 cruces', 'filas cuyo proyecto no existe', count(*)::text FROM filas WHERE emp_proyecto IS NULL
+  UNION ALL SELECT '3 cruces', 'app_users.project_id: personas con proyecto', count(*)::text FROM public.app_users WHERE project_id IS NOT NULL
+  UNION ALL SELECT '3 cruces', 'app_users.project_id: de ellas, con un proyecto que NO es de su empresa (de otra, inexistente o sin empresa)', count(*)::text
+                   FROM public.app_users u WHERE u.project_id IS NOT NULL
+                    AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = u.project_id AND p.company_id IS NOT NULL AND p.company_id IS NOT DISTINCT FROM u.company_id)
   UNION ALL SELECT '4 admins', 'administradores sin filas (exentos de proyecto)', count(*)::text FROM admins WHERE n = 0
   UNION ALL SELECT '4 admins', 'administradores con filas (acotados)', count(*)::text FROM admins WHERE n > 0
   UNION ALL SELECT '4 admins', 'filas de los administradores acotados', COALESCE(sum(n), 0)::text FROM admins WHERE n > 0
@@ -90,7 +97,7 @@ SELECT seccion, clave, valor FROM (
                    CASE WHEN p.prosrc ~ 'is_company_owner' AND p.prosrc !~ '''admin''' THEN 'del principal (propietario o superadministrador)'
                         WHEN p.prosrc ~ '''admin''' THEN 'anterior: admite al administrador' ELSE 'otra' END
                    FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'asignacion_puede_administrar'
-  -- ── 0700: las 11 políticas que cambió la migración de autoridad del principal ──
+  -- ── 0700: las 13 políticas que cambió la migración de autoridad del principal ──
   UNION ALL SELECT '9 0700', c.relname::text || '.' || p.polname::text,
                    CASE WHEN COALESCE(pg_get_expr(p.polqual, p.polrelid), '') || COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') ~ 'is_company_owner'
                           THEN CASE WHEN c.relname = 'user_invitations' THEN 'role admin sólo del principal' ELSE 'sólo el principal' END
@@ -102,7 +109,11 @@ SELECT seccion, clave, valor FROM (
                          ('roles', 'roles_insert'), ('roles', 'roles_update'), ('roles', 'roles_delete'),
                          ('role_permissions', 'role_permissions_insert'), ('role_permissions', 'role_permissions_delete'),
                          ('user_roles', 'user_roles_insert'), ('user_roles', 'user_roles_delete'),
-                         ('user_invitations', 'user_invitations_insert'), ('user_invitations', 'user_invitations_update'))
+                         ('user_invitations', 'user_invitations_insert'), ('user_invitations', 'user_invitations_select'),
+                         ('user_invitations', 'user_invitations_update'), ('user_invitations', 'user_invitations_delete'))
+  UNION ALL SELECT '9 0700', 'trigger trg_validar_proyecto_app_users (app_users.project_id es de la empresa de la persona)',
+                   CASE WHEN EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid = 'public.app_users'::regclass AND t.tgname = 'trg_validar_proyecto_app_users' AND NOT t.tgisinternal AND t.tgenabled = 'O')
+                        THEN 'puesto y habilitado' ELSE 'AUSENTE (producción antes de la 0700)' END
   UNION ALL SELECT '6 estado', 'RLS', CASE WHEN c.relrowsecurity THEN 'activa' ELSE 'DESACTIVADA' END || CASE WHEN c.relforcerowsecurity THEN ', forzada' ELSE ', no forzada' END
                    FROM pg_class c WHERE c.oid = 'public.user_project_assignments'::regclass
 ) t

@@ -8,7 +8,7 @@
 #   · 20261026000600_seguridad_asignaciones_proyecto.sql — nadie cambia sus propias asignaciones y SÓLO el principal (propietario de su empresa o superadministrador) escribe
 #     user_project_assignments; un administrador, acotado o exento, no;
 #   · 20261026000700_autoridad_principal_empresa.sql — sólo el principal crea y borra proyectos, escribe roles, llaves y asignaciones de roles de la empresa e invita
-#     administradores (11 políticas de projects, roles, role_permissions, user_roles y user_invitations; el texto de producción de las 18 de esas tablas está en
+#     administradores, y valida app_users.project_id (13 políticas de projects, roles, role_permissions, user_roles y user_invitations y un trigger de app_users; el texto de producción de las 18 de esas tablas está en
 #     politicas_produccion.md5, leído por SELECT el 2026-10-11).
 #
 #   1. CONTROL NEGATIVO: sin las migraciones, la matriz, los flujos, el alcance, el catálogo y el principal DEBEN ponerse en ROJO (y se cuenta cuántos
@@ -42,7 +42,7 @@
 #      migraciones) y con la de producción (authenticated CON DML), siempre COMO UN PROPIETARIO NO SUPERUSUARIO con BYPASSRLS (como el postgres
 #      de Supabase): no concede ni quita el DML, quita lo que debe y la reversión también es relativa.
 #
-#  11. el principal (assert_principal.sql): 10 actores × 21 escrituras sensibles, y los mutantes de cada política de la 0700 y de la regla de la 0600.
+#  11. el principal (assert_principal.sql): 10 actores × 35 escrituras sensibles, el proyecto de app_users, y los mutantes de cada política de la 0700 y de la regla de la 0600.
 #
 # Uso:  bash supabase/tests/asignaciones_proyecto/run.sh      (PGPORT_TEST=<puerto> para elegir el puerto del clúster desechable)
 # ============================================================================
@@ -351,8 +351,8 @@ como_sb "$MIGS/$MIGRACION.sql" asg_acl_prev
 echo "   ✓ (a) ACL final {propietario, service_role=Dxt}: authenticated SIGUE sin DML (no se le concede), anon sin nada, service_role intacto; la 2ª pasada no cambia nada"
 como_sb "$MIGS/$MIGRACION2.sql" asg_acl_prev
 como_sb "$MIGS/$MIGRACION2.sql" asg_acl_prev
-[ "$(pol_iguales asg_acl_prev)" = "7" ] || { echo "❌ 4c(a) · con la ACL de la preview la 0700 no dejó 7 políticas de producción y 11 del principal"; exit 1; }
-echo "   ✓ (a) la 0700 también se aplica con la ACL de la preview y como propietario NO superusuario (dos pasadas): 7 políticas con el texto de producción y 11 del principal"
+[ "$(pol_iguales asg_acl_prev)" = "5" ] || { echo "❌ 4c(a) · con la ACL de la preview la 0700 no dejó 5 políticas de producción y 13 del principal"; exit 1; }
+echo "   ✓ (a) la 0700 también se aplica con la ACL de la preview y como propietario NO superusuario (dos pasadas): 5 políticas con el texto de producción y 13 del principal"
 como_sb "$REVERSION" asg_acl_prev
 [ "$(privs asg_acl_prev)" = "anon=DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE authenticated=REFERENCES,TRIGGER,TRUNCATE service_role=REFERENCES,TRIGGER,TRUNCATE" ] \
   || { echo "❌ 4c(a) · la reversión dejó otros privilegios: $(privs asg_acl_prev)"; exit 1; }
@@ -455,10 +455,12 @@ aplicar "$MIGS/$MIGRACION2.sql" || { echo "❌ la 0700 no es idempotente: la seg
 huella "$BD" > "$SALIDAS/huella_fin2.txt"
 diff -q "$SALIDAS/huella_fin1.txt" "$SALIDAS/huella_fin2.txt" >/dev/null || { echo "❌ la segunda pasada de la 0700 cambió el catálogo"; diff "$SALIDAS/huella_fin1.txt" "$SALIDAS/huella_fin2.txt" | head; exit 1; }
 GRUPOS_0700=$(diff "$SALIDAS/huella_post2.txt" "$SALIDAS/huella_fin2.txt" | grep -c '^>' || true)
-SOLO_POLITICAS=$(diff "$SALIDAS/huella_post2.txt" "$SALIDAS/huella_fin2.txt" | grep '^>' | grep -vcE 'polic' || true)
-[ "$SOLO_POLITICAS" = "0" ] || { echo "❌ la 0700 cambió algo del catálogo que no son políticas:"; diff "$SALIDAS/huella_post2.txt" "$SALIDAS/huella_fin2.txt" | grep '^>' | grep -vE 'polic' | head -3; exit 1; }
-[ "$(pol_iguales "$BD")" = "7" ] || { echo "❌ tras la 0700 deben quedar EXACTAMENTE 7 políticas con el texto de producción (las que no cambian) y hay $(pol_iguales "$BD")"; exit 1; }
-echo "   ✓ 4f · segunda pasada limpia (huella idéntica, $(wc -l < "$SALIDAS/huella_fin2.txt") grupos); la 0700 cambia $GRUPOS_0700 grupos de la huella y TODOS son de políticas; de las 18 políticas, 7 conservan el md5 de producción y 11 cambian"
+GRUPOS_POLITICAS=$(diff "$SALIDAS/huella_post2.txt" "$SALIDAS/huella_fin2.txt" | grep '^>' | grep -cE 'polic' || true)
+# la 0700 cambia 5 grupos de políticas (una por tabla) y, de app_users, el grupo de triggers y los dos de la función del trigger nuevo (cuerpo y privilegios): nada más
+OTROS_0700=$(diff "$SALIDAS/huella_post2.txt" "$SALIDAS/huella_fin2.txt" | grep '^>' | grep -vcE 'polic|tabla:app_users/triggers|funcion:app_users_validar_proyecto\(\)' || true)
+[ "$OTROS_0700" = "0" ] && [ "$GRUPOS_POLITICAS" = "5" ] && [ "$GRUPOS_0700" = "8" ] || { echo "❌ la 0700 debía cambiar 8 grupos del catálogo (5 de políticas, el trigger y la función de app_users) y cambió $GRUPOS_0700 ($GRUPOS_POLITICAS de políticas, $OTROS_0700 de otra cosa):"; diff "$SALIDAS/huella_post2.txt" "$SALIDAS/huella_fin2.txt" | grep '^>' | head -8; exit 1; }
+[ "$(pol_iguales "$BD")" = "5" ] || { echo "❌ tras la 0700 deben quedar EXACTAMENTE 5 políticas con el texto de producción (las que no cambian) y hay $(pol_iguales "$BD")"; exit 1; }
+echo "   ✓ 4f · segunda pasada limpia (huella idéntica, $(wc -l < "$SALIDAS/huella_fin2.txt") grupos); la 0700 cambia $GRUPOS_0700 grupos de la huella ($GRUPOS_POLITICAS de políticas, 1 trigger y 2 de la función de ese trigger); de las 18 políticas, 5 conservan el md5 de producción y 13 cambian"
 
 # 4f(a) pre-vuelo: falta is_company_owner() → aborta, sin dejar nada
 copia "$BD_0600" asg_pre
@@ -477,7 +479,7 @@ echo "$SALIDA_DER" | grep -q 'DERIVA: roles.roles_insert no tiene el texto de pr
 [ "$(q "SELECT pg_get_expr(polwithcheck, polrelid) FROM pg_policy WHERE polname = 'roles_insert'" asg_deriva)" = "true" ] || { echo "❌ 4f · el aborto por deriva dejó la política cambiada"; exit 1; }
 # mutación: sin la guarda de deriva la 0700 SOBREESCRIBE en silencio un predicado que nadie leyó (lo que la guarda evita)
 perl -0pe 's/  IF array_length\(v_deriva, 1\) IS NOT NULL THEN\n    RAISE EXCEPTION[^\n]*\n  END IF;\n//' "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_sin_deriva.sql"
-! grep -q 'DERIVA' "$SALIDAS/migracion0700_sin_deriva.sql" || { echo "❌ 4f · no se pudo quitar la guarda de deriva"; exit 1; }
+! grep -q 'DERIVA: % no tiene el texto de producción' "$SALIDAS/migracion0700_sin_deriva.sql" || { echo "❌ 4f · no se pudo quitar la guarda de deriva"; exit 1; }
 aplicar "$SALIDAS/migracion0700_sin_deriva.sql" asg_deriva || { echo "❌ 4f · sin la guarda de deriva la 0700 debía aplicarse (y sobrescribir)"; exit 1; }
 N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
 echo "   ✓ 4f(b) · una política con otro texto (roles_insert = true) hace ABORTAR a la 0700 («DERIVA: roles.roles_insert…») sin cambiar nada; mutación «sin la guarda de deriva»: la sobrescribe en silencio (la prueba lo ve)"
@@ -500,19 +502,35 @@ N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
 echo "   ✓ 4f(c) · post-vuelo: si la 0700 cambiara UNA fila de roles ABORTA («las filas de roles … CAMBIARON») y no deja nada; mutación «sin la comprobación de filas»: la fila tocada se confirma (la prueba lo ve)"
 baja asg_post_vuelo
 
+# 4f(c2) el post-vuelo mide también app_users (la sexta tabla, por el trigger de project_id): si la migración tocara una persona, aborta y no deja nada (ni el trigger)
+copia "$BD_0600" asg_post_vuelo
+sed "s|^-- ── Post-vuelo: las filas son IDÉNTICAS|UPDATE public.app_users SET full_name = 'tocada' WHERE id = (SELECT id FROM public.app_users ORDER BY id LIMIT 1);\n-- ── Post-vuelo: las filas son IDÉNTICAS|" "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_que_toca_personas.sql"
+grep -q "SET full_name = 'tocada'" "$SALIDAS/migracion0700_que_toca_personas.sql" || { echo "❌ 4f · no se pudo preparar la 0700 que toca personas"; exit 1; }
+SALIDA_POST=$(psql -q -v ON_ERROR_STOP=1 -d asg_post_vuelo -f "$SALIDAS/migracion0700_que_toca_personas.sql" 2>&1) && { echo "❌ 4f · el post-vuelo de la 0700 no abortó cuando una persona cambió"; exit 1; }
+echo "$SALIDA_POST" | grep -q 'las filas de app_users CAMBIARON' || { echo "❌ 4f · el post-vuelo abortó por otra cosa:"; echo "$SALIDA_POST" | grep -E 'ERROR' | head -3; exit 1; }
+[ "$(pol_md5 asg_post_vuelo)" = "$(pol_md5 "$BD_0600")" ] && [ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_post_vuelo)" = "0" ] && [ "$(q "SELECT count(*) FROM public.app_users WHERE full_name = 'tocada'" asg_post_vuelo)" = "0" ] || { echo "❌ 4f · el post-vuelo abortó pero la transacción dejó cambios"; exit 1; }
+perl -0pe 's/    IF \(v_n::text \|\| \x27:\x27 \|\| v_h\) IS DISTINCT FROM current_setting\(\x27app\.principal_pre_\x27 \|\| v_t, true\) THEN\n.*?\n    END IF;\n//s' "$SALIDAS/migracion0700_que_toca_personas.sql" > "$SALIDAS/migracion0700_sin_chequeo_personas.sql"
+! grep -q 'las filas de % CAMBIARON' "$SALIDAS/migracion0700_sin_chequeo_personas.sql" || { echo "❌ 4f · no se pudo quitar la comprobación de filas"; exit 1; }
+copia "$BD_0600" asg_post_vuelo
+aplicar "$SALIDAS/migracion0700_sin_chequeo_personas.sql" asg_post_vuelo || { echo "❌ 4f · sin la comprobación de filas la 0700 manipulada debía aplicarse"; exit 1; }
+[ "$(q "SELECT count(*) FROM public.app_users WHERE full_name = 'tocada'" asg_post_vuelo)" = "1" ] || { echo "❌ 4f · la mutación no dejó la persona tocada"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
+baja asg_post_vuelo
+echo "   ✓ 4f(c2) · post-vuelo: si la 0700 cambiara UNA persona de app_users ABORTA («las filas de app_users … CAMBIARON») y no deja nada ni el trigger; mutación «sin la comprobación de filas»: la persona tocada se confirma (la prueba lo ve)"
+
 # 4f(d) quien corre debe ser el propietario de las cinco tablas
 copia "$BD_0600" asg_noprop
 psql -q -v ON_ERROR_STOP=1 -d asg_noprop -c "GRANT USAGE ON SCHEMA auth TO asg_intruso" >/dev/null
 SALIDA_NP=$(psql -q -v ON_ERROR_STOP=1 -U asg_intruso -d asg_noprop -f "$MIGS/$MIGRACION2.sql" 2>&1) && { echo "❌ 4f · la 0700 no debía poder aplicarla un rol que no es el propietario"; exit 1; }
-echo "$SALIDA_NP" | grep -q 'autoridad_principal_empresa (pre-vuelo): asg_intruso no es el propietario de projects' || { echo "❌ 4f · abortó, pero no con el mensaje del pre-vuelo:"; echo "$SALIDA_NP" | grep ERROR | head -3; exit 1; }
+echo "$SALIDA_NP" | grep -q 'autoridad_principal_empresa (pre-vuelo): asg_intruso no es el propietario de app_users' || { echo "❌ 4f · abortó, pero no con el mensaje del pre-vuelo:"; echo "$SALIDA_NP" | grep ERROR | head -3; exit 1; }
 [ "$(pol_md5 asg_noprop)" = "$(pol_md5 "$BD_0600")" ] || { echo "❌ 4f · el pre-vuelo del propietario abortó pero dejó políticas cambiadas"; exit 1; }
 perl -0pe 's/  FOREACH v_t IN ARRAY v_tablas LOOP\n    IF NOT pg_has_role\(current_user.*?    END IF;\n  END LOOP;\n//s' "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_sin_propietario.sql"
 ! grep -q 'pg_has_role(current_user' "$SALIDAS/migracion0700_sin_propietario.sql" || { echo "❌ 4f · no se pudo quitar la comprobación del propietario"; exit 1; }
 SALIDA_NP=$(psql -q -v ON_ERROR_STOP=1 -U asg_intruso -d asg_noprop -f "$SALIDAS/migracion0700_sin_propietario.sql" 2>&1 || true)
-! echo "$SALIDA_NP" | grep -q 'no es el propietario de projects' || { echo "❌ 4f · la 0700 sin la comprobación seguía diciendo que no es el propietario"; exit 1; }
+! echo "$SALIDA_NP" | grep -q 'no es el propietario de app_users' || { echo "❌ 4f · la 0700 sin la comprobación seguía diciendo que no es el propietario"; exit 1; }
 echo "$SALIDA_NP" | grep -q 'ERROR' || { echo "❌ 4f · la 0700 sin la comprobación debía fallar igualmente (privilegios), pero con OTRO mensaje"; exit 1; }
 N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
-echo "   ✓ 4f(d) · un rol que NO es el propietario recibe «asg_intruso no es el propietario de projects» y no cambia ninguna política; mutación «sin la comprobación»: falla después con otro mensaje (la prueba la ve)"
+echo "   ✓ 4f(d) · un rol que NO es el propietario recibe «asg_intruso no es el propietario de app_users» y no cambia ninguna política; mutación «sin la comprobación»: falla después con otro mensaje (la prueba la ve)"
 baja asg_noprop
 
 # 4f(e) independiente del search_path (los nombres van calificados public.*; el texto de pg_get_expr se normaliza sin «public.» ni «auth.»)
@@ -534,19 +552,77 @@ echo "   ✓ 4f(e) · con search_path vacío, «auth,public», «public», «pg_
 
 # 4f(f) independiente de la ACL: ni las tablas ni las funciones necesitan privilegio alguno para authenticated/anon/service_role (lección del P0 de la 0600)
 copia "$BD_0600" asg_acl0
-psql -q -v ON_ERROR_STOP=1 -d asg_acl0 -c "REVOKE ALL ON public.projects, public.roles, public.role_permissions, public.user_roles, public.user_invitations FROM anon, authenticated, service_role, PUBLIC" -c "REVOKE ALL ON FUNCTION public.is_super_admin(), public.is_company_owner(), public.current_user_role(), public.get_my_company_id() FROM PUBLIC, anon, authenticated, service_role" >/dev/null
+psql -q -v ON_ERROR_STOP=1 -d asg_acl0 -c "REVOKE ALL ON public.app_users, public.projects, public.roles, public.role_permissions, public.user_roles, public.user_invitations FROM anon, authenticated, service_role, PUBLIC" -c "REVOKE ALL ON FUNCTION public.is_super_admin(), public.is_company_owner(), public.current_user_role(), public.get_my_company_id() FROM PUBLIC, anon, authenticated, service_role" >/dev/null
 aplicar "$MIGS/$MIGRACION2.sql" asg_acl0 || { echo "❌ 4f · la 0700 abortó con las tablas y funciones SIN ningún privilegio: depende de la ACL"; exit 1; }
-[ "$(pol_iguales asg_acl0)" = "7" ] || { echo "❌ 4f · sin privilegios la 0700 no dejó las 11 políticas cambiadas y 7 intactas"; exit 1; }
+[ "$(pol_iguales asg_acl0)" = "5" ] || { echo "❌ 4f · sin privilegios la 0700 no dejó las 13 políticas cambiadas y 5 intactas"; exit 1; }
 baja asg_acl0
-echo "   ✓ 4f(f) · con CERO privilegios para anon, authenticated, service_role y PUBLIC sobre las cinco tablas y las cuatro funciones auxiliares, la 0700 se aplica igual: no consulta ninguna ACL (el P0 de la 0600 no se repite)"
+echo "   ✓ 4f(f) · con CERO privilegios para anon, authenticated, service_role y PUBLIC sobre las seis tablas y las cuatro funciones auxiliares, la 0700 se aplica igual: no consulta ninguna ACL (el P0 de la 0600 no se repite)"
 
-# 4f(g) la 0700 aplica SOLA (sin la 0600): son independientes
+# 4f(g) la 0700 NO aplica SOLA: exige la regla del PRINCIPAL de la 0600 (H-04 de la quinta verificación)
+#      REQUISITO: sin la 0600 (no existe asignacion_puede_administrar) aborta con un mensaje claro y no cambia ninguna política.
 copia "$BD_ANTES" asg_solo0700
-aplicar "$MIGS/$MIGRACION2.sql" asg_solo0700 || { echo "❌ 4f · la 0700 no se aplica sin la 0600"; exit 1; }
+SALIDA_S7=$(psql -q -v ON_ERROR_STOP=1 -d asg_solo0700 -f "$MIGS/$MIGRACION2.sql" 2>&1) && { echo "❌ 4f(g) · la 0700 debía abortar sin la 0600 (REQUISITO)"; exit 1; }
+echo "$SALIDA_S7" | grep -q 'REQUISITO: falta public.asignacion_puede_administrar' || { echo "❌ 4f(g) · abortó por otra cosa:"; echo "$SALIDA_S7" | grep -E 'ERROR' | head -3; exit 1; }
+[ "$(pol_md5 asg_solo0700)" = "$(pol_md5 "$BD_ANTES")" ] && [ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_solo0700)" = "0" ] || { echo "❌ 4f(g) · el aborto dejó piezas a medias"; exit 1; }
+echo "   ✓ 4f(g) · REQUISITO: sobre la cadena SIN la 0600 la 0700 ABORTA («falta public.asignacion_puede_administrar»: van en el mismo push) y no deja ni una política cambiada ni el trigger"
+# La línea base «sólo la 0700» de 8e (revertir sólo la 0600 con la 0700 puesta) se arma SIN esa comprobación: es la 0700 menos el bloque del REQUISITO/DERIVA, sobre la cadena sin la 0600.
+perl -0pe 's/  -- REQUISITO \(H-04\).*?(?=  -- BLOQUEO ANTES DE MEDIR)//s' "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_sin_requisito.sql"
+! grep -q 'REQUISITO: falta' "$SALIDAS/migracion0700_sin_requisito.sql" || { echo "❌ 4f(g) · no se pudo quitar la comprobación del REQUISITO"; exit 1; }
+copia "$BD_ANTES" asg_solo0700
+aplicar "$SALIDAS/migracion0700_sin_requisito.sql" asg_solo0700 || { echo "❌ 4f(g) · la 0700 sin la comprobación del REQUISITO debía aplicarse sobre la cadena sin la 0600"; exit 1; }
 huella asg_solo0700 > "$SALIDAS/huella_solo0700.txt"
-[ "$(pol_md5 asg_solo0700)" = "$(pol_md5 "$BD")" ] || { echo "❌ 4f · la 0700 sola deja otras políticas que con la 0600"; exit 1; }
+[ "$(pol_md5 asg_solo0700)" = "$(pol_md5 "$BD")" ] || { echo "❌ 4f(g) · la 0700 sin el REQUISITO deja otras políticas que con la 0600"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
 baja asg_solo0700
-echo "   ✓ 4f(g) · la 0700 se aplica SOLA sobre la cadena sin la 0600 y deja las mismas 18 políticas que con ella (son independientes: se pueden revertir por separado)"
+echo "   ✓ 4f(g) · mutación «sin la comprobación del REQUISITO»: la 0700 se aplica sobre la cadena sin la 0600 y deja las mismas 18 políticas (la prueba ve el defecto; esa base es la línea base «sólo la 0700» de 8e)"
+
+# 4f(h) H-04: una 0600 ANTERIOR ya registrada (Supabase Preview del #928 en 8d34392b: la versión está registrada y el archivo nuevo NO se reaplica) → la 0700 ABORTA en vez de pasar en silencio
+#      Se aplica la 0600 de 8d34392b (copia exacta en migracion_0600_8d34392b.sql: regla que admite al administrador y user_is_project_exempt) y luego la 0700 vigente.
+copia "$BD_ANTES" asg_vieja
+aplicar "$AQUI/migracion_0600_8d34392b.sql" asg_vieja
+[ "$(q "SELECT (prosrc ~ 'user_is_project_exempt' AND prosrc ~ '''admin''' AND prosrc !~ 'is_company_owner')::text FROM pg_proc WHERE proname = 'asignacion_puede_administrar'" asg_vieja)" = "true" ] || { echo "❌ 4f(h) · la 0600 anterior no dejó la regla anterior"; exit 1; }
+PMD5_VIEJA=$(pol_md5 asg_vieja)
+SALIDA_V=$(psql -q -v ON_ERROR_STOP=1 -d asg_vieja -f "$MIGS/$MIGRACION2.sql" 2>&1) && { echo "❌ 4f(h) · la 0700 debía ABORTAR sobre una 0600 anterior ya registrada"; exit 1; }
+echo "$SALIDA_V" | grep -q 'DERIVA: public.asignacion_puede_administrar no codifica la regla del principal' || { echo "❌ 4f(h) · abortó por otra cosa:"; echo "$SALIDA_V" | grep -E 'ERROR' | head -3; exit 1; }
+[ "$(pol_md5 asg_vieja)" = "$PMD5_VIEJA" ] && [ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_vieja)" = "0" ] || { echo "❌ 4f(h) · el aborto dejó piezas a medias"; exit 1; }
+echo "   ✓ 4f(h) · H-04: sobre la 0600 de 8d34392b ya registrada la 0700 ABORTA («DERIVA: public.asignacion_puede_administrar no codifica la regla del principal») sin cambiar una política ni crear el trigger"
+# con la 0600 vigente encima (lo que hace recrear la rama) la 0700 pasa y CONVERGE al catálogo de la cadena limpia
+aplicar "$MIGS/$MIGRACION.sql" asg_vieja
+aplicar "$MIGS/$MIGRACION2.sql" asg_vieja || { echo "❌ 4f(h) · con la 0600 vigente aplicada encima, la 0700 debía pasar"; exit 1; }
+huella asg_vieja > "$SALIDAS/huella_vieja.txt"
+diff -q "$SALIDAS/huella_fin2.txt" "$SALIDAS/huella_vieja.txt" >/dev/null || { echo "❌ 4f(h) · 0600 anterior + 0600 vigente + 0700 no converge al catálogo de la cadena limpia:"; diff "$SALIDAS/huella_fin2.txt" "$SALIDAS/huella_vieja.txt" | head -6; exit 1; }
+echo "   ✓ 4f(h) · con la 0600 vigente aplicada encima la 0700 pasa y el catálogo CONVERGE al de la cadena limpia (0 diferencias en $(wc -l < "$SALIDAS/huella_vieja.txt") grupos)"
+baja asg_vieja
+# mutación: sin el bloque del REQUISITO/DERIVA la 0700 pasa en SILENCIO sobre la 0600 anterior (lo que ocurría) y el administrador sigue escribiendo asignaciones
+copia "$BD_ANTES" asg_vieja
+aplicar "$AQUI/migracion_0600_8d34392b.sql" asg_vieja
+aplicar "$SALIDAS/migracion0700_sin_requisito.sql" asg_vieja || { echo "❌ 4f(h) · sin el REQUISITO la 0700 debía pasar en silencio sobre la 0600 anterior"; exit 1; }
+[ "$(q "SELECT asgt.huella_total()" asg_vieja)" = "$(q "SELECT huella_total FROM asgt.snap_tabla WHERE tag = 'antes'" asg_vieja)" ] || { echo "❌ 4f(h) · la base de la mutación no está en el estado inicial"; exit 1; }
+SALIDA_AX=$(PGOPTIONS="-c asgt.continuar=on" psql -q -d asg_vieja -f "$AQUI/assert_principal.sql" 2>&1 || true)
+grep -q '✗.*\[A1\] AX' <<<"$SALIDA_AX" || { echo "❌ 4f(h) · sin el REQUISITO y con la 0600 anterior, assert_principal debía ver al administrador asignando proyectos (A1 de AX)"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
+baja asg_vieja
+echo "   ✓ 4f(h) · mutación «sin el REQUISITO»: la 0700 pasa SIN avisar sobre la 0600 anterior y el administrador (AX) sigue asignando proyectos: assert_principal se pone ROJA (la prueba ve el defecto)"
+# DERIVA por cuerpo: cada forma de la regla que admite al administrador o a los exentos hace abortar a la 0700 (sobre la cadena con la 0600 vigente)
+REGLA_CAB0="CREATE OR REPLACE FUNCTION public.asignacion_puede_administrar(p_user_id uuid, p_project_id uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS \$\$"
+for CUERPO in "SELECT COALESCE(public.is_super_admin() OR (public.user_is_project_exempt() AND public.is_company_owner()), false)" \
+              "SELECT COALESCE(public.is_super_admin() OR public.current_user_role() = ANY (ARRAY['company_owner','admin']), false)" \
+              "SELECT COALESCE(public.is_super_admin() OR (public.current_user_role() = 'company_owner'), false)" \
+              "SELECT COALESCE(public.is_company_owner(), false)"; do
+  copia "$BD_0600" asg_deriva
+  psql -q -v ON_ERROR_STOP=1 -d asg_deriva -c "$REGLA_CAB0 $CUERPO \$\$" >/dev/null
+  SALIDA_D=$(psql -q -v ON_ERROR_STOP=1 -d asg_deriva -f "$MIGS/$MIGRACION2.sql" 2>&1) && { echo "❌ 4f(h) · la 0700 debía abortar con la regla «$CUERPO»"; exit 1; }
+  echo "$SALIDA_D" | grep -q 'DERIVA: public.asignacion_puede_administrar no codifica la regla del principal' || { echo "❌ 4f(h) · abortó por otra cosa con «$CUERPO»:"; echo "$SALIDA_D" | grep ERROR | head -2; exit 1; }
+  [ "$(pol_md5 asg_deriva)" = "$(pol_md5 "$BD_0600")" ] || { echo "❌ 4f(h) · el aborto dejó políticas cambiadas"; exit 1; }
+  baja asg_deriva
+done
+# … y una política de escritura de las asignaciones que ya no usa la regla (se reabrió el hueco original a mano)
+copia "$BD_0600" asg_deriva
+psql -q -v ON_ERROR_STOP=1 -d asg_deriva -c "ALTER POLICY user_project_assignments_insert ON public.user_project_assignments WITH CHECK (user_id = (SELECT auth.uid()))" >/dev/null
+SALIDA_D=$(psql -q -v ON_ERROR_STOP=1 -d asg_deriva -f "$MIGS/$MIGRACION2.sql" 2>&1) && { echo "❌ 4f(h) · la 0700 debía abortar con la política INSERT de las asignaciones sin la regla"; exit 1; }
+echo "$SALIDA_D" | grep -q 'las políticas de escritura de user_project_assignments (insert, update, delete) deben usar asignacion_puede_administrar' || { echo "❌ 4f(h) · abortó por otra cosa:"; echo "$SALIDA_D" | grep ERROR | head -2; exit 1; }
+baja asg_deriva
+echo "   ✓ 4f(h) · la 0700 ABORTA con DERIVA ante cuatro formas de regla que no son la del principal (user_is_project_exempt, 'admin', current_user_role() sin is_company_owner(), sin is_super_admin()) y ante una política de escritura de las asignaciones que ya no usa la regla"
 
 echo "── 5/10 · DATOS COMO PRODUCCIÓN: las 43 filas y el alcance de cada persona, antes y después"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -v tag=despues -d "$BD" -f "$AQUI/snapshot.sql" >/dev/null
@@ -587,7 +663,7 @@ bloque assert_flujos.sql     "6c · flujos de la pantalla (borrar todas + insert
 bloque assert_alcance.sql    "6d · efecto sobre el alcance: 290 intentos de autoasignación, 84 de borrar/cambiar lo propio, nadie se vuelve exento" "$BD_POST"
 bloque assert_capas.sql      "6e · las políticas SOLAS (sin triggers) ya cierran el hueco" "$BD_POST"
 bloque assert_defensa.sql    "6f · los triggers SOLOS (con una política «true») lo siguen cerrando" "$BD_POST"
-bloque assert_principal.sql  "6g · el principal: 10 actores × 21 escrituras sensibles (invitaciones «admin», app_users, proyectos, roles, llaves, asignaciones de roles y de proyecto), la otra empresa, sin app_users y el rol RBAC de administrador" "$BD_POST"
+bloque assert_principal.sql  "6g · el principal: 10 actores × 35 escrituras sensibles (invitaciones «admin» —también su lectura—, app_users, proyectos, roles, llaves, asignaciones de roles y de proyecto), el proyecto de app_users, la otra empresa, sin app_users y el rol RBAC de administrador" "$BD_POST"
 [ "$(q "SELECT asgt.huella_total()" "$BD_POST")" = "$(q "SELECT huella_total FROM asgt.snap_tabla WHERE tag = 'antes'" "$BD_POST")" ] \
   || { echo "❌ las suites dejaron la tabla cambiada"; exit 1; }
 echo "   ✓ tras todas las suites la tabla es IDÉNTICA a la inicial (ninguna prueba dejó residuos)"
@@ -820,8 +896,8 @@ mutacion "H-05/M7 · sin el COALESCE de «sin-empresa»: la clave de una persona
   "$(mutar_funcion asignacion_bloquear_propia "$SIN_COALESCE_SIN_EMPRESA")" \
   "assert_catalogo"
 
-# MUTANTES DE LA 0700: cada una de las 11 políticas vuelve, UNA a UNA, a su texto de producción (el de la reversión): admite otra vez al administrador, y assert_principal y assert_catalogo se ponen en ROJO
-for POL in projects_insert projects_delete roles_insert roles_update roles_delete role_permissions_insert role_permissions_delete user_roles_insert user_roles_delete user_invitations_insert user_invitations_update; do
+# MUTANTES DE LA 0700: cada una de las 13 políticas vuelve, UNA a UNA, a su texto de producción (el de la reversión): admite otra vez al administrador, y assert_principal y assert_catalogo se ponen en ROJO
+for POL in projects_insert projects_delete roles_insert roles_update roles_delete role_permissions_insert role_permissions_delete user_roles_insert user_roles_delete user_invitations_insert user_invitations_select user_invitations_update user_invitations_delete; do
   mutacion "0700 · $POL vuelve al texto de producción (admite al administrador)" "$(politica_original "$POL")" "assert_catalogo assert_principal"
 done
 mutacion "0700 · TODA la 0700 revertida (scripts/reversion-principal-empresa.sql: lo que haría un revert completo)" "$(cat "$REVERSION2")" "assert_catalogo assert_principal"
@@ -839,6 +915,73 @@ mutacion "0700 · el principal es user_is_project_exempt() en projects_insert (e
   "assert_catalogo assert_principal"
 mutacion "0700 · roles_insert pierde la condición de la empresa (el propietario de D crearía roles en C)" \
   "ALTER POLICY roles_insert ON public.roles WITH CHECK (public.is_super_admin() OR (is_system = false AND public.is_company_owner()))" \
+  "assert_catalogo assert_principal"
+mutacion "0700 · user_invitations_update pierde la guarda en el USING (lo que quedó tras la primera 0700: el administrador reescribe la invitación 'admin' que ve)" \
+  "ALTER POLICY user_invitations_update ON public.user_invitations USING (public.is_super_admin() OR (company_id = public.get_my_company_id() AND public.current_user_role() = ANY (ARRAY['company_owner', 'admin'])))" \
+  "assert_catalogo assert_principal"
+mutacion "0700 · user_invitations_select USING(true): cualquier autenticado lee los tokens de las invitaciones de TODAS las empresas" \
+  "ALTER POLICY user_invitations_select ON public.user_invitations USING (true)" \
+  "assert_catalogo assert_principal"
+mutacion "0700 · user_invitations_delete USING(true): cualquier autenticado borra las invitaciones de TODAS las empresas" \
+  "ALTER POLICY user_invitations_delete ON public.user_invitations USING (true)" \
+  "assert_catalogo assert_principal"
+mutacion "0700 · user_invitations_update WITH CHECK(true): el administrador sube una invitación de operador a 'admin' o la mueve de empresa" \
+  "ALTER POLICY user_invitations_update ON public.user_invitations WITH CHECK (true)" \
+  "assert_catalogo assert_principal"
+
+# H-05 de la quinta verificación: cinco mutantes de las políticas de la 0700 que SÓLO los detectaba el pin de texto de assert_catalogo. Ahora caen también por COMPORTAMIENTO: assert_principal
+# no compara ningún texto de política (la lista de «rojas» debe incluir assert_principal por sí sola). Dos precisiones medidas al escribir los casos: (1) los casos de UPDATE y DELETE de
+# invitaciones y de roles NO llevan WHERE, porque un WHERE que lee columnas ejecuta también la política SELECT sobre la fila vieja y la nueva y ésta tapa el USING/WITH CHECK del comando
+# (con WHERE, un USING(true) en update o delete seguía en verde); (2) un mutante de role_permissions_insert que sólo quita la empresa del rol NO es distinguible por comportamiento: el rol
+# de OTRA empresa ni siquiera es visible para el propietario (roles_select exige empresa o rol de sistema), así que el EXISTS de la política ya da falso; esa capa la cubre el texto (assert_catalogo).
+mutacion "H-05/m13 · user_roles_insert sin la comprobación de assigned_by: el propietario falsea quién asignó el rol (la bitácora)" \
+  "ALTER POLICY user_roles_insert ON public.user_roles WITH CHECK (public.is_super_admin() OR (EXISTS (SELECT 1 FROM public.app_users u WHERE u.id = user_roles.user_id AND u.company_id = public.get_my_company_id() AND public.is_company_owner()) AND EXISTS (SELECT 1 FROM public.roles r WHERE r.id = user_roles.role_id AND (r.is_system = true OR r.company_id = public.get_my_company_id()))))" \
+  "assert_principal"
+mutacion "H-05/m15 · role_permissions_insert deja al propietario escribir llaves de roles de SISTEMA" \
+  "ALTER POLICY role_permissions_insert ON public.role_permissions WITH CHECK (EXISTS (SELECT 1 FROM public.roles r WHERE r.id = role_permissions.role_id AND (public.is_super_admin() OR ((r.is_system = true OR r.company_id = public.get_my_company_id()) AND public.is_company_owner()))))" \
+  "assert_principal"
+mutacion "H-05/m16 · role_permissions_delete deja al propietario borrar llaves de roles de SISTEMA" \
+  "ALTER POLICY role_permissions_delete ON public.role_permissions USING (EXISTS (SELECT 1 FROM public.roles r WHERE r.id = role_permissions.role_id AND (public.is_super_admin() OR ((r.is_system = true OR r.company_id = public.get_my_company_id()) AND public.is_company_owner()))))" \
+  "assert_principal"
+mutacion "H-05/m17 · roles_update WITH CHECK sin la empresa: el propietario TRASLADA un rol de su empresa a otra" \
+  "ALTER POLICY roles_update ON public.roles WITH CHECK (public.is_super_admin() OR (is_system = false AND public.is_company_owner()))" \
+  "assert_principal"
+mutacion "H-05/m21 · user_invitations_update USING(true): el propietario toca las invitaciones de OTRA empresa (la fila nueva se rechaza por el WITH CHECK, así que el 0 filas esperado pasa a error)" \
+  "ALTER POLICY user_invitations_update ON public.user_invitations USING (true)" \
+  "assert_principal"
+
+
+# app_users.project_id (H-01): el trigger de integridad de la 0700. Cada mutante lo desarma por una vía distinta y assert_principal (§ 8) se pone ROJA.
+funcion_mig7() {     # funcion_mig7 NOMBRE — como funcion_mig, pero de la 0700
+  awk -v n="CREATE OR REPLACE FUNCTION public.$1(" 'index($0, n) == 1 { on = 1 } on { print } on && $0 == "$$;" { exit }' "$MIGS/$MIGRACION2.sql"
+}
+mutar_funcion7() {   # mutar_funcion7 NOMBRE 'expresión perl s///' — exige que la sustitución cambie algo
+  local orig mut
+  orig=$(funcion_mig7 "$1"); mut=$(printf '%s\n' "$orig" | perl -0pe "$2")
+  [ -n "$orig" ] || { echo "❌ mutar_funcion7: no se encontró $1 en la 0700" >&2; exit 1; }
+  [ "$orig" != "$mut" ] || { echo "❌ mutar_funcion7: la sustitución no cambió $1 (¿cambió su texto?)" >&2; exit 1; }
+  printf '%s\n' "$mut"
+}
+mutacion "H-01 · se quita el trigger de app_users.project_id: el propietario fija el proyecto de OTRA empresa" \
+  "DROP TRIGGER trg_validar_proyecto_app_users ON public.app_users" \
+  "assert_catalogo assert_principal"
+mutacion "H-01 · el trigger de app_users.project_id queda deshabilitado" \
+  "ALTER TABLE public.app_users DISABLE TRIGGER trg_validar_proyecto_app_users" \
+  "assert_catalogo assert_principal"
+mutacion "H-01 · el trigger no compara la empresa (sólo que el proyecto exista)" \
+  "$(mutar_funcion7 app_users_validar_proyecto 's/ OR v_emp_proyecto <> NEW\.company_id//')" \
+  "assert_principal"
+mutacion "H-01 · el trigger exime al rol de servicio y al superusuario (sin auth.uid()): el rigor «para cualquier actor» se pierde" \
+  "$(mutar_funcion7 app_users_validar_proyecto 's/(\nBEGIN\n)/$1  IF auth.uid() IS NULL THEN RETURN NEW; END IF;\n/')" \
+  "assert_principal"
+mutacion "H-01 · el trigger deja pasar a una persona sin empresa con proyecto" \
+  "$(mutar_funcion7 app_users_validar_proyecto 's/ OR NEW\.company_id IS NULL//')" \
+  "assert_principal"
+mutacion "H-01 · el trigger sólo se dispara al escribir project_id (cambiar la EMPRESA de una persona con proyecto lo deja con el de la anterior)" \
+  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users BEFORE INSERT OR UPDATE OF project_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
+  "assert_catalogo assert_principal"
+mutacion "H-01 · el trigger se dispara en TODO UPDATE (sin la lista OF): un dato heredado que ya cruza empresa impediría editar otras columnas" \
+  "CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users BEFORE INSERT OR UPDATE ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto()" \
   "assert_catalogo assert_principal"
 
 echo "── 10/10 · concurrencia: sesiones REALES simultáneas y la migración contra una transacción larga"
@@ -1372,8 +1515,8 @@ copia "$BD_0600" asg_conc
 N_ROLES=$(q "SELECT count(*) FROM public.roles" asg_conc)
 escritura_en_migracion asg_conc "$MIGS/$MIGRACION2.sql" f40700 '^-- ── 1\. Proyectos' "$ESC7"
 [ "$ESTADO2" = "esperando" ] && [ "$MIG_RC" = "0" ] && ! grep -q 'CAMBIARON' "$MIG_TXT" && ! grep -qi 'error' "$SALIDAS/f40700_esc.txt" \
-  && [ "$(q "SELECT count(*) FROM public.roles" asg_conc)" = "$((N_ROLES + 1))" ] && [ "$(pol_iguales asg_conc)" = "7" ] \
-  && echo "  ✓ F4 · 0700 · una escritura legítima (el propietario crea un rol) llega con la 0700 parada tras su pre-vuelo: ESPERA el bloqueo, la migración pasa (sin «CAMBIARON»), deja las 11 políticas del principal y la escritura se aplica después ($((N_ROLES + 1)) roles)" \
+  && [ "$(q "SELECT count(*) FROM public.roles" asg_conc)" = "$((N_ROLES + 1))" ] && [ "$(pol_iguales asg_conc)" = "5" ] \
+  && echo "  ✓ F4 · 0700 · una escritura legítima (el propietario crea un rol) llega con la 0700 parada tras su pre-vuelo: ESPERA el bloqueo, la migración pasa (sin «CAMBIARON»), deja las 13 políticas del principal y la escritura se aplica después ($((N_ROLES + 1)) roles)" \
   || { echo "❌ F4 · 0700 · ESTADO2=$ESTADO2 MIG_RC=$MIG_RC"; cat "$MIG_TXT" "$SALIDAS/f40700_esc.txt"; exit 1; }
 copia "$BD_0600" asg_conc
 sed '/^  LOCK TABLE public\.projects, public\.role_permissions, public\.roles/d' "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_sin_lock.sql"
@@ -1394,11 +1537,11 @@ escritura_en_migracion asg_conc "$REVERSION2" r020700 '^-- ── 1 · proyectos
   && echo "  ✓ R02 · 0700 · una escritura legítima llega con la REVERSIÓN de la 0700 parada tras su pre-vuelo: ESPERA, la reversión pasa (sin «CAMBIARON»), deja las 18 políticas de producción y la escritura se aplica después" \
   || { echo "❌ R02 · 0700 · ESTADO2=$ESTADO2 MIG_RC=$MIG_RC"; cat "$MIG_TXT" "$SALIDAS/r020700_esc.txt"; exit 1; }
 copia "$BD_POST" asg_conc
-sed '/^  LOCK TABLE public\.projects, public\.role_permissions, public\.roles/d' "$REVERSION2" > "$SALIDAS/reversion0700_sin_lock.sql"
-! grep -q 'LOCK TABLE public.projects' "$SALIDAS/reversion0700_sin_lock.sql" || { echo "❌ R02 · 0700 · no se pudo quitar el LOCK TABLE de la reversión"; exit 1; }
+sed '/^  LOCK TABLE public\.app_users, public\.projects, public\.role_permissions, public\.roles/d' "$REVERSION2" > "$SALIDAS/reversion0700_sin_lock.sql"
+! grep -q 'LOCK TABLE' "$SALIDAS/reversion0700_sin_lock.sql" || { echo "❌ R02 · 0700 · no se pudo quitar el LOCK TABLE de la reversión"; exit 1; }
 escritura_en_migracion asg_conc "$SALIDAS/reversion0700_sin_lock.sql" r020700b '^-- ── 1 · proyectos' "$ESC7"
-[ "$ESTADO2" = "terminó" ] && [ "$MIG_RC" != "0" ] && grep -q 'reversion_autoridad_principal_empresa: las filas de roles CAMBIARON' "$MIG_TXT" && [ "$(pol_iguales asg_conc)" = "7" ] \
-  && echo "  ✓ R02 · 0700 · mutación «reversión sin el LOCK TABLE»: la escritura se confirma durante la pausa y la reversión ABORTA con el falso «las filas de roles … CAMBIARON» sin deshacer nada (siguen las 11 políticas del principal): la prueba ve el defecto" \
+[ "$ESTADO2" = "terminó" ] && [ "$MIG_RC" != "0" ] && grep -q 'reversion_autoridad_principal_empresa: las filas de roles CAMBIARON' "$MIG_TXT" && [ "$(pol_iguales asg_conc)" = "5" ] \
+  && echo "  ✓ R02 · 0700 · mutación «reversión sin el LOCK TABLE»: la escritura se confirma durante la pausa y la reversión ABORTA con el falso «las filas de roles … CAMBIARON» sin deshacer nada (siguen las 13 políticas del principal): la prueba ve el defecto" \
   || { echo "❌ R02 · 0700 · sin el LOCK la reversión debía abortar con CAMBIARON: ESTADO2=$ESTADO2 MIG_RC=$MIG_RC"; cat "$MIG_TXT"; exit 1; }
 N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
 baja asg_conc
@@ -1449,9 +1592,78 @@ echo "$SALIDA_LOCK" | grep -q 'lock timeout' || { echo "❌ C · 0700 · falló,
 [ "$((FIN - INI))" -le 8 ] || { echo "❌ C · 0700 · tardó $((FIN - INI)) s: el lock_timeout de 5 s no cortó"; exit 1; }
 [ "$(pol_md5 asg_lock)" = "$(pol_md5 "$BD_0600")" ] || { echo "❌ C · 0700 · dejó políticas cambiadas"; exit 1; }
 aplicar "$MIGS/$MIGRACION2.sql" asg_lock
-[ "$(pol_iguales asg_lock)" = "7" ] || { echo "❌ C · 0700 · reintentada no dejó las 11 políticas del principal"; exit 1; }
+[ "$(pol_iguales asg_lock)" = "5" ] || { echo "❌ C · 0700 · reintentada no dejó las 13 políticas del principal"; exit 1; }
 echo "  ✓ C · 0700 · con una transacción larga sobre roles la 0700 FALLA en $((FIN - INI)) s por lock_timeout («canceling statement due to lock timeout»), no cambia ninguna política y, reintentada, se aplica"
 baja asg_lock
+
+# C · 0700 · app_users se sigue LEYENDO mientras la 0700 corre: la RLS de todo el sistema la consulta y la 0700 sólo le añade un trigger. Una transacción larga que LEE app_users (ACCESS SHARE) NO
+#             hace esperar a la migración (CREATE OR REPLACE TRIGGER pide SHARE ROW EXCLUSIVE, que no choca con una lectura), ni en la primera pasada ni al REAPLICARla. Medido: DROP TRIGGER IF EXISTS sólo pide
+#             ACCESS EXCLUSIVE cuando el trigger YA EXISTE (en la primera pasada, sin trigger, no espera): por eso la mutación (DROP TRIGGER IF EXISTS + CREATE TRIGGER) se prueba sobre la reaplicación.
+copia "$BD_0600" asg_lock
+FIN_LARGA="$SALIDAS/c7b.finlarga"; rm -f "$FIN_LARGA"
+ctl_abrir asg_lock c7b 4
+( PGAPPNAME=asg_larga psql -q -X -d asg_lock >/dev/null 2>&1 <<SQL || true; touch "$FIN_LARGA" ) &
+BEGIN;
+SELECT count(*) FROM public.app_users;
+SELECT pg_advisory_xact_lock($PUERTA, 4);
+COMMIT;
+SQL
+P_LARGA=$!
+esperar_o_fin asg_lock "$(en_puerta 4)" "$FIN_LARGA"
+INI=$(date +%s)
+SALIDA_LECTOR=$(psql -q -v ON_ERROR_STOP=1 -d asg_lock -f "$MIGS/$MIGRACION2.sql" 2>&1) || { ctl_soltar 4; echo "❌ C · 0700 · con una transacción larga que LEE app_users la 0700 debía aplicarse:"; echo "$SALIDA_LECTOR" | grep -E 'ERROR' | head -3; exit 1; }
+FIN=$(date +%s)
+[ "$((FIN - INI))" -le 3 ] || { ctl_soltar 4; echo "❌ C · 0700 · esperó $((FIN - INI)) s a una transacción que sólo lee app_users"; exit 1; }
+T_LECTOR=$((FIN - INI))
+[ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_lock)" = "1" ] || { ctl_soltar 4; echo "❌ C · 0700 · no dejó el trigger"; exit 1; }
+ctl_soltar 4
+wait $P_LARGA || true
+baja asg_lock
+# reaplicación (el trigger YA existe) con el mismo lector abierto: la 0700 vigente se aplica igual y no espera
+copia "$BD_POST" asg_lock
+FIN_LARGA="$SALIDAS/c7r.finlarga"; rm -f "$FIN_LARGA"
+ctl_abrir asg_lock c7r 4
+( PGAPPNAME=asg_larga psql -q -X -d asg_lock >/dev/null 2>&1 <<SQL || true; touch "$FIN_LARGA" ) &
+BEGIN;
+SELECT count(*) FROM public.app_users;
+SELECT pg_advisory_xact_lock($PUERTA, 4);
+COMMIT;
+SQL
+P_LARGA=$!
+esperar_o_fin asg_lock "$(en_puerta 4)" "$FIN_LARGA"
+INI=$(date +%s)
+SALIDA_LECTOR=$(psql -q -v ON_ERROR_STOP=1 -d asg_lock -f "$MIGS/$MIGRACION2.sql" 2>&1) || { ctl_soltar 4; echo "❌ C · 0700 · reaplicada con una transacción larga que LEE app_users la 0700 debía aplicarse:"; echo "$SALIDA_LECTOR" | grep -E 'ERROR' | head -3; exit 1; }
+FIN=$(date +%s)
+[ "$((FIN - INI))" -le 3 ] || { ctl_soltar 4; echo "❌ C · 0700 · reaplicada esperó $((FIN - INI)) s a una transacción que sólo lee app_users"; exit 1; }
+T_LECTOR2=$((FIN - INI))
+ctl_soltar 4
+wait $P_LARGA || true
+baja asg_lock
+# mutación: DROP TRIGGER IF EXISTS + CREATE TRIGGER pide ACCESS EXCLUSIVE sobre app_users en cuanto el trigger existe y, con el mismo lector, la 0700 reaplicada falla por lock_timeout
+perl -0pe 's/CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users/DROP TRIGGER IF EXISTS trg_validar_proyecto_app_users ON public.app_users;\nCREATE TRIGGER trg_validar_proyecto_app_users/' "$MIGS/$MIGRACION2.sql" > "$SALIDAS/migracion0700_drop_trigger.sql"
+grep -q 'DROP TRIGGER IF EXISTS trg_validar_proyecto_app_users' "$SALIDAS/migracion0700_drop_trigger.sql" || { echo "❌ C · 0700 · no se pudo preparar la variante con DROP TRIGGER"; exit 1; }
+copia "$BD_POST" asg_lock
+FIN_LARGA="$SALIDAS/c7c.finlarga"; rm -f "$FIN_LARGA"
+ctl_abrir asg_lock c7c 4
+( PGAPPNAME=asg_larga psql -q -X -d asg_lock >/dev/null 2>&1 <<SQL || true; touch "$FIN_LARGA" ) &
+BEGIN;
+SELECT count(*) FROM public.app_users;
+SELECT pg_advisory_xact_lock($PUERTA, 4);
+COMMIT;
+SQL
+P_LARGA=$!
+esperar_o_fin asg_lock "$(en_puerta 4)" "$FIN_LARGA"
+INI=$(date +%s)
+SALIDA_LECTOR=$(psql -q -v ON_ERROR_STOP=1 -d asg_lock -f "$SALIDAS/migracion0700_drop_trigger.sql" 2>&1) && { ctl_soltar 4; echo "❌ C · 0700 · con DROP TRIGGER y un lector de app_users la migración debía fallar por lock_timeout"; exit 1; }
+FIN=$(date +%s)
+ctl_soltar 4
+wait $P_LARGA || true
+echo "$SALIDA_LECTOR" | grep -q 'lock timeout' || { echo "❌ C · 0700 · la variante con DROP TRIGGER falló, pero no por lock_timeout:"; echo "$SALIDA_LECTOR" | grep -E 'ERROR' | head -3; exit 1; }
+[ "$(pol_md5 asg_lock)" = "$(pol_md5 "$BD_POST")" ] || { echo "❌ C · 0700 · la variante con DROP TRIGGER dejó políticas cambiadas"; exit 1; }
+[ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_validar_proyecto_app_users'" asg_lock)" = "1" ] || { echo "❌ C · 0700 · la variante con DROP TRIGGER, que falló, dejó el trigger quitado"; exit 1; }
+N_MUT_GUARDA=$((N_MUT_GUARDA + 1))
+baja asg_lock
+echo "  ✓ C · 0700 · una transacción larga que sólo LEE app_users no hace esperar a la 0700 (se aplica en $T_LECTOR s y deja el trigger; reaplicada, en $T_LECTOR2 s); mutación «DROP TRIGGER IF EXISTS + CREATE TRIGGER» (ACCESS EXCLUSIVE en cuanto el trigger existe): con el mismo lector la 0700 reaplicada FALLA en $((FIN - INI)) s por lock_timeout, no cambia ninguna política y no quita el trigger (la prueba ve el defecto)"
 
 echo "── 11 · scripts/diagnostico-asignaciones-proyecto.sql: un SELECT, en una transacción de SOLO LECTURA"
 SALIDA_DIAG_ANTES=$(PGOPTIONS="-c default_transaction_read_only=on" psql -q -v ON_ERROR_STOP=1 -At -F ' | ' -d "$BD_ANTES" -f "$DIAGNOSTICO")
@@ -1467,14 +1679,14 @@ for SALIDA in "$SALIDA_DIAG_ANTES" "$SALIDA_DIAG_POST"; do
   echo "$SALIDA" | grep -q '8 administrables | filas que el propietario de su empresa puede administrar (persona y proyecto de SU empresa, empresa con propietario) | 33' || { echo "❌ el diagnóstico no cuenta las 33 filas que el propietario administra"; exit 1; }
   echo "$SALIDA" | grep -q 'o de una empresa sin propietario) | 10' || { echo "❌ el diagnóstico no cuenta las 10 filas que sólo alcanzan el superadministrador y el servicio"; exit 1; }
 done
-[ "$(echo "$SALIDA_DIAG_ANTES" | grep -c '^9 0700 .*admite al administrador (producción)')" = "11" ] || { echo "❌ antes de las migraciones las 11 políticas de la 0700 deben decir «admite al administrador (producción)»"; exit 1; }
-[ "$(echo "$SALIDA_DIAG_POST" | grep -cE '^9 0700 .*(sólo el principal|role admin sólo del principal)')" = "11" ] || { echo "❌ tras las migraciones las 11 políticas de la 0700 deben decir «sólo el principal»"; exit 1; }
+[ "$(echo "$SALIDA_DIAG_ANTES" | grep -c '^9 0700 .*admite al administrador (producción)')" = "13" ] || { echo "❌ antes de las migraciones las 13 políticas de la 0700 deben decir «admite al administrador (producción)»"; exit 1; }
+[ "$(echo "$SALIDA_DIAG_POST" | grep -cE '^9 0700 .*(sólo el principal|role admin sólo del principal)')" = "13" ] || { echo "❌ tras las migraciones las 13 políticas de la 0700 deben decir «sólo el principal»"; exit 1; }
 echo "$SALIDA_DIAG_POST" | grep -q '6 estado | regla asignacion_puede_administrar | del principal (propietario o superadministrador)' || { echo "❌ el diagnóstico no ve la regla del principal"; exit 1; }
 echo "$SALIDA_DIAG_POST" | grep -q '7 principales | empresas con personas y SIN propietario' || { echo "❌ el diagnóstico no cuenta las empresas sin propietario"; exit 1; }
 if PGOPTIONS="-c default_transaction_read_only=on" psql -q -v ON_ERROR_STOP=1 -d "$BD_POST" -c "DELETE FROM public.user_project_assignments" >/dev/null 2>&1; then
   echo "❌ control: la sesión de solo lectura permitió un DELETE"; exit 1
 fi
-echo "   ✓ una sentencia; corre con default_transaction_read_only=on (control: un DELETE ahí falla); antes: 10 huérfanas, EL HUECO señalado, 11 políticas que admiten al administrador; después: «corregida», regla y 11 políticas del principal, anon sin privilegios; la sección «tabla» es idéntica; el propietario alcanza 33 de las 43 filas y las otras 10 sólo el superadministrador y el servicio"
+echo "   ✓ una sentencia; corre con default_transaction_read_only=on (control: un DELETE ahí falla); antes: 10 huérfanas, EL HUECO señalado, 13 políticas que admiten al administrador y sin el trigger de app_users; después: «corregida», regla, 13 políticas del principal y el trigger puesto, anon sin privilegios; la sección «tabla» es idéntica; el propietario alcanza 33 de las 43 filas y las otras 10 sólo el superadministrador y el servicio"
 
 echo ""
 echo "══ TOTAL: $TOTAL comprobaciones ✓ en bloques de una sesión + los controles negativos, la reversión, $((N_MUT + N_MUT_CONC + N_MUT_ACL + N_MUT_GUARDA)) mutaciones ($N_MUT de catálogo + $N_MUT_CONC de concurrencia + $N_MUT_ACL de privilegios + $N_MUT_GUARDA de guardas), la concurrencia y el diagnóstico ══"

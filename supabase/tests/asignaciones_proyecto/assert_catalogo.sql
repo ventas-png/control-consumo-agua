@@ -283,10 +283,11 @@ END $$;
 SELECT asgt.chk_bool(NOT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()), true,
   '[catálogo] y tras deshacer los casos esta sesión no retiene ningún candado (sin residuos)');
 
--- ═══ 6 · la 20261026000700: las 11 políticas del PRINCIPAL y las 7 de las mismas tablas que NO cambian ═══════════════════════════
+-- ═══ 6 · la 20261026000700: las 13 políticas del PRINCIPAL y las 5 de las mismas tablas que NO cambian ═══════════════════════════
 -- projects, roles, role_permissions, user_roles y user_invitations tienen 18 políticas. Las 11 de escritura que admitían al administrador pasan a is_company_owner() (conservando el
--- resto de su predicado de producción) y user_invitations añade «role <> 'admin' OR propietario OR superadministrador»; las otras 7 (los SELECT, projects_update, user_invitations_delete)
--- quedan IDÉNTICAS a producción. El texto se compara sin «public.» ni «auth.» y con los espacios colapsados (lo que imprime pg_get_expr depende del search_path de la sesión).
+-- resto de su predicado de producción) y user_invitations añade «role <> 'admin' OR propietario OR superadministrador» en sus cuatro políticas (insert, select, update, delete: la
+-- invitación 'admin' es del principal de punta a punta, también su lectura —el token es una credencial—); las otras 5 (los SELECT de projects, roles, role_permissions y user_roles, y
+-- projects_update) quedan IDÉNTICAS a producción. El texto se compara sin «public.» ni «auth.» y con los espacios colapsados (lo que imprime pg_get_expr depende del search_path de la sesión).
 CREATE TEMP TABLE _esperado_0700 (tabla text, politica text, usando text, con_check text);
 INSERT INTO _esperado_0700 VALUES
   ($q$projects$q$, $q$projects_delete$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND is_company_owner()))$q$, $q$$q$),
@@ -300,10 +301,10 @@ INSERT INTO _esperado_0700 VALUES
   ($q$roles$q$, $q$roles_insert$q$, $q$$q$, $q$(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND is_company_owner()))$q$),
   ($q$roles$q$, $q$roles_select$q$, $q$(is_super_admin() OR (is_system = true) OR (company_id = get_my_company_id()))$q$, $q$$q$),
   ($q$roles$q$, $q$roles_update$q$, $q$(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND is_company_owner()))$q$, $q$(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND is_company_owner()))$q$),
-  ($q$user_invitations$q$, $q$user_invitations_delete$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))$q$, $q$$q$),
+  ($q$user_invitations$q$, $q$user_invitations_delete$q$, $q$((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))$q$, $q$$q$),
   ($q$user_invitations$q$, $q$user_invitations_insert$q$, $q$$q$, $q$((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))$q$),
-  ($q$user_invitations$q$, $q$user_invitations_select$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))$q$, $q$$q$),
-  ($q$user_invitations$q$, $q$user_invitations_update$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))$q$, $q$((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))$q$),
+  ($q$user_invitations$q$, $q$user_invitations_select$q$, $q$((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))$q$, $q$$q$),
+  ($q$user_invitations$q$, $q$user_invitations_update$q$, $q$((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))$q$, $q$((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))$q$),
   ($q$user_roles$q$, $q$user_roles_delete$q$, $q$(is_super_admin() OR (EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND is_company_owner()))))$q$, $q$$q$),
   ($q$user_roles$q$, $q$user_roles_insert$q$, $q$$q$, $q$(is_super_admin() OR ((EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND is_company_owner()))) AND (EXISTS ( SELECT 1 FROM roles r WHERE ((r.id = user_roles.role_id) AND ((r.is_system = true) OR (r.company_id = get_my_company_id()))))) AND ((assigned_by IS NULL) OR (assigned_by = ( SELECT uid() AS uid)))))$q$),
   ($q$user_roles$q$, $q$user_roles_select$q$, $q$(is_super_admin() OR (user_id = ( SELECT uid() AS uid)) OR (EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))))$q$, $q$$q$);
@@ -315,13 +316,13 @@ SELECT asgt.chk((SELECT count(*) FROM _esperado_0700 e
                    JOIN pg_policy p ON p.polrelid = ('public.' || e.tabla)::regclass AND p.polname = e.politica
                   WHERE regexp_replace(regexp_replace(COALESCE(pg_get_expr(p.polqual, p.polrelid), ''), E'\\m(public|auth)\\.', '', 'g'), '\s+', ' ', 'g') = e.usando
                     AND regexp_replace(regexp_replace(COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), ''), E'\\m(public|auth)\\.', '', 'g'), '\s+', ' ', 'g') = e.con_check), 18,
-  '[0700] las 18 políticas tienen EXACTAMENTE el texto esperado: 11 del principal y 7 sin cambio');
+  '[0700] las 18 políticas tienen EXACTAMENTE el texto esperado: 13 del principal y 5 sin cambio');
 SELECT asgt.chk_txt((SELECT string_agg(c.relname || '.' || p.polname, ', ' ORDER BY c.relname, p.polname)
                        FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
                       WHERE c.oid = ANY (ARRAY['public.projects'::regclass, 'public.roles'::regclass, 'public.role_permissions'::regclass, 'public.user_roles'::regclass, 'public.user_invitations'::regclass])
                         AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') || COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') ~ 'is_company_owner'),
-  'projects.projects_delete, projects.projects_insert, role_permissions.role_permissions_delete, role_permissions.role_permissions_insert, roles.roles_delete, roles.roles_insert, roles.roles_update, user_invitations.user_invitations_insert, user_invitations.user_invitations_update, user_roles.user_roles_delete, user_roles.user_roles_insert',
-  '[0700] las políticas que usan is_company_owner() son exactamente las 11 que cambian');
+  'projects.projects_delete, projects.projects_insert, role_permissions.role_permissions_delete, role_permissions.role_permissions_insert, roles.roles_delete, roles.roles_insert, roles.roles_update, user_invitations.user_invitations_delete, user_invitations.user_invitations_insert, user_invitations.user_invitations_select, user_invitations.user_invitations_update, user_roles.user_roles_delete, user_roles.user_roles_insert',
+  '[0700] las políticas que usan is_company_owner() son exactamente las 13 que cambian');
 SELECT asgt.chk_txt((SELECT string_agg(c.relname || '.' || p.polname || ':' || p.polcmd::text || ':' || p.polpermissive::text || ':' || p.polroles::regrole[]::text, ', ' ORDER BY c.relname, p.polname)
                        FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
                       WHERE c.oid = ANY (ARRAY['public.projects'::regclass, 'public.roles'::regclass, 'public.role_permissions'::regclass, 'public.user_roles'::regclass, 'public.user_invitations'::regclass])),
@@ -331,3 +332,23 @@ SELECT asgt.chk_bool((SELECT pg_get_expr(p.polqual, p.polrelid) ~ '''admin''' FR
   '[0700] projects_update NO cambia: los administradores siguen configurando fiscal y cobros');
 SELECT asgt.chk((SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ('is_company_owner', 'is_super_admin', 'current_user_role', 'get_my_company_id')), 4,
   '[0700] no se creó ninguna función: la regla usa las que ya existían (is_super_admin, is_company_owner, current_user_role, get_my_company_id)');
+
+-- ═══ 7 · la 20261026000700: el trigger de integridad de app_users.project_id (H-01 de la quinta verificación) ═════════════════════════════════════════
+-- BEFORE INSERT OR UPDATE OF project_id, company_id, por fila, habilitado. Se dispara después de trg_lock_app_users_self_privilege (orden alfabético) para validar la fila ya restituida.
+SELECT asgt.chk_txt((SELECT string_agg(tgname::text || ':' || tgenabled::text, ', ' ORDER BY tgname) FROM pg_trigger WHERE tgrelid = 'public.app_users'::regclass AND NOT tgisinternal),
+  'trg_cliente_sin_company_id:O, trg_lock_app_users_self_privilege:O, trg_validar_proyecto_app_users:O',
+  '[0700] app_users tiene sus 2 triggers de siempre y el nuevo trg_validar_proyecto_app_users, los tres habilitados (origen)');
+SELECT asgt.chk_txt((SELECT pg_get_triggerdef(oid) FROM pg_trigger WHERE tgrelid = 'public.app_users'::regclass AND tgname = 'trg_validar_proyecto_app_users'),
+  'CREATE TRIGGER trg_validar_proyecto_app_users BEFORE INSERT OR UPDATE OF project_id, company_id ON public.app_users FOR EACH ROW EXECUTE FUNCTION app_users_validar_proyecto()',
+  '[0700] el trigger sólo se dispara al escribir project_id / company_id (no mira filas existentes ni otras columnas)');
+SELECT asgt.chk_bool((SELECT 'trg_validar_proyecto_app_users' > 'trg_lock_app_users_self_privilege' COLLATE "C"), true,
+  '[0700] y su nombre lo ordena DESPUÉS del trigger que restituye las columnas privilegiadas de una autoedición (valida la fila que de verdad se escribiría)');
+SELECT asgt.chk_txt((SELECT p.prosecdef::text || '|' || p.provolatile::text || '|' || COALESCE(array_to_string(p.proconfig, ','), '') FROM pg_proc p WHERE p.oid = 'public.app_users_validar_proyecto()'::regprocedure),
+  'true|v|search_path=""', '[0700] app_users_validar_proyecto: SECURITY DEFINER (la validación no depende de qué proyectos ve quien escribe) y search_path vacío');
+SELECT asgt.chk_txt((SELECT string_agg(r || '=' || has_function_privilege(r, 'public.app_users_validar_proyecto()', 'EXECUTE')::text, ', ' ORDER BY r)
+                       FROM unnest(ARRAY['anon', 'authenticated']) r),
+  'anon=false, authenticated=false', '[0700] la función de trigger no es invocable por anon ni authenticated');
+SELECT asgt.chk_bool(NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a WHERE p.oid = 'public.app_users_validar_proyecto()'::regprocedure AND a.grantee = 0),
+  true, '[0700] y PUBLIC no tiene EXECUTE (el REVOKE ALL … FROM PUBLIC quedó)');
+SELECT asgt.caso('[0700] authenticated no puede invocar el trigger de app_users a mano', 'OP1', 'SELECT public.app_users_validar_proyecto()', 'error',
+  p_sqlstate => '42501', p_patron => 'permission denied for function app_users_validar_proyecto', p_control => false);

@@ -65,10 +65,12 @@
 --      (ASIGNACION_PROPIA_NO_PERMITIDA, insufficient_privilege). Si una política
 --      permisiva futura reabriera el hueco, esto lo sigue cerrando. service_role y
 --      superusuario (auth.uid() nulo) pasan.
---      Baja en cascada: un administrador que borra por la API un proyecto al que él mismo está asignado
---      SÍ puede (su alcance sólo se reduce y es un flujo legítimo del servidor) mientras conserve otra
+--      Baja en cascada: con la 0600 SOLA un administrador que borra por la API un proyecto al que él mismo
+--      está asignado SÍ puede (su alcance sólo se reduce y es un flujo legítimo del servidor) mientras conserve otra
 --      asignación; si fuera su ÚLTIMA fila quedaría sin asignaciones y pasaría a ser exento, y eso se rechaza
---      (ASIGNACION_PROPIA_NO_PERMITIDA). Lo borra entonces el propietario o el superadministrador.
+--      (ASIGNACION_PROPIA_NO_PERMITIDA). Lo borra entonces el propietario o el superadministrador. Con la 20261026000700
+--      (mismo push) un administrador ya no borra proyectos por la API (projects_delete es del principal: recibe 0 filas) y
+--      esta comprobación sigue defendiendo en profundidad (propietario, superadministrador, funciones SECURITY DEFINER futuras).
 --      Esa comprobación («¿le queda otra fila?») se SERIALIZA con un candado de aviso POR EMPRESA (pg_advisory_xact_lock sobre
 --      'asg-cascada:' || la empresa de la PERSONA cuya fila se borra, leída de app_users) tomado ANTES de mirar: sin él, dos sesiones que
 --      borraran cada una uno de los dos únicos proyectos de un administrador veían cada una la fila de la otra como viva y lo dejaban con CERO

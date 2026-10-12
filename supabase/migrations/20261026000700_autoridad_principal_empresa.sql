@@ -25,40 +25,55 @@
 --       role 'admin' directamente en user_invitations (la lista blanca de las funciones de borde no es un control:
 --       accept-invitation crea app_users con invitation.role sin saber quién invitó).
 --
--- QUÉ CAMBIA (11 políticas; los mismos nombres, comandos y roles de base de datos; ALTER POLICY sólo cambia las expresiones)
+-- QUÉ CAMBIA (13 políticas y 1 trigger; los mismos nombres, comandos y roles de base de datos; ALTER POLICY sólo cambia las expresiones)
 --   1. projects_insert, projects_delete: public.is_super_admin() OR (company_id = public.get_my_company_id() AND
 --      public.is_company_owner()). projects_update NO cambia: los administradores siguen configurando fiscal y cobros.
 --   2. roles_insert / roles_update / roles_delete, role_permissions_insert / role_permissions_delete,
 --      user_roles_insert / user_roles_delete: se CONSERVAN EXACTAMENTE los demás predicados de producción (rol no
 --      de sistema, empresa del rol, persona de la empresa, assigned_by) y
 --      `current_user_role() = ANY (ARRAY['company_owner','admin'])` pasa a public.is_company_owner(); is_super_admin() se mantiene.
---   3. user_invitations_insert y user_invitations_update (WITH CHECK): se añade, además de lo que ya había,
---      (role <> 'admin' OR public.is_company_owner() OR public.is_super_admin()). Invitar operador, visor o cobros
---      sigue permitido a los administradores.
---   Los SELECT de todas esas tablas, user_invitations_delete y app_users_* (que ya eran sólo del propietario) NO cambian.
+--   3. user_invitations_insert, _select, _update (USING y WITH CHECK) y _delete: se añade, además de lo que ya había,
+--      (role <> 'admin' OR public.is_company_owner() OR public.is_super_admin()). Invitar operador, visor o cobros sigue permitido a los administradores, que ven
+--      y gestionan esas invitaciones; la invitación 'admin' es del principal de punta a punta: un administrador NO la crea, NO la rebaja ni la modifica, NO la
+--      borra y NO la LEE. El token de una invitación es una credencial (accept-invitation crea la cuenta con quien lo presente): sin la guarda en la lectura un
+--      administrador leía el token de la invitación 'admin' que el propietario emitió para otra persona y la completaba él con una contraseña que elige.
+--   4. Integridad de app_users.project_id (trigger trg_validar_proyecto_app_users, BEFORE INSERT OR UPDATE OF project_id, company_id): el proyecto de una persona
+--      debe existir y ser de SU empresa, para cualquier actor, también service_role y el superusuario (NEW.project_id NULL pasa). Es la columna hermana de
+--      user_project_assignments: user_has_project_access() y has_admin_project_access() leen app_users.project_id SIN comprobar la empresa del proyecto, y el
+--      propietario podía fijarle a una persona de su empresa el proyecto de OTRA (preexistente; producción hoy: 0 filas con project_id). Sólo valida lo que se
+--      escribe: no mira ni toca las filas existentes (el pre-vuelo cuenta, y sólo informa, las que ya crucen empresa). NO cubre app_users.cliente_id: decisión
+--      abierta D-20 del documento.
+--   Los demás SELECT de esas tablas (projects, roles, role_permissions, user_roles) y app_users_* (que ya eran sólo del propietario) NO cambian.
 --   Los administradores conservan, por perfil, todas las llaves (user_has_permission() los deja pasar): eso NO cambia aquí.
 --
 -- QUÉ NO CAMBIA
---   · NINGUNA fila: roles, role_permissions, user_roles, user_invitations y projects se miden (conteo y md5 de la fila completa) antes y después y
---     la migración aborta si difieren. Ningún privilegio, ninguna función, ningún trigger.
+--   · NINGUNA fila: app_users, roles, role_permissions, user_roles, user_invitations y projects se miden (conteo y md5 de la fila completa) antes y después y
+--     la migración aborta si difieren. Ningún privilegio y ninguna otra función o trigger.
 --
 -- QUÉ SUPONE DEL ENTORNO (y lo comprueba el pre-vuelo, con un mensaje claro)
---   · existen is_super_admin(), is_company_owner(), current_user_role(), get_my_company_id() y las cinco tablas con sus políticas;
---   · cada una de las 18 políticas de esas cinco tablas tiene el texto de producción (o ya el nuevo, si se corre dos veces): si hubiera deriva,
+--   · existen is_super_admin(), is_company_owner(), current_user_role(), get_my_company_id() y las seis tablas con sus políticas;
+--   · la 20261026000600 ESTÁ APLICADA CON LA REGLA DEL PRINCIPAL: public.asignacion_puede_administrar existe, usa is_super_admin() e is_company_owner() y no
+--     nombra al administrador ni a user_is_project_exempt() (REQUISITO/DERIVA). Una base que ya registró una versión ANTERIOR de la 0600 (la rama de Preview del #928
+--     en 8d34392b: Supabase no reaplica un archivo cuya versión ya está registrada) NO la tiene, y sin esta comprobación la 0700 pasaba en silencio dejando que
+--     un administrador siguiera escribiendo asignaciones;
+--   · cada una de las 18 políticas de las cinco tablas con políticas tiene el texto de producción (o ya el nuevo, si se corre dos veces): si hubiera deriva,
 --     aborta en vez de sobrescribir un predicado que no es el que se leyó;
---   · quien corre la migración es el propietario de las cinco tablas (o miembro de su rol);
+--   · quien corre la migración es el propietario de las seis tablas (o miembro de su rol);
 --   · NADA del search_path de la sesión (los nombres van calificados public.*; el texto de pg_get_expr cambia con el search_path y el pre/post-vuelo
 --     lo normaliza quitando «public.» y «auth.») NI la ACL de las tablas o las funciones (no se consulta ningún privilegio): lección del P0 de la 0600.
 --
--- DESPLIEGUE: va en el MISMO push que 20261026000600 (2 archivos, bajo el tope MAX_APPLY = 10) y ANTES de la serie 20261027… (PR #926). Las cinco
--- tablas se bloquean (ACCESS EXCLUSIVE, lock_timeout de 5 s, siempre en el mismo orden) unos milisegundos: si hay una transacción larga sobre alguna,
--- falla limpia, sin dejar nada, y se reintenta. roles, user_roles y projects se leen en cada inicio de sesión: elegir un horario tranquilo.
--- Hasta que esta migración llegue a producción un administrador SIGUE pudiendo escribir RBAC, crear proyectos e invitar administradores por la API.
--- Tras el despliegue hay que RECAPTURAR scripts/schema-drift/huella-produccion.json (cambian 11 políticas).
+-- DESPLIEGUE: va en el MISMO push que 20261026000600 (2 archivos, bajo el tope MAX_APPLY = 10) y ANTES de la serie 20261027… (PR #926). Las cinco tablas con
+-- políticas se bloquean (ACCESS EXCLUSIVE) y app_users (SHARE ROW EXCLUSIVE: se sigue pudiendo leer, no escribir), con lock_timeout de 5 s y siempre en el mismo
+-- orden, unos milisegundos: si hay una transacción larga sobre alguna, falla limpia, sin dejar nada, y se reintenta. roles, user_roles y projects se leen en cada
+-- inicio de sesión: elegir un horario tranquilo.
+-- Hasta que esta migración llegue a producción un administrador SIGUE pudiendo escribir RBAC, crear proyectos e invitar administradores por la API. Y, desplegada
+-- esta migración antes que las funciones create-user / invite-user (deploy-functions va después), las funciones viejas —service_role, sin RLS— siguen dejando
+-- crear o invitar administradores hasta que se desplieguen: ver la ventana en docs/SEGURIDAD_ASIGNACIONES_PROYECTO.md (consulta posterior al despliegue).
+-- Tras el despliegue hay que RECAPTURAR scripts/schema-drift/huella-produccion.json (cambian 13 políticas y hay un trigger y una función nuevos).
 -- Verificación posterior: scripts/diagnostico-asignaciones-proyecto.sql.
 --
--- CÓMO REVERTIR: scripts/reversion-principal-empresa.sql (devuelve las 11 políticas a su texto exacto de producción; idempotente). La reversión
--- reabre los huecos de arriba.
+-- CÓMO REVERTIR: scripts/reversion-principal-empresa.sql (devuelve las 13 políticas a su texto exacto de producción y quita el trigger y su función; idempotente).
+-- La reversión reabre los huecos de arriba.
 -- IMPACTO EN DATOS: ninguno.
 -- ════════════════════════════════════════════════════════════════════════════
 
@@ -67,14 +82,15 @@ SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
 
 -- ── Pre-vuelo ────────────────────────────────────────────────────────────────
--- Exige lo que la migración da por existente, BLOQUEA las cinco tablas ANTES de medir, mide (conteo y huella de la fila completa; set_config local a la
--- transacción), comprueba que las 18 políticas tienen el texto esperado (producción o ya el nuevo) e INFORMA —sin fallar— de a quién afecta.
+-- Exige lo que la migración da por existente (también que la 0600 sea la REGLA DEL PRINCIPAL), BLOQUEA las tablas ANTES de medir, mide (conteo y huella de la fila
+-- completa; set_config local a la transacción), comprueba que las 18 políticas tienen el texto esperado (producción o ya el nuevo) e INFORMA —sin fallar— de a quién
+-- afecta y de las filas de app_users cuyo project_id ya cruce empresa.
 -- v_esp: por política, el texto normalizado (sin «public.» ni «auth.», espacios colapsados) del USING y del WITH CHECK: «o» = producción, «n» = el nuevo.
 DO $pre$
 DECLARE
   v_faltan  text[] := ARRAY[]::text[];
   v_deriva  text[] := ARRAY[]::text[];
-  v_tablas  constant text[] := ARRAY['projects', 'role_permissions', 'roles', 'user_invitations', 'user_roles'];
+  v_tablas  constant text[] := ARRAY['app_users', 'projects', 'role_permissions', 'roles', 'user_invitations', 'user_roles'];
   v_t       text;
   v_n       bigint;
   v_h       text;
@@ -92,10 +108,10 @@ DECLARE
   {"t":"roles","p":"roles_insert","o":["","(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))"],"n":["","(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND is_company_owner()))"]},
   {"t":"roles","p":"roles_select","o":["(is_super_admin() OR (is_system = true) OR (company_id = get_my_company_id()))",""],"n":["(is_super_admin() OR (is_system = true) OR (company_id = get_my_company_id()))",""]},
   {"t":"roles","p":"roles_update","o":["(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))","(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))"],"n":["(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND is_company_owner()))","(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND is_company_owner()))"]},
-  {"t":"user_invitations","p":"user_invitations_delete","o":["(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))",""],"n":["(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))",""]},
+  {"t":"user_invitations","p":"user_invitations_delete","o":["(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))",""],"n":["((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))",""]},
   {"t":"user_invitations","p":"user_invitations_insert","o":["","(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))"],"n":["","((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))"]},
-  {"t":"user_invitations","p":"user_invitations_select","o":["(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))",""],"n":["(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))",""]},
-  {"t":"user_invitations","p":"user_invitations_update","o":["(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))","(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))"],"n":["(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))","((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))"]},
+  {"t":"user_invitations","p":"user_invitations_select","o":["(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))",""],"n":["((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))",""]},
+  {"t":"user_invitations","p":"user_invitations_update","o":["(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))","(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))"],"n":["((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))","((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))"]},
   {"t":"user_roles","p":"user_roles_delete","o":["(is_super_admin() OR (EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))))",""],"n":["(is_super_admin() OR (EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND is_company_owner()))))",""]},
   {"t":"user_roles","p":"user_roles_insert","o":["","(is_super_admin() OR ((EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))) AND (EXISTS ( SELECT 1 FROM roles r WHERE ((r.id = user_roles.role_id) AND ((r.is_system = true) OR (r.company_id = get_my_company_id()))))) AND ((assigned_by IS NULL) OR (assigned_by = ( SELECT uid() AS uid)))))"],"n":["","(is_super_admin() OR ((EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND is_company_owner()))) AND (EXISTS ( SELECT 1 FROM roles r WHERE ((r.id = user_roles.role_id) AND ((r.is_system = true) OR (r.company_id = get_my_company_id()))))) AND ((assigned_by IS NULL) OR (assigned_by = ( SELECT uid() AS uid)))))"]},
   {"t":"user_roles","p":"user_roles_select","o":["(is_super_admin() OR (user_id = ( SELECT uid() AS uid)) OR (EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))))",""],"n":["(is_super_admin() OR (user_id = ( SELECT uid() AS uid)) OR (EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))))",""]}
@@ -112,13 +128,16 @@ $json$::jsonb;
   v_super   bigint;
   v_adm_sin_prop bigint;
   v_inv_admin bigint;
+  v_regla   text;
+  v_pol_asg text[];
+  v_con_proy  bigint;
+  v_cruzan    bigint;
 BEGIN
   IF to_regprocedure('public.is_super_admin()')    IS NULL THEN v_faltan := array_append(v_faltan, 'is_super_admin()'); END IF;
   IF to_regprocedure('public.is_company_owner()')  IS NULL THEN v_faltan := array_append(v_faltan, 'is_company_owner()'); END IF;
   IF to_regprocedure('public.current_user_role()') IS NULL THEN v_faltan := array_append(v_faltan, 'current_user_role()'); END IF;
   IF to_regprocedure('public.get_my_company_id()') IS NULL THEN v_faltan := array_append(v_faltan, 'get_my_company_id()'); END IF;
   IF to_regprocedure('auth.uid()')                 IS NULL THEN v_faltan := array_append(v_faltan, 'auth.uid()'); END IF;
-  IF to_regclass('public.app_users') IS NULL THEN v_faltan := array_append(v_faltan, 'tabla app_users'); END IF;
   FOREACH v_t IN ARRAY v_tablas LOOP
     IF to_regclass('public.' || v_t) IS NULL THEN v_faltan := array_append(v_faltan, 'tabla ' || v_t); END IF;
   END LOOP;
@@ -133,8 +152,30 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- REQUISITO (H-04): la regla de las asignaciones de proyecto es la del PRINCIPAL. Una base que ya registró una versión ANTERIOR de la 0600 (Supabase Preview del #928 en
+  -- 8d34392b: la versión está registrada y el archivo nuevo NO se reaplica) tiene una regla que admite al administrador (user_is_project_exempt() / 'admin'); la 0700 pasaba
+  -- limpia sobre ella y el administrador seguía escribiendo asignaciones sin ningún aviso. Se mira el cuerpo de la función y que las tres políticas de escritura la usen.
+  v_regla := (SELECT p.prosrc FROM pg_proc p WHERE p.oid = to_regprocedure('public.asignacion_puede_administrar(uuid,uuid)'));
+  IF v_regla IS NULL THEN
+    RAISE EXCEPTION 'autoridad_principal_empresa (pre-vuelo): REQUISITO: falta public.asignacion_puede_administrar(uuid, uuid): la 20261026000600 debe estar aplicada ANTES (van en el mismo push y la 0700 la complementa)';
+  END IF;
+  IF v_regla !~ 'is_super_admin' OR v_regla !~ 'is_company_owner' OR v_regla ~ '''admin''' OR v_regla ~ 'user_is_project_exempt' OR v_regla ~ 'user_has_project_access' THEN
+    RAISE EXCEPTION 'autoridad_principal_empresa (pre-vuelo): DERIVA: public.asignacion_puede_administrar no codifica la regla del principal (debe usar is_super_admin() e is_company_owner() y no nombrar al administrador ni a user_is_project_exempt()): es una versión anterior de la 20261026000600 que ya quedó registrada. Recrea la base (rama de Preview) o aplica a mano el CREATE OR REPLACE FUNCTION de la 20261026000600 vigente antes de esta migración';
+  END IF;
+  SELECT array_agg(p.polname::text ORDER BY p.polname) INTO v_pol_asg
+    FROM pg_policy p
+   WHERE p.polrelid = to_regclass('public.user_project_assignments')
+     AND p.polcmd IN ('a', 'w', 'd')
+     AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') || ' ' || COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') !~ 'asignacion_puede_administrar';
+  IF v_pol_asg IS NOT NULL OR (SELECT count(*) FROM pg_policy p WHERE p.polrelid = to_regclass('public.user_project_assignments') AND p.polcmd IN ('a', 'w', 'd')) <> 3 THEN
+    RAISE EXCEPTION 'autoridad_principal_empresa (pre-vuelo): DERIVA: las políticas de escritura de user_project_assignments (insert, update, delete) deben usar asignacion_puede_administrar (la regla del principal de la 20261026000600) y no la usan: %',
+      COALESCE(array_to_string(v_pol_asg, ', '), 'no hay exactamente tres');
+  END IF;
+
   -- BLOQUEO ANTES DE MEDIR (como la 0600): con las tablas ya bloqueadas ninguna escritura legítima puede confirmarse entre la medición y el post-vuelo.
-  -- Siempre en el mismo orden (alfabético) para no interbloquearse con otra sesión que bloquee las mismas.
+  -- Siempre en el mismo orden (alfabético) para no interbloquearse con otra sesión que bloquee las mismas. app_users sólo recibe un CREATE TRIGGER: SHARE ROW EXCLUSIVE
+  -- (se sigue LEYENDO —la RLS de todo el sistema la consulta—, no se escribe) y primero; las otras cinco, ACCESS EXCLUSIVE, porque se les altera una política.
+  LOCK TABLE public.app_users IN SHARE ROW EXCLUSIVE MODE;
   LOCK TABLE public.projects, public.role_permissions, public.roles, public.user_invitations, public.user_roles IN ACCESS EXCLUSIVE MODE;
 
   FOREACH v_t IN ARRAY v_tablas LOOP
@@ -181,11 +222,19 @@ BEGIN
     FROM public.app_users a
    WHERE a.role = 'admin' AND NOT EXISTS (SELECT 1 FROM public.app_users o WHERE o.company_id = a.company_id AND o.role = 'company_owner');
   SELECT count(*) INTO v_inv_admin FROM public.user_invitations i WHERE i.role = 'admin';
+  -- app_users.project_id: personas que ya tienen proyecto y, de ellas, las que NO son de su empresa (proyecto de otra empresa, inexistente, o persona sin empresa). Sólo se
+  -- informa: el trigger nuevo valida lo que se ESCRIBE a partir de ahora y no toca las filas existentes.
+  SELECT count(*) FILTER (WHERE u.project_id IS NOT NULL),
+         count(*) FILTER (WHERE u.project_id IS NOT NULL
+                            AND NOT EXISTS (SELECT 1 FROM public.projects p WHERE p.id = u.project_id AND p.company_id IS NOT NULL AND p.company_id IS NOT DISTINCT FROM u.company_id))
+    INTO v_con_proy, v_cruzan
+    FROM public.app_users u;
 
-  RAISE NOTICE 'autoridad_principal_empresa (pre-vuelo): políticas: % con el texto de producción y % ya con el nuevo (de 18; 11 se cambian)', v_orig, v_nueva;
+  RAISE NOTICE 'autoridad_principal_empresa (pre-vuelo): políticas: % con el texto de producción y % ya con el nuevo (de 18; 13 se cambian)', v_orig, v_nueva;
   RAISE NOTICE 'autoridad_principal_empresa (pre-vuelo): % administradores dejan de escribir proyectos, roles, llaves, asignaciones de roles e invitaciones «admin» por la API; % propietarios y % superadministradores son los principales', v_admins, v_propiet, v_super;
   RAISE NOTICE 'autoridad_principal_empresa (pre-vuelo): % empresas con administradores y SIN propietario: sólo el superadministrador escribiría sus roles y proyectos', v_adm_sin_prop;
-  RAISE NOTICE 'autoridad_principal_empresa (pre-vuelo): % invitaciones con role admin ya existentes (no se tocan)', v_inv_admin;
+  RAISE NOTICE 'autoridad_principal_empresa (pre-vuelo): % invitaciones con role admin ya existentes (no se tocan; desde ahora sólo el principal las lee, las modifica y las borra)', v_inv_admin;
+  RAISE NOTICE 'autoridad_principal_empresa (pre-vuelo): % personas con app_users.project_id, % de ellas con un proyecto que NO es de su empresa (de otra, inexistente o sin empresa): no se tocan; el trigger nuevo sólo valida lo que se escribe', v_con_proy, v_cruzan;
 END
 $pre$;
 
@@ -257,31 +306,94 @@ ALTER POLICY "user_roles_delete" ON public.user_roles
     )
   );
 
--- ── 3. Invitaciones: el rol «admin» sólo lo invita el principal ──────────────
+-- ── 3. Invitaciones: el rol «admin» es del principal de punta a punta (crearla, leerla, modificarla, borrarla) ──────────
 -- Lo que ya había (superadministrador, o propietario/administrador de la empresa de la invitación) Y (role <> 'admin' OR propietario OR superadministrador).
+-- La LECTURA importa: el token es la credencial de accept-invitation. Sin la guarda en SELECT/UPDATE/DELETE un administrador leía el token de una invitación 'admin'
+-- del propietario, la rebajaba a 'operator' (cambiándole token y correo), la borraba o la completaba él mismo.
 ALTER POLICY "user_invitations_insert" ON public.user_invitations
   WITH CHECK (
     (public.is_super_admin()
      OR (company_id = public.get_my_company_id() AND public.current_user_role() = ANY (ARRAY['company_owner', 'admin'])))
     AND (role <> 'admin' OR public.is_company_owner() OR public.is_super_admin())
   );
+ALTER POLICY "user_invitations_select" ON public.user_invitations
+  USING (
+    (public.is_super_admin()
+     OR (company_id = public.get_my_company_id() AND public.current_user_role() = ANY (ARRAY['company_owner', 'admin'])))
+    AND (role <> 'admin' OR public.is_company_owner() OR public.is_super_admin())
+  );
 ALTER POLICY "user_invitations_update" ON public.user_invitations
+  USING (
+    (public.is_super_admin()
+     OR (company_id = public.get_my_company_id() AND public.current_user_role() = ANY (ARRAY['company_owner', 'admin'])))
+    AND (role <> 'admin' OR public.is_company_owner() OR public.is_super_admin())
+  )
   WITH CHECK (
     (public.is_super_admin()
      OR (company_id = public.get_my_company_id() AND public.current_user_role() = ANY (ARRAY['company_owner', 'admin'])))
     AND (role <> 'admin' OR public.is_company_owner() OR public.is_super_admin())
   );
+ALTER POLICY "user_invitations_delete" ON public.user_invitations
+  USING (
+    (public.is_super_admin()
+     OR (company_id = public.get_my_company_id() AND public.current_user_role() = ANY (ARRAY['company_owner', 'admin'])))
+    AND (role <> 'admin' OR public.is_company_owner() OR public.is_super_admin())
+  );
 
--- ── Post-vuelo: las filas son IDÉNTICAS y las 18 políticas quedaron como se esperaba ──
+-- ── 4. app_users.project_id: el proyecto de una persona es de SU empresa, para CUALQUIER actor ──────────────────────────────
+-- La columna hermana de user_project_assignments (H-01 de la quinta verificación): user_has_project_access() y has_admin_project_access() leen app_users.project_id sin
+-- comprobar la empresa del proyecto, y el propietario (app_users_update) podía fijarle a una persona de SU empresa el proyecto de OTRA y darle así acceso a las tablas
+-- con alcance por proyecto de la otra empresa. Mismo patrón y mismo rigor que trg_asignacion_empresa de la 0600: SECURITY DEFINER con search_path vacío (la validación no
+-- depende de qué proyectos ve quien escribe) y vale para service_role y el superusuario (no hay excepción por actor). NEW.project_id NULL pasa (la mayoría de las personas
+-- no tiene proyecto «principal»; también es lo que escribe un SET NULL en cascada si algún día se añadiera la llave foránea). Si no, el proyecto debe EXISTIR y ser de la
+-- empresa de la persona (NEW.company_id): un proyecto inexistente, de otra empresa o una persona sin empresa se rechazan. FOR SHARE: si otra transacción cambia la
+-- empresa del proyecto o lo borra, esta escritura ESPERA y ve el estado nuevo (como en la 0600). Valida SÓLO lo que se escribe (BEFORE INSERT OR UPDATE OF project_id,
+-- company_id); no mira ni toca las filas existentes, y una escritura que no toque esas columnas ni lo evalúa. El nombre del trigger lo ordena DESPUÉS de
+-- trg_lock_app_users_self_privilege (los triggers de una tabla se disparan por orden alfabético): valida lo que de verdad se escribiría tras restaurar las columnas de
+-- una autoedición. NO cubre app_users.cliente_id (decisión abierta D-20).
+CREATE OR REPLACE FUNCTION public.app_users_validar_proyecto()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_emp_proyecto uuid;
+  v_hay_proyecto boolean;
+BEGIN
+  IF NEW.project_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+  SELECT true, p.company_id INTO v_hay_proyecto, v_emp_proyecto
+    FROM public.projects p WHERE p.id = NEW.project_id FOR SHARE OF p;
+  IF v_hay_proyecto IS NOT TRUE OR v_emp_proyecto IS NULL OR NEW.company_id IS NULL OR v_emp_proyecto <> NEW.company_id THEN
+    RAISE EXCEPTION 'APP_USERS_PROYECTO_EMPRESA_DISTINTA: el proyecto de una persona debe existir y pertenecer a la misma empresa que ella'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END
+$$;
+
+-- Función de trigger: nadie la invoca directamente.
+REVOKE ALL ON FUNCTION public.app_users_validar_proyecto() FROM PUBLIC, anon, authenticated;
+
+-- CREATE OR REPLACE TRIGGER (PostgreSQL 14+) y no DROP + CREATE: DROP TRIGGER (también con IF EXISTS, en cuanto el trigger ya existe: una segunda pasada o un reintento) pide ACCESS EXCLUSIVE
+-- sobre app_users, y esa tabla la consulta la RLS de todo el sistema; CREATE OR REPLACE TRIGGER sólo pide SHARE ROW EXCLUSIVE (la tabla se sigue leyendo) y es idempotente igual.
+CREATE OR REPLACE TRIGGER trg_validar_proyecto_app_users
+  BEFORE INSERT OR UPDATE OF project_id, company_id ON public.app_users
+  FOR EACH ROW EXECUTE FUNCTION public.app_users_validar_proyecto();
+
+-- ── Post-vuelo: las filas son IDÉNTICAS, las 18 políticas quedaron como se esperaba y el trigger de app_users existe ──
 DO $post$
 DECLARE
-  v_tablas  constant text[] := ARRAY['projects', 'role_permissions', 'roles', 'user_invitations', 'user_roles'];
+  v_tablas  constant text[] := ARRAY['app_users', 'projects', 'role_permissions', 'roles', 'user_invitations', 'user_roles'];
   v_t       text;
   v_n       bigint;
   v_h       text;
   v_re      constant text := E'\\m(public|auth)\\.';
   v_esp     constant jsonb := current_setting('app.principal_esp', true)::jsonb;
   v_attr    text;
+  v_def     text;
 BEGIN
   FOREACH v_t IN ARRAY v_tablas LOOP
     EXECUTE format('SELECT count(*), md5(COALESCE(string_agg(x.t, E''\n'' ORDER BY x.t), '''')) FROM (SELECT r::text AS t FROM public.%I r) x', v_t) INTO v_n, v_h;
@@ -311,7 +423,23 @@ BEGIN
            OR regexp_replace(regexp_replace(COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), ''), v_re, '', 'g'), '\s+', ' ', 'g') <> e->'n'->>1);
   END IF;
 
-  RAISE NOTICE 'autoridad_principal_empresa (post-vuelo): filas de las 5 tablas idénticas; 18 políticas con el texto esperado (11 cambiadas, 7 intactas); nombres, comandos y roles sin cambio';
+  -- el trigger de integridad de app_users.project_id: existe, habilitado, BEFORE por fila para INSERT y UPDATE OF project_id, company_id; su función es SECURITY DEFINER con
+  -- search_path vacío y nadie (anon, authenticated) la invoca directamente
+  SELECT pg_get_triggerdef(t.oid) INTO v_def
+    FROM pg_trigger t
+   WHERE t.tgrelid = 'public.app_users'::regclass AND t.tgname = 'trg_validar_proyecto_app_users' AND NOT t.tgisinternal AND t.tgenabled = 'O';
+  IF v_def IS NULL OR v_def !~ 'BEFORE INSERT OR UPDATE OF project_id, company_id ON' OR v_def !~ 'FOR EACH ROW' OR v_def !~ 'app_users_validar_proyecto' THEN
+    RAISE EXCEPTION 'autoridad_principal_empresa (post-vuelo): falta el trigger trg_validar_proyecto_app_users de app_users (o no es BEFORE INSERT OR UPDATE OF project_id, company_id): %', COALESCE(v_def, 'no existe');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc p
+                  WHERE p.oid = to_regprocedure('public.app_users_validar_proyecto()') AND p.prosecdef AND COALESCE(array_to_string(p.proconfig, ','), '') = 'search_path=""') THEN
+    RAISE EXCEPTION 'autoridad_principal_empresa (post-vuelo): public.app_users_validar_proyecto debe ser SECURITY DEFINER con search_path vacío';
+  END IF;
+  IF has_function_privilege('anon', 'public.app_users_validar_proyecto()', 'EXECUTE') OR has_function_privilege('authenticated', 'public.app_users_validar_proyecto()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'autoridad_principal_empresa (post-vuelo): EXECUTE de la función de trigger app_users_validar_proyecto mal repartido';
+  END IF;
+
+  RAISE NOTICE 'autoridad_principal_empresa (post-vuelo): filas de las 6 tablas idénticas; 18 políticas con el texto esperado (13 cambiadas, 5 intactas); nombres, comandos y roles sin cambio; trigger trg_validar_proyecto_app_users presente';
 END
 $post$;
 
