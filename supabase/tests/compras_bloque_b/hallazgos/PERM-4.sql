@@ -36,8 +36,9 @@
 --   · Qué documentos pueden cambiar de proyecto en la misma sentencia que su estado (§5): la orden en borrador, la factura de gasto directo, la
 --     contraseña sin partidas y —al ANULARSE— la orden de pago en borrador (su bloque NUEVO del permiso es alcanzable y se prueba); la recepción,
 --     la orden de pago aprobada o pagada y las órdenes aprobadas / emitidas, no (otro control las frena antes).
---   · Eliminar un proyecto (acción referencial ON DELETE SET NULL) lo puede hacer un administrador con asignaciones sin que
---     mover lo frene; los documentos quedan sin proyecto.
+--   · Eliminar un proyecto (acción referencial ON DELETE SET NULL) con la sesión de un administrador con asignaciones no lo frena
+--     mover; los documentos quedan sin proyecto. (El DELETE lo ejecuta el superusuario con la sesión de esa persona: quién puede borrar
+--     proyectos por la API lo decide la política projects_delete —con la 0700 de #928, solo el principal— y no es lo que se prueba aquí.)
 --   · Un administrador SIN empresa no pasa por ninguna empresa.
 --
 -- Ids propios: md5('perm:PERM-4:…') (perm_id). Empresas E, F y M, y sus personas, propias de esta prueba.
@@ -634,11 +635,17 @@ BEGIN
   VALUES (public.perm_id('g2', 'op'), E, G, P, public.perm_id('g2', 'fac'), 100);
   INSERT INTO public.contrasenas_pago (id, company_id, project_id, proveedor_id, fecha_pago_programada)
   VALUES (public.perm_id('g3', 'cp'), E, G, P, current_date + 30);
-  PERFORM public.perm_como(adm2);
+  -- La SESIÓN es la de la persona (auth.uid() = adm2, administrador con asignaciones, NO exento de proyecto): es lo que miran los controles de mover. El
+  -- DELETE lo ejecuta el superusuario (sin RLS) a propósito: QUIÉN puede borrar proyectos por la API lo decide la política projects_delete, que hoy
+  -- admite al administrador y, con la migración 20261026000700 de #928 (decisión del dueño, 2026-10-11), solo al principal (propietario o
+  -- superadministrador). Lo que esta prueba demuestra es la acción referencial ON DELETE SET NULL con esa sesión, y vale CON y SIN la 0700; el borrado del
+  -- proyecto por el PROPIETARIO, bajo RLS, lo prueba DEP-5.
+  PERFORM public.perm_como(NULL);
+  PERFORM public.perm_sub(adm2);
   PERFORM public.chk_bool(public.user_is_project_exempt(), false, '[purga] montaje: el administrador tiene asignaciones, NO es exento de proyecto');
   PERFORM public.chk_bool(public.can_access_project(G), true, '[purga] montaje: y tiene acceso al proyecto G que va a eliminar');
   PERFORM public.perm_filas(format('DELETE FROM public.projects WHERE id = %L', G), 1,
-    '[purga] el administrador con asignaciones elimina el proyecto G con facturas, orden de pago y contraseña: ningún control de mover lo frena');
+    '[purga] con la sesión de un administrador con asignaciones, eliminar el proyecto G con facturas, orden de pago y contraseña: ningún control de mover lo frena');
   PERFORM public.perm_como(NULL);
   SELECT count(*) INTO v_n FROM public.projects WHERE id = G;
   PERFORM public.chk(v_n, 0, '[purga] el proyecto ya no existe');

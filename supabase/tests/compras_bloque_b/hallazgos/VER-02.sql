@@ -219,6 +219,8 @@ SELECT public.chk_num((SELECT cantidad_facturada FROM public.orden_compra_lineas
 --   Una sesión con usuario (UA, auth.uid() no nulo) elimina un proyecto: la FK deja project_id en NULL en una
 --   factura ya aprobada (aún sin asiento: contabilización pendiente). Y la purga definitiva de una empresa
 --   (con el permiso de sistema) se lleva en cascada una factura con asiento publicado.
+--   (El DELETE lo ejecuta el superusuario con la sesión de UA: la RLS no interviene. QUIÉN puede borrar proyectos por la API lo
+--   decide la política projects_delete —con la migración 20261026000700 de #928, solo el principal—; no es lo que se prueba aquí.)
 SELECT set_config('request.jwt.claim.sub', '', false);
 INSERT INTO public.companies (id, nombre, default_currency) VALUES ('fa302900-0000-0000-0000-000000000001', 'Empresa FA3-02 efímera', 'gtq');
 INSERT INTO public.projects (id, company_id, nombre) VALUES ('fa302910-0000-0000-0000-000000000001', 'fa302900-0000-0000-0000-000000000001', 'Proyecto FA3-02 efímero');

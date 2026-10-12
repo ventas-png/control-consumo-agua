@@ -3,27 +3,32 @@
 -- DEP-5 · Borrar un proyecto con una orden de pago APROBADA o PAGADA ahora falla por la acción SET NULL
 --         (COMPRAS_PAGO_INMUTABLE); la cabecera de 20261027000200 afirma que la cascada de proyecto no se bloquea.
 --
--- CAUSA RAÍZ (la misma de RG-3, aquí por el camino del ADMINISTRADOR con sesión de usuario)
+-- CAUSA RAÍZ (la misma de RG-3, aquí por el camino de una PERSONA con sesión de usuario: el PROPIETARIO de la empresa)
 --   ordenes_pago_project_id_fkey es ON DELETE SET NULL y su UPDATE dispara el trigger BEFORE INSERT OR UPDATE
 --   completo compras_tg_orden_pago_controles (20261027000100), que no distingue una acción referencial: lanza
 --   COMPRAS_PAGO_INMUTABLE para aprobada, pagada (y anulada). La política projects_delete deja borrar el proyecto
---   al administrador / propietario de la empresa. El mensaje es engañoso: quien solo borra un proyecto lee
---   «la orden de pago ya no está en borrador y no cambia de … proyecto».
+--   al propietario de la empresa y —hasta que la migración 20261026000700 de #928 esté en la cadena— también al
+--   administrador; con ella, a partir de la decisión del dueño del negocio (2026-10-11), SOLO lo borra el principal
+--   (propietario o superadministrador). Por eso esta prueba lo borra el PROPIETARIO: vale CON y SIN la 0700, y lo que
+--   prueba (el control COMPRAS_PAGO_INMUTABLE y la acción SET NULL) no depende de quién borre. El mensaje es engañoso:
+--   quien solo borra un proyecto lee «la orden de pago ya no está en borrador y no cambia de … proyecto».
 --
 -- COMPORTAMIENTO ESPERADO
---   a. El administrador (rol authenticated, JWT con su id) elimina el proyecto con una orden de pago APROBADA
---      por él: el proyecto desaparece y la orden queda con sus SELLOS INTACTOS (aprobada_por, aprobada_at)
---      y con project_id NULL.
+--   a. El PROPIETARIO (rol authenticated, JWT con su id) elimina el proyecto con una orden de pago APROBADA por el
+--      administrador asignado: el proyecto desaparece y la orden queda con sus SELLOS INTACTOS (aprobada_por = el
+--      administrador, aprobada_at) y con project_id NULL.
 --   b. Idem con una orden PAGADA (pagada_at intacto) cuya factura queda PAGADA PARCIAL.
 --   c. Idem con una orden en BORRADOR (ya pasaba: se protege de que deje de pasar).
 --   d. Una orden ANULADA: ningún trigger de 20261027000000…0700 la bloquea. (Hoy la bloquea, como antes del PR,
 --      cxp_proteger_orden —CXP_INMUTABLE, de 20260611—: es preexistente y se reporta aparte, no se prueba como bueno.)
---   e. LEGÍTIMO: el administrador no puede quitar el proyecto a una orden viva de un proyecto vivo.
+--   e. LEGÍTIMO: el administrador no puede quitar el proyecto a una orden viva de un proyecto vivo (esto es un UPDATE de la
+--      orden, no un borrado de proyecto: el administrador sigue pudiendo hacerlo todo lo que aquí se le niega).
 --
 -- Ids propios: fa800050-0000-0000-0000-0000000000XX
 -- ============================================================================
 \set C   '''cccccccc-cccc-cccc-cccc-cccccccccccc'''
 \set UA  '''c0c0c0c0-0000-0000-0000-00000000000a'''
+\set UP  '''fa800050-0000-0000-0000-0000000000f0'''
 \set P1  '''e3000000-0000-0000-0000-000000000001'''
 
 RESET ROLE;
@@ -63,8 +68,13 @@ BEGIN
 END;
 $$;
 
+-- El PROPIETARIO de la empresa C (el fixture solo trae administradores): efímero, dentro de esta transacción. Es quien borra los proyectos.
+SELECT set_config('request.jwt.claim.sub', '', false);
+INSERT INTO auth.users (id) VALUES (:UP::uuid);
+INSERT INTO public.app_users (id, company_id, full_name, role) VALUES (:UP::uuid, :C, 'DEP5 · propietario', 'company_owner');
+
 -- Cada bloque monta SU proyecto (insertado sin el tope del plan) con el administrador asignado.
--- Se monta como sistema (sin sesión) y las transiciones de la orden las hace el administrador.
+-- Se monta como sistema (sin sesión) y las transiciones de la orden las hace el administrador; el proyecto lo borra el propietario.
 
 -- ════════ a · orden APROBADA por el administrador ════════
 SELECT set_config('request.jwt.claim.sub', '', false);
@@ -87,10 +97,10 @@ SELECT public.chk((SELECT count(*) FROM public.ordenes_pago WHERE id = 'fa800050
 SELECT public.chk((SELECT count(*) FROM public.conta_asientos WHERE project_id = 'fa800050-0000-0000-0000-0000000000a1'), 0,
   '[DEP-5m] montaje: ningún asiento del proyecto (la contabilización quedó pendiente, sin cuenta)');
 
-SELECT public.como(:UA::uuid);
+SELECT public.como(:UP::uuid);
 SET ROLE authenticated;
 SELECT public.h8_debe_pasar($$ DELETE FROM public.projects WHERE id = 'fa800050-0000-0000-0000-0000000000a1' $$,
-  '[DEP-5a] el administrador elimina el proyecto con una orden de pago APROBADA (no COMPRAS_PAGO_INMUTABLE)');
+  '[DEP-5a] el PROPIETARIO elimina el proyecto con una orden de pago APROBADA por el administrador (no COMPRAS_PAGO_INMUTABLE)');
 RESET ROLE;
 SELECT public.chk((SELECT count(*) FROM public.projects WHERE id = 'fa800050-0000-0000-0000-0000000000a1'), 0, '[DEP-5a] el proyecto ya no existe');
 SELECT public.chk((SELECT count(*) FROM public.ordenes_pago WHERE id = 'fa800050-0000-0000-0000-0000000000c1' AND project_id IS NULL AND estado = 'aprobada'
@@ -121,10 +131,10 @@ SELECT public.chk((SELECT count(*) FROM public.ordenes_pago o JOIN public.factur
 SELECT public.chk((SELECT count(*) FROM public.conta_asientos WHERE project_id = 'fa800050-0000-0000-0000-0000000000a2'), 0,
   '[DEP-5m] montaje: ningún asiento del proyecto 2');
 
-SELECT public.como(:UA::uuid);
+SELECT public.como(:UP::uuid);
 SET ROLE authenticated;
 SELECT public.h8_debe_pasar($$ DELETE FROM public.projects WHERE id = 'fa800050-0000-0000-0000-0000000000a2' $$,
-  '[DEP-5b] el administrador elimina el proyecto con una orden de pago PAGADA (no COMPRAS_PAGO_INMUTABLE)');
+  '[DEP-5b] el PROPIETARIO elimina el proyecto con una orden de pago PAGADA por el administrador (no COMPRAS_PAGO_INMUTABLE)');
 RESET ROLE;
 SELECT public.chk((SELECT count(*) FROM public.ordenes_pago WHERE id = 'fa800050-0000-0000-0000-0000000000c2' AND project_id IS NULL AND estado = 'pagada'
                       AND monto = 40 AND pagada_at IS NOT NULL AND aprobada_por = :UA::uuid), 1,
@@ -144,10 +154,10 @@ VALUES ('fa800050-0000-0000-0000-0000000000b3', :C, 'fa800050-0000-0000-0000-000
 UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = 'fa800050-0000-0000-0000-0000000000b3';
 INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, factura_id, monto)
 VALUES ('fa800050-0000-0000-0000-0000000000c3', :C, 'fa800050-0000-0000-0000-0000000000a3', :P1, 'fa800050-0000-0000-0000-0000000000b3', 100);
-SELECT public.como(:UA::uuid);
+SELECT public.como(:UP::uuid);
 SET ROLE authenticated;
 SELECT public.h8_debe_pasar($$ DELETE FROM public.projects WHERE id = 'fa800050-0000-0000-0000-0000000000a3' $$,
-  '[DEP-5c] el administrador elimina el proyecto con una orden en BORRADOR');
+  '[DEP-5c] el PROPIETARIO elimina el proyecto con una orden en BORRADOR');
 RESET ROLE;
 SELECT public.chk((SELECT count(*) FROM public.ordenes_pago WHERE id = 'fa800050-0000-0000-0000-0000000000c3' AND project_id IS NULL AND estado = 'borrador'), 1,
   '[DEP-5c] la orden en borrador sigue ahí, solo sin proyecto');
@@ -165,11 +175,11 @@ INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, factu
 VALUES ('fa800050-0000-0000-0000-0000000000c4', :C, 'fa800050-0000-0000-0000-0000000000a4', :P1, 'fa800050-0000-0000-0000-0000000000b4', 100);
 UPDATE public.ordenes_pago SET estado = 'aprobada' WHERE id = 'fa800050-0000-0000-0000-0000000000c4';
 UPDATE public.ordenes_pago SET estado = 'anulada'  WHERE id = 'fa800050-0000-0000-0000-0000000000c4';
-SELECT public.como(:UA::uuid);
+SELECT public.como(:UP::uuid);
 SET ROLE authenticated;
 SELECT public.h8_no_bloquea($$ DELETE FROM public.projects WHERE id = 'fa800050-0000-0000-0000-0000000000a4' $$,
   'COMPRAS_[A-Z_]+:',
-  '[DEP-5d] eliminar el proyecto con una orden ANULADA no lo frena ningún control COMPRAS_* del circuito (CXP_INMUTABLE de cxp_proteger_orden es anterior al PR)');
+  '[DEP-5d] el PROPIETARIO elimina el proyecto con una orden ANULADA no lo frena ningún control COMPRAS_* del circuito (CXP_INMUTABLE de cxp_proteger_orden es anterior al PR)');
 RESET ROLE;
 
 -- ════════ e · LEGÍTIMO: con el proyecto VIVO, ni el administrador le quita el proyecto a una orden viva ════════

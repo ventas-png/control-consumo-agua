@@ -221,6 +221,8 @@ SELECT public.chk_num((SELECT cantidad_recibida FROM public.orden_compra_lineas 
 -- ═══ (f) El ON DELETE SET NULL del motor no se bloquea (proyecto y orden que se eliminan) ═══
 --   Una factura aprobada sin asiento (contabilización pendiente) ligada a un proyecto efímero y a una orden en
 --   borrador. Una sesión con usuario (UA) elimina el proyecto y la orden; las referencias quedan en NULL.
+--   (Los DELETE los ejecuta el superusuario con la sesión de UA: la RLS no interviene. QUIÉN puede borrar proyectos por la API lo decide
+--   la política projects_delete —con la migración 20261026000700 de #928, solo el principal—; no es lo que se prueba aquí.)
 SELECT set_config('request.jwt.claim.sub', '', false);
 INSERT INTO public.companies (id, nombre, default_currency) VALUES ('fa304900-0000-0000-0000-000000000001', 'Empresa FA3-04 efímera', 'gtq');
 INSERT INTO public.projects (id, company_id, nombre) VALUES ('fa304910-0000-0000-0000-000000000001', 'fa304900-0000-0000-0000-000000000001', 'Proyecto FA3-04 efímero');

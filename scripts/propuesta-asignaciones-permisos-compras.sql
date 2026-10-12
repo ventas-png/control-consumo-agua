@@ -1,12 +1,18 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- ██  REQUIERE CONFIRMACIÓN  ██  PROPUESTA DE ASIGNACIONES · NO SE HA EJECUTADO · NO SE EJECUTA SOLA
+-- ██  DECIDIDO (2026-10-11): PAQUETE A. ESTE SCRIPT NO SE USA PARA CONCEDER  ██  REFERENCIA · NO SE HA EJECUTADO · NO SE EJECUTA SOLA
+-- Decisión del dueño del negocio (2026-10-11): ninguna llave se concede por script, ni por Marco Santos Godoy, ni con el PR #926. Las llaves
+-- platform.contabilidad.compras.* las asigna el PRINCIPAL de la empresa (la cuenta propietaria, `company_owner`) desde el panel «Roles y
+-- permisos», cuando decida a quién (procedimiento paso a paso y comprobación: docs/COMPRAS_PROPUESTA_ASIGNACION_PERMISOS.md §6.2 y §6.4).
+-- Este archivo se conserva como REFERENCIA: los bloques P-1.x (paquetes B y C) son lo que el panel hace por debajo, con su reversión (P-9)
+-- y sus tres seguros; NO son una propuesta vigente y no se ejecutan sin una nueva decisión por escrito. Los bloques de SOLO LECTURA
+-- (P-0.x y V-x) siguen vigentes: sirven para comprobar, antes y después, lo que el principal asigne desde el panel.
 -- Puesta al día: 2026-10-10, cifras re-verificadas el 2026-10-11 (lecturas de producción, SOLO LECTURA). Documento que la acompaña, con
 -- la matriz, los tres paquetes y las consultas que producen cada cifra: docs/COMPRAS_PROPUESTA_ASIGNACION_PERMISOS.md
 --
--- Qué es: la lista de concesiones que HABRÍA que decidir después de aplicar 20261027000900, que NO concede ninguna llave nueva a
--- nadie. Cada concesión está COMENTADA (las líneas SQL llevan el prefijo «--SQL »), de modo que ejecutar este archivo completo NO
--- cambia nada: lo único sin comentar son SELECT de solo lectura (P-0.x y V-x). Para activar UNA concesión, una persona con
--- autoridad la confirma por escrito y extrae SOLO su bloque a un archivo, quitando el prefijo, p. ej.:
+-- Qué es: la lista de concesiones de REFERENCIA (después de aplicar 20261027000900, que NO concede ninguna llave nueva a
+-- nadie). Cada concesión está COMENTADA (las líneas SQL llevan el prefijo «--SQL »), de modo que ejecutar este archivo completo NO
+-- cambia nada: lo único sin comentar son SELECT de solo lectura (P-0.x y V-x). Para activar UNA concesión (solo con una nueva decisión por
+-- escrito), una persona con autoridad la confirma y extrae SOLO su bloque a un archivo, quitando el prefijo, p. ej.:
 --     sed -n '/^-- ▶ P-1.2/,/^-- ◀ P-1.2/p' scripts/propuesta-asignaciones-permisos-compras.sql | sed 's/^--SQL //' > bloque.sql
 --     (editar bloque.sql como dice abajo)   y   psql … -f bloque.sql      ← el archivo ENTERO, en UNA sola conexión
 -- TRES seguros, en este orden (el 2.º y el 3.º son distintos a propósito):
@@ -32,11 +38,14 @@
 --   · NO concede nada a las plantillas de sistema ni al rol de empresa «Finanzas / Contador» por defecto: concederle una llave a un
 --     ROL se la da a TODA persona que lo tenga hoy o mañana (y una plantilla solo llega a las copias que se creen DESPUÉS, o a
 --     quien la tenga asignada directamente: hoy nadie). Lo
---     propuesto es el rol de «ajustes individuales» (roles.user_override_for), el mismo mecanismo del panel «Ajustes finos» de la
---     pantalla. RECOMENDADO: hacerlo desde ese panel (Empresa › Usuarios › botón Roles y permisos), POR MARCO SANTOS GODOY (cuenta
---     personal): deja a la persona administradora como actor en permission_audit_log y la bitácora nombra a una persona. La cuenta
---     propietaria lleva el nombre de la empresa y no identifica a nadie. Por SQL, quien ejecuta NO queda como actor (auth.uid() es
---     nulo): todas las filas de la bitácora quedan con el actor vacío.
+--     de referencia es el rol de «ajustes individuales» (roles.user_override_for), el mismo mecanismo del panel «Ajustes finos» de la
+--     pantalla.
+--     DECIDIDO (2026-10-11): paquete A. Este script NO se usa para conceder. Las llaves las asigna el principal de la empresa (cuenta
+--     propietaria) desde el panel «Roles y permisos» (docs/COMPRAS_PROPUESTA_ASIGNACION_PERMISOS.md 6.2). Los bloques P-1.x se
+--     conservan como referencia reversible y siguen con sus tres seguros. Desde el panel, la bitácora (permission_audit_log) deja a la
+--     cuenta propietaria como actor; por SQL, quien ejecuta NO queda como actor (auth.uid() es nulo): todas las filas de la bitácora
+--     quedan con el actor vacío. (Un administrador, Marco incluido, no ve la pantalla de la empresa: la ruta y la entrada del menú son
+--     solo de `company_owner`.)
 --   · NO se puede ejecutar ANTES del despliegue de la 0900: las cinco llaves no existen en el catálogo (permissions) hasta entonces y
 --     role_permissions.permission_key es llave foránea de permissions(key) (P-0.3 lo comprueba).
 --
@@ -123,13 +132,13 @@ SELECT r.name AS rol, rp.permission_key, rp.effect, ur.expires_at
 --   con ON CONFLICT DO NOTHING (no pisa un `deny` ajeno: P-0.4 lo descarta antes). La condición del filtro (perfil, empresa, activo)
 --   hace que, si la persona no es la esperada, el bloque no escriba nada.
 --
---   PAQUETES (ver el documento, §5):
---     A · «ninguna llave por ahora»: no se ejecuta ningún bloque (se conceden en un minuto cuando Alexander vuelva a operar).
---     B · «recepción + factura + orden de pago» (RECOMENDADO): P-1.1, P-1.2 y P-1.3.
---     C · «continuidad total» (= lo que Alexander puede hoy): además P-1.4 y P-1.5.
+--   PAQUETES (ver el documento, §5). DECIDIDO (2026-10-11): A. B y C quedan como REFERENCIA, no como propuesta vigente:
+--     A · «ninguna llave por ahora» (VIGENTE): no se ejecuta ningún bloque; el principal asigna desde el panel cuando decida.
+--     B · «recepción + factura + orden de pago» (referencia): P-1.1, P-1.2 y P-1.3.
+--     C · «continuidad total» (referencia; = lo que Alexander puede hoy): además P-1.4 y P-1.5.
 -- ════════════════════════════════════════════════════════════════════════════
 
--- ▶ P-1.1 · Registrar recepciones          (pantalla hoy: change_status + edit; servidor hoy: solo edit)  → platform.contabilidad.compras.recepcion_registrar   [paquete B · RECOMENDADA]
+-- ▶ P-1.1 · Registrar recepciones          (pantalla hoy: change_status + edit; servidor hoy: solo edit)  → platform.contabilidad.compras.recepcion_registrar   [referencia: paquete B]
 --SQL BEGIN;
 --SQL -- CONFIRMACIÓN (A-1.1): quitar el «-- » del inicio de la línea SIGUIENTE solo con la respuesta por escrito. Es SET LOCAL a propósito (vale solo dentro de esta transacción), y se escribe 'si' sin tilde.
 --SQL -- SET LOCAL prop.confirmar = 'si';
@@ -173,7 +182,7 @@ SELECT r.name AS rol, rp.permission_key, rp.effect, ur.expires_at
 --SQL ROLLBACK;   -- ← por defecto NO confirma. Para confirmar: cambiar por COMMIT; solo con la confirmación escrita y la verificación revisada
 -- ◀ P-1.1
 
--- ▶ P-1.2 · Aprobar facturas de proveedor  (pantalla hoy: approve + edit; servidor hoy: solo edit)        → platform.contabilidad.compras.factura_aprobar        [paquete B · RECOMENDADA]
+-- ▶ P-1.2 · Aprobar facturas de proveedor  (pantalla hoy: approve + edit; servidor hoy: solo edit)        → platform.contabilidad.compras.factura_aprobar        [referencia: paquete B]
 --SQL BEGIN;
 --SQL -- CONFIRMACIÓN (A-1.2): quitar el «-- » del inicio de la línea SIGUIENTE solo con la respuesta por escrito. Es SET LOCAL a propósito (vale solo dentro de esta transacción), y se escribe 'si' sin tilde.
 --SQL -- SET LOCAL prop.confirmar = 'si';
@@ -217,7 +226,7 @@ SELECT r.name AS rol, rp.permission_key, rp.effect, ur.expires_at
 --SQL ROLLBACK;   -- ← por defecto NO confirma. Para confirmar: cambiar por COMMIT; solo con la confirmación escrita y la verificación revisada
 -- ◀ P-1.2
 
--- ▶ P-1.3 · Aprobar órdenes de pago        (pantalla hoy: approve + edit; servidor hoy: solo edit)        → platform.contabilidad.compras.orden_pago_aprobar     [paquete B · RECOMENDADA]
+-- ▶ P-1.3 · Aprobar órdenes de pago        (pantalla hoy: approve + edit; servidor hoy: solo edit)        → platform.contabilidad.compras.orden_pago_aprobar     [referencia: paquete B]
 --SQL BEGIN;
 --SQL -- CONFIRMACIÓN (A-1.3): quitar el «-- » del inicio de la línea SIGUIENTE solo con la respuesta por escrito. Es SET LOCAL a propósito (vale solo dentro de esta transacción), y se escribe 'si' sin tilde.
 --SQL -- SET LOCAL prop.confirmar = 'si';
@@ -261,7 +270,7 @@ SELECT r.name AS rol, rp.permission_key, rp.effect, ur.expires_at
 --SQL ROLLBACK;   -- ← por defecto NO confirma. Para confirmar: cambiar por COMMIT; solo con la confirmación escrita y la verificación revisada
 -- ◀ P-1.3
 
--- ▶ P-1.4 · Ejecutar pagos                 (pantalla hoy: change_status + edit; servidor hoy: solo edit)  → platform.contabilidad.compras.pago_ejecutar         [SOLO paquete C «continuidad total»]
+-- ▶ P-1.4 · Ejecutar pagos                 (pantalla hoy: change_status + edit; servidor hoy: solo edit)  → platform.contabilidad.compras.pago_ejecutar         [referencia: SOLO paquete C «continuidad total»]
 --SQL BEGIN;
 --SQL -- CONFIRMACIÓN (A-1.4): quitar el «-- » del inicio de la línea SIGUIENTE solo con la respuesta por escrito. Es SET LOCAL a propósito (vale solo dentro de esta transacción), y se escribe 'si' sin tilde.
 --SQL -- SET LOCAL prop.confirmar = 'si';
@@ -305,7 +314,7 @@ SELECT r.name AS rol, rp.permission_key, rp.effect, ur.expires_at
 --SQL ROLLBACK;   -- ← por defecto NO confirma. Para confirmar: cambiar por COMMIT; solo con la confirmación escrita y la verificación revisada
 -- ◀ P-1.4
 
--- ▶ P-1.5 · Anular pagos                   (pantalla hoy: change_status + edit; servidor hoy: solo edit)  → platform.contabilidad.compras.pago_anular           [SOLO paquete C «continuidad total»]
+-- ▶ P-1.5 · Anular pagos                   (pantalla hoy: change_status + edit; servidor hoy: solo edit)  → platform.contabilidad.compras.pago_anular           [referencia: SOLO paquete C «continuidad total»]
 --SQL BEGIN;
 --SQL -- CONFIRMACIÓN (A-1.5): quitar el «-- » del inicio de la línea SIGUIENTE solo con la respuesta por escrito. Es SET LOCAL a propósito (vale solo dentro de esta transacción), y se escribe 'si' sin tilde.
 --SQL -- SET LOCAL prop.confirmar = 'si';
@@ -351,10 +360,12 @@ SELECT r.name AS rol, rp.permission_key, rp.effect, ur.expires_at
 
 
 -- ════════════════════════════════════════════════════════════════════════════
--- P-2 · MARCO SANTOS GODOY · NADA QUE CONCEDER
+-- P-2 · MARCO SANTOS GODOY · DECIDIDO (2026-10-11): paquete A. Este script NO se usa para conceder. Nada que conceder.
 --   Es administrador: user_has_permission() le da toda llave, antes y después. Su alcance de proyecto (3 asignados) NO cambia y la
---   pieza lo respeta: el administrador con asignaciones solo actúa en SUS proyectos. No se propone ninguna línea. Lo mismo vale para
---   la cuenta propietaria (company_owner) y el superadministrador: pasan toda llave por su perfil y no hay llave que se la quite.
+--   pieza lo respeta: el administrador con asignaciones solo actúa en SUS proyectos. No se propone ninguna línea, y Marco NO asigna
+--   llaves a nadie (esa decisión es del principal de la empresa, desde el panel). Lo mismo vale para la cuenta propietaria
+--   (company_owner) y el superadministrador: pasan toda llave por su perfil y no hay llave que se la quite. El principal asigna llaves
+--   a operadores, visores y roles personalizados; no se las quita al nivel administrador (decisión abierta, otro PR).
 -- ════════════════════════════════════════════════════════════════════════════
 
 
@@ -546,9 +557,10 @@ SELECT u.full_name, rp.permission_key, rp.effect, r.name AS rol, ur.expires_at
 --   scripts/diagnostico-compras-controles.sql (hoy: 0 filas; solo Alexander tiene edit, approve y change_status).
 --   Lectura del 2026-10-10 (antes de la 0900 y de cualquier concesión):
 --     Alexander: hoy sí en las 6; después: 1 sí; 2, 3, 4, 5 y 6 no.     Marco: sí → sí en las 6.
---   Resultado esperado TRAS el paquete B (P-1.1 a P-1.3): Alexander 1, 2, 3 y 4 «sí»; 5 y 6 «no».
---   Resultado esperado TRAS el paquete C «continuidad total» (P-1.1 a P-1.5): Alexander «sí» en las 6 (sí → sí).
---   Con el paquete A (ninguna llave) no cambia nada: queda como la lectura de arriba.
+--   VIGENTE (paquete A, decidido el 2026-10-11): no cambia nada hasta que el principal asigne desde el panel; queda como la lectura de
+--   arriba. Tras lo que el principal asigne, cada llave concedida pasa su celda `despues_0900` a «sí».
+--   Referencia, TRAS el paquete B (P-1.1 a P-1.3): Alexander 1, 2, 3 y 4 «sí»; 5 y 6 «no».
+--   Referencia, TRAS el paquete C «continuidad total» (P-1.1 a P-1.5): Alexander «sí» en las 6 (sí → sí).
 WITH acciones (n, accion, generica, nueva) AS (
   VALUES
     (1, 'Aprobar orden de compra',      'platform.contabilidad.approve',       'condominios.tab.ordenes_compra.approve'),
@@ -581,7 +593,7 @@ SELECT p.full_name, a.n, a.accion,
 
 -- V-4 · Las asignaciones de proyecto de TODA la base no deben cambiar. Lectura del 2026-10-10: 43 filas, huella
 --   d32daf1d38d862b1cdd938a59ad2ff5f. (Contadores de la propuesta: 3 661 filas en role_permissions, 26 en user_roles y 34 roles; tras
---   el paquete B deben subir +3, +1 y +1 —el rol de ajustes individuales—; con el paquete C, +5, +1 y +1; con el A, +0; si en
+--   el paquete B deben subir +3, +1 y +1 —el rol de ajustes individuales—; con el paquete C, +5, +1 y +1; con el A (vigente), +0; si en
 --   el intervalo otra persona cambió roles, comparar contra una lectura hecha justo antes.)
 SELECT (SELECT count(*) FROM public.user_project_assignments) AS asignaciones_total,
        (SELECT md5(string_agg(id::text, ',' ORDER BY id)) FROM public.user_project_assignments) AS huella_asignaciones,
@@ -590,7 +602,7 @@ SELECT (SELECT count(*) FROM public.user_project_assignments) AS asignaciones_to
        (SELECT count(*) FROM public.roles) AS roles_total,
        (SELECT count(*) FROM public.role_permissions WHERE permission_key LIKE 'platform.contabilidad.compras.%') AS concesiones_de_las_cinco_llaves;
 
--- V-5 · Quién concedió qué (hacerlo desde la pantalla deja a la persona administradora como actor; por SQL, actor vacío).
+-- V-5 · Quién concedió qué (hacerlo desde la pantalla deja a la cuenta propietaria —el principal— como actor; por SQL, actor vacío).
 --   Tras una concesión: 1 create_role (si el rol de ajustes no existía), 1 assign_role y 1 grant_permission por llave.
 SELECT a.occurred_at, a.action, a.actor_id, a.target_user_id, a.target_role_id, a.details
   FROM public.permission_audit_log a
