@@ -64,6 +64,10 @@ END $$;
 -- ── Sesiones simuladas: SET ROLE + claims (los dos GUC que lee auth.uid() de Supabase) ──
 --   SISTEMA  superusuario sin sesión (migraciones, SQL Editor)     · ANON  rol anon
 --   SERVICIO rol service_role (BYPASSRLS, sin auth.uid())          · <ALIAS> rol authenticated con auth.uid() = esa persona
+--   !<ALIAS> el rol de base de datos PROPIETARIO (salta la RLS) con la sesión (auth.uid()) de esa persona: no es un camino de la API —con la 0700 un no principal ya no
+--            borra proyectos por la API—, es la forma de seguir ejercitando los TRIGGERS (defensa en profundidad) con un actor que NO es principal. El trigger lee al actor de
+--            app_users por auth.uid(), no del rol de base de datos; lo que ve y hace una función SECURITY DEFINER, una conexión del dueño con un JWT o una política futura más
+--            permisiva es lo que este actor representa.
 CREATE FUNCTION asgt.poner_actor(p_clave text) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE v_uid uuid;
 BEGIN
@@ -79,6 +83,12 @@ BEGIN
     PERFORM set_config('request.jwt.claim.sub', '', false);
     PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', false);
     SET LOCAL ROLE service_role;
+  ELSIF left(p_clave, 1) = '!' THEN
+    SELECT id INTO v_uid FROM asgt.ids WHERE alias = substr(p_clave, 2);
+    IF v_uid IS NULL THEN RAISE EXCEPTION 'actor desconocido «%»', p_clave; END IF;
+    PERFORM set_config('request.jwt.claim.sub', v_uid::text, false);
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', v_uid, 'role', 'authenticated')::text, false);
+    RESET ROLE;
   ELSE
     SELECT id INTO v_uid FROM asgt.ids WHERE alias = p_clave;
     IF v_uid IS NULL THEN RAISE EXCEPTION 'actor desconocido «%»', p_clave; END IF;
@@ -319,6 +329,10 @@ SELECT asgt.uid_de(n),
 INSERT INTO asgt.ids SELECT alias, asgt.uid_de(n), 'persona' FROM _personas;
 -- las huérfanas: user_id sin app_users ni auth.users (la tabla no tiene llave foránea hacia personas)
 INSERT INTO asgt.ids SELECT 'ORF' || k, asgt.uid_de(50 + k), 'huerfana' FROM generate_series(1, 6) k;
+
+-- ── RBAC de la empresa C (lo escribe assert_principal.sql): un rol de empresa, sin personas ni asignaciones nuevas ────────────────────────────────────────
+INSERT INTO public.roles (id, company_id, name, is_system) VALUES ('a5b00000-0000-0000-0000-000000000001', 'a5c00000-0000-0000-0000-000000000001', 'ASG rol de empresa', false);
+INSERT INTO asgt.ids VALUES ('ROLC', 'a5b00000-0000-0000-0000-000000000001', 'rol');
 
 -- ── Las 43 filas (todas «total») ─────────────────────────────────────────────
 --   AP: 3 (P1,P2,P3) · OP1..OP7: 14 (OPk → Pk y Pk+1) · VW1..VW3: 2 filas c/u, VW4..VW13: 1 c/u = 16 · ORF1..ORF4: 2 c/u, ORF5..ORF6: 1 c/u = 10

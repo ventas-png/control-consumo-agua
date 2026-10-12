@@ -1,6 +1,11 @@
 \set ON_ERROR_STOP on
 -- ============================================================================
--- FLUJOS LEGÍTIMOS DE ADMINISTRACIÓN — lo que hace la pantalla «Asignar Acceso a Proyectos» (AsignacionModal)
+-- FLUJOS DE ADMINISTRACIÓN — lo que hace la pantalla «Asignar Acceso a Proyectos» (AsignacionModal)
+--
+-- DECISIÓN DEL DUEÑO DEL NEGOCIO (2026-10-11): sólo el PRINCIPAL de la empresa (propietario o superadministrador) escribe las asignaciones. Los flujos 3, 4, 6 y 8 (propietario,
+-- superadministrador, propietario de otra empresa, otra empresa) dan lo MISMO que sin la migración; los de actor ADMINISTRADOR (1, 2, 5 y 9) pasan de «lo hace» a «el servidor lo
+-- rechaza» (INSERT: 42501 por la política; DELETE y UPDATE: 0 filas SIN error) y el [flujo 7] de la autoedición ya cambió con la 0600. run.sh compara estos 28 resultados antes y
+-- después de la migración y exige exactamente esos 18 cambios (13 de actor administrador + 5 de autoedición).
 --
 -- asgt.modal(actor, persona, proyectos, modo) devuelve «proyectos finales | resultado | filas conservadas tal cual (mismo id y created_at)»:
 --   · 'legado'      el guardado de hoy: borra TODAS las de la persona y vuelve a insertar las marcadas (dos peticiones)
@@ -9,24 +14,25 @@
 -- ============================================================================
 
 -- ═══ 1 · el reemplazo completo, por rol, sobre OTRAS personas de su empresa ══════════════════════════════════════
-SELECT asgt.chk_txt(asgt.modal('AX', 'OP1', ARRAY['P4','P5','P6'], 'legado'),      'P4,P5,P6|ok|0', '[flujo 1] administrador exento reemplaza (borrar todas + insertar): OP1 {P1,P2} → {P4,P5,P6}');
-SELECT asgt.chk_txt(asgt.modal('AX', 'OP1', ARRAY['P4','P5','P6'], 'diferencias'), 'P4,P5,P6|ok|0', '[flujo 1] … y por diferencias llega al mismo resultado');
-SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY['P1','P3'], 'legado'),           'P1,P3|ok|0',    '[flujo 2] administrador ACOTADO reemplaza a OP2 con proyectos que él ve: {P2,P3} → {P1,P3}');
-SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY['P1','P3'], 'diferencias'),      'P1,P3|ok|1',    '[flujo 2] … por diferencias la fila P3 que no cambia se CONSERVA (mismo id y created_at)');
-SELECT asgt.chk_txt(asgt.modal('AX', 'OP1', ARRAY['P1','P2','P6'], 'legado'),      'P1,P2,P6|ok|0', '[flujo 1] borrar todas + insertar vuelve a crear incluso las filas que no cambiaron (ids nuevos)');
-SELECT asgt.chk_txt(asgt.modal('AX', 'OP1', ARRAY['P1','P2','P6'], 'diferencias'), 'P1,P2,P6|ok|2', '[flujo 1] por diferencias conserva las 2 filas que no cambiaron');
-SELECT asgt.chk_txt(asgt.modal('AP', 'OP3', ARRAY['P1'], 'legado'),                'P1,P4|ok|1',    '[flujo 2] el administrador acotado NO borra lo que no ve: OP3 {P3,P4} → {P1} deja P4 (fila de un proyecto que no ve)');
-SELECT asgt.chk_txt(asgt.modal('AP', 'OP3', ARRAY['P1'], 'diferencias'),           'P1,P4|ok|1',    '[flujo 2] … también por diferencias');
-SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY[]::text[], 'legado'),            '|ok|0',         '[flujo 2] quitar todas las de OP2 (la persona queda sin proyectos)');
-SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY[]::text[], 'diferencias'),       '|ok|0',         '[flujo 2] … por diferencias');
+-- (antes de la decisión del 2026-10-11 estos diez flujos terminaban en «ok» y reemplazaban las asignaciones; ahora la persona se queda como estaba)
+SELECT asgt.chk_txt(asgt.modal('AX', 'OP1', ARRAY['P4','P5','P6'], 'legado'),      'P1,P2|42501|2', '[flujo 1] administrador exento reemplaza (borrar todas + insertar): OP1 {P1,P2} → {P4,P5,P6}: el DELETE afecta 0 filas y el INSERT lo rechaza la política');
+SELECT asgt.chk_txt(asgt.modal('AX', 'OP1', ARRAY['P4','P5','P6'], 'diferencias'), 'P1,P2|42501|2', '[flujo 1] … y por diferencias: el insert falla y no se borra nada');
+SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY['P1','P3'], 'legado'),           'P2,P3|42501|2', '[flujo 2] administrador ACOTADO reemplaza a OP2 con proyectos que él ve: {P2,P3} → {P1,P3}: tampoco');
+SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY['P1','P3'], 'diferencias'),      'P2,P3|42501|2', '[flujo 2] … por diferencias la fila P3 que no cambia se CONSERVA (mismo id y created_at), y la persona sigue como estaba');
+SELECT asgt.chk_txt(asgt.modal('AX', 'OP1', ARRAY['P1','P2','P6'], 'legado'),      'P1,P2|42501|2', '[flujo 1] borrar todas + insertar (con las filas que no cambiaron) tampoco');
+SELECT asgt.chk_txt(asgt.modal('AX', 'OP1', ARRAY['P1','P2','P6'], 'diferencias'), 'P1,P2|42501|2', '[flujo 1] por diferencias tampoco: sólo había que insertar P6');
+SELECT asgt.chk_txt(asgt.modal('AP', 'OP3', ARRAY['P1'], 'legado'),                'P3,P4|42501|2', '[flujo 2] el administrador acotado no cambia a OP3 {P3,P4} → {P1}: ni lo que ve (P3) ni lo que no ve (P4)');
+SELECT asgt.chk_txt(asgt.modal('AP', 'OP3', ARRAY['P1'], 'diferencias'),           'P3,P4|42501|2', '[flujo 2] … también por diferencias');
+SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY[]::text[], 'legado'),            'P2,P3|ok|2',    '[flujo 2] quitar todas las de OP2: el DELETE afecta 0 filas SIN error (la pantalla debe leer de vuelta) y la persona conserva sus 2 proyectos');
+SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY[]::text[], 'diferencias'),       'P2,P3|ok|2',    '[flujo 2] … por diferencias, igual');
 SELECT asgt.chk_txt(asgt.modal('OW', 'NUEVO', ARRAY['P1','P2','P3','P4','P5','P6','P7','P8'], 'legado'), 'P1,P2,P3,P4,P5,P6,P7,P8|ok|0', '[flujo 3] propietario asigna los 8 proyectos a una persona sin filas');
 SELECT asgt.chk_txt(asgt.modal('OW', 'OP4', ARRAY['P5'], 'diferencias'),           'P5|ok|1',       '[flujo 3] propietario quita uno por diferencias (OP4 {P4,P5} → {P5}); la fila P5 se conserva');
 SELECT asgt.chk_txt(asgt.modal('OW', 'OW', ARRAY['P2','P3'], 'legado'),            'P2,P3|ok|0',    '[flujo 3] propietario sobre SÍ MISMO (es exento: su alcance no cambia)');
 SELECT asgt.chk_txt(asgt.modal('SU', 'DOP', ARRAY['D1','D2'], 'legado'),           'D1,D2|ok|0',    '[flujo 4] superadministrador asigna a una persona de OTRA empresa los proyectos de ESA empresa');
 SELECT asgt.chk_txt(asgt.modal('SU', 'OP1', ARRAY['P8'], 'diferencias'),           'P8|ok|0',       '[flujo 4] y a una de C por diferencias');
 SELECT asgt.chk_txt(asgt.modal('SU2', 'OP1', ARRAY['P8'], 'legado'),               'P8|ok|0',       '[flujo 4] superadmin (la otra grafía), de la empresa D, administra a C');
-SELECT asgt.chk_txt(asgt.modal('AX2', 'AP', ARRAY['P5'], 'legado'),                'P5|ok|0',       '[flujo 5] un administrador cambia el alcance de OTRO administrador (AP {P1,P2,P3} → {P5}): colaboración permitida');
-SELECT asgt.chk_txt(asgt.modal('AX2', 'AP', ARRAY[]::text[], 'legado'),            '|ok|0',         '[flujo 5] y puede dejarlo sin filas (AP pasa a ser exento): lo decide otra persona, no AP');
+SELECT asgt.chk_txt(asgt.modal('AX2', 'AP', ARRAY['P5'], 'legado'),                'P1,P2,P3|42501|3', '[flujo 5] un administrador NO cambia el alcance de OTRO administrador (AP {P1,P2,P3} → {P5}): la colusión de D-2 queda cerrada');
+SELECT asgt.chk_txt(asgt.modal('AX2', 'AP', ARRAY[]::text[], 'legado'),            'P1,P2,P3|ok|3', '[flujo 5] ni puede dejarlo sin filas (AP seguiría acotado): el DELETE afecta 0 filas SIN error; sólo lo decide el principal');
 SELECT asgt.chk_txt(asgt.modal('DOW', 'DOP', ARRAY['D1'], 'legado'),               'D1|ok|0',       '[flujo 6] el propietario de OTRA empresa administra la suya');
 
 -- ═══ 2 · lo que NO puede hacer la pantalla ═══════════════════════════════════════════════════════════════════════
@@ -40,7 +46,7 @@ SELECT asgt.chk_txt(asgt.modal('AX', 'DOP', ARRAY['D1'], 'legado'),             
 
 -- ═══ 3 · la ventana con CERO asignaciones del guardado «borrar todas y volver a insertar» ═════════════════════════
 -- El DELETE y el INSERT son dos peticiones: si el INSERT falla, el DELETE ya valió. Por diferencias, un insert fallido no borra nada.
-SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY['P1','P4'], 'legado'),      '|42501|0',        '[flujo 9] guardado de hoy: el INSERT falla (P4 no es visible) DESPUÉS de borrar → OP2 queda con CERO asignaciones');
+SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY['P1','P4'], 'legado'),      'P2,P3|42501|2',   '[flujo 9] guardado de hoy de un administrador: el DELETE ya no afecta filas y el INSERT falla → OP2 conserva sus 2 asignaciones (ya no hay ventana con CERO: quien guarda es el principal)');
 SELECT asgt.chk_txt(asgt.modal('AP', 'OP2', ARRAY['P1','P4'], 'diferencias'), 'P2,P3|42501|2',   '[flujo 9] guardado por diferencias: el insert falla y NO se borra nada → OP2 conserva sus 2 asignaciones');
 
 -- ═══ 4 · lectura: cada persona ve lo suyo (la política SELECT no cambió) ═════════════════════════════════════════

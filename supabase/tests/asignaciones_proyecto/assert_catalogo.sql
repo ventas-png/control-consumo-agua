@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 -- ============================================================================
--- CATÁLOGO Y PRIVILEGIOS — la forma exacta que deja la migración 20261026000600
+-- CATÁLOGO Y PRIVILEGIOS — la forma exacta que dejan las migraciones 20261026000600 (asignaciones de proyecto) y 20261026000700 (autoridad del principal)
 -- ============================================================================
 -- El texto que imprimen pg_get_expr / pg_get_triggerdef DEPENDE del search_path de la sesión (con `auth` en el search_path «auth.uid()» sale como
 -- «uid()»; con el search_path vacío todo sale calificado). Estas aserciones comparan texto, así que fijan el suyo: pasan igual lanzadas con
@@ -67,14 +67,14 @@ SELECT asgt.caso('[catálogo] anon no puede invocar la regla', 'ANON', 'SELECT p
 DO $$
 DECLARE a text; v text := ''; x boolean;
 BEGIN
-  FOREACH a IN ARRAY ARRAY['AP', 'AX', 'DAD', 'OP1', 'OW', 'SU'] LOOP
+  FOREACH a IN ARRAY ARRAY['AP', 'AX', 'DAD', 'OP1', 'OW', 'SU', 'SINAPP', 'DOW'] LOOP
     PERFORM set_config('request.jwt.claim.sub', (SELECT id::text FROM asgt.ids WHERE alias = a), true);
     x := public.asignacion_puede_administrar(asgt.uid_de(21), asgt.pid_de(3));
     v := v || CASE WHEN v = '' THEN '' ELSE ', ' END || a || '=' || x;
   END LOOP;
   PERFORM set_config('request.jwt.claim.sub', '', true);
-  PERFORM asgt.chk_txt(v, 'AP=true, AX=true, DAD=false, OP1=false, OW=true, SU=true',
-    '[catálogo] la regla sobre (OP1, P3): AP y AX sí (ven P3), OW y SU sí, OP1 no (es sí mismo y no administra), DAD no (otra empresa)');
+  PERFORM asgt.chk_txt(v, 'AP=false, AX=false, DAD=false, OP1=false, OW=true, SU=true, SINAPP=false, DOW=false',
+    '[catálogo] la regla sobre (OP1, P3): SÓLO el principal —OW propietario de C, SU superadministrador— puede; AP y AX (administradores, aunque AX sea exento y AP vea P3), OP1, DAD, el propietario de OTRA empresa (DOW) y una sesión sin app_users NO, y nunca NULL');
 END $$;
 SELECT asgt.chk_bool(public.asignacion_puede_administrar(NULL, NULL), false, '[catálogo] sin sesión la regla es false (nunca NULL)');
 SELECT asgt.chk_bool(public.asignacion_puede_administrar(asgt.uid_de(21), NULL), false, '[catálogo] con proyecto NULL la regla es false (project_id es NOT NULL: no existe una asignación «sin proyecto» que escribir)');
@@ -108,7 +108,7 @@ DO $$
 DECLARE
   a text;  v_res text := '';  v_antes boolean;  v_despues boolean;
 BEGIN
-  FOREACH a IN ARRAY ARRAY['AP', 'OW', 'SU', 'SERVICIO'] LOOP
+  FOREACH a IN ARRAY ARRAY['AP', '!AP', 'OW', 'SU', 'SERVICIO'] LOOP
     v_antes := NULL;  v_despues := NULL;
     BEGIN
       PERFORM asgt.poner_actor(a);
@@ -122,8 +122,8 @@ BEGIN
     PERFORM asgt.poner_actor('SISTEMA');
     v_res := v_res || CASE WHEN v_res = '' THEN '' ELSE ', ' END || a || ':' || COALESCE(v_antes::text, '?') || '>' || COALESCE(v_despues::text, '?');
   END LOOP;
-  PERFORM asgt.chk_txt(v_res, 'AP:false>true, OW:false>true, SU:false>true, SERVICIO:false>false',
-    '[catálogo] borrar un proyecto con una sesión de la API (administrador acotado, propietario, superadministrador) toma un candado de aviso que antes no tenía; el rol de servicio no');
+  PERFORM asgt.chk_txt(v_res, 'AP:false>false, !AP:false>true, OW:false>true, SU:false>true, SERVICIO:false>false',
+    '[catálogo] borrar un proyecto con una sesión de la API (propietario, superadministrador; o el administrador con el rol propietario de la base, «!AP») toma un candado de aviso que antes no tenía; el administrador por la API (AP) no borra nada, así que no toma ninguno (0700); el rol de servicio no');
 END $$;
 
 -- La CLAVE (V3-01). Una sola por baja, la MISMA para cualquier actor de una empresa y DISTINTA entre empresas: así un propietario sólo estorba a las bajas de SU empresa. Se compara la clave retenida
@@ -133,7 +133,7 @@ DO $$
 DECLARE
   a text;  v_n text := '';  v_k text;  v_claves text[] := '{}';  v_cnt int;  v_kd text;  v_cnt_d int;
 BEGIN
-  FOREACH a IN ARRAY ARRAY['AP', 'OW', 'SU'] LOOP
+  FOREACH a IN ARRAY ARRAY['!AP', 'OW', 'SU'] LOOP
     v_k := NULL;  v_cnt := NULL;
     BEGIN
       PERFORM asgt.poner_actor(a);
@@ -160,10 +160,10 @@ BEGIN
   EXCEPTION WHEN SQLSTATE 'AS999' THEN NULL;
   END;
   PERFORM asgt.poner_actor('SISTEMA');
-  PERFORM asgt.chk_txt(v_n || ', DOW=' || COALESCE(v_cnt_d::text, '?'), 'AP=1, OW=1, SU=1, DOW=1',
+  PERFORM asgt.chk_txt(v_n || ', DOW=' || COALESCE(v_cnt_d::text, '?'), '!AP=1, OW=1, SU=1, DOW=1',
     '[catálogo] cada baja en cascada retiene UN solo candado (no uno por fila ni por persona de la cascada)');
   PERFORM asgt.chk_bool(v_claves[1] <> '?' AND v_claves[1] = v_claves[2] AND v_claves[2] = v_claves[3], true,
-    '[catálogo] la baja de un proyecto de C retiene la MISMA clave sea quien sea el actor (administrador acotado, propietario, superadministrador): se ordenan entre sí');
+    '[catálogo] la baja de un proyecto de C retiene la MISMA clave sea quien sea el actor (administrador acotado con el rol propietario de la base, propietario, superadministrador): se ordenan entre sí');
   PERFORM asgt.chk_bool(v_kd IS NOT NULL AND v_kd <> v_claves[1], true,
     '[catálogo] y la baja de un proyecto de D retiene OTRA clave: el propietario de una empresa no retiene el candado de otra (V3-01)');
 END $$;
@@ -237,7 +237,7 @@ DO $$
 DECLARE
   a text;  v_res text := '';  v_despues boolean;  v_n bigint;
 BEGIN
-  FOREACH a IN ARRAY ARRAY['OW', 'SU', 'AX'] LOOP
+  FOREACH a IN ARRAY ARRAY['OW', 'SU', 'AX', '!AX'] LOOP
     v_despues := NULL;  v_n := NULL;
     BEGIN
       PERFORM asgt.poner_actor(a);
@@ -251,8 +251,8 @@ BEGIN
     PERFORM asgt.poner_actor('SISTEMA');
     v_res := v_res || CASE WHEN v_res = '' THEN '' ELSE ', ' END || a || ':' || COALESCE(v_n::text, '?') || '>' || COALESCE(v_despues::text, '?');
   END LOOP;
-  PERFORM asgt.chk_txt(v_res, 'OW:1>false, SU:1>false, AX:1>false',
-    '[catálogo] borrar DIRECTAMENTE una asignación (OP1 en P1; el proyecto sigue existiendo) afecta 1 fila y NO retiene ningún candado: sólo lo toma la baja en cascada');
+  PERFORM asgt.chk_txt(v_res, 'OW:1>false, SU:1>false, AX:0>false, !AX:1>false',
+    '[catálogo] borrar DIRECTAMENTE una asignación (OP1 en P1; el proyecto sigue existiendo) afecta 1 fila y NO retiene ningún candado para el propietario, el superadministrador ni el administrador con el rol propietario de la base (!AX); el administrador por la API (AX) afecta 0 filas: sólo la baja en cascada toma el candado');
 END $$;
 
 -- Una fila HUÉRFANA (la persona no existe en app_users) no toma candado: sin rol no puede quedar exenta. Se monta una asignación huérfana a un proyecto nuevo (con los disparadores
@@ -282,3 +282,52 @@ BEGIN
 END $$;
 SELECT asgt.chk_bool(NOT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()), true,
   '[catálogo] y tras deshacer los casos esta sesión no retiene ningún candado (sin residuos)');
+
+-- ═══ 6 · la 20261026000700: las 11 políticas del PRINCIPAL y las 7 de las mismas tablas que NO cambian ═══════════════════════════
+-- projects, roles, role_permissions, user_roles y user_invitations tienen 18 políticas. Las 11 de escritura que admitían al administrador pasan a is_company_owner() (conservando el
+-- resto de su predicado de producción) y user_invitations añade «role <> 'admin' OR propietario OR superadministrador»; las otras 7 (los SELECT, projects_update, user_invitations_delete)
+-- quedan IDÉNTICAS a producción. El texto se compara sin «public.» ni «auth.» y con los espacios colapsados (lo que imprime pg_get_expr depende del search_path de la sesión).
+CREATE TEMP TABLE _esperado_0700 (tabla text, politica text, usando text, con_check text);
+INSERT INTO _esperado_0700 VALUES
+  ($q$projects$q$, $q$projects_delete$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND is_company_owner()))$q$, $q$$q$),
+  ($q$projects$q$, $q$projects_insert$q$, $q$$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND is_company_owner()))$q$),
+  ($q$projects$q$, $q$projects_select$q$, $q$(is_super_admin() OR ((company_id = ( SELECT get_my_company_id() AS get_my_company_id)) AND (user_is_project_exempt() OR user_has_project_access(id))) OR ((current_user_role() = 'cliente'::text) AND (EXISTS ( SELECT 1 FROM company_clientes cc WHERE ((cc.company_id = projects.company_id) AND (cc.cliente_id = ( SELECT get_my_cliente_id() AS get_my_cliente_id)))))))$q$, $q$$q$),
+  ($q$projects$q$, $q$projects_update$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))$q$),
+  ($q$role_permissions$q$, $q$role_permissions_delete$q$, $q$(EXISTS ( SELECT 1 FROM roles r WHERE ((r.id = role_permissions.role_id) AND (is_super_admin() OR ((r.is_system = false) AND (r.company_id = get_my_company_id()) AND is_company_owner())))))$q$, $q$$q$),
+  ($q$role_permissions$q$, $q$role_permissions_insert$q$, $q$$q$, $q$(EXISTS ( SELECT 1 FROM roles r WHERE ((r.id = role_permissions.role_id) AND (is_super_admin() OR ((r.is_system = false) AND (r.company_id = get_my_company_id()) AND is_company_owner())))))$q$),
+  ($q$role_permissions$q$, $q$role_permissions_select$q$, $q$(EXISTS ( SELECT 1 FROM roles r WHERE ((r.id = role_permissions.role_id) AND (is_super_admin() OR (r.is_system = true) OR (r.company_id = get_my_company_id())))))$q$, $q$$q$),
+  ($q$roles$q$, $q$roles_delete$q$, $q$(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND is_company_owner()))$q$, $q$$q$),
+  ($q$roles$q$, $q$roles_insert$q$, $q$$q$, $q$(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND is_company_owner()))$q$),
+  ($q$roles$q$, $q$roles_select$q$, $q$(is_super_admin() OR (is_system = true) OR (company_id = get_my_company_id()))$q$, $q$$q$),
+  ($q$roles$q$, $q$roles_update$q$, $q$(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND is_company_owner()))$q$, $q$(is_super_admin() OR ((is_system = false) AND (company_id = get_my_company_id()) AND is_company_owner()))$q$),
+  ($q$user_invitations$q$, $q$user_invitations_delete$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))$q$, $q$$q$),
+  ($q$user_invitations$q$, $q$user_invitations_insert$q$, $q$$q$, $q$((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))$q$),
+  ($q$user_invitations$q$, $q$user_invitations_select$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))$q$, $q$$q$),
+  ($q$user_invitations$q$, $q$user_invitations_update$q$, $q$(is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))$q$, $q$((is_super_admin() OR ((company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text])))) AND ((role <> 'admin'::text) OR is_company_owner() OR is_super_admin()))$q$),
+  ($q$user_roles$q$, $q$user_roles_delete$q$, $q$(is_super_admin() OR (EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND is_company_owner()))))$q$, $q$$q$),
+  ($q$user_roles$q$, $q$user_roles_insert$q$, $q$$q$, $q$(is_super_admin() OR ((EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND is_company_owner()))) AND (EXISTS ( SELECT 1 FROM roles r WHERE ((r.id = user_roles.role_id) AND ((r.is_system = true) OR (r.company_id = get_my_company_id()))))) AND ((assigned_by IS NULL) OR (assigned_by = ( SELECT uid() AS uid)))))$q$),
+  ($q$user_roles$q$, $q$user_roles_select$q$, $q$(is_super_admin() OR (user_id = ( SELECT uid() AS uid)) OR (EXISTS ( SELECT 1 FROM app_users u WHERE ((u.id = user_roles.user_id) AND (u.company_id = get_my_company_id()) AND (current_user_role() = ANY (ARRAY['company_owner'::text, 'admin'::text]))))))$q$, $q$$q$);
+SELECT asgt.chk((SELECT count(*) FROM _esperado_0700), 18, '[0700] montaje: 18 políticas esperadas en las cinco tablas');
+SELECT asgt.chk((SELECT count(*) FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+                  WHERE c.oid = ANY (ARRAY['public.projects'::regclass, 'public.roles'::regclass, 'public.role_permissions'::regclass, 'public.user_roles'::regclass, 'public.user_invitations'::regclass])), 18,
+  '[0700] las cinco tablas tienen exactamente 18 políticas (la migración no crea ni borra ninguna)');
+SELECT asgt.chk((SELECT count(*) FROM _esperado_0700 e
+                   JOIN pg_policy p ON p.polrelid = ('public.' || e.tabla)::regclass AND p.polname = e.politica
+                  WHERE regexp_replace(regexp_replace(COALESCE(pg_get_expr(p.polqual, p.polrelid), ''), E'\\m(public|auth)\\.', '', 'g'), '\s+', ' ', 'g') = e.usando
+                    AND regexp_replace(regexp_replace(COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), ''), E'\\m(public|auth)\\.', '', 'g'), '\s+', ' ', 'g') = e.con_check), 18,
+  '[0700] las 18 políticas tienen EXACTAMENTE el texto esperado: 11 del principal y 7 sin cambio');
+SELECT asgt.chk_txt((SELECT string_agg(c.relname || '.' || p.polname, ', ' ORDER BY c.relname, p.polname)
+                       FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+                      WHERE c.oid = ANY (ARRAY['public.projects'::regclass, 'public.roles'::regclass, 'public.role_permissions'::regclass, 'public.user_roles'::regclass, 'public.user_invitations'::regclass])
+                        AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') || COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') ~ 'is_company_owner'),
+  'projects.projects_delete, projects.projects_insert, role_permissions.role_permissions_delete, role_permissions.role_permissions_insert, roles.roles_delete, roles.roles_insert, roles.roles_update, user_invitations.user_invitations_insert, user_invitations.user_invitations_update, user_roles.user_roles_delete, user_roles.user_roles_insert',
+  '[0700] las políticas que usan is_company_owner() son exactamente las 11 que cambian');
+SELECT asgt.chk_txt((SELECT string_agg(c.relname || '.' || p.polname || ':' || p.polcmd::text || ':' || p.polpermissive::text || ':' || p.polroles::regrole[]::text, ', ' ORDER BY c.relname, p.polname)
+                       FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+                      WHERE c.oid = ANY (ARRAY['public.projects'::regclass, 'public.roles'::regclass, 'public.role_permissions'::regclass, 'public.user_roles'::regclass, 'public.user_invitations'::regclass])),
+  'projects.projects_delete:d:true:{authenticated}, projects.projects_insert:a:true:{authenticated}, projects.projects_select:r:true:{authenticated}, projects.projects_update:w:true:{authenticated}, role_permissions.role_permissions_delete:d:true:{-}, role_permissions.role_permissions_insert:a:true:{-}, role_permissions.role_permissions_select:r:true:{-}, roles.roles_delete:d:true:{-}, roles.roles_insert:a:true:{-}, roles.roles_select:r:true:{-}, roles.roles_update:w:true:{-}, user_invitations.user_invitations_delete:d:true:{authenticated}, user_invitations.user_invitations_insert:a:true:{authenticated}, user_invitations.user_invitations_select:r:true:{authenticated}, user_invitations.user_invitations_update:w:true:{authenticated}, user_roles.user_roles_delete:d:true:{-}, user_roles.user_roles_insert:a:true:{-}, user_roles.user_roles_select:r:true:{-}',
+  '[0700] nombres, comandos, tipo (permisivas) y roles de base de datos como en producción: projects y user_invitations TO authenticated; roles, role_permissions y user_roles para PUBLIC (la 0700 sólo cambia expresiones)');
+SELECT asgt.chk_bool((SELECT pg_get_expr(p.polqual, p.polrelid) ~ '''admin''' FROM pg_policy p WHERE p.polrelid = 'public.projects'::regclass AND p.polname = 'projects_update'), true,
+  '[0700] projects_update NO cambia: los administradores siguen configurando fiscal y cobros');
+SELECT asgt.chk((SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ('is_company_owner', 'is_super_admin', 'current_user_role', 'get_my_company_id')), 4,
+  '[0700] no se creó ninguna función: la regla usa las que ya existían (is_super_admin, is_company_owner, current_user_role, get_my_company_id)');

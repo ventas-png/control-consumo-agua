@@ -9,6 +9,8 @@
 --   · trg_asignacion_empresa  (integridad)      → persona y proyecto son de la misma empresa para TODO actor.
 -- Límite que se documenta: los triggers NO son una capa de autorización; con la política permisiva, asignar a OTRA persona de la misma
 -- empresa ya no lo frena nadie. Por eso las políticas con asignacion_puede_administrar() son la primera línea.
+-- (Decisión del dueño del negocio, 2026-10-11: esa regla es sólo del PRINCIPAL —propietario o superadministrador—. Esta suite NO cambia con ella: los triggers
+-- no distinguen al administrador del operador, sólo a quien es propietario o superadministrador de quien no lo es; los actores de aquí siguen siendo los mismos.)
 -- ============================================================================
 BEGIN;
 DROP POLICY "user_project_assignments_insert" ON public.user_project_assignments;

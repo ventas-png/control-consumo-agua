@@ -92,18 +92,28 @@ END $$;
 SELECT asgt.cero('[alcance 3] AP no se vuelve exento borrando sus 3 filas', 'AP', asgt.borrar_de('AP'),
   p_efecto_sql => $q$SELECT asgt.exento({AP})::text || '|' || asgt.alcance({AP})$q$, p_efecto => 'false|P1,P2,P3');
 
--- Borrar un proyecto al que se está asignado: la baja EN CASCADA de la fila propia se permite mientras quede otra asignación (el alcance
--- sólo se reduce; es un flujo legítimo del servidor) y se rechaza si fuera la ÚLTIMA (el administrador quedaría exento).
-SELECT asgt.err_propia('[alcance 3] AP (con sólo P1) no borra el proyecto P1 por la API: la cascada quitaría su última fila y lo volvería exento', 'AP',
+-- LA BAJA DE UN PROYECTO ES DEL PRINCIPAL (20261026000700, projects_delete): un administrador (acotado o exento) que borra un proyecto por la API recibe 0 filas SIN error. Eso
+-- cierra la superficie de F2-03 y de D-16 para quien no es principal; NO cierra el rol de servicio ni el SQL directo (ver abajo y docs/SEGURIDAD_ASIGNACIONES_PROYECTO.md).
+SELECT asgt.cero('[alcance 3] AP intenta borrar el proyecto P1 por la API: 0 filas (projects_delete es del principal) y conserva P1, P2 y P3', 'AP',
+  $q$DELETE FROM public.projects WHERE id = {P1}$q$,
+  p_efecto_sql => $q$SELECT asgt.filas_de({AP}) || '|' || asgt.exento({AP})::text || '|' || (SELECT count(*) FROM public.projects WHERE id = {P1})$q$, p_efecto => 'P1,P2,P3|false|1');
+SELECT asgt.cero('[alcance 3] el administrador exento (AX) tampoco', 'AX', $q$DELETE FROM public.projects WHERE id = {P1}$q$,
+  p_efecto_sql => $q$SELECT (SELECT count(*) FROM public.projects WHERE id = {P1}) || '|' || asgt.filas_de({AP})$q$, p_efecto => '1|P1,P2,P3');
+
+-- DEFENSA EN PROFUNDIDAD: el trigger de autoasignación sigue vigilando la baja EN CASCADA de un NO principal aunque la política ya no lo deje llegar. La API no tiene ya ese
+-- camino; se ejercita con el rol de base de datos PROPIETARIO (salta la RLS) y la sesión de AP («!AP»): lo que representa una función SECURITY DEFINER futura, una conexión directa
+-- del dueño con un JWT o una política más permisiva. La cascada de una llave foránea no pasa por la RLS, así que sólo el trigger decide sobre las filas de la persona que borra.
+-- Se permite mientras la persona CONSERVE otra asignación (el alcance sólo se reduce) y se rechaza si fuera la ÚLTIMA (el administrador quedaría exento).
+SELECT asgt.err_propia('[alcance 3 · trigger] AP (con sólo P1) no borra el proyecto P1: la cascada quitaría su última fila y lo volvería exento', '!AP',
   $q$DELETE FROM public.projects WHERE id = {P1}$q$,
   p_preparar => $q$DELETE FROM public.user_project_assignments WHERE user_id = {AP} AND project_id <> {P1}$q$);
-SELECT asgt.ok('[alcance 3] AP (P1, P2, P3) SÍ borra el proyecto P1: la cascada le quita esa fila, conserva P2 y P3 y SIGUE acotado', 'AP',
+SELECT asgt.ok('[alcance 3 · trigger] AP (P1, P2, P3) SÍ borra el proyecto P1: la cascada le quita esa fila, conserva P2 y P3 y SIGUE acotado', '!AP',
   $q$DELETE FROM public.projects WHERE id = {P1}$q$, 1,
   p_efecto_sql => $q$SELECT asgt.filas_de({AP}) || '|' || asgt.exento({AP})::text$q$, p_efecto => 'P2,P3|false');
-SELECT asgt.ok('[alcance 3] … y dos a la vez (P1 y P2), mientras le quede P3', 'AP',
+SELECT asgt.ok('[alcance 3 · trigger] … y dos a la vez (P1 y P2), mientras le quede P3', '!AP',
   $q$DELETE FROM public.projects WHERE id IN ({P1}, {P2})$q$, 2,
   p_efecto_sql => $q$SELECT asgt.filas_de({AP}) || '|' || asgt.exento({AP})::text$q$, p_efecto => 'P3|false');
-SELECT asgt.err_propia('[alcance 3] pero no los dos únicos que tiene en una sola sentencia (se quedaría sin filas): no se borra ninguno', 'AP',
+SELECT asgt.err_propia('[alcance 3 · trigger] pero no los dos únicos que tiene en una sola sentencia (se quedaría sin filas): no se borra ninguno', '!AP',
   $q$DELETE FROM public.projects WHERE id IN ({P1}, {P2})$q$,
   p_preparar => $q$DELETE FROM public.user_project_assignments WHERE user_id = {AP} AND project_id = {P3}$q$);
 SELECT asgt.ok('[alcance 3] el propietario SÍ puede borrar P1 (cascada incluida) y AP queda sin filas → exento: decisión del propietario, no de AP', 'OW',
@@ -112,8 +122,9 @@ SELECT asgt.ok('[alcance 3] el propietario SÍ puede borrar P1 (cascada incluida
   p_preparar => $q$DELETE FROM public.user_project_assignments WHERE user_id = {AP} AND project_id <> {P1}$q$);
 
 -- ═══ 4 · efecto sobre can_access_project: quien recibe un proyecto de OTRA persona lo alcanza; quien lo intenta solo, no ═══
-SELECT asgt.ok('[alcance 4] un administrador le da P3 a OP1: ahora OP1 SÍ alcanza P3', 'AX', asgt.ins('OP1', 'P3'),
+SELECT asgt.ok('[alcance 4] el propietario le da P3 a OP1: ahora OP1 SÍ alcanza P3', 'OW', asgt.ins('OP1', 'P3'),
   p_efecto_sql => $q$SELECT asgt.puede({OP1}, {P3})::text$q$, p_efecto => 'true');
+SELECT asgt.err_rls('[alcance 4] un administrador (AX) tampoco se lo da: sólo el principal asigna', 'AX', asgt.ins('OP1', 'P3'));
 SELECT asgt.err_propia('[alcance 4] OP1 intenta dárselo solo: no, y sigue SIN alcanzarlo', 'OP1', asgt.ins('OP1', 'P3'));
 SELECT asgt.cero('[alcance 4] OP1 no puede quitarse el que tiene', 'OP1', asgt.borrar_fila('OP1', 'P1'),
   p_efecto_sql => $q$SELECT asgt.puede({OP1}, {P1})::text$q$, p_efecto => 'true');
@@ -136,16 +147,28 @@ SELECT asgt.ok('[otros caminos] AP tampoco: sigue siendo admin de C, con su alca
   $q$UPDATE public.app_users SET role = 'company_owner', project_id = {P8} WHERE id = {AP}$q$, 1,
   p_efecto_sql => $q$SELECT role || '|' || COALESCE(project_id::text, '-') || '|' || asgt.exento({AP})::text FROM public.app_users WHERE id = {AP}$q$,
   p_efecto => 'admin|-|false');
--- b · crear un proyecto nuevo en su empresa no le da acceso a él (no hay asignación automática)
-SELECT asgt.ok('[otros caminos] AP crea un proyecto en su empresa: no lo alcanza (sin asignación) y no puede asignárselo', 'AP',
-  $q$INSERT INTO public.projects (id, company_id, nombre) VALUES ('a5d00000-0000-0000-0000-0000000000f1', {C}, 'ASG proyecto nuevo de AP')$q$, 1,
+-- b · D-9 (opción (c), decisión del dueño 2026-10-11): crear proyectos es del principal. Un administrador acotado ya no crea un proyecto que luego no ve y no puede asignarse
+--     (estado contradictorio); lo crea el propietario y se lo asigna él (assert_matriz [H3]).
+SELECT asgt.err_rls('[otros caminos] AP NO crea un proyecto en su empresa: projects_insert es del principal', 'AP',
+  $q$INSERT INTO public.projects (id, company_id, nombre) VALUES ('a5d00000-0000-0000-0000-0000000000f1', {C}, 'ASG proyecto nuevo de AP')$q$,
+  p_preparar => 'SET session_replication_role = replica');
+SELECT asgt.ok('[otros caminos] el propietario sí lo crea, y AP no lo alcanza hasta que el propietario se lo asigne (no hay asignación automática)', 'OW',
+  $q$INSERT INTO public.projects (id, company_id, nombre) VALUES ('a5d00000-0000-0000-0000-0000000000f1', {C}, 'ASG proyecto nuevo')$q$, 1,
   p_efecto_sql => $q$SELECT asgt.puede({AP}, 'a5d00000-0000-0000-0000-0000000000f1'::uuid)::text$q$, p_efecto => 'false',
   p_preparar => 'SET session_replication_role = replica');
--- c · F2-03 (RIESGO DOCUMENTADO, decisión abierta D-2/D-5/D-6; NO es una aserción de que esté bien): cualquier administrador puede dejar exento a OTRO administrador borrando
---     el último proyecto de éste. El trigger de autoasignación sólo vigila las filas PROPIAS de quien borra; la cascada que vacía la fila de un TERCERO no se comprueba, y
---     projects_delete deja borrar a `admin`. AX2 (administrador sin filas) recibe sólo P1; AP (acotado a P1, P2, P3) borra P1 por la API: AX2 pasa de acotado a EXENTO. Si esta
---     decisión se cierra (ampliar el trigger o quitar projects_delete a admin), este caso debe INVERTIRSE: el DELETE debería rechazarse y AX2 seguir acotado.
-SELECT asgt.ok('[otros caminos] F2-03 (documentado): AP borra P1 y AX2, cuya única fila era P1, queda sin filas → EXENTO; AP conserva P2 y P3', 'AP',
+-- c · F2-03 (un administrador deja exento a OTRO borrando el último proyecto de éste) y D-16: CERRADOS PARA QUIEN NO ES PRINCIPAL por projects_delete (20261026000700).
+SELECT asgt.cero('[otros caminos] F2-03 cerrado: AP borra P1 por la API y AX2, cuya única fila era P1, SIGUE acotado (0 filas)', 'AP',
+  $q$DELETE FROM public.projects WHERE id = {P1}$q$,
+  p_efecto_sql => $q$SELECT asgt.exento({AX2})::text || '|' || asgt.filas_de({AX2}) || '|' || asgt.filas_de({AP})$q$, p_efecto => 'false|P1|P1,P2,P3',
+  p_preparar => $q$INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES ({AX2}, {P1}, 'total')$q$);
+-- … y lo que NO se cierra, medido (límite documentado, D-6 / D-16 / D-17): (1) el rol de servicio y el SQL directo no pasan por la RLS ni por el trigger (auth.uid() nulo); (2) con el
+--     rol de la base propietario y la sesión de AP («!AP») la cascada vacía la fila de un TERCERO sin que el trigger la compruebe: AX2 queda exento. El propietario y el superadministrador
+--     también pueden dejar exento a un administrador borrando su proyecto: es decisión suya (D-6).
+SELECT asgt.ok('[otros caminos] F2-03 residual (documentado): con el rol propietario de la base y la sesión de AP, borrar P1 deja a AX2 sin filas → EXENTO; el trigger sólo vigila las filas PROPIAS', '!AP',
   $q$DELETE FROM public.projects WHERE id = {P1}$q$, 1,
   p_efecto_sql => $q$SELECT asgt.exento({AX2})::text || '|[' || asgt.filas_de({AX2}) || ']|' || asgt.filas_de({AP})$q$, p_efecto => 'true|[]|P2,P3',
+  p_preparar => $q$INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES ({AX2}, {P1}, 'total')$q$);
+SELECT asgt.ok('[otros caminos] y el rol de servicio borra P1 sin pasar por ninguna barrera (D-6): AX2 queda exento', 'SERVICIO',
+  $q$DELETE FROM public.projects WHERE id = {P1}$q$, 1,
+  p_efecto_sql => $q$SELECT asgt.exento({AX2})::text$q$, p_efecto => 'true',
   p_preparar => $q$INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES ({AX2}, {P1}, 'total')$q$);
