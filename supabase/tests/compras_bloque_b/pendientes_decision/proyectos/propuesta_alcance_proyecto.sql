@@ -4,7 +4,7 @@
 -- ⚠ ESTE ARCHIVO ESTÁ EN pendientes_decision/: NO se aplica con el PR #926 (tiene diez migraciones, el tope de MAX_APPLY = 10) ni se despliega.
 --   Para llevarlo: copiarlo como supabase/migrations/20261027001000_compras_alcance_proyecto_captura.sql en un PR PROPIO, con su push y su corrida de
 --   apply-migrations-prod.yml, en este orden de pushes a main (cada uno en SU push, cada uno por debajo del tope de diez):
---       #928 (20261026000600) → #926 (20261027000000…0900) → ESTE PR (20261027001000) → #927 (20261028000000).
+--       #928 (20261026000600 y 20261026000700, dos archivos) → #926 (20261027000000…0900) → ESTE PR (20261027001000) → #927 (20261028000000).
 --   La versión 20261027001000 NO es una preferencia: run.sh §3 aplica primero toda migración posterior a 20261021000000 que no sea 20261027* y DESPUÉS la serie
 --   20261027*; con una versión mayor (20261028…, 20261029…) esta se aplica ANTES de la 0900 y muere en su pre-vuelo (COMPRAS_MIGRACION_REQUISITOS; reproducido).
 --   Con 20261027001000 el historial de versiones queda monótono y esto no depende de #927 (housekeeping de evidencias que no toca compras): no hay que esperarlo.
@@ -56,10 +56,11 @@
 --   · NO compara la empresa del documento con la de la sesión al insertar (R1 «empresa», D-5): en la API ya lo hacen la RLS y
 --     trg_00_compras_rls_empresa; una función SECURITY DEFINER no. Añadirlo rompe el montaje de UNA aserción existente
 --     (conta_reglas_imputacion/assert.sql:490-493, que siembra una factura de la empresa B con la sesión de A) y no se pidió: README.md §5.
---   · NO vuelve «exento» una marca explícita: sigue siendo no tener filas en user_project_assignments, así que un administrador acotado que le borra sus filas a
---     OTRO administrador lo vuelve exento (D-9; la 0600 del PR #928 cierra que alguien se borre las SUYAS, no las de otro). La regla «NULL solo para exentos» es tan firme como esa exención.
+--   · NO vuelve «exento» una marca explícita: sigue siendo no tener filas en user_project_assignments. Con la 0600 del PR #928 desde 7bf85221 (solo el PRINCIPAL —propietario
+--     o superadministrador— escribe asignaciones) ningún administrador deja exento a otro: solo el principal lo hace (D-9; antes de esa 0600, un administrador acotado que le
+--     borraba sus filas a OTRO lo volvía exento). La regla «NULL solo para exentos» es tan firme como esa exención.
 --   · NO cambia ON DELETE de project_id: al eliminar un proyecto, sus facturas, contraseñas y órdenes de pago quedan SIN proyecto (SET NULL) —y las ve y actúa todo el que tenga la llave—
---     y sus órdenes de compra se borran (CASCADE) (D-10).
+--     y sus órdenes de compra se borran (CASCADE) (D-10). Con la 0700 del PR #928 solo el principal elimina proyectos por la API (un administrador obtiene cero filas).
 --   · NO endurece el GUC conta.allow_system_write (heredado de la 0900, la guarda común): cualquier sesión authenticated puede fijarlo con SQL directo; no es alcanzable
 --     por la API pública hoy, pero es una puerta del diseño de la guarda: hardening APARTE (README.md §6, F6).
 --   · NO crea ninguna llave ni concede ninguna. NO cambia los privilegios de anon (que NO tiene SELECT, INSERT ni UPDATE sobre estas nueve tablas en producción).

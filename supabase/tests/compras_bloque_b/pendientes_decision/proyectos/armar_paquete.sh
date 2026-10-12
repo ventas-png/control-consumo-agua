@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Arma el paquete de «alcance de proyecto al capturar» sobre UN ÁRBOL del repositorio (el de la rama del PR #926 —medido sobre e9764d3a y, por el verificador de
-# la cuarta ronda, sobre 339ef1fb—, con o sin la 20261026000600 del #928 —la de ae49119f, «md5 del archivo en ae49119f» 049eb590de0d92dd1b91a0f33f2ab669: la
-# corrida completa se repitió con ella, rc = 0 y 988 líneas ✓; en la tercera ronda se midió con la de b9b630b1, md5 2281d665…; si la 0600 cambia, repetir la corrida—)
+# Arma el paquete de «alcance de proyecto al capturar» sobre UN ÁRBOL del repositorio (el de la rama del PR #926 —medido sobre 65f63375 en la quinta verificación; antes
+# sobre e9764d3a y 339ef1fb—, con la 20261026000600 y la 20261026000700 del #928 puestas en «main» ANTES del #926, que es el orden de despliegue real: las de 7bf85221
+# —0600 editada, «md5 del archivo» dde34c0a35913af299fed915777fab49; 0700 nueva, c45aa559f47d1de2dd66c25e96633283—: run.sh rc = 0 y 989 líneas ✓ con la PRJ-1.sql corregida
+# (con la anterior, run.sh termina en rc = 1 en hallazgos/PRJ-1.sql: README.md §0.4). Las del tip anterior (0600 de 8d34392b, md5 8fd421b0…, sin 0700) y las de
+# ae49119f (049eb590…), b9b630b1 (2281d665…) y d1aeb94a (194f59f0…) son históricas. Si la 0600 o la 0700 cambian, repetir la corrida—)
 # para reproducir la corrida completa. NO toca esta carpeta ni el checkout desde el que se invoca: solo escribe en el árbol que se le da.
 #
 # Uso:  bash armar_paquete.sh <ruta-del-arbol>
@@ -11,8 +13,8 @@
 #   1. copia propuesta_alcance_proyecto.sql como supabase/migrations/20261027001000_compras_alcance_proyecto_captura.sql (la versión NO es opcional: justo
 #      después de la 0900; ver README.md §9) y PRJ-1.sql a supabase/tests/compras_bloque_b/hallazgos/ (la recoge run.sh §5r);
 #   2. aplica con `git apply` los tres parches: reversion_script.patch, adaptaciones_aserciones.patch y ui_mensajes.patch (comprobándolos antes con --check).
-# Después:  cd <ruta-del-arbol> && PGPORT_TEST=<puerto> bash supabase/tests/compras_bloque_b/run.sh   (rc = 0; 988 líneas ✓ en un repositorio git CON origin/main
-#            resoluble —el paso 7, migrations-append-only, lo exige—; si no, 987 y el paso 7 imprime «(omitido: sin git/node en este entorno)». Con un árbol de
+# Después:  cd <ruta-del-arbol> && PGPORT_TEST=<puerto> bash supabase/tests/compras_bloque_b/run.sh   (rc = 0; 989 líneas ✓ desde 65f63375 —988 en e9764d3a y 339ef1fb—, en un repositorio git CON origin/main
+#            resoluble —el paso 7, migrations-append-only, lo exige—; si no, una menos y el paso 7 imprime «(omitido: sin git/node en este entorno)». Con un árbol de
 #            «git archive»: git init + commit base + git update-ref refs/remotes/origin/main HEAD, y recién entonces armar el paquete; README.md §10.2)
 # En una copia SIN .git, exportar antes DIAG=<ruta-del-arbol>/scripts/diagnostico-numeros-factura.sql (README.md §10).
 # ============================================================================

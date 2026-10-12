@@ -27,15 +27,20 @@
 --   c. OTRA EMPRESA y anon: igual que hoy (RLS 42501 por la API; COMPRAS_ALCANCE_EMPRESA de la 0900 al mover por una función definer).
 --   d. LEGÍTIMO: la persona acotada crea (API y RPC) y mueve entre SUS proyectos; el ciclo completo orden→recepción→factura→pago en su
 --      proyecto; el flujo de Contabilidad › Compras y Cuentas por pagar con su proyecto activo; la exenta crea sin proyecto («Empresa»);
---      eliminar un proyecto (ON DELETE SET NULL) no lo frena.
+--      eliminar un proyecto (ON DELETE SET NULL) no lo frena: lo elimina el administrador con asignaciones si no está la 0700 del PR #928, y el PRINCIPAL (propietario)
+--      si está (con la 0700 el administrador obtiene CERO filas).
 --   e. UN CERO NUNCA ES ÉXITO: cada celda dice si espera exactamente 1 fila, exactamente 0 filas o un error con SQLSTATE y mensaje;
 --      la autoprueba del arnés (PRJ-0) comprueba que 0 filas no pasa por éxito y que un error por el motivo equivocado no pasa.
 --   f. LÍMITES QUE QUEDAN (documentados con una comprobación; cambian solo si el dueño decide D-4 / D-6 / D-9 / D-10, o amplía el alcance a las
 --      tablas vecinas, README.md §5 y §6):
 --        D-4  un documento que YA está sin proyecto lo sigue pudiendo actuar quien tiene la llave, y user_has_project_access no lee permission_type;
---        D-5  la empresa del INSERT no se compara (funciones definer) · D-6 «todo UPDATE» · D-0 la firmeza de user_project_assignments;
---        D-9  «exento» = no tener filas de asignación: un administrador acotado puede dejar SIN filas a otro y hacerlo exento (con o sin la 0600 del PR #928);
---        D-10 al eliminar un proyecto, sus facturas, contraseñas y órdenes de pago quedan «sin proyecto» y las ve y las actúa todo el que tenga la llave;
+--        D-5  la empresa del INSERT no se compara (funciones definer) · D-6 «todo UPDATE» · D-0 la firmeza de user_project_assignments (cerrada por la 0600 del PR #928);
+--        D-9  «exento» = no tener filas de asignación. Con la 0600 de #928 de ANTES (el administrador escribía asignaciones) o sin ella: un administrador acotado puede dejar SIN
+--             filas a otro y hacerlo exento [límite D-9]. Con la 0600 del PRINCIPAL (#928 desde 7bf85221: solo propietario y superadministrador escriben asignaciones) un
+--             administrador obtiene CERO filas, el otro sigue acotado y rechazado, y SOLO el principal lo vuelve exento [límite D-9 · el principal]: la exención sigue siendo
+--             «sin filas» y se da por decisión del principal, no se fabrica;
+--        D-10 al eliminar un proyecto, sus facturas, contraseñas y órdenes de pago quedan «sin proyecto» y las ve y las actúa todo el que tenga la llave. Con la 0700 de #928 solo el
+--             principal elimina un proyecto (el administrador: cero filas) y el límite sigue en pie para el principal;
 --        F7   solo las 5 + 4 tablas del circuito: las tablas vecinas con project_id (suministros_condominio, proformas_condominio…) no se tocan.
 --
 -- Modo informe: PGOPTIONS="-c prj.continuar=si" cuenta las comprobaciones rojas sin detenerse (✗) y al final falla si hay alguna.
@@ -441,7 +446,7 @@ $autoprueba$;
 --   uap operador cuyo proyecto está en app_users.project_id (A), sin asignaciones, con todas las llaves
 --   adm2 administrador CON asignaciones (A y G): NO es exento · AD administrador SIN asignaciones (exento) · ow propietario · su superadministrador
 --   su2 superadministrador cuya sesión es de la empresa F (actúa en cualquier empresa) · nc administrador SIN empresa (company_id NULL; exento por no tener asignaciones)
---   adm3 administrador asignado SOLO a A (NO exento; D-9: otro administrador acotado le borra la fila y lo vuelve exento) · ol operador con asignación 'lectura' a A y todas las llaves
+--   adm3 administrador asignado SOLO a A (NO exento; D-9: sin la regla del principal otro administrador acotado le borra la fila y lo vuelve exento; con ella solo el principal) · ol operador con asignación 'lectura' a A y todas las llaves
 --   (permission_type no limita la captura; F10). fan sesión autenticada SIN fila en app_users (rol NULL: can_access_project() devuelve NULL, no false). ua tiene además un rol con las llaves de dos tablas VECINAS (suministros_condominio, proformas_condominio; F7).
 --   Documentos de E en A, en B y SIN proyecto (los arma AD, exento): órdenes en borrador, recepciones en borrador, órdenes de pago en
 --   borrador, facturas de gasto directo y contraseñas sin partidas; anclas emitidas / facturas aprobadas para insertar recepciones y pagos.
@@ -899,11 +904,16 @@ BEGIN
 END;
 $pantalla$;
 
--- f5 · eliminar un proyecto (ON DELETE SET NULL de project_id) lo puede hacer un administrador con asignaciones: la propuesta no lo frena
+-- f5 · eliminar un proyecto (ON DELETE SET NULL de project_id): la propuesta no lo frena. Sin la 0700 del PR #928 lo elimina un administrador con asignaciones; CON la 0700
+--      (projects_delete es del principal) lo elimina el propietario y el administrador obtiene CERO filas. La comprobación se adapta a la base (como D-0): el actor y la
+--      redacción cambian, lo que se mide DESPUÉS (qué queda «sin proyecto» y quién lo ve) es lo mismo.
 DO $purga$
 DECLARE
   E constant uuid := public.prj_id('E', 'co');  P constant uuid := public.prj_id('P', 'pv');  AD constant uuid := public.prj_id('AD', 'u');
-  G constant uuid := public.prj_id('G', 'pg');  adm2 constant uuid := public.prj_id('adm2', 'u');
+  G constant uuid := public.prj_id('G', 'pg');  adm2 constant uuid := public.prj_id('adm2', 'u');  ow constant uuid := public.prj_id('ow', 'u');
+  -- ¿projects_delete ya es del principal (0700)? Por el texto de la política, no por el nombre de la migración.
+  v_principal boolean := COALESCE((SELECT pg_get_expr(p.polqual, p.polrelid) ~ 'is_company_owner' FROM pg_policy p
+                                    WHERE p.polrelid = 'public.projects'::regclass AND p.polname = 'projects_delete'), false);
 BEGIN
   PERFORM public.prj_como(AD);
   INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total) VALUES
@@ -920,8 +930,22 @@ BEGIN
   PERFORM public.prj_verifica(format('UPDATE public.facturas_proveedor SET concepto = ''editada por ua'' WHERE id = %L', public.prj_id('g1', 'fac')), 'OK0', '[D-10 · antes de eliminar G · ua] ni se edita (cero filas)');
   PERFORM public.prj_como(adm2);
   PERFORM public.prj_igual(public.user_is_project_exempt()::text, 'false', '[purga] montaje: el administrador tiene asignaciones, NO es exento de proyecto');
-  PERFORM public.prj_verifica(format('DELETE FROM public.projects WHERE id = %L', G), 'OK1',
-    '[purga] el administrador con asignaciones elimina el proyecto G con facturas, orden de pago, contraseña y orden: ni la captura ni mover lo frenan', true);
+  IF v_principal THEN
+    -- 0700: el administrador no elimina el proyecto (la RLS esconde la fila: CERO filas, no un error) y G sigue ahí con todo lo suyo
+    PERFORM public.prj_verifica(format('DELETE FROM public.projects WHERE id = %L', G), 'OK0',
+      '[purga · 0700 · adm2] el administrador con asignaciones NO elimina el proyecto G: cero filas (projects_delete es del principal de la empresa)');
+    PERFORM public.prj_como(NULL, 'sistema');
+    PERFORM public.prj_igual((SELECT count(*)::text FROM public.projects WHERE id = G), '1', '[purga · 0700 · adm2] el proyecto G sigue ahí tras el intento del administrador');
+    PERFORM public.prj_igual((SELECT count(*)::text FROM public.facturas_proveedor WHERE id IN (public.prj_id('g1', 'fac'), public.prj_id('g2', 'fac')) AND project_id = G), '2',
+      '[purga · 0700 · adm2] las dos facturas de G siguen en G');
+    PERFORM public.prj_como(ow);
+    PERFORM public.prj_igual(public.user_is_project_exempt()::text, 'true', '[purga · 0700] montaje: el propietario (el principal) es exento de proyecto');
+    PERFORM public.prj_verifica(format('DELETE FROM public.projects WHERE id = %L', G), 'OK1',
+      '[purga · 0700] el principal (propietario) elimina el proyecto G con facturas, orden de pago, contraseña y orden: ni la captura ni mover lo frenan', true);
+  ELSE
+    PERFORM public.prj_verifica(format('DELETE FROM public.projects WHERE id = %L', G), 'OK1',
+      '[purga] el administrador con asignaciones elimina el proyecto G con facturas, orden de pago, contraseña y orden: ni la captura ni mover lo frenan', true);
+  END IF;
   PERFORM public.prj_como(NULL, 'sistema');
   PERFORM public.prj_igual((SELECT count(*)::text FROM public.projects WHERE id = G), '0', '[purga] el proyecto ya no existe');
   PERFORM public.prj_igual((SELECT count(*)::text FROM public.facturas_proveedor WHERE id IN (public.prj_id('g1', 'fac'), public.prj_id('g2', 'fac')) AND project_id IS NULL), '2', '[purga] las dos facturas siguen ahí, solo sin proyecto');
@@ -937,7 +961,8 @@ BEGIN
                              WHERE c.contype = 'f' AND c.confrelid = 'public.projects'::regclass AND a.attname = 'project_id'
                                AND c.conrelid IN ('public.recepciones'::regclass, 'public.facturas_proveedor'::regclass, 'public.ordenes_pago'::regclass, 'public.contrasenas_pago'::regclass)), 'n',
     '[purga · D-10] las otras cuatro tablas del circuito son ON DELETE SET NULL (confdeltype n)');
-  -- D-10 (después): lo que era de G ya no tiene proyecto y por eso lo ve y lo actúa ua, que nunca tuvo G (no es una brecha NUEVA de esta propuesta: es lo que hace SET NULL con can_access_project(NULL))
+  -- D-10 (después): lo que era de G ya no tiene proyecto y por eso lo ve y lo actúa ua, que nunca tuvo G (no es una brecha NUEVA de esta propuesta: es lo que hace SET NULL con can_access_project(NULL)).
+  --                  Con la 0700 sigue en pie: quien lo provoca es ahora el PRINCIPAL (el bloqueo de README §6.3 solo frenaría a un no exento, y un no exento ya no elimina proyectos).
   PERFORM public.prj_como(public.prj_id('ua', 'u'));
   PERFORM public.prj_verifica(format('SELECT 1 FROM public.facturas_proveedor WHERE id = %L', public.prj_id('g1', 'fac')), 'OK1',
     '[límite D-10 · ua] tras eliminar G, su factura quedó «sin proyecto» y ua, que nunca tuvo G, la VE (si se decide ON DELETE RESTRICT, o bloquear el borrado, esta comprobación pasa a cero filas)');
@@ -1043,9 +1068,12 @@ $vecinas$;
 DO $permission_type$
 DECLARE
   E constant uuid := public.prj_id('E', 'co');  A constant uuid := public.prj_id('A', 'pa');  B constant uuid := public.prj_id('B', 'pb');  P constant uuid := public.prj_id('P', 'pv');
-  ol constant uuid := public.prj_id('ol', 'u');  adm3 constant uuid := public.prj_id('adm3', 'u');
+  ol constant uuid := public.prj_id('ol', 'u');  adm3 constant uuid := public.prj_id('adm3', 'u');  ow constant uuid := public.prj_id('ow', 'u');
   v_ins text := 'INSERT INTO public.ordenes_compra (company_id, project_id, proveedor_id, proveedor_nombre, concepto) VALUES (%L, %s, %L, ''P'', ''x'')';
   v_borrar text;
+  -- ¿asignacion_puede_administrar ya es la regla del PRINCIPAL (0600 de #928 desde 7bf85221)? Por el cuerpo de la función (usa is_company_owner() y no nombra al administrador), como su post-vuelo.
+  v_principal boolean := COALESCE((SELECT p.prosrc ~ 'is_company_owner' AND p.prosrc !~ '''admin'''
+                                     FROM pg_proc p WHERE p.oid = to_regprocedure('public.asignacion_puede_administrar(uuid,uuid)')), false);
 BEGIN
   PERFORM public.prj_como(NULL, 'sistema');
   PERFORM public.prj_igual((SELECT permission_type FROM public.user_project_assignments WHERE user_id = ol AND project_id = A), 'lectura', '[montaje] ol tiene una asignación de tipo «lectura» a A');
@@ -1055,16 +1083,34 @@ BEGIN
   PERFORM public.prj_verifica(format(v_ins, E, quote_literal(B), P), 'ERR:42501:necesita estar asignado al proyecto del documento', '[ol · ordenes_compra · INSERT en B] en el que no tiene asignación: rechazado');
   PERFORM public.prj_verifica(format(v_ins, E, 'NULL', P), 'ERR:42501:sin proyecto', '[ol · ordenes_compra · INSERT sin proyecto] rechazado');
 
-  -- D-9: adm3 (administrador solo A) NO es exento; adm2 (administrador A y G, también acotado) le borra la fila y entonces lo es: crea sin proyecto y en B
+  -- D-9: adm3 (administrador solo A) NO es exento. «Exento» = no tener filas de asignación. adm2 (administrador A y G, también acotado) intenta borrarle la fila.
+  --       Sin la regla del principal lo logra y adm3 queda exento (crea sin proyecto y en B); CON ella (0600 de #928 desde 7bf85221) adm2 obtiene cero filas y adm3 sigue acotado;
+  --       solo el principal (propietario ow) puede dejarlo sin filas, y entonces SÍ es exento: la regla «NULL solo para exentos» es tan firme como esa exención.
   PERFORM public.prj_como(adm3);
   PERFORM public.prj_igual(public.user_is_project_exempt()::text, 'false', '[D-9 · montaje] adm3 tiene una asignación (A): NO es exento');
   PERFORM public.prj_verifica(format(v_ins, E, 'NULL', P), 'ERR:42501:sin proyecto', '[D-9 · adm3 · antes] no puede crear sin proyecto');
   PERFORM public.prj_como(public.prj_id('adm2', 'u'));
   v_borrar := format('DELETE FROM public.user_project_assignments WHERE user_id = %L', adm3) || '; SELECT set_config(''request.jwt.claim.sub'', %L, true); ';
-  PERFORM public.prj_verifica(format(v_borrar || v_ins, adm3, E, 'NULL', P), 'OK1',
-    '[límite D-9 · adm2 borra la fila de adm3 y adm3 crea SIN proyecto] otro administrador acotado lo deja sin filas y por eso EXENTO: la regla «NULL solo para exentos» es tan firme como esa exención (con o sin la 0600 del PR #928, que cierra el borrarse las propias, no las de otro)');
-  PERFORM public.prj_verifica(format(v_borrar || v_ins, adm3, E, quote_literal(B), P), 'OK1',
-    '[límite D-9 · adm2 borra la fila de adm3 y adm3 crea en B] …y en un proyecto que nunca tuvo');
+  IF v_principal THEN
+    PERFORM public.prj_verifica(format('DELETE FROM public.user_project_assignments WHERE user_id = %L', adm3), 'OK0',
+      '[D-9 · 0600 del principal · adm2 intenta borrar la fila de adm3] cero filas: un administrador no escribe asignaciones');
+    PERFORM public.prj_verifica(format(v_borrar || v_ins, adm3, E, 'NULL', P), 'ERR:42501:sin proyecto',
+      '[D-9 · 0600 del principal · adm2 intenta borrar la fila de adm3 y adm3 crea SIN proyecto] adm3 sigue acotado: rechazado');
+    PERFORM public.prj_verifica(format(v_borrar || v_ins, adm3, E, quote_literal(B), P), 'ERR:42501:necesita estar asignado al proyecto del documento',
+      '[D-9 · 0600 del principal · adm2 intenta borrar la fila de adm3 y adm3 crea en B] …y en un proyecto que nunca tuvo: rechazado');
+    PERFORM public.prj_como(NULL, 'sistema');
+    PERFORM public.prj_igual((SELECT count(*)::text FROM public.user_project_assignments WHERE user_id = adm3), '1', '[D-9 · 0600 del principal] adm3 conserva su asignación a A tras los intentos de adm2');
+    PERFORM public.prj_como(ow);
+    PERFORM public.prj_verifica(format(v_borrar || v_ins, adm3, E, 'NULL', P), 'OK1',
+      '[límite D-9 · el principal borra la fila de adm3 y adm3 crea SIN proyecto] el propietario sí lo deja sin filas y por eso EXENTO: la exención sigue siendo «sin filas», ahora solo la da el principal (se deshace)');
+    PERFORM public.prj_verifica(format(v_borrar || v_ins, adm3, E, quote_literal(B), P), 'OK1',
+      '[límite D-9 · el principal borra la fila de adm3 y adm3 crea en B] …y en un proyecto que nunca tuvo (se deshace)');
+  ELSE
+    PERFORM public.prj_verifica(format(v_borrar || v_ins, adm3, E, 'NULL', P), 'OK1',
+      '[límite D-9 · adm2 borra la fila de adm3 y adm3 crea SIN proyecto] otro administrador acotado lo deja sin filas y por eso EXENTO: la regla «NULL solo para exentos» es tan firme como esa exención (con o sin la 0600 del PR #928 de antes de la regla del principal, que cierra el borrarse las propias, no las de otro)');
+    PERFORM public.prj_verifica(format(v_borrar || v_ins, adm3, E, quote_literal(B), P), 'OK1',
+      '[límite D-9 · adm2 borra la fila de adm3 y adm3 crea en B] …y en un proyecto que nunca tuvo');
+  END IF;
   PERFORM public.prj_como(NULL, 'sistema');
 END;
 $permission_type$;
