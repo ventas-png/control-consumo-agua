@@ -1,7 +1,6 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
-import { assertEmailAddress } from '../_shared/emailHeaders.ts'
 // Helpers puros (fechas/ventanas GT, dedupe de destinatarios, plantilla, rows
 // in-app, mensaje MIME) extraídos a ./logic.ts para testearlos con vitest
 // (infra:I22 · Track T8). Aquí queda solo el I/O (Gmail, queries, RPC).
@@ -54,7 +53,7 @@ function getCorsHeaders(origin: string | null) {
 }
 
 // deno-lint-ignore no-explicit-any
-type Client = ReturnType<typeof createClient>
+type Client = SupabaseClient
 
 // ---------------------------------------------------------------------------
 // Gmail helpers (mismo enfoque que la función send-email)
@@ -86,32 +85,6 @@ async function refreshAccessToken(refreshToken: string, supabase: Client, config
     .update({ access_token: await encryptSecret(data.access_token), token_expiry: newExpiry })
     .eq('id', configId)
   return data.access_token
-}
-
-function buildRawMessage(from: string, to: string, subject: string, htmlBody: string): string {
-  // PR-15: el destinatario se VALIDA antes de entrar en la cabecera. `To` es la
-  // única cabecera de este mensaje que no va codificada en base64, así que es la
-  // única por la que se puede inyectar (`\r\nBcc: ...`). Lanza en vez de sanear:
-  // recortar los CRLF en silencio enviaría a un destinatario distinto del pedido.
-  const safeTo = assertEmailAddress('To', to)
-  const boundary = `----=_Part_${Date.now()}`
-  const lines = [
-    `From: ${from}`,
-    `To: ${safeTo}`,
-    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-    `MIME-Version: 1.0`,
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    `Content-Type: text/html; charset=UTF-8`,
-    `Content-Transfer-Encoding: base64`,
-    '',
-    btoa(unescape(encodeURIComponent(htmlBody))),
-    '',
-    `--${boundary}--`,
-  ]
-  return btoa(unescape(encodeURIComponent(lines.join('\r\n'))))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 async function sendViaGmail(config: EmailConfig, to: string, subject: string, htmlBody: string, supabase: Client): Promise<void> {

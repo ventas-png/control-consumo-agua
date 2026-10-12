@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
 import { requireUser } from '../_shared/auth.ts'
-import { getCorsHeaders } from '../_shared/cors.ts'
+import { getCorsHeaders, isOriginAllowed } from '../_shared/cors.ts'
 // Lógica pura (gates de confirmación/gracia, partición de usuarios, snapshot
 // de auditoría) extraída a ./logic.ts para testearla en vitest (infra:I22).
 import {
@@ -47,8 +47,13 @@ Deno.serve(async (req) => {
 
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const allowed = getAllowedOrigins()
-  if (!origin || !allowed.includes(origin)) {
+  // `getAllowedOrigins` ya no existe aquí (6db61ad1 la llevó a _shared/cors.ts
+  // sin exportarla): su llamada era un ReferenceError FUERA del try, y toda
+  // petición acababa en 500 antes de cualquier compuerta. `isOriginAllowed`
+  // acepta la misma lista que la copia inline anterior; además, sólo si el
+  // proyecto define ALLOW_VERCEL_PREVIEW_ORIGINS=true (únicamente el sandbox),
+  // los previews de Vercel de este proyecto.
+  if (!origin || !isOriginAllowed(origin)) {
     return jsonResponse({ error: 'Origin not allowed' }, 403, corsHeaders)
   }
 

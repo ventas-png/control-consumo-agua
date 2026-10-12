@@ -211,7 +211,7 @@ Deno.serve(async (req: Request) => {
         extra_project: p.stripe_price_id_extra_project,
         unit_extra: p.stripe_price_id_unit_extra,
       }
-      const curItems: StripeSubItem[] = stripeSub.items.data.map(it => ({
+      const curItems: StripeSubItem[] = stripeSub.items.data.map((it: Stripe.SubscriptionItem) => ({
         id: it.id,
         price: { id: typeof it.price === 'string' ? it.price : it.price.id },
         quantity: it.quantity ?? 0,

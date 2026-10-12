@@ -68,11 +68,14 @@ export function decidirTrasReclamo(r: Reclamo): Decision {
  * Tras conciliar. Un fallo aquí es SIEMPRE reintentable: el dinero ya salió de
  * la tarjeta y la transacción revirtió entera, así que no hay nada escrito a
  * medias — sólo un cobro sin acreditar que el siguiente intento cuadra.
+ *
+ * Siempre responde (nunca `procesar`), y el tipo lo dice: el handler pasa el
+ * resultado directo a `cerrarYResponder`, que exige status y cuerpo.
  */
 export function decidirTrasConciliar(
   res: Conciliacion | null | undefined,
   error: { message: string } | null | undefined,
-): Decision {
+): Extract<Decision, { accion: 'responder' }> {
   if (error) {
     return {
       accion: 'responder',

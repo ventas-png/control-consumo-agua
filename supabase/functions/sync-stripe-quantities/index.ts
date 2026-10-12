@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
 import {
   computeExpectedQuantities,
@@ -66,7 +66,7 @@ interface SyncLogPayload {
 
 async function syncOne(
   sub: SubscriptionRow,
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   stripe: Stripe,
 ): Promise<SyncLogPayload> {
   const base: SyncLogPayload = {

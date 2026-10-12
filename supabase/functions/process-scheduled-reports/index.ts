@@ -21,7 +21,7 @@
 // leer/escribir cross-tenant — por eso el scoping explícito del paso 1 es la
 // ÚNICA barrera de aislamiento aquí y debe ser correcto por tabla.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { SOURCE_META, fetchAllChunks, serializeCsv, buildXlsx } from './logic.ts'
@@ -221,7 +221,7 @@ function jsonResponse(body: unknown, status: number, cors: HeadersInit): Respons
 }
 
 async function logRun(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   template: ReportTemplate,
   rowsCount: number,
   status: 'success' | 'failed',
