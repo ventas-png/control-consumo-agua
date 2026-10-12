@@ -13,7 +13,8 @@ Diferencias con el PostgreSQL desechable, y por qué:
   · sin residente (necesita `unidades` reales) → se omiten A9, B6 y C7;
   · sin la cascada de PROYECTO (G32): borrar un proyecto arrastra decenas de tablas del sandbox;
   · la concurrencia real (dos sesiones) no cabe en una sentencia: se prueba solo en el PostgreSQL desechable.
-Uso: python3 generar_guion_sandbox.py > sandbox_housekeeping.sql
+  · K12 (residente) y K13 (DELETE directo) solo corren en el PostgreSQL desechable.
+Uso: python3 generar_guion_sandbox.py --escribir | --parte N
 """
 import re, sys, pathlib
 
@@ -43,6 +44,10 @@ IF EXISTS (SELECT 1 FROM public.companies WHERE id IN (hkt.ca(), hkt.cb())) THEN
 END IF;
 IF to_regclass('public.servicio_housekeeping_fotos') IS NULL OR to_regprocedure('public.hk_acceso(uuid,uuid)') IS NULL THEN
   RAISE EXCEPTION 'GUION_ABORTA: la migración 20261028000000_housekeeping_evidencias NO está aplicada en este proyecto.';
+END IF;
+IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'servicios_housekeeping'
+                AND policyname = 'servicios_housekeeping_select' AND qual LIKE '%hk_acceso%') THEN
+  RAISE EXCEPTION 'GUION_ABORTA: la migración 20261028000100_housekeeping_servicios_por_proyecto NO está aplicada en este proyecto.';
 END IF;
 IF (SELECT count(*) FROM storage.objects WHERE bucket_id = 'housekeeping-evidencias') <> 0
    OR (SELECT count(*) FROM public.servicio_housekeeping_fotos) <> 0 THEN
@@ -119,6 +124,8 @@ a = cuerpo.index("  -- Por la vía vieja")
 b = cuerpo.index("= 1);", cuerpo.index("PERFORM hkt.ok('G31", a)) + len("= 1);\n")
 cuerpo = cuerpo[:a] + cuerpo[b:]
 cuerpo = cuerpo.replace("  DELETE FROM public.hk_limpieza_storage;\n", "")
+# K12 (residente: sin unidades reales) y K13 (DELETE directo): solo en el PostgreSQL desechable.
+cuerpo = quitar_entre(cuerpo, "  -- El residente sigue viendo el servicio de su unidad", "  PERFORM hkt.ok('K14", incluir_fin=False)
 # La BD de cada parte arranca con la cola vacía (preflight) porque cada parte es su propia transacción.
 
 # Comentarios de línea completa fuera (mismo contenido, menos superficie de texto).
@@ -131,11 +138,11 @@ sembrado = resto[:resto.index('DO $$')]
 resto = resto[len(sembrado):]
 for m in re.finditer(r'DO \$\$\n(.*?)\n?\$\$;', resto, flags=re.S):
     bloques.append(m.group(1).rstrip() + ';')
-assert len(bloques) == 13, f'se esperaban 13 bloques, hay {len(bloques)}'
+assert len(bloques) == 14, f'se esperaban 14 bloques, hay {len(bloques)}'
 
 # Cada parte es SU PROPIA transacción (arranca con la cola y el bucket vacíos). Índices de bloque:
-# 0 A · 1 B · 2 C(filas+objetos) · 3 C9/C10 · 4 D · 5 E · 6 F · 7 G(fotos) · 8 G(servicios) · 9 H(cola) · 10 H(huérfanas) · 11 I · 12 J
-PARTES = [[0, 1, 2, 3, 4, 5], [6, 12], [7], [8], [9], [10, 11]]
+# 0 A · 1 B · 2 C(filas+objetos) · 3 C9/C10 · 4 D · 5 E · 6 F · 7 G(fotos) · 8 G(servicios) · 9 H(cola) · 10 H(huérfanas) · 11 I · 12 J · 13 K
+PARTES = [[0, 1, 2, 3, 4, 5], [6, 12, 13], [7], [8], [9], [10, 11]]
 
 lib_txt = lib.replace('\\i', '--')
 lib_txt = '\n'.join(l for l in lib_txt.split('\n') if not l.strip().startswith('--'))

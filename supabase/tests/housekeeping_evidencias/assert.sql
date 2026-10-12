@@ -78,9 +78,10 @@ BEGIN
 
   -- Quién NO puede subir una foto al servicio 1 (A/PA1)
   PERFORM hkt.como(hkt.uid(4));
-  PERFORM hkt.ok('B3 operador de OTRO proyecto de la misma empresa → 42501 (acceso al proyecto)',
+  -- Desde 20261028000100 el servicio de otro proyecto ni siquiera es visible: «inexistente» (23503).
+  PERFORM hkt.ok('B3 operador de OTRO proyecto de la misma empresa → rechazado como servicio inexistente (23503)',
     hkt.estado_de(format($f$INSERT INTO public.servicio_housekeeping_fotos (servicio_id, fase, path) VALUES (%L,'ingreso',%L)$f$,
-      hkt.sv(1), hkt.ruta(hkt.pa1(), 1, 'x1.jpg'))) = '42501');
+      hkt.sv(1), hkt.ruta(hkt.pa1(), 1, 'x1.jpg'))) = '23503');
   PERFORM hkt.como(hkt.uid(5));
   PERFORM hkt.ok('B4 operador del proyecto SIN el permiso de la pestaña → falla (el servicio ni siquiera le es visible)',
     hkt.estado_de(format($f$INSERT INTO public.servicio_housekeeping_fotos (servicio_id, fase, path) VALUES (%L,'ingreso',%L)$f$,
@@ -102,9 +103,9 @@ BEGIN
     hkt.estado_de(format($f$INSERT INTO public.servicio_housekeeping_fotos (servicio_id, fase, path) VALUES (%L,'cierre',%L)$f$,
       hkt.sv(1), hkt.ruta(hkt.pa1(), 1, 'admin.jpg'))) = 'SIN_ERROR');
   PERFORM hkt.como(hkt.uid(2));
-  PERFORM hkt.ok('B9 …pero el admin asignado SOLO a PA1 no sube al servicio 2 (PA2) → 42501',
+  PERFORM hkt.ok('B9 …pero el admin asignado SOLO a PA1 no sube al servicio 2 (PA2) → servicio inexistente (23503)',
     hkt.estado_de(format($f$INSERT INTO public.servicio_housekeeping_fotos (servicio_id, fase, path) VALUES (%L,'ingreso',%L)$f$,
-      hkt.sv(2), hkt.ruta(hkt.pa2(), 2, 'x6.jpg'))) = '42501');
+      hkt.sv(2), hkt.ruta(hkt.pa2(), 2, 'x6.jpg'))) = '23503');
   PERFORM hkt.root();
 END $$;
 
@@ -594,6 +595,63 @@ BEGIN
   PERFORM hkt.ok('J8 el bucket es privado, 10 MiB y solo imágenes',
     (SELECT NOT public AND file_size_limit = 10485760 AND allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp']
        FROM storage.buckets WHERE id = 'housekeeping-evidencias'));
+END $$;
+
+-- ── K · el SERVICIO (textos y sellos) también se acota al proyecto (20261028000100) ──
+DO $$
+DECLARE n int; t text;
+BEGIN
+  UPDATE public.servicios_housekeeping SET hallazgos_ingreso = 'texto de A1' WHERE id = hkt.sv(1);
+  INSERT INTO public.servicios_housekeeping (id, company_id, project_id, estado) VALUES (hkt.sv(45), hkt.ca(), hkt.pa2(), 'pendiente');
+
+  PERFORM hkt.como(hkt.uid(4));   -- operador con permiso, asignado a PA2
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE id = hkt.sv(1);
+  PERFORM hkt.ok('K1 el operador de PA2 NO ve el servicio de PA1 de su misma empresa (ni sus textos)', n = 0);
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE id IN (hkt.sv(2), hkt.sv(45));
+  PERFORM hkt.ok('K2 …y sí ve los de su proyecto', n = 2);
+  PERFORM hkt.ok('K3 el operador de PA2 no modifica los textos del servicio de PA1 (0 filas)',
+    hkt.afectadas(format($f$UPDATE public.servicios_housekeeping SET hallazgos_ingreso = 'pisado', estado = 'completado' WHERE id = %L$f$, hkt.sv(1))) = 0);
+  PERFORM hkt.ok('K4 el operador de PA2 no crea servicios en PA1 → 42501',
+    hkt.estado_de(format($f$INSERT INTO public.servicios_housekeeping (company_id, project_id, fecha) VALUES (%L, %L, CURRENT_DATE)$f$, hkt.ca(), hkt.pa1())) = '42501');
+  PERFORM hkt.ok('K5 el operador de PA2 no mueve un servicio suyo a PA1 → 42501',
+    hkt.estado_de(format($f$UPDATE public.servicios_housekeeping SET project_id = %L WHERE id = %L$f$, hkt.pa1(), hkt.sv(45))) = '42501');
+  PERFORM hkt.root();
+  SELECT hallazgos_ingreso INTO t FROM public.servicios_housekeeping WHERE id = hkt.sv(1);
+  PERFORM hkt.ok('K6 el texto de PA1 quedó intacto y sin sello de cierre ajeno',
+    t = 'texto de A1' AND (SELECT completado_por FROM public.servicios_housekeeping WHERE id = hkt.sv(1)) IS NULL);
+
+  PERFORM hkt.como(hkt.uid(3));   -- operador de PA1
+  PERFORM hkt.ok('K7 el operador de PA1 sí edita su servicio (1 fila)',
+    hkt.afectadas(format($f$UPDATE public.servicios_housekeeping SET hallazgos_ingreso = 'editado en A1' WHERE id = %L$f$, hkt.sv(1))) = 1);
+  PERFORM hkt.como(hkt.uid(2));   -- admin asignado solo a PA1
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE id IN (hkt.sv(2), hkt.sv(45));
+  PERFORM hkt.ok('K8 el admin asignado solo a PA1 no ve los servicios de PA2', n = 0);
+  PERFORM hkt.como(hkt.uid(1));   -- dueña: exenta de proyecto
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE id IN (hkt.sv(1), hkt.sv(2), hkt.sv(45));
+  PERFORM hkt.ok('K9 la dueña (exenta de proyecto) ve los servicios de ambos proyectos', n = 3);
+  PERFORM hkt.como(hkt.uid(7));
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE company_id = hkt.ca();
+  PERFORM hkt.ok('K10 el admin de B no ve servicios de A', n = 0);
+  PERFORM hkt.como(hkt.uid(5));
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE company_id = hkt.ca();
+  PERFORM hkt.ok('K11 el operador sin el permiso de la pestaña no ve servicios', n = 0);
+  PERFORM hkt.root();
+
+  -- El residente sigue viendo el servicio de su unidad (rama previa, sin cambios).
+  PERFORM hkt.como(hkt.uid(8));
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE id = hkt.sv(1);
+  PERFORM hkt.root();
+  PERFORM hkt.ok('K12 el residente sigue viendo el servicio de su unidad', n = 1);
+
+  -- Borrado directo (no es la vía de la pantalla, pero la policy también exige el proyecto).
+  PERFORM hkt.como(hkt.uid(2));
+  PERFORM hkt.ok('K13 el admin asignado solo a PA1 no borra un servicio de PA2 (0 filas)',
+    hkt.afectadas(format($f$DELETE FROM public.servicios_housekeeping WHERE id = %L$f$, hkt.sv(45))) = 0);
+  PERFORM hkt.root();
+
+  PERFORM hkt.ok('K14 las cuatro policies del servicio usan hk_acceso / can_access_project',
+    (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'servicios_housekeeping'
+       AND (coalesce(qual, '') || coalesce(with_check, '')) ~ '(hk_acceso|can_access_project)') = 4);
 END $$;
 
 SELECT 'ASSERT_OK' AS resultado;

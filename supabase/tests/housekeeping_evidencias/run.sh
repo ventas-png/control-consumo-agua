@@ -31,6 +31,7 @@ set -euo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGRACION="$RAIZ/supabase/migrations/20261028000000_housekeeping_evidencias.sql"
+MIGRACION2="$RAIZ/supabase/migrations/20261028000100_housekeeping_servicios_por_proyecto.sql"
 ANTERIOR="$AQUI/migracion_anterior.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -67,6 +68,7 @@ psql -q -d postgres -c "CREATE DATABASE hk" >/dev/null
 psql -q -d postgres -c "CREATE DATABASE hkmut" >/dev/null
 psql -q -d postgres -c "CREATE DATABASE hksb" >/dev/null
 psql -q -d postgres -c "CREATE DATABASE hksb0" >/dev/null
+psql -q -d postgres -c "CREATE DATABASE hksb1" >/dev/null
 
 aplicar() { PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d "$1" -f "$2" >/dev/null; }
 huella() { psql -q -At -d "$1" -f "$AQUI/huella.sql"; }
@@ -81,10 +83,10 @@ aplicar hk "$ANTERIOR"
 aplicar hk "$AQUI/estado_antiguo.sql"
 echo "  OK    versión anterior aplicada y con datos cargados"
 
-echo "── 3/7 · la migración nueva, DOS veces, sobre ese estado ───────────────"
-aplicar hk "$MIGRACION"
+echo "── 3/7 · las migraciones nuevas, DOS veces, sobre ese estado ───────────"
+aplicar hk "$MIGRACION"; aplicar hk "$MIGRACION2"
 H1=$(huella hk)
-aplicar hk "$MIGRACION"
+aplicar hk "$MIGRACION"; aplicar hk "$MIGRACION2"
 H2=$(huella hk)
 [ "$H1" = "$H2" ] || { echo "❌ re-aplicar la migración cambió el catálogo ($H1 ≠ $H2)"; exit 1; }
 echo "  OK    idempotente: la huella del catálogo no cambia al re-aplicar"
@@ -129,6 +131,7 @@ grep -v "pg_advisory_xact_lock" "$MIGRACION" > "$MUT"
 grep -q "pg_advisory_xact_lock" "$MIGRACION" || { echo "❌ el candado ya no está en la migración"; exit 1; }
 aplicar hkmut "$AQUI/fixture.sql"
 aplicar hkmut "$MUT"
+aplicar hkmut "$MIGRACION2"
 psql -q -v ON_ERROR_STOP=1 -d hkmut -f "$AQUI/lib.sql" >/dev/null
 psql -q -v ON_ERROR_STOP=1 -d hkmut -f "$AQUI/datos.sql" >/dev/null
 R=$(concurrente hkmut)
@@ -146,7 +149,7 @@ for n in $(seq 1 $PARTES); do
     || { echo "❌ sandbox_housekeeping_parte$n.sql no coincide con generar_guion_sandbox.py (regenerar: python3 generar_guion_sandbox.py --escribir)"; exit 1; }
 done
 echo "  OK    las $PARTES partes coinciden con su generador"
-for f in "$AQUI/fixture.sql" "$AQUI/fixture_compat_sandbox.sql" "$MIGRACION"; do aplicar hksb "$f"; done
+for f in "$AQUI/fixture.sql" "$AQUI/fixture_compat_sandbox.sql" "$MIGRACION" "$MIGRACION2"; do aplicar hksb "$f"; done
 TOTAL=0
 for n in $(seq 1 $PARTES); do
   SALIDA=$(psql -q -d hksb -f "$AQUI/sandbox_housekeeping_parte$n.sql" 2>&1 || true)
@@ -164,6 +167,11 @@ SALIDA=$(psql -q -d hksb0 -f "$AQUI/sandbox_housekeeping_parte1.sql" 2>&1 || tru
 echo "$SALIDA" | grep -q "GUION_ABORTA: la migración 20261028000000_housekeeping_evidencias NO está aplicada" \
   || { echo "$SALIDA" | head -5; echo "❌ sin la migración el guion debía abortar"; exit 1; }
 echo "  OK    sin la migración aplicada el guion ABORTA sin escribir nada (lo que verá el sandbox antes de aplicarla)"
+for f in "$AQUI/fixture.sql" "$AQUI/fixture_compat_sandbox.sql" "$MIGRACION"; do aplicar hksb1 "$f"; done
+SALIDA=$(psql -q -d hksb1 -f "$AQUI/sandbox_housekeeping_parte2.sql" 2>&1 || true)
+echo "$SALIDA" | grep -q "GUION_ABORTA: la migración 20261028000100_housekeeping_servicios_por_proyecto NO está aplicada" \
+  || { echo "$SALIDA" | head -5; echo "❌ con solo la primera migración el guion debía abortar"; exit 1; }
+echo "  OK    con solo la primera migración el guion ABORTA (la segunda es requisito)"
 
 echo
 echo "✅ housekeeping_evidencias: aislamiento por proyecto/empresa/permiso, rutas fabricadas rechazadas, clientes sin UPDATE/DELETE, borrado coordinado con cola y reintentos, tope de 20 sin carreras, purga que conserva textos, y la actualización desde la versión anterior converge."

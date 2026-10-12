@@ -66,6 +66,10 @@ END IF;
 IF to_regclass('public.servicio_housekeeping_fotos') IS NULL OR to_regprocedure('public.hk_acceso(uuid,uuid)') IS NULL THEN
   RAISE EXCEPTION 'GUION_ABORTA: la migración 20261028000000_housekeeping_evidencias NO está aplicada en este proyecto.';
 END IF;
+IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'servicios_housekeeping'
+                AND policyname = 'servicios_housekeeping_select' AND qual LIKE '%hk_acceso%') THEN
+  RAISE EXCEPTION 'GUION_ABORTA: la migración 20261028000100_housekeeping_servicios_por_proyecto NO está aplicada en este proyecto.';
+END IF;
 IF (SELECT count(*) FROM storage.objects WHERE bucket_id = 'housekeeping-evidencias') <> 0
    OR (SELECT count(*) FROM public.servicio_housekeeping_fotos) <> 0 THEN
   RAISE EXCEPTION 'GUION_ABORTA: el bucket o la tabla de fotos ya tienen datos; las comprobaciones de conteo no serían atribuibles.';
@@ -137,9 +141,9 @@ BEGIN
   PERFORM hkt.ok('B2 creado_por lo sella la BD (no el que mandó el cliente)', r.creado_por = hkt.uid(3));
 
   PERFORM hkt.como(hkt.uid(4));
-  PERFORM hkt.ok('B3 operador de OTRO proyecto de la misma empresa → 42501 (acceso al proyecto)',
+  PERFORM hkt.ok('B3 operador de OTRO proyecto de la misma empresa → rechazado como servicio inexistente (23503)',
     hkt.estado_de(format($f$INSERT INTO public.servicio_housekeeping_fotos (servicio_id, fase, path) VALUES (%L,'ingreso',%L)$f$,
-      hkt.sv(1), hkt.ruta(hkt.pa1(), 1, 'x1.jpg'))) = '42501');
+      hkt.sv(1), hkt.ruta(hkt.pa1(), 1, 'x1.jpg'))) = '23503');
   PERFORM hkt.como(hkt.uid(5));
   PERFORM hkt.ok('B4 operador del proyecto SIN el permiso de la pestaña → falla (el servicio ni siquiera le es visible)',
     hkt.estado_de(format($f$INSERT INTO public.servicio_housekeeping_fotos (servicio_id, fase, path) VALUES (%L,'ingreso',%L)$f$,
@@ -157,9 +161,9 @@ BEGIN
     hkt.estado_de(format($f$INSERT INTO public.servicio_housekeeping_fotos (servicio_id, fase, path) VALUES (%L,'cierre',%L)$f$,
       hkt.sv(1), hkt.ruta(hkt.pa1(), 1, 'admin.jpg'))) = 'SIN_ERROR');
   PERFORM hkt.como(hkt.uid(2));
-  PERFORM hkt.ok('B9 …pero el admin asignado SOLO a PA1 no sube al servicio 2 (PA2) → 42501',
+  PERFORM hkt.ok('B9 …pero el admin asignado SOLO a PA1 no sube al servicio 2 (PA2) → servicio inexistente (23503)',
     hkt.estado_de(format($f$INSERT INTO public.servicio_housekeeping_fotos (servicio_id, fase, path) VALUES (%L,'ingreso',%L)$f$,
-      hkt.sv(2), hkt.ruta(hkt.pa2(), 2, 'x6.jpg'))) = '42501');
+      hkt.sv(2), hkt.ruta(hkt.pa2(), 2, 'x6.jpg'))) = '23503');
   PERFORM hkt.root();
 END;
   END;

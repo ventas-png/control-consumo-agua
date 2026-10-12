@@ -66,6 +66,10 @@ END IF;
 IF to_regclass('public.servicio_housekeeping_fotos') IS NULL OR to_regprocedure('public.hk_acceso(uuid,uuid)') IS NULL THEN
   RAISE EXCEPTION 'GUION_ABORTA: la migración 20261028000000_housekeeping_evidencias NO está aplicada en este proyecto.';
 END IF;
+IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'servicios_housekeeping'
+                AND policyname = 'servicios_housekeeping_select' AND qual LIKE '%hk_acceso%') THEN
+  RAISE EXCEPTION 'GUION_ABORTA: la migración 20261028000100_housekeeping_servicios_por_proyecto NO está aplicada en este proyecto.';
+END IF;
 IF (SELECT count(*) FROM storage.objects WHERE bucket_id = 'housekeeping-evidencias') <> 0
    OR (SELECT count(*) FROM public.servicio_housekeeping_fotos) <> 0 THEN
   RAISE EXCEPTION 'GUION_ABORTA: el bucket o la tabla de fotos ya tienen datos; las comprobaciones de conteo no serían atribuibles.';

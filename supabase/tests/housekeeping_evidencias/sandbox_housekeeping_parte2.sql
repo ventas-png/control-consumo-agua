@@ -66,6 +66,10 @@ END IF;
 IF to_regclass('public.servicio_housekeeping_fotos') IS NULL OR to_regprocedure('public.hk_acceso(uuid,uuid)') IS NULL THEN
   RAISE EXCEPTION 'GUION_ABORTA: la migración 20261028000000_housekeeping_evidencias NO está aplicada en este proyecto.';
 END IF;
+IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'servicios_housekeeping'
+                AND policyname = 'servicios_housekeeping_select' AND qual LIKE '%hk_acceso%') THEN
+  RAISE EXCEPTION 'GUION_ABORTA: la migración 20261028000100_housekeeping_servicios_por_proyecto NO está aplicada en este proyecto.';
+END IF;
 IF (SELECT count(*) FROM storage.objects WHERE bucket_id = 'housekeeping-evidencias') <> 0
    OR (SELECT count(*) FROM public.servicio_housekeeping_fotos) <> 0 THEN
   RAISE EXCEPTION 'GUION_ABORTA: el bucket o la tabla de fotos ya tienen datos; las comprobaciones de conteo no serían atribuibles.';
@@ -161,6 +165,50 @@ BEGIN
   PERFORM hkt.ok('J8 el bucket es privado, 10 MiB y solo imágenes',
     (SELECT NOT public AND file_size_limit = 10485760 AND allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp']
        FROM storage.buckets WHERE id = 'housekeeping-evidencias'));
+END;
+  END;
+  BEGIN
+DECLARE n int; t text;
+BEGIN
+  UPDATE public.servicios_housekeeping SET hallazgos_ingreso = 'texto de A1' WHERE id = hkt.sv(1);
+  INSERT INTO public.servicios_housekeeping (id, company_id, project_id, estado) VALUES (hkt.sv(45), hkt.ca(), hkt.pa2(), 'pendiente');
+
+  PERFORM hkt.como(hkt.uid(4));   -- operador con permiso, asignado a PA2
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE id = hkt.sv(1);
+  PERFORM hkt.ok('K1 el operador de PA2 NO ve el servicio de PA1 de su misma empresa (ni sus textos)', n = 0);
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE id IN (hkt.sv(2), hkt.sv(45));
+  PERFORM hkt.ok('K2 …y sí ve los de su proyecto', n = 2);
+  PERFORM hkt.ok('K3 el operador de PA2 no modifica los textos del servicio de PA1 (0 filas)',
+    hkt.afectadas(format($f$UPDATE public.servicios_housekeeping SET hallazgos_ingreso = 'pisado', estado = 'completado' WHERE id = %L$f$, hkt.sv(1))) = 0);
+  PERFORM hkt.ok('K4 el operador de PA2 no crea servicios en PA1 → 42501',
+    hkt.estado_de(format($f$INSERT INTO public.servicios_housekeeping (company_id, project_id, fecha) VALUES (%L, %L, CURRENT_DATE)$f$, hkt.ca(), hkt.pa1())) = '42501');
+  PERFORM hkt.ok('K5 el operador de PA2 no mueve un servicio suyo a PA1 → 42501',
+    hkt.estado_de(format($f$UPDATE public.servicios_housekeeping SET project_id = %L WHERE id = %L$f$, hkt.pa1(), hkt.sv(45))) = '42501');
+  PERFORM hkt.root();
+  SELECT hallazgos_ingreso INTO t FROM public.servicios_housekeeping WHERE id = hkt.sv(1);
+  PERFORM hkt.ok('K6 el texto de PA1 quedó intacto y sin sello de cierre ajeno',
+    t = 'texto de A1' AND (SELECT completado_por FROM public.servicios_housekeeping WHERE id = hkt.sv(1)) IS NULL);
+
+  PERFORM hkt.como(hkt.uid(3));   -- operador de PA1
+  PERFORM hkt.ok('K7 el operador de PA1 sí edita su servicio (1 fila)',
+    hkt.afectadas(format($f$UPDATE public.servicios_housekeeping SET hallazgos_ingreso = 'editado en A1' WHERE id = %L$f$, hkt.sv(1))) = 1);
+  PERFORM hkt.como(hkt.uid(2));   -- admin asignado solo a PA1
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE id IN (hkt.sv(2), hkt.sv(45));
+  PERFORM hkt.ok('K8 el admin asignado solo a PA1 no ve los servicios de PA2', n = 0);
+  PERFORM hkt.como(hkt.uid(1));   -- dueña: exenta de proyecto
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE id IN (hkt.sv(1), hkt.sv(2), hkt.sv(45));
+  PERFORM hkt.ok('K9 la dueña (exenta de proyecto) ve los servicios de ambos proyectos', n = 3);
+  PERFORM hkt.como(hkt.uid(7));
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE company_id = hkt.ca();
+  PERFORM hkt.ok('K10 el admin de B no ve servicios de A', n = 0);
+  PERFORM hkt.como(hkt.uid(5));
+  SELECT count(*) INTO n FROM public.servicios_housekeeping WHERE company_id = hkt.ca();
+  PERFORM hkt.ok('K11 el operador sin el permiso de la pestaña no ve servicios', n = 0);
+  PERFORM hkt.root();
+
+  PERFORM hkt.ok('K14 las cuatro policies del servicio usan hk_acceso / can_access_project',
+    (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'servicios_housekeeping'
+       AND (coalesce(qual, '') || coalesce(with_check, '')) ~ '(hk_acceso|can_access_project)') = 4);
 END;
   END;
   PERFORM hkt.root();
