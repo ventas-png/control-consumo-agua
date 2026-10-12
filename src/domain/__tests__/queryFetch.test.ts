@@ -2,7 +2,7 @@
 // manejo de errores de runQuery (lanza QueryError → react-query isError).
 import { describe, it, expect, vi } from 'vitest'
 import type { PostgrestError } from '@supabase/supabase-js'
-import { runQueryAll, QueryError } from '../queryFetch'
+import { runQueryAll, runAfectando, QueryError, SinFilasAfectadasError } from '../queryFetch'
 
 function page<T>(rows: T[]): { data: T[]; error: null } {
   return { data: rows, error: null }
@@ -126,5 +126,33 @@ describe('reportDegradedQuery', () => {
     // no un PostgrestError. Se tipó estructuralmente para no dejarlos fuera.
     const { reportDegradedQuery } = await import('../queryFetch')
     expect(reportDegradedQuery('auth.getSession', { message: 'invalid JWT' })).toBe(true)
+  })
+})
+
+// Un UPDATE/DELETE que la política de filas no deja tocar NO falla en PostgREST: devuelve éxito con cero filas.
+// Mostrar «Listo» en ese caso es un éxito falso sobre un documento o un movimiento de dinero que no se movió.
+describe('runAfectando', () => {
+  it('con filas devueltas: éxito y cuántas cambió', async () => {
+    const n = await runAfectando(() => Promise.resolve({ data: [{ id: 'a' }], error: null }))
+    expect(n).toBe(1)
+  })
+
+  it('con cero filas (RLS que no deja tocar): lanza SinFilasAfectadasError en vez de devolver éxito', async () => {
+    await expect(runAfectando(() => Promise.resolve({ data: [], error: null }))).rejects.toBeInstanceOf(SinFilasAfectadasError)
+  })
+
+  it('con data null también es cero filas', async () => {
+    await expect(runAfectando(() => Promise.resolve({ data: null, error: null }))).rejects.toBeInstanceOf(SinFilasAfectadasError)
+  })
+
+  it('un error del servidor sigue siendo un QueryError con su mensaje (no se enmascara como «sin filas»)', async () => {
+    const err = { message: 'COMPRAS_PERMISO_ACCION: para aprobar tu perfil necesita «Autorizar»', code: 'P0001', details: '', hint: '', name: 'PostgrestError' } as PostgrestError
+    const p = runAfectando(() => Promise.resolve({ data: null, error: err }))
+    await expect(p).rejects.toBeInstanceOf(QueryError)
+    await expect(p).rejects.toThrow(/COMPRAS_PERMISO_ACCION/)
+  })
+
+  it('el mensaje de «sin filas» dice qué pudo pasar y qué hacer', () => {
+    expect(new SinFilasAfectadasError().message).toMatch(/no aplicó el cambio.*permiso.*Actualiza la pantalla/s)
   })
 })

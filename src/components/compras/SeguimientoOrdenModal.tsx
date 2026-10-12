@@ -195,7 +195,9 @@ export function SeguimientoOrdenContenido({ s, monedaBase }: { s: SeguimientoOrd
           <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
             {s.eventos.map((e, i) => (
               <li key={i}>
-                {formatDateShort(e.created_at)} · {e.tipo === 'devolucion' ? 'Devuelta a borrador' : `${ESTADO_OC_LABELS[e.estado_anterior ?? 'borrador'] ?? e.estado_anterior ?? 'Alta'} → ${ESTADO_OC_LABELS[e.estado_nuevo] ?? e.estado_nuevo}`}
+                {formatDateShort(e.created_at)} · {e.tipo === 'devolucion' ? 'Devuelta a borrador'
+                  : e.tipo === 'modificacion' ? `Modificada estando ${ESTADO_OC_LABELS[e.estado_nuevo]?.toLowerCase() ?? e.estado_nuevo}`
+                  : `${ESTADO_OC_LABELS[e.estado_anterior ?? 'borrador'] ?? e.estado_anterior ?? 'Alta'} → ${ESTADO_OC_LABELS[e.estado_nuevo] ?? e.estado_nuevo}`}
                 {e.origen === 'sistema' && ' (automático)'}
                 {e.motivo && <> — {e.motivo}</>}
               </li>

@@ -1,0 +1,134 @@
+diff --git a/supabase/tests/compras_bloque_b/assert_inventario.sql b/supabase/tests/compras_bloque_b/assert_inventario.sql
+index 0305cb8..210b377 100644
+--- a/supabase/tests/compras_bloque_b/assert_inventario.sql
++++ b/supabase/tests/compras_bloque_b/assert_inventario.sql
+@@ -66,10 +66,12 @@ RESET ROLE;
+ SELECT public.chk((SELECT count(*) FROM public.orden_compra_lineas WHERE orden_compra_id = :OI::uuid), 0, '1 · ningún renglón inválido quedó guardado');
+ 
+ -- Una orden de la contabilidad de la EMPRESA (sin proyecto) no tiene bodega
++-- La orden «de la empresa» la siembra el SISTEMA: UO es un operador asignado a un proyecto y, con el alcance de proyecto al capturar (20261027001000),
++-- una persona acotada ya no crea un documento sin proyecto. El renglón con insumo sí lo intenta ella, como antes.
++SELECT public.como_sistema($$ INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto)
++  VALUES ('0c500000-0000-0000-0000-000000000002', 'cccccccc-cccc-cccc-cccc-cccccccccccc', NULL, 'e3000000-0000-0000-0000-000000000001', 'Ferretería Bloque B', 'Orden de la empresa') $$);
+ SELECT public.como(:UO::uuid);
+ SET ROLE authenticated;
+-INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto)
+-VALUES (:OE::uuid, :C::uuid, NULL, :P1::uuid, 'Ferretería Bloque B', 'Orden de la empresa');
+ SELECT public.chk_falla($$ INSERT INTO public.orden_compra_lineas (company_id, orden_compra_id, linea, descripcion, destino_tipo, suministro_id, categoria, cantidad, unidad, precio_unitario)
+   VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc', '0c500000-0000-0000-0000-000000000002', 1, 'Insumo en orden de empresa', 'inventario', '0c5a0000-0000-0000-0000-000000000001', 'limpieza', 1, 'litro', 1) $$,
+   'COMPRAS_LINEA_INSUMO_ALCANCE', '1 · una orden de la contabilidad de la empresa no admite insumos de bodega');
+diff --git a/supabase/tests/compras_bloque_b/hallazgos/EV-01.sql b/supabase/tests/compras_bloque_b/hallazgos/EV-01.sql
+index 1301c0b..f183b8f 100644
+--- a/supabase/tests/compras_bloque_b/hallazgos/EV-01.sql
++++ b/supabase/tests/compras_bloque_b/hallazgos/EV-01.sql
+@@ -238,18 +238,22 @@ SELECT public.chk_txt((SELECT COALESCE(project_id::text, 'NULL') FROM public.con
+   'NULL', '[EV-01h] al eliminar un proyecto, su contraseña con partidas queda sin proyecto (cascada, sin bloqueo)');
+ 
+ -- ═══ (i) Contabilidad de la EMPRESA (sin proyecto): el mismo invariante con project_id NULL ═══
++-- Los documentos «de la empresa» (sin proyecto) los siembra el SISTEMA: UA es un administrador CON asignaciones (C1 y C2: no exento de proyecto) y, con
++-- el alcance de proyecto al capturar (20261027001000), una persona acotada ya no crea un documento sin proyecto. Lo que se prueba aquí (la orden de una
++-- contraseña hereda «sin proyecto», no se pasa a otro proyecto y se paga por la vía legítima) no depende de quién la sembró.
++SELECT public.como_sistema($$ INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total)
++  VALUES ('fa211300-0000-0000-0000-000000000011', 'cccccccc-cccc-cccc-cccc-cccccccccccc', NULL, 'e3000000-0000-0000-0000-000000000001', 'FA2-EV01-11', 'factura de la contabilidad de la empresa', 250) $$);
+ SELECT public.como(:UA::uuid);
+ SET ROLE authenticated;
+-INSERT INTO public.facturas_proveedor (id, company_id, project_id, proveedor_id, numero_factura, concepto, monto_total)
+-VALUES ('fa211300-0000-0000-0000-000000000011', :C::uuid, NULL, :P1::uuid, 'FA2-EV01-11', 'factura de la contabilidad de la empresa', 250);
+ UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = 'fa211300-0000-0000-0000-000000000011';
+-INSERT INTO public.contrasenas_pago (id, company_id, project_id, proveedor_id, fecha_pago_programada)
+-VALUES ('fa211500-0000-0000-0000-000000000011', :C::uuid, NULL, :P1::uuid, CURRENT_DATE);
+-INSERT INTO public.contrasena_pago_facturas (company_id, contrasena_id, factura_id, monto)
+-VALUES (:C::uuid, 'fa211500-0000-0000-0000-000000000011', 'fa211300-0000-0000-0000-000000000011', 250);
+-INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, contrasena_pago_id, monto)
+-VALUES ('fa211400-0000-0000-0000-000000000011', :C::uuid, :C1::uuid, :P1::uuid, 'fa211500-0000-0000-0000-000000000011', 250);
+ RESET ROLE;
++SELECT public.como_sistema($$
++  INSERT INTO public.contrasenas_pago (id, company_id, project_id, proveedor_id, fecha_pago_programada)
++  VALUES ('fa211500-0000-0000-0000-000000000011', 'cccccccc-cccc-cccc-cccc-cccccccccccc', NULL, 'e3000000-0000-0000-0000-000000000001', CURRENT_DATE);
++  INSERT INTO public.contrasena_pago_facturas (company_id, contrasena_id, factura_id, monto)
++  VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'fa211500-0000-0000-0000-000000000011', 'fa211300-0000-0000-0000-000000000011', 250);
++  INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, contrasena_pago_id, monto)
++  VALUES ('fa211400-0000-0000-0000-000000000011', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'c1c1c1c1-0000-0000-0000-000000000001', 'e3000000-0000-0000-0000-000000000001', 'fa211500-0000-0000-0000-000000000011', 250) $$);
+ SELECT public.chk_txt((SELECT COALESCE(project_id::text, 'NULL') FROM public.ordenes_pago WHERE id = 'fa211400-0000-0000-0000-000000000011'), 'NULL',
+   '[EV-01i] la orden de una contraseña de la contabilidad de la empresa hereda «sin proyecto»');
+ SELECT public.como(:UC::uuid);
+diff --git a/supabase/tests/compras_bloque_b/hallazgos/EV-10.sql b/supabase/tests/compras_bloque_b/hallazgos/EV-10.sql
+index 45d6fe5..1f4c85e 100644
+--- a/supabase/tests/compras_bloque_b/hallazgos/EV-10.sql
++++ b/supabase/tests/compras_bloque_b/hallazgos/EV-10.sql
+@@ -116,8 +116,10 @@ INSERT INTO public.ordenes_compra (id,company_id,project_id,proveedor_id,proveed
+ VALUES ('fa710000-0000-0000-0000-0000000000e1', :C, :C1, :P1, 'x', 'EV10 orden con su obra', :OBRA_C1);
+ SELECT public.chk((SELECT count(*) FROM public.ordenes_compra WHERE id = 'fa710000-0000-0000-0000-0000000000e1' AND obra_id = 'fa710000-0000-0000-0000-0000000000c1'), 1,
+   '[EV-10c3] LEGÍTIMO: la orden de un proyecto con la obra de ese proyecto se crea');
+-INSERT INTO public.ordenes_compra (id,company_id,project_id,proveedor_id,proveedor_nombre,concepto,obra_id)
+-VALUES ('fa710000-0000-0000-0000-0000000000e2', :C, NULL, :P1, 'x', 'EV10 orden de empresa con una obra de la empresa', :OBRA_C2);
++-- La orden «de la empresa» (sin proyecto) la siembra el SISTEMA: la sesión de esta prueba es una persona acotada (UA, con asignaciones) y, con el alcance
++-- de proyecto al capturar (20261027001000), ya no crea un documento sin proyecto. Lo que se prueba (que lleve una obra de la empresa) no cambia.
++SELECT public.como_sistema($$ INSERT INTO public.ordenes_compra (id,company_id,project_id,proveedor_id,proveedor_nombre,concepto,obra_id)
++  VALUES ('fa710000-0000-0000-0000-0000000000e2', 'cccccccc-cccc-cccc-cccc-cccccccccccc', NULL, 'e3000000-0000-0000-0000-000000000001', 'x', 'EV10 orden de empresa con una obra de la empresa', 'fa710000-0000-0000-0000-0000000000c2') $$);
+ SELECT public.chk((SELECT count(*) FROM public.ordenes_compra WHERE id = 'fa710000-0000-0000-0000-0000000000e2'), 1,
+   '[EV-10c4] LEGÍTIMO: la orden de la contabilidad de la empresa (sin proyecto) puede llevar una obra de la empresa');
+ 
+diff --git a/supabase/tests/compras_bloque_b/hallazgos/PERM-3.sql b/supabase/tests/compras_bloque_b/hallazgos/PERM-3.sql
+index ca15dd4..b2766f5 100644
+--- a/supabase/tests/compras_bloque_b/hallazgos/PERM-3.sql
++++ b/supabase/tests/compras_bloque_b/hallazgos/PERM-3.sql
+@@ -335,7 +335,10 @@ BEGIN
+     '[INSERT oc aprobada] el administrador con asignaciones solo en A tampoco nace una orden aprobada en B');
+   PERFORM public.perm_como(ok);
+   v_id := public.perm_id('i4', 'oc');
+-  PERFORM public.perm_filas(public.perm3_ins_oc(v_id, E, NULL, P, 'aprobada'), 1, '[INSERT oc aprobada] una orden SIN proyecto es de la empresa: con la llave nace aprobada');
++  -- Una orden SIN proyecto es «de la empresa»: con el alcance de proyecto al capturar (20261027001000) solo una persona exenta de proyecto la crea; `ok` (operador con la
++  -- llave de la orden y el proyecto A) no lo es. Esto invierte la P-PERM-1 que esta línea documentaba (nacía aprobada sin proyecto): ahora se rechaza.
++  PERFORM public.perm_falla(public.perm3_ins_oc(v_id, E, NULL, P, 'aprobada'), '42501', '^COMPRAS_ALCANCE_PROYECTO: un documento de compras sin proyecto',
++    '[INSERT oc aprobada] una orden SIN proyecto es de la empresa: con la llave pero sin ser exento de proyecto, rechazada (alcance de proyecto al capturar)');
+   -- otra empresa: el mismo error de la RLS, no el de permisos
+   PERFORM public.perm_falla(public.perm3_ins_oc(public.perm_id('i5', 'oc'), Z, NULL, P, 'aprobada'), '42501', 'row-level security',
+     '[INSERT oc aprobada] con la empresa de OTRO en el cuerpo: el mismo error de la RLS (new row violates row-level security policy)');
+diff --git a/supabase/tests/compras_cierre_tecnico/fixture_lectura.sql b/supabase/tests/compras_cierre_tecnico/fixture_lectura.sql
+index a1787ad..d8205da 100644
+--- a/supabase/tests/compras_cierre_tecnico/fixture_lectura.sql
++++ b/supabase/tests/compras_cierre_tecnico/fixture_lectura.sql
+@@ -81,6 +81,9 @@ UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE id = 'f2000000-00
+ RESET ROLE;
+ 
+ -- ── Pagos: una orden de pago y una contraseña por ámbito ────────────────────
++-- Siembra del SISTEMA: `RESET ROLE` no borra `request.jwt.claim.sub`, que sigue siendo el de UD (empresa D) del `como(:UD)` anterior; con el alcance de proyecto al
++-- capturar (20261027001000) eso sería una sesión de usuario de la empresa D insertando en proyectos de C. Se limpia el `sub`: ahora sí es el sistema.
++SELECT set_config('request.jwt.claim.sub', '', false);
+ INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, factura_id, monto, metodo_pago, estado) VALUES
+   ('f3000000-0000-0000-0000-000000000001', :C::uuid, :C1::uuid, :P1::uuid, 'f2000000-0000-0000-0000-000000000001', 112, 'transferencia', 'borrador'),
+   ('f3000000-0000-0000-0000-000000000002', :C::uuid, :C2::uuid, :P1::uuid, 'f2000000-0000-0000-0000-000000000002', 112, 'transferencia', 'borrador'),
+@@ -120,12 +123,15 @@ SELECT ('f8000000-0000-0000-0000-00000000000' || row_number() OVER (ORDER BY a.c
+          ORDER BY company_id, project_id, created_at) a;
+ 
+ -- ── Órdenes y recepciones por ámbito (por las vías normales: admin crea, aprueba y emite) ─
++-- La orden y la recepción «de la empresa» (sin proyecto) las siembra el SISTEMA: UA es un administrador CON asignaciones (C1 y C2: no exento de proyecto) y, con el
++-- alcance de proyecto al capturar (20261027001000), una persona acotada ya no crea un documento sin proyecto. Lo que esta suite prueba es quién LEE, no quién creó.
++SELECT public.como_sistema($$ INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto)
++  VALUES ('f9000000-0000-0000-0000-000000000003', 'cccccccc-cccc-cccc-cccc-cccccccccccc', NULL, 'e3000000-0000-0000-0000-000000000001', 'Ferretería Bloque B', 'Orden LF de la empresa') $$);
+ SELECT public.como(:UA::uuid);
+ SET ROLE authenticated;
+ INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto) VALUES
+   ('f9000000-0000-0000-0000-000000000001', :C::uuid, :C1::uuid, :P1::uuid, 'Ferretería Bloque B', 'Orden LF de C1'),
+-  ('f9000000-0000-0000-0000-000000000002', :C::uuid, :C2::uuid, :P1::uuid, 'Ferretería Bloque B', 'Orden LF de C2'),
+-  ('f9000000-0000-0000-0000-000000000003', :C::uuid, NULL,      :P1::uuid, 'Ferretería Bloque B', 'Orden LF de la empresa');
++  ('f9000000-0000-0000-0000-000000000002', :C::uuid, :C2::uuid, :P1::uuid, 'Ferretería Bloque B', 'Orden LF de C2');
+ INSERT INTO public.orden_compra_lineas (id, company_id, orden_compra_id, linea, descripcion, destino_tipo, categoria, cantidad, unidad, precio_unitario, iva_monto) VALUES
+   ('f9100000-0000-0000-0000-000000000001', :C::uuid, 'f9000000-0000-0000-0000-000000000001', 1, 'Renglón de orden LF C1', 'gasto', 'mantenimiento', 10, 'u', 10, 12),
+   ('f9100000-0000-0000-0000-000000000002', :C::uuid, 'f9000000-0000-0000-0000-000000000002', 1, 'Renglón de orden LF C2', 'gasto', 'mantenimiento', 10, 'u', 10, 12),
+@@ -134,8 +140,12 @@ UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id IN ('f9000000-0000
+ UPDATE public.ordenes_compra SET estado = 'emitida'  WHERE id IN ('f9000000-0000-0000-0000-000000000001', 'f9000000-0000-0000-0000-000000000002', 'f9000000-0000-0000-0000-000000000003');
+ INSERT INTO public.recepciones (id, company_id, project_id, orden_compra_id, tipo) VALUES
+   ('f9200000-0000-0000-0000-000000000001', :C::uuid, :C1::uuid, 'f9000000-0000-0000-0000-000000000001', 'bienes'),
+-  ('f9200000-0000-0000-0000-000000000002', :C::uuid, :C2::uuid, 'f9000000-0000-0000-0000-000000000002', 'bienes'),
+-  ('f9200000-0000-0000-0000-000000000003', :C::uuid, NULL,      'f9000000-0000-0000-0000-000000000003', 'bienes');
++  ('f9200000-0000-0000-0000-000000000002', :C::uuid, :C2::uuid, 'f9000000-0000-0000-0000-000000000002', 'bienes');
++RESET ROLE;
++SELECT public.como_sistema($$ INSERT INTO public.recepciones (id, company_id, project_id, orden_compra_id, tipo)
++  VALUES ('f9200000-0000-0000-0000-000000000003', 'cccccccc-cccc-cccc-cccc-cccccccccccc', NULL, 'f9000000-0000-0000-0000-000000000003', 'bienes') $$);
++SELECT public.como(:UA::uuid);
++SET ROLE authenticated;
+ INSERT INTO public.recepcion_lineas (id, company_id, recepcion_id, orden_compra_linea_id, cantidad) VALUES
+   ('f9300000-0000-0000-0000-000000000001', :C::uuid, 'f9200000-0000-0000-0000-000000000001', 'f9100000-0000-0000-0000-000000000001', 4),
+   ('f9300000-0000-0000-0000-000000000002', :C::uuid, 'f9200000-0000-0000-0000-000000000002', 'f9100000-0000-0000-0000-000000000002', 4),
