@@ -67,6 +67,17 @@ INSERT INTO public.company_clientes (company_id, cliente_id) VALUES
   ('e1000000-0000-4000-8000-000000000001', 'c1000000-0000-4000-8000-000000000003'),
   ('e2000000-0000-4000-8000-000000000002', 'c2000000-0000-4000-8000-000000000001');
 
+-- Filas HEREDADAS: clientes con proyecto y sin empresa, y una persona de Y colgada de un
+-- proyecto de X. Desde 20261026000700 (#928) trg_validar_proyecto_app_users rechaza DAR DE
+-- ALTA esa forma, pero no revalida las filas que ya existen (producción las tiene), y la
+-- purga tiene que tratarlas. Si el trigger existe, se apaga SOLO para sembrarlas.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'public.app_users'::regclass
+              AND tgname = 'trg_validar_proyecto_app_users' AND NOT tgisinternal) THEN
+    ALTER TABLE public.app_users DISABLE TRIGGER trg_validar_proyecto_app_users;
+  END IF;
+END $$;
+
 INSERT INTO public.app_users (id, full_name, role, company_id, project_id, cliente_id) VALUES
   ('a0000000-0000-4000-8000-00000000000a', 'Actor',     'super_admin',   NULL, NULL, NULL),
   ('a0000000-0000-4000-8000-00000000005a', 'Colgado',   'superadmin',    'e1000000-0000-4000-8000-000000000001', 'f1000000-0000-4000-8000-000000000001', NULL),
@@ -78,6 +89,12 @@ INSERT INTO public.app_users (id, full_name, role, company_id, project_id, clien
   ('a0000000-0000-4000-8000-0000000000c1', 'Cliente 1', 'cliente',       NULL, 'f1000000-0000-4000-8000-000000000001', 'c1000000-0000-4000-8000-000000000001'),
   ('a0000000-0000-4000-8000-0000000000c2', 'Cliente 2', 'cliente',       NULL, 'f1000000-0000-4000-8000-000000000001', 'c1000000-0000-4000-8000-000000000002'),
   ('a0000000-0000-4000-8000-0000000000c9', 'Cliente Y', 'cliente',       NULL, 'f2000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001');
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'public.app_users'::regclass
+              AND tgname = 'trg_validar_proyecto_app_users' AND NOT tgisinternal) THEN
+    ALTER TABLE public.app_users ENABLE TRIGGER trg_validar_proyecto_app_users;
+  END IF;
+END $$;
 
 -- Roles: uno de empresa asignado al owner, y el rol de ajustes del admin.
 INSERT INTO public.roles (id, company_id, name) VALUES
