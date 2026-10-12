@@ -28,8 +28,8 @@ interface AsignacionModalProps {
   /** Se llama cuando el guardado quedó A MEDIAS (una parte se aplicó): quien muestra la lista debe recargarla. */
   onReload?: () => void
   /**
-   * Quien edita. OBLIGATORIO: sin él no habría compuerta y se ofrecería al administrador editarse a sí mismo (el servidor lo rechaza:
-   * se deshabilita Guardar con la explicación).
+   * Quien edita. OBLIGATORIO: sin él no habría compuerta y se ofrecería editar a quien no es el principal (propietario o superadministrador; un administrador no edita
+   * las asignaciones de nadie, ni las suyas: el servidor lo rechaza, así que se deshabilita Guardar con la explicación).
    */
   actor: { id: string; role: string }
 }

@@ -6,8 +6,8 @@
 //    (mismo id, created_at y permission_type);
 //  · un DELETE que la RLS filtra devuelve 0 filas SIN error: la pantalla lo comprueba y no dice «guardado»;
 //  · los errores de la base (ASIGNACION_PROPIA_NO_PERMITIDA, ASIGNACION_EMPRESA_DISTINTA, 42501) se traducen a un mensaje útil;
-//  · un administrador (que no es propietario ni superadministrador) no puede editarse a sí mismo: el botón Guardar queda
-//    deshabilitado con la explicación (el servidor lo rechazaría igual: migración 20261026000600);
+//  · sólo el PRINCIPAL (propietario o superadministrador) edita asignaciones: un administrador no edita a nadie, ni a sí mismo ni a otra persona; el botón Guardar queda
+//    deshabilitado con la explicación y no se escribe nada (el servidor lo rechazaría igual: migración 20261026000600);
 //  · la diferencia se calcula de TRES VÍAS contra lo que había al ABRIR el modal (no contra una lectura nueva al guardar): dos
 //    administradores a la vez no deshacen el trabajo del otro (sondas S4 y S5 del verificador);
 //  · si la lectura inicial FALLA se muestra el error y Guardar queda deshabilitado (nunca se borra por una lectura fallida: S6);
@@ -95,6 +95,7 @@ vi.mock('../../../lib/supabase', () => {
 vi.mock('../../shared/Dialog', () => ({ notify: notifyMock }))
 
 import { AsignacionModal } from '../AsignacionModal'
+import { MOTIVO_SOLO_PRINCIPAL } from '../../../domain/empresa/usuarios'
 
 const PROYECTOS = [
   { id: 'p1', nombre: 'Torre Norte' },
@@ -236,9 +237,10 @@ describe('AsignacionModal · mensajes de error útiles', () => {
     expect(aviso.text).toMatch(/misma empresa/)
   })
 
-  it('42501 de la RLS → explica el permiso (sólo proyectos que ve, a otras personas de su empresa)', async () => {
+  it('42501 de la RLS → explica el permiso (sólo el propietario de la empresa asigna, dentro de su empresa)', async () => {
     const aviso = await fallar({ code: '42501', message: 'new row violates row-level security policy for table "user_project_assignments"' })
     expect(aviso.text).toMatch(/No tienes permiso/)
+    expect(aviso.text).toMatch(/propietario/)
   })
 
   it('cualquier otro error conserva un mensaje genérico en español', async () => {
@@ -247,8 +249,8 @@ describe('AsignacionModal · mensajes de error útiles', () => {
   })
 })
 
-describe('AsignacionModal · un administrador no se edita a sí mismo', () => {
-  it('el administrador sobre SU propia fila: Guardar deshabilitado y con la explicación', async () => {
+describe('AsignacionModal · sólo el principal edita asignaciones (un administrador no edita a nadie)', () => {
+  it('el administrador sobre SU propia fila: Guardar deshabilitado y con la explicación de la autoedición', async () => {
     montar({ usuario: ADMIN, actor: { id: 'u-admin', role: 'admin' } })
     await esperarCarga()
     const boton = screen.getByRole('button', { name: /Guardar/ }) as HTMLButtonElement
@@ -256,11 +258,36 @@ describe('AsignacionModal · un administrador no se edita a sí mismo', () => {
     expect(screen.getByText(/No puedes cambiar tus propios proyectos/)).toBeTruthy()
   })
 
-  it('el administrador sobre OTRA persona: Guardar habilitado y sin el aviso', async () => {
+  it('el administrador sobre OTRA persona: Guardar deshabilitado y con la explicación «sólo el propietario»; las casillas también', async () => {
     montar({ usuario: OPERADOR, actor: { id: 'u-admin', role: 'admin' } })
     await esperarCarga()
-    expect((screen.getByRole('button', { name: /Guardar/ }) as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByRole('button', { name: /Guardar/ }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText(MOTIVO_SOLO_PRINCIPAL)).toBeTruthy()
     expect(screen.queryByText(/No puedes cambiar tus propios proyectos/)).toBeNull()
+    expect((screen.getByLabelText('Torre Norte') as HTMLInputElement).disabled).toBe(true)
+  })
+
+  it('el administrador no escribe NADA aunque fuerce el clic en Guardar (la compuerta de guardar() lo corta antes de llegar a la base)', async () => {
+    montar({ usuario: OPERADOR, actor: { id: 'u-admin', role: 'admin' } })
+    await esperarCarga()
+    guardar()
+    await new Promise(r => setTimeout(r, 20))
+    expect(escrituras()).toEqual([])
+    expect(db.rows.map(r => r.project_id).sort()).toEqual(['p1', 'p2'])
+  })
+
+  it.each(['operator', 'viewer', 'collector'])('un %s tampoco edita a otra persona', async rol => {
+    montar({ usuario: OPERADOR, actor: { id: 'u-otro', role: rol } })
+    await esperarCarga()
+    expect((screen.getByRole('button', { name: /Guardar/ }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText(MOTIVO_SOLO_PRINCIPAL)).toBeTruthy()
+  })
+
+  it.each(['company_owner', 'super_admin', 'superadmin'])('%s SÍ edita a otra persona: Guardar habilitado y sin aviso', async rol => {
+    montar({ usuario: OPERADOR, actor: { id: 'u-principal', role: rol } })
+    await esperarCarga()
+    expect((screen.getByRole('button', { name: /Guardar/ }) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.queryByText(MOTIVO_SOLO_PRINCIPAL)).toBeNull()
   })
 
   it.each(['company_owner', 'super_admin', 'superadmin'])('%s sí puede editar su propia fila (es exento)', async rol => {

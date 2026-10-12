@@ -68,12 +68,40 @@ export async function insertUserProjectAssignments(
 // Se INSERTA primero (ON CONFLICT DO NOTHING: si otro administrador ya lo asignó no es un error y su fila se conserva) y se BORRA después,
 // y se comprueba con una lectura posterior: la RLS puede filtrar un DELETE y contestar «0 filas» sin error, y eso no es «guardado».
 
-/** Quién puede cambiar las asignaciones propias: el propietario y el superadministrador (son exentos de proyecto). */
-const ROLES_QUE_EDITAN_LAS_SUYAS = ['company_owner', 'super_admin', 'superadmin']
+// ── El PRINCIPAL de la empresa ────────────────────────────────────────────────────────────────────────────────
+// Decisión del dueño del negocio (2026-10-11): quien asigna proyectos, permisos (roles y llaves) y administradores, y quien crea proyectos, es «el que tiene los permisos
+// de la empresa y todos los proyectos»: el PRINCIPAL = el propietario (app_users.role 'company_owner', dentro de SU empresa) o el superadministrador ('super_admin' /
+// 'superadmin', cualquier empresa). Un administrador —acotado o sin filas, «exento»— NO lo es, ni quien sólo tenga un rol RBAC de administrador: se mira el rol de
+// app_users y nada más. El servidor manda (public.asignacion_puede_administrar y las políticas de la migración 20261026000700); esto sólo evita ofrecer lo que será rechazado.
+const ROLES_PRINCIPALES = ['company_owner', 'super_admin', 'superadmin']
+
+/** ¿Este rol es el PRINCIPAL de la empresa (propietario o superadministrador)? Un administrador, acotado o exento, NO. */
+export function esPrincipalEmpresa(role?: string | null): boolean {
+  return !!role && ROLES_PRINCIPALES.includes(role)
+}
+
+/** Lo que se dice a quien no es el principal ante cualquier cosa que sólo el principal puede hacer (asignar proyectos, permisos y administradores; crear proyectos). */
+export const MOTIVO_SOLO_PRINCIPAL = 'Solo el propietario de la empresa asigna proyectos, permisos y administradores.'
+
+/** Lo que se dice cuando quien no es el principal intenta crear un proyecto. */
+export const MOTIVO_SOLO_PRINCIPAL_PROYECTOS = 'Solo el propietario de la empresa crea proyectos.'
+
+/** ¿Puede este rol crear proyectos? Sólo el principal (projects_insert, migración 20261026000700). La configuración fiscal y de cobros de un proyecto SIGUE abierta al administrador (projects_update no cambió). */
+export function puedeCrearProyectos(role?: string | null): boolean {
+  return esPrincipalEmpresa(role)
+}
+
+/**
+ * ¿Ve este rol el asistente del primer proyecto (SetupWizard)? El propietario de una empresa sin proyectos. Un administrador ya no: el servidor le rechazaría el INSERT
+ * (projects_insert es del principal) y el asistente fallaría al final. El superadministrador administra las empresas desde /superadmin: no se le abre el asistente.
+ */
+export function veAsistentePrimerProyecto(role?: string | null): boolean {
+  return role === 'company_owner'
+}
 
 /** Lo que el servidor devuelve (ASIGNACION_PROPIA_NO_PERMITIDA) cuando alguien intenta cambiar sus propias asignaciones. */
 export const MOTIVO_AUTOASIGNACION =
-  'No puedes cambiar tus propios proyectos. Pídele el cambio a otro administrador, al propietario o al superadministrador.'
+  'No puedes cambiar tus propios proyectos. Pídele el cambio al propietario de la empresa o al superadministrador.'
 
 /** Lo que se dice cuando una parte de los cambios SÍ se aplicó y otra no. */
 export const AVISO_GUARDADO_PARCIAL = 'Se aplicó una parte de los cambios y otra no. Vuelve a guardar para completar el resto.'
@@ -85,18 +113,18 @@ export const AVISO_RESULTADO_INCIERTO =
 const MENSAJE_ERROR_RED = 'No se pudieron guardar las asignaciones. Revisa tu conexión e intenta de nuevo.'
 
 /**
- * ¿Puede `actor` editar las asignaciones de proyecto de `objetivo`? Espeja la regla del servidor
- * (public.asignacion_puede_administrar, migración 20261026000600): un administrador no se edita a sí mismo, porque ampliaría su alcance
- * o, borrando las suyas, pasaría a ser «exento de proyecto». El servidor es el que manda; esto sólo evita ofrecer lo que será rechazado.
+ * ¿Puede `actor` editar las asignaciones de proyecto de `objetivo`? Espeja la regla del servidor (public.asignacion_puede_administrar, migración 20261026000600): SÓLO el principal
+ * de la empresa (propietario o superadministrador) las escribe, también las suyas (es exento: su alcance no cambia). Quien no lo es no edita a NADIE —un administrador,
+ * acotado o exento, tampoco a un operador ni a otro administrador— y en su propia fila se conserva el motivo de la autoedición. El servidor es el que manda; esto sólo evita
+ * ofrecer lo que será rechazado.
  */
 export function puedeEditarAsignaciones(
   actor: { id: string; role: string },
   objetivo: { id: string },
 ): { permitido: boolean; motivo: string | null } {
-  if (actor.id === objetivo.id && !ROLES_QUE_EDITAN_LAS_SUYAS.includes(actor.role)) {
-    return { permitido: false, motivo: MOTIVO_AUTOASIGNACION }
-  }
-  return { permitido: true, motivo: null }
+  if (esPrincipalEmpresa(actor.role)) return { permitido: true, motivo: null }
+  if (actor.id === objetivo.id) return { permitido: false, motivo: MOTIVO_AUTOASIGNACION }
+  return { permitido: false, motivo: MOTIVO_SOLO_PRINCIPAL }
 }
 
 /** Traduce el error de la base (códigos estables de la migración 20261026000600, o el 42501 de la RLS) a un mensaje útil. */
@@ -108,7 +136,7 @@ export function mensajeErrorAsignacion(
   if (texto.includes('ASIGNACION_PROPIA_NO_PERMITIDA')) return MOTIVO_AUTOASIGNACION
   if (texto.includes('ASIGNACION_EMPRESA_DISTINTA')) return 'La persona y el proyecto deben pertenecer a la misma empresa.'
   if (error.code === '42501' || /row-level security|permission denied/i.test(texto)) {
-    return 'No tienes permiso para cambiar estas asignaciones. Solo puedes asignar los proyectos que tú ves, a otras personas de tu empresa.'
+    return 'No tienes permiso para cambiar estas asignaciones. Solo el propietario de la empresa (o el superadministrador) asigna proyectos, y solo a personas y proyectos de su empresa.'
   }
   return 'No se pudieron guardar las asignaciones. Intenta de nuevo.'
 }

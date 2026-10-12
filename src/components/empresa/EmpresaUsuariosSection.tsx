@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import { createCompanyUser, deleteCompanyUser, puedeEditarAsignaciones, setUsuarioActivo } from '../../domain/empresa/usuarios'
+import { createCompanyUser, deleteCompanyUser, esPrincipalEmpresa, MOTIVO_SOLO_PRINCIPAL, puedeEditarAsignaciones, setUsuarioActivo } from '../../domain/empresa/usuarios'
 import { insertUserRoles, ensureCompanyRoleFromTemplate } from '../../domain/empresa/roles'
 import type { UserSession, Proyecto } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
@@ -223,7 +223,11 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
   // only appears when the action would actually succeed.
   const isSuperAdmin = currentUser.role === 'super_admin'
   const canDeleteUsers = isSuperAdmin || currentUser.role === 'company_owner' || currentUser.role === 'admin'
-  // ¿Puede quien mira cambiar los proyectos de esa fila? Un administrador no, en la suya (ver puedeEditarAsignaciones).
+  // El PRINCIPAL de la empresa (propietario o superadministrador): el único que asigna proyectos, permisos (roles y llaves) y administradores. Un administrador, acotado o
+  // exento, no: el servidor lo rechaza (migraciones 20261026000600 y 20261026000700), así que aquí no se ofrece y se explica. La pantalla /empresa sólo la abre el
+  // propietario (RoleGuard): son compuertas de defensa en profundidad por si un día se abre a otros roles.
+  const esPrincipal = esPrincipalEmpresa(currentUser.role)
+  // ¿Puede quien mira cambiar los proyectos de esa fila? Sólo el principal (ver puedeEditarAsignaciones); el motivo distingue la autoedición del resto.
   const permisoAcceso = (u: Usuario) => puedeEditarAsignaciones({ id: currentUser.user_id, role: currentUser.role }, u)
   const DELETABLE_TARGET_ROLES = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
 
@@ -303,7 +307,20 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
           </div>
         </div>
 
-        {(currentUser.role === 'company_owner' || currentUser.role === 'admin') && (
+        {!esPrincipal && currentUser.role === 'admin' && (
+          <div role="note" style={{
+            background: 'var(--at-accent-tint)',
+            border: '1px solid var(--at-accent-soft)',
+            borderRadius: '10px', padding: '10px 14px', marginBottom: '12px',
+            display: 'flex', alignItems: 'flex-start', gap: '10px',
+            color: 'var(--at-ink-2)', fontSize: '12px', lineHeight: 1.5,
+          }}>
+            <span style={{ fontSize: '14px', lineHeight: 1, marginTop: '1px' }}>🔒</span>
+            <div>{MOTIVO_SOLO_PRINCIPAL}</div>
+          </div>
+        )}
+
+        {esPrincipal && (
           <div style={{
             background: 'var(--at-accent-tint)',
             border: '1px solid var(--at-accent-soft)',
@@ -317,7 +334,8 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
               Desde <em>Roles y permisos</em> usa una <em>plantilla</em> como punto de partida para
               crear los roles de tu empresa (o personalízala antes de crearla). Para excepciones de
               una sola persona, concede o bloquea permisos puntuales directamente en el panel de
-              permisos efectivos, sin crear más roles. Los cambios se auditan en{' '}
+              permisos efectivos, sin crear más roles. Solo el propietario de la empresa asigna
+              permisos. Los cambios se auditan en{' '}
               <span style={{ color: 'var(--at-accent-light)' }}>📜 Auditoría</span>.
             </div>
           </div>
@@ -356,7 +374,7 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
                     </div>
                     {!permisoAcceso(u).permitido && (
                       <div id={`acceso-propio-${u.id}`} style={{ color: 'var(--at-ink-3)', fontSize: '11px', marginTop: '2px' }}>
-                        Tus proyectos los cambia otro administrador, el propietario o el superadministrador.
+                        {permisoAcceso(u).motivo}
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '3px' }}>
@@ -377,8 +395,8 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {/* Un administrador no cambia sus propios proyectos (ampliaría su alcance o, borrándolos, quedaría exento):
-                      el servidor lo rechaza (migración 20261026000600), así que aquí no se ofrece y se explica. */}
+                  {/* Solo el principal (propietario o superadministrador) asigna proyectos: un administrador no cambia los de nadie, ni los suyos
+                      (ampliaría su alcance o, borrándolos, quedaría exento). El servidor lo rechaza (migración 20261026000600): aquí no se ofrece y se explica. */}
                   <button
                     onClick={() => setUsuarioAsignar(u)}
                     disabled={!permisoAcceso(u).permitido}
@@ -397,14 +415,17 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
                     </svg>
                     Acceso
                   </button>
+                  {/* Solo el principal asigna roles y llaves (roles, role_permissions y user_roles: migración 20261026000700). */}
                   <button
                     onClick={() => setRolCondModal(u)}
-                    title="Roles y permisos (agua, condominios y plataforma)"
+                    disabled={!esPrincipal}
+                    title={esPrincipal ? 'Roles y permisos (agua, condominios y plataforma)' : 'Solo el propietario de la empresa asigna permisos.'}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '5px',
                       padding: '6px 10px', borderRadius: '7px', border: '1px solid var(--at-primary-soft)',
                       background: 'var(--at-primary-tint)', color: 'var(--at-accent-2)',
-                      cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
+                      cursor: esPrincipal ? 'pointer' : 'not-allowed', opacity: esPrincipal ? 1 : 0.55,
+                      fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                     }}
                   >
                     🔑 Roles y permisos
