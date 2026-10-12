@@ -1,0 +1,690 @@
+# Llaves foráneas de PRODUCCIÓN (nnsqmeigtgewatameexo) hacia companies, projects, app_users y auth.users.
+# Medido el 2026-10-12 con SELECT sobre pg_catalog.pg_constraint (conector Supabase, solo lectura). Ver docs/PURGA_EMPRESA.md.
+referenciada	tabla	constraint	on_delete	definicion
+companies	areas_condominio	areas_condominio_company_id_fkey	NO ACTION	FOREIGN KEY (company_id) REFERENCES companies(id)
+companies	convenios_pago	convenios_pago_company_id_fkey	NO ACTION	FOREIGN KEY (company_id) REFERENCES companies(id)
+companies	fuentes_agua	fuentes_agua_company_id_fkey	NO ACTION	FOREIGN KEY (company_id) REFERENCES companies(id)
+companies	payment_requests	payment_requests_company_id_fkey	NO ACTION	FOREIGN KEY (company_id) REFERENCES companies(id)
+companies	registros_calidad	registros_calidad_company_id_fkey	NO ACTION	FOREIGN KEY (company_id) REFERENCES companies(id)
+companies	rutas	rutas_company_id_fkey	NO ACTION	FOREIGN KEY (company_id) REFERENCES companies(id)
+companies	billing_sync_log	billing_sync_log_company_id_fkey	SET NULL	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
+companies	legal_acceptances	legal_acceptances_company_id_fkey	SET NULL	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
+companies	notification_preferences	notification_preferences_company_id_fkey	SET NULL	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
+companies	accesos_residentes	accesos_residentes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	actas_reunion	actas_reunion_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	activos_fijos	activos_fijos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	agenda_operativa	agenda_operativa_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	alertas_condominio	alertas_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	amenidades	amenidades_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	anuncio_lecturas	anuncio_lecturas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	anuncios_comunidad	anuncios_comunidad_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	asambleas	asambleas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	asambleas_digital	asambleas_digital_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	asignaciones_turno	asignaciones_turno_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	ausencias_personal	ausencias_personal_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	automatizaciones_cond	automatizaciones_cond_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	avisos_cobro	avisos_cobro_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	banco_movimientos	banco_movimientos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	bitacora_acciones	bitacora_acciones_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	bitacora_guardia	bitacora_guardia_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	bitacora_manto	bitacora_manto_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	bodegas_condominio	bodegas_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	caja_chica	caja_chica_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	calidad_tipologias	calidad_tipologias_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	campanas_cobro	campanas_cobro_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	capacitacion_personal_cond	capacitacion_personal_cond_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	cargos_adicionales_unidad	cargos_adicionales_unidad_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	checklist_areas	checklist_areas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	cierre_ciclo_config	cierre_ciclo_config_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	cierres_anuales	cierres_anuales_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	cierres_mensuales	cierres_mensuales_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	cobranza_judicial	cobranza_judicial_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	comentarios_mensaje_portal	comentarios_mensaje_portal_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	comentarios_ticket	comentarios_ticket_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	comision_config	comision_config_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	company_branding	company_branding_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	company_clientes	company_clientes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	company_email_configs	company_email_configs_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	company_payment_secrets	company_payment_secrets_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	company_sso_domains	company_sso_domains_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	company_whatsapp_configs	company_whatsapp_configs_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	compras_config	compras_config_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	compras_correlativos	compras_correlativos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	compras_linea_importacion_filas	compras_linea_importacion_filas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	compras_linea_importaciones	compras_linea_importaciones_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	comunicados_condominio	comunicados_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conciliacion_cobros_log	conciliacion_cobros_log_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	config_condominio	config_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	configuracion_condominio	configuracion_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	consumo_energia_areas	consumo_energia_areas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_ajustes_solicitudes	conta_ajustes_solicitudes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_anticipos	conta_anticipos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_asiento_lineas	conta_asiento_lineas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_asientos	conta_asientos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_auxiliares	conta_auxiliares_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_cierres_anuales	conta_cierres_anuales_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_cobro_aplicaciones	conta_cobro_aplicaciones_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_config_tipo_cargo	conta_config_tipo_cargo_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_cuentas	conta_cuentas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_duplicados_descartados	conta_duplicados_descartados_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_folios	conta_folios_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_incidencias_conciliacion	conta_incidencias_conciliacion_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_intentos_contabilizacion	conta_intentos_contabilizacion_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_mapeo_cuentas	conta_mapeo_cuentas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_notas_credito	conta_notas_credito_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_reglas_cargo	conta_reglas_cargo_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_reglas_compra	conta_reglas_compra_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_reglas_proveedor	conta_reglas_proveedor_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_resoluciones	conta_resoluciones_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_saldo_favor_aplicaciones	conta_saldo_favor_aplicaciones_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_saldo_favor_origenes	conta_saldo_favor_origenes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_tipos_cambio	conta_tipos_cambio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_tipos_cambio_mensual	conta_tipos_cambio_mensual_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	conta_tipos_cambio_mensual_historial	conta_tipos_cambio_mensual_historial_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	contactos_emergencia	contactos_emergencia_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	contadores	contadores_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	contrasena_pago_facturas	contrasena_pago_facturas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	contrasenas_pago	contrasenas_pago_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	contrato_ampliaciones	contrato_ampliaciones_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	contrato_proveedor_eventos	contrato_proveedor_eventos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	contratos_arrendamiento	contratos_arrendamiento_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	contratos_proveedores	contratos_proveedores_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	control_camaras_seguridad	control_camaras_seguridad_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	control_generador	control_generador_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	control_piscina	control_piscina_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	control_plagas	control_plagas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	control_sistema_incendio	control_sistema_incendio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	convenios_cuota_cond	convenios_cuota_cond_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	cuentas_bancarias	cuentas_bancarias_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	cuotas_condominio	cuotas_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	cuotas_plan_pago	cuotas_plan_pago_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	dias_no_laborables	dias_no_laborables_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	documentos_condominio	documentos_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	documentos_fiscales	documentos_fiscales_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	ejecuciones_limpieza	ejecuciones_limpieza_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	ejecuciones_mantenimiento	ejecuciones_mantenimiento_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	email_send_log	email_send_log_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	email_send_queue	email_send_queue_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	email_templates	email_templates_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	empresa_pagos_config	empresa_pagos_config_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	encuestas	encuestas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	entrega_unidades	entrega_unidades_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	equipos_comunes	equipos_comunes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	estacionamiento_visita	estacionamiento_visita_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	evaluaciones_proveedor	evaluaciones_proveedor_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	eventos_calendario	eventos_calendario_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	eventos_comunidad	eventos_comunidad_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	excepciones_turno	excepciones_turno_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	factura_proveedor_lineas	factura_proveedor_lineas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	facturas_energia	facturas_energia_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	facturas_proveedor	facturas_proveedor_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	firmas_digitales	firmas_digitales_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	fiscal_pac_secrets	fiscal_pac_secrets_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	flujo_aprobacion_cond	flujo_aprobacion_cond_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	fondo_reserva	fondo_reserva_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	fondo_reserva_condominio	fondo_reserva_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	fuentes_energia	fuentes_energia_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	garantias_equipo	garantias_equipo_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	gastos_condominio	gastos_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	generacion_cuotas_log	generacion_cuotas_log_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	gestion_cobranza	gestion_cobranza_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	historial_residentes	historial_residentes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	historial_saldos_unidad	historial_saldos_unidad_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	incidencias_elevador	incidencias_elevador_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	incidentes_seguridad	incidentes_seguridad_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	informes_mensuales	informes_mensuales_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	infracciones_condominio	infracciones_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	inspecciones_normativas	inspecciones_normativas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	inventario_condominio	inventario_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	invoices	invoices_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	junta_directiva	junta_directiva_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	lecturas_medidor_gas	lecturas_medidor_gas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	libro_novedades	libro_novedades_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	llaves_condominio	llaves_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	locales_comerciales	locales_comerciales_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	mantenimiento_cisterna	mantenimiento_cisterna_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	mantenimiento_jardineria	mantenimiento_jardineria_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	manual_residente_cond	manual_residente_cond_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	mascotas	mascotas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	medidores_unidad	medidores_unidad_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	memoria_labores	memoria_labores_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	mensajes_portal	mensajes_portal_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	movimientos_caja	movimientos_caja_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	movimientos_suministro	movimientos_suministro_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	notas_admin	notas_admin_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	notificaciones_enviadas	notificaciones_enviadas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	notification_templates	notification_templates_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	notifications_outbox	notifications_outbox_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	novedades_seguridad	novedades_seguridad_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	objetos_perdidos	objetos_perdidos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	obras_mejoras	obras_mejoras_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	onboarding_residentes	onboarding_residentes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	orden_compra_eventos	orden_compra_eventos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	orden_compra_excepciones	orden_compra_excepciones_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	orden_compra_lineas	orden_compra_lineas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	ordenes_compra	ordenes_compra_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	ordenes_pago	ordenes_pago_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	pagos_rechazo_eventos	pagos_rechazo_eventos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	paquetes_recibidos	paquetes_recibidos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	parqueos_condominio	parqueos_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	payfac_secrets	payfac_secrets_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	permisos_obra_unidad	permisos_obra_unidad_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	personal_condominio	personal_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	planes_mantenimiento	planes_mantenimiento_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	planes_pago_condominio	planes_pago_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	plantilla_cupos_pausa	plantilla_cupos_pausa_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	plantilla_tarea_herramientas	plantilla_tarea_herramientas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	plantilla_tarea_suministros	plantilla_tarea_suministros_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	plantillas_cuota	plantillas_cuota_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	plantillas_horario	plantillas_horario_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	plantillas_mensaje_cond	plantillas_mensaje_cond_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	polizas_seguro	polizas_seguro_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	presencia_pausas	presencia_pausas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	presencia_personal	presencia_personal_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	presencia_tipos_pausa	presencia_tipos_pausa_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	prestamos_equipo	prestamos_equipo_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	presupuesto_condominio	presupuesto_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	presupuesto_partidas	presupuesto_partidas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	presupuestos	presupuestos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	proformas_condominio	proformas_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	programa_actividades	programa_actividades_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	programacion_limpieza	programacion_limpieza_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	projects	projects_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	propuestas_inversion	propuestas_inversion_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	proveedor_contactos	proveedor_contactos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	proveedor_correlativos	proveedor_correlativos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	proveedor_documentos	proveedor_documentos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	proveedor_importacion_filas	proveedor_importacion_filas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	proveedor_importaciones	proveedor_importaciones_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	proveedor_proyectos	proveedor_proyectos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	proveedores	proveedores_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	proveedores_energia	proveedores_energia_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	proyectos_condominio	proyectos_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	puntos_verificacion	puntos_verificacion_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	recargo_tarjeta_config	recargo_tarjeta_config_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	recargos_mora	recargos_mora_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	recepcion_lineas	recepcion_lineas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	recepcion_respaldos	recepcion_respaldos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	recepciones	recepciones_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	recibos_digitales	recibos_digitales_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	reclamos_condominio	reclamos_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	recordatorios_condominio	recordatorios_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	registro_asistentes_evento	registro_asistentes_evento_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	registro_autoridades	registro_autoridades_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	registros_residuos	registros_residuos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	reglamento_condominio	reglamento_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	reglas_mora_config	reglas_mora_config_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	reglas_notificacion	reglas_notificacion_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	report_templates	report_templates_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	reservas_amenidades	reservas_amenidades_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	reservas_str	reservas_str_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	respuestas_encuesta	respuestas_encuesta_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	roles	roles_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	rondas_seguridad	rondas_seguridad_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	ruta_ocurrencias	ruta_ocurrencias_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	rutina_actividades	rutina_actividades_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	rutinas_limpieza	rutinas_limpieza_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	sanciones_condominio	sanciones_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	seguimiento_acuerdos	seguimiento_acuerdos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	servicios_housekeeping	servicios_housekeeping_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	solicitudes_certificado	solicitudes_certificado_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	solicitudes_concierge	solicitudes_concierge_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	solicitudes_residente	solicitudes_residente_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	subscriptions	subscriptions_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	sugerencias_condominio	sugerencias_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	suministros_condominio	suministros_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	tarea_bloque_suministros	tarea_bloque_suministros_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	tareas_condominio	tareas_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	tarifas	tarifas_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	tarifas_condominio	tarifas_condominio_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	tarifas_energia	tarifas_energia_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	tickets_mantenimiento	tickets_mantenimiento_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	timbrado_config	timbrado_config_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	unidad_residentes	unidad_residentes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	unidades	unidades_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	user_invitations	user_invitations_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	user_notifications	user_notifications_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	user_presence	user_presence_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	vehiculos_residentes	vehiculos_residentes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	vencimientos_extra	vencimientos_extra_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	visitantes	visitantes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	visitas_frecuentes	visitas_frecuentes_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	votaciones	votaciones_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+companies	votos	votos_company_id_fkey	CASCADE	FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+projects	convenios_pago	convenios_pago_project_id_fkey	NO ACTION	FOREIGN KEY (project_id) REFERENCES projects(id)
+projects	rutas	rutas_project_id_fkey	NO ACTION	FOREIGN KEY (project_id) REFERENCES projects(id)
+projects	activos_fijos	activos_fijos_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	banco_movimientos	banco_movimientos_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	bitacora_acciones	bitacora_acciones_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	clientes	clientes_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	conta_asientos	conta_asientos_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	contrasenas_pago	contrasenas_pago_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	cuentas_bancarias	cuentas_bancarias_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	facturas_proveedor	facturas_proveedor_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	notificaciones_enviadas	notificaciones_enviadas_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	orden_compra_eventos	orden_compra_eventos_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	ordenes_pago	ordenes_pago_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	pagos	pagos_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	recepciones	recepciones_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	registros	registros_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	report_templates	report_templates_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	ruta_ocurrencias	ruta_ocurrencias_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	user_presence	user_presence_project_id_fkey	SET NULL	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+projects	accesos_residentes	accesos_residentes_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	actas_reunion	actas_reunion_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	agenda_operativa	agenda_operativa_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	alertas_condominio	alertas_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	amenidades	amenidades_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	amenidades_bloqueos	amenidades_bloqueos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	anuncios_comunidad	anuncios_comunidad_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	areas_condominio	areas_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	asambleas	asambleas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	asambleas_digital	asambleas_digital_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	asignaciones_turno	asignaciones_turno_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	ausencias_personal	ausencias_personal_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	automatizaciones_cond	automatizaciones_cond_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	avisos_cobro	avisos_cobro_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	bitacora_guardia	bitacora_guardia_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	bitacora_manto	bitacora_manto_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	bloques_turno	bloques_turno_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	bodegas_condominio	bodegas_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	caja_chica	caja_chica_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	campanas_cobro	campanas_cobro_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	capacitacion_personal_cond	capacitacion_personal_cond_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	cargos_adicionales_unidad	cargos_adicionales_unidad_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	checklist_areas	checklist_areas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	cierre_ciclo_config	cierre_ciclo_config_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	cierres_anuales	cierres_anuales_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	cierres_mensuales	cierres_mensuales_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	cobranza_judicial	cobranza_judicial_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	compras_correlativos	compras_correlativos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	compras_linea_importaciones	compras_linea_importaciones_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	comunicados_condominio	comunicados_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conciliacion_cobros_log	conciliacion_cobros_log_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	config_condominio	config_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	configuracion_condominio	configuracion_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	consumo_energia_areas	consumo_energia_areas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_ajustes_solicitudes	conta_ajustes_solicitudes_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_anticipos	conta_anticipos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_cierres_anuales	conta_cierres_anuales_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_cobro_aplicaciones	conta_cobro_aplicaciones_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_config_tipo_cargo	conta_config_tipo_cargo_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_cuentas	conta_cuentas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_folios	conta_folios_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_incidencias_conciliacion	conta_incidencias_conciliacion_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_intentos_contabilizacion	conta_intentos_contabilizacion_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_mapeo_cuentas	conta_mapeo_cuentas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_notas_credito	conta_notas_credito_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_reglas_cargo	conta_reglas_cargo_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_reglas_compra	conta_reglas_compra_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_reglas_proveedor	conta_reglas_proveedor_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_resoluciones	conta_resoluciones_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_saldo_favor_aplicaciones	conta_saldo_favor_aplicaciones_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	conta_saldo_favor_origenes	conta_saldo_favor_origenes_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	contactos_emergencia	contactos_emergencia_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	contadores	contadores_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	contrato_ampliaciones	contrato_ampliaciones_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	contrato_proveedor_eventos	contrato_proveedor_eventos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	contratos_arrendamiento	contratos_arrendamiento_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	contratos_proveedores	contratos_proveedores_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	control_camaras_seguridad	control_camaras_seguridad_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	control_generador	control_generador_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	control_piscina	control_piscina_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	control_plagas	control_plagas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	control_sistema_incendio	control_sistema_incendio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	convenios_cuota_cond	convenios_cuota_cond_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	cuotas_condominio	cuotas_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	cuotas_plan_pago	cuotas_plan_pago_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	dias_no_laborables	dias_no_laborables_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	documentos_condominio	documentos_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	ejecuciones_limpieza	ejecuciones_limpieza_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	encuestas	encuestas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	entrega_unidades	entrega_unidades_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	equipos_comunes	equipos_comunes_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	estacionamiento_visita	estacionamiento_visita_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	evaluaciones_proveedor	evaluaciones_proveedor_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	eventos_calendario	eventos_calendario_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	eventos_comunidad	eventos_comunidad_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	excepciones_turno	excepciones_turno_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	facturas_energia	facturas_energia_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	firmas_digitales	firmas_digitales_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	fiscal_pac_secrets	fiscal_pac_secrets_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	flujo_aprobacion_cond	flujo_aprobacion_cond_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	fondo_reserva	fondo_reserva_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	fondo_reserva_condominio	fondo_reserva_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	fuentes_energia	fuentes_energia_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	garantias_equipo	garantias_equipo_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	gastos_condominio	gastos_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	generacion_cuotas_log	generacion_cuotas_log_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	gestion_cobranza	gestion_cobranza_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	historial_residentes	historial_residentes_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	historial_saldos_unidad	historial_saldos_unidad_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	incidencias_elevador	incidencias_elevador_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	incidentes_seguridad	incidentes_seguridad_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	informes_mensuales	informes_mensuales_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	infracciones_condominio	infracciones_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	inspecciones_normativas	inspecciones_normativas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	inventario_condominio	inventario_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	junta_directiva	junta_directiva_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	lecturas_medidor_gas	lecturas_medidor_gas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	libro_novedades	libro_novedades_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	llaves_condominio	llaves_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	locales_comerciales	locales_comerciales_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	mantenimiento_cisterna	mantenimiento_cisterna_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	mantenimiento_jardineria	mantenimiento_jardineria_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	manual_residente_cond	manual_residente_cond_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	mascotas	mascotas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	medidores_unidad	medidores_unidad_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	memoria_labores	memoria_labores_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	mensajes_portal	mensajes_portal_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	movimientos_caja	movimientos_caja_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	movimientos_suministro	movimientos_suministro_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	notas_admin	notas_admin_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	novedades_seguridad	novedades_seguridad_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	objetos_perdidos	objetos_perdidos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	obras_mejoras	obras_mejoras_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	onboarding_residentes	onboarding_residentes_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	orden_compra_excepciones	orden_compra_excepciones_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	ordenes_compra	ordenes_compra_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	pagos_rechazo_eventos	pagos_rechazo_eventos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	paquetes_recibidos	paquetes_recibidos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	parqueos_condominio	parqueos_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	payfac_secrets	payfac_secrets_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	permisos_obra_unidad	permisos_obra_unidad_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	personal_condominio	personal_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	planes_mantenimiento	planes_mantenimiento_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	planes_pago_condominio	planes_pago_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	plantilla_cupos_pausa	plantilla_cupos_pausa_project_fk	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	plantilla_tarea_herramientas	plantilla_tarea_herramientas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	plantilla_tarea_suministros	plantilla_tarea_suministros_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	plantillas_cuota	plantillas_cuota_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	plantillas_horario	plantillas_horario_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	plantillas_mensaje_cond	plantillas_mensaje_cond_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	plantillas_tarea_cargo	plantillas_tarea_cargo_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	polizas_seguro	polizas_seguro_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	presencia_pausas	presencia_pausas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	presencia_personal	presencia_personal_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	prestamos_equipo	prestamos_equipo_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	presupuesto_condominio	presupuesto_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	presupuestos	presupuestos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	proformas_condominio	proformas_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	programa_actividades	programa_actividades_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	programacion_limpieza	programacion_limpieza_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	propuestas_inversion	propuestas_inversion_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	proveedor_proyectos	proveedor_proyectos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	proveedores_energia	proveedores_energia_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	proyectos_condominio	proyectos_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	puntos_verificacion	puntos_verificacion_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	recargos_mora	recargos_mora_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	recepcion_respaldos	recepcion_respaldos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	recibos_digitales	recibos_digitales_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	reclamos_condominio	reclamos_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	recordatorios_condominio	recordatorios_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	registro_asistentes_evento	registro_asistentes_evento_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	registro_autoridades	registro_autoridades_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	registros_residuos	registros_residuos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	reglamento_condominio	reglamento_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	reglas_mora_config	reglas_mora_config_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	reglas_notificacion	reglas_notificacion_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	reservas_amenidades	reservas_amenidades_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	reservas_str	reservas_str_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	respuestas_encuesta	respuestas_encuesta_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	rondas_seguridad	rondas_seguridad_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	rutas_ronda	rutas_ronda_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	rutina_actividades	rutina_actividades_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	rutinas_limpieza	rutinas_limpieza_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	sanciones_condominio	sanciones_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	seguimiento_acuerdos	seguimiento_acuerdos_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	servicios_housekeeping	servicios_housekeeping_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	solicitudes_certificado	solicitudes_certificado_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	solicitudes_concierge	solicitudes_concierge_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	solicitudes_residente	solicitudes_residente_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	sugerencias_condominio	sugerencias_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	suministros_condominio	suministros_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	tarea_bloque_suministros	tarea_bloque_suministros_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	tareas_condominio	tareas_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	tarifas	tarifas_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	tarifas_condominio	tarifas_condominio_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	tarifas_energia	tarifas_energia_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	tickets_mantenimiento	tickets_mantenimiento_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	unidad_residentes	unidad_residentes_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	unidades	unidades_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	user_project_assignments	user_project_assignments_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	vehiculos_residentes	vehiculos_residentes_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	vencimientos_extra	vencimientos_extra_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	visitantes	visitantes_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	visitas_frecuentes	visitas_frecuentes_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+projects	votaciones	votaciones_project_id_fkey	CASCADE	FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+app_users	anuncios_comunidad	anuncios_comunidad_publicado_por_app_users_fkey	SET NULL	FOREIGN KEY (publicado_por) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	asambleas_digital	asambleas_digital_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	ausencias_personal	ausencias_personal_aprobada_por_fkey	SET NULL	FOREIGN KEY (aprobada_por) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	bitacora_acciones	bitacora_acciones_usuario_id_fkey	SET NULL	FOREIGN KEY (usuario_id) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	comentarios_ticket	comentarios_ticket_autor_id_fkey	SET NULL	FOREIGN KEY (autor_id) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	eventos_calendario	eventos_calendario_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	ordenes_compra	ordenes_compra_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	permission_audit_log	permission_audit_log_actor_id_fkey	SET NULL	FOREIGN KEY (actor_id) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	permission_audit_log	permission_audit_log_target_user_id_fkey	SET NULL	FOREIGN KEY (target_user_id) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	personal_condominio	personal_condominio_user_id_fkey	SET NULL	FOREIGN KEY (user_id) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	presencia_pausas	presencia_pausas_corregido_por_fkey	SET NULL	FOREIGN KEY (corregido_por) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	presencia_pausas	presencia_pausas_registrada_por_fkey	SET NULL	FOREIGN KEY (registrada_por) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	presencia_personal	presencia_personal_corregido_por_fkey	SET NULL	FOREIGN KEY (corregido_por) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	recordatorios_condominio	recordatorios_condominio_asignado_a_fkey	SET NULL	FOREIGN KEY (asignado_a) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	recordatorios_condominio	recordatorios_condominio_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	revisiones_tarea	revisiones_tarea_revisado_por_fkey	SET NULL	FOREIGN KEY (revisado_por) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	solicitud_renta_unidad	solicitud_renta_unidad_aprobado_por_user_id_fkey	SET NULL	FOREIGN KEY (aprobado_por_user_id) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	user_roles	user_roles_assigned_by_fkey	SET NULL	FOREIGN KEY (assigned_by) REFERENCES app_users(id) ON DELETE SET NULL
+app_users	roles	roles_user_override_for_fkey	CASCADE	FOREIGN KEY (user_override_for) REFERENCES app_users(id) ON DELETE CASCADE
+app_users	user_roles	user_roles_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES app_users(id) ON DELETE CASCADE
+auth.users	contrato_ampliaciones	contrato_ampliaciones_autorizado_por_fkey	RESTRICT	FOREIGN KEY (autorizado_por) REFERENCES auth.users(id) ON DELETE RESTRICT
+auth.users	orden_compra_excepciones	orden_compra_excepciones_autorizado_por_fkey	RESTRICT	FOREIGN KEY (autorizado_por) REFERENCES auth.users(id) ON DELETE RESTRICT
+auth.users	accesos_residentes	accesos_residentes_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	actas_reunion	actas_reunion_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	agenda_operativa	agenda_operativa_asignado_a_fkey	SET NULL	FOREIGN KEY (asignado_a) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	agenda_operativa	agenda_operativa_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	amenidades_bloqueos	amenidades_bloqueos_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	anuncios_comunidad	anuncios_comunidad_publicado_por_fkey	SET NULL	FOREIGN KEY (publicado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	asambleas	asambleas_convocado_por_fkey	SET NULL	FOREIGN KEY (convocado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	asignaciones_turno	asignaciones_turno_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	audit_log	audit_log_actor_id_fkey	SET NULL	FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ausencias_personal	ausencias_personal_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	auth.scim_users	scim_users_user_id_fkey	SET NULL	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	banco_movimientos	banco_movimientos_conciliado_por_fkey	SET NULL	FOREIGN KEY (conciliado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	bitacora_guardia	bitacora_guardia_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	bitacora_manto	bitacora_manto_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	bitacora_manto	bitacora_manto_firmado_por_fkey	SET NULL	FOREIGN KEY (firmado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	bloques_turno	bloques_turno_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	bodegas_condominio	bodegas_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	caja_chica	caja_chica_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	capacitacion_personal_cond	capacitacion_personal_cond_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	checklist_areas	checklist_areas_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	clientes	clientes_updated_by_fkey	SET NULL	FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	comentarios_mensaje_portal	comentarios_mensaje_portal_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	comentarios_ticket	comentarios_ticket_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	company_clientes	company_clientes_added_by_fkey	SET NULL	FOREIGN KEY (added_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	compras_linea_importaciones	compras_linea_importaciones_aplicado_por_fkey	SET NULL	FOREIGN KEY (aplicado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	compras_linea_importaciones	compras_linea_importaciones_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	consumo_energia_areas	consumo_energia_areas_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_asientos	conta_asientos_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_auxiliares	conta_auxiliares_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_cierres_anuales	conta_cierres_anuales_cerrado_por_fkey	SET NULL	FOREIGN KEY (cerrado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_config_tipo_cargo	conta_config_tipo_cargo_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_config_tipo_cargo	conta_config_tipo_cargo_updated_by_fkey	SET NULL	FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_duplicados_descartados	conta_duplicados_descartados_revisado_por_fkey	SET NULL	FOREIGN KEY (revisado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_intentos_contabilizacion	conta_intentos_contabilizacion_actor_fkey	SET NULL	FOREIGN KEY (actor) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_reglas_cargo	conta_reglas_cargo_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_reglas_compra	conta_reglas_compra_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_reglas_proveedor	conta_reglas_proveedor_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	conta_resoluciones	conta_resoluciones_resuelto_por_fkey	SET NULL	FOREIGN KEY (resuelto_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	contadores	contadores_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	contadores	contadores_updated_by_fkey	SET NULL	FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	contrasenas_pago	contrasenas_pago_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	contrato_proveedor_eventos	contrato_proveedor_eventos_actor_id_fkey	SET NULL	FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	contratos_proveedores	contratos_proveedores_activado_por_fkey	SET NULL	FOREIGN KEY (activado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	contratos_proveedores	contratos_proveedores_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	contratos_proveedores	contratos_proveedores_responsable_id_fkey	SET NULL	FOREIGN KEY (responsable_id) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	contratos_proveedores	contratos_proveedores_terminado_por_fkey	SET NULL	FOREIGN KEY (terminado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	control_camaras_seguridad	control_camaras_seguridad_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	control_generador	control_generador_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	control_piscina	control_piscina_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	control_plagas	control_plagas_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	control_sistema_incendio	control_sistema_incendio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	convenios_pago	convenios_pago_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	cuotas_condominio	cuotas_condominio_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	cuotas_condominio	cuotas_condominio_deleted_by_fkey	SET NULL	FOREIGN KEY (deleted_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	dias_no_laborables	dias_no_laborables_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	documentos_condominio	documentos_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	documentos_condominio	documentos_condominio_subido_por_fkey	SET NULL	FOREIGN KEY (subido_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ejecuciones_limpieza	ejecuciones_limpieza_anulada_por_fkey	SET NULL	FOREIGN KEY (anulada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ejecuciones_limpieza	ejecuciones_limpieza_completada_por_fkey	SET NULL	FOREIGN KEY (completada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ejecuciones_limpieza	ejecuciones_limpieza_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ejecuciones_mantenimiento	ejecuciones_mantenimiento_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	email_send_log	email_send_log_triggered_by_fkey	SET NULL	FOREIGN KEY (triggered_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	email_send_queue	email_send_queue_triggered_by_fkey	SET NULL	FOREIGN KEY (triggered_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	empresa_pagos_config	empresa_pagos_config_configured_by_fkey	SET NULL	FOREIGN KEY (configured_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	entrega_unidades	entrega_unidades_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	equipos_comunes	equipos_comunes_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	estacionamiento_visita	estacionamiento_visita_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	evaluaciones_proveedor	evaluaciones_proveedor_evaluado_por_id_fkey	SET NULL	FOREIGN KEY (evaluado_por_id) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	excepciones_turno	excepciones_turno_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	facturas_energia	facturas_energia_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	facturas_proveedor	facturas_proveedor_aprobada_por_fkey	SET NULL	FOREIGN KEY (aprobada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	facturas_proveedor	facturas_proveedor_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	facturas_proveedor	facturas_proveedor_match_forzado_por_fkey	SET NULL	FOREIGN KEY (match_forzado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	fondo_reserva_condominio	fondo_reserva_condominio_deleted_by_fkey	SET NULL	FOREIGN KEY (deleted_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	fuentes_agua	fuentes_agua_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	garantias_equipo	garantias_equipo_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	gastos_condominio	gastos_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	historial_residentes	historial_residentes_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	huespedes_str	huespedes_str_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	incidencias_elevador	incidencias_elevador_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	incidentes_seguridad	incidentes_seguridad_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	informes_mensuales	informes_mensuales_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	infracciones_condominio	infracciones_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	infracciones_condominio	infracciones_condominio_reportado_por_fkey	SET NULL	FOREIGN KEY (reportado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	inspecciones_normativas	inspecciones_normativas_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	inventario_condominio	inventario_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	lecturas_medidor_gas	lecturas_medidor_gas_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	libro_novedades	libro_novedades_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	libro_novedades	libro_novedades_firmado_por_fkey	SET NULL	FOREIGN KEY (firmado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	llaves_condominio	llaves_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	mantenimiento_cisterna	mantenimiento_cisterna_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	mantenimiento_jardineria	mantenimiento_jardineria_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	mascotas	mascotas_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	medidores_unidad	medidores_unidad_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	memoria_labores	memoria_labores_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	memoria_labores	memoria_labores_publicado_por_fkey	SET NULL	FOREIGN KEY (publicado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	movimientos_caja	movimientos_caja_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	movimientos_suministro	movimientos_suministro_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	novedades_seguridad	novedades_seguridad_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	novedades_seguridad	novedades_seguridad_reportado_por_fkey	SET NULL	FOREIGN KEY (reportado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	objetos_perdidos	objetos_perdidos_registrado_por_fkey	SET NULL	FOREIGN KEY (registrado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	obras_mejoras	obras_mejoras_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	onboarding_residentes	onboarding_residentes_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ordenes_compra	ordenes_compra_aprobada_por_fkey	SET NULL	FOREIGN KEY (aprobada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ordenes_pago	ordenes_pago_aprobada_por_fkey	SET NULL	FOREIGN KEY (aprobada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ordenes_pago	ordenes_pago_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ordenes_pago	ordenes_pago_solicitada_por_fkey	SET NULL	FOREIGN KEY (solicitada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	pagos	pagos_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	pagos	pagos_deleted_by_fkey	SET NULL	FOREIGN KEY (deleted_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	pagos	pagos_verified_by_fkey	SET NULL	FOREIGN KEY (verified_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	pagos_rechazo_eventos	pagos_rechazo_eventos_actor_fkey	SET NULL	FOREIGN KEY (actor) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	paquetes_recibidos	paquetes_recibidos_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	paquetes_recibidos	paquetes_recibidos_entrega_registrada_por_fkey	SET NULL	FOREIGN KEY (entrega_registrada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	paquetes_recibidos	paquetes_recibidos_entregado_por_fkey	SET NULL	FOREIGN KEY (entregado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	paquetes_recibidos	paquetes_recibidos_recibido_por_fkey	SET NULL	FOREIGN KEY (recibido_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	parqueos_condominio	parqueos_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	personal_condominio	personal_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	planes_mantenimiento	planes_mantenimiento_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	plantilla_tarea_herramientas	plantilla_tarea_herramientas_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	plantilla_tarea_suministros	plantilla_tarea_suministros_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	plantillas_horario	plantillas_horario_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	presencia_personal	presencia_personal_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	prestamos_equipo	prestamos_equipo_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	presupuestos	presupuestos_aprobado_por_fkey	SET NULL	FOREIGN KEY (aprobado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	presupuestos	presupuestos_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	programa_actividades	programa_actividades_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	programacion_limpieza	programacion_limpieza_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	programacion_limpieza	programacion_limpieza_ejecutado_por_fkey	SET NULL	FOREIGN KEY (ejecutado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	propuestas_inversion	propuestas_inversion_propuesto_por_fkey	SET NULL	FOREIGN KEY (propuesto_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	proveedor_documentos	proveedor_documentos_verificado_por_fkey	SET NULL	FOREIGN KEY (verificado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	proveedor_importaciones	proveedor_importaciones_aplicado_por_fkey	SET NULL	FOREIGN KEY (aplicado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	proveedor_importaciones	proveedor_importaciones_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	proveedor_proyectos	proveedor_proyectos_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	proveedor_proyectos	proveedor_proyectos_habilitado_por_fkey	SET NULL	FOREIGN KEY (habilitado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	proveedores	proveedores_autorizado_por_fkey	SET NULL	FOREIGN KEY (autorizado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	puntos_control_ruta	puntos_control_ruta_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	puntos_verificacion	puntos_verificacion_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	recepcion_respaldos	recepcion_respaldos_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	recepciones	recepciones_recibido_por_fkey	SET NULL	FOREIGN KEY (recibido_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	reclamos_condominio	reclamos_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	reclamos_condominio	reclamos_condominio_respuesta_sellada_por_fkey	SET NULL	FOREIGN KEY (respuesta_sellada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	registro_autoridades	registro_autoridades_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	registros	registros_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	registros	registros_deleted_by_fkey	SET NULL	FOREIGN KEY (deleted_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	registros_calidad	registros_calidad_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	registros_residuos	registros_residuos_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	registros_residuos	registros_residuos_registrado_por_fkey	SET NULL	FOREIGN KEY (registrado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	report_runs	report_runs_actor_id_fkey	SET NULL	FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	report_templates	report_templates_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	reservas_amenidades	reservas_amenidades_created_by_fkey	SET NULL	FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	reservas_str	reservas_str_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	revisiones_tarea	revisiones_tarea_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	rondas_seguridad	rondas_seguridad_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	rondas_seguridad	rondas_seguridad_guardia_id_fkey	SET NULL	FOREIGN KEY (guardia_id) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ruta_ocurrencias	ruta_ocurrencias_completada_por_fkey	SET NULL	FOREIGN KEY (completada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	ruta_ocurrencias	ruta_ocurrencias_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	rutas	rutas_asignado_a_fkey	SET NULL	FOREIGN KEY (asignado_a) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	rutas	rutas_completada_por_fkey	SET NULL	FOREIGN KEY (completada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	rutas	rutas_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	rutas_ronda	rutas_ronda_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	rutina_actividades	rutina_actividades_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	rutinas_limpieza	rutinas_limpieza_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	sanciones_condominio	sanciones_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	servicios_housekeeping	servicios_housekeeping_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	solicitud_mudanza_unidad	solicitud_mudanza_unidad_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	solicitud_renta_unidad	solicitud_renta_unidad_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	solicitudes_certificado	solicitudes_certificado_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	solicitudes_concierge	solicitudes_concierge_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	solicitudes_residente	solicitudes_residente_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	sugerencias_condominio	sugerencias_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	sugerencias_condominio	sugerencias_condominio_respuesta_sellada_por_fkey	SET NULL	FOREIGN KEY (respuesta_sellada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	suministros_condominio	suministros_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tarea_bloque_suministros	tarea_bloque_suministros_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tareas_bloque	tareas_bloque_anulada_por_fkey	SET NULL	FOREIGN KEY (anulada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tareas_bloque	tareas_bloque_completado_por_fkey	SET NULL	FOREIGN KEY (completado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tareas_bloque	tareas_bloque_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tareas_condominio	tareas_condominio_cerrado_por_fkey	SET NULL	FOREIGN KEY (cerrado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tareas_condominio	tareas_condominio_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tarifas	tarifas_updated_by_fkey	SET NULL	FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tickets_mantenimiento	tickets_mantenimiento_asignado_a_fkey	SET NULL	FOREIGN KEY (asignado_a) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tickets_mantenimiento	tickets_mantenimiento_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tickets_mantenimiento	tickets_mantenimiento_deleted_by_fkey	SET NULL	FOREIGN KEY (deleted_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	tickets_mantenimiento	tickets_mantenimiento_reportado_por_fkey	SET NULL	FOREIGN KEY (reportado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	unidad_residentes	unidad_residentes_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	unidades	unidades_updated_by_fkey	SET NULL	FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	user_invitations	user_invitations_accepted_user_id_fkey	SET NULL	FOREIGN KEY (accepted_user_id) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	user_invitations	user_invitations_invited_by_fkey	SET NULL	FOREIGN KEY (invited_by) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	vehiculos_residentes	vehiculos_residentes_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	visitantes	visitantes_pre_autorizado_por_fkey	SET NULL	FOREIGN KEY (pre_autorizado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	visitantes	visitantes_registrado_por_fkey	SET NULL	FOREIGN KEY (registrado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	visitantes	visitantes_salida_registrada_por_fkey	SET NULL	FOREIGN KEY (salida_registrada_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	visitas_control	visitas_control_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	visitas_control	visitas_control_visitado_por_fkey	SET NULL	FOREIGN KEY (visitado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	visitas_frecuentes	visitas_frecuentes_creado_por_fkey	SET NULL	FOREIGN KEY (creado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	votos_asamblea	votos_asamblea_registrado_por_fkey	SET NULL	FOREIGN KEY (registrado_por) REFERENCES auth.users(id) ON DELETE SET NULL
+auth.users	auth.identities	identities_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	auth.mfa_factors	mfa_factors_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	auth.mfa_recovery_code_sets	mfa_recovery_code_sets_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	auth.oauth_authorizations	oauth_authorizations_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	auth.oauth_consents	oauth_consents_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	auth.one_time_tokens	one_time_tokens_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	auth.sessions	sessions_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	auth.webauthn_challenges	webauthn_challenges_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	auth.webauthn_credentials	webauthn_credentials_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	device_tokens	device_tokens_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	legal_acceptances	legal_acceptances_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	notification_preferences	notification_preferences_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	rate_limit_log	rate_limit_log_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	user_notifications	user_notifications_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	user_preferences	user_preferences_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+auth.users	user_presence	user_presence_user_id_fkey	CASCADE	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE

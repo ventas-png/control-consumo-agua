@@ -15,6 +15,11 @@
 //
 // El shape que espera cada lectura lo fija el test (lista u objeto), igual que el
 // patrón `byTable` de src/domain/condominios/__tests__/tabQueries.test.ts.
+//
+// El admin expone además `auth.admin.deleteUser` y `storage.from().remove()`
+// (delete-company), y TODAS las operaciones con efecto —escrituras, RPC,
+// deleteUser, remove— se anotan en `state.secuencia` en el orden en que
+// ocurren, para que un test pueda fijar «esto, sólo después de aquello».
 
 export interface FakeWriteCall {
   table: string
@@ -51,6 +56,22 @@ export interface FakeSupabaseState {
   rpcsUsuario: Record<string, unknown>
   /** Resultado de caller.auth.getUser(). */
   auth: unknown
+  /**
+   * COLA de resoluciones por RPC, para handlers que llaman a la MISMA función
+   * varias veces con resultados distintos (delete-company: ensayo y purga).
+   * Agotada la cola, cae a `rpcs`.
+   */
+  rpcQueues: Record<string, unknown[]>
+  /** Ids pasados a admin.auth.admin.deleteUser, en orden. */
+  authAdminDeletes: string[]
+  /** Resolución de deleteUser por id (default `{ data: {}, error: null }`). */
+  authAdminResults: Record<string, unknown>
+  /** Llamadas a storage.from(bucket).remove(paths). */
+  storageRemoves: { bucket: string; paths: string[] }[]
+  /** Resolución de remove (default `{ data: [], error: null }`). */
+  storageResult: unknown
+  /** Orden de TODAS las operaciones con efecto: `insert:tabla`, `rpc:fn`, `auth.deleteUser:id`… */
+  secuencia: string[]
 }
 
 export function emptyState(): FakeSupabaseState {
@@ -58,6 +79,8 @@ export function emptyState(): FakeSupabaseState {
     byTable: {}, readQueues: {}, writes: {}, calls: [],
     rpcCalls: [], rpcs: {}, rpcsUsuario: {},
     auth: { data: { user: null }, error: null },
+    rpcQueues: {}, authAdminDeletes: [], authAdminResults: {},
+    storageRemoves: [], storageResult: null, secuencia: [],
   }
 }
 
@@ -75,13 +98,19 @@ function makeBuilder(state: FakeSupabaseState, table: string) {
   const b: Record<string, unknown> = {}
   const chain = (..._args: unknown[]) => b
   // Métodos de filtro/proyección: encadenan sin efecto.
-  for (const m of ['select', 'eq', 'neq', 'is', 'in', 'or', 'order', 'limit', 'gte', 'lte', 'abortSignal']) {
+  for (const m of ['select', 'eq', 'neq', 'is', 'not', 'in', 'or', 'order', 'limit', 'gte', 'lte', 'abortSignal']) {
     b[m] = chain
   }
   // Escrituras: registran la llamada y cambian el modo de resolución.
-  b.insert = (payload: unknown) => { op = 'insert'; state.calls.push({ table, op: 'insert', payload }); return b }
-  b.update = (payload: unknown) => { op = 'update'; state.calls.push({ table, op: 'update', payload }); return b }
-  b.delete = () => { op = 'delete'; state.calls.push({ table, op: 'delete', payload: null }); return b }
+  const anotar = (o: FakeWriteCall['op'], payload: unknown) => {
+    op = o
+    state.calls.push({ table, op: o, payload })
+    state.secuencia?.push(`${o}:${table}`)
+    return b
+  }
+  b.insert = (payload: unknown) => anotar('insert', payload)
+  b.update = (payload: unknown) => anotar('update', payload)
+  b.delete = () => anotar('delete', null)
   // Resoluciones.
   b.maybeSingle = () => Promise.resolve(resolve())
   b.single = () => Promise.resolve(resolve())
@@ -115,11 +144,32 @@ export function makeCreateClient(state: FakeSupabaseState) {
       // `admin.auth.getUser(token)` para que GoTrue reconozca al llamante ANTES
       // de abrirle un cliente propio. Comparte `state.auth` con el caller: es
       // el mismo usuario visto por el mismo GoTrue.
-      auth: { getUser: async (_token?: string) => state.auth },
+      auth: {
+        getUser: async (_token?: string) => state.auth,
+        admin: {
+          deleteUser: async (id: string) => {
+            state.authAdminDeletes.push(id)
+            state.secuencia?.push(`auth.deleteUser:${id}`)
+            return state.authAdminResults?.[id] ?? { data: {}, error: null }
+          },
+        },
+      },
       from: (table: string) => makeBuilder(state, table),
       rpc: (fn: string, args?: unknown) => {
         state.rpcCalls.push({ fn, args })
+        state.secuencia?.push(`rpc:${fn}`)
+        const cola = state.rpcQueues?.[fn]
+        if (cola && cola.length > 0) return Promise.resolve(cola.shift())
         return Promise.resolve(state.rpcs[fn] ?? FALLBACK)
+      },
+      storage: {
+        from: (bucket: string) => ({
+          remove: async (paths: string[]) => {
+            state.storageRemoves.push({ bucket, paths })
+            state.secuencia?.push(`storage.remove:${bucket}`)
+            return state.storageResult ?? { data: [], error: null }
+          },
+        }),
       },
     }
   }
