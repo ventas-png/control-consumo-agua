@@ -29,6 +29,7 @@ import { CompanyBrandingSection } from './CompanyBrandingSection'
 import { isExemptPlatformRole } from '../../lib/permissions'
 import { SsoConfigSection } from './SsoConfigSection'
 import { useFeatureFlags } from '../../lib/featureFlags'
+import { puedeCrearProyectos } from '../../domain/empresa/usuarios'
 
 interface Props {
   currentUser: UserSession
@@ -79,6 +80,7 @@ export function EmpresaSection({ currentUser }: Props) {
         companyId={companyId}
         effectiveMaxProjects={effectiveMaxProjects}
         onReload={reload}
+        puedeCrear={puedeCrearProyectos(currentUser.role)}
       />
 
       <EmpresaUsuariosSection

@@ -1,0 +1,10 @@
+-- Transacción de VARIAS sentencias (no alcanzable por PostgREST; sólo SQL directo): borrar un proyecto y después asignar sobre el SIGUIENTE (nunca sobre el que acaba de borrar: eso daría
+-- ASIGNACION_EMPRESA_DISTINTA y pgbench abortaría el cliente). Mezcla el candado de aviso con el FOR SHARE del trigger de integridad y PostgreSQL resuelve los cruces con «deadlock detected».
+\set a random(1,4)
+\set b (:a % 4) + 1
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', 'a5e00000-0000-0000-0000-000000000003', true);
+DELETE FROM public.projects WHERE id = ('b3f00000-0000-0000-0000-00000000000' || :a)::uuid;
+INSERT INTO public.user_project_assignments (user_id, project_id) VALUES ('a5e00000-0000-0000-0000-000000000022', ('b3f00000-0000-0000-0000-00000000000' || :b)::uuid) ON CONFLICT DO NOTHING;
+ROLLBACK;
