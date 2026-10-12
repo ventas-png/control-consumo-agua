@@ -148,9 +148,21 @@ echo "── 2/8 · CONTROL NEGATIVO: sin la migración, las fugas están abiert
 copia "$BD" "$BD_ANTES"
 matriz "$BD_ANTES"
 echo "   matriz: $(q "SELECT count(DISTINCT firma) FROM fos.resultados" "$BD_ANTES") funciones × 12 sesiones"
+# Fugas abiertas SIN esta migración. En el orden real de fusión (#928 → #926 → #927 → ESTA),
+# 20261027000800 (#926) ya cierra UNA: proveedor_habilitado_en para SINAPP, porque la guarda
+# nueva de proveedor_habilitado (hallazgo A4 de esa migración) devuelve false sin empresa y
+# proveedor_habilitado_en la llama. Si esa migración está en la cadena, esa fuga se exige
+# cerrada (y sólo esa); si no está, las 39 siguen abiertas.
+ESPERADAS=39
+if ls "$MIGS"/20261027000800_*.sql >/dev/null 2>&1; then ESPERADAS=38; fi
 R=$(rojos assert_cierre.sql "$BD_ANTES")
-[ "$R" = "39" ] || { echo "❌ sin la migración se esperaban las 39 fugas abiertas y hay $R"; q "SELECT msg FROM fos.fallos" "$BD_ANTES" | head; exit 1; }
-echo "  ✓ las 39 fugas de assert_cierre.sql (31 funciones) están ABIERTAS sin la migración, cada una medida:"
+[ "$R" = "$ESPERADAS" ] || { echo "❌ sin la migración se esperaban las $ESPERADAS fugas abiertas y hay $R"; q "SELECT msg FROM fos.fallos" "$BD_ANTES" | head; exit 1; }
+if [ "$ESPERADAS" = "38" ]; then
+  [ "$(q "SELECT count(*) FROM fos.fallos WHERE msg ~ 'proveedor_habilitado_en'" "$BD_ANTES")" = "0" ] \
+    || { echo "❌ con 20261027000800 en la cadena, la fuga de proveedor_habilitado_en debía estar ya cerrada"; exit 1; }
+  echo "  ✓ 20261027000800 (#926) ya cierra proveedor_habilitado_en para SINAPP; quedan 38 abiertas"
+fi
+echo "  ✓ las $R fugas de assert_cierre.sql están ABIERTAS sin la migración, cada una medida:"
 q "SELECT '      ' || left(msg, 150) FROM fos.fallos ORDER BY n LIMIT 6" "$BD_ANTES"
 echo "      … ($R en total)"
 R=$(rojos assert_tope.sql "$BD_ANTES")
