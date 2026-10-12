@@ -1,6 +1,9 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- COMPRAS · ALCANCE DE PROYECTO AL CAPTURAR Y «SIN PROYECTO» SOLO PARA PERSONAS EXENTAS (PROPUESTA, NO ES MIGRACIÓN DEL PR #926)
 --
+-- ⚠ DIFERIDO (2026-10-12) · LA VERSIÓN 20261027001000 QUEDA RETIRADA: es anterior a 20261028000000/0100 (#927), ya aplicadas en el sandbox. No hay versión
+--   reservada; al aprobarse recibe la siguiente versión libre (posterior a la última de la cadena) y antes se adapta run.sh §3 (prefijo 20261027*) y
+--   reversion_script.patch (README.md, aviso inicial). Lo que sigue describe cómo se probó el prototipo y queda como histórico.
 -- ⚠ ESTE ARCHIVO ESTÁ EN pendientes_decision/: NO se aplica con el PR #926 (tiene diez migraciones, el tope de MAX_APPLY = 10) ni se despliega.
 --   Para llevarlo: copiarlo como supabase/migrations/20261027001000_compras_alcance_proyecto_captura.sql en un PR PROPIO, con su push y su corrida de
 --   apply-migrations-prod.yml, en este orden de pushes a main (cada uno en SU push, cada uno por debajo del tope de diez):

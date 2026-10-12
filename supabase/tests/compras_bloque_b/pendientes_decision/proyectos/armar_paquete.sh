@@ -20,6 +20,12 @@
 # ============================================================================
 set -euo pipefail
 
+# DIFERIDO (2026-10-12): la versión 20261027001000 está RETIRADA (anterior a 20261028000000/0100 de #927, ya aplicadas en el
+# sandbox). No se arma el paquete con ella. Al aprobarse el bloque: asignar la siguiente versión libre, adaptar run.sh §3 y
+# reversion_script.patch, y cambiar este script (README.md, aviso inicial).
+echo "❌ paquete diferido: la versión 20261027001000 está retirada (anterior a migraciones ya aplicadas en el sandbox). Ver README.md, aviso inicial." >&2
+exit 3
+
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARBOL="${1:-}"
 [ -n "$ARBOL" ] && [ -d "$ARBOL/supabase/migrations" ] || { echo "uso: bash armar_paquete.sh <ruta-del-arbol> (un árbol del repo, con supabase/migrations)"; exit 2; }
