@@ -1,6 +1,7 @@
 # Housekeeping · evidencia fotográfica, autoría y borrado coordinado
 
-Migración: `supabase/migrations/20261028000000_housekeeping_evidencias.sql`
+Migraciones: `supabase/migrations/20261028000000_housekeeping_evidencias.sql` y
+`supabase/migrations/20261028000100_housekeeping_servicios_por_proyecto.sql` (el servicio y sus textos, acotados al proyecto)
 Pruebas: `supabase/tests/housekeeping_evidencias/run.sh` · `supabase/functions/_shared/__tests__/housekeepingLimpieza.test.ts` · `src/domain/condominios/__tests__/housekeepingEvidencias.test.ts`
 
 ## Qué hace
@@ -12,7 +13,10 @@ la autoría **no se purgan nunca**.
 ## Quién puede qué (una sola regla: `hk_acceso`)
 `hk_acceso(company_id, project_id)` = **empresa del usuario ∧ acceso al proyecto (`can_access_project`) ∧
 permiso `condominios.tab.housekeeping`** (o super_admin). La usan la tabla, el bucket y las RPC, así que
-no pueden divergir. Es la regla de escritura de `servicios_housekeeping` más el acceso al proyecto.
+no pueden divergir. Desde `20261028000100` también la usan las cuatro policies de `servicios_housekeeping`
+(la fila del servicio lleva los **textos** de evidencia y los sellos): antes bastaban empresa + permiso, y un
+operador de otro proyecto de la misma empresa leía y podía modificar esos textos (encontrado con inicio de
+sesión real en el sandbox; ver «Verificación»).
 
 | Acción | Tabla `servicio_housekeeping_fotos` | Bucket `housekeeping-evidencias` |
 |---|---|---|
@@ -64,13 +68,14 @@ estado; lo que mande el cliente se ignora, y un `UPDATE` posterior no los reescr
 reabre y se vuelve a completar, `completado_por` es quien lo hizo la última vez.
 
 ## Numeración y orden de fusión
-Va **después** de las diez migraciones de la PR #926 (`20261027000000` … `20261027000900`). Producción está
-en `20261026000500`; la guarda de migraciones intercaladas obliga a que lo nuevo sea posterior. #926 ya
-agota el tope `MAX_APPLY = 10` de `apply-migrations-prod` (se aplican las `.sql` **añadidas en ese push**),
-así que esta migración **no puede viajar en el mismo push**: entra en el suyo, el último. Orden acordado en
-#926 (cada uno en su propio push): #928 (`20261026000600`) → #926 (10) → PR de alcance por proyecto
-(`20261027001000`, futuro) → **#927 (`20261028000000`)**. Con ese orden el historial de `schema_migrations`
-queda monótono. Si #927 se fusionara antes que #926, las de #926 tendrían que renumerarse.
+Son **dos** migraciones (`20261028000000`, `20261028000100`) y van **después** de las diez de la PR #926
+(`20261027000000` … `20261027000900`). Producción está en `20261026000500`; la guarda de migraciones
+intercaladas obliga a que lo nuevo sea posterior. #926 ya agota el tope `MAX_APPLY = 10` de
+`apply-migrations-prod` (aplica las `.sql` **añadidas en ese push**), así que estas dos **no pueden viajar en el
+mismo push**: entran juntas en el suyo, el último. Orden acordado en #926 (cada uno en su propio push):
+#928 (`20261026000600`) → #926 (10) → PR de alcance por proyecto (`20261027001000`, futuro) → **#927
+(`20261028000000` + `20261028000100`)**. Con ese orden `schema_migrations` queda monótono. Si #927 se
+fusionara antes que #926, las de #926 tendrían que renumerarse.
 
 Historia: la primera versión de este PR se llamó `20261023000000` (chocaba con
 `compras_seguimiento_pendientes_por_renglon`), luego `20261023000001` y `20261027000000` (chocaba con
@@ -80,29 +85,41 @@ housekeeping, 864 versiones, máx. `20261026000500`). Estado de los entornos al 
 | Entorno | Versión de housekeeping registrada | Diseño que tiene |
 |---|---|---|
 | Producción | ninguna | — |
-| Sandbox `control-agua-rls-sandbox` | `20261028000000` (workflow `apply-migrations-sandbox`, run 38009275934) | definitivo |
+| Sandbox `control-agua-rls-sandbox` | `20261028000000` (run 38009275934) y `20261028000100` (run 38280940562), ambas con `apply-migrations-sandbox` | definitivo |
 | Preview branch de la PR (`xycrwolnonmgcygfuebe`) | `20261023000001` (**ya no existe en el repo**) | antiguo: 3 policies en la tabla, policy `hk_evidencias_delete` en el bucket, sin `hk_acceso`, sin cola, sin RPC de borrado, sin cron |
 
 ## Reconciliación del preview branch de la PR — PREPARADA, NO EJECUTADA
-Síntoma: `Remote migration versions not found in local migrations directory` — el preview tiene registrada
-`20261023000001_housekeeping_evidencias` y el repo ya no tiene ese archivo. Mientras no se reconcilie, cada
-push de la PR deja en rojo el check `Supabase Preview` (el resto de checks no depende de él).
+Síntoma (pushes del 9 y 10/10): `Remote migration versions not found in local migrations directory` — el
+preview tiene registrada `20261023000001_housekeeping_evidencias` y el repo ya no tiene ese archivo. Lo
+confirman los `workflow_run_logs` de la rama (`ERROR Remote migration versions not found…`, tras «Remote DB/
+API/Auth/Storage config is up to date»). La rama figura con estado `MIGRATIONS_FAILED` desde su creación.
+
+Síntoma nuevo (pushes del 12/10): el check falla en ~1 s con `Failed to update config for branch:
+claude/cleaning-documentation-images-85lefu` y **no deja ningún `workflow_run_logs`** en esa ventana (sí los
+hay de las corridas del 10/10): falla en el orquestador de Supabase, antes de clonar el repo. `supabase/config.toml`
+no cambió entre el 10/10 (config aplicada sin error) y el 12/10, y la rama de #926, sobre el mismo proyecto
+padre, pasó su `Supabase Preview` el 12/10 a las 16:05. No hay más detalle accesible desde aquí (el log del
+orquestador solo está en el panel Branches). Hipótesis no verificada: la rama quedó en un estado que el
+orquestador ya no actualiza. Ni un push nuevo ni la reconciliación de abajo garantizan arreglarlo; recrear
+la rama (cerrar y reabrir la PR, o borrar solo esta rama de preview) sí rehace su configuración.
 
 Reconciliación **sin resetear** el branch. Requiere autorización explícita porque borra una fila del
 registro de migraciones y escribe en la base del preview; por eso no se ha ejecutado:
 
 ```sql
--- 1) aplicar el contenido de 20261028000000_housekeeping_evidencias.sql (idempotente; converge desde el
---    estado antiguo, probado en run.sh §3). Debe terminar sin error ANTES del paso 2.
+-- 1) aplicar el contenido de 20261028000000_housekeeping_evidencias.sql y después el de
+--    20261028000100_housekeeping_servicios_por_proyecto.sql (ambos idempotentes; convergen desde el estado
+--    antiguo, probado en run.sh §3). Deben terminar sin error ANTES del paso 2.
 -- 2) mover el registro de la versión antigua a la definitiva (solo versión y nombre, como hace
 --    apply-migrations-sandbox.yml)
 BEGIN;
 DELETE FROM supabase_migrations.schema_migrations WHERE version = '20261023000001' AND name = 'housekeeping_evidencias';
-INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('20261028000000', 'housekeeping_evidencias')
+INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES
+  ('20261028000000', 'housekeeping_evidencias'), ('20261028000100', 'housekeeping_servicios_por_proyecto')
 ON CONFLICT (version) DO NOTHING;
 COMMIT;
--- 3) verificar (debe dar 1 / true / true / {hk_evidencias_insert,hk_evidencias_select}):
-SELECT (SELECT count(*) FROM supabase_migrations.schema_migrations WHERE name = 'housekeeping_evidencias'),
+-- 3) verificar (debe dar 2 / true / true / {hk_evidencias_insert,hk_evidencias_select}):
+SELECT (SELECT count(*) FROM supabase_migrations.schema_migrations WHERE name LIKE 'housekeeping\_%'),
        to_regprocedure('public.hk_acceso(uuid,uuid)') IS NOT NULL,
        to_regclass('public.hk_limpieza_storage') IS NOT NULL,
        (SELECT array_agg(policyname::text ORDER BY policyname) FROM pg_policies
@@ -116,46 +133,96 @@ Producción no necesita reconciliación: nunca tuvo la versión antigua.
 
 ## Despliegue
 1. Fusionar #928 y #926 en sus propios pushes y aplicar sus migraciones (`apply-migrations-prod`).
-2. Fusionar esta PR **en un push aparte**; `apply-migrations-prod` aplica `20261028000000` (1 archivo);
-   `deploy-functions` despliega `housekeeping-limpieza` y la nueva `purgar-fotos-registros`.
+2. Fusionar esta PR **en un push aparte**; `apply-migrations-prod` aplica `20261028000000` y `20261028000100`
+   (2 archivos); `deploy-functions` despliega `housekeeping-limpieza` y la nueva `purgar-fotos-registros`.
 3. **Manual, ya pendiente**: crear los secretos de Vault `purga_fotos_url` y `purga_fotos_service_key`
    (`docs/PURGA_FOTOS_SCHEDULE.md`). Sin ellos la cola solo se drena al borrar (desde la pantalla), no cada hora.
 
 ## Verificación en el sandbox existente (sin resetearlo)
-Versión realmente aplicada (leída de `supabase_migrations.schema_migrations` el 2026-10-12): `20261028000000
-housekeeping_evidencias`, junto a las diez de #926 (`20261027000000`…`000900`). Los seis guiones
-`sandbox_housekeeping_parte1..6.sql` (generados por `generar_guion_sandbox.py`) se ejecutaron uno por uno;
-cada uno termina SIEMPRE con una excepción que revierte todo, y tras cada pasada se comprobó que no quedaba
-residuo (0 empresas/usuarios de prueba, 0 fotos, 0 objetos, 0 filas en la cola, sin esquema `hkt`):
+### Versión aplicada, funciones, cron y Vault (2026-10-12)
+- `supabase_migrations.schema_migrations` del sandbox: `20261028000000 housekeeping_evidencias` y
+  `20261028000100 housekeeping_servicios_por_proyecto`, junto a las diez de #926.
+- **Edge Functions desplegadas en el sandbox** (no estaban): `housekeeping-limpieza` (v1) y
+  `purgar-fotos-registros` (v1), ambas `verify_jwt = false` como en `config.toml` (validan el token a mano).
+  Se subieron con la herramienta de Supabase desde los archivos del repo; en `_shared/cors.ts` y
+  `_shared/housekeepingLimpieza.ts` se omitieron solo comentarios (código idéntico).
+- **Cron** activo: `hk_limpieza_storage_hourly` (`17 * * * *`) y `purgar_fotos_storage_monthly` (`30 3 1 * *`).
+- **Vault**: `purga_fotos_url` creado (apunta a la función del sandbox; no es secreto).
+  `purga_fotos_service_key` **NO** está configurado: la service key no se puede obtener por ninguna vía de esta
+  sesión sin exponerla, y un workflow temporal que la leyera del entorno `sandbox-db` quedó bloqueado por la
+  política de seguridad de la sesión (no se subió). Hasta que alguien con acceso la cargue (panel → SQL:
+  `select vault.create_secret('<service_role key>', 'purga_fotos_service_key');`), el cron horario es un no-op
+  seguro y la cola se drena cuando la pantalla llama a `housekeeping-limpieza` tras cada borrado (probado abajo).
+  Ojo: con la key cargada, `purgar_fotos_storage_monthly` también purgará en el sandbox las fotos de
+  lecturas (> 90 d) y de fichajes (> 365 d) el día 1.
 
-| Parte | Cubre | Resultado |
+### Guiones SQL reversibles (sesión simulada con `SET ROLE` + claim del JWT)
+Seis guiones `sandbox_housekeeping_parte1..6.sql` (generados por `generar_guion_sandbox.py`); cada uno termina
+SIEMPRE con una excepción que revierte todo y tras cada pasada no queda residuo.
+
+| Parte | Cubre | Sandbox |
 |---|---|---|
-| 1 | visibilidad por persona (A), subida y autoría sellada (B), rutas manipuladas y tope de 60 objetos (C), sin UPDATE de clientes (D), sellos iniciado/completado (E) | 52/52 |
-| 2 | tope de 20 por fase (F), inventario de policies/privilegios/bucket (J) | 12/12 |
-| 3 | borrado de una foto por RPC (G) | 12/12 |
-| 4 | borrado de un servicio con fotos, cascada y cola (G) | 9/9 |
-| 5 | cola: arrendamiento, reintentos con espera creciente, atascadas, cero filas, permisos (H) | 19/19 |
-| 6 | huérfanas, retención: la purga conserva textos y sellos (H, I) | 9/9 |
+| 1 | visibilidad (A), subida y autoría (B), rutas manipuladas y tope de 60 objetos (C), sin UPDATE (D), sellos (E) | 52/52 (tras `…000100`) |
+| 2 | tope de 20 por fase (F), inventario (J), **servicio acotado al proyecto (K)** | 24/24 (tras `…000100`) |
+| 3 | borrado de una foto por RPC (G) | 12/12 (antes de `…000100`) |
+| 4 | borrado de un servicio con fotos, cascada y cola (G) | 9/9 (antes de `…000100`) |
+| 5 | cola: arrendamiento, reintentos, atascadas, cero filas, permisos (H) | 19/19 (antes de `…000100`) |
+| 6 | huérfanas; la purga conserva textos y sellos (H, I) | 9/9 (antes de `…000100`) |
 
-Total 113/113. Aclaraciones honestas:
-- La «sesión» es `SET ROLE authenticated/anon/service_role` con `request.jwt.claim.sub` (lo que hace PostgREST
-  tras validar el JWT). No hay inicio de sesión real por HTTP: no hay credenciales E2E de la aplicación.
-- La concurrencia de 20 fotos por fase no cabe en una sentencia: se prueba con dos sesiones reales en un
-  PostgreSQL desechable (`run.sh` §5) y el tope secuencial se comprueba en el sandbox (parte 2).
-- Las comprobaciones que ejecutan `DELETE`/`TRUNCATE` directos (D2, D4, G11, G12, G29–G31) solo corren en el
-  PostgreSQL local: la herramienta SQL del entorno retiene ese tipo de sentencias. En el sandbox el borrado se
-  ejercita por las RPC (`hk_eliminar_foto`, `hk_eliminar_servicio`), que es la única vía de los clientes.
-- El `UPDATE` que adelanta el reintento de la cola se acota a las empresas de prueba (`WHERE company_id IN …`).
-- Edge Functions: `housekeeping-limpieza` y `purgar-fotos-registros` **no están desplegadas en el sandbox**
-  (solo `timbrar-documento`, `invite-user`, `accept-invitation`, `delete-user`); `deploy-functions` solo
-  publica en producción al fusionar en main. La lógica de drenaje se prueba con dobles (17 tests vitest).
-- Cron: `hk_limpieza_storage_hourly` (`17 * * * *`) y `purgar_fotos_storage_monthly` están activos en el sandbox.
-- Vault: los secretos `purga_fotos_url` y `purga_fotos_service_key` **no existen** en el sandbox (comprobado
-  solo por nombre, sin leer valores). Sin ellos el cron no puede invocar las funciones.
+Las partes 3–6 solo cambiaron en el preflight; con las dos migraciones pasan en el PostgreSQL local (`run.sh`
+§7: 125/125). D2, D4, G11, G12, G29–G31, K12 y K13 (DELETE/TRUNCATE directos, residente) solo corren en local:
+la herramienta SQL del entorno retiene ese tipo de sentencias.
+
+### Inicio de sesión REAL (GoTrue, contraseña) en Chromium con los módulos reales de la app
+Cuatro usuarios de prueba (`zz-hk-e2e-*@example.invalid`): dueña de la empresa A, operador de A1, operador de
+A2 (misma empresa, otro proyecto) y admin de la empresa B. El navegador carga un paquete con el cliente
+Supabase, el dominio (`housekeepingEvidencias`, `tabMutations`) y el generador de PDF **reales**; no se usó la
+pantalla React (los previews de Vercel no son alcanzables desde este entorno), así que no se probó el clic en
+los botones, sí todo lo que esos botones llaman.
+
+| # | Resultado |
+|---|---|
+| Subida | 20 fotos de ingreso (comprimidas en el navegador: 225 KB → 82 KB, 1280×960) + 3 de cierre; la 21.ª rechazada («Máximo 20 fotos por fase») |
+| Autoría | `creado_por`, `iniciado_por`, `completado_por` = el operador que actuó; un UPDATE del cliente no los reescribe |
+| Visualización | el operador de A1 y la dueña ven las 23 fotos y las descargan |
+| PDF | 980 KB, 2 páginas, 23 fotos descargadas del bucket, textos y autoría (`informe-sandbox.pdf`, revisado a ojo) |
+| Aislamiento A2 / B | no ven el servicio ni sus textos, 0 fotos, no descargan, no listan la carpeta, no suben, no insertan filas, no borran (RPC «inexistente»), no crean ni modifican servicios de A1 |
+| Borrado | el operador no borra en un servicio completado (42501); el borrado directo en Storage borra 0; la dueña borra una foto y el servicio (21 archivos) por RPC; la limpieza real responde `ok` y los archivos dejan de existir |
+| Drenaje y empresa | la limpieza disparada por B toma 0 filas de A; la de A retira sus 2 huérfanos (la foto 21 rechazada y un objeto sin fila) |
+| Reintentos | una fila de la cola que apunta a otro bucket no se borra: queda como fallo con `intentos = 1`, error guardado y reintento a ~5 min; mientras espera no se vuelve a tomar |
+
+**Dos hallazgos de esta prueba, corregidos en el PR:**
+1. *Textos del servicio visibles y editables desde otro proyecto* → `20261028000100` (bloque K: 14 pruebas;
+   en el sandbox, A2 pasó de ver el servicio de A1 a no verlo).
+2. *Caché del navegador entre sesiones*: Storage sirve los objetos privados con `Cache-Control: public,
+   max-age=3600` y sin `Vary`. En el mismo navegador, tras cambiar de usuario, Chromium devolvió desde caché fotos
+   que el usuario anterior había visto, aunque el servidor se las deniega (HTTP 400). Las fotos se suben ahora
+   con `cacheControl: '0'` (`public, max-age=0`, comprobado): el navegador revalida con el token vigente y el
+   usuario siguiente ya no las recibe (comprobado en el mismo perfil de navegador).
+
+### Datos de prueba que quedaron en el sandbox
+Las fotos, servicios y archivos de la prueba se borraron por las RPC y la limpieza (bucket y cola en 0). Los
+4 usuarios, 2 empresas, 3 proyectos y 1 rol `ZZ HK E2E` **siguen** porque la herramienta SQL retiene los
+`DELETE`; los usuarios están **bloqueados** (`banned_until` 2999, contraseña aleatoria desconocida). Para
+retirarlos (requiere confirmación):
+
+```sql
+BEGIN;
+DELETE FROM public.user_roles       WHERE role_id = 'e2e0001e-0000-4000-8000-0000000000a8';
+DELETE FROM public.role_permissions WHERE role_id = 'e2e0001e-0000-4000-8000-0000000000a8';
+DELETE FROM public.roles            WHERE id      = 'e2e0001e-0000-4000-8000-0000000000a8';
+DELETE FROM public.app_users        WHERE id::text LIKE 'e2e00000-0000-4000-8000-%';
+DELETE FROM auth.identities         WHERE user_id::text LIKE 'e2e00000-0000-4000-8000-%';
+DELETE FROM auth.users              WHERE id::text LIKE 'e2e00000-0000-4000-8000-%';
+DELETE FROM public.projects         WHERE id::text LIKE 'e2e000__-0000-4000-8000-%';
+DELETE FROM public.companies        WHERE id::text LIKE 'e2e0000_-0000-4000-8000-%';
+COMMIT;
+```
 
 ## Límites conocidos
 - Los residentes ven los **textos** (`hallazgos_ingreso`, `observaciones_cierre`) del servicio de su unidad
-  porque la policy previa de `servicios_housekeeping` les da lectura de esa fila. Las fotos no.
+  (rama de residente de la policy de `servicios_housekeeping`, sin cambios). Las fotos no.
+- Las fotos subidas antes de `cacheControl: '0'` (solo en entornos de prueba) conservan `max-age=3600`.
 - Un objeto subido cuyo registro de fila falla queda sin fila hasta que el barrido horario lo retira
   (pasado un día); mientras tanto ocupa espacio y cuenta para el tope de 60 objetos por servicio.
 - La concurrencia del tope de 20 se prueba con sesiones reales en PostgreSQL 16 desechable, no en PG17 ni

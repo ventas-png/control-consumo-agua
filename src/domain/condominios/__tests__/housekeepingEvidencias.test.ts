@@ -145,6 +145,12 @@ describe('subirFotoServicio', () => {
     expect(r.error).toBeNull()
     expect(uploadMedia.mock.calls[0][1]).toMatch(/^proy\/serv\//)
   })
+  it('sube con max-age=0: el navegador no reutiliza la foto sin revalidarla con la sesión vigente', async () => {
+    uploadMedia.mockResolvedValue({ data: { path: 'ok' }, error: null })
+    insertFoto.mockResolvedValue({ data: { id: 'n1' }, error: null })
+    await subirFotoServicio({ projectId: 'proy', servicioId: 'serv', fase: 'ingreso', file })
+    expect(uploadMedia.mock.calls[0][3]).toEqual({ contentType: 'image/jpeg', upsert: false, cacheControl: '0' })
+  })
   it('si el registro de la fila falla NO intenta borrar el objeto (lo retira el barrido de huérfanos)', async () => {
     uploadMedia.mockResolvedValue({ data: { path: 'ok' }, error: null })
     insertFoto.mockResolvedValue({ data: null, error: { message: 'Máximo 20 fotos por fase' } })

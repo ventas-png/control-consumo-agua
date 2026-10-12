@@ -59,7 +59,8 @@ export async function generarInformeHousekeepingPdf(d: DatosInformeHK): Promise<
   const s = d.servicio
   texto(d.empresa ?? 'Informe de housekeeping', 15, true)
   texto(`${d.tipoLabel} — ${s.unidad_nombre ?? 'Sin unidad específica'}`, 12, true)
-  texto(`Fecha: ${s.fecha}    Horario: ${s.hora_inicio ?? '?'} – ${s.hora_fin ?? '?'}    Estado: ${d.estadoLabel}`)
+  // Postgres devuelve `time` como HH:MM:SS; en el informe basta HH:MM.
+  texto(`Fecha: ${s.fecha}    Horario: ${s.hora_inicio?.slice(0, 5) ?? '?'} – ${s.hora_fin?.slice(0, 5) ?? '?'}    Estado: ${d.estadoLabel}`)
   if (s.responsable) texto(`Responsable: ${s.responsable}`)
   texto(`Iniciado por: ${d.iniciadoPor ?? '—'} (${fmtFechaHora(s.iniciado_en)})`)
   texto(`Completado por: ${d.completadoPor ?? '—'} (${fmtFechaHora(s.completado_en)})`)

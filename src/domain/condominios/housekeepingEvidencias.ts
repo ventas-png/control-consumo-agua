@@ -47,7 +47,11 @@ export async function subirFotoServicio(args: {
   }
   // Exactamente <project>/<servicio>/<archivo>: lo que exigen las policies.
   const path = buildUploadPath(`${projectId}/${servicioId}`, file.name, 'jpg')
-  const up = await uploadMedia(BUCKET_HOUSEKEEPING, path, blob, { contentType: 'image/jpeg', upsert: false })
+  // max-age=0: Storage sirve los objetos privados con `Cache-Control: public` y sin `Vary`, así
+  // que con el valor por defecto (3600 s) el navegador reutilizaría la foto para OTRA sesión del
+  // mismo equipo sin preguntar al servidor (reproducido en el sandbox, PR #927). Con 0 la
+  // revalida con el token vigente y el servidor aplica la policy.
+  const up = await uploadMedia(BUCKET_HOUSEKEEPING, path, blob, { contentType: 'image/jpeg', upsert: false, cacheControl: '0' })
   if (up.error) return { data: null, error: up.error }
 
   const { data, error } = await supabase
