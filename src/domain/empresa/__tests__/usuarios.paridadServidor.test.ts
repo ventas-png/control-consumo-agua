@@ -10,7 +10,7 @@ import {
 } from '../usuarios'
 import { isPrincipalRole as principalCreate, canCreateRole, createRoleDenial } from '../../../../supabase/functions/create-user/validate'
 import { isPrincipalRole as principalInvite, canInviteRole } from '../../../../supabase/functions/invite-user/validate'
-import { DELETABLE_ROLES, checkDeleteTargetGate, isSuperAdminRole } from '../../../../supabase/functions/delete-user/validate'
+import { DELETABLE_ROLES, canManageUsers, checkDeleteTargetGate, isSuperAdminRole } from '../../../../supabase/functions/delete-user/validate'
 
 const ROLES_CHECK_PRODUCCION = ['super_admin', 'superadmin', 'company_owner', 'admin', 'operator', 'user', 'viewer', 'visor', 'operador', 'cliente', 'collector']
 // lo que ESPERA el servidor (is_super_admin() OR is_company_owner())
@@ -63,34 +63,80 @@ describe('paridad del principal entre cliente, create-user, invite-user y el ser
   })
 })
 
-describe('puedeEliminarUsuario espeja el gate de delete-user (checkDeleteTargetGate) para todos los pares de roles del CHECK', () => {
+describe('puedeEliminarUsuario espeja el gate de delete-user (canManageUsers && checkDeleteTargetGate) para todos los pares de roles del CHECK', () => {
+  // lo que decide el servidor: canManageUsers(actor) (403 «Insufficient permissions») y luego checkDeleteTargetGate con la empresa del llamador y la del objetivo
+  const servidor = (actor: string, callerCompanyId: string | null, objetivo: string, targetCompanyId: string | null) =>
+    canManageUsers(actor) && checkDeleteTargetGate({ isSuperAdmin: isSuperAdminRole(actor), callerRole: actor, callerCompanyId, target: { role: objetivo, company_id: targetCompanyId } }).ok
+  const cliente = (actor: string, callerCompanyId: string | null, objetivo: string, targetCompanyId: string | null) =>
+    puedeEliminarUsuario({ role: actor, company_id: callerCompanyId }, { role: objetivo, company_id: targetCompanyId })
+
   it('la lista de roles eliminables del cliente es la del servidor', () => {
     expect([...ROLES_ELIMINABLES].sort()).toEqual([...DELETABLE_ROLES].sort())
   })
 
-  // misma empresa en los dos lados: aquí sólo se compara la parte de ROLES (la de empresa la decide el servidor y la pantalla sólo lista a la propia)
+  // misma empresa en los dos lados: la parte de ROLES, par a par
   for (const actor of ROLES_CHECK_PRODUCCION) {
     for (const objetivo of ROLES_CHECK_PRODUCCION) {
       it(`actor «${actor}» → objetivo «${objetivo}»`, () => {
-        const sirveParaBorrar = ['super_admin', 'superadmin', 'company_owner', 'admin'].includes(actor)          // canManageUsers
-        const gate = checkDeleteTargetGate({ isSuperAdmin: isSuperAdminRole(actor), callerRole: actor, callerCompanyId: 'c1', target: { role: objetivo, company_id: 'c1' } })
-        expect(puedeEliminarUsuario(actor, objetivo)).toBe(sirveParaBorrar && gate.ok)
+        expect(cliente(actor, 'c1', objetivo, 'c1')).toBe(servidor(actor, 'c1', objetivo, 'c1'))
       })
     }
   }
 
+  // VEDGE-06: la parte de EMPRESA. El servidor deniega a quien no es superadministrador sin empresa (company_id null o '': V8-06 b, null === null dejaba borrar) y
+  // fuera de la suya; el cliente no recibía la empresa y ofrecía «Eliminar» igual. Los 121 pares por cada combinación (empresa del llamador, empresa del objetivo).
+  const COMBINACIONES_EMPRESA: Array<[string, string | null, string | null]> = [
+    ['misma empresa', 'c1', 'c1'],
+    ['llamador sin empresa (null)', null, 'c1'],
+    ["llamador con empresa vacía ('')", '', 'c1'],
+    ['llamador de otra empresa', 'c2', 'c1'],
+    ['los dos sin empresa (null, null)', null, null],
+    ["los dos con empresa vacía ('', '')", '', ''],
+    ['objetivo sin empresa (null)', 'c1', null],
+    ["objetivo con empresa vacía ('')", 'c1', ''],
+  ]
+  it.each(COMBINACIONES_EMPRESA)('%s: los 121 pares de roles coinciden con el servidor (0 divergencias)', (_etq, callerCompanyId, targetCompanyId) => {
+    const divergencias: string[] = []
+    let pares = 0
+    for (const actor of ROLES_CHECK_PRODUCCION) {
+      for (const objetivo of ROLES_CHECK_PRODUCCION) {
+        pares++
+        const s = servidor(actor, callerCompanyId, objetivo, targetCompanyId)
+        if (cliente(actor, callerCompanyId, objetivo, targetCompanyId) !== s) divergencias.push(`${actor} → ${objetivo}: servidor ${s}`)
+      }
+    }
+    expect(pares).toBe(121)
+    expect(divergencias).toEqual([])
+  })
+
+  it('fuera de la propia empresa, o sin empresa, sólo el superadministrador elimina (con cualquier grafía histórica)', () => {
+    for (const [, callerCompanyId, targetCompanyId] of COMBINACIONES_EMPRESA.slice(1)) {
+      for (const actor of ROLES_CHECK_PRODUCCION) {
+        expect(cliente(actor, callerCompanyId, 'operator', targetCompanyId)).toBe(actor === 'super_admin' || actor === 'superadmin')
+      }
+    }
+  })
+
   it('un administrador no elimina a otro administrador; el propietario y el superadministrador sí', () => {
-    expect(puedeEliminarUsuario('admin', 'admin')).toBe(false)
-    expect(puedeEliminarUsuario('company_owner', 'admin')).toBe(true)
-    expect(puedeEliminarUsuario('super_admin', 'admin')).toBe(true)
-    expect(puedeEliminarUsuario('admin', 'operator')).toBe(true)
+    expect(cliente('admin', 'c1', 'admin', 'c1')).toBe(false)
+    expect(cliente('company_owner', 'c1', 'admin', 'c1')).toBe(true)
+    expect(cliente('super_admin', 'c1', 'admin', 'c1')).toBe(true)
+    expect(cliente('admin', 'c1', 'operator', 'c1')).toBe(true)
+  })
+
+  it('el propietario sin empresa (null, undefined o vacía) no elimina a nadie; el superadministrador sin empresa sí', () => {
+    for (const company_id of [null, undefined, '']) {
+      expect(puedeEliminarUsuario({ role: 'company_owner', company_id }, { role: 'operator', company_id })).toBe(false)
+      expect(puedeEliminarUsuario({ role: 'admin', company_id }, { role: 'operator', company_id })).toBe(false)
+      expect(puedeEliminarUsuario({ role: 'super_admin', company_id }, { role: 'operator', company_id: 'c1' })).toBe(true)
+    }
   })
 
   it('sin rol (null/undefined) nadie elimina ni se elimina', () => {
-    expect(puedeEliminarUsuario(null, 'operator')).toBe(false)
-    expect(puedeEliminarUsuario(undefined, 'operator')).toBe(false)
-    expect(puedeEliminarUsuario('company_owner', null)).toBe(false)
-    expect(puedeEliminarUsuario('company_owner', undefined)).toBe(false)
+    expect(puedeEliminarUsuario({ role: null, company_id: 'c1' }, { role: 'operator', company_id: 'c1' })).toBe(false)
+    expect(puedeEliminarUsuario({ role: undefined, company_id: 'c1' }, { role: 'operator', company_id: 'c1' })).toBe(false)
+    expect(puedeEliminarUsuario({ role: 'company_owner', company_id: 'c1' }, { role: null, company_id: 'c1' })).toBe(false)
+    expect(puedeEliminarUsuario({ role: 'company_owner', company_id: 'c1' }, { role: undefined, company_id: 'c1' })).toBe(false)
   })
 })
 

@@ -14,8 +14,9 @@
 //   4. Inserta la fila en user_invitations (service_role; revoca los pending
 //      previos al MISMO correo en la company — comparación exacta del correo en
 //      minúsculas, sin comodines —, y si quien llama no es el principal NO revoca
-//      los de rol 'admin': son del propietario). Si la lectura de pendientes o el
-//      INSERT fallan, 500 con un mensaje genérico (el detalle, al registro).
+//      los de rol 'admin': son del propietario). Si la lectura de pendientes, su
+//      revocación o el INSERT fallan, 500 con un mensaje genérico (el detalle, al
+//      registro); si falla la revocación no se inserta.
 //   5. Envía el correo de invitación reusando send-email (template genérico
 //      `notificacion_empresa` con CTA → /aceptar-invitacion?token=...), desde
 //      la cuenta de Gmail de la empresa. Fire-and-forget: si falla el correo
@@ -194,13 +195,21 @@ Deno.serve(async (req: Request) => {
       email,
       isPrincipalRole(callerRole),
     )
+    // Si la revocación falla también se aborta, SIN insertar (VEDGE-04): antes se ignoraba su error y se intentaba el INSERT; con la pendiente aún viva, el índice
+    // único lo rechazaba y el principal recibía el 409 «otra invitación acaba de crearse», que es falso (la que choca es la suya, que no se pudo revocar).
     if (idsRevocar.length > 0) {
-      await adminClient
+      const { error: revocarErr } = await adminClient
         .from('user_invitations')
         .update({ status: 'revoked' })
         .eq('company_id', companyId)
         .eq('status', 'pending')
         .in('id', idsRevocar)
+      if (revocarErr) {
+        console.error('[invite-user] no se pudieron revocar las invitaciones pendientes:', registroErrorBd(revocarErr))
+        return new Response(JSON.stringify({ error: MSG_NO_SE_PUDO_CREAR }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     // 3. Crea la invitación con token + expiración.

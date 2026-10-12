@@ -247,7 +247,11 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
   // Who can permanently delete users, and which target roles are deletable.
   // Mirrors the server-side checks in the delete-user edge function so the button
   // only appears when the action would actually succeed.
-  // La decisión «¿se ofrece Eliminar sobre esta persona?» es puedeEliminarUsuario (espejo de checkDeleteTargetGate): un administrador ya no elimina a otro administrador (E-07).
+  // La decisión «¿se ofrece Eliminar sobre esta persona?» es puedeEliminarUsuario (espejo de checkDeleteTargetGate): un administrador ya no elimina a otro administrador (E-07)
+  // y quien no es superadministrador y no tiene empresa no elimina a nadie (VEDGE-06). La empresa de cada fila es la de la sesión: la lista la lee
+  // useEmpresaSectionDataQuery filtrada por currentUser.company_id (EmpresaSection), así que no hace falta traer app_users.company_id fila por fila.
+  const permisoEliminar = (u: Usuario) =>
+    puedeEliminarUsuario({ role: currentUser.role, company_id: currentUser.company_id }, { role: u.role, company_id: currentUser.company_id })
   // ¿Puede quien mira cambiar los proyectos de esa fila? Sólo el principal (ver puedeEditarAsignaciones); el motivo distingue la autoedición del resto.
   const permisoAcceso = (u: Usuario) => puedeEditarAsignaciones({ id: currentUser.user_id, role: currentUser.role }, u)
 
@@ -466,7 +470,7 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
                   >
                     {u.activo ? 'Desactivar' : 'Activar'}
                   </button>
-                  {puedeEliminarUsuario(currentUser.role, u.role) && (
+                  {permisoEliminar(u) && (
                     <button
                       onClick={() => void eliminarUsuario(u)}
                       title="Eliminar definitivamente"

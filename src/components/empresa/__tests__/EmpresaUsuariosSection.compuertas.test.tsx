@@ -2,7 +2,7 @@
 //  · «Nuevo Usuario» del propietario: orden create-user → rol de plantilla → user_roles, con promesas controladas; el tier de plataforma de un «Admin de Agua» es operator;
 //  · el error de insertUserRoles ya NO se ignora: si el servidor rechaza la asignación de roles la pantalla no dice «Usuario creado» como éxito (E-05);
 //  · «Nuevo Usuario» y «Activar/Desactivar» se deshabilitan con la explicación para quien no es el principal, y forzar el manejador del botón tampoco escribe;
-//  · «Eliminar» sigue el gate de delete-user: un administrador no elimina a otro administrador (E-07).
+//  · «Eliminar» sigue el gate de delete-user: un administrador no elimina a otro administrador (E-07) y sin empresa nadie salvo el superadministrador (VEDGE-06).
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react'
 
@@ -54,11 +54,11 @@ const USUARIOS = [
   { id: 'u-op', full_name: 'Operadora', role: 'operator', activo: true },
 ]
 
-function montar(rol: string, onReload: () => void = () => {}) {
+function montar(rol: string, onReload: () => void = () => {}, sesion: { company_id?: string } = {}) {
   cleanup()
   render(
     <EmpresaUsuariosSection
-      currentUser={{ user_id: 'u-yo', email: '', name: 'Yo Mismo', role: rol, company_id: 'c1', login_time: '', expires_at: '' } as never}
+      currentUser={{ user_id: 'u-yo', email: '', name: 'Yo Mismo', role: rol, company_id: 'c1', login_time: '', expires_at: '', ...sesion } as never}
       usuarios={USUARIOS as never}
       proyectos={[]}
       onReload={onReload}
@@ -190,5 +190,16 @@ describe('quien NO es el principal y llega a la sección (defensa en profundidad
     expect(screen.queryAllByRole('button', { name: /Eliminar/ })).toHaveLength(0)
     montar('company_owner')
     expect(screen.getAllByRole('button', { name: /Eliminar/ })).toHaveLength(3)
+  })
+
+  it('«Eliminar» (VEDGE-06): la pantalla pasa la empresa de la sesión; sin empresa (sin company_id o vacía) ni el propietario ni el administrador lo ven, el superadministrador sí', () => {
+    for (const sinEmpresa of [{ company_id: undefined }, { company_id: '' }]) {
+      montar('company_owner', () => {}, sinEmpresa)
+      expect(screen.queryAllByRole('button', { name: /Eliminar/ })).toHaveLength(0)
+      montar('admin', () => {}, sinEmpresa)
+      expect(screen.queryAllByRole('button', { name: /Eliminar/ })).toHaveLength(0)
+      montar('super_admin', () => {}, sinEmpresa)
+      expect(screen.getAllByRole('button', { name: /Eliminar/ })).toHaveLength(3)
+    }
   })
 })

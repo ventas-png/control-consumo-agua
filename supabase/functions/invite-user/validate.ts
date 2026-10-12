@@ -16,7 +16,7 @@ export const ROLES_SOLO_PRINCIPAL = ['admin']
 
 export const MSG_SOLO_PRINCIPAL_ADMIN = 'Solo el propietario de la empresa puede invitar administradores.'
 
-// Fallo de la base de datos al leer las pendientes o al insertar: mensaje genérico al cliente (el detalle va al registro con registroErrorBd).
+// Fallo de la base de datos al leer las pendientes, al revocarlas o al insertar: mensaje genérico al cliente (el detalle va al registro con registroErrorBd).
 export const MSG_NO_SE_PUDO_CREAR = 'No se pudo crear la invitación. Intenta de nuevo.'
 
 // 409 por el índice único (empresa, correo) entre las pendientes. Para quien NO es el principal, la que queda es la invitación 'admin' del propietario (no

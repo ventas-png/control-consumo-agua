@@ -50,6 +50,18 @@ function como(role: string | null, company: string | null = C) {
 const inserts = () => h.st.writes.filter(w => w.table === 'user_invitations' && w.op === 'insert')
 const updates = () => h.st.writes.filter(w => w.table === 'user_invitations' && w.op === 'update')
 const pendiente = (id: string, email: string, role: string) => ({ id, email, role })
+// El doble devuelve el MISMO resultado a todas las escrituras de una tabla; para que la revocación (UPDATE) y el INSERT respondan distinto se decide por la última
+// escritura registrada sobre user_invitations (el doble la registra al llamar a .update()/.insert(), antes de resolver la promesa).
+function escriturasInvitacionesPorOperacion(r: { update: unknown; insert: unknown }) {
+  Object.defineProperty(h.st.escrituras, 'user_invitations', {
+    configurable: true,
+    enumerable: true,
+    get: () => {
+      const propias = h.st.writes.filter(w => w.table === 'user_invitations')
+      return propias.length > 0 && propias[propias.length - 1].op === 'update' ? r.update : r.insert
+    },
+  })
+}
 
 describe('invite-user · el administrador NO invita administradores (variantes del rol)', () => {
   it('admin + role=admin: 403 con el motivo, sin revocar ni insertar nada', async () => {
@@ -255,7 +267,7 @@ describe('invite-user · la revocación de pendientes del mismo correo (service_
   }
 })
 
-describe('invite-user · los fallos de la base de datos fallan CERRADO y no filtran detalles (V8-07 B4, V8-08)', () => {
+describe('invite-user · los fallos de la base de datos fallan CERRADO y no filtran detalles (V8-07 B4, V8-08, VEDGE-04)', () => {
   it('si la lectura de las invitaciones pendientes falla: 500 genérico, sin revocar ni insertar nada (antes se trataba como «no hay pendientes» y se insertaba)', async () => {
     const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
@@ -263,18 +275,73 @@ describe('invite-user · los fallos de la base de datos fallan CERRADO y no filt
         Object.assign(h.st, estadoVacio())
         h.st.escrituras.user_invitations = { data: { id: 'inv-1' }, error: null }
         como(rol, empresa)
-        h.st.lecturas.user_invitations = { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout (detalle interno)' } }
+        // details y hint con el correo invitado (V14): al registro van sólo el código y el mensaje (registroErrorBd), nunca el error completo
+        h.st.lecturas.user_invitations = {
+          data: null,
+          error: { code: '57014', message: 'canceling statement due to statement timeout (detalle interno)', details: 'Key (company_id, email)=(company-C, nuevo@ejemplo.com)', hint: 'nuevo@ejemplo.com' },
+        }
         const r = await llamar(cuerpo('operator', empresa ? {} : { company_id: D }))
         expect(r.status).toBe(500)
         const texto = await r.text()
         expect(JSON.parse(texto)).toEqual({ error: 'No se pudo crear la invitación. Intenta de nuevo.' })
-        expect(texto).not.toMatch(/timeout|detalle interno|57014/)
+        expect(texto).not.toMatch(/timeout|detalle interno|57014|nuevo@ejemplo\.com/i)
         expect(h.st.writes).toHaveLength(0)
       }
-      expect(consola).toHaveBeenCalled()
+      expect(consola).toHaveBeenCalledTimes(3)
+      expect(consola).toHaveBeenCalledWith('[invite-user] no se pudieron leer las invitaciones pendientes:', { code: '57014', message: 'canceling statement due to statement timeout (detalle interno)' })
+      expect(JSON.stringify(consola.mock.calls)).not.toMatch(/nuevo@ejemplo\.com/i)
     } finally {
       consola.mockRestore()
     }
+  })
+
+  // VEDGE-04: el UPDATE que revoca las pendientes del correo no comprobaba su error. Si fallaba se intentaba igualmente el INSERT: con la pendiente aún viva el índice
+  // único lo rechazaba y el principal recibía el 409 «otra invitación acaba de crearse» (falso: la que choca es la suya, que no se pudo revocar), o, sin choque,
+  // quedaban dos pendientes para el mismo correo. Ahora falla CERRADO: 500 genérico y ningún INSERT.
+  it('si la revocación de las pendientes del correo falla: 500 genérico y NO se inserta (ni el 409 falso «otra invitación acaba de crearse» ni una segunda pendiente)', async () => {
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const errRevocar = { code: '42501', message: 'permission denied for table user_invitations', details: 'Failing row contains (inv-op, company-C, nuevo@ejemplo.com, operator, pending)', hint: 'nuevo@ejemplo.com' }
+    const choque = { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "uq_user_invitations_pending_email"' } }
+    const insertBien = { data: { id: 'inv-1' }, error: null }
+    let casos = 0
+    try {
+      for (const [rol, empresa] of [['company_owner', C], ['super_admin', null], ['superadmin', null], ['admin', C]] as Array<[string, string | null]>) {
+        // lo que habría devuelto el INSERT de no abortar: el choque con la pendiente que no se revocó, o éxito (dos pendientes para el mismo correo)
+        for (const resultadoInsert of [choque, insertBien]) {
+          Object.assign(h.st, estadoVacio())
+          h.st.lecturas.companies = { data: { nombre: 'Empresa C', logo_url: '' }, error: null }
+          como(rol, empresa)
+          h.st.lecturas.user_invitations = { data: [pendiente('inv-op', 'nuevo@ejemplo.com', 'operator')], error: null }
+          escriturasInvitacionesPorOperacion({ update: { data: null, error: errRevocar }, insert: resultadoInsert })
+          const r = await llamar(cuerpo('operator', empresa ? {} : { company_id: D }))
+          expect(r.status).toBe(500)
+          const texto = await r.text()
+          expect(JSON.parse(texto)).toEqual({ error: 'No se pudo crear la invitación. Intenta de nuevo.' })
+          expect(texto).not.toMatch(/42501|permission denied|acaba de crearse|propietario|nuevo@ejemplo\.com/i)
+          expect(updates()).toHaveLength(1)
+          expect(updates()[0].filtros).toContainEqual(['in', 'id', ['inv-op']])
+          expect(inserts()).toHaveLength(0)
+          casos++
+        }
+      }
+      expect(casos).toBe(8)
+      expect(consola).toHaveBeenCalledTimes(8)
+      expect(consola).toHaveBeenCalledWith('[invite-user] no se pudieron revocar las invitaciones pendientes:', { code: '42501', message: 'permission denied for table user_invitations' })
+      expect(JSON.stringify(consola.mock.calls)).not.toMatch(/nuevo@ejemplo\.com/i)
+    } finally {
+      consola.mockRestore()
+    }
+  })
+
+  it('el doble de la prueba anterior distingue la revocación del INSERT: si la revocación va bien se inserta (control)', async () => {
+    como('company_owner')
+    h.st.lecturas.user_invitations = { data: [pendiente('inv-op', 'nuevo@ejemplo.com', 'operator')], error: null }
+    escriturasInvitacionesPorOperacion({ update: { data: null, error: null }, insert: { data: { id: 'inv-9' }, error: null } })
+    const r = await llamar(cuerpo('operator'))
+    expect(r.status).toBe(200)
+    expect(((await r.json()) as { invitation_id: string }).invitation_id).toBe('inv-9')
+    expect(updates()).toHaveLength(1)
+    expect(inserts()).toHaveLength(1)
   })
 
   it('cualquier otro fallo del INSERT: 500 con un mensaje genérico (no el insertErr.message crudo); el detalle va a console.error sin el correo invitado', async () => {

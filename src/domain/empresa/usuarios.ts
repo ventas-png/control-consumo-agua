@@ -121,16 +121,25 @@ export function necesitaAsistentePrimerProyecto(input: {
 /** Roles a los que el edge delete-user deja eliminar a quien no es superadministrador (espejo de DELETABLE_ROLES de supabase/functions/delete-user/validate.ts). */
 export const ROLES_ELIMINABLES = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
 
+/** Lo que `puedeEliminarUsuario` necesita de cada lado: el rol y la empresa (app_users.role / app_users.company_id). */
+export interface PersonaEliminacion {
+  role: string | null | undefined
+  company_id: string | null | undefined
+}
+
 /**
- * ¿Se ofrece «Eliminar» sobre una persona de ese rol? Espeja el gate de delete-user (checkDeleteTargetGate): el superadministrador, a cualquiera; el propietario, a los roles
- * eliminables; el administrador, a los eliminables MENOS otro administrador (E-07: la función borra con service_role, saltándose user_roles_delete y roles_delete, que son del
- * principal; a los administradores los puso el principal). Nadie más elimina. El servidor es el que manda; esto sólo evita ofrecer lo que será rechazado.
+ * ¿Se ofrece «Eliminar» sobre esa persona? Espeja canManageUsers + el gate de delete-user (checkDeleteTargetGate), en su mismo orden: el superadministrador, a cualquiera
+ * (de cualquier empresa, también sin la suya); quien no lo es, SÓLO dentro de su propia empresa —sin empresa (company_id null o vacío) no tiene «su empresa» y no elimina a
+ * nadie (VEDGE-06; el servidor lo deniega desde V8-06 b)—; ahí el propietario, a los roles eliminables, y el administrador, a los eliminables MENOS otro administrador (E-07:
+ * la función borra con service_role, saltándose user_roles_delete y roles_delete, que son del principal; a los administradores los puso el principal). Nadie más elimina.
+ * El servidor es el que manda; esto sólo evita ofrecer lo que será rechazado.
  */
-export function puedeEliminarUsuario(actorRole: string | null | undefined, objetivoRole: string | null | undefined): boolean {
-  if (actorRole === 'super_admin' || actorRole === 'superadmin') return true
-  if (actorRole !== 'company_owner' && actorRole !== 'admin') return false
-  if (!objetivoRole || !ROLES_ELIMINABLES.includes(objetivoRole)) return false
-  if (objetivoRole === 'admin') return actorRole === 'company_owner'
+export function puedeEliminarUsuario(actor: PersonaEliminacion, objetivo: PersonaEliminacion): boolean {
+  if (actor.role === 'super_admin' || actor.role === 'superadmin') return true
+  if (actor.role !== 'company_owner' && actor.role !== 'admin') return false
+  if (!actor.company_id || objetivo.company_id !== actor.company_id) return false
+  if (!objetivo.role || !ROLES_ELIMINABLES.includes(objetivo.role)) return false
+  if (objetivo.role === 'admin') return actor.role === 'company_owner'
   return true
 }
 
