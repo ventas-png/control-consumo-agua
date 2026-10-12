@@ -6,8 +6,8 @@ import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 // mapping RBAC) extraída a ./validate.ts para testearla en vitest (infra:I22).
 import {
   canManageUsers,
+  createRoleDenial,
   hasMissingRequiredFields,
-  isRoleAllowedForNonSuper,
   isSuperAdminRole,
   normalizeEmail,
   platformRoleIdFor,
@@ -82,10 +82,12 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Non-superadmins can only create users within their own company
+    // Non-superadmins can only create users within their own company, and not every role: el rol 'admin' solo
+    // lo otorga el PRINCIPAL (company_owner; el super_admin ya salió arriba). Un administrador recibe 403 con el motivo.
     if (!isSuperAdmin) {
-      if (!isRoleAllowedForNonSuper(role)) {
-        return new Response(JSON.stringify({ error: 'Solo puedes crear usuarios con rol admin/operador/visualizador/cobros' }), {
+      const denial = createRoleDenial(callerRole, role)
+      if (denial) {
+        return new Response(JSON.stringify({ error: denial }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }

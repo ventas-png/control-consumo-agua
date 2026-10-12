@@ -3,10 +3,20 @@
 // en vitest. El handler (index.ts) importa estos símbolos: el comportamiento no
 // cambia, solo se mueve la definición a un archivo importable desde los tests.
 
-// Roles que un caller NO super_admin (company_owner/admin) puede crear. Espejo
-// del whitelist de invite-user (INVITABLE_ROLES). NUNCA super_admin ni
-// company_owner: es la barrera contra escalada de privilegios de este endpoint.
+// Universo de roles que un caller NO super_admin puede otorgar (company_owner o admin): espejo del
+// whitelist de invite-user (INVITABLE_ROLES). NUNCA super_admin ni company_owner: es la barrera
+// contra escalada de privilegios de este endpoint. QUIÉN puede otorgar cada uno lo decide
+// canCreateRole(): el propietario puede todos; el administrador, todos MENOS ROLES_SOLO_PRINCIPAL.
 export const ALLOWED_ROLES_FOR_NON_SUPER = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
+
+// Roles que SOLO otorga el PRINCIPAL de la empresa (company_owner, o super_admin/superadmin). Un
+// administrador sin filas de proyecto es «exento» (ve toda la empresa) y un alta de administrador
+// nace sin filas: si un administrador pudiera darlas, fabricaría exentos (D-2). Decisión del dueño
+// del negocio (2026-10-11): la autoridad es del principal. Espejo de la política RLS
+// user_invitations_insert (migración 20261026000700), que es el control real del camino directo.
+export const ROLES_SOLO_PRINCIPAL = ['admin']
+
+export const MSG_SOLO_PRINCIPAL_ADMIN = 'Solo el propietario de la empresa puede crear administradores.'
 
 /** `true` si el rol es super_admin (ambas grafías históricas). */
 export function isSuperAdminRole(role: string): boolean {
@@ -21,9 +31,38 @@ export function canManageUsers(role: string): boolean {
   return isSuperAdminRole(role) || role === 'company_owner' || role === 'admin'
 }
 
-/** `true` si un caller no-super puede otorgar `role` (whitelist, case-sensitive). */
+/** `true` si `role` pertenece al universo de roles que algún caller no-super puede otorgar (case-sensitive). No dice QUIÉN: ver canCreateRole. */
 export function isRoleAllowedForNonSuper(role: string): boolean {
   return ALLOWED_ROLES_FOR_NON_SUPER.includes(role)
+}
+
+/** `true` si el rol es el PRINCIPAL de la empresa: company_owner o super_admin/superadmin. Un administrador (acotado o exento) NO lo es. */
+export function isPrincipalRole(role: string): boolean {
+  return isSuperAdminRole(role) || role === 'company_owner'
+}
+
+/**
+ * Por qué `callerRole` NO puede crear a alguien con `targetRole`, o `null` si puede.
+ *   · super_admin: cualquier rol (así se da de alta al company_owner de una empresa nueva);
+ *   · company_owner: todo el universo de ALLOWED_ROLES_FOR_NON_SUPER (administrador incluido);
+ *   · admin: el universo MENOS ROLES_SOLO_PRINCIPAL (no crea administradores);
+ *   · cualquier otro rol: nada.
+ */
+export function createRoleDenial(callerRole: string, targetRole: string): string | null {
+  if (isSuperAdminRole(callerRole)) return null
+  if (!canManageUsers(callerRole)) return 'Insufficient permissions'
+  if (!isRoleAllowedForNonSuper(targetRole)) {
+    return isPrincipalRole(callerRole)
+      ? 'Solo puedes crear usuarios con rol admin/operador/visualizador/cobros'
+      : 'Solo puedes crear usuarios con rol operador/visualizador/cobros'
+  }
+  if (ROLES_SOLO_PRINCIPAL.includes(targetRole) && !isPrincipalRole(callerRole)) return MSG_SOLO_PRINCIPAL_ADMIN
+  return null
+}
+
+/** `true` si `callerRole` puede crear a alguien con `targetRole` (ver createRoleDenial). */
+export function canCreateRole(callerRole: string, targetRole: string): boolean {
+  return createRoleDenial(callerRole, targetRole) === null
 }
 
 /**

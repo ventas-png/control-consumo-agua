@@ -5,8 +5,11 @@
 //   1. Valida JWT del llamador (shared/auth requireUser) y que sea
 //      company_owner / admin / super_admin.
 //   2. Valida el rol a invitar (no se puede invitar super_admin ni
-//      company_owner por esta vía) y que la company sea la propia
-//      (salvo super_admin).
+//      company_owner por esta vía; el rol admin solo lo invita el PRINCIPAL:
+//      company_owner o super_admin — 403 para un administrador) y que la
+//      company sea la propia (salvo super_admin). El control real del camino
+//      directo (INSERT en user_invitations por la API) es la política RLS
+//      user_invitations_insert de la migración 20261026000700.
 //   3. Genera un token aleatorio seguro (crypto) con expiración (7 días).
 //   4. Inserta la fila en user_invitations (service_role; revoca cualquier
 //      pending previo al mismo correo en la company).
@@ -31,9 +34,11 @@ import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 // Lógica pura (whitelist de roles, token, expiración, validación de email)
 // extraída a ./validate.ts para poder testearla en vitest (infra:I22).
 import {
-  INVITABLE_ROLES,
+  MSG_SOLO_PRINCIPAL_ADMIN,
+  canInviteRole,
   computeExpiresAt,
   generateToken,
+  isInvitableRole,
   isValidEmail,
   roleLabel as labelForRole,
 } from './validate.ts'
@@ -98,9 +103,15 @@ Deno.serve(async (req: Request) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    if (!role || !INVITABLE_ROLES.includes(role)) {
+    if (!role || !isInvitableRole(role)) {
       return new Response(JSON.stringify({ error: 'Rol inválido. Solo admin/operador/visualizador/cobros' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    // El rol 'admin' solo lo invita el PRINCIPAL (company_owner o super_admin): un administrador recibe 403 con el motivo.
+    if (!canInviteRole(callerRole, role)) {
+      return new Response(JSON.stringify({ error: MSG_SOLO_PRINCIPAL_ADMIN }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
     if (!companyId) {
