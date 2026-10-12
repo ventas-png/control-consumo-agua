@@ -10,6 +10,8 @@ export { BUCKET_MEDIA, BUCKET_EVIDENCIAS } from './buckets'
 export interface UploadMediaOptions {
   contentType?: string
   upsert?: boolean
+  /** Segundos de `max-age` que Storage devolverá al servir el objeto (por defecto 3600). */
+  cacheControl?: string
 }
 
 
