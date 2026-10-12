@@ -99,6 +99,41 @@ export function veAsistentePrimerProyecto(role?: string | null): boolean {
   return role === 'company_owner'
 }
 
+/**
+ * ¿Hay que abrir el asistente del primer proyecto (SetupWizard)? Toda la compuerta de App.tsx en una función pura: los datos YA cargaron (si no, parpadearía), quien mira es el
+ * propietario (`veAsistentePrimerProyecto`), ve la empresa entera (`veEmpresaEntera`: para quien está acotado a sus proyectos, «no veo ninguno» no significa «la empresa no tiene»),
+ * tiene empresa y la empresa no tiene ningún proyecto. Cualquier otro caso —incluido un administrador, aunque sea «exento», o un rol con otra grafía— no lo ve.
+ */
+export function necesitaAsistentePrimerProyecto(input: {
+  cargando: boolean
+  role?: string | null
+  veEmpresaEntera: boolean
+  companyId?: string | null
+  totalProyectos: number
+}): boolean {
+  return !input.cargando
+    && veAsistentePrimerProyecto(input.role)
+    && input.veEmpresaEntera
+    && !!input.companyId
+    && input.totalProyectos === 0
+}
+
+/** Roles a los que el edge delete-user deja eliminar a quien no es superadministrador (espejo de DELETABLE_ROLES de supabase/functions/delete-user/validate.ts). */
+export const ROLES_ELIMINABLES = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
+
+/**
+ * ¿Se ofrece «Eliminar» sobre una persona de ese rol? Espeja el gate de delete-user (checkDeleteTargetGate): el superadministrador, a cualquiera; el propietario, a los roles
+ * eliminables; el administrador, a los eliminables MENOS otro administrador (E-07: la función borra con service_role, saltándose user_roles_delete y roles_delete, que son del
+ * principal; a los administradores los puso el principal). Nadie más elimina. El servidor es el que manda; esto sólo evita ofrecer lo que será rechazado.
+ */
+export function puedeEliminarUsuario(actorRole: string | null | undefined, objetivoRole: string | null | undefined): boolean {
+  if (actorRole === 'super_admin' || actorRole === 'superadmin') return true
+  if (actorRole !== 'company_owner' && actorRole !== 'admin') return false
+  if (!objetivoRole || !ROLES_ELIMINABLES.includes(objetivoRole)) return false
+  if (objetivoRole === 'admin') return actorRole === 'company_owner'
+  return true
+}
+
 /** Lo que el servidor devuelve (ASIGNACION_PROPIA_NO_PERMITIDA) cuando alguien intenta cambiar sus propias asignaciones. */
 export const MOTIVO_AUTOASIGNACION =
   'No puedes cambiar tus propios proyectos. Pídele el cambio al propietario de la empresa o al superadministrador.'

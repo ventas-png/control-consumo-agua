@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import { createCompanyUser, deleteCompanyUser, esPrincipalEmpresa, MOTIVO_SOLO_PRINCIPAL, puedeEditarAsignaciones, setUsuarioActivo } from '../../domain/empresa/usuarios'
+import { createCompanyUser, deleteCompanyUser, esPrincipalEmpresa, MOTIVO_SOLO_PRINCIPAL, puedeEditarAsignaciones, puedeEliminarUsuario, setUsuarioActivo } from '../../domain/empresa/usuarios'
 import { insertUserRoles, ensureCompanyRoleFromTemplate } from '../../domain/empresa/roles'
 import type { UserSession, Proyecto } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
@@ -40,7 +40,15 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
   const [showPapelera, setShowPapelera] = useState(false)
   const [showSavedReports, setShowSavedReports] = useState(false)
 
+  // El PRINCIPAL de la empresa (propietario o superadministrador): el único que asigna proyectos, permisos (roles y llaves) y administradores. Un administrador, acotado o
+  // exento, no: el servidor lo rechaza (migraciones 20261026000600 y 20261026000700), así que aquí no se ofrece y se explica. La pantalla /empresa sólo la abre el
+  // propietario (RoleGuard): son compuertas de defensa en profundidad por si un día se abre a otros roles.
+  const esPrincipal = esPrincipalEmpresa(currentUser.role)
+
   async function crearAdmin() {
+    // Defensa en profundidad (la ruta /empresa sólo la abre el propietario y el botón se deshabilita): crear una persona implica escribir roles, plantillas y user_roles, que son del
+    // principal (migración 20261026000700); sin la compuerta un administrador crearía la cuenta y quedaría sin permisos.
+    if (!esPrincipal) return
     const showAgua = currentUser.servicio_agua !== false
     const showCond = currentUser.servicio_condominios !== false
 
@@ -158,7 +166,18 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
         newAssignments.push({ user_id: userId, role_id: companyRole.id })
       }
       if (newAssignments.length > 0) {
-        await insertUserRoles(newAssignments)
+        // E-05: el error de la asignación de roles NO se ignora. Si el servidor la rechaza (RLS de user_roles, red, o una llave que falta) la persona ya existe pero SIN permisos:
+        // no se anuncia «Usuario creado» como éxito; se dice qué falta y dónde asignarlo, y se recarga la lista (la persona sí quedó creada).
+        const { error: rolesError } = await insertUserRoles(newAssignments)
+        if (rolesError) {
+          notify({
+            variant: 'error',
+            title: 'Usuario creado, pero sin permisos',
+            text: `No se pudieron asignar sus roles: ${rolesError}. Asígnalos desde "Roles y permisos".`,
+          })
+          onReload()
+          return
+        }
       }
 
       notify({ variant: 'success', title: 'Usuario creado', duration: 1500 })
@@ -173,7 +192,14 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
   // RolPermisosModal, which writes directly to user_roles.
 
   async function toggleActivoUsuario(usuario: Usuario) {
-    await setUsuarioActivo(usuario.id, !usuario.activo)
+    // app_users_update es del propietario (y del superadministrador): para otro rol la RLS filtra la fila y contesta «0 filas» sin error, es decir, un cambio que no ocurrió. Se
+    // compuerta (el botón se deshabilita con la explicación) y se muestra el error si el servidor lo devuelve.
+    if (!esPrincipal) return
+    const { error } = await setUsuarioActivo(usuario.id, !usuario.activo)
+    if (error) {
+      notify({ variant: 'error', title: usuario.activo ? 'No se pudo desactivar' : 'No se pudo activar', text: error })
+      return
+    }
     onReload()
   }
 
@@ -221,15 +247,9 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
   // Who can permanently delete users, and which target roles are deletable.
   // Mirrors the server-side checks in the delete-user edge function so the button
   // only appears when the action would actually succeed.
-  const isSuperAdmin = currentUser.role === 'super_admin'
-  const canDeleteUsers = isSuperAdmin || currentUser.role === 'company_owner' || currentUser.role === 'admin'
-  // El PRINCIPAL de la empresa (propietario o superadministrador): el único que asigna proyectos, permisos (roles y llaves) y administradores. Un administrador, acotado o
-  // exento, no: el servidor lo rechaza (migraciones 20261026000600 y 20261026000700), así que aquí no se ofrece y se explica. La pantalla /empresa sólo la abre el
-  // propietario (RoleGuard): son compuertas de defensa en profundidad por si un día se abre a otros roles.
-  const esPrincipal = esPrincipalEmpresa(currentUser.role)
+  // La decisión «¿se ofrece Eliminar sobre esta persona?» es puedeEliminarUsuario (espejo de checkDeleteTargetGate): un administrador ya no elimina a otro administrador (E-07).
   // ¿Puede quien mira cambiar los proyectos de esa fila? Sólo el principal (ver puedeEditarAsignaciones); el motivo distingue la autoedición del resto.
   const permisoAcceso = (u: Usuario) => puedeEditarAsignaciones({ id: currentUser.user_id, role: currentUser.role }, u)
-  const DELETABLE_TARGET_ROLES = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
 
   return (
     <>
@@ -292,11 +312,13 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
             </button>
             <button
               onClick={() => void crearAdmin()}
+              disabled={!esPrincipal}
+              title={esPrincipal ? undefined : MOTIVO_SOLO_PRINCIPAL}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 padding: '9px 16px', borderRadius: '8px', border: 'none',
-                background: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))',
-                color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+                background: esPrincipal ? 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' : 'var(--at-ink-2)',
+                color: esPrincipal ? 'white' : 'var(--at-ink-3)', cursor: esPrincipal ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 600,
               }}
             >
               <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -432,18 +454,19 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
                   </button>
                   <button
                     onClick={() => void toggleActivoUsuario(u)}
-                    title={u.activo ? 'Desactivar' : 'Activar'}
+                    disabled={!esPrincipal}
+                    title={esPrincipal ? (u.activo ? 'Desactivar' : 'Activar') : 'Solo el propietario de la empresa activa o desactiva personas.'}
                     style={{
                       padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap',
                       border: `1px solid ${u.activo ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
                       background: u.activo ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
                       color: u.activo ? 'var(--at-danger)' : 'var(--at-success)',
-                      cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                      cursor: esPrincipal ? 'pointer' : 'not-allowed', opacity: esPrincipal ? 1 : 0.55, fontSize: '12px', fontWeight: 600,
                     }}
                   >
                     {u.activo ? 'Desactivar' : 'Activar'}
                   </button>
-                  {canDeleteUsers && (isSuperAdmin || DELETABLE_TARGET_ROLES.includes(u.role)) && (
+                  {puedeEliminarUsuario(currentUser.role, u.role) && (
                     <button
                       onClick={() => void eliminarUsuario(u)}
                       title="Eliminar definitivamente"

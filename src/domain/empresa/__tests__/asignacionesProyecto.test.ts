@@ -75,11 +75,16 @@ describe('veAsistentePrimerProyecto · el asistente del primer proyecto es del p
     expect(veAsistentePrimerProyecto(null)).toBe(false)
     expect(veAsistentePrimerProyecto(undefined)).toBe(false)
   })
-  it('App.tsx lo usa y ya no admite al administrador en la condición del asistente', () => {
+  it('CABLEADO (la decisión está probada por comportamiento en usuarios.paridadServidor.test.ts): App.tsx se la deja a necesitaAsistentePrimerProyecto con el rol de la sesión y no añade una condición propia', () => {
     const src = readFileSync(resolve('src/App.tsx'), 'utf-8')
-    const bloque = src.slice(src.indexOf('const necesitaOnboarding'), src.indexOf('const necesitaOnboarding') + 400)
-    expect(bloque).toMatch(/veAsistentePrimerProyecto\(currentUser\.role\)/)
-    expect(bloque).not.toMatch(/'admin'/)
+    const ini = src.indexOf('const necesitaOnboarding')
+    const bloque = src.slice(ini, src.indexOf('\n  })', ini) + 5)
+    expect(bloque).toMatch(/necesitaAsistentePrimerProyecto\(\{/)
+    for (const campo of [
+      'cargando: agua.dataLoading,', 'role: currentUser.role,', 'veEmpresaEntera: agua.projectScope.exempt,',
+      'companyId: currentUser.company_id,', 'totalProyectos: agua.proyectos.length,',
+    ]) expect(bloque).toContain(campo)
+    expect(bloque).not.toMatch(/'admin'|\|\||startsWith|&&/)
   })
 })
 
