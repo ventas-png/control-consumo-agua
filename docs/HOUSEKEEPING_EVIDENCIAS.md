@@ -73,8 +73,10 @@ Son **dos** migraciones (`20261028000000`, `20261028000100`) y van **después** 
 intercaladas obliga a que lo nuevo sea posterior. #926 ya agota el tope `MAX_APPLY = 10` de
 `apply-migrations-prod` (aplica las `.sql` **añadidas en ese push**), así que estas dos **no pueden viajar en el
 mismo push**: entran juntas en el suyo, el último. Orden acordado en #926 (cada uno en su propio push):
-#928 (`20261026000600`) → #926 (10) → PR de alcance por proyecto (`20261027001000`, futuro) → **#927
-(`20261028000000` + `20261028000100`)**. Con ese orden `schema_migrations` queda monótono. Si #927 se
+**#928 (2: `20261026000600_seguridad_asignaciones_proyecto` + `20261026000700_autoridad_principal_empresa`)
+→ #926 (10: `20261027000000` … `20261027000900`) → PR de alcance por proyecto (`20261027001000`, futuro) →
+#927 (2: `20261028000000` + `20261028000100`)**. Ninguno pasa de 10 archivos, así que `MAX_APPLY = 10` no
+se toca. Con ese orden `schema_migrations` queda monótono. Si #927 se
 fusionara antes que #926, las de #926 tendrían que renumerarse.
 
 Historia: la primera versión de este PR se llamó `20261023000000` (chocaba con
@@ -100,41 +102,67 @@ branch` y sin ningún `workflow_run_logs` (falla del orquestador de Supabase ant
 «Migrations» con el mismo `Remote migration versions not found`. La causa vigente es, por tanto, únicamente
 el registro `20261023000001` sin archivo en el repo.
 
-Reconciliación **sin resetear** el branch. Requiere autorización explícita porque borra una fila del
-registro de migraciones y escribe en la base del preview; por eso no se ha ejecutado:
+Evidencia actual (`workflow_run_logs` de la rama, 12/10 a las 16:57, 17:30 y 17:31 UTC): «Remote DB/API/Auth/
+Storage config is up to date» seguido de `ERROR Remote migration versions not found in local migrations
+directory.`; el registro del preview conserva `20261023000001 housekeeping_evidencias` (558 versiones).
 
-```sql
--- 1) aplicar el contenido de 20261028000000_housekeeping_evidencias.sql y después el de
---    20261028000100_housekeeping_servicios_por_proyecto.sql (ambos idempotentes; convergen desde el estado
---    antiguo, probado en run.sh §3). Deben terminar sin error ANTES del paso 2.
--- 2) mover el registro de la versión antigua a la definitiva (solo versión y nombre, como hace
---    apply-migrations-sandbox.yml)
-BEGIN;
-DELETE FROM supabase_migrations.schema_migrations WHERE version = '20261023000001' AND name = 'housekeeping_evidencias';
-INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES
-  ('20261028000000', 'housekeeping_evidencias'), ('20261028000100', 'housekeeping_servicios_por_proyecto')
-ON CONFLICT (version) DO NOTHING;
-COMMIT;
--- 3) verificar (debe dar 2 / true / true / {hk_evidencias_insert,hk_evidencias_select}):
-SELECT (SELECT count(*) FROM supabase_migrations.schema_migrations WHERE name LIKE 'housekeeping\_%'),
-       to_regprocedure('public.hk_acceso(uuid,uuid)') IS NOT NULL,
-       to_regclass('public.hk_limpieza_storage') IS NOT NULL,
-       (SELECT array_agg(policyname::text ORDER BY policyname) FROM pg_policies
-         WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname LIKE 'hk\_evidencias\_%');
-```
+Dos salidas, **ambas limitadas a la rama efímera de esta PR** (`xycrwolnonmgcygfuebe`, branch
+`e13b7d2b-7cbc-4204-8d5c-2a1f936108ec`), ninguna toca producción ni el sandbox, y ninguna se ha ejecutado:
 
-Alternativa sin tocar el registro: cerrar y reabrir la PR, o borrar solo esta rama de preview (el worker la
-recrea desde cero con los archivos actuales; así se resolvió la de #926). No se hace sin autorización:
-destruye el estado del preview.
+1. **Reconciliar sin resetear** — `supabase/tests/housekeeping_evidencias/reconciliar_preview_pr927.sql`:
+   guarda (aborta si la base no tiene `20261023000001` o si ya tiene una versión definitiva, así que en
+   producción y en el sandbox no hace nada), aplica las dos migraciones definitivas (idempotentes, convergen
+   desde el estado antiguo), y en una transacción saca `20261023000001` del registro y mete las dos nuevas.
+   Probado contra una base que imita el preview en `run.sh` §8 (resultado `2|t|t|{hk_evidencias_insert,
+   hk_evidencias_select}|4`; una segunda pasada aborta en la guarda).
+2. **Recrear** — borrar *solo* esa rama de preview en el panel (Branches → `claude/cleaning-documentation-
+   images-85lefu` → Delete) y hacer un push o cerrar/reabrir la PR: el worker la crea desde cero con los
+   archivos actuales y despliega las funciones (así se resolvió la de #926). Destruye el estado del preview
+   (solo datos de prueba de la propia rama).
+
+Después, en cualquiera de las dos: check «Supabase Preview» verde en el HEAD; en la rama, la consulta del
+paso 4 del script y `list_edge_functions` con `housekeeping-limpieza` y `purgar-fotos-registros`.
 
 Producción no necesita reconciliación: nunca tuvo la versión antigua.
 
 ## Despliegue
-1. Fusionar #928 y #926 en sus propios pushes y aplicar sus migraciones (`apply-migrations-prod`).
-2. Fusionar esta PR **en un push aparte**; `apply-migrations-prod` aplica `20261028000000` y `20261028000100`
-   (2 archivos); `deploy-functions` despliega `housekeeping-limpieza` y la nueva `purgar-fotos-registros`.
-3. **Manual, ya pendiente**: crear los secretos de Vault `purga_fotos_url` y `purga_fotos_service_key`
-   (`docs/PURGA_FOTOS_SCHEDULE.md`). Sin ellos la cola solo se drena al borrar (desde la pantalla), no cada hora.
+Cada PR en **su propio push a `main`**, en el orden de arriba; `apply-migrations-prod` aplica las `.sql`
+añadidas en ese push (tope `MAX_APPLY = 10`, sin cambios) y `deploy-functions` (solo en push a `main`)
+despliega `purgar-fotos-registros` y `housekeeping-limpieza`, ambas con `--no-verify-jwt`
+(`.github/workflows/deploy-functions.yml`).
+
+1. #928 (2 migraciones) → comprobar → #926 (10) → comprobar → (alcance, 1, cuando exista) → **#927 (2)**.
+2. Tras el push de #927, **comprobaciones posteriores** (solo lectura): sección final de
+   `scripts/reversion-housekeeping-evidencias.sql` — registro con las 2 versiones, tablas de fotos y cola, 4
+   policies del servicio con `hk_acceso`/`can_access_project`, policies `hk_evidencias_insert/select` en el
+   bucket, bucket privado, cron horario activo, número de secretos de Vault (solo nombres), cola sin atascadas;
+   y en el panel, las dos Edge Functions con `verify_jwt = false`.
+3. **Manual**: cargar `purga_fotos_url` y `purga_fotos_service_key` en el Vault de producción (procedimiento
+   abajo). Sin la key la cola solo se drena al borrar desde la pantalla, no cada hora.
+
+**Recuperación** (`scripts/reversion-housekeeping-evidencias.sql`, no corre en CI): preferir avanzar con
+una migración nueva. A) revierte exactamente `20261028000100` (restaura las 4 policies previas); B) contiene
+`20261028000000` sin perder datos (parar el cron horario, las subidas y las RPC de borrado; se reanuda
+reaplicando el archivo, idempotente); C) la reversión completa no se guioniza porque borraría fotos de
+clientes. Si `apply-migrations-prod` falla a mitad, la migración afectada no queda registrada y se reaplica
+tal cual (todas son idempotentes).
+
+### Cargar `purga_fotos_service_key` en Vault sin exponerla
+1. Panel de Supabase del proyecto → *Project Settings → API Keys* → copiar la clave `service_role` (o
+   *secret key*) al portapapeles. No pegarla en chats, issues, commits, el editor SQL ni ningún log.
+2. *Integrations → Vault* (en paneles antiguos, *Project Settings → Vault*) → *Secrets → Add new secret*: nombre `purga_fotos_service_key`, valor = pegar.
+   Guardar. (El editor SQL con `vault.create_secret(...)` también sirve, pero deja el valor en el historial
+   de consultas del panel: evitarlo.)
+3. Comprobar sin leer el valor: `SELECT count(*) FROM vault.decrypted_secrets WHERE name IN
+   ('purga_fotos_url','purga_fotos_service_key');` → 2, y `SELECT public.run_hk_limpieza_storage();` seguido de
+   `SELECT status_code FROM net._http_response ORDER BY id DESC LIMIT 1;` → 200.
+
+**Qué se habilita al cargarla** (las dos únicas funciones que leen esa key): `run_hk_limpieza_storage`
+(cron `hk_limpieza_storage_hourly`, `17 * * * *`: drena la cola de housekeeping) y `run_purga_fotos_storage`
+(cron `purgar_fotos_storage_monthly`, `30 3 1 * *`: retención de fotos de lecturas `registros` > 90 d,
+fotos de fichajes `presencia_personal` > 365 d —anula también el GPS—, fotos de housekeeping > 90 d, cola y
+barrido de huérfanos de housekeeping). Medido en el sandbox el 12/10: 0 filas y 0 objetos afectados en las
+tres retenciones, cola en 0. `purgar_datos_expirados` (solo SQL) ya está activo y no depende de la key.
 
 ## Verificación en el sandbox existente (sin resetearlo)
 ### Versión aplicada, funciones, cron y Vault (2026-10-12)
@@ -146,13 +174,11 @@ Producción no necesita reconciliación: nunca tuvo la versión antigua.
   `_shared/housekeepingLimpieza.ts` se omitieron solo comentarios (código idéntico).
 - **Cron** activo: `hk_limpieza_storage_hourly` (`17 * * * *`) y `purgar_fotos_storage_monthly` (`30 3 1 * *`).
 - **Vault**: `purga_fotos_url` creado (apunta a la función del sandbox; no es secreto).
-  `purga_fotos_service_key` **NO** está configurado: la service key no se puede obtener por ninguna vía de esta
-  sesión sin exponerla, y un workflow temporal que la leyera del entorno `sandbox-db` quedó bloqueado por la
-  política de seguridad de la sesión (no se subió). Hasta que alguien con acceso la cargue (panel → SQL:
-  `select vault.create_secret('<service_role key>', 'purga_fotos_service_key');`), el cron horario es un no-op
-  seguro y la cola se drena cuando la pantalla llama a `housekeeping-limpieza` tras cada borrado (probado abajo).
-  Ojo: con la key cargada, `purgar_fotos_storage_monthly` también purgará en el sandbox las fotos de
-  lecturas (> 90 d) y de fichajes (> 365 d) el día 1.
+  `purga_fotos_service_key` **NO** está cargado: la key no se puede obtener por ninguna vía de esta sesión sin
+  exponerla (un workflow temporal que la leyera quedó bloqueado por la política de la sesión y no se subió).
+  Debe cargarla una persona por el panel (procedimiento arriba). Hasta entonces el cron horario es un no-op
+  seguro y la cola se drena cuando la pantalla llama a `housekeeping-limpieza` tras cada borrado. Pendiente
+  tras cargarla: drenaje programado a las :17, reintentos y conservación de textos y autoría con el cron real.
 
 ### Guiones SQL reversibles (sesión simulada con `SET ROLE` + claim del JWT)
 Seis guiones `sandbox_housekeeping_parte1..6.sql` (generados por `generar_guion_sandbox.py`); cada uno termina
@@ -175,8 +201,7 @@ la herramienta SQL del entorno retiene ese tipo de sentencias.
 Cuatro usuarios de prueba (`zz-hk-e2e-*@example.invalid`): dueña de la empresa A, operador de A1, operador de
 A2 (misma empresa, otro proyecto) y admin de la empresa B. El navegador carga un paquete con el cliente
 Supabase, el dominio (`housekeepingEvidencias`, `tabMutations`) y el generador de PDF **reales**; no se usó la
-pantalla React (los previews de Vercel no son alcanzables desde este entorno), así que no se probó el clic en
-los botones, sí todo lo que esos botones llaman.
+pantalla React aquí; eso es la sección siguiente.
 
 | # | Resultado |
 |---|---|
@@ -198,24 +223,50 @@ los botones, sí todo lo que esos botones llaman.
    con `cacheControl: '0'` (`public, max-age=0`, comprobado): el navegador revalida con el token vigente y el
    usuario siguiente ya no las recibe (comprobado en el mismo perfil de navegador).
 
-### Datos de prueba que quedaron en el sandbox
-Las fotos, servicios y archivos de la prueba se borraron por las RPC y la limpieza (bucket y cola en 0). Los
-4 usuarios, 2 empresas, 3 proyectos y 1 rol `ZZ HK E2E` **siguen** porque la herramienta SQL retiene los
-`DELETE`; los usuarios están **bloqueados** (`banned_until` 2999, contraseña aleatoria desconocida). Para
-retirarlos (requiere confirmación):
+### Pantalla React real con inicio de sesión (Chromium, build de `93b3427`)
+Distinta de la anterior: se compiló la app (`vite build` con las variables del sandbox) y se sirvió por HTTPS
+local bajo un nombre con forma de preview de Vercel (lo exige el CORS de las funciones del sandbox). Login por
+el formulario, navegación y **clics en los botones reales** de la pestaña Housekeeping.
 
-```sql
-BEGIN;
-DELETE FROM public.user_roles       WHERE role_id = 'e2e0001e-0000-4000-8000-0000000000a8';
-DELETE FROM public.role_permissions WHERE role_id = 'e2e0001e-0000-4000-8000-0000000000a8';
-DELETE FROM public.roles            WHERE id      = 'e2e0001e-0000-4000-8000-0000000000a8';
-DELETE FROM public.app_users        WHERE id::text LIKE 'e2e00000-0000-4000-8000-%';
-DELETE FROM auth.identities         WHERE user_id::text LIKE 'e2e00000-0000-4000-8000-%';
-DELETE FROM auth.users              WHERE id::text LIKE 'e2e00000-0000-4000-8000-%';
-DELETE FROM public.projects         WHERE id::text LIKE 'e2e000__-0000-4000-8000-%';
-DELETE FROM public.companies        WHERE id::text LIKE 'e2e0000_-0000-4000-8000-%';
-COMMIT;
-```
+| # | Paso | Resultado |
+|---|---|---|
+| P1–P4 | operador A1: login, pestaña, crear servicio por el formulario (textos de ingreso) | ✅ |
+| P5 | «Iniciar» | ✅ «Inició: ZZ HK E2E Operador A1» |
+| P6–P9 | 18 fotos de ingreso y luego 4 más | ✅ aviso «Máximo 20 por fase; se subirán 2» → 20/20; «Agregar» desaparece en la fase llena |
+| P10–P11 | 3 fotos de cierre; visor | ✅ imagen firmada 1280×960 |
+| P12 | «Completar» con observaciones | ✅ «Completó: ZZ HK E2E Operador A1» |
+| P13 | PDF / WhatsApp | ✅ descarga de PDF de 2 páginas (2,4 MB) con textos, autoría y 23 fotos |
+| P14–P15 | operador borra foto / servicio completado | ✅ rechazado: «No tienes autorización para eliminar…» |
+| P16–P17 | **cambio de usuario en el mismo navegador** → operador A2 | ✅ condominio A2 activo, A1 no aparece, 0 datos de A1 |
+| P18–P19 | admin de la empresa B | ✅ condominio B1, 0 datos de A |
+| P20–P23 | dueña de A: ve servicio, autoría y 20+3 fotos; borra una foto (19/20) y luego el servicio | ✅ |
+
+En BD al terminar el operador: textos guardados, `creado_por/iniciado_por/completado_por` = operador A1, 20+3
+filas, 23 objetos con `cacheControl` `max-age=0`. Tras la dueña: 0 servicios, 0 fotos, 0 objetos, cola en 0.
+Para la prueba se dio a los usuarios su asignación de proyecto y los permisos `….create/.edit`; después se
+volvieron a bloquear.
+
+### Datos de prueba que quedaron en el sandbox
+Fotos, servicios y archivos se borraron por las RPC y la limpieza (bucket y cola en 0). Los usuarios están
+**bloqueados** (`banned_until` 2999, contraseña aleatoria desconocida). Inventario exacto (12/10):
+
+| Tabla | Filas | Identificadores |
+|---|---|---|
+| `companies` | 2 | `e2e0000a-0000-4000-8000-00000000000a`, `e2e0000b-0000-4000-8000-00000000000b` |
+| `projects` | 3 | `e2e000a1-0000-4000-8000-000000000001`, `e2e000a2-0000-4000-8000-000000000002`, `e2e000b1-0000-4000-8000-000000000001` |
+| `auth.users` / `app_users` / `auth.identities` | 4 / 4 / 4 | `e2e00000-0000-4000-8000-0000000000{01,03,04,07}` |
+| `auth.sessions` / `auth.refresh_tokens` | 7 / 7 | de esos 4 usuarios |
+| `roles` / `role_permissions` / `user_roles` | 1 / 3 / 2 | rol `e2e0001e-0000-4000-8000-0000000000a8` |
+| `user_project_assignments` / `user_presence` | 2 / 4 | de esos 4 usuarios |
+| `permission_audit_log` / `bitacora_acciones` / `audit_log` / `subscriptions` | 6 / 22 / 2 / 2 | del rol, los usuarios o las 2 empresas |
+| `servicios_housekeeping` / fotos / objetos / cola | 0 | — |
+
+**No** son de la prueba (otra empresa, `e4668da9-…`, id aleatorio que empieza por «e2e»): `conta_asientos
+e2eace36-…` y sus 2 líneas, y 3 filas de `bitacora_acciones`. Por eso la retirada usa ids exactos, nunca
+`LIKE`: `supabase/tests/housekeeping_evidencias/limpieza_datos_e2e_sandbox.sql` (guarda por nombre de las dos
+empresas y por ausencia de servicios/objetos; borra hijos→padres; verifica que todo queda en 0, que bucket y
+cola siguen en 0 y que la fila ajena sigue; termina en `ROLLBACK` hasta cambiarlo a `COMMIT`). **No se ha
+ejecutado**: requiere autorización.
 
 ## Límites conocidos
 - Los residentes ven los **textos** (`hallazgos_ingreso`, `observaciones_cierre`) del servicio de su unidad

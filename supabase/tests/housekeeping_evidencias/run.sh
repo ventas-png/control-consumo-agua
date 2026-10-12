@@ -69,21 +69,23 @@ psql -q -d postgres -c "CREATE DATABASE hkmut" >/dev/null
 psql -q -d postgres -c "CREATE DATABASE hksb" >/dev/null
 psql -q -d postgres -c "CREATE DATABASE hksb0" >/dev/null
 psql -q -d postgres -c "CREATE DATABASE hksb1" >/dev/null
+psql -q -d postgres -c "CREATE DATABASE hkrec" >/dev/null
+psql -q -d postgres -c "CREATE DATABASE hkrev" >/dev/null
 
 aplicar() { PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d "$1" -f "$2" >/dev/null; }
 huella() { psql -q -At -d "$1" -f "$AQUI/huella.sql"; }
 cd "$AQUI"
 
-echo "── 1/7 · fixture ────────────────────────────────────────────────────────"
+echo "── 1/8 · fixture ────────────────────────────────────────────────────────"
 aplicar hk "$AQUI/fixture.sql"
 echo "  OK    esquema mínimo + policies vigentes de servicios_housekeeping"
 
-echo "── 2/7 · estado ANTERIOR (la versión del preview de #927) ──────────────"
+echo "── 2/8 · estado ANTERIOR (la versión del preview de #927) ──────────────"
 aplicar hk "$ANTERIOR"
 aplicar hk "$AQUI/estado_antiguo.sql"
 echo "  OK    versión anterior aplicada y con datos cargados"
 
-echo "── 3/7 · las migraciones nuevas, DOS veces, sobre ese estado ───────────"
+echo "── 3/8 · las migraciones nuevas, DOS veces, sobre ese estado ───────────"
 aplicar hk "$MIGRACION"; aplicar hk "$MIGRACION2"
 H1=$(huella hk)
 aplicar hk "$MIGRACION"; aplicar hk "$MIGRACION2"
@@ -93,7 +95,7 @@ echo "  OK    idempotente: la huella del catálogo no cambia al re-aplicar"
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d hk -f "$AQUI/despues_de_actualizar.sql" 2>&1) || { echo "$SALIDA" | sed -n 's/.*ERROR:  /  /p'; echo "❌ la actualización desde la versión anterior no converge"; exit 1; }
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 
-echo "── 4/7 · invariantes ───────────────────────────────────────────────────"
+echo "── 4/8 · invariantes ───────────────────────────────────────────────────"
 CODIGO=0
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d hk -f "$AQUI/assert.sql" 2>&1) || CODIGO=$?
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
@@ -121,12 +123,12 @@ concurrente() {   # $1 = base de datos. Lanza dos sesiones a la vez y devuelve �
   echo "$filas|$((ko_a + ko_b))"
 }
 
-echo "── 5/7 · concurrencia con DOS sesiones reales ──────────────────────────"
+echo "── 5/8 · concurrencia con DOS sesiones reales ──────────────────────────"
 R=$(concurrente hk)
 [ "$R" = "20|4" ] || { echo "❌ esperado 20 fotos y 4 rechazos; obtenido «$R»"; exit 1; }
 echo "  OK    24 intentos simultáneos sobre un mismo servicio/fase → 20 fotos y 4 rechazos"
 
-echo "── 6/7 · mutación: la misma prueba SIN el candado debe fallar ──────────"
+echo "── 6/8 · mutación: la misma prueba SIN el candado debe fallar ──────────"
 grep -v "pg_advisory_xact_lock" "$MIGRACION" > "$MUT"
 grep -q "pg_advisory_xact_lock" "$MIGRACION" || { echo "❌ el candado ya no está en la migración"; exit 1; }
 aplicar hkmut "$AQUI/fixture.sql"
@@ -141,7 +143,7 @@ else
   echo "❌ la mutación no se detectó («$R» en vez de 24|0): la prueba de concurrencia no prueba el candado"; exit 1
 fi
 
-echo "── 7/7 · guion del sandbox (6 partes), ejecutado aquí con el contrato del sandbox ─"
+echo "── 7/8 · guion del sandbox (6 partes), ejecutado aquí con el contrato del sandbox ─"
 # Los archivos están generados: si alguien edita assert.sql y no regenera, el sandbox probaría otra cosa.
 PARTES=6
 for n in $(seq 1 $PARTES); do
@@ -172,6 +174,30 @@ SALIDA=$(psql -q -d hksb1 -f "$AQUI/sandbox_housekeeping_parte2.sql" 2>&1 || tru
 echo "$SALIDA" | grep -q "GUION_ABORTA: la migración 20261028000100_housekeeping_servicios_por_proyecto NO está aplicada" \
   || { echo "$SALIDA" | head -5; echo "❌ con solo la primera migración el guion debía abortar"; exit 1; }
 echo "  OK    con solo la primera migración el guion ABORTA (la segunda es requisito)"
+
+echo "── 8/8 · guiones preparados: reconciliación del preview y reversión ─────"
+# Preview simulada: el estado que tiene la rama de #927 (versión antigua aplicada y registrada).
+aplicar hkrec "$AQUI/fixture.sql"; aplicar hkrec "$ANTERIOR"
+psql -q -d hkrec -c "CREATE SCHEMA supabase_migrations; CREATE TABLE supabase_migrations.schema_migrations (version text PRIMARY KEY, name text, statements text[]); INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('20261023000001', 'housekeeping_evidencias');" >/dev/null
+SALIDA=$(cd "$AQUI" && PGOPTIONS="-c client_min_messages=warning" psql -q -At -v ON_ERROR_STOP=1 -d hkrec -f reconciliar_preview_pr927.sql 2>&1) || { echo "$SALIDA" | tail -5; echo "❌ la reconciliación del preview falló"; exit 1; }
+[ "$(echo "$SALIDA" | tail -1)" = "2|t|t|{hk_evidencias_insert,hk_evidencias_select}|4" ] || { echo "$SALIDA" | tail -3; echo "❌ la reconciliación no dejó el estado esperado"; exit 1; }
+REG=$(psql -q -At -d hkrec -c "SELECT string_agg(version, ',' ORDER BY version) FROM supabase_migrations.schema_migrations")
+[ "$REG" = "20261028000000,20261028000100" ] || { echo "❌ registro tras reconciliar: $REG"; exit 1; }
+echo "  OK    reconciliación: converge desde la versión antigua y deja el registro en 20261028000000,20261028000100"
+SALIDA=$(cd "$AQUI" && psql -q -At -v ON_ERROR_STOP=1 -d hkrec -f reconciliar_preview_pr927.sql 2>&1 || true)
+echo "$SALIDA" | grep -q "ABORTA: esta base no tiene registrada 20261023000001" || { echo "$SALIDA" | tail -3; echo "❌ la segunda pasada debía abortar en la guarda"; exit 1; }
+echo "  OK    reconciliación: la guarda aborta sin tocar nada en una base que no es la preview de #927"
+# Reversión A: devuelve las policies del servicio a las de antes de la 0100.
+POL="SELECT md5(string_agg(policyname || cmd || coalesce(qual, '') || coalesce(with_check, ''), '|' ORDER BY policyname)) FROM pg_policies WHERE tablename = 'servicios_housekeeping'"
+aplicar hkrev "$AQUI/fixture.sql"; aplicar hkrev "$MIGRACION"
+ANTES=$(psql -q -At -d hkrev -c "$POL")
+aplicar hkrev "$MIGRACION2"
+DURANTE=$(psql -q -At -d hkrev -c "$POL")
+sed -n '/── A)/,/── B)/p' "$RAIZ/scripts/reversion-housekeeping-evidencias.sql" > "$MUT"
+aplicar hkrev "$MUT"
+DESPUES=$(psql -q -At -d hkrev -c "$POL")
+[ "$ANTES" != "$DURANTE" ] && [ "$ANTES" = "$DESPUES" ] || { echo "❌ la reversión A no restaura las policies previas ($ANTES / $DURANTE / $DESPUES)"; exit 1; }
+echo "  OK    reversión A: las cuatro policies del servicio vuelven exactamente a las previas"
 
 echo
 echo "✅ housekeeping_evidencias: aislamiento por proyecto/empresa/permiso, rutas fabricadas rechazadas, clientes sin UPDATE/DELETE, borrado coordinado con cola y reintentos, tope de 20 sin carreras, purga que conserva textos, y la actualización desde la versión anterior converge."
