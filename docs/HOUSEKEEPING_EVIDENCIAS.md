@@ -64,26 +64,36 @@ estado; lo que mande el cliente se ignora, y un `UPDATE` posterior no los reescr
 reabre y se vuelve a completar, `completado_por` es quien lo hizo la última vez.
 
 ## Numeración y orden de fusión
-Va **después** de las nueve migraciones de la PR #926 (`20261027000000` … `20261027000800`). Producción está
-en `20261026000500`; la guarda de migraciones intercaladas obliga a que lo nuevo sea posterior. Si esta PR se
-fusionara **antes** que #926, las de #926 tendrían que renumerarse. El tope `MAX_APPLY = 10` de
-`apply-migrations-prod` se cumple con 9 + 1.
+Va **después** de las diez migraciones de la PR #926 (`20261027000000` … `20261027000900`). Producción está
+en `20261026000500`; la guarda de migraciones intercaladas obliga a que lo nuevo sea posterior. #926 ya
+agota el tope `MAX_APPLY = 10` de `apply-migrations-prod` (se aplican las `.sql` **añadidas en ese push**),
+así que esta migración **no puede viajar en el mismo push**: entra en el suyo, el último. Orden acordado en
+#926 (cada uno en su propio push): #928 (`20261026000600`) → #926 (10) → PR de alcance por proyecto
+(`20261027001000`, futuro) → **#927 (`20261028000000`)**. Con ese orden el historial de `schema_migrations`
+queda monótono. Si #927 se fusionara antes que #926, las de #926 tendrían que renumerarse.
 
 Historia: la primera versión de este PR se llamó `20261023000000` (chocaba con
 `compras_seguimiento_pendientes_por_renglon`), luego `20261023000001` y `20261027000000` (chocaba con
-`compras_aislamiento_referencias` de #926). Ninguna llegó a main, a producción (0 migraciones de housekeeping,
-864 versiones, máx. `20261026000500`) ni al sandbox `control-agua-rls-sandbox` (máx. `…27000800`, 0 de housekeeping).
-**Solo `20261023000001` quedó aplicada, y solo en el preview branch efímero de esta PR.**
+`compras_aislamiento_referencias` de #926). Ninguna llegó a main ni a producción (0 migraciones de
+housekeeping, 864 versiones, máx. `20261026000500`). Estado de los entornos al 2026-10-12 (lectura directa):
 
-## Reconciliación del preview branch de la PR (único entorno afectado)
+| Entorno | Versión de housekeeping registrada | Diseño que tiene |
+|---|---|---|
+| Producción | ninguna | — |
+| Sandbox `control-agua-rls-sandbox` | `20261028000000` (workflow `apply-migrations-sandbox`, run 38009275934) | definitivo |
+| Preview branch de la PR (`xycrwolnonmgcygfuebe`) | `20261023000001` (**ya no existe en el repo**) | antiguo: 3 policies en la tabla, policy `hk_evidencias_delete` en el bucket, sin `hk_acceso`, sin cola, sin RPC de borrado, sin cron |
+
+## Reconciliación del preview branch de la PR — PREPARADA, NO EJECUTADA
 Síntoma: `Remote migration versions not found in local migrations directory` — el preview tiene registrada
-`20261023000001_housekeeping_evidencias` y el repo ya no tiene ese archivo. Causa confirmada con
-`workflow_run_logs` de la propia rama (no es cosmético; ver el informe de la PR). Reconciliación **sin
-resetear** el branch: aplicar el contenido final (idempotente y probado contra el estado antiguo en
-`run.sh` §3) y mover el registro:
+`20261023000001_housekeeping_evidencias` y el repo ya no tiene ese archivo. Mientras no se reconcilie, cada
+push de la PR deja en rojo el check `Supabase Preview` (el resto de checks no depende de él).
+
+Reconciliación **sin resetear** el branch. Requiere autorización explícita porque borra una fila del
+registro de migraciones y escribe en la base del preview; por eso no se ha ejecutado:
 
 ```sql
--- 1) aplicar el contenido de 20261028000000_housekeeping_evidencias.sql (idempotente)
+-- 1) aplicar el contenido de 20261028000000_housekeeping_evidencias.sql (idempotente; converge desde el
+--    estado antiguo, probado en run.sh §3). Debe terminar sin error ANTES del paso 2.
 -- 2) mover el registro de la versión antigua a la definitiva (solo versión y nombre, como hace
 --    apply-migrations-sandbox.yml)
 BEGIN;
@@ -91,16 +101,57 @@ DELETE FROM supabase_migrations.schema_migrations WHERE version = '2026102300000
 INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('20261028000000', 'housekeeping_evidencias')
 ON CONFLICT (version) DO NOTHING;
 COMMIT;
+-- 3) verificar (debe dar 1 / true / true / {hk_evidencias_insert,hk_evidencias_select}):
+SELECT (SELECT count(*) FROM supabase_migrations.schema_migrations WHERE name = 'housekeeping_evidencias'),
+       to_regprocedure('public.hk_acceso(uuid,uuid)') IS NOT NULL,
+       to_regclass('public.hk_limpieza_storage') IS NOT NULL,
+       (SELECT array_agg(policyname::text ORDER BY policyname) FROM pg_policies
+         WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname LIKE 'hk\_evidencias\_%');
 ```
 
-El sandbox y producción **no** necesitan reconciliación: nunca tuvieron la versión antigua.
+Alternativa sin tocar el registro: cerrar y reabrir la PR (el worker recrea el branch desde cero con los
+archivos actuales). No se hace sin autorización: destruye el estado del preview.
+
+Producción no necesita reconciliación: nunca tuvo la versión antigua.
 
 ## Despliegue
-1. Fusionar #926 y aplicar sus migraciones (`apply-migrations-prod`).
-2. Fusionar esta PR; `apply-migrations-prod` aplica `20261028000000`; `deploy-functions` despliega
-   `housekeeping-limpieza` y la nueva `purgar-fotos-registros`.
+1. Fusionar #928 y #926 en sus propios pushes y aplicar sus migraciones (`apply-migrations-prod`).
+2. Fusionar esta PR **en un push aparte**; `apply-migrations-prod` aplica `20261028000000` (1 archivo);
+   `deploy-functions` despliega `housekeeping-limpieza` y la nueva `purgar-fotos-registros`.
 3. **Manual, ya pendiente**: crear los secretos de Vault `purga_fotos_url` y `purga_fotos_service_key`
    (`docs/PURGA_FOTOS_SCHEDULE.md`). Sin ellos la cola solo se drena al borrar (desde la pantalla), no cada hora.
+
+## Verificación en el sandbox existente (sin resetearlo)
+Versión realmente aplicada (leída de `supabase_migrations.schema_migrations` el 2026-10-12): `20261028000000
+housekeeping_evidencias`, junto a las diez de #926 (`20261027000000`…`000900`). Los seis guiones
+`sandbox_housekeeping_parte1..6.sql` (generados por `generar_guion_sandbox.py`) se ejecutaron uno por uno;
+cada uno termina SIEMPRE con una excepción que revierte todo, y tras cada pasada se comprobó que no quedaba
+residuo (0 empresas/usuarios de prueba, 0 fotos, 0 objetos, 0 filas en la cola, sin esquema `hkt`):
+
+| Parte | Cubre | Resultado |
+|---|---|---|
+| 1 | visibilidad por persona (A), subida y autoría sellada (B), rutas manipuladas y tope de 60 objetos (C), sin UPDATE de clientes (D), sellos iniciado/completado (E) | 52/52 |
+| 2 | tope de 20 por fase (F), inventario de policies/privilegios/bucket (J) | 12/12 |
+| 3 | borrado de una foto por RPC (G) | 12/12 |
+| 4 | borrado de un servicio con fotos, cascada y cola (G) | 9/9 |
+| 5 | cola: arrendamiento, reintentos con espera creciente, atascadas, cero filas, permisos (H) | 19/19 |
+| 6 | huérfanas, retención: la purga conserva textos y sellos (H, I) | 9/9 |
+
+Total 113/113. Aclaraciones honestas:
+- La «sesión» es `SET ROLE authenticated/anon/service_role` con `request.jwt.claim.sub` (lo que hace PostgREST
+  tras validar el JWT). No hay inicio de sesión real por HTTP: no hay credenciales E2E de la aplicación.
+- La concurrencia de 20 fotos por fase no cabe en una sentencia: se prueba con dos sesiones reales en un
+  PostgreSQL desechable (`run.sh` §5) y el tope secuencial se comprueba en el sandbox (parte 2).
+- Las comprobaciones que ejecutan `DELETE`/`TRUNCATE` directos (D2, D4, G11, G12, G29–G31) solo corren en el
+  PostgreSQL local: la herramienta SQL del entorno retiene ese tipo de sentencias. En el sandbox el borrado se
+  ejercita por las RPC (`hk_eliminar_foto`, `hk_eliminar_servicio`), que es la única vía de los clientes.
+- El `UPDATE` que adelanta el reintento de la cola se acota a las empresas de prueba (`WHERE company_id IN …`).
+- Edge Functions: `housekeeping-limpieza` y `purgar-fotos-registros` **no están desplegadas en el sandbox**
+  (solo `timbrar-documento`, `invite-user`, `accept-invitation`, `delete-user`); `deploy-functions` solo
+  publica en producción al fusionar en main. La lógica de drenaje se prueba con dobles (17 tests vitest).
+- Cron: `hk_limpieza_storage_hourly` (`17 * * * *`) y `purgar_fotos_storage_monthly` están activos en el sandbox.
+- Vault: los secretos `purga_fotos_url` y `purga_fotos_service_key` **no existen** en el sandbox (comprobado
+  solo por nombre, sin leer valores). Sin ellos el cron no puede invocar las funciones.
 
 ## Límites conocidos
 - Los residentes ven los **textos** (`hallazgos_ingreso`, `observaciones_cierre`) del servicio de su unidad

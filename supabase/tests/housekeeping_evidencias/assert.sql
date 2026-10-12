@@ -441,7 +441,7 @@ BEGIN
   PERFORM hkt.ok('H4 el arrendamiento vence en ~10 min',
     (SELECT min(proximo_intento) FROM public.hk_limpieza_storage) > now() + interval '9 minutes');
 
-  UPDATE public.hk_limpieza_storage SET proximo_intento = now();
+  UPDATE public.hk_limpieza_storage SET proximo_intento = now() WHERE company_id IN (hkt.ca(), hkt.cb());
   PERFORM hkt.como_servicio();
   SELECT array_agg(id) INTO a FROM public.hk_limpieza_tomar(hkt.cb(), 10);
   PERFORM hkt.ok('H5 tomar(empresa B) solo entrega lo de B', cardinality(a) = 1 AND (SELECT company_id FROM public.hk_limpieza_storage WHERE id = a[1]) = hkt.cb());
