@@ -1136,6 +1136,12 @@ mutacion "VSQL-02 · la función sólo compara project_id: un cambio de EMPRESA 
 mutacion "VSQL-02 · la función sólo compara company_id: fijar el proyecto de OTRA empresa sin cambiar la empresa no se valida" \
   "$(mutar_funcion7 app_users_validar_proyecto 's/NEW\.project_id IS DISTINCT FROM OLD\.project_id OR //')" \
   "assert_principal" '\[app_users·1\]'
+# VER11-01 (verificación de la ronda 10): la comparación con OLD tiene que ser IS DISTINCT FROM. Con «<>» en company_id, NULL <> NULL da NULL y la función valida —y rechaza con 23514—
+# cualquier edición de una persona heredada SIN empresa y con proyecto (app_users·13b) y cualquier UPDATE masivo que la toque (app_users·13c). Con «<>» sólo en project_id es equivalente
+# (NULL lleva a validar y la validación da lo mismo): no se cuenta.
+mutacion "VER11-01 · la función compara company_id con «<>» en vez de IS DISTINCT FROM: una persona heredada sin empresa y con proyecto ya no se puede editar" \
+  "$(mutar_funcion7 app_users_validar_proyecto 's/NEW\.company_id IS DISTINCT FROM OLD\.company_id/NEW.company_id <> OLD.company_id/')" \
+  "assert_principal" '\[app_users·13b\]'
 # SQL-01 (octava verificación): el trigger vuelve a ser BEFORE, como en 898b25b7 (aquí sin la lista OF, con el diseño de ahora). Se ejecuta antes del WITH CHECK de la RLS y, como lee projects
 # sin RLS, a quien la RLS rechaza le contesta 23514 si el par (empresa, proyecto) no casa y 42501 si casa (el oráculo): assert_principal (§ 8b: por INSERT, anon, visor, cliente, sin app_users,
 # operador y administrador; por UPDATE, el propietario que mueve a una persona a D reciben 23514 con el par cruzado) y assert_catalogo (definición y tgtype del trigger) se ponen rojas.

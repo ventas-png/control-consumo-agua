@@ -400,6 +400,20 @@ SELECT asgt.caso('[app_users·12] un operador que intenta fijarse el proyecto de
 SELECT asgt.caso('[app_users·13] un dato heredado que ya cruza empresa no impide editar OTRAS columnas (la función sólo valida si la fila final cambia project_id / company_id)', 'OW',
   $q$UPDATE public.app_users SET full_name = 'ASG renombrado' WHERE id = {AX}$q$, 'ok', p_filas => 1,
   p_preparar => $q$SET session_replication_role = replica; UPDATE public.app_users SET project_id = {D1} WHERE id = {AX}; SET session_replication_role = origin$q$);
+-- … y también una persona heredada SIN empresa y con proyecto (VER11-01): la comparación con OLD tiene que ser IS DISTINCT FROM; con «<>», NULL <> NULL da NULL, la función
+-- validaría y rechazaría (23514) cualquier edición de esa fila, también un UPDATE masivo que la toque
+DO $$
+DECLARE a text;
+BEGIN
+  FOREACH a IN ARRAY ARRAY['SISTEMA', 'SERVICIO', 'SU'] LOOP
+    PERFORM asgt.caso('[app_users·13b] ' || a || ' · una persona heredada SIN empresa y con proyecto (SINEMP con D1) se sigue editando en lo demás', a,
+      $q$UPDATE public.app_users SET full_name = 'ASG renombrado' WHERE id = {SINEMP}$q$, 'ok', p_filas => 1,
+      p_preparar => $q$SET session_replication_role = replica; UPDATE public.app_users SET project_id = {D1} WHERE id = {SINEMP}; SET session_replication_role = origin$q$);
+  END LOOP;
+END $$;
+SELECT asgt.caso('[app_users·13c] SISTEMA · un UPDATE masivo que no cambia proyecto ni empresa (SET activo = activo) pasa con filas heredadas que cruzan empresa (AX con D1) o sin empresa (SINEMP con D1)', 'SISTEMA',
+  $q$UPDATE public.app_users SET activo = activo$q$, 'ok', p_filas_sql => $q$SELECT count(*) FROM public.app_users$q$,
+  p_preparar => $q$SET session_replication_role = replica; UPDATE public.app_users SET project_id = {D1} WHERE id IN ({SINEMP}, {AX}); SET session_replication_role = origin$q$);
 -- FLUJOS LEGÍTIMOS: borrar un proyecto al que apunta una persona (sin llave foránea no pasa nada; con ON DELETE SET NULL, el SET NULL en cascada pasa por el trigger y NULL pasa)
 SELECT asgt.caso('[app_users·14] el propietario borra un proyecto al que una persona apunta con app_users.project_id (hoy no hay llave foránea: la columna queda sin proyecto válido y no falla nada)', 'OW',
   $q$DELETE FROM public.projects WHERE id = {P1}$q$, 'ok', p_filas => 1,
