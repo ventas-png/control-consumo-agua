@@ -62,8 +62,11 @@ BEGIN
      AND (c.relname, a.attname) NOT IN (VALUES
        -- La purga las trata explícitamente (desliga, borra o pone a NULL).
        ('app_users', 'company_id'), ('app_users', 'project_id'), ('app_users', 'cliente_id'),
-       -- A propósito: la auditoría sobrevive a la empresa.
+       -- A propósito: la auditoría sobrevive a la empresa. La bitácora del interruptor
+       -- de separación de compras (20261027000900, #926; append-only, su guard impide
+       -- UPDATE/DELETE) es auditoría: sobrevive igual (decisión del dueño, 2026-10-13).
        ('audit_log', 'company_id'), ('audit_log', 'project_id'),
+       ('compras_config_separacion_bitacora', 'company_id'),
        -- Sólo en la forma de producción (drift #826): caen con el proyecto
        -- (project_id NOT NULL, ON DELETE CASCADE).
        ('plantillas_tarea_cargo', 'company_id'), ('rutas_ronda', 'company_id'),
