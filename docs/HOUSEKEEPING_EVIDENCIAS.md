@@ -340,12 +340,19 @@ filas, 23 objetos con `cacheControl` `max-age=0`. Tras la dueña: 0 servicios, 0
 Para la prueba se dio a los usuarios su asignación de proyecto y los permisos `….create/.edit`; después se
 volvieron a bloquear.
 
-### Datos de prueba del sandbox (retirados el 12/10; recreados el 13/10, PENDIENTES de retirar)
+### Datos de prueba del sandbox (retirados el 12/10; recreados y retirados otra vez el 13/10)
 **13/10:** para la prueba de pantalla de la sección anterior se recrearon con los MISMOS ids, nombres y correos (2
 empresas, 3 proyectos, 4 usuarios, el rol con 3 permisos, 2 asignaciones de rol y 2 de proyecto; las 2 suscripciones
 las crea el disparador de `companies`). Al terminar quedaron sin servicios, fotos, objetos ni cola, que es la guarda
-de `limpieza_datos_e2e_sandbox.sql`. Falta retirarlos con ese script en el editor SQL del panel del sandbox (aquí los
-`DELETE` no se completan): primero `modo := 'ensayo'`, después `'aplicar'`. **Ensayo de solo lectura del 13/10** (conteos por los
+de `limpieza_datos_e2e_sandbox.sql`. **Retirados el 13/10 (~20:25 UTC)** por el dueño con ese script en el editor SQL del
+panel del sandbox (desde el conector los `DELETE` no se completan): primero `modo := 'ensayo'` y después `'aplicar'`. El
+ensayo informó `user_project_assignments=2, user_roles=2, role_permissions=3, roles=1, subscriptions=2, user_presence=3,
+bitacora_acciones=2, app_users=4, auth.refresh_tokens=12, auth.sessions=12, auth.identities=4, auth.users=4, projects=3,
+companies=2, permission_audit_log=12, audit_log=4, filas ajenas (antes = después)=14698`; las 12 y 4 de auditoría son las 6 y 2
+que existían más las que insertan los disparadores al borrar roles, llaves, asignaciones, suscripciones y empresas (por eso se
+borran al final). Tras aplicar: `objetos_hk 0, cola_hk 0, fotos_hk 0, ajeno_intacto 1`, y una lectura independiente (20:28 UTC)
+encontró 0 filas de la prueba en las 19 comprobaciones por id, nombre y correo, con el asiento ajeno `e2eace36-…` (2 líneas) y
+la empresa `e4668da9-…` intactos. **Ensayo de solo lectura del 13/10** (conteos por los
 ids exactos del script, antes de pedir la retirada): `user_project_assignments` 2, `user_roles` 2, `role_permissions` 3, `roles` 1,
 `subscriptions` 2, `user_presence` 3, `bitacora_acciones` 2, `app_users` 4, `auth.refresh_tokens` 12, `auth.sessions` 12,
 `auth.identities` 4, `auth.users` 4, `projects` 3, `companies` 2, `permission_audit_log` ≥ 6, `audit_log` 2; las guardas se
