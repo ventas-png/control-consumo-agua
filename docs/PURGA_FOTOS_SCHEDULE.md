@@ -125,8 +125,11 @@ SELECT vault.create_secret(
 );
 ```
 
-> Reemplaza `<service_role_key>` con el valor real del **Service Role Key**
-> (Supabase Dashboard → Settings → API → `service_role` secret).
+> Reemplaza `<service_role_key>` con **el mismo valor que la variable `SUPABASE_SERVICE_ROLE_KEY` del entorno
+> de las Edge Functions**: la función compara el token por igualdad exacta y, si no coincide, responde 401. En el
+> sandbox se comprobó (2026-10-13) que esa variable es la *secret key* del proyecto (`sb_secret_…`) y que la
+> `service_role` JWT legacy recibe 401 (detalle en `docs/HOUSEKEEPING_EVIDENCIAS.md`, «Autenticación del cron»).
+> En producción no está comprobado: la primera llamada del smoke test (200 o 401) es la que lo confirma.
 
 ### Verificar que los secretos estén creados
 
@@ -165,14 +168,17 @@ ORDER BY created DESC
 LIMIT 5;
 ```
 
-La edge function responde:
-`{ success, dias, objetos_borrados, filas_actualizadas, iteraciones, errores }`.
+La edge function responde (forma observada en el sandbox, 2026-10-13):
+`{ success, objetivos: [{ nombre, dias, objetos_borrados, filas_actualizadas, iteraciones, errores }…],
+limpieza_housekeeping: { tomadas, borradas, fallidas, huerfanas_encoladas, lotes, errores }, objetos_borrados,
+filas_actualizadas, errores }`. Un `401 {"error":"Unauthorized"}` indica que el valor de Vault no es el de
+`SUPABASE_SERVICE_ROLE_KEY` del entorno de las funciones (ver arriba).
 
 También puede invocarse directo (super_admin o service_role):
 
 ```bash
 curl -X POST 'https://nnsqmeigtgewatameexo.supabase.co/functions/v1/purgar-fotos-registros' \
-  -H "Authorization: Bearer <service_role_key>" \
+  -H "Authorization: Bearer <valor de SUPABASE_SERVICE_ROLE_KEY de las funciones>" \
   -H 'Content-Type: application/json' \
   -d '{"mode":"batch"}'
 ```

@@ -158,14 +158,26 @@ clientes. Si `apply-migrations-prod` falla a mitad, la migración afectada no qu
 tal cual (todas son idempotentes).
 
 ### Cargar `purga_fotos_service_key` en Vault sin exponerla
-1. Panel de Supabase del proyecto → *Project Settings → API Keys* → copiar la clave `service_role` (o
-   *secret key*) al portapapeles. No pegarla en chats, issues, commits, el editor SQL ni ningún log.
-2. *Integrations → Vault* (en paneles antiguos, *Project Settings → Vault*) → *Secrets → Add new secret*: nombre `purga_fotos_service_key`, valor = pegar.
+**Qué valor va.** `purgar-fotos-registros` acepta la llamada del cron solo si el token es **idéntico** a la variable
+`SUPABASE_SERVICE_ROLE_KEY` de su propio entorno (`timingSafeEqualSecret`); si no coincide lo intenta como sesión de
+usuario y responde 401. El valor de Vault tiene que ser, por tanto, el mismo que esa variable. En el sandbox se
+comprobó (2026-10-13, ver «Autenticación del cron» abajo) que esa variable contiene la **secret key** del proyecto
+(formato `sb_secret_…`) y que la `service_role` JWT legacy, aunque es válida para la API, recibe 401. En producción
+**no está comprobado**: no se debe suponer que sea igual; la primera llamada (paso 3) es la que lo confirma.
+
+1. Panel de Supabase del proyecto → *Project Settings → API Keys* → copiar la clave que use el entorno de las
+   funciones (en el sandbox, la *secret key* `sb_secret_…`) al portapapeles. No pegarla en chats, issues, commits,
+   el editor SQL ni ningún log.
+2. *Integrations → Vault* (en paneles antiguos, *Project Settings → Vault*) → *Secrets → Add new secret* (o editar
+   el existente): nombre `purga_fotos_service_key`, valor = pegar.
    Guardar. (El editor SQL con `vault.create_secret(...)` también sirve, pero deja el valor en el historial
    de consultas del panel: evitarlo.)
 3. Comprobar sin leer el valor: `SELECT count(*) FROM vault.decrypted_secrets WHERE name IN
    ('purga_fotos_url','purga_fotos_service_key');` → 2, y `SELECT public.run_hk_limpieza_storage();` seguido de
-   `SELECT status_code FROM net._http_response ORDER BY id DESC LIMIT 1;` → 200.
+   `SELECT status_code, content FROM net._http_response ORDER BY id DESC LIMIT 1;` → **200**. Un **401
+   `Unauthorized`** significa que el valor de Vault no es el de `SUPABASE_SERVICE_ROLE_KEY` del entorno de las
+   funciones: no tocar la autenticación, corregir el valor de Vault. (El panel lista `SUPABASE_SERVICE_ROLE_KEY`
+   en *Edge Functions → Secrets → Default secrets* sin valor ni digest, así que no sirve para compararlo.)
 
 **Qué se habilita al cargarla** (las dos únicas funciones que leen esa key): `run_hk_limpieza_storage`
 (cron `hk_limpieza_storage_hourly`, `17 * * * *`: drena la cola de housekeeping) y `run_purga_fotos_storage`
@@ -196,12 +208,70 @@ lecturas de más de 90 días y las de fichajes de más de 365: medirlo allí ant
   Se subieron con la herramienta de Supabase desde los archivos del repo; en `_shared/cors.ts` y
   `_shared/housekeepingLimpieza.ts` se omitieron solo comentarios (código idéntico).
 - **Cron** activo: `hk_limpieza_storage_hourly` (`17 * * * *`) y `purgar_fotos_storage_monthly` (`30 3 1 * *`).
-- **Vault**: `purga_fotos_url` creado (apunta a la función del sandbox; no es secreto).
-  `purga_fotos_service_key` **NO** está cargado: la key no se puede obtener por ninguna vía de esta sesión sin
-  exponerla (un workflow temporal que la leyera quedó bloqueado por la política de la sesión y no se subió).
-  Debe cargarla una persona por el panel (procedimiento arriba). Hasta entonces el cron horario es un no-op
-  seguro y la cola se drena cuando la pantalla llama a `housekeeping-limpieza` tras cada borrado. Pendiente
-  tras cargarla: drenaje programado a las :17, reintentos y conservación de textos y autoría con el cron real.
+- **Vault**: `purga_fotos_url` creado (apunta a la función del sandbox; no es secreto). `purga_fotos_service_key`
+  la cargó una persona por el panel el 2026-10-13; ver la sección siguiente.
+
+### Autenticación del cron y prueba con el cron real (sandbox, 2026-10-13)
+Solo sandbox (`jwpmivhvlstslncrtokb`); nada de esto se midió en producción. Ninguna clave se imprimió: solo
+presencia, formato y comparaciones booleanas o por SHA-256.
+
+**1 · Con la `service_role` JWT legacy en Vault (cargada 15:03 UTC): 401.** Corrida de cron 193045
+(`hk_limpieza_storage_hourly`, 15:17:00) → respuesta pg_net id 3, **401 `{"error":"Unauthorized"}`**; el log de la
+función (`function_edge_logs`, 15:17:00.604, despliegue v1, `user_agent pg_net/0.20.4`, cuerpo de 33 bytes) muestra
+el mismo token (rol `service_role`, mismo `iat`/`exp`, prefijo de firma igual al de Vault, comparado como booleano).
+La key era válida para la API (GET a PostgREST con ella: 200).
+
+**2 · Causa comprobada dentro del runtime.** Con una función temporal aislada (`zz-diag-service-key`,
+`verify_jwt = true`, exige rol `service_role`, devuelve solo booleanos; retirada después como stub 410), llamada una
+vez por pg_net con la key de Vault: `SUPABASE_SERVICE_ROLE_KEY` del entorno de las funciones **presente, formato
+`sb_secret`, SHA-256 distinto** al de la JWT de Vault; `SUPABASE_SECRET_KEYS` con 1 entrada `sb_secret`, distinta;
+`SUPABASE_JWT_SECRET` ausente. Como la función compara por igualdad exacta, la JWT legacy no puede autenticarse
+nunca en este proyecto. El código desplegado es idéntico al del repositorio.
+
+**3 · Con la secret key (`sb_secret_…`) en Vault (17:35 UTC): 200.** Elegibles antes de invocar (17:36): 0 fotos de
+lecturas, 0 de fichajes, 0 de housekeeping, 0 objetos en los tres buckets, 0 huérfanas, cola vacía. Se sembraron dos
+filas de prueba marcadas `zz_prueba_validacion` (una con un bucket ajeno, otra con un objeto inexistente del bucket
+de housekeeping):
+
+| Llamada | HTTP | Resultado |
+|---|---|---|
+| `run_hk_limpieza_storage()` (17:37:17) | **200** | `tomadas 2, borradas 1, fallidas 1`; la del objeto inexistente sale de la cola (confirmada); la del bucket ajeno se rechaza (`bucket no permitido`), queda con `intentos = 1` y `proximo_intento` +5 min |
+| `run_purga_fotos_storage()` (17:37:32) | **200** | `success: true`; registros, presencia y housekeeping con 0 objetos y 0 filas; la fila en espera no se toma (backoff respetado) |
+| cron real `hk_limpieza_storage_hourly` (18:17, run 193486, AUTOMÁTICO) | **200** (pg_net id 14; log de la función 18:17:01, `pg_net/0.20.4`, 1150 ms) | **reintento real**: toma la fila del bucket ajeno ya vencida, la vuelve a rechazar (`tomadas 1, fallidas 1`) y la deja con `intentos = 2` y `proximo_intento` +10 min (18:27:01): la espera se duplica |
+
+Las filas de prueba se retiraron al terminar (18:20) con `hk_limpieza_confirmar` (cola, bucket, fotos y servicios en 0). `success: false` en las dos llamadas de limpieza es lo esperado: refleja el rechazo deliberado del bucket ajeno.
+
+### Pantalla real: borrado autorizado, drenaje y rechazo entre empresas (sandbox, 2026-10-13) — prueba MANUAL
+Build de `44a99ea` (`vite build` con la URL y la clave pública del sandbox) servido por HTTPS local bajo un nombre
+con forma de preview de Vercel (lo exige el CORS de las funciones del sandbox); Chromium dirigido con Playwright:
+login por el formulario, clics en los botones reales y, para los intentos de la empresa B, peticiones hechas desde
+la página con la sesión de ese usuario. Usuarios y empresas `ZZ HK E2E` recreados con los mismos ids que retira
+`limpieza_datos_e2e_sandbox.sql` (usuarios dados de alta por la API de Auth; contraseñas aleatorias que no salieron
+del entorno de prueba).
+
+| # | Quién | Acción | Resultado |
+|---|---|---|---|
+| U1 | Operador A1 | Pestaña Housekeeping del condominio A1 → «+ Nuevo Servicio» → «Agregar» | ✅ servicio pendiente creado, autoría A1 |
+| U2 | Operador A1 | «📋 Evidencia» → 2 fotos de ingreso | ✅ Storage 200 + filas 201; «Fotos al ingresar (2/20)»; 2 objetos en el bucket |
+| U3 | Admin B | Pestaña Housekeeping | ✅ solo su condominio B1, 0 servicios, ningún dato de A |
+| U4 | Admin B | `hk_eliminar_foto` / `hk_eliminar_servicio` sobre la foto y el servicio de A | ✅ rechazado: «Foto inexistente» / «Servicio inexistente» (P0002, no revela que existen) |
+| U5 | Admin B | leer fotos y servicios de A; listar sus objetos en el bucket | ✅ `[]` en los tres |
+| U6 | Admin B | `housekeeping-limpieza` con una fila de la cola de la empresa A pendiente | ✅ **HTTP 200** `tomadas 0`: la fila de A queda intacta (`intentos 0`) |
+| U7 | Operador A1 | «Eliminar foto» (suya, servicio sin completar) | ✅ `hk_eliminar_foto` 204 → la pantalla llama a `housekeeping-limpieza`: **HTTP 200** `tomadas 2, borradas 2` (el archivo de la foto y la fila de A de U6); objetos 2 → 1, ninguno huérfano |
+| U8 | Dueña A | ve el servicio y la autoría A1; 🗑️ → «Eliminar» | ✅ `hk_eliminar_servicio` 200 (1 archivo encolado) → `housekeeping-limpieza` **HTTP 200** `tomadas 1, borradas 1`; 0 servicios, 0 fotos, 0 objetos |
+
+El drenaje de la pantalla está acotado a la empresa del usuario: una fila de la cola sin empresa (la de prueba del
+bucket ajeno) no la toma ni A1 ni B; la toma el cron horario (tabla anterior).
+
+**Automático vs. manual.** Lo AUTOMÁTICO (corre solo en CI o por sí mismo) es: `supabase/tests/housekeeping_evidencias/run.sh`
+(PostgreSQL desechable, incluye concurrencia, mutación y los 6 guiones del sandbox con su contrato), los tests de
+vitest de `_shared/housekeepingLimpieza.ts` y de las funciones, y el cron `hk_limpieza_storage_hourly` del propio
+sandbox. Lo MANUAL (se ejecutó una vez, a mano, y no se repite solo) es: la carga de la clave en Vault, las
+invocaciones de `run_hk_limpieza_storage()`/`run_purga_fotos_storage()` de las 17:37, la función temporal de
+diagnóstico, la pantalla de esta sección y la retirada de los datos de prueba.
+
+Sigue pendiente: la conservación de textos y autoría tras la purga por retención (90 días) no se puede provocar en
+el sandbox sin envejecer datos a mano; está cubierta por la prueba automática de `run.sh`, no por el cron real.
 
 ### Guiones SQL reversibles (sesión simulada con `SET ROLE` + claim del JWT)
 Seis guiones `sandbox_housekeeping_parte1..6.sql` (generados por `generar_guion_sandbox.py`); cada uno termina
@@ -269,7 +339,13 @@ filas, 23 objetos con `cacheControl` `max-age=0`. Tras la dueña: 0 servicios, 0
 Para la prueba se dio a los usuarios su asignación de proyecto y los permisos `….create/.edit`; después se
 volvieron a bloquear.
 
-### Datos de prueba del sandbox (retirados el 12/10)
+### Datos de prueba del sandbox (retirados el 12/10; recreados el 13/10, PENDIENTES de retirar)
+**13/10:** para la prueba de pantalla de la sección anterior se recrearon con los MISMOS ids, nombres y correos (2
+empresas, 3 proyectos, 4 usuarios, el rol con 3 permisos, 2 asignaciones de rol y 2 de proyecto; las 2 suscripciones
+las crea el disparador de `companies`). Al terminar quedaron sin servicios, fotos, objetos ni cola, que es la guarda
+de `limpieza_datos_e2e_sandbox.sql`. Falta retirarlos con ese script en el editor SQL del panel del sandbox (aquí los
+`DELETE` no se completan): primero `modo := 'ensayo'`, después `'aplicar'`. Lo que sigue describe la retirada del 12/10.
+
 Fotos, servicios y archivos se borraron por las RPC y la limpieza (bucket y cola en 0). Los usuarios quedaron
 **bloqueados** (`banned_until` 2999, contraseña aleatoria) hasta su retirada. Inventario exacto que se retiró:
 
