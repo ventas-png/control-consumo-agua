@@ -1,0 +1,134 @@
+// REPRODUCCIÓN de los límites conocidos de la preselección de proyecto de Contabilidad (D-8) · cuarta verificación independiente (H2, H3, H4)
+//
+// NO es parte del paquete que se aplica ni de `vitest run`: se entrega con la extensión `.txt` a propósito, porque sus casos que muestran un LÍMITE fallan por diseño.
+// Para reproducir:  armar el paquete (`armar_paquete.sh <árbol>`, que aplica `ui_mensajes.patch`), copiar este archivo como
+//   <árbol>/src/components/contabilidad/__tests__/ver4Bypass.test.tsx
+// y correr  `npx vitest run src/components/contabilidad/__tests__/ver4Bypass.test.tsx`.
+//
+// Resultado medido con el `ui_mensajes.patch` ENTREGADO (cada caso afirma lo que la persona acotada DEBERÍA ver; fallar = límite conocido):
+//   R1  FALLA  (H2)  acceso solo por app_users.project_id: la pantalla no lo ve y abre «Empresa»        → límite, README §6.6
+//   R2  PASA   (H3)  le quitan en caliente el proyecto abierto: pasa a otro suyo (con el parche de la ronda anterior fallaba: se quedaba en «Empresa»)
+//   R3  FALLA  (H4)  «Empresa» recordada por OTRA persona del mismo navegador (la llave no lleva usuario)  → límite documentado, README §6.6
+//   R4  FALLA        la consulta de asignaciones falla: no se preselecciona nada y queda «Empresa»          → límite (fail-closed: sin saber su alcance no decide)
+//   R6  FALLA  (H4)  «Empresa» elegida siendo exenta y luego asignada a proyectos: sigue en «Empresa»     → límite documentado, README §6.6
+// (Los casos que fallan fallan por `expected '' to be '<id de proyecto>'`.)
+//
+// D-8 del alcance de proyecto al capturar (propuesta de pendientes_decision/proyectos): con qué contabilidad abre Contabilidad.
+//
+// El servidor solo deja crear un documento de compras «sin proyecto» (la contabilidad de la EMPRESA) a una persona exenta de proyecto: a una persona ACOTADA
+// la rechaza al guardar. Contabilidad abría por omisión en «🏢 Empresa» (project_id = null) cuando no había una contabilidad recordada, así que una persona
+// acotada que abría Compras o Cuentas por pagar y pulsaba «Nueva…» solo se enteraba al guardar. Ahora, sin una contabilidad recordada, la persona acotada
+// abre el PRIMER proyecto que ve y la exenta conserva «Empresa». Una contabilidad recordada se respeta; elegir «Empresa» a propósito no se deshace.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { montarConSesion } from '../../../test/sesionPermisos'
+
+vi.mock('../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
+
+const P1 = '11111111-1111-4111-8111-111111111111'
+const P2 = '22222222-2222-4222-8222-222222222222'
+const P3 = '33333333-3333-4333-8333-333333333333'
+const m = vi.hoisted(() => ({
+  proyectos: [] as Array<{ id: string; nombre: string }>,
+  proyectosCargados: true,
+  asignaciones: undefined as string[] | undefined,
+  asignacionesCargadas: true,
+}))
+
+vi.mock('../../../domain/agua/queries', () => ({
+  useProyectosQuery: () => ({ data: m.proyectos, isSuccess: m.proyectosCargados }),
+  useProyectoAssignmentsQuery: () => ({ data: m.asignaciones, isSuccess: m.asignacionesCargadas }),
+}))
+vi.mock('../../../domain/contabilidad/queries', () => ({ useMonedaBaseQuery: () => ({ data: 'GTQ' }) }))
+// Las pestañas no son el tema: solo importa con qué proyecto (o «empresa») se montan.
+vi.mock('../AsientosTab', () => ({ AsientosTab: ({ projectId }: { projectId: string | null }) => <div data-testid="ledger">{projectId ?? 'empresa'}</div> }))
+vi.mock('../CatalogoCuentasTab', () => ({ CatalogoCuentasTab: () => null }))
+vi.mock('../BalanzaTab', () => ({ BalanzaTab: () => null }))
+vi.mock('../MapeoCuentasTab', () => ({ MapeoCuentasTab: () => null }))
+vi.mock('../ReglasImputacionTab', () => ({ ReglasImputacionTab: () => null }))
+vi.mock('../TiposCargoTab', () => ({ TiposCargoTab: () => null }))
+vi.mock('../AuxiliaresTab', () => ({ AuxiliaresTab: () => null }))
+vi.mock('../PendientesContabilizacionTab', () => ({ PendientesContabilizacionTab: () => null }))
+vi.mock('../CargosPendientesTab', () => ({ CargosPendientesTab: () => null }))
+vi.mock('../EstadoCuentaTab', () => ({ EstadoCuentaTab: () => null }))
+vi.mock('../AjustesTab', () => ({ AjustesTab: () => null }))
+vi.mock('../ProveedoresTab', () => ({ ProveedoresTab: () => null }))
+vi.mock('../CuentasPorPagarTab', () => ({ CuentasPorPagarTab: () => null }))
+vi.mock('../ComprasTab', () => ({ ComprasTab: () => null }))
+vi.mock('../PresupuestoTab', () => ({ PresupuestoTab: () => null }))
+vi.mock('../BancosTab', () => ({ BancosTab: () => null }))
+vi.mock('../EstadosFinancierosTab', () => ({ EstadosFinancierosTab: () => null }))
+
+import { ContabilidadSection } from '../ContabilidadSection'
+
+const montar = (role: string) => montarConSesion(<ContabilidadSection />, { role })
+const selector = () => screen.getByLabelText('Seleccionar contabilidad') as HTMLSelectElement
+const montadaCon = () => screen.getByTestId('ledger').textContent
+
+
+beforeEach(() => {
+  localStorage.clear()
+  m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P2, nombre: 'Beta' }, { id: P3, nombre: 'Gamma' }]
+  m.proyectosCargados = true
+  m.asignaciones = [P2, P3]
+  m.asignacionesCargadas = true
+})
+afterEach(() => { cleanup(); localStorage.clear() })
+
+function Envuelto() {
+  const [n, setN] = useState(0)
+  return <><button onClick={() => setN(n + 1)}>refrescar {n}</button><ContabilidadSection /></>
+}
+const refrescar = () => fireEvent.click(screen.getByRole('button', { name: /refrescar/ }))
+
+// VER4: pruebas ADVERSARIALES (no estan en el paquete). Cada una afirma lo que la persona acotada DEBERIA ver y falla si no se cumple.
+describe('VER4 · intentos de refutar D-8', () => {
+  // R1 (real): el servidor concede acceso por app_users.project_id O por user_project_assignments (user_has_project_access); la RLS de projects
+  // deja en `proyectos` solo lo accesible. El cliente (filterProyectosByAssignment) solo mira las asignaciones: una persona acotada con
+  // app_users.project_id y sin filas de asignacion abre «Empresa» aunque el unico proyecto visible sea suyo.
+  it('R1 · acceso por app_users.project_id (sin filas de asignacion): abre su unico proyecto visible', () => {
+    m.proyectos = [{ id: P1, nombre: 'Alfa' }]
+    m.asignaciones = []
+    montarConSesion(<ContabilidadSection />, { role: 'operator' })
+    expect(selector().value).toBe(P1)
+  })
+
+  // R2 (real): la omision se resuelve UNA vez por empresa y montaje (ledgerPorOmisionResuelto); si despues un refetch quita el proyecto elegido,
+  // la guarda `fijarLedger(null)` la deja en «Empresa» y la omision NO se vuelve a evaluar, aunque conserve otros proyectos.
+  it('R2 · le quitan el proyecto abierto en caliente (refetch): pasa a otro suyo, no a «Empresa»', () => {
+    montarConSesion(<Envuelto />, { role: 'operator' })
+    expect(selector().value).toBe(P2)
+    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P3, nombre: 'Gamma' }]
+    m.asignaciones = [P3]
+    refrescar()
+    expect(selector().value).toBe(P3)
+  })
+
+  // R3 (documentado, "por empresa y por navegador"): la llave no lleva usuario; la «Empresa» elegida por otra persona deja a la acotada en «Empresa».
+  it('R3 · «Empresa» recordada por OTRA persona del mismo navegador', () => {
+    localStorage.setItem('conta-ledger:c1', 'empresa')
+    montarConSesion(<ContabilidadSection />, { role: 'operator' })
+    expect(selector().value).toBe(P2)
+  })
+
+  // R4 (estado de error): la consulta de asignaciones falla (isSuccess nunca es true): sin preseleccion, «Empresa».
+  it('R4 · error en la consulta de asignaciones', () => {
+    m.asignacionesCargadas = false
+    m.asignaciones = undefined
+    montarConSesion(<ContabilidadSection />, { role: 'operator' })
+    expect(selector().value).toBe(P2)
+  })
+
+  // R6: una exenta elige «Empresa» (se guarda) y despues pasa a estar acotada: sigue en «Empresa».
+  it('R6 · «Empresa» elegida siendo exenta y luego asignada a proyectos', () => {
+    m.asignaciones = []
+    const v = montarConSesion(<ContabilidadSection />, { role: 'admin' })
+    fireEvent.change(selector(), { target: { value: '' } })
+    expect(localStorage.getItem('conta-ledger:c1')).toBe('empresa')
+    v.unmount()
+    m.asignaciones = [P2]
+    montarConSesion(<ContabilidadSection />, { role: 'admin' })
+    expect(selector().value).toBe(P2)
+  })
+})
