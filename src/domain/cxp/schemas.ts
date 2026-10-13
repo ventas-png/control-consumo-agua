@@ -89,6 +89,8 @@ export const ordenPagoFormSchema = z.object({
   fecha_pago: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   referencia: z.string().trim().max(100).nullable(),
   notas: z.string().trim().max(500).nullable(),
+  /** Identifica ESTE intento de captura: un doble clic o un reintento no crea otra orden de pago (uq_ordenes_pago_clave). */
+  clave_idempotencia: z.string().trim().min(8).max(200).nullable().default(null),
 })
 
 export type OrdenPagoFormInput = z.infer<typeof ordenPagoFormSchema>

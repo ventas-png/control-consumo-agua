@@ -97,13 +97,15 @@ beforeEach(() => {
 afterEach(() => { vi.resetModules() })
 
 describe('App — identificación de usuario en analytics/monitoring', () => {
+  // Límite de 15 s: es la primera prueba del archivo y paga la importación en frío de App (~2,3 s de los ~3,8 s del archivo corrido solo); bajo la carga
+  // de la suite completa llegó a pasar de los 5 s por omisión (V8-11). Es tiempo de importación, no de lo que se prueba.
   it('identifica al montar con user_id, empresa y rol', async () => {
     await act(async () => { await renderApp() })
 
     expect(a.identify).toHaveBeenCalledWith('u-1', { company_id: 'emp-1', role: 'lecturista' })
     expect(a.registerSuperProperties).toHaveBeenCalledWith({ company_id: 'emp-1', role: 'lecturista' })
     expect(a.setMonitoringUser).toHaveBeenCalledWith({ id: 'u-1', companyId: 'emp-1', role: 'lecturista' })
-  })
+  }, 15000)
 
   it('RE-identifica cuando cambia el ROL del mismo usuario', async () => {
     const { rerender } = await act(async () => await renderApp())

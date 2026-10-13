@@ -1,6 +1,7 @@
 // Estilos y micro-componentes compartidos del módulo Contabilidad.
 import type { CSSProperties, ReactNode } from 'react'
 import { usePermissionsContext } from '../shared/PermissionsContext'
+import { usePasosCompras } from '../proveedores/permisos'
 
 export function Campo({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -66,14 +67,21 @@ export const btnPeligro: CSSProperties = {
  * cambiar estado (publicar, anular, conciliar, activar) / autorizar (aprobar
  * factura u orden) / eliminar. Sin esto, un rol con solo `view` vería botones
  * que la RLS rechaza.
+ *
+ * Los PASOS de compras y pagos (aprobar orden de compra, registrar recepción, aprobar factura, aprobar orden de
+ * pago, ejecutar pago, anular pago) ya no cuelgan de `puedeAutorizar` ni de `puedeCambiarEstado`: cada uno tiene su
+ * propia llave y se decide en un solo lugar (`decidirPasosCompras`, proveedores/permisos.ts), que se expone aquí
+ * para que las pestañas no repitan la combinación.
  */
 export function usePermisosContabilidad() {
   const perms = usePermissionsContext()
+  const pasos = usePasosCompras()
   return {
     puedeCrear: perms.canCreate('contabilidad'),
     puedeEditar: perms.canEdit('contabilidad'),
     puedeCambiarEstado: perms.canChangeStatus('contabilidad'),
     puedeAutorizar: perms.canApprove('contabilidad'),
     puedeEliminar: perms.canDelete('contabilidad'),
+    ...pasos,
   }
 }

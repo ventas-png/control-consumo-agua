@@ -5,11 +5,18 @@
 //   1. Valida JWT del llamador (shared/auth requireUser) y que sea
 //      company_owner / admin / super_admin.
 //   2. Valida el rol a invitar (no se puede invitar super_admin ni
-//      company_owner por esta vía) y que la company sea la propia
-//      (salvo super_admin).
+//      company_owner por esta vía; el rol admin solo lo invita el PRINCIPAL:
+//      company_owner o super_admin — 403 para un administrador) y que la
+//      company sea la propia (salvo super_admin). El control real del camino
+//      directo (INSERT en user_invitations por la API) es la política RLS
+//      user_invitations_insert de la migración 20261026000700.
 //   3. Genera un token aleatorio seguro (crypto) con expiración (7 días).
-//   4. Inserta la fila en user_invitations (service_role; revoca cualquier
-//      pending previo al mismo correo en la company).
+//   4. Inserta la fila en user_invitations (service_role; revoca los pending
+//      previos al MISMO correo en la company — comparación exacta del correo en
+//      minúsculas, sin comodines —, y si quien llama no es el principal NO revoca
+//      los de rol 'admin': son del propietario). Si la lectura de pendientes, su
+//      revocación o el INSERT fallan, 500 con un mensaje genérico (el detalle, al
+//      registro); si falla la revocación no se inserta.
 //   5. Envía el correo de invitación reusando send-email (template genérico
 //      `notificacion_empresa` con CTA → /aceptar-invitacion?token=...), desde
 //      la cuenta de Gmail de la empresa. Fire-and-forget: si falla el correo
@@ -31,10 +38,18 @@ import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 // Lógica pura (whitelist de roles, token, expiración, validación de email)
 // extraída a ./validate.ts para poder testearla en vitest (infra:I22).
 import {
-  INVITABLE_ROLES,
+  MSG_NO_SE_PUDO_CREAR,
+  MSG_SOLO_PRINCIPAL_ADMIN,
+  canInviteRole,
   computeExpiresAt,
   generateToken,
+  idsPendientesARevocar,
+  isInvitableRole,
+  isPrincipalRole,
+  isTextOrAbsent,
   isValidEmail,
+  msgConflictoPendiente,
+  registroErrorBd,
   roleLabel as labelForRole,
 } from './validate.ts'
 
@@ -80,11 +95,33 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const body = await req.json() as {
-      email?: string
-      role?: string
-      company_id?: string
-      full_name?: string
+    // El cuerpo llega de la red: un campo que no sea texto (arreglo, objeto, número…) o un cuerpo que no sea un objeto JSON es una petición mal formada → 400, nunca un
+    // TypeError en .trim() (500 «Internal server error»). Se valida ANTES de recortar y de decidir nada con el rol.
+    const body = await req.json().catch(() => null) as {
+      email?: unknown
+      role?: unknown
+      company_id?: unknown
+      full_name?: unknown
+    } | null
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: 'Cuerpo inválido' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!isTextOrAbsent(body.email)) {
+      return new Response(JSON.stringify({ error: 'Correo electrónico inválido' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!isTextOrAbsent(body.role)) {
+      return new Response(JSON.stringify({ error: 'Rol inválido. Solo admin/operador/visualizador/cobros' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!isTextOrAbsent(body.full_name) || !isTextOrAbsent(body.company_id)) {
+      return new Response(JSON.stringify({ error: 'Datos inválidos' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const email = (body.email ?? '').trim().toLowerCase()
@@ -98,9 +135,15 @@ Deno.serve(async (req: Request) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    if (!role || !INVITABLE_ROLES.includes(role)) {
+    if (!role || !isInvitableRole(role)) {
       return new Response(JSON.stringify({ error: 'Rol inválido. Solo admin/operador/visualizador/cobros' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    // El rol 'admin' solo lo invita el PRINCIPAL (company_owner o super_admin): un administrador recibe 403 con el motivo.
+    if (!canInviteRole(callerRole, role)) {
+      return new Response(JSON.stringify({ error: MSG_SOLO_PRINCIPAL_ADMIN }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
     if (!companyId) {
@@ -129,14 +172,45 @@ Deno.serve(async (req: Request) => {
     }, corsHeaders)
     if (rl) return rl
 
-    // 2. Revoca cualquier pending previo al mismo correo en la company (evita
-    // chocar con el índice único parcial y permite re-invitar limpio).
-    await adminClient
+    // 2. Revoca los pending previos al MISMO correo en la company (evita chocar con el índice único parcial y permite re-invitar limpio).
+    // Se leen las pendientes de la empresa y se comparan en código (correo recortado y en minúsculas, igualdad exacta) para revocarlas por id: un filtro
+    // ilike con el correo del cuerpo interpretaría % _ \ — y el * de PostgREST — como comodines, y '%@%.%' (pasa isValidEmail) revocaba TODAS las
+    // pendientes de la empresa. Y quien NO es el principal no revoca las invitaciones 'admin': son del propietario (esta escritura es con service_role,
+    // sin RLS; un administrador no debe poder anular por aquí lo que la política user_invitations_update ya le impide).
+    // Si esa lectura falla se aborta (falla CERRADO): tratarla como «no hay pendientes» (data ?? []) insertaba igualmente y dejaba el resultado en manos del
+    // índice único o, sin él, en dos pendientes para el mismo correo (V8-07 B4).
+    const { data: pendientes, error: pendientesErr } = await adminClient
       .from('user_invitations')
-      .update({ status: 'revoked' })
+      .select('id, email, role')
       .eq('company_id', companyId)
       .eq('status', 'pending')
-      .ilike('email', email)
+    if (pendientesErr) {
+      console.error('[invite-user] no se pudieron leer las invitaciones pendientes:', registroErrorBd(pendientesErr))
+      return new Response(JSON.stringify({ error: MSG_NO_SE_PUDO_CREAR }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const idsRevocar = idsPendientesARevocar(
+      (pendientes ?? []) as Array<{ id: string; email: string | null; role: string | null }>,
+      email,
+      isPrincipalRole(callerRole),
+    )
+    // Si la revocación falla también se aborta, SIN insertar (VEDGE-04): antes se ignoraba su error y se intentaba el INSERT; con la pendiente aún viva, el índice
+    // único lo rechazaba y el principal recibía el 409 «otra invitación acaba de crearse», que es falso (la que choca es la suya, que no se pudo revocar).
+    if (idsRevocar.length > 0) {
+      const { error: revocarErr } = await adminClient
+        .from('user_invitations')
+        .update({ status: 'revoked' })
+        .eq('company_id', companyId)
+        .eq('status', 'pending')
+        .in('id', idsRevocar)
+      if (revocarErr) {
+        console.error('[invite-user] no se pudieron revocar las invitaciones pendientes:', registroErrorBd(revocarErr))
+        return new Response(JSON.stringify({ error: MSG_NO_SE_PUDO_CREAR }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
 
     // 3. Crea la invitación con token + expiración.
     const token = generateToken()
@@ -156,8 +230,18 @@ Deno.serve(async (req: Request) => {
       .select('id')
       .single()
 
+    // Índice único (empresa, correo) entre las pendientes: si queda una que este llamador no podía revocar (la invitación 'admin' del propietario), es un conflicto, no un 500.
+    // El principal revoca TODAS las pendientes del correo: si aun así choca, otra petición creó una entre su revocación y su INSERT, y decirle que «la gestiona
+    // el propietario» al propio propietario es falso (V8-07 B2): se le dice que recargue e intente de nuevo.
+    if ((insertErr as { code?: string } | null)?.code === '23505') {
+      return new Response(JSON.stringify({ error: msgConflictoPendiente(isPrincipalRole(callerRole)) }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    // Cualquier otro fallo: mensaje genérico al cliente; el detalle (código y mensaje de la base de datos, sin el correo invitado) sólo al registro (V8-08).
     if (insertErr || !invitation) {
-      return new Response(JSON.stringify({ error: insertErr?.message ?? 'No se pudo crear la invitación' }), {
+      console.error('[invite-user] no se pudo insertar la invitación:', insertErr ? registroErrorBd(insertErr) : 'sin fila devuelta')
+      return new Response(JSON.stringify({ error: MSG_NO_SE_PUDO_CREAR }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
