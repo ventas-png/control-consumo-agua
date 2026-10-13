@@ -282,6 +282,11 @@ vacíos. De las 5 empresas, la elegible hoy se purga (sólo tiene catálogo); la
 única con operación (6 939 lecturas, 12 conversaciones, 120 turnos) quedaría
 retenida si se suspendiera (1 turno ya ocurrido, además de su facturación).
 
+**Aprobación (2026-10-13).** El dueño aprobó la política de esta sección (grupos A–G:
+la empresa con historia no se purga y queda suspendida con `PURGA_RETENCION`) y el ajuste
+de datos de la migración (las 2 filas de `conversations.cliente_id` que apuntan a un
+cliente ya borrado pasan a `NULL`). Siguen abiertas las preguntas de abajo.
+
 **Preguntas abiertas para el dueño de producto**
 
 1. **Plazo de retención.** ¿Cuánto se conserva la historia de una empresa
@@ -305,13 +310,9 @@ retenida si se suspendiera (1 turno ya ocurrido, además de su facturación).
      —la cola de borrado del bucket sobrevive a la empresa para retirar sus archivos—, lo
      dice su propia migración. Ya están en la lista de razones de `assert_politica.sql`.
    - `compras_config_separacion_bitacora.company_id` (#926, `NOT NULL`, sin llave):
-     bitácora *append-only* con guard que impide `UPDATE`/`DELETE`. **Decisión pendiente**:
-     (a) tratarla como `audit_log` —sobrevive a la purga, se añade a la lista de razones—;
-     o (b) llave `ON DELETE CASCADE` a `companies`, de modo que su guard aborte la purga
-     (categoría D: retiene a la empresa que haya cambiado el interruptor). Hasta decidir,
-     la suite de este PR queda en rojo **sobre la cadena combinada** (en solitario, sobre
-     `main`, pasa: la tabla no existe). Con la opción (a) aplicada en local, la suite
-     completa pasa en el orden real (rc 0).
+     bitácora *append-only* con guard que impide `UPDATE`/`DELETE`. **Decidido por el
+     dueño (2026-10-13): se trata como `audit_log`** —es auditoría, sobrevive a la purga
+     y no retiene a la empresa—; está en la lista de razones de `assert_politica.sql`.
 
 ## La empresa elegible hoy (medido el 2026-10-12)
 
