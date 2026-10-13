@@ -1,0 +1,986 @@
+diff --git a/src/components/condominios/tabs/OrdenesCompraTab.tsx b/src/components/condominios/tabs/OrdenesCompraTab.tsx
+index b9033ae..4e63ac6 100644
+--- a/src/components/condominios/tabs/OrdenesCompraTab.tsx
++++ b/src/components/condominios/tabs/OrdenesCompraTab.tsx
+@@ -168,7 +168,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
+       }
+       setShowForm(false); setEditId(null); setForm({ ...BLANK }); setLineas([]); onRefresh()
+     } catch (e) {
+-      notify({ variant: 'error', title: 'Error', text: mensajeCrearOrden(e) })
++      notify({ variant: 'error', title: 'Error', duration: DURACION_ERROR_LARGO_MS, text: mensajeCrearOrden(e) })
+     } finally {
+       enviando.current = false
+       setSaving(false)
+diff --git a/src/components/condominios/tabs/__tests__/OrdenesCompraTab.errorAlcance.test.tsx b/src/components/condominios/tabs/__tests__/OrdenesCompraTab.errorAlcance.test.tsx
+new file mode 100644
+index 0000000..c7e589b
+--- /dev/null
++++ b/src/components/condominios/tabs/__tests__/OrdenesCompraTab.errorAlcance.test.tsx
+@@ -0,0 +1,87 @@
++// Operaciones › Nueva OC y el alcance de proyecto al capturar (propuesta de pendientes_decision/proyectos): Operaciones SIEMPRE manda el proyecto de la pestaña, así que el rechazo
++// «…tu perfil necesita estar asignado al proyecto del documento» solo llega si la persona perdió ese proyecto con la pantalla abierta; igual se muestra SIN el código técnico
++// (COMPRAS_ALCANCE_PROYECTO) y el tiempo suficiente para leerlo (el aviso por omisión dura 3,5 s y el mensaje mide ~110 caracteres).
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
++import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
++import { DURACION_ERROR_LARGO_MS } from '../../../../domain/compras/errores'
++
++const PROV = '11111111-1111-4111-8111-111111111111'
++const h = vi.hoisted(() => ({
++  crear: vi.fn(),
++  update: vi.fn(),
++  notify: vi.fn(),
++}))
++
++vi.mock('../../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
++vi.mock('../../../../domain/cxp/queries', () => ({
++  useProveedoresQuery: () => ({ data: [{ id: PROV, nombre: 'Proveedor ZZ', estado: 'autorizado', alcance: 'empresa' }], isLoading: false }),
++}))
++vi.mock('../../../../domain/proveedores/queries', () => ({ useAsignacionesQuery: () => ({ data: [], isLoading: false }) }))
++vi.mock('../../../../domain/compras/queries', () => ({
++  useInsumosAlmacenQuery: () => ({ data: [], isLoading: false }),
++}))
++vi.mock('../../../../domain/compras/mutations', () => ({ crearOrdenTransaccional: h.crear }))
++vi.mock('../../../../domain/condominios/tabMutations', () => ({
++  createCondominioRow: vi.fn(() => { throw new Error('Operaciones ya no inserta la cabecera por separado') }),
++  updateCondominioRowAfectando: h.update,
++  deleteCondominioRowAfectando: vi.fn(),
++}))
++vi.mock('../../../proveedores/ProveedorSelector', () => ({
++  ProveedorSelector: ({ onChange }: { onChange: (id: string | null, p?: { nombre: string }) => void }) => (
++    <button type="button" onClick={() => onChange(PROV, { nombre: 'Proveedor ZZ' })}>Elegir proveedor</button>
++  ),
++}))
++vi.mock('../../../proveedores/ContratoSelector', () => ({ ContratoSelector: () => null }))
++vi.mock('../../../proveedores/SugerenciaCuentaLinea', () => ({ SugerenciaCuentaLinea: () => null }))
++vi.mock('../../../compras/SeguimientoOrdenModal', () => ({ SeguimientoOrdenModal: () => null }))
++vi.mock('../../../compras/SeguimientoComprasPanel', () => ({ SeguimientoComprasPanel: () => null }))
++vi.mock('../../../compras/ImportarLineasOrdenModal', () => ({ ImportarLineasOrdenModal: () => null }))
++vi.mock('../../../proveedores/ContratoSeguimientoModal', () => ({ ContratoSeguimientoModal: () => null }))
++vi.mock('../../../proveedores/permisos', () => ({ usePermisosProveedor: () => ({ cambiarEstado: true, puedeCambiarEstadoPaso: true, puedeAprobarOrdenCompra: true }) }))
++vi.mock('../../../../domain/proveedores/contratosCompras', async (orig) => ({
++  ...(await orig<typeof import('../../../../domain/proveedores/contratosCompras')>()),
++  useExcepcionContratoMutation: () => ({ mutateAsync: vi.fn() }),
++}))
++vi.mock('../../../shared/PromptDialog', () => ({ openPromptDialog: vi.fn() }))
++vi.mock('../../../shared/Dialog', () => ({ confirm: vi.fn(), notify: h.notify }))
++
++import OrdenesCompraTab from '../OrdenesCompraTab'
++
++const montar = (ordenes: never[] = [], onRefresh = vi.fn()) =>
++  render(<OrdenesCompraTab ordenes={ordenes} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit onRefresh={onRefresh} proveedores={[]} />)
++
++function abrirYLlenar(concepto = 'Mantenimiento de bombas') {
++  fireEvent.click(screen.getByRole('button', { name: '+ Nueva OC' }))
++  fireEvent.click(screen.getByRole('button', { name: 'Elegir proveedor' }))
++  fireEvent.change(screen.getByPlaceholderText('Descripción breve de la compra'), { target: { value: concepto } })
++}
++
++
++const OTRO_PROYECTO = 'COMPRAS_ALCANCE_PROYECTO: para crear un documento de compras tu perfil necesita estar asignado al proyecto del documento.'
++
++beforeEach(() => { h.crear.mockResolvedValue({ orden: { id: 'o1' }, lineas: [], reutilizada: false }) })
++afterEach(() => { cleanup(); vi.clearAllMocks() })
++
++describe('Operaciones · Nueva OC: el rechazo de alcance de proyecto se lee entero', () => {
++  it('muestra el texto del servidor sin el código y con la duración larga', async () => {
++    h.crear.mockRejectedValueOnce(new Error(OTRO_PROYECTO))
++    montar()
++    abrirYLlenar()
++    fireEvent.click(screen.getByRole('button', { name: 'Guardar como borrador' }))
++    await waitFor(() => expect(h.notify).toHaveBeenCalled())
++    const avisos = h.notify.mock.calls.map((c) => c[0] as { variant?: string; text?: string; duration?: number }).filter((a) => a.variant === 'error')
++    expect(avisos).toHaveLength(1)
++    expect(avisos[0].text).toBe('Para crear un documento de compras tu perfil necesita estar asignado al proyecto del documento.')
++    expect(avisos[0].text).not.toContain('COMPRAS_')
++    expect(avisos[0].duration).toBe(DURACION_ERROR_LARGO_MS)
++  })
++
++  it('un rechazo de datos conserva su código (no se disfraza) y también dura lo suficiente', async () => {
++    h.crear.mockRejectedValueOnce(new Error('COMPRAS_LINEA_INSUMO_ALCANCE: el insumo no es del proyecto'))
++    montar()
++    abrirYLlenar()
++    fireEvent.click(screen.getByRole('button', { name: 'Guardar como borrador' }))
++    await waitFor(() => expect(h.notify).toHaveBeenCalled())
++    expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error', text: 'COMPRAS_LINEA_INSUMO_ALCANCE: el insumo no es del proyecto', duration: DURACION_ERROR_LARGO_MS }))
++  })
++})
+diff --git a/src/components/contabilidad/ComprasTab.tsx b/src/components/contabilidad/ComprasTab.tsx
+index 8ca0e8f..8336c83 100644
+--- a/src/components/contabilidad/ComprasTab.tsx
++++ b/src/components/contabilidad/ComprasTab.tsx
+@@ -595,7 +595,7 @@ export function OrdenCompraModal({
+       notify({ variant: 'success', title: 'Listo', text: 'Orden creada en borrador. Apruébala para emitirla.' })
+       onClose()
+     } catch (e) {
+-      notify({ variant: 'error', title: 'Error', text: mensajeCrearOrden(e) })
++      notify({ variant: 'error', title: 'Error', duration: DURACION_ERROR_LARGO_MS, text: mensajeCrearOrden(e) })
+     } finally {
+       enviando.current = false
+     }
+@@ -761,7 +761,7 @@ function RecepcionModal({
+       })
+       onClose()
+     } catch (e) {
+-      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo crear la recepción.' })
++      notify({ variant: 'error', title: 'Error', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e, 'No se pudo crear la recepción.') })
+     }
+   }
+ 
+diff --git a/src/components/contabilidad/ContabilidadSection.tsx b/src/components/contabilidad/ContabilidadSection.tsx
+index f5b7bc9..5d79a38 100644
+--- a/src/components/contabilidad/ContabilidadSection.tsx
++++ b/src/components/contabilidad/ContabilidadSection.tsx
+@@ -1,7 +1,8 @@
+-import { useCallback, useEffect, useState } from 'react'
++import { useCallback, useEffect, useRef, useState } from 'react'
+ import { useSession } from '../shared/SessionContext'
+ import { TabStrip } from '../shared/TabStrip'
+-import { useProyectosQuery } from '../../domain/agua/queries'
++import { useProyectoAssignmentsQuery, useProyectosQuery } from '../../domain/agua/queries'
++import { filterProyectosByAssignment, isCompanyWideRole, isProjectExempt, ledgerInicialPorAlcance } from '../../lib/proyectosAccess'
+ import { useMonedaBaseQuery } from '../../domain/contabilidad/queries'
+ import { CatalogoCuentasTab } from './CatalogoCuentasTab'
+ import { AsientosTab } from './AsientosTab'
+@@ -58,10 +59,34 @@ const TABS: { id: SubTab; label: string; icon: string }[] = [
+  * propios); los asientos automáticos nacen de los triggers de BD en el
+  * ledger del documento.
+  */
+-/** Contabilidad recordada de una empresa (null = la de la empresa). */
+-function leerLedgerGuardado(companyId?: string | null): string | null {
+-  if (!companyId) return null
+-  return localStorage.getItem(`conta-ledger:${companyId}`) || null
++/** Lo que se guarda cuando la persona eligió «🏢 Empresa» a propósito (un id de proyecto nunca vale esto): distingue «Empresa elegida» de «nada recordado». */
++const LEDGER_EMPRESA_ELEGIDA = 'empresa'
++
++/**
++ * El almacenamiento del navegador puede fallar (cuota llena, modo privado, acceso bloqueado por la configuración o ausente): NINGUNA lectura ni escritura puede
++ * tumbar la pantalla. Sin almacenamiento simplemente no se recuerda nada (la persona acotada abre su primer proyecto y la selección vive en memoria).
++ */
++function leerAlmacen(key: string): string | null {
++  try { return localStorage.getItem(key) } catch { return null }
++}
++/** `valor` null = quitar la llave. Si el navegador no deja escribir, la selección sigue en memoria y solo no se recuerda. */
++function escribirAlmacen(key: string, valor: string | null): void {
++  try {
++    if (valor === null) localStorage.removeItem(key)
++    else localStorage.setItem(key, valor)
++  } catch { /* cuota llena, modo privado o acceso bloqueado */ }
++}
++
++/**
++ * Contabilidad recordada de una empresa, en este navegador: un proyecto (`proyecto`), «Empresa» elegida a propósito (`empresaElegida`) o nada
++ * (`proyecto` null y `empresaElegida` false: sin llave). Solo la elección explícita de «Empresa» se guarda; abrir en «Empresa» por omisión no deja rastro.
++ * Sin almacenamiento utilizable, nada recordado.
++ */
++function leerLedgerGuardado(companyId?: string | null): { proyecto: string | null; empresaElegida: boolean } {
++  if (!companyId) return { proyecto: null, empresaElegida: false }
++  const guardado = leerAlmacen(`conta-ledger:${companyId}`)
++  if (guardado === LEDGER_EMPRESA_ELEGIDA) return { proyecto: null, empresaElegida: true }
++  return { proyecto: guardado || null, empresaElegida: false }
+ }
+ 
+ export function ContabilidadSection() {
+@@ -70,40 +95,71 @@ export function ContabilidadSection() {
+   const [tab, setTab] = useState<SubTab>('polizas')
+ 
+   const { data: proyectos = [], isSuccess: proyectosCargados } = useProyectosQuery(companyId)
++  // Alcance de la persona: decide con qué contabilidad abre cuando no recordó ninguna (ver más abajo).
++  const { data: asignaciones, isSuccess: asignacionesCargadas } = useProyectoAssignmentsQuery(session.user_id, session.role)
+ 
+   // Ledger activo: null = contabilidad de la EMPRESA; uuid = la del proyecto.
+   // Persistido por empresa para volver donde el admin trabajaba. El estado
+   // guarda TAMBIÉN la empresa dueña de la selección: sin eso, el proyecto de
+   // una empresa se arrastraba (y se re-persistía) bajo la llave de otra cuando
+   // la sesión cambiaba de empresa o cuando aún no había resuelto al montar.
+-  const [ledger, setLedger] = useState<{ empresa: string | null; proyecto: string | null }>(() => ({
++  // `empresaElegida`: la persona eligió «Empresa» en el selector (no es la omisión ni una corrección del componente); se recuerda como tal.
++  const [ledger, setLedger] = useState<{ empresa: string | null; proyecto: string | null; empresaElegida: boolean }>(() => ({
+     empresa: companyId ?? null,
+-    proyecto: leerLedgerGuardado(companyId),
++    ...leerLedgerGuardado(companyId),
+   }))
+   const ledgerProjectId = ledger.empresa === (companyId ?? null) ? ledger.proyecto : null
++  // La persona elige en el selector: «Empresa» elegida a propósito se recuerda y NO se deshace al remontar ni al recargar.
+   const elegirLedger = useCallback(
+-    (proyecto: string | null) => setLedger({ empresa: companyId ?? null, proyecto }),
++    (proyecto: string | null) => setLedger({ empresa: companyId ?? null, proyecto, empresaElegida: proyecto === null }),
+     [companyId],
+   )
++  // Lo fija el propio componente (contabilidad por omisión o corrección de un proyecto que ya no existe): no es una elección de la persona.
++  const fijarLedger = useCallback(
++    (proyecto: string | null) => setLedger({ empresa: companyId ?? null, proyecto, empresaElegida: false }),
++    [companyId],
++  )
++  // Sin una contabilidad recordada, una persona ACOTADA a proyectos abre el primero que ve y no «🏢 Empresa»: el servidor solo deja crear documentos de compras
++  // «sin proyecto» a una persona exenta (COMPRAS_ALCANCE_PROYECTO) y no tiene sentido ofrecerle por omisión un libro donde no puede capturar. Una sola vez por empresa
++  // y por montaje. Si elige «Empresa» a propósito, esa elección SE RECUERDA (por empresa y por navegador, como un proyecto) y no se le quita al remontar ni al recargar:
++  // solo se preselecciona el primer proyecto cuando NO hay elección recordada.
++  const ledgerPorOmisionResuelto = useRef<string | null>(null)
++  useEffect(() => {
++    if (!companyId || ledger.empresa !== companyId || ledgerPorOmisionResuelto.current === companyId) return
++    if (!proyectosCargados || !(isCompanyWideRole(session.role) || asignacionesCargadas)) return
++    // Un proyecto recordado que ya no existe lo descarta la guarda de más abajo; se decide en el render siguiente, ya sin él (si no, la persona acotada quedaba en «Empresa»).
++    if (ledger.proyecto && !proyectos.some((p) => p.id === ledger.proyecto)) return
++    ledgerPorOmisionResuelto.current = companyId
++    const inicial = ledgerInicialPorAlcance({
++      exento: isProjectExempt(session.role, session.assigned_role_ids, asignaciones),
++      guardado: ledger.proyecto,
++      empresaElegida: ledger.empresaElegida,
++      accesibles: filterProyectosByAssignment({
++        proyectos, userId: session.user_id, role: session.role, assignedRoleIds: session.assigned_role_ids, assignments: asignaciones,
++      }),
++    })
++    if (inicial !== ledger.proyecto) fijarLedger(inicial)
++  }, [companyId, ledger, proyectos, proyectosCargados, asignaciones, asignacionesCargadas, session.role, session.user_id, session.assigned_role_ids, fijarLedger])
+   // Cambió la empresa: la contabilidad activa se relee de ESA empresa.
+   useEffect(() => {
+     if (ledger.empresa === (companyId ?? null)) return
+-    setLedger({ empresa: companyId ?? null, proyecto: leerLedgerGuardado(companyId) })
++    setLedger({ empresa: companyId ?? null, ...leerLedgerGuardado(companyId) })
+   }, [companyId, ledger.empresa])
+   useEffect(() => {
+     if (!companyId || ledger.empresa !== companyId) return
+-    const key = `conta-ledger:${companyId}`
+-    if (ledger.proyecto) localStorage.setItem(key, ledger.proyecto)
+-    else localStorage.removeItem(key)
++    escribirAlmacen(`conta-ledger:${companyId}`, ledger.proyecto || (ledger.empresaElegida ? LEDGER_EMPRESA_ELEGIDA : null))
+   }, [companyId, ledger])
+   // Si el proyecto persistido no es de esta empresa (o ya no existe/accesible),
+   // volver a la empresa. La guarda corre en cuanto la lista resuelve, incluso
+   // vacía: una empresa SIN proyectos conservaba el proyecto de la anterior.
++  // Y devuelve la decisión a la omisión de arriba (V4-H3): si un refetch quita el proyecto abierto cuando la omisión ya estaba resuelta, la persona acotada
++  // pasa al primer proyecto que sí ve (la exenta conserva «Empresa») en vez de quedarse en el libro donde el servidor le rechaza capturar.
+   useEffect(() => {
+     if (proyectosCargados && ledgerProjectId && !proyectos.some((p) => p.id === ledgerProjectId)) {
+-      elegirLedger(null)
++      ledgerPorOmisionResuelto.current = null
++      fijarLedger(null)
+     }
+-  }, [ledgerProjectId, proyectos, proyectosCargados, elegirLedger])
++  }, [ledgerProjectId, proyectos, proyectosCargados, fijarLedger])
+ 
+   const { data: monedaBase = 'GTQ' } = useMonedaBaseQuery(companyId, ledgerProjectId)
+   // Identidad de la contabilidad activa (empresa + proyecto) para remontar las
+diff --git a/src/components/contabilidad/CuentasPorPagarTab.tsx b/src/components/contabilidad/CuentasPorPagarTab.tsx
+index 26e2f72..23ce954 100644
+--- a/src/components/contabilidad/CuentasPorPagarTab.tsx
++++ b/src/components/contabilidad/CuentasPorPagarTab.tsx
+@@ -598,7 +598,7 @@ function ContrasenaFormModal({ companyId, projectId, monedaBase, facturas, onClo
+       })
+       onClose()
+     } catch (e) {
+-      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo emitir.' })
++      notify({ variant: 'error', title: 'Error', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e, 'No se pudo emitir.') })
+     }
+   }
+ 
+@@ -1015,7 +1015,7 @@ function OrdenFormModal({ companyId, factura, monedaBase, onClose }: {
+       notify({ variant: 'success', title: 'Solicitada', text: 'Orden de pago creada en borrador; apruébala y márcala pagada para contabilizar.' })
+       onClose()
+     } catch (e) {
+-      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo crear la orden.' })
++      notify({ variant: 'error', title: 'Error', duration: DURACION_ERROR_LARGO_MS, text: mensajeAccionCompras(e, 'No se pudo crear la orden.') })
+     } finally {
+       enviando.current = false
+     }
+diff --git a/src/components/contabilidad/__tests__/erroresCapturaProyecto.test.tsx b/src/components/contabilidad/__tests__/erroresCapturaProyecto.test.tsx
+new file mode 100644
+index 0000000..5741948
+--- /dev/null
++++ b/src/components/contabilidad/__tests__/erroresCapturaProyecto.test.tsx
+@@ -0,0 +1,181 @@
++// Alcance de proyecto al capturar (propuesta de pendientes_decision/proyectos): cuando el servidor rechaza un documento NUEVO porque la persona no tiene el
++// proyecto asignado («…tu perfil necesita estar asignado al proyecto del documento»), la pantalla muestra ESE texto, sin el código técnico del prefijo
++// (COMPRAS_ALCANCE_PROYECTO) y el tiempo suficiente para leerlo: los avisos de 3,5 s por omisión desaparecían antes de leerse un mensaje de ~170 caracteres.
++//
++// Son los CINCO flujos de creación que mostraban `e.message` crudo y 3,5 s (la factura —textoErrorServidor— y las acciones sobre documentos existentes
++// —mensajeAccionCompras— ya lo hacían bien):
++//   Compras › Nueva orden · Compras › Recibir · Cuentas por pagar › Emitir contraseña · Cuentas por pagar › Pagar (orden de pago) · (Operaciones › Nueva OC
++//   tiene su archivo: condominios/tabs/__tests__/OrdenesCompraTab.errorAlcance.test.tsx).
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
++import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
++import { DURACION_ERROR_LARGO_MS } from '../../../domain/compras/errores'
++
++vi.mock('../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
++vi.mock('../../../domain/proveedores/contratosCompras', async (orig) => ({
++  ...(await orig<typeof import('../../../domain/proveedores/contratosCompras')>()),
++  useContratosParaOrdenQuery: () => ({ data: [], isLoading: false }),
++  useExcepcionContratoMutation: () => ({ mutateAsync: vi.fn() }),
++}))
++
++const PROV = '11111111-1111-4111-8111-111111111111'
++const PROY = '22222222-2222-4222-8222-222222222222'
++const OC1 = '33333333-3333-4333-8333-333333333333'
++const OCL1 = '44444444-4444-4444-8444-444444444444'
++const FAC1 = '55555555-5555-4555-8555-555555555555'
++const m = vi.hoisted(() => ({
++  crearOrden: vi.fn(), crearRecepcion: vi.fn(), crearContrasena: vi.fn(), crearOrdenPago: vi.fn(),
++  notify: vi.fn(), onClose: vi.fn(),
++  ordenes: [] as unknown[], lineas: [] as unknown[], facturas: [] as unknown[],
++}))
++const vacio = { data: [], isLoading: false }
++
++vi.mock('../../../domain/compras/queries', () => ({
++  useOrdenesCompraQuery: () => ({ data: m.ordenes, isLoading: false }),
++  useRecepcionesQuery: () => vacio, useContrasenasQuery: () => vacio, useActivosFijosQuery: () => vacio,
++  useCompromisosQuery: () => vacio, useDuplicadosQuery: () => vacio,
++  useOrdenCompraLineasQuery: () => ({ data: m.lineas, isLoading: false }),
++  useCuadreQuery: () => vacio, useInsumosAlmacenQuery: () => vacio,
++}))
++vi.mock('../../../domain/compras/mutations', () => ({
++  useCrearOrdenCompraMutation: () => ({ mutateAsync: m.crearOrden, isPending: false }),
++  useCrearRecepcionMutation: () => ({ mutateAsync: m.crearRecepcion, isPending: false }),
++  useCrearContrasenaMutation: () => ({ mutateAsync: m.crearContrasena, isPending: false }),
++  useCambiarEstadoOrdenCompraMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++  useCambiarEstadoRecepcionMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++  useAprobarFacturaConCuadreMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++  useEnlazarGastoAFacturaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++  useDescartarDuplicadoMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++}))
++vi.mock('../../../domain/proveedores/queries', async (orig) => ({
++  ...(await orig<typeof import('../../../domain/proveedores/queries')>()),
++  useResponsablesQuery: () => vacio,
++}))
++vi.mock('../../../domain/cxp/queries', () => ({
++  useProveedoresQuery: () => ({ data: [{ id: PROV, nombre: 'Ferretería', estado: 'autorizado', alcance: 'empresa' }], isLoading: false }),
++  useFacturasProveedorQuery: () => ({ data: m.facturas, isLoading: false }),
++  useOrdenesPagoQuery: () => vacio, useAgingQuery: () => vacio, useProyeccionPagosQuery: () => vacio,
++}))
++vi.mock('../../../domain/cxp/mutations', () => ({
++  useAprobarFacturaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++  useAnularFacturaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++  useAprobarOrdenMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++  useMarcarOrdenPagadaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++  useAnularOrdenMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++  useCrearFacturaProveedorMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
++  useCrearOrdenPagoMutation: () => ({ mutateAsync: m.crearOrdenPago, isPending: false }),
++}))
++vi.mock('../../proveedores/SugerenciaCuentaLinea', () => ({ SugerenciaCuentaLinea: () => null }))
++vi.mock('../../shared/Dialog', () => ({ confirm: vi.fn(), notify: m.notify }))
++vi.mock('../ui', async (original) => {
++  const real = await original<typeof import('../ui')>()
++  const { PASOS_TODOS } = await import('../../../test/sesionPermisos')
++  return {
++    ...real,
++    usePermisosContabilidad: () => ({ puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: true, puedeEliminar: true, ...PASOS_TODOS }),
++  }
++})
++
++import { ComprasTab, OrdenCompraModal } from '../ComprasTab'
++import { CuentasPorPagarTab } from '../CuentasPorPagarTab'
++import { montarConSesion } from '../../../test/sesionPermisos'
++
++// Los textos de la propuesta (propuesta_alcance_proyecto.sql), tal cual los escribe el servidor.
++const SIN_PROYECTO = 'COMPRAS_ALCANCE_PROYECTO: un documento de compras sin proyecto (la contabilidad de la Empresa) solo lo crea una persona exenta de proyecto; si no lo eres, tu perfil necesita estar asignado al proyecto del documento: elige uno de los tuyos.'
++const OTRO_PROYECTO = 'COMPRAS_ALCANCE_PROYECTO: para crear un documento de compras tu perfil necesita estar asignado al proyecto del documento.'
++const LEGIBLE_SIN_PROYECTO = 'Un documento de compras sin proyecto (la contabilidad de la Empresa) solo lo crea una persona exenta de proyecto; si no lo eres, tu perfil necesita estar asignado al proyecto del documento: elige uno de los tuyos.'
++const LEGIBLE_OTRO_PROYECTO = 'Para crear un documento de compras tu perfil necesita estar asignado al proyecto del documento.'
++
++/** El aviso de error que la pantalla mostró: sin el código técnico y con el tiempo de los mensajes largos. */
++function avisoDeError() {
++  const llamadas = m.notify.mock.calls.map((c) => c[0] as { variant?: string; text?: string; duration?: number }).filter((a) => a.variant === 'error')
++  expect(llamadas).toHaveLength(1)
++  return llamadas[0]
++}
++
++beforeEach(() => {
++  m.ordenes = []; m.lineas = []; m.facturas = []
++})
++afterEach(() => { cleanup(); vi.clearAllMocks() })
++
++describe.each([
++  ['sin proyecto (la contabilidad de la Empresa)', SIN_PROYECTO, LEGIBLE_SIN_PROYECTO],
++  ['en un proyecto que la persona no tiene', OTRO_PROYECTO, LEGIBLE_OTRO_PROYECTO],
++])('el servidor rechaza un documento NUEVO %s', (_caso, crudo, legible) => {
++  it('Compras › Nueva orden: texto sin el código y con tiempo para leerlo', async () => {
++    m.crearOrden.mockRejectedValueOnce(new Error(crudo))
++    render(<OrdenCompraModal companyId="c1" projectId={null} monedaBase="GTQ" proveedores={[{ id: PROV, nombre: 'Proveedor ZZ' }]} hayProveedores onClose={m.onClose} />)
++    fireEvent.change(screen.getByText('Proveedor autorizado *').closest('label')!.querySelector('select')!, { target: { value: PROV } })
++    fireEvent.change(screen.getByText('Concepto *').closest('label')!.querySelector('input')!, { target: { value: 'Compra de cloro' } })
++    fireEvent.change(screen.getByLabelText('Descripción del renglón 1'), { target: { value: 'Cloro' } })
++    fireEvent.change(screen.getByLabelText('Precio del renglón 1'), { target: { value: '12.5' } })
++    fireEvent.click(screen.getByRole('button', { name: 'Crear borrador' }))
++    await waitFor(() => expect(m.notify).toHaveBeenCalled())
++    const aviso = avisoDeError()
++    expect(aviso.text).toBe(legible)
++    expect(aviso.text).not.toContain('COMPRAS_')
++    expect(aviso.duration).toBe(DURACION_ERROR_LARGO_MS)
++    expect(m.onClose).not.toHaveBeenCalled()
++  })
++
++  it('Compras › Recibir: texto sin el código y con tiempo para leerlo', async () => {
++    m.crearRecepcion.mockRejectedValueOnce(new Error(crudo))
++    m.ordenes = [{ id: OC1, numero: 'OC-1', estado: 'emitida', concepto: 'Compra', proveedor_nombre: 'Ferretería', proveedores: { nombre: 'Ferretería' }, total: 100, moneda: 'GTQ', contrato_id: null }]
++    m.lineas = [{ id: OCL1, orden_compra_id: OC1, linea: 1, descripcion: 'Cloro', destino_tipo: 'gasto', cantidad: 10, cantidad_recibida: 0, cantidad_facturada: 0, precio_unitario: 10, unidad: 'u' }]
++    montarConSesion(<ComprasTab companyId="c1" projectId={null} monedaBase="GTQ" />, { role: 'operator' })
++    fireEvent.click(screen.getByRole('button', { name: 'Recibir' }))
++    fireEvent.click(await screen.findByRole('button', { name: 'Crear recepción' }))
++    await waitFor(() => expect(m.crearRecepcion).toHaveBeenCalledTimes(1))
++    await waitFor(() => expect(m.notify).toHaveBeenCalled())
++    const aviso = avisoDeError()
++    expect(aviso.text).toBe(legible)
++    expect(aviso.text).not.toContain('COMPRAS_')
++    expect(aviso.duration).toBe(DURACION_ERROR_LARGO_MS)
++  })
++
++  it('Cuentas por pagar › Emitir contraseña: texto sin el código y con tiempo para leerlo', async () => {
++    m.crearContrasena.mockRejectedValueOnce(new Error(crudo))
++    m.facturas = [{ id: FAC1, proveedor_id: PROV, proveedores: { nombre: 'Ferretería' }, numero_factura: 'F-1', concepto: 'Material', fecha_vencimiento: '2026-11-01', monto_total: 600, monto_pagado: 0, moneda: 'GTQ', estado: 'aprobada', orden_compra_id: null }]
++    montarConSesion(<CuentasPorPagarTab companyId="c1" projectId={null} monedaBase="GTQ" />, { role: 'operator' })
++    fireEvent.click(screen.getByRole('button', { name: 'Emitir contraseña de pago' }))
++    fireEvent.change(screen.getByText('Proveedor *').closest('label')!.querySelector('select')!, { target: { value: PROV } })
++    fireEvent.change(screen.getByText('Se le paga el *').closest('label')!.querySelector('input')!, { target: { value: '2026-11-15' } })
++    fireEvent.click(await screen.findByRole('checkbox'))
++    fireEvent.click(screen.getByRole('button', { name: 'Emitir' }))
++    await waitFor(() => expect(m.crearContrasena).toHaveBeenCalledTimes(1))
++    await waitFor(() => expect(m.notify).toHaveBeenCalled())
++    const aviso = avisoDeError()
++    expect(aviso.text).toBe(legible)
++    expect(aviso.text).not.toContain('COMPRAS_')
++    expect(aviso.duration).toBe(DURACION_ERROR_LARGO_MS)
++  })
++
++  it('Cuentas por pagar › Pagar (orden de pago): texto sin el código y con tiempo para leerlo', async () => {
++    m.crearOrdenPago.mockRejectedValueOnce(new Error(crudo))
++    m.facturas = [{ id: FAC1, proveedor_id: PROV, proveedores: { nombre: 'Ferretería' }, numero_factura: 'F-1', concepto: 'Material', fecha_vencimiento: '2026-11-01', monto_total: 600, monto_pagado: 0, moneda: 'GTQ', estado: 'aprobada', orden_compra_id: null, project_id: null }]
++    montarConSesion(<CuentasPorPagarTab companyId="c1" projectId={null} monedaBase="GTQ" />, { role: 'operator' })
++    fireEvent.click(screen.getByRole('button', { name: 'Pagar' }))
++    fireEvent.click(await screen.findByRole('button', { name: 'Crear orden' }))
++    await waitFor(() => expect(m.crearOrdenPago).toHaveBeenCalledTimes(1))
++    await waitFor(() => expect(m.notify).toHaveBeenCalled())
++    const aviso = avisoDeError()
++    expect(aviso.text).toBe(legible)
++    expect(aviso.text).not.toContain('COMPRAS_')
++    expect(aviso.duration).toBe(DURACION_ERROR_LARGO_MS)
++  })
++})
++
++describe('lo que NO cambia: un rechazo de datos se muestra como llegó (con su código) y con el mismo tiempo largo', () => {
++  it('Nueva orden: COMPRAS_LINEA_CUENTA_INVALIDA conserva su código', async () => {
++    m.crearOrden.mockRejectedValueOnce(new Error('COMPRAS_LINEA_CUENTA_INVALIDA: la cuenta no es de la empresa'))
++    render(<OrdenCompraModal companyId="c1" projectId={PROY} monedaBase="GTQ" proveedores={[{ id: PROV, nombre: 'Proveedor ZZ' }]} hayProveedores onClose={m.onClose} />)
++    fireEvent.change(screen.getByText('Proveedor autorizado *').closest('label')!.querySelector('select')!, { target: { value: PROV } })
++    fireEvent.change(screen.getByText('Concepto *').closest('label')!.querySelector('input')!, { target: { value: 'Compra de cloro' } })
++    fireEvent.change(screen.getByLabelText('Descripción del renglón 1'), { target: { value: 'Cloro' } })
++    fireEvent.change(screen.getByLabelText('Precio del renglón 1'), { target: { value: '12.5' } })
++    fireEvent.click(screen.getByRole('button', { name: 'Crear borrador' }))
++    await waitFor(() => expect(m.notify).toHaveBeenCalled())
++    const aviso = avisoDeError()
++    expect(aviso.text).toBe('COMPRAS_LINEA_CUENTA_INVALIDA: la cuenta no es de la empresa')
++    expect(aviso.duration).toBe(DURACION_ERROR_LARGO_MS)
++  })
++})
+diff --git a/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx b/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx
+new file mode 100644
+index 0000000..b91c11b
+--- /dev/null
++++ b/src/components/contabilidad/__tests__/ledgerPorOmision.test.tsx
+@@ -0,0 +1,402 @@
++// D-8 del alcance de proyecto al capturar (propuesta de pendientes_decision/proyectos): con qué contabilidad abre Contabilidad.
++//
++// El servidor solo deja crear un documento de compras «sin proyecto» (la contabilidad de la EMPRESA) a una persona exenta de proyecto: a una persona ACOTADA
++// la rechaza al guardar. Contabilidad abría por omisión en «🏢 Empresa» (project_id = null) cuando no había una contabilidad recordada, así que una persona
++// acotada que abría Compras o Cuentas por pagar y pulsaba «Nueva…» solo se enteraba al guardar. Ahora, sin una contabilidad recordada, la persona acotada
++// abre el PRIMER proyecto que ve y la exenta conserva «Empresa». Una contabilidad recordada se respeta; elegir «Empresa» a propósito no se deshace.
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
++import { useState } from 'react'
++import { cleanup, fireEvent, screen } from '@testing-library/react'
++import { montarConSesion } from '../../../test/sesionPermisos'
++
++vi.mock('../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
++
++const P1 = '11111111-1111-4111-8111-111111111111'
++const P2 = '22222222-2222-4222-8222-222222222222'
++const P3 = '33333333-3333-4333-8333-333333333333'
++const m = vi.hoisted(() => ({
++  proyectos: [] as Array<{ id: string; nombre: string }>,
++  proyectosCargados: true,
++  asignaciones: undefined as string[] | undefined,
++  asignacionesCargadas: true,
++}))
++
++vi.mock('../../../domain/agua/queries', () => ({
++  useProyectosQuery: () => ({ data: m.proyectos, isSuccess: m.proyectosCargados }),
++  useProyectoAssignmentsQuery: () => ({ data: m.asignaciones, isSuccess: m.asignacionesCargadas }),
++}))
++vi.mock('../../../domain/contabilidad/queries', () => ({ useMonedaBaseQuery: () => ({ data: 'GTQ' }) }))
++// Las pestañas no son el tema: solo importa con qué proyecto (o «empresa») se montan.
++vi.mock('../AsientosTab', () => ({ AsientosTab: ({ projectId }: { projectId: string | null }) => <div data-testid="ledger">{projectId ?? 'empresa'}</div> }))
++vi.mock('../CatalogoCuentasTab', () => ({ CatalogoCuentasTab: () => null }))
++vi.mock('../BalanzaTab', () => ({ BalanzaTab: () => null }))
++vi.mock('../MapeoCuentasTab', () => ({ MapeoCuentasTab: () => null }))
++vi.mock('../ReglasImputacionTab', () => ({ ReglasImputacionTab: () => null }))
++vi.mock('../TiposCargoTab', () => ({ TiposCargoTab: () => null }))
++vi.mock('../AuxiliaresTab', () => ({ AuxiliaresTab: () => null }))
++vi.mock('../PendientesContabilizacionTab', () => ({ PendientesContabilizacionTab: () => null }))
++vi.mock('../CargosPendientesTab', () => ({ CargosPendientesTab: () => null }))
++vi.mock('../EstadoCuentaTab', () => ({ EstadoCuentaTab: () => null }))
++vi.mock('../AjustesTab', () => ({ AjustesTab: () => null }))
++vi.mock('../ProveedoresTab', () => ({ ProveedoresTab: () => null }))
++vi.mock('../CuentasPorPagarTab', () => ({ CuentasPorPagarTab: () => null }))
++vi.mock('../ComprasTab', () => ({ ComprasTab: () => null }))
++vi.mock('../PresupuestoTab', () => ({ PresupuestoTab: () => null }))
++vi.mock('../BancosTab', () => ({ BancosTab: () => null }))
++vi.mock('../EstadosFinancierosTab', () => ({ EstadosFinancierosTab: () => null }))
++
++import { ContabilidadSection } from '../ContabilidadSection'
++
++const montar = (role: string) => montarConSesion(<ContabilidadSection />, { role })
++const selector = () => screen.getByLabelText('Seleccionar contabilidad') as HTMLSelectElement
++const montadaCon = () => screen.getByTestId('ledger').textContent
++
++beforeEach(() => {
++  localStorage.clear()
++  m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P2, nombre: 'Beta' }, { id: P3, nombre: 'Gamma' }]
++  m.proyectosCargados = true
++  m.asignaciones = [P2, P3]
++  m.asignacionesCargadas = true
++})
++afterEach(() => { cleanup(); localStorage.clear() })
++
++describe('Contabilidad abre con la contabilidad que la persona puede usar para capturar', () => {
++  it('una persona ACOTADA sin contabilidad recordada abre el PRIMER proyecto que ve (no «Empresa»)', () => {
++    montar('operator')
++    expect(selector().value).toBe(P2)          // Alfa (P1) no es suyo: el primero de los suyos, por nombre, es Beta
++    expect(montadaCon()).toBe(P2)
++    expect(localStorage.getItem('conta-ledger:c1')).toBe(P2)
++  })
++
++  it('un administrador CON asignaciones también está acotado: abre el primero de los suyos', () => {
++    montar('admin')
++    expect(selector().value).toBe(P2)
++  })
++
++  it.each(['company_owner', 'super_admin'])('%s (alcance de empresa) conserva «Empresa»', (rol) => {
++    m.asignaciones = undefined          // para ellos la consulta de asignaciones ni se hace
++    m.asignacionesCargadas = false
++    montar(rol)
++    expect(selector().value).toBe('')
++    expect(montadaCon()).toBe('empresa')
++  })
++
++  it('un administrador SIN asignaciones es exento: conserva «Empresa»', () => {
++    m.asignaciones = []
++    montar('admin')
++    expect(selector().value).toBe('')
++  })
++
++  it('una contabilidad recordada se respeta siempre', () => {
++    localStorage.setItem('conta-ledger:c1', P3)
++    montar('operator')
++    expect(selector().value).toBe(P3)
++  })
++
++  it('una persona acotada que no ve ningún proyecto queda en «Empresa» (no hay otra)', () => {
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }]
++    m.asignaciones = []
++    montar('operator')
++    expect(selector().value).toBe('')
++  })
++
++  it('no decide hasta saber sus asignaciones: mientras cargan queda en «Empresa» y al llegar abre su proyecto', () => {
++    m.asignacionesCargadas = false
++    m.asignaciones = undefined
++    function Envuelto() {
++      const [n, setN] = useState(0)
++      return <><button onClick={() => setN(n + 1)}>refrescar {n}</button><ContabilidadSection /></>
++    }
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe('')
++    m.asignacionesCargadas = true
++    m.asignaciones = [P2, P3]
++    fireEvent.click(screen.getByRole('button', { name: /refrescar/ }))
++    expect(selector().value).toBe(P2)
++  })
++
++  it('si la persona elige «Empresa» a propósito, no se le quita después', () => {
++    montar('operator')
++    expect(selector().value).toBe(P2)
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(selector().value).toBe('')
++    expect(montadaCon()).toBe('empresa')
++  })
++})
++
++// Elegir «Empresa» a propósito PERSISTE (por empresa y por navegador, como un proyecto). Antes se guardaba igual que «nada recordado» (se borraba la llave de
++// localStorage), así que al volver a entrar a Contabilidad (remontar) o al recargar la página la persona acotada regresaba al primer proyecto aunque hubiera
++// elegido «Empresa» (hallazgo V2-B1 de la segunda verificación independiente).
++describe('elegir «Empresa» a propósito se recuerda; sin elección recordada se preselecciona el primer proyecto', () => {
++  const llave = 'conta-ledger:c1'
++
++  it('al volver a entrar a Contabilidad (remontar), la persona acotada que eligió «Empresa» sigue en «Empresa»', () => {
++    const primera = montar('operator')
++    expect(selector().value).toBe(P2)
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(selector().value).toBe('')
++    primera.unmount()
++    montar('operator')
++    expect(selector().value).toBe('')
++    expect(montadaCon()).toBe('empresa')
++  })
++
++  it('tras recargar la página (las asignaciones llegan DESPUÉS del montaje) sigue en «Empresa» y no salta al primer proyecto', () => {
++    montar('operator')
++    fireEvent.change(selector(), { target: { value: '' } })
++    cleanup()
++    m.asignacionesCargadas = false
++    m.asignaciones = undefined
++    function Envuelto() {
++      const [n, setN] = useState(0)
++      return <><button onClick={() => setN(n + 1)}>refrescar {n}</button><ContabilidadSection /></>
++    }
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe('')
++    m.asignacionesCargadas = true
++    m.asignaciones = [P2, P3]
++    fireEvent.click(screen.getByRole('button', { name: /refrescar/ }))
++    expect(selector().value).toBe('')
++  })
++
++  it('«Empresa» se guarda con un valor propio (no se borra la llave): así se distingue de «nada recordado»', () => {
++    montar('operator')
++    expect(localStorage.getItem(llave)).toBe(P2)            // la preselección del primer proyecto sí se recuerda
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(localStorage.getItem(llave)).toBe('empresa')
++    expect(localStorage.getItem(llave)).not.toBeNull()
++  })
++
++  it('elegir después un proyecto reemplaza la elección de «Empresa», y también se recuerda', () => {
++    const primera = montar('operator')
++    fireEvent.change(selector(), { target: { value: '' } })
++    fireEvent.change(selector(), { target: { value: P3 } })
++    expect(localStorage.getItem(llave)).toBe(P3)
++    primera.unmount()
++    montar('operator')
++    expect(selector().value).toBe(P3)
++  })
++
++  it('sin elección recordada (nunca eligió, o la llave se borró) se preselecciona el primer proyecto, como antes', () => {
++    localStorage.removeItem(llave)
++    montar('operator')
++    expect(selector().value).toBe(P2)
++  })
++
++  it('la elección es por empresa: haber elegido «Empresa» en OTRA empresa no afecta a esta', () => {
++    localStorage.setItem('conta-ledger:otra-empresa', 'empresa')
++    montar('operator')
++    expect(selector().value).toBe(P2)
++  })
++
++  it('las personas exentas no cambian: sin elección recordada abren «Empresa» y no se escribe nada; su elección explícita también persiste', () => {
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    const primera = montar('company_owner')
++    expect(selector().value).toBe('')
++    expect(localStorage.getItem(llave)).toBeNull()          // abrir en «Empresa» por omisión no deja rastro (igual que antes)
++    fireEvent.change(selector(), { target: { value: P1 } })
++    expect(localStorage.getItem(llave)).toBe(P1)
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(localStorage.getItem(llave)).toBe('empresa')
++    primera.unmount()
++    montar('company_owner')
++    expect(selector().value).toBe('')
++  })
++
++  it('un administrador sin asignaciones (exento) tampoco cambia: «Empresa» por omisión, sin escribir nada', () => {
++    m.asignaciones = []
++    montar('admin')
++    expect(selector().value).toBe('')
++    expect(localStorage.getItem(llave)).toBeNull()
++  })
++
++  it('un proyecto recordado que YA NO EXISTE se descarta: la persona acotada abre su primer proyecto (no «Empresa»)', () => {
++    localStorage.setItem(llave, '99999999-9999-4999-8999-999999999999')
++    montar('operator')
++    expect(selector().value).toBe(P2)
++    expect(localStorage.getItem(llave)).toBe(P2)
++  })
++
++  it('...y la persona exenta con un proyecto recordado que ya no existe abre «Empresa» y la llave se limpia', () => {
++    localStorage.setItem(llave, '99999999-9999-4999-8999-999999999999')
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    montar('company_owner')
++    expect(selector().value).toBe('')
++    expect(localStorage.getItem(llave)).toBeNull()
++  })
++})
++
++// V3-07 (tercera verificación independiente): el almacenamiento del navegador puede fallar (cuota llena, modo privado, acceso bloqueado por la
++// configuración del navegador o ausente). Antes del parche la pantalla de Contabilidad no escribía nada al montar; con la preselección del primer
++// proyecto sí escribe, y un `setItem` que lanzaba rompía el montaje de la persona acotada. Ninguna lectura ni escritura de `localStorage` puede
++// tumbar la pantalla: sin almacenamiento nada se recuerda, pero la persona acotada sigue abriendo su primer proyecto y puede cambiar de contabilidad.
++describe('sin almacenamiento utilizable (cuota llena, bloqueado o ausente) la pantalla funciona igual: solo no recuerda', () => {
++  const descriptorOriginal = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
++  const quota = () => { throw new DOMException('The quota has been exceeded.', 'QuotaExceededError') }
++  const bloqueado = () => { throw new DOMException('The operation is insecure.', 'SecurityError') }
++  const bloquearAcceso = () => Object.defineProperty(globalThis, 'localStorage', { configurable: true, get: bloqueado })
++  const quitarAlmacenamiento = () => Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: undefined, writable: true })
++
++  afterEach(() => {
++    vi.restoreAllMocks()
++    if (descriptorOriginal) Object.defineProperty(globalThis, 'localStorage', descriptorOriginal)
++  })
++
++  it('setItem que lanza (cuota llena): la persona ACOTADA monta, abre su primer proyecto y puede cambiar de contabilidad y volver a «Empresa»', () => {
++    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(quota)
++    expect(() => montar('operator')).not.toThrow()
++    expect(selector().value).toBe(P2)
++    expect(montadaCon()).toBe(P2)
++    fireEvent.change(selector(), { target: { value: P3 } })
++    expect(selector().value).toBe(P3)
++    expect(montadaCon()).toBe(P3)
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(selector().value).toBe('')
++    expect(montadaCon()).toBe('empresa')
++  })
++
++  it('setItem que lanza: la persona EXENTA también monta y elige proyecto sin error', () => {
++    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(quota)
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    expect(() => montar('company_owner')).not.toThrow()
++    expect(selector().value).toBe('')
++    fireEvent.change(selector(), { target: { value: P1 } })
++    expect(montadaCon()).toBe(P1)
++  })
++
++  it('removeItem que lanza: la persona exenta (nada recordado) monta en «Empresa»', () => {
++    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(bloqueado)
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    expect(() => montar('company_owner')).not.toThrow()
++    expect(selector().value).toBe('')
++    fireEvent.change(selector(), { target: { value: P1 } })
++    fireEvent.change(selector(), { target: { value: '' } })     // «Empresa» elegida: se guarda con setItem, no con removeItem
++    expect(montadaCon()).toBe('empresa')
++  })
++
++  it('getItem que lanza: nada recordado, así que la persona acotada abre su primer proyecto y la exenta «Empresa»', () => {
++    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(bloqueado)
++    const acotada = montar('operator')
++    expect(selector().value).toBe(P2)
++    expect(montadaCon()).toBe(P2)
++    acotada.unmount()
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    expect(() => montar('company_owner')).not.toThrow()
++    expect(selector().value).toBe('')
++  })
++
++  it('acceso bloqueado (leer `localStorage` lanza SecurityError): la persona acotada monta y abre su primer proyecto', () => {
++    bloquearAcceso()
++    expect(() => montar('operator')).not.toThrow()
++    expect(selector().value).toBe(P2)
++    fireEvent.change(selector(), { target: { value: P3 } })
++    expect(montadaCon()).toBe(P3)
++  })
++
++  it('almacenamiento ausente (`localStorage` indefinido): la persona acotada abre su primer proyecto y la exenta «Empresa»', () => {
++    quitarAlmacenamiento()
++    const acotada = montar('operator')
++    expect(selector().value).toBe(P2)
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(montadaCon()).toBe('empresa')
++    acotada.unmount()
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    expect(() => montar('company_owner')).not.toThrow()
++    expect(selector().value).toBe('')
++  })
++
++  it('sin almacenamiento no se recuerda nada: al remontar la persona acotada vuelve a su primer proyecto (aunque hubiera elegido «Empresa»)', () => {
++    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(quota)
++    const primera = montar('operator')
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(selector().value).toBe('')
++    primera.unmount()
++    montar('operator')
++    expect(selector().value).toBe(P2)
++  })
++})
++
++// V4-H3 (cuarta verificación independiente): la omisión se resolvía UNA sola vez por empresa y montaje. Si después un refetch (refetchOnWindowFocus, staleTime
++// de 60 s) quitaba el proyecto que la persona acotada tenía abierto (asignación revocada o proyecto eliminado), la guarda de «el proyecto ya no existe» la dejaba en
++// «Empresa» —el libro donde el servidor le rechaza capturar— aunque conservara otros proyectos, y la omisión no se volvía a evaluar. Ahora la guarda la devuelve
++// a la omisión: la persona acotada pasa al primer proyecto que sí ve, y la exenta conserva «Empresa».
++describe('si un refetch quita el proyecto abierto, la persona acotada pasa a otro suyo y no se queda en «Empresa»', () => {
++  function Envuelto() {
++    const [n, setN] = useState(0)
++    return <><button onClick={() => setN(n + 1)}>refrescar {n}</button><ContabilidadSection /></>
++  }
++  const refrescar = () => fireEvent.click(screen.getByRole('button', { name: /refrescar/ }))
++
++  it('le revocan el proyecto abierto y conserva otro: pasa al primero que sigue viendo (no «Empresa»)', () => {
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe(P2)
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P3, nombre: 'Gamma' }]
++    m.asignaciones = [P3]
++    refrescar()
++    expect(selector().value).toBe(P3)
++    expect(montadaCon()).toBe(P3)
++    expect(localStorage.getItem('conta-ledger:c1')).toBe(P3)
++  })
++
++  it('le quitan todos sus proyectos: queda en «Empresa» (no hay otra contabilidad) y no entra en un ciclo', () => {
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe(P2)
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }]
++    m.asignaciones = []
++    refrescar()
++    expect(selector().value).toBe('')
++    expect(montadaCon()).toBe('empresa')
++    refrescar()
++    expect(selector().value).toBe('')
++  })
++
++  it('el proyecto abierto lo elimina otra persona (ya no está en la lista) y conserva otro: pasa a ese', () => {
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe(P2)
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P3, nombre: 'Gamma' }]
++    m.asignaciones = [P2, P3]          // la fila de asignación sobrevive; el proyecto ya no existe
++    refrescar()
++    expect(selector().value).toBe(P3)
++  })
++
++  it('quien eligió «Empresa» a propósito no es movido por un refetch que cambia sus proyectos', () => {
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    fireEvent.change(selector(), { target: { value: '' } })
++    expect(selector().value).toBe('')
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P3, nombre: 'Gamma' }]
++    m.asignaciones = [P3]
++    refrescar()
++    expect(selector().value).toBe('')
++    expect(localStorage.getItem('conta-ledger:c1')).toBe('empresa')
++  })
++
++  it('el único reinicio es perder el proyecto abierto: quien abrió en «Empresa» por no ver ninguno no es movida cuando después le asignan uno (límite conocido)', () => {
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }]
++    m.asignaciones = []
++    montarConSesion(<Envuelto />, { role: 'operator' })
++    expect(selector().value).toBe('')
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P2, nombre: 'Beta' }]
++    m.asignaciones = [P2]
++    refrescar()
++    expect(selector().value).toBe('')          // la omisión se evalúa una vez por montaje; recargar la pantalla la vuelve a evaluar
++  })
++
++  it('la persona exenta que tenía un proyecto abierto y se lo eliminan conserva «Empresa» (no se le preselecciona nada)', () => {
++    m.asignaciones = undefined
++    m.asignacionesCargadas = false
++    montarConSesion(<Envuelto />, { role: 'company_owner' })
++    fireEvent.change(selector(), { target: { value: P2 } })
++    expect(selector().value).toBe(P2)
++    m.proyectos = [{ id: P1, nombre: 'Alfa' }, { id: P3, nombre: 'Gamma' }]
++    refrescar()
++    expect(selector().value).toBe('')
++    expect(montadaCon()).toBe('empresa')
++    expect(localStorage.getItem('conta-ledger:c1')).toBeNull()
++  })
++})
+diff --git a/src/domain/compras/ordenCrear.ts b/src/domain/compras/ordenCrear.ts
+index 92e3692..fab7fd5 100644
+--- a/src/domain/compras/ordenCrear.ts
++++ b/src/domain/compras/ordenCrear.ts
+@@ -1,5 +1,6 @@
+ // Creación de órdenes de compra — piezas compartidas por Contabilidad (Compras › Nueva orden) y Operaciones
+ // (Órdenes compra › Nueva OC): la clave de idempotencia de un intento de captura y el texto del error.
++import { mensajeAccionCompras } from './errores'
+ 
+ /**
+  * Una clave por intento de captura (por apertura del formulario): un doble clic, un reintento tras un corte o una
+@@ -13,14 +14,16 @@ export function nuevaClaveIdempotencia(prefijo = 'oc'): string {
+ }
+ 
+ /**
+- * Los códigos COMPRAS_* de la base están escritos para leerse tal cual. Una excepción: la clave repetida con otro
+- * contenido casi siempre significa que la captura anterior SÍ se guardó (la respuesta se perdió) y se cambió algo
+- * antes de reintentar; «la clave ya se usó» no dice qué hacer.
++ * El texto del error al crear una orden. Los rechazos de permiso, de alcance de proyecto o de empresa, de separación y de
++ * estado se muestran sin su código técnico (`mensajeAccionCompras`: «Tu perfil necesita estar asignado al proyecto del
++ * documento…», no «COMPRAS_ALCANCE_PROYECTO: …»); el resto de los COMPRAS_* de la base, como llegan. Una excepción
++ * propia: la clave repetida con otro contenido casi siempre significa que la captura anterior SÍ se guardó (la respuesta
++ * se perdió) y se cambió algo antes de reintentar; «la clave ya se usó» no dice qué hacer.
+  */
+ export function mensajeCrearOrden(e: unknown): string {
+   const texto = e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : ''
+   if (texto.includes('COMPRAS_ORDEN_CLAVE_CONFLICTO')) {
+     return 'Esta captura ya se guardó como una orden (puede que la respuesta se perdiera). Revisa la lista de órdenes; si necesitas otra distinta, cierra este formulario y crea una nueva.'
+   }
+-  return texto || 'No se pudo crear la orden.'
++  return mensajeAccionCompras(e, 'No se pudo crear la orden.')
+ }
+diff --git a/src/lib/__tests__/ledgerInicialPorAlcance.test.ts b/src/lib/__tests__/ledgerInicialPorAlcance.test.ts
+new file mode 100644
+index 0000000..f0b7f45
+--- /dev/null
++++ b/src/lib/__tests__/ledgerInicialPorAlcance.test.ts
+@@ -0,0 +1,34 @@
++// Con qué contabilidad abre Contabilidad: ver ledgerInicialPorAlcance (D-8 del alcance de proyecto al capturar).
++import { describe, expect, it } from 'vitest'
++import { ledgerInicialPorAlcance } from '../proyectosAccess'
++
++const A = { id: 'proyecto-a' }
++const B = { id: 'proyecto-b' }
++
++describe('ledgerInicialPorAlcance', () => {
++  it('una contabilidad recordada se respeta, sea quien sea', () => {
++    expect(ledgerInicialPorAlcance({ exento: false, guardado: 'proyecto-b', accesibles: [A, B] })).toBe('proyecto-b')
++    expect(ledgerInicialPorAlcance({ exento: true, guardado: 'proyecto-b', accesibles: [A, B] })).toBe('proyecto-b')
++  })
++
++  it('la persona exenta, sin contabilidad recordada, conserva «Empresa» (null)', () => {
++    expect(ledgerInicialPorAlcance({ exento: true, guardado: null, accesibles: [A, B] })).toBeNull()
++  })
++
++  it('la persona acotada, sin contabilidad recordada, abre el PRIMER proyecto que ve', () => {
++    expect(ledgerInicialPorAlcance({ exento: false, guardado: null, accesibles: [A, B] })).toBe('proyecto-a')
++  })
++
++  it('la persona acotada que no ve ningún proyecto queda en «Empresa» (null): no hay otra contabilidad', () => {
++    expect(ledgerInicialPorAlcance({ exento: false, guardado: null, accesibles: [] })).toBeNull()
++  })
++
++  it('«Empresa» elegida a propósito (empresaElegida) se respeta también para la persona acotada: no se le preselecciona un proyecto', () => {
++    expect(ledgerInicialPorAlcance({ exento: false, guardado: null, empresaElegida: true, accesibles: [A, B] })).toBeNull()
++    expect(ledgerInicialPorAlcance({ exento: true, guardado: null, empresaElegida: true, accesibles: [A, B] })).toBeNull()
++  })
++
++  it('sin «Empresa» elegida (false o ausente) la persona acotada abre el primer proyecto', () => {
++    expect(ledgerInicialPorAlcance({ exento: false, guardado: null, empresaElegida: false, accesibles: [A, B] })).toBe('proyecto-a')
++  })
++})
+diff --git a/src/lib/proyectosAccess.ts b/src/lib/proyectosAccess.ts
+index 2b81895..2b87889 100644
+--- a/src/lib/proyectosAccess.ts
++++ b/src/lib/proyectosAccess.ts
+@@ -97,6 +97,29 @@ export function filterProyectosByAssignment({
+   return proyectos.filter((p) => allowed.has(p.id))
+ }
+ 
++/**
++ * La contabilidad (ledger) con la que abre Contabilidad cuando la persona no recordó ninguna: `null` = la de la EMPRESA
++ * (sin proyecto), o el id de un proyecto.
++ *
++ * El servidor solo deja crear un documento de compras «sin proyecto» (la contabilidad de la Empresa) a una persona exenta
++ * de proyecto; a una persona acotada la rechaza al guardar (COMPRAS_ALCANCE_PROYECTO). Por eso, sin una contabilidad
++ * recordada, la persona acotada abre el PRIMER proyecto que ve (la lista ya viene ordenada por nombre) y la exenta
++ * conserva «Empresa». Una contabilidad recordada se respeta siempre, y también «Empresa» elegida a propósito (`empresaElegida`: la persona la eligió
++ * en el selector y se recordó): no se le preselecciona un proyecto aunque sea acotada (la pantalla le mostrará el rechazo del servidor, legible).
++ * Si la persona no ve ningún proyecto, queda en «Empresa».
++ */
++export function ledgerInicialPorAlcance({ exento, guardado, empresaElegida = false, accesibles }: {
++  exento: boolean
++  guardado: string | null
++  empresaElegida?: boolean
++  accesibles: Pick<Proyecto, 'id'>[]
++}): string | null {
++  if (guardado) return guardado
++  if (empresaElegida) return null
++  if (exento) return null
++  return accesibles[0]?.id ?? null
++}
++
+ function maxUnidadesFrom(p: Proyecto): MaxUnidadesPorTipo {
+   return {
+     apartamento:     p.max_unidades_apartamento ?? null,

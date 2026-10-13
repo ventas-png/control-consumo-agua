@@ -38,7 +38,7 @@ SELECT 'INDICE=' || indisvalid || '/' || indisunique FROM pg_index WHERE indexre
 ROLLBACK;
 SQL
 )
-echo "$S" | grep -q 'INDICE=true/true' && ! echo "$S" | grep -q 'ERROR' \
+grep -q 'INDICE=true/true' <<<"$S" && ! grep -q 'ERROR' <<<"$S" \
   && ok "1 · con el índice presente y válido, la migración pasa y no cambia nada" || mal "1 · no pasó con el índice válido" "$S"
 
 # 2 ── ausente + duplicados: se detiene con diagnóstico
@@ -54,10 +54,10 @@ SELECT 'INDICE_EXISTE=' || count(*) FROM pg_class WHERE relname = 'uq_mov_sumini
 ROLLBACK;
 SQL
 )
-echo "$S" | grep -q 'COMPRAS_INVENTARIO_DUPLICADOS' && ok "2 · con duplicados históricos la migración SE DETIENE (COMPRAS_INVENTARIO_DUPLICADOS), no sigue con un WARNING" || mal "2 · no se detuvo por duplicados" "$S"
-echo "$S" | grep -q "recepcion_lineas $OR1: 2 movimientos" && ok "2 · el diagnóstico nombra el renglón, el origen y cuántos movimientos hay" || mal "2 · el diagnóstico no nombra el renglón" "$S"
-echo "$S" | grep -q 'MOVS=2' && ok "2 · NO se borró ni se modificó ningún movimiento (siguen los 2 duplicados)" || mal "2 · cambió el número de movimientos" "$S"
-echo "$S" | grep -q 'INDICE_EXISTE=0' && ok "2 · y el índice NO se creó (no queda una protección a medias)" || mal "2 · quedó un índice" "$S"
+grep -q 'COMPRAS_INVENTARIO_DUPLICADOS' <<<"$S" && ok "2 · con duplicados históricos la migración SE DETIENE (COMPRAS_INVENTARIO_DUPLICADOS), no sigue con un WARNING" || mal "2 · no se detuvo por duplicados" "$S"
+grep -q "recepcion_lineas $OR1: 2 movimientos" <<<"$S" && ok "2 · el diagnóstico nombra el renglón, el origen y cuántos movimientos hay" || mal "2 · el diagnóstico no nombra el renglón" "$S"
+grep -q 'MOVS=2' <<<"$S" && ok "2 · NO se borró ni se modificó ningún movimiento (siguen los 2 duplicados)" || mal "2 · cambió el número de movimientos" "$S"
+grep -q 'INDICE_EXISTE=0' <<<"$S" && ok "2 · y el índice NO se creó (no queda una protección a medias)" || mal "2 · quedó un índice" "$S"
 
 # 3 ── mismo nombre, otra definición
 S=$(correr <<SQL
@@ -68,7 +68,7 @@ CREATE INDEX uq_mov_suministro_origen_recepcion ON public.movimientos_suministro
 ROLLBACK;
 SQL
 )
-echo "$S" | grep -q 'COMPRAS_INVENTARIO_INDICE' && ok "3 · un índice del mismo nombre NO único / con otra definición: la migración se detiene" || mal "3 · aceptó un índice con otra definición" "$S"
+grep -q 'COMPRAS_INVENTARIO_INDICE' <<<"$S" && ok "3 · un índice del mismo nombre NO único / con otra definición: la migración se detiene" || mal "3 · aceptó un índice con otra definición" "$S"
 
 # 4 ── índice inválido: se reconstruye
 S=$(correr <<SQL
@@ -79,7 +79,7 @@ SELECT 'VALIDO=' || indisvalid || '/' || indisready || '/' || indisunique FROM p
 ROLLBACK;
 SQL
 )
-echo "$S" | grep -q 'VALIDO=true/true/true' && ! echo "$S" | grep -q 'ERROR' && ok "4 · un índice INVÁLIDO se reconstruye y queda válido" || mal "4 · no reparó el índice inválido" "$S"
+grep -q 'VALIDO=true/true/true' <<<"$S" && ! grep -q 'ERROR' <<<"$S" && ok "4 · un índice INVÁLIDO se reconstruye y queda válido" || mal "4 · no reparó el índice inválido" "$S"
 
 # 5 ── ausente y sin duplicados: se crea
 S=$(correr <<SQL
@@ -91,8 +91,8 @@ $DUP
 ROLLBACK;
 SQL
 )
-echo "$S" | grep -q 'CREADO=true/true/2' && ok "5 · sin el índice y sin duplicados, se crea único, válido y de dos columnas" || mal "5 · no creó el índice" "$S"
-echo "$S" | grep -q 'uq_mov_suministro_origen_recepcion' && ok "5 · y con él instalado, un duplicado nuevo se rechaza" || mal "5 · el duplicado no fue rechazado por el índice" "$S"
+grep -q 'CREADO=true/true/2' <<<"$S" && ok "5 · sin el índice y sin duplicados, se crea único, válido y de dos columnas" || mal "5 · no creó el índice" "$S"
+grep -q 'uq_mov_suministro_origen_recepcion' <<<"$S" && ok "5 · y con él instalado, un duplicado nuevo se rechaza" || mal "5 · el duplicado no fue rechazado por el índice" "$S"
 
 # 6 ── mismo nombre y columnas, único, predicado MÁS RESTRICTIVO: contiene todos los fragmentos esperados
 #      (por eso un LIKE lo aceptaría) pero dejaría sin proteger los movimientos con cantidad <= 0
@@ -105,8 +105,8 @@ CREATE UNIQUE INDEX uq_mov_suministro_origen_recepcion ON public.movimientos_sum
 ROLLBACK;
 SQL
 )
-echo "$S" | grep -q 'COMPRAS_INVENTARIO_INDICE' && ok "6 · índice único con predicado más restrictivo (AND cantidad > 0): la migración lo RECHAZA" || mal "6 · aceptó un predicado más restrictivo" "$S"
-echo "$S" | grep -q 'cantidad > (0)::numeric' && ok "6 · y el mensaje muestra el predicado actual para el diagnóstico" || mal "6 · el mensaje no muestra el predicado" "$S"
+grep -q 'COMPRAS_INVENTARIO_INDICE' <<<"$S" && ok "6 · índice único con predicado más restrictivo (AND cantidad > 0): la migración lo RECHAZA" || mal "6 · aceptó un predicado más restrictivo" "$S"
+grep -q 'cantidad > (0)::numeric' <<<"$S" && ok "6 · y el mensaje muestra el predicado actual para el diagnóstico" || mal "6 · el mensaje no muestra el predicado" "$S"
 
 # 7 ── único, mismas columnas, predicado que cubre menos orígenes
 S=$(correr <<SQL
@@ -118,7 +118,7 @@ CREATE UNIQUE INDEX uq_mov_suministro_origen_recepcion ON public.movimientos_sum
 ROLLBACK;
 SQL
 )
-echo "$S" | grep -q 'COMPRAS_INVENTARIO_INDICE' && ok "7 · índice único que no cubre recepcion_lineas_anulada: la migración lo rechaza" || mal "7 · aceptó un predicado que cubre menos orígenes" "$S"
+grep -q 'COMPRAS_INVENTARIO_INDICE' <<<"$S" && ok "7 · índice único que no cubre recepcion_lineas_anulada: la migración lo rechaza" || mal "7 · aceptó un predicado que cubre menos orígenes" "$S"
 
 # 8 ── mismas columnas en otro orden
 S=$(correr <<SQL
@@ -130,7 +130,7 @@ CREATE UNIQUE INDEX uq_mov_suministro_origen_recepcion ON public.movimientos_sum
 ROLLBACK;
 SQL
 )
-echo "$S" | grep -q 'COMPRAS_INVENTARIO_INDICE' && ok "8 · mismas columnas en otro orden: la migración lo rechaza" || mal "8 · aceptó otro orden de columnas" "$S"
+grep -q 'COMPRAS_INVENTARIO_INDICE' <<<"$S" && ok "8 · mismas columnas en otro orden: la migración lo rechaza" || mal "8 · aceptó otro orden de columnas" "$S"
 
 # 9 ── el índice de referencia no queda en la base tras una verificación correcta
 S=$(correr <<SQL
@@ -140,7 +140,7 @@ SELECT 'REF=' || count(*) FROM pg_class WHERE relname = 'uq_mov_suministro_orige
 ROLLBACK;
 SQL
 )
-echo "$S" | grep -q 'REF=0' && ok "9 · la verificación no deja índices auxiliares" || mal "9 · quedó el índice de referencia" "$S"
+grep -q 'REF=0' <<<"$S" && ok "9 · la verificación no deja índices auxiliares" || mal "9 · quedó el índice de referencia" "$S"
 
 N_DESPUES=$(psql -X -q -t -A -d "$BD" -c "SELECT count(*) FROM public.movimientos_suministro")
 [ "$N_ANTES" = "$N_DESPUES" ] && ok "la base quedó intacta ($N_DESPUES movimientos antes y después)" || mal "cambió el número de movimientos: $N_ANTES → $N_DESPUES" ""

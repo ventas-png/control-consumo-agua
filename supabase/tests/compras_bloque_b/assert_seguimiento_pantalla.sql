@@ -70,6 +70,7 @@ UPDATE public.facturas_proveedor SET estado = 'aprobada' WHERE numero_factura IN
 INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, factura_id, monto, metodo_pago, referencia)
 SELECT '0c930000-0000-0000-0000-000000000001', f.company_id, f.project_id, f.proveedor_id, f.id, 300, 'transferencia', 'TRF-300'
   FROM public.facturas_proveedor f WHERE f.numero_factura = 'SP-G1';
+UPDATE public.ordenes_pago SET estado = 'aprobada' WHERE id = '0c930000-0000-0000-0000-000000000001';
 UPDATE public.ordenes_pago SET estado = 'pagada', fecha_pago = CURRENT_DATE WHERE id = '0c930000-0000-0000-0000-000000000001';
 -- el saldo (372) por una contraseña de pago
 INSERT INTO public.contrasenas_pago (id, company_id, project_id, proveedor_id, fecha_pago_programada, moneda)
@@ -78,6 +79,7 @@ INSERT INTO public.contrasena_pago_facturas (company_id, contrasena_id, factura_
 SELECT :C::uuid, '0c940000-0000-0000-0000-000000000001', f.id, 372 FROM public.facturas_proveedor f WHERE f.numero_factura = 'SP-G1';
 INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, contrasena_pago_id, monto, metodo_pago, referencia)
 VALUES ('0c930000-0000-0000-0000-000000000002', :C::uuid, :C1::uuid, :P1::uuid, '0c940000-0000-0000-0000-000000000001', 372, 'transferencia', 'TRF-372');
+UPDATE public.ordenes_pago SET estado = 'aprobada' WHERE id = '0c930000-0000-0000-0000-000000000002';
 UPDATE public.ordenes_pago SET estado = 'pagada', fecha_pago = CURRENT_DATE WHERE id = '0c930000-0000-0000-0000-000000000002';
 RESET ROLE;
 SELECT public.chk_txt((SELECT estado FROM public.facturas_proveedor WHERE numero_factura = 'SP-G1'), 'pagada', '0 · la factura de OG quedó pagada (300 directo + 372 por contraseña)');

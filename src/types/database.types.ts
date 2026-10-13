@@ -26198,6 +26198,8 @@ export type Database = {
           role: string
         }[]
       }
+      sesion_api_sin_empresa: { Args: never; Returns: boolean }
+      sesion_de_api: { Args: never; Returns: boolean }
       set_role_permissions: {
         Args: { p_keys: string[]; p_role_id: string }
         Returns: number

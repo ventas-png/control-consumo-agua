@@ -14,6 +14,7 @@ import { OPEN_AMPLIAR_FLAG } from '../shared/promptUpgrade'
 import { PlanUsageCard } from './PlanUsageCard'
 import { AmpliarPlanModal } from './AmpliarPlanModal'
 import type { EmpresaInfo } from '../../domain/empresa/queries'
+import { MOTIVO_SOLO_PRINCIPAL_PROYECTOS } from '../../domain/empresa/usuarios'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: 'var(--at-success)' },
@@ -37,9 +38,14 @@ interface Props {
   companyId: string | null | undefined
   effectiveMaxProjects: number
   onReload: () => void
+  /**
+   * ¿Puede quien mira crear proyectos? Sólo el principal (propietario o superadministrador): projects_insert (migración 20261026000700). Editar un proyecto
+   * (fiscal, cobros, estado, logo) NO depende de esto: projects_update sigue abierto al administrador. Por omisión es `false`: sin la compuerta no se ofrece crear.
+   */
+  puedeCrear?: boolean
 }
 
-export function EmpresaProyectosSection({ empresa, proyectos, companyId, effectiveMaxProjects, onReload }: Props) {
+export function EmpresaProyectosSection({ empresa, proyectos, companyId, effectiveMaxProjects, onReload, puedeCrear = false }: Props) {
   const [showAmpliar, setShowAmpliar] = useState(false)
   // Remonta PlanUsageCard tras una ampliación (su usePlanLimits es interno).
   const [usageKey, setUsageKey] = useState(0)
@@ -178,7 +184,7 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
   }
 
   async function crearProyecto() {
-    if (!empresa) return
+    if (!empresa || !puedeCrear) return
     if (proyectos.length >= effectiveMaxProjects) {
       // Límite alcanzado: ya estamos en la sección Empresa, así que se abre el
       // modal de ampliación self-service directamente (sin navegación).
@@ -233,15 +239,15 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
           <h2 style={{ color: 'var(--at-ink)', fontSize: '16px', fontWeight: 600, margin: 0 }}>Proyectos</h2>
           <button
             onClick={() => void crearProyecto()}
-            disabled={proyectos.length >= effectiveMaxProjects}
-            title={proyectos.length >= effectiveMaxProjects ? 'Límite del plan alcanzado. Actualiza desde Perfil → Mi plan.' : undefined}
+            disabled={!puedeCrear || proyectos.length >= effectiveMaxProjects}
+            title={!puedeCrear ? MOTIVO_SOLO_PRINCIPAL_PROYECTOS : proyectos.length >= effectiveMaxProjects ? 'Límite del plan alcanzado. Actualiza desde Perfil → Mi plan.' : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '9px 16px', borderRadius: '8px', border: 'none',
-              background: proyectos.length >= effectiveMaxProjects
+              background: !puedeCrear || proyectos.length >= effectiveMaxProjects
                 ? 'var(--at-ink-2)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
-              color: proyectos.length >= effectiveMaxProjects ? 'var(--at-ink-3)' : 'white',
-              cursor: proyectos.length >= effectiveMaxProjects ? 'not-allowed' : 'pointer',
+              color: !puedeCrear || proyectos.length >= effectiveMaxProjects ? 'var(--at-ink-3)' : 'white',
+              cursor: !puedeCrear || proyectos.length >= effectiveMaxProjects ? 'not-allowed' : 'pointer',
               fontSize: '13px', fontWeight: 600,
             }}
           >

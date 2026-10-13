@@ -93,6 +93,26 @@ BEGIN
 END;
 $$;
 
+-- Ayuda de las pruebas (para fixture.sql): ejecuta `p_sql` COMO SISTEMA —superusuario, sin sesión de usuario— y devuelve la sesión a la
+-- persona y al rol que tenía. Es lo que ya hacen EV-07 y la prueba P-2 con `set_config('request.jwt.claim.sub', '', false)`, sin tener que
+-- volver a fijar a la persona después. Desde que el interruptor de la separación solo lo cambia la RPC (o el sistema), sembrarlo en una
+-- prueba es una carga de sistema, no un acto del usuario que quedó puesto en la sesión (RESET ROLE no borra request.jwt.claim.sub).
+CREATE OR REPLACE FUNCTION public.como_sistema(p_sql text)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  v_sub text := current_setting('request.jwt.claim.sub', true);
+  v_rol text := current_setting('role', true);
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  RESET ROLE;
+  EXECUTE p_sql;
+  IF COALESCE(v_rol, 'none') <> 'none' THEN
+    EXECUTE format('SET ROLE %I', v_rol);
+  END IF;
+  PERFORM set_config('request.jwt.claim.sub', COALESCE(v_sub, ''), true);
+END;
+$$;
+
 -- ── Empresas, proyectos, usuarios ───────────────────────────────────────────
 INSERT INTO public.companies (id, nombre, default_currency) VALUES
   ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'Empresa C', 'gtq'),
