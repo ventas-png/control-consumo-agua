@@ -30,7 +30,7 @@ import {
 import type { PermissionDef, RoleDef } from '../../types'
 import { CONDOMINIOS_SECTION_GROUPS, type SectionGroup } from '../../lib/condominiosRoles'
 import { AGUA_MODULE_GROUPS } from '../../lib/aguaPermissions'
-import { PLATFORM_MODULE_GROUPS } from '../../lib/platformPermissions'
+import { gruposPlataformaDisponibles } from '../../lib/platformPermissions'
 import { condominiosTabPermission, isExemptPlatformRole } from '../../lib/permissions'
 import {
   buildRolePermIndex,
@@ -241,7 +241,8 @@ export function RolPermisosModal({
   const matrixSections: MatrixSectionBlock[] = [
     ...(showCondominios ? [{ label: 'Condominios', groups: CONDOMINIOS_KEY_GROUPS }] : []),
     ...(showAgua ? [{ label: 'Agua', groups: AGUA_MODULE_GROUPS }] : []),
-    { label: 'Plataforma', groups: PLATFORM_MODULE_GROUPS },
+    // «Compras y pagos» solo muestra las llaves que el catálogo cargado ya tiene (la migración que las siembra puede no haberse aplicado)
+    { label: 'Plataforma', groups: gruposPlataformaDisponibles(permLabels) },
   ]
 
   const selectedChips = [...selectedRoleIds]

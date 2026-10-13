@@ -236,6 +236,9 @@ jobs:
       - name: Deploy purgar-fotos-registros (no JWT — invocada por pg_cron con service_role)
         run: bash .github/scripts/deploy-fn.sh purgar-fotos-registros --no-verify-jwt
 
+      - name: Deploy housekeeping-limpieza (no JWT — valida el token a mano; drena la cola de archivos de housekeeping)
+        run: bash .github/scripts/deploy-fn.sh housekeeping-limpieza --no-verify-jwt
+
       - name: Deploy health (no JWT — endpoint público para monitoreo externo)
         run: bash .github/scripts/deploy-fn.sh health --no-verify-jwt
 

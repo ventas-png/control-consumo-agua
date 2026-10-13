@@ -77,12 +77,13 @@ export function RespaldosRecepcionModal({ companyId, projectId, recepcion, puede
   }
 
   async function quitar(r: RecepcionRespaldo) {
-    const ok = await confirm({
+    // confirm() devuelve { isConfirmed }: un objeto siempre es «verdadero», así que `if (!ok)` nunca frenaba «Cancelar».
+    const { isConfirmed } = await confirm({
       title: 'Retirar archivo',
       text: `«${r.nombre}» se quita de la recepción (sigue en borrador). Una vez registrada, la evidencia ya no se puede retirar.`,
       confirmText: 'Retirar',
     })
-    if (!ok) return
+    if (!isConfirmed) return
     try {
       await retirar.mutateAsync(r)
       notify({ variant: 'success', title: 'Archivo retirado', text: `«${r.nombre}» se quitó de la recepción y del almacenamiento.` })

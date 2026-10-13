@@ -149,8 +149,9 @@ RESET ROLE;
 SELECT public.chk_txt((SELECT estado FROM public.ordenes_compra WHERE id = '0b000000-0000-0000-0000-000000000004'), 'aprobada',
   '9 · por defecto (sin decisión de negocio) quien captura puede aprobar: el comportamiento de hoy no cambia');
 
-INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES (:C::uuid, true)
-  ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true;
+-- El interruptor de la separación lo cambia una carga de sistema (o la RPC compras_separacion_configurar), no el usuario que quedó en la sesión.
+SELECT public.como_sistema($$ INSERT INTO public.compras_config (company_id, aprobacion_separada) VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc', true)
+  ON CONFLICT (company_id) DO UPDATE SET aprobacion_separada = true $$);
 SET ROLE authenticated;
 INSERT INTO public.ordenes_compra (id, company_id, project_id, proveedor_id, proveedor_nombre, concepto)
 VALUES ('0b000000-0000-0000-0000-000000000005', :C::uuid, :C1::uuid, :P1::uuid, 'Ferretería Bloque B', 'Con separación activada');
@@ -163,7 +164,7 @@ UPDATE public.ordenes_compra SET estado = 'aprobada' WHERE id = '0b000000-0000-0
 RESET ROLE;
 SELECT public.chk_uuid((SELECT aprobada_por FROM public.ordenes_compra WHERE id = '0b000000-0000-0000-0000-000000000005'), :UB::uuid,
   '9 · otra persona autorizada sí la aprueba, y queda como aprobador');
-UPDATE public.compras_config SET aprobacion_separada = false WHERE company_id = :C::uuid;
+SELECT public.como_sistema($$ UPDATE public.compras_config SET aprobacion_separada = false WHERE company_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' $$);
 
 -- ── 10. El historial es solo de lectura y respeta el aislamiento ────────────
 SELECT public.como(:UA::uuid);

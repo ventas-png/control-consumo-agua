@@ -8,6 +8,18 @@
 // pero nunca a otros owners ni superadmins.
 export const DELETABLE_ROLES = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
 
+// Roles que SOLO elimina el PRINCIPAL de la empresa (company_owner, o super_admin/superadmin). Un administrador no elimina a otro administrador: esta función
+// borra con service_role (sin RLS) sus user_roles, su rol de ajustes individuales y su perfil, es decir, saltándose user_roles_delete y roles_delete, que desde la migración
+// 20261026000700 son sólo del principal; y los administradores los puso el principal (decisión del dueño, 2026-10-11: el principal de la empresa asigna los permisos).
+export const ROLES_SOLO_PRINCIPAL_ELIMINAR = ['admin']
+
+export const MSG_SOLO_PRINCIPAL_ELIMINAR_ADMIN = 'Solo el propietario de la empresa puede eliminar administradores.'
+
+/** `true` si el rol es el PRINCIPAL de la empresa: company_owner o super_admin/superadmin. Un administrador (acotado o exento) NO lo es. */
+export function isPrincipalRole(role: string): boolean {
+  return isSuperAdminRole(role) || role === 'company_owner'
+}
+
 /** `true` si el rol es super_admin (ambas grafías históricas). */
 export function isSuperAdminRole(role: string): boolean {
   return role === 'super_admin' || role === 'superadmin'
@@ -19,6 +31,14 @@ export function isSuperAdminRole(role: string): boolean {
  */
 export function canManageUsers(role: string): boolean {
   return isSuperAdminRole(role) || role === 'company_owner' || role === 'admin'
+}
+
+/**
+ * `true` si el valor es texto o falta (undefined / null): el cuerpo llega de la red y un arreglo, un objeto o un número no se recortan (TypeError → 500):
+ * se rechazan con 400. Espejo de isTextOrAbsent de invite-user/validate.ts (cada función se despliega con lo suyo; la prueba fija que coinciden).
+ */
+export function isTextOrAbsent(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || typeof value === 'string'
 }
 
 /** Fila mínima del usuario objetivo (lo que el handler lee de app_users). */
@@ -35,21 +55,29 @@ export type DeleteGate = { ok: true } | { ok: false; error: string }
 /**
  * Gate de borrado para el usuario objetivo. super_admin puede borrar a
  * cualquiera; el resto (company_owner/admin) solo dentro de su propia empresa
- * y nunca a un owner/superadmin. El check de empresa va PRIMERO (mismo orden
- * que el handler): un owner de otra empresa produce el error de cross-tenant,
- * no el de rol.
+ * y nunca a un owner/superadmin, y un administrador tampoco a otro administrador
+ * (ROLES_SOLO_PRINCIPAL_ELIMINAR: lo elimina el propietario). El check de empresa
+ * va PRIMERO (mismo orden que el handler): un owner de otra empresa produce el
+ * error de cross-tenant, no el de rol. Un llamador no super_admin SIN empresa
+ * (company_id null o vacío) no tiene «su propia empresa»: se deniega siempre. Antes
+ * se comparaba sólo target.company_id !== callerCompanyId, y con los dos en null
+ * la comparación era falsa y se borraba con service_role (V8-06 b).
  */
 export function checkDeleteTargetGate(input: {
   isSuperAdmin: boolean
+  callerRole: string
   callerCompanyId: string | null
   target: Pick<TargetUserRow, 'role' | 'company_id'>
 }): DeleteGate {
   if (!input.isSuperAdmin) {
-    if (input.target.company_id !== input.callerCompanyId) {
+    if (!input.callerCompanyId || input.target.company_id !== input.callerCompanyId) {
       return { ok: false, error: 'No puedes eliminar usuarios de otra empresa' }
     }
     if (!DELETABLE_ROLES.includes(input.target.role)) {
       return { ok: false, error: 'No tienes permiso para eliminar a este usuario' }
+    }
+    if (ROLES_SOLO_PRINCIPAL_ELIMINAR.includes(input.target.role) && !isPrincipalRole(input.callerRole)) {
+      return { ok: false, error: MSG_SOLO_PRINCIPAL_ELIMINAR_ADMIN }
     }
   }
   return { ok: true }
