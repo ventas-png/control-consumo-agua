@@ -7,6 +7,7 @@ Elimina automáticamente las fotos que guardan los dos flujos que las producen.
 | --- | --- | --- | --- |
 | Foto de una lectura de agua | `registro-fotos` | **90 días** | `registros.foto` |
 | Foto y ubicación de un fichaje | `presencia-evidencias` | **365 días** | `presencia_personal.foto_entrada`, `.foto_salida`, `.gps_entrada`, `.gps_salida` |
+| Fotos de evidencia de housekeeping (ingreso y cierre) | `housekeeping-evidencias` | **90 días** | `servicio_housekeeping_fotos.path` |
 
 Los datos de la lectura (consumo, lectura, monto, estado) y los del marcaje
 (hora de entrada y salida, estado, horas trabajadas) **siempre se conservan**.
@@ -37,6 +38,19 @@ dato —dónde estuvo una persona identificada, a qué hora— y sin la foto ya 
 sirve para lo único que justificaba guardarlo. Dejarlo sobrevivir lo convertiría
 en el rastro de ubicación más longevo del sistema, conservado por omisión y no
 porque alguien decidiera conservarlo.
+
+### Housekeeping — 90 días, y el texto no caduca
+
+Las fotos del estado de la unidad antes y después de una limpieza se depuran a
+los 90 días con la misma función y el mismo cron (objetivo `housekeeping`, plazo
+`dias_housekeeping`, default 90 en la edge function). La fila de la foto
+sobrevive con `path` NULL —fase, quién la subió y cuándo— y la UI la muestra
+como «foto depurada». Los **hallazgos de ingreso y las observaciones de cierre
+viven en `servicios_housekeeping` y no se purgan nunca**: son el registro de que
+algo estaba roto aunque la foto ya no exista. Migración:
+`20261028000000_housekeeping_evidencias.sql`. Diseño completo, cola de limpieza con reintentos y borrado
+coordinado: `docs/HOUSEKEEPING_EVIDENCIAS.md`. El cron horario `hk_limpieza_storage_hourly` llama a esta misma
+función con `{"mode":"limpieza_housekeeping"}` (no purga por retención: solo drena la cola y barre huérfanos).
 
 ## Por qué dos mecánicas
 
@@ -111,8 +125,11 @@ SELECT vault.create_secret(
 );
 ```
 
-> Reemplaza `<service_role_key>` con el valor real del **Service Role Key**
-> (Supabase Dashboard → Settings → API → `service_role` secret).
+> Reemplaza `<service_role_key>` con **el mismo valor que la variable `SUPABASE_SERVICE_ROLE_KEY` del entorno
+> de las Edge Functions**: la función compara el token por igualdad exacta y, si no coincide, responde 401. En el
+> sandbox se comprobó (2026-10-13) que esa variable es la *secret key* del proyecto (`sb_secret_…`) y que la
+> `service_role` JWT legacy recibe 401 (detalle en `docs/HOUSEKEEPING_EVIDENCIAS.md`, «Autenticación del cron»).
+> En producción no está comprobado: la primera llamada del smoke test (200 o 401) es la que lo confirma.
 
 ### Verificar que los secretos estén creados
 
@@ -151,14 +168,17 @@ ORDER BY created DESC
 LIMIT 5;
 ```
 
-La edge function responde:
-`{ success, dias, objetos_borrados, filas_actualizadas, iteraciones, errores }`.
+La edge function responde (forma observada en el sandbox, 2026-10-13):
+`{ success, objetivos: [{ nombre, dias, objetos_borrados, filas_actualizadas, iteraciones, errores }…],
+limpieza_housekeeping: { tomadas, borradas, fallidas, huerfanas_encoladas, lotes, errores }, objetos_borrados,
+filas_actualizadas, errores }`. Un `401 {"error":"Unauthorized"}` indica que el valor de Vault no es el de
+`SUPABASE_SERVICE_ROLE_KEY` del entorno de las funciones (ver arriba).
 
 También puede invocarse directo (super_admin o service_role):
 
 ```bash
 curl -X POST 'https://nnsqmeigtgewatameexo.supabase.co/functions/v1/purgar-fotos-registros' \
-  -H "Authorization: Bearer <service_role_key>" \
+  -H "Authorization: Bearer <valor de SUPABASE_SERVICE_ROLE_KEY de las funciones>" \
   -H 'Content-Type: application/json' \
   -d '{"mode":"batch"}'
 ```
