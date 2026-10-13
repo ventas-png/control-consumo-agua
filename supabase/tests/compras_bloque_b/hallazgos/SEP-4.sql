@@ -59,8 +59,13 @@ SELECT public.sep_nbit(:D::uuid) AS a0d \gset
 
 SELECT public.como(:GH::uuid);
 SET ROLE authenticated;
-SELECT public.chk_bool(public.current_user_role() IS NULL AND public.is_super_admin() IS NULL AND public.get_my_company_id() IS NULL, true,
-  '[SEP-4a] la causa: sin fila en app_users el rol, «es super administrador» y la empresa son NULL (no false)');
+-- Con 20261029000000 (#930, se fusiona después de este PR) is_super_admin() deja de ser NULL para una sesión de la API sin perfil
+-- y pasa a false (fail-closed); la migración crea sesion_api_sin_empresa(). Sin ella sigue siendo NULL. Se exige el valor EXACTO
+-- de cada caso; lo que se comprueba después (SEP-4b/c: no enciende, no apaga, no lee) no cambia.
+SELECT public.chk_bool(public.current_user_role() IS NULL AND public.get_my_company_id() IS NULL
+  AND CASE WHEN to_regprocedure('public.sesion_api_sin_empresa()') IS NULL THEN public.is_super_admin() IS NULL
+           ELSE public.is_super_admin() IS FALSE END, true,
+  '[SEP-4a] la causa: sin fila en app_users el rol y la empresa son NULL, y «es super administrador» NULL (false con 20261029000000)');
 -- por la RPC: empresa ajena que existe (C, con la separación encendida por su administrador), otra empresa que existe (D) y una que no existe
 SELECT public.chk_falla($$ SELECT public.compras_separacion_configurar('cccccccc-cccc-cccc-cccc-cccccccccccc', false, 'Un principal sin perfil intenta apagar C') $$,
   'COMPRAS_CONFIG_SEPARACION_SOLO_ADMIN', '[SEP-4b] sin fila en app_users no apaga la separación que encendió el administrador de C');
