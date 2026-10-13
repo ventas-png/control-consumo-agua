@@ -64,8 +64,12 @@ DATA=$(mktemp -d /tmp/rrhhdata.XXXX)
 SOCK=$(mktemp -d /tmp/rrhhsock.XXXX)
 PUERTO=${PGPORT_TEST:-55493}
 
+# El apagado se delega IGUAL que el arranque (`correr` se define más abajo; el
+# trap la resuelve al salir): con `pg_ctl` a secas, como root falla en silencio
+# y el cluster queda vivo ocupando el puerto, así que la corrida siguiente muere
+# con «could not start server». `pg_ctl stop` espera a que el postmaster salga.
 limpiar() {
-  pg_ctl -D "$DATA" stop -m immediate >/dev/null 2>&1 || true
+  correr "pg_ctl -D $DATA stop -m immediate" >/dev/null 2>&1 || true
   rm -rf "$DATA" "$SOCK"
 }
 trap limpiar EXIT
