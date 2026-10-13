@@ -142,10 +142,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'No puedes eliminar una empresa a la que pertenece tu propia cuenta' }, 400, corsHeaders)
     }
     // Un super_admin nunca debería colgar de una empresa; si ocurre, se le
-    // desliga (company_id=null) en vez de eliminarlo junto con el tenant.
+    // desliga (company_id=null) en vez de eliminarlo junto con el tenant. Se limpia
+    // también project_id en el MISMO UPDATE: el trigger trg_validar_proyecto_app_users
+    // (migración 20261026000700) rechaza una persona con proyecto y sin empresa.
     const { superAdmins, deletables } = partitionCompanyUsers(users)
     for (const sa of superAdmins) {
-      await adminClient.from('app_users').update({ company_id: null }).eq('id', sa.id)
+      await adminClient.from('app_users').update({ company_id: null, project_id: null }).eq('id', sa.id)
     }
 
     for (const u of deletables) {
