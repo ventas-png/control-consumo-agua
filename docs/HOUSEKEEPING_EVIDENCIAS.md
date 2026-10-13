@@ -222,7 +222,8 @@ el mismo token (rol `service_role`, mismo `iat`/`exp`, prefijo de firma igual al
 La key era válida para la API (GET a PostgREST con ella: 200).
 
 **2 · Causa comprobada dentro del runtime.** Con una función temporal aislada (`zz-diag-service-key`,
-`verify_jwt = true`, exige rol `service_role`, devuelve solo booleanos; retirada después como stub 410), llamada una
+`verify_jwt = true`, exige rol `service_role`, devuelve solo booleanos; retirada después como stub 410 y **eliminada del sandbox el 13/10**: una llamada posterior
+devuelve 404), llamada una
 vez por pg_net con la key de Vault: `SUPABASE_SERVICE_ROLE_KEY` del entorno de las funciones **presente, formato
 `sb_secret`, SHA-256 distinto** al de la JWT de Vault; `SUPABASE_SECRET_KEYS` con 1 entrada `sb_secret`, distinta;
 `SUPABASE_JWT_SECRET` ausente. Como la función compara por igualdad exacta, la JWT legacy no puede autenticarse
@@ -344,7 +345,12 @@ volvieron a bloquear.
 empresas, 3 proyectos, 4 usuarios, el rol con 3 permisos, 2 asignaciones de rol y 2 de proyecto; las 2 suscripciones
 las crea el disparador de `companies`). Al terminar quedaron sin servicios, fotos, objetos ni cola, que es la guarda
 de `limpieza_datos_e2e_sandbox.sql`. Falta retirarlos con ese script en el editor SQL del panel del sandbox (aquí los
-`DELETE` no se completan): primero `modo := 'ensayo'`, después `'aplicar'`. Lo que sigue describe la retirada del 12/10.
+`DELETE` no se completan): primero `modo := 'ensayo'`, después `'aplicar'`. **Ensayo de solo lectura del 13/10** (conteos por los
+ids exactos del script, antes de pedir la retirada): `user_project_assignments` 2, `user_roles` 2, `role_permissions` 3, `roles` 1,
+`subscriptions` 2, `user_presence` 3, `bitacora_acciones` 2, `app_users` 4, `auth.refresh_tokens` 12, `auth.sessions` 12,
+`auth.identities` 4, `auth.users` 4, `projects` 3, `companies` 2, `permission_audit_log` ≥ 6, `audit_log` 2; las guardas se
+cumplen (0 servicios, objetos y cola de prueba) y el asiento ajeno `e2eace36-…` sigue presente. Lo que sigue describe la
+retirada del 12/10.
 
 Fotos, servicios y archivos se borraron por las RPC y la limpieza (bucket y cola en 0). Los usuarios quedaron
 **bloqueados** (`banned_until` 2999, contraseña aleatoria) hasta su retirada. Inventario exacto que se retiró:
