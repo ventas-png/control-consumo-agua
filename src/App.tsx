@@ -40,6 +40,7 @@ import {
 import { AuthSplash, DualServicePortal, PresenceBar } from './components/app/shell'
 import { APP_ROUTES, renderAppRoute, type AppRoutesCtx } from './components/app/routes'
 import { MfaGate } from './components/auth/MfaGate'
+import { necesitaAsistentePrimerProyecto } from './domain/empresa/usuarios'
 
 // F3.13: ComponentShowcase dev route (/dev/components). `lazy()` va a nivel de
 // módulo, no dentro del render: llamarlo en cada render crea un TIPO de componente
@@ -445,17 +446,21 @@ function AppShell() {
     activeSection.startsWith('condominios') &&
     agua.proyectos.filter(p => p.estado === 'activo').length === 0
 
-  // F3.11 (P1 quick win): onboarding. Un company_owner/admin cuya empresa aún no
+  // F3.11 (P1 quick win): onboarding. El company_owner cuya empresa aún no
   // tiene proyectos ve el SetupWizard (crea el primero). Se evalúa SOLO tras
   // cargar los datos → nunca parpadea; empresas ya configuradas jamás lo ven.
-  // Solo aplica a quien ve la empresa entera: para un admin acotado a sus
-  // proyectos asignados, "no veo ninguno" no significa "la empresa no tiene".
-  const necesitaOnboarding =
-    !agua.dataLoading &&
-    (currentUser.role === 'company_owner' || currentUser.role === 'admin') &&
-    agua.projectScope.exempt &&
-    !!currentUser.company_id &&
-    agua.proyectos.length === 0
+  // Solo el PRINCIPAL crea proyectos (projects_insert, migración 20261026000700): un
+  // administrador —aunque sea «exento»— ya no ve el asistente, porque el servidor le
+  // rechazaría el alta al final. Solo aplica a quien ve la empresa entera: para quien
+  // está acotado a sus proyectos asignados, "no veo ninguno" no significa "la empresa no tiene".
+  // Toda la compuerta vive en necesitaAsistentePrimerProyecto (función pura con su prueba de comportamiento): aquí sólo se le pasan los datos.
+  const necesitaOnboarding = necesitaAsistentePrimerProyecto({
+    cargando: agua.dataLoading,
+    role: currentUser.role,
+    veEmpresaEntera: agua.projectScope.exempt,
+    companyId: currentUser.company_id,
+    totalProyectos: agua.proyectos.length,
+  })
 
   // Contexto que consumen los renders del registro declarativo de rutas (P1 #4).
   const routesCtx: AppRoutesCtx = {

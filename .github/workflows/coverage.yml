@@ -798,6 +798,26 @@ jobs:
           PGPORT_TEST: 55531
         run: supabase/tests/compras_cierre_tecnico/run.sh
 
+      # Seguridad de las asignaciones de proyecto (20261026000600) y autoridad del
+      # PRINCIPAL de la empresa (20261026000700): nadie se asigna, cambia ni borra sus
+      # propios proyectos (salvo propietario y superadministrador), la persona y el
+      # proyecto son de la MISMA empresa para todo actor, y sólo el principal (propietario
+      # de su empresa o superadministrador) escribe las asignaciones, crea y borra proyectos,
+      # escribe roles y llaves e invita administradores (la invitación 'admin' es suya también
+      # para leerla, modificarla y borrarla), el proyecto de app_users es de la empresa de la
+      # persona para todo actor y la 0700 aborta ante una 0600 anterior ya registrada
+      # (Preview). Datos con la forma de producción
+      # (43 filas, 10 huérfanas, un administrador acotado): las filas y el alcance de cada
+      # persona quedan idénticos. Incluye CONTROL NEGATIVO (sin las migraciones la matriz y
+      # el principal se ponen en rojo), reversiones (exactas con la ACL de producción, juntas y
+      # por separado), mutaciones por pieza y por política, guardas del pre/post-vuelo,
+      # lock_timeout y concurrencia con sesiones reales.
+      - name: Asignaciones de proyecto — seguridad (autoasignación, empresa, privilegios, principal)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55532
+        run: supabase/tests/asignaciones_proyecto/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
