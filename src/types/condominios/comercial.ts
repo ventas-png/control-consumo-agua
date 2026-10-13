@@ -74,7 +74,27 @@ export interface ServicioHousekeeping {
   estado: EstadoHousekeeping
   costo?: number | null
   notas?: string | null
+  /** Estado en que se encontró la unidad y eventualidades. Nunca se purga. */
+  hallazgos_ingreso?: string | null
+  /** Cómo quedó la unidad al terminar. Nunca se purga. */
+  observaciones_cierre?: string | null
+  /** Sellados por la BD en la transición de estado (trg_hk_sellar_ejecucion). */
+  iniciado_por?: string | null
+  iniciado_en?: string | null
+  completado_por?: string | null
+  completado_en?: string | null
   created_at: string
   unidad_nombre?: string
+}
+
+export type FaseFotoHousekeeping = 'ingreso' | 'cierre'
+export interface FotoHousekeeping {
+  id: string
+  servicio_id: string
+  fase: FaseFotoHousekeeping
+  /** null = depurada por retención (90 días). */
+  path: string | null
+  created_at: string
+  creado_por?: string | null
 }
 

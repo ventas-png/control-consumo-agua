@@ -309,7 +309,9 @@ LANGUAGE plpgsql SET search_path = '' AS $$
 BEGIN
   INSERT INTO public.ordenes_pago (id, company_id, project_id, proveedor_id, factura_id, monto, fecha_pago, metodo_pago, estado)
   VALUES (p_orden, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-0000-0000-0000-000000000001',
-      'd0000000-0000-0000-0000-0000000d1001', p_factura, p_monto, p_fecha, 'transferencia', 'aprobada');
+      'd0000000-0000-0000-0000-0000000d1001', p_factura, p_monto, p_fecha, 'transferencia', 'borrador');
+  -- Desde 20261027000100 una orden de pago nace en borrador y se paga pasando por «aprobada».
+  UPDATE public.ordenes_pago SET estado = 'aprobada' WHERE id = p_orden;
   UPDATE public.ordenes_pago SET estado = 'pagada' WHERE id = p_orden;
 END;
 $$;
