@@ -20017,6 +20017,11 @@ export type Database = {
           responsable_asignado_en: string | null
           responsable_asignado_por: string | null
           responsable_user_id: string | null
+          reserva_str_id: string | null
+          reserva_str_resumen: Json | null
+          inconvenientes: string | null
+          informe_enviado_en: string | null
+          informe_enviado_por: string | null
           tipo: string
           unidad_id: string | null
         }
@@ -20036,6 +20041,11 @@ export type Database = {
           responsable_asignado_en?: string | null
           responsable_asignado_por?: string | null
           responsable_user_id?: string | null
+          reserva_str_id?: string | null
+          reserva_str_resumen?: Json | null
+          inconvenientes?: string | null
+          informe_enviado_en?: string | null
+          informe_enviado_por?: string | null
           tipo?: string
           unidad_id?: string | null
         }
@@ -20055,6 +20065,11 @@ export type Database = {
           responsable_asignado_en?: string | null
           responsable_asignado_por?: string | null
           responsable_user_id?: string | null
+          reserva_str_id?: string | null
+          reserva_str_resumen?: Json | null
+          inconvenientes?: string | null
+          informe_enviado_en?: string | null
+          informe_enviado_por?: string | null
           tipo?: string
           unidad_id?: string | null
         }
@@ -20092,6 +20107,13 @@ export type Database = {
             columns: ["responsable_user_id"]
             isOneToOne: false
             referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicios_housekeeping_reserva_str_id_fkey"
+            columns: ["reserva_str_id"]
+            isOneToOne: false
+            referencedRelation: "reservas_str"
             referencedColumns: ["id"]
           },
           {
@@ -25577,6 +25599,30 @@ export type Database = {
           id: string
           role: string
         }[]
+      }
+      hk_reservas_vinculables: {
+        Args: { p_project_id: string; p_unidad_id?: string | null }
+        Returns: {
+          id: string
+          codigo_confirmacion: string | null
+          huesped_nombre: string
+          fecha_entrada: string
+          fecha_salida: string
+          hora_llegada_estimada: string | null
+          hora_salida_estimada: string | null
+          estado: string
+          unidad_id: string | null
+          unidad_nombre: string | null
+          plataforma: string
+        }[]
+      }
+      hk_notificar_informe: {
+        Args: { p_servicio_id: string; p_a_administradores?: boolean; p_email_extra?: string | null }
+        Returns: Json
+      }
+      hk_recordatorios_previos: {
+        Args: { p_ventana?: string; p_ahora?: string }
+        Returns: number
       }
       personal_usuarios_asignables: {
         Args: { p_project_id: string }
