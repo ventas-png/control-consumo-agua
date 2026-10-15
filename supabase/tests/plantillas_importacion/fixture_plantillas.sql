@@ -60,8 +60,9 @@ CREATE TABLE public.inventario_condominio (
   CONSTRAINT inventario_id_tenant_uq UNIQUE (id, company_id, project_id)
 );
 ALTER TABLE public.inventario_condominio ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "inventario_select" ON public.inventario_condominio FOR SELECT TO authenticated
-  USING (company_id = public.get_my_company_id() OR public.is_super_admin());
+-- 20260518000010 (rbac_rls_condominios_phase1): ver el inventario exige condominios.tab.inventario.
+CREATE POLICY "inventario_condominio_select" ON public.inventario_condominio FOR SELECT TO authenticated
+  USING (public.is_super_admin() OR (company_id = public.get_my_company_id() AND public.user_has_permission('condominios.tab.inventario')));
 
 -- ── plantillas_tarea_cargo (20260424000060 + 20260904000200 + 20260904000400) ──
 CREATE TABLE public.plantillas_tarea_cargo (

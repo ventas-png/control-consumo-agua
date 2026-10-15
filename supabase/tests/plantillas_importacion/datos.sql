@@ -2,10 +2,11 @@
 -- (dos empresas A/B, proyectos PA1/PA2/PB1, trece cuentas con RBAC real).
 --
 -- Permisos del catálogo (RBAC real, roles de la empresa A):
---   «Plantillas completo» (tab + create + edit + tab.suministros) → 3 (PA1), 4 (PA2), 13 (asignado a PA1)
---   «Plantillas solo ver» (tab)                                → 6 (PA1): ve el catálogo, no carga ni edita
---   «Plantillas crear sin editar» (tab + create + suministros) → 11 (PA1): carga, pero no bloque
---   «Plantillas sin suministros» (tab + create + edit)         → 10 (PA1, rol vigente): no ve insumos
+--   «Plantillas completo» (tab + create + edit + tab.suministros + tab.inventario) → 3 (PA1), 4 (PA2), 13 (asignado a PA1)
+--   «Plantillas solo ver» (tab)                                     → 6 (PA1): ve el catálogo, no carga ni edita
+--   «Plantillas crear sin editar» (tab + create + suministros + inventario) → 11 (PA1): carga, pero no bloque
+--   «Plantillas sin suministros» (tab + create + edit + inventario) → 10 (PA1, rol vigente): no ve insumos
+--   «Plantillas sin inventario» (tab + create + edit + suministros) → 14 (PA1, cuenta propia de esta suite): no ve herramientas ni equipo
 --   5: sin permiso · 1 dueña, 2 admin PA1, 12 admin exento · 7 admin de B
 -- Áreas PA1: Pasillo, Gradas, Dup ×2 (ambigua), Vieja (inactiva); PA2: Jardín.
 -- Insumos PA1: Escoba, Bolsa, Cloro (inactivo), Dup ×2; PA2: Trapo; PB1: Escoba B.
@@ -27,25 +28,37 @@ INSERT INTO public.roles (id, company_id, name) VALUES
   ('e0000000-0000-0000-0000-0000000000f1'::uuid, hkt.ca(), 'Plantillas completo'),
   ('e0000000-0000-0000-0000-0000000000f2'::uuid, hkt.ca(), 'Plantillas solo ver'),
   ('e0000000-0000-0000-0000-0000000000f3'::uuid, hkt.ca(), 'Plantillas crear sin editar'),
-  ('e0000000-0000-0000-0000-0000000000f4'::uuid, hkt.ca(), 'Plantillas sin suministros');
+  ('e0000000-0000-0000-0000-0000000000f4'::uuid, hkt.ca(), 'Plantillas sin suministros'),
+  ('e0000000-0000-0000-0000-0000000000f5'::uuid, hkt.ca(), 'Plantillas sin inventario');
 INSERT INTO public.role_permissions (role_id, permission_key, effect) VALUES
   ('e0000000-0000-0000-0000-0000000000f1', 'condominios.tab.plantillas_cargo', 'allow'),
   ('e0000000-0000-0000-0000-0000000000f1', 'condominios.tab.plantillas_cargo.create', 'allow'),
   ('e0000000-0000-0000-0000-0000000000f1', 'condominios.tab.plantillas_cargo.edit', 'allow'),
   ('e0000000-0000-0000-0000-0000000000f1', 'condominios.tab.suministros', 'allow'),
+  ('e0000000-0000-0000-0000-0000000000f1', 'condominios.tab.inventario', 'allow'),
   ('e0000000-0000-0000-0000-0000000000f2', 'condominios.tab.plantillas_cargo', 'allow'),
   ('e0000000-0000-0000-0000-0000000000f3', 'condominios.tab.plantillas_cargo', 'allow'),
   ('e0000000-0000-0000-0000-0000000000f3', 'condominios.tab.plantillas_cargo.create', 'allow'),
   ('e0000000-0000-0000-0000-0000000000f3', 'condominios.tab.suministros', 'allow'),
+  ('e0000000-0000-0000-0000-0000000000f3', 'condominios.tab.inventario', 'allow'),
   ('e0000000-0000-0000-0000-0000000000f4', 'condominios.tab.plantillas_cargo', 'allow'),
   ('e0000000-0000-0000-0000-0000000000f4', 'condominios.tab.plantillas_cargo.create', 'allow'),
-  ('e0000000-0000-0000-0000-0000000000f4', 'condominios.tab.plantillas_cargo.edit', 'allow');
+  ('e0000000-0000-0000-0000-0000000000f4', 'condominios.tab.plantillas_cargo.edit', 'allow'),
+  ('e0000000-0000-0000-0000-0000000000f4', 'condominios.tab.inventario', 'allow'),
+  ('e0000000-0000-0000-0000-0000000000f5', 'condominios.tab.plantillas_cargo', 'allow'),
+  ('e0000000-0000-0000-0000-0000000000f5', 'condominios.tab.plantillas_cargo.create', 'allow'),
+  ('e0000000-0000-0000-0000-0000000000f5', 'condominios.tab.plantillas_cargo.edit', 'allow'),
+  ('e0000000-0000-0000-0000-0000000000f5', 'condominios.tab.suministros', 'allow');
+INSERT INTO auth.users (id, email) VALUES (hkt.uid(14), 'u14@test');
+INSERT INTO public.app_users (id, full_name, role, company_id, project_id, activo) VALUES
+  (hkt.uid(14), 'Operadora sin inventario', 'operator', hkt.ca(), hkt.pa1(), true);
 INSERT INTO public.user_roles (user_id, role_id, expires_at)
   SELECT hkt.uid(n), 'e0000000-0000-0000-0000-0000000000f1', NULL FROM unnest(ARRAY[3, 4, 13]) n;
 INSERT INTO public.user_roles (user_id, role_id, expires_at) VALUES
   (hkt.uid(6),  'e0000000-0000-0000-0000-0000000000f2', NULL),
   (hkt.uid(11), 'e0000000-0000-0000-0000-0000000000f3', NULL),
-  (hkt.uid(10), 'e0000000-0000-0000-0000-0000000000f4', NULL);
+  (hkt.uid(10), 'e0000000-0000-0000-0000-0000000000f4', NULL),
+  (hkt.uid(14), 'e0000000-0000-0000-0000-0000000000f5', NULL);
 
 INSERT INTO public.areas_condominio (id, company_id, project_id, nombre, activo) VALUES
   (hkt.ar(1), hkt.ca(), hkt.pa1(), 'Pasillo', true),

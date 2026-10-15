@@ -198,7 +198,7 @@ export function RecursosEnBloqueModal({ proyectoId, plantillas, suministros, inv
             })
         ) : (
           filtra(listaInventario).length === 0
-            ? <p style={{ fontSize: 12.5, color: 'var(--at-ink-3)', margin: '8px 0' }}>{listaInventario.length === 0 ? `No hay ${pestana === 'equipo' ? 'equipo' : 'herramientas'} en el inventario del proyecto.` : 'Nada con ese nombre.'}</p>
+            ? <p style={{ fontSize: 12.5, color: 'var(--at-ink-3)', margin: '8px 0' }}>{listaInventario.length === 0 ? `No hay ${pestana === 'equipo' ? 'equipo' : 'herramientas'} en el inventario del proyecto (o no tienes permiso para ver Inventario).` : 'Nada con ese nombre.'}</p>
             : filtra(listaInventario).map((i) => {
               const e = inv.get(i.id)
               return (

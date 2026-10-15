@@ -48,7 +48,7 @@ export const PLANTILLA_ACTIVIDADES: Plantilla = {
     'Toda actividad importada nace ACTIVA en el proyecto elegido. Importar no modifica ni elimina actividades existentes.',
     'Si ya existe una actividad con el mismo título y cargo en el proyecto (activa o inactiva), o el archivo la repite, la fila se rechaza: la carga no sobrescribe.',
     'El área, los insumos, las herramientas y el equipo se buscan por su nombre exacto en los catálogos del proyecto; si no existen, están inactivos o dados de baja, o hay dos con el mismo nombre, la fila falla. No se crean recursos.',
-    'Herramientas y equipo viven en Inventario: la columna decide la categoría («herramientas» → herramienta, «equipo» → equipo). Para vincular insumos necesitas permiso para ver Suministros.',
+    'Herramientas y equipo viven en Inventario: la columna decide la categoría («herramientas» → herramienta, «equipo» → equipo). Para vincular insumos necesitas permiso para ver Suministros; para herramientas y equipo, permiso para ver Inventario.',
     'Si UNA fila tiene error no se guarda ninguna: la carga es todo o nada.',
     'Cargar dos veces el mismo contenido en el mismo proyecto se rechaza mientras sus actividades sigan ahí.',
     'No se admiten fórmulas: pega valores. No incluyas columnas de estado ni identificadores: se rechazan.',

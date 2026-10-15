@@ -436,9 +436,14 @@ BEGIN
   END LOOP;
 
   -- Herramientas y equipo: inventario NO dado de baja del proyecto, por nombre y categoría;
-  -- cantidad entera > 0 (vacío = 1); «!» = obligatoria.
+  -- cantidad entera > 0 (vacío = 1); «!» = obligatoria. Ver el inventario exige
+  -- condominios.tab.inventario (RLS de inventario_condominio): sin él, mensaje claro en vez de «no existe».
   FOR v_col, v_cat, v_label IN SELECT * FROM (VALUES ('herramientas', 'herramienta', 'La herramienta'), ('equipo', 'equipo', 'El equipo')) t(c, cat, l) LOOP
     v_items := public.plantillas_import_partir_recursos(p_fila->>v_col);
+    IF jsonb_array_length(v_items) > 0 AND NOT COALESCE(public.user_has_permission('condominios.tab.inventario'), false) THEN
+      v_err := v_err || jsonb_build_object('campo', v_col, 'mensaje', 'Para vincular herramientas o equipo por nombre necesitas permiso para ver la pestaña Inventario.');
+      CONTINUE;
+    END IF;
     FOR it IN SELECT value FROM jsonb_array_elements(v_items) LOOP
       v_nombre := it->>'nombre';
       v_cant_t := COALESCE(it->>'cantidad', '1');
@@ -799,6 +804,9 @@ BEGIN
   -- la RLS no deje ver cuenta como inexistente). Al agregar, los recursos deben estar vigentes.
   IF jsonb_array_length(v_sum) > 0 AND NOT COALESCE(public.user_has_permission('condominios.tab.suministros'), false) THEN
     RAISE EXCEPTION 'PLANTILLAS_BLOQUE_PERMISO: para asignar insumos necesitas permiso para ver la pestaña Suministros.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF jsonb_array_length(v_inv) > 0 AND NOT COALESCE(public.user_has_permission('condominios.tab.inventario'), false) THEN
+    RAISE EXCEPTION 'PLANTILLAS_BLOQUE_PERMISO: para asignar herramientas o equipo necesitas permiso para ver la pestaña Inventario.' USING ERRCODE = 'insufficient_privilege';
   END IF;
   SELECT count(*) INTO v_n FROM public.plantillas_tarea_cargo p
    WHERE p.id = ANY (v_pl) AND p.company_id = v_company AND p.project_id = p_project_id;

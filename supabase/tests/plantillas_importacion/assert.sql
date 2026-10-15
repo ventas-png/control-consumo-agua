@@ -302,6 +302,14 @@ BEGIN
   v := public.plantillas_importar_previsualizar(hkt.pa1(), fila::jsonb, 'g.csv');
   PERFORM hkt.ok('G10b … y sin insumos carga normal', (v->'resumen'->>'validas')::int = 1);
   PERFORM public.plantillas_importar_descartar((v->>'lote_id')::uuid);
+  PERFORM hkt.como(hkt.uid(14));
+  v := public.plantillas_importar_previsualizar(hkt.pa1(), '[{"titulo":"Eva inv","cargo":"conserje","servicio":"otro","insumos":"Escoba","herramientas":"Trapeador","equipo":"Hidrolavadora"}]'::jsonb, 'g.csv');
+  PERFORM hkt.ok('G10c sin permiso de ver Inventario: herramientas y equipo por nombre fallan con un mensaje claro; el insumo sí se resuelve',
+    (v->'resumen'->>'con_error')::int = 1 AND hkt.err(v, 1, 'herramientas') LIKE '%ver la pestaña Inventario%'
+    AND hkt.err(v, 1, 'equipo') LIKE '%ver la pestaña Inventario%' AND hkt.err(v, 1, 'insumos') IS NULL);
+  v := public.plantillas_importar_previsualizar(hkt.pa1(), fila3::jsonb, 'g.csv');
+  PERFORM hkt.ok('G10d … y con solo insumos carga normal', (v->'resumen'->>'validas')::int = 1);
+  PERFORM public.plantillas_importar_descartar((v->>'lote_id')::uuid);
   PERFORM hkt.como(gen_random_uuid());
   PERFORM hkt.ok('G11 sesión sin perfil → 42501', hkt.estado_de(format('SELECT public.plantillas_importar_previsualizar(%L, %L::jsonb, %L)', hkt.pa1(), fila, 'g.csv')) = '42501');
   PERFORM hkt.como_anon();
@@ -412,6 +420,11 @@ BEGIN
   PERFORM hkt.ok('J15 quien edita pero no ve Suministros: insumos → PERMISO con mensaje claro; herramientas sí',
     msg LIKE 'PLANTILLAS_BLOQUE_PERMISO%Suministros%'
     AND (public.plantillas_recursos_en_bloque(hkt.pa1(), ARRAY[p2], 'agregar', '[]'::jsonb, '[{"id":"ad000000-0000-0000-0000-000000000001"}]'::jsonb)->>'agregados')::int = 1);
+  PERFORM hkt.como(hkt.uid(14));
+  msg := hkt.mensaje_de(format('SELECT public.plantillas_recursos_en_bloque(%L, ARRAY[%L]::uuid[], %L, %L::jsonb, %L::jsonb)', hkt.pa1(), p2, 'agregar', '[]', '[{"id":"ad000000-0000-0000-0000-000000000002"}]'));
+  PERFORM hkt.ok('J15b quien edita pero no ve Inventario: herramientas → PERMISO con mensaje claro; insumos sí',
+    msg LIKE 'PLANTILLAS_BLOQUE_PERMISO%Inventario%'
+    AND (public.plantillas_recursos_en_bloque(hkt.pa1(), ARRAY[p2], 'agregar', '[{"id":"ac000000-0000-0000-0000-000000000002"}]'::jsonb, '[]'::jsonb)->>'ya_estaban')::int = 1);
   PERFORM hkt.como(hkt.uid(4));
   PERFORM hkt.ok('J16 operadora de PA2 sobre PA1 → PLANTILLAS_BLOQUE_PROYECTO', hkt.mensaje_de(format('SELECT public.plantillas_recursos_en_bloque(%L, ARRAY[%L]::uuid[], %L, %L::jsonb, %L::jsonb)', hkt.pa1(), p2, 'agregar', sum1, '[]')) LIKE 'PLANTILLAS_BLOQUE_PROYECTO%');
   PERFORM hkt.como(hkt.uid(1));
