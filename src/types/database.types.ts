@@ -25578,6 +25578,22 @@ export type Database = {
           role: string
         }[]
       }
+      str_import_puede_crear: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      str_reservas_importar_previsualizar: {
+        Args: { p_project_id: string; p_filas: Json; p_archivo?: string | null }
+        Returns: Json
+      }
+      str_reservas_importar_aplicar: {
+        Args: { p_lote_id: string }
+        Returns: Json
+      }
+      str_reservas_importar_descartar: {
+        Args: { p_lote_id: string }
+        Returns: Json
+      }
       personal_usuarios_asignables: {
         Args: { p_project_id: string }
         Returns: {

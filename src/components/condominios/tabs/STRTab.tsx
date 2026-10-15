@@ -14,6 +14,7 @@ import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 import { ModalPortal } from '../../shared/ModalPortal'
+import { ImportarReservasSTRModal } from './ImportarReservasSTRModal'
 
 interface HuespedSTRForm {
   id?: string
@@ -79,6 +80,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
   const [form, setForm] = useState<Partial<ReservaSTR>>(blank())
   const [editId, setEditId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [saving, setSaving] = useState(false)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
@@ -303,9 +305,18 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Rentas de Corto Plazo (STR)</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Reserva</button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button onClick={() => setShowImport(true)} title="Cargar varias reservas desde un archivo CSV o XLSX"
+              style={{ padding: '8px 14px', background: 'var(--at-surface)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>⬆️ Carga masiva</button>
+            <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Reserva</button>
+          </div>
         )}
       </div>
+
+      {showImport && (
+        <ImportarReservasSTRModal proyectoId={proyectoId} moneda={moneda}
+          onClose={() => setShowImport(false)} onImportado={onRefresh} />
+      )}
 
       {showForm && (
         <ModalPortal>

@@ -857,6 +857,21 @@ jobs:
           PGPORT_TEST: 55562
         run: supabase/tests/housekeeping_responsable/run.sh
 
+      # 20261031000100: carga masiva de reservas STR desde una plantilla propia.
+      # Vista previa validada en el SERVIDOR (unidad por nombre del proyecto, fechas,
+      # horas, personas, catálogos, montos, código repetido = error, solape = aviso,
+      # fórmulas y columnas prohibidas), aplicar todo o nada re-evaluando contra el
+      # estado de hoy, idempotente por huella del contenido, bajo la RLS y el sello
+      # creado_por del llamador (SECURITY INVOKER), con el mismo permiso que crear
+      # una reserva en pantalla y acceso al proyecto; lotes escritos solo por las
+      # RPC. Con SESIONES REALES: el mismo lote aplicado a la vez y dos lotes con el
+      # mismo contenido a la vez. CONTROL NEGATIVO: cinco mutantes.
+      - name: STR — carga masiva de reservas
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55564
+        run: supabase/tests/str_importacion/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
