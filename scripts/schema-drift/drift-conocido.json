@@ -223,9 +223,9 @@
       "repo": "62c4f352afb05ec7c02cb11b4c1d53bb30d2f187424ce8d719555370a21365e0:12"
     },
     "tabla:amenidades_bloqueos/constraints": {
-      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826. Actualizado el 2026-10-15: 20261030000000 (#933) creó en producción la llave amenidades_bloqueos_company_id_fkey (ON DELETE CASCADE) con el nombre y la definición del repositorio, así que producción pasa de 4 a 5 constraints; las otras dos diferencias siguen.",
       "desde": "2026-09-01",
-      "produccion": "916d01336f66b0fca8d9d324f5d4ddde9419e70f61f942ca1b562a208d7b5e4b:4",
+      "produccion": "208abdcd0d3f9cb2560059be603e666ba9782ce101416f474bbcb309beae59f7:5",
       "repo": "fbde9291f1348ed624f5ccb27fc58b9692e14514843891ac346d9887513caf8b:7"
     },
     "tabla:amenidades_bloqueos/indices": {

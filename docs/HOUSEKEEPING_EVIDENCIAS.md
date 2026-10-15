@@ -147,8 +147,14 @@ despliega `purgar-fotos-registros` y `housekeeping-limpieza`, ambas con `--no-ve
    policies del servicio con `hk_acceso`/`can_access_project`, policies `hk_evidencias_insert/select` en el
    bucket, bucket privado, cron horario activo, número de secretos de Vault (solo nombres), cola sin atascadas;
    y en el panel, las dos Edge Functions con `verify_jwt = false`.
-3. **Manual**: cargar `purga_fotos_url` y `purga_fotos_service_key` en el Vault de producción (procedimiento
-   abajo). Sin la key la cola solo se drena al borrar desde la pantalla, no cada hora.
+3. **Vault de producción (medido el 13/10, solo lectura): no hay nada que cargar.** `purga_fotos_url` y
+   `purga_fotos_service_key` **ya existen** allí (la key, en formato JWT, creada el 2026-07-23 y actualizada el
+   2026-08-17). El cron mensual `purgar_fotos_storage_monthly` ya operaba antes de #927 (no queda ningún
+   `registros` con foto anterior al 2026-07-03) y la primera llamada horaria de housekeeping tras el
+   despliegue (13/10, 21:17 UTC) respondió HTTP 200 con `tomadas 0`. La afirmación del mensaje de commit de #927
+   («sin `purga_fotos_service_key` el cron es un no-op») describe el sandbox, no producción. El procedimiento de
+   abajo queda para un proyecto nuevo o un sandbox; sin la key, la cola solo se drenaría al borrar desde la
+   pantalla, no cada hora.
 
 **Recuperación** (`scripts/reversion-housekeeping-evidencias.sql`, no corre en CI): preferir avanzar con
 una migración nueva. A) revierte exactamente `20261028000100` (restaura las 4 policies previas); B) contiene
@@ -196,8 +202,11 @@ Lo que se eliminaría HOY en el sandbox (medido el 12/10 ~20:05 UTC; la purga an
 | huérfanos de `housekeeping-evidencias` | objeto sin fila, > 1 día | 0 |
 | cola `hk_limpieza_storage` | filas pendientes | 0 |
 
-Los tres buckets están vacíos. En producción, en cambio, la primera ejecución del día 1 sí retiraría las fotos de
-lecturas de más de 90 días y las de fichajes de más de 365: medirlo allí antes de cargar la key.
+Los tres buckets del sandbox están vacíos. En producción se midió el 13/10 (solo lectura), con la key ya cargada y
+el cron mensual operando desde antes de #927: la ejecución del 1 de noviembre retiraría las fotos de 251 `registros`
+(45 ya purgables hoy; la foto más antigua que queda es del 2026-07-03), 0 fotos de fichajes (la más antigua es del
+2026-09-07) y 0 de housekeeping; objetos en los buckets: `registro-fotos` 1771, `presencia-evidencias` 521,
+`housekeeping-evidencias` 0. La purga anula columnas, nunca borra filas.
 
 ## Verificación en el sandbox existente (sin resetearlo)
 ### Versión aplicada, funciones, cron y Vault (2026-10-12)
