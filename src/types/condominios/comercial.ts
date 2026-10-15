@@ -89,11 +89,52 @@ export interface ServicioHousekeeping {
   iniciado_en?: string | null
   completado_por?: string | null
   completado_en?: string | null
+  /** Reserva STR vinculada (20261031000000). La valida la BD (mismo proyecto, no cancelada). */
+  reserva_str_id?: string | null
+  /** Resumen de la reserva sellado por la BD al vincular; sobrevive al borrado de la reserva. */
+  reserva_str_resumen?: ReservaSTRResumen | null
+  /** Inconvenientes encontrados al ingresar (texto; fotos en la fase «inconvenientes»). */
+  inconvenientes?: string | null
+  /** Sellados por hk_notificar_informe al encolar el informe por correo. */
+  informe_enviado_en?: string | null
+  informe_enviado_por?: string | null
   created_at: string
   unidad_nombre?: string
 }
 
-export type FaseFotoHousekeeping = 'ingreso' | 'cierre'
+/** Lo que la BD guarda de la reserva al vincularla (trg_hk_reserva). */
+export interface ReservaSTRResumen {
+  reserva_id: string
+  codigo_confirmacion: string | null
+  huesped_nombre: string | null
+  huesped_telefono: string | null
+  huesped_email: string | null
+  fecha_entrada: string | null
+  fecha_salida: string | null
+  hora_llegada_estimada: string | null
+  hora_salida_estimada: string | null
+  estado: string | null
+  plataforma: string | null
+  unidad_id: string | null
+  vinculado_en: string
+}
+
+/** Fila del catálogo hk_reservas_vinculables (reservas en curso o confirmadas del proyecto). */
+export interface ReservaSTRVinculable {
+  id: string
+  codigo_confirmacion: string | null
+  huesped_nombre: string
+  fecha_entrada: string
+  fecha_salida: string
+  hora_llegada_estimada: string | null
+  hora_salida_estimada: string | null
+  estado: 'confirmada' | 'en_curso'
+  unidad_id: string | null
+  unidad_nombre: string | null
+  plataforma: string
+}
+
+export type FaseFotoHousekeeping = 'ingreso' | 'inconvenientes' | 'cierre'
 export interface FotoHousekeeping {
   id: string
   servicio_id: string

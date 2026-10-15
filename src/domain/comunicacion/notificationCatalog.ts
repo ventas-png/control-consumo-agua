@@ -21,6 +21,7 @@ export type NotificationGroup =
   | 'correspondencia'
   | 'cobros'
   | 'operacion'
+  | 'housekeeping'
   | 'cuenta'
   | 'otros'
 
@@ -46,8 +47,11 @@ export const GROUP_META: Record<NotificationGroup, GroupMeta> = {
   correspondencia: { label: 'correspondencia', labelSingular: 'correspondencia', icon: '📬', order: 5 },
   cobros:      { label: 'cobros',      labelSingular: 'cobro',      icon: '💰', order: 6 },
   operacion:   { label: 'operación',   labelSingular: 'operación',  icon: '🛠️', order: 7 },
-  cuenta:      { label: 'cuenta',      labelSingular: 'cuenta',     icon: '🔐', order: 8 },
-  otros:       { label: 'avisos',      labelSingular: 'aviso',      icon: '🔔', order: 9 },
+  // Avisos al responsable de un servicio de housekeeping (asignación y recordatorio
+  // previo, 20261031000000): tienen hora y destinatario concreto, no son «operación».
+  housekeeping: { label: 'servicios de housekeeping', labelSingular: 'servicio de housekeeping', icon: '🧹', order: 8 },
+  cuenta:      { label: 'cuenta',      labelSingular: 'cuenta',     icon: '🔐', order: 9 },
+  otros:       { label: 'avisos',      labelSingular: 'aviso',      icon: '🔔', order: 10 },
 }
 
 // `tipo` exactos que emiten los productores. Los que no estén aquí caen en
@@ -72,6 +76,7 @@ const PREFIX_TO_GROUP: ReadonlyArray<[string, NotificationGroup]> = [
   ['correspondencia_', 'correspondencia'],
   ['cuota_', 'cobros'],
   ['recibo_', 'cobros'],
+  ['housekeeping_', 'housekeeping'],
 ]
 
 /** Grupo al que pertenece un `tipo`. Nunca lanza: lo desconocido es 'otros'. */

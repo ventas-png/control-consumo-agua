@@ -45,6 +45,11 @@ describe('groupOf', () => {
     expect(groupOf('cuota_emitida')).toBe('cobros')
     expect(groupOf('cuota_recordatorio')).toBe('cobros')
     expect(groupOf('recibo_agua_emitido')).toBe('cobros')
+    // Avisos al responsable de housekeeping (20261031000000): asignación y
+    // recordatorio previo; cualquier variante futura `housekeeping_*` cae aquí.
+    expect(groupOf('housekeeping_asignado')).toBe('housekeeping')
+    expect(groupOf('housekeeping_recordatorio')).toBe('housekeeping')
+    expect(groupOf('housekeeping_informe')).toBe('housekeeping')
   })
 
   // Un `tipo` nuevo en la BD no puede hacer que la fila desaparezca de la campana.
