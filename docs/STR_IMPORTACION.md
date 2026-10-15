@@ -113,6 +113,20 @@ lotes). Datos «ZZ HKF» (`supabase/tests/housekeeping_flujo/sandbox_datos_hkf.s
 SQL tras la carga: las dos reservas nacen `confirmada`, con la unidad resuelta por nombre, `monto_total` calculado
 (100 × 2 = 200; 80 × 3 = 240), `mascotas` true/false y `creado_por` = g5 (sello de `trg_sellar_creado_por`).
 
+## Despliegue
+
+Solo la migración; no hay funciones Edge ni secretos nuevos. Producción se aplica por `apply-migrations-prod.yml`
+con la aprobación `production-db`.
+
+**Desplegada el 2026-10-15** (PR #940 fusionada como `3bc06d4c`; run 38809183788 de «Apply Migrations to
+Production», `success` a las 21:22 UTC, aprobación `production-db` de la persona responsable). Comprobación
+posterior de solo lectura en producción: 884 migraciones, máx. `20261031000100`; tablas `str_importaciones` y
+`str_importacion_filas` con RLS activa y policies `str_imp_select/insert/update` (más la compuerta MFA global);
+las seis funciones presentes; `str_reservas_importar_previsualizar` ejecutable por `authenticated` y
+`str_reservas_importar_aplicar` cerrada a `anon`; 0 lotes y 0 filas. Huella de producción recapturada a las
+21:24 UTC (`scripts/schema-drift/huella-produccion.json`): 0 grupos cambiados y 26 nuevos, 3599 → 3625,
+exactamente los que el auditor de la PR anunció; `drift-conocido.json` no cambia.
+
 ## Recuperación
 
 `scripts/reversion-str-importacion.sql`: A) cerrar las RPC a la API conservando el historial de lotes; B) localizar lo
