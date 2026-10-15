@@ -233,11 +233,13 @@ BEGIN
     RAISE EXCEPTION 'Proyecto inexistente' USING ERRCODE = '42501';
   END IF;
 
-  IF NOT (public.is_super_admin() OR v_company = public.get_my_company_id()) THEN
+  -- COALESCE: una sesión de la API sin perfil (get_my_company_id() NULL) no debe
+  -- pasar una guarda por NULL (20261029000000); aquí se cierra explícitamente.
+  IF NOT COALESCE(public.is_super_admin() OR v_company = public.get_my_company_id(), false) THEN
     RAISE EXCEPTION 'Proyecto fuera de la empresa' USING ERRCODE = '42501';
   END IF;
 
-  IF NOT public.hk_acceso(v_company, p_project_id) THEN
+  IF NOT COALESCE(public.hk_acceso(v_company, p_project_id), false) THEN
     RAISE EXCEPTION 'No autorizado' USING ERRCODE = '42501';
   END IF;
 

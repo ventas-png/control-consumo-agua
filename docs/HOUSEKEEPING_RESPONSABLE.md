@@ -76,7 +76,8 @@ responsable de un servicio; el servicio conserva el vínculo y la pantalla lo ma
   `app_users` no exponga esa persona al llamador (un operador no ve a otros operadores en el directorio; sí los
   recibe aquí, con nombre, para elegirlos y mostrarlos).
 - Las funciones nuevas son `SECURITY DEFINER` con `search_path = ''`, `REVOKE ... FROM PUBLIC`; solo la RPC del
-  catálogo se concede a `authenticated`.
+  catálogo se concede a `authenticated`. Sus guardas van con `COALESCE(…, false)`: una sesión de la API sin perfil
+  (`get_my_company_id()` NULL) no pasa por NULL (regla de 20261029000000).
 
 ## Pantalla
 
@@ -107,6 +108,7 @@ responsable de un servicio; el servicio conserva el vínculo y la pantalla lo ma
 |---|---|---|
 | SQL (Postgres 16 desechable) | 168 comprobaciones: equivalencia con `hk_acceso` cuenta por cuenta; catálogo; crear/rechazar (otra empresa, otro proyecto, sin módulo, deshabilitado, caducado, denegado, cliente, id inventado) por sesión y por `service_role`; manipulación directa (sellos, mover de proyecto); reasignar conserva creado/iniciado/completado/fotos/texto; revocación conserva el historial y no da acceso; heredados sin vincular; borrado de usuario → SET NULL; inventario y ACL. Idempotencia (se aplica dos veces con huella) y 4 mutantes que deben fallar (sin acceso al proyecto, sin empresa, sin `activo`, sin sello del asignador). | `supabase/tests/housekeeping_responsable/run.sh` (`PGPORT_TEST` opcional) |
 | SQL de #927 con esta migración encima | la suite de evidencias sigue pasando con 20261030000100 aplicada | `supabase/tests/housekeeping_evidencias/run.sh` |
+| SQL de #930 (`fail_open_sin_perfil`) con esta migración encima | la matriz función × sesión recorre también `hk_responsables_elegibles` (nueva, ejecutable por `authenticated`) y la juzga frente a las sesiones sin perfil; la suite anota en `fos.posteriores` las funciones que traen migraciones posteriores a su serie en vez de exigir que estuvieran «antes» | `supabase/tests/fail_open_sin_perfil/run.sh` |
 | Interfaz y dominio (vitest) | 14 de dominio, 11 de la pestaña, 8 del chip | `npx vitest run src/components/condominios src/domain/condominios src/components/shared` |
 | Guardas del repo | `migrations-guard`, `append-only`, `type-check`, `lint` | CI |
 
