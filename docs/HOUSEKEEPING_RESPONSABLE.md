@@ -14,7 +14,7 @@ o subió cada foto) y sin vincular por nombre los responsables antiguos. Complem
 | Datos de prueba del sandbox y su retirada | `supabase/tests/housekeeping_responsable/sandbox_datos_hkr.sql`, `sandbox_limpieza_hkr.sql` |
 | Dominio (catálogo, estado que se muestra, preselección, buscador, línea del PDF) | `src/domain/condominios/housekeepingResponsable.ts` |
 | Selector y línea «Responsable» | `src/components/condominios/tabs/ResponsableSelector.tsx` |
-| Pestaña, detalle con evidencias y PDF | `src/components/condominios/tabs/HousekeepingTab.tsx`, `HousekeepingEvidencias.tsx`, `housekeepingPdf.ts` |
+| Pestaña, detalle con evidencias y PDF | `src/components/condominios/tabs/HousekeepingTab.tsx`, `HousekeepingServicioPasos.tsx` (antes `HousekeepingEvidencias.tsx`, sustituido por el flujo por pasos de [`HOUSEKEEPING_FLUJO.md`](HOUSEKEEPING_FLUJO.md)), `housekeepingPdf.ts` |
 | Pruebas de interfaz y dominio | `src/components/condominios/tabs/__tests__/HousekeepingTab.responsable.test.tsx`, `src/domain/condominios/__tests__/housekeepingResponsable.test.ts`, `src/components/shared/__tests__/UsuarioChip.test.tsx` |
 | Recuperación | `scripts/reversion-housekeeping-responsable.sql` |
 | Capturas de la prueba real en el sandbox | `docs/capturas/housekeeping_responsable/` |

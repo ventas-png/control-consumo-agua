@@ -1,12 +1,14 @@
 // Informe PDF de un servicio de housekeeping: estado de la unidad al ingresar,
-// eventualidades, cómo quedó y quién lo hizo. Pensado para mandarse por WhatsApp
-// (Web Share con archivo) o descargarse.
+// inconvenientes encontrados, cómo quedó, quién lo hizo, horas dedicadas y la
+// reserva STR vinculada (si la hay). Pensado para mandarse por WhatsApp (Web
+// Share con archivo) o descargarse.
 //
 // Peso: las fotos ya están a 1280 px en el bucket; para el PDF se bajan a 900 px
-// y calidad 0.7. Con 40 fotos queda alrededor de 4–6 MB, por debajo del límite de
+// y calidad 0.7. Con 60 fotos queda alrededor de 6–9 MB, por debajo del límite de
 // documentos de WhatsApp. jsPDF se importa al generar, no al abrir la pestaña.
 import { descargarFotoServicio } from '../../../domain/condominios/housekeepingEvidencias'
-import type { FotoHousekeeping, ServicioHousekeeping } from '../../../types'
+import { etiquetaReserva, horasDedicadas } from '../../../domain/condominios/housekeepingFlujo'
+import type { FaseFotoHousekeeping, FotoHousekeeping, ServicioHousekeeping } from '../../../types'
 
 const MAX_LADO_PDF = 900
 const CALIDAD_PDF = 0.7
@@ -46,6 +48,25 @@ async function fotoADataUri(path: string): Promise<{ uri: string; w: number; h: 
 const fmtFechaHora = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' }) : '—'
 
+/** Líneas de cabecera del informe (puras, para probarlas sin jsPDF). */
+export function lineasCabeceraInforme(d: DatosInformeHK): string[] {
+  const s = d.servicio
+  const lineas = [
+    `${d.tipoLabel} — ${s.unidad_nombre ?? 'Sin unidad específica'}`,
+    // Postgres devuelve `time` como HH:MM:SS; en el informe basta HH:MM.
+    `Fecha: ${s.fecha}    Ingreso tentativo: ${s.hora_inicio?.slice(0, 5) ?? '—'}    Fin estimado: ${s.hora_fin?.slice(0, 5) ?? '—'}    Estado: ${d.estadoLabel}`,
+    d.responsableLinea ?? (s.responsable ? `Responsable anterior sin vincular: ${s.responsable}` : 'Responsable: —'),
+    `Inicio real: ${fmtFechaHora(s.iniciado_en)} (${d.iniciadoPor ?? '—'})    Fin real: ${fmtFechaHora(s.completado_en)} (${d.completadoPor ?? '—'})`,
+    `Horas dedicadas: ${horasDedicadas(s)}`,
+  ]
+  if (s.reserva_str_resumen) {
+    const r = s.reserva_str_resumen
+    lineas.push(`Reserva vinculada: ${etiquetaReserva(r)}${r.plataforma ? ` · ${r.plataforma}` : ''}${r.huesped_telefono ? ` · ${r.huesped_telefono}` : ''}${r.hora_llegada_estimada ? ` · llegada ${r.hora_llegada_estimada.slice(0, 5)}` : ''}`)
+  }
+  if (d.evidenciasPor && d.evidenciasPor.length > 0) lineas.push(`Evidencias (fotos) subidas por: ${d.evidenciasPor.join(', ')}`)
+  return lineas
+}
+
 export async function generarInformeHousekeepingPdf(d: DatosInformeHK): Promise<Blob> {
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
@@ -62,20 +83,16 @@ export async function generarInformeHousekeepingPdf(d: DatosInformeHK): Promise<
 
   const s = d.servicio
   texto(d.empresa ?? 'Informe de housekeeping', 15, true)
-  texto(`${d.tipoLabel} — ${s.unidad_nombre ?? 'Sin unidad específica'}`, 12, true)
-  // Postgres devuelve `time` como HH:MM:SS; en el informe basta HH:MM.
-  texto(`Fecha: ${s.fecha}    Horario: ${s.hora_inicio?.slice(0, 5) ?? '?'} – ${s.hora_fin?.slice(0, 5) ?? '?'}    Estado: ${d.estadoLabel}`)
-  texto(d.responsableLinea ?? (s.responsable ? `Responsable anterior sin vincular: ${s.responsable}` : 'Responsable: —'))
-  texto(`Iniciado por: ${d.iniciadoPor ?? '—'} (${fmtFechaHora(s.iniciado_en)})`)
-  texto(`Completado por: ${d.completadoPor ?? '—'} (${fmtFechaHora(s.completado_en)})`)
-  if (d.evidenciasPor && d.evidenciasPor.length > 0) texto(`Evidencias (fotos) subidas por: ${d.evidenciasPor.join(', ')}`)
+  const [titulo, ...resto] = lineasCabeceraInforme(d)
+  texto(titulo, 12, true)
+  for (const l of resto) texto(l)
   y += 3
 
-  const bloque = async (titulo: string, textoLibre: string | null | undefined, fase: 'ingreso' | 'cierre') => {
+  const bloque = async (titulo: string, textoLibre: string | null | undefined, fase: FaseFotoHousekeeping, vacio: string) => {
     salto(20)
     doc.setDrawColor(180); doc.line(M, y, PW - M, y); y += 5
     texto(titulo, 12, true)
-    texto(textoLibre?.trim() ? textoLibre : 'Sin observaciones registradas.')
+    texto(textoLibre?.trim() ? textoLibre : vacio)
     const delFase = d.fotos.filter(f => f.fase === fase)
     const vivas = delFase.filter(f => f.path)
     const depuradas = delFase.length - vivas.length
@@ -98,8 +115,9 @@ export async function generarInformeHousekeepingPdf(d: DatosInformeHK): Promise<
     y += 2
   }
 
-  await bloque('Estado al ingresar y eventualidades', s.hallazgos_ingreso, 'ingreso')
-  await bloque('Resultado del servicio', s.observaciones_cierre, 'cierre')
+  await bloque('Estado al ingresar', s.hallazgos_ingreso, 'ingreso', 'Sin observaciones registradas.')
+  await bloque('Inconvenientes encontrados', s.inconvenientes, 'inconvenientes', 'Ninguno registrado.')
+  await bloque('Resultado del servicio', s.observaciones_cierre, 'cierre', 'Sin observaciones registradas.')
 
   const n = doc.getNumberOfPages()
   for (let p = 1; p <= n; p++) {
