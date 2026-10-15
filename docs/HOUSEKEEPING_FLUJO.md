@@ -199,7 +199,26 @@ reabrir `→ en_proceso` permitido, `en_proceso → cancelado` permitido.
 10:30 Guatemala) → 0; a las 15:45 UTC → 4 (campana + correo de los dos pendientes de esa franja); repetido → 0.
 
 Los datos ZZ HKF se retiran con `sandbox_limpieza_hkf.sql` (ensayo → autorización → aplicar) tras borrar las fotos
-por las RPC y drenar la cola.
+por las RPC y drenar la cola. Fotos y servicios retirados el 2026-10-15 con la sesión real de la dueña:
+`hk_eliminar_servicio` × 4 (4 archivos encolados) y `housekeeping-limpieza` `tomadas 4, borradas 4`; 0 fotos,
+0 objetos, 0 cola.
+
+## Despliegue
+
+Solo la migración (más tres plantillas globales de correo que ella misma inserta); no hay funciones Edge ni
+secretos nuevos. Producción se aplica por `apply-migrations-prod.yml` con la aprobación `production-db`.
+
+**Desplegada el 2026-10-15** (PR #939 fusionada como `188c69af`; run 38792165260 de «Apply Migrations to
+Production», `success` a las 19:21 UTC, aprobación `production-db` de la persona responsable). Comprobación
+posterior de solo lectura en producción: 883 migraciones, máx. `20261031000000`; las diez funciones `hk_*`
+nuevas presentes; en `servicios_housekeeping` los ocho triggers en el orden esperado (`trg_bitacora`,
+`trg_hk_estado_transicion`, `trg_hk_notificar_asignacion`, `trg_hk_reserva`, `trg_hk_responsable`,
+`trg_hk_sellar_ejecucion`, `trg_hk_servicio_alcance`, `trg_sellar_creado_por`); CHECK de fase con tres valores;
+policy `hk_evidencias_insert` con cupo `< 90`; cron `hk_recordatorios_previos` cada 15 min; 3 plantillas
+globales `housekeeping_*`; 1 servicio existente, sin reserva vinculada y con su responsable intacto; 0 filas en
+`hk_recordatorios_log`. Huella de producción recapturada a las 20:23 UTC
+(`scripts/schema-drift/huella-produccion.json`): 5 grupos cambiados y 27 nuevos, 3572 → 3599, exactamente los
+32 que el auditor de la PR anunció; `drift-conocido.json` no cambia.
 
 ## Recuperación
 
