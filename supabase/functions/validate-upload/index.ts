@@ -43,7 +43,10 @@ Deno.serve(async (req) => {
     return json({ error: 'Se esperaba multipart/form-data con los campos file, bucket y path.' }, 400, corsHeaders)
   }
 
-  const file = form.get('file')
+  // `unknown` y no `FormDataEntryValue | null`: con ese tipo, tras descartar
+  // `File` sólo queda `string | null` y TS rechaza el `instanceof Blob`
+  // defensivo (TS2358). El chequeo en tiempo de ejecución no cambia.
+  const file: unknown = form.get('file')
   const bucket = String(form.get('bucket') ?? '')
   const path = String(form.get('path') ?? '')
   const upsert = String(form.get('upsert') ?? '') === 'true'

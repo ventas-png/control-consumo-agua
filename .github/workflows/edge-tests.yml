@@ -8,8 +8,9 @@ name: Edge Function Tests
 # stubeando `Deno.env` / mockeando el cliente de supabase-js. Por eso el gate REAL corre
 # vitest acotado a supabase/functions/ (no `deno test`, que no resolvería `vitest`).
 #
-# Además, un job ADVISORY corre `deno check` sobre los helpers puros extraídos para
-# detectar drift de tipos a nivel Deno (lo que `tsc` no cubre: tsconfig solo incluye src/).
+# Además, dos jobs BLOQUEANTES corren `deno check` (lo que `tsc` no cubre: tsconfig
+# solo incluye src/, y eslint ignora supabase/**): uno sobre los helpers puros y otro
+# sobre los handlers (`*/index.ts`) con todo lo que importan.
 #
 # Es aditivo: el workflow `ci.yml` ya corre `npm run test` (toda la suite, incl. estos
 # tests). Este workflow los aísla para feedback rápido y específico cuando solo cambian
@@ -19,11 +20,13 @@ on:
   pull_request:
     paths:
       - 'supabase/functions/**'
+      - '.github/deno/**'
       - '.github/workflows/edge-tests.yml'
   push:
     branches: [main]
     paths:
       - 'supabase/functions/**'
+      - '.github/deno/**'
       - '.github/workflows/edge-tests.yml'
   workflow_dispatch:
 
@@ -82,16 +85,8 @@ jobs:
     # mano se quedó cubriendo el 12% de los helpers puros sin que nadie lo notara.
     # Así, un helper nuevo entra al gate el día que se escribe.
     #
-    # POR QUÉ NO HAY UN JOB EQUIVALENTE PARA LOS HANDLERS (index.ts):
-    # Se probó en este mismo PR y devolvió 91 errores, TODOS ruido del entorno de
-    # tipos, ninguno un defecto: `SupabaseClient<any,…>` no asignable a
-    # `SupabaseClient<unknown,…>`, `.update({…})` contra `never` (el cliente sin
-    # tipos generados), y un `file instanceof File` que depende de las libs DOM
-    # que cargue Deno. Un check "advisory" permanentemente rojo es PEOR que no
-    # tenerlo: normaliza el rojo en los PRs y entrena a ignorarlo. Para que los
-    # handlers sean verificables hay que generar antes los tipos de la BD para el
-    # lado Deno (`supabase gen types` + un import_map); hasta entonces, el gate
-    # honesto es este, sobre lógica pura.
+    # Los handlers (index.ts) y lo que importa supabase-js/Stripe los cubre el
+    # job `deno-check-handlers`, más abajo.
     steps:
       - uses: actions/checkout@v7
 
@@ -113,3 +108,69 @@ jobs:
           echo "Helpers puros a verificar: ${#FILES[@]}"
           printf '  %s\n' "${FILES[@]}"
           deno check "${FILES[@]}"
+
+  deno-check-handlers:
+    name: deno check — handlers index.ts (bloqueante)
+    runs-on: ubuntu-latest
+    # POR QUÉ EXISTE: `delete-company` respondió 500 a TODA petición desde
+    # 6db61ad1 (#672) hasta #931 por llamar a `getAllowedOrigins()`, que no
+    # existía en el módulo (ReferenceError fuera del try). Ningún gate lo vio: el
+    # job de arriba excluye todo `index.ts`, `tsconfig.json` sólo incluye src/ y
+    # eslint ignora supabase/**. `deno check` lo reporta en el acto:
+    # `TS2304 Cannot find name 'getAllowedOrigins'`.
+    #
+    # POR QUÉ AHORA SÍ ES VERIFICABLE: antes se probó y dio 91 errores de
+    # "entorno". Casi todos eran tipos mal escritos en NUESTRO código, no ruido
+    # irreducible: helpers tipados con `ReturnType<typeof createClient>` (cliente
+    # sin esquema → `.update()` contra `never`; ahora `SupabaseClient`, como
+    # `_shared/auth.ts`) y `RpcClient` exigiendo `Promise` cuando `.rpc()`
+    # devuelve un builder que sólo es `PromiseLike`. Entre ellos había defectos
+    # reales: `.catch()` sobre el builder de PostgREST (TypeError que abortaba
+    # el rollback de signup-company y accept-invitation) y un `buildRawMessage`
+    # local que chocaba con el importado (route-reminders).
+    #
+    # CÓMO:
+    #   · `.github/deno/import_map.json` redirige cada URL de esm.sh a su paquete
+    #     npm con versión EXACTA: tipos reproducibles (la URL `@2` de esm.sh
+    #     flota) y sin depender de esm.sh en CI. Vive FUERA de
+    #     supabase/functions/ a propósito: el CLI de Supabase toma un
+    #     `import_map.json` o `deno.json` en supabase/functions/ como
+    #     configuración global de las funciones, y esto NO debe cambiar lo que
+    #     se despliega. Sólo afecta a este chequeo.
+    #   · `.github/deno/deno.lock` fija también las dependencias transitivas
+    #     (p. ej. `@types/node`, que el SDK de Stripe pide con `>=8.1.0`): sin él,
+    #     una publicación ajena podría poner rojo este gate sin cambio nuestro.
+    #   · `--no-remote`: si un handler importa una URL que no está en el mapa,
+    #     falla aquí ("A remote specifier was requested … --no-remote") en vez de
+    #     bajar los tipos de esm.sh en silencio. Arreglo: añadir la URL al mapa
+    #     (con su `npm:` y versión exacta).
+    #   · Cubre TODO `.ts` no-test de supabase/functions: cada uno es alcanzable
+    #     desde algún `index.ts` (verificado con `deno info` al crear el job).
+    #
+    # Límite conocido: el SDK de Stripe declara sus tipos como módulo ambiente
+    # (`declare module 'stripe'`) y bajo `npm:` Deno lo deja en `any`. Las
+    # llamadas a Stripe no se verifican; los nombres sin definir, sí.
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.x
+
+      - name: deno check (supabase/functions/*/index.ts)
+        run: |
+          set -euo pipefail
+          HANDLERS=(supabase/functions/*/index.ts)
+          echo "Handlers a verificar: ${#HANDLERS[@]}"
+          deno check --no-config --no-remote \
+            --import-map=.github/deno/import_map.json \
+            --lock=.github/deno/deno.lock \
+            "${HANDLERS[@]}"
+
+      # Segunda red, sin red ni npm: SÓLO la regla `no-undef` (`--rules-tags=`
+      # vacío apaga el set recomendado, que sigue advisory en deploy-functions).
+      # Detecta el mismo `getAllowedOrigins` aunque el typecheck no llegue a
+      # correr, y cubre también los tests. Corre aunque el paso anterior falle.
+      - name: deno lint — no-undef (supabase/functions)
+        if: ${{ !cancelled() }}
+        run: deno lint --rules-tags= --rules-include=no-undef supabase/functions

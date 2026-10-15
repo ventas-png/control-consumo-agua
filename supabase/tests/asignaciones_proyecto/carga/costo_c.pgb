@@ -1,0 +1,7 @@
+-- Coste del candado: el propietario de C borra uno de 4 proyectos pequeños y deshace.
+\set a random(1,4)
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', 'a5e00000-0000-0000-0000-000000000003', true);
+DELETE FROM public.projects WHERE id = ('b3f00000-0000-0000-0000-00000000000' || :a)::uuid;
+ROLLBACK;

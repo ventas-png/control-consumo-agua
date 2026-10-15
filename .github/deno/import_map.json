@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "https://esm.sh/@supabase/supabase-js@2": "npm:@supabase/supabase-js@2.117.3",
+    "https://esm.sh/stripe@17.4.0?target=deno": "npm:stripe@17.4.0",
+    "https://esm.sh/stripe@13.10.0?target=deno": "npm:stripe@13.10.0"
+  }
+}

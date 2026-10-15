@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { isRetriable } from '../_shared/emailRetryable.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
@@ -53,7 +53,7 @@ interface EmailConfig {
 
 async function refreshAccessToken(
   refreshToken: string,
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   configId: string,
 ): Promise<string | null> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -80,7 +80,7 @@ async function refreshAccessToken(
 // scope creep.
 async function attemptSend(
   row: QueueRow,
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { payload } = row
   const valid = validateQueuePayload(payload)

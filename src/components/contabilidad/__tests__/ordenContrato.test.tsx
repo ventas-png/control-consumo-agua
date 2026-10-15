@@ -5,6 +5,7 @@
 // vigencia, monto, quién autoriza) las prueba supabase/tests/compras_bloque_b/assert_contratos_compras.sql.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { PASOS_TODOS } from '../../../test/sesionPermisos'
 
 vi.mock('../../../lib/supabase', () => ({ supabase: {}, warmUpSupabase: vi.fn() }))
 
@@ -14,7 +15,7 @@ const m = vi.hoisted(() => ({
   excepcion: vi.fn(),
   prompt: vi.fn(),
   notify: vi.fn(),
-  permisos: { puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: true, puedeEliminar: true },
+  permisos: {} as Record<string, boolean>,
   ordenes: [] as unknown[],
 }))
 
@@ -68,6 +69,13 @@ vi.mock('../ui', async (original) => {
 
 import { ComprasTab } from '../ComprasTab'
 
+// La persona de estas pruebas: puede crear, editar, cambiar estado y TIENE la llave de aprobar órdenes de compra
+// («Autorizar / Denegar — Órdenes compra»). Aprobar y devolver cuelgan de esa llave; emitir y cancelar, de «Cambiar estado».
+const PERMISOS = {
+  puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: true, puedeEliminar: true,
+  ...PASOS_TODOS,
+}
+
 const NO_VIGENTE = new Error('COMPRAS_CONTRATO_NO_VIGENTE: no se puede aprobar la orden al amparo de su contrato (rebasa el monto máximo vigente de 1000.00)')
 
 const orden = (estado: string, contrato: string | null = 'k1') => ({
@@ -76,7 +84,7 @@ const orden = (estado: string, contrato: string | null = 'k1') => ({
 })
 
 beforeEach(() => {
-  m.permisos = { puedeCrear: true, puedeEditar: true, puedeCambiarEstado: true, puedeAutorizar: true, puedeEliminar: true }
+  m.permisos = { ...PERMISOS }
   m.ordenes = []
   m.crear.mockResolvedValue(undefined)
   m.cambiar.mockResolvedValue(undefined)
@@ -146,7 +154,8 @@ describe('Aprobar y emitir con contrato no vigente', () => {
   })
 
   it('sin el permiso de cambio de estado: no se ofrece la excepción y se muestra el rechazo del servidor', async () => {
-    m.permisos = { ...m.permisos, puedeCambiarEstado: false }
+    // sin «Cambiar estado»: no hay excepción que autorizar, pero la llave de aprobar sigue ofreciendo Aprobar
+    m.permisos = { ...m.permisos, puedeCambiarEstado: false, puedeCambiarEstadoPaso: false }
     m.ordenes = [orden('borrador')]
     m.cambiar.mockRejectedValue(NO_VIGENTE)
     render(<ComprasTab companyId="c1" projectId="22222222-2222-4222-8222-222222222222" monedaBase="GTQ" />)

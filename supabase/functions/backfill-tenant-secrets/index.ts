@@ -15,7 +15,7 @@
 //
 // Ver docs/RUNBOOK_TENANT_SECRETS_ENCRYPTION.md (sección "Backfill (MIGRATE)").
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { encryptSecret, encryptJson, isEncrypted, hasEncryptionKey } from '../_shared/secretsCrypto.ts'
 
@@ -23,7 +23,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? ''
 
-type Admin = ReturnType<typeof createClient>
+type Admin = SupabaseClient
 
 interface TableResult {
   table: string
@@ -53,7 +53,9 @@ async function backfillTextColumns(
   const r: TableResult = { table, scanned: 0, encrypted: 0, skipped: 0, errors: 0, last_error: null }
   const { data, error } = await admin.from(table).select(['id', ...columns].join(','))
   if (error) { r.errors++; r.last_error = error.message; return r }
-  for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+  // `unknown` intermedio: con una lista de columnas dinámica, supabase-js no
+  // puede inferir la fila y la tipa como `GenericStringError`.
+  for (const row of (data ?? []) as unknown as Array<Record<string, unknown>>) {
     r.scanned++
     const update: Record<string, string> = {}
     for (const col of columns) {

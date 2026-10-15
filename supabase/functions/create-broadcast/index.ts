@@ -100,8 +100,12 @@ Deno.serve(async (req) => {
       .from('user_roles')
       .select('role_id, role:roles(cloned_from_role_id)')
       .eq('user_id', caller.id)
-    const assignedRoleIds = (roleRows ?? []).flatMap(
-      (r: { role_id: string; role?: { cloned_from_role_id?: string | null } | null }) =>
+    // Cast: sin tipos generados de la BD, supabase-js infiere el embed como
+    // arreglo; `user_roles.role_id → roles.id` es muchos-a-uno y PostgREST lo
+    // devuelve como objeto.
+    type RoleRow = { role_id: string; role?: { cloned_from_role_id?: string | null } | null }
+    const assignedRoleIds = ((roleRows ?? []) as RoleRow[]).flatMap(
+      (r) =>
         // Linaje: las copias de empresa heredan el gate de su plantilla de origen.
         [r.role_id, r.role?.cloned_from_role_id].filter((v): v is string => !!v),
     )

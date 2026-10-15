@@ -17,7 +17,9 @@ DECLARE
   last_evt bigint;
   tmpu uuid := gen_random_uuid();
   urole uuid := gen_random_uuid();
+  ownu uuid := gen_random_uuid();
   k text;
+  actor_role text;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.app_users WHERE id=uid AND company_id=cid) THEN
     RAISE EXCEPTION 'AUDIT_FIXTURE_MISSING';
@@ -126,7 +128,25 @@ BEGIN
   INSERT INTO public.roles(id,company_id,name) VALUES
     (other_role,other_cid,'Audit aislado '||other_role),
     (owned_role,cid,'Audit administrador '||owned_role);
-  -- La corrección no debe ampliar el acceso: el admin normal sólo borra su empresa.
+  -- La corrección no debe ampliar el acceso: el usuario normal (no superadministrador) sólo borra roles de su empresa. Ese usuario es el PROPIETARIO de
+  -- la empresa (efímero: se crea aquí y el ROLLBACK final lo borra): los roles los escribe el principal de la empresa; hasta la migración 20261026000700
+  -- de #928 también los escribía el administrador, y con ella ya no. Con el propietario como actor la prueba vale CON y SIN la 0700 (el código de error
+  -- conserva el nombre «ADMIN» por compatibilidad con quien ya lo cita).
+  -- Con la 0700 de #928 (roles_delete es del principal) el actor configurado, si NO es principal (administrador), recibe 0 filas SIN error: la RLS filtra la fila.
+  -- Sin la 0700 esto se omite (la prueba vale con y sin ella). Es la comprobación que traía la rama de #928 en esta misma prueba.
+  SELECT role INTO actor_role FROM public.app_users WHERE id=uid;
+  IF COALESCE((SELECT pg_get_expr(p.polqual, p.polrelid) ~ 'is_company_owner' FROM pg_policy p
+                WHERE p.polrelid='public.roles'::regclass AND p.polname='roles_delete'), false)
+     AND actor_role NOT IN ('company_owner','super_admin','superadmin') THEN
+    EXECUTE 'SET LOCAL ROLE authenticated';
+    DELETE FROM public.roles WHERE id=owned_role;
+    GET DIAGNOSTICS affected=ROW_COUNT;
+    EXECUTE 'RESET ROLE';
+    IF affected<>0 THEN RAISE EXCEPTION 'AUDIT_NON_PRINCIPAL_DELETE_ALLOWED'; END IF;
+  END IF;
+  INSERT INTO auth.users(id) VALUES (ownu);
+  INSERT INTO public.app_users(id,company_id,full_name,role) VALUES (ownu,cid,'Audit propietario temporal','company_owner');
+  PERFORM set_config('request.jwt.claim.sub', ownu::text, true);
   EXECUTE 'SET LOCAL ROLE authenticated';
   DELETE FROM public.roles WHERE id=other_role;
   GET DIAGNOSTICS affected=ROW_COUNT;
@@ -135,8 +155,9 @@ BEGIN
   GET DIAGNOSTICS affected=ROW_COUNT;
   IF affected<>1 THEN RAISE EXCEPTION 'AUDIT_ADMIN_DELETE_FAILED'; END IF;
   EXECUTE 'RESET ROLE';
+  PERFORM set_config('request.jwt.claim.sub', uid::text, true);
   IF NOT EXISTS (SELECT 1 FROM public.permission_audit_log
-    WHERE action='delete_role' AND actor_id=uid AND details->>'role_id'=owned_role::text) THEN
+    WHERE action='delete_role' AND actor_id=ownu AND details->>'role_id'=owned_role::text) THEN
     RAISE EXCEPTION 'AUDIT_ADMIN_ACTOR_LOST';
   END IF;
   FOREACH k IN ARRAY ARRAY['audit_roles_changes','audit_role_permissions_changes','audit_user_roles_changes'] LOOP

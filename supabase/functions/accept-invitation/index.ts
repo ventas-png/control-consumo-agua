@@ -206,8 +206,13 @@ Deno.serve(async (req: Request) => {
         assigned_by: userId, // self-assigned vía aceptación de invitación
       })
       if (roleErr) {
-        // Rollback: no dejar un usuario sin permisos.
-        await adminClient.from('app_users').delete().eq('id', userId).catch(() => undefined)
+        // Rollback: no dejar un usuario sin permisos. Sin `.catch` en el
+        // DELETE: el builder de PostgREST sólo implementa `then`, así que
+        // `.catch(...)` lanzaba TypeError, el DELETE nunca salía y tampoco se
+        // borraba la identidad de auth (quedaban huérfanas). No rechaza: un
+        // fallo llega en `error`.
+        const { error: rbErr } = await adminClient.from('app_users').delete().eq('id', userId)
+        if (rbErr) console.error('accept-invitation rollback app_users:', rbErr.message)
         await adminClient.auth.admin.deleteUser(userId).catch(() => undefined)
         return new Response(
           JSON.stringify({ error: 'No se pudo asignar el rol: ' + roleErr.message }),
