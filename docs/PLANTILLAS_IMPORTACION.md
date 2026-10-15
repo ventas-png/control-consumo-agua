@@ -161,7 +161,9 @@ quedan con Bolsa ×1 e Hidrolavadora ×1 obligatoria tras quitar la Escoba; toda
 en el primer intento; es historial, no se borra por la API).
 
 Retirada: `sandbox_limpieza_pla.sql` (ensayo → aplicar) borra también lo que creó la prueba (actividades, puentes y
-lotes de la empresa). Pendiente de correr en el editor SQL del sandbox: el conector retiene los `DELETE`.
+lotes de la empresa). **Retirado el 2026-10-15** por la persona responsable desde el editor SQL del sandbox (el conector
+retiene los `DELETE`); comprobación posterior de solo lectura: 0 empresas, usuarios, roles, actividades, lotes, insumos e
+inventario «ZZ PLA».
 
 ## Despliegue
 
