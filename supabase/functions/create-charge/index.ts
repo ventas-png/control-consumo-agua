@@ -344,14 +344,17 @@ Deno.serve(async (req: Request) => {
     if (compErr) return json({ error: compErr.message }, 500)
     if (!company) return json({ error: 'Empresa no encontrada' }, 404)
 
-    let projectRow: { proveedor_pago?: string | null; moneda?: string | null; ambiente_pago?: string | null } | null = null
+    // Alias con nombre y no `typeof projectRow`: tras `= null`, TS estrecha la
+    // variable a `null` y el cast la dejaba en `null` (el resto, en `never`).
+    type ProjectRow = { proveedor_pago?: string | null; moneda?: string | null; ambiente_pago?: string | null }
+    let projectRow: ProjectRow | null = null
     if (projectId) {
       const { data: proj } = await admin
         .from('projects')
         .select('proveedor_pago, moneda, ambiente_pago')
         .eq('id', projectId)
         .maybeSingle()
-      projectRow = (proj as typeof projectRow) ?? null
+      projectRow = (proj as ProjectRow | null) ?? null
     }
 
     const empresaConfig: ConfigPagoEmpresa = {

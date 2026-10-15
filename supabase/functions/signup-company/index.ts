@@ -154,7 +154,13 @@ Deno.serve(async (req: Request) => {
       })
 
     if (appUserErr) {
-      await admin.from('companies').delete().eq('id', companyId).catch(() => undefined)
+      // Sin `.catch` en el DELETE: el builder de PostgREST sólo implementa
+      // `then`, así que `.catch(...)` lanzaba TypeError, el DELETE nunca salía
+      // y tampoco se borraba la identidad de auth (empresa y cuenta huérfanas,
+      // y el correo ya no podía volver a registrarse). No rechaza: un fallo
+      // llega en `error`.
+      const { error: rbErr } = await admin.from('companies').delete().eq('id', companyId)
+      if (rbErr) console.error('[signup-company] rollback companies:', rbErr.message)
       await admin.auth.admin.deleteUser(userId).catch(() => undefined)
       return new Response(
         JSON.stringify({ error: appUserErr.message ?? 'No se pudo vincular el usuario a la empresa' }),

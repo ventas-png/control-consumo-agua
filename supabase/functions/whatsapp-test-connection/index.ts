@@ -12,7 +12,7 @@
 // validamos el token a mano (service_role O admin/owner JWT), con comparación
 // en tiempo constante del secreto.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { decryptSecret } from '../_shared/secretsCrypto.ts'
@@ -122,7 +122,7 @@ Deno.serve(async (req: Request) => {
 
 /** Persiste el resultado del ping en la bóveda y responde SOLO metadata. */
 async function persistir(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   companyId: string,
   estado: 'ok' | 'error',
   mensaje: string,
