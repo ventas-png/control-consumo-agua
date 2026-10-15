@@ -320,7 +320,9 @@ COMMENT ON FUNCTION public.hk_reservas_vinculables(uuid, uuid) IS
 CREATE TABLE IF NOT EXISTS public.hk_recordatorios_log (
   id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   servicio_id uuid NOT NULL REFERENCES public.servicios_housekeeping(id) ON DELETE CASCADE,
-  company_id  uuid NOT NULL,
+  -- Llave a la empresa: la purga atómica (20261029000100) exige que toda columna
+  -- company_id tenga FK; en cascada con la empresa, igual que el servicio.
+  company_id  uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   user_id     uuid NOT NULL,
   hito        text NOT NULL CHECK (hito IN ('asignacion', 'previo')),
   clave       text NOT NULL,

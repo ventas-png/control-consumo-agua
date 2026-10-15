@@ -187,9 +187,16 @@ conserva columnas y asignaciones; volver a aplicar la migración lo restaura); *
 ## Despliegue
 
 Solo la migración; no hay funciones Edge ni secretos nuevos. Producción se aplica por `apply-migrations.yml` con
-la aprobación `production-db`, una migración por ejecución, tras las ya desplegadas (`20261030000000` es la última
-en producción). No hay relleno de datos: los servicios existentes quedan con su texto como «anterior sin
-vincular» hasta que alguien los edite.
+la aprobación `production-db`, una migración por ejecución. No hay relleno de datos: los servicios existentes
+quedan con su texto como «anterior sin vincular» hasta que alguien los edite.
+
+**Desplegada el 2026-10-15** (PR #937 fusionada como `11ca7e1f`; run 38766510506 de «Apply Migrations to
+Production», `success`, aprobación `production-db` de la persona responsable). Comprobación posterior de solo
+lectura en producción: 882 migraciones, máx. `20261030000100`; las cuatro funciones y `trg_hk_responsable`
+presentes; las tres columnas nuevas; 1 servicio existente, sin vincular y con su texto heredado intacto; la RPC
+del catálogo ejecutable por `authenticated` y la de elegibilidad cerrada a `anon`. Huella de producción
+recapturada a las 16:22 UTC (`scripts/schema-drift/huella-produccion.json`): 4 grupos cambiados y 8 nuevos,
+3564 → 3572, exactamente los de esta migración; `drift-conocido.json` no cambia.
 
 ## Límites conocidos
 
