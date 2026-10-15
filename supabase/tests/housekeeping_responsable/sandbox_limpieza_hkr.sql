@@ -44,7 +44,7 @@ BEGIN
   DELETE FROM public.role_permissions WHERE role_id = ANY (roles_); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'role_permissions', n);
   DELETE FROM public.roles WHERE id = ANY (roles_); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'roles', n);
   DELETE FROM public.user_presence WHERE user_id = ANY (usuarios); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'user_presence', n);
-  DELETE FROM public.bitacora_acciones WHERE user_id = ANY (usuarios) OR company_id = ANY (empresas); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'bitacora_acciones', n);
+  DELETE FROM public.bitacora_acciones WHERE usuario_id = ANY (usuarios) OR company_id = ANY (empresas); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'bitacora_acciones', n);
   DELETE FROM public.app_users WHERE id = ANY (usuarios); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'app_users', n);
   DELETE FROM auth.refresh_tokens WHERE user_id::text = ANY (usuarios::text[]); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'auth.refresh_tokens', n);
   DELETE FROM auth.sessions WHERE user_id = ANY (usuarios); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'auth.sessions', n);
@@ -56,7 +56,7 @@ BEGIN
   -- Auditoría al final: los disparadores insertan al borrar roles/llaves/asignaciones/suscripciones.
   DELETE FROM public.permission_audit_log WHERE target_user_id = ANY (usuarios) OR target_role_id = ANY (roles_) OR actor_id = ANY (usuarios)
      OR (details->>'role_id')::uuid = ANY (roles_) OR (details->>'user_id')::uuid = ANY (usuarios); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'permission_audit_log', n);
-  DELETE FROM public.audit_log WHERE company_id = ANY (empresas) OR user_id = ANY (usuarios); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'audit_log', n);
+  DELETE FROM public.audit_log WHERE company_id = ANY (empresas) OR actor_id = ANY (usuarios); GET DIAGNOSTICS n = ROW_COUNT; p := p + 1; INSERT INTO hkr_informe VALUES (p, 'audit_log', n);
 
   SELECT (SELECT count(*) FROM public.servicios_housekeeping WHERE company_id <> ALL (empresas))
        + (SELECT count(*) FROM public.app_users WHERE id <> ALL (usuarios))
