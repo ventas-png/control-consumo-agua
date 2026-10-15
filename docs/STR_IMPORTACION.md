@@ -92,6 +92,27 @@ mismo contenido a la vez (uno entra, el otro se rechaza). Cinco mutantes (códig
 proyecto, re-evaluación, unidad del proyecto) hacen fallar la suite. `fail_open_sin_perfil` registra
 `str_import_puede_crear` y exige que rechace una sesión sin perfil.
 
+## Verificación en el sandbox (`jwpmivhvlstslncrtokb`, 2026-10-15)
+
+Migración `20261031000100` aplicada por `apply-migrations-sandbox.yml` (run 74); inventario comprobado por SQL
+(seis funciones con sus ACL y modo INVOKER/DEFINER, dos tablas con RLS y policies, dos triggers del candado, cero
+lotes). Datos «ZZ HKF» (`supabase/tests/housekeeping_flujo/sandbox_datos_hkf.sql`): la operadora STR g5 (rol con
+`condominios.tab.str` + `.create`, asignada a P1), unidades «ZZ HKF Apto 1A» / «ZZ HKF Apto 2B», reserva previa
+`HKF-FUTURA` confirmada.
+
+**Navegador real** (Chromium + Playwright, build de la rama contra el sandbox; capturas en
+`docs/capturas/str_importacion/`):
+
+| Paso | Resultado |
+|---|---|
+| «⬆️ Carga masiva» → «Descargar CSV» | `plantilla_reservas_str.csv` con el encabezado de las 19 columnas |
+| archivo con errores (unidad «Nada», salida antes de la entrada, código `HKF-FUTURA` ya usado) | fila 1 válida (total Q 200.00); filas 2–4 marcadas en su fila con el motivo; **«Confirmar y guardar» deshabilitado**; Cancelar descarta el lote |
+| archivo limpio (unidad en minúsculas, teléfono con `+`, `mascotas=si`, sin `monto_total`) | «2 válidas · 0 con error · total Q 440.00» → confirmación → **2 reservas** en la pestaña |
+| volver a subir el mismo archivo | «ya se importó a este proyecto», guardar deshabilitado; además las filas con código ya existente salen con error |
+
+SQL tras la carga: las dos reservas nacen `confirmada`, con la unidad resuelta por nombre, `monto_total` calculado
+(100 × 2 = 200; 80 × 3 = 240), `mascotas` true/false y `creado_por` = g5 (sello de `trg_sellar_creado_por`).
+
 ## Recuperación
 
 `scripts/reversion-str-importacion.sql`: A) cerrar las RPC a la API conservando el historial de lotes; B) localizar lo
