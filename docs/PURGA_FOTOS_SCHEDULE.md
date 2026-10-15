@@ -107,11 +107,18 @@ fallo y exige que la columna NO se haya tocado.
 - ✅ Edge function `purgar-fotos-registros` (se despliega por `.github/workflows/deploy-functions.yml` al mergear a `main`).
 - ✅ `20260908000100` extiende esa misma función y ese mismo cron a `presencia-evidencias` (365 d, con el GPS). Sin cron nuevo y sin secretos nuevos.
 
-## Lo único que falta — 1 paso manual (vault secrets)
+## Secretos de Vault (en producción ya están cargados)
+
+**Producción (medido el 2026-10-13, solo lectura):** `purga_fotos_url` y
+`purga_fotos_service_key` **existen** en el Vault (la key, en formato JWT, creada el
+2026-07-23 y actualizada el 2026-08-17) y el cron mensual opera: no queda ningún
+`registros` con foto anterior al 2026-07-03, y la llamada horaria de housekeeping
+del 13/10 (21:17 UTC) respondió HTTP 200. Medido para el 1 de noviembre: 251
+`registros` con foto purgable, 0 fichajes (el más antiguo es del 2026-09-07).
 
 `run_purga_fotos_storage()` está en modo **safe fallback**: si los secretos no
 existen, no hace la llamada HTTP y no rompe el cron. Para activar el borrado de
-objetos de Storage:
+objetos de Storage en un proyecto nuevo o un sandbox:
 
 ```sql
 SELECT vault.create_secret(
