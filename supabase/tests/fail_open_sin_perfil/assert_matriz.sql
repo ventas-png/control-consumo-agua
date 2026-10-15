@@ -8,17 +8,30 @@
 -- padrón). Los resultados están normalizados (uuids y marcas de tiempo nuevas).
 -- ============================================================================
 
--- 0. La matriz cubre el inventario entero, no una muestra.
+-- 0. La matriz cubre el inventario entero, no una muestra. Las únicas funciones que pueden
+--    no estar «antes» son las que trajo una migración POSTERIOR a la serie (fos.posteriores:
+--    run.sh la llena comparando el inventario antes y después de aplicarlas); la matriz las
+--    ejecuta igual y las secciones 2 y 3 las juzgan frente a las sesiones sin perfil.
+CREATE TABLE IF NOT EXISTS fos.posteriores (firma text PRIMARY KEY);
 DO $$
-DECLARE v_antes int; v_desp int; v_inv int;
+DECLARE v_antes int; v_desp int; v_inv int; v_post int; v_ajenas int; v_lista text;
 BEGIN
   SELECT count(DISTINCT firma) INTO v_antes FROM fos.antes;
   SELECT count(DISTINCT firma) INTO v_desp  FROM fos.resultados;
   SELECT count(*) INTO v_inv FROM fos.inventario();
-  IF v_desp < 200 OR v_antes <> v_desp OR v_inv <> v_desp THEN
-    RAISE EXCEPTION 'inventario: % funciones antes, % después, % en el catálogo (se esperan ≥ 200 e iguales)', v_antes, v_desp, v_inv;
+  SELECT count(*) INTO v_post
+    FROM (SELECT DISTINCT firma FROM fos.resultados EXCEPT SELECT firma FROM fos.antes) x;
+  SELECT count(*), string_agg(firma, ', ') INTO v_ajenas, v_lista
+    FROM (SELECT DISTINCT firma FROM fos.resultados EXCEPT SELECT firma FROM fos.antes EXCEPT SELECT firma FROM fos.posteriores) x;
+  IF v_desp < 200 OR v_inv <> v_desp OR v_antes + v_post <> v_desp OR v_ajenas > 0 THEN
+    RAISE EXCEPTION 'inventario: % funciones antes, % después (% nuevas de migraciones posteriores), % en el catálogo; nuevas sin justificar: %',
+      v_antes, v_desp, v_post, v_inv, COALESCE(v_lista, '—');
   END IF;
-  RAISE NOTICE '✓ la matriz cubre las % funciones SECURITY DEFINER ejecutables por authenticated, antes y después', v_desp;
+  IF v_post = 0 THEN
+    RAISE NOTICE '✓ la matriz cubre las % funciones SECURITY DEFINER ejecutables por authenticated, antes y después', v_desp;
+  ELSE
+    RAISE NOTICE '✓ la matriz cubre las % funciones SECURITY DEFINER ejecutables por authenticated (% nuevas de migraciones posteriores a la serie, ejecutadas y juzgadas igual)', v_desp, v_post;
+  END IF;
 END $$;
 
 -- 1. Sesiones legítimas y de backend: el MISMO resultado en cada función.

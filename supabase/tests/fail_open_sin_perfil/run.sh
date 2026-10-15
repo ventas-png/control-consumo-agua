@@ -127,11 +127,16 @@ matriz() {           # matriz BD
   aplicar "$AQUI/matriz.sql" "$1"
   q "SET lock_timeout = '2s'; SELECT fos.correr($ACTORES)" "$1" >/dev/null
 }
-cargar_antes() {     # cargar_antes BD — copia los resultados de $BD_ANTES como fos.antes
+cargar_antes() {     # cargar_antes BD — copia los resultados de $BD_ANTES como fos.antes, y las firmas que trajeron migraciones POSTERIORES como fos.posteriores
   q "COPY (SELECT * FROM fos.resultados) TO STDOUT" "$BD_ANTES" > "$TRABAJO/antes.tsv"
   PGOPTIONS="-c client_min_messages=warning" psql -q -d "$1" -c "DROP TABLE IF EXISTS fos.antes" -c "CREATE TABLE fos.antes (LIKE fos.resultados)" \
-       -c "\\copy fos.antes FROM '$TRABAJO/antes.tsv'" >/dev/null
+       -c "\\copy fos.antes FROM '$TRABAJO/antes.tsv'" \
+       -c "DROP TABLE IF EXISTS fos.posteriores" -c "CREATE TABLE fos.posteriores (firma text PRIMARY KEY)" \
+       -c "\\copy fos.posteriores FROM '$TRABAJO/posteriores.txt'" >/dev/null
 }
+# El inventario que recorre la matriz (la misma definición que fos.inventario(), sin depender del esquema fos).
+INVENTARIO_SQL="SELECT p.oid::regprocedure::text FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef AND p.prokind = 'f' AND p.prorettype <> 'trigger'::regtype AND has_function_privilege('authenticated', p.oid, 'EXECUTE')"
+: > "$TRABAJO/posteriores.txt"
 
 echo "── 1/8 · andamiaje de plataforma y cadena de migraciones ANTERIORES a $VERSION"
 aplicar "$RAIZ/scripts/schema-drift/bootstrap.sql" 2>/dev/null   # (su único WARNING es el wal_level de la publicación: irrelevante aquí)
@@ -190,13 +195,19 @@ CAMBIADOS=$( { diff <(cut -f1,2 "$TRABAJO/h0") <(cut -f1,2 "$TRABAJO/h1") || tru
 ESPERADOS="funcion:assert_company_scope(…) funcion:banco_ajuste_conciliacion(…) funcion:banco_conciliar_movimiento(…) funcion:banco_desconciliar_movimiento(…) funcion:calculate_monthly_total_cents(…) funcion:can_access_conversation_project(…) funcion:can_access_project(…) funcion:compras_seguimiento_orden(…) funcion:compras_validar_match(…) funcion:conta_anular_asiento(…) funcion:conta_publicar_asiento(…) funcion:conta_puede_escribir(…) funcion:get_company_usage(…) funcion:has_admin_or_owner_access_in_company(…) funcion:has_super_admin_access(…) funcion:is_company_owner(…) funcion:is_super_admin(…) funcion:is_user_cliente_with_id(…) funcion:prov_puede_ver_papeleria(…) funcion:sesion_api_sin_empresa(…) funcion:sesion_api_sin_empresa(…)/grants funcion:sesion_de_api(…) funcion:sesion_de_api(…)/grants funcion:tope_plan_exigir_alcance(…) funcion:tope_plan_exigir_alcance(…)/grants funcion:user_is_project_exempt(…) tabla:projects/triggers tabla:unidades/triggers "
 [ "$CAMBIADOS" = "$ESPERADOS" ] || { echo "❌ la migración cambió otros grupos de la huella:"; echo "   cambiados: $CAMBIADOS"; echo "   esperados: $ESPERADOS"; exit 1; }
 echo "  ✓ la huella cambia EXACTAMENTE en 28 grupos: 20 cuerpos de función (sin tocar sus grants), 3 funciones nuevas con sus grants y los triggers de projects y unidades"
-# Migraciones POSTERIORES a la serie (si las hay): la nueva no debe romperlas.
+# Migraciones POSTERIORES a la serie (si las hay): la nueva no debe romperlas. Si alguna
+# trae una función nueva ejecutable por authenticated, la matriz la recorre igual (sale de
+# pg_proc) y las secciones de sesiones sin perfil la juzgan; lo único que no puede exigirse
+# es que estuviera «antes»: su firma se anota en fos.posteriores (ver assert_matriz.sql).
+q "$INVENTARIO_SQL" "$BD_POST" | LC_ALL=C sort > "$TRABAJO/inv_sin_posteriores.txt"
 for f in "$MIGS"/*.sql; do
   base="$(basename "$f" .sql)"
   [[ "${base:0:14}" > "$VERSION" ]] || continue
   aplicar "$f" "$BD_POST"
   echo "   + posterior aplicada: $base"
 done
+q "$INVENTARIO_SQL" "$BD_POST" | LC_ALL=C sort | LC_ALL=C comm -13 "$TRABAJO/inv_sin_posteriores.txt" - > "$TRABAJO/posteriores.txt"
+[ -s "$TRABAJO/posteriores.txt" ] && echo "   funciones nuevas (ejecutables por authenticated) de las posteriores: $(tr '\n' ' ' < "$TRABAJO/posteriores.txt")"
 
 echo "── 4/8 · CON la migración: cierre, matriz, tope y helpers"
 matriz "$BD_POST"

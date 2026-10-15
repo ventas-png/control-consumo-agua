@@ -67,6 +67,11 @@ lo retiró la propia purga). Textos y sellos no se tocan: están en `servicios_h
 estado; lo que mande el cliente se ignora, y un `UPDATE` posterior no los reescribe. Si un servicio se
 reabre y se vuelve a completar, `completado_por` es quien lo hizo la última vez.
 
+- **Responsable del servicio (20261030000100)**: ya no es un texto libre sino un usuario elegible del proyecto
+  (`responsable_user_id`), con sellos `responsable_asignado_por/_en` que pone la base; separado de `creado_por`,
+  `iniciado_por`, `completado_por` y del autor de cada foto. Detalle, pruebas y evidencia del sandbox en
+  [`HOUSEKEEPING_RESPONSABLE.md`](HOUSEKEEPING_RESPONSABLE.md).
+
 ## Numeración y orden de fusión
 Son **dos** migraciones (`20261028000000`, `20261028000100`) y van **después** de las diez de la PR #926
 (`20261027000000` … `20261027000900`). Producción está en `20261026000500`; la guarda de migraciones

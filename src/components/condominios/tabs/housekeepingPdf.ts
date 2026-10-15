@@ -19,6 +19,10 @@ export interface DatosInformeHK {
   /** Nombres ya resueltos (la BD guarda uuids). */
   iniciadoPor?: string
   completadoPor?: string
+  /** Línea «Responsable: …» ya resuelta (lineaResponsablePdf). Distinta de quién hizo las evidencias. */
+  responsableLinea?: string
+  /** Quiénes subieron las fotos (nombres), para que el responsable no se confunda con el autor. */
+  evidenciasPor?: string[]
   empresa?: string
 }
 
@@ -61,9 +65,10 @@ export async function generarInformeHousekeepingPdf(d: DatosInformeHK): Promise<
   texto(`${d.tipoLabel} — ${s.unidad_nombre ?? 'Sin unidad específica'}`, 12, true)
   // Postgres devuelve `time` como HH:MM:SS; en el informe basta HH:MM.
   texto(`Fecha: ${s.fecha}    Horario: ${s.hora_inicio?.slice(0, 5) ?? '?'} – ${s.hora_fin?.slice(0, 5) ?? '?'}    Estado: ${d.estadoLabel}`)
-  if (s.responsable) texto(`Responsable: ${s.responsable}`)
+  texto(d.responsableLinea ?? (s.responsable ? `Responsable anterior sin vincular: ${s.responsable}` : 'Responsable: —'))
   texto(`Iniciado por: ${d.iniciadoPor ?? '—'} (${fmtFechaHora(s.iniciado_en)})`)
   texto(`Completado por: ${d.completadoPor ?? '—'} (${fmtFechaHora(s.completado_en)})`)
+  if (d.evidenciasPor && d.evidenciasPor.length > 0) texto(`Evidencias (fotos) subidas por: ${d.evidenciasPor.join(', ')}`)
   y += 3
 
   const bloque = async (titulo: string, textoLibre: string | null | undefined, fase: 'ingreso' | 'cierre') => {

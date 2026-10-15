@@ -33,9 +33,16 @@ interface Props {
   /** Muestra el rol junto al nombre (útil en tablas de supervisión). */
   mostrarRol?: boolean
   companyId?: string
+  /**
+   * Nombre que el llamador ya conoce por otra vía (p. ej. un catálogo devuelto por una
+   * RPC). Se usa cuando el directorio de app_users no expone a esa persona al que mira:
+   * un operador no ve a los demás operadores de su empresa, pero sí los recibe en el
+   * catálogo de responsables elegibles. El directorio manda si tiene el dato.
+   */
+  nombre?: string
 }
 
-export function UsuarioChip({ userId, historico = false, mostrarRol = false, companyId }: Props) {
+export function UsuarioChip({ userId, historico = false, mostrarRol = false, companyId, nombre: nombreConocido }: Props) {
   const { mapa } = useUsuariosMap(companyId)
 
   if (!userId) {
@@ -47,7 +54,7 @@ export function UsuarioChip({ userId, historico = false, mostrarRol = false, com
   }
 
   const usuario = mapa.get(userId)
-  const nombre = usuario?.full_name?.trim() || `Usuario ${userId.slice(0, 8)}`
+  const nombre = usuario?.full_name?.trim() || nombreConocido?.trim() || `Usuario ${userId.slice(0, 8)}`
 
   return (
     <span

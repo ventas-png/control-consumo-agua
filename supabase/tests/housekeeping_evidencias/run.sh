@@ -32,6 +32,9 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGRACION="$RAIZ/supabase/migrations/20261028000000_housekeeping_evidencias.sql"
 MIGRACION2="$RAIZ/supabase/migrations/20261028000100_housekeeping_servicios_por_proyecto.sql"
+# 20261030000100 (responsable como usuario) se aplica ENCIMA: esta suite debe seguir igual.
+MIGRACION3="$RAIZ/supabase/migrations/20261030000100_housekeeping_responsable_usuario.sql"
+SHIM3="$RAIZ/supabase/tests/housekeeping_responsable/fixture_min_para_evidencias.sql"
 ANTERIOR="$AQUI/migracion_anterior.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -86,9 +89,9 @@ aplicar hk "$AQUI/estado_antiguo.sql"
 echo "  OK    versión anterior aplicada y con datos cargados"
 
 echo "── 3/8 · las migraciones nuevas, DOS veces, sobre ese estado ───────────"
-aplicar hk "$MIGRACION"; aplicar hk "$MIGRACION2"
+aplicar hk "$MIGRACION"; aplicar hk "$MIGRACION2"; aplicar hk "$SHIM3"; aplicar hk "$MIGRACION3"
 H1=$(huella hk)
-aplicar hk "$MIGRACION"; aplicar hk "$MIGRACION2"
+aplicar hk "$MIGRACION"; aplicar hk "$MIGRACION2"; aplicar hk "$MIGRACION3"
 H2=$(huella hk)
 [ "$H1" = "$H2" ] || { echo "❌ re-aplicar la migración cambió el catálogo ($H1 ≠ $H2)"; exit 1; }
 echo "  OK    idempotente: la huella del catálogo no cambia al re-aplicar"
@@ -133,7 +136,7 @@ grep -v "pg_advisory_xact_lock" "$MIGRACION" > "$MUT"
 grep -q "pg_advisory_xact_lock" "$MIGRACION" || { echo "❌ el candado ya no está en la migración"; exit 1; }
 aplicar hkmut "$AQUI/fixture.sql"
 aplicar hkmut "$MUT"
-aplicar hkmut "$MIGRACION2"
+aplicar hkmut "$MIGRACION2"; aplicar hkmut "$SHIM3"; aplicar hkmut "$MIGRACION3"
 psql -q -v ON_ERROR_STOP=1 -d hkmut -f "$AQUI/lib.sql" >/dev/null
 psql -q -v ON_ERROR_STOP=1 -d hkmut -f "$AQUI/datos.sql" >/dev/null
 R=$(concurrente hkmut)
@@ -155,7 +158,7 @@ for f in "$AQUI/fixture.sql" "$AQUI/fixture_compat_sandbox.sql" "$MIGRACION" "$M
 TOTAL=0
 for n in $(seq 1 $PARTES); do
   SALIDA=$(psql -q -d hksb -f "$AQUI/sandbox_housekeeping_parte$n.sql" 2>&1 || true)
-  echo "$SALIDA" | grep -q "GUION_OK_REVERTIDO" || { echo "$SALIDA" | head -25; echo "❌ la parte $n del guion no terminó en GUION_OK_REVERTIDO"; exit 1; }
+  grep -q "GUION_OK_REVERTIDO" <<< "$SALIDA" || { echo "$SALIDA" | head -25; echo "❌ la parte $n del guion no terminó en GUION_OK_REVERTIDO"; exit 1; }
   N=$(echo "$SALIDA" | sed -n 's/.*GUION_OK_REVERTIDO · \([0-9]*\) comprobaciones.*/\1/p')
   TOTAL=$((TOTAL + N))
   echo "  OK    parte $n · GUION_OK_REVERTIDO · $N comprobaciones, 0 con FALLO"
@@ -166,12 +169,12 @@ RES=$(psql -q -At -d hksb -c "SELECT (SELECT count(*) FROM public.companies) || 
 echo "  OK    sin residuo: 0 empresas, 0 fotos, 0 objetos, 0 en la cola y el esquema de pruebas revertido"
 for f in "$AQUI/fixture.sql" "$AQUI/fixture_compat_sandbox.sql"; do aplicar hksb0 "$f"; done
 SALIDA=$(psql -q -d hksb0 -f "$AQUI/sandbox_housekeeping_parte1.sql" 2>&1 || true)
-echo "$SALIDA" | grep -q "GUION_ABORTA: la migración 20261028000000_housekeeping_evidencias NO está aplicada" \
+grep -q "GUION_ABORTA: la migración 20261028000000_housekeeping_evidencias NO está aplicada" <<< "$SALIDA" \
   || { echo "$SALIDA" | head -5; echo "❌ sin la migración el guion debía abortar"; exit 1; }
 echo "  OK    sin la migración aplicada el guion ABORTA sin escribir nada (lo que verá el sandbox antes de aplicarla)"
 for f in "$AQUI/fixture.sql" "$AQUI/fixture_compat_sandbox.sql" "$MIGRACION"; do aplicar hksb1 "$f"; done
 SALIDA=$(psql -q -d hksb1 -f "$AQUI/sandbox_housekeeping_parte2.sql" 2>&1 || true)
-echo "$SALIDA" | grep -q "GUION_ABORTA: la migración 20261028000100_housekeeping_servicios_por_proyecto NO está aplicada" \
+grep -q "GUION_ABORTA: la migración 20261028000100_housekeeping_servicios_por_proyecto NO está aplicada" <<< "$SALIDA" \
   || { echo "$SALIDA" | head -5; echo "❌ con solo la primera migración el guion debía abortar"; exit 1; }
 echo "  OK    con solo la primera migración el guion ABORTA (la segunda es requisito)"
 
@@ -185,7 +188,7 @@ REG=$(psql -q -At -d hkrec -c "SELECT string_agg(version, ',' ORDER BY version) 
 [ "$REG" = "20261028000000,20261028000100" ] || { echo "❌ registro tras reconciliar: $REG"; exit 1; }
 echo "  OK    reconciliación: converge desde la versión antigua y deja el registro en 20261028000000,20261028000100"
 SALIDA=$(cd "$AQUI" && psql -q -At -v ON_ERROR_STOP=1 -d hkrec -f reconciliar_preview_pr927.sql 2>&1 || true)
-echo "$SALIDA" | grep -q "ABORTA: esta base no tiene registrada 20261023000001" || { echo "$SALIDA" | tail -3; echo "❌ la segunda pasada debía abortar en la guarda"; exit 1; }
+grep -q "ABORTA: esta base no tiene registrada 20261023000001" <<< "$SALIDA" || { echo "$SALIDA" | tail -3; echo "❌ la segunda pasada debía abortar en la guarda"; exit 1; }
 echo "  OK    reconciliación: la guarda aborta sin tocar nada en una base que no es la preview de #927"
 # Reversión A: devuelve las policies del servicio a las de antes de la 0100.
 POL="SELECT md5(string_agg(policyname || cmd || coalesce(qual, '') || coalesce(with_check, ''), '|' ORDER BY policyname)) FROM pg_policies WHERE tablename = 'servicios_housekeeping'"
