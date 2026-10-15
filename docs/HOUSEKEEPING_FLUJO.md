@@ -7,9 +7,8 @@ antes) y, al cerrar, encola el **informe** por correo a dueño/administradores y
 Complementa [`HOUSEKEEPING_EVIDENCIAS.md`](HOUSEKEEPING_EVIDENCIAS.md) (fotos, autoría, borrado) y
 [`HOUSEKEEPING_RESPONSABLE.md`](HOUSEKEEPING_RESPONSABLE.md) (el responsable es un usuario elegible).
 
-Esta parte es la del **servidor** (base, pruebas SQL, dominio puro). La pantalla (modal de alta, selector de
-reserva, flujo por pasos, PDF, diálogo de notificación) llega en la PR siguiente y se documenta aquí mismo al
-cerrarla.
+La primera parte es la del **servidor** (base, pruebas SQL, dominio puro); la segunda, la **pantalla** (modal de
+alta, selector de reserva, flujo por pasos, PDF y diálogo de notificación).
 
 ## Archivos
 
@@ -20,6 +19,11 @@ cerrarla.
 | Dominio puro (transiciones, horas dedicadas, etiqueta y orden de reservas, destinatario, WhatsApp, texto del informe) | `src/domain/condominios/housekeepingFlujo.ts` (+ `__tests__/housekeepingFlujo.test.ts`) |
 | Acceso a las RPC (catálogo de reservas, informe) | `src/domain/condominios/housekeepingReservas.ts` |
 | Fases y cupos | `src/domain/condominios/housekeepingEvidencias.ts` (`FASES_FOTO`, `MAX_FOTOS_SERVICIO`) |
+| Pantalla: alta/edición en ventana emergente | `src/components/condominios/tabs/HousekeepingServicioModal.tsx` (+ `ReservaSTRPicker.tsx`) |
+| Pantalla: flujo por pasos, PDF, notificación | `HousekeepingServicioPasos.tsx` (sustituye a `HousekeepingEvidencias.tsx`), `HousekeepingFaseFotos.tsx`, `housekeepingPdf.ts` |
+| Pantalla: tarjetas y botones por estado | `HousekeepingTab.tsx` |
+| Pruebas de interfaz | `__tests__/HousekeepingServicioModal.test.tsx`, `HousekeepingTab.flujo.test.tsx`, `HousekeepingServicioPasos.test.tsx` (+ `HousekeepingTab.responsable.test.tsx`, que sigue en verde) |
+| Datos de prueba del sandbox y su retirada | `supabase/tests/housekeeping_flujo/sandbox_datos_hkf.sql`, `sandbox_limpieza_hkf.sql` |
 | Campana: grupo «servicios de housekeeping» | `src/domain/comunicacion/notificationCatalog.ts` |
 | Render del correo (plantillas y respaldo) | `supabase/functions/notifications-dispatcher/__tests__/render.test.ts` |
 | Tipos | `src/types/condominios/comercial.ts`, `src/types/database.types.ts` |
@@ -104,6 +108,37 @@ sobreescribirlas por `company_id`): `housekeeping_asignado`, `housekeeping_recor
 Variables: `{{servicio_tipo}} {{unidad}} {{fecha}} {{hora}} {{asignado_por}} {{reserva}} {{notas}} {{informe_html}}
 {{app_url}}`. Si faltan, el dispatcher usa `subject`/`body` del payload tal cual.
 
+## Pantalla
+
+- **Alta y edición en ventana emergente** (`HousekeepingServicioModal`): tipo, unidad, **reserva STR opcional**
+  (`ReservaSTRPicker` sobre `hk_reservas_vinculables`: buscador por código, huésped o unidad; la unidad vacía se
+  rellena con la de la reserva; al editar, el chip usa el resumen sellado mientras carga el catálogo), fecha,
+  **hora tentativa de ingreso**, hora estimada de fin, responsable (elegible), costo y notas. **Sin selector de
+  estado**: el payload no lleva `estado` ni `reserva_str_resumen`. Al editar un servicio pendiente o en proceso,
+  «Cancelar servicio» (confirmación, `updateCondominioRowAfectando`). Los rechazos de la base
+  (`HK_TRANSICION_INVALIDA`, `HK_RESERVA_*`, `HK_RESPONSABLE_NO_ELEGIBLE`) se traducen (`mensajeErrorFlujo`,
+  `mensajeErrorResponsable`).
+- **Tarjeta** (`HousekeepingTab`): reserva (`🔖 código · huésped · entrada → salida`), «🕐 Ingreso tentativo»,
+  «⏱ horas dedicadas» cuando está completado, «📨 Informe enviado». Botones por estado: `pendiente` →
+  **«▶️ Iniciar servicio»** (confirmación → `estado = en_proceso` exigiendo una fila; `SIN_FILAS` se explica → abre
+  el paso 1); `en_proceso` → **«📝 Evidencia de ingreso»** (paso 1) y **«🏁 Finalizar limpieza»** (paso 2);
+  `completado | cancelado` → **«📋 Ver evidencia»** (solo lectura). ✏️ y 🗑️ se mantienen.
+- **Flujo por pasos** (`HousekeepingServicioPasos`, con `HousekeepingFaseFotos` tres veces):
+  - Paso 1 · Ingreso: «Estado en que se encontró la unidad» + fotos `ingreso`; botón **«⚠️ Inconvenientes
+    encontrados»** que despliega su texto + fotos `inconvenientes` (se abre solo si ya hay texto o fotos);
+    **Guardar** (solo textos) y «🏁 Finalizar limpieza →» (en proceso).
+  - Paso 2 · Resultado: «Resultado de la limpieza» + fotos `cierre`; **«✅ Guardar y dar por finalizado»**: guarda
+    los textos → `estado = completado` exigiendo una fila (la base sella `completado_en`) → recarga → diálogo
+    **«¿Notificar el informe?»** (`openPromptDialog`): ☑ correo a dueño y administradores del proyecto (por defecto),
+    ☐ WhatsApp (compartir el PDF desde este dispositivo), «Otro destinatario (correo o teléfono)». Correo →
+    `hk_notificar_informe` (aviso con los destinatarios; recuerda que sale solo con Gmail). WhatsApp o teléfono →
+    PDF por Web Share; si el dispositivo no comparte archivos, se descarga y se abre `wa.me` (teléfono tecleado o
+    el del huésped de la reserva) con el texto de `resumenTextoInforme`. «Ahora no» = no notificar; se puede
+    repetir desde «📋 Ver evidencia» → **«📨 Notificar informe»**.
+  - Completado o cancelado: solo lectura (sin Guardar/Finalizar ni subir fotos), PDF y notificar.
+- **PDF** (`housekeepingPdf.ts`): hora tentativa y fin estimado, inicio y fin reales, **horas dedicadas**, línea
+  de la reserva vinculada (del resumen), tres bloques fotográficos (ingreso, inconvenientes, resultado).
+
 ## Qué NO cambia
 
 `hk_acceso`, las policies de `servicios_housekeeping`, `trg_hk_sellar_ejecucion`, `trg_hk_responsable` ni los sellos
@@ -129,6 +164,61 @@ solo service_role, cron programado una vez), F informe (solo dueño/admin con ac
 (proyecto de la reserva, idempotencia, rol, acceso al proyecto, sin perfil, salto, catálogo) hacen fallar la suite.
 `fail_open_sin_perfil` registra las dos RPC nuevas (`hk_reservas_vinculables`, `hk_notificar_informe`) y exige que
 rechacen una sesión sin perfil.
+
+## Verificación en el sandbox (`jwpmivhvlstslncrtokb`, 2026-10-15)
+
+Migraciones `20261031000000` (run 73) y `20261031000100` (run 74) aplicadas por `apply-migrations-sandbox.yml`;
+inventario comprobado por SQL (funciones y sus ACL, triggers y su orden, columnas, CHECK de fase, policy `< 90`,
+tres plantillas, cron `*/15` activo, RLS del log). Datos «ZZ HKF» (`sandbox_datos_hkf.sql`): empresa con zona
+Guatemala, P1/P2, dueña g1, operadora g2 (módulo), admin P1 g3, admin P2 g4, operadora STR g5, admin de otra empresa
+g6; 3 unidades; reservas en curso, futura y cancelada.
+
+**Navegador real** (Chromium + Playwright, build de la rama contra el sandbox; capturas en
+`docs/capturas/housekeeping_flujo/`):
+
+| Paso | Resultado |
+|---|---|
+| g2 abre «+ Nuevo Servicio» | ventana emergente sin selector de estado; g2 preseleccionada; el catálogo muestra solo HKF-EN-CURSO y HKF-FUTURA (la cancelada no) |
+| elige HKF-FUTURA | la unidad vacía pasa a «ZZ HKF Apto 2B»; chip `🔖 HKF-FUTURA · ZZ HKF Huésped Futuro · 25/10 → 29/10 · ZZ HKF Apto 2B (confirmada)` |
+| Agregar | fila con `reserva_str_resumen` sellado (13 claves), sin `estado` ni resumen en el payload; **sin aviso** (se asignó a sí misma) |
+| «▶️ Iniciar servicio» → Iniciar | `iniciado_en`/`iniciado_por` sellados; se abre el paso 1 con la cabecera (unidad, ingreso tentativo 09:00, reserva) |
+| paso 1 | texto + 2 fotos `ingreso`; «⚠️ Inconvenientes encontrados» despliega texto + 1 foto `inconvenientes`; Guardar → PATCH solo de textos |
+| «🏁 Finalizar limpieza →» → paso 2 | texto + 1 foto `cierre`; «✅ Guardar y dar por finalizado» → `completado`, `completado_en` sellado, diálogo «¿Notificar el informe?» |
+| Notificar (correo ☑ + otro `externo-hkf@…`) | `hk_notificar_informe` → `{encolados: 3, destinatarios: [g1, g3, externo]}`; **g4 (admin acotado a P2) no**; 3 filas `email` en el outbox con el HTML (horas dedicadas, reserva, `ingreso 2 · inconvenientes 1 · resultado 1`); `informe_enviado_en/por` sellados |
+| tarjeta | «Completado», reserva, ingreso tentativo, «⏱ 0 min», «📨 Informe enviado»; «📋 Ver evidencia» en solo lectura con «📨 Notificar informe» |
+| g1 asigna a g2 (09:00) y reprograma a 10:30 | 2 avisos `in_app` + 2 `email` a g2 (`asignado por ZZ HKF Dueña`), log `asignacion:2026-11-20|09:00:00` y `|10:30:00` |
+
+**Peticiones directas con la sesión real** (REST): g2 `pendiente → completado` → `23514 HK_TRANSICION_INVALIDA`;
+reserva de otro proyecto → `HK_RESERVA_FUERA_DE_ALCANCE`; cancelada → `HK_RESERVA_CANCELADA`; `reserva_str_resumen`
+«pirata» → ignorado (queda `null`); vincular la reserva en curso → hereda la unidad y sella el resumen; informe de un
+pendiente → `HK_INFORME_NO_COMPLETADO`; `reservas_str` directo como g2 → `[]` (sin permiso de STR) mientras
+`hk_reservas_vinculables` sí devuelve el catálogo. g1 (dueña): salto `pendiente → completado` permitido con sello,
+reabrir `→ en_proceso` permitido, `en_proceso → cancelado` permitido.
+
+**Recordatorio previo** (`hk_recordatorios_previos(60 min, p_ahora)` por SQL): a las 16:45 UTC (61 min antes de las
+10:30 Guatemala) → 0; a las 15:45 UTC → 4 (campana + correo de los dos pendientes de esa franja); repetido → 0.
+
+Los datos ZZ HKF se retiran con `sandbox_limpieza_hkf.sql` (ensayo → autorización → aplicar) tras borrar las fotos
+por las RPC y drenar la cola. Fotos y servicios retirados el 2026-10-15 con la sesión real de la dueña:
+`hk_eliminar_servicio` × 4 (4 archivos encolados) y `housekeeping-limpieza` `tomadas 4, borradas 4`; 0 fotos,
+0 objetos, 0 cola.
+
+## Despliegue
+
+Solo la migración (más tres plantillas globales de correo que ella misma inserta); no hay funciones Edge ni
+secretos nuevos. Producción se aplica por `apply-migrations-prod.yml` con la aprobación `production-db`.
+
+**Desplegada el 2026-10-15** (PR #939 fusionada como `188c69af`; run 38792165260 de «Apply Migrations to
+Production», `success` a las 19:21 UTC, aprobación `production-db` de la persona responsable). Comprobación
+posterior de solo lectura en producción: 883 migraciones, máx. `20261031000000`; las diez funciones `hk_*`
+nuevas presentes; en `servicios_housekeeping` los ocho triggers en el orden esperado (`trg_bitacora`,
+`trg_hk_estado_transicion`, `trg_hk_notificar_asignacion`, `trg_hk_reserva`, `trg_hk_responsable`,
+`trg_hk_sellar_ejecucion`, `trg_hk_servicio_alcance`, `trg_sellar_creado_por`); CHECK de fase con tres valores;
+policy `hk_evidencias_insert` con cupo `< 90`; cron `hk_recordatorios_previos` cada 15 min; 3 plantillas
+globales `housekeeping_*`; 1 servicio existente, sin reserva vinculada y con su responsable intacto; 0 filas en
+`hk_recordatorios_log`. Huella de producción recapturada a las 20:23 UTC
+(`scripts/schema-drift/huella-produccion.json`): 5 grupos cambiados y 27 nuevos, 3572 → 3599, exactamente los
+32 que el auditor de la PR anunció; `drift-conocido.json` no cambia.
 
 ## Recuperación
 

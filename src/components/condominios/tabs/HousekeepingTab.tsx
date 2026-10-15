@@ -1,16 +1,20 @@
+// Pestaña de housekeeping: agenda por fecha, alta/edición en ventana emergente y flujo por
+// pasos de cada servicio (Iniciar servicio → evidencia de ingreso → Finalizar limpieza →
+// informe). El estado lo mueven los botones de la tarjeta, nunca un selector: la base
+// (trg_hk_estado_transicion) rechaza cualquier otro salto.
 import { hoyLocalISO } from '../../../lib/format'
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import type { ServicioHousekeeping, EstadoHousekeeping, TipoHousekeeping, Unidad } from '../../../types'
+import { useEffect, useRef, useState } from 'react'
+import { updateCondominioRowAfectando } from '../../../domain/condominios/tabMutations'
+import type { ServicioHousekeeping, EstadoHousekeeping, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { eliminarServicioConEvidencias } from '../../../domain/condominios/housekeepingEvidencias'
-import { HousekeepingEvidencias } from './HousekeepingEvidencias'
+import { etiquetaReserva, horasDedicadas, mensajeErrorFlujo } from '../../../domain/condominios/housekeepingFlujo'
+import { HousekeepingServicioPasos, type PasoHK } from './HousekeepingServicioPasos'
+import { HousekeepingServicioModal, TIPO_CONFIG } from './HousekeepingServicioModal'
 import { UsuarioChip } from '../../shared/UsuarioChip'
 import type { AppUser } from '../../../domain/usuarios/queries'
-import {
-  estadoResponsable, fetchResponsablesElegibles, mensajeErrorResponsable, preseleccionResponsable,
-} from '../../../domain/condominios/housekeepingResponsable'
-import { ResponsableLinea, ResponsableSelector } from './ResponsableSelector'
+import { estadoResponsable, fetchResponsablesElegibles } from '../../../domain/condominios/housekeepingResponsable'
+import { ResponsableLinea } from './ResponsableSelector'
 
 interface Props {
   servicios: ServicioHousekeeping[]
@@ -32,33 +36,16 @@ const ESTADO_CONFIG: Record<EstadoHousekeeping, { label: string; color: string; 
   cancelado:  { label: 'Cancelado',  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
-const TIPO_CONFIG: Record<TipoHousekeeping, { label: string; icon: string }> = {
-  limpieza_estandar:   { label: 'Limpieza Estándar',  icon: '🧹' },
-  limpieza_profunda:   { label: 'Limpieza Profunda',  icon: '🧽' },
-  lavanderia:          { label: 'Lavandería',          icon: '👕' },
-  mantenimiento_menor: { label: 'Mant. Menor',         icon: '🔧' },
-  otro:                { label: 'Otro',                icon: '📋' },
-}
-
-const blank = (): Partial<ServicioHousekeeping> => ({
-  unidad_id: undefined, tipo: 'limpieza_estandar',
-  fecha: hoyLocalISO(),
-  hora_inicio: '', hora_fin: '', responsable_user_id: null,
-  estado: 'pendiente', costo: undefined, notas: '',
-})
-
 export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoHousekeeping | 'todos'>('todos')
-  const [form, setForm] = useState<Partial<ServicioHousekeeping>>(blank())
-  const [editId, setEditId] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [evidenciaId, setEvidenciaId] = useState<string | null>(null)
-  const evidencia = servicios.find(s => s.id === evidenciaId) ?? null
+  const [modal, setModal] = useState<{ abierto: boolean; servicio: ServicioHousekeeping | null }>({ abierto: false, servicio: null })
+  const [pasos, setPasos] = useState<{ id: string; paso: PasoHK } | null>(null)
+  const [iniciando, setIniciando] = useState<string | null>(null)
+  const servicioPasos = pasos ? servicios.find(s => s.id === pasos.id) ?? null : null
 
   // Catálogo de responsables ELEGIBLES de este proyecto (lo decide la base). `null`
   // mientras no se ha cargado. Se vacía y se vuelve a pedir al cambiar de proyecto,
-  // de empresa o de sesión, y con él se limpia cualquier selección a medias.
+  // de empresa o de sesión, y con él se cierra cualquier ventana a medias.
   const [elegibles, setElegibles] = useState<AppUser[] | null>(null)
   const [elegiblesError, setElegiblesError] = useState<string | null>(null)
   const [cargandoElegibles, setCargandoElegibles] = useState(false)
@@ -71,7 +58,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
     setElegibles(error ? [] : data); setElegiblesError(error); setCargandoElegibles(false)
   }
   useEffect(() => {
-    setShowForm(false); setEditId(null); setForm(blank()); setEvidenciaId(null)
+    setModal({ abierto: false, servicio: null }); setPasos(null)
     setElegibles(null); setElegiblesError(null)
     void cargarElegibles()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -94,49 +81,9 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
   }
   const fechas = Object.keys(byFecha).sort((a, b) => b.localeCompare(a))
 
-  function startEdit(s: ServicioHousekeeping) {
-    setForm({
-      unidad_id: s.unidad_id ?? undefined, tipo: s.tipo, fecha: s.fecha,
-      hora_inicio: s.hora_inicio ?? '', hora_fin: s.hora_fin ?? '',
-      responsable: s.responsable ?? null, responsable_user_id: s.responsable_user_id ?? null, estado: s.estado,
-      costo: s.costo ?? undefined, notas: s.notas ?? '',
-    })
-    setEditId(s.id); setShowForm(true)
-  }
-
-  function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
-
-  function abrirAlta() {
-    // El usuario conectado va preseleccionado SOLO si es elegible aquí; si no, hay que elegir.
-    setForm({ ...blank(), responsable_user_id: preseleccionResponsable(userId, elegibles) })
-    setEditId(null); setShowForm(true)
-  }
-
-  async function handleSave() {
-    if (!form.fecha) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa la fecha del servicio.' })
-    if (!editId && !form.responsable_user_id) {
-      return notify({ variant: 'warning', title: 'Responsable requerido', text: 'Elige un responsable con acceso a este proyecto y al módulo de housekeeping.' })
-    }
-    setSaving(true)
-    // `responsable` (texto heredado) no se escribe nunca desde aquí: se conserva tal cual.
-    const payload = {
-      company_id: companyId, project_id: proyectoId,
-      unidad_id: form.unidad_id || null,
-      tipo: form.tipo ?? 'limpieza_estandar',
-      fecha: form.fecha!, hora_inicio: form.hora_inicio || null, hora_fin: form.hora_fin || null,
-      responsable_user_id: form.responsable_user_id ?? null, estado: form.estado ?? 'pendiente',
-      costo: form.costo ?? null, notas: form.notas || null,
-    }
-    const { error } = editId
-      ? await updateCondominioRow('servicios_housekeeping', editId, payload)
-      : await createCondominioRow('servicios_housekeeping', payload)
-    if (error) {
-      // 23514 HK_RESPONSABLE_NO_ELEGIBLE: la base rechazó al responsable (p. ej. perdió el acceso
-      // después de cargar la lista). Se recarga el catálogo para que la pantalla lo refleje.
-      notify({ variant: 'error', title: 'No se guardó el servicio', text: mensajeErrorResponsable(error.message) })
-      void cargarElegibles(); setSaving(false); return
-    }
-    setSaving(false); cancelForm(); onRefresh()
+  const nombreResponsable = (s: ServicioHousekeeping) => {
+    const e = estadoResponsable(s, elegibles)
+    return e.kind === 'vinculado' ? e.nombre : e.kind === 'anterior_sin_vincular' ? e.texto : undefined
   }
 
   async function handleDelete(id: string) {
@@ -148,14 +95,21 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
     onRefresh()
   }
 
-  async function handleEstado(id: string, estado: EstadoHousekeeping) {
-    const { error } = await updateCondominioRow('servicios_housekeeping', id, { estado })
-    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
+  /** «Iniciar servicio»: sella la hora de inicio real (la base) y abre el paso 1. */
+  async function iniciar(s: ServicioHousekeeping) {
+    const r = await confirm({ title: 'Iniciar servicio', text: `Se registrará la hora de inicio ahora y podrás documentar el estado en que encontraste ${s.unidad_nombre ? `la unidad ${s.unidad_nombre}` : 'la unidad'}.`, confirmText: 'Iniciar' })
+    if (!r.isConfirmed) return
+    setIniciando(s.id)
+    const { error } = await updateCondominioRowAfectando('servicios_housekeeping', s.id, { estado: 'en_proceso' })
+    setIniciando(null)
+    if (error) {
+      return notify({ variant: 'error', title: 'No se inició el servicio', text: error.code === 'SIN_FILAS' ? 'El servicio ya no existe o no tienes acceso.' : mensajeErrorFlujo(error.message) })
+    }
     onRefresh()
+    setPasos({ id: s.id, paso: 1 })
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
+  const btnChip = (extra: React.CSSProperties = {}): React.CSSProperties => ({ flex: 1, padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', ...extra })
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -178,75 +132,16 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Housekeeping</h2>
-        {canCreate && !showForm && (
-          <button onClick={abrirAlta} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Servicio</button>
+        {canCreate && (
+          <button onClick={() => setModal({ abierto: true, servicio: null })} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Servicio</button>
         )}
       </div>
 
-      {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Servicio' : 'Nuevo Servicio de Housekeeping'}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
-            <div>
-              <label style={labelStyle}>Tipo</label>
-              <select style={inputStyle} value={form.tipo ?? 'limpieza_estandar'} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoHousekeeping }))}>
-                {Object.entries(TIPO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={labelStyle}>Unidad</label>
-              <select style={inputStyle} value={form.unidad_id ?? ''} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value || undefined }))}>
-                <option value="">Sin unidad específica</option>
-                {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={labelStyle}>Fecha *</label>
-              <input style={inputStyle} type="date" value={form.fecha ?? ''} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} />
-            </div>
-            <div>
-              <label style={labelStyle}>Hora inicio</label>
-              <input style={inputStyle} type="time" value={form.hora_inicio ?? ''} onChange={e => setForm(f => ({ ...f, hora_inicio: e.target.value }))} />
-            </div>
-            <div>
-              <label style={labelStyle}>Hora fin</label>
-              <input style={inputStyle} type="time" value={form.hora_fin ?? ''} onChange={e => setForm(f => ({ ...f, hora_fin: e.target.value }))} />
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Responsable{editId ? '' : ' *'}</label>
-              <ResponsableSelector elegibles={elegibles} cargando={cargandoElegibles} error={elegiblesError}
-                value={form.responsable_user_id ?? null} onChange={id => setForm(f => ({ ...f, responsable_user_id: id }))} userId={userId} />
-              {editId && !form.responsable_user_id && form.responsable && (
-                <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 4 }}>Responsable anterior sin vincular: <b>{form.responsable}</b>. Elige un usuario para vincularlo.</div>
-              )}
-              {editId && form.responsable_user_id && elegibles && !elegibles.some(u => u.id === form.responsable_user_id) && (
-                <div style={{ fontSize: 11, color: 'var(--at-warning-strong)', marginTop: 4 }}>
-                  El responsable actual ya no tiene acceso a este proyecto o al módulo (requiere reasignación). Si no eliges otro, se conserva tal cual.
-                </div>
-              )}
-            </div>
-            <div>
-              <label style={labelStyle}>Estado</label>
-              <select style={inputStyle} value={form.estado ?? 'pendiente'} onChange={e => setForm(f => ({ ...f, estado: e.target.value as EstadoHousekeeping }))}>
-                {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={labelStyle}>Costo ({moneda})</label>
-              <input style={inputStyle} type="number" min="0" step="0.01" value={form.costo ?? ''} onChange={e => setForm(f => ({ ...f, costo: e.target.value ? Number(e.target.value) : undefined }))} placeholder="0.00" />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Notas</label>
-              <input style={inputStyle} value={form.notas ?? ''} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
-            </button>
-          </div>
-        </div>
+      {modal.abierto && (
+        <HousekeepingServicioModal
+          servicio={modal.servicio} unidades={unidades} proyectoId={proyectoId} companyId={companyId} userId={userId} moneda={moneda}
+          elegibles={elegibles} cargandoElegibles={cargandoElegibles} elegiblesError={elegiblesError} onRecargarElegibles={() => void cargarElegibles()}
+          onClose={() => setModal({ abierto: false, servicio: null })} onSaved={onRefresh} />
       )}
 
       {/* Filtros */}
@@ -286,33 +181,43 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
                 {byFecha[fecha].map(s => {
                   const est = ESTADO_CONFIG[s.estado]
                   const tipo = TIPO_CONFIG[s.tipo]
+                  const cerrado = s.estado === 'completado' || s.estado === 'cancelado'
                   return (
-                    <div key={s.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '14px' }}>
+                    <div key={s.id} data-testid={`servicio-${s.id}`} data-estado={s.estado} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '14px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                         <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{tipo.icon} {tipo.label}</div>
                         <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '10px' }}>
                         {s.unidad_nombre && <div>🏠 {s.unidad_nombre}</div>}
+                        {s.reserva_str_resumen && <div title="Reserva STR vinculada">🔖 {etiquetaReserva(s.reserva_str_resumen)}</div>}
                         <ResponsableLinea estado={estadoResponsable(s, elegibles)} />
-                        {(s.hora_inicio || s.hora_fin) && <div>🕐 {s.hora_inicio ?? '?'} — {s.hora_fin ?? '?'}</div>}
+                        {(s.hora_inicio || s.hora_fin) && <div>🕐 Ingreso tentativo {s.hora_inicio?.slice(0, 5) ?? '?'}{s.hora_fin ? ` — fin ${s.hora_fin.slice(0, 5)}` : ''}</div>}
                         {s.costo && <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>💰 {moneda} {s.costo.toFixed(2)}</div>}
-                        {s.completado_por && <div>✅ Completó: <UsuarioChip userId={s.completado_por} /></div>}
+                        {s.completado_por && <div>✅ Completó: <UsuarioChip userId={s.completado_por} /> · ⏱ {horasDedicadas(s)}</div>}
                         {!s.completado_por && s.iniciado_por && <div>▶️ Inició: <UsuarioChip userId={s.iniciado_por} /></div>}
+                        {s.informe_enviado_en && <div>📨 Informe enviado</div>}
                       </div>
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        <button onClick={() => setEvidenciaId(s.id)} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>📋 Evidencia</button>
+                        {s.estado === 'pendiente' && canEdit && (
+                          <button onClick={() => iniciar(s)} disabled={iniciando === s.id} style={btnChip({ background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' })}>
+                            {iniciando === s.id ? 'Iniciando…' : '▶️ Iniciar servicio'}
+                          </button>
+                        )}
+                        {s.estado === 'en_proceso' && (
+                          <>
+                            <button onClick={() => setPasos({ id: s.id, paso: 1 })} style={btnChip()}>📝 Evidencia de ingreso</button>
+                            {canEdit && <button onClick={() => setPasos({ id: s.id, paso: 2 })} style={btnChip({ background: 'var(--at-success-tint)', color: 'var(--at-success-strong)' })}>🏁 Finalizar limpieza</button>}
+                          </>
+                        )}
+                        {(cerrado || (s.estado === 'pendiente' && !canEdit)) && (
+                          <button onClick={() => setPasos({ id: s.id, paso: 1 })} style={btnChip()}>📋 Ver evidencia</button>
+                        )}
                       </div>
                       {canEdit && (
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
-                          {s.estado === 'pendiente' && (
-                            <button onClick={() => handleEstado(s.id, 'en_proceso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Iniciar</button>
-                          )}
-                          {s.estado === 'en_proceso' && (
-                            <button onClick={() => handleEstado(s.id, 'completado')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Completar</button>
-                          )}
-                          <button onClick={() => startEdit(s)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                          <button onClick={() => handleDelete(s.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                          <button onClick={() => setModal({ abierto: true, servicio: s })} aria-label="Editar servicio" style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                          <button onClick={() => handleDelete(s.id)} aria-label="Eliminar servicio" style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                         </div>
                       )}
                     </div>
@@ -323,12 +228,13 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
           ))}
         </div>
       )}
-      {evidencia && (
-        <HousekeepingEvidencias
-          servicio={evidencia} projectId={proyectoId} companyId={companyId}
-          tipoLabel={TIPO_CONFIG[evidencia.tipo].label} estadoLabel={ESTADO_CONFIG[evidencia.estado].label}
-          responsableEstado={estadoResponsable(evidencia, elegibles)}
-          canEdit={canEdit} onClose={() => setEvidenciaId(null)} onRefresh={onRefresh} />
+      {servicioPasos && pasos && (
+        <HousekeepingServicioPasos
+          key={`${servicioPasos.id}-${pasos.paso}`}
+          servicio={servicioPasos} projectId={proyectoId} companyId={companyId}
+          tipoLabel={TIPO_CONFIG[servicioPasos.tipo].label} estadoLabel={ESTADO_CONFIG[servicioPasos.estado].label}
+          responsableEstado={estadoResponsable(servicioPasos, elegibles)} responsableNombre={nombreResponsable(servicioPasos)}
+          canEdit={canEdit} pasoInicial={pasos.paso} onClose={() => setPasos(null)} onRefresh={onRefresh} />
       )}
     </div>
   )
