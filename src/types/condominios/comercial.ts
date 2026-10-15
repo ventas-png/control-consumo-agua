@@ -37,6 +37,54 @@ export interface ReservaSTR {
   unidad_nombre?: string
 }
 
+// ── Carga masiva de reservas STR (20261031000100) ────────────────────────────
+export interface FilaImportacionSTR {
+  fila: number
+  origen: Record<string, string>
+  /** Datos normalizados por el servidor; null si la fila tiene errores. */
+  datos: {
+    unidad_id: string
+    unidad: string
+    huesped_nombre: string
+    huesped_email: string | null
+    huesped_telefono: string | null
+    fecha_entrada: string
+    fecha_salida: string
+    noches: number
+    hora_llegada_estimada: string | null
+    hora_salida_estimada: string | null
+    num_adultos: number
+    num_ninos: number
+    num_bebes: number
+    plataforma: PlataformaSTR
+    codigo_confirmacion: string | null
+    fecha_reservacion: string | null
+    monto_noche: number | null
+    monto_total: number | null
+    politica_cancelacion: PoliticaCancelacionSTR
+    mascotas: boolean
+    notas: string | null
+    estado: 'confirmada'
+  } | null
+  errores: { campo: string; mensaje: string }[]
+  advertencias: { campo: string; mensaje: string }[]
+}
+
+export interface VistaPreviaImportacionSTR {
+  lote_id: string
+  project_id: string
+  resumen: { total: number; validas: number; con_error: number; duplicado_de_lote_aplicado: boolean }
+  filas: FilaImportacionSTR[]
+}
+
+export interface ResultadoImportacionSTR {
+  lote_id: string
+  project_id: string
+  reservas_creadas: number
+  reserva_ids: string[]
+  reutilizada: boolean
+}
+
 export type GiroLocal = 'restaurante' | 'oficina' | 'comercio' | 'servicio' | 'otro'
 export type EstadoLocal = 'disponible' | 'ocupado' | 'en_remodelacion'
 export interface LocalComercial {

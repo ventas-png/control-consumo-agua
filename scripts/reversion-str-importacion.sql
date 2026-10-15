@@ -1,0 +1,45 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- Recuperación tras desplegar 20261031000100 (carga masiva de reservas STR)
+-- ════════════════════════════════════════════════════════════════════════════
+-- NO se ejecuta sola ni en CI. Leer antes de correr. Regla general: ante un problema,
+-- preferir AVANZAR con una migración nueva. Las reservas ya importadas son filas
+-- normales de `reservas_str` (con `creado_por` sellado): ninguna sección las toca.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── A) Cerrar la carga masiva a la API sin perder el historial de lotes ─────────
+-- La pantalla deja de poder previsualizar/aplicar; los lotes y sus filas quedan como
+-- registro. Para reanudar: GRANT EXECUTE … TO authenticated (las tres).
+-- BEGIN;
+-- REVOKE EXECUTE ON FUNCTION public.str_reservas_importar_previsualizar(uuid, jsonb, text) FROM authenticated;
+-- REVOKE EXECUTE ON FUNCTION public.str_reservas_importar_aplicar(uuid) FROM authenticated;
+-- REVOKE EXECUTE ON FUNCTION public.str_reservas_importar_descartar(uuid) FROM authenticated;
+-- COMMIT;
+
+-- ── B) Localizar lo que importó un lote (solo lectura) ─────────────────────────
+-- SELECT l.id, l.project_id, l.archivo_nombre, l.estado, l.aplicado_at, l.aplicado_por,
+--        l.resultado->>'reservas_creadas' AS creadas
+--   FROM public.str_importaciones l ORDER BY l.created_at DESC LIMIT 50;
+-- SELECT r.* FROM public.reservas_str r
+--  WHERE r.id::text IN (SELECT jsonb_array_elements_text(l.resultado->'reserva_ids')
+--                         FROM public.str_importaciones l WHERE l.id = '<lote>');
+-- Si un lote se cargó por error, las reservas se cancelan o eliminan desde la pestaña
+-- STR (con el permiso correspondiente), nunca con un DELETE masivo desde aquí.
+
+-- ── C) Revertir EXACTAMENTE el esquema (pierde el historial de lotes) ──────────
+-- Antes, guardar una copia:
+--   CREATE TABLE public.zz_respaldo_str_importaciones AS SELECT * FROM public.str_importaciones;
+--   CREATE TABLE public.zz_respaldo_str_importacion_filas AS SELECT * FROM public.str_importacion_filas;
+-- BEGIN;
+-- DROP FUNCTION IF EXISTS public.str_reservas_importar_previsualizar(uuid, jsonb, text);
+-- DROP FUNCTION IF EXISTS public.str_reservas_importar_aplicar(uuid);
+-- DROP FUNCTION IF EXISTS public.str_reservas_importar_descartar(uuid);
+-- DROP FUNCTION IF EXISTS public.str_import_evaluar(uuid, uuid, jsonb, int);
+-- DROP TABLE IF EXISTS public.str_importacion_filas;
+-- DROP TABLE IF EXISTS public.str_importaciones;
+-- DROP FUNCTION IF EXISTS public.str_tg_imp_solo_rpc();
+-- DROP FUNCTION IF EXISTS public.str_import_puede_crear();
+-- COMMIT;
+
+-- ── D) Comprobaciones posteriores (solo lectura) ────────────────────────────────
+-- SELECT proname FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname LIKE 'str\_%' ORDER BY 1;
+-- SELECT estado, count(*) FROM public.str_importaciones GROUP BY 1;
