@@ -25640,6 +25640,34 @@ export type Database = {
         Args: { p_lote_id: string }
         Returns: Json
       }
+      plantillas_import_puede_crear: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      plantillas_puede_editar: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      plantillas_import_partir_recursos: {
+        Args: { p_celda: string | null }
+        Returns: Json
+      }
+      plantillas_importar_previsualizar: {
+        Args: { p_project_id: string; p_filas: Json; p_archivo?: string | null }
+        Returns: Json
+      }
+      plantillas_importar_aplicar: {
+        Args: { p_lote_id: string }
+        Returns: Json
+      }
+      plantillas_importar_descartar: {
+        Args: { p_lote_id: string }
+        Returns: Json
+      }
+      plantillas_recursos_en_bloque: {
+        Args: { p_project_id: string; p_plantilla_ids: string[]; p_accion: string; p_suministros?: Json; p_inventario?: Json }
+        Returns: Json
+      }
       personal_usuarios_asignables: {
         Args: { p_project_id: string }
         Returns: {

@@ -12,10 +12,20 @@
 // en el panel expandible de cada tarjeta, y cada cambio ahí se guarda al
 // instante — el panel lo dice. Así cancelar el formulario nunca deja cambios
 // ocultos ya persistidos.
+//
+// EN BLOQUE (20261031000200): «⬆️ Carga masiva» crea actividades desde un archivo
+// (con sus recursos por nombre) y las casillas de las tarjetas + «Recursos en
+// bloque» agregan o quitan insumos, herramientas y equipo a varias actividades
+// en una sola llamada atómica al servidor. Ambas solo con permiso de crear /
+// editar, nunca en consulta ni en modo selector.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { EmptyState } from '../shared/EmptyState'
+import { SelectionToolbar } from '../shared/SelectionToolbar'
+import { useBulkSelection } from '../../hooks/useBulkSelection'
+import { ImportarActividadesModal } from './tabs/ImportarActividadesModal'
+import { RecursosEnBloqueModal } from './RecursosEnBloqueModal'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../domain/condominios/tabMutations'
 import { fetchRecursosPlantillas } from '../../domain/condominios/tabQueries'
 import { CARGO_LABEL } from './tabs/limpieza/ui'
@@ -86,6 +96,8 @@ function etiquetaCargo(cargo: string): string {
   return (CARGO_LABEL as Record<string, string>)[cargo] ?? cargo
 }
 
+const idDePlantilla = (p: PlantillaTareaCargo) => p.id
+
 function blankForm() {
   return {
     cargo: '', titulo: '', descripcion: '', icono: '✅', orden: 0, area_id: '',
@@ -111,6 +123,8 @@ export function ActividadesCatalog({
   const [filtroEstado, setFiltroEstado] = useState<'todas' | 'activas' | 'inactivas'>('todas')
   // Panel de recursos abierto (uno a la vez); vive FUERA del formulario.
   const [recursosDe, setRecursosDe] = useState<string | null>(null)
+  const [showImportar, setShowImportar] = useState(false)
+  const [showBloque, setShowBloque] = useState(false)
 
   // En modo selector no se administra el catálogo: se elige de él.
   const enSeleccion = seleccion != null
@@ -148,12 +162,19 @@ export function ActividadesCatalog({
 
   // ── Filtros y agrupación ───────────────────────────────────────────────────
   const cargos = Array.from(new Set(plantillas.map(p => p.cargo))).sort()
-  const filtradas = [...plantillas]
+  const filtradas = useMemo(() => [...plantillas]
     .filter(p => filtroCargo === 'todos' || p.cargo === filtroCargo)
     .filter(p => filtroServicio === 'todos'
       || (filtroServicio === 'pendiente' ? !p.servicio : p.servicio === filtroServicio))
     .filter(p => filtroEstado === 'todas' || (filtroEstado === 'activas' ? p.activo : !p.activo))
-    .sort((a, b) => a.cargo.localeCompare(b.cargo) || a.orden - b.orden)
+    .sort((a, b) => a.cargo.localeCompare(b.cargo) || a.orden - b.orden),
+  [plantillas, filtroCargo, filtroServicio, filtroEstado])
+
+  // Selección para «Recursos en bloque»: sobre las tarjetas VISIBLES (los filtros
+  // acotan «Seleccionar todas»). Solo con permiso de editar.
+  const bloque = useBulkSelection(filtradas, idDePlantilla)
+  const puedeBloque = puedeEditar
+  const seleccionadas = bloque.selectedItems
 
   const cargosPorGrupo = Array.from(
     filtradas.reduce((m, p) => { m.set(p.cargo, [...(m.get(p.cargo) ?? []), p]); return m }, new Map<string, PlantillaTareaCargo[]>())
@@ -440,12 +461,36 @@ export function ActividadesCatalog({
           </p>
         </div>
         {puedeCrear && (
-          <button onClick={() => { resetForm(); setShowForm(true) }}
-            style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
-            + Nueva actividad
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button onClick={() => setShowImportar(true)}
+              style={{ padding: '9px 16px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+              ⬆️ Carga masiva
+            </button>
+            <button onClick={() => { resetForm(); setShowForm(true) }}
+              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+              + Nueva actividad
+            </button>
+          </div>
         )}
       </div>
+
+      {showImportar && (
+        <ImportarActividadesModal
+          proyectoId={proyectoId}
+          onClose={() => setShowImportar(false)}
+          onImportado={() => { onRefresh(); void cargarRecursos() }}
+        />
+      )}
+      {showBloque && seleccionadas.length > 0 && (
+        <RecursosEnBloqueModal
+          proyectoId={proyectoId}
+          plantillas={seleccionadas}
+          suministros={suministros}
+          inventario={inventario}
+          onClose={() => setShowBloque(false)}
+          onAplicado={() => { bloque.clear(); void cargarRecursos() }}
+        />
+      )}
 
       {soloLectura && (
         <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '10px', padding: '10px 14px', marginBottom: '14px', fontSize: '12.5px', color: 'var(--at-ink-3)' }}>
@@ -589,6 +634,12 @@ export function ActividadesCatalog({
           <option value="activas">Activas</option>
           <option value="inactivas">Inactivas</option>
         </select>
+        {puedeBloque && filtradas.length > 0 && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--at-ink-2)', cursor: 'pointer', marginLeft: 'auto' }}>
+            <input type="checkbox" checked={bloque.isAllSelected} onChange={bloque.toggleAll} aria-label="Seleccionar todas las actividades visibles" />
+            {bloque.isAllSelected ? 'Quitar selección' : `Seleccionar todas (${filtradas.length})`}
+          </label>
+        )}
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
         {(['todos', ...cargos] as string[]).map(c => (
@@ -636,8 +687,13 @@ export function ActividadesCatalog({
                   const nSum = (sumPorPlantilla.get(p.id) ?? []).length
                   const nHer = (herPorPlantilla.get(p.id) ?? []).length
                   return (
-                    <div key={p.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${p.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '12px', padding: '14px', opacity: p.activo ? 1 : 0.55 }}>
+                    <div key={p.id} data-testid={`actividad-${p.id}`} data-seleccionada={puedeBloque && bloque.isSelected(p.id) ? 'si' : undefined}
+                      style={{ background: 'var(--at-surface)', border: `1.5px solid ${puedeBloque && bloque.isSelected(p.id) ? 'var(--at-primary)' : p.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '12px', padding: '14px', opacity: p.activo ? 1 : 0.55 }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                        {puedeBloque && (
+                          <input type="checkbox" checked={bloque.isSelected(p.id)} onChange={() => bloque.toggle(p.id)} aria-label={`Seleccionar ${p.titulo}`}
+                            style={{ marginTop: '11px', flexShrink: 0 }} />
+                        )}
                         <span style={{ fontSize: '24px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--at-warning-tint)', borderRadius: '9px', flexShrink: 0 }}>{p.icono}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--at-ink)' }}>{p.titulo}</div>
@@ -685,6 +741,17 @@ export function ActividadesCatalog({
             </div>
           ))}
         </div>
+      )}
+
+      {puedeBloque && (
+        <SelectionToolbar
+          count={bloque.count}
+          entityLabel={{ one: 'actividad', many: 'actividades' }}
+          onClear={bloque.clear}
+          actions={[
+            { id: 'recursos-bloque', label: 'Recursos en bloque', icon: '🧰', variant: 'primary', onClick: () => setShowBloque(true) },
+          ]}
+        />
       )}
     </div>
   )
