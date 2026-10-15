@@ -103,6 +103,72 @@ describe('dispatcher/resolveEmailContent (cascada)', () => {
     emailTpl: null,
   }
 
+  // Avisos de housekeeping (20261031000000): la plantilla global `housekeeping_asignado`
+  // renderiza las variables que encola hk_encolar_aviso_responsable; sin plantilla, el
+  // payload trae subject/body y se envía igual.
+  it('housekeeping_asignado: plantilla global con las variables del payload', () => {
+    const payload = {
+      subject: 'Servicio de housekeeping asignado', body: '<p>respaldo</p>',
+      servicio_tipo: 'Limpieza profunda', unidad: 'Apto 1A', fecha: '20/11/2026', hora: '09:00',
+      asignado_por: 'Owner A', reserva: 'Reserva HM-001 · Ana Pérez (2026-11-08 → 2026-11-12)', notas: '&lt;b&gt;ojo&lt;/b&gt;',
+    }
+    const r = resolveEmailContent({
+      ...base,
+      payloadSubject: payload.subject,
+      payloadHtmlBody: payload.body,
+      vars: { empresa_nombre: 'Acme', app_url: 'https://app.test', ...payload },
+      notifTpl: {
+        subject: 'Servicio asignado: {{servicio_tipo}} · {{unidad}} · {{fecha}}',
+        body: '<p><b>{{servicio_tipo}}</b> · Unidad {{unidad}}<br/>Fecha {{fecha}} · ingreso tentativo {{hora}}<br/>Asignado por {{asignado_por}}<br/>{{reserva}}</p><p>{{notas}}</p><p><a href="{{app_url}}/condominios">Abrir en la aplicación</a></p>',
+      },
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.subject).toBe('Servicio asignado: Limpieza profunda · Apto 1A · 20/11/2026')
+    expect(r.htmlBody).toContain('ingreso tentativo 09:00')
+    expect(r.htmlBody).toContain('Asignado por Owner A')
+    expect(r.htmlBody).toContain('Reserva HM-001 · Ana Pérez')
+    expect(r.htmlBody).toContain('href="https://app.test/condominios"')
+    // El HTML del usuario llega ya escapado por la base y la plantilla no lo desescapa.
+    expect(r.htmlBody).toContain('&lt;b&gt;ojo&lt;/b&gt;')
+    expect(r.htmlBody).not.toContain('<b>ojo</b>')
+  })
+
+  it('housekeeping_informe sin plantilla: subject/body del payload se envían tal cual, en el layout', () => {
+    // El fallback del payload NO sustituye {{variables}}: por eso la base no mete marcadores
+    // en los cuerpos del payload y deja el enlace a la app en la plantilla.
+    const r = resolveEmailContent({
+      ...base,
+      payloadSubject: 'Informe de housekeeping: Limpieza estándar · Apto 1A · 10/11/2026',
+      payloadHtmlBody: '<h2>Informe de housekeeping</h2><p>El PDF con las fotografías se comparte desde la aplicación.</p>',
+      vars: { empresa_nombre: 'Acme', app_url: 'https://app.test' },
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.subject).toBe('Informe de housekeeping: Limpieza estándar · Apto 1A · 10/11/2026')
+    expect(r.htmlBody).toContain('<h2>Informe de housekeeping</h2>')
+    expect(r.htmlBody).toMatch(/<!DOCTYPE html>/i)
+  })
+
+  it('housekeeping_informe con la plantilla global: {{informe_html}} entra entero y el enlace de la plantilla se resuelve', () => {
+    const informe = '<h2>Informe de housekeeping</h2><table><tr><td><b>Horas dedicadas</b></td><td>02:30 h</td></tr></table>'
+    const r = resolveEmailContent({
+      ...base,
+      payloadSubject: 'x', payloadHtmlBody: informe,
+      vars: { empresa_nombre: 'Acme', app_url: 'https://app.test', informe_html: informe, servicio_tipo: 'Limpieza estándar', unidad: 'Apto 1A', fecha: '10/11/2026' },
+      notifTpl: {
+        subject: 'Informe de housekeeping: {{servicio_tipo}} · {{unidad}} · {{fecha}}',
+        body: '{{informe_html}}<p><a href="{{app_url}}/condominios">Abrir en la aplicación</a></p>',
+      },
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.subject).toBe('Informe de housekeeping: Limpieza estándar · Apto 1A · 10/11/2026')
+    expect(r.htmlBody).toContain('<td>02:30 h</td>')
+    expect(r.htmlBody).toContain('href="https://app.test/condominios"')
+    expect(r.htmlBody).not.toContain('{{')
+  })
+
   it('1) notification_templates GANA sobre email_templates y payload', () => {
     const r = resolveEmailContent({
       ...base,

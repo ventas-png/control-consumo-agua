@@ -19,6 +19,12 @@ import type { FaseFotoHousekeeping, FotoHousekeeping } from '../../types'
 /** Tope por fase; lo impone también la BD (hk_fotos_preparar). */
 export const MAX_FOTOS_POR_FASE = 20
 
+/** Fases en el orden del flujo (20261031000000 añade «inconvenientes»). */
+export const FASES_FOTO: readonly FaseFotoHousekeeping[] = ['ingreso', 'inconvenientes', 'cierre']
+
+/** Objetos por servicio que admite el bucket (policy hk_evidencias_insert: 3 fases × 20 + holgura). */
+export const MAX_FOTOS_SERVICIO = 90
+
 /** Cuántas de `nuevas` caben sin pasar del tope, dadas las `actuales`. */
 export function cupoDisponible(actuales: number, nuevas: number, max = MAX_FOTOS_POR_FASE): number {
   return Math.max(0, Math.min(nuevas, max - actuales))

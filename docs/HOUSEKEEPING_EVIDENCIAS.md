@@ -5,8 +5,9 @@ Migraciones: `supabase/migrations/20261028000000_housekeeping_evidencias.sql` y
 Pruebas: `supabase/tests/housekeeping_evidencias/run.sh` · `supabase/functions/_shared/__tests__/housekeepingLimpieza.test.ts` · `src/domain/condominios/__tests__/housekeepingEvidencias.test.ts`
 
 ## Qué hace
-Cada servicio de housekeeping documenta cómo se encontró la unidad (texto + hasta 20 fotos) y cómo
-quedó (texto + hasta 20 fotos), queda sellado **quién lo inició y quién lo completó**, y se puede
+Cada servicio de housekeeping documenta cómo se encontró la unidad (texto + hasta 20 fotos), los
+inconvenientes encontrados (texto + hasta 20 fotos, fase añadida por `20261031000000`, ver
+[`HOUSEKEEPING_FLUJO.md`](HOUSEKEEPING_FLUJO.md)) y cómo quedó (texto + hasta 20 fotos), queda sellado **quién lo inició y quién lo completó**, y se puede
 generar un informe PDF para compartir por WhatsApp. Las fotos se depuran a los 90 días; los textos y
 la autoría **no se purgan nunca**.
 
@@ -21,7 +22,7 @@ sesión real en el sandbox; ver «Verificación»).
 | Acción | Tabla `servicio_housekeeping_fotos` | Bucket `housekeeping-evidencias` |
 |---|---|---|
 | Ver | `hk_acceso` | `hk_acceso` **y** la carpeta 1 = proyecto del servicio y la carpeta 2 = ese servicio |
-| Subir | `hk_acceso` + ruta del servicio + máx. 20 por fase | igual + `<carpeta>/<carpeta>/<archivo>` + máx. 60 objetos por servicio |
+| Subir | `hk_acceso` + ruta del servicio + máx. 20 por fase | igual + `<carpeta>/<carpeta>/<archivo>` + máx. 60 objetos por servicio (90 desde `20261031000000`, tres fases) |
 | Modificar | **nadie** (sin privilegio `UPDATE`) | **nadie** (sin policy) |
 | Borrar | **nadie directo** (sin privilegio `DELETE`) → RPC | **nadie** (sin policy) → lo retira el servidor |
 
@@ -428,6 +429,7 @@ Verificación posterior (solo lectura):
   (rama de residente de la policy de `servicios_housekeeping`, sin cambios). Las fotos no.
 - Las fotos subidas antes de `cacheControl: '0'` (solo en entornos de prueba) conservan `max-age=3600`.
 - Un objeto subido cuyo registro de fila falla queda sin fila hasta que el barrido horario lo retira
-  (pasado un día); mientras tanto ocupa espacio y cuenta para el tope de 60 objetos por servicio.
+  (pasado un día); mientras tanto ocupa espacio y cuenta para el tope de objetos por servicio (60; 90 desde
+  `20261031000000`).
 - La concurrencia del tope de 20 se prueba con sesiones reales en PostgreSQL 16 desechable, no en PG17 ni
   tras el pooler.

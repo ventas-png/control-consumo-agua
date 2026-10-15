@@ -857,6 +857,22 @@ jobs:
           PGPORT_TEST: 55562
         run: supabase/tests/housekeeping_responsable/run.sh
 
+      # 20261031000000: flujo por pasos de housekeeping. La base valida las
+      # transiciones (pendiente → en_proceso → completado; el salto directo y
+      # reabrir son solo de dueño/admin), sella un RESUMEN de la reserva STR
+      # vinculada (misma empresa y proyecto, no cancelada, unidad coherente),
+      # admite la fase de fotos «inconvenientes» (cupo de Storage 90), avisa al
+      # responsable (campana + correo, una vez por clave, outbox roto no bloquea),
+      # recuerda 60 min antes en la zona del tenant y encola el informe al
+      # cerrar solo a dueño/admin CON acceso al proyecto y/o a un correo tecleado.
+      # CONTROL NEGATIVO: siete mutantes (proyecto, idempotencia, rol, acceso,
+      # sin perfil, salto, catálogo).
+      - name: Housekeeping — flujo por pasos, reserva STR, avisos e informe
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55563
+        run: supabase/tests/housekeeping_flujo/run.sh
+
       # 20261031000100: carga masiva de reservas STR desde una plantilla propia.
       # Vista previa validada en el SERVIDOR (unidad por nombre del proyecto, fechas,
       # horas, personas, catálogos, montos, código repetido = error, solape = aviso,
