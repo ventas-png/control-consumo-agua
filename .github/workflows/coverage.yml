@@ -844,6 +844,19 @@ jobs:
           PGPORT_TEST: 55561
         run: supabase/tests/purgar_empresa/run.sh
 
+      # 20261030000100: el responsable de un servicio de housekeeping es un usuario
+      # elegible del proyecto (habilitado, misma empresa, acceso al proyecto y al
+      # módulo, con las MISMAS reglas vigentes evaluadas para esa cuenta). La base lo
+      # valida en INSERT/UPDATE (también por la API), sella quién asignó, no toca la
+      # autoría (creado/iniciado/completado/fotos) al reasignar, conserva el texto
+      # heredado sin vincularlo y mantiene el historial si se revoca el acceso.
+      # CONTROL NEGATIVO: cuatro mutantes (acceso, empresa, habilitado, sello).
+      - name: Housekeeping — responsable como usuario elegible
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55562
+        run: supabase/tests/housekeeping_responsable/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

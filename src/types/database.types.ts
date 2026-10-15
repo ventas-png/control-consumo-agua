@@ -20014,6 +20014,9 @@ export type Database = {
           notas: string | null
           project_id: string
           responsable: string | null
+          responsable_asignado_en: string | null
+          responsable_asignado_por: string | null
+          responsable_user_id: string | null
           tipo: string
           unidad_id: string | null
         }
@@ -20030,6 +20033,9 @@ export type Database = {
           notas?: string | null
           project_id: string
           responsable?: string | null
+          responsable_asignado_en?: string | null
+          responsable_asignado_por?: string | null
+          responsable_user_id?: string | null
           tipo?: string
           unidad_id?: string | null
         }
@@ -20046,6 +20052,9 @@ export type Database = {
           notas?: string | null
           project_id?: string
           responsable?: string | null
+          responsable_asignado_en?: string | null
+          responsable_asignado_por?: string | null
+          responsable_user_id?: string | null
           tipo?: string
           unidad_id?: string | null
         }
@@ -20076,6 +20085,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicios_housekeeping_responsable_user_id_fkey"
+            columns: ["responsable_user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
             referencedColumns: ["id"]
           },
           {
@@ -25551,6 +25567,15 @@ export type Database = {
           tiene_prod: boolean
           tiene_sandbox: boolean
           updated_at: string
+        }[]
+      }
+      hk_responsables_elegibles: {
+        Args: { p_project_id: string }
+        Returns: {
+          activo: boolean
+          full_name: string
+          id: string
+          role: string
         }[]
       }
       personal_usuarios_asignables: {

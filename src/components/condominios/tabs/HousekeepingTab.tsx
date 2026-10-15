@@ -1,17 +1,24 @@
 import { hoyLocalISO } from '../../../lib/format'
-import { useState, type CSSProperties} from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ServicioHousekeeping, EstadoHousekeeping, TipoHousekeeping, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { eliminarServicioConEvidencias } from '../../../domain/condominios/housekeepingEvidencias'
 import { HousekeepingEvidencias } from './HousekeepingEvidencias'
 import { UsuarioChip } from '../../shared/UsuarioChip'
+import type { AppUser } from '../../../domain/usuarios/queries'
+import {
+  estadoResponsable, fetchResponsablesElegibles, mensajeErrorResponsable, preseleccionResponsable,
+} from '../../../domain/condominios/housekeepingResponsable'
+import { ResponsableLinea, ResponsableSelector } from './ResponsableSelector'
 
 interface Props {
   servicios: ServicioHousekeeping[]
   unidades: Unidad[]
   proyectoId: string
   companyId: string
+  /** Usuario conectado: preseleccionado como responsable al crear si es elegible. */
+  userId: string
   moneda: string
   canCreate: boolean
   canEdit: boolean
@@ -36,11 +43,11 @@ const TIPO_CONFIG: Record<TipoHousekeeping, { label: string; icon: string }> = {
 const blank = (): Partial<ServicioHousekeeping> => ({
   unidad_id: undefined, tipo: 'limpieza_estandar',
   fecha: hoyLocalISO(),
-  hora_inicio: '', hora_fin: '', responsable: '',
+  hora_inicio: '', hora_fin: '', responsable_user_id: null,
   estado: 'pendiente', costo: undefined, notas: '',
 })
 
-export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoHousekeeping | 'todos'>('todos')
   const [form, setForm] = useState<Partial<ServicioHousekeeping>>(blank())
   const [editId, setEditId] = useState<string | null>(null)
@@ -48,6 +55,27 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
   const [saving, setSaving] = useState(false)
   const [evidenciaId, setEvidenciaId] = useState<string | null>(null)
   const evidencia = servicios.find(s => s.id === evidenciaId) ?? null
+
+  // Catálogo de responsables ELEGIBLES de este proyecto (lo decide la base). `null`
+  // mientras no se ha cargado. Se vacía y se vuelve a pedir al cambiar de proyecto,
+  // de empresa o de sesión, y con él se limpia cualquier selección a medias.
+  const [elegibles, setElegibles] = useState<AppUser[] | null>(null)
+  const [elegiblesError, setElegiblesError] = useState<string | null>(null)
+  const [cargandoElegibles, setCargandoElegibles] = useState(false)
+  const peticion = useRef(0)
+  const cargarElegibles = async () => {
+    const n = ++peticion.current
+    setCargandoElegibles(true)
+    const { data, error } = await fetchResponsablesElegibles(proyectoId)
+    if (n !== peticion.current) return   // llegó tarde: ya cambió el proyecto/empresa/sesión
+    setElegibles(error ? [] : data); setElegiblesError(error); setCargandoElegibles(false)
+  }
+  useEffect(() => {
+    setShowForm(false); setEditId(null); setForm(blank()); setEvidenciaId(null)
+    setElegibles(null); setElegiblesError(null)
+    void cargarElegibles()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proyectoId, companyId, userId])
 
   const today = hoyLocalISO()
   const thisMonth = today.slice(0, 7)
@@ -70,7 +98,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
     setForm({
       unidad_id: s.unidad_id ?? undefined, tipo: s.tipo, fecha: s.fecha,
       hora_inicio: s.hora_inicio ?? '', hora_fin: s.hora_fin ?? '',
-      responsable: s.responsable ?? '', estado: s.estado,
+      responsable: s.responsable ?? null, responsable_user_id: s.responsable_user_id ?? null, estado: s.estado,
       costo: s.costo ?? undefined, notas: s.notas ?? '',
     })
     setEditId(s.id); setShowForm(true)
@@ -78,21 +106,36 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
 
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
+  function abrirAlta() {
+    // El usuario conectado va preseleccionado SOLO si es elegible aquí; si no, hay que elegir.
+    setForm({ ...blank(), responsable_user_id: preseleccionResponsable(userId, elegibles) })
+    setEditId(null); setShowForm(true)
+  }
+
   async function handleSave() {
     if (!form.fecha) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa la fecha del servicio.' })
+    if (!editId && !form.responsable_user_id) {
+      return notify({ variant: 'warning', title: 'Responsable requerido', text: 'Elige un responsable con acceso a este proyecto y al módulo de housekeeping.' })
+    }
     setSaving(true)
+    // `responsable` (texto heredado) no se escribe nunca desde aquí: se conserva tal cual.
     const payload = {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id || null,
       tipo: form.tipo ?? 'limpieza_estandar',
       fecha: form.fecha!, hora_inicio: form.hora_inicio || null, hora_fin: form.hora_fin || null,
-      responsable: form.responsable || null, estado: form.estado ?? 'pendiente',
+      responsable_user_id: form.responsable_user_id ?? null, estado: form.estado ?? 'pendiente',
       costo: form.costo ?? null, notas: form.notas || null,
     }
     const { error } = editId
       ? await updateCondominioRow('servicios_housekeeping', editId, payload)
       : await createCondominioRow('servicios_housekeeping', payload)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
+    if (error) {
+      // 23514 HK_RESPONSABLE_NO_ELEGIBLE: la base rechazó al responsable (p. ej. perdió el acceso
+      // después de cargar la lista). Se recarga el catálogo para que la pantalla lo refleje.
+      notify({ variant: 'error', title: 'No se guardó el servicio', text: mensajeErrorResponsable(error.message) })
+      void cargarElegibles(); setSaving(false); return
+    }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -136,7 +179,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Housekeeping</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Servicio</button>
+          <button onClick={abrirAlta} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Servicio</button>
         )}
       </div>
 
@@ -169,9 +212,13 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
               <label style={labelStyle}>Hora fin</label>
               <input style={inputStyle} type="time" value={form.hora_fin ?? ''} onChange={e => setForm(f => ({ ...f, hora_fin: e.target.value }))} />
             </div>
-            <div>
-              <label style={labelStyle}>Responsable</label>
-              <input style={inputStyle} value={form.responsable ?? ''} onChange={e => setForm(f => ({ ...f, responsable: e.target.value }))} placeholder="Nombre del limpiador" />
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={labelStyle}>Responsable{editId ? '' : ' *'}</label>
+              <ResponsableSelector elegibles={elegibles} cargando={cargandoElegibles} error={elegiblesError}
+                value={form.responsable_user_id ?? null} onChange={id => setForm(f => ({ ...f, responsable_user_id: id }))} userId={userId} />
+              {editId && !form.responsable_user_id && form.responsable && (
+                <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 4 }}>Responsable anterior sin vincular: <b>{form.responsable}</b>. Elige un usuario para vincularlo.</div>
+              )}
             </div>
             <div>
               <label style={labelStyle}>Estado</label>
@@ -242,7 +289,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '10px' }}>
                         {s.unidad_nombre && <div>🏠 {s.unidad_nombre}</div>}
-                        {s.responsable && <div>👤 {s.responsable}</div>}
+                        <ResponsableLinea estado={estadoResponsable(s, elegibles)} />
                         {(s.hora_inicio || s.hora_fin) && <div>🕐 {s.hora_inicio ?? '?'} — {s.hora_fin ?? '?'}</div>}
                         {s.costo && <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>💰 {moneda} {s.costo.toFixed(2)}</div>}
                         {s.completado_por && <div>✅ Completó: <UsuarioChip userId={s.completado_por} /></div>}
@@ -275,6 +322,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
         <HousekeepingEvidencias
           servicio={evidencia} projectId={proyectoId} companyId={companyId}
           tipoLabel={TIPO_CONFIG[evidencia.tipo].label} estadoLabel={ESTADO_CONFIG[evidencia.estado].label}
+          responsableEstado={estadoResponsable(evidencia, elegibles)}
           canEdit={canEdit} onClose={() => setEvidenciaId(null)} onRefresh={onRefresh} />
       )}
     </div>

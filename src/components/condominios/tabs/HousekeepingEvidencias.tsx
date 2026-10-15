@@ -13,6 +13,8 @@ import {
   MAX_FOTOS_POR_FASE, cupoDisponible, eliminarFotoServicio, listarFotosServicio, subirFotoServicio,
 } from '../../../domain/condominios/housekeepingEvidencias'
 import { compartirOdescargarPdf, generarInformeHousekeepingPdf } from './housekeepingPdf'
+import { lineaResponsablePdf, type EstadoResponsable } from '../../../domain/condominios/housekeepingResponsable'
+import { ResponsableLinea } from './ResponsableSelector'
 import type { FaseFotoHousekeeping, FotoHousekeeping, ServicioHousekeeping } from '../../../types'
 
 interface Props {
@@ -21,6 +23,8 @@ interface Props {
   companyId: string
   tipoLabel: string
   estadoLabel: string
+  /** Responsable del servicio (vinculado, requiere reasignación, texto heredado o ninguno). */
+  responsableEstado: EstadoResponsable
   canEdit: boolean
   onClose: () => void
   onRefresh: () => void
@@ -87,7 +91,7 @@ function FaseFotos({ titulo, ayuda, fase, fotos, canEdit, subiendo, onAgregar, o
   )
 }
 
-export function HousekeepingEvidencias({ servicio, projectId, tipoLabel, estadoLabel, canEdit, onClose, onRefresh }: Props) {
+export function HousekeepingEvidencias({ servicio, projectId, tipoLabel, estadoLabel, responsableEstado, canEdit, onClose, onRefresh }: Props) {
   const { mapa } = useUsuariosMap()
   const [fotos, setFotos] = useState<FotoHousekeeping[]>([])
   const [hallazgos, setHallazgos] = useState(servicio.hallazgos_ingreso ?? '')
@@ -153,6 +157,8 @@ export function HousekeepingEvidencias({ servicio, projectId, tipoLabel, estadoL
         servicio: { ...servicio, hallazgos_ingreso: hallazgos, observaciones_cierre: cierre },
         fotos, tipoLabel, estadoLabel,
         iniciadoPor: nombre(servicio.iniciado_por), completadoPor: nombre(servicio.completado_por),
+        responsableLinea: lineaResponsablePdf(responsableEstado, nombre),
+        evidenciasPor: [...new Set(fotos.map(f => f.creado_por).filter((id): id is string => !!id))].map(id => nombre(id)!),
       })
       const compartido = await compartirOdescargarPdf(blob, `housekeeping-${servicio.unidad_nombre ?? 'servicio'}-${servicio.fecha}.pdf`.replace(/\s+/g, '_'))
       if (!compartido) notify({ variant: 'info', title: 'PDF descargado', text: 'Adjúntalo en WhatsApp desde tus descargas.' })
@@ -174,7 +180,7 @@ export function HousekeepingEvidencias({ servicio, projectId, tipoLabel, estadoL
               <h3 style={{ margin: 0, fontSize: 15 }}>📋 Evidencia · {tipoLabel}</h3>
               <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4, lineHeight: 1.6 }}>
                 {servicio.unidad_nombre ?? 'Sin unidad específica'} · {servicio.fecha} · {estadoLabel}<br />
-                {servicio.responsable && <>Responsable: {servicio.responsable}<br /></>}
+                <ResponsableLinea estado={responsableEstado} />
                 {servicio.iniciado_por && <>Iniciado por <b>{nombre(servicio.iniciado_por)}</b> ({fecha(servicio.iniciado_en)})<br /></>}
                 {servicio.completado_por && <>Completado por <b>{nombre(servicio.completado_por)}</b> ({fecha(servicio.completado_en)})</>}
               </div>

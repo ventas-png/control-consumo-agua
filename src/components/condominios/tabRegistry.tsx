@@ -566,7 +566,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'sostenibilidad', label: 'Sostenibilidad', icon: '🌱', render: (ctx) =>
     <SostenibilidadTab residuos={ctx.residuos} proyectoId={ctx.proyectoId} companyId={ctx.cid} /> },
   { id: 'housekeeping', label: 'Housekeeping', icon: '🧹', render: (ctx) =>
-    <HousekeepingTab servicios={ctx.serviciosHK} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('housekeeping')} canEdit={ctx.canEdit('housekeeping')} onRefresh={ctx.onRefresh} /> },
+    <HousekeepingTab servicios={ctx.serviciosHK} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} moneda={ctx.moneda} canCreate={ctx.canCreate('housekeeping')} canEdit={ctx.canEdit('housekeeping')} onRefresh={ctx.onRefresh} /> },
   { id: 'firmas', label: 'Firmas', icon: '✍️', render: (ctx) =>
     <FirmaDigitalTab firmas={ctx.firmas} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('firmas')} canEdit={ctx.canEdit('firmas')} onRefresh={ctx.onRefresh} /> },
   { id: 'concierge', label: 'Concierge', icon: '🛎️', render: (ctx) =>

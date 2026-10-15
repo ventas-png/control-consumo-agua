@@ -70,7 +70,13 @@ export interface ServicioHousekeeping {
   fecha: string
   hora_inicio?: string | null
   hora_fin?: string | null
+  /** Texto anterior a 20261030000100 («responsable anterior sin vincular»). No se vincula por nombre. */
   responsable?: string | null
+  /** Usuario responsable (elegible del proyecto; lo valida la BD). No concede acceso. */
+  responsable_user_id?: string | null
+  /** Sellados por la BD al cambiar responsable_user_id (trg_hk_responsable). */
+  responsable_asignado_por?: string | null
+  responsable_asignado_en?: string | null
   estado: EstadoHousekeeping
   costo?: number | null
   notas?: string | null
