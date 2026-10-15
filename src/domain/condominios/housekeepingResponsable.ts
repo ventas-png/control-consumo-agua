@@ -27,8 +27,10 @@ export async function fetchResponsablesElegibles(projectId: string): Promise<{ d
 }
 
 export type EstadoResponsable =
-  /** Vinculado a un usuario que sigue siendo elegible. */
-  | { kind: 'vinculado'; userId: string }
+  /** Vinculado a un usuario que sigue siendo elegible. `nombre` viene del catálogo de
+   *  elegibles (la RPC lo devuelve aunque el directorio de app_users no exponga a esa
+   *  persona al que mira, p. ej. un operador viendo a otro operador). */
+  | { kind: 'vinculado'; userId: string; nombre?: string }
   /** Vinculado a un usuario que ya no es elegible (acceso revocado, deshabilitado…). */
   | { kind: 'requiere_reasignacion'; userId: string }
   /** Solo tiene el texto anterior a 20261030000100. */
@@ -45,10 +47,12 @@ export function estadoResponsable(
   elegibles: readonly AppUser[] | null,
 ): EstadoResponsable {
   if (s.responsable_user_id) {
-    if (elegibles && !elegibles.some(u => u.id === s.responsable_user_id)) {
+    const elegible = elegibles?.find(u => u.id === s.responsable_user_id)
+    if (elegibles && !elegible) {
       return { kind: 'requiere_reasignacion', userId: s.responsable_user_id }
     }
-    return { kind: 'vinculado', userId: s.responsable_user_id }
+    const nombre = elegible?.full_name?.trim()
+    return nombre ? { kind: 'vinculado', userId: s.responsable_user_id, nombre } : { kind: 'vinculado', userId: s.responsable_user_id }
   }
   const texto = s.responsable?.trim()
   if (texto) return { kind: 'anterior_sin_vincular', texto }
@@ -75,7 +79,7 @@ function normalizar(t: string | null | undefined): string {
 /** Texto de la línea «Responsable» del informe PDF (nombres ya resueltos). */
 export function lineaResponsablePdf(estado: EstadoResponsable, nombre: (id: string) => string | undefined): string {
   switch (estado.kind) {
-    case 'vinculado': return `Responsable: ${nombre(estado.userId) ?? `Usuario ${estado.userId.slice(0, 8)}`}`
+    case 'vinculado': return `Responsable: ${nombre(estado.userId) ?? estado.nombre ?? `Usuario ${estado.userId.slice(0, 8)}`}`
     case 'requiere_reasignacion': return `Responsable: ${nombre(estado.userId) ?? `Usuario ${estado.userId.slice(0, 8)}`} (requiere reasignación)`
     case 'anterior_sin_vincular': return `Responsable anterior sin vincular: ${estado.texto}`
     case 'sin_responsable': return 'Responsable: —'

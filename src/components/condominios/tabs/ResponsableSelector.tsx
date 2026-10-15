@@ -85,7 +85,7 @@ export function ResponsableSelector({ elegibles, cargando, error, value, onChang
 export function ResponsableLinea({ estado }: { estado: EstadoResponsable }) {
   switch (estado.kind) {
     case 'vinculado':
-      return <div>👤 Responsable: <UsuarioChip userId={estado.userId} /></div>
+      return <div>👤 Responsable: <UsuarioChip userId={estado.userId} nombre={estado.nombre} /></div>
     case 'requiere_reasignacion':
       return (
         <div>

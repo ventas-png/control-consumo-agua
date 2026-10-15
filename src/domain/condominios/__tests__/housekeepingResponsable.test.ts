@@ -14,8 +14,8 @@ const beto: AppUser = { id: 'u2', full_name: 'Beto López', role: 'admin', activ
 const ELEGIBLES = [ana, beto]
 
 describe('estadoResponsable — qué se muestra', () => {
-  it('vinculado cuando el usuario sigue siendo elegible', () => {
-    expect(estadoResponsable({ responsable_user_id: 'u1', responsable: null }, ELEGIBLES)).toEqual({ kind: 'vinculado', userId: 'u1' })
+  it('vinculado cuando el usuario sigue siendo elegible, con el nombre que trae el catálogo', () => {
+    expect(estadoResponsable({ responsable_user_id: 'u1', responsable: null }, ELEGIBLES)).toEqual({ kind: 'vinculado', userId: 'u1', nombre: 'Ana Pérez' })
   })
   it('requiere reasignación cuando el usuario ya no está entre los elegibles (acceso revocado, deshabilitado…)', () => {
     expect(estadoResponsable({ responsable_user_id: 'u9', responsable: null }, ELEGIBLES)).toEqual({ kind: 'requiere_reasignacion', userId: 'u9' })
@@ -68,6 +68,8 @@ describe('lineaResponsablePdf — el responsable no es el autor de las evidencia
   it('requiere reasignación → lo dice; id desconocido → prefijo del uuid', () => {
     expect(lineaResponsablePdf({ kind: 'requiere_reasignacion', userId: 'u1' }, nombre)).toBe('Responsable: Ana Pérez (requiere reasignación)')
     expect(lineaResponsablePdf({ kind: 'vinculado', userId: 'deadbeef-0000' }, nombre)).toBe('Responsable: Usuario deadbeef')
+    // el directorio no lo tiene pero el catálogo sí (otro operador de la empresa)
+    expect(lineaResponsablePdf({ kind: 'vinculado', userId: 'u2', nombre: 'Beto López' }, nombre)).toBe('Responsable: Beto López')
   })
   it('texto heredado → «anterior sin vincular»; nada → guion', () => {
     expect(lineaResponsablePdf({ kind: 'anterior_sin_vincular', texto: 'Juan Viejo' }, nombre)).toBe('Responsable anterior sin vincular: Juan Viejo')

@@ -219,6 +219,11 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
               {editId && !form.responsable_user_id && form.responsable && (
                 <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 4 }}>Responsable anterior sin vincular: <b>{form.responsable}</b>. Elige un usuario para vincularlo.</div>
               )}
+              {editId && form.responsable_user_id && elegibles && !elegibles.some(u => u.id === form.responsable_user_id) && (
+                <div style={{ fontSize: 11, color: 'var(--at-warning-strong)', marginTop: 4 }}>
+                  El responsable actual ya no tiene acceso a este proyecto o al módulo (requiere reasignación). Si no eliges otro, se conserva tal cual.
+                </div>
+              )}
             </div>
             <div>
               <label style={labelStyle}>Estado</label>

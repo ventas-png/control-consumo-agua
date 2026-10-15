@@ -65,6 +65,17 @@ describe('UsuarioChip', () => {
     expect(screen.getByText('Carlos Pérez')).toBeTruthy()
   })
 
+  it('con un nombre conocido por el llamador lo usa cuando el directorio no tiene al usuario (y el directorio manda si lo tiene)', () => {
+    // Un operador no ve a los demás operadores en app_users, pero la RPC de
+    // responsables elegibles sí se los devuelve con nombre (20261030000100).
+    renderChip(<UsuarioChip userId="u-9" nombre="Beto López" />)
+    expect(screen.getByText('Beto López')).toBeTruthy()
+    cleanup()
+    renderChip(<UsuarioChip userId="u-1" nombre="Otro Nombre" />)
+    expect(screen.getByText('Ana María López')).toBeTruthy()
+    expect(screen.queryByText('Otro Nombre')).toBeNull()
+  })
+
   it('con id desconocido muestra los primeros 8 chars, no "Sistema"', () => {
     renderChip(<UsuarioChip userId="ffffffff-1111-2222-3333-444444444444" />)
     expect(screen.getByText('Usuario ffffffff')).toBeTruthy()

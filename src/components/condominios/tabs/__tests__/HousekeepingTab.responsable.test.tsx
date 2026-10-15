@@ -164,6 +164,20 @@ describe('HousekeepingTab — responsable como usuario', () => {
     expect(screen.getByText('chip:u2')).toBeTruthy()
   })
 
+  it('al editar un servicio cuyo responsable fue revocado, lo avisa, no lo ofrece en el buscador y conserva el vínculo si no se cambia', async () => {
+    renderTab({ servicios: [servicio({ responsable_user_id: 'u9' })] })
+    await waitFor(() => expect(mocks.fetchResponsablesElegibles).toHaveBeenCalled())
+    fireEvent.click(screen.getByText('✏️'))
+    expect(screen.getByText(/El responsable actual ya no tiene acceso/)).toBeTruthy()
+    expect(screen.queryByTestId('responsable-elegido')).toBeNull()
+    fireEvent.focus(screen.getByLabelText('Buscar responsable'))
+    const lista = screen.getByRole('listbox', { name: 'Responsables elegibles' })
+    expect(within(lista).getAllByRole('option')).toHaveLength(2)   // u9 no está
+    fireEvent.click(screen.getByText('Actualizar'))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1))
+    expect(mocks.updateCondominioRow.mock.calls[0][2].responsable_user_id).toBe('u9')   // historial conservado; la base no revalida si no cambia
+  })
+
   it('si la base rechaza al responsable (HK_RESPONSABLE_NO_ELEGIBLE) lo explica y recarga el catálogo', async () => {
     mocks.createCondominioRow.mockResolvedValueOnce({ error: { message: 'HK_RESPONSABLE_NO_ELEGIBLE: el responsable debe ser…' } })
     renderTab()
