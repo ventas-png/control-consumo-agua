@@ -888,6 +888,24 @@ jobs:
           PGPORT_TEST: 55564
         run: supabase/tests/str_importacion/run.sh
 
+      # 20261031000200: carga masiva de ACTIVIDADES del catálogo (plantillas_tarea_cargo)
+      # desde una plantilla propia, con insumos, herramientas y equipo por NOMBRE
+      # (columnas por tipo, «;», cantidad «x n», «!» obligatoria), y recursos EN BLOQUE
+      # (agregar / quitar a varias actividades a la vez, atómico). Vista previa
+      # validada en el servidor (cargo y servicio del catálogo, duración, área por
+      # nombre, checklist, recurso inexistente / ambiguo / inactivo / de otra
+      # categoría = error; actividad ya existente o repetida en el archivo = error),
+      # aplicar todo o nada re-evaluando, idempotente por huella, SECURITY INVOKER
+      # bajo la RLS del catálogo y de las puentes con el permiso de crear / editar
+      # de la pantalla; lotes escritos solo por las RPC. Con SESIONES REALES: el
+      # mismo lote aplicado a la vez y dos lotes con el mismo contenido a la vez.
+      # CONTROL NEGATIVO: ocho mutantes.
+      - name: Plantillas — carga masiva de actividades y recursos en bloque
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55565
+        run: supabase/tests/plantillas_importacion/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

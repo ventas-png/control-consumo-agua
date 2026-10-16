@@ -84,6 +84,67 @@ export interface PlantillaTareaHerramienta {
   inventario_estado?: string
 }
 
+// ── Carga masiva de actividades y recursos en bloque (20261031000200) ────────
+
+/** Fila evaluada por el servidor (`plantillas_import_evaluar`). */
+export interface FilaImportacionActividad {
+  fila: number
+  origen: Record<string, string>
+  /** Datos normalizados por el servidor; null si la fila tiene errores. */
+  datos: {
+    titulo: string
+    cargo: string
+    servicio: ServicioOperativo
+    descripcion: string | null
+    instrucciones_seguridad: string | null
+    duracion_estimada_min: number | null
+    icono: string
+    area: string | null
+    area_id: string | null
+    orden: number
+    requiere_foto: boolean
+    requiere_comentario: boolean
+    requiere_checklist: boolean
+    checklist: string[]
+    recursos: {
+      suministros: { id: string; nombre: string; cantidad: number }[]
+      inventario: { id: string; nombre: string; categoria: 'herramienta' | 'equipo'; cantidad: number; obligatoria: boolean }[]
+    }
+    n_recursos: number
+  } | null
+  errores: { campo: string; mensaje: string }[]
+  advertencias: { campo: string; mensaje: string }[]
+}
+
+export interface VistaPreviaImportacionActividades {
+  lote_id: string
+  project_id: string
+  resumen: { total: number; validas: number; con_error: number; duplicado_de_lote_aplicado: boolean }
+  filas: FilaImportacionActividad[]
+}
+
+export interface ResultadoImportacionActividades {
+  lote_id: string
+  project_id: string
+  actividades_creadas: number
+  plantilla_ids: string[]
+  insumos_vinculados: number
+  herramientas_vinculadas: number
+  reutilizada: boolean
+}
+
+/** Respuesta de `plantillas_recursos_en_bloque`. */
+export interface ResultadoRecursosBloque {
+  accion: 'agregar' | 'quitar'
+  plantillas: number
+  recursos: number
+  pares: number
+  agregados: number
+  ya_estaban: number
+  quitados: number
+  no_estaban: number
+}
+
 // ── Rutinas de limpieza (20260907000200) ─────────────────────────────────────
 
 /**

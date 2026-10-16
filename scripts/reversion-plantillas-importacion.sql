@@ -1,0 +1,51 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- Recuperación tras desplegar 20261031000200 (carga masiva de actividades y recursos en bloque)
+-- ════════════════════════════════════════════════════════════════════════════
+-- NO se ejecuta sola ni en CI. Leer antes de correr. Regla general: ante un problema,
+-- preferir AVANZAR con una migración nueva. Las actividades ya importadas y los recursos
+-- asignados en bloque son filas normales de `plantillas_tarea_cargo` y de las puentes
+-- (con `creado_por` sellado): ninguna sección las toca.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── A) Cerrar la carga masiva y el bloque a la API sin perder el historial de lotes ──
+-- La pantalla deja de poder previsualizar/aplicar y de asignar en bloque; los lotes y
+-- sus filas quedan como registro. Para reanudar: GRANT EXECUTE … TO authenticated.
+-- BEGIN;
+-- REVOKE EXECUTE ON FUNCTION public.plantillas_importar_previsualizar(uuid, jsonb, text) FROM authenticated;
+-- REVOKE EXECUTE ON FUNCTION public.plantillas_importar_aplicar(uuid) FROM authenticated;
+-- REVOKE EXECUTE ON FUNCTION public.plantillas_importar_descartar(uuid) FROM authenticated;
+-- REVOKE EXECUTE ON FUNCTION public.plantillas_recursos_en_bloque(uuid, uuid[], text, jsonb, jsonb) FROM authenticated;
+-- COMMIT;
+
+-- ── B) Localizar lo que importó un lote (solo lectura) ─────────────────────────
+-- SELECT l.id, l.project_id, l.archivo_nombre, l.estado, l.aplicado_at, l.aplicado_por,
+--        l.resultado->>'actividades_creadas' AS creadas
+--   FROM public.plantillas_importaciones l ORDER BY l.created_at DESC LIMIT 50;
+-- SELECT p.* FROM public.plantillas_tarea_cargo p
+--  WHERE p.id::text IN (SELECT jsonb_array_elements_text(l.resultado->'plantilla_ids')
+--                         FROM public.plantillas_importaciones l WHERE l.id = '<lote>');
+-- Si un lote se cargó por error, las actividades se desactivan o eliminan desde el
+-- catálogo (con el permiso correspondiente), nunca con un DELETE masivo desde aquí.
+-- Los recursos agregados en bloque se quitan con la misma acción en bloque («Quitar»).
+
+-- ── C) Revertir EXACTAMENTE el esquema (pierde el historial de lotes) ──────────
+-- Antes, guardar una copia:
+--   CREATE TABLE public.zz_respaldo_plantillas_importaciones AS SELECT * FROM public.plantillas_importaciones;
+--   CREATE TABLE public.zz_respaldo_plantillas_importacion_filas AS SELECT * FROM public.plantillas_importacion_filas;
+-- BEGIN;
+-- DROP FUNCTION IF EXISTS public.plantillas_recursos_en_bloque(uuid, uuid[], text, jsonb, jsonb);
+-- DROP FUNCTION IF EXISTS public.plantillas_importar_previsualizar(uuid, jsonb, text);
+-- DROP FUNCTION IF EXISTS public.plantillas_importar_aplicar(uuid);
+-- DROP FUNCTION IF EXISTS public.plantillas_importar_descartar(uuid);
+-- DROP FUNCTION IF EXISTS public.plantillas_import_evaluar(uuid, uuid, jsonb, int);
+-- DROP FUNCTION IF EXISTS public.plantillas_import_partir_recursos(text);
+-- DROP TABLE IF EXISTS public.plantillas_importacion_filas;
+-- DROP TABLE IF EXISTS public.plantillas_importaciones;
+-- DROP FUNCTION IF EXISTS public.plantillas_tg_imp_solo_rpc();
+-- DROP FUNCTION IF EXISTS public.plantillas_import_puede_crear();
+-- DROP FUNCTION IF EXISTS public.plantillas_puede_editar();
+-- COMMIT;
+
+-- ── D) Comprobaciones posteriores (solo lectura) ────────────────────────────────
+-- SELECT proname FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname LIKE 'plantillas\_%' ORDER BY 1;
+-- SELECT estado, count(*) FROM public.plantillas_importaciones GROUP BY 1;
