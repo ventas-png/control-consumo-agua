@@ -104,7 +104,8 @@ describe('PersonalTab — cargos y turnos desde el catálogo del condominio', ()
     fireEvent.change(screen.getByLabelText('Turno del empleado'), { target: { value: 'fin_semana' } })
     fireEvent.click(screen.getByText('Agregar'))
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
-    expect(mocks.createCondominioRow.mock.calls[0][1]).toMatchObject({ cargo: 'supervisor_piscina', turno: 'fin_semana' })
+    const [, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    expect(payload).toMatchObject({ cargo: 'supervisor_piscina', turno: 'fin_semana' })
   })
 
   it('una ficha con un cargo apagado lo conserva marcado «(inactivo)» y avisa', async () => {
