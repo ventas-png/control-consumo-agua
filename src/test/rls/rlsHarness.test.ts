@@ -471,6 +471,36 @@ const PORTAL_SOLICITUD_RENTA_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }
   },
 ]
 
+// ── RPC del registro de mascotas y vehículos (20261101000000) ────────────────
+// Misma forma que las de la solicitud de renta: el residente no escribe
+// `mascotas` ni `vehiculos_residentes` (sus policies exigen el permiso del tab),
+// así que estas RPC son su única vía. Los ids de fila inexistentes bastan: el
+// gate de ROL rechaza a un usuario de staff ANTES de mirar la fila.
+const PORTAL_PADRON_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
+  { name: 'portal_reservar_mascota', args: (b) => ({ p_unidad_id: b.unidadId }) },
+  {
+    name: 'portal_enviar_mascota',
+    args: () => ({
+      p_mascota_id: SOLICITUD_ID_INEXISTENTE,
+      p_datos: { nombre: 'Intruso RLS', especie: 'otro', vacunas: [] },
+      p_documentos: [],
+    }),
+  },
+  { name: 'portal_descartar_mascota', args: () => ({ p_mascota_id: SOLICITUD_ID_INEXISTENTE }) },
+  { name: 'portal_baja_mascota', args: () => ({ p_mascota_id: SOLICITUD_ID_INEXISTENTE }) },
+  { name: 'portal_reservar_vehiculo', args: (b) => ({ p_unidad_id: b.unidadId }) },
+  {
+    name: 'portal_enviar_vehiculo',
+    args: () => ({
+      p_vehiculo_id: SOLICITUD_ID_INEXISTENTE,
+      p_datos: { placa: 'RLS-000', tipo: 'auto' },
+      p_documentos: [],
+    }),
+  },
+  { name: 'portal_descartar_vehiculo', args: () => ({ p_vehiculo_id: SOLICITUD_ID_INEXISTENTE }) },
+  { name: 'portal_baja_vehiculo', args: () => ({ p_vehiculo_id: SOLICITUD_ID_INEXISTENTE }) },
+]
+
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -1199,6 +1229,27 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   // residente insertando su propia solicitud ya 'aprobada'.
   describe('guard RPCs de solicitud de renta (20260829000200) — garantía de ROL', () => {
     for (const { name, args } of PORTAL_SOLICITUD_RENTA_RPCS) {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args(B))
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+
+      it(`${idEvidencia(name, 'authenticated-cross-tenant')} authenticated (A) NO puede ejecutar ${name} sobre datos ajenos`, async () => {
+        const { data, error } = await userA.rpc(name, args(B))
+        expect(error, `${name} sobre datos ajenos debe fallar`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
+      })
+    }
+  })
+
+  // ────────────────────────────────────────────────────────────────────────
+  // guard RPCs del registro de mascotas y vehículos (20261101000000)
+  // ────────────────────────────────────────────────────────────────────────
+  // Única vía de escritura del residente sobre el padrón: si su gate de rol
+  // cediera, un usuario podría registrar (o dar de baja) en una unidad ajena.
+  describe('guard RPCs del registro de mascotas y vehículos (20261101000000) — garantía de ROL', () => {
+    for (const { name, args } of PORTAL_PADRON_RPCS) {
       it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()

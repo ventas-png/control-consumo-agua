@@ -2,9 +2,9 @@
 // (ImageUploader, FileUploader). Bucket privado `condominios-media`; se persiste
 // el path bare y SecureImage/useSignedUrl firma al render. T7/PR3.
 import { supabase } from '../../lib/supabase'
-import { BUCKET_MEDIA } from './buckets'
+import { BUCKET_MEDIA, BUCKET_PADRON_DOCS } from './buckets'
 
-export { BUCKET_MEDIA, BUCKET_EVIDENCIAS } from './buckets'
+export { BUCKET_MEDIA, BUCKET_EVIDENCIAS, BUCKET_PADRON_DOCS } from './buckets'
 
 /** Opciones de subida (subconjunto de FileOptions de supabase-js). */
 export interface UploadMediaOptions {
@@ -81,5 +81,27 @@ export async function uploadRentaDoc(
 export async function removeRentaDocs(paths: string[]): Promise<{ error: string | null }> {
   if (paths.length === 0) return { error: null }
   const { error } = await supabase.storage.from('renta-docs').remove(paths)
+  return { error: error?.message ?? null }
+}
+
+/**
+ * Sube un adjunto del registro de mascota/vehículo al bucket privado
+ * `padron-docs`. El path DEBE ser `{unidad_id}/{mascotas|vehiculos}/{fila_id}/…`:
+ * la policy del bucket (20261101000000) solo acepta escrituras de quien registró
+ * la fila y mientras sigue en borrador.
+ */
+export async function uploadPadronDoc(
+  path: string,
+  body: Blob | File,
+  options?: UploadMediaOptions,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.storage.from(BUCKET_PADRON_DOCS).upload(path, body, options)
+  return { error: error?.message ?? null }
+}
+
+/** Elimina adjuntos del bucket `padron-docs` (solo mientras el borrador vive). */
+export async function removePadronDocs(paths: string[]): Promise<{ error: string | null }> {
+  if (paths.length === 0) return { error: null }
+  const { error } = await supabase.storage.from(BUCKET_PADRON_DOCS).remove(paths)
   return { error: error?.message ?? null }
 }

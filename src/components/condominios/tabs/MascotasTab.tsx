@@ -7,6 +7,8 @@ import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
+import { estadoDe } from '../PadronComun'
+import { SolicitudesMascotasPanel, VistaPadronToggle, esSolicitudPortal } from './SolicitudesPadronPanel'
 
 interface Props {
   mascotas: Mascota[]
@@ -33,6 +35,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
   const [filtroEspecie, setFiltroEspecie] = useState<EspecieMascota | 'todos'>('todos')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  const [vista, setVista] = useState<'padron' | 'solicitudes'>('padron')
   const [form, setForm] = useState({
     unidad_id: '', nombre: '', especie: 'perro' as EspecieMascota,
     raza: '', color: '', fecha_nacimiento: '', fecha_ultima_vacuna: '', notas: '',
@@ -40,13 +43,18 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
 
   const hoy = hoyLocalISO()
 
-  const filtradas = mascotas.filter(m => {
+  // El padrón son las AUTORIZADAS: lo que el residente envía desde el portal
+  // (20261101000000) vive en la vista Solicitudes hasta que se resuelve.
+  const padron = mascotas.filter(m => estadoDe(m) === 'aprobada')
+  const pendientesPortal = mascotas.filter(m => esSolicitudPortal(m) && estadoDe(m) === 'pendiente').length
+
+  const filtradas = padron.filter(m => {
     const matchEspecie = filtroEspecie === 'todos' || m.especie === filtroEspecie
     return matchEspecie && m.activo
   })
 
   // Alert for overdue vaccines (>1 year)
-  const vencidasVacuna = mascotas.filter(m => {
+  const vencidasVacuna = padron.filter(m => {
     if (!m.fecha_ultima_vacuna || !m.activo) return false
     return (diasEntreFechasCalendario(m.fecha_ultima_vacuna, hoy) ?? 0) > 365
   })
@@ -101,15 +109,20 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>{t('condominios.mascotas.title')}</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>{t('condominios.mascotas.subtitle', { count: mascotas.filter(m => m.activo).length })}</p>
+          <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>{t('condominios.mascotas.subtitle', { count: padron.filter(m => m.activo).length })}</p>
         </div>
-        {canCreate && (
+        {canCreate && vista === 'padron' && (
           <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             {t('condominios.mascotas.new_button')}
           </button>
         )}
       </div>
 
+      <VistaPadronToggle vista={vista} onChange={setVista} pendientes={pendientesPortal} />
+
+      {vista === 'solicitudes' ? (
+        <SolicitudesMascotasPanel mascotas={mascotas} unidades={unidades} canEdit={canEdit} onRefresh={onRefresh} />
+      ) : <>
       {/* Vacunas vencidas */}
       {vencidasVacuna.length > 0 && (
         <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -261,6 +274,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
           },
         ] satisfies DataTableColumn<Mascota>[]}
       />
+      </>}
     </div>
   )
 }

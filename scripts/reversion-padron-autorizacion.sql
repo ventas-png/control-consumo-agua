@@ -1,0 +1,96 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- Recuperación tras desplegar 20261101000000 (autorización de mascotas y
+-- vehículos desde el portal)
+-- ════════════════════════════════════════════════════════════════════════════
+-- NO se ejecuta sola ni en CI. Leer antes de correr. Regla general: ante un
+-- problema, preferir AVANZAR con una migración nueva. Las filas que el staff
+-- cargó antes siguen 'aprobada' y activas: el padrón existente no depende de
+-- nada de esta migración.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── A) Cerrar el registro desde el portal sin perder lo ya registrado ─────────
+-- El portal deja de poder reservar/enviar; lo pendiente se puede seguir
+-- resolviendo desde el panel. Para reanudar: GRANT EXECUTE … TO authenticated.
+-- BEGIN;
+-- REVOKE EXECUTE ON FUNCTION public.portal_reservar_mascota(uuid)                FROM authenticated;
+-- REVOKE EXECUTE ON FUNCTION public.portal_enviar_mascota(uuid, jsonb, jsonb)    FROM authenticated;
+-- REVOKE EXECUTE ON FUNCTION public.portal_reservar_vehiculo(uuid)               FROM authenticated;
+-- REVOKE EXECUTE ON FUNCTION public.portal_enviar_vehiculo(uuid, jsonb, jsonb)   FROM authenticated;
+-- COMMIT;
+
+-- ── B) Ver lo que llegó por el portal (solo lectura) ──────────────────────────
+-- SELECT 'mascota' AS tipo, estado, count(*) FROM public.mascotas
+--  WHERE cliente_id IS NOT NULL GROUP BY 1, 2
+-- UNION ALL
+-- SELECT 'vehiculo', estado, count(*) FROM public.vehiculos_residentes
+--  WHERE cliente_id IS NOT NULL GROUP BY 1, 2;
+
+-- ── C) Revertir EXACTAMENTE el esquema (pierde el circuito y la ficha ampliada) ─
+-- Antes, guardar una copia y decidir qué hacer con lo no aprobado: al soltar
+-- `estado`, una fila 'pendiente'/'rechazada' quedaría como un registro más del
+-- padrón (inactiva, porque la base ya la tenía en activo=false).
+--   CREATE TABLE public.zz_respaldo_mascotas  AS SELECT * FROM public.mascotas;
+--   CREATE TABLE public.zz_respaldo_vehiculos AS SELECT * FROM public.vehiculos_residentes;
+--   DELETE FROM public.mascotas             WHERE estado IN ('borrador', 'pendiente', 'rechazada');
+--   DELETE FROM public.vehiculos_residentes WHERE estado IN ('borrador', 'pendiente', 'rechazada');
+-- BEGIN;
+-- DROP TRIGGER IF EXISTS trg_notif_solicitud_mascota  ON public.mascotas;
+-- DROP TRIGGER IF EXISTS trg_notif_solicitud_vehiculo ON public.vehiculos_residentes;
+-- DROP POLICY IF EXISTS "padron_docs_select" ON storage.objects;
+-- DROP POLICY IF EXISTS "padron_docs_insert" ON storage.objects;
+-- DROP POLICY IF EXISTS "padron_docs_update" ON storage.objects;
+-- DROP POLICY IF EXISTS "padron_docs_delete" ON storage.objects;
+-- DROP FUNCTION IF EXISTS public.padron_doc_escribible(text);
+-- DROP FUNCTION IF EXISTS public.padron_doc_legible(text);
+-- DROP FUNCTION IF EXISTS public.portal_reservar_mascota(uuid);
+-- DROP FUNCTION IF EXISTS public.portal_enviar_mascota(uuid, jsonb, jsonb);
+-- DROP FUNCTION IF EXISTS public.portal_descartar_mascota(uuid);
+-- DROP FUNCTION IF EXISTS public.portal_baja_mascota(uuid, text);
+-- DROP FUNCTION IF EXISTS public.portal_reservar_vehiculo(uuid);
+-- DROP FUNCTION IF EXISTS public.portal_enviar_vehiculo(uuid, jsonb, jsonb);
+-- DROP FUNCTION IF EXISTS public.portal_descartar_vehiculo(uuid);
+-- DROP FUNCTION IF EXISTS public.portal_baja_vehiculo(uuid, text);
+-- DROP FUNCTION IF EXISTS public.resolver_mascota(uuid, boolean, text);
+-- DROP FUNCTION IF EXISTS public.resolver_vehiculo(uuid, boolean, text, text, text);
+-- DROP FUNCTION IF EXISTS public.asignar_tag_vehiculo(uuid, text, text);
+-- DROP FUNCTION IF EXISTS public.padron_validar_documentos(jsonb, text);
+-- DROP FUNCTION IF EXISTS public.padron_puede_retirar(uuid, uuid);
+-- DROP FUNCTION IF EXISTS public.padron_avisar_residente(uuid, uuid, text, text, text, jsonb);
+-- DROP INDEX IF EXISTS public.idx_mascotas_borrador_residente;
+-- DROP INDEX IF EXISTS public.idx_vehiculos_borrador_residente;
+-- DROP INDEX IF EXISTS public.idx_vehiculos_tag_unico;
+-- DROP INDEX IF EXISTS public.idx_mascotas_estado;
+-- DROP INDEX IF EXISTS public.idx_vehiculos_estado;
+-- ALTER TABLE public.mascotas
+--   DROP CONSTRAINT IF EXISTS mascotas_estado_check,
+--   DROP CONSTRAINT IF EXISTS mascotas_activo_solo_aprobada,
+--   DROP CONSTRAINT IF EXISTS mascotas_documentos_check,
+--   DROP CONSTRAINT IF EXISTS mascotas_vacunas_check,
+--   DROP CONSTRAINT IF EXISTS mascotas_sexo_check,
+--   DROP CONSTRAINT IF EXISTS mascotas_tamano_check,
+--   DROP CONSTRAINT IF EXISTS mascotas_peso_check,
+--   DROP COLUMN IF EXISTS estado, DROP COLUMN IF EXISTS cliente_id, DROP COLUMN IF EXISTS documentos,
+--   DROP COLUMN IF EXISTS fecha_solicitud, DROP COLUMN IF EXISTS fecha_resolucion,
+--   DROP COLUMN IF EXISTS comentario_admin, DROP COLUMN IF EXISTS resuelto_por,
+--   DROP COLUMN IF EXISTS resuelto_por_user_id, DROP COLUMN IF EXISTS sexo, DROP COLUMN IF EXISTS peso_kg,
+--   DROP COLUMN IF EXISTS tamano, DROP COLUMN IF EXISTS esterilizada, DROP COLUMN IF EXISTS microchip,
+--   DROP COLUMN IF EXISTS vacunas, DROP COLUMN IF EXISTS fecha_ultima_desparasitacion,
+--   DROP COLUMN IF EXISTS veterinario, DROP COLUMN IF EXISTS veterinario_telefono;
+-- ALTER TABLE public.vehiculos_residentes
+--   DROP CONSTRAINT IF EXISTS vehiculos_residentes_estado_check,
+--   DROP CONSTRAINT IF EXISTS vehiculos_residentes_activo_solo_aprobada,
+--   DROP CONSTRAINT IF EXISTS vehiculos_residentes_documentos_check,
+--   DROP CONSTRAINT IF EXISTS vehiculos_residentes_tag_tipo_check,
+--   DROP COLUMN IF EXISTS estado, DROP COLUMN IF EXISTS cliente_id, DROP COLUMN IF EXISTS documentos,
+--   DROP COLUMN IF EXISTS fecha_solicitud, DROP COLUMN IF EXISTS fecha_resolucion,
+--   DROP COLUMN IF EXISTS comentario_admin, DROP COLUMN IF EXISTS resuelto_por,
+--   DROP COLUMN IF EXISTS resuelto_por_user_id, DROP COLUMN IF EXISTS tag_codigo,
+--   DROP COLUMN IF EXISTS tag_tipo, DROP COLUMN IF EXISTS tag_asignado_at;
+-- COMMIT;
+-- El bucket `padron-docs` se deja (puede tener archivos); vaciarlo desde el
+-- panel de Storage si se decide retirarlo.
+
+-- ── D) Comprobaciones posteriores (solo lectura) ──────────────────────────────
+-- SELECT proname FROM pg_proc WHERE pronamespace = 'public'::regnamespace
+--    AND (proname LIKE 'portal\_%mascota%' OR proname LIKE 'portal\_%vehiculo%' OR proname LIKE 'padron\_%');
+-- SELECT conname FROM pg_constraint WHERE conrelid IN ('public.mascotas'::regclass, 'public.vehiculos_residentes'::regclass);

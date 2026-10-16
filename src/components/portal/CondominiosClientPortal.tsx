@@ -22,6 +22,8 @@ import { PortalVisitantesTab } from '../condominios/tabs/PortalVisitantesTab'
 import { PortalAnunciosTab }   from '../condominios/tabs/PortalAnunciosTab'
 import { PortalRentasTab }     from '../condominios/tabs/PortalRentasTab'
 import { PortalMudanzaTab }    from '../condominios/tabs/PortalMudanzaTab'
+import { PortalMascotasTab }   from '../condominios/tabs/PortalMascotasTab'
+import { PortalVehiculosTab }  from '../condominios/tabs/PortalVehiculosTab'
 import { PortalPaquetesTab }   from '../condominios/tabs/PortalPaquetesTab'
 import { PortalCorrespondenciaTab } from '../condominios/tabs/PortalCorrespondenciaTab'
 import { MediaScopeProvider }  from '../shared/MediaScopeContext'
@@ -60,6 +62,9 @@ const SECCION_A_TAB: Record<string, PortalTab> = {
   cobros: 'cuenta',
   condominios_mantenimiento: 'tickets',
   condominios_visitantes: 'visitantes',
+  // Resolución de la administración sobre un registro (20261101000000).
+  mascotas: 'mascotas',
+  vehiculos: 'vehiculos',
 }
 
 // PORTAL_TABS y la visibilidad por rol viven en lib/portalTabs (módulo puro,
@@ -562,6 +567,22 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 proyectoId={proyectoId}
                 companyId={resolvedCompanyId}
                 clienteId={clienteId}
+              />
+            )}
+            {tab === 'mascotas' && (
+              <PortalMascotasTab
+                unidadId={selectedUnidadId}
+                unidadNombre={unidad.nombre}
+                clienteId={clienteId}
+                esPropietario={(unidad.rol ?? 'propietario') === 'propietario'}
+              />
+            )}
+            {tab === 'vehiculos' && (
+              <PortalVehiculosTab
+                unidadId={selectedUnidadId}
+                unidadNombre={unidad.nombre}
+                clienteId={clienteId}
+                esPropietario={(unidad.rol ?? 'propietario') === 'propietario'}
               />
             )}
             {tab === 'asambleas' && (

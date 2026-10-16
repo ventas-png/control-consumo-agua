@@ -12072,56 +12072,114 @@ export type Database = {
       mascotas: {
         Row: {
           activo: boolean
+          cliente_id: string | null
           color: string | null
+          comentario_admin: string | null
           company_id: string
           creado_por: string | null
           created_at: string
+          documentos: Json
           especie: string
+          estado: string
+          esterilizada: boolean | null
           fecha_nacimiento: string | null
+          fecha_resolucion: string | null
+          fecha_solicitud: string | null
+          fecha_ultima_desparasitacion: string | null
           fecha_ultima_vacuna: string | null
           foto_url: string | null
           id: string
+          microchip: string | null
           nombre: string
           notas: string | null
+          peso_kg: number | null
           project_id: string
           raza: string | null
+          resuelto_por: string | null
+          resuelto_por_user_id: string | null
+          sexo: string | null
+          tamano: string | null
           unidad_id: string
+          vacunas: Json
+          veterinario: string | null
+          veterinario_telefono: string | null
         }
         Insert: {
           activo?: boolean
+          cliente_id?: string | null
           color?: string | null
+          comentario_admin?: string | null
           company_id: string
           creado_por?: string | null
           created_at?: string
+          documentos?: Json
           especie?: string
+          estado?: string
+          esterilizada?: boolean | null
           fecha_nacimiento?: string | null
+          fecha_resolucion?: string | null
+          fecha_solicitud?: string | null
+          fecha_ultima_desparasitacion?: string | null
           fecha_ultima_vacuna?: string | null
           foto_url?: string | null
           id?: string
+          microchip?: string | null
           nombre: string
           notas?: string | null
+          peso_kg?: number | null
           project_id: string
           raza?: string | null
+          resuelto_por?: string | null
+          resuelto_por_user_id?: string | null
+          sexo?: string | null
+          tamano?: string | null
           unidad_id: string
+          vacunas?: Json
+          veterinario?: string | null
+          veterinario_telefono?: string | null
         }
         Update: {
           activo?: boolean
+          cliente_id?: string | null
           color?: string | null
+          comentario_admin?: string | null
           company_id?: string
           creado_por?: string | null
           created_at?: string
+          documentos?: Json
           especie?: string
+          estado?: string
+          esterilizada?: boolean | null
           fecha_nacimiento?: string | null
+          fecha_resolucion?: string | null
+          fecha_solicitud?: string | null
+          fecha_ultima_desparasitacion?: string | null
           fecha_ultima_vacuna?: string | null
           foto_url?: string | null
           id?: string
+          microchip?: string | null
           nombre?: string
           notas?: string | null
+          peso_kg?: number | null
           project_id?: string
           raza?: string | null
+          resuelto_por?: string | null
+          resuelto_por_user_id?: string | null
+          sexo?: string | null
+          tamano?: string | null
           unidad_id?: string
+          vacunas?: Json
+          veterinario?: string | null
+          veterinario_telefono?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "mascotas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "mascotas_company_id_fkey"
             columns: ["company_id"]
@@ -22264,52 +22322,92 @@ export type Database = {
         Row: {
           activo: boolean
           anio: number | null
+          cliente_id: string | null
           color: string | null
+          comentario_admin: string | null
           company_id: string
           creado_por: string | null
           created_at: string
+          documentos: Json
+          estado: string
+          fecha_resolucion: string | null
+          fecha_solicitud: string | null
           id: string
           marca: string | null
           modelo: string | null
           notas: string | null
           placa: string
           project_id: string
+          resuelto_por: string | null
+          resuelto_por_user_id: string | null
+          tag_asignado_at: string | null
+          tag_codigo: string | null
+          tag_tipo: string | null
           tipo: string
           unidad_id: string
         }
         Insert: {
           activo?: boolean
           anio?: number | null
+          cliente_id?: string | null
           color?: string | null
+          comentario_admin?: string | null
           company_id: string
           creado_por?: string | null
           created_at?: string
+          documentos?: Json
+          estado?: string
+          fecha_resolucion?: string | null
+          fecha_solicitud?: string | null
           id?: string
           marca?: string | null
           modelo?: string | null
           notas?: string | null
           placa: string
           project_id: string
+          resuelto_por?: string | null
+          resuelto_por_user_id?: string | null
+          tag_asignado_at?: string | null
+          tag_codigo?: string | null
+          tag_tipo?: string | null
           tipo?: string
           unidad_id: string
         }
         Update: {
           activo?: boolean
           anio?: number | null
+          cliente_id?: string | null
           color?: string | null
+          comentario_admin?: string | null
           company_id?: string
           creado_por?: string | null
           created_at?: string
+          documentos?: Json
+          estado?: string
+          fecha_resolucion?: string | null
+          fecha_solicitud?: string | null
           id?: string
           marca?: string | null
           modelo?: string | null
           notas?: string | null
           placa?: string
           project_id?: string
+          resuelto_por?: string | null
+          resuelto_por_user_id?: string | null
+          tag_asignado_at?: string | null
+          tag_codigo?: string | null
+          tag_tipo?: string | null
           tipo?: string
           unidad_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "vehiculos_residentes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "vehiculos_residentes_company_id_fkey"
             columns: ["company_id"]
@@ -23788,6 +23886,10 @@ export type Database = {
         Returns: Json
       }
       areas_normalizar_nombre: { Args: { p_nombre: string }; Returns: string }
+      asignar_tag_vehiculo: {
+        Args: { p_tag_codigo: string; p_tag_tipo?: string; p_vehiculo_id: string }
+        Returns: undefined
+      }
       assert_company_scope: {
         Args: { p_company_id: string }
         Returns: undefined
@@ -25460,6 +25562,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      padron_doc_escribible: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      padron_doc_legible: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
       paquete_autorizar_salida: {
         Args: {
           p_autorizado_documento?: string
@@ -25623,6 +25733,46 @@ export type Database = {
       hk_recordatorios_previos: {
         Args: { p_ventana?: string; p_ahora?: string }
         Returns: number
+      }
+      portal_baja_mascota: {
+        Args: { p_mascota_id: string; p_motivo?: string }
+        Returns: string
+      }
+      portal_baja_vehiculo: {
+        Args: { p_motivo?: string; p_vehiculo_id: string }
+        Returns: string
+      }
+      portal_descartar_mascota: {
+        Args: { p_mascota_id: string }
+        Returns: undefined
+      }
+      portal_descartar_vehiculo: {
+        Args: { p_vehiculo_id: string }
+        Returns: undefined
+      }
+      portal_enviar_mascota: {
+        Args: { p_datos: Json; p_documentos?: Json; p_mascota_id: string }
+        Returns: string
+      }
+      portal_enviar_vehiculo: {
+        Args: { p_datos: Json; p_documentos?: Json; p_vehiculo_id: string }
+        Returns: string
+      }
+      portal_reservar_mascota: {
+        Args: { p_unidad_id: string }
+        Returns: string
+      }
+      portal_reservar_vehiculo: {
+        Args: { p_unidad_id: string }
+        Returns: string
+      }
+      resolver_mascota: {
+        Args: { p_aprobar: boolean; p_comentario?: string; p_mascota_id: string }
+        Returns: undefined
+      }
+      resolver_vehiculo: {
+        Args: { p_aprobar: boolean; p_comentario?: string; p_tag_codigo?: string; p_tag_tipo?: string; p_vehiculo_id: string }
+        Returns: undefined
       }
       str_import_puede_crear: {
         Args: Record<PropertyKey, never>

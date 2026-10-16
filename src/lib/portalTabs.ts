@@ -5,7 +5,7 @@
 export type PortalTab =
   | 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'paquetes'
   | 'correspondencia'
-  | 'anuncios' | 'rentas' | 'mudanza' | 'asambleas' | 'transparencia'
+  | 'anuncios' | 'rentas' | 'mudanza' | 'mascotas' | 'vehiculos' | 'asambleas' | 'transparencia'
 
 export const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'mi_unidad',     label: 'Mi Unidad',       icon: '🏠' },
@@ -20,6 +20,8 @@ export const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'transparencia', label: 'Transparencia',   icon: '📊' },
   { id: 'rentas',        label: 'Rentas',          icon: '🏨' },
   { id: 'mudanza',       label: 'Mudanzas',        icon: '🚛' },
+  { id: 'mascotas',      label: 'Mascotas',        icon: '🐾' },
+  { id: 'vehiculos',     label: 'Vehículos',       icon: '🚗' },
 ]
 
 // Tabs OPERATIVOS: lo que un residente no-propietario puede hacer en la unidad.
@@ -31,9 +33,12 @@ export const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
 // 'correspondencia' entra aquí junto a 'paquetes': lo que llega a la unidad es
 // del que la habita, y el RLS solo le proyecta las piezas de SU unidad (la
 // dirigida a la administración no lleva unidad_id y nunca le llega).
+// 'mascotas' y 'vehiculos' también: la mascota y el carro son de quien vive en
+// la unidad. Las RPC de 20261101000000 dejan registrar a cualquier residente
+// (mis_unidades_ids) y retirar/dar de baja a quien registró o al propietario.
 const TABS_NO_PROPIETARIO: readonly PortalTab[] = [
   'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes',
-  'correspondencia', 'anuncios', 'mudanza',
+  'correspondencia', 'anuncios', 'mudanza', 'mascotas', 'vehiculos',
 ]
 
 /**

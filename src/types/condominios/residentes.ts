@@ -3,6 +3,7 @@
 // ./index.ts re-exporta todo, así que la superficie pública no cambia.
 
 import type { TipoResidente } from './operaciones'
+import type { AutorizacionPadron } from './seguridad'
 
 /**
  * Membresía de un residente en una unidad (portal propietario/inquilino · fase 1).
@@ -688,7 +689,10 @@ export interface SeguimientoAcuerdo {
 }
 
 export type TipoVehiculo = 'auto' | 'moto' | 'camion' | 'otro'
-export interface VehiculoResidente {
+/** Medio físico del TAG de ingreso. Espeja el CHECK de 20261101000000. */
+export type TipoTagVehiculo = 'sticker' | 'rfid' | 'tarjeta' | 'control' | 'otro'
+
+export interface VehiculoResidente extends AutorizacionPadron {
   id: string
   company_id: string
   project_id: string
@@ -702,6 +706,10 @@ export interface VehiculoResidente {
   activo: boolean
   notas?: string | null
   created_at: string
+  /** TAG de ingreso que asigna la administración (único por proyecto). */
+  tag_codigo?: string | null
+  tag_tipo?: TipoTagVehiculo | null
+  tag_asignado_at?: string | null
 }
 
 export type TipoEventoComunidad = 'cultural' | 'deportivo' | 'social' | 'informativo' | 'otro'

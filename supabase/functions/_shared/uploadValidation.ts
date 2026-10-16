@@ -129,6 +129,7 @@ export const BUCKET_POLICIES: Record<string, BucketPolicy> = {
   'condominios-media': { maxBytes: 10 * MiB, allowSvg: false },
   'mudanza-docs': { maxBytes: 10 * MiB, allowSvg: false },
   'renta-docs': { maxBytes: 10 * MiB, allowSvg: false },
+  'padron-docs': { maxBytes: 10 * MiB, allowSvg: false },
   'pagos-comprobantes': { maxBytes: 10 * MiB, allowSvg: false },
   'registro-fotos': { maxBytes: 10 * MiB, allowSvg: false },
   'conv-attachments': { maxBytes: 10 * MiB, allowSvg: false },
