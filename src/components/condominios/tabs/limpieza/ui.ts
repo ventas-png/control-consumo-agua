@@ -9,6 +9,7 @@ import type {
   TurnoPersonal,
   CargoPersonal,
 } from '../../../../types'
+import { CARGOS_DEFAULT, TURNOS_DEFAULT } from '../../../../domain/condominios/rrhhCatalogos'
 
 export const inputStyle: CSSProperties = {
   width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)',
@@ -41,20 +42,17 @@ export const FRECUENCIA_LABEL: Record<FrecuenciaLimpieza, { label: string; bg: s
   mensual:   { label: 'Mensual',   bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
 }
 
-export const TURNO_LABEL: Record<TurnoPersonal, { label: string; icon: string }> = {
-  diurno:    { label: 'Diurno',    icon: '☀️' },
-  nocturno:  { label: 'Nocturno',  icon: '🌙' },
-  rotativo:  { label: 'Rotativo',  icon: '🔄' },
-}
+/**
+ * @deprecated Los turnos y cargos salen del catálogo del condominio
+ * (ctx.tiposTurno / ctx.cargosPersonal) con etiquetaTurno / etiquetaCargo de
+ * domain/condominios/rrhhCatalogos. Esto es sólo el fallback de siempre.
+ */
+export const TURNO_LABEL: Record<TurnoPersonal, { label: string; icon: string }> =
+  Object.fromEntries(TURNOS_DEFAULT.map(t => [t.codigo, { label: t.nombre, icon: t.icono }]))
 
-export const CARGO_LABEL: Record<CargoPersonal, string> = {
-  conserje: 'Conserje',
-  guardia: 'Guardia',
-  jardinero: 'Jardinero',
-  mantenimiento: 'Mantenimiento',
-  administrador: 'Administrador',
-  otro: 'Otro',
-}
+/** @deprecated Ver TURNO_LABEL: usar etiquetaCargo(codigo, ctx.cargosPersonal). */
+export const CARGO_LABEL: Record<CargoPersonal, string> =
+  Object.fromEntries(CARGOS_DEFAULT.map(c => [c.codigo, c.nombre]))
 
 export const ESTADO_EJECUCION: Record<EstadoEjecucionLimpieza, {
   label: string; icon: string; bg: string; border: string; color: string

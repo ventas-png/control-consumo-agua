@@ -2,16 +2,28 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchUsuariosAsignablesPersonal } from '../../../domain/condominios/tabQueries'
 import type {
-  PersonalCondominio, CargoPersonal, EstadoPersonal, TurnoPersonal,
+  PersonalCondominio, EstadoPersonal,
   ContactoEmergenciaPersonal, CodigoAccesoPersonal, EquipoAsignadoPersonal,
-  UsuarioAsignablePersonal,
+  UsuarioAsignablePersonal, CargoCatalogo, TipoTurnoCatalogo,
 } from '../../../types'
+import {
+  CARGOS_DEFAULT, TURNOS_DEFAULT, etiquetaCargo, iconoCargo, etiquetaTurno, iconoTurno,
+  opcionesSelect, primerActivo, mensajeErrorCatalogo,
+} from '../../../domain/condominios/rrhhCatalogos'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   personal: PersonalCondominio[]
+  /**
+   * Catálogos del condominio (Recursos Humanos → Configuración). Los selects
+   * ofrecen sólo los ACTIVOS; una ficha con un valor apagado o legado lo
+   * conserva marcado. Sin catálogo (entorno sin la migración) se ofrecen los
+   * seis cargos y tres turnos de siempre.
+   */
+  cargos?: CargoCatalogo[]
+  tiposTurno?: TipoTurnoCatalogo[]
   proyectoId: string
   companyId: string
   moneda: string
@@ -19,15 +31,6 @@ interface Props {
   canEdit: boolean
   onRefresh: () => void
 }
-
-const CARGOS: { value: CargoPersonal; label: string; icon: string }[] = [
-  { value: 'conserje',       label: 'Conserje',       icon: '🧹' },
-  { value: 'guardia',        label: 'Guardia',        icon: '💂' },
-  { value: 'jardinero',      label: 'Jardinero',      icon: '🌿' },
-  { value: 'mantenimiento',  label: 'Mantenimiento',  icon: '🔧' },
-  { value: 'administrador',  label: 'Administrador',  icon: '👔' },
-  { value: 'otro',           label: 'Otro',           icon: '👤' },
-]
 
 const ESTADO_CONFIG: Record<EstadoPersonal, { label: string; color: string; bg: string }> = {
   activo:      { label: 'Activo',      color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
@@ -43,9 +46,9 @@ const TIPOS_CONTRATO = ['Planilla (indefinido)', 'Plazo fijo', 'Por servicios', 
 const TIPOS_CUENTA   = ['Monetaria', 'Ahorro']
 const TIPOS_CODIGO   = ['Tarjeta', 'Llavero / TAG', 'PIN', 'Control remoto', 'App', 'Otro']
 
-const blank = (): Partial<PersonalCondominio> => ({
-  nombre: '', cargo: 'conserje', telefono: '', email: '',
-  fecha_ingreso: '', fecha_nacimiento: '', turno: 'diurno', estado: 'activo',
+const blank = (cargo: string, turno: string): Partial<PersonalCondominio> => ({
+  nombre: '', cargo, telefono: '', email: '',
+  fecha_ingreso: '', fecha_nacimiento: '', turno, estado: 'activo',
   salario: undefined, dpi: '', notas: '', foto_url: null,
   contactos_emergencia: [], numero_igss: '', numero_irtra: '', nit: '',
   tags: [], codigos_acceso: [], equipo_asignado: [],
@@ -62,13 +65,18 @@ function mensajeGuardado(raw: string): string {
   if (raw.includes('personal_condominio_user_unico_por_proyecto')) {
     return 'Esa cuenta ya está vinculada a otro empleado de este condominio. Recarga la lista y elige otra.'
   }
+  // RRHH_CARGO: / RRHH_TURNO: (20261031000300): el valor no está activo en el
+  // catálogo del condominio. Se muestra el hecho, sin el prefijo técnico.
+  if (/RRHH_(CARGO|TURNO):/.test(raw)) return mensajeErrorCatalogo({ message: raw }, /RRHH_TURNO:/.test(raw) ? 'turno' : 'cargo')
   return raw
 }
 
-export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
-  const [filtroCargo, setFiltroCargo] = useState<CargoPersonal | 'todos'>('todos')
+export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+  const cargoInicial = primerActivo(cargos, CARGOS_DEFAULT)
+  const turnoInicial = primerActivo(tiposTurno, TURNOS_DEFAULT)
+  const [filtroCargo, setFiltroCargo] = useState<string>('todos')
   const [filtroEstado, setFiltroEstado] = useState<EstadoPersonal | 'todos'>('activo')
-  const [form, setForm] = useState<Partial<PersonalCondominio>>(blank())
+  const [form, setForm] = useState<Partial<PersonalCondominio>>(() => blank(cargoInicial, turnoInicial))
   const [editId, setEditId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -159,7 +167,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
     setEditId(p.id); setShowForm(true)
   }
 
-  function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()); setTagInput('') }
+  function cancelForm() { setShowForm(false); setEditId(null); setForm(blank(cargoInicial, turnoInicial)); setTagInput('') }
 
   async function handleSave() {
     if (!form.nombre?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el nombre.' })
@@ -169,11 +177,11 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
     const cleanEquipos = (form.equipo_asignado ?? []).filter(e => e.item?.trim())
     const payload = {
       company_id: companyId, project_id: proyectoId,
-      nombre: form.nombre!.trim(), cargo: form.cargo ?? 'conserje',
+      nombre: form.nombre!.trim(), cargo: form.cargo ?? cargoInicial,
       telefono: form.telefono || null, email: form.email || null,
       fecha_ingreso: form.fecha_ingreso || null,
       fecha_nacimiento: form.fecha_nacimiento || null,
-      turno: form.turno ?? 'diurno',
+      turno: form.turno ?? turnoInicial,
       estado: form.estado ?? 'activo', salario: form.salario ?? null,
       dpi: form.dpi || null, notas: form.notas || null,
       foto_url: form.foto_url || null,
@@ -219,8 +227,24 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
     setExpanded(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  const cargoInfo = (c: CargoPersonal) => CARGOS.find(x => x.value === c) ?? CARGOS[CARGOS.length - 1]
-  const turnoLabel: Record<TurnoPersonal, string> = { diurno: '☀️ Diurno', nocturno: '🌙 Nocturno', rotativo: '🔄 Rotativo' }
+  // Etiquetas e íconos desde el catálogo del condominio; un código apagado o
+  // legado se sigue mostrando (con su nombre de siempre o el código crudo).
+  const cargoInfo = (c: string) => ({ label: etiquetaCargo(c, cargos), icon: iconoCargo(c, cargos) })
+  const turnoLabel = (t: string) => `${iconoTurno(t, tiposTurno)} ${etiquetaTurno(t, tiposTurno)}`
+  const opcionesCargo = opcionesSelect(cargos, form.cargo, CARGOS_DEFAULT)
+  const opcionesTurno = opcionesSelect(tiposTurno, form.turno, TURNOS_DEFAULT)
+  // El filtro ofrece los activos y además cualquier cargo que algún empleado
+  // tenga aunque ya esté apagado: si no, esas fichas no se podrían filtrar.
+  const opcionesFiltroCargo = (() => {
+    const base = opcionesSelect(cargos, undefined, CARGOS_DEFAULT)
+    const vistos = new Set(base.map(o => o.value))
+    for (const p of personal) {
+      if (vistos.has(p.cargo)) continue
+      vistos.add(p.cargo)
+      base.push({ value: p.cargo, label: `${iconoCargo(p.cargo, cargos)} ${etiquetaCargo(p.cargo, cargos)} (inactivo)`, icono: '', inactivo: true, historico: false })
+    }
+    return base
+  })()
 
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
@@ -271,16 +295,19 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
             </div>
             <div>
               <label style={labelStyle}>Cargo</label>
-              <select style={inputStyle} value={form.cargo ?? 'conserje'} onChange={e => setForm(f => ({ ...f, cargo: e.target.value as CargoPersonal }))}>
-                {CARGOS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+              <select style={inputStyle} aria-label="Cargo del empleado" value={form.cargo ?? cargoInicial} onChange={e => setForm(f => ({ ...f, cargo: e.target.value }))}>
+                {opcionesCargo.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
+              {opcionesCargo.some(o => o.value === form.cargo && (o.inactivo || o.historico)) && (
+                <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', marginTop: '4px' }}>
+                  ⚠ Este cargo ya no se ofrece en Configuración. Podés conservarlo o elegir uno activo.
+                </div>
+              )}
             </div>
             <div>
               <label style={labelStyle}>Turno</label>
-              <select style={inputStyle} value={form.turno ?? 'diurno'} onChange={e => setForm(f => ({ ...f, turno: e.target.value as TurnoPersonal }))}>
-                <option value="diurno">☀️ Diurno</option>
-                <option value="nocturno">🌙 Nocturno</option>
-                <option value="rotativo">🔄 Rotativo</option>
+              <select style={inputStyle} aria-label="Turno del empleado" value={form.turno ?? turnoInicial} onChange={e => setForm(f => ({ ...f, turno: e.target.value }))}>
+                {opcionesTurno.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div>
@@ -563,10 +590,10 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
           </button>
         ))}
         <div style={{ width: '1px', height: '24px', background: 'var(--at-line)', margin: '0 4px' }} />
-        <select value={filtroCargo} onChange={e => setFiltroCargo(e.target.value as CargoPersonal | 'todos')}
+        <select value={filtroCargo} onChange={e => setFiltroCargo(e.target.value)} aria-label="Filtrar por cargo"
           style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: 'var(--at-surface-2)' }}>
           <option value="todos">Todos los cargos</option>
-          {CARGOS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+          {opcionesFiltroCargo.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
       </div>
 
@@ -614,7 +641,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
-                  <div>{turnoLabel[p.turno]}</div>
+                  <div>{turnoLabel(p.turno)}</div>
                   {p.telefono && <div>📞 {p.telefono}</div>}
                   {p.fecha_ingreso && <div>📅 Desde: {p.fecha_ingreso}</div>}
                   {p.salario != null && <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{moneda} {p.salario.toFixed(2)}/mes</div>}

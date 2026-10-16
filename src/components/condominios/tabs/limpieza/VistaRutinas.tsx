@@ -39,10 +39,12 @@ import type {
   RutinaActividad,
   RutinaLimpieza,
   SuministroCondominio,
+  CargoCatalogo,
 } from '../../../../types'
 
 interface Props {
   plantillas: PlantillaTareaCargo[]
+  cargos?: CargoCatalogo[]
   areas: AreaCondominio[]
   suministros: SuministroCondominio[]
   inventario: ItemInventario[]
@@ -80,7 +82,7 @@ export function formatearDuracion(minutos: number): string {
 
 export function VistaRutinas({
   plantillas, areas, suministros, inventario, proyectoId, companyId,
-  canCreate, canEdit, canDelete, onRefresh,
+  canCreate, canEdit, canDelete, onRefresh, cargos = [],
 }: Props) {
   const [rutinas, setRutinas] = useState<RutinaLimpieza[]>([])
   const [pasos, setPasos] = useState<RutinaActividad[]>([])
@@ -369,6 +371,7 @@ export function VistaRutinas({
           <div style={{ marginTop: '10px', padding: '10px', background: 'var(--at-surface-2)', borderRadius: '10px' }}>
             <ActividadesCatalog
               plantillas={plantillas}
+              cargos={cargos}
               areas={areas}
               suministros={suministros}
               inventario={inventario}

@@ -17,6 +17,8 @@ import type {
   RutinaActividad,
   RutinaLimpieza,
   TareaBloqueSuministro,
+  UsoCargo,
+  UsoTurno,
   UsuarioAsignablePersonal,
 } from '../../types'
 
@@ -521,6 +523,33 @@ export async function fetchUsuariosAsignablesPersonal(
     data: (data as UsuarioAsignablePersonal[] | null) ?? [],
     error: error ? { message: error.message } : null,
   }
+}
+
+// ── RrhhConfiguracionTab ──
+
+/**
+ * «En uso: N» de cada cargo o tipo de turno del condominio (rrhh_cargo_en_uso /
+ * rrhh_turno_en_uso, 20261031000300): cuántos empleados, actividades,
+ * programaciones o ejecuciones guardan ese código. Decide si la tarjeta ofrece
+ * borrar o sólo desactivar; la BD lo vuelve a comprobar al borrar (23503).
+ * Degrada a un mapa vacío: sin el conteo, la pantalla ofrece borrar y el
+ * servidor responde.
+ */
+export async function fetchUsoCatalogoRrhh(
+  tipo: 'cargo' | 'turno',
+  projectId: string,
+  codigos: string[],
+): Promise<Map<string, UsoCargo | UsoTurno>> {
+  const uso = new Map<string, UsoCargo | UsoTurno>()
+  await Promise.all(codigos.map(async (codigo) => {
+    const { data, error } = tipo === 'cargo'
+      ? await db.rpc('rrhh_cargo_en_uso', { p_project: projectId, p_codigo: codigo })
+      : await db.rpc('rrhh_turno_en_uso', { p_project: projectId, p_codigo: codigo })
+    reportDegradedQuery('condominios.fetchUsoCatalogoRrhh', error)
+    const fila = (data as (UsoCargo | UsoTurno)[] | null)?.[0]
+    if (fila) uso.set(codigo, fila)
+  }))
+  return uso
 }
 
 // ── PlantillasCargoTab ──

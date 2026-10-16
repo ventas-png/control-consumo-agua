@@ -332,6 +332,19 @@ export async function fetchCondominiosTurnosData(pid: string, cid: string) {
 }
 
 /**
+ * Catálogos de cargos y tipos de turno del condominio (20261031000300). Batch
+ * aparte por el mismo motivo que los turnos: si un entorno aún no tiene la
+ * migración, las listas quedan vacías y los tabs caen a los seis cargos y tres
+ * turnos de siempre (CARGOS_DEFAULT / TURNOS_DEFAULT) sin tumbar el panel.
+ */
+export async function fetchCondominiosRrhhCatalogosData(pid: string, cid: string) {
+  return Promise.all([
+    db.from('rrhh_cargos').select('*').eq('project_id', pid).eq('company_id', cid).order('orden').order('nombre'),
+    db.from('rrhh_tipos_turno').select('*').eq('project_id', pid).eq('company_id', cid).order('orden').order('nombre'),
+  ])
+}
+
+/**
  * Lo que el calendario de turnos necesita de UN RANGO de fechas: los bloques
  * materializados y los días quitados a mano.
  *

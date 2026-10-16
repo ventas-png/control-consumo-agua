@@ -1,7 +1,8 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { fetchDirectorioResidentes } from '../../../domain/condominios/tabQueries'
-import type { PersonalCondominio, ContactoEmergencia } from '../../../types'
+import type { PersonalCondominio, ContactoEmergencia, CargoCatalogo } from '../../../types'
+import { etiquetaCargo, iconoCargo } from '../../../domain/condominios/rrhhCatalogos'
 
 interface ResidenteEntry {
   unidad_nombre: string
@@ -13,6 +14,8 @@ interface ResidenteEntry {
 
 interface Props {
   personal: PersonalCondominio[]
+  /** Cargos del condominio (Configuración RRHH) para ícono y nombre. */
+  cargos?: CargoCatalogo[]
   contactosEmergencia: ContactoEmergencia[]
   proyectoId: string
   companyId: string
@@ -20,12 +23,7 @@ interface Props {
 
 type DirectorioTab = 'residentes' | 'personal' | 'emergencias'
 
-const CARGO_ICONS: Record<string, string> = {
-  conserje: '🧹', guardia: '🛡️', jardinero: '🌿', mantenimiento: '🔧',
-  administrador: '👔', otro: '👤',
-}
-
-export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Props) {
+export function DirectorioTab({ personal, cargos = [], contactosEmergencia, proyectoId }: Props) {
   const [activeTab, setActiveTab] = useState<DirectorioTab>('residentes')
   const [residentes, setResidentes] = useState<ResidenteEntry[]>([])
   const [loading, setLoading] = useState(false)
@@ -143,10 +141,10 @@ export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Pro
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px' }}>
             {filteredPersonal.map(p => (
               <div key={p.id} style={cardStyle}>
-                <div style={{ fontSize: '24px' }}>{CARGO_ICONS[p.cargo] ?? '👤'}</div>
+                <div style={{ fontSize: '24px' }}>{iconoCargo(p.cargo, cargos)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{p.nombre}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', textTransform: 'capitalize' }}>{p.cargo}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', textTransform: 'capitalize' }}>{etiquetaCargo(p.cargo, cargos)}</div>
                   {p.telefono && (
                     <a href={`tel:${p.telefono}`} style={{ fontSize: '12px', color: 'var(--at-primary)', display: 'block', marginTop: '2px', textDecoration: 'none' }}>📞 {p.telefono}</a>
                   )}

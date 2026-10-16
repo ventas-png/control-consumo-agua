@@ -28,7 +28,7 @@ export const PLANTILLA_ACTIVIDADES: Plantilla = {
   nombreArchivo: 'plantilla_actividades',
   columnas: [
     { key: 'titulo', requerida: true, ayuda: 'Título de la actividad (2–150 caracteres). Si ya existe una con el mismo título y cargo en el proyecto, la fila se rechaza.', ejemplos: ['Barrido de pasillos', 'Ronda nocturna'] },
-    { key: 'cargo', requerida: true, ayuda: 'Cargo que la desempeña: conserje, guardia, jardinero, mantenimiento, administrador u otro.', ejemplos: ['conserje', 'guardia'] },
+    { key: 'cargo', requerida: true, ayuda: 'Cargo que la desempeña: el código o el nombre de un cargo ACTIVO del condominio (Recursos Humanos → Configuración). Por defecto: conserje, guardia, jardinero, mantenimiento, administrador u otro.', ejemplos: ['conserje', 'guardia'] },
     { key: 'servicio', requerida: true, ayuda: 'Familia: limpieza, mantenimiento, seguridad, jardineria, administracion u otro.', ejemplos: ['limpieza', 'seguridad'] },
     { key: 'descripcion', ayuda: 'Detalle de cómo realizar la actividad (hasta 2000 caracteres).', ejemplos: ['Barrer y trapear de arriba abajo', ''] },
     { key: 'instrucciones_seguridad', ayuda: 'EPP requerido, bloqueo de área, manejo de químicos… (hasta 2000 caracteres).', ejemplos: ['Guantes y señalización de piso mojado', ''] },

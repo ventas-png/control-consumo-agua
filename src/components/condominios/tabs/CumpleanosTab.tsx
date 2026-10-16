@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useHoyDate } from '../../../hooks/useHoy'
-import type { PersonalCondominio } from '../../../types'
+import type { PersonalCondominio, CargoCatalogo } from '../../../types'
+import { etiquetaCargo } from '../../../domain/condominios/rrhhCatalogos'
 
 interface ClienteBirthday {
   id: string
@@ -11,17 +12,14 @@ interface ClienteBirthday {
 
 interface Props {
   personal: PersonalCondominio[]
+  /** Cargos del condominio (Configuración RRHH) para el subtítulo. */
+  cargos?: CargoCatalogo[]
   clientesBirthday: ClienteBirthday[]
   proyectoNombre?: string
 }
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-
-const CARGO_LABEL: Record<string, string> = {
-  conserje: 'Conserje', guardia: 'Guardia', jardinero: 'Jardinero',
-  mantenimiento: 'Mantenimiento', administrador: 'Administrador', otro: 'Personal',
-}
 
 const COLOR = {
   residente: { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'var(--at-primary-soft-2)', dot: 'var(--at-primary)' },
@@ -57,7 +55,7 @@ function diasHastaSiguiente(mesdia: string, hoy: Date): number {
   return Math.ceil((proximo.getTime() - hoy.getTime()) / 86400000)
 }
 
-export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Condominio' }: Props) {
+export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Condominio', cargos = [] }: Props) {
   // `new Date()` por render hacía imposible declarar `hoy` como dependencia del
   // memo de "próximos 7 días" sin recalcularlo siempre. useHoyDate mantiene la
   // identidad estable dentro del día y la renueva al cruzar la medianoche, así
@@ -86,11 +84,11 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
       list.push({
         id: `p-${p.id}`, nombre: p.nombre, tipo: 'personal',
         mesdia: raw.slice(5), anioNac: parseInt(raw.slice(0, 4)),
-        subtitulo: CARGO_LABEL[p.cargo] ?? 'Personal',
+        subtitulo: p.cargo === 'otro' && !cargos.some(c => c.codigo === 'otro') ? 'Personal' : (etiquetaCargo(p.cargo, cargos) || 'Personal'),
       })
     }
     return list
-  }, [clientesBirthday, personal])
+  }, [cargos, clientesBirthday, personal])
 
   const filtrados = filtroTipo === 'todos' ? todos : todos.filter(c => c.tipo === filtroTipo)
 

@@ -28,6 +28,7 @@ import { hoyLocalISO } from '../../../lib/format'
 import type {
   AreaCondominio, EjecucionLimpieza, ItemInventario, PersonalCondominio,
   PlantillaTareaCargo, ProgramacionLimpieza, SuministroCondominio,
+  CargoCatalogo, TipoTurnoCatalogo,
 } from '../../../types'
 import { AreasResumen } from '../AreasResumen'
 import { ActividadesCatalog } from '../ActividadesCatalog'
@@ -44,6 +45,9 @@ interface Props {
   programaciones: ProgramacionLimpieza[]
   ejecuciones: EjecucionLimpieza[]
   personal: PersonalCondominio[]
+  /** Catálogos del condominio (Configuración RRHH) para los selects de cargo y turno. */
+  cargos?: CargoCatalogo[]
+  tiposTurno?: TipoTurnoCatalogo[]
   areas: AreaCondominio[]
   plantillas: PlantillaTareaCargo[]
   suministros: SuministroCondominio[]
@@ -72,7 +76,7 @@ const VISTAS: { id: Vista; label: string; icon: string }[] = [
 
 export function ProgramacionLimpiezaTab({
   programaciones, ejecuciones, personal, areas, plantillas, suministros, inventario,
-  proyectoId, companyId, canCreate, canEdit, canDelete, puedeConfigurarAreas, onIrATab, onRefresh,
+  proyectoId, companyId, canCreate, canEdit, canDelete, puedeConfigurarAreas, onIrATab, onRefresh, cargos = [], tiposTurno = [],
 }: Props) {
   const [vista, setVista] = useState<Vista>('areas')
 
@@ -152,6 +156,8 @@ export function ProgramacionLimpiezaTab({
         <VistaAreas
           programaciones={programaciones}
           personal={personal}
+          cargos={cargos}
+          tiposTurno={tiposTurno}
           areas={areas}
           proyectoId={proyectoId}
           companyId={companyId}
@@ -166,6 +172,7 @@ export function ProgramacionLimpiezaTab({
         // rearmarlas cada día. Reutiliza ActividadesCatalog como selector.
         <VistaRutinas
           plantillas={plantillas}
+          cargos={cargos}
           areas={areas}
           suministros={suministros}
           inventario={inventario}
@@ -183,6 +190,7 @@ export function ProgramacionLimpiezaTab({
         // en consulta (soloLectura); administrarlo sigue siendo de Plantillas.
         <ActividadesCatalog
           plantillas={plantillas}
+          cargos={cargos}
           areas={areas}
           suministros={suministros}
           inventario={inventario}
@@ -213,6 +221,8 @@ export function ProgramacionLimpiezaTab({
           programaciones={programaciones}
           ejecuciones={ejecuciones}
           personal={personal}
+          cargos={cargos}
+          tiposTurno={tiposTurno}
           proyectoId={proyectoId}
           companyId={companyId}
           canCreate={canCreate}

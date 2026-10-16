@@ -19436,6 +19436,126 @@ export type Database = {
           },
         ]
       }
+      rrhh_cargos: {
+        Row: {
+          activo: boolean
+          codigo: string
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          descripcion: string | null
+          icono: string
+          id: string
+          nombre: string
+          orden: number
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo: string
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion?: string | null
+          icono?: string
+          id?: string
+          nombre: string
+          orden?: number
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo?: string
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion?: string | null
+          icono?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rrhh_cargos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rrhh_cargos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rrhh_tipos_turno: {
+        Row: {
+          activo: boolean
+          codigo: string
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          descripcion: string | null
+          icono: string
+          id: string
+          nombre: string
+          orden: number
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo: string
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion?: string | null
+          icono?: string
+          id?: string
+          nombre: string
+          orden?: number
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo?: string
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion?: string | null
+          icono?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rrhh_tipos_turno_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rrhh_tipos_turno_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ruta_ocurrencias: {
         Row: {
           company_id: string | null
@@ -26454,6 +26574,30 @@ export type Database = {
       run_notifications_dispatcher: { Args: never; Returns: undefined }
       run_purga_fotos_storage: { Args: never; Returns: undefined }
       run_route_reminders: { Args: never; Returns: undefined }
+      rrhh_cargo_en_uso: {
+        Args: { p_codigo: string; p_project: string }
+        Returns: {
+          actividades: number
+          personal: number
+          programaciones: number
+        }[]
+      }
+      rrhh_cargo_valido: {
+        Args: { p_codigo: string; p_project: string; p_solo_activos?: boolean }
+        Returns: boolean
+      }
+      rrhh_turno_en_uso: {
+        Args: { p_codigo: string; p_project: string }
+        Returns: {
+          ejecuciones: number
+          personal: number
+          programaciones: number
+        }[]
+      }
+      rrhh_turno_valido: {
+        Args: { p_codigo: string; p_project: string; p_solo_activos?: boolean }
+        Returns: boolean
+      }
       rutas_operadores_asignables: {
         Args: { p_project_id: string }
         Returns: {

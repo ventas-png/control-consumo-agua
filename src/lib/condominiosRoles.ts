@@ -152,6 +152,8 @@ const RECURSOS_HUMANOS_TABS = [
   'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
   'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza',
   'desempeno_personal', 'actividad_equipo',
+  // Catálogos del área (cargos y tipos de turno), 20261031000300.
+  'rrhh_config',
 ]
 const RECURSOS_HUMANOS_SET = new Set(RECURSOS_HUMANOS_TABS)
 const sinRRHH = (tabs: string[]) => tabs.filter(t => !RECURSOS_HUMANOS_SET.has(t))
@@ -190,7 +192,7 @@ export const CONDOMINIOS_TAB_ACCESS: Record<CondominiosRole, Set<string> | null>
     ...TODAS_INSTALACIONES,
     // Administración: técnica
     'documentos', 'bitacora_acciones', 'vencimientos_criticos', 'polizas',
-    'inspecciones', 'automatizaciones', 'personal', 'capacitacion_personal',
+    'inspecciones', 'automatizaciones', 'personal', 'rrhh_config', 'capacitacion_personal',
     'comunicacion_condominios',
   ]),
 

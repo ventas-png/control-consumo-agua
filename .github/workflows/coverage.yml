@@ -906,6 +906,17 @@ jobs:
           PGPORT_TEST: 55565
         run: supabase/tests/plantillas_importacion/run.sh
 
+      # 20261031000300: catálogos de cargos y tipos de turno POR CONDOMINIO. Backfill 6+3 por
+      # proyecto, proyecto nuevo sembrado por trigger, CRUD bajo RLS por permiso del tab,
+      # código inmutable, desactivar vs borrar en uso (23503), validación en personal /
+      # actividades / programación / ejecuciones con IS DISTINCT FROM (históricos editables),
+      # carga masiva contra el catálogo. CONTROL NEGATIVO: seis mutantes.
+      - name: RRHH — catálogos de cargos y tipos de turno por condominio
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55566
+        run: supabase/tests/rrhh_catalogos/run.sh
+
       # 20261101000000: el residente registra MASCOTAS y VEHÍCULOS desde el portal y
       # la administración los autoriza (mismo circuito que la solicitud de renta):
       # borrador → pendiente → aprobada/rechazada/baja, escritura del residente solo
@@ -915,7 +926,7 @@ jobs:
       - name: Padrón — autorización de mascotas y vehículos desde el portal
         env:
           PGBIN: ${{ steps.pg.outputs.bin }}
-          PGPORT_TEST: 55566
+          PGPORT_TEST: 55567
         run: supabase/tests/padron_autorizacion/run.sh
 
   rls-harness:

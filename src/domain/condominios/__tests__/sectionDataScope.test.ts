@@ -48,6 +48,7 @@ const FUNCIONES_CON_PROYECTO = [
   'fetchCondominiosTareasData',
   'fetchCondominiosLimpiezaData',
   'fetchCondominiosTurnosData',
+  'fetchCondominiosRrhhCatalogosData',
 ]
 
 /**
