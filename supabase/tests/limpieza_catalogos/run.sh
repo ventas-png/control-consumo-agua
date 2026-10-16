@@ -11,6 +11,12 @@
 # bien, borrar una programación sigue arrastrando fotos y reportes históricos.
 # Nada de esto se valida leyendo el SQL.
 #
+# NOTA: 20261031000300 (catálogos RRHH por condominio) sustituye después la lista literal
+# de cargos de `plantillas_cargo_valida_cargo()` y retira los CHECK de cargo/turno de
+# programacion_limpieza y ejecuciones_limpieza. Esta suite aplica SOLO la serie histórica
+# (hasta 20260907000000) y sus aserciones no cambian; la versión con catálogo se prueba
+# en supabase/tests/rrhh_catalogos.
+#
 # QUÉ COMPRUEBA (37 invariantes)
 #   A · BACKFILL    coincidencia única (con espacios, mayúsculas y acentos),
 #                   área inexistente creada UNA sola vez, ambigua que se queda
