@@ -87,7 +87,7 @@ export async function removeRentaDocs(paths: string[]): Promise<{ error: string 
 /**
  * Sube un adjunto del registro de mascota/vehículo al bucket privado
  * `padron-docs`. El path DEBE ser `{unidad_id}/{mascotas|vehiculos}/{fila_id}/…`:
- * la policy del bucket (20261101000000) solo acepta escrituras de quien registró
+ * la policy del bucket (20261031000500) solo acepta escrituras de quien registró
  * la fila y mientras sigue en borrador.
  */
 export async function uploadPadronDoc(

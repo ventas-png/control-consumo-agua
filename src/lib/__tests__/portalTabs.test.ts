@@ -24,7 +24,7 @@ describe('tabsForRol', () => {
   })
 
   it('el inquilino registra sus mascotas y vehículos, pero no ve rentas', () => {
-    // 20261101000000: cualquier residente de la unidad registra lo suyo.
+    // 20261031000500: cualquier residente de la unidad registra lo suyo.
     expect(tabsForRol('arrendatario')).toEqual(expect.arrayContaining(['mascotas', 'vehiculos']))
     expect(tabsForRol('arrendatario')).not.toContain('rentas')
   })

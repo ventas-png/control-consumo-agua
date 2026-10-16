@@ -1,6 +1,6 @@
 // domain/condominios/padronAutorizacion.ts — la administración resuelve las
 // solicitudes de mascotas y vehículos que los residentes envían desde el portal
-// (20261101000000).
+// (20261031000500).
 //
 // Aprobar y rechazar van por RPC (no por updateCondominioRow) porque el servidor
 // valida la transición (solo desde 'pendiente'), sella la identidad desde

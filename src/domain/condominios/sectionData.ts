@@ -84,7 +84,7 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     db.from('tickets_mantenimiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
     db.from('anuncios_comunidad').select('*, app_users(full_name)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     db.from('parqueos_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('numero'),
-    // Los borradores del portal (20261101000000) son del residente hasta que los envía.
+    // Los borradores del portal (20261031000500) son del residente hasta que los envía.
     db.from('mascotas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).neq('estado', 'borrador').order('nombre'),
     // clase='paquete': desde 20260829000600 la tabla es el motor de recepción y
     // también guarda correspondencia, que tiene su propia entrada más abajo.

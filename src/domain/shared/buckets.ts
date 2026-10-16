@@ -57,7 +57,7 @@ export const BUCKET_HOUSEKEEPING = 'housekeeping-evidencias'
 /**
  * Expediente del registro de mascotas y vehículos que el residente envía desde
  * el portal (carnet de vacunación, tarjeta de circulación…). Bucket PRIVADO
- * (20261101000000). Ruta `<unidad_id>/<mascotas|vehiculos>/<fila_id>/<archivo>`:
+ * (20261031000500). Ruta `<unidad_id>/<mascotas|vehiculos>/<fila_id>/<archivo>`:
  * escribe solo quien registró la fila y mientras es borrador; leen quien la
  * registró, el propietario de la unidad y el staff con el permiso del tab.
  */

@@ -1,5 +1,5 @@
 // lib/padronMascotas.ts — Reglas puras del registro de mascotas desde el portal
-// (20261101000000). Módulo sin React ni Supabase para poder probarlo aislado.
+// (20261031000500). Módulo sin React ni Supabase para poder probarlo aislado.
 //
 // La validación espeja la de portal_enviar_mascota: el servidor es quien manda,
 // esto solo le muestra al residente el problema antes de enviar.

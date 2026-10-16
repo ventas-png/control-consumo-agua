@@ -62,7 +62,7 @@ const SECCION_A_TAB: Record<string, PortalTab> = {
   cobros: 'cuenta',
   condominios_mantenimiento: 'tickets',
   condominios_visitantes: 'visitantes',
-  // Resolución de la administración sobre un registro (20261101000000).
+  // Resolución de la administración sobre un registro (20261031000500).
   mascotas: 'mascotas',
   vehiculos: 'vehiculos',
 }

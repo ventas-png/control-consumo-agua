@@ -3,7 +3,7 @@
 \pset format unaligned
 
 -- ════════════════════════════════════════════════════════════════════════════
--- Invariantes de 20261101000000: mascotas y vehículos se registran desde el
+-- Invariantes de 20261031000500: mascotas y vehículos se registran desde el
 -- portal y la administración los autoriza (mismo circuito que la renta).
 --
 --    1-3   padrón previo intacto (aprobado/activo) y la invariante de la base:
@@ -17,6 +17,8 @@
 --          con TAG único, sin doble resolución, aviso al residente, documentos
 --   30-34  baja y descarte: propietario da de baja, el TAG queda libre;
 --          descartar borra solo borradores; ACL
+--   35-37  placa única en la base: índice parcial, otra grafía rechazada aun
+--          sin pasar por la RPC, rechazadas/bajas no reservan la placa
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -419,4 +421,45 @@ BEGIN
     END IF;
   END LOOP;
   RAISE NOTICE '34 OK    los helpers internos no son invocables desde la API';
+END $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- G · Placa única ATÓMICA (idx_vehiculos_placa_unica). La concurrencia con
+--     sesiones reales se prueba en run.sh (paso 4); aquí, que el índice existe,
+--     normaliza igual que la RPC y solo cuenta pendientes/aprobados.
+-- ─────────────────────────────────────────────────────────────────────────────
+DO $$
+DECLARE
+  CO uuid := 'aaaaaaaa-0000-0000-0000-00000000000a';
+  P1 uuid := '11111111-0000-0000-0000-000000000001';
+  U2 uuid := '11d10000-0000-0000-0000-000000000002';
+  v_def text;
+BEGIN
+  SELECT indexdef INTO v_def FROM pg_indexes WHERE indexname = 'idx_vehiculos_placa_unica';
+  IF v_def IS NULL OR v_def NOT ILIKE '%UNIQUE%' OR v_def NOT ILIKE '%pendiente%' OR v_def NOT ILIKE '%aprobada%' THEN
+    RAISE EXCEPTION '35: falta el índice único de placa o no acota pendiente/aprobada: %', v_def;
+  END IF;
+  RAISE NOTICE '35 OK    índice único parcial por proyecto sobre la placa normalizada';
+
+  -- Escritura directa (la del staff, que no pasa por la RPC) con otra grafía de
+  -- una placa ya autorizada: la base la rechaza igual.
+  BEGIN
+    INSERT INTO public.vehiculos_residentes (company_id, project_id, unidad_id, placa, tipo)
+    VALUES (CO, P1, U2, '  p-777aaa ', 'auto');
+    RAISE EXCEPTION '36: la base aceptó una placa autorizada escrita con otra grafía';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO public.vehiculos_residentes (company_id, project_id, unidad_id, placa, tipo, estado, activo)
+    VALUES (CO, P1, U2, 'P-777AAA', 'auto', 'pendiente', false);
+    RAISE EXCEPTION '36: la base aceptó una pendiente con una placa ya autorizada';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  RAISE NOTICE '36 OK    la base rechaza la placa duplicada aunque no se pase por la RPC';
+
+  -- Rechazadas, bajas y borradores no reservan la placa: 'P 123 ABC' quedó en
+  -- baja en el bloque F y puede volver a autorizarse.
+  INSERT INTO public.vehiculos_residentes (company_id, project_id, unidad_id, placa, tipo, estado, activo)
+  VALUES (CO, P1, U2, 'P 123 ABC', 'auto', 'rechazada', false);
+  INSERT INTO public.vehiculos_residentes (company_id, project_id, unidad_id, placa, tipo)
+  VALUES (CO, P1, U2, 'p 123   abc', 'auto');
+  RAISE NOTICE '37 OK    rechazadas y bajas no bloquean la placa';
 END $$;

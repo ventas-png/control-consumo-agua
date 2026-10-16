@@ -50,7 +50,7 @@ export interface ParqueoCondominio {
 
 /**
  * Estado del registro de una mascota o un vehículo en el padrón (migración
- * 20261101000000). Lo que el staff crea directo nace 'aprobada'; lo que el
+ * 20261031000500). Lo que el staff crea directo nace 'aprobada'; lo que el
  * residente registra desde el portal recorre borrador → pendiente → aprobada |
  * rechazada, y puede terminar en 'baja'. La base impide que algo no aprobado
  * esté activo.

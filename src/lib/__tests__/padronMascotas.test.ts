@@ -1,4 +1,4 @@
-// Reglas del registro de mascotas/vehículos en el portal (20261101000000). El
+// Reglas del registro de mascotas/vehículos en el portal (20261031000500). El
 // servidor (portal_enviar_*) es quien manda; esto solo debe ESPEJARLO para que el
 // residente vea el error antes de enviar. Lo que la BD exige se prueba en
 // supabase/tests/padron_autorizacion.

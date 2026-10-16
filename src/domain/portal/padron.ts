@@ -1,5 +1,5 @@
 // domain/portal/padron.ts — el residente registra sus mascotas y vehículos desde
-// el portal y pide autorización a la administración (20261101000000).
+// el portal y pide autorización a la administración (20261031000500).
 //
 // Mismo circuito que la solicitud de renta (domain/portal/solicitudRenta.ts):
 // el portal NO escribe `mascotas` ni `vehiculos_residentes` (sus policies de

@@ -78,6 +78,11 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
       ({ error } = await createCondominioRow('vehiculos_residentes', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
+    // idx_vehiculos_placa_unica (20261031000500): la base rechaza una placa que
+    // ya está pendiente o autorizada en el proyecto, también desde el panel.
+    if (error?.code === '23505' && error.message.includes('idx_vehiculos_placa_unica')) {
+      return notify({ variant: 'error', title: t('condominios.comun.error'), text: `La placa ${payload.placa} ya está registrada o en revisión en el condominio.` })
+    }
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     setShowForm(false); setEditId(null); setForm({ ...BLANK }); onRefresh()
   }
@@ -115,7 +120,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
   }
 
   // El padrón son los AUTORIZADOS: lo que el residente envía desde el portal
-  // (20261101000000) vive en la vista Solicitudes hasta que se resuelve.
+  // (20261031000500) vive en la vista Solicitudes hasta que se resuelve.
   const padron = vehiculos.filter(v => estadoDe(v) === 'aprobada')
   const pendientesPortal = vehiculos.filter(v => esSolicitudPortal(v) && estadoDe(v) === 'pendiente').length
 

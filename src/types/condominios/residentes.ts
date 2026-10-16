@@ -689,7 +689,7 @@ export interface SeguimientoAcuerdo {
 }
 
 export type TipoVehiculo = 'auto' | 'moto' | 'camion' | 'otro'
-/** Medio físico del TAG de ingreso. Espeja el CHECK de 20261101000000. */
+/** Medio físico del TAG de ingreso. Espeja el CHECK de 20261031000500. */
 export type TipoTagVehiculo = 'sticker' | 'rfid' | 'tarjeta' | 'control' | 'otro'
 
 export interface VehiculoResidente extends AutorizacionPadron {

@@ -1,5 +1,5 @@
 // Piezas compartidas por las dos caras del registro de mascotas y vehículos
-// (20261101000000): el portal del residente (PortalMascotasTab /
+// (20261031000500): el portal del residente (PortalMascotasTab /
 // PortalVehiculosTab, que registra y muestra lo enviado) y el panel de la
 // administración (MascotasTab / VehiculosTab, que lo evalúa). Viven aquí para que
 // ambas rindan exactamente los mismos datos — igual que SolicitudRentaDetalle.

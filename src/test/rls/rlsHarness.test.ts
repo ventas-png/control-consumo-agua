@@ -471,7 +471,7 @@ const PORTAL_SOLICITUD_RENTA_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }
   },
 ]
 
-// ── RPC del registro de mascotas y vehículos (20261101000000) ────────────────
+// ── RPC del registro de mascotas y vehículos (20261031000500) ────────────────
 // Misma forma que las de la solicitud de renta: el residente no escribe
 // `mascotas` ni `vehiculos_residentes` (sus policies exigen el permiso del tab),
 // así que estas RPC son su única vía. Los ids de fila inexistentes bastan: el
@@ -1244,11 +1244,11 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   })
 
   // ────────────────────────────────────────────────────────────────────────
-  // guard RPCs del registro de mascotas y vehículos (20261101000000)
+  // guard RPCs del registro de mascotas y vehículos (20261031000500)
   // ────────────────────────────────────────────────────────────────────────
   // Única vía de escritura del residente sobre el padrón: si su gate de rol
   // cediera, un usuario podría registrar (o dar de baja) en una unidad ajena.
-  describe('guard RPCs del registro de mascotas y vehículos (20261101000000) — garantía de ROL', () => {
+  describe('guard RPCs del registro de mascotas y vehículos (20261031000500) — garantía de ROL', () => {
     for (const { name, args } of PORTAL_PADRON_RPCS) {
       it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))

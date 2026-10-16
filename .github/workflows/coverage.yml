@@ -917,12 +917,15 @@ jobs:
           PGPORT_TEST: 55566
         run: supabase/tests/rrhh_catalogos/run.sh
 
-      # 20261101000000: el residente registra MASCOTAS y VEHÍCULOS desde el portal y
+      # 20261031000500: el residente registra MASCOTAS y VEHÍCULOS desde el portal y
       # la administración los autoriza (mismo circuito que la solicitud de renta):
       # borrador → pendiente → aprobada/rechazada/baja, escritura del residente solo
       # por RPC, vacunas/placa/foto/documentos validados en el servidor, expediente
       # inmutable al enviar, TAG de ingreso único por condominio, y la base impide
-      # que algo no aprobado esté activo. CONTROL NEGATIVO: ocho mutantes.
+      # que algo no aprobado esté activo. Placa única por proyecto con índice único
+      # (concurrencia con SESIONES REALES: dos envíos simultáneos de la misma placa) y
+      # auditoría previa que aborta sin tocar datos si hubiera duplicados.
+      # CONTROL NEGATIVO: diez mutantes.
       - name: Padrón — autorización de mascotas y vehículos desde el portal
         env:
           PGBIN: ${{ steps.pg.outputs.bin }}

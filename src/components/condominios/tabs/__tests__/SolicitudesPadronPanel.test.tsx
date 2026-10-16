@@ -1,5 +1,5 @@
 // Cola de autorización de mascotas y vehículos en el panel admin
-// (20261101000000). Reglas de la UI:
+// (20261031000500). Reglas de la UI:
 //   1. Solo lista lo que vino del portal (con cliente_id); lo que cargó el staff
 //      no es una "solicitud".
 //   2. Aprobar un vehículo lleva el TAG de ingreso a la RPC; rechazar exige

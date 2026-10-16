@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Recuperación tras desplegar 20261101000000 (autorización de mascotas y
+-- Recuperación tras desplegar 20261031000500 (autorización de mascotas y
 -- vehículos desde el portal)
 -- ════════════════════════════════════════════════════════════════════════════
 -- NO se ejecuta sola ni en CI. Leer antes de correr. Regla general: ante un
@@ -59,6 +59,7 @@
 -- DROP INDEX IF EXISTS public.idx_mascotas_borrador_residente;
 -- DROP INDEX IF EXISTS public.idx_vehiculos_borrador_residente;
 -- DROP INDEX IF EXISTS public.idx_vehiculos_tag_unico;
+-- DROP INDEX IF EXISTS public.idx_vehiculos_placa_unica;
 -- DROP INDEX IF EXISTS public.idx_mascotas_estado;
 -- DROP INDEX IF EXISTS public.idx_vehiculos_estado;
 -- ALTER TABLE public.mascotas

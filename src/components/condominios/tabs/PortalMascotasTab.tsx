@@ -1,4 +1,4 @@
-// Portal del residente · Mascotas (20261101000000).
+// Portal del residente · Mascotas (20261031000500).
 //
 // El residente registra a su mascota con la ficha completa (vacunas, foto,
 // carnet…) y solicita autorización a la administración — mismo circuito que la

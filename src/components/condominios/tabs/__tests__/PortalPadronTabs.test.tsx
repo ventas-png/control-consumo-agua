@@ -1,4 +1,4 @@
-// Registro de mascotas y vehículos desde el portal (20261101000000).
+// Registro de mascotas y vehículos desde el portal (20261031000500).
 //
 // Reglas que la UI debe sostener (lo demás lo exigen la BD y las RPC, y se
 // prueba en supabase/tests/padron_autorizacion):

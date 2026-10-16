@@ -44,7 +44,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
   const hoy = hoyLocalISO()
 
   // El padrón son las AUTORIZADAS: lo que el residente envía desde el portal
-  // (20261101000000) vive en la vista Solicitudes hasta que se resuelve.
+  // (20261031000500) vive en la vista Solicitudes hasta que se resuelve.
   const padron = mascotas.filter(m => estadoDe(m) === 'aprobada')
   const pendientesPortal = mascotas.filter(m => esSolicitudPortal(m) && estadoDe(m) === 'pendiente').length
 

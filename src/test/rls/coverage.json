@@ -449,7 +449,7 @@
     {
       "nombre": "portal_reservar_mascota",
       "dominio": "padron-mascotas",
-      "porQue": "20261101000000 — abre el borrador cuyo id es la carpeta de los adjuntos en padron-docs; sobre una unidad ajena sembraría un registro en el padrón de otro tenant",
+      "porQue": "20261031000500 — abre el borrador cuyo id es la carpeta de los adjuntos en padron-docs; sobre una unidad ajena sembraría un registro en el padrón de otro tenant",
       "garantia": "rol",
       "evidencias": [
         "anon",
@@ -459,7 +459,7 @@
     {
       "nombre": "portal_enviar_mascota",
       "dominio": "padron-mascotas",
-      "porQue": "20261101000000 — única vía de escritura del residente sobre mascotas (sus policies de escritura exigen el permiso del tab); deja la fila pendiente de autorización",
+      "porQue": "20261031000500 — única vía de escritura del residente sobre mascotas (sus policies de escritura exigen el permiso del tab); deja la fila pendiente de autorización",
       "garantia": "rol",
       "evidencias": [
         "anon",
@@ -469,7 +469,7 @@
     {
       "nombre": "portal_descartar_mascota",
       "dominio": "padron-mascotas",
-      "porQue": "20261101000000 — borra un borrador de mascotas; sobre uno ajeno destruiría el registro en curso de otro residente",
+      "porQue": "20261031000500 — borra un borrador de mascotas; sobre uno ajeno destruiría el registro en curso de otro residente",
       "garantia": "rol",
       "evidencias": [
         "anon",
@@ -479,7 +479,7 @@
     {
       "nombre": "portal_baja_mascota",
       "dominio": "padron-mascotas",
-      "porQue": "20261101000000 — retira o da de baja una fila autorizada de mascotas; sobre una ajena desactivaría el padrón de otro tenant",
+      "porQue": "20261031000500 — retira o da de baja una fila autorizada de mascotas; sobre una ajena desactivaría el padrón de otro tenant",
       "garantia": "rol",
       "evidencias": [
         "anon",
@@ -489,7 +489,7 @@
     {
       "nombre": "portal_reservar_vehiculo",
       "dominio": "padron-vehiculos",
-      "porQue": "20261101000000 — abre el borrador cuyo id es la carpeta de los adjuntos en padron-docs; sobre una unidad ajena sembraría un registro en el padrón de otro tenant",
+      "porQue": "20261031000500 — abre el borrador cuyo id es la carpeta de los adjuntos en padron-docs; sobre una unidad ajena sembraría un registro en el padrón de otro tenant",
       "garantia": "rol",
       "evidencias": [
         "anon",
@@ -499,7 +499,7 @@
     {
       "nombre": "portal_enviar_vehiculo",
       "dominio": "padron-vehiculos",
-      "porQue": "20261101000000 — única vía de escritura del residente sobre vehiculos_residentes (sus policies de escritura exigen el permiso del tab); deja la fila pendiente de autorización",
+      "porQue": "20261031000500 — única vía de escritura del residente sobre vehiculos_residentes (sus policies de escritura exigen el permiso del tab); deja la fila pendiente de autorización",
       "garantia": "rol",
       "evidencias": [
         "anon",
@@ -509,7 +509,7 @@
     {
       "nombre": "portal_descartar_vehiculo",
       "dominio": "padron-vehiculos",
-      "porQue": "20261101000000 — borra un borrador de vehiculos_residentes; sobre uno ajeno destruiría el registro en curso de otro residente",
+      "porQue": "20261031000500 — borra un borrador de vehiculos_residentes; sobre uno ajeno destruiría el registro en curso de otro residente",
       "garantia": "rol",
       "evidencias": [
         "anon",
@@ -519,7 +519,7 @@
     {
       "nombre": "portal_baja_vehiculo",
       "dominio": "padron-vehiculos",
-      "porQue": "20261101000000 — retira o da de baja una fila autorizada de vehiculos_residentes; sobre una ajena desactivaría el padrón de otro tenant",
+      "porQue": "20261031000500 — retira o da de baja una fila autorizada de vehiculos_residentes; sobre una ajena desactivaría el padrón de otro tenant",
       "garantia": "rol",
       "evidencias": [
         "anon",

@@ -133,6 +133,51 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_vehiculos_tag_unico
   ON public.vehiculos_residentes (project_id, upper(btrim(tag_codigo)))
   WHERE tag_codigo IS NOT NULL AND estado = 'aprobada';
 
+-- Una placa (normalizada: mayúsculas, sin espacios sobrantes) no puede estar
+-- pendiente ni autorizada dos veces en el mismo proyecto. El IF EXISTS de
+-- portal_enviar_vehiculo solo da un mensaje legible: entre su SELECT y su UPDATE
+-- otra sesión puede enviar la misma placa, y ninguna de las dos ve a la otra
+-- hasta el COMMIT. El índice único es lo que lo impide de forma ATÓMICA: la
+-- segunda inserción en el índice espera a que la primera transacción termine y,
+-- si ésta confirma, falla con unique_violation. Cubre también al staff (alta y
+-- edición directas desde el panel). Borradores, rechazados y bajas no cuentan.
+--
+-- AUDITORÍA PREVIA, sin tocar datos: si al desplegar ya hubiera placas
+-- duplicadas entre filas pendientes/aprobadas, crear el índice fallaría con un
+-- error genérico. Aquí se detecta antes y se aborta la migración nombrando cada
+-- grupo, para que la administración decida (dar de baja, corregir la placa) —
+-- nunca se borra ni se altera una fila en silencio. Al escribir esta migración
+-- (2026-10-16) producción y el sandbox RLS tenían 0 filas en la tabla.
+DO $$
+DECLARE
+  v_grupos text;
+  v_n      int;
+BEGIN
+  SELECT count(*), string_agg(
+           format('proyecto %s · placa %s · %s filas (ids: %s)', project_id, placa_norm, filas, ids),
+           E'\n' ORDER BY project_id, placa_norm)
+    INTO v_n, v_grupos
+    FROM (
+      SELECT project_id,
+             upper(regexp_replace(btrim(placa), '\s+', ' ', 'g')) AS placa_norm,
+             count(*) AS filas,
+             string_agg(id::text, ', ' ORDER BY created_at) AS ids
+        FROM public.vehiculos_residentes
+       WHERE estado IN ('pendiente', 'aprobada')
+       GROUP BY 1, 2
+      HAVING count(*) > 1
+    ) d;
+  IF v_n > 0 THEN
+    RAISE EXCEPTION 'Hay % placa(s) duplicada(s) entre vehículos pendientes/aprobados; no se crea idx_vehiculos_placa_unica ni se modifica ningún dato.', v_n
+      USING DETAIL = v_grupos,
+            HINT   = 'Resolver cada grupo desde el panel (dar de baja o corregir la placa) y volver a aplicar la migración.';
+  END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vehiculos_placa_unica
+  ON public.vehiculos_residentes (project_id, upper(regexp_replace(btrim(placa), '\s+', ' ', 'g')))
+  WHERE estado IN ('pendiente', 'aprobada');
+
 -- La cola de la administración filtra por estado.
 CREATE INDEX IF NOT EXISTS idx_mascotas_estado  ON public.mascotas (project_id, estado);
 CREATE INDEX IF NOT EXISTS idx_vehiculos_estado ON public.vehiculos_residentes (project_id, estado);
@@ -491,6 +536,7 @@ DECLARE
   v_placa text;
   v_tipo  text;
   v_anio  int;
+  v_restriccion text;
 BEGIN
   IF current_user_role() <> 'cliente' THEN
     RAISE EXCEPTION 'Solo un residente puede enviar la solicitud desde el portal.';
@@ -534,6 +580,8 @@ BEGIN
 
   -- La misma placa no puede estar pendiente ni autorizada dos veces en el
   -- condominio (en otra unidad sería un vehículo que ya tiene dueño registrado).
+  -- Este IF EXISTS solo adelanta el mensaje en el caso común: la garantía es
+  -- idx_vehiculos_placa_unica, que también cubre dos envíos simultáneos.
   IF EXISTS (
     SELECT 1 FROM public.vehiculos_residentes x
      WHERE x.project_id = v_v.project_id AND x.id <> v_v.id
@@ -543,6 +591,7 @@ BEGIN
     RAISE EXCEPTION 'La placa % ya está registrada o en revisión en el condominio.', v_placa;
   END IF;
 
+  BEGIN
   UPDATE public.vehiculos_residentes
      SET placa           = v_placa,
          tipo            = v_tipo,
@@ -558,6 +607,15 @@ BEGIN
          activo          = false,
          fecha_solicitud = now()
    WHERE id = v_v.id;
+  EXCEPTION WHEN unique_violation THEN
+    -- Otra sesión envió la misma placa entre el IF EXISTS y este UPDATE: el
+    -- índice esperó a que confirmara y rechaza esta. Mismo mensaje que arriba.
+    GET STACKED DIAGNOSTICS v_restriccion = CONSTRAINT_NAME;
+    IF v_restriccion = 'idx_vehiculos_placa_unica' THEN
+      RAISE EXCEPTION 'La placa % ya está registrada o en revisión en el condominio.', v_placa;
+    END IF;
+    RAISE;
+  END;
 
   RETURN v_v.id;
 END;

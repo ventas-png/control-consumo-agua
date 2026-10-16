@@ -1,5 +1,5 @@
 // Cola de autorización de mascotas y vehículos que los residentes registran
-// desde el portal (20261101000000). Vive DENTRO de los tabs Mascotas y
+// desde el portal (20261031000500). Vive DENTRO de los tabs Mascotas y
 // Vehículos del panel admin (vista "Solicitudes"), con el mismo permiso que el
 // padrón: quien administra el padrón es quien lo autoriza.
 //

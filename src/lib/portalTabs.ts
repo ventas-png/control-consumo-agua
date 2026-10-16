@@ -34,7 +34,7 @@ export const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
 // del que la habita, y el RLS solo le proyecta las piezas de SU unidad (la
 // dirigida a la administración no lleva unidad_id y nunca le llega).
 // 'mascotas' y 'vehiculos' también: la mascota y el carro son de quien vive en
-// la unidad. Las RPC de 20261101000000 dejan registrar a cualquier residente
+// la unidad. Las RPC de 20261031000500 dejan registrar a cualquier residente
 // (mis_unidades_ids) y retirar/dar de baja a quien registró o al propietario.
 const TABS_NO_PROPIETARIO: readonly PortalTab[] = [
   'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes',

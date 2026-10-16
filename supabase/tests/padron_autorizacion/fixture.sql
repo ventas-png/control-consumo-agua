@@ -1,4 +1,4 @@
--- Fixture para EJECUTAR 20261101000000_padron_mascotas_vehiculos_autorizacion
+-- Fixture para EJECUTAR 20261031000500_padron_mascotas_vehiculos_autorizacion
 -- contra un Postgres real. Reproduce solo lo que la feature toca.
 --
 -- Las tablas `mascotas` y `vehiculos_residentes` se copian de su DDL original
