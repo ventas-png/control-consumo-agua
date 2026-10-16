@@ -167,8 +167,20 @@ inventario «ZZ PLA».
 
 ## Despliegue
 
-Solo la migración; no hay funciones Edge ni secretos nuevos. Producción se aplica por `apply-migrations-prod.yml` con la
-aprobación `production-db`; la huella de producción se refresca después en una PR aparte (como #942 / #943).
+Solo la migración; no hay funciones Edge ni secretos nuevos. Producción se aplica por `apply-migrations-prod.yml`
+(el workflow corre al fusionar en `main`, evento `push`, con la aprobación `production-db`); la huella de producción se
+refresca después en una PR aparte (como #942 / #943).
+
+**Desplegada el 2026-10-16** (PR #944 fusionada como `52b7f882`; run 38828352692 de «Apply Migrations to Production»,
+evento `push` al fusionar, `success` a las 00:15 UTC). Un disparo manual posterior del mismo workflow (run 38841271796,
+aprobado a las 12:55 UTC) abortó con la guarda «la versión YA está registrada» sin tocar producción: es el
+comportamiento esperado del cortafuegos append-only. Comprobación posterior de solo lectura en producción (13:05 UTC):
+885 migraciones, máx. `20261031000200`; `plantillas_importaciones` (RLS, 4 policies) y `plantillas_importacion_filas`
+(RLS, 3 policies); las nueve funciones con su modo (DEFINER solo `plantillas_import_puede_crear`, `plantillas_puede_editar`
+y `plantillas_tg_imp_solo_rpc`) y ACL (`authenticated` sí, `anon` no; el trigger no ejecutable); los dos triggers del
+candado; 0 lotes; los cuerpos de `plantillas_import_evaluar` y `plantillas_recursos_en_bloque` son los definitivos (mensaje
+de Inventario). Huella de producción recapturada a las 13:09 UTC (`scripts/schema-drift/huella-produccion.json`): 0 grupos
+cambiados y 32 nuevos, 3625 → 3657, exactamente los que el auditor de la PR anunció; `drift-conocido.json` no cambia.
 
 ## Recuperación
 
