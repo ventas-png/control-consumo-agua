@@ -1,0 +1,98 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- Recuperación tras desplegar 20261031000300 (catálogos RRHH: cargos y tipos de turno)
+-- ════════════════════════════════════════════════════════════════════════════
+-- NO se ejecuta sola ni en CI. Leer antes de correr. Regla general: ante un problema,
+-- preferir AVANZAR con una migración nueva. La migración no cambia ninguna fila existente
+-- de personal, actividades ni programaciones: sólo añade dos catálogos (sembrados con los
+-- valores de siempre), triggers de validación y retira tres CHECK literales.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── A) Reabrir la escritura sin catálogo (las pantallas siguen funcionando) ──────────
+-- Quita los triggers que validan contra el catálogo, vuelve a la lista literal en
+-- actividades y re-instala los tres CHECK. Los catálogos quedan (sólo lectura efectiva).
+-- Antes de re-ADD de los CHECK: ver B (una fila con un valor nuevo del catálogo haría
+-- fallar el ALTER; en ese caso usar `NOT VALID` o normalizarla).
+-- BEGIN;
+-- DROP TRIGGER IF EXISTS trg_personal_catalogo_rrhh    ON public.personal_condominio;
+-- DROP TRIGGER IF EXISTS trg_prog_limpieza_catalogo_rrhh ON public.programacion_limpieza;
+-- DROP TRIGGER IF EXISTS trg_ejec_limpieza_turno_rrhh  ON public.ejecuciones_limpieza;
+-- DROP TRIGGER IF EXISTS trg_rrhh_sembrar_catalogos    ON public.projects;
+-- CREATE OR REPLACE FUNCTION public.plantillas_cargo_valida_cargo()
+-- RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+-- BEGIN
+--   IF TG_OP = 'INSERT' OR NEW.cargo IS DISTINCT FROM OLD.cargo THEN
+--     IF lower(btrim(NEW.cargo)) NOT IN
+--        ('conserje', 'guardia', 'jardinero', 'mantenimiento', 'administrador', 'otro') THEN
+--       RAISE EXCEPTION 'PLANTILLAS_CARGO: cargo "%" fuera del catálogo (conserje|guardia|jardinero|mantenimiento|administrador|otro)', NEW.cargo
+--         USING ERRCODE = 'check_violation';
+--     END IF;
+--   END IF;
+--   RETURN NEW;
+-- END;
+-- $$;
+-- DROP TRIGGER IF EXISTS trg_plantillas_cargo_controlado ON public.plantillas_tarea_cargo;
+-- CREATE TRIGGER trg_plantillas_cargo_controlado
+--   BEFORE INSERT OR UPDATE OF cargo ON public.plantillas_tarea_cargo
+--   FOR EACH ROW EXECUTE FUNCTION public.plantillas_cargo_valida_cargo();
+-- ALTER TABLE public.programacion_limpieza ADD CONSTRAINT prog_limpieza_turno_check
+--   CHECK (turno IS NULL OR turno IN ('diurno', 'nocturno', 'rotativo'));
+-- ALTER TABLE public.programacion_limpieza ADD CONSTRAINT prog_limpieza_cargo_check
+--   CHECK (cargo IS NULL OR cargo IN ('conserje', 'guardia', 'jardinero', 'mantenimiento', 'administrador', 'otro'));
+-- ALTER TABLE public.ejecuciones_limpieza ADD CONSTRAINT ejec_limpieza_turno_check
+--   CHECK (turno IS NULL OR turno IN ('diurno', 'nocturno', 'rotativo'));
+-- COMMIT;
+
+-- ── B) Valores fuera de la lista original (solo lectura) ────────────────────────────
+-- Filas que ya usan un cargo o turno creado desde Configuración (no existían antes):
+-- SELECT 'personal' AS tabla, p.id, p.project_id, p.cargo, p.turno FROM public.personal_condominio p
+--  WHERE p.cargo NOT IN ('conserje','guardia','jardinero','mantenimiento','administrador','otro')
+--     OR p.turno NOT IN ('diurno','nocturno','rotativo')
+-- UNION ALL
+-- SELECT 'actividad', a.id, a.project_id, a.cargo, NULL FROM public.plantillas_tarea_cargo a
+--  WHERE a.cargo NOT IN ('conserje','guardia','jardinero','mantenimiento','administrador','otro')
+-- UNION ALL
+-- SELECT 'programacion', g.id, g.project_id, g.cargo, g.turno FROM public.programacion_limpieza g
+--  WHERE g.cargo NOT IN ('conserje','guardia','jardinero','mantenimiento','administrador','otro')
+--     OR g.turno NOT IN ('diurno','nocturno','rotativo')
+-- UNION ALL
+-- SELECT 'ejecucion', e.id, e.project_id, NULL, e.turno FROM public.ejecuciones_limpieza e
+--  WHERE e.turno NOT IN ('diurno','nocturno','rotativo');
+-- Lo que cada condominio personalizó (para decidir si se conserva):
+-- SELECT c.project_id, c.codigo, c.nombre, c.activo FROM public.rrhh_cargos c
+--  WHERE c.codigo NOT IN ('conserje','guardia','jardinero','mantenimiento','administrador','otro') OR NOT c.activo;
+-- SELECT t.project_id, t.codigo, t.nombre, t.activo FROM public.rrhh_tipos_turno t
+--  WHERE t.codigo NOT IN ('diurno','nocturno','rotativo') OR NOT t.activo;
+
+-- ── C) Revertir EXACTAMENTE el esquema (pierde los catálogos personalizados) ────────
+-- Antes, guardar una copia:
+--   CREATE TABLE public.zz_respaldo_rrhh_cargos      AS SELECT * FROM public.rrhh_cargos;
+--   CREATE TABLE public.zz_respaldo_rrhh_tipos_turno AS SELECT * FROM public.rrhh_tipos_turno;
+-- Y haber corrido A (que deja plantillas_import_evaluar sin cambios: restaurarla aquí).
+-- BEGIN;
+-- DROP FUNCTION IF EXISTS public.rrhh_tg_cargo_borrable();      -- cae con la tabla, explícito por claridad
+-- DROP FUNCTION IF EXISTS public.rrhh_tg_turno_borrable();
+-- DROP FUNCTION IF EXISTS public.rrhh_personal_valida_catalogo();
+-- DROP FUNCTION IF EXISTS public.rrhh_prog_limpieza_valida_catalogo();
+-- DROP FUNCTION IF EXISTS public.rrhh_ejec_limpieza_valida_turno();
+-- DROP FUNCTION IF EXISTS public.rrhh_sembrar_on_project();
+-- DROP FUNCTION IF EXISTS public.rrhh_sembrar_defaults(uuid, uuid);
+-- DROP FUNCTION IF EXISTS public.rrhh_cargo_en_uso(uuid, text);
+-- DROP FUNCTION IF EXISTS public.rrhh_turno_en_uso(uuid, text);
+-- DROP FUNCTION IF EXISTS public.rrhh_cargo_uso(uuid, text);
+-- DROP FUNCTION IF EXISTS public.rrhh_turno_uso(uuid, text);
+-- DROP FUNCTION IF EXISTS public.rrhh_cargo_valido(uuid, text, boolean);
+-- DROP FUNCTION IF EXISTS public.rrhh_turno_valido(uuid, text, boolean);
+-- DROP TABLE IF EXISTS public.rrhh_cargos;
+-- DROP TABLE IF EXISTS public.rrhh_tipos_turno;
+-- DROP FUNCTION IF EXISTS public.rrhh_catalogo_coherente();
+-- -- plantillas_import_evaluar: volver a pegar el cuerpo de 20261031000200 (líneas 238-499).
+-- DELETE FROM public.role_permissions WHERE permission_key LIKE 'condominios.tab.rrhh\_config%';
+-- DELETE FROM public.permissions      WHERE key            LIKE 'condominios.tab.rrhh\_config%';
+-- COMMIT;
+
+-- ── D) Comprobaciones ───────────────────────────────────────────────────────────────
+-- SELECT count(*) FROM public.rrhh_cargos;                          -- 6 × proyectos si nadie personalizó
+-- SELECT count(*) FROM public.rrhh_tipos_turno;                     -- 3 × proyectos
+-- SELECT conname FROM pg_constraint WHERE conname IN ('prog_limpieza_cargo_check','prog_limpieza_turno_check','ejec_limpieza_turno_check');
+-- SELECT tgname FROM pg_trigger WHERE tgname LIKE 'trg_%rrhh%' OR tgname = 'trg_plantillas_cargo_controlado';
+-- SELECT key FROM public.permissions WHERE key LIKE 'condominios.tab.rrhh\_config%';   -- 6

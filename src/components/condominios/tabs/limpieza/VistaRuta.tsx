@@ -20,16 +20,21 @@ import { MultiImageUploader } from '../../../shared/ImageUploader'
 import { ImageGallery } from '../../../shared/ImageGallery'
 import type {
   ProgramacionLimpieza, EjecucionLimpieza, PersonalCondominio, EstadoEjecucionLimpieza,
+  CargoCatalogo, TipoTurnoCatalogo,
 } from '../../../../types'
 import {
   areasDeEmpleado, construirRuta, avanceRuta, puedeCerrar, proximaEjecucion,
 } from '../../../../domain/condominios/limpieza'
-import { btn, chip, inputStyle, labelStyle, ESTADO_EJECUCION, PRIORIDAD_LABEL, TURNO_LABEL, CARGO_LABEL } from './ui'
+import { btn, chip, inputStyle, labelStyle, ESTADO_EJECUCION, PRIORIDAD_LABEL } from './ui'
+import { etiquetaCargo, etiquetaTurno, iconoTurno } from '../../../../domain/condominios/rrhhCatalogos'
 
 interface Props {
   programaciones: ProgramacionLimpieza[]
   ejecuciones: EjecucionLimpieza[]
   personal: PersonalCondominio[]
+  /** Catálogos del condominio (Configuración RRHH) para etiquetar cargo y turno. */
+  cargos?: CargoCatalogo[]
+  tiposTurno?: TipoTurnoCatalogo[]
   proyectoId: string
   companyId: string
   canCreate: boolean
@@ -38,7 +43,7 @@ interface Props {
 }
 
 export function VistaRuta({
-  programaciones, ejecuciones, personal, proyectoId, companyId, canCreate, canEdit, onRefresh,
+  programaciones, ejecuciones, personal, cargos = [], tiposTurno = [], proyectoId, companyId, canCreate, canEdit, onRefresh,
 }: Props) {
   const [fecha, setFecha] = useState(hoyLocalISO())
   const [empleadoId, setEmpleadoId] = useState('')
@@ -276,7 +281,7 @@ export function VistaRuta({
         initialValue: ejec.personal_id ?? '',
         options: [
           { value: '', label: '— Sin asignar —' },
-          ...disponibles.map(e => ({ value: e.id, label: `${e.nombre} · ${CARGO_LABEL[e.cargo] ?? e.cargo}` })),
+          ...disponibles.map(e => ({ value: e.id, label: `${e.nombre} · ${etiquetaCargo(e.cargo, cargos)}` })),
         ],
       }],
       submitText: 'Reasignar',
@@ -303,7 +308,7 @@ export function VistaRuta({
             <option value="">Todos los empleados</option>
             {disponibles.map(e => (
               <option key={e.id} value={e.id}>
-                {e.nombre} · {CARGO_LABEL[e.cargo] ?? e.cargo} · {TURNO_LABEL[e.turno]?.label ?? e.turno}
+                {e.nombre} · {etiquetaCargo(e.cargo, cargos)} · {etiquetaTurno(e.turno, tiposTurno)}
               </option>
             ))}
           </select>
@@ -361,7 +366,7 @@ export function VistaRuta({
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                       👤 {ejec.personal_id ? (nombrePersonal.get(ejec.personal_id) ?? 'Empleado dado de baja') : 'Sin asignar'}
-                      {ejec.turno && ` · ${TURNO_LABEL[ejec.turno]?.icon ?? ''} ${TURNO_LABEL[ejec.turno]?.label ?? ejec.turno}`}
+                      {ejec.turno && ` · ${iconoTurno(ejec.turno, tiposTurno)} ${etiquetaTurno(ejec.turno, tiposTurno)}`}
                     </div>
                     {prog?.notas && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px' }}>📋 {prog.notas}</div>}
                   </div>

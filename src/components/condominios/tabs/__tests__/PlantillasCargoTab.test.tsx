@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import type {
+  CatalogoRrhhItem,
   ItemInventario,
   PlantillaTareaCargo,
   PlantillaTareaHerramienta,
@@ -209,6 +210,30 @@ describe('PlantillasCargoTab — crear y editar actividades', () => {
     expect([...select.options].map(o => o.value)).toEqual([
       '', 'conserje', 'guardia', 'jardinero', 'mantenimiento', 'administrador', 'otro',
     ])
+  })
+
+  it('con el catálogo del condominio: ofrece sus activos; uno apagado se conserva al editar, marcado', async () => {
+    const item = (over: Partial<CatalogoRrhhItem>): CatalogoRrhhItem => ({
+      id: 'c', company_id: 'co1', project_id: 'p1', codigo: 'x', nombre: 'X', descripcion: null, icono: '👤',
+      orden: 0, activo: true, created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z', ...over,
+    })
+    const cargos = [
+      item({ id: 'c1', codigo: 'supervisor_piscina', nombre: 'Supervisor de piscina', icono: '🏊', orden: 5 }),
+      item({ id: 'c2', codigo: 'conserje', nombre: 'Conserje', icono: '🧹', orden: 10 }),
+      item({ id: 'c3', codigo: 'jardinero', nombre: 'Jardinero', icono: '🌿', orden: 30, activo: false }),
+    ]
+    renderTab({ cargos, plantillas: [plantilla({ cargo: 'jardinero' })] })
+    await esperarRecursos()
+    fireEvent.click(screen.getByText('+ Nueva actividad'))
+    let select = screen.getByLabelText('Cargo que desempeña la actividad') as HTMLSelectElement
+    expect([...select.options].map(o => o.value)).toEqual(['', 'supervisor_piscina', 'conserje'])
+    fireEvent.click(screen.getByText('Cancelar'))
+
+    fireEvent.click(screen.getByText('✏️ Editar'))
+    select = screen.getByLabelText('Cargo que desempeña la actividad') as HTMLSelectElement
+    expect(select.value).toBe('jardinero')
+    expect([...select.options].map(o => o.text)).toContain('🌿 Jardinero (inactivo)')
+    expect(screen.getByText(/ya no está activo en Configuración/)).toBeTruthy()
   })
 
   it('el cargo histórico (texto libre) se conserva como opción al editar', async () => {

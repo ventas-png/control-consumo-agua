@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import type {
   BloqueTurno, TareaBloque, RevisionTarea,
   RondaSeguridad, VisitaControl, PersonalCondominio,
+  CargoCatalogo, TipoTurnoCatalogo,
 } from '../../../types'
+import { etiquetaCargo, etiquetaTurno } from '../../../domain/condominios/rrhhCatalogos'
 import { hoyLocalISO, sumarDiasCalendario, diaLocalDeInstante } from '../../../lib/format'
 
 interface Props {
@@ -12,6 +14,9 @@ interface Props {
   rondas:        RondaSeguridad[]
   visitasControl: VisitaControl[]
   personal:      PersonalCondominio[]
+  /** Catálogos del condominio (Configuración RRHH) para nombrar cargo y turno. */
+  cargos?:       CargoCatalogo[]
+  tiposTurno?:   TipoTurnoCatalogo[]
 }
 
 type Periodo = '7' | '30' | '90'
@@ -35,7 +40,7 @@ function medalla(rank: number): string {
   return `#${rank + 1}`
 }
 
-export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visitasControl, personal }: Props) {
+export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visitasControl, personal, cargos = [], tiposTurno = [] }: Props) {
   const [periodo, setPeriodo] = useState<Periodo>('30')
   const [filtroCargo, setFiltroCargo] = useState('')
 
@@ -59,7 +64,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
     [rondas, cutoff],
   )
 
-  const cargos = useMemo(() => {
+  const cargosUsados = useMemo(() => {
     const set = new Set(personal.map(p => p.cargo))
     return Array.from(set).sort()
   }, [personal])
@@ -168,7 +173,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
       </div>
 
       {/* Filtro cargo */}
-      {cargos.length > 1 && (
+      {cargosUsados.length > 1 && (
         <div style={{ marginBottom: '16px', display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
           <button onClick={() => setFiltroCargo('')}
             style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid',
@@ -177,13 +182,13 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
               color: !filtroCargo ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             Todos los cargos
           </button>
-          {cargos.map(c => (
+          {cargosUsados.map(c => (
             <button key={c} onClick={() => setFiltroCargo(c)}
               style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid',
                 borderColor: filtroCargo === c ? 'var(--at-primary)' : 'var(--at-line)',
                 background: filtroCargo === c ? 'var(--at-primary-tint)' : 'var(--at-surface)',
                 color: filtroCargo === c ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
-              {c.replace(/_/g, ' ')}
+              {etiquetaCargo(c, cargos)}
             </button>
           ))}
         </div>
@@ -207,7 +212,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
                     <div style={{ fontSize: '24px', flexShrink: 0 }}>{typeof medalla(i) === 'string' && medalla(i).startsWith('#') ? <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--at-ink-3)', background: 'var(--at-chip)', borderRadius: '8px', padding: '4px 8px' }}>{medalla(i)}</span> : medalla(i)}</div>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--at-ink)' }}>{s.persona.nombre}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '1px' }}>{s.persona.cargo.replace(/_/g, ' ')} · Turno {s.persona.turno}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '1px' }}>{etiquetaCargo(s.persona.cargo, cargos)} · Turno {etiquetaTurno(s.persona.turno, tiposTurno)}</div>
                     </div>
                   </div>
 

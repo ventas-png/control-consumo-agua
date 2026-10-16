@@ -16,14 +16,20 @@ import { useState, useMemo } from 'react'
 import { hoyLocalISO } from '../../../../lib/format'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../../shared/Dialog'
-import type { AreaCondominio, ProgramacionLimpieza, PersonalCondominio } from '../../../../types'
+import type { AreaCondominio, ProgramacionLimpieza, PersonalCondominio,
+  CargoCatalogo, TipoTurnoCatalogo,
+} from '../../../../types'
 import { empleadosDeArea, sumarDias } from '../../../../domain/condominios/limpieza'
 import { nombreAreaDe } from '../../../../domain/condominios/areas'
-import { btn, chip, inputStyle, labelStyle, FRECUENCIA_LABEL, TURNO_LABEL, CARGO_LABEL } from './ui'
+import { btn, chip, inputStyle, labelStyle, FRECUENCIA_LABEL } from './ui'
+import { etiquetaCargo, etiquetaTurno, iconoTurno, opcionesSelect, CARGOS_DEFAULT, TURNOS_DEFAULT } from '../../../../domain/condominios/rrhhCatalogos'
 
 interface Props {
   programaciones: ProgramacionLimpieza[]
   personal: PersonalCondominio[]
+  /** Catálogos del condominio (Configuración RRHH): selects de turno y cargo. */
+  cargos?: CargoCatalogo[]
+  tiposTurno?: TipoTurnoCatalogo[]
   areas: AreaCondominio[]
   proyectoId: string
   companyId: string
@@ -59,7 +65,7 @@ const ALERTA_STYLE = {
   sin_fecha: { bg: 'var(--at-surface-2)', border: 'var(--at-line)', badge: 'var(--at-ink-3)', badgeBg: 'var(--at-chip)', label: 'Sin fecha' },
 }
 
-export function VistaAreas({ programaciones, personal, areas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
+export function VistaAreas({ programaciones, personal, cargos = [], tiposTurno = [], areas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({ ...BLANK })
@@ -259,7 +265,7 @@ export function VistaAreas({ programaciones, personal, areas, proyectoId, compan
               <select style={inputStyle} value={bloque.personal_id} onChange={e => setBloque(b => ({ ...b, personal_id: e.target.value }))}>
                 <option value="">— Sin empleado fijo —</option>
                 {disponibles.map(e => (
-                  <option key={e.id} value={e.id}>{e.nombre} · {CARGO_LABEL[e.cargo] ?? e.cargo}</option>
+                  <option key={e.id} value={e.id}>{e.nombre} · {etiquetaCargo(e.cargo, cargos)}</option>
                 ))}
               </select>
             </div>
@@ -267,14 +273,14 @@ export function VistaAreas({ programaciones, personal, areas, proyectoId, compan
               <label style={labelStyle}>Turno</label>
               <select style={inputStyle} value={bloque.turno} onChange={e => setBloque(b => ({ ...b, turno: e.target.value }))}>
                 <option value="">Cualquier turno</option>
-                {Object.entries(TURNO_LABEL).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+                {opcionesSelect(tiposTurno, bloque.turno, TURNOS_DEFAULT).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div>
               <label style={labelStyle}>Cargo</label>
               <select style={inputStyle} value={bloque.cargo} onChange={e => setBloque(b => ({ ...b, cargo: e.target.value }))}>
                 <option value="">Cualquier cargo</option>
-                {Object.entries(CARGO_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {opcionesSelect(cargos, bloque.cargo, CARGOS_DEFAULT).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
           </div>
@@ -331,14 +337,14 @@ export function VistaAreas({ programaciones, personal, areas, proyectoId, compan
               <label style={labelStyle}>Turno</label>
               <select style={inputStyle} value={form.turno} onChange={e => setF('turno', e.target.value)}>
                 <option value="">Cualquier turno</option>
-                {Object.entries(TURNO_LABEL).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+                {opcionesSelect(tiposTurno, form.turno, TURNOS_DEFAULT).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div>
               <label style={labelStyle}>Cargo</label>
               <select style={inputStyle} value={form.cargo} onChange={e => setF('cargo', e.target.value)}>
                 <option value="">Cualquier cargo</option>
-                {Object.entries(CARGO_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {opcionesSelect(cargos, form.cargo, CARGOS_DEFAULT).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div>
@@ -447,8 +453,8 @@ export function VistaAreas({ programaciones, personal, areas, proyectoId, compan
                     </span>
                   )}
                   <span style={chip(fr.bg, fr.color)}>{fr.label}</span>
-                  {p.turno && <span style={chip('var(--at-chip)', 'var(--at-ink-2)')}>{TURNO_LABEL[p.turno].icon} {TURNO_LABEL[p.turno].label}</span>}
-                  {p.cargo && <span style={chip('var(--at-chip)', 'var(--at-ink-2)')}>{CARGO_LABEL[p.cargo]}</span>}
+                  {p.turno && <span style={chip('var(--at-chip)', 'var(--at-ink-2)')}>{iconoTurno(p.turno, tiposTurno)} {etiquetaTurno(p.turno, tiposTurno)}</span>}
+                  {p.cargo && <span style={chip('var(--at-chip)', 'var(--at-ink-2)')}>{etiquetaCargo(p.cargo, cargos)}</span>}
                   {p.requiere_foto !== false && <span style={chip('var(--at-accent-tint)', 'var(--at-accent-hover)')}>📸 Foto</span>}
                   {p.activo
                     ? <span style={chip(al.badgeBg, al.badge)}>{al.label}</span>

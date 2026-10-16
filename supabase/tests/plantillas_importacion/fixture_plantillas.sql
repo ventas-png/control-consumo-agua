@@ -9,6 +9,9 @@
 -- · `plantillas_tarea_cargo` (20260424000060 + 20260904000200: columnas, CHECKs,
 --   plantilla_checklist_valido, ancla UNIQUE, policies vigentes) y el trigger del cargo en su
 --   versión vigente (20260904000400).
+--   NOTA: 20261031000300 (catálogos RRHH) reemplaza el cuerpo de ese trigger para leer
+--   `rrhh_cargos`; esta suite aplica la serie hasta 20261031000200 y conserva la versión
+--   literal a propósito. La versión con catálogo la prueba supabase/tests/rrhh_catalogos.
 -- · Las puentes `plantilla_tarea_suministros` / `plantilla_tarea_herramientas` (20260904000300)
 --   con `plantilla_recurso_coherente`, el sello `creado_por` y sus policies.
 
