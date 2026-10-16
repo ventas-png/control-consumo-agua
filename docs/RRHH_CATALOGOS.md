@@ -148,6 +148,17 @@ PR aparte (como #945). Impacto en datos: ninguna fila existente cambia de valor;
 condominio (8 condominios → 48 + 24 filas). Producción (solo lectura, 2026-10-16) usa exclusivamente los valores de
 siempre, así que ningún empleado, actividad ni programación queda fuera del catálogo.
 
+**Desplegada el 2026-10-16** (PR #946 fusionada como `efbab83a`; run 38945427734 de «Apply Migrations to Production», evento
+`push` al fusionar, `success` a las 18:11 UTC tras la aprobación de `production-db`). Comprobación posterior de solo lectura en
+producción (18:20 UTC): 886 migraciones, máx. `20261031000300`; 8 proyectos con 6 cargos y 3 turnos cada uno (48 / 24 filas);
+los tres CHECK literales retirados; los 7 triggers; 6 claves RBAC, 6 grants del Administrador General y 30 grants en total;
+0 empleados, actividades o programaciones fuera del catálogo; las 14 funciones `rrhh_*` con su modo (DEFINER salvo los tres
+triggers de validación INVOKER) y ACL (`authenticated` solo en los dos validadores y los dos `en_uso`; `anon` en ninguna).
+Huella de producción recapturada a las 18:20 UTC (`scripts/schema-drift/huella-produccion.json`): 9 grupos cambiados y 42
+nuevos, 3657 → 3699, exactamente los que el auditor de la PR anunció; los 3646 grupos que la PR no toca son idénticos a la
+captura anterior y el sha256 completo coincide con el medido en producción; `drift-conocido.json` no cambia. «ZZ RRH» retirado
+del sandbox el mismo día (comprobación de solo lectura: 0 empresas, usuarios, roles, cargos y personal).
+
 ## Recuperación
 
 `scripts/reversion-rrhh-catalogos.sql`: A) reabrir la escritura sin catálogo (quitar los triggers, volver a la lista
