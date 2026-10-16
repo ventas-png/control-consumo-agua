@@ -85,6 +85,8 @@ export const SECTIONS: SectionDef[] = [
     'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza',
     // Con qué se les mide
     'desempeno_personal', 'actividad_equipo',
+    // Lo que el área define una vez y el resto consume: cargos y tipos de turno
+    'rrhh_config',
   ]},
   { id: 'especiales', label: 'Especiales', tabs: [
     'str', 'locales', 'housekeeping', 'concierge', 'residuos', 'sostenibilidad',

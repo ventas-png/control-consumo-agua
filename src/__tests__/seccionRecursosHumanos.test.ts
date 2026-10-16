@@ -34,6 +34,8 @@ const TABS_RRHH = [
   'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
   'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza',
   'desempeno_personal', 'actividad_equipo',
+  // Catálogos del área (20261031000300): cargos y tipos de turno.
+  'rrhh_config',
 ] as const
 
 /**

@@ -8,6 +8,7 @@ import {
   fetchTareasBloqueData,
   fetchCondominiosLimpiezaData,
   fetchCondominiosTurnosData,
+  fetchCondominiosRrhhCatalogosData,
 } from '../../domain/condominios/sectionData'
 import { track } from '../../lib/analytics'
 import { canViewCondominiosTabByPermission, canActInCondominiosTab } from '../../lib/permissions'
@@ -48,6 +49,7 @@ import type {
   ChecklistArea, ProgramacionLimpieza, EjecucionLimpieza, ConsumoEnergiaArea, HistorialResidente,
   EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
   PlantillaHorario, AsignacionTurno, DiaNoLaborable, AusenciaPersonal, ExcepcionTurno,
+  CargoCatalogo, TipoTurnoCatalogo,
   SuministroCondominio, MovimientoSuministro, TareaCondominio, GestionCobranza,
   SolicitudCertificado, VisitaFrecuente, ArticuloReglamento, ControlPlagas,
   CargoAdicionalUnidad, ProgramaActividad, RegistroAutoridad, NotaAdmin,
@@ -283,6 +285,9 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [diasNoLaborables, setDiasNoLaborables] = useState<DiaNoLaborable[]>([])
   const [ausenciasPersonal, setAusenciasPersonal] = useState<AusenciaPersonal[]>([])
   const [excepcionesTurno, setExcepcionesTurno] = useState<ExcepcionTurno[]>([])
+  // Catálogos de cargos y tipos de turno del condominio (20261031000300)
+  const [cargosPersonal, setCargosPersonal] = useState<CargoCatalogo[]>([])
+  const [tiposTurno, setTiposTurno] = useState<TipoTurnoCatalogo[]>([])
   // Fase 21
   const [suministros, setSuministros] = useState<SuministroCondominio[]>([])
   const [movimientosSuministro, setMovimientosSuministro] = useState<MovimientoSuministro[]>([])
@@ -528,6 +533,13 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     } else {
       setTareasBloque([]); setRevisionesTarea([])
     }
+
+    // Catálogos de cargos y tipos de turno (20261031000300). Aparte del
+    // Promise.all grande: sin la migración, listas vacías y los tabs caen a
+    // los valores de siempre.
+    const [cargosRes, tiposTurnoRes] = await fetchCondominiosRrhhCatalogosData(pid, cid)
+    setCargosPersonal((cargosRes.data ?? []) as CargoCatalogo[])
+    setTiposTurno((tiposTurnoRes.data ?? []) as TipoTurnoCatalogo[])
 
     // Control de asignación de turnos (20260820000000 / 000100). Aparte del
     // Promise.all grande por el mismo motivo que las rutas de limpieza: las
@@ -777,6 +789,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     progLimpieza, ejecLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
     plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal, excepcionesTurno,
+    cargosPersonal, tiposTurno,
     tareasCond, cobranzas, certificados, visitasFrecuentes, reglamento,
     controlPlagas, cargosAdicionales, programaActividades, registroAutoridades,
     notasAdmin, controlPiscina, mantenimientoJardineria, incidenciasElevador,
@@ -811,6 +824,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     progLimpieza, ejecLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
     plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal, excepcionesTurno,
+    cargosPersonal, tiposTurno,
     tareasCond, cobranzas, certificados, visitasFrecuentes, reglamento,
     controlPlagas, cargosAdicionales, programaActividades, registroAutoridades,
     notasAdmin, controlPiscina, mantenimientoJardineria, incidenciasElevador,

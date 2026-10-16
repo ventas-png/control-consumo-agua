@@ -28,9 +28,10 @@ import { ImportarActividadesModal } from './tabs/ImportarActividadesModal'
 import { RecursosEnBloqueModal } from './RecursosEnBloqueModal'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../domain/condominios/tabMutations'
 import { fetchRecursosPlantillas } from '../../domain/condominios/tabQueries'
-import { CARGO_LABEL } from './tabs/limpieza/ui'
+import { etiquetaCargo, opcionesSelect } from '../../domain/condominios/rrhhCatalogos'
 import type {
   AreaCondominio,
+  CargoCatalogo,
   ItemInventario,
   PlantillaTareaCargo,
   PlantillaTareaHerramienta,
@@ -41,6 +42,8 @@ import type {
 
 interface Props {
   plantillas: PlantillaTareaCargo[]
+  /** Cargos del condominio (Recursos Humanos → Configuración); sin catálogo, los seis de siempre. */
+  cargos?: CargoCatalogo[]
   areas: AreaCondominio[]
   suministros: SuministroCondominio[]
   inventario: ItemInventario[]
@@ -91,11 +94,6 @@ const labelStyle = {
   display: 'block', marginBottom: '4px',
 } as const
 
-/** Etiqueta del cargo; los valores históricos (texto libre) se muestran tal cual. */
-function etiquetaCargo(cargo: string): string {
-  return (CARGO_LABEL as Record<string, string>)[cargo] ?? cargo
-}
-
 const idDePlantilla = (p: PlantillaTareaCargo) => p.id
 
 function blankForm() {
@@ -109,7 +107,7 @@ function blankForm() {
 }
 
 export function ActividadesCatalog({
-  plantillas, areas, suministros, inventario, proyectoId, companyId,
+  plantillas, cargos = [], areas, suministros, inventario, proyectoId, companyId,
   canCreate, canEdit, canDelete, onRefresh,
   servicioInicial, soloLectura = false, seleccion, titulo, subtitulo,
 }: Props) {
@@ -161,7 +159,7 @@ export function ActividadesCatalog({
   }, [recHerramientas])
 
   // ── Filtros y agrupación ───────────────────────────────────────────────────
-  const cargos = Array.from(new Set(plantillas.map(p => p.cargo))).sort()
+  const cargosUsados = Array.from(new Set(plantillas.map(p => p.cargo))).sort()
   const filtradas = useMemo(() => [...plantillas]
     .filter(p => filtroCargo === 'todos' || p.cargo === filtroCargo)
     .filter(p => filtroServicio === 'todos'
@@ -180,11 +178,13 @@ export function ActividadesCatalog({
     filtradas.reduce((m, p) => { m.set(p.cargo, [...(m.get(p.cargo) ?? []), p]); return m }, new Map<string, PlantillaTareaCargo[]>())
   )
 
-  // Cargo con valores controlados (el catálogo de personal_condominio). Al
-  // editar un legado con cargo libre, su valor actual se ofrece tal cual —
-  // conservarlo es válido (el trigger de BD solo controla INSERT); cambiar es
-  // elegir del catálogo.
-  const cargoEsHistorico = form.cargo !== '' && !(form.cargo in (CARGO_LABEL as Record<string, string>))
+  // Cargo con valores controlados: los ACTIVOS del catálogo del condominio
+  // (rrhh_cargos). Al editar una actividad con un cargo apagado o legado, su
+  // valor actual se ofrece marcado — conservarlo es válido (el trigger de BD
+  // sólo valida cuando el valor CAMBIA); cambiar es elegir uno activo.
+  const etiquetaDe = (c: string) => etiquetaCargo(c, cargos)
+  const opcionesCargo = opcionesSelect(cargos, form.cargo)
+  const cargoEsHistorico = form.cargo !== '' && !opcionesCargo.some(o => o.value === form.cargo && !o.inactivo && !o.historico)
 
   // ── Form (borrador: nada persiste hasta Guardar) ───────────────────────────
   function startEdit(p: PlantillaTareaCargo) {
@@ -454,7 +454,7 @@ export function ActividadesCatalog({
           <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
             {subtitulo ?? (
               <>
-                {plantillas.filter(p => p.activo).length} activas · {cargos.length} cargo{cargos.length !== 1 ? 's' : ''}
+                {plantillas.filter(p => p.activo).length} activas · {cargosUsados.length} cargo{cargosUsados.length !== 1 ? 's' : ''}
                 {plantillas.some(p => !p.servicio) && ` · ${plantillas.filter(p => !p.servicio).length} sin clasificar`}
               </>
             )}
@@ -519,12 +519,11 @@ export function ActividadesCatalog({
               <label style={labelStyle}>Cargo que la desempeña *</label>
               <select value={form.cargo} onChange={e => setForm(f => ({ ...f, cargo: e.target.value }))} style={inputStyle} aria-label="Cargo que desempeña la actividad">
                 <option value="">— Selecciona el cargo —</option>
-                {cargoEsHistorico && <option value={form.cargo}>{form.cargo} (valor histórico)</option>}
-                {Object.entries(CARGO_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {opcionesCargo.map(o => <option key={o.value} value={o.value}>{o.historico ? `${o.value} (valor histórico)` : o.label}</option>)}
               </select>
               {cargoEsHistorico && (
                 <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', marginTop: '4px' }}>
-                  ⚠ Cargo con texto libre anterior. Podés conservarlo o elegir uno del catálogo.
+                  ⚠ Este cargo ya no está activo en Configuración. Podés conservarlo o elegir uno activo.
                 </div>
               )}
             </div>
@@ -642,11 +641,11 @@ export function ActividadesCatalog({
         )}
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
-        {(['todos', ...cargos] as string[]).map(c => (
+        {(['todos', ...cargosUsados] as string[]).map(c => (
           <button key={c} onClick={() => setFiltroCargo(c)}
             style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: 'none',
               background: filtroCargo === c ? 'var(--at-warning-tint)' : 'var(--at-chip)', color: filtroCargo === c ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
-            {c === 'todos' ? `Todos (${plantillas.length})` : `${etiquetaCargo(c)} (${plantillas.filter(p => p.cargo === c).length})`}
+            {c === 'todos' ? `Todos (${plantillas.length})` : `${etiquetaDe(c)} (${plantillas.filter(p => p.cargo === c).length})`}
           </button>
         ))}
       </div>
@@ -677,7 +676,7 @@ export function ActividadesCatalog({
             <div key={cargo}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                 <span style={{ fontWeight: 800, fontSize: '14px', color: 'var(--at-warning-strong)', background: 'var(--at-warning-tint)', padding: '4px 12px', borderRadius: '20px' }}>
-                  {etiquetaCargo(cargo)}
+                  {etiquetaDe(cargo)}
                 </span>
                 <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{tareas.length} actividad{tareas.length !== 1 ? 'es' : ''}</span>
               </div>

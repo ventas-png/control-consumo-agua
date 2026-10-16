@@ -16,13 +16,17 @@ import type {
   BloqueTurno, TareaBloque, PlantillaTareaCargo,
   PersonalCondominio, AreaCondominio, TareaBloqueSuministro,
   EstadoBloqueTurno, TurnoTipo, EstadoTareaBloque,
+  CargoCatalogo,
 } from '../../../types'
+import { etiquetaCargo } from '../../../domain/condominios/rrhhCatalogos'
 
 interface Props {
   bloques: BloqueTurno[]
   tareas: TareaBloque[]
   plantillas: PlantillaTareaCargo[]
   personal: PersonalCondominio[]
+  /** Cargos del condominio (Configuración RRHH) para nombrarlos en pantalla. */
+  cargos?: CargoCatalogo[]
   areas: AreaCondominio[]
   proyectoId: string
   companyId: string
@@ -58,7 +62,7 @@ function blankBloque(hoy: string) {
 
 export function TareasPersonalTab({
   bloques, tareas, plantillas, personal, areas,
-  proyectoId, companyId, userId, canCreate, canEdit, onRefresh,
+  proyectoId, companyId, userId, canCreate, canEdit, onRefresh, cargos = [],
 }: Props) {
   const hoy = hoyLocalISO()
   const [saving, setSaving] = useState(false)
@@ -429,7 +433,7 @@ export function TareasPersonalTab({
               <select value={bloqueForm.personal_id} onChange={e => setBloqueForm(f => ({ ...f, personal_id: e.target.value }))}
                 style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 <option value="">Seleccionar empleado...</option>
-                {personalActivo.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.cargo}</option>)}
+                {personalActivo.map(p => <option key={p.id} value={p.id}>{p.nombre} — {etiquetaCargo(p.cargo, cargos)}</option>)}
               </select>
             </div>
             <div>
@@ -466,7 +470,7 @@ export function TareasPersonalTab({
         <select value={selectedPersonalId} onChange={e => setSelectedPersonalId(e.target.value)}
           style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }}>
           <option value="todos">Todos los empleados</option>
-          {personalActivo.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.cargo}</option>)}
+          {personalActivo.map(p => <option key={p.id} value={p.id}>{p.nombre} — {etiquetaCargo(p.cargo, cargos)}</option>)}
         </select>
         <input type="date" value={selectedFecha} onChange={e => setSelectedFecha(e.target.value)}
           style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
@@ -502,7 +506,7 @@ export function TareasPersonalTab({
                   <span style={{ fontSize: '22px' }}>{tc.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)' }}>
-                      {empleado?.nombre ?? 'Empleado'} — {empleado?.cargo ?? ''}
+                      {empleado?.nombre ?? 'Empleado'} — {empleado?.cargo ? etiquetaCargo(empleado.cargo, cargos) : ''}
                     </div>
                     <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '2px' }}>
                       <span style={{ background: tc.bg, color: tc.color, padding: '1px 8px', borderRadius: '20px', fontWeight: 600 }}>{tc.label}</span>
@@ -550,7 +554,7 @@ export function TareasPersonalTab({
                         {Array.from(new Set(plantillas.filter(p => p.activo && p.cargo.toLowerCase() === (empleado.cargo ?? '').toLowerCase()).map(p => p.cargo))).map(cargo => (
                           <button key={cargo} onClick={() => agregarDesdePlantillas(bloque.id, cargo)} disabled={saving}
                             style={{ padding: '7px 14px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: '1.5px solid var(--at-warning-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600 }}>
-                            📋 Cargar tareas de {cargo}
+                            📋 Cargar tareas de {etiquetaCargo(cargo, cargos)}
                           </button>
                         ))}
                       </div>
@@ -759,7 +763,7 @@ export function TareasPersonalTab({
                                 }} style={{ width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-warning-border)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-warning-tint)' }}>
                                   <option value="">Tarea personalizada</option>
                                   {plantillas.filter(p => p.activo).sort((a, b) => a.cargo.localeCompare(b.cargo) || a.orden - b.orden).map(p => (
-                                    <option key={p.id} value={p.id}>{p.cargo} — {p.titulo}</option>
+                                    <option key={p.id} value={p.id}>{etiquetaCargo(p.cargo, cargos)} — {p.titulo}</option>
                                   ))}
                                 </select>
                               </div>

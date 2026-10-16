@@ -611,8 +611,43 @@ export type TipoPoliza = 'incendio' | 'responsabilidad_civil' | 'terremoto' | 'i
 export type EstadoPoliza = 'vigente' | 'vencida' | 'cancelada'
 export type TipoInspeccion = 'bomberos' | 'igss' | 'municipalidad' | 'electrica' | 'sanitaria' | 'elevadores' | 'otro'
 export type ResultadoInspeccion = 'aprobado' | 'aprobado_con_observaciones' | 'reprobado' | 'pendiente'
-export type CargoPersonal = 'conserje' | 'guardia' | 'jardinero' | 'mantenimiento' | 'administrador' | 'otro'
-export type TurnoPersonal = 'diurno' | 'nocturno' | 'rotativo'
+/**
+ * Código de cargo del personal. Desde 20261031000300 es el `codigo` de un
+ * cargo del catálogo del condominio (`rrhh_cargos`; los seis de siempre
+ * —conserje, guardia, jardinero, mantenimiento, administrador, otro— vienen
+ * sembrados). Las etiquetas e íconos se resuelven con
+ * domain/condominios/rrhhCatalogos, nunca con un mapa literal.
+ */
+export type CargoPersonal = string
+/**
+ * Código del tipo de turno del EXPEDIENTE (`rrhh_tipos_turno`: diurno,
+ * nocturno, rotativo por defecto). No es la jornada de `bloques_turno`
+ * (manana/tarde/noche).
+ */
+export type TurnoPersonal = string
+
+/** Fila de `rrhh_cargos` o `rrhh_tipos_turno`: catálogo por condominio (20261031000300). */
+export interface CatalogoRrhhItem {
+  id: string
+  company_id: string
+  project_id: string
+  /** Slug inmutable `^[a-z0-9][a-z0-9_]{0,39}$`: lo que guardan personal, actividades y programaciones. */
+  codigo: string
+  nombre: string
+  descripcion?: string | null
+  icono: string
+  orden: number
+  activo: boolean
+  creado_por?: string | null
+  created_at: string
+  updated_at: string
+}
+export type CargoCatalogo = CatalogoRrhhItem
+export type TipoTurnoCatalogo = CatalogoRrhhItem
+/** Resultado de `rrhh_cargo_en_uso`. */
+export interface UsoCargo { personal: number; actividades: number; programaciones: number }
+/** Resultado de `rrhh_turno_en_uso`. */
+export interface UsoTurno { personal: number; programaciones: number; ejecuciones: number }
 export type EstadoPersonal = 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad'
 
 export interface ItemInventario {

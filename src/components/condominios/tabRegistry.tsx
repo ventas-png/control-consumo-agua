@@ -18,6 +18,7 @@ import type {
   AreaCondominio, RutaRonda, PuntoControlRuta, PuntoVerificacion, VisitaControl,
   PlantillaTareaCargo, BloqueTurno, TareaBloque, RevisionTarea,
   PlantillaHorario, AsignacionTurno, DiaNoLaborable, AusenciaPersonal, ExcepcionTurno,
+  CargoCatalogo, TipoTurnoCatalogo,
   Asamblea, ContratoProveedor, ObjetoPerdido, AgendaItem,
   ItemInventario, PolizaSeguro, InspeccionNormativa, PersonalCondominio,
   ContactoEmergencia, DocumentoCondominio, RegistroResiduo,
@@ -104,7 +105,7 @@ export type CondominioTab =
   | 'desempeno_personal' | 'reporte_consolidado' | 'comunicacion_condominios'
   | 'benchmarking'
   | 'turnos' | 'ausencias' | 'horas_extra'
-  | 'areas_config'
+  | 'areas_config' | 'rrhh_config'
 
 // ── Contexto pasado a cada `render(ctx)` ─────────────────────────────────────
 // Centraliza todo el estado y derivados que CondominiosSection tenía dispersos
@@ -165,6 +166,9 @@ export interface CondominiosTabContext {
   polizas: PolizaSeguro[]
   inspecciones: InspeccionNormativa[]
   personal: PersonalCondominio[]
+  /** Catálogos del condominio (rrhh_cargos / rrhh_tipos_turno): los selects de cargo y turno salen de aquí. */
+  cargosPersonal: CargoCatalogo[]
+  tiposTurno: TipoTurnoCatalogo[]
   clientesBirthday: { id: string; nombre: string; fecha_nacimiento: string; unidad_nombre?: string }[]
   contactosEmergencia: ContactoEmergencia[]
   documentos: DocumentoCondominio[]
@@ -306,6 +310,7 @@ const InfraccionesTab = lazy(() => import('./tabs/InfraccionesTab').then(m => ({
 const SeguridadTab = lazy(() => import('./tabs/SeguridadTab').then(m => ({ default: m.SeguridadTab })))
 const RutasRondaTab = lazy(() => import('./tabs/RutasRondaTab').then(m => ({ default: m.RutasRondaTab })))
 const AreasCondominioTab = lazy(() => import('./tabs/AreasCondominioTab').then(m => ({ default: m.AreasCondominioTab })))
+const RrhhConfiguracionTab = lazy(() => import('./tabs/RrhhConfiguracionTab').then(m => ({ default: m.RrhhConfiguracionTab })))
 const PlantillasCargoTab = lazy(() => import('./tabs/PlantillasCargoTab').then(m => ({ default: m.PlantillasCargoTab })))
 const TareasPersonalTab = lazy(() => import('./tabs/TareasPersonalTab').then(m => ({ default: m.TareasPersonalTab })))
 const RevisionTareasTab = lazy(() => import('./tabs/RevisionTareasTab').then(m => ({ default: m.RevisionTareasTab })))
@@ -512,13 +517,13 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'rutas_ronda', label: 'Rutas Ronda', icon: '🗺️', render: (ctx) =>
     <RutasRondaTab areas={ctx.areas} rutas={ctx.rutas} puntosControl={ctx.puntosControl} puntosVerificacion={ctx.puntosVerificacion} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('rutas_ronda')} canEdit={ctx.canEdit('rutas_ronda')} canDelete={ctx.canDelete('rutas_ronda')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'plantillas_cargo', label: 'Plantillas', icon: '📋', render: (ctx) =>
-    <PlantillasCargoTab plantillas={ctx.plantillasCargo} areas={ctx.areas} suministros={ctx.suministros} inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('plantillas_cargo')} canEdit={ctx.canEdit('plantillas_cargo')} canDelete={ctx.canDelete('plantillas_cargo')} onRefresh={ctx.onRefresh} /> },
+    <PlantillasCargoTab plantillas={ctx.plantillasCargo} cargos={ctx.cargosPersonal} areas={ctx.areas} suministros={ctx.suministros} inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('plantillas_cargo')} canEdit={ctx.canEdit('plantillas_cargo')} canDelete={ctx.canDelete('plantillas_cargo')} onRefresh={ctx.onRefresh} /> },
   { id: 'tareas_personal', label: 'Tareas por turno', icon: '⚙️', render: (ctx) =>
-    <TareasPersonalTab bloques={ctx.bloquesTurno} tareas={ctx.tareasBloque} plantillas={ctx.plantillasCargo} personal={ctx.personal} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('tareas_personal')} canEdit={ctx.canEdit('tareas_personal')} onRefresh={ctx.onRefresh} /> },
+    <TareasPersonalTab bloques={ctx.bloquesTurno} tareas={ctx.tareasBloque} plantillas={ctx.plantillasCargo} personal={ctx.personal} cargos={ctx.cargosPersonal} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('tareas_personal')} canEdit={ctx.canEdit('tareas_personal')} onRefresh={ctx.onRefresh} /> },
   { id: 'revision_tareas', label: 'Revisión Admin', icon: '🔍', render: (ctx) =>
     <RevisionTareasTab bloques={ctx.bloquesTurno} tareas={ctx.tareasBloque} revisiones={ctx.revisionesTarea} personal={ctx.personal} userId={ctx.uid} canEdit={ctx.canEdit('revision_tareas')} onRefresh={ctx.onRefresh} /> },
   { id: 'desempeno_personal', label: 'Desempeño', icon: '🏆', render: (ctx) =>
-    <DesempenoPersonalTab bloques={ctx.bloquesTurno} tareas={ctx.tareasBloque} revisiones={ctx.revisionesTarea} rondas={ctx.rondas} visitasControl={ctx.visitasControl} personal={ctx.personal} /> },
+    <DesempenoPersonalTab bloques={ctx.bloquesTurno} tareas={ctx.tareasBloque} revisiones={ctx.revisionesTarea} rondas={ctx.rondas} visitasControl={ctx.visitasControl} personal={ctx.personal} cargos={ctx.cargosPersonal} tiposTurno={ctx.tiposTurno} /> },
   { id: 'reporte_consolidado', label: 'Rpt. Consolidado', icon: '📋', render: (ctx) =>
     <ReporteConsolidadoTab cuotas={ctx.cuotas} gastos={ctx.gastos} tickets={ctx.tickets} presupuestos={ctx.presupuestos} visitantes={ctx.visitantes} novedades={ctx.novedades} rondas={ctx.rondas} anuncios={ctx.anuncios} reservas={ctx.reservas} bloques={ctx.bloquesTurno} tareas={ctx.tareasBloque} unidades={ctx.unidadesProyecto} paquetes={ctx.paquetes} moneda={ctx.moneda} proyectoNombre={ctx.proyectoActual?.nombre} /> },
   { id: 'benchmarking', label: 'Benchmarking', icon: '🏆', render: (ctx) =>
@@ -534,7 +539,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'agenda', label: 'Agenda', icon: '📅', render: (ctx) =>
     <AgendaTab agenda={ctx.agenda} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('agenda')} canEdit={ctx.canEdit('agenda')} onRefresh={ctx.onRefresh} /> },
   { id: 'cumpleanos', label: 'Cumpleaños', icon: '🎂', render: (ctx) =>
-    <CumpleanosTab personal={ctx.personal} clientesBirthday={ctx.clientesBirthday} proyectoNombre={ctx.proyectoActual?.nombre} /> },
+    <CumpleanosTab personal={ctx.personal} cargos={ctx.cargosPersonal} clientesBirthday={ctx.clientesBirthday} proyectoNombre={ctx.proyectoActual?.nombre} /> },
   { id: 'inventario', label: 'Inventario', icon: '🗃️', render: (ctx) =>
     <InventarioTab inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('inventario')} canEdit={ctx.canEdit('inventario')} onRefresh={ctx.onRefresh} /> },
   // Etiqueta "Seguros": el id/tab gestiona pólizas de SEGURO; el nombre "Pólizas"
@@ -544,7 +549,9 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'inspecciones', label: 'Inspecciones', icon: '🏛️', render: (ctx) =>
     <InspeccionesTab inspecciones={ctx.inspecciones} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('inspecciones')} canEdit={ctx.canEdit('inspecciones')} onRefresh={ctx.onRefresh} /> },
   { id: 'personal', label: 'Personal', icon: '👥', render: (ctx) =>
-    <PersonalTab personal={ctx.personal} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('personal')} canEdit={ctx.canEdit('personal')} onRefresh={ctx.onRefresh} /> },
+    <PersonalTab personal={ctx.personal} cargos={ctx.cargosPersonal} tiposTurno={ctx.tiposTurno} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('personal')} canEdit={ctx.canEdit('personal')} onRefresh={ctx.onRefresh} /> },
+  { id: 'rrhh_config', label: 'Configuración', icon: '⚙️', render: (ctx) =>
+    <RrhhConfiguracionTab cargos={ctx.cargosPersonal} tiposTurno={ctx.tiposTurno} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('rrhh_config')} canEdit={ctx.canEdit('rrhh_config')} canDelete={ctx.canDelete('rrhh_config')} onRefresh={ctx.onRefresh} /> },
   { id: 'emergencias', label: 'Emergencias', icon: '🆘', render: (ctx) =>
     <EmergenciasTab contactos={ctx.contactosEmergencia} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('emergencias')} canEdit={ctx.canEdit('emergencias')} onRefresh={ctx.onRefresh} /> },
   { id: 'documentos', label: 'Documentos', icon: '📁', render: (ctx) =>
@@ -592,7 +599,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'calendario', label: 'Calendario', icon: '📅', render: (ctx) =>
     <CalendarioTab eventos={ctx.eventosCalendario} asambleas={ctx.asambleas} agenda={ctx.agenda} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('calendario')} canEdit={ctx.canEdit('calendario')} onRefresh={ctx.onRefresh} /> },
   { id: 'directorio', label: 'Directorio', icon: '📒', render: (ctx) =>
-    <DirectorioTab personal={ctx.personal} contactosEmergencia={ctx.contactosEmergencia} proyectoId={ctx.proyectoId} companyId={ctx.cid} /> },
+    <DirectorioTab personal={ctx.personal} cargos={ctx.cargosPersonal} contactosEmergencia={ctx.contactosEmergencia} proyectoId={ctx.proyectoId} companyId={ctx.cid} /> },
   { id: 'configuracion', label: 'Configuración', icon: '⚙️', render: (ctx) =>
     <ConfiguracionTab configuracion={ctx.configuracion} proyectoId={ctx.proyectoId} companyId={ctx.cid} canEdit={ctx.canEdit('configuracion')} onRefresh={ctx.onRefresh} /> },
   { id: 'solicitudes', label: 'Solicitudes', icon: '📥', render: (ctx) =>
@@ -670,7 +677,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'checklist_areas', label: 'Checklist', icon: '🗒️', render: (ctx) =>
     <ChecklistAreasTab checklists={ctx.checklistAreas} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('checklist_areas')} canEdit={ctx.canEdit('checklist_areas')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'prog_limpieza', label: 'Limpieza', icon: '🧹', render: (ctx) =>
-    <ProgramacionLimpiezaTab programaciones={ctx.progLimpieza} ejecuciones={ctx.ejecLimpieza} personal={ctx.personal} areas={ctx.areas} plantillas={ctx.plantillasCargo} suministros={ctx.suministros} inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('prog_limpieza')} canEdit={ctx.canEdit('prog_limpieza')} canDelete={ctx.canDelete('prog_limpieza')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
+    <ProgramacionLimpiezaTab programaciones={ctx.progLimpieza} ejecuciones={ctx.ejecLimpieza} personal={ctx.personal} cargos={ctx.cargosPersonal} tiposTurno={ctx.tiposTurno} areas={ctx.areas} plantillas={ctx.plantillasCargo} suministros={ctx.suministros} inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('prog_limpieza')} canEdit={ctx.canEdit('prog_limpieza')} canDelete={ctx.canDelete('prog_limpieza')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'consumo_energia', label: 'Consumo Energía', icon: '⚡', render: (ctx) =>
     <ConsumoEnergiaAreasTab consumos={ctx.consumoEnergia} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('consumo_energia')} canEdit={ctx.canEdit('consumo_energia')} onRefresh={ctx.onRefresh} /> },
   { id: 'historial_res', label: 'Historial Res.', icon: '👥', render: (ctx) =>
