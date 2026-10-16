@@ -16,11 +16,17 @@ describe('tabsForRol', () => {
     expect(tabsForRol('')).toEqual(todos)
   })
 
-  it('arrendatario ve solo los tabs operativos (mudanza incluida)', () => {
+  it('arrendatario ve solo los tabs operativos (mudanza, mascotas y vehículos incluidos)', () => {
     expect(tabsForRol('arrendatario')).toEqual([
       'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes',
-      'correspondencia', 'anuncios', 'mudanza',
+      'correspondencia', 'anuncios', 'mudanza', 'mascotas', 'vehiculos',
     ])
+  })
+
+  it('el inquilino registra sus mascotas y vehículos, pero no ve rentas', () => {
+    // 20261031000500: cualquier residente de la unidad registra lo suyo.
+    expect(tabsForRol('arrendatario')).toEqual(expect.arrayContaining(['mascotas', 'vehiculos']))
+    expect(tabsForRol('arrendatario')).not.toContain('rentas')
   })
 
   it('el inquilino ve la correspondencia de su unidad', () => {

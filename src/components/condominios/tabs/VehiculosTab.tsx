@@ -5,6 +5,11 @@ import type { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
+import { openPromptDialog } from '../../shared/PromptDialog'
+import { asignarTagVehiculo } from '../../../domain/condominios/padronAutorizacion'
+import { TAG_TIPO_LABEL, estadoDe } from '../PadronComun'
+import { OPCIONES_TAG, SolicitudesVehiculosPanel, VistaPadronToggle, esSolicitudPortal } from './SolicitudesPadronPanel'
+import type { TipoTagVehiculo } from '../../../types'
 
 interface Props {
   vehiculos: VehiculoResidente[]
@@ -46,6 +51,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
   const [filtroUnidad, setFiltroUnidad] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [soloActivos, setSoloActivos] = useState(true)
+  const [vista, setVista] = useState<'padron' | 'solicitudes'>('padron')
 
   function setF<K extends keyof typeof form>(k: K, v: typeof form[K]) { setForm(p => ({ ...p, [k]: v })) }
 
@@ -72,6 +78,11 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
       ({ error } = await createCondominioRow('vehiculos_residentes', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
+    // idx_vehiculos_placa_unica (20261031000500): la base rechaza una placa que
+    // ya está pendiente o autorizada en el proyecto, también desde el panel.
+    if (error?.code === '23505' && error.message.includes('idx_vehiculos_placa_unica')) {
+      return notify({ variant: 'error', title: t('condominios.comun.error'), text: `La placa ${payload.placa} ya está registrada o en revisión en el condominio.` })
+    }
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     setShowForm(false); setEditId(null); setForm({ ...BLANK }); onRefresh()
   }
@@ -88,7 +99,32 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
     onRefresh()
   }
 
-  let filtered = vehiculos
+  // Asignar, reponer o quitar el TAG de ingreso de un vehículo autorizado. Va por
+  // RPC: el servidor garantiza que el TAG no esté en otro vehículo del proyecto.
+  async function editarTag(v: VehiculoResidente) {
+    const r = await openPromptDialog({
+      title: `TAG de ingreso — ${v.placa}`,
+      description: 'Deje el código vacío para retirar el TAG (por ejemplo, si se perdió y aún no se repone).',
+      fields: [
+        { name: 'tag_codigo', label: 'Código del TAG', initialValue: v.tag_codigo ?? '', placeholder: 'Ej. TG-0153', autoFocus: true },
+        { name: 'tag_tipo', label: 'Tipo de TAG', control: 'select', options: OPCIONES_TAG, initialValue: v.tag_tipo ?? 'sticker' },
+      ],
+      submitText: 'Guardar',
+    })
+    if (!r) return
+    const codigo = r.tag_codigo?.trim() || null
+    const { error } = await asignarTagVehiculo(v.id, codigo, codigo ? (r.tag_tipo as TipoTagVehiculo) : null)
+    if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error })
+    notify({ variant: 'success', title: codigo ? `TAG ${codigo} asignado` : 'TAG retirado', duration: 1400 })
+    onRefresh()
+  }
+
+  // El padrón son los AUTORIZADOS: lo que el residente envía desde el portal
+  // (20261031000500) vive en la vista Solicitudes hasta que se resuelve.
+  const padron = vehiculos.filter(v => estadoDe(v) === 'aprobada')
+  const pendientesPortal = vehiculos.filter(v => esSolicitudPortal(v) && estadoDe(v) === 'pendiente').length
+
+  let filtered = padron
   if (filtroUnidad) filtered = filtered.filter(v => v.unidad_id === filtroUnidad)
   if (filtroTipo !== 'todos') filtered = filtered.filter(v => v.tipo === filtroTipo)
   if (soloActivos) filtered = filtered.filter(v => v.activo)
@@ -104,7 +140,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
           <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>{t('condominios.vehiculos.title')}</h2>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>{t('condominios.vehiculos.subtitle', { count: totalActivos })}</p>
         </div>
-        {canCreate && !showForm && (
+        {canCreate && !showForm && vista === 'padron' && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setShowForm(true) }}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             {t('condominios.vehiculos.new_button')}
@@ -112,6 +148,11 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
         )}
       </div>
 
+      <VistaPadronToggle vista={vista} onChange={setVista} pendientes={pendientesPortal} />
+
+      {vista === 'solicitudes' ? (
+        <SolicitudesVehiculosPanel vehiculos={vehiculos} unidades={unidades} canEdit={canEdit} onRefresh={onRefresh} />
+      ) : <>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {Object.keys(TIPO_LABEL_KEY).map(tipo => {
@@ -252,6 +293,13 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
             ),
           },
           {
+            key: 'tag', header: '🏷️ TAG', sortable: true,
+            accessor: v => v.tag_codigo ?? '',
+            render: v => v.tag_codigo
+              ? <span title={v.tag_tipo ? TAG_TIPO_LABEL[v.tag_tipo] : undefined} style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)' }}>{v.tag_codigo}</span>
+              : <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Sin TAG</span>,
+          },
+          {
             key: 'unidad', header: t('condominios.comun.unit'), sortable: true,
             accessor: v => unidades.find(u => u.id === v.unidad_id)?.nombre ?? '',
             render: v => {
@@ -267,6 +315,8 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
                   style={{ padding: '3px 7px', background: v.activo ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', color: v.activo ? 'var(--at-danger)' : 'var(--at-success)' }}>
                   {v.activo ? t('condominios.vehiculos.desactivar') : t('condominios.vehiculos.activar')}
                 </button>
+                <button onClick={() => editarTag(v)} aria-label={`TAG de ingreso de ${v.placa}`} title="TAG de ingreso"
+                  style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🏷️</button>
                 <button onClick={() => startEdit(v)} aria-label={t('condominios.comun.edit')}
                   style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                 <button onClick={() => handleDelete(v.id)} aria-label={t('condominios.comun.delete')}
@@ -276,6 +326,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
           },
         ] satisfies DataTableColumn<VehiculoResidente>[]}
       />
+      </>}
     </div>
   )
 }

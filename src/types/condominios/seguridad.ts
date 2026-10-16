@@ -48,7 +48,48 @@ export interface ParqueoCondominio {
   unidad_nombre?: string
 }
 
-export interface Mascota {
+/**
+ * Estado del registro de una mascota o un vehículo en el padrón (migración
+ * 20261031000500). Lo que el staff crea directo nace 'aprobada'; lo que el
+ * residente registra desde el portal recorre borrador → pendiente → aprobada |
+ * rechazada, y puede terminar en 'baja'. La base impide que algo no aprobado
+ * esté activo.
+ */
+export type EstadoPadron = 'borrador' | 'pendiente' | 'aprobada' | 'rechazada' | 'baja'
+
+/** Adjunto del expediente en el bucket privado `padron-docs`. */
+export interface DocumentoPadron {
+  path: string
+  nombre: string
+  etiqueta?: string | null
+  mime?: string | null
+  size?: number | null
+}
+
+/** Columnas del circuito de autorización, comunes a mascotas y vehículos. */
+export interface AutorizacionPadron {
+  estado?: EstadoPadron
+  /** Residente que lo registró desde el portal (NULL si lo cargó el staff). */
+  cliente_id?: string | null
+  documentos?: DocumentoPadron[] | null
+  fecha_solicitud?: string | null
+  fecha_resolucion?: string | null
+  comentario_admin?: string | null
+  resuelto_por?: string | null
+  resuelto_por_user_id?: string | null
+}
+
+/** Una vacuna aplicada: tipo, fecha y (opcional) la próxima dosis. */
+export interface VacunaMascota {
+  tipo: string
+  fecha: string
+  proxima?: string | null
+}
+
+export type SexoMascota = 'macho' | 'hembra'
+export type TamanoMascota = 'pequeno' | 'mediano' | 'grande'
+
+export interface Mascota extends AutorizacionPadron {
   id: string
   company_id: string
   project_id: string
@@ -63,6 +104,15 @@ export interface Mascota {
   foto_url?: string | null
   notas?: string | null
   created_at: string
+  sexo?: SexoMascota | null
+  peso_kg?: number | null
+  tamano?: TamanoMascota | null
+  esterilizada?: boolean | null
+  microchip?: string | null
+  vacunas?: VacunaMascota[] | null
+  fecha_ultima_desparasitacion?: string | null
+  veterinario?: string | null
+  veterinario_telefono?: string | null
   // joins
   unidad_nombre?: string
 }

@@ -84,7 +84,8 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     db.from('tickets_mantenimiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
     db.from('anuncios_comunidad').select('*, app_users(full_name)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     db.from('parqueos_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('numero'),
-    db.from('mascotas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('nombre'),
+    // Los borradores del portal (20261031000500) son del residente hasta que los envía.
+    db.from('mascotas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).neq('estado', 'borrador').order('nombre'),
     // clase='paquete': desde 20260829000600 la tabla es el motor de recepción y
     // también guarda correspondencia, que tiene su propia entrada más abajo.
     db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'paquete').order('hora_recepcion', { ascending: false }).limit(200),
@@ -135,7 +136,7 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'correspondencia').order('hora_recepcion', { ascending: false }).limit(300),
     db.from('libro_novedades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('turno'),
     db.from('seguimiento_acuerdos').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite'),
-    db.from('vehiculos_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('placa'),
+    db.from('vehiculos_residentes').select('*').eq('project_id', pid).eq('company_id', cid).neq('estado', 'borrador').order('placa'),
     db.from('eventos_comunidad').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
     // PR-27: las 5 tablas hijas marcadas abajo no TENÍAN `project_id` — por eso
     // filtraban solo por empresa mientras las otras ~135 de este batch filtraban
