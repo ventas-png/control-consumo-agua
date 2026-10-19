@@ -3,7 +3,8 @@
 // Lo que se cubre es lo que el sandbox SQL no puede ver, porque es de la vista:
 // que arrastrar un área y soltarle actividades arme el recorrido que se guarda;
 // que cada gesto tenga su botón para quien no puede arrastrar (y que ↑/↓ crucen
-// de un área a la vecina); que el tiempo se vaya acumulando por área y contra la
+// de un área a la vecina); que los ＋ sumen varias de una vez, en el orden
+// marcado; que el tiempo se vaya acumulando por área y contra la
 // jornada, avisando lo que no declara duración; que nada persista hasta
 // «Guardar» y que cabecera y recorrido se guarden juntos; y que los errores de la
 // base —23505 del nombre, 23503 de la rutina con historia, un fallo del
@@ -317,6 +318,118 @@ describe('VistaRutinas · cada gesto tiene su botón (táctil y teclado)', () =>
     await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalled())
     expect(recorridoGuardado()).toEqual(['a2:'])
     expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
+  })
+})
+
+// ── Varias de una vez ─────────────────────────────────────────────────────────
+
+describe('VistaRutinas · ＋ agrega varias de una vez y después se ordenan con las flechas', () => {
+  const ventana = (nombre: string | RegExp) => screen.getByRole('dialog', { name: nombre })
+  const casilla = (v: HTMLElement, nombre: RegExp) => within(v).getByRole('checkbox', { name: nombre }) as HTMLInputElement
+
+  it('«＋ Agregar áreas»: se marcan varias, entran al final en el orden marcado, y las que ya están se ven apagadas', async () => {
+    cargarCon({ rutinas: [rutina()], paradas: [parada('z2', 'a2', 0)] })
+    montar()
+    fireEvent.click(await screen.findByLabelText('Editar el recorrido de Rutina Lunes AM'))
+
+    fireEvent.click(screen.getByRole('button', { name: '＋ Agregar áreas' }))
+    const v = ventana('Agregar áreas al recorrido')
+    // 1C ya está: marcada y apagada, no se puede volver a sumar.
+    expect(casilla(v, /Apartamento 1C/).checked).toBe(true)
+    expect(casilla(v, /Apartamento 1C/).disabled).toBe(true)
+    const agregar = () => within(v).getByRole('button', { name: /^Agregar/ }) as HTMLButtonElement
+    expect(agregar().disabled).toBe(true)
+
+    // El orden en que se marcan es el orden en que entran: Gradas antes que 1AB.
+    fireEvent.click(casilla(v, /Gradas/))
+    fireEvent.click(casilla(v, /Apartamento 1AB/))
+    expect(within(v).getByText('2 marcadas')).toBeTruthy()
+    fireEvent.click(agregar())
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('region', { name: 'Área 1: Apartamento 1C' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Área 2: Gradas' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Área 3: Apartamento 1AB' })).toBeTruthy()
+    expect(screen.getByText(/2 áreas agregadas al final del recorrido/)).toBeTruthy()
+
+    // Y se acomodan con las flechas: 1AB sube por encima de Gradas.
+    fireEvent.click(screen.getByLabelText('Subir Apartamento 1AB'))
+    expect(mocks.guardarRecorridoRutina).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalled())
+    expect(recorridoGuardado()).toEqual(['a2:', 'a1:', 'a3:'])
+  })
+
+  it('«＋ Actividades» de un área: marca varias del catálogo, dice cuánto suman, y entran al final de ESA área', async () => {
+    const PULIR = actividad('pulir', 'Pulido de piso', 20, { servicio: 'mantenimiento' })
+    cargarCon({
+      rutinas: [rutina()],
+      paradas: [parada('z1', 'a1', 0), parada('z2', 'a2', 1)],
+      pasos: [paso('p1', 'barrer', 0, 'z1')],
+    })
+    montar({ plantillas: [BARRER, VIDRIOS, SIN_DURACION, PULIR] })
+    fireEvent.click(await screen.findByLabelText('Editar el recorrido de Rutina Lunes AM'))
+
+    fireEvent.click(screen.getByLabelText('Agregar actividades a Apartamento 1AB'))
+    const v = ventana('Actividades en «Apartamento 1AB»')
+    expect(casilla(v, /Barrido de piso/).disabled).toBe(true)
+    // Arranca filtrada por limpieza, como la paleta; con «Todos» aparece el resto.
+    expect(within(v).queryByRole('checkbox', { name: /Pulido de piso/ })).toBeNull()
+    fireEvent.change(within(v).getByLabelText('Servicio'), { target: { value: '' } })
+
+    fireEvent.click(casilla(v, /Revisar luces/))
+    fireEvent.click(casilla(v, /Limpieza de vidrios/))
+    fireEvent.click(casilla(v, /Pulido de piso/))
+    // El tiempo de lo marcado, avisando lo que no declara duración.
+    expect(v.textContent).toMatch(/Suman 22 min · ⚠ 1 sin duración/)
+    fireEvent.click(within(v).getByRole('button', { name: 'Agregar 3 actividades' }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByText('3 actividades agregadas a «Apartamento 1AB». Ordenalas con ↑ ↓.')).toBeTruthy()
+    // Sólo en 1AB; 1C no se tocó.
+    expect(within(seccionArea(/Apartamento 1C/)).getByText(/Soltá aquí las actividades/)).toBeTruthy()
+
+    // Ordenar después: vidrios sube por encima de «Revisar luces».
+    fireEvent.click(within(seccionArea(/Apartamento 1AB/)).getByLabelText('Subir Limpieza de vidrios'))
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalled())
+    expect(recorridoGuardado()).toEqual(['a1:barrer,vidrios,sin,pulir', 'a2:'])
+  })
+
+  it('las marcas sobreviven a la búsqueda; «Marcar las que se ven»; cancelar no agrega nada', async () => {
+    montar()
+    fireEvent.click(await screen.findByText('+ Nueva rutina'))
+
+    fireEvent.click(screen.getByRole('button', { name: '＋ Agregar áreas' }))
+    let v = ventana('Agregar áreas al recorrido')
+    fireEvent.change(within(v).getByLabelText('Buscar área'), { target: { value: 'apartamento' } })
+    expect(within(v).queryByRole('checkbox', { name: /Gradas/ })).toBeNull()
+    fireEvent.click(within(v).getByRole('button', { name: 'Marcar las que se ven' }))
+    fireEvent.change(within(v).getByLabelText('Buscar área'), { target: { value: '' } })
+    fireEvent.click(casilla(v, /Gradas/))
+    expect(within(v).getByText('3 marcadas')).toBeTruthy()
+
+    fireEvent.click(within(v).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('region', { name: /^Área/ })).toBeNull()
+
+    // Al volver a abrir, sin marcas; «Marcar todas» sin filtro, y Esc también cierra sin agregar.
+    fireEvent.click(screen.getByRole('button', { name: '＋ Agregar áreas' }))
+    v = ventana('Agregar áreas al recorrido')
+    expect(within(v).getByText('Ninguna marcada')).toBeTruthy()
+    fireEvent.click(within(v).getByRole('button', { name: 'Marcar todas' }))
+    expect(within(v).getByText('3 marcadas')).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('region', { name: /^Área/ })).toBeNull()
+  })
+
+  it('sin permiso de edición no aparecen los ＋', async () => {
+    cargarCon({ rutinas: [rutina()], paradas: [parada('z1', 'a1', 0)] })
+    montar({ canCreate: false, canEdit: false, canDelete: false })
+    fireEvent.click(await screen.findByLabelText('Ver el recorrido de Rutina Lunes AM'))
+    expect(screen.queryByRole('button', { name: '＋ Agregar áreas' })).toBeNull()
+    expect(screen.queryByLabelText('Agregar actividades a Apartamento 1AB')).toBeNull()
   })
 })
 
