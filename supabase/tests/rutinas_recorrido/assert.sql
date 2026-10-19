@@ -251,6 +251,10 @@ SELECT rr.error(
 SELECT rr.chk(
   (SELECT count(*)::int FROM pg_indexes WHERE indexname = 'uq_tareas_bloque_plantilla'),
   0, 'F3 · el índice viejo (bloque, plantilla) ya no existe');
+SELECT rr.chk(
+  (SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_tareas_bloque_plantilla_id'),
+  'CREATE INDEX idx_tareas_bloque_plantilla_id ON public.tareas_bloque USING btree (plantilla_id)',
+  'F4 · la FK plantilla_id tiene su índice líder (producción nunca lo tuvo)');
 
 -- ── G · borrado ──────────────────────────────────────────────────────────────
 -- Un área usada SÓLO por una parada (ninguna actividad ni tarea la nombra).

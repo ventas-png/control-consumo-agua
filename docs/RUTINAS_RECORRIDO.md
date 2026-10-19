@@ -61,28 +61,32 @@ seleccionada, la de borde resaltado), **↑ ↓** para reordenar —en el borde 
   al recorrido, la parada de un área dada de baja no genera trabajo nuevo y «ya existe» compara también el área.
 - `rutinas_limpieza.area_id` queda como **legado** (sólo aplica a pasos sin parada); el editor ya no lo ofrece.
 
-## Despliegue: el drift de los índices de `tareas_bloque`
+## Despliegue: los índices de `tareas_bloque`
 
-`tabla:tareas_bloque/indices` tiene **drift declarado** contra producción desde antes de esta migración
-(`scripts/schema-drift/drift-conocido.json`, #826): producción tiene 6 índices y el repositorio 7, con diferencias que no
-se pueden reconstruir offline. Esta migración **tiene que** tocar ese grupo —es la única forma de que la misma actividad
-exista en dos áreas de un turno—, así que el job «Auditar drift en tres vías» lo marca **CAMBIO AMBIGUO** hasta que se
-mida producción. Para que eso no sea un riesgo:
+`tabla:tareas_bloque/indices` tenía **drift declarado** contra producción desde el 2026-09-01 (#826). Esta migración
+**tiene que** tocar ese grupo, porque es la única forma de que la misma actividad exista en dos áreas de un turno. Con el
+drift declarado, el auditor de tres vías la marcaba **CAMBIO AMBIGUO**.
 
-- la unicidad vieja se retira **por sus columnas** `(bloque_id, plantilla_id)`, sea índice o constraint y se llame como
-  se llame (el aviso `RUTINAS_RECORRIDO: retirada la unicidad …` queda en el log del deploy);
-- un **pre-vuelo** aborta toda la migración, sin tocar nada, si ya hubiera filas repetidas en
-  (bloque, actividad, área).
+Se midió producción (`pg_indexes`, 2026-10-19). La unicidad `uq_tareas_bloque_plantilla` existe allá con el mismo nombre
+y la misma forma que en el repositorio. Las diferencias eran otras tres:
 
-Antes de desplegar, conviene mirar producción (solo lectura):
+- el nombre del índice `(bloque_id, orden)`;
+- la definición del índice de `completado_por`;
+- un índice de `plantilla_id` que producción no tiene.
 
-```sql
-SELECT indexname, indexdef FROM pg_indexes
- WHERE schemaname = 'public' AND tablename = 'tareas_bloque' ORDER BY 1;
-```
+ventas-png/control-consumo-agua#953 (`20261101000000`) hace converger el repositorio a esa forma: es no-op en producción y
+retira la entrada de `drift-conocido.json`. **Se fusiona antes que este PR**; con eso, este cambio pasa a ser CAMBIO
+PLANIFICADO.
 
-Y después del despliegue, refrescar la huella y la entrada de `tabla:tareas_bloque/indices` en `drift-conocido.json`, como
-en los PR de huella anteriores.
+Esta migración, además:
+
+- **Retira la unicidad vieja por sus columnas** `(bloque_id, plantilla_id)`, sea índice o constraint y se llame como se
+  llame. El aviso `RUTINAS_RECORRIDO: retirada la unicidad …` queda en el log del deploy.
+- **Aborta en un pre-vuelo** toda la migración, sin tocar nada, si hubiera filas repetidas en (bloque, actividad, área).
+- **Devuelve el índice líder de la FK `plantilla_id`** (`idx_tareas_bloque_plantilla_id`, política de `20260606170000`),
+  que producción nunca tuvo y que la unicidad nueva no cubre.
+
+Después del despliegue hay que refrescar la huella de producción, como en los PR de huella anteriores.
 
 ## Recuperación
 

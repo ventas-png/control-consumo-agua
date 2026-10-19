@@ -136,6 +136,17 @@ describe('20261102000000 · RLS de rutina_areas con el gate del tab y nada más'
   )
 })
 
+describe('20261102000000 · tareas_bloque', () => {
+  it('devuelve el índice líder de la FK plantilla_id, que la unicidad nueva no cubre', () => {
+    // La unicidad nueva empieza por bloque_id; sin este índice la FK hace
+    // seq-scan (política de 20260606170000). 20261101000000 lo retiró para
+    // converger con producción, que nunca lo tuvo.
+    expect(sql).toMatch(
+      /CREATE INDEX IF NOT EXISTS idx_tareas_bloque_plantilla_id\s+ON public\.tareas_bloque\(plantilla_id\);/i,
+    )
+  })
+})
+
 describe('20261102000000 · el sandbox conductual sigue en CI', () => {
   it('coverage.yml corre supabase/tests/rutinas_recorrido/run.sh', () => {
     const ci = readFileSync(resolve('.github/workflows/coverage.yml'), 'utf8')

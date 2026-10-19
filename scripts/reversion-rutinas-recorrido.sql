@@ -42,6 +42,9 @@
 -- CREATE UNIQUE INDEX IF NOT EXISTS uq_tareas_bloque_plantilla
 --   ON public.tareas_bloque(bloque_id, plantilla_id) WHERE plantilla_id IS NOT NULL;
 -- DROP INDEX IF EXISTS public.uq_tareas_bloque_plantilla_area;
+-- -- (opcional) el índice de la FK plantilla_id que esta migración devolvió:
+-- --  inofensivo, y producción no lo tenía antes.
+-- DROP INDEX IF EXISTS public.idx_tareas_bloque_plantilla_id;
 -- ALTER TABLE public.rutina_actividades
 --   ADD CONSTRAINT rutina_act_unica UNIQUE (rutina_id, plantilla_tarea_id);
 -- ALTER TABLE public.rutina_actividades DROP CONSTRAINT IF EXISTS rutina_act_unica_parada;

@@ -83,11 +83,14 @@
 -- unicidad vieja no existiera), el pre-vuelo de §4 aborta TODA la migración
 -- con el conteo, antes de tocar nada.
 --
--- DRIFT DECLARADO. `tabla:tareas_bloque/indices` difiere entre producción y el
--- repositorio desde antes de esta migración (#826), y §4 tiene que tocarlo: es
--- la única forma de que la misma actividad exista en dos áreas de un turno. El
--- auditor de tres vías lo marca CAMBIO AMBIGUO hasta que se mida producción;
--- por eso §4 identifica la unicidad vieja por sus COLUMNAS y no por su nombre.
+-- LOS ÍNDICES DE tareas_bloque. §4 tiene que tocarlos: es la única forma de que
+-- la misma actividad exista en dos áreas de un turno. Tenían drift declarado
+-- contra producción (#826), que 20261101000000 hizo converger antes de esto
+-- —producción tiene `uq_tareas_bloque_plantilla` con el mismo nombre y la
+-- misma forma que el repositorio—. Aun así §4 identifica la unicidad vieja por
+-- sus COLUMNAS y no por su nombre: no le cuesta nada y no depende de que el
+-- nombre siga siendo ése. Y devuelve el índice líder de la FK `plantilla_id`
+-- (política de 20260606170000), que producción nunca tuvo.
 --
 -- REVERSA: scripts/reversion-rutinas-recorrido.sql (restaura la RPC de
 -- 20260907000300 y los dos UNIQUE originales; aborta si ya hay datos que sólo
@@ -358,6 +361,15 @@ BEGIN
   END LOOP;
 END;
 $UNICIDAD$;
+
+-- El índice líder de la FK `plantilla_id` → plantillas_tarea_cargo (política de
+-- 20260606170000: FK de dominio con índice que empiece por ella). Producción
+-- nunca lo tuvo, y 20261101000000 lo retiró del repositorio para converger;
+-- vuelve aquí, ya como cambio que sí llega a producción. La unicidad nueva
+-- empieza por `bloque_id`, así que no sirve para la FK: sin éste, borrar o
+-- buscar las tareas de una actividad recorre la tabla entera.
+CREATE INDEX IF NOT EXISTS idx_tareas_bloque_plantilla_id
+  ON public.tareas_bloque(plantilla_id);
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 5. guardar_recorrido_rutina — el recorrido completo, en una transacción
