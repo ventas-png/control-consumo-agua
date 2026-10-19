@@ -98,7 +98,14 @@ Esta migración, además:
 - **Devuelve el índice líder de la FK `plantilla_id`** (`idx_tareas_bloque_plantilla_id`, política de `20260606170000`),
   que producción nunca tuvo y que la unicidad nueva no cubre.
 
-Después del despliegue hay que refrescar la huella de producción, como en los PR de huella anteriores.
+**`20261101000000` y `20261102000000` desplegadas el 2026-10-19**, en ese orden: PR #953 fusionada como `553039de`, run
+39302743669 de «Apply Migrations to Production» (evento `push`, `success` a las 19:01 UTC); PR #951 fusionada como `c0934969`,
+run 39306560861 (`success` a las 19:02 UTC). Comprobación posterior de solo lectura en producción (20:12 UTC): 890
+migraciones, máx. `20261102000000`; `rutina_areas` y `guardar_recorrido_rutina(uuid, jsonb)` existen, y `tareas_bloque` tiene
+7 índices: `uq_tareas_bloque_plantilla_area` e `idx_tareas_bloque_plantilla_id` en lugar de `uq_tareas_bloque_plantilla`.
+Huella de producción recapturada: 11 grupos nuevos y 5 cambiados (3731 → 3742), exactamente los 16 que el auditor anunció
+como cambio planificado, con valores idénticos a la reconstrucción de `main`; los 3726 grupos restantes son idénticos a la
+captura anterior y el sha256 completo coincide con el medido en producción; `drift-conocido.json` no cambia.
 
 ## Recuperación
 
