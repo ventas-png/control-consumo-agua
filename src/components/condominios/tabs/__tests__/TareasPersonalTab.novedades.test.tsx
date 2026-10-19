@@ -101,6 +101,8 @@ function montar(tareas: TareaBloque[]) {
     />,
   )
   fireEvent.click(screen.getByText('▾'))
+  // Un turno en curso abre en el paso a paso; estas pruebas son de la lista.
+  fireEvent.click(screen.getByText('☰ Ver lista completa'))
   return r
 }
 

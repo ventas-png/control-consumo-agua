@@ -798,3 +798,34 @@ export async function fetchInsumosDeTareas(
     error: error ? { message: error.message } : null,
   }
 }
+
+/**
+ * Herramientas y equipo de las plantillas de un turno, para la preparación
+ * antes de iniciarlo. A diferencia de los insumos, no hay plan congelado por
+ * tarea: se lee la receta vigente de cada plantilla (`plantilla_tarea_herramientas`,
+ * 20260904000300), cuya RLS ya admite a quien ejecuta (tareas_personal) y a
+ * quien programa la limpieza (prog_limpieza).
+ *
+ * El error se devuelve: «no pude leer las herramientas» no es «no hace falta
+ * ninguna», y la preparación lo dice.
+ */
+export async function fetchHerramientasDePlantillas(
+  plantillaIds: string[],
+): Promise<{ herramientas: PlantillaTareaHerramienta[]; error: { message: string } | null }> {
+  if (plantillaIds.length === 0) return { herramientas: [], error: null }
+
+  const { data, error } = await db
+    .from('plantilla_tarea_herramientas')
+    .select('*, inventario_condominio(nombre, estado)')
+    .in('plantilla_tarea_id', plantillaIds)
+
+  reportDegradedQuery('condominios.fetchHerramientasDePlantillas', error)
+  const herramientas: PlantillaTareaHerramienta[] = (data ?? []).map(
+    ({ inventario_condominio: h, ...resto }) => ({
+      ...resto,
+      inventario_nombre: h?.nombre,
+      inventario_estado: h?.estado,
+    }),
+  )
+  return { herramientas, error: error ? { message: error.message } : null }
+}
