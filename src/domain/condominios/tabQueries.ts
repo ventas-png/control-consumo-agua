@@ -16,8 +16,12 @@ import type {
   PlantillaTareaSuministro,
   RutinaActividad,
   RutinaArea,
+  RutinaEnTurno,
   RutinaLimpieza,
+  TareaBloque,
   TareaBloqueSuministro,
+  TurnoCalendarioLimpieza,
+  TurnoTipo,
   UsoCargo,
   UsoTurno,
   UsuarioAsignablePersonal,
@@ -675,6 +679,92 @@ export async function fetchRutinasLimpieza(
     pasos: (pasRes.data ?? []) as RutinaActividad[],
     paradas: (parRes.data ?? []) as RutinaArea[],
     horarios: horRes.data ?? [],
+    error: error ? { message: error.message } : null,
+  }
+}
+
+/**
+ * Calendario de limpieza (20261103000000): los turnos del rango, cada uno con
+ * el nombre y cargo de su persona, su jornada y las rutinas que tiene
+ * asignadas. Es una RPC y no un SELECT porque quien administra la limpieza no
+ * lee `personal_condominio` ni `plantillas_horario` por RLS; la RPC proyecta lo
+ * mínimo (nada del expediente).
+ */
+export async function fetchCalendarioLimpieza(
+  projectId: string,
+  desde: string,
+  hasta: string,
+): Promise<{ turnos: TurnoCalendarioLimpieza[]; error: { message: string } | null }> {
+  const { data, error } = await db.rpc('limpieza_calendario', {
+    p_project_id: projectId,
+    p_desde: desde,
+    p_hasta: hasta,
+  })
+  reportDegradedQuery('condominios.fetchCalendarioLimpieza', error)
+  const turnos = (data ?? []).map(f => ({
+    ...f,
+    turno: f.turno as TurnoTipo,
+    estado: f.estado as TurnoCalendarioLimpieza['estado'],
+    // numeric(5,2): según el driver llega como número o como texto.
+    horas_planificadas: f.horas_planificadas == null ? null : Number(f.horas_planificadas),
+    rutinas: Array.isArray(f.rutinas) ? (f.rutinas as unknown as RutinaEnTurno[]) : [],
+  }))
+  return { turnos, error: error ? { message: error.message } : null }
+}
+
+/** La fila de `tareas_bloque` con su área embebida, como la lee «Tareas por turno». */
+function aTareaBloque(t: Record<string, unknown>): TareaBloque {
+  const area = t.areas_condominio as { nombre: string; icono: string } | null
+  return {
+    ...t,
+    foto_urls: (t.foto_urls as string[] | null) ?? [],
+    area_nombre: area?.nombre,
+    area_icono: area?.icono,
+  } as TareaBloque
+}
+
+/**
+ * Las tareas de unos turnos: la Ruta del día de limpieza. Todas las del turno y
+ * no sólo las de rutinas, porque cerrar el turno calcula su puntaje sobre lo que
+ * ve: con una lista parcial escribiría un puntaje falso.
+ */
+export async function fetchTareasDeTurnos(
+  bloqueIds: string[],
+): Promise<{ tareas: TareaBloque[]; error: { message: string } | null }> {
+  if (bloqueIds.length === 0) return { tareas: [], error: null }
+  const { data, error } = await db
+    .from('tareas_bloque')
+    .select('*, areas_condominio(nombre, icono)')
+    .in('bloque_id', bloqueIds)
+    .order('orden')
+  reportDegradedQuery('condominios.fetchTareasDeTurnos', error)
+  return {
+    tareas: (data ?? []).map(t => aTareaBloque(t as Record<string, unknown>)),
+    error: error ? { message: error.message } : null,
+  }
+}
+
+/**
+ * Novedades de las rutinas de limpieza desde `desde`: tareas de rutina con un
+ * hallazgo escrito o marcadas para mantenimiento. El filtro de proyecto y fecha
+ * va por el turno (`bloques_turno!inner`), no por una lista de ids: un mes de
+ * turnos no cabe en la URL de un `in.(…)`.
+ */
+export async function fetchNovedadesRutinas(
+  projectId: string,
+  desde: string,
+): Promise<{ tareas: TareaBloque[]; error: { message: string } | null }> {
+  const { data, error } = await supabase
+    .from('tareas_bloque')
+    .select('*, areas_condominio(nombre, icono), bloques_turno!inner(project_id, fecha)')
+    .eq('bloques_turno.project_id', projectId)
+    .gte('bloques_turno.fecha', desde)
+    .not('rutina_id', 'is', null)
+    .or('novedad.not.is.null,notas_operativo.not.is.null,requiere_mantenimiento.is.true')
+    .limit(500)
+  reportDegradedQuery('condominios.fetchNovedadesRutinas', error)
+  return {
+    tareas: (data ?? []).map(({ bloques_turno: _b, ...t }) => aTareaBloque(t as Record<string, unknown>)),
     error: error ? { message: error.message } : null,
   }
 }

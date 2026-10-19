@@ -1,127 +1,128 @@
-// Tab Limpieza — seis vistas sobre el mismo dato:
+// Tab Limpieza — cuatro vistas sobre el mismo trabajo (20261103000000):
 //
-//   Áreas       programaciones + a quién le toca cada área (persona, o perfil
-//               turno+cargo), con asignación en bloque. Desde 20260904000100
-//               el área se elige del catálogo canónico (`areas_condominio`).
-//   Catálogo    el catálogo compartido de áreas, EN SOLO LECTURA: desde que
-//               existe el tab “Áreas” el alta vive ahí y en ningún otro lado,
-//               para que nadie cree dos veces la misma área sin saberlo.
-//   Actividades el catálogo compartido de actividades (ActividadesCatalog, el
-//               mismo componente del tab Plantillas), filtrado de entrada por
-//               servicio = limpieza y en modo consulta: la administración vive
-//               en Seguridad → Plantillas y no se duplica aquí. La RLS de
-//               20260904000200/000300 acepta `prog_limpieza` en el SELECT, así
-//               que se lee sin permisos del módulo Seguridad.
-//   Rutinas     recorridos: las áreas en el orden en que se intervienen y, en
-//               cada una, sus actividades (20261102000000), armados arrastrando
-//               y soltando, con el tiempo acumulado. Es DEFINICIÓN: la
-//               ocurrencia del día se materializa aparte.
-//   Ruta        lo que le toca hoy a cada empleado, con foto de evidencia y
-//               cierre área por área.
-//   Novedades   lo que se encontró de paso y necesita mantenimiento.
+//   Calendario   cada empleado con sus turnos del mes; sobre cada día se le
+//                asignan rutinas, arrastrando o con ＋. Asignar CREA las tareas
+//                del recorrido en ese turno: no hay que «generar» después.
+//   Rutinas      los recorridos (20261102000000): las áreas en orden y, en cada
+//                una, sus actividades. Es la DEFINICIÓN de lo que se asigna.
+//   Ruta del día lo asignado para un día, para ejecutarlo con evidencia y cierre
+//                (el tablero de «Tareas por turno» en modo ruta, sin copia).
+//   Novedades    lo que se encontró al ejecutar las rutinas y necesita
+//                mantenimiento.
 //
-// Antes el tab era solo el catálogo, con `responsable` como texto libre: se
-// programaba la limpieza pero no se podía repartir entre la plantilla ya
-// cargada en Personal, ni verificar que se hizo. Las vistas cubren el ciclo
-// completo — programar, ejecutar con evidencia, escalar el hallazgo.
-import { useState, useMemo } from 'react'
+// Los indicadores de arriba salen de las mismas tareas: lo atrasado de la
+// semana, lo de hoy, y los turnos de hoy que nadie programó.
+//
+// Antes había además «Áreas» (programar cada área con frecuencia y responsable,
+// sobre programacion_limpieza → ejecuciones_limpieza), «Áreas del catálogo» y
+// «Actividades». El calendario reemplaza a la primera; las otras dos eran
+// consultas de catálogos que se administran en el tab Áreas y en Plantillas, y
+// se consultan allá. Las filas del motor anterior quedan como historia.
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { hoyLocalISO } from '../../../lib/format'
 import type {
-  AreaCondominio, EjecucionLimpieza, ItemInventario, PersonalCondominio,
-  PlantillaTareaCargo, ProgramacionLimpieza, SuministroCondominio,
-  CargoCatalogo, TipoTurnoCatalogo,
+  AreaCondominio, BloqueTurno, CargoCatalogo, EstadoBloqueTurno, PersonalCondominio,
+  PlantillaTareaCargo, TareaBloque, TurnoCalendarioLimpieza,
 } from '../../../types'
-import { AreasResumen } from '../AreasResumen'
-import { ActividadesCatalog } from '../ActividadesCatalog'
-import { VistaAreas } from './limpieza/VistaAreas'
+import { VistaCalendario } from './limpieza/VistaCalendario'
 import { VistaRutinas } from './limpieza/VistaRutinas'
-import { VistaRuta } from './limpieza/VistaRuta'
+import { VistaRutaDia } from './limpieza/VistaRutaDia'
 import { VistaNovedades } from './limpieza/VistaNovedades'
 import { sumarDias } from '../../../domain/condominios/limpieza'
-import { novedadesDeEjecuciones, type NovedadOperativa } from '../../../domain/condominios/novedades'
+import { kpisLimpieza } from '../../../domain/condominios/calendarioLimpieza'
+import { novedadesDeTareas, type NovedadOperativa } from '../../../domain/condominios/novedades'
+import { fetchCalendarioLimpieza, fetchNovedadesRutinas } from '../../../domain/condominios/tabQueries'
 import { atenderNovedad } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 
 interface Props {
-  programaciones: ProgramacionLimpieza[]
-  ejecuciones: EjecucionLimpieza[]
   personal: PersonalCondominio[]
-  /** Catálogos del condominio (Configuración RRHH) para los selects de cargo y turno. */
+  /** Catálogo de cargos del condominio (Configuración RRHH), para nombrarlos. */
   cargos?: CargoCatalogo[]
-  tiposTurno?: TipoTurnoCatalogo[]
   areas: AreaCondominio[]
   plantillas: PlantillaTareaCargo[]
-  suministros: SuministroCondominio[]
-  inventario: ItemInventario[]
   proyectoId: string
   companyId: string
+  userId: string
   canCreate: boolean
   canEdit: boolean
   canDelete: boolean
-  /** Visibilidad del tab Áreas: decide si se ofrece el atajo para configurarlas. */
-  puedeConfigurarAreas: boolean
-  onIrATab: (tabId: 'areas_config') => void
   onRefresh: () => void
 }
 
-type Vista = 'areas' | 'catalogo' | 'actividades' | 'rutinas' | 'ruta' | 'novedades'
+type Vista = 'calendario' | 'rutinas' | 'ruta' | 'novedades'
 
 const VISTAS: { id: Vista; label: string; icon: string }[] = [
-  { id: 'areas',       label: 'Áreas',     icon: '🧹' },
-  { id: 'catalogo',    label: 'Áreas del catálogo', icon: '📍' },
-  { id: 'actividades', label: 'Actividades', icon: '📋' },
-  { id: 'rutinas',     label: 'Rutinas',     icon: '🧭' },
-  { id: 'ruta',        label: 'Ruta del día', icon: '🗓️' },
-  { id: 'novedades',   label: 'Novedades', icon: '⚠️' },
+  { id: 'calendario', label: 'Calendario',   icon: '🗓️' },
+  { id: 'rutinas',    label: 'Rutinas',      icon: '🧭' },
+  { id: 'ruta',       label: 'Ruta del día', icon: '🧹' },
+  { id: 'novedades',  label: 'Novedades',    icon: '⚠️' },
 ]
 
-export function ProgramacionLimpiezaTab({
-  programaciones, ejecuciones, personal, areas, plantillas, suministros, inventario,
-  proyectoId, companyId, canCreate, canEdit, canDelete, puedeConfigurarAreas, onIrATab, onRefresh, cargos = [], tiposTurno = [],
-}: Props) {
-  const [vista, setVista] = useState<Vista>('areas')
+/** Días hacia atrás que cuentan como «atrasado» y que alimentan las novedades. */
+const DIAS_ATRASO = 7
+const DIAS_NOVEDADES = 30
 
-  const novedades = useMemo(
-    () => novedadesDeEjecuciones(programaciones, ejecuciones, personal),
-    [programaciones, ejecuciones, personal],
-  )
+export function ProgramacionLimpiezaTab({
+  personal, areas, plantillas, proyectoId, companyId, userId,
+  canCreate, canEdit, canDelete, onRefresh, cargos = [],
+}: Props) {
+  const [vista, setVista] = useState<Vista>('calendario')
+  const hoy = hoyLocalISO()
+
+  // Una sola lectura para indicadores y novedades: los turnos de los últimos 30
+  // días (con el nombre de su persona) y las tareas de rutina con hallazgo.
+  const [turnos, setTurnos] = useState<TurnoCalendarioLimpieza[]>([])
+  const [tareasNovedad, setTareasNovedad] = useState<TareaBloque[]>([])
+
+  const cargarOperacion = useCallback(async () => {
+    const desde = sumarDias(hoy, -DIAS_NOVEDADES)
+    const [cal, nov] = await Promise.all([
+      fetchCalendarioLimpieza(proyectoId, desde, hoy),
+      fetchNovedadesRutinas(proyectoId, desde),
+    ])
+    if (!cal.error) setTurnos(cal.turnos)
+    if (!nov.error) setTareasNovedad(nov.tareas)
+  }, [proyectoId, hoy])
+
+  useEffect(() => { void cargarOperacion() }, [cargarOperacion])
+
+  const novedades = useMemo(() => {
+    // Lo que novedadesDeTareas necesita del turno: fecha y persona.
+    const bloques = turnos.map(t => ({
+      id: t.bloque_id, personal_id: t.personal_id, personal_nombre: t.personal_nombre,
+      fecha: t.fecha, estado: t.estado as EstadoBloqueTurno,
+    })) as BloqueTurno[]
+    return novedadesDeTareas(bloques, tareasNovedad, personal)
+  }, [turnos, tareasNovedad, personal])
 
   const kpis = useMemo(() => {
-    const hoy = hoyLocalISO()
-    const en3 = sumarDias(hoy, 3)
-    const activas = programaciones.filter(p => p.activo)
-    const vencidas = activas.filter(p => p.proxima_ejecucion && p.proxima_ejecucion < hoy).length
-    const proximas = activas.filter(p => p.proxima_ejecucion && p.proxima_ejecucion >= hoy && p.proxima_ejecucion <= en3).length
-    const sinAsignar = activas.filter(p => !p.personal_id && !p.turno && !p.cargo && !p.responsable).length
-    const delDia = ejecuciones.filter(e => e.fecha === hoy)
-    const pendientesHoy = delDia.filter(e => e.estado === 'pendiente').length
-    // Cuenta sobre las novedades normalizadas y no sobre `ejecuciones` a secas:
-    // el adaptador descarta las ejecuciones anuladas, y un KPI que diga 3
-    // mientras el listado muestra 2 sólo hace dudar de los dos números.
-    const conManto = novedades.filter(n => n.requiere_mantenimiento).length
-    return { vencidas, proximas, sinAsignar, pendientesHoy, novedades: conManto, totalHoy: delDia.length }
-  }, [programaciones, ejecuciones, novedades])
+    const k = kpisLimpieza(turnos, hoy, sumarDias(hoy, -DIAS_ATRASO))
+    return { ...k, conManto: novedades.filter(n => n.requiere_mantenimiento).length }
+  }, [turnos, hoy, novedades])
 
-  /**
-   * La vista de novedades ya no sabe a qué tabla escribe: lo decide el padre,
-   * que es quien conoce su fuente. Aquí, `ejecuciones_limpieza`.
-   */
+  /** Asignar, quitar o ejecutar cambia los indicadores; el resto del panel también lo ve. */
+  const alCambiar = useCallback(() => {
+    void cargarOperacion()
+    onRefresh()
+  }, [cargarOperacion, onRefresh])
+
   async function atender(novedad: NovedadOperativa) {
     const { error } = await atenderNovedad(novedad)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
-    onRefresh()
+    alCambiar()
   }
 
   return (
     <div style={{ padding: '20px', maxWidth: '1060px', margin: '0 auto' }}>
-      {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '18px' }}>
+      {/* Indicadores */}
+      <div aria-label="Indicadores de limpieza" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '18px' }}>
         {[
-          { label: 'Vencidas', value: kpis.vencidas, icon: '🔴', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
-          { label: 'Próximas (≤3d)', value: kpis.proximas, icon: '🟡', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
-          { label: 'Sin asignar', value: kpis.sinAsignar, icon: '👤', bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
-          { label: `Pendientes hoy (de ${kpis.totalHoy})`, value: kpis.pendientesHoy, icon: '🗓️', bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
-          { label: 'Requieren manto.', value: kpis.novedades, icon: '🛠', bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)' },
+          { label: `Atrasadas (${DIAS_ATRASO} días)`, value: kpis.atrasadas, icon: '🔴', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
+          { label: `Pendientes hoy (de ${kpis.totalHoy})`, value: kpis.pendientesHoy, icon: '🟡', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
+          { label: 'Hechas hoy', value: kpis.hechasHoy, icon: '✅', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+          { label: 'Turnos de hoy sin rutina', value: kpis.turnosHoySinRutina, icon: '👤', bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
+          { label: 'Requieren manto.', value: kpis.conManto, icon: '🛠', bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', marginBottom: '2px' }}>{k.icon}</div>
@@ -148,29 +149,22 @@ export function ProgramacionLimpiezaTab({
             }}
           >
             {v.icon} {v.label}
-            {v.id === 'novedades' && kpis.novedades > 0 && ` (${kpis.novedades})`}
+            {v.id === 'novedades' && kpis.conManto > 0 && ` (${kpis.conManto})`}
           </button>
         ))}
       </div>
 
-      {vista === 'areas' && (
-        <VistaAreas
-          programaciones={programaciones}
-          personal={personal}
-          cargos={cargos}
-          tiposTurno={tiposTurno}
-          areas={areas}
+      {vista === 'calendario' && (
+        <VistaCalendario
           proyectoId={proyectoId}
           companyId={companyId}
-          canCreate={canCreate}
+          plantillas={plantillas}
+          cargos={cargos}
           canEdit={canEdit}
-          canDelete={canDelete}
-          onRefresh={onRefresh}
+          onCambio={alCambiar}
         />
       )}
       {vista === 'rutinas' && (
-        // Armado de rutinas como recorrido: áreas del catálogo en orden, cada
-        // una con sus actividades, para no rearmarlo cada día.
         <VistaRutinas
           plantillas={plantillas}
           cargos={cargos}
@@ -183,50 +177,17 @@ export function ProgramacionLimpiezaTab({
           onRefresh={onRefresh}
         />
       )}
-      {vista === 'actividades' && (
-        // MISMO componente que el tab Plantillas: un solo catálogo, sin
-        // implementación paralela. Aquí abre filtrado por servicio=limpieza y
-        // en consulta (soloLectura); administrarlo sigue siendo de Plantillas.
-        <ActividadesCatalog
-          plantillas={plantillas}
-          cargos={cargos}
-          areas={areas}
-          suministros={suministros}
-          inventario={inventario}
-          proyectoId={proyectoId}
-          companyId={companyId}
-          canCreate={canCreate}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          onRefresh={onRefresh}
-          servicioInicial="limpieza"
-          soloLectura
-          titulo="Actividades de limpieza"
-          subtitulo="Catálogo compartido de actividades, filtrado por servicio de limpieza."
-        />
-      )}
-      {vista === 'catalogo' && (
-        // Solo lectura: el alta de áreas vive en el tab Áreas y en ningún otro
-        // lado. Aquí se muestra para saber qué se puede programar sin salir del
-        // tab, con el atajo a la configuración para quien tenga ese permiso.
-        <AreasResumen
-          areas={areas}
-          uso="las programaciones y la ruta del día"
-          onConfigurar={puedeConfigurarAreas ? () => onIrATab('areas_config') : undefined}
-        />
-      )}
       {vista === 'ruta' && (
-        <VistaRuta
-          programaciones={programaciones}
-          ejecuciones={ejecuciones}
-          personal={personal}
-          cargos={cargos}
-          tiposTurno={tiposTurno}
+        <VistaRutaDia
           proyectoId={proyectoId}
           companyId={companyId}
-          canCreate={canCreate}
+          userId={userId}
+          personal={personal}
+          plantillas={plantillas}
+          areas={areas}
+          cargos={cargos}
           canEdit={canEdit}
-          onRefresh={onRefresh}
+          onCambio={alCambiar}
         />
       )}
       {vista === 'novedades' && (

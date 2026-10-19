@@ -76,12 +76,13 @@ function prioridadValida(v: string | null | undefined): PrioridadNovedadLimpieza
   return v === 'baja' || v === 'media' || v === 'alta' ? v : null
 }
 
-function nombreDe(personal: PersonalCondominio[], id: string | null | undefined): string {
+function nombreDe(personal: PersonalCondominio[], id: string | null | undefined, respaldo?: string): string {
   if (!id) return 'Sin asignar'
   // El empleado puede haber salido de la nómina después de reportar: la novedad
   // sigue siendo válida, y decir «Empleado dado de baja» es más honesto que
-  // dejar el hueco en blanco.
-  return personal.find(p => p.id === id)?.nombre ?? 'Empleado dado de baja'
+  // dejar el hueco en blanco. `respaldo` es el nombre que ya trae el turno
+  // (calendario de limpieza): cubre a quien no lee el tab Personal.
+  return personal.find(p => p.id === id)?.nombre ?? respaldo ?? 'Empleado dado de baja'
 }
 
 /** Novedades de la ruta de limpieza. */
@@ -149,7 +150,7 @@ export function novedadesDeTareas(
         // que responde «¿cuándo se vio esto?». Sin bloque —dato incompleto— se
         // usa el día del alta antes que dejar la novedad fuera del orden.
         fecha: bloque?.fecha ?? t.created_at.slice(0, 10),
-        persona: nombreDe(personal, bloque?.personal_id),
+        persona: nombreDe(personal, bloque?.personal_id, bloque?.personal_nombre),
         foto_urls: t.foto_urls ?? [],
       }
     })

@@ -19,7 +19,7 @@ import { supabase, db } from '../../lib/supabase'
 import { SinFilasAfectadasError } from '../queryFetch'
 import type {
   ConsumoDeclarado, ResultadoConsumoInsumos,
-  ResultadoGeneracionTurnos, ResultadoGuardarRecorrido, ResultadoMaterializacionRutinas,
+  ResultadoAsignarRutinas, ResultadoGeneracionTurnos, ResultadoGuardarRecorrido, ResultadoMaterializacionRutinas,
 } from '../../types'
 import { TABLA_DE_FUENTE, type NovedadOperativa } from './novedades'
 import type { ParadaPayload } from './rutinasRecorrido'
@@ -396,6 +396,39 @@ export async function guardarRecorridoRutina(
   })
   const fila = Array.isArray(data) ? data[0] : data
   return { data: (fila as ResultadoGuardarRecorrido | null) ?? null, error }
+}
+
+/**
+ * Calendario de limpieza (20261103000000): asigna rutinas a UN turno. Crea sus
+ * tareas en el orden pedido, detrás de lo que el turno ya tenía; lo que ya
+ * estaba (misma actividad en la misma área) se cuenta como omitido.
+ */
+export async function asignarRutinasTurno(
+  bloqueId: string,
+  rutinaIds: string[],
+): Promise<{ data: ResultadoAsignarRutinas | null; error: RowError }> {
+  const { data, error } = await db.rpc('limpieza_asignar_rutinas', {
+    p_bloque_id: bloqueId,
+    p_rutina_ids: rutinaIds,
+  })
+  const fila = Array.isArray(data) ? data[0] : data
+  return { data: (fila as ResultadoAsignarRutinas | null) ?? null, error }
+}
+
+/**
+ * Quita una rutina de un turno: borra sus tareas mientras ninguna se haya
+ * trabajado (si alguna sí, la base lo rechaza entero con 55000). Devuelve
+ * cuántas tareas borró.
+ */
+export async function quitarRutinaTurno(
+  bloqueId: string,
+  rutinaId: string,
+): Promise<{ data: number | null; error: RowError }> {
+  const { data, error } = await db.rpc('limpieza_quitar_rutina', {
+    p_bloque_id: bloqueId,
+    p_rutina_id: rutinaId,
+  })
+  return { data: (data as number | null) ?? null, error }
 }
 
 /**

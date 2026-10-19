@@ -65,11 +65,14 @@ describe('catálogo de áreas: un solo punto de alta', () => {
   })
 
   it('los tabs que consumen el catálogo lo muestran en solo lectura', () => {
-    for (const tab of ['RutasRondaTab.tsx', 'ProgramacionLimpiezaTab.tsx']) {
+    // Limpieza ya no lo muestra (20261103000000): sus áreas llegan por las
+    // rutinas, y el catálogo se consulta donde se administra. Tampoco lo monta.
+    for (const tab of ['RutasRondaTab.tsx']) {
       const src = readFileSync(join(DIR_TABS, tab), 'utf8')
       expect(src).toContain('<AreasResumen')
       expect(src).not.toContain('<AreasCatalog')
     }
+    expect(readFileSync(join(DIR_TABS, 'ProgramacionLimpiezaTab.tsx'), 'utf8')).not.toContain('<AreasCatalog')
   })
 
   it('el tab está registrado y vive en una sola sección de la nav', () => {
@@ -140,8 +143,10 @@ describe('ningún tab captura el área como texto libre', () => {
   // Los tres consumidores que alguna vez la transcribieron. El día que alguno
   // vuelva a un <input>, esto se cae — que es el punto: el arreglo no es un
   // formulario, es que el área tenga una sola fuente.
-  // (En Limpieza el formulario vive en la vista, no en el tab contenedor.)
-  const CONSUMIDORES = ['limpieza/VistaAreas.tsx', 'TareasCondominioTab.tsx', 'ChecklistAreasTab.tsx']
+  // (Limpieza capturaba el área en su vista «Áreas», que el calendario de
+  // 20261103000000 reemplazó: el área de una tarea de limpieza sale de la parada
+  // de su rutina, que el editor elige del catálogo.)
+  const CONSUMIDORES = ['TareasCondominioTab.tsx', 'ChecklistAreasTab.tsx', 'limpieza/EditorRutina.tsx']
 
   it.each(CONSUMIDORES)('%s captura el área con un <select> del catálogo', archivo => {
     const [ruta] = archivosUI(DIR_TABS).filter(f => f.endsWith(archivo))

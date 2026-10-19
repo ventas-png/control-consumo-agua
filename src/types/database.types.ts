@@ -25702,6 +25702,41 @@ export type Database = {
         Args: { p_cliente_id: string }
         Returns: boolean
       }
+      limpieza_asignar_rutinas: {
+        Args: { p_bloque_id: string; p_rutina_ids: string[] }
+        Returns: {
+          generadas: number
+          omitidas_existente: number
+        }[]
+      }
+      limpieza_calendario: {
+        Args: { p_desde: string; p_hasta: string; p_project_id: string }
+        Returns: {
+          bloque_id: string
+          cerrado_en: string | null
+          estado: string
+          fecha: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          horas_planificadas: number | null
+          iniciado_en: string | null
+          jornada_codigo: string | null
+          jornada_color: string | null
+          jornada_nombre: string | null
+          otras_tareas: number
+          personal_cargo: string | null
+          personal_estado: string | null
+          personal_id: string
+          personal_nombre: string
+          plantilla_horario_id: string | null
+          rutinas: Json
+          turno: string
+        }[]
+      }
+      limpieza_quitar_rutina: {
+        Args: { p_bloque_id: string; p_rutina_id: string }
+        Returns: number
+      }
       mark_email_open: { Args: { p_tracking_id: string }; Returns: undefined }
       mark_notification_delivery: {
         Args: { p_detail?: Json; p_event: string; p_outbox_id: string }
