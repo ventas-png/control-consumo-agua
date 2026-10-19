@@ -343,3 +343,34 @@ motivo y sin cambiar nada; que una bitácora no se borra ni con `DELETE` directo
 tabla** conserva una fila de X, de sus proyectos o de sus clientes exclusivos
 (salvo `audit_log`). Los 30 bloques marcados de la migración se quitan uno por uno
 y la suite falla sin cada uno.
+
+## Catálogo RRHH en uso (`20261031000700`)
+
+**Qué fallaba.** Desde `20261031000300` (#946), `rrhh_tg_cargo_borrable` /
+`rrhh_tg_turno_borrable` impiden borrar un cargo o tipo de turno que algún empleado,
+actividad, programación o ejecución usa (`RRHH_CARGO_EN_USO` / `RRHH_TURNO_EN_USO`,
+23503). Son `BEFORE DELETE` por fila, así que también se disparaban cuando el catálogo
+caía en la cascada de `DELETE FROM projects` dentro de `purgar_empresa`. Quien lo usa cae
+en la misma cascada, pero Postgres dispara las acciones de las llaves de `projects` en
+orden de nombre de trigger (`RI_ConstraintTrigger_a_<oid>`): si la del catálogo iba antes
+—reproducido aplicando `forma_produccion.sql` después de todas las migraciones, con lo que
+la llave de `plantillas_tarea_cargo` queda más nueva que la del catálogo—, la guarda
+contaba a sus usuarios todavía vivos y la purga entera se revertía. Una sola actividad
+bastaba. La suite no lo veía porque aplica esa forma antes de `20261031000300`. Los
+`RESTRICT` entre esas tablas, como `ejecuciones_limpieza → programacion_limpieza`, no
+estorban: las acciones en cascada se comprueban al final de la sentencia; sólo los
+`BEFORE DELETE` ven el estado intermedio.
+
+**Qué hace.** Las dos guardas se apartan cuando el proyecto o la empresa de la fila ya no
+existen, es decir, en su cascada. El borrado a mano de un código en uso, con el
+condominio vivo, sigue abortando igual. Detalle en el encabezado de la migración y en
+[RRHH_CATALOGOS.md](RRHH_CATALOGOS.md).
+
+**Pruebas.** `assert_rrhh.sql` (bloques 3d y 4d de `run.sh`, en las dos formas de llaves):
+X con un empleado, una actividad, una programación y una ejecución que usan su «conserje»
+y su «diurno», con el orden de cascada **adverso forzado** (las llaves de los usuarios
+hacia `projects` se re-crean idénticas para que se disparen después del catálogo; la
+suite lo comprueba como precondición). Antes de purgar, borrar a mano el cargo o el turno
+falla con 23503; la purga se completa y no deja restos; en Y el catálogo sigue intacto y
+protegido. El paso 6 de `run.sh` quita cada bloque `[paso:…]` de la migración y exige que
+el caso falle.

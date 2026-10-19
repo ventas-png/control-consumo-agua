@@ -289,28 +289,13 @@ DECLARE
   C       constant uuid[] := ARRAY['c1000000-0000-4000-8000-000000000001', 'c1000000-0000-4000-8000-000000000003']::uuid[];
   vecinos jsonb := pg_temp.huella_vecinos();
   r       text;
-  t       record;
-  n       bigint;
-  quedan  text[] := ARRAY[]::text[];
+  quedan  text[];
 BEGIN
   BEGIN
     r := pg_temp.intento(pg_temp.purga_x());
     PERFORM pg_temp.chk(r = 'OK', format('X (sin historia, con datos de cada grupo de la política) se purga (recibido: %s)', left(r, 200)));
 
-    FOR t IN
-      SELECT c.oid::regclass AS tabla, a.attname AS col
-        FROM pg_catalog.pg_attribute a
-        JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
-       WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p')
-         AND a.attnum > 0 AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype
-         AND a.attname IN ('company_id', 'project_id', 'cliente_id')
-         AND c.relname <> 'audit_log'
-       ORDER BY c.relname, a.attname
-    LOOP
-      EXECUTE format('SELECT count(*) FROM %s WHERE %I = ANY ($1)', t.tabla, t.col)
-        INTO n USING CASE t.col WHEN 'company_id' THEN ARRAY[X] WHEN 'project_id' THEN P ELSE C END;
-      IF n > 0 THEN quedan := quedan || format('%s.%s (%s)', t.tabla, t.col, n); END IF;
-    END LOOP;
+    quedan := pg_temp.restos_de(X, P, C);
     PERFORM pg_temp.chk(cardinality(quedan) = 0,
       format('ninguna tabla de public conserva filas de X, sus proyectos o sus clientes exclusivos (quedan: %s)', array_to_string(quedan, ', ')));
 
