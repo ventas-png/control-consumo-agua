@@ -116,3 +116,14 @@ entorno persistente (producción y sandbox RLS terminan en `20261031000300`).
   `padronMascotas.test.ts`, `portalTabs.test.ts`.
 
 Reversión: `scripts/reversion-padron-autorizacion.sql`.
+
+## Despliegue
+
+**Desplegada el 2026-10-16** (PR #947 fusionada como `33db8c8a`; run 38958867992 de «Apply Migrations to
+Production», evento `push`, `success` a las 20:13 UTC). Comprobación posterior de solo lectura en producción
+(2026-10-19 17:09 UTC): 887 migraciones, máx. `20261031000500`. Huella de producción recapturada
+(`scripts/schema-drift/huella-produccion.json`): 32 grupos nuevos y 8 cambiados, 3699 → 3731. Son las 16 funciones
+nuevas del padrón con sus grants, y columnas, constraints, índices y triggers de `mascotas` y
+`vehiculos_residentes`, con valores idénticos a la reconstrucción de `main`. Los 3691 grupos restantes son
+idénticos a la captura anterior y el sha256 completo coincide con el medido en producción; `drift-conocido.json`
+no cambia.
