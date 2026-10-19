@@ -9,14 +9,19 @@ import {
   deleteCondominioRow,
   cerrarTareaYConsumir,
 } from '../../../domain/condominios/tabMutations'
-import { fetchInsumosDeTareas } from '../../../domain/condominios/tabQueries'
+import { fetchHerramientasDePlantillas, fetchInsumosDeTareas } from '../../../domain/condominios/tabQueries'
 import { evidenciaSuficiente, esErrorDeEvidencia } from '../../../domain/condominios/evidencia'
+import {
+  paradasDelTurno, preparacionDelTurno, siguientePendiente,
+} from '../../../domain/condominios/ejecucionGuiada'
 import { MultiImageUploader } from '../../shared/ImageUploader'
+import { PreparacionTurno } from './turno/PreparacionTurno'
+import { EjecucionGuiada } from './turno/EjecucionGuiada'
 import type {
   BloqueTurno, TareaBloque, PlantillaTareaCargo,
   PersonalCondominio, AreaCondominio, TareaBloqueSuministro,
   EstadoBloqueTurno, TurnoTipo, EstadoTareaBloque,
-  CargoCatalogo,
+  CargoCatalogo, PlantillaTareaHerramienta,
 } from '../../../types'
 import { etiquetaCargo } from '../../../domain/condominios/rrhhCatalogos'
 
@@ -68,6 +73,14 @@ function blankBloque(hoy: string) {
   return { personal_id: '', turno: 'manana' as TurnoTipo, fecha: hoy, notas: '' }
 }
 
+/** El mapa sin esa clave (para soltar lo local de una tarea). */
+function sin<T>(m: Record<string, T>, clave: string): Record<string, T> {
+  if (!(clave in m)) return m
+  const n = { ...m }
+  delete n[clave]
+  return n
+}
+
 export function TareasPersonalTab({
   bloques, tareas, plantillas, personal, areas,
   proyectoId, companyId, userId, canCreate, canEdit, onRefresh, cargos = [], modoRuta,
@@ -117,18 +130,67 @@ export function TareasPersonalTab({
     onRefresh()
   }
 
-  async function iniciarBloque(id: string) {
-    await updateCondominioRow('bloques_turno', id, { estado: 'en_curso', iniciado_en: new Date().toISOString() })
+  /**
+   * El estado de un turno recién iniciado o cerrado desde esta pantalla, hasta
+   * que la recarga lo traiga: sin esto se seguía viendo el botón anterior y un
+   * segundo clic volvía a escribir `iniciado_en` / `cerrado_en`.
+   */
+  const [estadoBloqueLocal, setEstadoBloqueLocal] = useState<Record<string, EstadoBloqueTurno>>({})
+  useEffect(() => {
+    setEstadoBloqueLocal(m => Object.fromEntries(Object.entries(m).filter(([id, e]) => bloques.find(b => b.id === id)?.estado !== e)))
+  }, [bloques])
+
+  async function iniciarBloque(id: string): Promise<boolean> {
+    const { error } = await updateCondominioRow('bloques_turno', id, { estado: 'en_curso', iniciado_en: new Date().toISOString() })
+    // Antes el error se ignoraba: el turno seguía «pendiente» y el botón no hacía nada.
+    if (error) { notify({ variant: 'error', title: 'No se pudo iniciar el turno', text: error.message }); return false }
+    setEstadoBloqueLocal(m => ({ ...m, [id]: 'en_curso' }))
     onRefresh()
+    return true
+  }
+
+  // ── Antes de iniciar ───────────────────────────────────────────────────────
+  // «▶ Iniciar» ya no arranca de un clic: primero muestra lo que hay que tener a
+  // mano (herramientas, insumos, indicaciones, cámara) y el turno se inicia
+  // cuando la persona confirma que lo tiene.
+  const [preparandoDe, setPreparandoDe] = useState<string | null>(null)
+  const [herramientasPrep, setHerramientasPrep] = useState<
+    { bloqueId: string; lista: PlantillaTareaHerramienta[] | null; error: string | null } | null
+  >(null)
+  const [iniciando, setIniciando] = useState(false)
+
+  async function prepararInicio(bloqueId: string) {
+    setBloqueAbierto(bloqueId)
+    setPreparandoDe(bloqueId)
+    setHerramientasPrep({ bloqueId, lista: null, error: null })
+    const ids = [...new Set(tareasDeBloque(bloqueId).map(t => t.plantilla_id).filter((x): x is string => !!x))]
+    const { herramientas, error } = await fetchHerramientasDePlantillas(ids)
+    setHerramientasPrep(h => (h?.bloqueId === bloqueId ? { bloqueId, lista: herramientas, error: error?.message ?? null } : h))
+  }
+
+  async function confirmarInicio(bloqueId: string) {
+    setIniciando(true)
+    const ok = await iniciarBloque(bloqueId)
+    setIniciando(false)
+    if (!ok) return
+    setPreparandoDe(null)
+    // Recién iniciado: paso a paso desde la primera pendiente.
+    setVistaLista(v => sin(v, bloqueId))
+    setActualDe(a => sin(a, bloqueId))
   }
 
   async function cerrarBloque(id: string, estado: EstadoBloqueTurno) {
-    const ts = tareasDeBloque(id)
+    // Con lo ya guardado en esta sesión: la última tarea del paso a paso puede
+    // no haber vuelto todavía en la recarga, y el puntaje saldría corto.
+    const ts = tareasDeBloque(id).map(t => (estadoLocal[t.id] ? { ...t, estado: estadoLocal[t.id] } : t))
     const completadas = ts.filter(t => t.estado === 'completada' || t.estado === 'con_observacion').length
     const puntaje = ts.length > 0 ? Math.round((completadas / ts.length) * 100) : 0
-    await updateCondominioRow('bloques_turno', id, {
+    const { error } = await updateCondominioRow('bloques_turno', id, {
       estado, cerrado_en: new Date().toISOString(), puntaje_completitud: puntaje,
     })
+    // Igual que al iniciar: el error se ignoraba y el turno parecía cerrado al recargar… sin estarlo.
+    if (error) { notify({ variant: 'error', title: 'No se pudo cerrar el turno', text: error.message }); return }
+    setEstadoBloqueLocal(m => ({ ...m, [id]: estado }))
     onRefresh()
   }
 
@@ -215,13 +277,34 @@ export function TareasPersonalTab({
   // quien ejecuta vea QUÉ le falta antes del viaje de ida y vuelta, y tenga
   // dónde aportarlo. Hasta esta versión `requiere_foto` era un badge y nada más.
   const [evidenciaDe, setEvidenciaDe] = useState<string | null>(null)
-  const [comentario, setComentario] = useState('')
-  const [motivo, setMotivo] = useState('')
+  // Por tarea y no uno solo: en el paso a paso se pasa de una tarea a otra sin
+  // «abrir» ninguna, y un comentario escrito no puede aparecer en la siguiente.
+  const [comentarios, setComentarios] = useState<Record<string, string>>({})
+  const [motivos, setMotivos] = useState<Record<string, string>>({})
+  const comentarioDe = (t: TareaBloque) => comentarios[t.id] ?? t.evidencia_texto ?? ''
+  const motivoDe = (tareaId: string) => motivos[tareaId] ?? ''
+  const olvidarBorrador = (tareaId: string) => {
+    setComentarios(c => sin(c, tareaId))
+    setMotivos(m => sin(m, tareaId))
+  }
+
+  // Lo que ya se guardó pero todavía no volvió en `tareas`: sin esto, dos pasos
+  // marcados seguidos se pisaban (el segundo partía de la fila vieja) y el
+  // cierre podía no ver la foto recién subida.
+  const [pasosLocales, setPasosLocales] = useState<Record<string, number[]>>({})
+  const [fotosLocales, setFotosLocales] = useState<Record<string, string[]>>({})
+  const pasosDe = (t: TareaBloque) => pasosLocales[t.id] ?? t.checklist_completado ?? []
+  const fotosDe = (t: TareaBloque) => fotosLocales[t.id] ?? t.foto_urls ?? []
+  useEffect(() => {
+    // Cuando la recarga trae lo mismo, lo local sobra.
+    const igual = (a: unknown[] = [], b: unknown[] = []) => a.length === b.length && a.every((x, k) => x === b[k])
+    setPasosLocales(m => Object.fromEntries(Object.entries(m).filter(([id, v]) => !igual(v, tareas.find(t => t.id === id)?.checklist_completado ?? []))))
+    setFotosLocales(m => Object.fromEntries(Object.entries(m).filter(([id, v]) => !igual(v, tareas.find(t => t.id === id)?.foto_urls ?? []))))
+  }, [tareas])
 
   function abrirEvidencia(t: TareaBloque) {
     setEvidenciaDe(actual => (actual === t.id ? null : t.id))
-    setComentario(t.evidencia_texto ?? '')
-    setMotivo('')
+    olvidarBorrador(t.id)
   }
 
   // ── Insumos usados (20260907000500) ───────────────────────────────────────
@@ -284,26 +367,39 @@ export function TareasPersonalTab({
 
   /** Marcar un paso se guarda al instante: es progreso, no un borrador. */
   async function togglePaso(t: TareaBloque, i: number) {
-    const hechos = new Set(t.checklist_completado ?? [])
+    const hechos = new Set(pasosDe(t))
     if (hechos.has(i)) hechos.delete(i); else hechos.add(i)
-    const { error } = await updateCondominioRow('tareas_bloque', t.id, {
-      checklist_completado: [...hechos].sort((a, b) => a - b),
-    })
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    const nuevos = [...hechos].sort((a, b) => a - b)
+    setPasosLocales(m => ({ ...m, [t.id]: nuevos }))
+    const { error } = await updateCondominioRow('tareas_bloque', t.id, { checklist_completado: nuevos })
+    if (error) {
+      setPasosLocales(m => sin(m, t.id))
+      notify({ variant: 'error', title: 'Error', text: error.message })
+      return
+    }
     onRefresh()
   }
 
   async function guardarFotos(t: TareaBloque, urls: string[]) {
+    setFotosLocales(m => ({ ...m, [t.id]: urls }))
     const { error } = await updateCondominioRow('tareas_bloque', t.id, { foto_urls: urls })
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    if (error) {
+      setFotosLocales(m => sin(m, t.id))
+      notify({ variant: 'error', title: 'Error', text: error.message })
+      return
+    }
     onRefresh()
   }
 
+  /** Estado ya guardado en esta sesión, para que el paso a paso avance sin esperar la recarga. */
+  const [estadoLocal, setEstadoLocal] = useState<Record<string, EstadoTareaBloque>>({})
+
+  /** Devuelve si quedó guardada: el paso a paso sólo avanza cuando sí. */
   async function marcarTarea(
     tareaId: string,
     estado: EstadoTareaBloque,
     motivoAplicable = '',
-  ) {
+  ): Promise<boolean> {
     if (estado === 'con_observacion') {
       // Mismos cuatro campos que la ruta de limpieza (VistaRuta · reportarNovedad):
       // un hallazgo de turno y uno de limpieza se administran en el mismo listado,
@@ -331,7 +427,7 @@ export function TareasPersonalTab({
         ],
         submitText: 'Registrar',
       })
-      if (!result) return
+      if (!result) return false
       // `notas_operativo` no se escribe ni se pisa: las filas viejas conservan su
       // texto y la tarjeta lee `novedad ?? notas_operativo`. Reescribirlas sería
       // cambiar qué significaba aquella columna el día que se llenó.
@@ -345,7 +441,7 @@ export function TareasPersonalTab({
       })
       // Antes esta rama ignoraba el error y refrescaba igual: el operativo veía
       // su tarea sin la observación y sin saber por qué.
-      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
     } else if (estado === 'completada') {
       // El cierre y el consumo son UNA transacción (20260907001000). Antes esto
       // eran DOS requests —UPDATE del estado y después la RPC de consumo— y
@@ -356,12 +452,24 @@ export function TareasPersonalTab({
       if (t) {
         // Cortesía de UI: el rechazo con contexto ANTES del viaje a la base.
         // El control real es el trigger, dentro de la transacción del RPC.
-        const chequeo = evidenciaSuficiente(t, { ...t, motivo_sin_evidencia: motivoAplicable })
+        const chequeo = evidenciaSuficiente(t, {
+          ...t,
+          foto_urls: fotosDe(t),
+          checklist_completado: pasosDe(t),
+          evidencia_texto: comentarioDe(t),
+          motivo_sin_evidencia: motivoAplicable,
+        })
         if (!chequeo.ok) {
           setEvidenciaDe(tareaId)
-          setComentario(t.evidencia_texto ?? '')
           notify({ variant: 'warning', title: 'Falta evidencia', text: chequeo.motivo })
-          return
+          return false
+        }
+        // Un comentario escrito y todavía sin guardar (el blur y el clic llegan
+        // juntos) se guarda ANTES del cierre: el trigger lee la fila, no la pantalla.
+        const escrito = comentarios[t.id]
+        if (escrito !== undefined && escrito !== (t.evidencia_texto ?? '')) {
+          const { error } = await updateCondominioRow('tareas_bloque', t.id, { evidencia_texto: escrito })
+          if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
         }
       }
       const { data, error } = await cerrarTareaYConsumir(
@@ -379,7 +487,7 @@ export function TareasPersonalTab({
             ? 'La tarea no se puede cerrar sin la evidencia que exige. Adjuntala, o declará el motivo.'
             : error.message,
         })
-        return
+        return false
       }
       // La falta de stock NO es un error: el cierre y el consumo ya ocurrieron.
       // Se avisa para que alguien reponga, no para culpar a quien ejecutó.
@@ -395,7 +503,7 @@ export function TareasPersonalTab({
       // `onRefresh` recarga las tareas, no el plan de insumos: sin esto la
       // pantalla seguiría ofreciendo editar lo que ya se descontó.
       await recargarInsumos()
-      setEvidenciaDe(null); setMotivo(''); setComentario('')
+      setEvidenciaDe(null); olvidarBorrador(tareaId)
     } else {
       // `omitida` (y el reabrir defensivo a 'pendiente'): no consumen insumos
       // ni exigen evidencia — omitir es que NO se hizo. El UPDATE directo de
@@ -406,16 +514,202 @@ export function TareasPersonalTab({
       })
       if (error) {
         notify({ variant: 'error', title: 'Error', text: error.message })
-        return
+        return false
       }
-      setEvidenciaDe(null); setMotivo(''); setComentario('')
+      setEvidenciaDe(null); olvidarBorrador(tareaId)
     }
+    setEstadoLocal(m => ({ ...m, [tareaId]: estado }))
     onRefresh()
+    return true
+  }
+
+  // ── Paso a paso (turno en curso) ───────────────────────────────────────────
+  // Una tarjeta por vez, por paradas. «Listo · Siguiente» es el que guarda: usa
+  // el mismo cierre de arriba (evidencia, RPC, insumos) y avanza sólo si salió.
+  const [vistaLista, setVistaLista] = useState<Record<string, boolean>>({})
+  /** Tarea a la vista por turno; sin entrada = la primera pendiente; null = resumen. */
+  const [actualDe, setActualDe] = useState<Record<string, string | null>>({})
+  const [paradasEmpezadas, setParadasEmpezadas] = useState<Record<string, string[]>>({})
+  const [guardandoTarea, setGuardandoTarea] = useState(false)
+  const [aviso, setAviso] = useState('')
+
+  const tareasGuiadas = (bloqueId: string) =>
+    tareasDeBloque(bloqueId).map(t => (estadoLocal[t.id] ? { ...t, estado: estadoLocal[t.id] } : t))
+
+  function irA(bloqueId: string, tareaId: string | null) {
+    setActualDe(a => ({ ...a, [bloqueId]: tareaId }))
+    setAviso('')
+  }
+
+  function avanzar(bloqueId: string, hecha: TareaBloque, estado: EstadoTareaBloque, texto: string) {
+    // `estadoLocal` todavía no se aplicó en este render: se resuelve aquí la recién guardada.
+    const ts = tareasGuiadas(bloqueId).map(t => (t.id === hecha.id ? { ...t, estado } : t))
+    const sig = siguientePendiente(ts, hecha.id)
+    setActualDe(a => ({ ...a, [bloqueId]: sig }))
+    const titulo = sig ? ts.find(t => t.id === sig)?.titulo : null
+    setAviso(titulo ? `${texto} Sigue: ${titulo}.` : `${texto} No quedan tareas pendientes.`)
+  }
+
+  async function resolverYSeguir(bloqueId: string, t: TareaBloque, estado: EstadoTareaBloque, motivoAplicable = '') {
+    setGuardandoTarea(true)
+    const ok = await marcarTarea(t.id, estado, motivoAplicable)
+    setGuardandoTarea(false)
+    if (!ok) return
+    avanzar(bloqueId, t, estado,
+      estado === 'omitida' ? `«${t.titulo}» omitida.`
+        : estado === 'con_observacion' ? `Observación de «${t.titulo}» registrada.`
+          : `«${t.titulo}» guardada ✓.`)
+  }
+
+  async function omitirYSeguir(bloqueId: string, t: TareaBloque) {
+    // En la lista el ⏭ es chico y está aparte; aquí es un botón grande junto a
+    // «Listo», así que se pregunta.
+    const r = await confirm({
+      title: '¿Omitir esta tarea?',
+      text: 'Queda registrada como NO hecha. Si la hiciste, usá «Listo · Siguiente».',
+      icon: 'warning', confirmText: 'Omitir',
+    })
+    if (!r.isConfirmed) return
+    await resolverYSeguir(bloqueId, t, 'omitida')
   }
 
   async function deleteTarea(id: string) {
     await deleteCondominioRow('tareas_bloque', id)
     onRefresh()
+  }
+
+  /** La tarea trae algo que leer o aportar: si no, no hay panel que mostrar. */
+  const tienePanel = (t: TareaBloque) =>
+    t.requiere_foto || !!t.requiere_comentario || !!t.requiere_checklist || !!t.instrucciones_seguridad || insumosDe(t.id).length > 0
+
+  /** Hay algo que aportar para cerrar: foto, comentario o pasos. */
+  const exigeEvidencia = (t: TareaBloque) =>
+    t.requiere_foto || !!t.requiere_comentario || (!!t.requiere_checklist && (t.checklist?.length ?? 0) > 0)
+
+  /**
+   * Lo que se hace y se aporta en UNA tarea: indicaciones, insumos, pasos,
+   * foto, comentario y la salida declarada. Lo pinta la lista (al tocar 📋) y
+   * el paso a paso (siempre, en la tarjeta), así que es una sola copia.
+   */
+  function panelEjecucion(t: TareaBloque, cerrarConMotivo: () => void) {
+    return (
+      <div style={{ padding: '12px', margin: '0 0 8px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '10px' }}>
+        {/* Las instrucciones van ARRIBA y siempre: leerlas al cerrar es tarde. */}
+        {t.instrucciones_seguridad && (
+          <div role="note" style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', fontSize: '12.5px', color: 'var(--at-warning-strong)' }}>
+            🦺 <strong>Antes de empezar:</strong> {t.instrucciones_seguridad}
+          </div>
+        )}
+
+        {/* Los insumos van tras las instrucciones y antes de los pasos:
+            primero cómo no lastimarse, después con qué se hace. */}
+        {insumosDe(t.id).length > 0 && (
+          <div style={{ marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '4px' }}>
+              Insumos usados
+            </div>
+            {insumosDe(t.id).map(ins => (
+              <div key={ins.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
+                  {ins.nombre_suministro}
+                </span>
+                {ins.movimiento_id ? (
+                  // Ya descontado: no se vuelve a ofrecer. La RPC lo ignoraría
+                  // igual, pero un campo editable que no hace nada miente.
+                  <span style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 700 }}>
+                    ✓ descontado
+                  </span>
+                ) : ins.no_usado_en ? (
+                  // Sellado como «no usado» (20260907001000): terminal. Deshacerlo
+                  // es una corrección del admin, no un campo en esta pantalla.
+                  <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 700 }}>
+                    ∅ no usado
+                  </span>
+                ) : (
+                  <>
+                    <input
+                      type="number" min="0" step="0.01"
+                      aria-label={`Cantidad usada de ${ins.nombre_suministro}`}
+                      value={cantidades[ins.id] ?? String(ins.cantidad_planificada)}
+                      onChange={e => setCantidades(c => ({ ...c, [ins.id]: e.target.value }))}
+                      style={{ width: '78px', padding: '5px 7px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '12.5px', background: 'var(--at-surface)' }} />
+                    <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', width: '54px' }}>
+                      {ins.unidad_medida}
+                    </span>
+                  </>
+                )}
+              </div>
+            ))}
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
+              Se descuentan del almacén al marcar la tarea completada. Poné 0 en lo que no hayas usado.
+            </div>
+          </div>
+        )}
+
+        {t.requiere_checklist && (t.checklist?.length ?? 0) > 0 && (
+          <div style={{ marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '4px' }}>Pasos</div>
+            {t.checklist!.map((paso, i) => {
+              const hecho = pasosDe(t).includes(i)
+              return (
+                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--at-ink-2)', marginBottom: '3px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={hecho}
+                    onChange={() => void togglePaso(t, i)}
+                    aria-label={paso} />
+                  <span style={{ textDecoration: hecho ? 'line-through' : 'none', opacity: hecho ? 0.6 : 1 }}>{paso}</span>
+                </label>
+              )
+            })}
+          </div>
+        )}
+
+        {t.requiere_foto && (
+          <div style={{ marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '4px' }}>Foto de evidencia</div>
+            <MultiImageUploader
+              values={fotosDe(t)}
+              onChange={urls => { void guardarFotos(t, urls) }}
+              folder="tareas"
+              label="Evidencia"
+              maxFiles={6}
+              capture
+            />
+          </div>
+        )}
+
+        {t.requiere_comentario && (
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }} htmlFor={`com-${t.id}`}>
+              Comentario de quien ejecuta
+            </label>
+            <textarea id={`com-${t.id}`} rows={2} value={comentarioDe(t)}
+              onChange={e => { const v = e.target.value; setComentarios(c => ({ ...c, [t.id]: v })) }}
+              onBlur={() => void updateCondominioRow('tareas_bloque', t.id, { evidencia_texto: comentarioDe(t) }).then(onRefresh)}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
+          </div>
+        )}
+
+        {/* La salida declarada. No es un bypass: queda escrita en la fila. Sólo
+            tiene sentido donde se exige evidencia. */}
+        {exigeEvidencia(t) && <details>
+          <summary style={{ fontSize: '12px', color: 'var(--at-ink-3)', cursor: 'pointer' }}>
+            No puedo aportar la evidencia
+          </summary>
+          <div style={{ marginTop: '6px' }}>
+            <input value={motivoDe(t.id)} onChange={e => { const v = e.target.value; setMotivos(m => ({ ...m, [t.id]: v })) }}
+              aria-label="Motivo para cerrar sin evidencia"
+              placeholder="Por qué no se puede aportar (queda registrado)"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
+            <button
+              onClick={cerrarConMotivo}
+              disabled={motivoDe(t.id).trim() === ''}
+              style={{ marginTop: '6px', padding: '6px 12px', background: motivoDe(t.id).trim() === '' ? 'var(--at-chip)' : 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', cursor: motivoDe(t.id).trim() === '' ? 'default' : 'pointer', fontSize: '12.5px', fontWeight: 700, color: 'var(--at-warning-strong)', opacity: motivoDe(t.id).trim() === '' ? 0.5 : 1 }}>
+              Cerrar declarando el motivo
+            </button>
+          </div>
+        </details>}
+      </div>
+    )
   }
 
   const personalActivo = personal.filter(p => p.estado !== 'inactivo').sort((a, b) => a.nombre.localeCompare(b.nombre))
@@ -504,7 +798,8 @@ export function TareasPersonalTab({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {bloquesFiltrados.map(bloque => {
+          {bloquesFiltrados.map(fila => {
+            const bloque = estadoBloqueLocal[fila.id] ? { ...fila, estado: estadoBloqueLocal[fila.id] } : fila
             const tc = TURNO_CONFIG[bloque.turno]
             const ec = ESTADO_BLOQUE[bloque.estado]
             const ts = tareasDeBloque(bloque.id)
@@ -512,6 +807,9 @@ export function TareasPersonalTab({
             const progreso = ts.length > 0 ? Math.round((completadas / ts.length) * 100) : 0
             const isOpen = bloqueAbierto === bloque.id
             const empleado = personal.find(p => p.id === bloque.personal_id)
+            const nombreEmpleado = empleado?.nombre ?? bloque.personal_nombre ?? 'Empleado'
+            // Turno en curso y quien puede ejecutarlo: una tarjeta por vez, salvo que pida la lista.
+            const guiado = canEdit && bloque.estado === 'en_curso' && !vistaLista[bloque.id]
             // El nombre que trae el turno cubre a quien no lee el tab Personal (la ruta de Limpieza).
             const cargoEmpleado = empleado?.cargo ?? bloque.personal_cargo
 
@@ -523,7 +821,7 @@ export function TareasPersonalTab({
                   <span style={{ fontSize: '22px' }}>{tc.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)' }}>
-                      {empleado?.nombre ?? bloque.personal_nombre ?? 'Empleado'} — {cargoEmpleado ? etiquetaCargo(cargoEmpleado, cargos) : ''}
+                      {nombreEmpleado} — {cargoEmpleado ? etiquetaCargo(cargoEmpleado, cargos) : ''}
                     </div>
                     <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '2px' }}>
                       <span style={{ background: tc.bg, color: tc.color, padding: '1px 8px', borderRadius: '20px', fontWeight: 600 }}>{tc.label}</span>
@@ -547,7 +845,7 @@ export function TareasPersonalTab({
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '5px' }} onClick={e => e.stopPropagation()}>
                       {bloque.estado === 'pendiente' && (
-                        <button onClick={() => iniciarBloque(bloque.id)} style={{ padding: '6px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        <button onClick={() => void prepararInicio(bloque.id)} style={{ padding: '6px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                           ▶ Iniciar
                         </button>
                       )}
@@ -567,6 +865,49 @@ export function TareasPersonalTab({
                 {/* Detalle de tareas */}
                 {isOpen && (
                   <div style={{ borderTop: '1px solid var(--at-warning-border)', padding: '16px 18px', background: 'var(--at-warning-tint)' }}>
+                    {preparandoDe === bloque.id && bloque.estado === 'pendiente' ? (
+                      <PreparacionTurno
+                        persona={nombreEmpleado}
+                        prep={herramientasPrep?.bloqueId === bloque.id && herramientasPrep.lista
+                          ? preparacionDelTurno(ts, insumos, herramientasPrep.lista, areas)
+                          : null}
+                        errorHerramientas={herramientasPrep?.bloqueId === bloque.id ? herramientasPrep.error : null}
+                        iniciando={iniciando}
+                        onIniciar={() => void confirmarInicio(bloque.id)}
+                        onCancelar={() => setPreparandoDe(null)}
+                      />
+                    ) : guiado ? (() => {
+                      const tg = tareasGuiadas(bloque.id)
+                      const actualId = bloque.id in actualDe ? actualDe[bloque.id] : siguientePendiente(tg, null)
+                      const empezadas = paradasEmpezadas[bloque.id] ?? []
+                      return (
+                        <EjecucionGuiada
+                          tareas={tg}
+                          paradas={paradasDelTurno(tg, areas)}
+                          actualId={actualId}
+                          paradaEmpezada={clave => empezadas.includes(clave)}
+                          puedeEjecutar={canEdit}
+                          guardando={guardandoTarea}
+                          aviso={aviso}
+                          onIr={id => irA(bloque.id, id)}
+                          onEmpezarParada={clave => setParadasEmpezadas(m => ({ ...m, [bloque.id]: [...(m[bloque.id] ?? []), clave] }))}
+                          onListo={t => void resolverYSeguir(bloque.id, t, 'completada')}
+                          onObservacion={t => void resolverYSeguir(bloque.id, t, 'con_observacion')}
+                          onOmitir={t => void omitirYSeguir(bloque.id, t)}
+                          onCerrarTurno={() => void cerrarBloque(bloque.id, 'completado')}
+                          onVerLista={() => setVistaLista(v => ({ ...v, [bloque.id]: true }))}
+                          panel={t => (tienePanel(t)
+                            ? panelEjecucion(t, () => void resolverYSeguir(bloque.id, t, 'completada', motivoDe(t.id).trim()))
+                            : null)}
+                        />
+                      )
+                    })() : (<>
+                    {canEdit && bloque.estado === 'en_curso' && (
+                      <button onClick={() => setVistaLista(v => sin(v, bloque.id))}
+                        style={{ marginBottom: '12px', padding: '7px 14px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600 }}>
+                        ▶ Volver al paso a paso
+                      </button>
+                    )}
                     {/* Botón cargar plantillas */}
                     {puedeArmar && empleado && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
@@ -603,7 +944,7 @@ export function TareasPersonalTab({
                                   {t.requiere_comentario && <span style={{ fontSize: '11.5px', color: 'var(--at-accent-hover)' }}>💬 Requiere comentario</span>}
                                   {t.requiere_checklist && (t.checklist?.length ?? 0) > 0 && (
                                     <span style={{ fontSize: '11.5px', color: 'var(--at-accent-hover)' }}>
-                                      ☑️ {(t.checklist_completado ?? []).length}/{t.checklist!.length}
+                                      ☑️ {pasosDe(t).length}/{t.checklist!.length}
                                     </span>
                                   )}
                                   {pendientesDe(t.id).length > 0 && (
@@ -631,7 +972,7 @@ export function TareasPersonalTab({
                                   <button onClick={() => marcarTarea(t.id, 'completada')} title="Completada" style={{ padding: '5px 9px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>✅</button>
                                   <button onClick={() => marcarTarea(t.id, 'con_observacion')} title="Con observación" style={{ padding: '5px 9px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>⚠️</button>
                                   <button onClick={() => marcarTarea(t.id, 'omitida')} title="Omitir" style={{ padding: '5px 9px', background: 'var(--at-accent-tint-2)', border: '1px solid var(--at-accent-soft-2)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>⏭</button>
-                                  {(t.requiere_foto || t.requiere_comentario || t.requiere_checklist || t.instrucciones_seguridad || insumosDe(t.id).length > 0) && (
+                                  {tienePanel(t) && (
                                     <button onClick={() => abrirEvidencia(t)} aria-label={`Evidencia de ${t.titulo}`} title="Evidencia e instrucciones" style={{ padding: '5px 9px', background: evidenciaDe === t.id ? 'var(--at-primary-soft)' : 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>📋</button>
                                   )}
                                 </div>
@@ -640,123 +981,7 @@ export function TareasPersonalTab({
                                 <button onClick={() => deleteTarea(t.id)} style={{ padding: '5px 8px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '13px', flexShrink: 0 }}>✕</button>
                               )}
                             </div>
-                            {evidenciaDe === t.id && (
-                              <div style={{ padding: '12px', margin: '0 0 8px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '10px' }}>
-                                {/* Las instrucciones van ARRIBA y siempre: leerlas al cerrar es tarde. */}
-                                {t.instrucciones_seguridad && (
-                                  <div role="note" style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', fontSize: '12.5px', color: 'var(--at-warning-strong)' }}>
-                                    🦺 <strong>Antes de empezar:</strong> {t.instrucciones_seguridad}
-                                  </div>
-                                )}
-
-                                {/* Los insumos van tras las instrucciones y antes de los pasos:
-                                    primero cómo no lastimarse, después con qué se hace. */}
-                                {insumosDe(t.id).length > 0 && (
-                                  <div style={{ marginBottom: '10px' }}>
-                                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '4px' }}>
-                                      Insumos usados
-                                    </div>
-                                    {insumosDe(t.id).map(ins => (
-                                      <div key={ins.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                        <span style={{ flex: 1, minWidth: 0, fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
-                                          {ins.nombre_suministro}
-                                        </span>
-                                        {ins.movimiento_id ? (
-                                          // Ya descontado: no se vuelve a ofrecer. La RPC lo ignoraría
-                                          // igual, pero un campo editable que no hace nada miente.
-                                          <span style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 700 }}>
-                                            ✓ descontado
-                                          </span>
-                                        ) : ins.no_usado_en ? (
-                                          // Sellado como «no usado» (20260907001000): terminal. Deshacerlo
-                                          // es una corrección del admin, no un campo en esta pantalla.
-                                          <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 700 }}>
-                                            ∅ no usado
-                                          </span>
-                                        ) : (
-                                          <>
-                                            <input
-                                              type="number" min="0" step="0.01"
-                                              aria-label={`Cantidad usada de ${ins.nombre_suministro}`}
-                                              value={cantidades[ins.id] ?? String(ins.cantidad_planificada)}
-                                              onChange={e => setCantidades(c => ({ ...c, [ins.id]: e.target.value }))}
-                                              style={{ width: '78px', padding: '5px 7px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '12.5px', background: 'var(--at-surface)' }} />
-                                            <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', width: '54px' }}>
-                                              {ins.unidad_medida}
-                                            </span>
-                                          </>
-                                        )}
-                                      </div>
-                                    ))}
-                                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
-                                      Se descuentan del almacén al marcar la tarea completada. Poné 0 en lo que no hayas usado.
-                                    </div>
-                                  </div>
-                                )}
-
-                                {t.requiere_checklist && (t.checklist?.length ?? 0) > 0 && (
-                                  <div style={{ marginBottom: '10px' }}>
-                                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '4px' }}>Pasos</div>
-                                    {t.checklist!.map((paso, i) => {
-                                      const hecho = (t.checklist_completado ?? []).includes(i)
-                                      return (
-                                        <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--at-ink-2)', marginBottom: '3px', cursor: 'pointer' }}>
-                                          <input type="checkbox" checked={hecho}
-                                            onChange={() => void togglePaso(t, i)}
-                                            aria-label={paso} />
-                                          <span style={{ textDecoration: hecho ? 'line-through' : 'none', opacity: hecho ? 0.6 : 1 }}>{paso}</span>
-                                        </label>
-                                      )
-                                    })}
-                                  </div>
-                                )}
-
-                                {t.requiere_foto && (
-                                  <div style={{ marginBottom: '10px' }}>
-                                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '4px' }}>Foto de evidencia</div>
-                                    <MultiImageUploader
-                                      values={t.foto_urls ?? []}
-                                      onChange={urls => { void guardarFotos(t, urls) }}
-                                      folder="tareas"
-                                      label="Evidencia"
-                                      maxFiles={6}
-                                      capture
-                                    />
-                                  </div>
-                                )}
-
-                                {t.requiere_comentario && (
-                                  <div style={{ marginBottom: '10px' }}>
-                                    <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }} htmlFor={`com-${t.id}`}>
-                                      Comentario de quien ejecuta
-                                    </label>
-                                    <textarea id={`com-${t.id}`} rows={2} value={comentario}
-                                      onChange={e => setComentario(e.target.value)}
-                                      onBlur={() => void updateCondominioRow('tareas_bloque', t.id, { evidencia_texto: comentario }).then(onRefresh)}
-                                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
-                                  </div>
-                                )}
-
-                                {/* La salida declarada. No es un bypass: queda escrita en la fila. */}
-                                <details>
-                                  <summary style={{ fontSize: '12px', color: 'var(--at-ink-3)', cursor: 'pointer' }}>
-                                    No puedo aportar la evidencia
-                                  </summary>
-                                  <div style={{ marginTop: '6px' }}>
-                                    <input value={motivo} onChange={e => setMotivo(e.target.value)}
-                                      aria-label="Motivo para cerrar sin evidencia"
-                                      placeholder="Por qué no se puede aportar (queda registrado)"
-                                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
-                                    <button
-                                      onClick={() => void marcarTarea(t.id, 'completada', motivo.trim())}
-                                      disabled={motivo.trim() === ''}
-                                      style={{ marginTop: '6px', padding: '6px 12px', background: motivo.trim() === '' ? 'var(--at-chip)' : 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', cursor: motivo.trim() === '' ? 'default' : 'pointer', fontSize: '12.5px', fontWeight: 700, color: 'var(--at-warning-strong)', opacity: motivo.trim() === '' ? 0.5 : 1 }}>
-                                      Cerrar declarando el motivo
-                                    </button>
-                                  </div>
-                                </details>
-                              </div>
-                            )}
+                            {evidenciaDe === t.id && panelEjecucion(t, () => void marcarTarea(t.id, 'completada', motivoDe(t.id).trim()))}
                           </div>
                           )
                         })}
@@ -834,6 +1059,7 @@ export function TareasPersonalTab({
                         </div>
                       </div>
                     )}
+                    </>)}
                   </div>
                 )}
               </div>

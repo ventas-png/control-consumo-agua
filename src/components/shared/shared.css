@@ -29,6 +29,18 @@
   to   { opacity: 1; }
 }
 
+/* Entrada de una tarjeta que reemplaza a la anterior (la ejecución guiada de un
+ * turno pasa de tarea en tarea): sube un poco mientras aparece, para que se note
+ * que cambió aunque se vea parecida. Sin movimiento si el usuario lo pidió. */
+@keyframes shared-card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.shared-card-in { animation: shared-card-in .28s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .shared-card-in { animation: none; }
+}
+
 /* Clase utilitaria para skeleton — fondo gradiente con shimmer.
  * Usa color por defecto que funciona sobre fondo blanco; para fondos
  * oscuros (KPI cards), el componente <Skeleton> override el background. */
