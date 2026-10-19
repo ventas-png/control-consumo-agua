@@ -20,6 +20,16 @@ Sin arrastre (pantallas táctiles, teclado) cada gesto tiene su botón: **＋** 
 seleccionada, la de borde resaltado), **↑ ↓** para reordenar —en el borde de un área la actividad cruza a la vecina— y
 **✕** para quitar. Todo es **borrador hasta «Guardar»**: cabecera y recorrido se guardan juntos.
 
+**Varias de una vez.** **＋ Agregar áreas** (arriba del recorrido) abre una ventana para marcar muchas áreas juntas, y
+**＋ Actividades** (en la cabecera de cada área) hace lo mismo con el catálogo de actividades, con búsqueda, filtro de
+servicio y lo que suman las marcadas. Lo marcado entra **al final, en el orden en que se marcó** (cada marca muestra su
+número), y después se acomoda con ↑ ↓ o arrastrando. Lo que ya está se ve marcado y apagado. Las marcas sobreviven a la
+búsqueda, y «Marcar todas» / «Marcar las que se ven» marca de una vez lo listado.
+
+| ＋ Agregar áreas | ＋ Actividades de un área |
+|---|---|
+| ![Varias áreas](capturas/rutinas_recorrido/40-varias-areas.png) | ![Varias actividades](capturas/rutinas_recorrido/41-varias-actividades.png) |
+
 | Móvil | Modo oscuro |
 |---|---|
 | ![Móvil](capturas/rutinas_recorrido/20-movil.png) | ![Oscuro](capturas/rutinas_recorrido/30-oscuro.png) |
@@ -33,7 +43,7 @@ seleccionada, la de borde resaltado), **↑ ↓** para reordenar —en el borde 
 | Guardas estáticas | `src/__tests__/rutinasRecorridoMigracion.test.ts`; `materializarRutinasRls.test.ts` e `insertSoloPendiente.test.ts` ahora vigilan la versión viva de la RPC |
 | Dominio puro (cada gesto del editor y el tiempo acumulado) | `src/domain/condominios/rutinasRecorrido.ts` (+ `__tests__/rutinasRecorrido.test.ts`) |
 | Datos | `fetchRutinasLimpieza` (trae `paradas`) en `tabQueries.ts`; `guardarRecorridoRutina` en `tabMutations.ts` |
-| Pantalla | `src/components/condominios/tabs/limpieza/EditorRutina.tsx`, `VistaRutinas.tsx` (+ `__tests__/VistaRutinas.test.tsx`) |
+| Pantalla | `src/components/condominios/tabs/limpieza/EditorRutina.tsx`, `SelectorVarios.tsx` (ventana de «agregar varias»), `VistaRutinas.tsx` (+ `__tests__/VistaRutinas.test.tsx`) |
 | Tipos | `RutinaArea`, `ResultadoGuardarRecorrido`, `RutinaActividad.rutina_area_id` en `src/types/condominios/operaciones.ts`; `src/types/database.types.ts` |
 | Recuperación | `scripts/reversion-rutinas-recorrido.sql` |
 | CI | paso «Rutinas como recorrido por áreas…» en `.github/workflows/coverage.yml` |
@@ -81,7 +91,9 @@ PLANIFICADO.
 Esta migración, además:
 
 - **Retira la unicidad vieja por sus columnas** `(bloque_id, plantilla_id)`, sea índice o constraint y se llame como se
-  llame. El aviso `RUTINAS_RECORRIDO: retirada la unicidad …` queda en el log del deploy.
+  llame, con un aviso `RUTINAS_RECORRIDO: retirada la unicidad …` (NOTICE). La API con la que despliega
+  `apply-migrations-prod.yml` no devuelve los NOTICE, así que el log del workflow no lo muestra: el resultado se
+  comprueba en `pg_indexes`.
 - **Aborta en un pre-vuelo** toda la migración, sin tocar nada, si hubiera filas repetidas en (bloque, actividad, área).
 - **Devuelve el índice líder de la FK `plantilla_id`** (`idx_tareas_bloque_plantilla_id`, política de `20260606170000`),
   que producción nunca tuvo y que la unicidad nueva no cubre.

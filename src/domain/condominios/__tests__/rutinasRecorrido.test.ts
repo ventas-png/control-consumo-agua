@@ -3,8 +3,8 @@
 import { describe, it, expect } from 'vitest'
 import type { PlantillaTareaCargo, RutinaActividad, RutinaArea } from '../../../types'
 import {
-  alternarObligatoria, destinoVecino, formatearMinutos, horaMas, insertarActividad, insertarParada,
-  minutosJornada, mismoRecorrido, moverActividad, moverParada, quitarActividad,
+  alternarObligatoria, destinoVecino, formatearMinutos, horaMas, insertarActividad, insertarActividades,
+  insertarParada, insertarParadas, minutosJornada, mismoRecorrido, moverActividad, moverParada, quitarActividad,
   quitarParada, recorridoDesdeFilas, tiempoRecorrido, type Recorrido,
 } from '../rutinasRecorrido'
 
@@ -74,6 +74,14 @@ describe('paradas', () => {
     expect(texto(moverParada(r, 2, 0))).toEqual(['-:x', 'A2:', 'A1:'])
   })
 
+  it('insertar varias (ventana «＋ Áreas»): al final, en el orden marcado, saltando las que ya están', () => {
+    const r = rec('-:x', 'A1:')
+    expect(texto(insertarParadas(r, ['A3', 'A1', 'A2', 'A3']))).toEqual(['-:x', 'A1:', 'A3:', 'A2:'])
+    // Si ninguna es nueva, el MISMO recorrido: el editor avisa en vez de callar.
+    expect(insertarParadas(r, ['A1'])).toBe(r)
+    expect(insertarParadas(r, [])).toBe(r)
+  })
+
   it('quitar se lleva la parada con sus actividades', () => {
     expect(texto(quitarParada(rec('A1:barrer', 'A2:'), 0))).toEqual(['A2:'])
   })
@@ -90,6 +98,15 @@ describe('actividades', () => {
   it('nada se agrega al grupo legado', () => {
     const r = rec('-:x', 'A1:')
     expect(insertarActividad(r, 0, 'y')).toBe(r)
+    expect(insertarActividades(r, 0, ['y', 'z'])).toBe(r)
+  })
+
+  it('insertar varias (ventana «＋ Actividades»): al final de ESA parada, en el orden marcado', () => {
+    const r = rec('A1:barrer', 'A2:barrer')
+    expect(texto(insertarActividades(r, 0, ['vidrios', 'barrer', 'luces', 'vidrios'])))
+      .toEqual(['A1:barrer,vidrios,luces', 'A2:barrer'])
+    expect(insertarActividades(r, 1, ['barrer'])).toBe(r)
+    expect(insertarActividades(r, 5, ['vidrios'])).toBe(r)
   })
 
   it('mover dentro de la parada', () => {

@@ -98,6 +98,14 @@ export function moverParada(rec: Recorrido, desde: number, hasta: number): Recor
   return [...sin.slice(0, final), rec[desde], ...sin.slice(final)]
 }
 
+/**
+ * Varias áreas de una vez (la ventana «＋ Áreas»): al final, en el orden dado.
+ * Las que ya están —o vienen repetidas en la lista— se saltan.
+ */
+export function insertarParadas(rec: Recorrido, areaIds: string[]): Recorrido {
+  return areaIds.reduce((r, id) => insertarParada(r, id), rec)
+}
+
 export function quitarParada(rec: Recorrido, indice: number): Recorrido {
   if (indice < 0 || indice >= rec.length) return rec
   return [...rec.slice(0, indice), ...rec.slice(indice + 1)]
@@ -124,6 +132,14 @@ export function insertarActividad(
     ...destino.actividades.slice(pos),
   ]
   return conActividades(rec, parada, actividades)
+}
+
+/**
+ * Varias actividades de una vez en una parada (la ventana «＋ Actividades»): al
+ * final, en el orden dado. Las que esa parada ya tiene se saltan.
+ */
+export function insertarActividades(rec: Recorrido, parada: number, plantillaIds: string[]): Recorrido {
+  return plantillaIds.reduce((r, id) => insertarActividad(r, parada, id), rec)
 }
 
 /**

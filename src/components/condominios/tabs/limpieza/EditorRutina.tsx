@@ -17,6 +17,10 @@
 // (las actividades van al área SELECCIONADA), ↑ ↓ para reordenar —en el borde de
 // un área la actividad cruza a la vecina— y ✕ para quitar.
 //
+// VARIAS DE UNA VEZ. «＋ Agregar áreas» (arriba del recorrido) y «＋ Actividades»
+// (en cada área) abren una ventana para marcar muchas juntas (`SelectorVarios`):
+// entran al final, en el orden en que se marcaron, y se acomodan con ↑ ↓.
+//
 // BORRADOR HASTA «GUARDAR». Nada persiste mientras se arma: la cabecera y el
 // recorrido se guardan juntos, el recorrido en UNA transacción
 // (`guardar_recorrido_rutina`). Cancelar nunca deja cambios a medias, y un
@@ -30,11 +34,12 @@ import {
 } from '../../../../domain/condominios/tabMutations'
 import { etiquetaCargo } from '../../../../domain/condominios/rrhhCatalogos'
 import {
-  alternarObligatoria, destinoVecino, formatearMinutos, horaMas, insertarActividad,
-  insertarParada, minutosJornada, mismoRecorrido, moverActividad, moverParada,
+  alternarObligatoria, destinoVecino, formatearMinutos, horaMas, insertarActividad, insertarActividades,
+  insertarParada, insertarParadas, minutosJornada, mismoRecorrido, moverActividad, moverParada,
   quitarActividad, quitarParada, tieneArea, tiempoRecorrido, type PosicionPaso, type Recorrido,
 } from '../../../../domain/condominios/rutinasRecorrido'
 import { SERVICIO_LABEL } from '../../ActividadesCatalog'
+import { SelectorVarios } from './SelectorVarios'
 import type {
   AreaCondominio, CargoCatalogo, PlantillaTareaCargo, RutinaLimpieza, ServicioOperativo,
 } from '../../../../types'
@@ -69,6 +74,9 @@ type Destino =
   | { tipo: 'parada'; indice: number }
   | { tipo: 'paso'; parada: number; indice: number }
 
+/** La ventana de «agregar varias» abierta: áreas al recorrido, o actividades a un área. */
+type Ventana = { tipo: 'areas' } | { tipo: 'actividades'; areaId: string }
+
 const inputStyle: CSSProperties = {
   width: '100%', boxSizing: 'border-box', padding: '9px 12px',
   border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px',
@@ -81,6 +89,11 @@ const labelStyle: CSSProperties = {
 const botonMini: CSSProperties = {
   padding: '2px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)',
   borderRadius: '6px', cursor: 'pointer', fontSize: '11.5px', lineHeight: 1.4,
+}
+const botonVarios: CSSProperties = {
+  padding: '5px 10px', background: 'var(--at-primary-soft)', border: '1px solid var(--at-primary)',
+  borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--at-primary)',
+  whiteSpace: 'nowrap',
 }
 const lineaInsercion: CSSProperties = {
   height: '3px', borderRadius: '2px', background: 'var(--at-primary)', margin: '2px 0',
@@ -122,6 +135,7 @@ export function EditorRutina({
   const [busqueda, setBusqueda] = useState('')
   const [servicio, setServicio] = useState<ServicioOperativo | ''>('limpieza')
   const [aviso, setAviso] = useState('')
+  const [ventana, setVentana] = useState<Ventana | null>(null)
 
   // La paleta acompaña el scroll (sticky) sólo cuando va AL LADO del recorrido:
   // apilada encima, en pantallas angostas, se quedaría pegada tapándolo. Se mide
@@ -178,6 +192,31 @@ export function EditorRutina({
       `«${nombreActividad(plantillaId)}» ya está en «${nombreArea(area)}».`,
       `«${nombreActividad(plantillaId)}» agregada a «${nombreArea(area)}».`)
     if (area) setActiva(area)
+  }
+
+  /** Lo marcado en la ventana «＋ Agregar áreas»: al final, en el orden marcado. */
+  function agregarAreas(ids: string[]) {
+    setVentana(null)
+    const nuevas = ids.filter(id => !tieneArea(rec, id))
+    if (aplicar(insertarParadas(rec, ids), 'Esas áreas ya están en el recorrido.',
+      nuevas.length === 1
+        ? `«${nombreArea(nuevas[0])}» agregada al recorrido.`
+        : `${nuevas.length} áreas agregadas al final del recorrido. Ordenalas con ↑ ↓ o arrastrándolas.`)) {
+      setActiva(nuevas[0])
+    }
+  }
+
+  /** Lo marcado en la ventana «＋ Actividades» de un área: al final de ella. */
+  function agregarActividades(areaId: string, ids: string[]) {
+    setVentana(null)
+    const parada = rec.findIndex(p => p.area_id === areaId)
+    const ya = new Set(rec[parada]?.actividades.map(a => a.plantilla_tarea_id) ?? [])
+    const nuevas = ids.filter(id => !ya.has(id))
+    aplicar(insertarActividades(rec, parada, ids), `Esas actividades ya están en «${nombreArea(areaId)}».`,
+      nuevas.length === 1
+        ? `«${nombreActividad(nuevas[0])}» agregada a «${nombreArea(areaId)}».`
+        : `${nuevas.length} actividades agregadas a «${nombreArea(areaId)}». Ordenalas con ↑ ↓.`)
+    setActiva(areaId)
   }
 
   function moverPaso(desde: PosicionPaso, hasta: PosicionPaso) {
@@ -330,17 +369,29 @@ export function EditorRutina({
 
   // ── Paleta ─────────────────────────────────────────────────────────────────
 
-  const q = busqueda.trim().toLowerCase()
-  const areasPaleta = areas
+  const areasActivas = useMemo(() => areas
     .filter(a => a.activo !== false)
-    .filter(a => !q || a.nombre.toLowerCase().includes(q))
-    .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
-  const actividadesPaleta = plantillas
+    .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre)), [areas])
+  const actividadesActivas = useMemo(() => plantillas
     .filter(p => p.activo !== false)
+    .sort((a, b) => a.orden - b.orden || a.titulo.localeCompare(b.titulo)), [plantillas])
+
+  const q = busqueda.trim().toLowerCase()
+  const areasPaleta = areasActivas.filter(a => !q || a.nombre.toLowerCase().includes(q))
+  const actividadesPaleta = actividadesActivas
     .filter(p => !servicio || p.servicio === servicio)
     .filter(p => !q || p.titulo.toLowerCase().includes(q))
-    .sort((a, b) => a.orden - b.orden || a.titulo.localeCompare(b.titulo))
   const enActiva = new Set(rec[indiceActiva]?.actividades.map(a => a.plantilla_tarea_id) ?? [])
+
+  /** Duración y cargo de una actividad del catálogo, igual en la paleta y en la ventana. */
+  const detalleActividad = (p: PlantillaTareaCargo) => (
+    <>
+      {p.duracion_estimada_min != null
+        ? `⏱ ${p.duracion_estimada_min} min`
+        : <span style={{ color: 'var(--at-warning-strong)' }}>⚠ sin duración</span>}
+      {' · '}{etiquetaCargo(p.cargo, cargos)}
+    </>
+  )
 
   function renderPaleta() {
     const tab = (id: 'areas' | 'actividades', texto: string) => (
@@ -451,12 +502,7 @@ export function EditorRutina({
                     <span aria-hidden style={{ fontSize: '17px' }}>{p.icono || '✅'}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.titulo}</span>
-                      <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
-                        {p.duracion_estimada_min != null
-                          ? `⏱ ${p.duracion_estimada_min} min`
-                          : <span style={{ color: 'var(--at-warning-strong)' }}>⚠ sin duración</span>}
-                        {' · '}{etiquetaCargo(p.cargo, cargos)}
-                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{detalleActividad(p)}</span>
                     </span>
                     {!soloLectura && (ya
                       ? <span style={{ fontSize: '11px', color: 'var(--at-success)', fontWeight: 700 }} title={`Ya está en ${nombreArea(activa)}`}>✓</span>
@@ -543,7 +589,8 @@ export function EditorRutina({
               </span>
             </span>
             {!legado && !soloLectura && (
-              <span style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+              <span style={{ display: 'flex', gap: '4px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                <button onClick={() => setVentana({ tipo: 'actividades', areaId: parada.area_id! })} aria-label={`Agregar actividades a ${area?.nombre ?? 'el área'}`} title="Elegir varias actividades de una vez" style={{ ...botonVarios, padding: '2px 8px', fontSize: '11.5px' }}>＋ Actividades</button>
                 <button onClick={() => setRec(moverParada(rec, i, i - 1))} disabled={i <= primerReal} aria-label={`Subir ${area?.nombre ?? 'el área'}`} style={{ ...botonMini, opacity: i <= primerReal ? 0.4 : 1 }}>↑</button>
                 <button onClick={() => setRec(moverParada(rec, i, i + 2))} disabled={i === rec.length - 1} aria-label={`Bajar ${area?.nombre ?? 'el área'}`} style={{ ...botonMini, opacity: i === rec.length - 1 ? 0.4 : 1 }}>↓</button>
                 <button onClick={() => quitarArea(i)} aria-label={`Quitar ${area?.nombre ?? 'el área'} del recorrido`} style={{ ...botonMini, background: 'var(--at-danger-tint)', border: 'none', color: 'var(--at-danger)' }}>✕</button>
@@ -613,7 +660,7 @@ export function EditorRutina({
                 padding: '12px', textAlign: 'center', fontSize: '12px', color: 'var(--at-ink-3)',
                 border: `1.5px dashed ${recibeActividad ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '8px',
               }}>
-                {soloLectura ? 'Sin actividades.' : 'Soltá aquí las actividades que se hacen en esta área.'}
+                {soloLectura ? 'Sin actividades.' : <>Soltá aquí las actividades que se hacen en esta área, o tocá <strong>＋ Actividades</strong> para elegir varias.</>}
               </div>
             )}
           </div>
@@ -709,6 +756,14 @@ export function EditorRutina({
         {!soloLectura && renderPaleta()}
 
         <div style={{ flex: '999 1 360px', minWidth: 0 }} aria-label="Recorrido">
+          {!soloLectura && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--at-ink-2)' }}>
+                Recorrido{tiempo.paradas > 0 ? ` · ${tiempo.paradas} área${tiempo.paradas !== 1 ? 's' : ''}` : ''}
+              </span>
+              <button onClick={() => setVentana({ tipo: 'areas' })} title="Elegir varias áreas de una vez" style={botonVarios}>＋ Agregar áreas</button>
+            </div>
+          )}
           {rec.length === 0 ? (
             <div
               onDragOver={e => { if (arrastraArea()) { e.preventDefault(); if (destino?.tipo !== 'parada') setDestino({ tipo: 'parada', indice: 0 }) } }}
@@ -722,7 +777,7 @@ export function EditorRutina({
               <div style={{ fontSize: '26px', marginBottom: '6px' }}>🗺</div>
               {soloLectura
                 ? 'Esta rutina todavía no tiene recorrido.'
-                : <>Arrastrá aquí la <strong>primera área</strong> del recorrido (o usá ＋ en la paleta).<br />Después soltale encima las actividades que se hacen ahí.</>}
+                : <>Arrastrá aquí la <strong>primera área</strong> del recorrido, o tocá <strong>＋ Agregar áreas</strong> para elegir varias.<br />Después soltale encima las actividades que se hacen ahí.</>}
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '8px' }}>
@@ -746,6 +801,49 @@ export function EditorRutina({
       </div>
 
       <div aria-live="polite" style={{ minHeight: '16px', marginTop: '8px', fontSize: '12px', color: 'var(--at-ink-3)' }}>{aviso}</div>
+
+      {ventana?.tipo === 'areas' && (
+        <SelectorVarios
+          titulo="Agregar áreas al recorrido"
+          subtitulo="Marcá las que hagan falta: entran al final, en el orden en que las marques. Después se ordenan con ↑ ↓."
+          opciones={areasActivas.map(a => ({ id: a.id, icono: a.icono, titulo: a.nombre, yaEsta: tieneArea(rec, a.id) }))}
+          buscar="Buscar área"
+          textoYaEsta="En el recorrido"
+          vacio="No hay áreas activas. Se crean en el tab Áreas."
+          textoAgregar={n => (n === 0 ? 'Agregar' : `Agregar ${n} área${n !== 1 ? 's' : ''}`)}
+          onAgregar={agregarAreas}
+          onCerrar={() => setVentana(null)}
+        />
+      )}
+      {ventana?.tipo === 'actividades' && (() => {
+        const destinoVentana = rec.find(p => p.area_id === ventana.areaId)
+        if (!destinoVentana) return null
+        const ya = new Set(destinoVentana.actividades.map(a => a.plantilla_tarea_id))
+        return (
+          <SelectorVarios
+            titulo={`Actividades en «${nombreArea(ventana.areaId)}»`}
+            subtitulo="Marcá las que se hacen en esta área: entran al final, en el orden en que las marques. Después se ordenan con ↑ ↓."
+            opciones={actividadesActivas.map(p => ({
+              id: p.id, icono: p.icono || '✅', titulo: p.titulo, grupo: p.servicio ?? undefined,
+              detalle: detalleActividad(p), yaEsta: ya.has(p.id),
+            }))}
+            grupos={{
+              etiqueta: 'Servicio', todos: 'Todos los servicios', inicial: servicio,
+              valores: (Object.keys(SERVICIO_LABEL) as ServicioOperativo[]).map(s => ({ id: s, texto: SERVICIO_LABEL[s] })),
+            }}
+            buscar="Buscar actividad"
+            textoYaEsta="Ya está aquí"
+            vacio="El catálogo de actividades está vacío (se administra en Plantillas)."
+            resumen={ids => {
+              const t = tiempoRecorrido([{ area_id: ventana.areaId, actividades: ids.map(id => ({ plantilla_tarea_id: id, obligatoria: true })) }], porPlantilla)
+              return <>Suman <strong>{formatearMinutos(t.minutos)}</strong>{t.sinDato > 0 && <span style={{ color: 'var(--at-warning-strong)' }}> · ⚠ {t.sinDato} sin duración</span>}</>
+            }}
+            textoAgregar={n => (n === 0 ? 'Agregar' : `Agregar ${n} actividad${n !== 1 ? 'es' : ''}`)}
+            onAgregar={ids => agregarActividades(ventana.areaId, ids)}
+            onCerrar={() => setVentana(null)}
+          />
+        )
+      })()}
 
       <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
         {!soloLectura && (
