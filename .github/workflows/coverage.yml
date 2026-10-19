@@ -932,6 +932,17 @@ jobs:
           PGPORT_TEST: 55567
         run: supabase/tests/padron_autorizacion/run.sh
 
+      # 20261101000000: convergencia de drift. Los índices de tareas_bloque del
+      # repositorio pasan a describir los que producción YA tiene (drift #826
+      # declarado desde 2026-09-01). Lo que hay que probar es lo que un
+      # sandbox desde el repo no ve: que sobre la forma REAL de producción sea
+      # un no-op, y que el escenario de producción dé su huella registrada.
+      - name: Índices de tareas_bloque — convergencia a la forma de producción
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55569
+        run: supabase/tests/tareas_bloque_indices/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
