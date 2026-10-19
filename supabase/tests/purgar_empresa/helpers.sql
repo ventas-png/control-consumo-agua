@@ -100,6 +100,32 @@ CREATE FUNCTION pg_temp.huella_vecinos() RETURNS jsonb LANGUAGE sql AS $$
     'registros_y', (SELECT count(*) FROM public.registros WHERE project_id = 'f2000000-0000-4000-8000-000000000001'));
 $$;
 
+-- Leído del catálogo: cada columna company_id/project_id/cliente_id de public que
+-- conserva filas de la empresa, de sus proyectos o de sus clientes, con su conteo.
+-- audit_log no cuenta (sobrevive a propósito). Vacío: la purga no dejó nada.
+CREATE FUNCTION pg_temp.restos_de(p_empresa uuid, p_proyectos uuid[], p_clientes uuid[]) RETURNS text[] LANGUAGE plpgsql AS $$
+DECLARE
+  t      record;
+  n      bigint;
+  quedan text[] := ARRAY[]::text[];
+BEGIN
+  FOR t IN
+    SELECT c.oid::regclass AS tabla, a.attname AS col
+      FROM pg_catalog.pg_attribute a
+      JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+     WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p')
+       AND a.attnum > 0 AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype
+       AND a.attname IN ('company_id', 'project_id', 'cliente_id')
+       AND c.relname <> 'audit_log'
+     ORDER BY c.relname, a.attname
+  LOOP
+    EXECUTE format('SELECT count(*) FROM %s WHERE %I = ANY ($1)', t.tabla, t.col)
+      INTO n USING CASE t.col WHEN 'company_id' THEN ARRAY[p_empresa] WHEN 'project_id' THEN p_proyectos ELSE p_clientes END;
+    IF n > 0 THEN quedan := quedan || format('%s.%s (%s)', t.tabla, t.col, n); END IF;
+  END LOOP;
+  RETURN quedan;
+END $$;
+
 -- La llamada de la purga de X por el actor, con lo que se le pase.
 CREATE FUNCTION pg_temp.purga_x(p_actor text DEFAULT 'a0000000-0000-4000-8000-00000000000a',
                                 p_nombre text DEFAULT 'Residencial Purga',

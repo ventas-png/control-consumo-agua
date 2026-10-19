@@ -15,7 +15,8 @@ turnos» (`plantillas_horario` / `bloques_turno`: mañana/tarde/noche) **no se t
 | Qué | Dónde |
 |---|---|
 | Migración (RBAC del tab, tablas, RLS, siembra, validadores y triggers, en uso y borrado, carga masiva) | `supabase/migrations/20261031000300_rrhh_catalogos_cargos_y_turnos.sql` |
-| Suite SQL (Postgres real, sesiones emuladas, 6 mutantes) | `supabase/tests/rrhh_catalogos/` (`run.sh`, `assert.sql`, `datos.sql`, `fixture_rrhh.sql`, `huella.sql`) |
+| El catálogo cae con su condominio (la guarda de borrado no bloquea la cascada de `projects` / `companies`: purga de empresa) | `supabase/migrations/20261031000700_rrhh_catalogos_caen_con_su_condominio.sql` |
+| Suite SQL (Postgres real, sesiones emuladas, 6 + 8 mutantes) | `supabase/tests/rrhh_catalogos/` (`run.sh`, `assert.sql`, `assert_cascada.sql`, `datos.sql`, `fixture_rrhh.sql`, `huella.sql`); la purga, en `supabase/tests/purgar_empresa/assert_rrhh.sql` |
 | Dominio puro | `src/domain/condominios/rrhhCatalogos.ts` (+ `__tests__/rrhhCatalogos.test.ts`) |
 | Datos | `fetchCondominiosRrhhCatalogosData` en `src/domain/condominios/sectionData.ts`; `fetchUsoCatalogoRrhh` en `tabQueries.ts`; `ctx.cargosPersonal` / `ctx.tiposTurno` en `tabRegistry.tsx` |
 | Pantalla | `src/components/condominios/tabs/RrhhConfiguracionTab.tsx`, `src/components/condominios/CatalogoRrhhPanel.tsx` (+ `__tests__/RrhhConfiguracionTab.test.tsx`) |
@@ -49,7 +50,7 @@ turnos» (`plantillas_horario` / `bloques_turno`: mañana/tarde/noche) **no se t
 | `programacion_limpieza` | `NULL` sigue siendo comodín; si no, activo en el catálogo |
 | `ejecuciones_limpieza.turno` | registro derivado: exige que el turno **exista** (activo o no) |
 | Históricos | los triggers sólo validan cuando el valor **cambia** (`IS DISTINCT FROM`): una ficha con un cargo apagado o legado se sigue editando entera |
-| Borrar | `rrhh_tg_cargo_borrable` / `rrhh_tg_turno_borrable` abortan con `RRHH_CARGO_EN_USO` / `RRHH_TURNO_EN_USO` (23503) si algún empleado, actividad, programación o ejecución lo usa |
+| Borrar | `rrhh_tg_cargo_borrable` / `rrhh_tg_turno_borrable` abortan con `RRHH_CARGO_EN_USO` / `RRHH_TURNO_EN_USO` (23503) si algún empleado, actividad, programación o ejecución lo usa. Excepción (`20261031000700`): si el proyecto o la empresa de la fila ya no existen, el DELETE es su cascada (borrar el condominio, purgar la empresa) y el catálogo se va con ellos y con sus usuarios |
 | CHECK literales | `prog_limpieza_cargo_check`, `prog_limpieza_turno_check` y `ejec_limpieza_turno_check` se retiran **después** de instalar los triggers |
 | Carga masiva | `plantillas_import_evaluar` lee los cargos **activos** del condominio; acepta el código o el nombre de pantalla y guarda el código; sin cargos activos: «Este condominio no tiene cargos activos: configúralos en Recursos Humanos → Configuración» |
 
@@ -104,6 +105,21 @@ proyecto, mover de proyecto, ejecución con turno apagado), F históricos editab
 inactivo, inexistente, vacío, catálogo vacío), H re-sembrar. Seis mutantes (activo ignorado, `IS DISTINCT FROM`,
 guarda de borrado, acceso al proyecto en SELECT, lista literal en la carga, siembra al crear el proyecto) hacen fallar
 la suite. `limpieza_catalogos`, `plantillas_importacion` y `fail_open_sin_perfil` (221 funciones) siguen en verde.
+
+**`20261031000700` (el catálogo cae con su condominio).** La guarda de borrado es `BEFORE DELETE` por fila y se
+disparaba también en la cascada de `DELETE FROM projects`: Postgres dispara las acciones de las llaves en orden de
+nombre de trigger (`RI_ConstraintTrigger_a_<oid>`), y si la del catálogo iba antes que la de sus usuarios los contaba
+todavía vivos. Con la forma de llaves de producción, `purgar_empresa` no podía purgar una empresa con una sola
+actividad (`RRHH_CARGO_EN_USO … 1 actividad(es)`). Ahora la guarda se aparta sólo si el proyecto o la empresa de la
+fila ya no existen; se mira eso y no `pg_trigger_depth()`, que eximiría también un DELETE lanzado desde otro trigger con
+el condominio vivo. El paso 6 de `run.sh` la aplica dos veces encima de esta migración, vuelve a correr las 53
+comprobaciones de `assert.sql` y corre `assert_cascada.sql`: I1 fuerza el orden de cascada **adverso** (re-crea
+idénticas las llaves de personal, actividades —en su forma de producción—, programaciones y ejecuciones, y comprueba que
+el catálogo se dispara antes que ellas y que `projects`), I2 borra un condominio y I3 una empresa con su «conserje» y su
+«diurno» en uso por un empleado, una actividad, una programación y una ejecución, e I4 comprueba que borrar a mano un
+código en uso sigue dando 23503 (como root y como la dueña, por la RLS) y que uno sin uso se borra. Ocho mutantes (cada
+condición —proyecto, empresa— de cada guarda, una excepción que eximiera siempre, la guarda de uso) hacen fallar la
+suite. `supabase/tests/purgar_empresa/assert_rrhh.sql` prueba la purga con lo mismo, en las dos formas de llaves.
 
 ## Verificación en el sandbox (`jwpmivhvlstslncrtokb`, 2026-10-16)
 
