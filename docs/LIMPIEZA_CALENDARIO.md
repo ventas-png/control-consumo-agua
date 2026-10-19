@@ -114,8 +114,16 @@ DROP FUNCTION IF EXISTS public.limpieza_asegurar_turno_programable(public.bloque
 DROP FUNCTION IF EXISTS public.limpieza_tarea_trabajada(public.tareas_bloque);
 ```
 
+## Despliegue
+
+**`20261103000000` desplegada el 2026-10-19**: PR #957 fusionada como `b550736f`, run 39336210757 de «Apply Migrations
+to Production» (evento `push`, `success` a las 22:38 UTC). Comprobación posterior de solo lectura en producción (22:54 UTC):
+891 migraciones, máx. `20261103000000`, y las cinco funciones existen. Huella de producción recapturada: 10 grupos nuevos y
+0 cambiados (3742 → 3752), exactamente los que el auditor anunció como cambio planificado, con valores idénticos a la
+reconstrucción de `main`; los 3742 grupos restantes son idénticos a la captura anterior y el sha256 completo coincide con el
+medido en producción; `drift-conocido.json` no cambia.
+
 ## Pendiente
 
 - Retirar las cargas de `programacion_limpieza` y `ejecuciones_limpieza` del panel. Ya no tienen pantalla, pero
   retirarlas toca el batch posicional de `sectionData.ts` y varias guardas; va en un cambio aparte.
-- Después del despliegue, refrescar la huella de producción: cambian los 10 grupos de las cinco funciones nuevas.
