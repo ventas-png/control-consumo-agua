@@ -82,8 +82,9 @@ describe('20260907001100 · la tarea nace pendiente y sin sellos — para TODOS'
   })
 
   it('la materialización escribe pendiente LITERAL (la RPC no pasa por la RLS)', () => {
+    // La versión viva de la RPC (20261102000000 la redefinió con la misma firma).
     const rpc = soloCodigo(readFileSync(
-      join(MIGRATIONS_DIR, '20260907000300_materializar_rutinas.sql'), 'utf8'))
+      join(MIGRATIONS_DIR, '20261102000000_rutinas_recorrido_por_areas.sql'), 'utf8'))
     const ins = rpc.match(/INSERT INTO public\.tareas_bloque \(([\s\S]*?)ON CONFLICT/i)
     expect(ins).not.toBeNull()
     expect(ins![1]).toContain("'pendiente'")

@@ -1,24 +1,30 @@
-// Armado de rutinas (20260907000200) desde la UI.
+// Rutinas como RECORRIDO (20261102000000) desde la UI.
 //
 // Lo que se cubre es lo que el sandbox SQL no puede ver, porque es de la vista:
-// que el total de duración sume y avise cuando una actividad no la declara; que
-// el selector sea el catálogo compartido en modo selección (sin sus acciones de
-// escritura); que los pasos se guarden al instante y la cabecera no; que
-// reordenar intercambie el orden con el vecino en vez de renumerar; y que el
-// choque de nombre —23505, el índice único por nombre normalizado— se traduzca
-// a algo que quien captura pueda accionar, en vez del mensaje crudo de Postgres.
+// que arrastrar un área y soltarle actividades arme el recorrido que se guarda;
+// que cada gesto tenga su botón para quien no puede arrastrar (y que ↑/↓ crucen
+// de un área a la vecina); que el tiempo se vaya acumulando por área y contra la
+// jornada, avisando lo que no declara duración; que nada persista hasta
+// «Guardar» y que cabecera y recorrido se guarden juntos; y que los errores de la
+// base —23505 del nombre, 23503 de la rutina con historia, un fallo del
+// recorrido después de crear la cabecera— se traduzcan a algo accionable.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
-import type {
-  AreaCondominio, ItemInventario, PlantillaTareaCargo, SuministroCondominio,
-} from '../../../../../types'
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
+import type { AreaCondominio, PlantillaTareaCargo } from '../../../../../types'
 
 type RowError = { message: string; code?: string } | null
 
 const mocks = vi.hoisted(() => ({
-  createCondominioRow: vi.fn(async () => ({ error: null as RowError })),
+  createCondominioRowReturning: vi.fn(async () => ({
+    data: { id: 'rutNueva' } as Record<string, unknown> | null,
+    error: null as RowError,
+  })),
   updateCondominioRow: vi.fn(async () => ({ error: null as RowError })),
   deleteCondominioRow: vi.fn(async () => ({ error: null as RowError })),
+  guardarRecorridoRutina: vi.fn(async () => ({
+    data: { paradas: 0, pasos: 0 } as Record<string, number> | null,
+    error: null as RowError,
+  })),
   materializarRutinasTurno: vi.fn(async () => ({
     data: {
       generadas: 0, omitidas_existente: 0,
@@ -29,15 +35,10 @@ const mocks = vi.hoisted(() => ({
   fetchRutinasLimpieza: vi.fn(async () => ({
     rutinas: [] as Array<Record<string, unknown>>,
     pasos: [] as Array<Record<string, unknown>>,
+    paradas: [] as Array<Record<string, unknown>>,
     horarios: [] as Array<Record<string, unknown>>,
     error: null as { message: string } | null,
   })),
-  fetchRecursosPlantillas: vi.fn(async () => ({
-    suministros: [] as Array<Record<string, unknown>>,
-    herramientas: [] as Array<Record<string, unknown>>,
-    error: null as { message: string } | null,
-  })),
-  openPromptDialog: vi.fn(async () => null as Record<string, string> | null),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   notify: vi.fn(),
 }))
@@ -47,65 +48,71 @@ vi.mock('../../../../../lib/supabase', () => ({
   db: { from: () => ({}) },
 }))
 vi.mock('../../../../../domain/condominios/tabMutations', () => ({
-  createCondominioRow: mocks.createCondominioRow,
+  createCondominioRowReturning: mocks.createCondominioRowReturning,
   updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
+  guardarRecorridoRutina: mocks.guardarRecorridoRutina,
   materializarRutinasTurno: mocks.materializarRutinasTurno,
 }))
 vi.mock('../../../../../domain/condominios/tabQueries', () => ({
   fetchRutinasLimpieza: mocks.fetchRutinasLimpieza,
-  fetchRecursosPlantillas: mocks.fetchRecursosPlantillas,
 }))
 vi.mock('../../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
-vi.mock('../../../../shared/PromptDialog', () => ({ openPromptDialog: mocks.openPromptDialog }))
 
 const { VistaRutinas } = await import('../VistaRutinas')
 
 // ── Datos ──────────────────────────────────────────────────────────────────
 
-const area: AreaCondominio = {
-  id: 'area1', company_id: 'co1', project_id: 'p1', nombre: 'Piscina',
-  descripcion: null, icono: '🏊', orden: 0, activo: true,
-  created_at: '2026-01-01T00:00:00.000Z',
-}
-
-function actividad(over: Partial<PlantillaTareaCargo> = {}): PlantillaTareaCargo {
+function area(id: string, nombre: string, over: Partial<AreaCondominio> = {}): AreaCondominio {
   return {
-    id: 'act1', company_id: 'co1', project_id: 'p1', cargo: 'limpieza',
-    titulo: 'Barrer el borde', descripcion: null, icono: '🧹', orden: 0,
-    area_id: 'area1', requiere_foto: false, activo: true,
-    servicio: 'limpieza', duracion_estimada_min: 30,
-    created_at: '2026-01-01T00:00:00.000Z',
-    ...over,
+    id, company_id: 'co1', project_id: 'p1', nombre, descripcion: null, icono: '🚪',
+    orden: 0, activo: true, created_at: '2026-01-01T00:00:00.000Z', ...over,
+  }
+}
+const AREAS = [area('a1', 'Apartamento 1AB'), area('a2', 'Apartamento 1C', { orden: 1 }), area('a3', 'Gradas', { orden: 2 })]
+
+function actividad(id: string, titulo: string, min: number | null, over: Partial<PlantillaTareaCargo> = {}): PlantillaTareaCargo {
+  return {
+    id, company_id: 'co1', project_id: 'p1', cargo: 'conserje', titulo, descripcion: null,
+    icono: '🧹', orden: 0, area_id: null, requiere_foto: false, activo: true,
+    servicio: 'limpieza', duracion_estimada_min: min, created_at: '2026-01-01T00:00:00.000Z', ...over,
   } as PlantillaTareaCargo
 }
+const BARRER = actividad('barrer', 'Barrido de piso', 5)
+const VIDRIOS = actividad('vidrios', 'Limpieza de vidrios', 2)
+const SIN_DURACION = actividad('sin', 'Revisar luces', null)
 
 function rutina(over: Record<string, unknown> = {}) {
   return {
-    id: 'rut1', company_id: 'co1', project_id: 'p1', nombre: 'Matutina de piscina',
-    descripcion: null, area_id: 'area1', servicio: 'limpieza',
+    id: 'rut1', company_id: 'co1', project_id: 'p1', nombre: 'Rutina Lunes AM',
+    descripcion: 'Tareas primera hora', area_id: null, servicio: 'limpieza',
     plantilla_horario_id: null, activa: true, orden: 0,
-    created_at: '2026-01-01T00:00:00.000Z', area_nombre: 'Piscina',
-    ...over,
-  }
-}
-
-function paso(over: Record<string, unknown> = {}) {
-  return {
-    id: 'paso1', company_id: 'co1', project_id: 'p1', rutina_id: 'rut1',
-    plantilla_tarea_id: 'act1', orden: 0, obligatoria: true, notas: null,
     created_at: '2026-01-01T00:00:00.000Z',
     ...over,
   }
+}
+const parada = (id: string, area_id: string, orden: number) => ({
+  id, company_id: 'co1', project_id: 'p1', rutina_id: 'rut1', area_id, orden,
+  created_at: '2026-01-01T00:00:00.000Z',
+})
+const paso = (id: string, plantilla: string, orden: number, rutina_area_id: string | null) => ({
+  id, company_id: 'co1', project_id: 'p1', rutina_id: 'rut1', rutina_area_id,
+  plantilla_tarea_id: plantilla, orden, obligatoria: true, notas: null,
+  created_at: '2026-01-01T00:00:00.000Z',
+})
+const JORNADA = { id: 'h1', nombre: 'Mañana', hora_inicio: '07:00:00', hora_fin: '07:10:00' }
+
+function cargarCon(datos: Partial<{ rutinas: unknown[]; pasos: unknown[]; paradas: unknown[]; horarios: unknown[] }>) {
+  mocks.fetchRutinasLimpieza.mockResolvedValue({
+    rutinas: [], pasos: [], paradas: [], horarios: [], error: null, ...datos,
+  } as never)
 }
 
 function montar(props: Partial<Parameters<typeof VistaRutinas>[0]> = {}) {
   return render(
     <VistaRutinas
-      plantillas={[actividad()]}
-      areas={[area]}
-      suministros={[] as SuministroCondominio[]}
-      inventario={[] as ItemInventario[]}
+      plantillas={[BARRER, VIDRIOS, SIN_DURACION]}
+      areas={AREAS}
       proyectoId="p1"
       companyId="co1"
       canCreate
@@ -117,218 +124,267 @@ function montar(props: Partial<Parameters<typeof VistaRutinas>[0]> = {}) {
   )
 }
 
+/** Arrastra `origen` y lo suelta sobre `destino` (eventos nativos de HTML5). */
+function arrastrar(origen: Element, destino: Element) {
+  const dataTransfer = { setData: vi.fn(), getData: vi.fn(), effectAllowed: '', dropEffect: '' }
+  fireEvent.dragStart(origen, { dataTransfer })
+  fireEvent.dragOver(destino, { dataTransfer })
+  fireEvent.drop(destino, { dataTransfer })
+  fireEvent.dragEnd(origen, { dataTransfer })
+}
+
+const paleta = () => screen.getByRole('complementary', { name: 'Paleta de áreas y actividades' })
+const itemPaleta = (texto: string) => within(paleta()).getByText(texto).closest('li')!
+const seccionArea = (nombre: RegExp) => screen.getByRole('region', { name: nombre })
+const resumen = () => screen.getByLabelText('Resumen del recorrido')
+
+/** La rutina de la llamada `n` a guardarRecorridoRutina. */
+const rutinaGuardada = (n: number) =>
+  (mocks.guardarRecorridoRutina.mock.calls[n] as unknown as [string] | undefined)?.[0]
+
+/** El recorrido que se mandó a guardar, legible: 'área:act,act'. */
+function recorridoGuardado(): string[] {
+  const [, rec] = mocks.guardarRecorridoRutina.mock.calls.at(-1) as unknown as
+    [string, Array<{ area_id: string | null; actividades: Array<{ plantilla_tarea_id: string; obligatoria: boolean }> }>]
+  return rec.map(p => `${p.area_id ?? '-'}:${p.actividades.map(a => a.plantilla_tarea_id + (a.obligatoria ? '' : '?')).join(',')}`)
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.createCondominioRow.mockResolvedValue({ error: null })
+  mocks.createCondominioRowReturning.mockResolvedValue({ data: { id: 'rutNueva' }, error: null })
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
   mocks.deleteCondominioRow.mockResolvedValue({ error: null })
+  mocks.guardarRecorridoRutina.mockResolvedValue({ data: { paradas: 0, pasos: 0 }, error: null })
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
   mocks.materializarRutinasTurno.mockResolvedValue({
     data: { generadas: 0, omitidas_existente: 0, omitidas_bloque_cerrado: 0, rutinas_sin_jornada: 0 },
     error: null,
   })
-  mocks.fetchRutinasLimpieza.mockResolvedValue({
-    rutinas: [], pasos: [], horarios: [], error: null,
-  })
+  cargarCon({})
 })
 afterEach(cleanup)
 
-describe('VistaRutinas · lo que la rutina le dice a quien la arma', () => {
-  it('suma la duración de los pasos y avisa de los que no la declaran', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
+// ── Tarjeta ──────────────────────────────────────────────────────────────────
+
+describe('VistaRutinas · la tarjeta resume el recorrido', () => {
+  it('muestra las áreas en orden, cuántas actividades y el tiempo total, avisando lo que no tiene duración', async () => {
+    cargarCon({
       rutinas: [rutina()],
-      pasos: [paso(), paso({ id: 'paso2', plantilla_tarea_id: 'act2', orden: 1 })],
-      horarios: [], error: null,
-    })
-    montar({
-      plantillas: [
-        actividad({ duracion_estimada_min: 45 }),
-        // Sin duración: el total se quedaría corto en silencio.
-        actividad({ id: 'act2', titulo: 'Revisar cloro', duracion_estimada_min: null }),
-      ],
-    })
-
-    // 45 min de la única que la declara.
-    expect(await screen.findByText(/⏱ 45 min/)).toBeTruthy()
-
-    fireEvent.click(screen.getByLabelText('Pasos de Matutina de piscina'))
-    expect(await screen.findByText(/1 sin duración/)).toBeTruthy()
-  })
-
-  it('convierte los minutos a horas cuando pasa de 60', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
-      rutinas: [rutina()],
-      pasos: [paso(), paso({ id: 'paso2', plantilla_tarea_id: 'act2', orden: 1 })],
-      horarios: [], error: null,
-    })
-    montar({
-      plantillas: [
-        actividad({ duracion_estimada_min: 60 }),
-        actividad({ id: 'act2', titulo: 'Revisar cloro', duracion_estimada_min: 45 }),
-      ],
-    })
-    expect(await screen.findByText(/⏱ 1 h 45 min/)).toBeTruthy()
-  })
-
-  it('marca la actividad desactivada en el catálogo sin quitarla de la rutina', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
-      rutinas: [rutina()], pasos: [paso()], horarios: [], error: null,
-    })
-    montar({ plantillas: [actividad({ activo: false })] })
-
-    fireEvent.click(await screen.findByLabelText('Pasos de Matutina de piscina'))
-    expect(await screen.findByTitle(/desactivada en el catálogo/)).toBeTruthy()
-  })
-})
-
-describe('VistaRutinas · el selector es el catálogo compartido', () => {
-  it('abre ActividadesCatalog en modo selección, sin sus acciones de escritura', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
-      rutinas: [rutina()], pasos: [], horarios: [], error: null,
+      paradas: [parada('z2', 'a2', 1), parada('z1', 'a1', 0)],
+      pasos: [paso('p1', 'barrer', 0, 'z1'), paso('p2', 'vidrios', 1, 'z1'), paso('p3', 'barrer', 0, 'z2'), paso('p4', 'sin', 1, 'z2')],
     })
     montar()
 
-    fireEvent.click(await screen.findByLabelText('Pasos de Matutina de piscina'))
-    fireEvent.click(await screen.findByText('➕ Agregar actividades del catálogo'))
-
-    // El catálogo compartido aparece con su botón de elegir…
-    expect(await screen.findByLabelText('Agregar Barrer el borde a la rutina')).toBeTruthy()
-    // …y SIN las acciones que administrarían el catálogo desde aquí. Se
-    // comprueba por el aria-label de la ACTIVIDAD: «✏️ Editar» a secas también
-    // lo tiene la tarjeta de la rutina, y buscarlo por texto daría un falso
-    // positivo tranquilizador.
-    expect(screen.queryByText('+ Nueva actividad')).toBeNull()
-    expect(screen.queryByLabelText('Eliminar Barrer el borde')).toBeNull()
-    // El único «Editar» de la pantalla es el de la rutina, no el del catálogo.
-    expect(screen.getAllByText('✏️ Editar')).toHaveLength(1)
+    expect(await screen.findByText(/Apartamento 1AB → Apartamento 1C/)).toBeTruthy()
+    expect(screen.getByText('📍 2 áreas')).toBeTruthy()
+    expect(screen.getByText('📋 4 actividades')).toBeTruthy()
+    expect(screen.getByText('⏱ 12 min')).toBeTruthy()
+    expect(screen.getByText('⚠ 1 sin duración')).toBeTruthy()
   })
 
-  it('agregar un paso lo persiste al instante, al final del orden', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
-      rutinas: [rutina()], pasos: [paso()], horarios: [], error: null,
-    })
-    montar({
-      plantillas: [actividad(), actividad({ id: 'act2', titulo: 'Revisar cloro' })],
-    })
-
-    fireEvent.click(await screen.findByLabelText('Pasos de Matutina de piscina'))
-    fireEvent.click(await screen.findByText('➕ Agregar actividades del catálogo'))
-    fireEvent.click(await screen.findByLabelText('Agregar Revisar cloro a la rutina'))
-
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalled())
-    const [tabla, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as
-      [string, Record<string, unknown>]
-    expect(tabla).toBe('rutina_actividades')
-    expect(payload.rutina_id).toBe('rut1')
-    expect(payload.plantilla_tarea_id).toBe('act2')
-    // Ya había un paso: el nuevo va detrás.
-    expect(payload.orden).toBe(1)
-  })
-
-  it('la actividad ya elegida no ofrece agregarse otra vez', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
-      rutinas: [rutina()], pasos: [paso()], horarios: [], error: null,
-    })
-    montar()
-
-    fireEvent.click(await screen.findByLabelText('Pasos de Matutina de piscina'))
-    fireEvent.click(await screen.findByText('➕ Agregar actividades del catálogo'))
-
-    expect(await screen.findByText('✓ En la rutina')).toBeTruthy()
-    expect(screen.queryByLabelText('Agregar Barrer el borde a la rutina')).toBeNull()
+  it('pasa a horas cuando el recorrido supera los 60 minutos', async () => {
+    cargarCon({ rutinas: [rutina()], paradas: [parada('z1', 'a1', 0)], pasos: [paso('p1', 'larga', 0, 'z1')] })
+    montar({ plantillas: [actividad('larga', 'Lavado profundo', 105)] })
+    expect(await screen.findByText('⏱ 1 h 45 min')).toBeTruthy()
   })
 })
 
-describe('VistaRutinas · reordenar y quitar pasos', () => {
-  it('mover un paso intercambia el orden con su vecino, sin renumerar el resto', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
-      rutinas: [rutina()],
-      pasos: [
-        paso({ id: 'paso1', orden: 0 }),
-        paso({ id: 'paso2', plantilla_tarea_id: 'act2', orden: 5 }),
-      ],
-      horarios: [], error: null,
-    })
-    montar({
-      plantillas: [actividad(), actividad({ id: 'act2', titulo: 'Revisar cloro' })],
-    })
+// ── Armar arrastrando ─────────────────────────────────────────────────────────
 
-    fireEvent.click(await screen.findByLabelText('Pasos de Matutina de piscina'))
-    fireEvent.click(await screen.findByLabelText('Bajar Barrer el borde'))
+describe('VistaRutinas · armar el recorrido arrastrando', () => {
+  it('primero se arrastran las áreas, después se les sueltan actividades, y se guarda todo junto', async () => {
+    montar()
+    fireEvent.click(await screen.findByText('+ Nueva rutina'))
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Rutina Lunes AM' } })
 
-    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(2))
-    const llamadas = mocks.updateCondominioRow.mock.calls as unknown as
-      Array<[string, string, Record<string, unknown>]>
-    // Cada uno se queda con el orden del otro: dos updates, no una renumeración.
-    expect(llamadas.map(([, id, patch]) => [id, patch.orden]).sort())
-      .toEqual([['paso1', 5], ['paso2', 0]])
+    // El recorrido vacío recibe la primera área; el final del recorrido, la segunda.
+    arrastrar(itemPaleta('Apartamento 1AB'), screen.getByText(/Arrastrá aquí la/))
+    arrastrar(itemPaleta('Apartamento 1C'), screen.getByText('Soltá un área aquí para sumarla al final del recorrido'))
+    expect(screen.getByRole('region', { name: 'Área 1: Apartamento 1AB' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Área 2: Apartamento 1C' })).toBeTruthy()
+    // La que ya está no se puede arrastrar otra vez.
+    expect(within(itemPaleta('Apartamento 1AB')).getByText('✓ En el recorrido')).toBeTruthy()
+
+    // Actividades: soltadas sobre el área donde se hacen. La misma en dos áreas vale.
+    fireEvent.click(within(paleta()).getByRole('tab', { name: /Actividades/ }))
+    arrastrar(itemPaleta('Barrido de piso'), within(seccionArea(/Apartamento 1AB/)).getByText(/Soltá aquí las actividades/))
+    arrastrar(itemPaleta('Limpieza de vidrios'), within(seccionArea(/Apartamento 1AB/)).getByText(/Barrido de piso/))
+    arrastrar(itemPaleta('Barrido de piso'), within(seccionArea(/Apartamento 1C/)).getByText(/Soltá aquí las actividades/))
+
+    // El tiempo se va acumulando: 1AB = 5 + 2, 1C arranca donde terminó 1AB.
+    expect(resumen().textContent).toMatch(/2 áreas.*3 actividades.*Total 12 min/)
+    expect(within(seccionArea(/Apartamento 1AB/)).getByText(/⏱ 7 min · acumulado 7 min/)).toBeTruthy()
+    expect(within(seccionArea(/Apartamento 1C/)).getByText(/⏱ 5 min · acumulado 12 min/)).toBeTruthy()
+
+    // Nada se guardó mientras se armaba.
+    expect(mocks.createCondominioRowReturning).not.toHaveBeenCalled()
+    expect(mocks.guardarRecorridoRutina).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalled())
+    const [tabla, cabecera] = mocks.createCondominioRowReturning.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    expect(tabla).toBe('rutinas_limpieza')
+    expect(cabecera).toMatchObject({ nombre: 'Rutina Lunes AM', servicio: 'limpieza', company_id: 'co1', project_id: 'p1' })
+    // Jornada en null, no en cadena vacía: la FK compuesta sólo se salta con NULL.
+    expect(cabecera.plantilla_horario_id).toBeNull()
+    expect(rutinaGuardada(0)).toBe('rutNueva')
+    // El orden de soltar sobre «Barrido de piso» (mitad inferior) lo deja detrás.
+    expect(recorridoGuardado()).toEqual(['a1:barrer,vidrios', 'a2:barrer'])
   })
 
-  it('el primero no sube y el último no baja', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
+  it('reordenar áreas arrastrando su cabecera, y actividades entre áreas', async () => {
+    cargarCon({
       rutinas: [rutina()],
-      pasos: [paso({ id: 'paso1', orden: 0 }), paso({ id: 'paso2', plantilla_tarea_id: 'act2', orden: 1 })],
-      horarios: [], error: null,
-    })
-    montar({
-      plantillas: [actividad(), actividad({ id: 'act2', titulo: 'Revisar cloro' })],
-    })
-
-    fireEvent.click(await screen.findByLabelText('Pasos de Matutina de piscina'))
-    expect((await screen.findByLabelText('Subir Barrer el borde') as HTMLButtonElement).disabled).toBe(true)
-    expect((screen.getByLabelText('Bajar Revisar cloro') as HTMLButtonElement).disabled).toBe(true)
-  })
-
-  it('quitar un paso borra la fila puente, no la actividad del catálogo', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
-      rutinas: [rutina()], pasos: [paso()], horarios: [], error: null,
+      paradas: [parada('z1', 'a1', 0), parada('z2', 'a2', 1), parada('z3', 'a3', 2)],
+      pasos: [paso('p1', 'barrer', 0, 'z1'), paso('p2', 'vidrios', 1, 'z1')],
     })
     montar()
+    fireEvent.click(await screen.findByLabelText('Editar el recorrido de Rutina Lunes AM'))
 
-    fireEvent.click(await screen.findByLabelText('Pasos de Matutina de piscina'))
-    fireEvent.click(await screen.findByLabelText('Quitar Barrer el borde de la rutina'))
+    // 1AB al final.
+    const cabecera1AB = within(seccionArea(/Apartamento 1AB/)).getByText('Apartamento 1AB').closest('[draggable="true"]')!
+    arrastrar(cabecera1AB, screen.getByText('Soltá un área aquí para sumarla al final del recorrido'))
+    expect(screen.getByRole('region', { name: 'Área 3: Apartamento 1AB' })).toBeTruthy()
 
-    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalled())
-    expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('rutina_actividades', 'paso1')
+    // «Limpieza de vidrios» de 1AB a Gradas.
+    const filaVidrios = within(seccionArea(/Apartamento 1AB/)).getByText(/Limpieza de vidrios/).closest('[draggable="true"]')!
+    arrastrar(filaVidrios, within(seccionArea(/Gradas/)).getByText(/Soltá aquí las actividades/))
+
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalled())
+    expect(mocks.createCondominioRowReturning).not.toHaveBeenCalled()
+    expect(mocks.updateCondominioRow).toHaveBeenCalledWith('rutinas_limpieza', 'rut1', expect.objectContaining({ nombre: 'Rutina Lunes AM' }))
+    expect(recorridoGuardado()).toEqual(['a2:', 'a3:vidrios', 'a1:barrer'])
+  })
+
+  it('la misma actividad dos veces en un área no entra, y se explica', async () => {
+    cargarCon({ rutinas: [rutina()], paradas: [parada('z1', 'a1', 0)], pasos: [paso('p1', 'barrer', 0, 'z1')] })
+    montar()
+    fireEvent.click(await screen.findByLabelText('Editar el recorrido de Rutina Lunes AM'))
+
+    arrastrar(itemPaleta('Barrido de piso'), within(seccionArea(/Apartamento 1AB/)).getByText(/Barrido de piso/))
+    expect(screen.getByText('«Barrido de piso» ya está en «Apartamento 1AB».')).toBeTruthy()
+    expect(within(seccionArea(/Apartamento 1AB/)).getAllByText(/Barrido de piso/)).toHaveLength(1)
   })
 })
+
+// ── Sin arrastre ──────────────────────────────────────────────────────────────
+
+describe('VistaRutinas · cada gesto tiene su botón (táctil y teclado)', () => {
+  it('＋ agrega áreas al final y actividades al área seleccionada; ↑/↓ cruzan al área vecina', async () => {
+    montar()
+    fireEvent.click(await screen.findByText('+ Nueva rutina'))
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Botones' } })
+
+    fireEvent.click(screen.getByLabelText('Agregar Apartamento 1AB al recorrido'))
+    fireEvent.click(screen.getByLabelText('Agregar Gradas al recorrido'))
+    // La última agregada queda seleccionada: ahí van las actividades.
+    fireEvent.click(within(paleta()).getByRole('tab', { name: /Actividades/ }))
+    fireEvent.click(screen.getByLabelText('Agregar Barrido de piso a Gradas'))
+    // Seleccionar otra área cambia el destino del ＋.
+    fireEvent.click(within(seccionArea(/Apartamento 1AB/)).getByText('Apartamento 1AB'))
+    fireEvent.click(screen.getByLabelText('Agregar Limpieza de vidrios a Apartamento 1AB'))
+
+    // Bajar la última de 1AB la lleva al principio de Gradas.
+    fireEvent.click(within(seccionArea(/Apartamento 1AB/)).getByLabelText('Bajar Limpieza de vidrios'))
+    // Y Gradas sube por encima de 1AB.
+    fireEvent.click(screen.getByLabelText('Subir Gradas'))
+    // La primera área no sube más; su primera actividad, tampoco (no hay vecina arriba).
+    expect((screen.getByLabelText('Subir Gradas') as HTMLButtonElement).disabled).toBe(true)
+    expect((within(seccionArea(/Gradas/)).getByLabelText('Subir Limpieza de vidrios') as HTMLButtonElement).disabled).toBe(true)
+    // Opcional.
+    fireEvent.click(within(seccionArea(/Gradas/)).getByLabelText('Volver opcional Barrido de piso'))
+
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalled())
+    expect(recorridoGuardado()).toEqual(['a3:vidrios,barrer?', 'a1:'])
+  })
+
+  it('sin área seleccionada el ＋ de actividades está apagado y dice por qué', async () => {
+    montar()
+    fireEvent.click(await screen.findByText('+ Nueva rutina'))
+    fireEvent.click(within(paleta()).getByRole('tab', { name: /Actividades/ }))
+    const boton = screen.getByLabelText('Agregar Barrido de piso (primero seleccioná un área)') as HTMLButtonElement
+    expect(boton.disabled).toBe(true)
+  })
+
+  it('quitar un área se lleva sus actividades (del borrador; no toca el catálogo)', async () => {
+    cargarCon({ rutinas: [rutina()], paradas: [parada('z1', 'a1', 0), parada('z2', 'a2', 1)], pasos: [paso('p1', 'barrer', 0, 'z1')] })
+    montar()
+    fireEvent.click(await screen.findByLabelText('Editar el recorrido de Rutina Lunes AM'))
+    fireEvent.click(screen.getByLabelText('Quitar Apartamento 1AB del recorrido'))
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalled())
+    expect(recorridoGuardado()).toEqual(['a2:'])
+    expect(mocks.deleteCondominioRow).not.toHaveBeenCalled()
+  })
+})
+
+// ── Tiempo ────────────────────────────────────────────────────────────────────
+
+describe('VistaRutinas · el tiempo contra la jornada', () => {
+  it('con jornada, cada área dice su horario estimado y el total avisa si no cabe', async () => {
+    cargarCon({
+      rutinas: [rutina({ plantilla_horario_id: 'h1', horario_nombre: 'Mañana' })],
+      paradas: [parada('z1', 'a1', 0), parada('z2', 'a2', 1)],
+      pasos: [paso('p1', 'barrer', 0, 'z1'), paso('p2', 'vidrios', 1, 'z1'), paso('p3', 'barrer', 0, 'z2')],
+      horarios: [JORNADA],
+    })
+    montar()
+    fireEvent.click(await screen.findByLabelText('Editar el recorrido de Rutina Lunes AM'))
+
+    expect(within(seccionArea(/Apartamento 1AB/)).getByText(/07:00 → 07:07/)).toBeTruthy()
+    expect(within(seccionArea(/Apartamento 1C/)).getByText(/07:07 → 07:12/)).toBeTruthy()
+    // 12 min en una jornada de 10.
+    expect(resumen().textContent).toMatch(/Excede la jornada «Mañana» \(10 min\) por 2 min/)
+  })
+
+  it('el grupo de pasos sin área (rutinas de antes) se ve primero y se puede vaciar', async () => {
+    cargarCon({
+      rutinas: [rutina()],
+      paradas: [parada('z1', 'a1', 0)],
+      pasos: [paso('p0', 'sin', 0, null), paso('p1', 'barrer', 0, 'z1')],
+    })
+    montar()
+    fireEvent.click(await screen.findByLabelText('Editar el recorrido de Rutina Lunes AM'))
+
+    const legado = screen.getByRole('region', { name: 'Actividades sin área' })
+    expect(within(legado).getByText(/Revisar luces/)).toBeTruthy()
+    fireEvent.click(within(legado).getByLabelText('Bajar Revisar luces'))
+    expect(screen.queryByRole('region', { name: 'Actividades sin área' })).toBeNull()
+
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalled())
+    expect(recorridoGuardado()).toEqual(['a1:sin,barrer'])
+  })
+})
+
+// ── Guardado y errores ────────────────────────────────────────────────────────
 
 describe('VistaRutinas · guardado y errores', () => {
-  it('la cabecera es un borrador: cancelar no persiste nada', async () => {
+  it('cancelar sin cambios cierra; con cambios pide confirmación y no persiste nada', async () => {
     montar()
     fireEvent.click(await screen.findByText('+ Nueva rutina'))
-    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Nocturna' } })
     fireEvent.click(screen.getByText('Cancelar'))
+    await waitFor(() => expect(screen.queryByLabelText('Nombre')).toBeNull())
+    expect(mocks.confirm).not.toHaveBeenCalled()
 
-    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('+ Nueva rutina'))
+    fireEvent.click(screen.getByLabelText('Agregar Gradas al recorrido'))
+    fireEvent.click(screen.getByText('Cancelar'))
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
+    expect(mocks.createCondominioRowReturning).not.toHaveBeenCalled()
+    expect(mocks.guardarRecorridoRutina).not.toHaveBeenCalled()
   })
 
-  it('la rutina nueva nace con servicio limpieza y el tenant de la pantalla', async () => {
-    montar()
-    fireEvent.click(await screen.findByText('+ Nueva rutina'))
-    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Nocturna' } })
-    fireEvent.click(screen.getByText('Guardar'))
-
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalled())
-    const [tabla, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as
-      [string, Record<string, unknown>]
-    expect(tabla).toBe('rutinas_limpieza')
-    expect(payload).toMatchObject({
-      nombre: 'Nocturna', servicio: 'limpieza', company_id: 'co1', project_id: 'p1',
-    })
-    // Área y jornada quedan en null, no en cadena vacía: la FK compuesta sólo
-    // se salta con NULL (MATCH SIMPLE); '' reventaría como uuid inválido.
-    expect(payload.area_id).toBeNull()
-    expect(payload.plantilla_horario_id).toBeNull()
-  })
-
-  it('el choque de nombre (23505) se explica en vez de mostrar el error de Postgres', async () => {
-    mocks.createCondominioRow.mockResolvedValue({
+  it('el choque de nombre (23505) se explica y el recorrido no se intenta', async () => {
+    mocks.createCondominioRowReturning.mockResolvedValue({
+      data: null,
       error: { message: 'duplicate key value violates unique constraint "uq_rutinas_nombre_normalizado"', code: '23505' },
     })
     montar()
     fireEvent.click(await screen.findByText('+ Nueva rutina'))
-    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Matutina de piscina' } })
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Matutina' } })
     fireEvent.click(screen.getByText('Guardar'))
 
     await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
@@ -336,6 +392,7 @@ describe('VistaRutinas · guardado y errores', () => {
     expect(args.title).toBe('Nombre repetido')
     expect(args.text).toMatch(/Ya existe una rutina con ese nombre/)
     expect(args.text).not.toMatch(/duplicate key/)
+    expect(mocks.guardarRecorridoRutina).not.toHaveBeenCalled()
   })
 
   it('sin nombre no se llama a la base', async () => {
@@ -344,12 +401,34 @@ describe('VistaRutinas · guardado y errores', () => {
     fireEvent.click(screen.getByText('Guardar'))
 
     await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
-    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+    expect(mocks.createCondominioRowReturning).not.toHaveBeenCalled()
+  })
+
+  it('si el recorrido falla después de crear la cabecera, reintentar no duplica la rutina', async () => {
+    mocks.guardarRecorridoRutina.mockResolvedValueOnce({ data: null, error: { message: 'sin red' } })
+    montar()
+    fireEvent.click(await screen.findByText('+ Nueva rutina'))
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Nocturna' } })
+    fireEvent.click(screen.getByLabelText('Agregar Gradas al recorrido'))
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
+    const [args] = mocks.notify.mock.calls[0] as unknown as [{ title: string; text: string }]
+    expect(args.title).toBe('No se pudo guardar el recorrido')
+    expect(args.text).toMatch(/volvé a guardar para reintentar/)
+    // El borrador sigue ahí.
+    expect(screen.getByRole('region', { name: 'Área 1: Gradas' })).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalledTimes(2))
+    expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1)
+    expect(mocks.updateCondominioRow).toHaveBeenCalledWith('rutinas_limpieza', 'rutNueva', expect.anything())
+    expect(rutinaGuardada(1)).toBe('rutNueva')
   })
 
   it('un fallo de carga se muestra y ofrece reintentar', async () => {
     mocks.fetchRutinasLimpieza.mockResolvedValue({
-      rutinas: [], pasos: [], horarios: [], error: { message: 'sin red' },
+      rutinas: [], pasos: [], paradas: [], horarios: [], error: { message: 'sin red' },
     })
     montar()
     expect(await screen.findByRole('alert')).toBeTruthy()
@@ -359,20 +438,17 @@ describe('VistaRutinas · guardado y errores', () => {
 })
 
 describe('VistaRutinas · permisos', () => {
-  it('sin canEdit no se ofrece armar ni reordenar', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
-      rutinas: [rutina()], pasos: [paso()], horarios: [], error: null,
-    })
+  it('sin canEdit el recorrido se ve pero no se arma ni se guarda', async () => {
+    cargarCon({ rutinas: [rutina()], paradas: [parada('z1', 'a1', 0)], pasos: [paso('p1', 'barrer', 0, 'z1')] })
     montar({ canCreate: false, canEdit: false, canDelete: false })
 
     expect(screen.queryByText('+ Nueva rutina')).toBeNull()
-    fireEvent.click(await screen.findByLabelText('Pasos de Matutina de piscina'))
-    // Los pasos se ven…
-    expect(await screen.findByText(/Barrer el borde/)).toBeTruthy()
-    // …pero no se tocan.
-    expect(screen.queryByText('➕ Agregar actividades del catálogo')).toBeNull()
-    expect(screen.queryByLabelText('Quitar Barrer el borde de la rutina')).toBeNull()
-    expect(screen.queryByLabelText('Eliminar Matutina de piscina')).toBeNull()
+    fireEvent.click(await screen.findByLabelText('Ver el recorrido de Rutina Lunes AM'))
+    expect(within(seccionArea(/Apartamento 1AB/)).getByText(/Barrido de piso/)).toBeTruthy()
+    expect(screen.queryByRole('complementary', { name: 'Paleta de áreas y actividades' })).toBeNull()
+    expect(screen.queryByLabelText('Quitar Barrido de piso de Apartamento 1AB')).toBeNull()
+    expect(screen.queryByText('Guardar')).toBeNull()
+    expect(screen.queryByLabelText('Eliminar Rutina Lunes AM')).toBeNull()
   })
 })
 
@@ -413,9 +489,6 @@ describe('VistaRutinas · materializar en los turnos', () => {
   })
 
   it('cuando no pasa NADA explica por qué, en vez de dejar un cero mudo', async () => {
-    // Todo en cero y sin rutinas huérfanas sólo puede significar una cosa: no
-    // hay turnos de esas jornadas en el rango. Decirlo evita que el usuario
-    // crea que la rutina está rota.
     montar()
     fireEvent.click(await screen.findByText('🗓️ Generar tareas'))
     expect(await screen.findByText(/No hubo turnos de esas jornadas en el rango/)).toBeTruthy()
@@ -443,9 +516,7 @@ describe('VistaRutinas · materializar en los turnos', () => {
 
 describe('VistaRutinas · la rutina que ya generó trabajo', () => {
   it('explica el 23503 en vez de mostrar el error de la FK', async () => {
-    mocks.fetchRutinasLimpieza.mockResolvedValue({
-      rutinas: [rutina()], pasos: [], horarios: [], error: null,
-    })
+    cargarCon({ rutinas: [rutina()] })
     mocks.deleteCondominioRow.mockResolvedValue({
       error: {
         message: 'update or delete on table "rutinas_limpieza" violates foreign key constraint "tareas_bloque_rutina_fk"',
@@ -453,7 +524,7 @@ describe('VistaRutinas · la rutina que ya generó trabajo', () => {
       },
     })
     montar()
-    fireEvent.click(await screen.findByLabelText('Eliminar Matutina de piscina'))
+    fireEvent.click(await screen.findByLabelText('Eliminar Rutina Lunes AM'))
 
     await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
     const [args] = mocks.notify.mock.calls[0] as unknown as [{ title: string; text: string }]

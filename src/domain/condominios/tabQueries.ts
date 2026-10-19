@@ -15,6 +15,7 @@ import type {
   PlantillaTareaHerramienta,
   PlantillaTareaSuministro,
   RutinaActividad,
+  RutinaArea,
   RutinaLimpieza,
   TareaBloqueSuministro,
   UsoCargo,
@@ -625,10 +626,12 @@ export async function fetchRutinasLimpieza(
 ): Promise<{
   rutinas: RutinaLimpieza[]
   pasos: RutinaActividad[]
+  /** Paradas del recorrido de cada rutina (20261102000000). */
+  paradas: RutinaArea[]
   horarios: Array<{ id: string; nombre: string; hora_inicio: string; hora_fin: string }>
   error: { message: string } | null
 }> {
-  const [rutRes, pasRes, horRes] = await Promise.all([
+  const [rutRes, pasRes, parRes, horRes] = await Promise.all([
     db
       .from('rutinas_limpieza')
       .select('*, areas_condominio(nombre), plantillas_horario(nombre)')
@@ -638,6 +641,12 @@ export async function fetchRutinasLimpieza(
       .order('nombre'),
     db
       .from('rutina_actividades')
+      .select('*')
+      .eq('project_id', projectId)
+      .eq('company_id', companyId)
+      .order('orden'),
+    db
+      .from('rutina_areas')
       .select('*')
       .eq('project_id', projectId)
       .eq('company_id', companyId)
@@ -652,7 +661,7 @@ export async function fetchRutinasLimpieza(
       .eq('activo', true)
       .order('hora_inicio'),
   ])
-  const error = rutRes.error ?? pasRes.error ?? horRes.error
+  const error = rutRes.error ?? pasRes.error ?? parRes.error ?? horRes.error
   reportDegradedQuery('condominios.fetchRutinasLimpieza', error)
   const rutinas: RutinaLimpieza[] = (rutRes.data ?? []).map(
     ({ areas_condominio: a, plantillas_horario: h, ...resto }) => ({
@@ -664,6 +673,7 @@ export async function fetchRutinasLimpieza(
   return {
     rutinas,
     pasos: (pasRes.data ?? []) as RutinaActividad[],
+    paradas: (parRes.data ?? []) as RutinaArea[],
     horarios: horRes.data ?? [],
     error: error ? { message: error.message } : null,
   }

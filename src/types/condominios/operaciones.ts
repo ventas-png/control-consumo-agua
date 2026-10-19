@@ -178,13 +178,42 @@ export interface RutinaActividad {
   company_id: string
   project_id: string
   rutina_id: string
+  /**
+   * Parada del recorrido (`rutina_areas`) donde se hace el paso (20261102000000).
+   * null = paso legado sin parada: se materializa con el área de la actividad o,
+   * si no tiene, la de la rutina.
+   */
+  rutina_area_id?: string | null
   plantilla_tarea_id: string
+  /** Posición DENTRO de su parada (o entre los pasos sin parada). */
   orden: number
   /** false = paso opcional; la rutina se cumple sin él. */
   obligatoria: boolean
   notas?: string | null
   creado_por?: string | null
   created_at: string
+}
+
+/**
+ * Parada del recorrido de una rutina (20261102000000): qué área se interviene y
+ * en qué orden. Sus actividades son los `RutinaActividad` con su `rutina_area_id`.
+ */
+export interface RutinaArea {
+  id: string
+  company_id: string
+  project_id: string
+  rutina_id: string
+  area_id: string
+  orden: number
+  notas?: string | null
+  creado_por?: string | null
+  created_at: string
+}
+
+/** Lo que `guardar_recorrido_rutina` deja guardado. */
+export interface ResultadoGuardarRecorrido {
+  paradas: number
+  pasos: number
 }
 
 export type EstadoBloqueTurno = 'pendiente' | 'en_curso' | 'completado' | 'incompleto'

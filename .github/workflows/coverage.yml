@@ -932,6 +932,21 @@ jobs:
           PGPORT_TEST: 55567
         run: supabase/tests/padron_autorizacion/run.sh
 
+      # 20261102000000: la rutina pasa a ser un RECORRIDO (áreas en orden, cada
+      # una con sus actividades). El guardado reconcilia una foto completa contra
+      # lo que ya hay —conserva, crea y borra en UNA transacción— y la
+      # materialización toma el área de la parada y el orden del recorrido. Lo
+      # fácil de romper sin notarlo: que una foto inválida deje el recorrido a
+      # medias, que «barrer» en dos apartamentos colapse en una sola tarea, o que
+      # «Cargar tareas del cargo» vuelva a duplicar al cambiar el índice.
+      # Cadena COMPLETA de migraciones, huella del auditor, purga en la forma de
+      # producción y nueve mutantes.
+      - name: Rutinas como recorrido por áreas — guardado atómico y materialización por parada
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55568
+        run: supabase/tests/rutinas_recorrido/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

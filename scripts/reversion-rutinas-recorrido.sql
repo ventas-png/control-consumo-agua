@@ -1,0 +1,56 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- Recuperación tras desplegar 20261102000000 (rutinas como recorrido por áreas)
+-- ════════════════════════════════════════════════════════════════════════════
+-- NO se ejecuta sola ni en CI. Leer antes de correr. Regla general: ante un problema,
+-- preferir AVANZAR con una migración nueva. La migración no reescribe ninguna fila: los
+-- pasos existentes quedaron con rutina_area_id NULL y se materializan como antes.
+--
+-- Volver atrás SÍ puede perder datos si ya se armaron recorridos, porque el modelo viejo
+-- no puede representarlos (la misma actividad en dos áreas, el área por paso). Por eso el
+-- bloque B aborta en vez de borrar: decidir qué hacer con esos recorridos es de una
+-- persona, no de un script.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── A) Diagnóstico (sólo lectura) ────────────────────────────────────────────────────
+-- Cuántos recorridos se armaron, y cuántas filas violarían los UNIQUE originales.
+-- SELECT count(*) AS paradas, count(DISTINCT rutina_id) AS rutinas FROM public.rutina_areas;
+-- SELECT rutina_id, plantilla_tarea_id, count(*) FROM public.rutina_actividades
+--  GROUP BY 1, 2 HAVING count(*) > 1;                        -- choca con rutina_act_unica
+-- SELECT bloque_id, plantilla_id, count(*) FROM public.tareas_bloque
+--  WHERE plantilla_id IS NOT NULL GROUP BY 1, 2 HAVING count(*) > 1;   -- choca con uq_tareas_bloque_plantilla
+
+-- ── B) Reversa completa (sólo si A no devuelve filas en las dos últimas consultas) ──
+-- BEGIN;
+-- DO $$
+-- BEGIN
+--   IF EXISTS (SELECT 1 FROM public.rutina_actividades GROUP BY rutina_id, plantilla_tarea_id HAVING count(*) > 1)
+--      OR EXISTS (SELECT 1 FROM public.tareas_bloque WHERE plantilla_id IS NOT NULL
+--                  GROUP BY bloque_id, plantilla_id HAVING count(*) > 1) THEN
+--     RAISE EXCEPTION 'REVERSA_RECORRIDO: hay datos que sólo el modelo nuevo admite; ver el bloque A';
+--   END IF;
+-- END $$;
+--
+-- -- 1. La RPC de materialización vuelve al cuerpo de 20260907000300: re-ejecutar la
+-- --    sección «2. La RPC» de supabase/migrations/20260907000300_materializar_rutinas.sql
+-- --    (CREATE OR REPLACE FUNCTION public.materializar_rutinas_turno … y su COMMENT,
+-- --    REVOKE y GRANT). Misma firma: no hace falta DROP.
+--
+-- -- 2. El guardado atómico.
+-- DROP FUNCTION IF EXISTS public.guardar_recorrido_rutina(uuid, jsonb);
+--
+-- -- 3. Los UNIQUE originales, ANTES de retirar los nuevos.
+-- CREATE UNIQUE INDEX IF NOT EXISTS uq_tareas_bloque_plantilla
+--   ON public.tareas_bloque(bloque_id, plantilla_id) WHERE plantilla_id IS NOT NULL;
+-- DROP INDEX IF EXISTS public.uq_tareas_bloque_plantilla_area;
+-- ALTER TABLE public.rutina_actividades
+--   ADD CONSTRAINT rutina_act_unica UNIQUE (rutina_id, plantilla_tarea_id);
+-- ALTER TABLE public.rutina_actividades DROP CONSTRAINT IF EXISTS rutina_act_unica_parada;
+--
+-- -- 4. Los pasos dejan de colgar de paradas (quedan como pasos sin área de la rutina) y
+-- --    las paradas se van.
+-- ALTER TABLE public.rutina_actividades DROP CONSTRAINT IF EXISTS rutina_act_parada_fk;
+-- DROP INDEX IF EXISTS public.idx_rutina_act_parada;
+-- ALTER TABLE public.rutina_actividades DROP COLUMN IF EXISTS rutina_area_id;
+-- DROP TABLE IF EXISTS public.rutina_areas;
+-- DROP FUNCTION IF EXISTS public.rutina_area_coherente();
+-- COMMIT;

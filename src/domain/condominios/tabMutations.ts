@@ -19,9 +19,10 @@ import { supabase, db } from '../../lib/supabase'
 import { SinFilasAfectadasError } from '../queryFetch'
 import type {
   ConsumoDeclarado, ResultadoConsumoInsumos,
-  ResultadoGeneracionTurnos, ResultadoMaterializacionRutinas,
+  ResultadoGeneracionTurnos, ResultadoGuardarRecorrido, ResultadoMaterializacionRutinas,
 } from '../../types'
 import { TABLA_DE_FUENTE, type NovedadOperativa } from './novedades'
+import type { ParadaPayload } from './rutinasRecorrido'
 
 /**
  * Error con el shape mínimo que consume la UI (mensaje legible). `code` es el
@@ -373,6 +374,28 @@ export async function materializarRutinasTurno(
   })
   const fila = Array.isArray(data) ? data[0] : data
   return { data: (fila as ResultadoMaterializacionRutinas | null) ?? null, error }
+}
+
+/**
+ * Guarda el recorrido COMPLETO de una rutina —paradas en orden y las actividades
+ * de cada una— en una transacción (RPC `guardar_recorrido_rutina`,
+ * 20261102000000). La RPC reconcilia la foto contra lo guardado: conserva lo que
+ * sigue (con sus notas), crea lo nuevo y borra lo que ya no viene, así que un
+ * arrastre que reordena todo el recorrido no queda nunca a medias.
+ *
+ * Es SECURITY INVOKER: escribe bajo la RLS de quien llama. Si la rutina no es
+ * visible para el usuario, falla con P0002 en vez de escribir. Devuelve UNA fila.
+ */
+export async function guardarRecorridoRutina(
+  rutinaId: string,
+  recorrido: ParadaPayload[],
+): Promise<{ data: ResultadoGuardarRecorrido | null; error: RowError }> {
+  const { data, error } = await db.rpc('guardar_recorrido_rutina', {
+    p_rutina_id: rutinaId,
+    p_recorrido: recorrido,
+  })
+  const fila = Array.isArray(data) ? data[0] : data
+  return { data: (fila as ResultadoGuardarRecorrido | null) ?? null, error }
 }
 
 /**

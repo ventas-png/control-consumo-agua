@@ -67,6 +67,7 @@ const TABLAS_VIGILADAS = [
   'ejecuciones_limpieza',
   'rutinas_limpieza',
   'rutina_actividades',
+  'rutina_areas',
   // Motor de turnos (destino de la materialización de rutinas)
   'plantillas_horario',
   'asignaciones_turno',

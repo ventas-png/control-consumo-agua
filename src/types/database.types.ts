@@ -19820,6 +19820,7 @@ export type Database = {
           orden: number
           plantilla_tarea_id: string
           project_id: string
+          rutina_area_id: string | null
           rutina_id: string
         }
         Insert: {
@@ -19832,6 +19833,7 @@ export type Database = {
           orden?: number
           plantilla_tarea_id: string
           project_id: string
+          rutina_area_id?: string | null
           rutina_id: string
         }
         Update: {
@@ -19844,9 +19846,17 @@ export type Database = {
           orden?: number
           plantilla_tarea_id?: string
           project_id?: string
+          rutina_area_id?: string | null
           rutina_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "rutina_act_parada_fk"
+            columns: ["rutina_area_id", "rutina_id"]
+            isOneToOne: false
+            referencedRelation: "rutina_areas"
+            referencedColumns: ["id", "rutina_id"]
+          },
           {
             foreignKeyName: "rutina_act_plantilla_fk"
             columns: ["plantilla_tarea_id", "company_id", "project_id"]
@@ -19888,6 +19898,85 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      rutina_areas: {
+        Row: {
+          area_id: string
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          id: string
+          notas: string | null
+          orden: number
+          project_id: string
+          rutina_id: string
+        }
+        Insert: {
+          area_id: string
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          notas?: string | null
+          orden?: number
+          project_id: string
+          rutina_id: string
+        }
+        Update: {
+          area_id?: string
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          notas?: string | null
+          orden?: number
+          project_id?: string
+          rutina_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rutina_areas_area_fk"
+            columns: ["area_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "rutina_areas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rutina_areas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rutina_areas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "rutina_areas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rutina_areas_rutina_fk"
+            columns: ["rutina_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "rutinas_limpieza"
+            referencedColumns: ["id", "company_id", "project_id"]
           },
         ]
       }
@@ -25570,6 +25659,13 @@ export type Database = {
       get_user_permissions: {
         Args: { target_user_id: string }
         Returns: string[]
+      }
+      guardar_recorrido_rutina: {
+        Args: { p_recorrido: Json; p_rutina_id: string }
+        Returns: {
+          paradas: number
+          pasos: number
+        }[]
       }
       has_admin_company_access: {
         Args: { p_company_id: string }

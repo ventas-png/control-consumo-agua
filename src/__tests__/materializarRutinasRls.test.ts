@@ -24,9 +24,15 @@ import { resolve, join } from 'node:path'
 //   3. Que la detección de existentes NO filtre por anulación. Agregarle
 //      `AND tb.anulada_en IS NULL` al EXISTS es una línea, deja todo verde, y
 //      hace que cada corrida resucite lo que alguien anuló.
+//
+// VERSIÓN VIVA. 20261102000000 (rutinas como recorrido por áreas) redefinió la
+// RPC con la misma firma: el área sale de la parada y el orden del recorrido.
+// Los guards de la RPC miran ESA versión; los de las columnas de snapshot y la
+// FK de linaje siguen mirando 20260907000300, que es donde se declaran.
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
 const MIG_MAT = '20260907000300_materializar_rutinas.sql'
+const MIG_VIVA = '20261102000000_rutinas_recorrido_por_areas.sql'
 
 const archivosOrdenados = readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort()
 
@@ -34,17 +40,18 @@ const archivosOrdenados = readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.s
 const soloCodigo = (sql: string) => sql.replace(/--[^\n]*/g, '')
 
 const sqlMat = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_MAT), 'utf8'))
+const sqlViva = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_VIVA), 'utf8'))
 
-/** Cuerpo de la RPC, sin la cabecera de la migración. */
+/** Cuerpo de la RPC VIVA, sin la cabecera de la migración. */
 const cuerpoRpc = (() => {
-  const m = sqlMat.match(
+  const m = sqlViva.match(
     /CREATE OR REPLACE FUNCTION public\.materializar_rutinas_turno\(([\s\S]*?)\n\$\$;/i,
   )
   if (!m) throw new Error('no se encontró la RPC materializar_rutinas_turno')
   return m[1]
 })()
 
-describe('20260907000300 · la SECURITY DEFINER trae su propio control', () => {
+describe('materializar_rutinas_turno (versión viva) · la SECURITY DEFINER trae su propio control', () => {
   it('es SECURITY DEFINER con search_path fijado', () => {
     expect(cuerpoRpc).toMatch(/SECURITY DEFINER/i)
     expect(cuerpoRpc).toMatch(/SET search_path = public, pg_temp/i)
@@ -74,10 +81,10 @@ describe('20260907000300 · la SECURITY DEFINER trae su propio control', () => {
   })
 
   it('anon no puede invocarla', () => {
-    expect(sqlMat).toMatch(
+    expect(sqlViva).toMatch(
       /REVOKE EXECUTE ON FUNCTION public\.materializar_rutinas_turno\(uuid, date, date\)\s+FROM PUBLIC, anon/i,
     )
-    expect(sqlMat).toMatch(
+    expect(sqlViva).toMatch(
       /GRANT\s+EXECUTE ON FUNCTION public\.materializar_rutinas_turno\(uuid, date, date\)\s+TO authenticated, service_role/i,
     )
   })
@@ -89,7 +96,7 @@ describe('20260907000300 · la SECURITY DEFINER trae su propio control', () => {
   })
 })
 
-describe('20260907000300 · la tarea COPIA, no lee por join', () => {
+describe('materializar_rutinas_turno (versión viva) · la tarea COPIA, no lee por join', () => {
   const SNAPSHOT = [
     'duracion_estimada_min',
     'checklist',
@@ -121,7 +128,7 @@ describe('20260907000300 · la tarea COPIA, no lee por join', () => {
   })
 })
 
-describe('20260907000300 · idempotencia que respeta las decisiones', () => {
+describe('materializar_rutinas_turno (versión viva) · idempotencia que respeta las decisiones', () => {
   it('la detección de existentes NO filtra por anulación', () => {
     // Agregar `AND tb.anulada_en IS NULL` aquí es una línea que deja todo verde
     // y hace que cada corrida resucite lo que alguien anuló con motivo.
@@ -131,6 +138,11 @@ describe('20260907000300 · idempotencia que respeta las decisiones', () => {
     expect(ex, 'no se encontró el EXISTS de ya_existe').not.toBeNull()
     expect(ex![1]).toMatch(/tb\.bloque_id = b\.id/)
     expect(ex![1]).toMatch(/tb\.plantilla_id = p\.id/)
+    // La identidad es la del índice (bloque, plantilla, área): sin el área,
+    // «barrer» ya hecho en un apartamento ocultaría el de todos los demás.
+    expect(ex![1]).toMatch(
+      /tb\.area_id IS NOT DISTINCT FROM COALESCE\(rz\.area_id, p\.area_id, r\.area_id\)/i,
+    )
     expect(ex![1], 'el EXISTS empezó a ignorar las anuladas: van a revivir')
       .not.toMatch(/anulada/i)
   })
@@ -139,13 +151,19 @@ describe('20260907000300 · idempotencia que respeta las decisiones', () => {
     expect(cuerpoRpc).toMatch(/ON CONFLICT DO NOTHING/i)
   })
 
-  it('el índice que sostiene esa idempotencia sigue declarado en 20260907000100', () => {
-    // Si alguien lo quita allá, aquí el ON CONFLICT deja de tener a qué agarrarse.
-    const paridad = soloCodigo(
-      readFileSync(join(MIGRATIONS_DIR, '20260907000100_tareas_bloque_paridad.sql'), 'utf8'),
-    )
-    expect(paridad).toMatch(
-      /CREATE UNIQUE INDEX IF NOT EXISTS uq_tareas_bloque_plantilla[\s\S]*?\(\s*bloque_id\s*,\s*plantilla_id\s*\)/i,
+  it('el índice que sostiene esa idempotencia es el de 20261102000000, con el área', () => {
+    // Si alguien lo quita, aquí el ON CONFLICT deja de tener a qué agarrarse.
+    // Reemplazó a uq_tareas_bloque_plantilla (20260907000100) y se crea ANTES de
+    // retirar aquél: nunca hay un instante sin unicidad. La vieja se busca por
+    // sus COLUMNAS (los índices de tareas_bloque tienen drift contra producción,
+    // #826): retirarla por nombre podía dejar viva una equivalente.
+    const crea = sqlViva.search(/CREATE UNIQUE INDEX IF NOT EXISTS uq_tareas_bloque_plantilla_area/i)
+    const retira = sqlViva.search(/= ARRAY\['bloque_id', 'plantilla_id'\]/)
+    expect(crea).toBeGreaterThan(-1)
+    expect(retira).toBeGreaterThan(crea)
+    expect(sqlViva).not.toMatch(/DROP INDEX IF EXISTS public\.uq_tareas_bloque_plantilla;/i)
+    expect(sqlViva).toMatch(
+      /uq_tareas_bloque_plantilla_area\s+ON public\.tareas_bloque\(bloque_id, plantilla_id, area_id\) NULLS NOT DISTINCT\s+WHERE plantilla_id IS NOT NULL/i,
     )
   })
 
@@ -154,6 +172,8 @@ describe('20260907000300 · idempotencia que respeta las decisiones', () => {
     expect(cuerpoRpc).toMatch(/bloque_estado NOT IN \('completado', 'incompleto'\)/i)
     expect(cuerpoRpc).toMatch(/AND r\.activa/i)
     expect(cuerpoRpc).toMatch(/AND p\.activo/i)
+    // Ni la parada de un área dada de baja.
+    expect(cuerpoRpc).toMatch(/AND \(rz\.id IS NULL OR za\.activo\)/i)
     // La rutina sin jornada no se materializa a ciegas.
     expect(cuerpoRpc).toMatch(/r\.plantilla_horario_id IS NOT NULL/i)
   })
@@ -176,8 +196,8 @@ describe('20260907000300 · idempotencia que respeta las decisiones', () => {
   })
 })
 
-describe('20260907000300 · el guard de append-only sigue contento', () => {
-  it('es la última migración de la serie y nadie la reescribió después', () => {
+describe('materializar_rutinas_turno · el guard de append-only sigue contento', () => {
+  it('20261102000000 es la versión viva y nadie la reescribió después', () => {
     // Se busca la REDEFINICIÓN, no la mención. Antes bastaba con nombrar la RPC
     // para que este guard se disparara, y 20260907000500 la nombra dentro de un
     // `COMMENT ON … IS '…'` —que es texto documentando de dónde vienen las
@@ -185,7 +205,7 @@ describe('20260907000300 · el guard de append-only sigue contento', () => {
     // `--`, no literales SQL. Un guard que grita por documentar algo enseña a
     // ignorarlo, y entonces deja de proteger cuando importa.
     const REDEFINE = /(CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.materializar_rutinas_turno|DROP\s+FUNCTION[^;]*materializar_rutinas_turno)/i
-    const posteriores = archivosOrdenados.filter(f => f > MIG_MAT)
+    const posteriores = archivosOrdenados.filter(f => f > MIG_VIVA)
     const culpables = posteriores.filter(f =>
       REDEFINE.test(soloCodigo(readFileSync(join(MIGRATIONS_DIR, f), 'utf8'))),
     )
