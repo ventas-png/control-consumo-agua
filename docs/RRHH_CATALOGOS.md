@@ -175,6 +175,12 @@ nuevos, 3657 → 3699, exactamente los que el auditor de la PR anunció; los 364
 captura anterior y el sha256 completo coincide con el medido en producción; `drift-conocido.json` no cambia. «ZZ RRH» retirado
 del sandbox el mismo día (comprobación de solo lectura: 0 empresas, usuarios, roles, cargos y personal).
 
+**`20261031000700` desplegada el 2026-10-19** (PR #950 fusionada como `ffc7a3c7`; run 39300108317 de «Apply Migrations to
+Production», evento `push`, `success` a las 18:09 UTC). Comprobación posterior de solo lectura en producción (18:10 UTC): 888
+migraciones, máx. `20261031000700`. Huella de producción recapturada: sólo cambian los cuerpos de `rrhh_tg_cargo_borrable()` y
+`rrhh_tg_turno_borrable()` (3731 → 3731), con valores idénticos a la reconstrucción de `main`; los 3729 grupos restantes son
+idénticos a la captura anterior y el sha256 completo coincide con el medido en producción; `drift-conocido.json` no cambia.
+
 ## Recuperación
 
 `scripts/reversion-rrhh-catalogos.sql`: A) reabrir la escritura sin catálogo (quitar los triggers, volver a la lista
