@@ -837,7 +837,10 @@ jobs:
       # conserva filas suyas (leído del catálogo); toda columna company_id/
       # project_id/cliente_id tiene llave. Contra la forma de llaves del
       # repositorio Y la medida en producción. CONTROL NEGATIVO por mutantes:
-      # sin cada compuerta o paso de la migración la suite debe fallar.
+      # sin cada compuerta o paso de la migración la suite debe fallar. Con
+      # 20261031000700: una empresa con empleados, actividades, programaciones y
+      # ejecuciones que usan su catálogo RRHH se purga (orden de cascada adverso
+      # forzado), y sin cada paso de esa migración el caso falla.
       - name: Empresas — purga atómica y retención (delete-company)
         env:
           PGBIN: ${{ steps.pg.outputs.bin }}
@@ -911,6 +914,9 @@ jobs:
       # código inmutable, desactivar vs borrar en uso (23503), validación en personal /
       # actividades / programación / ejecuciones con IS DISTINCT FROM (históricos editables),
       # carga masiva contra el catálogo. CONTROL NEGATIVO: seis mutantes.
+      # 20261031000700: el catálogo cae con su condominio o su empresa (la guarda de borrado
+      # no bloquea su cascada, con el orden de cascada adverso forzado) y el borrado a mano
+      # de un código en uso sigue rechazado. CONTROL NEGATIVO: ocho mutantes más.
       - name: RRHH — catálogos de cargos y tipos de turno por condominio
         env:
           PGBIN: ${{ steps.pg.outputs.bin }}

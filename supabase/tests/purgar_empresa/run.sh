@@ -21,10 +21,15 @@
 #      ensayo y purga completa (assert.sql);
 #   4. FORMA DE PRODUCCIÓN: la misma suite, y el área con tareas, que aquí SÍ
 #      se purga;
+#      en las dos formas, además, el catálogo RRHH en uso (assert_rrhh.sql,
+#      20261031000700): empleados, actividades, programaciones y ejecuciones
+#      con el orden de cascada adverso forzado;
 #   5. CONTROL NEGATIVO POR MUTANTES: quita de la migración, uno por uno, cada
 #      bloque marcado `[compuerta:…]` / `[paso:…]` y exige que la suite FALLE
 #      (o que la migración no aplique). Si alguno pasara, la suite no estaría
-#      probando ese bloque.
+#      probando ese bloque;
+#   6. lo mismo con cada bloque `[paso:…]` de 20261031000700: sin él, el caso
+#      del catálogo RRHH tiene que fallar.
 #
 # Uso:  bash supabase/tests/purgar_empresa/run.sh
 # ============================================================================
@@ -35,6 +40,7 @@ RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
 NUESTRA=20261030000000_purga_empresa_retencion_y_huerfanas
 MIG="$MIGS/$NUESTRA.sql"
+MIG_RRHH="$MIGS/20261031000700_rrhh_catalogos_caen_con_su_condominio.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -109,7 +115,7 @@ bloque() {  # bloque BD ARCHIVO ETIQUETA [psql args…]
   echo "  $(echo "$salida" | grep -c '✓') comprobaciones ✓"
 }
 
-echo "── 1/5 · andamiaje de plataforma y migraciones ANTERIORES, en orden"
+echo "── 1/6 · andamiaje de plataforma y migraciones ANTERIORES, en orden"
 psql -q -d postgres -c "CREATE DATABASE antes" >/dev/null
 aplicar "$RAIZ/scripts/schema-drift/bootstrap.sql" antes
 N=0
@@ -125,7 +131,7 @@ aplicar "$AQUI/forma_produccion.sql" antes_prod
 echo "   y la forma de llaves medida en producción (forma_produccion.sql)"
 for b in antes antes_prod; do aplicar "$AQUI/pre_migracion.sql" "$b"; done
 
-echo "── 2/5 · la migración, dos veces, sobre las dos formas (la segunda debe ser limpia)"
+echo "── 2/6 · la migración, dos veces, sobre las dos formas (la segunda debe ser limpia)"
 nueva_bd plantilla antes
 aplicar "$MIG" plantilla
 aplicar "$MIG" plantilla && echo "   ✓ repositorio: segunda pasada limpia"
@@ -135,33 +141,43 @@ aplicar "$MIG" plantilla_prod
 aplicar "$MIG" plantilla_prod && echo "   ✓ producción: segunda pasada limpia"
 posteriores plantilla_prod
 
-echo "── 3/5 · forma de llaves del REPOSITORIO"
+echo "── 3/6 · forma de llaves del REPOSITORIO"
 nueva_bd repo plantilla
 fixtures repo
 nueva_bd repo_areas repo
 bloque repo_areas assert_areas.sql "3a · área con tareas: falla ENTERA (drift #826)" -v forma=repositorio
 bloque repo assert_politica.sql "3b · política: llaves, retención por categoría, cliente y purga sin restos"
 bloque repo assert.sql "3c · compuertas, todo o nada, ensayo y purga completa"
+nueva_bd repo_rrhh plantilla
+fixtures repo_rrhh
+bloque repo_rrhh assert_rrhh.sql "3d · catálogo RRHH en uso, con el orden de cascada adverso: se purga; el borrado a mano sigue rechazado"
 
-echo "── 4/5 · forma de llaves de PRODUCCIÓN"
+echo "── 4/6 · forma de llaves de PRODUCCIÓN"
 nueva_bd prod plantilla_prod
 fixtures prod
 nueva_bd prod_areas prod
 bloque prod_areas assert_areas.sql "4a · área con tareas: se purga" -v forma=produccion
 bloque prod assert_politica.sql "4b · política: llaves, retención por categoría, cliente y purga sin restos"
 bloque prod assert.sql "4c · compuertas, todo o nada, ensayo y purga completa"
+nueva_bd prod_rrhh plantilla_prod
+fixtures prod_rrhh
+bloque prod_rrhh assert_rrhh.sql "4d · catálogo RRHH en uso, con el orden de cascada adverso: se purga; el borrado a mano sigue rechazado"
 
-echo "── 5/5 · CONTROL NEGATIVO: sin cada bloque de la migración, la suite DEBE fallar"
+# Copia ORIGEN en DESTINO sin el bloque «-- [MARCA]» … «-- [/MARCA]» (ambos incluidos).
+sin_bloque() {  # sin_bloque MARCA ORIGEN DESTINO
+  awk -v ini="-- [$1]" -v fin="-- [/$1]" '
+    index($0, ini) { dentro = 1 }
+    !dentro { print }
+    index($0, fin) { dentro = 0 }' "$2" > "$3"
+  if cmp -s "$3" "$2"; then echo "❌ $1: el mutante es idéntico a $(basename "$2")"; exit 1; fi
+}
+
+echo "── 5/6 · CONTROL NEGATIVO: sin cada bloque de la migración, la suite DEBE fallar"
 MARCAS=$(grep -oE '\-\- \[(compuerta|paso):[a-z_]+\]' "$MIG" | sed -E 's/^-- \[(.*)\]$/\1/')
 [ -n "$MARCAS" ] || { echo "❌ la migración no tiene bloques marcados"; exit 1; }
 for marca in $MARCAS; do
   mutante="$MUT/${marca/:/_}.sql"
-  # Borra desde «-- [marca]» hasta «-- [/marca]», ambos incluidos.
-  awk -v ini="-- [$marca]" -v fin="-- [/$marca]" '
-    index($0, ini) { dentro = 1 }
-    !dentro { print }
-    index($0, fin) { dentro = 0 }' "$MIG" > "$mutante"
-  if cmp -s "$mutante" "$MIG"; then echo "❌ $marca: el mutante es idéntico a la migración"; exit 1; fi
+  sin_bloque "$marca" "$MIG" "$mutante"
   nueva_bd mutante antes
   if ! salida=$(PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d mutante -f "$mutante" 2>&1 >/dev/null); then
     echo "  ✓ sin [$marca] la migración no aplica: $(echo "$salida" | grep -E 'ERROR' | head -1 | sed 's/.*ERROR:  //' | cut -c1-100)"
@@ -175,4 +191,20 @@ for marca in $MARCAS; do
   echo "  ✓ sin [$marca] la suite falla: $(echo "$salida" | grep -E 'ERROR' | head -1 | sed 's/.*ERROR:  //' | cut -c1-100)"
 done
 
-echo "✅ purgar_empresa: todo o nada, política de retención sin huérfanos, en las dos formas de llaves, y cada bloque probado"
+echo "── 6/6 · CONTROL NEGATIVO de $(basename "$MIG_RRHH" .sql): sin cada bloque, el caso RRHH (4d) DEBE fallar"
+MARCAS=$(grep -oE '\-\- \[paso:[a-z_]+\]' "$MIG_RRHH" | sed -E 's/^-- \[(.*)\]$/\1/')
+[ -n "$MARCAS" ] || { echo "❌ $(basename "$MIG_RRHH") no tiene bloques marcados"; exit 1; }
+for marca in $MARCAS; do
+  mutante="$MUT/rrhh_${marca/:/_}.sql"
+  sin_bloque "$marca" "$MIG_RRHH" "$mutante"
+  # plantilla_prod ya tiene la migración: el mutante la sobrescribe (CREATE OR REPLACE).
+  nueva_bd mutante plantilla_prod
+  aplicar "$mutante" mutante
+  fixtures mutante
+  if salida=$(suite mutante assert_rrhh.sql); then
+    echo "❌ $marca: el caso RRHH PASÓ sin ese bloque, así que no lo prueba."; exit 1
+  fi
+  echo "  ✓ sin [$marca] el caso RRHH falla: $(echo "$salida" | grep -E 'ERROR' | head -1 | sed 's/.*ERROR:  //' | cut -c1-140)"
+done
+
+echo "✅ purgar_empresa: todo o nada, política de retención sin huérfanos, en las dos formas de llaves, con el catálogo RRHH en uso, y cada bloque probado"
