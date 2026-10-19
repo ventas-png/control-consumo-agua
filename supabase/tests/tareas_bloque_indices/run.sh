@@ -5,9 +5,9 @@
 #
 # QUÉ COMPRUEBA
 #   0 · ESCENARIO   la forma de producción montada a mano (forma_produccion.sql)
-#                   da EXACTAMENTE la huella registrada en huella-produccion.json
-#                   para `tabla:tareas_bloque/indices`. Sin esto, lo demás no
-#                   prueba nada.
+#                   da EXACTAMENTE la huella que producción tenía para
+#                   `tabla:tareas_bloque/indices` antes de 20261102000000 (ver
+#                   META abajo). Sin esto, lo demás no prueba nada.
 #   1 · CONVERGE    sobre la cadena del repositorio, la migración deja el grupo
 #                   con esa misma huella; una segunda pasada no cambia nada.
 #   2 · NO-OP       sobre la forma de producción no escribe nada (el catálogo
@@ -31,8 +31,12 @@ HUELLA="$RAIZ/scripts/schema-drift/fingerprint.sql"
 GRUPO='tabla:tareas_bloque/indices'
 
 [ -f "$NUESTRA" ] || { echo "❌ no existe $NUESTRA"; exit 1; }
-META=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['grupos'][sys.argv[2]].split(':')[0])" \
-  "$RAIZ/scripts/schema-drift/huella-produccion.json" "$GRUPO")
+# La huella de producción del grupo ANTES de 20261102000000: la forma a la que
+# converge esta migración, medida el 2026-10-19 y registrada en
+# huella-produccion.json hasta su recaptura tras #951. Va fija y no se lee del
+# archivo: 20261102000000 vuelve a cambiar el grupo (6 → 7 índices), así que la
+# huella vigente ya no describe el punto de la cadena que esta suite prueba.
+META=d23b0e8d0f2caf45df822b42479f8387411d3678fe21bca73bad5243a0a50f54
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH

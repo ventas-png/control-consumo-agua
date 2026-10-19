@@ -1,8 +1,8 @@
 -- La forma MEDIDA en producción de los índices de tareas_bloque (pg_indexes,
 -- 2026-10-19), montada sobre la cadena del repositorio ANTERIOR a
 -- 20261101000000. run.sh exige que esta forma dé exactamente la huella que
--- scripts/schema-drift/huella-produccion.json registra para el grupo: si no la
--- diera, el escenario no describiría producción y la prueba de no-op no diría
+-- producción tenía para el grupo antes de 20261102000000 (META en run.sh): si no
+-- la diera, el escenario no describiría producción y la prueba de no-op no diría
 -- nada.
 \set ON_ERROR_STOP on
 ALTER INDEX public.idx_tareas_bloque_bloque RENAME TO tareas_bloque_bloque_id_orden_idx;
