@@ -707,7 +707,7 @@ export function EditorRutina({
                 <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
                   {horarios.length === 0
                     ? 'No hay jornadas activas cargadas (se definen en Turnos).'
-                    : 'Sin jornada, la rutina no entra sola en ningún turno.'}
+                    : 'Opcional: la jornada sólo sirve para comparar el tiempo del recorrido. A quién le toca y qué día se asigna en el Calendario.'}
                 </div>
               )}
             </div>

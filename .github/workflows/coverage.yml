@@ -964,6 +964,16 @@ jobs:
           PGPORT_TEST: 55568
         run: supabase/tests/rutinas_recorrido/run.sh
 
+      # 20261103000000: calendario de limpieza. Tres RPC SECURITY DEFINER leen y
+      # escriben saltándose la RLS: ver no alcanza para asignar, día pasado y
+      # turno cerrado se rechazan, lo trabajado no se quita y el orden sigue al
+      # recorrido. Cadena completa, huella del auditor y catorce mutantes.
+      - name: Calendario de limpieza — rutinas por persona y día de turno
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55570
+        run: supabase/tests/limpieza_calendario/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

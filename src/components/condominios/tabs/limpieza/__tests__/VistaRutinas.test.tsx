@@ -26,13 +26,6 @@ const mocks = vi.hoisted(() => ({
     data: { paradas: 0, pasos: 0 } as Record<string, number> | null,
     error: null as RowError,
   })),
-  materializarRutinasTurno: vi.fn(async () => ({
-    data: {
-      generadas: 0, omitidas_existente: 0,
-      omitidas_bloque_cerrado: 0, rutinas_sin_jornada: 0,
-    } as Record<string, number> | null,
-    error: null as RowError,
-  })),
   fetchRutinasLimpieza: vi.fn(async () => ({
     rutinas: [] as Array<Record<string, unknown>>,
     pasos: [] as Array<Record<string, unknown>>,
@@ -53,7 +46,6 @@ vi.mock('../../../../../domain/condominios/tabMutations', () => ({
   updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
   guardarRecorridoRutina: mocks.guardarRecorridoRutina,
-  materializarRutinasTurno: mocks.materializarRutinasTurno,
 }))
 vi.mock('../../../../../domain/condominios/tabQueries', () => ({
   fetchRutinasLimpieza: mocks.fetchRutinasLimpieza,
@@ -157,10 +149,6 @@ beforeEach(() => {
   mocks.deleteCondominioRow.mockResolvedValue({ error: null })
   mocks.guardarRecorridoRutina.mockResolvedValue({ data: { paradas: 0, pasos: 0 }, error: null })
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
-  mocks.materializarRutinasTurno.mockResolvedValue({
-    data: { generadas: 0, omitidas_existente: 0, omitidas_bloque_cerrado: 0, rutinas_sin_jornada: 0 },
-    error: null,
-  })
   cargarCon({})
 })
 afterEach(cleanup)
@@ -565,65 +553,16 @@ describe('VistaRutinas · permisos', () => {
   })
 })
 
-describe('VistaRutinas · materializar en los turnos', () => {
-  it('llama a la RPC con el proyecto y el rango elegidos', async () => {
+describe('VistaRutinas · a quién y qué día se asigna en el Calendario', () => {
+  // 20261103000000: «Generar tareas» por jornada le daba la rutina a TODOS los
+  // turnos de su jornada. Ya no se ofrece: la rutina se asigna a una persona en
+  // un día desde el Calendario.
+  it('no ofrece «Generar tareas» y dice dónde se asigna', async () => {
     montar()
-    fireEvent.change(await screen.findByLabelText('Desde'), { target: { value: '2026-09-01' } })
-    fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-09-30' } })
-    fireEvent.click(screen.getByText('🗓️ Generar tareas'))
-
-    await waitFor(() => expect(mocks.materializarRutinasTurno).toHaveBeenCalled())
-    expect(mocks.materializarRutinasTurno).toHaveBeenCalledWith('p1', '2026-09-01', '2026-09-30')
-  })
-
-  it('resume el resultado por bucket en vez de decir sólo "listo"', async () => {
-    mocks.materializarRutinasTurno.mockResolvedValue({
-      data: { generadas: 12, omitidas_existente: 3, omitidas_bloque_cerrado: 2, rutinas_sin_jornada: 0 },
-      error: null,
-    })
-    montar()
-    fireEvent.click(await screen.findByText('🗓️ Generar tareas'))
-
-    const estado = await screen.findByRole('status')
-    expect(estado.textContent).toMatch(/12/)
-    expect(estado.textContent).toMatch(/3 ya estaban/)
-    expect(estado.textContent).toMatch(/2 en turnos ya cerrados/)
-  })
-
-  it('avisa de las rutinas activas SIN jornada, que no pueden materializarse solas', async () => {
-    mocks.materializarRutinasTurno.mockResolvedValue({
-      data: { generadas: 0, omitidas_existente: 0, omitidas_bloque_cerrado: 0, rutinas_sin_jornada: 2 },
-      error: null,
-    })
-    montar()
-    fireEvent.click(await screen.findByText('🗓️ Generar tareas'))
-
-    expect(await screen.findByText(/2 rutinas activas sin jornada/)).toBeTruthy()
-  })
-
-  it('cuando no pasa NADA explica por qué, en vez de dejar un cero mudo', async () => {
-    montar()
-    fireEvent.click(await screen.findByText('🗓️ Generar tareas'))
-    expect(await screen.findByText(/No hubo turnos de esas jornadas en el rango/)).toBeTruthy()
-  })
-
-  it('un fallo de la RPC se muestra y no simula éxito', async () => {
-    mocks.materializarRutinasTurno.mockResolvedValue({
-      data: null, error: { message: 'no autorizado', code: '42501' },
-    })
-    montar()
-    fireEvent.click(await screen.findByText('🗓️ Generar tareas'))
-
-    await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
-    const [args] = mocks.notify.mock.calls[0] as unknown as [{ title: string; text: string }]
-    expect(args.title).toBe('No se pudo materializar')
-    expect(screen.queryByRole('status')).toBeNull()
-  })
-
-  it('sin canEdit no se ofrece generar nada', async () => {
-    montar({ canCreate: false, canEdit: false, canDelete: false })
     await waitFor(() => expect(mocks.fetchRutinasLimpieza).toHaveBeenCalled())
-    expect(screen.queryByText('🗓️ Generar tareas')).toBeNull()
+    expect(screen.queryByText(/Generar tareas/)).toBeNull()
+    expect(screen.queryByLabelText('Desde')).toBeNull()
+    expect(screen.getByText(/se asigna en el Calendario/)).toBeTruthy()
   })
 })
 

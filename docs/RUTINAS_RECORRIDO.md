@@ -11,8 +11,9 @@ rutina deja de ser una lista plana de actividades con un área opcional en la ca
    anterior. Con jornada, se lee como hora estimada («07:00 → 07:07») y el total se compara con lo que dura la jornada
    (aviso si no cabe). Las actividades sin duración se cuentan aparte.
 
-Quien recibe la rutina en su turno la hace en ese orden: **Generar tareas** crea las tareas con el área de su parada y
-en el orden rutina → área → actividad.
+Quien recibe la rutina en su turno la hace en ese orden: las tareas se crean con el área de su parada y en el orden
+rutina → área → actividad. **A quién y qué día** se decide en el **Calendario** de Limpieza
+([LIMPIEZA_CALENDARIO.md](LIMPIEZA_CALENDARIO.md), 20261103000000), que reemplazó a «Generar tareas» por jornada.
 
 ![Armado en escritorio](capturas/rutinas_recorrido/10-armado-escritorio.png)
 

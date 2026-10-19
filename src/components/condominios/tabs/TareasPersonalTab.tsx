@@ -34,6 +34,14 @@ interface Props {
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
+  /**
+   * «Ruta del día» de Limpieza (20261103000000): el mismo tablero, sólo para
+   * EJECUTAR. Sin alta ni borrado de turnos ni de tareas sueltas —el trabajo lo
+   * asigna el calendario—, con su propio título, y avisando del cambio de fecha
+   * para que quien lo monta cargue ese día. Ejecutar (evidencia, checklist,
+   * insumos, cierre) es exactamente lo de siempre: no hay una segunda copia.
+   */
+  modoRuta?: { titulo: string; subtitulo?: string; onFechaChange: (fecha: string) => void }
 }
 
 const TURNO_CONFIG: Record<TurnoTipo, { label: string; icon: string; bg: string; color: string }> = {
@@ -62,14 +70,21 @@ function blankBloque(hoy: string) {
 
 export function TareasPersonalTab({
   bloques, tareas, plantillas, personal, areas,
-  proyectoId, companyId, userId, canCreate, canEdit, onRefresh, cargos = [],
+  proyectoId, companyId, userId, canCreate, canEdit, onRefresh, cargos = [], modoRuta,
 }: Props) {
   const hoy = hoyLocalISO()
   const [saving, setSaving] = useState(false)
   const [showBloqueForm, setShowBloqueForm] = useState(false)
   const [bloqueForm, setBloqueForm] = useState(blankBloque(hoy))
   const [selectedPersonalId, setSelectedPersonalId] = useState<string>('todos')
-  const [selectedFecha, setSelectedFecha] = useState<string>(hoy)
+  const [selectedFecha, setSelectedFechaLocal] = useState<string>(hoy)
+  const setSelectedFecha = (fecha: string) => {
+    setSelectedFechaLocal(fecha)
+    modoRuta?.onFechaChange(fecha)
+  }
+  /** En la ruta sólo se ejecuta: el alta y el borrado viven en «Tareas por turno». */
+  const puedeArmar = canCreate && !modoRuta
+  const puedeBorrar = canEdit && !modoRuta
   const [bloqueAbierto, setBloqueAbierto] = useState<string | null>(null)
 
   // Tareas a agregar al bloque
@@ -406,16 +421,16 @@ export function TareasPersonalTab({
   const personalActivo = personal.filter(p => p.estado !== 'inactivo').sort((a, b) => a.nombre.localeCompare(b.nombre))
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1100px' }}>
+    <div style={{ padding: modoRuta ? 0 : '24px', maxWidth: '1100px' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Turnos y tareas operativas</h2>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>{modoRuta?.titulo ?? 'Turnos y tareas operativas'}</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
-            {bloques.filter(b => b.estado === 'en_curso').length} turno{bloques.filter(b => b.estado === 'en_curso').length !== 1 ? 's' : ''} en curso hoy
+            {modoRuta?.subtitulo ?? `${bloques.filter(b => b.estado === 'en_curso').length} turno${bloques.filter(b => b.estado === 'en_curso').length !== 1 ? 's' : ''} en curso hoy`}
           </p>
         </div>
-        {canCreate && (
+        {puedeArmar && (
           <button onClick={() => { setBloqueForm(blankBloque(hoy)); setShowBloqueForm(true) }}
             style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
             + Asignar turno
@@ -497,6 +512,8 @@ export function TareasPersonalTab({
             const progreso = ts.length > 0 ? Math.round((completadas / ts.length) * 100) : 0
             const isOpen = bloqueAbierto === bloque.id
             const empleado = personal.find(p => p.id === bloque.personal_id)
+            // El nombre que trae el turno cubre a quien no lee el tab Personal (la ruta de Limpieza).
+            const cargoEmpleado = empleado?.cargo ?? bloque.personal_cargo
 
             return (
               <div key={bloque.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${isOpen ? 'var(--at-warning)' : 'var(--at-line)'}`, borderRadius: '16px', overflow: 'hidden' }}>
@@ -506,7 +523,7 @@ export function TareasPersonalTab({
                   <span style={{ fontSize: '22px' }}>{tc.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)' }}>
-                      {empleado?.nombre ?? 'Empleado'} — {empleado?.cargo ? etiquetaCargo(empleado.cargo, cargos) : ''}
+                      {empleado?.nombre ?? bloque.personal_nombre ?? 'Empleado'} — {cargoEmpleado ? etiquetaCargo(cargoEmpleado, cargos) : ''}
                     </div>
                     <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '2px' }}>
                       <span style={{ background: tc.bg, color: tc.color, padding: '1px 8px', borderRadius: '20px', fontWeight: 600 }}>{tc.label}</span>
@@ -539,7 +556,9 @@ export function TareasPersonalTab({
                           ✓ Cerrar turno
                         </button>
                       )}
-                      <button onClick={() => deleteBloque(bloque.id)} style={{ padding: '6px 9px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-danger)' }}>🗑</button>
+                      {puedeBorrar && (
+                        <button onClick={() => deleteBloque(bloque.id)} style={{ padding: '6px 9px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-danger)' }}>🗑</button>
+                      )}
                     </div>
                   )}
                   <span style={{ color: 'var(--at-ink-3)', fontSize: '16px', transition: 'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'none' }}>▾</span>
@@ -549,7 +568,7 @@ export function TareasPersonalTab({
                 {isOpen && (
                   <div style={{ borderTop: '1px solid var(--at-warning-border)', padding: '16px 18px', background: 'var(--at-warning-tint)' }}>
                     {/* Botón cargar plantillas */}
-                    {canCreate && empleado && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
+                    {puedeArmar && empleado && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                         {Array.from(new Set(plantillas.filter(p => p.activo && p.cargo.toLowerCase() === (empleado.cargo ?? '').toLowerCase()).map(p => p.cargo))).map(cargo => (
                           <button key={cargo} onClick={() => agregarDesdePlantillas(bloque.id, cargo)} disabled={saving}
@@ -617,7 +636,7 @@ export function TareasPersonalTab({
                                   )}
                                 </div>
                               )}
-                              {canEdit && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
+                              {puedeBorrar && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
                                 <button onClick={() => deleteTarea(t.id)} style={{ padding: '5px 8px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '13px', flexShrink: 0 }}>✕</button>
                               )}
                             </div>
@@ -745,7 +764,7 @@ export function TareasPersonalTab({
                     )}
 
                     {/* Agregar tarea ad-hoc */}
-                    {canCreate && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
+                    {puedeArmar && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
                       <>
                         {!addingTarea ? (
                           <button onClick={() => setAddingTarea(true)}

@@ -216,6 +216,53 @@ export interface ResultadoGuardarRecorrido {
   pasos: number
 }
 
+/**
+ * Una rutina asignada a un turno (20261103000000): cuántas tareas suyas tiene
+ * el turno y cómo van. `trabajadas > 0` = ya no se puede quitar del día.
+ */
+export interface RutinaEnTurno {
+  rutina_id: string
+  tareas: number
+  pendientes: number
+  hechas: number
+  trabajadas: number
+}
+
+/**
+ * Un turno del calendario de limpieza (`limpieza_calendario`): el bloque con
+ * lo mínimo de la persona y de su jornada, y las rutinas que tiene asignadas.
+ */
+export interface TurnoCalendarioLimpieza {
+  bloque_id: string
+  personal_id: string
+  personal_nombre: string
+  personal_cargo: string | null
+  personal_estado: string | null
+  fecha: string
+  turno: TurnoTipo
+  /** La base admite también 'cancelado'. */
+  estado: EstadoBloqueTurno | 'cancelado'
+  iniciado_en: string | null
+  cerrado_en: string | null
+  plantilla_horario_id: string | null
+  jornada_nombre: string | null
+  jornada_codigo: string | null
+  jornada_color: string | null
+  hora_inicio: string | null
+  hora_fin: string | null
+  horas_planificadas: number | null
+  rutinas: RutinaEnTurno[]
+  /** Tareas sueltas del turno (no salen de ninguna rutina). */
+  otras_tareas: number
+}
+
+/** Lo que `limpieza_asignar_rutinas` creó en el turno. */
+export interface ResultadoAsignarRutinas {
+  generadas: number
+  /** Tareas que el turno ya tenía (misma actividad en la misma área). */
+  omitidas_existente: number
+}
+
 export type EstadoBloqueTurno = 'pendiente' | 'en_curso' | 'completado' | 'incompleto'
 export type TurnoTipo = 'manana' | 'tarde' | 'noche'
 
