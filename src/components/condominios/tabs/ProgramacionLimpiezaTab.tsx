@@ -12,9 +12,10 @@
 //               en Seguridad → Plantillas y no se duplica aquí. La RLS de
 //               20260904000200/000300 acepta `prog_limpieza` en el SELECT, así
 //               que se lee sin permisos del módulo Seguridad.
-//   Rutinas     conjuntos ordenados de actividades que se ejecutan juntos
-//               ("la matutina de la piscina"), para no rearmarlos cada día.
-//               Es DEFINICIÓN: la ocurrencia del día se materializa aparte.
+//   Rutinas     recorridos: las áreas en el orden en que se intervienen y, en
+//               cada una, sus actividades (20261102000000), armados arrastrando
+//               y soltando, con el tiempo acumulado. Es DEFINICIÓN: la
+//               ocurrencia del día se materializa aparte.
 //   Ruta        lo que le toca hoy a cada empleado, con foto de evidencia y
 //               cierre área por área.
 //   Novedades   lo que se encontró de paso y necesita mantenimiento.
@@ -168,14 +169,12 @@ export function ProgramacionLimpiezaTab({
         />
       )}
       {vista === 'rutinas' && (
-        // Armado de rutinas: agrupa actividades del catálogo para no
-        // rearmarlas cada día. Reutiliza ActividadesCatalog como selector.
+        // Armado de rutinas como recorrido: áreas del catálogo en orden, cada
+        // una con sus actividades, para no rearmarlo cada día.
         <VistaRutinas
           plantillas={plantillas}
           cargos={cargos}
           areas={areas}
-          suministros={suministros}
-          inventario={inventario}
           proyectoId={proyectoId}
           companyId={companyId}
           canCreate={canCreate}
