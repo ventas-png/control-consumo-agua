@@ -6,7 +6,6 @@ import {
   fetchVisitasControlRecent,
   fetchCondominiosTareasData,
   fetchTareasBloqueData,
-  fetchCondominiosLimpiezaData,
   fetchCondominiosTurnosData,
   fetchCondominiosRrhhCatalogosData,
 } from '../../domain/condominios/sectionData'
@@ -46,7 +45,7 @@ import type {
   PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
   AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
   FondoReserva, PermisoObraUnidad, TarifaCondominio, IncidenteSeguridad,
-  ChecklistArea, ProgramacionLimpieza, EjecucionLimpieza, ConsumoEnergiaArea, HistorialResidente,
+  ChecklistArea, ConsumoEnergiaArea, HistorialResidente,
   EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
   PlantillaHorario, AsignacionTurno, DiaNoLaborable, AusenciaPersonal, ExcepcionTurno,
   CargoCatalogo, TipoTurnoCatalogo,
@@ -271,8 +270,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [incidentes, setIncidentes] = useState<IncidenteSeguridad[]>([])
   // Fase 19
   const [checklistAreas, setChecklistAreas] = useState<ChecklistArea[]>([])
-  const [progLimpieza, setProgLimpieza] = useState<ProgramacionLimpieza[]>([])
-  const [ejecLimpieza, setEjecLimpieza] = useState<EjecucionLimpieza[]>([])
   const [consumoEnergia, setConsumoEnergia] = useState<ConsumoEnergiaArea[]>([])
   const [historialRes, setHistorialRes] = useState<HistorialResidente[]>([])
   // Fase 20
@@ -429,7 +426,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
       planesPagoRes, cuotasPlanRes, accesosResRes, garantiasRes, entregasRes,
       avisosCobroRes, bitacoraMantoRes, evalProvRes, reclamosCondRes,
       fondoReservaRes, permisosObraRes, tarifasRes, incidentesRes,
-      checklistAreasRes, progLimpiezaRes, consumoEnergiaRes, historialResRes,
+      checklistAreasRes, consumoEnergiaRes, historialResRes,
       estacVisitaRes, bitacoraGuardiaRes, equiposComunesRes, presenciaPersonalRes,
       suministrosRes, movsumRes, tareasCondRes, cobranzasRes,
       certificadosRes, visFrecRes, reglamentoRes, plagasRes,
@@ -570,18 +567,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     )
     setExcepcionesTurno((excepcionesRes.data ?? []) as ExcepcionTurno[])
 
-    // Rutas de limpieza (20260807130000). Va aparte del Promise.all grande
-    // porque la tabla es nueva: si el entorno todavía no tiene la migración
-    // aplicada, el error se queda aquí (lista vacía) en vez de tumbar la carga
-    // de las otras ~140 colecciones del panel.
-    const ejecLimpiezaRes = await fetchCondominiosLimpiezaData(pid, cid)
-    setEjecLimpieza(
-      (ejecLimpiezaRes.data ?? []).map((e: Record<string, unknown>) => ({
-        ...e,
-        foto_urls: (e.foto_urls as string[] | null) ?? [],
-      })) as EjecucionLimpieza[]
-    )
-
     if (runSeqRef.current !== run) return
 
     setCuotas(mapUnidad<CuotaCondominio>(cuotasRes.data ?? []))
@@ -673,7 +658,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     setTarifas((tarifasRes.data ?? []) as TarifaCondominio[])
     setIncidentes((incidentesRes.data ?? []) as IncidenteSeguridad[])
     setChecklistAreas((checklistAreasRes.data ?? []) as ChecklistArea[])
-    setProgLimpieza((progLimpiezaRes.data ?? []) as ProgramacionLimpieza[])
     setConsumoEnergia((consumoEnergiaRes.data ?? []) as ConsumoEnergiaArea[])
     setHistorialRes((historialResRes.data ?? []) as HistorialResidente[])
     setEstacVisita((estacVisitaRes.data ?? []) as EstacionamientoVisita[])
@@ -786,7 +770,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     cajasChicas, movimientosCaja, obras, planesPage, accesosRes, garantias,
     entregas, avisosCobro, bitacoraRegistros, evaluacionesProv, reclamos,
     fondoReserva, permisosObra, tarifas, incidentes, checklistAreas,
-    progLimpieza, ejecLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
+    consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
     plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal, excepcionesTurno,
     cargosPersonal, tiposTurno,
@@ -821,7 +805,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     cajasChicas, movimientosCaja, obras, planesPage, accesosRes, garantias,
     entregas, avisosCobro, bitacoraRegistros, evaluacionesProv, reclamos,
     fondoReserva, permisosObra, tarifas, incidentes, checklistAreas,
-    progLimpieza, ejecLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
+    consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
     plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal, excepcionesTurno,
     cargosPersonal, tiposTurno,

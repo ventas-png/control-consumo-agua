@@ -23,6 +23,9 @@ import { resolve, join } from 'node:path'
 //   3. Que las RPC no las invoque anon y los helpers internos no se expongan.
 //   4. Que la pantalla ya no ofrezca «Generar tareas» por jornada.
 //   5. Que el job que corre el sandbox siga registrado.
+//   6. Que el panel no vuelva a bajar el motor viejo (programacion_limpieza /
+//      ejecuciones_limpieza): ninguna pantalla lo lee desde el calendario, y
+//      cargarlo en cada entrada a Condominios era tráfico para nadie.
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
 const MIG = '20261103000000_limpieza_calendario_rutinas.sql'
@@ -127,5 +130,23 @@ describe('20261103000000 · la pantalla', () => {
   it('coverage.yml corre supabase/tests/limpieza_calendario/run.sh', () => {
     const ci = readFileSync(resolve('.github/workflows/coverage.yml'), 'utf8')
     expect(ci).toMatch(/run: supabase\/tests\/limpieza_calendario\/run\.sh/)
+  })
+})
+
+describe('20261103000000 · el panel ya no carga el motor viejo', () => {
+  // Las tablas quedan como historia (no se borran ni se dejan de auditar);
+  // lo que se retira es la carga en cada entrada al panel.
+  const sinComentarios = (f: string) => readFileSync(resolve(f), 'utf8').replace(/^\s*(\/\/|\*).*$/gm, '')
+
+  it('el cargador de Condominios no consulta programacion_limpieza ni ejecuciones_limpieza', () => {
+    const loader = sinComentarios('src/domain/condominios/sectionData.ts')
+    expect(loader).not.toMatch(/from\('programacion_limpieza'\)/)
+    expect(loader).not.toMatch(/from\('ejecuciones_limpieza'\)/)
+  })
+
+  it('ni el panel ni el contexto de los tabs las llevan', () => {
+    for (const f of ['src/components/condominios/CondominiosSection.tsx', 'src/components/condominios/tabRegistry.tsx']) {
+      expect(sinComentarios(f), f).not.toMatch(/\b(progLimpieza|ejecLimpieza|fetchCondominiosLimpiezaData)\b/)
+    }
   })
 })

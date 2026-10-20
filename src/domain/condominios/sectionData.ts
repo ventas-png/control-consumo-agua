@@ -161,7 +161,6 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     db.from('incidentes_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
     // Sin tipar: la UI castea `items` (Json) a ChecklistItem[].
     supabase.from('checklist_areas').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
-    db.from('programacion_limpieza').select('*').eq('project_id', pid).eq('company_id', cid).order('area'),
     db.from('consumo_energia_areas').select('*').eq('project_id', pid).eq('company_id', cid).order('periodo', { ascending: false }).order('area'),
     db.from('historial_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_desde', { ascending: false }),
     db.from('estacionamiento_visita').select('*').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(500),
@@ -289,22 +288,6 @@ export async function fetchCondominiosTareasData(pid: string, cid: string) {
 }
 
 /**
- * Ejecuciones de limpieza (la ruta diaria de cada empleado) de los últimos
- * `dias`. No se trae el histórico completo: el tab muestra el día seleccionado
- * y un resumen corto de novedades, y una tabla que crece una fila por área y
- * por día no se puede cargar entera para siempre.
- *
- * Va en `db` (tipado): `ejecuciones_limpieza` existe en database.types.ts
- * desde la sincronización del PR de catálogos de limpieza (serie 20260904*).
- */
-export async function fetchCondominiosLimpiezaData(pid: string, cid: string, dias = 45) {
-  const desde = new Date()
-  desde.setDate(desde.getDate() - dias)
-  const desdeISO = desde.toISOString().slice(0, 10)
-  return db.from('ejecuciones_limpieza').select('*').eq('project_id', pid).eq('company_id', cid).gte('fecha', desdeISO).order('fecha', { ascending: false }).order('orden').limit(2000)
-}
-
-/**
  * Control de asignación de turnos (20260820000000 / 000100): jornadas, reglas
  * recurrentes, calendario de días no laborables y ausencias del personal.
  *
@@ -312,8 +295,7 @@ export async function fetchCondominiosLimpiezaData(pid: string, cid: string, dia
  * el destructuring de ese batch es POSICIONAL —meter cuatro entradas en medio
  * desplazaría ~130 variables sin que TS lo note— y estas tablas son nuevas, así
  * que si un entorno todavía no tiene la migración aplicada el error se queda
- * aquí (listas vacías) en vez de tumbar la carga del panel entero. Mismo
- * criterio que `fetchCondominiosLimpiezaData`.
+ * aquí (listas vacías) en vez de tumbar la carga del panel entero.
  *
  * Va en `supabase` (sin tipar) y no en `db`: las cuatro tablas las crean las
  * migraciones 20260820000000/000100 y no existen en database.types.ts hasta la
