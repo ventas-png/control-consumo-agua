@@ -423,8 +423,12 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
 
               {/* Desglose por proyecto cuando se ven todos */}
               {!selectedProjectId && data.proyectos.length > 1 && Object.keys(perProjectStats).length > 0 && (
-                <div className="table-scroll-wrapper" style={{ marginTop: '20px' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                  {/* Seis columnas no caben en 375px: en el teléfono cada
+                      proyecto es una tarjeta (etiquetas desde data-label). El
+                      contenedor no usa .table-scroll-wrapper porque su degradado
+                      lateral (≤640px) tapaba el borde derecho de las tarjetas. */}
+                  <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
                       <tr style={{ background: 'var(--at-surface-2)' }}>
                         <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)', borderBottom: '2px solid var(--at-line)' }}>Proyecto</th>
@@ -447,15 +451,15 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                             onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-primary-tint)'}
                             onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)'}
                           >
-                            <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)' }}>
+                            <td data-label="Proyecto" style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)' }}>
                               {hasCritica && <span style={{ marginRight: 6, color: 'var(--at-danger)' }}>●</span>}
                               {p.nombre}
                             </td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.sinAsignar > 0 ? 700 : 400, color: s.sinAsignar > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{s.sinAsignar}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cerradasHoy > 0 ? 700 : 400, color: s.cerradasHoy > 0 ? 'var(--at-success-strong)' : 'var(--at-ink-3)' }}>{s.cerradasHoy}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.criticas > 0 ? 700 : 400, color: s.criticas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{s.criticas}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.urgentes > 0 ? 700 : 400, color: s.urgentes > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{s.urgentes}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.enProceso > 0 ? 700 : 400, color: s.enProceso > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{s.enProceso}</td>
+                            <td data-label="Sin asignar" style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.sinAsignar > 0 ? 700 : 400, color: s.sinAsignar > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{s.sinAsignar}</td>
+                            <td data-label="Cerradas hoy" style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cerradasHoy > 0 ? 700 : 400, color: s.cerradasHoy > 0 ? 'var(--at-success-strong)' : 'var(--at-ink-3)' }}>{s.cerradasHoy}</td>
+                            <td data-label="Críticas" style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.criticas > 0 ? 700 : 400, color: s.criticas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{s.criticas}</td>
+                            <td data-label="Urgentes" style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.urgentes > 0 ? 700 : 400, color: s.urgentes > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{s.urgentes}</td>
+                            <td data-label="En proceso" style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.enProceso > 0 ? 700 : 400, color: s.enProceso > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{s.enProceso}</td>
                           </tr>
                         )
                       })}

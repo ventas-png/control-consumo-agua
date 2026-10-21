@@ -6,6 +6,8 @@ import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
 import { DataTable, type DataTableColumn, Icon, PhotoLightbox } from '../shared'
 import { UsuarioChip } from '../shared/UsuarioChip'
+import { EditModal } from '../shared/EditModal'
+import { Button } from '../shared/Button'
 import { formatDate, formatCurrency, formatNumber } from '../../lib/format'
 import {
   registroCoincide,
@@ -13,7 +15,6 @@ import {
   unidadesDelProyecto,
   type HistorialFiltros,
 } from '../../lib/historialFiltros'
-import { ModalPortal } from '../shared/ModalPortal'
 import { tint } from '../shared/statusTone'
 
 interface Props {
@@ -35,6 +36,10 @@ const ESTADO_PILL: Record<string, { bg: string; color: string; icon: string }> =
   pendiente: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', icon: '⏳' },
   pagado:    { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)', icon: '✓' },
   mora:      { bg: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', icon: '⚠️' },
+}
+
+function pillDeEstado(estado: string) {
+  return ESTADO_PILL[estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '' }
 }
 
 const TIPO_AGUA_LABELS: Record<string, string> = {
@@ -73,17 +78,11 @@ export function HistorialSection({
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [currentPage, setCurrentPage] = useState(1)
-  // IDs de lecturas con el detalle desplegado (tabla y cards comparten el set).
-  const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
+  // Lectura abierta en la ventana de detalle. Por id y no la fila: tras cambiar
+  // el estado, `registros` llega actualizado y la ventana muestra el dato nuevo;
+  // si la lectura se elimina, la ventana se cierra sola.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
   const itemsPerPage = 20
-
-  function toggleDetalle(id: string) {
-    setExpandidas(prev => {
-      const s = new Set(prev)
-      s.has(id) ? s.delete(id) : s.add(id)
-      return s
-    })
-  }
 
   const canEdit = canEditProp && canChangeStatusProp && userRole !== 'viewer'
   // Eliminar lecturas se controla con el permiso de eliminar (no el de editar).
@@ -182,6 +181,13 @@ export function HistorialSection({
     setSavingEstado(false)
   }
 
+  // Mientras se guarda no se cierra: si falla, el error aparece con la ventana
+  // todavía abierta y no queda la duda de si el cambio entró.
+  function cerrarEditModal() {
+    if (savingEstado) return
+    setEditModal(null)
+  }
+
   const eliminarRegistro = useCallback(async (registro: Registro) => {
     const result = await confirm({
       icon: 'warning',
@@ -200,6 +206,8 @@ export function HistorialSection({
       notify({ variant: 'warning', title: 'Sin permisos', text: 'No tienes permisos para eliminar esta lectura.' })
       return
     }
+    // Si se eliminó desde su ventana de detalle, la ventana ya no tiene qué mostrar.
+    setDetalleId(prev => (prev === registro.id ? null : prev))
     onRegistroDeleted?.(registro.id)
     notify({ variant: 'success', title: 'Lectura eliminada', duration: 1500 })
   }, [onRegistroDeleted])
@@ -212,34 +220,34 @@ export function HistorialSection({
   }
 
   // ── Tabla via DataTable ─────────────────────────────────────────────────
+  // En el teléfono (≤480px) cada fila es una tarjeta con fecha, cliente,
+  // consumo, total y estado; el resto (`hideOnMobile`) vive en la ventana de
+  // detalle, incluidas las acciones.
   const columns: DataTableColumn<Registro>[] = useMemo(() => [
-    {
-      key: 'expand', header: '', width: 44,
-      render: r => {
-        const abierto = expandidas.has(r.id)
-        return (
-          <button
-            onClick={() => toggleDetalle(r.id)}
-            aria-label={abierto ? 'Ocultar detalles de la lectura' : 'Ver detalles de la lectura'}
-            aria-expanded={abierto}
-            title={abierto ? 'Ocultar detalles' : 'Ver detalles'}
-            style={expandBtnStyle(abierto)}
-          >{abierto ? '▲' : '▼'}</button>
-        )
-      },
-    },
     {
       key: 'fecha', header: 'Fecha', sortable: true,
       accessor: r => r.fecha,
       render: r => `📅 ${formatDate(r.fecha)}`,
     },
     {
+      // El nombre es el botón que abre el detalle: el clic en la fila
+      // (onRowClick) no se alcanza con el teclado ni lo anuncia un lector.
       key: 'cliente', header: 'Cliente', sortable: true,
       accessor: r => r.cliente_nombre ?? '',
-      render: r => r.cliente_nombre ?? '—',
+      render: r => (
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); setDetalleId(r.id) }}
+          aria-label={`Ver detalles de la lectura de ${r.cliente_nombre ?? 'cliente sin nombre'} del ${formatDate(r.fecha)}`}
+          style={rowMainBtnStyle}
+        >
+          {r.cliente_nombre ?? '—'}
+          <span aria-hidden="true" style={{ color: 'var(--at-ink-3)', marginLeft: 6 }}>›</span>
+        </button>
+      ),
     },
     {
-      key: 'contador', header: '# Contador', sortable: true,
+      key: 'contador', header: '# Contador', sortable: true, hideOnMobile: true,
       accessor: r => numeroContadorDeRegistro(r, contadoresById) ?? '',
       render: r => {
         const numero = numeroContadorDeRegistro(r, contadoresById)
@@ -249,12 +257,12 @@ export function HistorialSection({
       },
     },
     {
-      key: 'lectAnt', header: 'Lect. Ant.', numeric: true,
+      key: 'lectAnt', header: 'Lect. Ant.', numeric: true, hideOnMobile: true,
       accessor: r => r.lectura_anterior,
       render: r => <span style={{ color: 'var(--at-ink-3)' }}>{r.lectura_anterior}</span>,
     },
     {
-      key: 'lectAct', header: 'Lect. Act.', numeric: true,
+      key: 'lectAct', header: 'Lect. Act.', numeric: true, hideOnMobile: true,
       accessor: r => r.lectura_actual,
       render: r => <span style={{ color: 'var(--at-primary)', fontWeight: 600 }}>{r.lectura_actual}</span>,
     },
@@ -266,13 +274,13 @@ export function HistorialSection({
     {
       key: 'total', header: `Total (${moneda})`, sortable: true, numeric: true,
       accessor: r => getTotal(r),
-      render: r => <span style={{ fontWeight: 700, color: 'var(--at-primary)' }}>{formatCurrency(getTotal(r), moneda)}</span>,
+      render: r => <span style={{ fontWeight: 700, color: 'var(--at-primary)', whiteSpace: 'nowrap' }}>{formatCurrency(getTotal(r), moneda)}</span>,
     },
     {
       key: 'estado', header: 'Estado', sortable: true,
       accessor: r => r.estado,
       render: r => {
-        const p = ESTADO_PILL[r.estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '' }
+        const p = pillDeEstado(r.estado)
         return (
           <span style={pillStyle(p)}>
             {p.icon} {r.estado}
@@ -289,9 +297,10 @@ export function HistorialSection({
       render: r => <UsuarioChip userId={r.creado_por} historico />,
     },
     {
-      key: 'acciones', header: 'Acciones',
+      key: 'acciones', header: 'Acciones', hideOnMobile: true,
       render: r => (
-        <div style={{ display: 'flex', gap: 5 }}>
+        // La fila entera abre el detalle; estos botones hacen otra cosa.
+        <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
           {canEdit && (
             <button
               onClick={() => setEditModal({ registroId: r.id, estado: r.estado === 'mora' ? 'mora' : 'pendiente' })}
@@ -320,26 +329,35 @@ export function HistorialSection({
         </div>
       ),
     },
-  ], [moneda, canEdit, canDelete, onRegistroDeleted, contadoresById, expandidas, enviarWhatsApp, eliminarRegistro])
+  ], [moneda, canEdit, canDelete, onRegistroDeleted, contadoresById, enviarWhatsApp, eliminarRegistro])
+
+  const detalle = detalleId ? registros.find(r => r.id === detalleId) ?? null : null
+  const registroEnEdicion = editModal ? registros.find(r => r.id === editModal.registroId) ?? null : null
 
   return (
-    <div style={{ background: 'var(--at-surface)', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 12, borderBottom: '2px solid var(--at-line)' }}>
-        <span style={{ fontSize: 20, fontWeight: 700 }}>📊 Historial de Lecturas</span>
-        <div style={{ display: 'flex', gap: 10 }}>
+    // Padding y radio menores en el teléfono: con 32px fijos la tabla y los
+    // KPIs perdían 64px de un ancho de ~350.
+    <div style={{ background: 'var(--at-surface)', borderRadius: 'clamp(16px, 4vw, 24px)', padding: 'clamp(16px, 4vw, 32px)', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+      {/* Header: en el teléfono el título va en su propia línea y los botones
+          en una fila que puede partirse (antes el título ocupaba tres líneas y
+          el botón PDF quedaba cortado). */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 20, paddingBottom: 12, borderBottom: '2px solid var(--at-line)' }}>
+        <span style={{ fontSize: 20, fontWeight: 700, flex: '1 1 240px', minWidth: 0 }}>📊 Historial de Lecturas</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <button
             onClick={() => setShowFilters(s => !s)}
+            aria-expanded={showFilters}
             style={{
               padding: '10px 16px',
               background: showFilters ? 'var(--at-primary)' : 'var(--at-chip)',
               color: showFilters ? 'white' : 'var(--at-ink-2)',
               border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14,
+              whiteSpace: 'nowrap',
             }}
           >⚙️ Filtros</button>
           <div style={{ display: 'flex', gap: 5, border: '1px solid var(--at-line)', borderRadius: 8, padding: 4 }}>
-            <button onClick={() => setViewMode('table')} style={viewBtnStyle(viewMode === 'table')}>📋</button>
-            <button onClick={() => setViewMode('cards')} style={viewBtnStyle(viewMode === 'cards')}>🎴</button>
+            <button onClick={() => setViewMode('table')} aria-label="Vista de tabla" aria-pressed={viewMode === 'table'} title="Vista de tabla" style={viewBtnStyle(viewMode === 'table')}>📋</button>
+            <button onClick={() => setViewMode('cards')} aria-label="Vista de tarjetas" aria-pressed={viewMode === 'cards'} title="Vista de tarjetas" style={viewBtnStyle(viewMode === 'cards')}>🎴</button>
           </div>
           <button
             onClick={async () => {
@@ -347,13 +365,15 @@ export function HistorialSection({
               const numeroContadorById = new Map(contadores.map(c => [c.id, c.numero_serie]))
               exportarPDFGlobal(filtrados, numeroContadorById)
             }}
-            style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
+            style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}
           >📄 PDF</button>
         </div>
       </div>
 
-      {/* Stats — derivados del filtered set */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      {/* Stats — derivados del filtered set. Tres por fila en escritorio
+          (totales arriba, por estado abajo) y dos en el teléfono: uno por fila
+          eran seis tarjetas altas antes de la primera lectura. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(max(120px, 30%), 1fr))', gap: 'clamp(8px, 2vw, 12px)', marginBottom: 20 }}>
         <StatCard label="Total Registros" value={String(stats.totalRegistros)} color="var(--at-primary)" icon={<Icon name="inbox" size={14} />} moneda={moneda} />
         <StatCard label="Total Consumo" value={`${formatNumber(stats.totalConsumo)} m³`} color="var(--at-accent-2)" icon={<Icon name="droplet" size={14} />} moneda={moneda} />
         <StatCard label="Total Monto" value={stats.totalMonto} color="var(--at-accent)" icon={<Icon name="coins" size={14} />} moneda={moneda} />
@@ -422,33 +442,30 @@ export function HistorialSection({
             columns={columns}
             rowKey="id"
             pageSize={0}  // paginación la hacemos en el padre para que cards también use la misma
+            mobileCardLayout
+            onRowClick={r => setDetalleId(r.id)}
             emptyState={{ icon: '📭', title: 'Sin registros' }}
-            isRowExpanded={r => expandidas.has(r.id)}
-            expandedContent={r => (
-              <RegistroDetalle
-                registro={r}
-                moneda={moneda}
-                total={getTotal(r)}
-                numeroContador={numeroContadorDeRegistro(r, contadoresById)}
-              />
-            )}
           />
         </div>
       )}
 
       {/* View Mode: Cards (custom — no es un patrón estándar de DataTable) */}
       {viewMode === 'cards' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16, marginBottom: 20 }}>
+        // min(100%, 320px): con 320px fijos la tarjeta se salía en teléfonos angostos.
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: 16, marginBottom: 20 }}>
           {paginados.map(r => {
             const total = getTotal(r)
-            const p = ESTADO_PILL[r.estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '' }
+            const p = pillDeEstado(r.estado)
             return (
               <div
                 key={r.id}
+                // Como en la tabla: tocar la tarjeta abre su detalle (el botón
+                // "Ver detalles" es el camino de teclado).
+                onClick={() => setDetalleId(r.id)}
                 style={{
                   background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12,
                   padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                  transition: 'all 0.2s', cursor: 'pointer',
+                  transition: 'all 0.2s', cursor: 'pointer', minWidth: 0,
                 }}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)' }}
                 onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)' }}
@@ -469,9 +486,9 @@ export function HistorialSection({
                   <div><span style={{ color: 'var(--at-ink-3)' }}>Consumo</span><div style={{ fontWeight: 600, color: 'var(--at-accent)' }}>💧 {formatNumber(r.consumo)} m³</div></div>
                   <div><span style={{ color: 'var(--at-ink-3)' }}>Total</span><div style={{ fontWeight: 700, color: 'var(--at-primary)' }}>{formatCurrency(total, moneda)}</div></div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   <span style={pillStyle(p)}>{p.icon} {r.estado}</span>
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
                     {canEdit && (
                       <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado === 'mora' ? 'mora' : 'pendiente' })} aria-label="Editar estado" style={{ padding: '6px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                     )}
@@ -482,35 +499,17 @@ export function HistorialSection({
                     )}
                   </div>
                 </div>
-                {/* Toggle de detalles — mismo set que la tabla */}
-                {(() => {
-                  const abierto = expandidas.has(r.id)
-                  return (
-                    <>
-                      <button
-                        onClick={() => toggleDetalle(r.id)}
-                        aria-expanded={abierto}
-                        aria-label={abierto ? 'Ocultar detalles de la lectura' : 'Ver detalles de la lectura'}
-                        style={{
-                          marginTop: 12, width: '100%', padding: '8px',
-                          background: abierto ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
-                          color: 'var(--at-ink-2)', border: '1px solid var(--at-line)',
-                          borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                        }}
-                      >{abierto ? '▲ Ocultar detalles' : '▼ Ver detalles'}</button>
-                      {abierto && (
-                        <div style={{ marginTop: 10 }}>
-                          <RegistroDetalle
-                            registro={r}
-                            moneda={moneda}
-                            total={total}
-                            numeroContador={numeroContadorDeRegistro(r, contadoresById)}
-                          />
-                        </div>
-                      )}
-                    </>
-                  )
-                })()}
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); setDetalleId(r.id) }}
+                  aria-label={`Ver detalles de la lectura de ${r.cliente_nombre ?? 'cliente sin nombre'} del ${formatDate(r.fecha)}`}
+                  style={{
+                    marginTop: 12, width: '100%', padding: '8px',
+                    background: 'var(--at-surface-2)',
+                    color: 'var(--at-ink-2)', border: '1px solid var(--at-line)',
+                    borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  }}
+                >Ver detalles ›</button>
               </div>
             )
           })}
@@ -531,66 +530,95 @@ export function HistorialSection({
         />
       )}
 
-      {/* Edit Status Modal */}
+      {/* Detalle de la lectura en ventana (antes se desplegaba dentro de la
+          fila y en el teléfono se salía por la derecha). */}
+      {detalle && (() => {
+        const numero = numeroContadorDeRegistro(detalle, contadoresById)
+        const p = pillDeEstado(detalle.estado)
+        return (
+          <EditModal
+            title={`${detalle.cliente_nombre ?? 'Lectura'} — ${formatDate(detalle.fecha)}`}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span>🔢 {numero ? `Contador ${numero}` : 'Sin contador'}</span>
+                <span style={{ ...pillStyle(p), padding: '2px 10px' }}>{p.icon} {detalle.estado}</span>
+              </span>
+            }
+            maxWidth="720px"
+            fullScreenOnMobile
+            // La foto se abre encima y cierra con Escape escuchando en `window`;
+            // esta ventana escucha en `document`, que va antes, y se cerraba
+            // junto con la foto.
+            closeOnEscape={!photoModal}
+            onClose={() => setDetalleId(null)}
+            // Las mismas acciones y permisos que la fila: en el teléfono la
+            // columna de acciones se oculta y este es su único sitio.
+            // Envueltas para que bajen de línea en pantallas angostas.
+            footer={
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, width: '100%' }}>
+                {canDelete && onRegistroDeleted && (
+                  <Button variant="outline-danger" onClick={() => eliminarRegistro(detalle)} aria-label="Eliminar lectura" style={{ marginRight: 'auto' }}>🗑️</Button>
+                )}
+                <Button variant="secondary" onClick={() => setPhotoModal({ registroId: detalle.id, label: fotoLabel(detalle) })} aria-label="Ver imagen de la lectura">🖼️ Imagen</Button>
+                <Button variant="secondary" onClick={() => enviarWhatsApp(detalle)} aria-label="Enviar por WhatsApp">💬 WhatsApp</Button>
+                {canEdit && (
+                  <Button
+                    variant="warning"
+                    onClick={() => setEditModal({ registroId: detalle.id, estado: detalle.estado === 'mora' ? 'mora' : 'pendiente' })}
+                    aria-label="Editar estado"
+                  >✏️ Editar estado</Button>
+                )}
+              </div>
+            }
+          >
+            <RegistroDetalle
+              registro={detalle}
+              moneda={moneda}
+              total={getTotal(detalle)}
+              numeroContador={numero}
+            />
+          </EditModal>
+        )
+      })()}
+
+      {/* Cambio de estado. Abierto desde el detalle queda encima de él:
+          EditModal apila las ventanas y Escape cierra solo la de arriba. */}
       {editModal && (
-        <ModalPortal>
-        <div
-          style={{
-            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-            background: 'rgba(0,0,0,0.5)', zIndex: 1000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={e => e.target === e.currentTarget && setEditModal(null)}
+        <EditModal
+          title="📝 Modificar Estado de Pago"
+          subtitle={registroEnEdicion ? `${registroEnEdicion.cliente_nombre ?? 'Lectura'} · ${formatDate(registroEnEdicion.fecha)}` : undefined}
+          maxWidth="480px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!savingEstado}
+          closeOnEscape={!savingEstado}
+          onClose={cerrarEditModal}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarEditModal} disabled={savingEstado}>Cancelar</Button>
+            <Button onClick={updateEstado} loading={savingEstado} loadingText="Guardando…">Guardar</Button>
+          </>}
         >
-          <div style={{ background: 'var(--at-surface)', padding: 32, borderRadius: 16, width: '90%', maxWidth: 480 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ margin: 0 }}>📝 Modificar Estado de Pago</h3>
-              <button onClick={() => setEditModal(null)} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer' }}>×</button>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>Nuevo Estado</label>
-              <select
-                value={editModal.estado}
-                onChange={e => setEditModal(prev => prev ? { ...prev, estado: e.target.value as EstadoSeguimiento } : null)}
-                style={{ width: '100%', padding: 12, border: '2px solid var(--at-line)', borderRadius: 10, fontSize: 15 }}
-              >
-                <option value="pendiente">⏳ Pendiente</option>
-                <option value="mora">⚠️ Mora</option>
-              </select>
-              {/* "Pagado" ya NO está aquí: marcar cobrado un recibo sin monto,
-                  sin fecha y sin rastro es el hallazgo `pagada_sin_pago` del
-                  reporte de inconsistencias, y era esta pantalla la que lo
-                  producía. Se cobra registrando el pago, que exige el monto. */}
-              <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--at-muted)' }}>
-                Para marcar un recibo como pagado, registrá el pago desde Cobros: el
-                abono queda con su monto y su fecha.
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button
-                onClick={updateEstado}
-                disabled={savingEstado}
-                style={{
-                  flex: 1, padding: 12,
-                  background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
-                  color: 'white', border: 'none', borderRadius: 10, fontWeight: 600,
-                  cursor: savingEstado ? 'not-allowed' : 'pointer',
-                  opacity: savingEstado ? 0.6 : 1,
-                }}
-              >
-                {savingEstado ? '⏳ Guardando...' : '✓ Actualizar'}
-              </button>
-              <button
-                onClick={() => setEditModal(null)}
-                style={{ flex: 1, padding: 12, background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer' }}
-              >
-                ✕ Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-        </ModalPortal>
+          <label htmlFor="historial-nuevo-estado" style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>Nuevo Estado</label>
+          <select
+            id="historial-nuevo-estado"
+            value={editModal.estado}
+            onChange={e => setEditModal(prev => prev ? { ...prev, estado: e.target.value as EstadoSeguimiento } : null)}
+            style={{
+              width: '100%', padding: 12, border: '2px solid var(--at-line)', borderRadius: 10, fontSize: 15,
+              boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--at-surface)', color: 'var(--at-ink)',
+            }}
+          >
+            <option value="pendiente">⏳ Pendiente</option>
+            <option value="mora">⚠️ Mora</option>
+          </select>
+          {/* "Pagado" ya NO está aquí: marcar cobrado un recibo sin monto,
+              sin fecha y sin rastro es el hallazgo `pagada_sin_pago` del
+              reporte de inconsistencias, y era esta pantalla la que lo
+              producía. Se cobra registrando el pago, que exige el monto. */}
+          <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--at-muted)' }}>
+            Para marcar un recibo como pagado, registrá el pago desde Cobros: el
+            abono queda con su monto y su fecha.
+          </p>
+        </EditModal>
       )}
 
       {/* Lightbox de la foto de la lectura — baja la imagen bajo demanda por id */}
@@ -612,8 +640,8 @@ function fotoLabel(r: Registro): string {
 
 // ── Sub-componentes locales ───────────────────────────────────────────────
 
-// Panel de detalle de una lectura — muestra todos los campos que no caben en
-// la fila/card (período de servicio, desglose de tarifa, pago, notas, GPS…).
+// Contenido de la ventana de detalle — todos los campos que no caben en la
+// fila/card (período de servicio, desglose de tarifa, pago, notas, GPS…).
 // `foto` no se incluye: el listado nunca la trae (es base64 pesado; ver
 // REGISTROS_LIST_COLS en domain/agua/queries.ts).
 function RegistroDetalle({ registro: r, moneda, total, numeroContador }: {
@@ -625,15 +653,11 @@ function RegistroDetalle({ registro: r, moneda, total, numeroContador }: {
   const gps = r.gps
 
   return (
-    <div style={{
-      background: 'var(--at-surface)', border: '1px solid var(--at-line)',
-      borderRadius: 10, padding: 16, marginTop: 4,
-      display: 'flex', flexDirection: 'column', gap: 14,
-    }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14,
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10,
       }}>
-        <DetailField label="Período de servicio" value={periodo} />
+        <DetailField label="Período de servicio" value={periodo} wide />
         {r.dias_servicio != null && <DetailField label="Días de servicio" value={`${formatNumber(r.dias_servicio, 0)} días`} />}
         {r.mes && <DetailField label="Mes facturado" value={r.mes} />}
         {numeroContador && <DetailField label="# Contador" value={numeroContador} />}
@@ -650,12 +674,14 @@ function RegistroDetalle({ registro: r, moneda, total, numeroContador }: {
 
         {r.monto_pagado != null && <DetailField label="Monto pagado" value={formatCurrency(r.monto_pagado, moneda)} accent="var(--at-success-strong)" />}
         {r.fecha_pago && <DetailField label="Fecha de pago" value={formatDate(r.fecha_pago)} />}
+        {/* La columna "Capturó" se oculta en el teléfono: aquí sigue a mano. */}
+        <DetailField label="Capturó" value={<UsuarioChip userId={r.creado_por} historico />} />
       </div>
 
       {r.notas && (
         <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px' }}>
           <div style={detailLabelStyle}>📝 Notas</div>
-          <div style={{ fontSize: 13.5, color: 'var(--at-ink)', whiteSpace: 'pre-wrap' }}>{r.notas}</div>
+          <div style={{ fontSize: 13.5, color: 'var(--at-ink)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{r.notas}</div>
         </div>
       )}
 
@@ -673,16 +699,22 @@ function RegistroDetalle({ registro: r, moneda, total, numeroContador }: {
         </a>
       )}
 
-      <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>ID de lectura: {r.id}</div>
+      <div style={{ fontSize: 11, color: 'var(--at-ink-3)', overflowWrap: 'anywhere' }}>ID de lectura: {r.id}</div>
     </div>
   )
 }
 
-function DetailField({ label, value, accent }: {
-  label: string; value: ReactNode; accent?: string
+function DetailField({ label, value, accent, wide = false }: {
+  label: string; value: ReactNode; accent?: string; wide?: boolean
 }) {
   return (
-    <div style={{ minWidth: 0 }}>
+    <div style={{
+      minWidth: 0, background: 'var(--at-surface-2)', border: '1px solid var(--at-line)',
+      borderRadius: 8, padding: '8px 10px',
+      // `1 / -1` y no `span 2`: con una sola columna el span crea una columna
+      // implícita y el campo se sale de la ventana.
+      gridColumn: wide ? '1 / -1' : undefined,
+    }}>
       <div style={detailLabelStyle}>{label}</div>
       <div style={{ fontSize: 13.5, fontWeight: 600, color: accent ?? 'var(--at-ink)', wordBreak: 'break-word' }}>{value}</div>
     </div>
@@ -694,15 +726,21 @@ function StatCard({ label, value, color, icon, moneda }: {
 }) {
   return (
     <div style={{
-      flex: 1, minWidth: 200, padding: 16,
+      minWidth: 0, padding: 'clamp(10px, 2.5vw, 16px)',
+      // Contenedor de consulta: el valor se mide con `cqi` (ancho de la propia
+      // tarjeta) para que un monto de seis cifras quepa con dos por fila.
+      containerType: 'inline-size',
       background: `linear-gradient(135deg, ${tint(color, 12)} 0%, ${tint(color, 6)} 100%)`,
+      // `border` antes que `borderLeft`: en el orden inverso el atajo pisaba
+      // el filete de color y nunca se veía.
+      border: `1px solid ${tint(color, 25)}`,
       borderLeft: `4px solid ${color}`,
-      borderRadius: 12, border: `1px solid ${tint(color, 25)}`,
+      borderRadius: 12,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--at-ink-3)', fontWeight: 600, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--at-ink-3)', fontWeight: 600, marginBottom: 'clamp(4px, 1.5vw, 8px)' }}>
         {icon} {label}
       </div>
-      <div style={{ fontSize: 24, fontWeight: 700, color }}>
+      <div style={{ fontSize: 'clamp(15px, 12cqi, 24px)', fontWeight: 700, color, lineHeight: 1.2, overflowWrap: 'anywhere' }}>
         {typeof value === 'number' ? formatCurrency(value, moneda) : value}
       </div>
     </div>
@@ -754,17 +792,19 @@ function Pagination({ currentPage, totalPages, onChange }: {
 // ── Styles compartidos ────────────────────────────────────────────────────
 
 function pillStyle(p: { bg: string; color: string }): CSSProperties {
-  return { padding: '6px 14px', borderRadius: 12, fontSize: 12, fontWeight: 600, ...p }
+  // nowrap: en columnas angostas el icono y el estado se partían en dos líneas.
+  return { padding: '6px 14px', borderRadius: 12, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', ...p }
 }
 
-function expandBtnStyle(abierto: boolean): CSSProperties {
-  return {
-    width: 30, height: 30, padding: 0, lineHeight: 1,
-    background: abierto ? 'var(--at-primary)' : 'var(--at-surface-2)',
-    color: abierto ? 'white' : 'var(--at-ink-2)',
-    border: '1px solid', borderColor: abierto ? 'var(--at-primary)' : 'var(--at-line)',
-    borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600,
-  }
+// Botón del nombre del cliente: se ve como texto enlazado y hereda la
+// alineación de la celda (a la derecha en la tarjeta del teléfono).
+const rowMainBtnStyle: CSSProperties = {
+  background: 'none', border: 'none', padding: 0, margin: 0,
+  fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit',
+  color: 'var(--at-primary)', fontWeight: 600, textAlign: 'inherit',
+  // `break-word` y no `anywhere`: este último encoge el ancho mínimo de la
+  // columna y en la tabla de escritorio partía los nombres a media palabra.
+  cursor: 'pointer', overflowWrap: 'break-word',
 }
 
 const detailLabelStyle: CSSProperties = {

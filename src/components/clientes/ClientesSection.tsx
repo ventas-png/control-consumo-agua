@@ -480,7 +480,9 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
         header: 'Acciones',
         align: 'center',
         render: c => (
-          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+          // flexWrap: en la tarjeta del teléfono los botones bajan de línea
+          // en vez de empujar la celda fuera de la pantalla.
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
             {canEdit && (
               <button
                 onClick={() => startEdit(c)}
@@ -588,12 +590,14 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
       {/* All client forms inside a single modal */}
       {isModalOpen && canEdit && <ClienteFormModal ctx={ctx} />}
 
-      {/* Table */}
+      {/* Table — en el teléfono cada cliente es una tarjeta (la tabla de 6+
+          columnas se cortaba a la derecha, con los badges de Cuenta fuera). */}
       <DataTable<Cliente>
         data={filtered}
         columns={columns}
         rowKey="id"
         pageSize={50}
+        mobileCardLayout
         defaultSort={{ key: 'cliente', direction: 'asc' }}
         emptyState={{
           icon: '👤',

@@ -272,6 +272,8 @@ export function TarifasSection({
     border: '2px solid var(--at-line)',
     borderRadius: '8px',
     fontSize: '14px',
+    // Los controles no heredan la fuente de la app (el textarea salía monoespaciado).
+    fontFamily: 'inherit',
     width: '100%',
     boxSizing: 'border-box',
     outline: 'none',
@@ -286,14 +288,16 @@ export function TarifasSection({
 
   return (
     <div>
-      {/* Sub-tabs: tarifas vs. configuración de facturación (IVA / mora). */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--at-line)', marginBottom: '24px' }}>
+      {/* Sub-tabs: tarifas vs. configuración de facturación (IVA / mora).
+          En el teléfono el relleno se encoge y, si aun así no caben, la tira
+          se desliza de lado en vez de cortar la segunda pestaña. */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--at-line)', marginBottom: '24px', overflowX: 'auto' }}>
         {([['tarifas', '💧 Tarifas'], ['facturacion', '🧾 Facturación (IVA / Mora)']] as const).map(([id, label]) => (
           <button
             key={id}
             onClick={() => setView(id)}
             style={{
-              padding: '10px 20px', fontSize: '14px', fontWeight: view === id ? 700 : 500,
+              padding: '10px clamp(12px, 3.5vw, 20px)', fontSize: '14px', fontWeight: view === id ? 700 : 500,
               color: view === id ? 'var(--at-primary)' : 'var(--at-ink-3)',
               background: 'transparent', border: 'none',
               borderBottom: view === id ? '3px solid var(--at-primary)' : '3px solid transparent',
@@ -348,11 +352,19 @@ export function TarifasSection({
 
       {/* Form Modal */}
       {isModalOpen && canEdit && (
-        <EditModal title={editingId ? 'Editar Tarifa' : 'Nueva Tarifa'} onClose={cancelForm}>
+        <EditModal
+          title={editingId ? 'Editar Tarifa' : 'Nueva Tarifa'}
+          onClose={cancelForm}
+          fullScreenOnMobile
+          // Guardando: ni Escape ni un toque en el fondo la cierran a medias.
+          closeOnBackdropClick={!loading}
+          closeOnEscape={!loading}
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '20px' }}>
             <div>
-              <label style={labelStyle}>Nombre *</label>
+              <label htmlFor="tar-nombre" style={labelStyle}>Nombre *</label>
               <input
+                id="tar-nombre"
                 style={inputStyle}
                 value={form.nombre}
                 onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
@@ -362,8 +374,9 @@ export function TarifasSection({
             </div>
             {!editingId && (
               <div>
-                <label style={labelStyle}>Proyecto *</label>
+                <label htmlFor="tar-proyecto" style={labelStyle}>Proyecto *</label>
                 <select
+                  id="tar-proyecto"
                   style={inputStyle}
                   value={form.project_id}
                   onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}
@@ -376,8 +389,9 @@ export function TarifasSection({
               </div>
             )}
             <div>
-              <label style={labelStyle}>Tipo de Agua *</label>
+              <label htmlFor="tar-tipo-agua" style={labelStyle}>Tipo de Agua *</label>
               <select
+                id="tar-tipo-agua"
                 style={inputStyle}
                 value={form.tipo_agua}
                 onChange={e => setForm(f => ({ ...f, tipo_agua: e.target.value }))}
@@ -388,8 +402,9 @@ export function TarifasSection({
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Precio por m³ *</label>
+              <label htmlFor="tar-precio" style={labelStyle}>Precio por m³ *</label>
               <input
+                id="tar-precio"
                 style={inputStyle}
                 type="number"
                 min="0"
@@ -400,8 +415,9 @@ export function TarifasSection({
               />
             </div>
             <div>
-              <label style={labelStyle}>Precio por m³ exceso</label>
+              <label htmlFor="tar-precio-exceso" style={labelStyle}>Precio por m³ exceso</label>
               <input
+                id="tar-precio-exceso"
                 style={inputStyle}
                 type="number"
                 min="0"
@@ -415,8 +431,9 @@ export function TarifasSection({
               </span>
             </div>
             <div>
-              <label style={labelStyle}>Canon Fijo (mensual)</label>
+              <label htmlFor="tar-canon" style={labelStyle}>Canon Fijo (mensual)</label>
               <input
+                id="tar-canon"
                 style={inputStyle}
                 type="number"
                 min="0"
@@ -427,8 +444,9 @@ export function TarifasSection({
               />
             </div>
             <div>
-              <label style={labelStyle}>Consumo Mínimo (m³)</label>
+              <label htmlFor="tar-consumo-minimo" style={labelStyle}>Consumo Mínimo (m³)</label>
               <input
+                id="tar-consumo-minimo"
                 style={inputStyle}
                 type="number"
                 min="0"
@@ -511,9 +529,10 @@ export function TarifasSection({
               )}
             </div>
             <div style={{ gridColumn: '1 / -1', background: 'var(--at-surface-2)', borderRadius: '8px', padding: '14px 16px', border: '1px solid var(--at-line)' }}>
-              <label style={{ ...labelStyle, color: 'var(--at-ink)' }}>Fecha de Revisión</label>
+              <label htmlFor="tar-fecha-revision" style={{ ...labelStyle, color: 'var(--at-ink)' }}>Fecha de Revisión</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <input
+                  id="tar-fecha-revision"
                   style={{ ...inputStyle, width: 'auto', minWidth: '180px', background: 'var(--at-surface)' }}
                   type="date"
                   value={form.fecha_revision}
@@ -534,8 +553,9 @@ export function TarifasSection({
               </div>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Descripción</label>
+              <label htmlFor="tar-descripcion" style={labelStyle}>Descripción</label>
               <textarea
+                id="tar-descripcion"
                 style={{ ...inputStyle, minHeight: '70px', resize: 'vertical' }}
                 value={form.descripcion}
                 onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
@@ -563,7 +583,7 @@ export function TarifasSection({
               </button>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button
               onClick={handleGuardar}
               disabled={loading}
@@ -613,15 +633,19 @@ export function TarifasSection({
           </div>
         ) : (
           <div className="table-scroll-wrapper">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            {/* En el teléfono cada tarifa es una tarjeta (data-label por celda) y
+                exceso/consumo mínimo se ocultan: las 9 columnas no cabían y los
+                montos quedaban cortados. Acciones (sin data-label) va centrada
+                en su propia línea al pie de la tarjeta. */}
+            <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead>
                 <tr style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)' }}>Nombre</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)' }}>Tipo de Agua</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Precio/m³</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Precio Exceso/m³</th>
+                  <th scope="col" className="table-col-secondary" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Precio Exceso/m³</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Canon Fijo</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Cons. Mínimo</th>
+                  <th scope="col" className="table-col-secondary" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Cons. Mínimo</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-2)' }}>Estado</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-2)' }}>Revisión</th>
                   {(canEdit || canDelete) && (
@@ -635,37 +659,39 @@ export function TarifasSection({
                     key={t.id}
                     style={{ borderBottom: '1px solid var(--at-chip)', background: idx % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)' }}
                   >
-                    <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--at-ink)' }}>
-                      {t.nombre}
-                      {t.descripcion && (
-                        <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 400, marginTop: '2px' }}>
-                          {t.descripcion}
-                        </div>
-                      )}
-                      {(() => {
-                        const tag = getEditedTagInfo(t.updated_at, t.updated_by_name)
-                        if (!tag) return null
-                        return (
-                          <span
-                            title={tag.tooltip}
-                            style={{
-                              display: 'inline-block',
-                              marginTop: '4px',
-                              padding: '2px 8px',
-                              borderRadius: '10px',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              color: tag.color,
-                              background: tag.bg,
-                              cursor: 'default',
-                            }}
-                          >
-                            {tag.label}
-                          </span>
-                        )
-                      })()}
+                    <td data-label="Nombre" style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--at-ink)' }}>
+                      <div>
+                        {t.nombre}
+                        {t.descripcion && (
+                          <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 400, marginTop: '2px' }}>
+                            {t.descripcion}
+                          </div>
+                        )}
+                        {(() => {
+                          const tag = getEditedTagInfo(t.updated_at, t.updated_by_name)
+                          if (!tag) return null
+                          return (
+                            <span
+                              title={tag.tooltip}
+                              style={{
+                                display: 'inline-block',
+                                marginTop: '4px',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                fontSize: '11px',
+                                fontWeight: 500,
+                                color: tag.color,
+                                background: tag.bg,
+                                cursor: 'default',
+                              }}
+                            >
+                              {tag.label}
+                            </span>
+                          )
+                        })()}
+                      </div>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td data-label="Tipo de Agua" style={{ padding: '12px 16px' }}>
                       <span style={{
                         padding: '3px 10px',
                         borderRadius: '12px',
@@ -677,21 +703,21 @@ export function TarifasSection({
                         {tipoLabel(t.tipo_agua)}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--at-ink)' }}>
+                    <td data-label="Precio/m³" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--at-ink)' }}>
                       {moneda} {Number(t.precio_m3).toFixed(4)}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--at-ink-2)' }}>
+                    <td data-label="Precio Exceso/m³" className="table-col-secondary" style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--at-ink-2)' }}>
                       {Number(t.precio_m3_exceso ?? 0) > 0
                         ? `${moneda} ${Number(t.precio_m3_exceso).toFixed(4)}`
                         : '—'}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--at-ink-2)' }}>
+                    <td data-label="Canon Fijo" style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--at-ink-2)' }}>
                       {moneda} {Number(t.canon_fijo).toFixed(2)}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--at-ink-2)' }}>
+                    <td data-label="Cons. Mínimo" className="table-col-secondary" style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--at-ink-2)' }}>
                       {Number(t.consumo_minimo ?? 0).toFixed(4)} m³
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <td data-label="Estado" style={{ padding: '12px 16px', textAlign: 'center' }}>
                       {canEdit ? (
                         <button
                           onClick={() => handleToggleActiva(t)}
@@ -722,7 +748,7 @@ export function TarifasSection({
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <td data-label="Revisión" style={{ padding: '12px 16px', textAlign: 'center' }}>
                       {(() => {
                         const status = getRevisionStatus(t)
                         if (status === 'none') return <span style={{ color: 'var(--at-ink-3)', fontSize: '12px' }}>—</span>
@@ -744,7 +770,7 @@ export function TarifasSection({
                     </td>
                     {(canEdit || canDelete) && (
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
                           {canEdit && (
                             <button
                               onClick={() => startEdit(t)}

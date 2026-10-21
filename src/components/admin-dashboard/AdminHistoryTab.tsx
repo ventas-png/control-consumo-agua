@@ -126,10 +126,13 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
 
   return (
     <div>
-      {/* Filtros — controlados por el padre para poder calcular los stats */}
+      {/* Filtros — controlados por el padre para poder calcular los stats.
+          Flex en vez de `1fr 200px`: con el crecimiento 999:1 el select se
+          queda en ~200px en el escritorio, y en el teléfono cada control baja
+          a su propia línea a todo el ancho en vez de apretar el buscador. */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 200px',
+        display: 'flex',
+        flexWrap: 'wrap',
         gap: '16px',
         marginBottom: '24px',
       }}>
@@ -139,6 +142,8 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
+            flex: '999 1 240px',
+            minWidth: 0,
             padding: '12px 16px',
             borderRadius: '8px',
             border: '2px solid var(--at-line)',
@@ -151,6 +156,8 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
           onChange={(e) => setFilterEstado(e.target.value as FiltroEstado)}
           aria-label="Filtrar por estado"
           style={{
+            flex: '1 1 200px',
+            minWidth: 0,
             padding: '12px 16px',
             borderRadius: '8px',
             border: '2px solid var(--at-line)',
@@ -190,9 +197,11 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
         />
       </div>
 
+      {/* Cinco columnas no caben en 375px: en el teléfono cada lectura es una tarjeta. */}
       <DataTable<RowVm>
         data={filtrados}
         columns={columns}
+        mobileCardLayout
         rowKey={r => r.registro.id}
         defaultSort={{ key: 'fecha', direction: 'desc' }}
         pageSize={50}
@@ -229,7 +238,9 @@ function StatCard({
       border: `1px solid ${border}`,
     }}>
       <div style={{ fontSize: '12px', color: labelColor, marginBottom: '4px' }}>{label}</div>
-      <div style={{ fontSize: '24px', fontWeight: 700, color: valueColor }}>{value}</div>
+      {/* En el teléfono van dos tarjetas por fila (~138px útiles): a 24px un
+          recaudo histórico de siete cifras se salía de la tarjeta. */}
+      <div style={{ fontSize: 'clamp(18px, 5vw, 24px)', fontWeight: 700, color: valueColor }}>{value}</div>
     </div>
   )
 }

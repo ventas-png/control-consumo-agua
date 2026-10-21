@@ -496,7 +496,8 @@ export function UnidadesSection({
         </div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+          {/* min(100%, …): en teléfonos de 320px las tarjetas de 300px fijos se salían. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 16 }}>
             {paginated.map(u => (
               <UnidadCard
                 key={u.id}

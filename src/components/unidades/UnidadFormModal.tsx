@@ -9,7 +9,15 @@ import { EditModal } from '../shared/EditModal'
 export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
   const { contadores, clientes, proyectos, form, setForm, selectedContadorIds, setSelectedContadorIds, editingId, loading, cancelForm, handleGuardar } = ctx
   return (
-        <EditModal title={editingId ? 'Editar Unidad' : 'Nueva Unidad'} onClose={cancelForm} maxWidth="820px">
+        <EditModal
+          title={editingId ? 'Editar Unidad' : 'Nueva Unidad'}
+          onClose={cancelForm}
+          maxWidth="820px"
+          fullScreenOnMobile
+          // Guardando: ni Escape ni un toque en el fondo la cierran a medias.
+          closeOnBackdropClick={!loading}
+          closeOnEscape={!loading}
+        >
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
               Datos de la Unidad
@@ -17,8 +25,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               {proyectos.length > 1 && (
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Proyecto *</label>
+                  <label htmlFor="uni-proyecto" style={labelStyle}>Proyecto *</label>
                   <select
+                    id="uni-proyecto"
                     style={inputStyle}
                     value={form.project_id}
                     onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}
@@ -31,8 +40,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 </div>
               )}
               <div>
-                <label style={labelStyle}>Nombre / Número *</label>
+                <label htmlFor="uni-nombre" style={labelStyle}>Nombre / Número *</label>
                 <input
+                  id="uni-nombre"
                   style={inputStyle}
                   value={form.nombre}
                   onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
@@ -41,8 +51,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 />
               </div>
               <div>
-                <label style={labelStyle}>Tipo de Unidad *</label>
+                <label htmlFor="uni-tipo" style={labelStyle}>Tipo de Unidad *</label>
                 <select
+                  id="uni-tipo"
                   style={inputStyle}
                   value={form.tipo}
                   onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoUnidad }))}
@@ -53,8 +64,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Piso</label>
+                <label htmlFor="uni-piso" style={labelStyle}>Piso</label>
                 <input
+                  id="uni-piso"
                   style={inputStyle}
                   type="number"
                   value={form.piso}
@@ -63,8 +75,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 />
               </div>
               <div>
-                <label style={labelStyle}>Área (m²)</label>
+                <label htmlFor="uni-area" style={labelStyle}>Área (m²)</label>
                 <input
+                  id="uni-area"
                   style={inputStyle}
                   type="number"
                   min="0"
@@ -75,8 +88,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 />
               </div>
               <div>
-                <label style={labelStyle} title="Porcentaje de participación en gastos comunes (0-100). Si no se define, se calcula proporcionalmente por área.">Alícuota % <span style={{ color: 'var(--at-ink-3)', fontWeight: 400 }}>(opcional)</span></label>
+                <label htmlFor="uni-alicuota" style={labelStyle} title="Porcentaje de participación en gastos comunes (0-100). Si no se define, se calcula proporcionalmente por área.">Alícuota % <span style={{ color: 'var(--at-ink-3)', fontWeight: 400 }}>(opcional)</span></label>
                 <input
+                  id="uni-alicuota"
                   style={inputStyle}
                   type="number"
                   min="0"
@@ -88,8 +102,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Descripción</label>
+                <label htmlFor="uni-descripcion" style={labelStyle}>Descripción</label>
                 <textarea
+                  id="uni-descripcion"
                   style={{ ...inputStyle, minHeight: '56px', resize: 'vertical' }}
                   value={form.descripcion}
                   onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
@@ -106,8 +121,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               <div>
-                <label style={labelStyle}>Nombre</label>
+                <label htmlFor="uni-propietario-nombre" style={labelStyle}>Nombre</label>
                 <input
+                  id="uni-propietario-nombre"
                   style={inputStyle}
                   value={form.propietario_nombre}
                   onChange={e => setForm(f => ({ ...f, propietario_nombre: e.target.value }))}
@@ -116,8 +132,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 />
               </div>
               <div>
-                <label style={labelStyle}>Teléfono</label>
+                <label htmlFor="uni-propietario-telefono" style={labelStyle}>Teléfono</label>
                 <input
+                  id="uni-propietario-telefono"
                   style={inputStyle}
                   type="tel"
                   value={form.propietario_telefono}
@@ -127,8 +144,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 />
               </div>
               <div>
-                <label style={labelStyle}>Correo Electrónico</label>
+                <label htmlFor="uni-propietario-email" style={labelStyle}>Correo Electrónico</label>
                 <input
+                  id="uni-propietario-email"
                   style={inputStyle}
                   type="email"
                   value={form.propietario_email}
@@ -147,8 +165,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Dirección</label>
+                <label htmlFor="uni-direccion" style={labelStyle}>Dirección</label>
                 <input
+                  id="uni-direccion"
                   style={inputStyle}
                   value={form.direccion}
                   onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))}
@@ -157,8 +176,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 />
               </div>
               <div>
-                <label style={labelStyle}>Tipo de Régimen</label>
+                <label htmlFor="uni-regimen" style={labelStyle}>Tipo de Régimen</label>
                 <select
+                  id="uni-regimen"
                   style={inputStyle}
                   value={form.tipo_regimen}
                   onChange={e => setForm(f => ({ ...f, tipo_regimen: e.target.value as TipoRegimen | '' }))}
@@ -170,8 +190,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Fecha de Construcción</label>
+                <label htmlFor="uni-fecha-construccion" style={labelStyle}>Fecha de Construcción</label>
                 <input
+                  id="uni-fecha-construccion"
                   style={inputStyle}
                   type="date"
                   value={form.fecha_construccion}
@@ -179,8 +200,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Datos Registrales</label>
+                <label htmlFor="uni-datos-registrales" style={labelStyle}>Datos Registrales</label>
                 <textarea
+                  id="uni-datos-registrales"
                   style={{ ...inputStyle, minHeight: '72px', resize: 'vertical' }}
                   value={form.datos_registrales}
                   onChange={e => setForm(f => ({ ...f, datos_registrales: e.target.value }))}
@@ -198,8 +220,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               <div>
-                <label style={labelStyle}>Estado</label>
+                <label htmlFor="uni-estado-ocupacional" style={labelStyle}>Estado</label>
                 <select
+                  id="uni-estado-ocupacional"
                   style={inputStyle}
                   value={form.estado_ocupacional}
                   onChange={e => setForm(f => ({ ...f, estado_ocupacional: e.target.value as EstadoOcupacional | '' }))}
@@ -220,8 +243,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               <div>
-                <label style={labelStyle}>¿Tiene Contrato?</label>
+                <label htmlFor="uni-contrato" style={labelStyle}>¿Tiene Contrato?</label>
                 <select
+                  id="uni-contrato"
                   style={inputStyle}
                   value={form.contrato_suministro}
                   onChange={e => setForm(f => ({ ...f, contrato_suministro: e.target.value as ContratoSuministro | '' }))}
@@ -233,8 +257,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Número de Contrato</label>
+                <label htmlFor="uni-numero-contrato" style={labelStyle}>Número de Contrato</label>
                 <input
+                  id="uni-numero-contrato"
                   style={inputStyle}
                   value={form.numero_contrato_suministro}
                   onChange={e => setForm(f => ({ ...f, numero_contrato_suministro: e.target.value }))}
@@ -243,8 +268,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 />
               </div>
               <div>
-                <label style={labelStyle}>Fecha de Firma</label>
+                <label htmlFor="uni-fecha-firma" style={labelStyle}>Fecha de Firma</label>
                 <input
+                  id="uni-fecha-firma"
                   style={inputStyle}
                   type="date"
                   value={form.fecha_firma_contrato}
@@ -252,8 +278,9 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                 />
               </div>
               <div>
-                <label style={labelStyle}>Fecha de Vencimiento</label>
+                <label htmlFor="uni-fecha-vencimiento" style={labelStyle}>Fecha de Vencimiento</label>
                 <input
+                  id="uni-fecha-vencimiento"
                   style={inputStyle}
                   type="date"
                   value={form.fecha_vencimiento_contrato}
@@ -292,7 +319,8 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
                     No hay contadores disponibles para asignar.
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '8px' }}>
+                  // min(100%, …): en un teléfono angosto 260px fijos se salían del ancho.
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '8px' }}>
                     {disponibles.map(c => {
                       const checked = selectedContadorIds.includes(c.id)
                       return (
@@ -363,7 +391,7 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button
               onClick={handleGuardar}
               disabled={loading}
