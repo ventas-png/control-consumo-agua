@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { softDelete } from '../../../lib/softDelete'
+import { SinFilasAfectadasError } from '../../../domain/queryFetch'
 import type { TicketMantenimiento, Unidad } from '../../../types'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { ImageGallery } from '../../shared/ImageGallery'
@@ -165,7 +166,8 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
     if (!canDelete) return
     const result = await confirm({ title: '¿Eliminar ticket?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
-    await softDelete('tickets_mantenimiento', { id })
+    const { error, count } = await softDelete('tickets_mantenimiento', { id })
+    if (error || count === 0) { notify({ variant: 'error', title: 'Error', text: error?.message ?? new SinFilasAfectadasError().message }); return }
     onRefresh()
   }
 

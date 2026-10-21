@@ -10,7 +10,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import type { IncidenteSeguridad } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
-  deleteCondominioRow: vi.fn(async () => ({ error: null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
   notify: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   onRefresh: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock('../../../../lib/supabase', () => ({
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
-  deleteCondominioRow: mocks.deleteCondominioRow,
+  deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
 }))
 vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: mocks.confirm }))
 vi.mock('../exportUtils', () => ({ exportarPDFTabla: vi.fn(), exportarExcel: vi.fn() }))
@@ -76,6 +76,17 @@ describe('IncidentesTab — Eliminar exige el permiso de eliminar del tab', () =
     abrirDetalle()
     fireEvent.click(screen.getByText('🗑 Eliminar'))
 
-    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', 'i1'))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('incidentes_seguridad', 'i1'))
+  })
+
+  it('si la base no borra (la RLS lo rechaza), avisa y no da el incidente por eliminado', async () => {
+    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
+    renderTab()
+    abrirDetalle()
+    fireEvent.click(screen.getByText('🗑 Eliminar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
+    expect(mocks.onRefresh).not.toHaveBeenCalled()
+    expect(screen.getByText('🗑 Eliminar')).toBeTruthy()
   })
 })

@@ -1,7 +1,7 @@
 import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { createCondominioRow, deleteCondominioRowAfectando, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { IncidenteSeguridad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
@@ -99,7 +99,8 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
     if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar incidente?', text: i.descripcion, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('incidentes_seguridad', i.id)
+    const { error } = await deleteCondominioRowAfectando('incidentes_seguridad', i.id)
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     if (selected?.id === i.id) setSelected(null)
     onRefresh()
   }

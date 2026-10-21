@@ -10,7 +10,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import type { TicketMantenimiento } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
-  softDelete: vi.fn(async () => ({ error: null })),
+  softDelete: vi.fn(async () => ({ error: null as { message: string } | null, count: 1 as number | null })),
   notify: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   onRefresh: vi.fn(),
@@ -75,5 +75,14 @@ describe('MantenimientoTab — Eliminar exige el permiso de eliminar del tab', (
     fireEvent.click(screen.getByTitle('Eliminar'))
 
     await waitFor(() => expect(mocks.softDelete).toHaveBeenCalledWith('tickets_mantenimiento', { id: 't1' }))
+  })
+
+  it('si la base no da de baja el ticket (la RLS lo rechaza), avisa y no lo da por eliminado', async () => {
+    mocks.softDelete.mockResolvedValueOnce({ error: null, count: 0 })
+    renderTab()
+    fireEvent.click(screen.getByTitle('Eliminar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
+    expect(mocks.onRefresh).not.toHaveBeenCalled()
   })
 })

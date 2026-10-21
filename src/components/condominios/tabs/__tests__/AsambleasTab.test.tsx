@@ -10,7 +10,8 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import type { Asamblea } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
-  deleteCondominioRow: vi.fn(async () => ({ error: null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
+  toastError: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   onRefresh: vi.fn(),
 }))
@@ -22,13 +23,14 @@ vi.mock('../../../../lib/supabase', () => ({
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
-  deleteCondominioRow: mocks.deleteCondominioRow,
+  deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
   upsertCondominioRow: vi.fn(async () => ({ error: null })),
 }))
 vi.mock('../../../../domain/condominios/tabQueries', () => ({
   fetchPuntosAsambleaConVotos: vi.fn(async () => []),
 }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm }))
+vi.mock('../../../../lib/toast', () => ({ toast: { error: mocks.toastError, success: vi.fn() } }))
 
 const { AsambleasTab } = await import('../AsambleasTab')
 
@@ -76,6 +78,15 @@ describe('AsambleasTab — Eliminar exige el permiso de eliminar del tab', () =>
     renderTab({ canEdit: false })
     fireEvent.click(screen.getByTitle('Eliminar'))
 
-    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('asambleas', 'a1'))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('asambleas', 'a1'))
+  })
+
+  it('si la base no borra (la RLS lo rechaza), avisa y no da la asamblea por eliminada', async () => {
+    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
+    renderTab()
+    fireEvent.click(screen.getByTitle('Eliminar'))
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('El servidor no aplicó el cambio'))
+    expect(mocks.onRefresh).not.toHaveBeenCalled()
   })
 })

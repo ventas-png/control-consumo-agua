@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createCondominioRow, updateCondominioRow, deleteCondominioRow, upsertCondominioRow } from '../../../domain/condominios/tabMutations'
+import { createCondominioRow, updateCondominioRow, deleteCondominioRowAfectando, upsertCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchPuntosAsambleaConVotos } from '../../../domain/condominios/tabQueries'
 import { toast } from '../../../lib/toast'
 import { confirm } from '../../shared/Dialog'
@@ -121,7 +121,8 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
     if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar asamblea?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('asambleas', id)
+    const { error } = await deleteCondominioRowAfectando('asambleas', id)
+    if (error) { toast.error(error.message); return }
     if (selectedId === id) setSelectedId(null)
     onRefresh()
   }
