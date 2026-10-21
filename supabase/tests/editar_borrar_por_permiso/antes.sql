@@ -1,14 +1,19 @@
 -- ============================================================================
--- CONTROL PREVIO: el estado de ANTES de 20261103000200, sobre el mismo padrón.
+-- CONTROL PREVIO: el estado de ANTES de 20261103000200 y 000300, sobre el
+-- mismo padrón.
 --
--- Si estos dos huecos no se reproducen, el padrón no prueba lo que dice: la
--- suite de después pasaría igual sin la migración.
+-- Si estos huecos no se reproducen, el padrón no prueba lo que dice: la suite
+-- de después pasaría igual sin las migraciones.
 -- ============================================================================
 \set ON_ERROR_STOP on
 
 SELECT bp.como('VER'); SET ROLE authenticated;
 SELECT bp.chk(bp.da_de_baja('TKT'), true,
   'antes · VER (sólo ver) SÍ daba de baja un ticket: la policy de UPDATE sólo pedía visibilidad');
+SELECT bp.chk(bp.edita_ticket('TKT'), true,
+  'antes · VER (sólo ver) SÍ editaba un ticket');
+SELECT bp.chk(bp.edita('incidentes_seguridad', 'INC'), true,
+  'antes · VER (sólo ver) SÍ editaba un incidente');
 RESET ROLE;
 
 SELECT bp.como('BOR'); SET ROLE authenticated;

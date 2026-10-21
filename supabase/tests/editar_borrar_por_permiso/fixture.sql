@@ -1,18 +1,20 @@
 -- ============================================================================
--- PADRÓN DE LA SUITE «borrado_por_permiso» (20261103000200)
+-- PADRÓN DE LA SUITE «editar_borrar_por_permiso» (20261103000200 · 000300)
 --
 -- Se carga sobre la cadena REAL de migraciones: lo que se prueba son las
 -- policies que de verdad tiene el repositorio, con los helpers de RBAC reales.
 --
--- Dos empresas: A (la de las filas) y B (la vecina, con el MISMO permiso).
+-- Dos empresas: A (la de las filas) y B (la vecina, con los MISMOS permisos).
 -- Personas de A (todas «operator» salvo ADM):
 --   VER   ve los cinco tabs, nada más
 --   EDI   ve y EDITA los cinco tabs (sin «Eliminar»)
---   BOR   ve los cinco tabs y tiene «Eliminar» en cada uno
---   LEG   ve los cinco tabs + el par legado platform.condominios.view/.delete
---   OCU   tiene «Eliminar» en los cinco tabs pero NO los ve (tab oculto)
+--   BOR   ve los cinco tabs y tiene «Eliminar» en cada uno (sin «Editar»)
+--   LEG   ve los cinco tabs + el par legado platform.condominios.view/.edit/.delete
+--   OCU   tiene «Editar» y «Eliminar» en los cinco tabs pero NO los ve (tab oculto)
+--   KAN   ve Mantenimiento y EDITA en el Kanban de tickets (otra pantalla que
+--         edita tickets_mantenimiento)
 --   ADM   company_owner/admin de A: exento, sin roles granulares
--- Y BORB, de la empresa B, con visibilidad y «Eliminar» en los cinco tabs.
+-- Y BORB, de la empresa B, con visibilidad, «Editar» y «Eliminar» en los cinco.
 --
 -- Filas de A, una por tabla: INC, ASA, CHK, POB y el ticket vivo TKT. Además
 -- TKB, un ticket ya dado de baja (para restaurar).
@@ -43,12 +45,14 @@ INSERT INTO bp.ids (alias, id) VALUES
   ('OCU',  'b2000000-0000-0000-0000-000000000005'),
   ('ADM',  'b2000000-0000-0000-0000-000000000006'),
   ('BORB', 'b2000000-0000-0000-0000-000000000007'),
+  ('KAN',  'b2000000-0000-0000-0000-000000000008'),
   ('R_VER',  'b3000000-0000-0000-0000-000000000001'),
   ('R_EDI',  'b3000000-0000-0000-0000-000000000002'),
   ('R_BOR',  'b3000000-0000-0000-0000-000000000003'),
   ('R_LEG',  'b3000000-0000-0000-0000-000000000004'),
   ('R_OCU',  'b3000000-0000-0000-0000-000000000005'),
   ('R_BORB', 'b3000000-0000-0000-0000-000000000007'),
+  ('R_KAN',  'b3000000-0000-0000-0000-000000000008'),
   ('INC',  'b4000000-0000-0000-0000-000000000001'),
   ('ASA',  'b4000000-0000-0000-0000-000000000002'),
   ('CHK',  'b4000000-0000-0000-0000-000000000003'),
@@ -133,6 +137,64 @@ LANGUAGE sql AS $$
   SELECT bp.afecta('UPDATE public.tickets_mantenimiento SET estado = ''en_proceso'' WHERE id = $1', bp.id(p_alias))
 $$;
 
+-- Una edición cualquiera de la fila: lo que se prueba es la policy, no el dato.
+CREATE FUNCTION bp.edita(p_tabla text, p_alias text) RETURNS boolean
+LANGUAGE sql AS $$
+  SELECT bp.afecta(format('UPDATE public.%I SET created_at = created_at WHERE id = $1', p_tabla), bp.id(p_alias))
+$$;
+
+-- ¿Puede re-etiquetar filas hacia la empresa B? SIN WHERE y con un SET
+-- constante: con WHERE, Postgres exige además que la fila NUEVA pase la policy
+-- de SELECT (que ya acota a la empresa) y el WITH CHECK de UPDATE no se vería.
+-- Un 42501 es ese WITH CHECK rechazando: cuenta como «no». Se deshace siempre.
+CREATE FUNCTION bp.muda_a_b(p_tabla text) RETURNS boolean
+LANGUAGE plpgsql AS $$
+DECLARE
+  n int := 0;
+BEGIN
+  BEGIN
+    EXECUTE format('UPDATE public.%I SET company_id = %L', p_tabla, bp.id('B'));
+    GET DIAGNOSTICS n = ROW_COUNT;
+    RAISE EXCEPTION USING ERRCODE = 'BP000', MESSAGE = 'deshacer';
+  EXCEPTION
+    WHEN SQLSTATE 'BP000' THEN RETURN n > 0;
+    WHEN insufficient_privilege THEN RETURN false;
+  END;
+END;
+$$;
+
+-- ¿Cuántas filas toca un UPDATE SIN WHERE? Como en el DELETE: sin lectura, sólo
+-- la policy de UPDATE separa a una empresa de otra. Por eso el SET es una
+-- constante: `SET x = x` LEE la columna y metería a la policy de SELECT (que ya
+-- acota a la empresa), ocultando lo que se quiere ver. Se deshace siempre.
+CREATE FUNCTION bp.edita_sin_filtro(p_tabla text) RETURNS int
+LANGUAGE plpgsql AS $$
+DECLARE
+  n int := 0;
+BEGIN
+  BEGIN
+    EXECUTE format('UPDATE public.%I SET created_at = %L', p_tabla, '2026-01-01T00:00:00Z');
+    GET DIAGNOSTICS n = ROW_COUNT;
+    RAISE EXCEPTION USING ERRCODE = 'BP000', MESSAGE = 'deshacer';
+  EXCEPTION
+    WHEN SQLSTATE 'BP000' THEN RETURN n;
+  END;
+END;
+$$;
+
+-- Las cuatro ediciones de golpe (las tablas de borrado físico).
+CREATE FUNCTION bp.cuatro_ediciones(p_quien text, p_espera boolean) RETURNS void
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_verbo text := CASE WHEN p_espera THEN 'SÍ' ELSE 'NO' END;
+BEGIN
+  PERFORM bp.chk(bp.edita('incidentes_seguridad', 'INC'), p_espera, format('%s %s edita un incidente', p_quien, v_verbo));
+  PERFORM bp.chk(bp.edita('asambleas', 'ASA'),            p_espera, format('%s %s edita una asamblea', p_quien, v_verbo));
+  PERFORM bp.chk(bp.edita('checklist_areas', 'CHK'),      p_espera, format('%s %s edita un checklist', p_quien, v_verbo));
+  PERFORM bp.chk(bp.edita('permisos_obra_unidad', 'POB'), p_espera, format('%s %s edita un permiso de obra', p_quien, v_verbo));
+END;
+$$;
+
 -- Las cinco bajas de golpe, para quien puede todas o ninguna.
 CREATE FUNCTION bp.cinco(p_quien text, p_espera boolean) RETURNS void
 LANGUAGE plpgsql AS $$
@@ -159,17 +221,17 @@ INSERT INTO public.projects (id, company_id, nombre, tipo) VALUES
   (bp.id('B1'), bp.id('B'), 'Condominio B1', 'condominios');
 
 INSERT INTO auth.users (id)
-SELECT bp.id(a) FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','ADM','BORB']) AS a;
+SELECT bp.id(a) FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','ADM','BORB','KAN']) AS a;
 
 INSERT INTO public.app_users (id, company_id, full_name, role)
 SELECT bp.id(a), bp.id(CASE a WHEN 'BORB' THEN 'B' ELSE 'A' END), 'Borrado ' || a,
        CASE a WHEN 'ADM' THEN 'admin' ELSE 'operator' END
-FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','ADM','BORB']) AS a;
+FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','ADM','BORB','KAN']) AS a;
 
 -- ── RBAC ────────────────────────────────────────────────────────────────────
 INSERT INTO public.roles (id, company_id, name)
 SELECT bp.id('R_' || a), bp.id(CASE a WHEN 'BORB' THEN 'B' ELSE 'A' END), 'Borrado ' || a
-FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','BORB']) AS a;
+FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','BORB','KAN']) AS a;
 
 -- Visibilidad (clave de 3 segmentos) y acción (4) de los cinco tabs.
 WITH tabs(tab) AS (VALUES ('mantenimiento'), ('incidentes'), ('asambleas'), ('checklist_areas'), ('permisos_obra')),
@@ -177,16 +239,22 @@ grants(rol, clave) AS (
   SELECT r, 'condominios.tab.' || tab FROM tabs, unnest(ARRAY['VER','EDI','BOR','LEG','BORB']) AS r
   UNION ALL SELECT 'EDI',  'condominios.tab.' || tab || '.edit'   FROM tabs
   UNION ALL SELECT 'BOR',  'condominios.tab.' || tab || '.delete' FROM tabs
+  UNION ALL SELECT 'BORB', 'condominios.tab.' || tab || '.edit'   FROM tabs
   UNION ALL SELECT 'BORB', 'condominios.tab.' || tab || '.delete' FROM tabs
+  UNION ALL SELECT 'OCU',  'condominios.tab.' || tab || '.edit'   FROM tabs
   UNION ALL SELECT 'OCU',  'condominios.tab.' || tab || '.delete' FROM tabs
   UNION ALL SELECT 'LEG',  'platform.condominios.view'
+  UNION ALL SELECT 'LEG',  'platform.condominios.edit'
   UNION ALL SELECT 'LEG',  'platform.condominios.delete'
+  UNION ALL SELECT 'KAN',  'condominios.tab.mantenimiento'
+  UNION ALL SELECT 'KAN',  'condominios.tab.kanban_tickets'
+  UNION ALL SELECT 'KAN',  'condominios.tab.kanban_tickets.edit'
 )
 INSERT INTO public.role_permissions (role_id, permission_key, effect)
 SELECT DISTINCT bp.id('R_' || rol), clave, 'allow' FROM grants;
 
 INSERT INTO public.user_roles (user_id, role_id)
-SELECT bp.id(a), bp.id('R_' || a) FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','BORB']) AS a;
+SELECT bp.id(a), bp.id('R_' || a) FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','BORB','KAN']) AS a;
 
 -- ── Filas de A ──────────────────────────────────────────────────────────────
 INSERT INTO public.incidentes_seguridad (id, company_id, project_id, descripcion)
