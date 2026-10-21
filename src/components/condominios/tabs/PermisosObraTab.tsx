@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { createCondominioRow, deleteCondominioRowAfectando, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PermisoObraUnidad, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -108,7 +108,8 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
     if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar permiso?', text: p.descripcion, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('permisos_obra_unidad', p.id)
+    const { error } = await deleteCondominioRowAfectando('permisos_obra_unidad', p.id)
+    if (error) return notify({ variant: 'error', title: 'No se eliminó el permiso', text: error.message })
     if (selected?.id === p.id) setSelected(null)
     onRefresh()
   }

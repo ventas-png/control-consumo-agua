@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { softDelete } from '../../../lib/softDelete'
+import { SinFilasAfectadasError } from '../../../domain/queryFetch'
 import type { TicketMantenimiento, Unidad } from '../../../types'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { ImageGallery } from '../../shared/ImageGallery'
@@ -165,7 +166,17 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
     if (!canDelete) return
     const result = await confirm({ title: '¿Eliminar ticket?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
-    await softDelete('tickets_mantenimiento', { id })
+    // Sin `.delete` la RLS rechaza el UPDATE con 42501 (20261104000100); 0 filas
+    // es que el ticket ya no está o ya estaba borrado. Ninguno se da por hecho.
+    const { error, count } = await softDelete('tickets_mantenimiento', { id })
+    if (error || count === 0) {
+      const sinPermiso = error && (error.code === '42501' || /row-level security/i.test(error.message))
+      const text = !error ? new SinFilasAfectadasError().message
+        : sinPermiso ? 'Tu usuario no tiene permiso para eliminar tickets de mantenimiento.'
+        : error.message
+      notify({ variant: 'error', title: 'No se eliminó el ticket', text })
+      return
+    }
     onRefresh()
   }
 

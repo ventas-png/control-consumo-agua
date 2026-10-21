@@ -18,7 +18,7 @@ import type { AreaCondominio, ChecklistArea } from '../../../../types'
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
   updateCondominioRow: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
-  deleteCondominioRow: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
   notify: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   irATab: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock('../../../../lib/supabase', () => ({
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
-  deleteCondominioRow: mocks.deleteCondominioRow,
+  deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
 }))
 vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: mocks.confirm }))
 
@@ -208,6 +208,20 @@ describe('ChecklistAreasTab — Eliminar exige el permiso de eliminar del tab', 
     fireEvent.click(screen.getByText(/2026-09-01/))
     fireEvent.click(screen.getByText('🗑 Eliminar'))
 
-    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('checklist_areas', 'c1'))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('checklist_areas', 'c1'))
+    await waitFor(() => expect(mocks.onRefresh).toHaveBeenCalled())
+  })
+
+  it('si el servidor no borra la fila (RLS o ya no está), avisa y no refresca', async () => {
+    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
+    renderTab({ checklists: [checklist()] })
+    fireEvent.click(screen.getByText(/2026-09-01/))
+    fireEvent.click(screen.getByText('🗑 Eliminar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', title: 'No se eliminó el checklist', text: 'El servidor no aplicó el cambio',
+    })))
+    expect(mocks.onRefresh).not.toHaveBeenCalled()
+    expect(screen.getByText('🗑 Eliminar')).toBeTruthy()
   })
 })

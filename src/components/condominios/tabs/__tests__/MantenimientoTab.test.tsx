@@ -5,12 +5,18 @@
 //
 //   1. Sin permiso de eliminar no hay 🗑, tampoco para quien sí puede editar.
 //   2. Con el permiso, el botón borra (soft delete) aunque no se pueda editar.
+//   3. Si la base no lo marca —la RLS lo rechaza con 42501 porque falta
+//      `.delete` (20261104000100), o 0 filas porque ya no estaba—, la pestaña
+//      lo dice y no refresca como si se hubiera borrado.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import type { TicketMantenimiento } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
-  softDelete: vi.fn(async () => ({ error: null })),
+  softDelete: vi.fn(async () => ({
+    error: null as { message: string; code?: string } | null,
+    count: 1 as number | null,
+  })),
   notify: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   onRefresh: vi.fn(),
@@ -75,5 +81,47 @@ describe('MantenimientoTab — Eliminar exige el permiso de eliminar del tab', (
     fireEvent.click(screen.getByTitle('Eliminar'))
 
     await waitFor(() => expect(mocks.softDelete).toHaveBeenCalledWith('tickets_mantenimiento', { id: 't1' }))
+    await waitFor(() => expect(mocks.onRefresh).toHaveBeenCalled())
+    expect(mocks.notify).not.toHaveBeenCalled()
+  })
+
+  it('si la RLS rechaza el borrado (42501), lo dice en español y no refresca', async () => {
+    mocks.softDelete.mockResolvedValueOnce({
+      error: { code: '42501', message: 'new row violates row-level security policy for table "tickets_mantenimiento"' },
+      count: null,
+    })
+    renderTab()
+    fireEvent.click(screen.getByTitle('Eliminar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error',
+      title: 'No se eliminó el ticket',
+      text: 'Tu usuario no tiene permiso para eliminar tickets de mantenimiento.',
+    })))
+    expect(mocks.onRefresh).not.toHaveBeenCalled()
+  })
+
+  it('si no marcó ninguna fila (ya no estaba), avisa y no refresca', async () => {
+    mocks.softDelete.mockResolvedValueOnce({ error: null, count: 0 })
+    renderTab()
+    fireEvent.click(screen.getByTitle('Eliminar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error',
+      title: 'No se eliminó el ticket',
+      text: expect.stringMatching(/^El servidor no aplicó el cambio/),
+    })))
+    expect(mocks.onRefresh).not.toHaveBeenCalled()
+  })
+
+  it('otro error del servidor se muestra tal cual', async () => {
+    mocks.softDelete.mockResolvedValueOnce({ error: { code: '08006', message: 'connection failure' }, count: null })
+    renderTab()
+    fireEvent.click(screen.getByTitle('Eliminar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', text: 'connection failure',
+    })))
+    expect(mocks.onRefresh).not.toHaveBeenCalled()
   })
 })

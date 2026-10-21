@@ -5,12 +5,15 @@
 //
 //   1. Sin permiso de eliminar no hay 🗑, tampoco para quien sí puede editar.
 //   2. Con el permiso, el botón borra aunque no se pueda editar.
+//   3. Si el servidor no borra nada (la RLS lo negó o la fila ya no está),
+//      la pestaña lo dice y no refresca como si la asamblea se hubiera borrado.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import type { Asamblea } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
-  deleteCondominioRow: vi.fn(async () => ({ error: null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
+  toastError: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   onRefresh: vi.fn(),
 }))
@@ -22,13 +25,16 @@ vi.mock('../../../../lib/supabase', () => ({
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
-  deleteCondominioRow: mocks.deleteCondominioRow,
+  deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
   upsertCondominioRow: vi.fn(async () => ({ error: null })),
 }))
 vi.mock('../../../../domain/condominios/tabQueries', () => ({
   fetchPuntosAsambleaConVotos: vi.fn(async () => []),
 }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm }))
+vi.mock('../../../../lib/toast', () => ({
+  toast: { error: mocks.toastError, success: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}))
 
 const { AsambleasTab } = await import('../AsambleasTab')
 
@@ -76,6 +82,16 @@ describe('AsambleasTab — Eliminar exige el permiso de eliminar del tab', () =>
     renderTab({ canEdit: false })
     fireEvent.click(screen.getByTitle('Eliminar'))
 
-    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('asambleas', 'a1'))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('asambleas', 'a1'))
+    await waitFor(() => expect(mocks.onRefresh).toHaveBeenCalled())
+  })
+
+  it('si el servidor no borra la fila, avisa y no refresca', async () => {
+    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
+    renderTab()
+    fireEvent.click(screen.getByTitle('Eliminar'))
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('El servidor no aplicó el cambio'))
+    expect(mocks.onRefresh).not.toHaveBeenCalled()
   })
 })
