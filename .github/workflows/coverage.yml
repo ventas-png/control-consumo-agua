@@ -974,18 +974,19 @@ jobs:
           PGPORT_TEST: 55570
         run: supabase/tests/limpieza_calendario/run.sh
 
-      # 20261103000200 · 000300: en Mantenimiento, Incidentes, Asambleas,
-      # Checklist de áreas y Permisos de obra, borrar exige «Eliminar» y editar
-      # «Editar» del tab también en la base (antes: DELETE sólo de admin, y
-      # UPDATE —también la baja de tickets— con sólo VER el tab). El Kanban
-      # sigue editando tickets con su propio permiso. Control previo que
-      # reproduce los huecos, cadena completa, huella del auditor, guardas que
-      # abortan con una policy de más y catorce mutantes.
-      - name: Editar y borrar por permiso — «Editar»/«Eliminar» del tab en cinco tablas
+      # 20261103000200 · 000300 · 000400: en Mantenimiento, Incidentes,
+      # Asambleas, Checklist de áreas y Permisos de obra, crear exige «Crear»,
+      # editar «Editar» y borrar «Eliminar» del tab también en la base (antes:
+      # INSERT y UPDATE —también la baja de tickets— con sólo VER el tab, y
+      # DELETE sólo de admin). El Kanban sigue editando tickets con su propio
+      # permiso y el residente sigue reportándolos desde el portal. Control
+      # previo que reproduce los huecos, cadena completa, huella del auditor,
+      # guardas que abortan con una policy de más y veinte mutantes.
+      - name: Acciones por permiso — «Crear»/«Editar»/«Eliminar» del tab en cinco tablas
         env:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55571
-        run: supabase/tests/editar_borrar_por_permiso/run.sh
+        run: supabase/tests/acciones_por_permiso/run.sh
 
   rls-harness:
     name: RLS harness (server-side)

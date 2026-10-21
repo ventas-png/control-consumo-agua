@@ -1,6 +1,6 @@
 -- ============================================================================
--- INVARIANTES de 20261103000200 · 000300 · borrar exige «Eliminar» del tab y
--- editar exige «Editar»
+-- INVARIANTES de 20261103000200 · 000300 · 000400 · borrar exige «Eliminar»
+-- del tab, editar exige «Editar» y crear exige «Crear»
 -- ============================================================================
 \set ON_ERROR_STOP on
 
@@ -112,10 +112,29 @@ SELECT bp.chk(bp.muda_a_b('checklist_areas'),      false, 'D · …ni un checkli
 SELECT bp.chk(bp.muda_a_b('permisos_obra_unidad'), false, 'D · …ni un permiso de obra');
 RESET ROLE;
 
--- ── E · El borrado físico de tickets sigue siendo sólo de admin ─────────────
+-- ── E · Crear exige «Crear» del tab; el residente reporta en sus unidades ───
+SELECT bp.como('VER'); SET ROLE authenticated; SELECT bp.cinco_altas('E · VER (sólo ver)', false);                  RESET ROLE;
+SELECT bp.como('EDI'); SET ROLE authenticated; SELECT bp.cinco_altas('E · EDI (editar no es crear)', false);       RESET ROLE;
+SELECT bp.como('BOR'); SET ROLE authenticated; SELECT bp.cinco_altas('E · BOR (eliminar no es crear)', false);     RESET ROLE;
+SELECT bp.como('OCU'); SET ROLE authenticated; SELECT bp.cinco_altas('E · OCU (crear sin ver el tab)', false);     RESET ROLE;
+SELECT bp.como('CRE'); SET ROLE authenticated; SELECT bp.cinco_altas('E · CRE (crear del tab)', true);             RESET ROLE;
+SELECT bp.como('CRE'); SET ROLE authenticated; SELECT bp.cinco_altas('E · CRE, en la empresa B', false, 'B');      RESET ROLE;
+SELECT bp.como('LEG'); SET ROLE authenticated; SELECT bp.cinco_altas('E · LEG (par legado view + create)', true);  RESET ROLE;
+SELECT bp.como('ADM'); SET ROLE authenticated; SELECT bp.cinco_altas('E · ADM (admin de la empresa)', true);       RESET ROLE;
+SELECT bp.como('KAN'); SET ROLE authenticated;
+SELECT bp.chk(bp.crea('tickets_mantenimiento'), false, 'E · KAN (editar en el Kanban) NO crea tickets');
+RESET ROLE;
+SELECT bp.como('RES'); SET ROLE authenticated;
+SELECT bp.chk(bp.crea('tickets_mantenimiento', 'A', 'U1'), true,  'E · RES (residente) SÍ reporta un ticket de SU unidad desde el portal');
+SELECT bp.chk(bp.crea('tickets_mantenimiento', 'A', 'U2'), false, 'E · RES NO reporta un ticket de una unidad ajena');
+SELECT bp.chk(bp.crea('tickets_mantenimiento'),            false, 'E · RES NO crea un ticket sin unidad (eso es del staff)');
+SELECT bp.chk(bp.crea('incidentes_seguridad'),             false, 'E · RES NO registra un incidente');
+RESET ROLE;
+
+-- ── F · El borrado físico de tickets sigue siendo sólo de admin ─────────────
 SELECT bp.como('BOR'); SET ROLE authenticated;
-SELECT bp.chk(bp.borra('tickets_mantenimiento', 'TKT'), false, 'E · BOR no borra FÍSICAMENTE un ticket (se da de baja)');
+SELECT bp.chk(bp.borra('tickets_mantenimiento', 'TKT'), false, 'F · BOR no borra FÍSICAMENTE un ticket (se da de baja)');
 RESET ROLE;
 SELECT bp.como('ADM'); SET ROLE authenticated;
-SELECT bp.chk(bp.borra('tickets_mantenimiento', 'TKT'), true,  'E · ADM sí, como antes');
+SELECT bp.chk(bp.borra('tickets_mantenimiento', 'TKT'), true,  'F · ADM sí, como antes');
 RESET ROLE;

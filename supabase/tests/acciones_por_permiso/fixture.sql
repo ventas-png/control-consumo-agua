@@ -1,19 +1,21 @@
 -- ============================================================================
--- PADRÓN DE LA SUITE «editar_borrar_por_permiso» (20261103000200 · 000300)
+-- PADRÓN DE LA SUITE «acciones_por_permiso» (20261103000200 · 000300 · 000400)
 --
 -- Se carga sobre la cadena REAL de migraciones: lo que se prueba son las
 -- policies que de verdad tiene el repositorio, con los helpers de RBAC reales.
 --
 -- Dos empresas: A (la de las filas) y B (la vecina, con los MISMOS permisos).
--- Personas de A (todas «operator» salvo ADM):
+-- Personas de A (todas «operator» salvo ADM y RES):
 --   VER   ve los cinco tabs, nada más
---   EDI   ve y EDITA los cinco tabs (sin «Eliminar»)
---   BOR   ve los cinco tabs y tiene «Eliminar» en cada uno (sin «Editar»)
---   LEG   ve los cinco tabs + el par legado platform.condominios.view/.edit/.delete
---   OCU   tiene «Editar» y «Eliminar» en los cinco tabs pero NO los ve (tab oculto)
+--   CRE   ve los cinco tabs y CREA en cada uno (sin «Editar» ni «Eliminar»)
+--   EDI   ve y EDITA los cinco tabs (sin «Crear» ni «Eliminar»)
+--   BOR   ve los cinco tabs y tiene «Eliminar» en cada uno (sin «Crear» ni «Editar»)
+--   LEG   ve los cinco tabs + el par legado platform.condominios.view/.create/.edit/.delete
+--   OCU   tiene «Crear», «Editar» y «Eliminar» en los cinco tabs pero NO los ve
 --   KAN   ve Mantenimiento y EDITA en el Kanban de tickets (otra pantalla que
 --         edita tickets_mantenimiento)
 --   ADM   company_owner/admin de A: exento, sin roles granulares
+--   RES   residente («cliente») dueño de la unidad U1 de A1; U2 es de otro
 -- Y BORB, de la empresa B, con visibilidad, «Editar» y «Eliminar» en los cinco.
 --
 -- Filas de A, una por tabla: INC, ASA, CHK, POB y el ticket vivo TKT. Además
@@ -46,6 +48,8 @@ INSERT INTO bp.ids (alias, id) VALUES
   ('ADM',  'b2000000-0000-0000-0000-000000000006'),
   ('BORB', 'b2000000-0000-0000-0000-000000000007'),
   ('KAN',  'b2000000-0000-0000-0000-000000000008'),
+  ('CRE',  'b2000000-0000-0000-0000-000000000009'),
+  ('RES',  'b2000000-0000-0000-0000-00000000000a'),
   ('R_VER',  'b3000000-0000-0000-0000-000000000001'),
   ('R_EDI',  'b3000000-0000-0000-0000-000000000002'),
   ('R_BOR',  'b3000000-0000-0000-0000-000000000003'),
@@ -53,6 +57,10 @@ INSERT INTO bp.ids (alias, id) VALUES
   ('R_OCU',  'b3000000-0000-0000-0000-000000000005'),
   ('R_BORB', 'b3000000-0000-0000-0000-000000000007'),
   ('R_KAN',  'b3000000-0000-0000-0000-000000000008'),
+  ('R_CRE',  'b3000000-0000-0000-0000-000000000009'),
+  ('CLI',  'b5000000-0000-0000-0000-000000000001'),
+  ('U1',   'b6000000-0000-0000-0000-000000000001'),
+  ('U2',   'b6000000-0000-0000-0000-000000000002'),
   ('INC',  'b4000000-0000-0000-0000-000000000001'),
   ('ASA',  'b4000000-0000-0000-0000-000000000002'),
   ('CHK',  'b4000000-0000-0000-0000-000000000003'),
@@ -182,6 +190,53 @@ BEGIN
 END;
 $$;
 
+-- ¿Puede dar de alta una fila en `p_tabla`, en la empresa `p_empresa` (y su
+-- proyecto «<empresa>1»)? En tickets, opcionalmente para la unidad `p_unidad`
+-- (la rama del residente). Un 42501 es el WITH CHECK rechazando: «no». Se
+-- deshace siempre.
+CREATE FUNCTION bp.crea(p_tabla text, p_empresa text DEFAULT 'A', p_unidad text DEFAULT NULL)
+RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE
+  n    int := 0;
+  v_co uuid := bp.id(p_empresa);
+  v_pr uuid := bp.id(p_empresa || '1');
+BEGIN
+  BEGIN
+    CASE p_tabla
+      WHEN 'incidentes_seguridad' THEN
+        INSERT INTO public.incidentes_seguridad (company_id, project_id, descripcion) VALUES (v_co, v_pr, 'Alta de prueba');
+      WHEN 'asambleas' THEN
+        INSERT INTO public.asambleas (company_id, project_id, titulo, fecha, hora_inicio) VALUES (v_co, v_pr, 'Alta de prueba', CURRENT_DATE, '18:00');
+      WHEN 'checklist_areas' THEN
+        INSERT INTO public.checklist_areas (company_id, project_id, area) VALUES (v_co, v_pr, 'Alta de prueba');
+      WHEN 'permisos_obra_unidad' THEN
+        INSERT INTO public.permisos_obra_unidad (company_id, project_id, descripcion) VALUES (v_co, v_pr, 'Alta de prueba');
+      WHEN 'tickets_mantenimiento' THEN
+        INSERT INTO public.tickets_mantenimiento (company_id, project_id, titulo, unidad_id) VALUES (v_co, v_pr, 'Alta de prueba', bp.id(p_unidad));
+    END CASE;
+    GET DIAGNOSTICS n = ROW_COUNT;
+    RAISE EXCEPTION USING ERRCODE = 'BP000', MESSAGE = 'deshacer';
+  EXCEPTION
+    WHEN SQLSTATE 'BP000' THEN RETURN n = 1;
+    WHEN insufficient_privilege THEN RETURN false;
+  END;
+END;
+$$;
+
+-- Las cinco altas de golpe, en la empresa `p_empresa`.
+CREATE FUNCTION bp.cinco_altas(p_quien text, p_espera boolean, p_empresa text DEFAULT 'A') RETURNS void
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_verbo text := CASE WHEN p_espera THEN 'SÍ' ELSE 'NO' END;
+BEGIN
+  PERFORM bp.chk(bp.crea('incidentes_seguridad', p_empresa),  p_espera, format('%s %s registra un incidente', p_quien, v_verbo));
+  PERFORM bp.chk(bp.crea('asambleas', p_empresa),             p_espera, format('%s %s convoca una asamblea', p_quien, v_verbo));
+  PERFORM bp.chk(bp.crea('checklist_areas', p_empresa),       p_espera, format('%s %s crea un checklist', p_quien, v_verbo));
+  PERFORM bp.chk(bp.crea('permisos_obra_unidad', p_empresa),  p_espera, format('%s %s crea un permiso de obra', p_quien, v_verbo));
+  PERFORM bp.chk(bp.crea('tickets_mantenimiento', p_empresa), p_espera, format('%s %s crea un ticket', p_quien, v_verbo));
+END;
+$$;
+
 -- Las cuatro ediciones de golpe (las tablas de borrado físico).
 CREATE FUNCTION bp.cuatro_ediciones(p_quien text, p_espera boolean) RETURNS void
 LANGUAGE plpgsql AS $$
@@ -221,29 +276,39 @@ INSERT INTO public.projects (id, company_id, nombre, tipo) VALUES
   (bp.id('B1'), bp.id('B'), 'Condominio B1', 'condominios');
 
 INSERT INTO auth.users (id)
-SELECT bp.id(a) FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','ADM','BORB','KAN']) AS a;
+SELECT bp.id(a) FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','ADM','BORB','KAN','CRE','RES']) AS a;
+
+-- El residente: un cliente dueño de U1 (U2 es de otro, del mismo condominio).
+INSERT INTO public.clientes (id, nombre, codigo) VALUES (bp.id('CLI'), 'Residente de prueba', 'RES-1');
+INSERT INTO public.unidades (id, project_id, company_id, nombre, cliente_id) VALUES
+  (bp.id('U1'), bp.id('A1'), bp.id('A'), 'Unidad del residente', bp.id('CLI')),
+  (bp.id('U2'), bp.id('A1'), bp.id('A'), 'Unidad ajena', NULL);
 
 INSERT INTO public.app_users (id, company_id, full_name, role)
-SELECT bp.id(a), bp.id(CASE a WHEN 'BORB' THEN 'B' ELSE 'A' END), 'Borrado ' || a,
-       CASE a WHEN 'ADM' THEN 'admin' ELSE 'operator' END
-FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','ADM','BORB','KAN']) AS a;
+SELECT bp.id(a), bp.id(CASE a WHEN 'BORB' THEN 'B' ELSE 'A' END), 'Acciones ' || a,
+       CASE a WHEN 'ADM' THEN 'admin' WHEN 'RES' THEN 'cliente' ELSE 'operator' END
+FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','ADM','BORB','KAN','CRE','RES']) AS a;
+UPDATE public.app_users SET cliente_id = bp.id('CLI') WHERE id = bp.id('RES');
 
 -- ── RBAC ────────────────────────────────────────────────────────────────────
 INSERT INTO public.roles (id, company_id, name)
 SELECT bp.id('R_' || a), bp.id(CASE a WHEN 'BORB' THEN 'B' ELSE 'A' END), 'Borrado ' || a
-FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','BORB','KAN']) AS a;
+FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','BORB','KAN','CRE']) AS a;
 
 -- Visibilidad (clave de 3 segmentos) y acción (4) de los cinco tabs.
 WITH tabs(tab) AS (VALUES ('mantenimiento'), ('incidentes'), ('asambleas'), ('checklist_areas'), ('permisos_obra')),
 grants(rol, clave) AS (
-  SELECT r, 'condominios.tab.' || tab FROM tabs, unnest(ARRAY['VER','EDI','BOR','LEG','BORB']) AS r
+  SELECT r, 'condominios.tab.' || tab FROM tabs, unnest(ARRAY['VER','EDI','BOR','LEG','BORB','CRE']) AS r
+  UNION ALL SELECT 'CRE',  'condominios.tab.' || tab || '.create' FROM tabs
   UNION ALL SELECT 'EDI',  'condominios.tab.' || tab || '.edit'   FROM tabs
   UNION ALL SELECT 'BOR',  'condominios.tab.' || tab || '.delete' FROM tabs
   UNION ALL SELECT 'BORB', 'condominios.tab.' || tab || '.edit'   FROM tabs
   UNION ALL SELECT 'BORB', 'condominios.tab.' || tab || '.delete' FROM tabs
+  UNION ALL SELECT 'OCU',  'condominios.tab.' || tab || '.create' FROM tabs
   UNION ALL SELECT 'OCU',  'condominios.tab.' || tab || '.edit'   FROM tabs
   UNION ALL SELECT 'OCU',  'condominios.tab.' || tab || '.delete' FROM tabs
   UNION ALL SELECT 'LEG',  'platform.condominios.view'
+  UNION ALL SELECT 'LEG',  'platform.condominios.create'
   UNION ALL SELECT 'LEG',  'platform.condominios.edit'
   UNION ALL SELECT 'LEG',  'platform.condominios.delete'
   UNION ALL SELECT 'KAN',  'condominios.tab.mantenimiento'
@@ -254,7 +319,7 @@ INSERT INTO public.role_permissions (role_id, permission_key, effect)
 SELECT DISTINCT bp.id('R_' || rol), clave, 'allow' FROM grants;
 
 INSERT INTO public.user_roles (user_id, role_id)
-SELECT bp.id(a), bp.id('R_' || a) FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','BORB','KAN']) AS a;
+SELECT bp.id(a), bp.id('R_' || a) FROM unnest(ARRAY['VER','EDI','BOR','LEG','OCU','BORB','KAN','CRE']) AS a;
 
 -- ── Filas de A ──────────────────────────────────────────────────────────────
 INSERT INTO public.incidentes_seguridad (id, company_id, project_id, descripcion)

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20261103000200 y 20261103000300: en
+# Verificación EJECUTABLE de 20261103000200, 000300 y 000400: en
 # Mantenimiento, Incidentes, Asambleas, Checklist de áreas y Permisos de obra,
-# borrar exige la acción «Eliminar» del tab y editar exige «Editar», también en
-# la base.
+# borrar exige la acción «Eliminar» del tab, editar exige «Editar» y crear
+# exige «Crear», también en la base.
 #
 # POR QUÉ EXISTE
 # Una policy se lee bien y falla en silencio: si pide de menos, modifica o
@@ -11,25 +11,28 @@
 # la pantalla lo da por hecho. Y en tickets la baja ES un UPDATE: las dos
 # policies RESTRICTIVAS (baja ↔ «Eliminar», ticket vivo ↔ «Editar») tienen que
 # repartirse el UPDATE sin que una puentee a la otra ni bloquee al Kanban, que
-# edita tickets con su propio permiso. Nada de eso se ve leyendo el SQL.
+# edita tickets con su propio permiso. Y el alta de tickets tiene una rama del
+# RESIDENTE (portal) que no puede romperse al endurecer la del staff. Nada de
+# eso se ve leyendo el SQL.
 #
 # QUÉ HACE
 #   1 · cadena     bootstrap + TODAS las migraciones anteriores a la primera,
 #                  en una base vacía (el esquema real, no uno copiado a mano)
 #   2 · antes      sobre ese estado, el padrón REPRODUCE los huecos (ver basta
-#                  para editar y dar de baja; «Eliminar» no basta para borrar
-#                  un incidente). Si no, la suite no probaría nada.
+#                  para crear, editar y dar de baja; «Eliminar» no basta para
+#                  borrar un incidente). Si no, la suite no probaría nada.
 #   3 · migra      cada migración DOS veces: la segunda no cambia la huella del
-#                  auditor de drift, y entre las dos cambian EXACTAMENTE las
+#                  auditor de drift, y entre las tres cambian EXACTAMENTE las
 #                  policies de las cinco tablas
-#   4 · invariantes fixture.sql + assert.sql (quién borra, da de baja, edita,
-#                  restaura; entre empresas, con y sin WHERE)
+#   4 · invariantes fixture.sql + assert.sql (quién crea, borra, da de baja,
+#                  edita, restaura; entre empresas, con y sin WHERE; el
+#                  residente en sus unidades)
 #   5 · guardas    con una policy permisiva de más, cada migración ABORTA (sus
 #                  guardas de postcondición no son decorativas)
 #   6 · mutantes   copias de las migraciones (sin guardas), cada una sin una
 #                  compuerta: la suite DEBE fallar con cada una
 #
-# USO:  supabase/tests/editar_borrar_por_permiso/run.sh   (PGPORT_TEST=<puerto> para elegirlo)
+# USO:  supabase/tests/acciones_por_permiso/run.sh   (PGPORT_TEST=<puerto> para elegirlo)
 # Requiere initdb/pg_ctl/psql. No toca ningún proyecto remoto: cluster temporal.
 # ════════════════════════════════════════════════════════════════════════════
 set -Eeuo pipefail
@@ -40,10 +43,12 @@ RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
 BORRAR="$MIGS/20261103000200_condominios_borrar_exige_permiso_delete.sql"
 EDITAR="$MIGS/20261103000300_condominios_editar_exige_permiso_edit.sql"
+CREAR="$MIGS/20261103000400_condominios_crear_exige_permiso_create.sql"
+NUESTRAS=("$BORRAR" "$EDITAR" "$CREAR")   # en el orden en que se aplican
 PRIMERA=20261103000200
-ULTIMA=20261103000300
+ULTIMA=20261103000400
 HUELLA="$RAIZ/scripts/schema-drift/fingerprint.sql"
-for m in "$BORRAR" "$EDITAR"; do [ -f "$m" ] || { echo "❌ no existe $m"; exit 1; }; done
+for m in "${NUESTRAS[@]}"; do [ -f "$m" ] || { echo "❌ no existe $m"; exit 1; }; done
 
 for d in ${PGBIN:-} /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -63,9 +68,9 @@ for ext in pg_net pg_cron; do
 done
 
 # El socket unix tiene un tope de 107 bytes: rutas cortas a propósito.
-DATA=$(mktemp -d /tmp/bppdata.XXXX)
-SOCK=$(mktemp -d /tmp/bppsock.XXXX)
-TRABAJO=$(mktemp -d /tmp/bpptrab.XXXX)
+DATA=$(mktemp -d /tmp/apdata.XXXX)
+SOCK=$(mktemp -d /tmp/apsock.XXXX)
+TRABAJO=$(mktemp -d /tmp/aptrab.XXXX)
 chmod 777 "$TRABAJO"
 PUERTO=${PGPORT_TEST:-55571}
 
@@ -135,7 +140,7 @@ suite bpp_antes "$AQUI/antes.sql"
 echo "── 3/6 · cada migración, DOS veces, y lo que cambia en la huella"
 copia "$BD" bpp_post
 huella bpp_post > "$TRABAJO/h0"
-for m in "$BORRAR" "$EDITAR"; do
+for m in "${NUESTRAS[@]}"; do
   aplicar bpp_post "$m"
   huella bpp_post > "$TRABAJO/h1"
   aplicar bpp_post "$m"
@@ -146,7 +151,7 @@ done
 CAMBIADOS=$( { diff <(cut -f1,2 "$TRABAJO/h0") <(cut -f1,2 "$TRABAJO/h1") || true; } | sed -n 's/^[<>] //p' | cut -f1 | LC_ALL=C sort -u | tr '\n' ' ')
 ESPERADOS="tabla:asambleas/policies tabla:checklist_areas/policies tabla:incidentes_seguridad/policies tabla:permisos_obra_unidad/policies tabla:tickets_mantenimiento/policies "
 [ "$CAMBIADOS" = "$ESPERADOS" ] || { echo "❌ la migración cambió otros grupos de la huella:"; echo "   cambiados: $CAMBIADOS"; echo "   esperados: $ESPERADOS"; exit 1; }
-echo "  OK    entre las dos, la huella cambia EXACTAMENTE en las policies de las cinco tablas (ninguna función, grant ni columna)"
+echo "  OK    entre las tres, la huella cambia EXACTAMENTE en las policies de las cinco tablas (ninguna función, grant ni columna)"
 posteriores bpp_post
 
 echo "── 4/6 · invariantes"
@@ -157,7 +162,8 @@ suite bpp_inv "$AQUI/assert.sql"
 echo "── 5/6 · guardas: con una policy permisiva de más, cada migración aborta"
 guarda() {   # $1 = migración · $2 = policy de más · $3 = motivo esperado en el error
   copia "$BD" bpp_guarda
-  [ "$1" = "$EDITAR" ] && aplicar bpp_guarda "$BORRAR"
+  local m
+  for m in "${NUESTRAS[@]}"; do [ "$m" = "$1" ] && break; aplicar bpp_guarda "$m"; done   # las anteriores a la probada
   psql -q -v ON_ERROR_STOP=1 -d bpp_guarda -c "$2" >/dev/null
   local salida
   if salida=$(PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d bpp_guarda -f "$1" 2>&1); then
@@ -171,6 +177,8 @@ guarda "$BORRAR" "CREATE POLICY borrado_heredado ON public.asambleas FOR DELETE 
   'asambleas conserva 2 policies permisivas de borrado'
 guarda "$EDITAR" "CREATE POLICY edicion_heredada ON public.checklist_areas FOR UPDATE TO authenticated USING (true)" \
   'checklist_areas conserva 2 policies permisivas de UPDATE'
+guarda "$CREAR" "CREATE POLICY alta_heredada ON public.incidentes_seguridad FOR INSERT TO authenticated WITH CHECK (true)" \
+  'incidentes_seguridad conserva 2 policies permisivas de INSERT'
 
 echo "── 6/6 · mutantes: sin cada compuerta, la suite debe fallar"
 # A las dos migraciones se les quita la guarda de postcondición: lo que se
@@ -193,15 +201,17 @@ PY
   chmod 644 "$2"
 }
 mutante() {   # $1 = etiqueta · $2 = migración mutada · $3 = texto que se quita · $4 = reemplazo
-  local otra; [ "$2" = "$BORRAR" ] && otra="$EDITAR" || otra="$BORRAR"
-  sin_guarda "$2" "$TRABAJO/mutante.sql" "$3" "$4" || { echo "❌ el mutante «$1» no encuentra su texto en $(basename "$2")"; exit 1; }
-  sin_guarda "$otra" "$TRABAJO/otra.sql"
+  local m i=0
   copia "$BD" bpp_mut
-  if [ "$2" = "$BORRAR" ]; then
-    aplicar bpp_mut "$TRABAJO/mutante.sql"; aplicar bpp_mut "$TRABAJO/otra.sql"
-  else
-    aplicar bpp_mut "$TRABAJO/otra.sql"; aplicar bpp_mut "$TRABAJO/mutante.sql"
-  fi
+  for m in "${NUESTRAS[@]}"; do   # todas sin guarda, en orden; sólo $2 lleva la mutación
+    i=$((i + 1))
+    if [ "$m" = "$2" ]; then
+      sin_guarda "$m" "$TRABAJO/m$i.sql" "$3" "$4" || { echo "❌ el mutante «$1» no encuentra su texto en $(basename "$2")"; exit 1; }
+    else
+      sin_guarda "$m" "$TRABAJO/m$i.sql"
+    fi
+    aplicar bpp_mut "$TRABAJO/m$i.sql"
+  done
   posteriores bpp_mut
   aplicar bpp_mut "$AQUI/fixture.sql"
   if psql -q -v ON_ERROR_STOP=1 -d bpp_mut -f "$AQUI/assert.sql" >/dev/null 2>&1; then
@@ -253,9 +263,27 @@ mutante "Tickets: el Kanban también edita" "$EDITAR" \
 mutante "Tickets: la policy de edición es RESTRICTIVA" "$EDITAR" \
   $'CREATE POLICY tickets_mantenimiento_vivo_exige_editar ON public.tickets_mantenimiento\n  AS RESTRICTIVE\n' \
   $'CREATE POLICY tickets_mantenimiento_vivo_exige_editar ON public.tickets_mantenimiento\n'
+mutante "Incidentes: ver no basta para crear" "$CREAR" \
+  "(SELECT public.condominios_puede_actuar('incidentes', 'create'))" \
+  "(SELECT public.user_has_permission('condominios.tab.incidentes'))"
+mutante "Asambleas: editar no es crear" "$CREAR" \
+  "(SELECT public.condominios_puede_actuar('asambleas', 'create'))" \
+  "(SELECT public.condominios_puede_actuar('asambleas', 'edit'))"
+mutante "Checklist: crear sólo en la propia empresa" "$CREAR" \
+  $'OR (company_id = (SELECT public.get_my_company_id())\n        AND (SELECT public.condominios_puede_actuar(\'checklist_areas\', \'create\')))' \
+  $'OR ((SELECT public.condominios_puede_actuar(\'checklist_areas\', \'create\')))'
+mutante "Permisos de obra: eliminar no es crear" "$CREAR" \
+  "(SELECT public.condominios_puede_actuar('permisos_obra', 'create'))" \
+  "(SELECT public.condominios_puede_actuar('permisos_obra', 'delete'))"
+mutante "Tickets: el staff necesita «Crear», no sólo ver" "$CREAR" \
+  "(SELECT public.condominios_puede_actuar('mantenimiento', 'create'))" \
+  "(SELECT public.user_has_permission('condominios.tab.mantenimiento'))"
+mutante "Tickets: el residente reporta en sus unidades" "$CREAR" \
+  $'\n    OR (unidad_id IN (SELECT public.mis_unidades_ids()))' \
+  ''
 echo
-echo "✅ editar_borrar_por_permiso: el padrón reproduce los huecos de antes;"
-echo "   después, borrar exige «Eliminar» y editar «Editar» del tab (ver, el otro"
-echo "   permiso, tab oculto y otra empresa no alcanzan; el par legado y el admin"
-echo "   sí; el Kanban edita tickets), las guardas abortan de verdad y catorce"
-echo "   mutantes rompen la suite."
+echo "✅ acciones_por_permiso: el padrón reproduce los huecos de antes; después,"
+echo "   crear exige «Crear», editar «Editar» y borrar «Eliminar» del tab (ver, otra"
+echo "   acción, tab oculto y otra empresa no alcanzan; el par legado y el admin sí;"
+echo "   el Kanban edita tickets; el residente reporta en sus unidades), las guardas"
+echo "   abortan de verdad y veinte mutantes rompen la suite."
