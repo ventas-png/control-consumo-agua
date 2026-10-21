@@ -77,12 +77,11 @@ export const ROLE_LABELS: Record<string, string> = {
 /**
  * Fondo suave a partir de un color de los mapas de arriba. Los colores son
  * `var(--at-*)`, así que el viejo `color + '18'` (alfa hex) producía
- * `var(--at-info)18`: CSS inválido, y los badges salían sin fondo.
- * `color-mix` sí acepta variables y respeta el modo oscuro.
+ * `var(--at-info)18`: CSS inválido, y los badges salían sin fondo. Se
+ * reexporta el `tint` compartido para que los componentes de comunicación
+ * sigan importándolo de aquí.
  */
-export function tint(color: string, pct = 14): string {
-  return `color-mix(in srgb, ${color} ${pct}%, transparent)`
-}
+export { tint } from '../shared/statusTone'
 
 /** Iniciales para el avatar de una fila ("Carlos García" → "CG"). */
 export function initials(name?: string | null): string {
