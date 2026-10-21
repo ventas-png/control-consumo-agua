@@ -1,5 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import {
   createCondominioRow,
   updateCondominioRow,
@@ -85,7 +87,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
     await deleteCondominioRowBy('respuestas_encuesta', 'encuesta_id', id)
     const { error } = await deleteCondominioRow('encuestas', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
-    if (selectedId === id) setSelectedId(null)
+    if (selectedId === id) { setSelectedId(null); setShowRespForm(false) }
     onRefresh()
   }
 
@@ -117,50 +119,73 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
     setSavingResp(false); setShowRespForm(false); onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  function cerrarFormEnc() {
+    if (savingEnc) return
+    cancelEncuestaForm()
+  }
+
+  function cerrarDetalle() {
+    if (savingResp) return
+    setSelectedId(null)
+    setShowRespForm(false)
+  }
+
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Encuestas de Satisfacción</h2>
-        {canCreate && !showEncuestaForm && (
+        {canCreate && (
           <button onClick={() => { setShowEncuestaForm(true); setEditEncuestaId(null); setFormEnc(blankEncuesta()); setPreguntas([]) }}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Encuesta</button>
         )}
       </div>
 
-      {/* Formulario encuesta */}
+      {/* Formulario encuesta en ventana: antes se desplegaba arriba de la
+          lista y en el teléfono la empujaba fuera de la vista. */}
       {showEncuestaForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editEncuestaId ? 'Editar Encuesta' : 'Nueva Encuesta'}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+        <EditModal
+          title={editEncuestaId ? 'Editar encuesta' : 'Nueva encuesta'}
+          maxWidth="680px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!savingEnc}
+          closeOnEscape={!savingEnc}
+          onClose={cerrarFormEnc}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarFormEnc} disabled={savingEnc}>Cancelar</Button>
+            <Button onClick={handleSaveEncuesta} loading={savingEnc} loadingText="Guardando…">{editEncuestaId ? 'Actualizar' : 'Crear Encuesta'}</Button>
+          </>}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Título *</label>
-              <input style={inputStyle} value={formEnc.titulo ?? ''} onChange={e => setFormEnc(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej: Satisfacción servicios Q1 2026" />
+              <label htmlFor="enc-titulo" style={labelStyle}>Título *</label>
+              <input id="enc-titulo" style={inputStyle} value={formEnc.titulo ?? ''} onChange={e => setFormEnc(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej: Satisfacción servicios Q1 2026" autoFocus />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Descripción</label>
-              <input style={inputStyle} value={formEnc.descripcion ?? ''} onChange={e => setFormEnc(f => ({ ...f, descripcion: e.target.value }))} placeholder="Instrucciones o contexto" />
+              <label htmlFor="enc-descripcion" style={labelStyle}>Descripción</label>
+              <input id="enc-descripcion" style={inputStyle} value={formEnc.descripcion ?? ''} onChange={e => setFormEnc(f => ({ ...f, descripcion: e.target.value }))} placeholder="Instrucciones o contexto" />
             </div>
             <div>
-              <label style={labelStyle}>Fecha inicio</label>
-              <input style={inputStyle} type="date" value={formEnc.fecha_inicio ?? ''} onChange={e => setFormEnc(f => ({ ...f, fecha_inicio: e.target.value }))} />
+              <label htmlFor="enc-fecha-inicio" style={labelStyle}>Fecha inicio</label>
+              <input id="enc-fecha-inicio" style={inputStyle} type="date" value={formEnc.fecha_inicio ?? ''} onChange={e => setFormEnc(f => ({ ...f, fecha_inicio: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Fecha fin</label>
-              <input style={inputStyle} type="date" value={formEnc.fecha_fin ?? ''} onChange={e => setFormEnc(f => ({ ...f, fecha_fin: e.target.value }))} />
+              <label htmlFor="enc-fecha-fin" style={labelStyle}>Fecha fin</label>
+              <input id="enc-fecha-fin" style={inputStyle} type="date" value={formEnc.fecha_fin ?? ''} onChange={e => setFormEnc(f => ({ ...f, fecha_fin: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Estado</label>
-              <select style={inputStyle} value={formEnc.estado ?? 'borrador'} onChange={e => setFormEnc(f => ({ ...f, estado: e.target.value as EstadoEncuesta }))}>
+              <label htmlFor="enc-estado" style={labelStyle}>Estado</label>
+              <select id="enc-estado" style={inputStyle} value={formEnc.estado ?? 'borrador'} onChange={e => setFormEnc(f => ({ ...f, estado: e.target.value as EstadoEncuesta }))}>
                 {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
           </div>
 
-          {/* Constructor de preguntas */}
-          <div style={{ marginBottom: '16px' }}>
+          {/* Constructor de preguntas — cada fila se parte en dos líneas en el
+              teléfono (con `1fr 160px auto` el texto quedaba de unos pocos píxeles). */}
+          <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)' }}>Preguntas ({preguntas.length})</span>
               <button onClick={addPregunta} style={{ padding: '4px 12px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>+ Agregar</button>
@@ -170,109 +195,129 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {preguntas.map((p, i) => (
-                <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px auto', gap: '8px', alignItems: 'center', background: 'var(--at-surface)', padding: '10px', borderRadius: '8px', border: '1px solid var(--at-line)' }}>
-                  <input style={{ ...inputStyle, background: 'var(--at-surface)' }} value={p.texto} onChange={e => updatePregunta(i, { texto: e.target.value })} placeholder={`Pregunta ${i + 1}`} />
-                  <select style={{ ...inputStyle, background: 'var(--at-surface)' }} value={p.tipo} onChange={e => updatePregunta(i, { tipo: e.target.value as PreguntaItem['tipo'] })}>
+                <div key={p.id} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', background: 'var(--at-surface)', padding: '10px', borderRadius: '8px', border: '1px solid var(--at-line)' }}>
+                  <input style={{ ...inputStyle, background: 'var(--at-surface)', flex: '1 1 220px', minWidth: 0 }} value={p.texto} onChange={e => updatePregunta(i, { texto: e.target.value })} placeholder={`Pregunta ${i + 1}`} aria-label={`Pregunta ${i + 1}`} />
+                  <select style={{ ...inputStyle, background: 'var(--at-surface)', flex: '1 1 150px', minWidth: 0 }} value={p.tipo} onChange={e => updatePregunta(i, { tipo: e.target.value as PreguntaItem['tipo'] })} aria-label={`Tipo de la pregunta ${i + 1}`}>
                     <option value="texto">Respuesta libre</option>
                     <option value="rating_5">Puntuación 1-5</option>
                     <option value="si_no">Sí / No</option>
                   </select>
-                  <button onClick={() => removePregunta(i)} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', color: 'var(--at-danger)', cursor: 'pointer' }}>🗑️</button>
+                  <button onClick={() => removePregunta(i)} aria-label={`Quitar pregunta ${i + 1}`} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', color: 'var(--at-danger)', cursor: 'pointer', flexShrink: 0 }}>🗑️</button>
                 </div>
               ))}
             </div>
           </div>
-
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelEncuestaForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
-            <button onClick={handleSaveEncuesta} disabled={savingEnc} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: savingEnc ? 0.7 : 1 }}>
-              {savingEnc ? 'Guardando…' : editEncuestaId ? 'Actualizar' : 'Crear Encuesta'}
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: selectedEncuesta ? '280px 1fr' : '1fr', gap: '20px' }}>
-        {/* Lista encuestas */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {encuestas.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)' }}>
-              <div style={{ fontSize: '40px', marginBottom: '12px' }}>📊</div>
-              <p style={{ margin: 0, fontWeight: 600 }}>No hay encuestas</p>
-            </div>
-          ) : (
-            encuestas.map(enc => {
-              const est = ESTADO_CONFIG[enc.estado]
-              const numResp = respuestas.filter(r => r.encuesta_id === enc.id).length
-              return (
-                <div key={enc.id} onClick={() => setSelectedId(enc.id === selectedId ? null : enc.id)}
-                  style={{ background: enc.id === selectedId ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${enc.id === selectedId ? 'var(--at-accent-2)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)', flex: 1, marginRight: '8px' }}>{enc.titulo}</div>
+      {/* Lista — cada encuesta se abre en ventana. Antes el detalle iba al
+          lado de una columna fija de 280px que en el teléfono partía la
+          pantalla y dejaba las respuestas fuera de la vista. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {encuestas.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📊</div>
+            <p style={{ margin: 0, fontWeight: 600 }}>No hay encuestas</p>
+          </div>
+        ) : (
+          encuestas.map(enc => {
+            const est = ESTADO_CONFIG[enc.estado]
+            const numResp = respuestas.filter(r => r.encuesta_id === enc.id).length
+            return (
+              <div key={enc.id}
+                style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px', paddingRight: '10px' }}>
+                <button type="button" className="cond-row-main" onClick={() => setSelectedId(enc.id)}
+                  style={{ flex: '1 1 240px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: '14px 4px 14px 14px', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{enc.titulo}</span>
                     <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color, whiteSpace: 'nowrap' }}>{est.label}</span>
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
                     {(enc.preguntas as PreguntaItem[]).length} preguntas · {numResp} respuestas
                     {enc.fecha_inicio && ` · ${enc.fecha_inicio}`}
                   </div>
-                  {canEdit && (
-                    <div style={{ display: 'flex', gap: '5px', marginTop: '8px' }} onClick={e => e.stopPropagation()}>
-                      {enc.estado === 'borrador' && <button onClick={() => handleEstadoEncuesta(enc.id, 'activa')} style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Activar</button>}
-                      {enc.estado === 'activa'   && <button onClick={() => handleEstadoEncuesta(enc.id, 'cerrada')} style={{ padding: '3px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Cerrar</button>}
-                      <button onClick={() => startEditEncuesta(enc)} style={{ padding: '3px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDeleteEncuesta(enc.id)} style={{ padding: '3px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                    </div>
-                  )}
-                </div>
-              )
-            })
-          )}
-        </div>
-
-        {/* Detalle encuesta + respuestas */}
-        {selectedEncuesta && (
-          <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-              <div>
-                <h3 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: 800, color: 'var(--at-ink)' }}>{selectedEncuesta.titulo}</h3>
-                {selectedEncuesta.descripcion && <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--at-ink-3)' }}>{selectedEncuesta.descripcion}</p>}
-                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
-                  {(selectedEncuesta.preguntas as PreguntaItem[]).length} preguntas · {encuestaRespuestas.length} respuestas
-                </div>
+                </button>
+                {canEdit && (
+                  <div style={{ display: 'flex', gap: '5px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
+                    {enc.estado === 'borrador' && <button onClick={() => handleEstadoEncuesta(enc.id, 'activa')} style={{ padding: '5px 9px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Activar</button>}
+                    {enc.estado === 'activa'   && <button onClick={() => handleEstadoEncuesta(enc.id, 'cerrada')} style={{ padding: '5px 9px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Cerrar</button>}
+                    <button onClick={() => startEditEncuesta(enc)} aria-label={`Editar ${enc.titulo}`} title="Editar" style={{ padding: '5px 9px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => handleDeleteEncuesta(enc.id)} aria-label={`Eliminar ${enc.titulo}`} title="Eliminar" style={{ padding: '5px 9px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                  </div>
+                )}
               </div>
-              {selectedEncuesta.estado === 'activa' && (
-                <button onClick={startRespForm} style={{ padding: '7px 14px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>+ Respuesta</button>
-              )}
-            </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Detalle + respuestas en ventana (a pantalla completa en el teléfono),
+          con las acciones de la fila al pie. */}
+      {selectedEncuesta && (() => {
+        const est = ESTADO_CONFIG[selectedEncuesta.estado]
+        const pregs = selectedEncuesta.preguntas as PreguntaItem[]
+        const activa = selectedEncuesta.estado === 'activa'
+        return (
+          <EditModal
+            title={selectedEncuesta.titulo}
+            subtitle={<span style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
+              <span>
+                {pregs.length} preguntas · {encuestaRespuestas.length} respuestas
+                {selectedEncuesta.fecha_inicio ? ` · ${selectedEncuesta.fecha_inicio}${selectedEncuesta.fecha_fin ? ` → ${selectedEncuesta.fecha_fin}` : ''}` : ''}
+              </span>
+            </span>}
+            maxWidth="680px"
+            fullScreenOnMobile
+            closeOnBackdropClick={!savingResp}
+            closeOnEscape={!savingResp}
+            onClose={cerrarDetalle}
+            footer={canEdit || activa ? (
+              // Envuelve: con cuatro botones el pie no cabe a lo ancho del teléfono.
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end' }}>
+                {canEdit && <Button variant="outline-danger" onClick={() => handleDeleteEncuesta(selectedEncuesta.id)} aria-label="Eliminar encuesta">🗑️</Button>}
+                {canEdit && <Button variant="secondary" onClick={() => { cerrarDetalle(); startEditEncuesta(selectedEncuesta) }}>✏️ Editar</Button>}
+                {canEdit && selectedEncuesta.estado === 'borrador' && <Button variant="success" onClick={() => handleEstadoEncuesta(selectedEncuesta.id, 'activa')}>Activar</Button>}
+                {canEdit && activa && <Button variant="secondary" onClick={() => handleEstadoEncuesta(selectedEncuesta.id, 'cerrada')}>Cerrar encuesta</Button>}
+                {activa && <Button onClick={startRespForm}>+ Respuesta</Button>}
+              </div>
+            ) : undefined}
+          >
+            {selectedEncuesta.descripcion && <p style={{ margin: '0 0 14px', fontSize: '13px', color: 'var(--at-ink-3)' }}>{selectedEncuesta.descripcion}</p>}
 
             {/* Formulario de respuesta */}
             {showRespForm && (
               <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '10px', padding: '16px', marginBottom: '16px' }}>
                 <h4 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700 }}>Registrar Respuesta</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
                   <div>
-                    <label style={labelStyle}>Unidad</label>
-                    <select style={inputStyle} value={respForm.unidad_id} onChange={e => setRespForm(f => ({ ...f, unidad_id: e.target.value }))}>
+                    <label htmlFor="enc-resp-unidad" style={labelStyle}>Unidad</label>
+                    {/* autoFocus: el botón que lo abre está al pie, así el formulario queda a la vista. */}
+                    <select id="enc-resp-unidad" style={inputStyle} value={respForm.unidad_id} onChange={e => setRespForm(f => ({ ...f, unidad_id: e.target.value }))} autoFocus>
                       <option value="">Sin unidad</option>
                       {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={labelStyle}>Nombre respondente</label>
-                    <input style={inputStyle} value={respForm.nombre} onChange={e => setRespForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Opcional" />
+                    <label htmlFor="enc-resp-nombre" style={labelStyle}>Nombre respondente</label>
+                    <input id="enc-resp-nombre" style={inputStyle} value={respForm.nombre} onChange={e => setRespForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Opcional" />
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '12px' }}>
-                  {(selectedEncuesta.preguntas as PreguntaItem[]).map(p => (
+                  {pregs.map(p => (
                     <div key={p.id}>
-                      <label style={labelStyle}>{p.texto}</label>
-                      {p.tipo === 'texto' && (
-                        <input style={inputStyle} value={respForm.answers[p.id] ?? ''} onChange={e => setRespForm(f => ({ ...f, answers: { ...f.answers, [p.id]: e.target.value } }))} placeholder="Respuesta libre" />
+                      {p.tipo === 'texto' ? (
+                        <>
+                          <label htmlFor={`enc-resp-${p.id}`} style={labelStyle}>{p.texto}</label>
+                          <input id={`enc-resp-${p.id}`} style={inputStyle} value={respForm.answers[p.id] ?? ''} onChange={e => setRespForm(f => ({ ...f, answers: { ...f.answers, [p.id]: e.target.value } }))} placeholder="Respuesta libre" />
+                        </>
+                      ) : (
+                        <span style={labelStyle}>{p.texto}</span>
                       )}
                       {p.tipo === 'rating_5' && (
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                        <div role="group" aria-label={p.texto} style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                           {[1,2,3,4,5].map(n => (
-                            <button key={n} onClick={() => setRespForm(f => ({ ...f, answers: { ...f.answers, [p.id]: String(n) } }))}
+                            <button key={n} onClick={() => setRespForm(f => ({ ...f, answers: { ...f.answers, [p.id]: String(n) } }))} aria-pressed={respForm.answers[p.id] === String(n)}
                               style={{ width: '36px', height: '36px', borderRadius: '8px', border: '1.5px solid', fontSize: '14px', fontWeight: 700, cursor: 'pointer',
                                 background: respForm.answers[p.id] === String(n) ? 'var(--at-primary)' : 'var(--at-surface)',
                                 color: respForm.answers[p.id] === String(n) ? 'white' : 'var(--at-ink-3)',
@@ -283,9 +328,9 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
                         </div>
                       )}
                       {p.tipo === 'si_no' && (
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div role="group" aria-label={p.texto} style={{ display: 'flex', gap: '8px' }}>
                           {['si', 'no'].map(v => (
-                            <button key={v} onClick={() => setRespForm(f => ({ ...f, answers: { ...f.answers, [p.id]: v } }))}
+                            <button key={v} onClick={() => setRespForm(f => ({ ...f, answers: { ...f.answers, [p.id]: v } }))} aria-pressed={respForm.answers[p.id] === v}
                               style={{ padding: '6px 16px', borderRadius: '8px', border: '1.5px solid', fontSize: '13px', fontWeight: 700, cursor: 'pointer', textTransform: 'capitalize',
                                 background: respForm.answers[p.id] === v ? 'var(--at-primary)' : 'var(--at-surface)',
                                 color: respForm.answers[p.id] === v ? 'white' : 'var(--at-ink-3)',
@@ -320,7 +365,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
                       <span style={{ fontWeight: 400, color: 'var(--at-ink-3)', marginLeft: '8px' }}>{new Date(r.created_at).toLocaleDateString()}</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {(selectedEncuesta.preguntas as PreguntaItem[]).map(p => {
+                      {pregs.map(p => {
                         const ans = (r.respuestas as Record<string, string>)[p.id]
                         if (!ans) return null
                         return (
@@ -335,9 +380,9 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
                 ))}
               </div>
             )}
-          </div>
-        )}
-      </div>
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }

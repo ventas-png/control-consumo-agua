@@ -19,6 +19,7 @@ import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { SignaturePad } from '../../shared/SignaturePad'
 import { RecepcionBuscador } from './RecepcionBuscador'
 
@@ -298,8 +299,13 @@ export function CorrespondenciaCondTab({
     })
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
+
+  function cerrarForm() {
+    if (saving) return
+    resetForm()
+  }
 
   const SegBtn = ({ id, label }: { id: 'correspondencia' | 'recepcion'; label: string }) => (
     <button onClick={() => setVista(id)}
@@ -314,7 +320,8 @@ export function CorrespondenciaCondTab({
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Correspondencia</h2>
-        {canCreate && vista === 'correspondencia' && !showForm && (
+        {/* Sigue montado con la ventana abierta: al cerrarla, el foco vuelve aquí. */}
+        {canCreate && vista === 'correspondencia' && (
           <button onClick={() => setShowForm(true)}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Registrar
@@ -355,65 +362,78 @@ export function CorrespondenciaCondTab({
         ))}
       </div>
 
-      {/* Form */}
+      {/* Form en ventana (antes se desplegaba arriba de la lista y en el
+          teléfono empujaba todo hacia abajo). */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Registrar Correspondencia</h3>
+        <EditModal
+          title="Registrar correspondencia"
+          maxWidth="680px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} loadingText="Guardando…">Guardar</Button>
+          </>}
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={labelStyle}>Tipo</label>
-              <select style={inputStyle} value={form.direccion} onChange={e => setF('direccion', e.target.value as 'entrante' | 'saliente')}>
+              <label htmlFor="corr-direccion" style={labelStyle}>Tipo</label>
+              <select id="corr-direccion" style={inputStyle} value={form.direccion} onChange={e => setF('direccion', e.target.value as 'entrante' | 'saliente')}>
                 <option value="entrante">📥 Entrada</option>
                 <option value="saliente">📤 Salida</option>
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Categoría</label>
-              <select style={inputStyle} value={form.categoria} onChange={e => setF('categoria', e.target.value as CategoriaCorrespondencia)}>
+              <label htmlFor="corr-categoria" style={labelStyle}>Categoría</label>
+              <select id="corr-categoria" style={inputStyle} value={form.categoria} onChange={e => setF('categoria', e.target.value as CategoriaCorrespondencia)}>
                 {Object.entries(CAT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Prioridad</label>
-              <select style={inputStyle} value={form.prioridad} onChange={e => setF('prioridad', e.target.value)}>
+              <label htmlFor="corr-prioridad" style={labelStyle}>Prioridad</label>
+              <select id="corr-prioridad" style={inputStyle} value={form.prioridad} onChange={e => setF('prioridad', e.target.value)}>
                 <option value="normal">Normal</option>
                 <option value="urgente">🔴 Urgente</option>
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Fecha</label>
-              <input style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
+              <label htmlFor="corr-fecha" style={labelStyle}>Fecha</label>
+              <input id="corr-fecha" style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Asunto *</label>
-              <input style={inputStyle} value={form.asunto} onChange={e => setF('asunto', e.target.value)} placeholder="Descripción del documento" autoFocus />
-            </div>
-            <div>
-              <label style={labelStyle}>Remitente</label>
-              <input style={inputStyle} value={form.remitente} onChange={e => setF('remitente', e.target.value)} placeholder="Quién envía" />
+            {/* `1 / -1` y no `span 2`: con una sola columna (teléfono) el span
+                creaba una columna implícita y el campo se salía de la ventana. */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="corr-asunto" style={labelStyle}>Asunto *</label>
+              <input id="corr-asunto" style={inputStyle} value={form.asunto} onChange={e => setF('asunto', e.target.value)} placeholder="Descripción del documento" autoFocus />
             </div>
             <div>
-              <label style={labelStyle}>Destinatario</label>
-              <input style={inputStyle} value={form.destinatario} onChange={e => setF('destinatario', e.target.value)} placeholder="A quién va dirigido" />
+              <label htmlFor="corr-remitente" style={labelStyle}>Remitente</label>
+              <input id="corr-remitente" style={inputStyle} value={form.remitente} onChange={e => setF('remitente', e.target.value)} placeholder="Quién envía" />
             </div>
             <div>
-              <label style={labelStyle}>N° guía / referencia</label>
-              <input style={inputStyle} value={form.numero_guia} onChange={e => setF('numero_guia', e.target.value)} placeholder="Número de tracking" />
+              <label htmlFor="corr-destinatario" style={labelStyle}>Destinatario</label>
+              <input id="corr-destinatario" style={inputStyle} value={form.destinatario} onChange={e => setF('destinatario', e.target.value)} placeholder="A quién va dirigido" />
             </div>
             <div>
-              <label style={labelStyle}>Empresa mensajería</label>
-              <input style={inputStyle} value={form.empresa_mensajeria} onChange={e => setF('empresa_mensajeria', e.target.value)} placeholder="DHL, Correos, courier..." />
+              <label htmlFor="corr-guia" style={labelStyle}>N° guía / referencia</label>
+              <input id="corr-guia" style={inputStyle} value={form.numero_guia} onChange={e => setF('numero_guia', e.target.value)} placeholder="Número de tracking" />
             </div>
             <div>
-              <label style={labelStyle}>Unidad relacionada</label>
-              <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
+              <label htmlFor="corr-mensajeria" style={labelStyle}>Empresa mensajería</label>
+              <input id="corr-mensajeria" style={inputStyle} value={form.empresa_mensajeria} onChange={e => setF('empresa_mensajeria', e.target.value)} placeholder="DHL, Correos, courier..." />
+            </div>
+            <div>
+              <label htmlFor="corr-unidad" style={labelStyle}>Unidad relacionada</label>
+              <select id="corr-unidad" style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Administración —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Fecha límite (plazo)</label>
-              <input style={inputStyle} type="date" value={form.fecha_limite} onChange={e => setF('fecha_limite', e.target.value)} />
+              <label htmlFor="corr-fecha-limite" style={labelStyle}>Fecha límite (plazo)</label>
+              <input id="corr-fecha-limite" style={inputStyle} type="date" value={form.fecha_limite} onChange={e => setF('fecha_limite', e.target.value)} />
               <div style={{ fontSize: '10.5px', color: 'var(--at-ink-3)', marginTop: '3px' }}>Para notificaciones con plazo de respuesta.</div>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -424,17 +444,7 @@ export function CorrespondenciaCondTab({
                 label="Fotos del documento / sobre" maxFiles={4} capture />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button onClick={resetForm}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Filters */}
@@ -465,164 +475,164 @@ export function CorrespondenciaCondTab({
         </div>
       </div>
 
-      {/* Split view */}
-      <div style={{ display: 'grid', gridTemplateColumns: detail ? '1fr 340px' : '1fr', gap: '16px' }}>
-        {/* List — F3.9: migrado a <DataTable> shared */}
-        <div>
-          <DataTable<PiezaRecepcion>
-            data={filtered}
-            rowKey="id"
-            searchableKeys={['descripcion']}
-            searchPlaceholder="Buscar asunto..."
-            emptyState={{ icon: '📨', title: 'No hay correspondencia' }}
-            defaultSort={{ key: 'fecha_pieza', direction: 'desc' }}
-            onRowClick={(c) => setSelected(selected === c.id ? null : c.id)}
-            rowStyle={(c) => selected === c.id ? { background: 'var(--at-primary-tint)' } : {}}
-            columns={[
-              {
-                key: 'direccion',
-                header: 'Tipo',
-                sortable: true,
-                render: (c) => (
-                  <>
-                    <span style={{ fontSize: '13px' }}>{esEntrada(c) ? '📥' : '📤'}</span>
-                    {c.prioridad === 'urgente' && <span style={{ fontSize: '10px', marginLeft: '4px', color: 'var(--at-danger)', fontWeight: 700 }}>URG</span>}
-                  </>
-                ),
-              },
-              {
-                key: 'descripcion',
-                header: 'Asunto',
-                sortable: true,
-                render: (c) => (
-                  <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>
-                    {c.descripcion}
-                    {(c.fotos?.length ?? 0) > 0 && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginLeft: '6px' }}>📷 {c.fotos?.length}</span>}
-                    {c.firma_path && <span style={{ fontSize: '11px', color: 'var(--at-success)', marginLeft: '6px' }}>✍</span>}
-                  </span>
-                ),
-              },
-              {
-                key: 'tipo',
-                header: 'Categoría',
-                hideOnMobile: true,
-                render: (c) => CAT_LABELS[c.tipo] ?? c.tipo,
-              },
-              { key: 'fecha_pieza', header: 'Fecha', sortable: true, render: (c) => fechaDocumento(c) },
-              {
-                key: 'hora_recepcion',
-                header: 'En custodia',
-                sortable: true,
-                hideOnMobile: true,
-                render: (c) => {
-                  if (c.estado !== 'pendiente') return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
-                  const dias = diasEnCustodia(c, hoy)
-                  const alerta = dias >= DIAS_CUSTODIA_ALERTA
-                  return (
-                    <span style={{ fontSize: '11px', fontWeight: alerta ? 700 : 500, color: alerta ? 'var(--at-warning-strong)' : 'var(--at-ink-3)' }}>
-                      {dias}d
-                    </span>
-                  )
-                },
-              },
-              {
-                key: 'fecha_limite',
-                header: 'Plazo',
-                sortable: true,
-                hideOnMobile: true,
-                render: (c) => <Plazo fechaLimite={c.fecha_limite} estado={c.estado} hoy={hoy} />,
-              },
-              {
-                key: 'estado',
-                header: 'Estado',
-                sortable: true,
-                render: (c) => {
-                  const es = ESTADO_STYLE[c.estado]
-                  return (
-                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es?.bg, color: es?.color }}>
-                      {c.estado}
-                    </span>
-                  )
-                },
-              },
-              {
-                key: '__actions',
-                header: '',
-                render: (c) => (
-                  canEdit && c.estado === 'pendiente' ? (
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                      {/* Una sola puerta de entrega: el acuse (nombre de quien
-                          recibe) es obligatorio con firma y sin ella. */}
-                      <button onClick={(e) => { e.stopPropagation(); setAcuse(c); setAcuseNombre('') }}
-                        title="Registrar quién recibe la pieza, con o sin firma"
-                        style={{ padding: '2px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                        ✍ Entregar
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'devuelto') }}
-                        title="La pieza vuelve al remitente sin haberse entregado"
-                        style={{ padding: '2px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
-                        ↩ Devolver
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'archivado') }}
-                        style={{ padding: '2px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
-                        Archivar
-                      </button>
-                    </div>
-                  ) : null
-                ),
-              },
-            ] satisfies DataTableColumn<PiezaRecepcion>[]}
-          />
-        </div>
+      {/* List — F3.9: migrado a <DataTable> shared. Cada pieza se abre en
+          ventana: antes el detalle iba en una columna fija de 340px que en el
+          teléfono dejaba la tabla en una franja y el detalle fuera de pantalla. */}
+      <DataTable<PiezaRecepcion>
+        data={filtered}
+        rowKey="id"
+        searchableKeys={['descripcion']}
+        searchPlaceholder="Buscar asunto..."
+        emptyState={{ icon: '📨', title: 'No hay correspondencia' }}
+        defaultSort={{ key: 'fecha_pieza', direction: 'desc' }}
+        onRowClick={(c) => setSelected(c.id)}
+        columns={[
+          {
+            key: 'direccion',
+            header: 'Tipo',
+            sortable: true,
+            render: (c) => (
+              <>
+                <span style={{ fontSize: '13px' }}>{esEntrada(c) ? '📥' : '📤'}</span>
+                {c.prioridad === 'urgente' && <span style={{ fontSize: '10px', marginLeft: '4px', color: 'var(--at-danger)', fontWeight: 700 }}>URG</span>}
+              </>
+            ),
+          },
+          {
+            key: 'descripcion',
+            header: 'Asunto',
+            sortable: true,
+            // Botón además del clic en la fila: el <tr> de DataTable no se
+            // alcanza con el teclado, así se puede abrir la pieza con Tab.
+            render: (c) => (
+              <button type="button" onClick={() => setSelected(c.id)}
+                style={{ textAlign: 'left', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', fontWeight: 600, color: 'var(--at-ink)' }}>
+                {c.descripcion}
+                {(c.fotos?.length ?? 0) > 0 && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginLeft: '6px' }}>📷 {c.fotos?.length}</span>}
+                {c.firma_path && <span style={{ fontSize: '11px', color: 'var(--at-success)', marginLeft: '6px' }}>✍</span>}
+              </button>
+            ),
+          },
+          {
+            key: 'tipo',
+            header: 'Categoría',
+            hideOnMobile: true,
+            render: (c) => CAT_LABELS[c.tipo] ?? c.tipo,
+          },
+          { key: 'fecha_pieza', header: 'Fecha', sortable: true, render: (c) => fechaDocumento(c) },
+          {
+            key: 'hora_recepcion',
+            header: 'En custodia',
+            sortable: true,
+            hideOnMobile: true,
+            render: (c) => {
+              if (c.estado !== 'pendiente') return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+              const dias = diasEnCustodia(c, hoy)
+              const alerta = dias >= DIAS_CUSTODIA_ALERTA
+              return (
+                <span style={{ fontSize: '11px', fontWeight: alerta ? 700 : 500, color: alerta ? 'var(--at-warning-strong)' : 'var(--at-ink-3)' }}>
+                  {dias}d
+                </span>
+              )
+            },
+          },
+          {
+            key: 'fecha_limite',
+            header: 'Plazo',
+            sortable: true,
+            hideOnMobile: true,
+            render: (c) => <Plazo fechaLimite={c.fecha_limite} estado={c.estado} hoy={hoy} />,
+          },
+          {
+            key: 'estado',
+            header: 'Estado',
+            sortable: true,
+            render: (c) => {
+              const es = ESTADO_STYLE[c.estado]
+              return (
+                <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es?.bg, color: es?.color }}>
+                  {c.estado}
+                </span>
+              )
+            },
+          },
+          {
+            key: '__actions',
+            header: '',
+            render: (c) => (
+              canEdit && c.estado === 'pendiente' ? (
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                  {/* Una sola puerta de entrega: el acuse (nombre de quien
+                      recibe) es obligatorio con firma y sin ella. */}
+                  <button onClick={(e) => { e.stopPropagation(); setAcuse(c); setAcuseNombre('') }}
+                    title="Registrar quién recibe la pieza, con o sin firma"
+                    style={{ padding: '2px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    ✍ Entregar
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'devuelto') }}
+                    title="La pieza vuelve al remitente sin haberse entregado"
+                    style={{ padding: '2px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
+                    ↩ Devolver
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'archivado') }}
+                    style={{ padding: '2px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
+                    Archivar
+                  </button>
+                </div>
+              ) : null
+            ),
+          },
+        ] satisfies DataTableColumn<PiezaRecepcion>[]}
+      />
 
-        {/* Detail */}
-        {detail && (
-          <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', alignSelf: 'flex-start' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={{ fontSize: '20px' }}>{esEntrada(detail) ? '📥' : '📤'}</span>
-              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '16px' }}>✕</button>
+      {/* Detalle en ventana: a pantalla completa en el teléfono. */}
+      {detail && (
+        <EditModal
+          title={detail.descripcion}
+          subtitle={`${esEntrada(detail) ? '📥 Entrada' : '📤 Salida'} · ${CAT_LABELS[detail.tipo] ?? detail.tipo} · ${detail.estado}`}
+          maxWidth="600px"
+          fullScreenOnMobile
+          onClose={() => setSelected(null)}
+        >
+          {([
+            ['Categoría', CAT_LABELS[detail.tipo] ?? detail.tipo],
+            ['Dirigida a', detail.unidad_nombre ?? (detail.destinatario_tipo === 'unidad' ? '—' : 'Administración')],
+            ['Fecha', fechaDocumento(detail)],
+            ['Plazo', detail.fecha_limite ?? '—'],
+            ['Remitente', detail.remitente ?? '—'],
+            ['Destinatario', detail.destinatario ?? '—'],
+            ['Mensajería', detail.empresa_mensajeria ?? '—'],
+            ['N° guía', detail.num_guia ?? '—'],
+            ['Prioridad', detail.prioridad],
+            ['Registrada', fechaCorta(detail.hora_recepcion)],
+            ['Entregada', detail.hora_entrega ? fechaCorta(detail.hora_entrega) : '—'],
+            ['Recibió', detail.entregado_a_nombre ?? '—'],
+          ] as [string, string][]).map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '6px 0', borderBottom: '1px solid var(--at-chip)', fontSize: '13px' }}>
+              <span style={{ color: 'var(--at-ink-3)', fontWeight: 600, flexShrink: 0 }}>{k}</span>
+              <span style={{ color: 'var(--at-ink)', textAlign: 'right', minWidth: 0, overflowWrap: 'anywhere' }}>{v}</span>
             </div>
-            <h3 style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>{detail.descripcion}</h3>
-            {([
-              ['Categoría', CAT_LABELS[detail.tipo] ?? detail.tipo],
-              ['Dirigida a', detail.unidad_nombre ?? (detail.destinatario_tipo === 'unidad' ? '—' : 'Administración')],
-              ['Fecha', fechaDocumento(detail)],
-              ['Plazo', detail.fecha_limite ?? '—'],
-              ['Remitente', detail.remitente ?? '—'],
-              ['Destinatario', detail.destinatario ?? '—'],
-              ['Mensajería', detail.empresa_mensajeria ?? '—'],
-              ['N° guía', detail.num_guia ?? '—'],
-              ['Prioridad', detail.prioridad],
-              ['Registrada', fechaCorta(detail.hora_recepcion)],
-              ['Entregada', detail.hora_entrega ? fechaCorta(detail.hora_entrega) : '—'],
-              ['Recibió', detail.entregado_a_nombre ?? '—'],
-            ] as [string, string][]).map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--at-chip)', fontSize: '12px' }}>
-                <span style={{ color: 'var(--at-ink-3)', fontWeight: 600 }}>{k}</span>
-                <span style={{ color: 'var(--at-ink)' }}>{v}</span>
-              </div>
-            ))}
-            {detail.fotos && detail.fotos.length > 0 && (
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
-                {detail.fotos.map(f => (
-                  <SecureImage key={f} src={f} bucket={BUCKET_EVIDENCIAS} alt="" style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
-                ))}
-              </div>
-            )}
-            {detail.firma_path && (
-              <div style={{ marginTop: '10px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px' }}>Acuse de recibo</div>
-                <SecureImage src={detail.firma_path} bucket={BUCKET_EVIDENCIAS} alt="firma" style={{ width: '100%', height: '80px', objectFit: 'contain', background: '#fff', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
-              </div>
-            )}
-            {detail.notas && (
-              <div style={{ marginTop: '10px', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '6px', fontSize: '12px', color: 'var(--at-ink-2)' }}>
-                {detail.notas}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          ))}
+          {detail.fotos && detail.fotos.length > 0 && (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '12px' }}>
+              {detail.fotos.map(f => (
+                <SecureImage key={f} src={f} bucket={BUCKET_EVIDENCIAS} alt="" style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
+              ))}
+            </div>
+          )}
+          {detail.firma_path && (
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px' }}>Acuse de recibo</div>
+              <SecureImage src={detail.firma_path} bucket={BUCKET_EVIDENCIAS} alt="firma" style={{ width: '100%', height: '80px', objectFit: 'contain', background: '#fff', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
+            </div>
+          )}
+          {detail.notas && (
+            <div style={{ marginTop: '12px', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '6px', fontSize: '12.5px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>
+              {detail.notas}
+            </div>
+          )}
+        </EditModal>
+      )}
 
       {/* Acuse de recibo — el único camino para dar por entregada una pieza */}
       {acuse && (

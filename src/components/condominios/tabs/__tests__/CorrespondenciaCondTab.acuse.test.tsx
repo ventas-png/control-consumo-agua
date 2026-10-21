@@ -76,9 +76,11 @@ vi.mock('../../../shared/SignaturePad', () => ({
     </button>
   ),
 }))
+// El pie se pinta también: el formulario de registro va en ventana y su
+// "Guardar" vive en el pie.
 vi.mock('../../../shared/EditModal', () => ({
-  EditModal: ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div data-testid="modal" aria-label={title}>{children}</div>
+  EditModal: ({ title, children, footer }: { title: string; children: React.ReactNode; footer?: React.ReactNode }) => (
+    <div data-testid="modal" aria-label={title}>{children}{footer}</div>
   ),
 }))
 

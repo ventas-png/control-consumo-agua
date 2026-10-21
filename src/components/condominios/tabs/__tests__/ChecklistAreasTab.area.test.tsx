@@ -12,7 +12,7 @@
 //      quedar bloqueado, y que al elegir área quede vinculado.
 //   4. Que el alta de áreas no viva aquí: el tab manda al tab Áreas.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import type { AreaCondominio, ChecklistArea } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
@@ -127,13 +127,13 @@ describe('ChecklistAreasTab — el área viene del catálogo', () => {
       areas: [area({ nombre: 'Piscina techada' })],
     })
     fireEvent.click(screen.getByText(/2026-09-01/))
-    expect(screen.getByTestId('checklist-area').textContent).toContain('Piscina techada')
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).toContain('Piscina techada')
   })
 
   it('un checklist legado conserva su texto y queda marcado como sin vincular', () => {
     renderTab({ checklists: [checklist({ area_id: null, area: 'gimnasio  viejo' })] })
     fireEvent.click(screen.getByText(/2026-09-01/))
-    expect(screen.getByTestId('checklist-area').textContent).toContain('gimnasio  viejo')
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).toContain('gimnasio  viejo')
     expect(screen.getByText(/⚠ sin vincular/)).toBeTruthy()
   })
 

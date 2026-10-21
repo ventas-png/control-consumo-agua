@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { TicketMantenimiento, ReservaAmenidad, PlanMantenimiento, InspeccionNormativa, VencimientoExtra } from '../../../types'
-import { formatFechaCalendario } from '../../../lib/format'
 import { tint } from '../../shared/statusTone'
+import { EditModal } from '../../shared/EditModal'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -29,6 +29,13 @@ const TIPO_CFG = {
 
 const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const DIAS_LARGOS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+/** "2026-10-14" → "Miércoles 14 de octubre" (título de la ventana del día). */
+function tituloDia(fecha: string) {
+  const [y, m, d] = fecha.split('-').map(Number)
+  return `${DIAS_LARGOS[new Date(y, m - 1, d).getDay()]} ${d} de ${MESES[m - 1].toLowerCase()}`
+}
 
 export default function CalendarioMantenimientoTab({ tickets, reservas, planesMantenimiento, inspecciones, vencimientosExtra }: Props) {
   const hoy = new Date()
@@ -148,88 +155,92 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
         })}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: diaDetalle ? '1fr 280px' : '1fr', gap: 14 }}>
-        {/* Calendario */}
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
-          {/* Días semana header */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--at-surface-2)' }}>
-            {DIAS_SEMANA.map(d => (
-              <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--at-ink-3)' }}>{d}</div>
-            ))}
-          </div>
-
-          {/* Celdas */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
-            {celdas.map((dia, i) => {
-              const fecha = dia ? fechaDia(dia) : ''
-              const evs = dia ? (eventosPorDia[fecha] ?? []) : []
-              const esHoy = fecha === hoyStr
-              const seleccionado = fecha === diaDetalle
-              return (
-                <div key={i}
-                  onClick={() => dia && setDiaDetalle(seleccionado ? null : fecha)}
-                  style={{
-                    minHeight: 72, padding: '4px 6px', borderTop: '1px solid var(--at-chip)',
-                    borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--at-chip)' : undefined,
-                    background: seleccionado ? 'var(--at-primary-tint)' : esHoy ? 'var(--at-warning-tint)' : dia ? 'var(--at-surface)' : 'var(--at-surface-2)',
-                    cursor: dia ? 'pointer' : 'default',
-                  }}>
-                  {dia && (
-                    <>
-                      <div style={{ fontSize: 12, fontWeight: esHoy ? 800 : 500,
-                        width: 22, height: 22, borderRadius: '50%',
-                        background: esHoy ? 'var(--at-primary)' : undefined,
-                        color: esHoy ? 'white' : 'var(--at-ink-2)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}>
-                        {dia}
-                      </div>
-                      {evs.slice(0, 3).map((ev, j) => (
-                        <div key={j} style={{ fontSize: 9, padding: '1px 4px', borderRadius: 4, background: ev.bg,
-                          color: ev.color, marginBottom: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontWeight: 600 }}>
-                          {ev.label}
-                        </div>
-                      ))}
-                      {evs.length > 3 && (
-                        <div style={{ fontSize: 9, color: 'var(--at-ink-3)', paddingLeft: 4 }}>+{evs.length - 3} más</div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+      {/* Calendario a todo el ancho; el día se abre en ventana (la columna
+          de 280px al lado lo apretaba en el teléfono). */}
+      <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
+        {/* Días semana header */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--at-surface-2)' }}>
+          {DIAS_SEMANA.map(d => (
+            <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--at-ink-3)' }}>{d}</div>
+          ))}
         </div>
 
-        {/* Panel de detalle */}
-        {diaDetalle && (
-          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)' }}>
-                {formatFechaCalendario(diaDetalle, { weekday: 'long', day: 'numeric', month: 'long' }, 'es', '—')}
-              </div>
-              <button onClick={() => setDiaDetalle(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--at-ink-3)' }}>×</button>
-            </div>
-            {detalleEventos.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--at-ink-3)', fontSize: 12 }}>Sin eventos</div>
-            ) : (
-              detalleEventos.map((ev, i) => {
-                const cfg = TIPO_CFG[ev.tipo]
-                return (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10,
-                    padding: '8px 10px', background: ev.bg, borderRadius: 8, border: `1px solid ${tint(ev.color, 13)}` }}>
-                    <span style={{ fontSize: 16, lineHeight: 1 }}>{cfg.icon}</span>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: ev.color }}>{cfg.label}</div>
-                      <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginTop: 2 }}>{ev.label}</div>
-                    </div>
+        {/* Celdas — cada día es un botón (antes un div con onClick, fuera del
+            alcance del teclado); los huecos del mes siguen siendo div. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+          {celdas.map((dia, i) => {
+            const borderRight = (i + 1) % 7 !== 0 ? '1px solid var(--at-chip)' : 'none'
+            if (!dia) {
+              return (
+                <div key={i}
+                  style={{ minHeight: 72, padding: '4px 6px', borderTop: '1px solid var(--at-chip)', borderRight, background: 'var(--at-surface-2)' }} />
+              )
+            }
+            const fecha = fechaDia(dia)
+            const evs = eventosPorDia[fecha] ?? []
+            const esHoy = fecha === hoyStr
+            const seleccionado = fecha === diaDetalle
+            return (
+              <button key={i} type="button" onClick={() => setDiaDetalle(fecha)}
+                aria-label={`${tituloDia(fecha)} de ${anio}${evs.length ? `, ${evs.length} evento${evs.length !== 1 ? 's' : ''}` : ''}`}
+                aria-current={esHoy ? 'date' : undefined}
+                style={{
+                  minHeight: 72, minWidth: 0, padding: '4px 6px',
+                  borderTop: '1px solid var(--at-chip)', borderRight, borderBottom: 'none', borderLeft: 'none',
+                  display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start',
+                  textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer',
+                  background: seleccionado ? 'var(--at-primary-tint)' : esHoy ? 'var(--at-warning-tint)' : 'var(--at-surface)',
+                }}>
+                <div style={{ fontSize: 12, fontWeight: esHoy ? 800 : 500,
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: esHoy ? 'var(--at-primary)' : undefined,
+                  color: esHoy ? 'white' : 'var(--at-ink-2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}>
+                  {dia}
+                </div>
+                {evs.slice(0, 3).map((ev, j) => (
+                  <div key={j} style={{ fontSize: 9, padding: '1px 4px', borderRadius: 4, background: ev.bg,
+                    color: ev.color, marginBottom: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontWeight: 600 }}>
+                    {ev.label}
                   </div>
-                )
-              })
-            )}
-          </div>
-        )}
+                ))}
+                {evs.length > 3 && (
+                  <div style={{ fontSize: 9, color: 'var(--at-ink-3)', paddingLeft: 4 }}>+{evs.length - 3} más</div>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
+
+      {/* Detalle del día en ventana: a pantalla completa en el teléfono. */}
+      {diaDetalle && (
+        <EditModal
+          title={tituloDia(diaDetalle)}
+          subtitle={`${diaDetalle.slice(0, 4)} · ${detalleEventos.length === 0 ? 'Sin eventos' : `${detalleEventos.length} evento${detalleEventos.length !== 1 ? 's' : ''}`}`}
+          maxWidth="560px"
+          fullScreenOnMobile
+          onClose={() => setDiaDetalle(null)}
+        >
+          {detalleEventos.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--at-ink-3)', fontSize: 13 }}>Sin eventos</div>
+          ) : (
+            detalleEventos.map((ev, i) => {
+              const cfg = TIPO_CFG[ev.tipo]
+              return (
+                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10,
+                  padding: '10px 12px', background: ev.bg, borderRadius: 8, border: `1px solid ${tint(ev.color, 13)}` }}>
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>{cfg.icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: ev.color }}>{cfg.label}</div>
+                    <div style={{ fontSize: 14, color: 'var(--at-ink-2)', marginTop: 2, overflowWrap: 'anywhere' }}>{ev.label}</div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </EditModal>
+      )}
 
       {/* Leyenda de conteos del mes */}
       <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>

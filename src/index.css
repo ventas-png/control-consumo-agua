@@ -810,10 +810,9 @@ button:focus:not(:focus-visible) {
 /* ─── Panel de Condominios en el teléfono ─────────────────────────────────
  *
  * Las ~190 pestañas del módulo se escribieron para escritorio, con rejillas de
- * columnas fijas inline (más de 200: `'1fr 1fr'`, `'repeat(4,1fr)'`, …) y
- * vistas lista|detalle (`selected ? '1fr 420px' : '1fr'`). En un teléfono eso
- * daba formularios de campos de 140px, KPIs de 70px y la lista apretada en
- * una franja con el detalle saliéndose de la pantalla. En vez de tocar
+ * columnas fijas inline (más de 200: `'1fr 1fr'`, `'repeat(4,1fr)'`, …). En
+ * un teléfono eso daba formularios de campos de 140px, KPIs de 70px y
+ * columnas laterales que se salían de la pantalla. En vez de tocar
  * archivo por archivo, el cuerpo del módulo (`.cond-panel`, en
  * CondominiosSection) reacomoda esas rejillas por el valor que el navegador
  * serializa en el atributo style — siempre normalizado ("repeat(4, 1fr)"
@@ -845,14 +844,10 @@ button:focus:not(:focus-visible) {
   .cond-panel [style*="grid-template-columns: 1fr 1fr 1fr 1fr;"] {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
-  /* Lista | detalle y columnas laterales fijas: una sola columna, el
-   * detalle debajo de la lista en vez de fuera de la pantalla. */
-  .cond-panel [style*="grid-template-columns: 1fr 1.4fr;"],
-  .cond-panel [style*="grid-template-columns: 1fr 420px;"],
-  .cond-panel [style*="grid-template-columns: 1fr 380px;"],
-  .cond-panel [style*="grid-template-columns: 1fr 340px;"],
+  /* Columnas laterales fijas (resúmenes, pisos, simuladores): una sola
+   * columna, la lateral debajo en vez de fuera de la pantalla. Las vistas
+   * lista|detalle ya abren el detalle en ventana (EditModal). */
   .cond-panel [style*="grid-template-columns: 1fr 290px;"],
-  .cond-panel [style*="grid-template-columns: 1fr 280px;"],
   .cond-panel [style*="grid-template-columns: 1fr 240px;"],
   .cond-panel [style*="grid-template-columns: 1fr 220px;"],
   .cond-panel [style*="grid-template-columns: 280px 1fr;"],
