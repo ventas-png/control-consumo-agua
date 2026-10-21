@@ -1,6 +1,7 @@
 import { mesLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import { CuotaCondominio, GastoCondominio } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -105,7 +106,7 @@ export default function PronosticoFinancieroTab({ cuotas, gastos, moneda }: Prop
           { label: 'Proyectado 6m',     val: `${moneda} ${Math.round(saldoAcumulado).toLocaleString('es')}`, color: saldoAcumulado >= 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: saldoAcumulado >= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)' },
           { label: 'Meses en rojo',     val: String(mesesEnRojo), color: mesesEnRojo === 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: mesesEnRojo === 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)' },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
+          <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>

@@ -7,6 +7,7 @@ import { fetchConfigCondominioTerminos } from '../../../domain/condominios/tabQu
 import { SecureImage } from '../../shared/SecureImage'
 import { useSignedUrl } from '../../../lib/storageUrls'
 import type { SolicitudMudanzaUnidad, TipoSolicitudMudanza, EstadoSolicitudMudanza, Unidad } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 // Pequeño wrapper para link de descarga con signed URL del bucket mudanza-docs.
 function SignedMudanzaImageLink({ url, idx }: { url: string; idx: number }) {
@@ -313,7 +314,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
           { label: 'Aprobadas',  count: aprobadas,  color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
           { label: 'Rechazadas', count: rechazadas, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
         ].map(k => (
-          <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.color}30`, borderRadius: '10px', padding: '12px 20px', minWidth: '110px' }}>
+          <div key={k.label} style={{ background: k.bg, border: `1px solid ${tint(k.color, 19)}`, borderRadius: '10px', padding: '12px 20px', minWidth: '110px' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: k.color }}>{k.count}</div>
             <div style={{ fontSize: '12px', color: k.color, fontWeight: 600 }}>{k.label}</div>
           </div>

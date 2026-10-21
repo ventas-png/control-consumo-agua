@@ -6,6 +6,7 @@ import {
   SugerenciaCondominio, Unidad, RecargoMora, FondoReservaMovimiento,
 } from '../../../types'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -33,7 +34,7 @@ function diasHasta(fecha: string): number {
 
 function Kpi({ label, val, sub, color, bg }: { label: string; val: string; sub?: string; color: string; bg: string }) {
   return (
-    <div style={{ flex: '1 1 120px', background: bg, border: `1px solid ${color}33`, borderRadius: 10, padding: '10px 14px' }}>
+    <div style={{ flex: '1 1 120px', background: bg, border: `1px solid ${tint(color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
       <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{label}</div>
       <div style={{ fontSize: 16, fontWeight: 800, color, marginTop: 2 }}>{val}</div>
       {sub && <div style={{ fontSize: 10, color, opacity: 0.8, marginTop: 1 }}>{sub}</div>}
@@ -209,7 +210,7 @@ export default function PanelDirectivoTab({
       <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 14 }}>Indicadores clave para la junta directiva · {hoy}</div>
 
       {/* Puntaje de salud */}
-      <div style={{ background: `${saludColor}0f`, border: `1px solid ${saludColor}44`, borderRadius: 12, padding: 14, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ background: tint(saludColor, 6), border: `1px solid ${tint(saludColor, 27)}`, borderRadius: 12, padding: 14, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 16 }}>
         <div style={{ textAlign: 'center', minWidth: 80 }}>
           <div style={{ fontSize: 36, fontWeight: 900, color: saludColor, lineHeight: 1 }}>{puntajeSalud}</div>
           <div style={{ fontSize: 10, color: saludColor, fontWeight: 700, marginTop: 2 }}>/ 100</div>

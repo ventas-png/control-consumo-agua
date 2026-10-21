@@ -4,6 +4,7 @@ import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { InfraccionCondominio, SugerenciaCondominio, Unidad, EstadoInfraccion, EstadoSugerencia } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   infracciones: InfraccionCondominio[]
@@ -154,7 +155,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
           { label: 'Sugerencias pendientes', val: String(sugActivas), color: sugActivas > 5 ? 'var(--at-danger)' : 'var(--at-warning)', bg: sugActivas > 5 ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)' },
           { label: 'Sugerencias respondidas', val: String(sugerencias.filter(s => s.estado === 'respondida').length), color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
+          <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
@@ -202,7 +203,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, background: cfg.bg,
-                      padding: '2px 8px', borderRadius: 10, border: `1px solid ${cfg.color}33` }}>{cfg.label}</span>
+                      padding: '2px 8px', borderRadius: 10, border: `1px solid ${tint(cfg.color, 20)}` }}>{cfg.label}</span>
                     <span style={{ fontSize: 11, color: 'var(--at-ink-2)', fontWeight: 600 }}>{inf.tipo.replace('_', ' ')}</span>
                     {inf.unidad_nombre && <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>· {inf.unidad_nombre}</span>}
                   </div>
@@ -239,7 +240,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, background: cfg.bg,
-                        padding: '2px 8px', borderRadius: 10, border: `1px solid ${cfg.color}33` }}>{cfg.label}</span>
+                        padding: '2px 8px', borderRadius: 10, border: `1px solid ${tint(cfg.color, 20)}` }}>{cfg.label}</span>
                       <span style={{ fontSize: 11, color: 'var(--at-ink-2)', fontWeight: 600 }}>{sug.categoria}</span>
                       {sug.unidad_nombre && <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>· {sug.unidad_nombre}</span>}
                       {sug.anonima && <span style={{ fontSize: 9, color: 'var(--at-ink-3)', fontStyle: 'italic' }}>anónima</span>}

@@ -6,6 +6,7 @@ import {
   AnuncioComunidad, ConciliacionCobrosLog, FondoReservaMovimiento, Unidad,
   InfraccionCondominio, SugerenciaCondominio,
 } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -211,11 +212,12 @@ export default function BitacoraActividadTab({
         ) : (
           pagActual.map((ev, i) => {
             const cfg = TIPO_CFG[ev.tipo]
+            const badgeColor = ev.badgeColor ?? 'var(--at-ink-3)'
             return (
               <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px',
                 borderBottom: i < pagActual.length - 1 ? '1px solid var(--at-chip)' : undefined }}>
                 {/* Ícono */}
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.bg, border: `1px solid ${cfg.color}33`,
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.bg, border: `1px solid ${tint(cfg.color, 20)}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
                   {cfg.icon}
                 </div>
@@ -224,7 +226,7 @@ export default function BitacoraActividadTab({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink)' }}>{ev.titulo}</span>
                     {ev.badge && (
-                      <span style={{ fontSize: 9, fontWeight: 700, color: ev.badgeColor ?? 'var(--at-ink-3)', background: `${ev.badgeColor}1a`, padding: '1px 6px', borderRadius: 10, border: `1px solid ${ev.badgeColor}33` }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: badgeColor, background: tint(badgeColor, 10), padding: '1px 6px', borderRadius: 10, border: `1px solid ${tint(badgeColor, 20)}` }}>
                         {ev.badge}
                       </span>
                     )}

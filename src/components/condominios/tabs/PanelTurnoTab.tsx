@@ -5,6 +5,7 @@ import {
   ReservaAmenidad, PolizaSeguro, ContratoProveedor,
   InspeccionNormativa, VencimientoExtra, CuotaCondominio,
 } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   visitantes: Visitante[]
@@ -42,7 +43,7 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
 
   function Bloque({ titulo, icon, count, color, children }: { titulo: string; icon: string; count: number; color: string; children: ReactNode }) {
     return (
-      <div style={{ background: 'var(--at-surface)', border: `1px solid ${color}33`, borderRadius: 12, padding: 14, borderLeft: `4px solid ${color}` }}>
+      <div style={{ background: 'var(--at-surface)', border: `1px solid ${tint(color, 20)}`, borderRadius: 12, padding: 14, borderLeft: `4px solid ${color}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)' }}>{icon} {titulo}</div>
           <div style={{ fontSize: 20, fontWeight: 800, color }}>{count}</div>
@@ -69,7 +70,7 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
           { label: 'Reservas hoy', val: reservasHoy.length, color: 'var(--at-primary)' },
           { label: 'Cuotas morosas', val: morosas.length, color: semaforo(morosas.length, 0, 5) },
         ].map(k => (
-          <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', border: `1px solid ${k.color}22` }}>
+          <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', border: `1px solid ${tint(k.color, 13)}` }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.val}</div>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
           </div>

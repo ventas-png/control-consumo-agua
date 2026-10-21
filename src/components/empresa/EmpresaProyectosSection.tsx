@@ -15,6 +15,7 @@ import { PlanUsageCard } from './PlanUsageCard'
 import { AmpliarPlanModal } from './AmpliarPlanModal'
 import type { EmpresaInfo } from '../../domain/empresa/queries'
 import { MOTIVO_SOLO_PRINCIPAL_PROYECTOS } from '../../domain/empresa/usuarios'
+import { tint } from '../shared/statusTone'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: 'var(--at-success)' },
@@ -353,7 +354,7 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
                       title="Cambiar estado"
                       style={{
                         padding: '4px 12px', borderRadius: '7px',
-                        border: `1px solid ${estadoCfg.color}44`,
+                        border: `1px solid ${tint(estadoCfg.color, 27)}`,
                         background: estadoCfg.bg,
                         color: estadoCfg.color,
                         cursor: 'pointer', fontSize: '11px', fontWeight: 600,
@@ -407,7 +408,7 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
                     onClick={() => void cambiarEstadoProyecto(p)}
                     style={{
                       flex: 1, padding: '9px 0', borderRadius: '8px',
-                      border: `1px solid ${estadoCfg.color}55`,
+                      border: `1px solid ${tint(estadoCfg.color, 33)}`,
                       background: estadoCfg.bg,
                       color: estadoCfg.color,
                       cursor: 'pointer', fontSize: '13px', fontWeight: 600,

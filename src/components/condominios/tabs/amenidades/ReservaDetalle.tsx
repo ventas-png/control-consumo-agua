@@ -8,6 +8,7 @@ import { SecureImage } from '../../../shared/SecureImage'
 import { CheckoutForm } from './comunes'
 import { ModalPortal } from '../../../shared/ModalPortal'
 import { formatFechaCalendario } from '../../../../lib/format'
+import { tint } from '../../../shared/statusTone'
 
 export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
   const { amenidades, moneda, canEdit, onRefresh, reservaDetalle, setReservaDetalle, registrarCheckin, registrarCheckout, actualizarEstadoDeposito, retenerDeposito, aprobarReserva, rechazarReserva } = ctx
@@ -123,7 +124,7 @@ export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
             <div onClick={e => e.stopPropagation()}
               style={{ background: 'var(--at-surface)', borderRadius: 18, maxWidth: 700, width: '100%', maxHeight: '92vh', overflow: 'auto', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.4)' }}>
               {/* Header gradiente */}
-              <div style={{ padding: '20px 24px', background: `linear-gradient(135deg, ${accent}, ${accent}dd)`, color: 'white', borderRadius: '18px 18px 0 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ padding: '20px 24px', background: `linear-gradient(135deg, ${accent}, ${tint(accent, 87)})`, color: 'white', borderRadius: '18px 18px 0 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Reserva · {r.estado}</div>
                   <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{r.amenidad_nombre}</div>
@@ -150,12 +151,12 @@ export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
                         {/* Bullet */}
                         <div style={{
                           width: 28, height: 28, borderRadius: '50%',
-                          background: s.done ? 'var(--at-success-tint)' : s.current ? `${accent}22` : 'var(--at-chip)',
+                          background: s.done ? 'var(--at-success-tint)' : s.current ? tint(accent, 13) : 'var(--at-chip)',
                           border: `2px solid ${dotColor}`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: dotColor, fontWeight: 800, fontSize: 13,
                           flexShrink: 0, zIndex: 1, position: 'relative',
-                          boxShadow: s.current ? `0 0 0 4px ${accent}22` : 'none',
+                          boxShadow: s.current ? `0 0 0 4px ${tint(accent, 13)}` : 'none',
                         }}>
                           {s.done ? '✓' : i + 1}
                         </div>

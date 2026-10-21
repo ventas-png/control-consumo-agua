@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { GastoCondominio, Unidad } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   gastos: GastoCondominio[]
@@ -86,7 +87,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
           { label: 'Variación este mes', val: `${pctVariacion >= 0 ? '+' : ''}${pctVariacion.toFixed(1)}%`, color: Math.abs(pctVariacion) < 10 ? 'var(--at-success)' : pctVariacion > 0 ? 'var(--at-danger)' : 'var(--at-success)', bg: Math.abs(pctVariacion) < 10 ? 'var(--at-success-tint)' : pctVariacion > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)' },
           { label: 'CO₂ estimado 12m', val: `${(co2Estimado / 1000).toFixed(2)} ton`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 110px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
+          <div key={k.label} style={{ flex: '1 1 110px', background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
@@ -100,7 +101,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
           const val = totales12m[cat]
           const pct = totalGeneral > 0 ? (val / totalGeneral) * 100 : 0
           return (
-            <div key={cat} style={{ flex: '1 1 150px', background: cfg.bg, border: `1px solid ${cfg.color}33`, borderRadius: 10, padding: '10px 14px' }}>
+            <div key={cat} style={{ flex: '1 1 150px', background: cfg.bg, border: `1px solid ${tint(cfg.color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
               <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{cfg.label}</div>
               <div style={{ fontSize: 14, fontWeight: 800, color: cfg.color, marginTop: 2 }}>{moneda} {val.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
               <div style={{ fontSize: 10, color: cfg.color, marginTop: 2 }}>{pct.toFixed(1)}% del total</div>
