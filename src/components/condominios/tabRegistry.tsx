@@ -35,7 +35,7 @@ import type {
   PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
   AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
   FondoReserva, PermisoObraUnidad, TarifaCondominio, IncidenteSeguridad,
-  ChecklistArea, ProgramacionLimpieza, EjecucionLimpieza, ConsumoEnergiaArea, HistorialResidente,
+  ChecklistArea, ConsumoEnergiaArea, HistorialResidente,
   EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
   SuministroCondominio, MovimientoSuministro, TareaCondominio, GestionCobranza,
   SolicitudCertificado, VisitaFrecuente, ArticuloReglamento, ControlPlagas,
@@ -227,8 +227,6 @@ export interface CondominiosTabContext {
   tarifas: TarifaCondominio[]
   incidentes: IncidenteSeguridad[]
   checklistAreas: ChecklistArea[]
-  progLimpieza: ProgramacionLimpieza[]
-  ejecLimpieza: EjecucionLimpieza[]
   consumoEnergia: ConsumoEnergiaArea[]
   historialRes: HistorialResidente[]
   estacVisita: EstacionamientoVisita[]

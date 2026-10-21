@@ -91,7 +91,8 @@ Los **indicadores** y las **novedades** salen de esas tareas:
   expediente (salario, DPI, cuenta…). Sigue el patrón de `rutas_operadores_asignables`.
 - **Sin cambios:**
   - `materializar_rutinas_turno` sigue existiendo, pero ya ninguna pantalla la llama.
-  - `programacion_limpieza` y `ejecuciones_limpieza` quedan como historia; el panel todavía las carga.
+  - `programacion_limpieza` y `ejecuciones_limpieza` quedan como historia: no se borran, pero el panel ya no las
+    carga (ninguna pantalla las lee). Lo vigila `limpiezaCalendarioMigracion.test.ts`.
 
 ## Pruebas
 
@@ -123,7 +124,11 @@ to Production» (evento `push`, `success` a las 22:38 UTC). Comprobación poster
 reconstrucción de `main`; los 3742 grupos restantes son idénticos a la captura anterior y el sha256 completo coincide con el
 medido en producción; `drift-conocido.json` no cambia.
 
-## Pendiente
+## Carga del panel
 
-- Retirar las cargas de `programacion_limpieza` y `ejecuciones_limpieza` del panel. Ya no tienen pantalla, pero
-  retirarlas toca el batch posicional de `sectionData.ts` y varias guardas; va en un cambio aparte.
+Al entrar a Condominios ya no se bajan `programacion_limpieza` (el programa por área) ni `ejecuciones_limpieza` (los
+últimos 45 días de la ruta vieja, hasta 2000 filas). Salieron:
+- la entrada del lote posicional de `fetchCondominiosSectionData`, junto con su nombre en el destructuring, en la
+  misma posición (131 y 131 después);
+- `fetchCondominiosLimpiezaData`;
+- `progLimpieza` y `ejecLimpieza` del estado del panel y del contexto de los tabs.
