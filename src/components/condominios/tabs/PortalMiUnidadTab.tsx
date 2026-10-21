@@ -8,6 +8,7 @@ import { MensajePortalChatModal } from './MensajePortalChatModal'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchConteoComentariosMensajePortal } from '../../../domain/condominios/tabQueries'
 import { AccesosUnidadSection } from './AccesosUnidadSection'
+import { tint } from '../../shared/statusTone'
 import type { Unidad, MensajePortal, TipoMensajePortal } from '../../../types'
 
 interface Props {
@@ -222,42 +223,57 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
             const tc = TIPO_MSG[m.tipo]
             const ec = ESTADO_MSG[m.estado] ?? ESTADO_MSG.nuevo
             const nHilo = conteoMensajes[m.id] ?? 0
+            const respondido = m.estado === 'respondido' || !!m.respuesta
             return (
-              <div key={m.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 16px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '18px', flexShrink: 0 }}>{tc.icon}</span>
+              <div key={m.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${m.tipo === 'emergencia' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '14px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '14px 16px' }}>
+                  <span aria-hidden="true" style={{ width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '19px', background: 'var(--at-primary-tint)' }}>{tc.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '3px' }}>
-                      <span style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--at-ink)' }}>{m.asunto}</span>
-                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: ec.color }}>{ec.label}</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline' }}>
+                      <span style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)' }}>{m.asunto}</span>
+                      <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', flexShrink: 0 }}>{new Date(m.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</span>
                     </div>
-                    <p style={{ margin: '0 0 5px', fontSize: '13px', color: 'var(--at-ink-2)' }}>{m.cuerpo}</p>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', margin: '5px 0' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 9px', borderRadius: '999px', fontSize: '11.5px', fontWeight: 700, background: tint(ec.color), color: ec.color }}>
+                        <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />{ec.label}
+                      </span>
+                      <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{tc.label}</span>
+                    </div>
+                    {/* Tres líneas en la lista; el mensaje completo encabeza la conversación. */}
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-2)', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{m.cuerpo}</p>
                     {m.foto_urls?.length > 0 && (
-                      <div style={{ margin: '6px 0' }}>
+                      <div style={{ margin: '8px 0 0' }}>
                         <ImageGallery urls={m.foto_urls} maxVisible={4} />
                       </div>
                     )}
                     {m.archivo_urls?.length > 0 && (
-                      <div style={{ margin: '6px 0' }}>
+                      <div style={{ margin: '8px 0 0' }}>
                         <ListaAdjuntos paths={m.archivo_urls} />
                       </div>
                     )}
                     {m.respuesta && (
-                      <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '8px', padding: '8px 12px', marginTop: '6px' }}>
+                      <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '10px', padding: '8px 12px', marginTop: '8px' }}>
                         <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--at-success)', marginBottom: '2px' }}>Respuesta de administración:</div>
                         <div style={{ fontSize: '13px', color: 'var(--at-ink-2)' }}>{m.respuesta}</div>
                       </div>
                     )}
-                    <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
-                      {new Date(m.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </div>
-                    <button
-                      onClick={() => setConversacion(m)}
-                      style={{ marginTop: '9px', padding: '6px 13px', background: nHilo > 0 ? 'var(--at-primary-tint)' : 'var(--at-chip)', color: nHilo > 0 ? 'var(--at-primary)' : 'var(--at-ink-2)', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-                      💬 {nHilo > 0 ? `Conversación (${nHilo})` : (isAdmin ? 'Responder' : 'Escribir a la administración')}
-                    </button>
                   </div>
                 </div>
+                {/* El hilo se abre en ventana (MensajePortalChatModal). */}
+                <button
+                  type="button"
+                  className="conv-row"
+                  onClick={() => setConversacion(m)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+                    padding: '11px 16px', borderTop: '1px solid var(--at-line)', borderRight: 'none', borderBottom: 'none', borderLeft: 'none',
+                    background: nHilo > 0 || respondido ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
+                    color: nHilo > 0 || respondido ? 'var(--at-primary)' : 'var(--at-ink-2)',
+                    fontSize: '13px', fontWeight: 700, cursor: 'pointer', textAlign: 'left',
+                  }}>
+                  <span>💬 {nHilo > 0 ? `Conversación (${nHilo})` : (isAdmin ? 'Responder' : 'Escribir a la administración')}</span>
+                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                </button>
               </div>
             )
           })}
