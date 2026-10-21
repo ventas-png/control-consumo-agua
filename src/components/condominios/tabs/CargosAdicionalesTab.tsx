@@ -8,6 +8,7 @@ import { pedirRebaja } from '../../contabilidad/solicitarRebajaDialog'
 import { CargoAdicionalUnidad, CategoriaCargoAdicional, EstadoCargoAdicional, Unidad } from '../../../types'
 import { useCargosCobroResumenQuery } from '../../../domain/contabilidad/cobrosCargo'
 import CobroCargoModal from './CobroCargoModal'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cargos: CargoAdicionalUnidad[]
@@ -245,7 +246,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                     <div key={c.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencido ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: cat?.color + '20', color: cat?.color }}>{cat?.icon} {cat?.label}</span>
+                          <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: cat && tint(cat.color, 12), color: cat?.color }}>{cat?.icon} {cat?.label}</span>
                           <span style={{ fontWeight: 600, fontSize: 14 }}>{c.concepto}</span>
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 3 }}>

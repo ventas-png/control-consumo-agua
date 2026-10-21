@@ -2,6 +2,7 @@ import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
+import { tint } from '../../shared/statusTone'
 import { ControlPlagas, TipoControlPlagas, ResultadoControlPlagas } from '../../../types'
 
 interface Props {
@@ -122,7 +123,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
               style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-accent-tint)' : 'var(--at-surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
-                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: res?.color + '20', color: res?.color }}>{res?.label}</span>
+                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: res && tint(res.color, 12), color: res?.color }}>{res?.label}</span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
                 {r.fecha}
@@ -237,7 +238,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
             <div>
               <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 4 }}>{tipo?.icon} {tipo?.label}</div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-                <span style={{ padding: '4px 12px', borderRadius: 10, background: res?.color + '20', color: res?.color, fontWeight: 600, fontSize: 13 }}>{res?.label}</span>
+                <span style={{ padding: '4px 12px', borderRadius: 10, background: res && tint(res.color, 12), color: res?.color, fontWeight: 600, fontSize: 13 }}>{res?.label}</span>
                 <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{selected.fecha}</span>
                 {selected.hora_inicio && <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{selected.hora_inicio} – {selected.hora_fin || '?'}</span>}
               </div>

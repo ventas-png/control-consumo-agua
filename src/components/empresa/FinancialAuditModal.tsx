@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, Fragment, type ReactNode, type CSSPro
 import { fetchFinancialAuditLog } from '../../domain/empresa/auditoria'
 import { fetchAppUserNamesByIds } from '../../domain/usuarios/queries'
 import { ModalPortal } from '../shared/ModalPortal'
+import { tint } from '../shared/statusTone'
 
 // ============================================================================
 // FinancialAuditModal — F4.2.1: UI sobre audit_log generico de F2.7.
@@ -196,7 +197,7 @@ export function FinancialAuditModal({ onClose }: Props) {
                         <td style={tdStyle}>
                           <span style={{
                             fontSize: '11px', fontWeight: 600, color: a.color,
-                            background: a.color + '14', padding: '2px 8px', borderRadius: '999px',
+                            background: tint(a.color, 8), padding: '2px 8px', borderRadius: '999px',
                           }}>{a.label}</span>
                         </td>
                         <td style={tdStyle}>{actor}</td>

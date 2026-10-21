@@ -11,6 +11,7 @@ import { proveedorHabilitadoEn } from '../../../domain/proveedores/identidad'
 import type { ProveedorCatalogo } from '../../../types/proveedores'
 import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
 import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   suministros: SuministroCondominio[]
@@ -368,7 +369,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
                 { key: 'tipo', header: 'Tipo', sortable: true,
                   render: (m) => {
                     const tipo = TIPOS_MOV.find(t => t.value === m.tipo)
-                    return <span style={{ padding: '2px 8px', borderRadius: 8, background: (tipo?.color ?? 'var(--at-ink-3)') + '20', color: tipo?.color, fontSize: 11 }}>{tipo?.label}</span>
+                    return <span style={{ padding: '2px 8px', borderRadius: 8, background: tint(tipo?.color ?? 'var(--at-ink-3)', 12), color: tipo?.color, fontSize: 11 }}>{tipo?.label}</span>
                   } },
                 { key: 'cantidad', header: 'Cantidad', align: 'right', sortable: true,
                   render: (m) => <span style={{ fontWeight: 600 }}>{m.cantidad} {selected.unidad_medida}</span> },

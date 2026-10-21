@@ -37,6 +37,20 @@ export function statusTone(estado?: string | null): Tone {
   return TONE_BY_STATUS[estado.toLowerCase().trim()] ?? 'neutral'
 }
 
+/**
+ * Versión translúcida de un color: `pct`% del color sobre transparente.
+ * Sustituye al viejo `color + '20'` (alfa hex), que con `var(--at-*)` daba
+ * `var(--at-success)20`: no es un color, la propiedad caía a su valor inicial
+ * y el badge salía sin fondo (o el borde desaparecía). `color-mix` acepta
+ * variables, hex o cualquier otro color y sigue al modo oscuro.
+ *
+ * Equivalencias del sufijo hex: '14' ≈ 8, '1a' ≈ 10, '20' ≈ 12, '22' ≈ 13,
+ * '33' = 20, '44' ≈ 27.
+ */
+export function tint(color: string, pct = 14): string {
+  return `color-mix(in srgb, ${color} ${pct}%, transparent)`
+}
+
 /** Estilo suave (tint + texto a tono + borde) para un tono dado. */
 export function softToneStyle(tone: Tone): CSSProperties {
   const v = TONE_VARS[tone]

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
+import { tint } from '../../shared/statusTone'
 import { NotaAdmin, CategoriaNota, PrioridadNota } from '../../../types'
 
 interface Props {
@@ -250,7 +251,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: cat?.color + '20', color: cat?.color }}>{cat?.icon} {cat?.label}</span>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: cat && tint(cat.color, 12), color: cat?.color }}>{cat?.icon} {cat?.label}</span>
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: prio?.bg, color: prio?.color }}>{prio?.label}</span>
                     {selected.fijada && <span style={{ fontSize: 11, color: 'var(--at-warning)' }}>📌 Fijada</span>}
                     {selected.resuelta && <span style={{ fontSize: 11, color: 'var(--at-success)' }}>✓ Resuelta</span>}

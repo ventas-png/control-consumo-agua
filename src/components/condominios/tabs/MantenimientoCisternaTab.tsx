@@ -2,6 +2,7 @@ import { hoyLocalISO, esFechaCalendarioVencida } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
+import { tint } from '../../shared/statusTone'
 import { MantenimientoCisterna, TipoMantenimientoCisterna, EstadoCisterna } from '../../../types'
 
 interface Props {
@@ -251,7 +252,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
                 <div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>🏗️ {r.cisterna}</span>
-                    <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: tipo?.color + '20', color: tipo?.color }}>{tipo?.icon} {tipo?.label}</span>
+                    <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: tipo && tint(tipo.color, 12), color: tipo?.color }}>{tipo?.icon} {tipo?.label}</span>
                     <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.icon} {est?.label}</span>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 3 }}>

@@ -6,6 +6,7 @@ import type { AnuncioComunidad, TipoAnuncio } from '../../../types'
 import { fetchAnuncioLecturas } from '../../../domain/portal/queries'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   anuncios: AnuncioComunidad[]
@@ -188,7 +189,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
           {filtrados.map(a => {
             const cfg = TIPO_CONFIG[a.tipo]
             return (
-              <div key={a.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${a.activo ? cfg.color + '40' : 'var(--at-line)'}`, borderRadius: '14px', padding: '18px 20px', opacity: a.activo ? 1 : 0.6 }}>
+              <div key={a.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${a.activo ? tint(cfg.color, 25) : 'var(--at-line)'}`, borderRadius: '14px', padding: '18px 20px', opacity: a.activo ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   <div style={{ width: 40, height: 40, borderRadius: '12px', background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
                     {cfg.icon}

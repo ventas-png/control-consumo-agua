@@ -1,6 +1,7 @@
 import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
+import { tint } from '../../shared/statusTone'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { PlantillaMensajeCond, CuotaCondominio, Unidad, ReservaAmenidad, CanalPlantilla } from '../../../types'
 
@@ -152,7 +153,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
                   const sel = plantillaId === p.id
                   return (
                     <div key={p.id} onClick={() => setPlantillaId(p.id)}
-                      style={{ padding: '10px 12px', border: `1.5px solid ${sel ? c.color : 'var(--at-line)'}`, borderRadius: 8, cursor: 'pointer', background: sel ? c.color + '11' : 'var(--at-surface-2)' }}>
+                      style={{ padding: '10px 12px', border: `1.5px solid ${sel ? c.color : 'var(--at-line)'}`, borderRadius: 8, cursor: 'pointer', background: sel ? tint(c.color, 7) : 'var(--at-surface-2)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                         <span style={{ fontSize: 10, fontWeight: 700, color: c.color }}>{c.icon} {c.label}</span>
                       </div>
@@ -217,7 +218,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               {previews.map(p => (
                 <button key={p.unidad.id} onClick={() => setPreviewUnidadId(p.unidad.id)}
-                  style={{ padding: '4px 10px', border: `1px solid ${previewUnidad?.id === p.unidad.id ? canalCfg?.color ?? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, background: previewUnidad?.id === p.unidad.id ? (canalCfg?.color ?? 'var(--at-primary)') + '11' : 'var(--at-surface-2)' }}>
+                  style={{ padding: '4px 10px', border: `1px solid ${previewUnidad?.id === p.unidad.id ? canalCfg?.color ?? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, background: previewUnidad?.id === p.unidad.id ? tint(canalCfg?.color ?? 'var(--at-primary)', 7) : 'var(--at-surface-2)' }}>
                   {p.unidad.nombre}
                 </button>
               ))}
