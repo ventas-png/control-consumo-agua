@@ -23,7 +23,9 @@ export function AlertasConsumoCard({ companyId, projectId }: Props) {
       boxShadow: '0 8px 24px rgba(0,0,0,0.06)', border: '1px solid var(--at-warning-border, var(--at-line))',
       marginBottom: '24px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+      {/* wrap: con fugas y medidores parados a la vez, en el teléfono el
+          resumen se apretaba a ~100px junto al título; ahora baja de línea. */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 4 }}>
         <span style={{ fontSize: 22 }}>⚠️</span>
         <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--at-ink)' }}>Alertas de consumo</h3>
         <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--at-ink-3)' }}>

@@ -1,9 +1,9 @@
-import { useState, type ChangeEvent} from 'react'
+import { useState, type ChangeEvent, type CSSProperties } from 'react'
 import { notify } from '../shared/Dialog'
 import { createPago, uploadComprobantePago } from '../../domain/cobros/mutations'
 import type { Registro, UserSession, FormaPago } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
-import { ModalPortal } from '../shared/ModalPortal'
+import { EditModal } from '../shared/EditModal'
 
 interface Props {
   registro: Registro
@@ -114,44 +114,59 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
     }
   }
 
+  // No se cierra a mitad del registro: el comprobante ya puede ir subiendo.
+  const cerrar = () => { if (!loading) onClose() }
+
+  const labelStyle: CSSProperties = { display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }
+  // `box-sizing: border-box`: con width 100% + padding, los campos se salían
+  // 26px del borde de la ventana (en el teléfono, cortados a la derecha).
+  const fieldStyle: CSSProperties = {
+    width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '10px',
+    border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit',
+    background: 'var(--at-surface)', color: 'var(--at-ink)',
+  }
+
   return (
-    <ModalPortal>
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '16px',
-      }}
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        style={{
-          background: 'var(--at-surface)',
-          borderRadius: '16px',
-          padding: '32px',
-          width: '100%',
-          maxWidth: '520px',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)', margin: 0 }}>📄 Registrar Pago</h2>
+    <EditModal
+      title="📄 Registrar pago"
+      subtitle="Si ya pagaste por transferencia, depósito u otro medio, avísanos aquí y lo verificamos."
+      maxWidth="520px"
+      fullScreenOnMobile
+      onClose={cerrar}
+      closeOnBackdropClick={!loading}
+      closeOnEscape={!loading}
+      footer={
+        <div style={{ width: '100%', display: 'flex', gap: '12px' }}>
           <button
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--at-ink-3)' }}
+            type="button"
+            onClick={cerrar}
+            disabled={loading}
+            style={{
+              flex: 1, padding: '12px', borderRadius: '10px',
+              border: '1.5px solid var(--at-line)', background: 'var(--at-surface)',
+              color: 'var(--at-ink-2)', fontWeight: 700, fontSize: '14px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
           >
-            ✕
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            style={{
+              flex: 2, padding: '12px', borderRadius: '10px', border: 'none',
+              background: loading ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-success), var(--at-success-strong))',
+              color: 'white', fontWeight: 700, fontSize: '14px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {loading ? '⏳ Registrando...' : '📤 Registrar Pago'}
           </button>
         </div>
-
-        <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
+      }
+    >
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid var(--at-line)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
             <div>
               <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Total Cargo</div>
@@ -164,184 +179,101 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
           </div>
         </div>
 
-        <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
-            Monto Pagado ({moneda}) *
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            max={saldo}
-            value={monto}
-            onChange={e => setMonto(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '8px',
-              border: '1.5px solid var(--at-line)',
-              fontSize: '16px',
-              fontWeight: 700,
-              fontFamily: 'inherit',
-            }}
-          />
-        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div>
+            <label htmlFor="pago-manual-monto" style={labelStyle}>Monto Pagado ({moneda}) *</label>
+            <input
+              id="pago-manual-monto"
+              type="number"
+              step="0.01"
+              min="0.01"
+              max={saldo}
+              inputMode="decimal"
+              value={monto}
+              onChange={e => setMonto(e.target.value)}
+              style={{ ...fieldStyle, fontSize: '16px', fontWeight: 700 }}
+            />
+          </div>
 
-        <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
-            Forma de Pago *
-          </label>
-          <select
-            value={formaPago}
-            onChange={e => setFormaPago(e.target.value as FormaPago)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '8px',
-              border: '1.5px solid var(--at-line)',
-              fontSize: '14px',
-              fontFamily: 'inherit',
-              background: 'var(--at-surface)',
-            }}
-          >
-            {FORMAS_PAGO.map(fp => (
-              <option key={fp.value} value={fp.value}>
-                {fp.label}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div>
+            <label htmlFor="pago-manual-forma" style={labelStyle}>Forma de Pago *</label>
+            <select
+              id="pago-manual-forma"
+              value={formaPago}
+              onChange={e => setFormaPago(e.target.value as FormaPago)}
+              style={fieldStyle}
+            >
+              {FORMAS_PAGO.map(fp => (
+                <option key={fp.value} value={fp.value}>
+                  {fp.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
-            Número de Comprobante *
-            <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--at-ink-3)', marginLeft: '6px' }}>
-              (# cheque, ref. transf., # depósito, etc.)
-            </span>
-          </label>
-          <input
-            type="text"
-            value={numeroComprobante}
-            onChange={e => setNumeroComprobante(e.target.value)}
-            placeholder="Ej: CHQ-2025-001234"
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '8px',
-              border: '1.5px solid var(--at-line)',
-              fontSize: '14px',
-              fontFamily: 'inherit',
-            }}
-          />
-        </div>
+          <div>
+            <label htmlFor="pago-manual-comprobante" style={labelStyle}>
+              Número de Comprobante *
+              <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--at-ink-3)', marginLeft: '6px' }}>
+                (# cheque, ref. transf., # depósito, etc.)
+              </span>
+            </label>
+            <input
+              id="pago-manual-comprobante"
+              type="text"
+              value={numeroComprobante}
+              onChange={e => setNumeroComprobante(e.target.value)}
+              placeholder="Ej: CHQ-2025-001234"
+              style={fieldStyle}
+            />
+          </div>
 
-        <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
-            Banco / Referencia
-          </label>
-          <input
-            type="text"
-            value={referencia}
-            onChange={e => setReferencia(e.target.value)}
-            placeholder="Ej: Banco Industrial, Cuenta 123456"
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '8px',
-              border: '1.5px solid var(--at-line)',
-              fontSize: '14px',
-              fontFamily: 'inherit',
-            }}
-          />
-        </div>
+          <div>
+            <label htmlFor="pago-manual-referencia" style={labelStyle}>Banco / Referencia</label>
+            <input
+              id="pago-manual-referencia"
+              type="text"
+              value={referencia}
+              onChange={e => setReferencia(e.target.value)}
+              placeholder="Ej: Banco Industrial, Cuenta 123456"
+              style={fieldStyle}
+            />
+          </div>
 
-        <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
-            Adjuntar Comprobante (Imagen/PDF)
-          </label>
-          <input
-            type="file"
-            accept="image/*,.pdf"
-            onChange={handleSelectFile}
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '8px',
-              border: '1.5px solid var(--at-line)',
-              fontSize: '13px',
-            }}
-          />
-          {previewAdjunto && (
-            <div style={{ marginTop: '12px' }}>
-              {adjunto?.type.startsWith('image') ? (
-                <img src={previewAdjunto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
-              ) : (
-                <div style={{ padding: '12px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1px solid var(--at-line)', textAlign: 'center', color: 'var(--at-ink-3)' }}>
-                  📄 PDF seleccionado
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+          <div>
+            <label htmlFor="pago-manual-adjunto" style={labelStyle}>Adjuntar Comprobante (Imagen/PDF)</label>
+            <input
+              id="pago-manual-adjunto"
+              type="file"
+              accept="image/*,.pdf"
+              onChange={handleSelectFile}
+              style={{ ...fieldStyle, fontSize: '13px' }}
+            />
+            {previewAdjunto && (
+              <div style={{ marginTop: '12px' }}>
+                {adjunto?.type.startsWith('image') ? (
+                  <img src={previewAdjunto} alt="Vista previa del comprobante" style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
+                ) : (
+                  <div style={{ padding: '12px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1px solid var(--at-line)', textAlign: 'center', color: 'var(--at-ink-3)' }}>
+                    📄 PDF seleccionado
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-        <div style={{ marginBottom: '24px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
-            Notas (opcional)
-          </label>
-          <textarea
-            value={notas}
-            onChange={e => setNotas(e.target.value)}
-            placeholder="Detalles adicionales sobre el pago..."
-            rows={2}
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '8px',
-              border: '1.5px solid var(--at-line)',
-              fontSize: '14px',
-              fontFamily: 'inherit',
-              resize: 'vertical',
-            }}
-          />
+          <div>
+            <label htmlFor="pago-manual-notas" style={labelStyle}>Notas (opcional)</label>
+            <textarea
+              id="pago-manual-notas"
+              value={notas}
+              onChange={e => setNotas(e.target.value)}
+              placeholder="Detalles adicionales sobre el pago..."
+              rows={2}
+              style={{ ...fieldStyle, resize: 'vertical' }}
+            />
+          </div>
         </div>
-
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button
-            onClick={onClose}
-            style={{
-              flex: 1,
-              padding: '12px',
-              borderRadius: '8px',
-              border: '1.5px solid var(--at-line)',
-              background: 'var(--at-surface)',
-              color: 'var(--at-ink-3)',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: 'pointer',
-            }}
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            style={{
-              flex: 2,
-              padding: '12px',
-              borderRadius: '8px',
-              border: 'none',
-              background: loading ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-success), var(--at-success-strong))',
-              color: 'white',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {loading ? '⏳ Registrando...' : '📤 Registrar Pago'}
-          </button>
-        </div>
-      </div>
-    </div>
-    </ModalPortal>
+    </EditModal>
   )
 }

@@ -40,13 +40,14 @@ export function ClienteCell({ cliente: c }: { cliente: Cliente }) {
 
 export function IdentificacionCell({ cliente: c }: { cliente: Cliente }) {
   if (!c.cui_dui && !c.nacionalidad) return <span style={{ color: 'var(--at-line-strong)' }}>—</span>
+  // Un solo bloque, por la vista de tarjetas (ver ContactoCell).
   return (
-    <>
+    <div>
       {c.cui_dui && <div style={{ fontSize: 13, fontFamily: 'monospace' }}>{sanitizeHTML(c.cui_dui)}</div>}
       {c.nacionalidad && (
         <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{sanitizeHTML(c.nacionalidad)}</div>
       )}
-    </>
+    </div>
   )
 }
 
@@ -54,8 +55,12 @@ export function ContactoCell({ cliente: c }: { cliente: Cliente }) {
   if (!c.email && !c.telefono && !c.telefono_alterno && !c.whatsapp) {
     return <span style={{ color: 'var(--at-line-strong)' }}>—</span>
   }
+  // Un solo bloque y no un fragmento: en la vista de tarjetas del teléfono la
+  // celda es una fila flex y cada hijo suelto quedaba repartido a lo ancho.
+  // `minWidth: 0` + `break-word`: un correo largo se parte dentro de la
+  // tarjeta en vez de salirse (en la tabla de escritorio no cambia nada).
   return (
-    <>
+    <div style={{ minWidth: 0, overflowWrap: 'break-word' }}>
       {c.email && <div style={{ fontSize: 13 }}>✉️ {sanitizeHTML(c.email)}</div>}
       {c.telefono && (
         <div style={{ fontSize: 12, marginTop: 2 }}>
@@ -84,7 +89,7 @@ export function ContactoCell({ cliente: c }: { cliente: Cliente }) {
           </a>
         </div>
       )}
-    </>
+    </div>
   )
 }
 

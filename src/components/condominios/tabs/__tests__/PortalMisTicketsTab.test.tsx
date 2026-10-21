@@ -157,7 +157,7 @@ describe('PortalMisTicketsTab — conversación del ticket', () => {
     await screen.findByLabelText('Mensaje')
 
     fireEvent.change(screen.getByLabelText('Mensaje'), { target: { value: 'Sigue goteando' } })
-    fireEvent.click(screen.getByText('➤ Enviar mensaje'))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
 
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     const [tabla, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
@@ -176,6 +176,8 @@ describe('PortalMisTicketsTab — conversación del ticket', () => {
     renderTab()
     fireEvent.click(screen.getByText('💬 Escribir al equipo'))
     await screen.findByLabelText('Mensaje')
+    // Los adjuntos van en una bandeja plegable bajo el botón del clip.
+    fireEvent.click(screen.getByRole('button', { name: 'Adjuntar fotos o documentos' }))
     expect(screen.getByText(/Adjuntar documentos/)).toBeTruthy()
   })
 
@@ -184,7 +186,7 @@ describe('PortalMisTicketsTab — conversación del ticket', () => {
     fireEvent.click(screen.getByText('💬 Escribir al equipo'))
     await screen.findByLabelText('Mensaje')
 
-    fireEvent.click(screen.getByText('➤ Enviar mensaje'))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
     await waitFor(() => expect(mocks.createCondominioRow).not.toHaveBeenCalled())
   })
 })

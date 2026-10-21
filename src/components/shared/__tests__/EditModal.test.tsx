@@ -260,6 +260,20 @@ describe('EditModal — comportamiento controlable', () => {
     expect(cerrarExterno).toHaveBeenCalledTimes(1)
   })
 
+  it('un Escape que ya atendió un confirm() abierto encima no cierra la ventana', () => {
+    const onClose = vi.fn()
+    render(<EditModal title="Reclamo" onClose={onClose}><p>x</p></EditModal>)
+    // El AlertDialog de Radix escucha en captura y marca el evento al cerrarse.
+    const confirmar = (e: KeyboardEvent) => e.preventDefault()
+    document.addEventListener('keydown', confirmar, { capture: true })
+    fireEvent.keyDown(document, { key: 'Escape' })
+    document.removeEventListener('keydown', confirmar, { capture: true })
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('NO cierra con Escape cuando closeOnEscape=false', () => {
     const onClose = vi.fn()
     render(

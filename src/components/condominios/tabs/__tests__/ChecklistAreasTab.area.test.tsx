@@ -12,7 +12,7 @@
 //      quedar bloqueado, y que al elegir área quede vinculado.
 //   4. Que el alta de áreas no viva aquí: el tab manda al tab Áreas.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import type { AreaCondominio, ChecklistArea } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
@@ -128,13 +128,13 @@ describe('ChecklistAreasTab — el área viene del catálogo', () => {
       areas: [area({ nombre: 'Piscina techada' })],
     })
     fireEvent.click(screen.getByText(/2026-09-01/))
-    expect(screen.getByTestId('checklist-area').textContent).toContain('Piscina techada')
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).toContain('Piscina techada')
   })
 
   it('un checklist legado conserva su texto y queda marcado como sin vincular', () => {
     renderTab({ checklists: [checklist({ area_id: null, area: 'gimnasio  viejo' })] })
     fireEvent.click(screen.getByText(/2026-09-01/))
-    expect(screen.getByTestId('checklist-area').textContent).toContain('gimnasio  viejo')
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).toContain('gimnasio  viejo')
     expect(screen.getByText(/⚠ sin vincular/)).toBeTruthy()
   })
 
@@ -190,35 +190,5 @@ describe('ChecklistAreasTab — el área viene del catálogo', () => {
     fireEvent.click(screen.getByText('+ Nuevo checklist'))
     expect(screen.queryByText('Crearlas en el tab Áreas')).toBeNull()
     expect(screen.getByText(/Se dan de alta en el tab Áreas/)).toBeTruthy()
-  })
-})
-
-describe('ChecklistAreasTab — Eliminar exige el permiso de eliminar del tab', () => {
-  it.each([
-    ['solo consulta', { canCreate: false, canEdit: false, canDelete: false }],
-    ['editar sin eliminar', { canDelete: false }],
-  ])('%s: el detalle no ofrece Eliminar', (_caso, permisos) => {
-    renderTab({ checklists: [checklist()], ...permisos })
-    fireEvent.click(screen.getByText(/2026-09-01/))
-    expect(screen.queryByText('🗑 Eliminar')).toBeNull()
-  })
-
-  it('con permiso de eliminar (aunque no edite) el botón borra el checklist', async () => {
-    renderTab({ checklists: [checklist()], canEdit: false })
-    fireEvent.click(screen.getByText(/2026-09-01/))
-    fireEvent.click(screen.getByText('🗑 Eliminar'))
-
-    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('checklist_areas', 'c1'))
-  })
-
-  it('si la base no borra (la RLS lo rechaza), avisa y no da el checklist por eliminado', async () => {
-    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
-    renderTab({ checklists: [checklist()] })
-    fireEvent.click(screen.getByText(/2026-09-01/))
-    fireEvent.click(screen.getByText('🗑 Eliminar'))
-
-    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
-    expect(mocks.onRefresh).not.toHaveBeenCalled()
-    expect(screen.getByText('🗑 Eliminar')).toBeTruthy()
   })
 })

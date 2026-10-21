@@ -489,7 +489,7 @@ const DirectorioComunidadTab = lazy(() => import('./tabs/DirectorioComunidadTab'
 // Tipo `TabDef` garantiza coherencia; agregar/quitar tab no toca el monolito.
 export const TAB_REGISTRY: TabDef[] = [
   { id: 'panel', label: 'Panel', icon: '📊', render: (ctx) =>
-    <PanelGeneralTab cuotas={ctx.cuotas} tickets={ctx.tickets} visitantes={ctx.visitantes} amenidades={ctx.amenidades} reservas={ctx.reservas} polizas={ctx.polizas} inspecciones={ctx.inspecciones} gastos={ctx.gastos} paquetes={ctx.paquetes} correspondencia={ctx.correspondencia} moneda={ctx.moneda} proyectoNombre={ctx.proyectoActual?.nombre} /> },
+    <PanelGeneralTab cuotas={ctx.cuotas} tickets={ctx.tickets} visitantes={ctx.visitantes} amenidades={ctx.amenidades} reservas={ctx.reservas} polizas={ctx.polizas} inspecciones={ctx.inspecciones} gastos={ctx.gastos} paquetes={ctx.paquetes} correspondencia={ctx.correspondencia} moneda={ctx.moneda} proyectoNombre={ctx.proyectoActual?.nombre} puedeVer={ctx.canView} onIrATab={ctx.irATab} /> },
   { id: 'cuotas', label: 'Cuotas', icon: '💳', render: (ctx) =>
     <CuotasTab cuotas={ctx.cuotas} unidades={ctx.unidadesProyecto} proyectos={ctx.proyectosActivos} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('cuotas')} canEdit={ctx.canEdit('cuotas')} onRefresh={ctx.onRefresh} /> },
   { id: 'visitantes', label: 'Visitantes', icon: '🚪', render: (ctx) =>

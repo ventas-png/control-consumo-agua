@@ -1,12 +1,14 @@
 import { Fragment, useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { AttachmentImage, AttachmentLink } from './ChatAttachments'
-import { dayKey, dayLabel, getFileIcon, initials } from './conversationConstants'
+import { dayKey, dayLabel, getFileIcon } from './conversationConstants'
+import { Avatar, DaySeparator } from '../shared/ChatBits'
 import type { ConversationMessage } from '../../types'
 
 // Hilo de una conversación: burbujas, separadores de día y scroll al último
 // mensaje. Lo usan la ventana del equipo (ConversationDetailModal) y la del
 // portal del cliente (CustomerConversationModal), cada una desde su lado: los
-// mensajes de quien mira van a la derecha.
+// mensajes de quien mira van a la derecha. Avatar y separador de día vienen de
+// shared/ChatBits, igual que en los hilos de condominios.
 
 interface Props {
   /** Mensajes de UNA conversación, en orden cronológico. */
@@ -48,34 +50,6 @@ export function ChatThread({ messages, viewer, empty }: Props) {
         })
       )}
       <div ref={endRef} />
-    </div>
-  )
-}
-
-export function Avatar({ name, size = 28, tone = 'accent' }: { name?: string | null; size?: number; tone?: 'accent' | 'primary' }) {
-  return (
-    <span aria-hidden="true" style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: Math.round(size * 0.4), fontWeight: 700,
-      background: tone === 'primary' ? 'var(--at-primary-soft)' : 'var(--at-accent-tint)',
-      color: tone === 'primary' ? 'var(--at-primary-hover)' : 'var(--at-accent-dark)',
-    }}>
-      {initials(name)}
-    </span>
-  )
-}
-
-function DaySeparator({ label }: { label: string }) {
-  return (
-    <div role="separator" style={{ display: 'flex', justifyContent: 'center', margin: '6px 0 2px' }}>
-      <span style={{
-        fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)',
-        background: 'var(--at-surface)', border: '1px solid var(--at-line)',
-        padding: '3px 10px', borderRadius: '999px',
-      }}>
-        {label}
-      </span>
     </div>
   )
 }

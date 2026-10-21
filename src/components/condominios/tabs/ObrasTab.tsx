@@ -1,5 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ObraMejora, EstadoObra } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -31,7 +33,9 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
-  const [selected, setSelected] = useState<ObraMejora | null>(null)
+  // Por id y no la fila: tras mover el progreso, `obras` llega refrescado y la
+  // ventana muestra el porcentaje y el estado nuevos (la copia quedaba vieja).
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filtroEstado, setFiltroEstado] = useState<'todos' | EstadoObra>('todos')
 
   function setF<K extends keyof typeof form>(k: K, v: typeof form[K]) { setForm(p => ({ ...p, [k]: v })) }
@@ -40,6 +44,11 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
     setEditId(o.id)
     setForm({ titulo: o.titulo, descripcion: o.descripcion ?? '', area: o.area ?? '', contratista: o.contratista ?? '', monto_contrato: o.monto_contrato ? String(o.monto_contrato) : '', fecha_inicio: o.fecha_inicio ?? '', fecha_fin_estimada: o.fecha_fin_estimada ?? '', fecha_fin_real: o.fecha_fin_real ?? '', estado: o.estado, progreso: String(o.progreso), notas: o.notas ?? '' })
     setShowForm(true)
+  }
+
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false); setEditId(null)
   }
 
   async function handleSave() {
@@ -67,7 +76,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
     const r = await confirm({ title: '¿Eliminar obra?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('obras_mejoras', id)
-    if (selected?.id === id) setSelected(null)
+    if (selectedId === id) setSelectedId(null)
     onRefresh()
   }
 
@@ -80,12 +89,15 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
   }
 
   const filtered = filtroEstado === 'todos' ? obras : obras.filter(o => o.estado === filtroEstado)
+  // De `obras` y no de `filtered`: cambiar el filtro no cierra la ventana.
+  const selected = selectedId ? obras.find(o => o.id === selectedId) ?? null : null
 
   const totalPresupuestado = obras.reduce((s, o) => s + Number(o.monto_contrato ?? 0), 0)
   const enEjecucion = obras.filter(o => o.estado === 'en_ejecucion').length
   const completadas = obras.filter(o => o.estado === 'completada').length
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -94,7 +106,9 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
           <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Obras y Mejoras</h2>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>{enEjecucion} en ejecución · {completadas} completadas</p>
         </div>
-        {canCreate && !showForm && (
+        {/* Sin `!showForm`: el botón sigue montado detrás de la ventana y
+            recupera el foco al cerrarla. */}
+        {canCreate && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setShowForm(true) }}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nueva Obra
@@ -117,66 +131,69 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
         ))}
       </div>
 
-      {/* Form */}
+      {/* Form en ventana (antes se desplegaba arriba de la lista y en el
+          teléfono la empujaba fuera de la pantalla). */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar obra' : 'Nueva Obra'}</h3>
+        <EditModal
+          title={editId ? 'Editar obra' : 'Nueva obra'}
+          maxWidth="680px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} loadingText="Guardando…">Guardar</Button>
+          </>}
+        >
+          {/* `1 / -1` y no `span 2`: con una sola columna (teléfono) el span
+              creaba una columna implícita y el campo se salía de la ventana. */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Título *</label>
-              <input style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Ej: Remodelación salón comunal" autoFocus />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="obra-titulo" style={labelStyle}>Título *</label>
+              <input id="obra-titulo" style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Ej: Remodelación salón comunal" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Área</label>
-              <input style={inputStyle} value={form.area} onChange={e => setF('area', e.target.value)} placeholder="Salón, Piscina, Exteriores…" />
+              <label htmlFor="obra-area" style={labelStyle}>Área</label>
+              <input id="obra-area" style={inputStyle} value={form.area} onChange={e => setF('area', e.target.value)} placeholder="Salón, Piscina, Exteriores…" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Contratista</label>
-              <input style={inputStyle} value={form.contratista} onChange={e => setF('contratista', e.target.value)} placeholder="Empresa / persona" />
+              <label htmlFor="obra-contratista" style={labelStyle}>Contratista</label>
+              <input id="obra-contratista" style={inputStyle} value={form.contratista} onChange={e => setF('contratista', e.target.value)} placeholder="Empresa / persona" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Monto contrato ({moneda})</label>
-              <input style={inputStyle} type="number" step="0.01" value={form.monto_contrato} onChange={e => setF('monto_contrato', e.target.value)} placeholder="0.00" />
+              <label htmlFor="obra-monto" style={labelStyle}>Monto contrato ({moneda})</label>
+              <input id="obra-monto" style={inputStyle} type="number" step="0.01" value={form.monto_contrato} onChange={e => setF('monto_contrato', e.target.value)} placeholder="0.00" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha inicio</label>
-              <input style={inputStyle} type="date" value={form.fecha_inicio} onChange={e => setF('fecha_inicio', e.target.value)} />
+              <label htmlFor="obra-fecha-inicio" style={labelStyle}>Fecha inicio</label>
+              <input id="obra-fecha-inicio" style={inputStyle} type="date" value={form.fecha_inicio} onChange={e => setF('fecha_inicio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha fin estimada</label>
-              <input style={inputStyle} type="date" value={form.fecha_fin_estimada} onChange={e => setF('fecha_fin_estimada', e.target.value)} />
+              <label htmlFor="obra-fecha-fin-estimada" style={labelStyle}>Fecha fin estimada</label>
+              <input id="obra-fecha-fin-estimada" style={inputStyle} type="date" value={form.fecha_fin_estimada} onChange={e => setF('fecha_fin_estimada', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha fin real</label>
-              <input style={inputStyle} type="date" value={form.fecha_fin_real} onChange={e => setF('fecha_fin_real', e.target.value)} />
+              <label htmlFor="obra-fecha-fin-real" style={labelStyle}>Fecha fin real</label>
+              <input id="obra-fecha-fin-real" style={inputStyle} type="date" value={form.fecha_fin_real} onChange={e => setF('fecha_fin_real', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
-              <select style={inputStyle} value={form.estado} onChange={e => setF('estado', e.target.value as EstadoObra)}>
+              <label htmlFor="obra-estado" style={labelStyle}>Estado</label>
+              <select id="obra-estado" style={inputStyle} value={form.estado} onChange={e => setF('estado', e.target.value as EstadoObra)}>
                 {Object.entries(ESTADO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Progreso ({form.progreso}%)</label>
-              <input style={inputStyle} type="range" min="0" max="100" value={form.progreso} onChange={e => setF('progreso', e.target.value)} />
+              <label htmlFor="obra-progreso" style={labelStyle}>Progreso ({form.progreso}%)</label>
+              <input id="obra-progreso" style={inputStyle} type="range" min="0" max="100" value={form.progreso} onChange={e => setF('progreso', e.target.value)} />
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Descripción / Notas</label>
-              <textarea style={{ ...inputStyle, minHeight: '55px', resize: 'vertical', fontFamily: 'inherit' }}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="obra-notas" style={labelStyle}>Descripción / Notas</label>
+              <textarea id="obra-notas" style={{ ...inputStyle, minHeight: '55px', resize: 'vertical', fontFamily: 'inherit' }}
                 value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Detalles, observaciones…" />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Filter */}
@@ -193,56 +210,75 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1fr' : '1fr', gap: '16px' }}>
-        {/* List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filtered.length === 0 ? (
-            <EmptyState icon="🏗️" title="No hay obras registradas" />
-          ) : filtered.map(o => {
-            const es = ESTADO_STYLE[o.estado]
-            const progreso = o.progreso ?? 0
-            return (
-              <div key={o.id} onClick={() => setSelected(selected?.id === o.id ? null : o)}
-                style={{ background: 'var(--at-surface)', border: `1.5px solid ${selected?.id === o.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: '13px' }}>{o.titulo}</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '6px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      {o.area && <span>📍 {o.area}</span>}
-                      {o.contratista && <span>👷 {o.contratista}</span>}
-                      {o.monto_contrato && <span>💰 {fmt(Number(o.monto_contrato), moneda)}</span>}
-                      {o.fecha_fin_estimada && <span>📅 Est: {o.fecha_fin_estimada}</span>}
-                    </div>
-                    {/* Progress bar */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ flex: 1, height: '6px', background: 'var(--at-line)', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${progreso}%`, background: progreso === 100 ? 'var(--at-success)' : progreso > 50 ? 'var(--at-primary)' : 'var(--at-warning)', borderRadius: '3px', transition: 'width 0.3s' }} />
-                      </div>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-2)', minWidth: '30px' }}>{progreso}%</span>
-                    </div>
-                  </div>
-                  {canEdit && (
-                    <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }} onClick={e => e.stopPropagation()}>
-                      <button onClick={() => startEdit(o)}
-                        style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(o.id)}
-                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                    </div>
-                  )}
+      {/* Lista a todo el ancho — cada obra se abre en ventana. Antes el
+          detalle ocupaba media pantalla a la derecha y en el teléfono partía
+          la lista. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {filtered.length === 0 ? (
+          <EmptyState icon="🏗️" title="No hay obras registradas" />
+        ) : filtered.map(o => {
+          const es = ESTADO_STYLE[o.estado]
+          const progreso = o.progreso ?? 0
+          return (
+            <div key={o.id}
+              style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px', paddingRight: '10px' }}>
+              <button type="button" className="cond-row-main" onClick={() => setSelectedId(o.id)}
+                style={{ flex: '1 1 260px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: '12px 4px 12px 14px', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 700, fontSize: '13px' }}>{o.titulo}</span>
+                  <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '6px', display: 'flex', gap: '4px 10px', flexWrap: 'wrap' }}>
+                  {o.area && <span>📍 {o.area}</span>}
+                  {o.contratista && <span>👷 {o.contratista}</span>}
+                  {o.monto_contrato && <span>💰 {fmt(Number(o.monto_contrato), moneda)}</span>}
+                  {o.fecha_fin_estimada && <span>📅 Est: {o.fecha_fin_estimada}</span>}
+                </div>
+                {/* Progress bar */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ flex: 1, height: '6px', background: 'var(--at-line)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${progreso}%`, background: progreso === 100 ? 'var(--at-success)' : progreso > 50 ? 'var(--at-primary)' : 'var(--at-warning)', borderRadius: '3px', transition: 'width 0.3s' }} />
+                  </div>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-2)', minWidth: '30px' }}>{progreso}%</span>
+                </div>
+              </button>
+              {canEdit && (
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
+                  <button onClick={() => startEdit(o)} aria-label={`Editar ${o.titulo}`}
+                    style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                  <button onClick={() => handleDelete(o.id)} aria-label={`Eliminar ${o.titulo}`}
+                    style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
-        {/* Detail panel */}
-        {selected && (
-          <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{selected.titulo}</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+      {/* Detalle en ventana: a pantalla completa en el teléfono. */}
+      {selected && (() => {
+        const es = ESTADO_STYLE[selected.estado]
+        return (
+          <EditModal
+            title={selected.titulo}
+            subtitle={<span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {es && <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>}
+              {selected.area && <span>📍 {selected.area}</span>}
+              <span>{selected.progreso ?? 0}% de avance</span>
+            </span>}
+            maxWidth="640px"
+            fullScreenOnMobile
+            onClose={() => setSelectedId(null)}
+            // Las mismas acciones de la fila: con la ventana abierta la lista
+            // queda detrás y no se alcanzan.
+            footer={canEdit ? <>
+              <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar obra">🗑️</Button>
+              <Button variant="secondary" onClick={() => { setSelectedId(null); startEdit(selected) }}>✏️ Editar</Button>
+            </> : undefined}
+          >
+            {/* Tarjetas que se reacomodan: dentro de la ventana no aplican las
+                reglas de teléfono del panel. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px', marginBottom: '12px' }}>
               {[
                 { label: 'Estado', value: ESTADO_STYLE[selected.estado]?.label },
                 { label: 'Área', value: selected.area ?? '—' },
@@ -252,7 +288,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
                 { label: 'Fecha fin estimada', value: selected.fecha_fin_estimada ?? '—' },
                 { label: 'Fecha fin real', value: selected.fecha_fin_real ?? '—' },
               ].map(f => (
-                <div key={f.label} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '8px', border: '1px solid var(--at-line)' }}>
+                <div key={f.label} style={{ background: 'var(--at-surface-2)', borderRadius: '7px', padding: '8px', border: '1px solid var(--at-line)' }}>
                   <div style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{f.label}</div>
                   <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)' }}>{f.value}</div>
                 </div>
@@ -262,14 +298,14 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
             {/* Progress adjuster */}
             {canEdit && selected.estado !== 'completada' && selected.estado !== 'cancelada' && (
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '4px' }}>Actualizar progreso: {selected.progreso}%</label>
+                <label htmlFor="obra-detalle-progreso" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '4px' }}>Actualizar progreso: {selected.progreso}%</label>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <input type="range" min="0" max="100" defaultValue={selected.progreso ?? 0}
-                    style={{ flex: 1 }}
+                  <input id="obra-detalle-progreso" type="range" min="0" max="100" defaultValue={selected.progreso ?? 0}
+                    style={{ flex: 1, minWidth: 0 }}
                     onMouseUp={e => actualizarProgreso(selected.id, parseInt((e.target as HTMLInputElement).value))}
                     onTouchEnd={e => actualizarProgreso(selected.id, parseInt((e.target as HTMLInputElement).value))}
                   />
-                  <div style={{ height: '8px', width: '120px', background: 'var(--at-line)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '8px', width: '120px', flexShrink: 0, background: 'var(--at-line)', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${selected.progreso ?? 0}%`, background: 'var(--at-primary)', borderRadius: '4px' }} />
                   </div>
                 </div>
@@ -277,14 +313,14 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
             )}
 
             {selected.notas && (
-              <div style={{ background: 'var(--at-surface)', borderRadius: '8px', padding: '10px', border: '1px solid var(--at-line)' }}>
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px', border: '1px solid var(--at-line)' }}>
                 <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>Notas</div>
-                <div style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>{selected.notas}</div>
+                <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{selected.notas}</div>
               </div>
             )}
-          </div>
-        )}
-      </div>
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }

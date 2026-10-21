@@ -1,6 +1,8 @@
 import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { LibroNovedad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -100,7 +102,13 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   const filtered = filtroTurno === 'todos' ? novedades : novedades.filter(n => n.turno === filtroTurno)
   const detail = selected ? novedades.find(n => n.id === selected) : null
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
+
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false)
+  }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -109,7 +117,8 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
           <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Libro de Novedades</h2>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>Bitácora de turnos de seguridad y administración</p>
         </div>
-        {canCreate && !showForm && (
+        {/* Sigue montado con la ventana abierta: al cerrarla, el foco vuelve aquí. */}
+        {canCreate && (
           <button onClick={() => setShowForm(true)}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nueva entrada
@@ -117,42 +126,55 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
         )}
       </div>
 
-      {/* Form */}
+      {/* Form en ventana (antes se desplegaba arriba de la lista y en el
+          teléfono empujaba todo hacia abajo). */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nueva entrada</h3>
+        <EditModal
+          title="Nueva entrada"
+          maxWidth="680px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} loadingText="Guardando…">Guardar</Button>
+          </>}
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha</label>
-              <input style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
+              <label htmlFor="lib-fecha" style={labelStyle}>Fecha</label>
+              <input id="lib-fecha" style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Turno</label>
-              <select style={inputStyle} value={form.turno} onChange={e => setF('turno', e.target.value)}>
+              <label htmlFor="lib-turno" style={labelStyle}>Turno</label>
+              <select id="lib-turno" style={inputStyle} value={form.turno} onChange={e => setF('turno', e.target.value)}>
                 <option value="mañana">🌅 Mañana</option>
                 <option value="tarde">☀️ Tarde</option>
                 <option value="noche">🌙 Noche</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Responsable *</label>
-              <input style={inputStyle} value={form.responsable} onChange={e => setF('responsable', e.target.value)} placeholder="Nombre del encargado" autoFocus />
+              <label htmlFor="lib-responsable" style={labelStyle}>Responsable *</label>
+              <input id="lib-responsable" style={inputStyle} value={form.responsable} onChange={e => setF('responsable', e.target.value)} placeholder="Nombre del encargado" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Hora inicio</label>
-              <input style={inputStyle} type="time" value={form.hora_inicio} onChange={e => setF('hora_inicio', e.target.value)} />
+              <label htmlFor="lib-hora-inicio" style={labelStyle}>Hora inicio</label>
+              <input id="lib-hora-inicio" style={inputStyle} type="time" value={form.hora_inicio} onChange={e => setF('hora_inicio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Hora fin</label>
-              <input style={inputStyle} type="time" value={form.hora_fin} onChange={e => setF('hora_fin', e.target.value)} />
+              <label htmlFor="lib-hora-fin" style={labelStyle}>Hora fin</label>
+              <input id="lib-hora-fin" style={inputStyle} type="time" value={form.hora_fin} onChange={e => setF('hora_fin', e.target.value)} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
               <input type="checkbox" id="firmado_form" checked={form.firmado} onChange={e => setF('firmado', e.target.checked)} />
               <label htmlFor="firmado_form" style={{ fontSize: '12px', color: 'var(--at-ink-3)', cursor: 'pointer' }}>Turno firmado</label>
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Novedades del turno *</label>
-              <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical', fontFamily: 'inherit' }}
+            {/* `1 / -1` y no `span 2`: con una sola columna (teléfono) el span
+                creaba una columna implícita y el campo se salía de la ventana. */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="lib-novedades" style={labelStyle}>Novedades del turno *</label>
+              <textarea id="lib-novedades" style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
                 value={form.novedades} onChange={e => setF('novedades', e.target.value)}
                 placeholder="Describe las novedades generales del turno…" />
             </div>
@@ -161,35 +183,26 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
           {/* Incidentes */}
           <div style={{ marginTop: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)' }}>Incidentes del turno</label>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)' }}>Incidentes del turno</span>
               <button onClick={addIncidente}
                 style={{ padding: '3px 10px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>
                 + Agregar
               </button>
             </div>
+            {/* Fila que se parte en el teléfono: con columnas fijas de 90 + 120px
+                a la descripción le quedaban unos pocos píxeles. */}
             {form.incidentes.map((inc, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '90px 120px 1fr auto', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
-                <input style={inputStyle} type="time" value={inc.hora} onChange={e => setIncidente(i, 'hora', e.target.value)} placeholder="Hora" />
-                <select style={inputStyle} value={inc.tipo} onChange={e => setIncidente(i, 'tipo', e.target.value)}>
+              <div key={i} style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
+                <input style={{ ...inputStyle, flex: '0 0 90px' }} type="time" value={inc.hora} onChange={e => setIncidente(i, 'hora', e.target.value)} placeholder="Hora" aria-label={`Hora del incidente ${i + 1}`} />
+                <select style={{ ...inputStyle, flex: '0 0 120px' }} value={inc.tipo} onChange={e => setIncidente(i, 'tipo', e.target.value)} aria-label={`Tipo del incidente ${i + 1}`}>
                   {TIPO_INCIDENTE.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <input style={inputStyle} value={inc.descripcion} onChange={e => setIncidente(i, 'descripcion', e.target.value)} placeholder="Descripción del incidente" />
-                <button onClick={() => removeIncidente(i)} style={{ padding: '6px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>✕</button>
+                <input style={{ ...inputStyle, flex: '1 1 180px', width: 'auto', minWidth: 0 }} value={inc.descripcion} onChange={e => setIncidente(i, 'descripcion', e.target.value)} placeholder="Descripción del incidente" aria-label={`Descripción del incidente ${i + 1}`} />
+                <button onClick={() => removeIncidente(i)} aria-label={`Quitar incidente ${i + 1}`} style={{ padding: '6px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>✕</button>
               </div>
             ))}
           </div>
-
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Filter */}
@@ -208,82 +221,77 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
         })}
       </div>
 
-      {/* Split view */}
-      <div style={{ display: 'grid', gridTemplateColumns: detail ? '1fr 340px' : '1fr', gap: '16px' }}>
+      {/* Lista — cada entrada se abre en ventana. Antes el detalle iba en una
+          columna fija de 340px que en el teléfono dejaba la lista en una
+          franja y el texto fuera de la pantalla. */}
+      {filtered.length === 0 ? (
+        <EmptyState icon="📋" title="No hay entradas" />
+      ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filtered.length === 0 ? (
-            <EmptyState icon="📋" title="No hay entradas" />
-          ) : (
-            filtered.map(n => {
-              const tc = TURNO_COLORS[n.turno] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', icon: '📋' }
-              const incs = n.incidentes as Incidente[]
-              return (
-                <div key={n.id} onClick={() => setSelected(selected === n.id ? null : n.id)}
-                  style={{ background: selected === n.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${selected === n.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '3px' }}>
-                        <span style={{ fontSize: '16px' }}>{tc.icon}</span>
-                        <span style={{ fontWeight: 700, fontSize: '13px' }}>{n.fecha}</span>
-                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '1px 7px', borderRadius: '10px', background: tc.bg, color: tc.color }}>{n.turno}</span>
-                        {n.firmado && <span style={{ fontSize: '10px', color: 'var(--at-success)', fontWeight: 700 }}>✓ Firmado</span>}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
-                        {n.responsable}{n.hora_inicio ? ` · ${n.hora_inicio}–${n.hora_fin ?? '?'}` : ''}
-                        {incs.length > 0 && <span style={{ marginLeft: '8px', color: 'var(--at-danger)', fontWeight: 600 }}>{incs.length} incidente(s)</span>}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '500px' }}>
-                        {n.novedades}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                      <button onClick={e => { e.stopPropagation(); handlePrint(n) }}
-                        style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
-                      {canEdit && !n.firmado && (
-                        <button onClick={e => { e.stopPropagation(); toggleFirmado(n.id, n.firmado) }}
-                          style={{ padding: '3px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Firmar</button>
-                      )}
-                      {canEdit && (
-                        <button onClick={e => { e.stopPropagation(); handleDelete(n.id) }}
-                          style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
-                      )}
-                    </div>
+          {filtered.map(n => {
+            const tc = TURNO_COLORS[n.turno] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', icon: '📋' }
+            const incs = n.incidentes as Incidente[]
+            return (
+              <div key={n.id}
+                style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px', paddingRight: '10px' }}>
+                <button type="button" className="cond-row-main" onClick={() => setSelected(n.id)}
+                  style={{ flex: '1 1 260px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: '12px 4px 12px 14px', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '16px' }}>{tc.icon}</span>
+                    <span style={{ fontWeight: 700, fontSize: '13px' }}>{n.fecha}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, padding: '1px 7px', borderRadius: '10px', background: tc.bg, color: tc.color }}>{n.turno}</span>
+                    {n.firmado && <span style={{ fontSize: '10px', color: 'var(--at-success)', fontWeight: 700 }}>✓ Firmado</span>}
                   </div>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
+                    {n.responsable}{n.hora_inicio ? ` · ${n.hora_inicio}–${n.hora_fin ?? '?'}` : ''}
+                    {incs.length > 0 && <span style={{ marginLeft: '8px', color: 'var(--at-danger)', fontWeight: 600 }}>{incs.length} incidente(s)</span>}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '500px' }}>
+                    {n.novedades}
+                  </div>
+                </button>
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
+                  <button onClick={() => handlePrint(n)} aria-label={`Imprimir entrada del ${n.fecha} (${n.turno})`}
+                    style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
+                  {canEdit && !n.firmado && (
+                    <button onClick={() => toggleFirmado(n.id, n.firmado)}
+                      style={{ padding: '3px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Firmar</button>
+                  )}
+                  {canEdit && (
+                    <button onClick={() => handleDelete(n.id)} aria-label={`Eliminar entrada del ${n.fecha} (${n.turno})`}
+                      style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                  )}
                 </div>
-              )
-            })
-          )}
+              </div>
+            )
+          })}
         </div>
+      )}
 
-        {/* Detail */}
-        {detail && (
-          <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', alignSelf: 'flex-start' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>
-                {TURNO_COLORS[detail.turno]?.icon} {detail.fecha} — {detail.turno}
-              </h3>
-              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)' }}>✕</button>
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '10px' }}>
-              {detail.responsable}{detail.hora_inicio ? ` · ${detail.hora_inicio} – ${detail.hora_fin}` : ''}
-              {detail.firmado && ' · ✓ Firmado'}
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', lineHeight: 1.5, marginBottom: '12px', whiteSpace: 'pre-wrap' }}>{detail.novedades}</div>
-            {(detail.incidentes as Incidente[]).length > 0 && (
-              <>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '6px' }}>Incidentes</div>
-                {(detail.incidentes as Incidente[]).map((inc, i) => (
-                  <div key={i} style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '6px', padding: '6px 8px', marginBottom: '4px', fontSize: '12px' }}>
-                    <span style={{ fontWeight: 700, color: 'var(--at-danger)' }}>{inc.hora}</span>
-                    <span style={{ color: 'var(--at-ink-3)', marginLeft: '6px', fontSize: '11px' }}>[{inc.tipo}]</span>
-                    <span style={{ marginLeft: '6px', color: 'var(--at-ink-2)' }}>{inc.descripcion}</span>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Detalle en ventana: a pantalla completa en el teléfono. */}
+      {detail && (
+        <EditModal
+          title={`${TURNO_COLORS[detail.turno]?.icon ?? '📋'} ${detail.fecha} — ${detail.turno}`}
+          subtitle={`${detail.responsable}${detail.hora_inicio ? ` · ${detail.hora_inicio} – ${detail.hora_fin}` : ''}${detail.firmado ? ' · ✓ Firmado' : ''}`}
+          maxWidth="620px"
+          fullScreenOnMobile
+          onClose={() => setSelected(null)}
+        >
+          <div style={{ fontSize: '14px', color: 'var(--at-ink-2)', lineHeight: 1.55, marginBottom: '14px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{detail.novedades}</div>
+          {(detail.incidentes as Incidente[]).length > 0 && (
+            <>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '6px' }}>Incidentes</div>
+              {(detail.incidentes as Incidente[]).map((inc, i) => (
+                <div key={i} style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '6px', padding: '6px 8px', marginBottom: '4px', fontSize: '12.5px' }}>
+                  <span style={{ fontWeight: 700, color: 'var(--at-danger)' }}>{inc.hora}</span>
+                  <span style={{ color: 'var(--at-ink-3)', marginLeft: '6px', fontSize: '11px' }}>[{inc.tipo}]</span>
+                  <span style={{ marginLeft: '6px', color: 'var(--at-ink-2)' }}>{inc.descripcion}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </EditModal>
+      )}
     </div>
   )
 }

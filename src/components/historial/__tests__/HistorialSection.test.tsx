@@ -72,12 +72,14 @@ describe('HistorialSection — detalle de lectura', () => {
     expect(screen.queryByText(/ID de lectura/)).toBeNull()
   })
 
-  it('despliega el detalle al pulsar "Ver detalles"', () => {
+  // El detalle se abre en una ventana (EditModal) en vez de desplegarse dentro
+  // de la fila; el botón lleva el nombre del cliente y la fecha.
+  it('abre el detalle al pulsar "Ver detalles"', () => {
     renderSection()
-    const toggle = screen.getByRole('button', { name: 'Ver detalles de la lectura' })
+    const toggle = screen.getByRole('button', { name: /Ver detalles de la lectura/ })
     fireEvent.click(toggle)
 
-    // Campos que SOLO aparecen en el detalle desplegado.
+    // Campos que SOLO aparecen en la ventana de detalle.
     expect(screen.getByText('Período de servicio')).toBeTruthy()
     expect(screen.getByText('Tipo de cobro')).toBeTruthy()
     expect(screen.getByText('Consumo con Exceso')).toBeTruthy()
@@ -89,16 +91,16 @@ describe('HistorialSection — detalle de lectura', () => {
 
   it('expone un enlace a Google Maps cuando hay GPS', () => {
     renderSection()
-    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles de la lectura' }))
+    fireEvent.click(screen.getByRole('button', { name: /Ver detalles de la lectura/ }))
     const link = screen.getByRole('link', { name: /Ver ubicación en el mapa/ }) as HTMLAnchorElement
     expect(link.href).toContain('query=14.6349,-90.5069')
   })
 
-  it('colapsa el detalle al volver a pulsar', () => {
+  it('oculta el detalle al cerrar la ventana', () => {
     renderSection()
-    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles de la lectura' }))
+    fireEvent.click(screen.getByRole('button', { name: /Ver detalles de la lectura/ }))
     expect(screen.getByText('Período de servicio')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Ocultar detalles de la lectura' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar modal' }))
     expect(screen.queryByText('Período de servicio')).toBeNull()
   })
 })

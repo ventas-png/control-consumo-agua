@@ -1,6 +1,8 @@
 import { hoyLocalISO, sumarDiasCalendario, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, useEffect, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchEjecucionesMantenimiento } from '../../../domain/condominios/tabQueries'
 import type { PlanMantenimiento, EjecucionMantenimiento } from '../../../types'
@@ -115,17 +117,32 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
     onRefresh()
   }
 
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false)
+  }
+
+  // Al cerrar se descarta la ejecución a medio capturar: si no, reaparecía
+  // abierta (con sus datos) en el siguiente plan que se abriera.
+  function cerrarDetalle() {
+    if (savingEjec) return
+    setSelected(null)
+    setShowEjecForm(false)
+    setEjecForm({ ...BLANK_EJEC })
+  }
+
   const planesActivos = planes.filter(p => p.activo)
   const vencidos = planesActivos.filter(p => getStatus(p) === 'vencido').length
   const proximos = planesActivos.filter(p => ['urgente', 'proximo'].includes(getStatus(p))).length
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Mantenimiento Preventivo</h2>
-        {canCreate && !showForm && (
+        {canCreate && (
           <button onClick={() => setShowForm(true)}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Plan
@@ -147,191 +164,189 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
         ))}
       </div>
 
-      {/* Form */}
+      {/* Form en ventana (antes se desplegaba arriba de la lista). */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nuevo Plan de Mantenimiento</h3>
+        <EditModal
+          title="Nuevo plan de mantenimiento"
+          maxWidth="620px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSavePlan} loading={saving} loadingText="Guardando…">Guardar</Button>
+          </>}
+        >
+          {/* `1 / -1` y no `span 2`: con una sola columna (teléfono) el span
+              creaba una columna implícita y el campo se salía de la ventana. */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Equipo / Área *</label>
-              <input style={inputStyle} value={form.equipo} onChange={e => setForm(f => ({ ...f, equipo: e.target.value }))} placeholder="Ej: Bomba de agua, Ascensor, Jardines" autoFocus />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="mp-equipo" style={labelStyle}>Equipo / Área *</label>
+              <input id="mp-equipo" style={inputStyle} value={form.equipo} onChange={e => setForm(f => ({ ...f, equipo: e.target.value }))} placeholder="Ej: Bomba de agua, Ascensor, Jardines" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Frecuencia</label>
-              <select style={inputStyle} value={form.frecuencia} onChange={e => setForm(f => ({ ...f, frecuencia: e.target.value }))}>
+              <label htmlFor="mp-frecuencia" style={labelStyle}>Frecuencia</label>
+              <select id="mp-frecuencia" style={inputStyle} value={form.frecuencia} onChange={e => setForm(f => ({ ...f, frecuencia: e.target.value }))}>
                 {Object.entries(FREQ_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Responsable</label>
-              <input style={inputStyle} value={form.responsable} onChange={e => setForm(f => ({ ...f, responsable: e.target.value }))} placeholder="Nombre o empresa" />
+              <label htmlFor="mp-responsable" style={labelStyle}>Responsable</label>
+              <input id="mp-responsable" style={inputStyle} value={form.responsable} onChange={e => setForm(f => ({ ...f, responsable: e.target.value }))} placeholder="Nombre o empresa" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Última ejecución</label>
-              <input style={inputStyle} type="date" value={form.ultima_ejecucion} onChange={e => setForm(f => ({ ...f, ultima_ejecucion: e.target.value }))} />
+              <label htmlFor="mp-ultima" style={labelStyle}>Última ejecución</label>
+              <input id="mp-ultima" style={inputStyle} type="date" value={form.ultima_ejecucion} onChange={e => setForm(f => ({ ...f, ultima_ejecucion: e.target.value }))} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Próxima ejecución</label>
-              <input style={inputStyle} type="date" value={form.proxima_ejecucion} onChange={e => setForm(f => ({ ...f, proxima_ejecucion: e.target.value }))} />
+              <label htmlFor="mp-proxima" style={labelStyle}>Próxima ejecución</label>
+              <input id="mp-proxima" style={inputStyle} type="date" value={form.proxima_ejecucion} onChange={e => setForm(f => ({ ...f, proxima_ejecucion: e.target.value }))} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Costo estimado ({moneda})</label>
-              <input style={inputStyle} type="number" min="0" step="0.01" value={form.costo_estimado} onChange={e => setForm(f => ({ ...f, costo_estimado: parseFloat(e.target.value) || 0 }))} />
+              <label htmlFor="mp-costo" style={labelStyle}>Costo estimado ({moneda})</label>
+              <input id="mp-costo" style={inputStyle} type="number" min="0" step="0.01" value={form.costo_estimado} onChange={e => setForm(f => ({ ...f, costo_estimado: parseFloat(e.target.value) || 0 }))} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSavePlan} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
+        </EditModal>
+      )}
+
+      {/* Lista a todo el ancho — cada plan se abre en ventana. Antes el
+          detalle iba en una columna al lado y en el teléfono apretaba la
+          lista y se salía de la pantalla. */}
+      {planes.length === 0 ? (
+        <EmptyState icon="📋" title="No hay planes. Crea uno para comenzar" />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {planes.map(p => {
+            const st = getStatus(p)
+            const stStyle = STATUS[st]
+            return (
+              <button key={p.id} type="button" onClick={() => setSelected(p.id)}
+                style={{ display: 'block', width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', cursor: 'pointer', opacity: p.activo ? 1 : 0.6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{p.equipo}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
+                      {FREQ_LABELS[p.frecuencia]}{p.responsable ? ` · ${p.responsable}` : ''}
+                    </div>
+                    {p.proxima_ejecucion && (
+                      <div style={{ fontSize: '11px', color: stStyle.color, fontWeight: 600, marginTop: '2px' }}>
+                        Próxima: {p.proxima_ejecucion}
+                      </div>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: stStyle.bg, color: stStyle.color, flexShrink: 0, alignSelf: 'flex-start' }}>
+                    {stStyle.label}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
         </div>
       )}
 
-      {/* Split view */}
-      <div style={{ display: 'grid', gridTemplateColumns: plan ? '280px 1fr' : '1fr', gap: '16px' }}>
-        {/* Plans list */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {planes.length === 0 ? (
-            <EmptyState icon="📋" title="No hay planes. Crea uno para comenzar" />
-          ) : (
-            planes.map(p => {
-              const st = getStatus(p)
-              const stStyle = STATUS[st]
-              return (
-                <div key={p.id} onClick={() => setSelected(selected === p.id ? null : p.id)}
-                  style={{ background: selected === p.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${selected === p.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px', cursor: 'pointer', opacity: p.activo ? 1 : 0.6 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{p.equipo}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
-                        {FREQ_LABELS[p.frecuencia]}{p.responsable ? ` · ${p.responsable}` : ''}
-                      </div>
-                      {p.proxima_ejecucion && (
-                        <div style={{ fontSize: '11px', color: stStyle.color, fontWeight: 600, marginTop: '2px' }}>
-                          Próxima: {p.proxima_ejecucion}
-                        </div>
-                      )}
-                    </div>
-                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: stStyle.bg, color: stStyle.color, flexShrink: 0, alignSelf: 'flex-start' }}>
-                      {stStyle.label}
-                    </span>
-                  </div>
+      {/* Detalle e historial en ventana: a pantalla completa en el teléfono. */}
+      {plan && (
+        <EditModal
+          title={plan.equipo}
+          subtitle={<>
+            {FREQ_LABELS[plan.frecuencia]}
+            {plan.responsable ? ` · ${plan.responsable}` : ''}
+            {plan.costo_estimado ? ` · Est. ${moneda} ${plan.costo_estimado.toFixed(2)}` : ''}
+          </>}
+          maxWidth="640px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!savingEjec}
+          closeOnEscape={!savingEjec}
+          onClose={cerrarDetalle}
+          footer={(canEdit || (canCreate && plan.activo)) ? <>
+            {canEdit && (
+              <Button variant={plan.activo ? 'secondary' : 'success'} onClick={() => toggleActivo(plan.id, plan.activo)}>
+                {plan.activo ? 'Desactivar' : 'Activar'}
+              </Button>
+            )}
+            {canCreate && plan.activo && (
+              <Button onClick={() => setShowEjecForm(v => !v)} aria-expanded={showEjecForm}>
+                + Registrar ejecución
+              </Button>
+            )}
+          </> : undefined}
+        >
+          {/* Execution form */}
+          {showEjecForm && (
+            <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px' }}>
+                <div>
+                  <label htmlFor="mp-ej-fecha" style={labelStyle}>Fecha *</label>
+                  <input id="mp-ej-fecha" style={inputStyle} type="date" value={ejecForm.fecha} onChange={e => setEjecForm(f => ({ ...f, fecha: e.target.value }))} />
                 </div>
-              )
-            })
-          )}
-        </div>
-
-        {/* Detail */}
-        {plan && (
-          <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-              <div>
-                <h3 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: 700 }}>{plan.equipo}</h3>
-                <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
-                  {FREQ_LABELS[plan.frecuencia]}
-                  {plan.responsable ? ` · ${plan.responsable}` : ''}
-                  {plan.costo_estimado ? ` · Est. ${moneda} ${plan.costo_estimado.toFixed(2)}` : ''}
+                <div>
+                  <label htmlFor="mp-ej-realizado" style={labelStyle}>Realizado por</label>
+                  <input id="mp-ej-realizado" style={inputStyle} value={ejecForm.realizado_por} onChange={e => setEjecForm(f => ({ ...f, realizado_por: e.target.value }))} />
+                </div>
+                <div>
+                  <label htmlFor="mp-ej-costo" style={labelStyle}>Costo real ({moneda})</label>
+                  <input id="mp-ej-costo" style={inputStyle} type="number" min="0" step="0.01" value={ejecForm.costo_real} onChange={e => setEjecForm(f => ({ ...f, costo_real: parseFloat(e.target.value) || 0 }))} />
+                </div>
+                <div>
+                  <label htmlFor="mp-ej-estado" style={labelStyle}>Estado</label>
+                  <select id="mp-ej-estado" style={inputStyle} value={ejecForm.estado} onChange={e => setEjecForm(f => ({ ...f, estado: e.target.value }))}>
+                    <option value="completado">Completado</option>
+                    <option value="parcial">Parcial</option>
+                    <option value="omitido">Omitido</option>
+                  </select>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label htmlFor="mp-ej-observaciones" style={labelStyle}>Observaciones</label>
+                  <input id="mp-ej-observaciones" style={inputStyle} value={ejecForm.observaciones} onChange={e => setEjecForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Notas de la ejecución" />
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {canEdit && (
-                  <button onClick={() => toggleActivo(plan.id, plan.activo)}
-                    style={{ padding: '4px 10px', background: plan.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', color: plan.activo ? 'var(--at-warning-strong)' : 'var(--at-success)', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                    {plan.activo ? 'Desactivar' : 'Activar'}
-                  </button>
-                )}
-                {canCreate && plan.activo && (
-                  <button onClick={() => setShowEjecForm(v => !v)}
-                    style={{ padding: '4px 12px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                    + Registrar ejecución
-                  </button>
-                )}
+              <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button size="sm" variant="success" onClick={handleRegistrarEjecucion} loading={savingEjec} loadingText="Guardando…">
+                  Guardar
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => setShowEjecForm(false)} disabled={savingEjec}>
+                  Cancelar
+                </Button>
+                <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
+                  → Próxima auto: {ejecForm.fecha ? addDays(ejecForm.fecha, FREQ_DAYS[plan.frecuencia] ?? 30) : '—'}
+                </span>
               </div>
             </div>
+          )}
 
-            {/* Execution form */}
-            {showEjecForm && (
-              <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px' }}>
-                  <div>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha *</label>
-                    <input style={inputStyle} type="date" value={ejecForm.fecha} onChange={e => setEjecForm(f => ({ ...f, fecha: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Realizado por</label>
-                    <input style={inputStyle} value={ejecForm.realizado_por} onChange={e => setEjecForm(f => ({ ...f, realizado_por: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Costo real ({moneda})</label>
-                    <input style={inputStyle} type="number" min="0" step="0.01" value={ejecForm.costo_real} onChange={e => setEjecForm(f => ({ ...f, costo_real: parseFloat(e.target.value) || 0 }))} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
-                    <select style={inputStyle} value={ejecForm.estado} onChange={e => setEjecForm(f => ({ ...f, estado: e.target.value }))}>
-                      <option value="completado">Completado</option>
-                      <option value="parcial">Parcial</option>
-                      <option value="omitido">Omitido</option>
-                    </select>
-                  </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Observaciones</label>
-                    <input style={inputStyle} value={ejecForm.observaciones} onChange={e => setEjecForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Notas de la ejecución" />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center' }}>
-                  <button onClick={handleRegistrarEjecucion} disabled={savingEjec}
-                    style={{ padding: '6px 14px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                    {savingEjec ? '…' : 'Guardar'}
-                  </button>
-                  <button onClick={() => setShowEjecForm(false)}
-                    style={{ padding: '6px 10px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-                    Cancelar
-                  </button>
-                  <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
-                    → Próxima auto: {ejecForm.fecha ? addDays(ejecForm.fecha, FREQ_DAYS[plan.frecuencia] ?? 30) : '—'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* History */}
-            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '8px' }}>Historial de ejecuciones</div>
-            {loadingEj ? (
-              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Cargando…</div>
-            ) : ejecuciones.length === 0 ? (
-              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Sin ejecuciones registradas.</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {ejecuciones.map(e => {
-                  const bg = e.estado === 'completado' ? 'var(--at-success-tint)' : e.estado === 'parcial' ? 'var(--at-warning-tint)' : 'var(--at-chip)'
-                  const color = e.estado === 'completado' ? 'var(--at-success)' : e.estado === 'parcial' ? 'var(--at-warning-strong)' : 'var(--at-ink-3)'
-                  return (
-                    <div key={e.id} style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '12px' }}>{e.fecha}</div>
-                        {e.realizado_por && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{e.realizado_por}</div>}
-                        {e.observaciones && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontStyle: 'italic', marginTop: '2px' }}>{e.observaciones}</div>}
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px', background: bg, color, display: 'block', marginBottom: '2px' }}>
-                          {e.estado}
-                        </span>
-                        {e.costo_real != null && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{moneda} {e.costo_real.toFixed(2)}</div>}
-                      </div>
+          {/* History */}
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '8px' }}>Historial de ejecuciones</div>
+          {loadingEj ? (
+            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Cargando…</div>
+          ) : ejecuciones.length === 0 ? (
+            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Sin ejecuciones registradas.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {ejecuciones.map(e => {
+                const bg = e.estado === 'completado' ? 'var(--at-success-tint)' : e.estado === 'parcial' ? 'var(--at-warning-tint)' : 'var(--at-chip)'
+                const color = e.estado === 'completado' ? 'var(--at-success)' : e.estado === 'parcial' ? 'var(--at-warning-strong)' : 'var(--at-ink-3)'
+                return (
+                  <div key={e.id} style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '12px' }}>{e.fecha}</div>
+                      {e.realizado_por && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{e.realizado_por}</div>}
+                      {e.observaciones && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontStyle: 'italic', marginTop: '2px' }}>{e.observaciones}</div>}
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px', background: bg, color, display: 'block', marginBottom: '2px' }}>
+                        {e.estado}
+                      </span>
+                      {e.costo_real != null && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{moneda} {e.costo_real.toFixed(2)}</div>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </EditModal>
+      )}
     </div>
   )
 }

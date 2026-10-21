@@ -164,11 +164,11 @@ export function PortalMisTicketsTab({
         </EditModal>
       )}
 
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', marginBottom: '14px' }}>
+      {/* Filtros: una fila deslizable (en el teléfono, en dos filas empujaban la lista) */}
+      <div className="tab-strip-scrollable" style={{ display: 'flex', gap: '7px', overflowX: 'auto', marginBottom: '14px', paddingBottom: '2px' }}>
         {(['todos', 'abierto', 'en_proceso', 'resuelto', 'cerrado'] as const).map(f => (
-          <button key={f} onClick={() => setFiltro(f)}
-            style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none',
+          <button key={f} onClick={() => setFiltro(f)} aria-pressed={filtro === f}
+            style={{ padding: '7px 13px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: 'none', whiteSpace: 'nowrap', flexShrink: 0,
               background: filtro === f ? 'var(--at-primary-tint)' : 'transparent', color: filtro === f ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {f === 'todos' ? `Todos (${tickets.length})` : `${ESTADO_CONFIG[f].icon} ${ESTADO_CONFIG[f].label}`}
           </button>
@@ -186,18 +186,24 @@ export function PortalMisTicketsTab({
             const ec = ESTADO_CONFIG[t.estado as EstadoTicket] ?? ESTADO_CONFIG.abierto
             const pc = PRIORIDAD_CONFIG[t.prioridad as PrioridadTicket] ?? PRIORIDAD_CONFIG.media
             const nMensajes = conteoMensajes[t.id] ?? 0
+            const activo = t.estado === 'abierto' || t.estado === 'en_proceso'
             return (
-              <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.estado === 'resuelto' || t.estado === 'cerrado' ? 'var(--at-line)' : 'var(--at-primary-soft-2)'}`, borderRadius: '12px', padding: '14px 16px' }}>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '20px', flexShrink: 0 }}>{ec.icon}</span>
+              <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${activo ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '14px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '14px 16px' }}>
+                  <span aria-hidden="true" style={{ width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '19px', background: ec.bg }}>🔧</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', marginBottom: '3px' }}>{t.titulo}</div>
-                    {t.descripcion && <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginBottom: '5px' }}>{t.descripcion}</div>}
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
-                      <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
-                      <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{new Date(t.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline' }}>
+                      <span style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)' }}>{t.titulo}</span>
+                      <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', flexShrink: 0 }}>{new Date(t.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</span>
                     </div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', margin: '5px 0' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 9px', borderRadius: '999px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color }}>
+                        <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />{ec.label}
+                      </span>
+                      <span style={{ padding: '2px 9px', borderRadius: '999px', fontSize: '11.5px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
+                    </div>
+                    {/* Tres líneas bastan en la lista: el reporte completo encabeza la conversación. */}
+                    {t.descripcion && <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.descripcion}</div>}
                     {t.foto_urls?.length > 0 && (
                       <div style={{ marginTop: '8px' }}>
                         <ImageGallery urls={t.foto_urls} maxVisible={4} />
@@ -208,14 +214,25 @@ export function PortalMisTicketsTab({
                         <ListaAdjuntos paths={t.archivo_urls} />
                       </div>
                     )}
-                    {t.fecha_cierre && <div style={{ fontSize: '12px', color: 'var(--at-success)', marginTop: '4px' }}>✅ Resuelto el {new Date(t.fecha_cierre).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</div>}
-                    <button
-                      onClick={() => setConversacion(t)}
-                      style={{ marginTop: '9px', padding: '6px 13px', background: nMensajes > 0 ? 'var(--at-primary-tint)' : 'var(--at-chip)', color: nMensajes > 0 ? 'var(--at-primary)' : 'var(--at-ink-2)', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-                      💬 {nMensajes > 0 ? `Conversación (${nMensajes})` : 'Escribir al equipo'}
-                    </button>
+                    {t.fecha_cierre && <div style={{ fontSize: '12px', color: 'var(--at-success)', marginTop: '6px' }}>✅ Resuelto el {new Date(t.fecha_cierre).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</div>}
                   </div>
                 </div>
+                {/* La conversación se abre en ventana (TicketChatModal): una barra a lo
+                    ancho de la tarjeta es más fácil de encontrar y de tocar. */}
+                <button
+                  type="button"
+                  className="conv-row"
+                  onClick={() => setConversacion(t)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+                    padding: '11px 16px', borderTop: '1px solid var(--at-line)', borderRight: 'none', borderBottom: 'none', borderLeft: 'none',
+                    background: nMensajes > 0 ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
+                    color: nMensajes > 0 ? 'var(--at-primary)' : 'var(--at-ink-2)',
+                    fontSize: '13px', fontWeight: 700, cursor: 'pointer', textAlign: 'left',
+                  }}>
+                  <span>💬 {nMensajes > 0 ? `Conversación (${nMensajes})` : 'Escribir al equipo'}</span>
+                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                </button>
               </div>
             )
           })}

@@ -329,8 +329,11 @@ export function FiscalConfigSection({ proyectos }: Props) {
           <div style={{ color: 'var(--at-ink-3)', fontSize: 13, padding: '12px 0' }}>Cargando configuración…</div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-              <div style={{ gridColumn: 'span 2' }}>
+            {/* Como mucho 2 columnas (mínimo: media fila menos holgura por el
+                gap) y una cuando no llegan a 220px, como en el teléfono. `1 / -1`
+                en vez de `span 2` para no crear columnas implícitas con una sola. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(max(220px, calc(50% - 7px)), 1fr))', gap: 12 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
                 {fieldLbl('regimenFiscal', 'Régimen fiscal')}
                 <select
                   style={inp} value={regimenForm} disabled={!canEdit}
@@ -347,7 +350,7 @@ export function FiscalConfigSection({ proyectos }: Props) {
               </div>
 
               {regimenRealForm && (
-                <div style={{ gridColumn: 'span 2' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
                   {fieldLbl('proveedorTimbrado', 'Proveedor de timbrado (PAC)')}
                   <select
                     style={inp} value={proveedorForm} disabled={!canEdit}
@@ -362,7 +365,7 @@ export function FiscalConfigSection({ proyectos }: Props) {
                 </div>
               )}
 
-              <div style={{ gridColumn: 'span 2' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
                 {fieldLbl('nombreFiscal', 'Nombre / razón social fiscal')}
                 <input style={inp} value={form.nombreFiscal ?? ''} disabled={!canEdit}
                   onChange={(e) => setForm((p) => ({ ...p, nombreFiscal: e.target.value }))}
@@ -441,7 +444,8 @@ export function FiscalConfigSection({ proyectos }: Props) {
         </div>
 
         {canEdit && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+          // Sandbox y producción lado a lado en escritorio, apiladas en el teléfono.
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 16 }}>
             {/* Sandbox */}
             <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>🧪 Sandbox (pruebas)</div>

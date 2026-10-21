@@ -425,7 +425,9 @@ export function RutasSection({
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+      {/* min(100%, …): en teléfonos de menos de ~345px útiles la tarjeta de
+          320px se salía por la derecha. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '16px' }}>
         {rutas.map(ruta => <RutaCard key={ruta.id} ruta={ruta} ctx={ctx} />)}
       </div>
     </div>

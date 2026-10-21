@@ -131,7 +131,7 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
 
   const cardStyle = (from: string, to: string): CSSProperties => ({
     background: `linear-gradient(135deg, ${from}, ${to})`,
-    borderRadius: '16px', padding: '24px', color: 'white',
+    borderRadius: '16px', padding: '18px', color: 'white', minWidth: 0,
     boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
     display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
   })
@@ -139,18 +139,19 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '16px' }}>
+        <h1 style={{ fontSize: 'clamp(22px, 5vw, 28px)', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '16px' }}>
           Panel — Condominios
         </h1>
 
         {/* Selector de proyecto */}
         {proyectosActivos.length > 0 && (
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '24px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--at-ink-2)' }}>Proyecto:</label>
+          <div style={{ display: 'flex', gap: '8px 12px', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap' }}>
+            <label htmlFor="cond-dash-proyecto" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--at-ink-2)' }}>Proyecto:</label>
             <select
+              id="cond-dash-proyecto"
               value={selectedProjectId}
               onChange={e => setSelectedProjectId(e.target.value)}
-              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '14px', fontWeight: 500, background: 'var(--at-surface)', cursor: 'pointer', minWidth: '200px' }}
+              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '14px', fontWeight: 500, background: 'var(--at-surface)', cursor: 'pointer', flex: '1 1 200px', maxWidth: '360px', minWidth: 0 }}
             >
               <option value="">-- Todos los proyectos --</option>
               {proyectosActivos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
@@ -159,12 +160,13 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
         )}
       </div>
 
-      {/* KPI cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+      {/* KPI cards — minmax 140px: dos por fila en el teléfono (con 200px
+          quedaba una sola y los seis ocupaban más de dos pantallas). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '32px' }}>
         {kpis.map(k => (
           <div key={k.label} style={cardStyle(k.from, k.to)}>
-            <div style={{ fontSize: '28px', marginBottom: '4px' }}>{k.icon}</div>
-            <div style={{ fontSize: '30px', fontWeight: 800, lineHeight: 1 }}>{k.value}</div>
+            <div style={{ fontSize: '24px', marginBottom: '4px' }}>{k.icon}</div>
+            <div style={{ fontSize: '28px', fontWeight: 800, lineHeight: 1 }}>{k.value}</div>
             <div style={{ marginTop: '8px' }}>
               <div style={{ fontSize: '13px', fontWeight: 600, opacity: 0.95 }}>{k.label}</div>
               <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '2px' }}>{k.sub}</div>
@@ -176,7 +178,7 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
       {/* Accesos rápidos */}
       <div style={{ marginBottom: '32px' }}>
         <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Acceso Rápido</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
           {accesos.map(a => (
             <button
               key={a.label}

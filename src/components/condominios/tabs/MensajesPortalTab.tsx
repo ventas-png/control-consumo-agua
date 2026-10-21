@@ -139,11 +139,13 @@ export function MensajesPortalTab({ mensajes, unidades, autorNombre, autorUserId
         ))}
       </div>
 
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+      {/* Filtros — los estados en una sola línea que se desliza de lado en el
+          teléfono; debajo, tipo/unidad/búsqueda. */}
+      <div role="group" aria-label="Filtrar por estado" style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2, marginBottom: 8 }}>
         {FILTROS.map(f => (
           <button key={f.id} onClick={() => setFiltroEstado(f.id)} aria-pressed={filtroEstado === f.id}
             style={{
+              flexShrink: 0, whiteSpace: 'nowrap',
               padding: '6px 13px', borderRadius: 20, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
               border: '1.5px solid', borderColor: filtroEstado === f.id ? 'var(--at-primary)' : 'var(--at-line)',
               background: filtroEstado === f.id ? 'var(--at-primary-tint)' : 'var(--at-surface)',
@@ -152,18 +154,20 @@ export function MensajesPortalTab({ mensajes, unidades, autorNombre, autorUserId
             {f.label}
           </button>
         ))}
-        <select aria-label="Filtrar por tipo" value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoMensajePortal | '')} style={selectStyle}>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+        <select aria-label="Filtrar por tipo" value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoMensajePortal | '')} style={{ ...selectStyle, flex: '1 1 140px', minWidth: 0 }}>
           <option value="">Todos los tipos</option>
           {(Object.keys(TIPO_CFG) as TipoMensajePortal[]).map(t => (
             <option key={t} value={t}>{TIPO_CFG[t].icon} {TIPO_CFG[t].label}</option>
           ))}
         </select>
-        <select aria-label="Filtrar por unidad" value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)} style={selectStyle}>
+        <select aria-label="Filtrar por unidad" value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)} style={{ ...selectStyle, flex: '1 1 140px', minWidth: 0 }}>
           <option value="">Todas las unidades</option>
           {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
         </select>
         <input aria-label="Buscar mensajes" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar asunto o texto…"
-          style={{ ...selectStyle, minWidth: 190 }} />
+          style={{ ...selectStyle, flex: '1 1 190px', minWidth: 0 }} />
         <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{lista.length} mensaje{lista.length === 1 ? '' : 's'}</span>
       </div>
 
@@ -194,7 +198,9 @@ export function MensajesPortalTab({ mensajes, unidades, autorNombre, autorUserId
                     <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 5 }}>
                       🏠 {nombreUnidad(m)} · {tc.label} · {fechaCorta(m.created_at)}
                     </div>
-                    <p style={{ margin: '0 0 5px', fontSize: 13, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>{m.cuerpo}</p>
+                    {/* Tres líneas: el texto completo está en la conversación,
+                        fijado arriba del hilo. */}
+                    <p style={{ margin: '0 0 5px', fontSize: 13, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{m.cuerpo}</p>
                     {m.foto_urls?.length > 0 && (
                       <div style={{ margin: '6px 0' }}><ImageGallery urls={m.foto_urls} maxVisible={4} /></div>
                     )}
@@ -207,26 +213,28 @@ export function MensajesPortalTab({ mensajes, unidades, autorNombre, autorUserId
                         <div style={{ fontSize: 13, color: 'var(--at-ink-2)' }}>{m.respuesta}</div>
                       </div>
                     )}
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 9 }}>
+                    {/* La conversación es la acción principal: barra a todo el
+                        ancho, como en el portal del residente. */}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--at-line)' }}>
                       <button onClick={() => abrirHilo(m)}
-                        style={{ padding: '6px 13px', background: nHilo > 0 ? 'var(--at-primary-tint)' : 'var(--at-chip)', color: nHilo > 0 ? 'var(--at-primary)' : 'var(--at-ink-2)', border: 'none', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                        style={{ flex: '1 1 180px', padding: '9px 13px', background: nHilo > 0 || canEdit ? 'var(--at-primary-tint)' : 'var(--at-chip)', color: nHilo > 0 || canEdit ? 'var(--at-primary)' : 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                         💬 {nHilo > 0 ? `Conversación (${nHilo})` : (canEdit ? 'Responder' : 'Ver conversación')}
                       </button>
                       {canEdit && m.estado === 'nuevo' && (
                         <button onClick={() => cambiarEstado(m, 'leido')}
-                          style={{ padding: '6px 13px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                          style={{ padding: '9px 13px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                           👁 Marcar leído
                         </button>
                       )}
                       {canEdit && m.estado !== 'cerrado' && (
                         <button onClick={() => cambiarEstado(m, 'cerrado')}
-                          style={{ padding: '6px 13px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                          style={{ padding: '9px 13px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                           ✔ Cerrar
                         </button>
                       )}
                       {canEdit && m.estado === 'cerrado' && (
                         <button onClick={() => cambiarEstado(m, 'leido')}
-                          style={{ padding: '6px 13px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                          style={{ padding: '9px 13px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                           ↩ Reabrir
                         </button>
                       )}

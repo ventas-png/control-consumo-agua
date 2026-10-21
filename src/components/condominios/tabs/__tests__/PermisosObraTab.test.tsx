@@ -1,95 +1,138 @@
-// Eliminar un permiso de obra exige condominios.tab.permisos_obra.delete
-// (canDelete).
-//
-// "🗑 Eliminar" del detalle se mostraba y borraba sin mirar ningún permiso,
-// así que un rol de solo consulta podía eliminar permisos de obra. Lo que se
-// vigila aquí:
-//
-//   1. Sin permiso de eliminar no hay botón, tampoco para quien sí puede editar.
-//   2. Con el permiso, el botón borra aunque no se pueda editar.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
-import type { PermisoObraUnidad } from '../../../../types'
+import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react'
+import type { PermisoObraUnidad, Unidad } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
-  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
-  notify: vi.fn(),
-  confirm: vi.fn(async () => ({ isConfirmed: true })),
-  onRefresh: vi.fn(),
-}))
-
-vi.mock('../../../../lib/supabase', () => ({
-  supabase: { from: () => ({}) },
-  db: { from: () => ({}) },
-}))
-vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
+  confirm: vi.fn(async () => ({ isConfirmed: true })),
+  notify: vi.fn(),
+}))
+
+vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
+vi.mock('../../../../domain/condominios/tabMutations', () => ({
+  createCondominioRow: mocks.createCondominioRow,
+  updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
 }))
-vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: mocks.confirm }))
+vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
 
 const { PermisosObraTab } = await import('../PermisosObraTab')
 
+const unidades = [{ id: 'un1', nombre: 'Casa 4', activo: true }] as unknown as Unidad[]
+
 function permiso(over: Partial<PermisoObraUnidad> = {}): PermisoObraUnidad {
   return {
-    id: 'po1', company_id: 'co1', project_id: 'p1',
-    tipo_obra: 'remodelacion', descripcion: 'Remodelación de cocina',
-    estado: 'solicitado', created_at: '2026-09-01T00:00:00.000Z',
+    id: 'po1', company_id: 'co1', project_id: 'p1', unidad_id: 'un1', tipo_obra: 'remodelacion',
+    descripcion: 'Remodelar cocina', fecha_inicio: '2026-11-01', fecha_fin_estimada: '2026-11-30',
+    horario_permitido: 'Lun-Vie 8:00-17:00', fianza: 500, estado: 'solicitado',
+    aprobado_por: null, observaciones: 'Sin ruido después de las 5', created_at: '2026-10-20T00:00:00Z',
     ...over,
+  } as PermisoObraUnidad
+}
+
+type Props = Parameters<typeof PermisosObraTab>[0]
+function props(over: Partial<Props> = {}): Props {
+  return {
+    permisos: [permiso()], unidades, proyectoId: 'p1', companyId: 'co1', moneda: 'USD',
+    canCreate: true, canEdit: true, canDelete: true, onRefresh: () => {}, ...over,
   }
 }
 
-function renderTab(props: Partial<Parameters<typeof PermisosObraTab>[0]> = {}) {
-  return render(
-    <PermisosObraTab
-      permisos={[permiso()]}
-      unidades={[]}
-      proyectoId="p1"
-      companyId="co1"
-      moneda="GTQ"
-      canCreate
-      canEdit
-      canDelete
-      onRefresh={mocks.onRefresh}
-      {...props}
-    />,
-  )
-}
-
-function abrirDetalle() {
-  fireEvent.click(screen.getByText('Remodelación de cocina'))
-}
-
 beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
-afterEach(() => { cleanup() })
+afterEach(cleanup)
 
-describe('PermisosObraTab — Eliminar exige el permiso de eliminar del tab', () => {
-  it.each([
-    ['solo consulta', { canCreate: false, canEdit: false, canDelete: false }],
-    ['editar sin eliminar', { canDelete: false }],
-  ])('%s: el detalle no ofrece Eliminar', (_caso, permisos) => {
-    renderTab(permisos)
-    abrirDetalle()
-    expect(screen.queryByText('🗑 Eliminar')).toBeNull()
+describe('PermisosObraTab — ventanas', () => {
+  it('cada permiso se abre en ventana (pantalla completa en el teléfono)', () => {
+    render(<PermisosObraTab {...props()} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
+
+    const dialog = screen.getByRole('dialog', { name: '🔨 Remodelar cocina' })
+    expect(dialog.classList.contains('at-modal--fs-mobile')).toBe(true)
+    expect(within(dialog).getByText('Lun-Vie 8:00-17:00')).toBeTruthy()
+    expect(within(dialog).getByText('USD 500.00')).toBeTruthy()
+    expect(within(dialog).getByText('Unidad: Casa 4')).toBeTruthy()
+    expect(within(dialog).getByText('Sin ruido después de las 5')).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('con permiso de eliminar (aunque no edite) el botón borra el permiso', async () => {
-    renderTab({ canEdit: false })
-    abrirDetalle()
-    fireEvent.click(screen.getByText('🗑 Eliminar'))
+  it('aprobar desde la ventana avanza el estado y la ventana lo refleja', async () => {
+    const onRefresh = vi.fn()
+    render(<PermisosObraTab {...props({ onRefresh })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '→ Aprobar' }))
 
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('permisos_obra_unidad', 'po1', { estado: 'aprobado' }))
+    expect(onRefresh).toHaveBeenCalled()
+    expect(await within(dialog).findByRole('button', { name: '→ Iniciar Ejecución' })).toBeTruthy()
+  })
+
+  it('rechazar pide confirmación y marca rechazado; la ventana muestra la fila vigente', async () => {
+    const { rerender } = render(<PermisosObraTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '✗ Rechazar' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('permisos_obra_unidad', 'po1', { estado: 'rechazado' }))
+    expect(mocks.confirm).toHaveBeenCalled()
+
+    // Lo que trae onRefresh llega a la ventana abierta.
+    rerender(<PermisosObraTab {...props({ permisos: [permiso({ estado: 'rechazado' })] })} />)
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByRole('button', { name: '✗ Rechazar' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: /^→/ })).toBeNull()
+  })
+
+  it('el formulario de nuevo permiso es una ventana y guarda', async () => {
+    render(<PermisosObraTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nuevo permiso' }))
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo permiso de obra' })
+    expect(dialog.classList.contains('at-modal--fs-mobile')).toBe(true)
+
+    fireEvent.change(within(dialog).getByLabelText('Descripción *'), { target: { value: 'Pintar fachada' } })
+    fireEvent.change(within(dialog).getByLabelText('Tipo de obra *'), { target: { value: 'pintura' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('permisos_obra_unidad', expect.objectContaining({ descripcion: 'Pintar fachada', tipo_obra: 'pintura' })))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('sin permiso de edición no hay editar ni cambios de estado', () => {
+    render(<PermisosObraTab {...props({ canCreate: false, canEdit: false })} />)
+    expect(screen.queryByRole('button', { name: '+ Nuevo permiso' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByRole('button', { name: '✏️ Editar' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: '→ Aprobar' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: '✗ Rechazar' })).toBeNull()
+  })
+
+  it('eliminar exige su propio permiso: editar no basta', async () => {
+    render(<PermisosObraTab {...props({ canDelete: false })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
+    let dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: '✏️ Editar' })).toBeTruthy()
+    expect(within(dialog).queryByRole('button', { name: /Eliminar/ })).toBeNull()
+    cleanup()
+
+    render(<PermisosObraTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
+    dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Eliminar/ }))
     await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('permisos_obra_unidad', 'po1'))
   })
 
-  it('si la base no borra (la RLS lo rechaza), avisa y no da el permiso por eliminado', async () => {
+  it('eliminar no depende de editar; si la base no borra (la RLS lo rechaza), avisa y no lo da por eliminado', async () => {
     mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
-    renderTab()
-    abrirDetalle()
-    fireEvent.click(screen.getByText('🗑 Eliminar'))
+    const onRefresh = vi.fn()
+    render(<PermisosObraTab {...props({ canEdit: false, onRefresh })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
 
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
-    expect(mocks.onRefresh).not.toHaveBeenCalled()
-    expect(screen.getByText('🗑 Eliminar')).toBeTruthy()
+    expect(onRefresh).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 })
