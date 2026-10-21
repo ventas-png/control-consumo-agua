@@ -42,6 +42,15 @@ export const STATUS_LABELS: Record<ConversationStatus, string> = {
   cerrada: 'Cerrada',
 }
 
+/** Los mismos estados, contados desde el lado del cliente (portal). */
+export const STATUS_LABELS_CLIENTE: Record<ConversationStatus, string> = {
+  abierta: 'Abierta',
+  en_progreso: 'En progreso',
+  esperando_cliente: 'Esperando tu respuesta',
+  resuelta: 'Resuelta',
+  cerrada: 'Cerrada',
+}
+
 export const STATUS_COLORS: Record<ConversationStatus, string> = {
   abierta: 'var(--at-info)',
   en_progreso: 'var(--at-warning)',

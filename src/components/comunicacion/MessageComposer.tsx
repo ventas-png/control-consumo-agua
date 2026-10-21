@@ -2,10 +2,12 @@ import { useEffect, useMemo } from 'react'
 import { notify } from '../shared/Dialog'
 import { getFileIcon, formatBytes } from './conversationConstants'
 
-// Compositor de mensaje del detalle de conversación. Vive en el footer del
-// modal (ConversationDetailModal), que ya pone el borde y el padding.
+// Compositor de mensaje de una conversación. Vive en el footer de la ventana
+// (ConversationDetailModal del equipo, CustomerConversationModal del portal),
+// que ya pone el borde y el padding.
 interface Props {
-  isInternalConversation: boolean
+  /** Ofrece "Nota interna": solo el equipo, y no en discusiones internas. */
+  allowInternalNote: boolean
   isInternalNote: boolean
   onToggleInternalNote: (v: boolean) => void
   pendingFile: File | null
@@ -14,13 +16,16 @@ interface Props {
   onChangeMessage: (v: string) => void
   sending: boolean
   onSend: () => void
+  /** Texto guía de la caja (por defecto, el del equipo). */
+  placeholder?: string
 }
 
 const MAX_BYTES = 10 * 1024 * 1024
 
 export function MessageComposer({
-  isInternalConversation, isInternalNote, onToggleInternalNote,
+  allowInternalNote, isInternalNote, onToggleInternalNote,
   pendingFile, onPickFile, messageText, onChangeMessage, sending, onSend,
+  placeholder = 'Escribe una respuesta…',
 }: Props) {
   const canSend = !sending && (!!messageText.trim() || !!pendingFile)
 
@@ -34,10 +39,10 @@ export function MessageComposer({
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {/* Respuesta vs nota interna — solo en conversaciones con clientes. Un
-          control segmentado deja claro a quién le llega el mensaje antes de
-          escribirlo; la casilla de antes pasaba desapercibida. */}
-      {!isInternalConversation && (
+      {/* Respuesta vs nota interna. Un control segmentado deja claro a quién
+          le llega el mensaje antes de escribirlo; la casilla de antes pasaba
+          desapercibida. */}
+      {allowInternalNote && (
         <div role="radiogroup" aria-label="Tipo de mensaje" style={{
           display: 'inline-flex', alignSelf: 'flex-start', padding: '3px', gap: '2px',
           background: 'var(--at-chip)', borderRadius: '10px',
@@ -108,7 +113,7 @@ export function MessageComposer({
         <textarea
           value={messageText}
           onChange={e => onChangeMessage(e.target.value)}
-          placeholder={isInternalNote ? 'Escribe una nota para el equipo…' : 'Escribe una respuesta…'}
+          placeholder={isInternalNote ? 'Escribe una nota para el equipo…' : placeholder}
           aria-label="Mensaje"
           rows={2}
           style={{

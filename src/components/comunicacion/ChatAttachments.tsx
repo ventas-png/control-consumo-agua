@@ -1,14 +1,17 @@
 import { SecureImage } from '../shared/SecureImage'
 import { useSignedUrl } from '../../lib/storageUrls'
+import { formatBytes } from './conversationConstants'
 
 // Sub-componentes para adjuntos del chat (bucket conv-attachments es privado tras
 // S6 follow-up → se firman las URLs). Extraídos de ComunicacionSection (com:N6).
 
 // Link a un adjunto no-imagen del chat.
-export function AttachmentLink({ src, name, type, getIcon, body }: {
+export function AttachmentLink({ src, name, type, size, getIcon, body }: {
   src: string
   name?: string | null
   type?: string | null
+  /** Bytes del archivo; si llega se muestra bajo el nombre. */
+  size?: number | null
   getIcon: (mime?: string | null) => string
   body?: string | null
 }) {
@@ -31,6 +34,7 @@ export function AttachmentLink({ src, name, type, getIcon, body }: {
         <div style={{ fontSize: '12px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {name}
         </div>
+        {size ? <div style={{ fontSize: '10px', opacity: 0.7 }}>{formatBytes(size)}</div> : null}
       </div>
     </a>
   )

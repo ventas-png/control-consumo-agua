@@ -16,12 +16,13 @@ function pill(color: string, size: 'sm' | 'md'): CSSProperties {
   }
 }
 
-export function StatusPill({ status, size = 'sm' }: { status: ConversationStatus; size?: 'sm' | 'md' }) {
+/** `label` permite el texto del portal ("Esperando tu respuesta") con el mismo color. */
+export function StatusPill({ status, size = 'sm', label }: { status: ConversationStatus; size?: 'sm' | 'md'; label?: string }) {
   const color = STATUS_COLORS[status]
   return (
     <span style={pill(color, size)}>
       <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: color }} />
-      {STATUS_LABELS[status]}
+      {label ?? STATUS_LABELS[status]}
     </span>
   )
 }

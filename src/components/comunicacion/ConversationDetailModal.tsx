@@ -1,13 +1,10 @@
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
-import { AttachmentImage, AttachmentLink } from './ChatAttachments'
+import { Avatar, ChatThread } from './ChatThread'
 import { MessageComposer } from './MessageComposer'
 import { PriorityPill, StatusPill } from './ConversationBadges'
-import {
-  CATEGORY_ICONS, CATEGORY_LABELS, STATUS_LABELS,
-  dayKey, dayLabel, getFileIcon, initials,
-} from './conversationConstants'
+import { CATEGORY_ICONS, CATEGORY_LABELS, STATUS_LABELS } from './conversationConstants'
 import type { Conversation, ConversationMessage, ConversationStatus } from '../../types'
 
 interface Assignment {
@@ -55,13 +52,6 @@ export function ConversationDetailModal({
   const thread = messages.filter(m => m.conversation_id === conversation.id)
   const isClosed = conversation.status === 'cerrada'
 
-  // Como en cualquier chat, se abre mirando el último mensaje y se sigue al
-  // final cuando llega uno nuevo. `?.()` porque jsdom no implementa scrollIntoView.
-  const endRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    endRef.current?.scrollIntoView?.({ block: 'end' })
-  }, [thread.length, conversation.id])
-
   const subtitle = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
       <StatusPill status={conversation.status} />
@@ -80,7 +70,7 @@ export function ConversationDetailModal({
   if (canCreate && !isClosed) {
     footer = (
       <MessageComposer
-        isInternalConversation={!!conversation.is_internal}
+        allowInternalNote={!conversation.is_internal}
         isInternalNote={isInternalNote}
         onToggleInternalNote={onToggleInternalNote}
         pendingFile={pendingFile}
@@ -131,31 +121,11 @@ export function ConversationDetailModal({
           />
         )}
 
-        {/* Hilo */}
-        <div style={{
-          flex: 1, padding: '16px', background: 'var(--at-surface-2)',
-          display: 'flex', flexDirection: 'column', gap: '10px',
-        }}>
-          {thread.length === 0 ? (
-            <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px' }}>
-              <div style={{ fontSize: '34px', marginBottom: '8px' }}>💬</div>
-              <div style={{ fontSize: '13.5px' }}>
-                Aún no hay mensajes{canCreate && !isClosed ? '. Escribe el primero abajo.' : '.'}
-              </div>
-            </div>
-          ) : (
-            thread.map((msg, i) => {
-              const newDay = i === 0 || dayKey(thread[i - 1].created_at) !== dayKey(msg.created_at)
-              return (
-                <Fragment key={msg.id}>
-                  {newDay && <DaySeparator label={dayLabel(msg.created_at)} />}
-                  <MessageBubble msg={msg} />
-                </Fragment>
-              )
-            })
-          )}
-          <div ref={endRef} />
-        </div>
+        <ChatThread
+          messages={thread}
+          viewer="agent"
+          empty={`Aún no hay mensajes${canCreate && !isClosed ? '. Escribe el primero abajo.' : '.'}`}
+        />
       </div>
     </EditModal>
   )
@@ -288,83 +258,6 @@ function ManageBar({
           <button type="button" onClick={onOpenAssignModal} style={smallBtn}>
             {activeAssignments.length > 0 ? '+ Agregar' : '👥 Asignar a…'}
           </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Hilo ────────────────────────────────────────────────────────────────────
-
-function DaySeparator({ label }: { label: string }) {
-  return (
-    <div role="separator" style={{ display: 'flex', justifyContent: 'center', margin: '6px 0 2px' }}>
-      <span style={{
-        fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)',
-        background: 'var(--at-surface)', border: '1px solid var(--at-line)',
-        padding: '3px 10px', borderRadius: '999px',
-      }}>
-        {label}
-      </span>
-    </div>
-  )
-}
-
-function Avatar({ name, size = 28, tone = 'accent' }: { name?: string | null; size?: number; tone?: 'accent' | 'primary' }) {
-  return (
-    <span aria-hidden="true" style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: Math.round(size * 0.4), fontWeight: 700,
-      background: tone === 'primary' ? 'var(--at-primary-soft)' : 'var(--at-accent-tint)',
-      color: tone === 'primary' ? 'var(--at-primary-hover)' : 'var(--at-accent-dark)',
-    }}>
-      {initials(name)}
-    </span>
-  )
-}
-
-function MessageBubble({ msg }: { msg: ConversationMessage }) {
-  const isAgent = msg.sender_type === 'agent'
-  const isNote = msg.is_internal_note
-  const skin: CSSProperties = isNote
-    ? { background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: '1px dashed var(--at-warning-border)' }
-    : isAgent
-      ? { background: 'var(--at-primary)', color: 'var(--at-on-status)', border: '1px solid transparent' }
-      : { background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line)' }
-
-  return (
-    <div style={{ display: 'flex', justifyContent: isAgent ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '8px' }}>
-      {!isAgent && <Avatar name={msg.sender_name} />}
-      <div style={{
-        maxWidth: 'min(80%, 520px)',
-        padding: '9px 13px 7px',
-        borderRadius: isAgent ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-        ...skin,
-      }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '3px', opacity: isNote ? 1 : 0.75 }}>
-          {isNote ? '🔒 Nota interna · ' : ''}{msg.sender_name ?? 'Usuario'}
-        </div>
-        {msg.body && (
-          <div style={{ fontSize: '14px', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-            {msg.body}
-          </div>
-        )}
-        {msg.attachment_url && msg.attachment_type?.startsWith('image/') && (
-          <AttachmentImage src={msg.attachment_url} name={msg.attachment_name ?? undefined} body={msg.body} />
-        )}
-        {msg.attachment_url && !msg.attachment_type?.startsWith('image/') && (
-          <AttachmentLink
-            src={msg.attachment_url}
-            name={msg.attachment_name ?? undefined}
-            type={msg.attachment_type}
-            getIcon={getFileIcon}
-            body={msg.body}
-          />
-        )}
-        <div style={{ fontSize: '10.5px', opacity: 0.65, marginTop: '4px', textAlign: 'right' }}>
-          {new Date(msg.created_at).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
     </div>
