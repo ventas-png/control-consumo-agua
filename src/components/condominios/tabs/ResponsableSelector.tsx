@@ -18,7 +18,7 @@ interface Props {
   disabled?: boolean
 }
 
-const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 13, color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+const inputStyle: CSSProperties = { width: '100%', minWidth: 0, minHeight: 40, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
 export function ResponsableSelector({ elegibles, cargando, error, value, onChange, userId, disabled }: Props) {
   const [busqueda, setBusqueda] = useState('')
@@ -33,12 +33,12 @@ export function ResponsableSelector({ elegibles, cargando, error, value, onChang
   return (
     <div>
       {elegido ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }} data-testid="responsable-elegido">
-          <span style={{ fontWeight: 600 }}>{elegido.full_name}{elegido.id === userId ? ' (tú)' : ''}</span>
-          <span style={{ color: 'var(--at-ink-3)', fontSize: 11 }}>· {elegido.role}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, minWidth: 0 }} data-testid="responsable-elegido">
+          <span style={{ fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>{elegido.full_name}{elegido.id === userId ? ' (tú)' : ''}</span>
+          <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>· {elegido.role}</span>
           {!disabled && (
             <button type="button" onClick={() => { onChange(null); setAbierto(true) }}
-              style={{ marginLeft: 'auto', padding: '2px 8px', border: '1.5px solid var(--at-line)', borderRadius: 6, background: 'var(--at-surface)', fontSize: 11, cursor: 'pointer' }}>
+              style={{ marginLeft: 'auto', padding: '4px 10px', border: '1.5px solid var(--at-line)', borderRadius: 6, background: 'var(--at-surface)', fontSize: 12, cursor: 'pointer' }}>
               Cambiar
             </button>
           )}

@@ -111,6 +111,16 @@ export function sugerirReservas(
   return [...reservas].sort((a, b) => puntos(b) - puntos(a) || a.fecha_entrada.localeCompare(b.fecha_entrada) || a.id.localeCompare(b.id))
 }
 
+/**
+ * Reservas compatibles con la unidad del servicio: las de esa unidad y las que no tienen
+ * unidad (trg_hk_reserva solo rechaza una reserva CON otra unidad). Sin unidad elegida,
+ * todas.
+ */
+export function reservasDeUnidad(reservas: readonly ReservaSTRVinculable[], unidadId: string | null | undefined): ReservaSTRVinculable[] {
+  if (!unidadId) return [...reservas]
+  return reservas.filter(r => !r.unidad_id || r.unidad_id === unidadId)
+}
+
 /** Buscador del selector: código, huésped o unidad, sin mayúsculas ni acentos. */
 export function filtrarReservas(reservas: readonly ReservaSTRVinculable[], texto: string): ReservaSTRVinculable[] {
   const q = normalizar(texto)

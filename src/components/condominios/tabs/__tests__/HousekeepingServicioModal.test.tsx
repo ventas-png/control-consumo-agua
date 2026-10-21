@@ -1,5 +1,6 @@
 // Alta/edición de un servicio en ventana emergente: sin selector de estado (lo mueven Iniciar
-// y Finalizar), reserva STR opcional que rellena la unidad vacía, responsable obligatorio al
+// y Finalizar), reserva STR opcional atada a la unidad (la unidad acota la lista, la reserva
+// asigna su unidad), responsable obligatorio al
 // crear, hora tentativa de ingreso, cancelación de un servicio pendiente/en proceso y
 // mensajes legibles cuando la base rechaza.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -89,12 +90,51 @@ describe('HousekeepingServicioModal', () => {
     expect(mocks.createCondominioRow.mock.calls[0][1]).toMatchObject({ reserva_str_id: 'r2', unidad_id: 'un2' })
   })
 
-  it('una unidad ya elegida no se pisa al vincular una reserva de otra unidad (la base dirá si no coincide)', async () => {
+  it('con una unidad elegida lista solo sus reservas; «Ver reservas de otras unidades» las muestra y elegir una cambia la unidad', async () => {
     abrir()
+    await waitFor(() => expect(mocks.fetchReservasVinculables).toHaveBeenCalled())
     fireEvent.change(screen.getByLabelText('Unidad'), { target: { value: 'un1' } })
     fireEvent.focus(screen.getByLabelText('Buscar reserva'))
-    fireEvent.click(within(await screen.findByRole('listbox', { name: 'Reservas vinculables' })).getByText(/HM-002/))
+    const lista = await screen.findByRole('listbox', { name: 'Reservas vinculables' })
+    expect(within(lista).getByText(/HM-001/)).toBeTruthy()
+    expect(within(lista).queryByText(/HM-002/)).toBeNull()
+    fireEvent.click(within(lista).getByText('Ver reservas de otras unidades (1)'))
+    fireEvent.click(within(lista).getByText(/HM-002/))
+    expect((screen.getByLabelText('Unidad') as HTMLSelectElement).value).toBe('un2')
+    fireEvent.click(screen.getByText('Agregar'))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    expect(mocks.createCondominioRow.mock.calls[0][1]).toMatchObject({ reserva_str_id: 'r2', unidad_id: 'un2' })
+  })
+
+  it('una unidad sin reservas lo dice', async () => {
+    mocks.fetchReservasVinculables.mockResolvedValueOnce({ data: [r2], error: null })
+    abrir()
+    await waitFor(() => expect(mocks.fetchReservasVinculables).toHaveBeenCalled())
+    fireEvent.change(screen.getByLabelText('Unidad'), { target: { value: 'un1' } })
+    fireEvent.focus(await screen.findByLabelText('Buscar reserva'))
+    const lista = await screen.findByRole('listbox', { name: 'Reservas vinculables' })
+    expect(within(lista).getByText('No hay reservas para Apto 1A.')).toBeTruthy()
+  })
+
+  it('cambiar a otra unidad quita la reserva que ya no le corresponde y lo avisa; a «Sin unidad» la conserva', async () => {
+    abrir()
+    fireEvent.focus(await screen.findByLabelText('Buscar reserva'))
+    fireEvent.click(within(await screen.findByRole('listbox', { name: 'Reservas vinculables' })).getByText(/HM-001/))
     expect((screen.getByLabelText('Unidad') as HTMLSelectElement).value).toBe('un1')
+    fireEvent.change(screen.getByLabelText('Unidad'), { target: { value: '' } })
+    expect(screen.getByTestId('reserva-elegida')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Unidad'), { target: { value: 'un2' } })
+    expect(screen.queryByTestId('reserva-elegida')).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain('Se quitó la reserva vinculada porque es de otra unidad.')
+    fireEvent.click(screen.getByText('Agregar'))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    expect(mocks.createCondominioRow.mock.calls[0][1]).toMatchObject({ reserva_str_id: null, unidad_id: 'un2' })
+  })
+
+  it('si la base rechaza la unidad de la reserva, lo explica', async () => {
+    abrir()
+    fireEvent.focus(await screen.findByLabelText('Buscar reserva'))
+    fireEvent.click(within(await screen.findByRole('listbox', { name: 'Reservas vinculables' })).getByText(/HM-002/))
     mocks.createCondominioRow.mockResolvedValueOnce({ error: { message: 'HK_RESERVA_UNIDAD_DISTINTA: la unidad del servicio no coincide' } })
     fireEvent.click(screen.getByText('Agregar'))
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error', text: 'La unidad del servicio no coincide con la de la reserva.' })))

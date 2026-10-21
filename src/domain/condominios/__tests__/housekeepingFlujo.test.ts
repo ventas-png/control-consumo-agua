@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   clasificarDestinatario, construirEnlaceWhatsApp, esAdminDeTransiciones, etiquetaReserva, filtrarReservas,
-  formatearDuracion, horasDedicadas, mensajeErrorFlujo, minutosDedicados, resumenTextoInforme, sugerirReservas,
+  formatearDuracion, horasDedicadas, mensajeErrorFlujo, minutosDedicados, reservasDeUnidad, resumenTextoInforme, sugerirReservas,
   transicionPermitida,
 } from '../housekeepingFlujo'
 import type { ReservaSTRVinculable } from '../../../types'
@@ -92,6 +92,12 @@ describe('selector de reservas', () => {
     const copia = [...reservas]
     sugerirReservas(reservas, { unidadId: 'u2' })
     expect(reservas).toEqual(copia)
+  })
+  it('reservasDeUnidad: con unidad, solo las suyas y las que no tienen unidad (la base no las rechaza); sin unidad, todas', () => {
+    expect(reservasDeUnidad(reservas, 'u2').map(r => r.id)).toEqual(['r2', 'r7'])
+    expect(reservasDeUnidad(reservas, 'u9').map(r => r.id)).toEqual(['r7'])
+    expect(reservasDeUnidad(reservas, null)).toHaveLength(3)
+    expect(reservasDeUnidad(reservas, '')).toHaveLength(3)
   })
   it('filtrarReservas: por código, huésped o unidad, sin acentos', () => {
     expect(filtrarReservas(reservas, 'perez').map(r => r.id)).toEqual(['r1'])
