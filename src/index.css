@@ -708,6 +708,105 @@ button:focus:not(:focus-visible) {
   }
 }
 
+/* ─── EditModal `fullScreenOnMobile`: hoja a pantalla completa ────────────
+ *
+ * Un chat en un modal centrado al 95vw × 90vh desperdicia los bordes y deja
+ * el teclado tapando media conversación. En el teléfono el panel pasa a
+ * ocupar todo el viewport, sin radio, y el header/footer reservan el
+ * safe-area de iOS (notch y barra de inicio). `dvh` y no `vh`: con la barra
+ * de Safari visible, `100vh` mide de más y el footer queda bajo ella.
+ *
+ * `!important` porque el panel lleva su tamaño inline (EditModal.tsx). */
+@media (max-width: 767px) {
+  .at-modal--fs-mobile {
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+  .at-modal--fs-mobile > .at-modal-panel {
+    max-width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+  }
+  .at-modal--fs-mobile .at-modal-header {
+    padding-top: calc(12px + max(env(safe-area-inset-top, 0px), var(--at-safe-top, 0px))) !important;
+  }
+  .at-modal--fs-mobile .at-modal-footer {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ─── Centro de Comunicación ──────────────────────────────────────────────
+ * Lo que no se puede expresar inline: hover de las filas y el reacomodo de
+ * filtros/KPIs en el teléfono. */
+.conv-row:hover {
+  background: var(--at-surface-2) !important;
+}
+.conv-row[aria-current="true"]:hover {
+  background: var(--at-primary-tint) !important;
+}
+.conv-stat[aria-pressed="false"]:hover {
+  /* El borde superior es el color del estado: no se toca. */
+  border-right-color: var(--at-line-strong) !important;
+  border-bottom-color: var(--at-line-strong) !important;
+  border-left-color: var(--at-line-strong) !important;
+}
+/* Barra de gestión del chat: en escritorio siempre abierta y sin botón de
+ * plegar; en el teléfono plegada hasta que se toca el resumen. */
+.conv-manage-toggle {
+  display: none;
+}
+@media (max-width: 767px) {
+  .conv-manage-toggle {
+    display: flex;
+  }
+  .conv-manage:not(.is-open) .conv-manage-body {
+    display: none !important;
+  }
+  .conv-manage.is-open .conv-manage-body {
+    padding-top: 0 !important;
+  }
+  /* En el teléfono no hay Ctrl+Enter: la pista solo ocupa sitio. */
+  .conv-composer-hint {
+    display: none;
+  }
+}
+/* Teléfonos angostos: "Enviar" queda solo con la flecha y el texto del
+ * mensaje gana ese ancho (el botón conserva su aria-label). */
+@media (max-width: 480px) {
+  .conv-send-label {
+    display: none;
+  }
+}
+.conv-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .conv-filters {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .conv-filters > :first-child {
+    grid-column: 1 / -1;
+  }
+  /* Los cuatro KPIs siguen en una fila, pero compactos: en 2×2 (como
+   * estaban) se comían media pantalla antes de la primera conversación. */
+  .conv-stats {
+    gap: 6px !important;
+  }
+  .conv-stat {
+    padding: 8px 6px !important;
+    text-align: center;
+  }
+  .conv-stat-value {
+    font-size: 18px !important;
+  }
+  .conv-stat-label {
+    font-size: 10.5px !important;
+  }
+}
+
 /* ─── Hide non-essential user-chip text on very narrow phones ─────────── */
 @media (max-width: 380px) {
   /* En phones extra-narrow, el user-chip de la topbar ocupa demasiado.
