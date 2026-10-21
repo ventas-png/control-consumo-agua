@@ -6,6 +6,7 @@
 import { hoyLocalISO } from '../../lib/format'
 import { useState } from 'react'
 import type { RoleDef } from '../../types'
+import { tint } from '../shared/statusTone'
 
 export function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -29,8 +30,8 @@ export function SubsectionHeader({ children }: { children: React.ReactNode }) {
 export function Banner({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <div style={{
-      fontSize: '11px', color, background: color + '14',
-      border: `1px solid ${color}33`, borderRadius: '6px',
+      fontSize: '11px', color, background: tint(color, 8),
+      border: `1px solid ${tint(color, 20)}`, borderRadius: '6px',
       padding: '6px 10px', marginBottom: '10px', lineHeight: '1.4',
     }}>{children}</div>
   )
@@ -45,7 +46,7 @@ export function AccessBadge({ level, count, total }: { level: 'completo' | 'parc
   return (
     <span style={{
       fontSize: '11px', fontWeight: 600, color: cfg.color,
-      background: cfg.color + '1a', padding: '2px 8px', borderRadius: '999px',
+      background: tint(cfg.color, 10), padding: '2px 8px', borderRadius: '999px',
     }}>{cfg.label}</span>
   )
 }
@@ -89,8 +90,8 @@ export function RoleCard({
     <div style={{
       display: 'flex', flexDirection: 'column',
       width: '100%', marginBottom: '6px', borderRadius: '8px',
-      border: `1px solid ${checked ? role.color + '55' : 'var(--at-line)'}`,
-      background: checked ? role.color + '12' : 'transparent',
+      border: `1px solid ${checked ? tint(role.color, 33) : 'var(--at-line)'}`,
+      background: checked ? tint(role.color, 7) : 'transparent',
       transition: 'border-color 0.15s, background 0.15s',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '9px 11px' }}>
@@ -159,7 +160,7 @@ export function RoleCard({
       {checked && onExpirationChange && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '0 11px 9px', borderTop: `1px dashed ${role.color}22`, paddingTop: '8px', marginTop: '0',
+          padding: '0 11px 9px', borderTop: `1px dashed ${tint(role.color, 13)}`, paddingTop: '8px', marginTop: '0',
         }}>
           <label style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Expira:</label>
           <input

@@ -41,6 +41,7 @@ import {
 import { Banner, CollapsibleSection, RoleCard, SectionHeader, TemplateCard } from './rolesUi'
 import { PermissionMatrixPanel, type MatrixSectionBlock } from './PermissionMatrixPanel'
 import { ModalPortal } from '../shared/ModalPortal'
+import { tint } from '../shared/statusTone'
 
 /** Petición de apertura del editor de roles desde este modal. */
 export interface CustomEditorRequest {
@@ -462,7 +463,7 @@ export function RolPermisosModal({
                       <span key={r.id} style={{
                         display: 'inline-flex', alignItems: 'center', gap: '5px',
                         padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                        background: r.color + '22', color: r.color,
+                        background: tint(r.color, 13), color: r.color,
                       }}>
                         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: r.color }} />
                         {r.name}

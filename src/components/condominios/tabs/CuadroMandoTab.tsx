@@ -7,6 +7,7 @@ import {
   Encuesta,
 } from '../../../types'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -37,7 +38,7 @@ interface KpiCard { label: string; val: string | number; color: string; sub?: st
 
 function KpiBox({ k }: { k: KpiCard }) {
   return (
-    <div style={{ background: 'var(--at-surface)', border: `1px solid ${k.color}33`, borderRadius: 10, padding: '12px 14px', borderTop: `3px solid ${k.color}` }}>
+    <div style={{ background: 'var(--at-surface)', border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '12px 14px', borderTop: `3px solid ${k.color}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.val}</div>
@@ -203,7 +204,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
                 const dias = diasRestantes(v.fecha)
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: dias <= 7 ? 'var(--at-danger-tint)' : 'var(--at-surface-2)', borderRadius: 7 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: v.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: tint(v.color, 13), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: 10, fontWeight: 700, color: v.color }}>{dias}d</span>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>

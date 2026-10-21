@@ -28,6 +28,7 @@ import { getDisplayRoleLabel, getDisplayRoleColor } from '../../lib/permissions'
 import { PreferenciasRegionales } from './PreferenciasRegionales'
 import { SesionesActivas } from './SesionesActivas'
 import { LegalYPrivacidad } from './LegalYPrivacidad'
+import { tint } from '../shared/statusTone'
 
 interface Props {
   currentUser: UserSession
@@ -129,7 +130,7 @@ function SubmitBtn({ loading, label, color = 'var(--at-primary)' }: { loading: b
       disabled={loading}
       style={{
         padding: '10px 22px',
-        background: loading ? 'var(--at-ink-3)' : `linear-gradient(135deg, ${color}, ${color}cc)`,
+        background: loading ? 'var(--at-ink-3)' : `linear-gradient(135deg, ${color}, ${tint(color, 80)})`,
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -540,9 +541,9 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
           <div style={{ color: 'var(--at-ink-3)', fontSize: '13px', marginTop: '3px' }}>{currentUser.email}</div>
           <span style={{
             display: 'inline-block', marginTop: '8px',
-            background: roleColor + '22',
+            background: tint(roleColor, 13),
             color: roleColor,
-            border: `1px solid ${roleColor}44`,
+            border: `1px solid ${tint(roleColor, 27)}`,
             borderRadius: '20px', padding: '2px 10px', fontSize: '11px', fontWeight: 700,
           }}>
             {getDisplayRoleLabel(currentUser)}

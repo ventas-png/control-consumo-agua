@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
+import { tint } from '../../shared/statusTone'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { PlantillaMensajeCond, CanalPlantilla } from '../../../types'
 
@@ -123,7 +124,7 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
             {filtradas.map(p => {
               const c = CANAL_CFG[p.canal]
               return (
-                <div key={p.id} style={{ background: 'var(--at-surface)', border: `1px solid ${p.activa ? c.color + '33' : 'var(--at-line)'}`, borderRadius: 10, padding: '10px 14px', opacity: p.activa ? 1 : 0.6 }}>
+                <div key={p.id} style={{ background: 'var(--at-surface)', border: `1px solid ${p.activa ? tint(c.color, 20) : 'var(--at-line)'}`, borderRadius: 10, padding: '10px 14px', opacity: p.activa ? 1 : 0.6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -198,7 +199,7 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: 4 }}>Canal</label>
                 <select value={form.canal} onChange={e => setForm(f => ({ ...f, canal: e.target.value as CanalPlantilla }))}
-                  style={{ width: '100%', padding: '7px 10px', border: `1px solid ${cfg.color}66`, borderRadius: 7, fontSize: 13 }}>
+                  style={{ width: '100%', padding: '7px 10px', border: `1px solid ${tint(cfg.color, 40)}`, borderRadius: 7, fontSize: 13 }}>
                   {(Object.keys(CANAL_CFG) as CanalPlantilla[]).map(c => <option key={c} value={c}>{CANAL_CFG[c].icon} {CANAL_CFG[c].label}</option>)}
                 </select>
               </div>

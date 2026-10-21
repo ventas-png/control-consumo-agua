@@ -3,6 +3,7 @@ import { fetchPermissionAuditLog, fetchRoleNamesByIds } from '../../domain/empre
 import { fetchAppUserNamesByIds } from '../../domain/usuarios/queries'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
 import { EditModal } from '../shared/EditModal'
+import { tint } from '../shared/statusTone'
 
 interface Props {
   onClose: () => void
@@ -99,7 +100,7 @@ export function AuditLogModal({ onClose }: Props) {
         return (
           <span style={{
             fontSize: '11px', fontWeight: 600, color: a.color,
-            background: a.color + '14', padding: '2px 8px', borderRadius: '999px',
+            background: tint(a.color, 8), padding: '2px 8px', borderRadius: '999px',
           }}>{a.label}</span>
         )
       },

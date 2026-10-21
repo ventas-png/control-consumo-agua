@@ -2,6 +2,7 @@ import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
+import { tint } from '../../shared/statusTone'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { EquipoComun, CategoriaEquipo, EstadoEquipo } from '../../../types'
 
@@ -182,7 +183,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
               style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === e.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: alerta === 'vencido' ? '3px solid var(--at-danger)' : alerta === 'proximo' ? '3px solid var(--at-warning)' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {e.nombre}</span>
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: est?.color + '20', color: est?.color }}>{est?.label}</span>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: est && tint(est.color, 12), color: est?.color }}>{est?.label}</span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
                 {e.marca && <span>{e.marca} {e.modelo} · </span>}
@@ -289,7 +290,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
                     {selected.ubicacion && <span>{selected.ubicacion}</span>}
                   </div>
                 </div>
-                <span style={{ padding: '4px 12px', borderRadius: 12, background: est?.color + '20', color: est?.color, fontWeight: 600, fontSize: 13 }}>{est?.label}</span>
+                <span style={{ padding: '4px 12px', borderRadius: 12, background: est && tint(est.color, 12), color: est?.color, fontWeight: 600, fontSize: 13 }}>{est?.label}</span>
               </div>
 
               {/* Alerta mantenimiento */}
