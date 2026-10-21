@@ -871,7 +871,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Header */}
-      <div style={{ padding: '16px 24px 0', borderBottom: '1px solid var(--at-line)', background: 'var(--at-surface)', flexShrink: 0 }}>
+      <div className="cond-header" style={{ padding: '16px 24px 0', borderBottom: '1px solid var(--at-line)', background: 'var(--at-surface)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '20px' }}>🏢</span>
@@ -898,8 +898,10 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
       </div>
 
       {/* Body: contenido a todo el ancho. Las 11 secciones viven en el sidebar
-          global; arriba quedan las pestañas de la sección activa. */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          global; arriba quedan las pestañas de la sección activa.
+          `cond-panel`: en el teléfono reacomoda las rejillas fijas de las
+          pestañas (ver index.css). */}
+      <div className="cond-panel" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {/* infra:I14 — provides the active project_id to condominios-media uploaders. */}
         <MediaScopeProvider projectId={selectedProyectoId}>
         <Suspense fallback={<TabFallback />}>

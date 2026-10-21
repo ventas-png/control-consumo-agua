@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { hoyLocalISO } from '../../../lib/format'
 import { piezasEnRiesgo } from '../../../domain/condominios/recepcion'
 import type {
@@ -19,7 +20,14 @@ interface Props {
   correspondencia: PiezaRecepcion[]
   moneda: string
   proyectoNombre?: string
+  /** Lleva a la pestaña de cada KPI / lista. Sin él (o sin permiso de ver esa
+   *  pestaña) las tarjetas son solo informativas. */
+  onIrATab?: (tab: PanelDestino) => void
+  puedeVer?: (tab: PanelDestino) => boolean
 }
+
+/** Pestañas a las que el panel sabe llevar. */
+export type PanelDestino = 'cuotas' | 'mantenimiento' | 'visitantes' | 'amenidades' | 'paqueteria'
 
 interface Alerta {
   nivel: 'error' | 'warning' | 'info'
@@ -37,8 +45,9 @@ function mesLabel(periodo: string): string {
   return ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m) - 1]
 }
 
-export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reservas, polizas, inspecciones, gastos, paquetes, correspondencia, moneda, proyectoNombre }: Props) {
+export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reservas, polizas, inspecciones, gastos, paquetes, correspondencia, moneda, proyectoNombre, onIrATab, puedeVer }: Props) {
   const hoy = hoyLocalISO()
+  const irA = (tab: PanelDestino) => (onIrATab && (puedeVer?.(tab) ?? true) ? () => onIrATab(tab) : undefined)
 
   // ── KPI base ─────────────────────────────────────────────────────────────────
   const cuotasPendientes  = cuotas.filter(c => c.estado === 'pendiente')
@@ -146,13 +155,13 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
   const saldoMes = recaudadoMes - gastadoMes
 
   const kpis = [
-    { label: 'Cuotas pendientes', value: cuotasPendientes.length, sub: `${moneda} ${montoPendiente.toFixed(2)}`, color: 'var(--at-primary)', bg: 'rgba(27, 59, 54,0.1)', icon: '💳' },
-    { label: 'Cuotas en mora',    value: cuotasMorosas.length,   sub: 'unidades morosas',                   color: 'var(--at-danger)', bg: 'rgba(239,68,68,0.1)',    icon: '⚠️' },
-    { label: 'Tickets abiertos',  value: ticketsAbiertos.length, sub: `${ticketsUrgentes.length} urgentes`, color: 'var(--at-warning)', bg: 'rgba(245,158,11,0.1)',    icon: '🔧' },
-    { label: 'Visitas hoy',       value: visitantesHoy.length,   sub: 'registradas',                        color: 'var(--at-success)', bg: 'rgba(16,185,129,0.1)',    icon: '🚪' },
-    { label: 'Amenidades',        value: amenidadesActivas.length, sub: 'disponibles',                      color: 'var(--at-accent)', bg: 'rgba(185, 106, 63,0.1)',    icon: '🏊' },
-    { label: 'Paquetes pendientes', value: paqEntrantesPend.length + paqSalidasPend.length, sub: `${paqEntrantesPend.length} por entregar · ${paqSalidasPend.length} por retirar`, color: 'var(--at-primary)', bg: 'rgba(27, 59, 54,0.1)', icon: '📦' },
-  ]
+    { label: 'Cuotas pendientes', value: cuotasPendientes.length, sub: `${moneda} ${montoPendiente.toFixed(2)}`, color: 'var(--at-primary)', bg: 'rgba(27, 59, 54,0.1)', icon: '💳', destino: 'cuotas' },
+    { label: 'Cuotas en mora',    value: cuotasMorosas.length,   sub: 'unidades morosas',                   color: 'var(--at-danger)', bg: 'rgba(239,68,68,0.1)',    icon: '⚠️', destino: 'cuotas' },
+    { label: 'Tickets abiertos',  value: ticketsAbiertos.length, sub: `${ticketsUrgentes.length} urgentes`, color: 'var(--at-warning)', bg: 'rgba(245,158,11,0.1)',    icon: '🔧', destino: 'mantenimiento' },
+    { label: 'Visitas hoy',       value: visitantesHoy.length,   sub: 'registradas',                        color: 'var(--at-success)', bg: 'rgba(16,185,129,0.1)',    icon: '🚪', destino: 'visitantes' },
+    { label: 'Amenidades',        value: amenidadesActivas.length, sub: 'disponibles',                      color: 'var(--at-accent)', bg: 'rgba(185, 106, 63,0.1)',    icon: '🏊', destino: 'amenidades' },
+    { label: 'Paquetes pendientes', value: paqEntrantesPend.length + paqSalidasPend.length, sub: `${paqEntrantesPend.length} por entregar · ${paqSalidasPend.length} por retirar`, color: 'var(--at-primary)', bg: 'rgba(27, 59, 54,0.1)', icon: '📦', destino: 'paqueteria' },
+  ] satisfies { destino: PanelDestino; [k: string]: unknown }[]
 
   return (
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
@@ -171,13 +180,15 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
           {alertas.map((a, i) => {
             const s = nivelColor[a.nivel]
             return (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10 }}>
-                <span style={{ fontSize: 16 }}>{a.icon}</span>
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10 }}>
+                <span style={{ fontSize: 16, lineHeight: '20px' }}>{a.icon}</span>
+                {/* Título y detalle en dos líneas: en una sola, el detalle se
+                    cortaba a media palabra en el teléfono. */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{a.titulo}</span>
-                  {a.desc && <span style={{ fontSize: 11, color: s.color, opacity: 0.8, marginLeft: 8 }}>{a.desc}</span>}
+                  <div style={{ fontSize: 13, fontWeight: 700, color: s.color, lineHeight: '20px' }}>{a.titulo}</div>
+                  {a.desc && <div style={{ fontSize: 12, color: s.color, opacity: 0.85, marginTop: 1, overflowWrap: 'anywhere' }}>{a.desc}</div>}
                 </div>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: s.dot, flexShrink: 0, marginTop: 6 }} />
               </div>
             )
           })}
@@ -185,17 +196,32 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
       )}
 
       {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px', marginBottom: '24px' }}>
-        {kpis.map(k => (
-          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '14px', padding: '18px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-            <div style={{ width: 34, height: 34, borderRadius: '10px', background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', marginBottom: '10px' }}>
-              {k.icon}
-            </div>
-            <div style={{ fontSize: '26px', fontWeight: 800, color: k.color, lineHeight: 1 }}>{k.value}</div>
-            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', margin: '4px 0 2px' }}>{k.label}</div>
-            <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{k.sub}</div>
-          </div>
-        ))}
+      {/* minmax 140px: dos tarjetas por fila en el teléfono (con 180px quedaba
+          una sola y los seis KPIs ocupaban tres pantallas). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+        {kpis.map(k => {
+          const abrir = irA(k.destino)
+          const contenido = (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span style={{ width: 34, height: 34, borderRadius: '10px', background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>
+                  {k.icon}
+                </span>
+                {abrir && <span aria-hidden="true" style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>›</span>}
+              </div>
+              <div style={{ fontSize: '26px', fontWeight: 800, color: k.color, lineHeight: 1 }}>{k.value}</div>
+              <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', margin: '4px 0 2px' }}>{k.label}</div>
+              <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{k.sub}</div>
+            </>
+          )
+          // Columna flex: un <button> centra su contenido en vertical y, con
+          // una etiqueta de dos líneas en la fila, los íconos quedaban a
+          // distinta altura.
+          const card = { display: 'flex', flexDirection: 'column', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', minWidth: 0 } as const
+          return abrir
+            ? <button key={k.label} type="button" onClick={abrir} className="cond-kpi-link" style={{ ...card, textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>{contenido}</button>
+            : <div key={k.label} style={card}>{contenido}</div>
+        })}
       </div>
 
       {/* Gráfica de recaudación */}
@@ -246,11 +272,11 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: '16px' }}>
         {/* Tickets abiertos */}
         {ticketsAbiertos.length > 0 && (
           <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '14px', padding: '18px' }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: 'var(--at-ink)' }}>🔧 Tickets abiertos</h3>
+            <PanelTitulo onVerTodos={irA('mantenimiento')}>🔧 Tickets abiertos</PanelTitulo>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
               {ticketsAbiertos.slice(0, 5).map(t => (
                 <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'var(--at-surface-2)', borderRadius: '9px' }}>
@@ -277,7 +303,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
         {/* Visitas de hoy */}
         {visitantesHoy.length > 0 && (
           <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '14px', padding: '18px' }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: 'var(--at-ink)' }}>🚪 Visitas de hoy</h3>
+            <PanelTitulo onVerTodos={irA('visitantes')}>🚪 Visitas de hoy</PanelTitulo>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
               {visitantesHoy.slice(0, 5).map(v => (
                 <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'var(--at-surface-2)', borderRadius: '9px' }}>
@@ -304,7 +330,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
         {/* Reservas de hoy */}
         {reservasHoy.length > 0 && (
           <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '14px', padding: '18px' }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: 'var(--at-ink)' }}>🏊 Reservas de hoy</h3>
+            <PanelTitulo onVerTodos={irA('amenidades')}>🏊 Reservas de hoy</PanelTitulo>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
               {reservasHoy.map(r => (
                 <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'var(--at-surface-2)', borderRadius: '9px' }}>
@@ -330,6 +356,21 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
           <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--at-ink-3)' }}>El módulo Condominios está listo</p>
           <p style={{ fontSize: '13px' }}>Comienza registrando cuotas, visitantes o tickets de mantenimiento</p>
         </div>
+      )}
+    </div>
+  )
+}
+
+/** Encabezado de cada lista del panel, con "Ver todos" cuando lleva a su pestaña. */
+function PanelTitulo({ children, onVerTodos }: { children: ReactNode; onVerTodos?: () => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, margin: '0 0 12px' }}>
+      <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 700, color: 'var(--at-ink)' }}>{children}</h3>
+      {onVerTodos && (
+        <button type="button" onClick={onVerTodos}
+          style={{ background: 'none', border: 'none', padding: '4px 2px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 700, color: 'var(--at-primary)', whiteSpace: 'nowrap' }}>
+          Ver todos ›
+        </button>
       )}
     </div>
   )

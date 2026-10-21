@@ -1,6 +1,8 @@
 import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ReclamoCondominio } from '../../../types'
 import type { Unidad } from '../../../types'
@@ -46,9 +48,12 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
-  const [selected, setSelected] = useState<ReclamoCondominio | null>(null)
+  // Por id y no la fila: tras responder o cambiar de estado, `reclamos` llega
+  // refrescado y la ventana muestra el dato nuevo (la copia quedaba vieja).
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showRespForm, setShowRespForm] = useState(false)
   const [formResp, setFormResp] = useState({ ...BLANK_RESP })
+  const [respondiendo, setRespondiendo] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'recibido' | 'en_revision' | 'respondido' | 'cerrado' | 'escalado'>('todos')
   const [filtroTipo, setFiltroTipo] = useState('todos')
 
@@ -59,7 +64,26 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
     setEditId(r.id)
     setForm({ unidad_id: r.unidad_id ?? '', tipo: r.tipo, asunto: r.asunto, descripcion: r.descripcion ?? '', prioridad: r.prioridad, plazo_respuesta: r.plazo_respuesta ?? '', anonimo: r.anonimo })
     setShowForm(true)
-    setSelected(null)
+    cerrarDetalle()
+  }
+
+  function abrirDetalle(id: string) {
+    setSelectedId(id)
+    setShowRespForm(false)
+    setFormResp({ ...BLANK_RESP })
+  }
+
+  function cerrarDetalle() {
+    if (respondiendo) return
+    setSelectedId(null)
+    setShowRespForm(false)
+    setFormResp({ ...BLANK_RESP })
+  }
+
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false)
+    setEditId(null)
   }
 
   async function handleSave() {
@@ -85,7 +109,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
     const r = await confirm({ title: '¿Eliminar reclamo?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('reclamos_condominio', id)
-    if (selected?.id === id) setSelected(null)
+    if (selectedId === id) cerrarDetalle()
     onRefresh()
   }
 
@@ -95,14 +119,17 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
   }
 
   async function handleResponder() {
-    if (!selected) return
+    if (!selectedId) return
     if (!formResp.respuesta_admin.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'Escriba una respuesta.' })
-    await updateCondominioRow('reclamos_condominio', selected.id, {
+    setRespondiendo(true)
+    const { error } = await updateCondominioRow('reclamos_condominio', selectedId, {
       respuesta_admin: formResp.respuesta_admin.trim(),
       respondido_por: formResp.respondido_por || null,
       fecha_respuesta: hoyLocalISO(),
       estado: 'respondido',
     })
+    setRespondiendo(false)
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowRespForm(false); setFormResp({ ...BLANK_RESP }); onRefresh()
   }
 
@@ -110,8 +137,12 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
   if (filtroEstado !== 'todos') filtered = filtered.filter(r => r.estado === filtroEstado)
   if (filtroTipo !== 'todos') filtered = filtered.filter(r => r.tipo === filtroTipo)
 
+  const selected = selectedId ? reclamos.find(r => r.id === selectedId) ?? null : null
   const pendientes = reclamos.filter(r => r.estado === 'recibido' || r.estado === 'en_revision').length
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const today = hoyLocalISO()
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
+  const pill = (bg: string, color: string): CSSProperties => ({ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: bg, color, whiteSpace: 'nowrap' })
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -120,7 +151,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
           <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Reclamos y Sugerencias</h2>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>{pendientes} pendiente(s) de respuesta</p>
         </div>
-        {canCreate && !showForm && (
+        {canCreate && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setShowForm(true) }}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo
@@ -128,216 +159,212 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
         )}
       </div>
 
-      {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', marginBottom: '16px' }}>
-        {Object.entries(ESTADO_STYLE).map(([est, s]) => (
-          <div key={est} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: s.color }}>{reclamos.filter(r => r.estado === est).length}</div>
-            <div style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{s.label}</div>
-          </div>
-        ))}
+      {/* KPIs por estado — también son el filtro: tocar uno muestra solo
+          esos (antes había una fila de chips aparte con lo mismo). */}
+      <div role="group" aria-label="Filtrar por estado" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px', marginBottom: '12px' }}>
+        {([['todos', { label: 'Todos', color: 'var(--at-ink-2)' }], ...Object.entries(ESTADO_STYLE)] as [string, { label: string; color: string }][]).map(([est, st]) => {
+          const activo = filtroEstado === est
+          const n = est === 'todos' ? reclamos.length : reclamos.filter(r => r.estado === est).length
+          return (
+            <button key={est} type="button" aria-pressed={activo}
+              onClick={() => setFiltroEstado((activo && est !== 'todos' ? 'todos' : est) as typeof filtroEstado)}
+              style={{ background: activo ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${activo ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '8px 6px', textAlign: 'center', cursor: 'pointer', font: 'inherit' }}>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: st.color }}>{n}</div>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: activo ? 700 : 500 }}>{st.label}</div>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Form */}
-      {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar reclamo' : 'Nuevo Reclamo / Sugerencia'}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Tipo</label>
-              <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
-                {Object.entries(TIPO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.icon} {s.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Unidad</label>
-              <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
-                <option value="">— Sin unidad / General —</option>
-                {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Prioridad</label>
-              <select style={inputStyle} value={form.prioridad} onChange={e => setF('prioridad', e.target.value)}>
-                {Object.entries(PRIORIDAD_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Plazo de respuesta</label>
-              <input style={inputStyle} type="date" value={form.plazo_respuesta} onChange={e => setF('plazo_respuesta', e.target.value)} />
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Asunto *</label>
-              <input style={inputStyle} value={form.asunto} onChange={e => setF('asunto', e.target.value)} placeholder="Resumen del reclamo o sugerencia" autoFocus />
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Descripción</label>
-              <textarea style={{ ...inputStyle, minHeight: '65px', resize: 'vertical', fontFamily: 'inherit' }}
-                value={form.descripcion} onChange={e => setF('descripcion', e.target.value)} placeholder="Detalle del reclamo, contexto, evidencias…" />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', color: 'var(--at-ink-3)', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginTop: '8px' }}>
-                <input type="checkbox" checked={form.anonimo} onChange={e => setF('anonimo', e.target.checked)} />
-                Anónimo
-              </label>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-        {(['todos', 'recibido', 'en_revision', 'respondido', 'cerrado', 'escalado'] as const).map(f => (
-          <button key={f} onClick={() => setFiltroEstado(f)}
-            style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
-              borderColor: filtroEstado === f ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroEstado === f ? 'var(--at-primary-soft)' : 'var(--at-surface)',
-              color: filtroEstado === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)',
-              fontWeight: filtroEstado === f ? 700 : 500 }}>
-            {f === 'todos' ? 'Todos' : ESTADO_STYLE[f]?.label ?? f}
-          </button>
-        ))}
-        <select style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '11px', background: 'var(--at-surface-2)', color: 'var(--at-ink)' }}
+      <div style={{ marginBottom: '12px' }}>
+        <select aria-label="Filtrar por tipo" style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12.5px', background: 'var(--at-surface-2)', color: 'var(--at-ink)' }}
           value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
           <option value="todos">Todos los tipos</option>
           {Object.entries(TIPO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
         </select>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1fr' : '1fr', gap: '16px' }}>
-        {/* List */}
+      {/* Form en ventana (antes se desplegaba arriba de la lista). */}
+      {showForm && (
+        <EditModal
+          title={editId ? 'Editar reclamo' : 'Nuevo reclamo / sugerencia'}
+          maxWidth="600px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} loadingText="Guardando…">Guardar</Button>
+          </>}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px' }}>
+            <div>
+              <label htmlFor="rec-tipo" style={labelStyle}>Tipo</label>
+              <select id="rec-tipo" style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
+                {Object.entries(TIPO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.icon} {s.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="rec-unidad" style={labelStyle}>Unidad</label>
+              <select id="rec-unidad" style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
+                <option value="">— Sin unidad / General —</option>
+                {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="rec-prioridad" style={labelStyle}>Prioridad</label>
+              <select id="rec-prioridad" style={inputStyle} value={form.prioridad} onChange={e => setF('prioridad', e.target.value)}>
+                {Object.entries(PRIORIDAD_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="rec-plazo" style={labelStyle}>Plazo de respuesta</label>
+              <input id="rec-plazo" style={inputStyle} type="date" value={form.plazo_respuesta} onChange={e => setF('plazo_respuesta', e.target.value)} />
+            </div>
+            {/* `1 / -1` y no `span 2`: en una sola columna el span creaba una
+                columna implícita y el campo se salía de la ventana. */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="rec-asunto" style={labelStyle}>Asunto *</label>
+              <input id="rec-asunto" style={inputStyle} value={form.asunto} onChange={e => setF('asunto', e.target.value)} placeholder="Resumen del reclamo o sugerencia" autoFocus />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="rec-descripcion" style={labelStyle}>Descripción</label>
+              <textarea id="rec-descripcion" style={{ ...inputStyle, minHeight: '110px', resize: 'vertical', fontFamily: 'inherit' }}
+                value={form.descripcion} onChange={e => setF('descripcion', e.target.value)} placeholder="Detalle del reclamo, contexto, evidencias…" />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: '13px', color: 'var(--at-ink-2)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.anonimo} onChange={e => setF('anonimo', e.target.checked)} />
+                Anónimo
+              </label>
+            </div>
+          </div>
+        </EditModal>
+      )}
+
+      {/* Lista — cada reclamo se abre en ventana. Antes el detalle ocupaba
+          media pantalla a la derecha y en el teléfono partía la lista. */}
+      {filtered.length === 0 ? (
+        <EmptyState icon="📋" title="No hay reclamos registrados" />
+      ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filtered.length === 0 ? (
-            <EmptyState icon="📋" title="No hay reclamos registrados" />
-          ) : filtered.map(r => {
+          {filtered.map(r => {
             const ts = TIPO_STYLE[r.tipo] ?? TIPO_STYLE.queja
             const es = ESTADO_STYLE[r.estado] ?? ESTADO_STYLE.recibido
             const pr = PRIORIDAD_STYLE[r.prioridad] ?? PRIORIDAD_STYLE.normal
             const unidad = unidades.find(u => u.id === r.unidad_id)
-            const today = hoyLocalISO()
             const vencido = (r.estado === 'recibido' || r.estado === 'en_revision') && r.plazo_respuesta && r.plazo_respuesta < today
+            const accion = !canEdit ? null
+              : r.estado === 'recibido' ? { label: 'En revisión', estado: 'en_revision', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' }
+              : r.estado === 'respondido' ? { label: 'Cerrar', estado: 'cerrado', bg: 'var(--at-chip)', color: 'var(--at-ink-2)' }
+              : null
             return (
-              <div key={r.id} onClick={() => setSelected(selected?.id === r.id ? null : r)}
-                style={{ background: 'var(--at-surface)', border: `1.5px solid ${vencido ? 'var(--at-danger-border)' : selected?.id === r.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '13px' }}>{ts.icon}</span>
-                      <span style={{ fontWeight: 700, fontSize: '13px' }}>{r.asunto}</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px', background: ts.bg, color: ts.color }}>{ts.label}</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      {!r.anonimo && unidad && <span>🏠 {unidad.nombre}</span>}
-                      {r.anonimo && <span style={{ color: 'var(--at-ink-3)' }}>🔒 Anónimo</span>}
-                      <span style={{ color: pr.color, fontWeight: 600 }}>● {pr.label}</span>
-                      <span>📅 {r.created_at.slice(0, 10)}</span>
-                      {r.plazo_respuesta && <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>⏰ Plazo: {r.plazo_respuesta}{vencido ? ' ⚠️' : ''}</span>}
-                    </div>
+              <div key={r.id}
+                style={{ background: 'var(--at-surface)', border: `1.5px solid ${vencido ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '10px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px', paddingRight: '10px' }}>
+                <button type="button" className="cond-row-main" onClick={() => abrirDetalle(r.id)}
+                  style={{ flex: '1 1 280px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: '12px 4px 12px 14px', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{ts.icon} {r.asunto}</span>
+                    <span style={pill(es.bg, es.color)}>{es.label}</span>
                   </div>
-                  {canEdit && (
-                    <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                      {r.estado === 'recibido' && (
-                        <button onClick={() => cambiarEstado(r.id, 'en_revision')}
-                          style={{ padding: '3px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
-                          En revisión
-                        </button>
-                      )}
-                      {r.estado === 'respondido' && (
-                        <button onClick={() => cambiarEstado(r.id, 'cerrado')}
-                          style={{ padding: '3px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
-                          Cerrar
-                        </button>
-                      )}
-                      <button onClick={() => startEdit(r)}
-                        style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(r.id)}
-                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                    </div>
-                  )}
-                </div>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', display: 'flex', gap: '4px 10px', flexWrap: 'wrap' }}>
+                    <span>{ts.label}</span>
+                    {!r.anonimo && unidad && <span>🏠 {unidad.nombre}</span>}
+                    {r.anonimo && <span>🔒 Anónimo</span>}
+                    <span style={{ color: pr.color, fontWeight: 600 }}>● {pr.label}</span>
+                    <span>📅 {r.created_at.slice(0, 10)}</span>
+                    {r.plazo_respuesta && <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: vencido ? 700 : 400 }}>⏰ Plazo: {r.plazo_respuesta}{vencido ? ' · vencido' : ''}</span>}
+                  </div>
+                </button>
+                {accion && (
+                  <button type="button" onClick={() => cambiarEstado(r.id, accion.estado)}
+                    style={{ margin: '8px 0 8px auto', padding: '6px 12px', background: accion.bg, color: accion.color, border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', fontWeight: 700, flexShrink: 0 }}>
+                    {accion.label}
+                  </button>
+                )}
               </div>
             )
           })}
         </div>
+      )}
 
-        {/* Detail / response panel */}
-        {selected && (
-          <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-            <h3 style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700 }}>{TIPO_STYLE[selected.tipo]?.icon} {selected.asunto}</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
-              {[
-                { label: 'Tipo', value: TIPO_STYLE[selected.tipo]?.label },
-                { label: 'Estado', value: ESTADO_STYLE[selected.estado]?.label },
-                { label: 'Prioridad', value: PRIORIDAD_STYLE[selected.prioridad]?.label },
-                { label: 'Unidad', value: selected.anonimo ? 'Anónimo' : (unidades.find(u => u.id === selected.unidad_id)?.nombre ?? '—') },
-                { label: 'Recibido', value: selected.created_at.slice(0, 10) },
-                { label: 'Plazo', value: selected.plazo_respuesta ?? '—' },
-              ].map(f => (
-                <div key={f.label} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '7px', border: '1px solid var(--at-line)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{f.label}</div>
-                  <div style={{ fontSize: '12px', fontWeight: 600 }}>{f.value}</div>
+      {/* Detalle y respuesta en ventana: a pantalla completa en el teléfono. */}
+      {selected && (() => {
+        const ts = TIPO_STYLE[selected.tipo] ?? TIPO_STYLE.queja
+        const es = ESTADO_STYLE[selected.estado] ?? ESTADO_STYLE.recibido
+        const puedeResponder = canEdit && (selected.estado === 'recibido' || selected.estado === 'en_revision')
+        return (
+          <EditModal
+            title={`${ts.icon} ${selected.asunto}`}
+            subtitle={<span style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={pill(es.bg, es.color)}>{es.label}</span>
+              <span>{ts.label}</span>
+            </span>}
+            maxWidth="620px"
+            fullScreenOnMobile
+            closeOnBackdropClick={!respondiendo}
+            closeOnEscape={!respondiendo}
+            onClose={cerrarDetalle}
+            footer={showRespForm ? <>
+              <Button variant="secondary" onClick={() => { setShowRespForm(false); setFormResp({ ...BLANK_RESP }) }} disabled={respondiendo}>Cancelar</Button>
+              <Button onClick={handleResponder} loading={respondiendo} loadingText="Enviando…">Enviar respuesta</Button>
+            </> : <>
+              {canEdit && <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar reclamo">🗑️</Button>}
+              {canEdit && <Button variant="secondary" onClick={() => startEdit(selected)}>✏️ Editar</Button>}
+              {canEdit && selected.estado === 'recibido' && <Button variant="warning" onClick={() => cambiarEstado(selected.id, 'en_revision')}>En revisión</Button>}
+              {canEdit && selected.estado === 'respondido' && <Button variant="secondary" onClick={() => cambiarEstado(selected.id, 'cerrado')}>Cerrar reclamo</Button>}
+              {puedeResponder
+                ? <Button onClick={() => setShowRespForm(true)}>✍️ Responder</Button>
+                : !canEdit && <Button variant="secondary" onClick={cerrarDetalle}>Cerrar</Button>}
+            </>}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                {[
+                  { label: 'Prioridad', value: PRIORIDAD_STYLE[selected.prioridad]?.label },
+                  { label: 'Unidad', value: selected.anonimo ? 'Anónimo' : (unidades.find(u => u.id === selected.unidad_id)?.nombre ?? '—') },
+                  { label: 'Recibido', value: selected.created_at.slice(0, 10) },
+                  { label: 'Plazo', value: selected.plazo_respuesta ?? '—' },
+                ].map(f => (
+                  <div key={f.label} style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '8px 10px', border: '1px solid var(--at-line)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{f.label}</div>
+                    <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--at-ink)' }}>{f.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {selected.descripcion && (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Descripción</div>
+                  <div style={{ fontSize: '14px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{selected.descripcion}</div>
                 </div>
-              ))}
+              )}
+
+              {selected.respuesta_admin && (
+                <div style={{ background: 'var(--at-success-tint)', borderRadius: '10px', padding: '10px 12px', border: '1px solid var(--at-success-border)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 700, marginBottom: '3px' }}>Respuesta{selected.respondido_por ? ` de ${selected.respondido_por}` : ''}{selected.fecha_respuesta ? ` · ${selected.fecha_respuesta}` : ''}</div>
+                  <div style={{ fontSize: '14px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>{selected.respuesta_admin}</div>
+                </div>
+              )}
+
+              {showRespForm && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--at-line)', paddingTop: '12px' }}>
+                  <div>
+                    <label htmlFor="rec-respuesta" style={labelStyle}>Respuesta *</label>
+                    <textarea id="rec-respuesta" style={{ ...inputStyle, minHeight: '110px', resize: 'vertical', fontFamily: 'inherit' }}
+                      value={formResp.respuesta_admin} onChange={e => setFR('respuesta_admin', e.target.value)} placeholder="Respuesta oficial de la administración…" autoFocus />
+                  </div>
+                  <div>
+                    <label htmlFor="rec-respondido-por" style={labelStyle}>Respondido por</label>
+                    <input id="rec-respondido-por" style={inputStyle} value={formResp.respondido_por} onChange={e => setFR('respondido_por', e.target.value)} placeholder="Nombre del administrador" />
+                  </div>
+                </div>
+              )}
             </div>
-
-            {selected.descripcion && (
-              <div style={{ background: 'var(--at-surface)', borderRadius: '8px', padding: '8px', border: '1px solid var(--at-line)', marginBottom: '10px' }}>
-                <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', marginBottom: '3px' }}>Descripción</div>
-                <div style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>{selected.descripcion}</div>
-              </div>
-            )}
-
-            {selected.respuesta_admin && (
-              <div style={{ background: 'var(--at-success-tint)', borderRadius: '8px', padding: '8px', border: '1px solid var(--at-success-border)', marginBottom: '10px' }}>
-                <div style={{ fontSize: '10px', color: 'var(--at-success)', fontWeight: 700, marginBottom: '3px' }}>Respuesta{selected.respondido_por ? ` de ${selected.respondido_por}` : ''} ({selected.fecha_respuesta})</div>
-                <div style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>{selected.respuesta_admin}</div>
-              </div>
-            )}
-
-            {canEdit && !showRespForm && (selected.estado === 'recibido' || selected.estado === 'en_revision') && (
-              <button onClick={() => setShowRespForm(true)}
-                style={{ width: '100%', padding: '8px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', fontWeight: 600, marginBottom: '8px' }}>
-                ✍️ Responder
-              </button>
-            )}
-
-            {showRespForm && (
-              <div style={{ background: 'var(--at-surface)', borderRadius: '8px', padding: '10px', border: '1px solid var(--at-line)' }}>
-                <div style={{ marginBottom: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '2px' }}>Respondido por</label>
-                  <input style={{ ...inputStyle, fontSize: '12px' }} value={formResp.respondido_por} onChange={e => setFR('respondido_por', e.target.value)} placeholder="Nombre del administrador" />
-                </div>
-                <div style={{ marginBottom: '8px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '2px' }}>Respuesta *</label>
-                  <textarea style={{ ...inputStyle, minHeight: '70px', resize: 'vertical', fontFamily: 'inherit', fontSize: '12px' }}
-                    value={formResp.respuesta_admin} onChange={e => setFR('respuesta_admin', e.target.value)} placeholder="Respuesta oficial de la administración…" autoFocus />
-                </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button onClick={handleResponder}
-                    style={{ padding: '6px 14px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
-                    Enviar respuesta
-                  </button>
-                  <button onClick={() => { setShowRespForm(false); setFormResp({ ...BLANK_RESP }) }}
-                    style={{ padding: '6px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }
