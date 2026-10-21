@@ -36,7 +36,7 @@ type Props = Parameters<typeof PermisosObraTab>[0]
 function props(over: Partial<Props> = {}): Props {
   return {
     permisos: [permiso()], unidades, proyectoId: 'p1', companyId: 'co1', moneda: 'USD',
-    canCreate: true, canEdit: true, onRefresh: () => {}, ...over,
+    canCreate: true, canEdit: true, canDelete: true, onRefresh: () => {}, ...over,
   }
 }
 
@@ -107,5 +107,20 @@ describe('PermisosObraTab — ventanas', () => {
     expect(within(dialog).queryByRole('button', { name: '✏️ Editar' })).toBeNull()
     expect(within(dialog).queryByRole('button', { name: '→ Aprobar' })).toBeNull()
     expect(within(dialog).queryByRole('button', { name: '✗ Rechazar' })).toBeNull()
+  })
+
+  it('eliminar exige su propio permiso: editar no basta', async () => {
+    render(<PermisosObraTab {...props({ canDelete: false })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
+    let dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: '✏️ Editar' })).toBeTruthy()
+    expect(within(dialog).queryByRole('button', { name: /Eliminar/ })).toBeNull()
+    cleanup()
+
+    render(<PermisosObraTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
+    dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Eliminar/ }))
+    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('permisos_obra_unidad', 'po1'))
   })
 })

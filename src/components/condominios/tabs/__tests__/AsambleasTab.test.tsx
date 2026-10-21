@@ -53,7 +53,7 @@ const asambleas = [
 function renderTab(props: Partial<Parameters<typeof AsambleasTab>[0]> = {}) {
   return render(
     <AsambleasTab asambleas={asambleas} unidades={unidades} proyectoId="p1" companyId="co1" userId="user1"
-      canCreate canEdit onRefresh={() => {}} {...props} />,
+      canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -150,5 +150,16 @@ describe('AsambleasTab — ventanas', () => {
     await within(finalizada).findByText('Aprobar presupuesto')
     expect(within(finalizada).getByText('Se aprobó la pintura.')).toBeTruthy()
     expect(within(finalizada).queryByLabelText('📝 Acta de la asamblea')).toBeNull()
+  })
+
+  it('eliminar exige su propio permiso: editar no basta', async () => {
+    renderTab({ canDelete: false })
+    expect(screen.getAllByRole('combobox', { name: /Estado de/ }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /^Eliminar / })).toBeNull()
+    cleanup()
+
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Asamblea Ordinaria Abril' }))
+    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('asambleas', 'a1'))
   })
 })

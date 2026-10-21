@@ -14,6 +14,9 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.<tab>.delete): ver o
+   *  editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -45,7 +48,7 @@ const inputStyle: CSSProperties = {
 }
 const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
 
-export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   // Por id y no la fila: tras editar o rechazar, la ventana muestra lo que
   // trae onRefresh (la copia guardada quedaba con los datos de antes).
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -119,6 +122,8 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
   }
 
   const handleDelete = async (p: PermisoObraUnidad) => {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar permiso?', text: p.descripcion, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('permisos_obra_unidad', p.id)
@@ -295,7 +300,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
             // Hasta cuatro botones: el contenedor propio los deja partirse en
             // dos filas en el teléfono en vez de salirse de la ventana.
             footer={<div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
-              <Button variant="outline-danger" onClick={() => handleDelete(selected)}>🗑 Eliminar</Button>
+              {canDelete && <Button variant="outline-danger" onClick={() => handleDelete(selected)}>🗑 Eliminar</Button>}
               {canEdit && <Button variant="secondary" onClick={() => openEdit(selected)}>✏️ Editar</Button>}
               {canEdit && (selected.estado === 'solicitado' || selected.estado === 'aprobado') && (
                 <Button variant="outline-danger" onClick={() => rechazar(selected)}>✗ Rechazar</Button>

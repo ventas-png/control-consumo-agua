@@ -66,6 +66,7 @@ function renderTab(props: Partial<Parameters<typeof ChecklistAreasTab>[0]> = {})
       companyId="co1"
       canCreate
       canEdit
+      canDelete
       puedeConfigurarAreas
       onIrATab={mocks.irATab}
       onRefresh={mocks.onRefresh}

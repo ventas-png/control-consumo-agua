@@ -31,6 +31,9 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.<tab>.delete): ver o
+   *  editar no basta. */
+  canDelete: boolean
   /** Visibilidad del tab Áreas: decide si se ofrece el atajo para configurarlas. */
   puedeConfigurarAreas: boolean
   onIrATab: (tabId: 'areas_config') => void
@@ -66,7 +69,7 @@ function calcEstado(items: ChecklistItem[]): ChecklistArea['estado'] {
   return 'pendiente'
 }
 
-export function ChecklistAreasTab({ checklists, areas, proyectoId, companyId, canCreate, canEdit, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
+export function ChecklistAreasTab({ checklists, areas, proyectoId, companyId, canCreate, canEdit, canDelete, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
   // Por id y no la fila: tras editar, la ventana muestra lo que trae
   // onRefresh (la copia guardada quedaba con los datos de antes).
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -175,6 +178,8 @@ export function ChecklistAreasTab({ checklists, areas, proyectoId, companyId, ca
   }
 
   const handleDelete = async (c: ChecklistArea) => {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar checklist?', text: `${nombreArea(c)} · ${c.fecha}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('checklist_areas', c.id)
@@ -365,7 +370,7 @@ export function ChecklistAreasTab({ checklists, areas, proyectoId, companyId, ca
             fullScreenOnMobile
             onClose={() => setSelectedId(null)}
             footer={<>
-              <Button variant="outline-danger" onClick={() => handleDelete(selected)}>🗑 Eliminar</Button>
+              {canDelete && <Button variant="outline-danger" onClick={() => handleDelete(selected)}>🗑 Eliminar</Button>}
               {canEdit && <Button variant="secondary" onClick={() => openEdit(selected)}>✏️ Editar</Button>}
             </>}
           >

@@ -15,6 +15,9 @@ interface Props {
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.<tab>.delete): ver o
+   *  editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -53,7 +56,7 @@ function tituloCorto(texto: string): string {
   return texto.length > 80 ? `${texto.slice(0, 79).trimEnd()}…` : texto
 }
 
-export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
+export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombre = 'Condominio', canCreate, canEdit, canDelete, onRefresh }: Props) {
   // Por id y no la fila: tras editar o avanzar de estado, `incidentes` llega
   // refrescado y la ventana muestra el dato nuevo (la copia quedaba vieja).
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -106,6 +109,8 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
   }
 
   const handleDelete = async (i: IncidenteSeguridad) => {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar incidente?', text: i.descripcion, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('incidentes_seguridad', i.id)
@@ -297,7 +302,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
             fullScreenOnMobile
             onClose={() => setSelectedId(null)}
             footer={<>
-              <Button variant="outline-danger" onClick={() => handleDelete(selected)}>🗑 Eliminar</Button>
+              {canDelete && <Button variant="outline-danger" onClick={() => handleDelete(selected)}>🗑 Eliminar</Button>}
               {canEdit && <Button variant="secondary" onClick={() => openEdit(selected)}>✏️ Editar</Button>}
               {canEdit && es.next && <Button onClick={() => avanzarEstado(selected)}>→ {es.nextLabel}</Button>}
             </>}

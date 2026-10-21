@@ -497,7 +497,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'amenidades', label: 'Amenidades', icon: '🏊', render: (ctx) =>
     <AmenidadesTab amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueos={ctx.bloqueosAmenidades} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} moneda={ctx.moneda} canCreate={ctx.canCreate('amenidades')} canEdit={ctx.canEdit('amenidades')} onRefresh={ctx.onRefresh} /> },
   { id: 'mantenimiento', label: 'Mantenimiento', icon: '🔧', render: (ctx) =>
-    <MantenimientoTab tickets={ctx.tickets} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} autorNombre={ctx.currentUser.name ?? ''} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('mantenimiento')} canEdit={ctx.canEdit('mantenimiento')} onRefresh={ctx.onRefresh} /> },
+    <MantenimientoTab tickets={ctx.tickets} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} autorNombre={ctx.currentUser.name ?? ''} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('mantenimiento')} canEdit={ctx.canEdit('mantenimiento')} canDelete={ctx.canDelete('mantenimiento')} onRefresh={ctx.onRefresh} /> },
   { id: 'comunidad', label: 'Comunidad', icon: '📢', render: (ctx) =>
     <ComunidadTab anuncios={ctx.anuncios} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('comunidad')} onRefresh={ctx.onRefresh} /> },
   { id: 'parqueos', label: 'Parqueos', icon: '🅿️', render: (ctx) =>
@@ -529,7 +529,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'arrendamientos', label: 'Arrendamientos', icon: '📄', render: (ctx) =>
     <ArrendamientosTab contratos={ctx.contratos} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('arrendamientos')} canEdit={ctx.canEdit('arrendamientos')} onRefresh={ctx.onRefresh} /> },
   { id: 'asambleas', label: 'Asambleas', icon: '🗳️', render: (ctx) =>
-    <AsambleasTab asambleas={ctx.asambleas} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('asambleas')} canEdit={ctx.canEdit('asambleas')} onRefresh={ctx.onRefresh} /> },
+    <AsambleasTab asambleas={ctx.asambleas} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('asambleas')} canEdit={ctx.canEdit('asambleas')} canDelete={ctx.canDelete('asambleas')} onRefresh={ctx.onRefresh} /> },
   { id: 'proveedores', label: 'Contratos', icon: '🤝', render: (ctx) =>
     <ContratosProveedorTab contratos={ctx.contratosProveedores as ContratoProveedorCatalogo[]} proyectoId={ctx.proyectoId} proyectoNombre={ctx.proyectoActual?.nombre} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proveedores')} canEdit={ctx.canEdit('proveedores')} onRefresh={ctx.onRefresh} /> },
   { id: 'objetos', label: 'Obj. Perdidos', icon: '🔍', render: (ctx) =>
@@ -667,13 +667,13 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'fondo_reserva', label: 'Fondo Reserva', icon: '🏦', render: (ctx) =>
     <FondoReservaTab movimientos={ctx.fondoReserva} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('fondo_reserva')} canEdit={ctx.canEdit('fondo_reserva')} onRefresh={ctx.onRefresh} /> },
   { id: 'permisos_obra', label: 'Permisos Obra', icon: '🔨', render: (ctx) =>
-    <PermisosObraTab permisos={ctx.permisosObra} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('permisos_obra')} canEdit={ctx.canEdit('permisos_obra')} onRefresh={ctx.onRefresh} /> },
+    <PermisosObraTab permisos={ctx.permisosObra} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('permisos_obra')} canEdit={ctx.canEdit('permisos_obra')} canDelete={ctx.canDelete('permisos_obra')} onRefresh={ctx.onRefresh} /> },
   { id: 'tarifas', label: 'Tarifas', icon: '💰', render: (ctx) =>
     <TarifasTab tarifas={ctx.tarifas} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('tarifas')} canEdit={ctx.canEdit('tarifas')} onRefresh={ctx.onRefresh} /> },
   { id: 'incidentes', label: 'Incidentes', icon: '🚨', render: (ctx) =>
-    <IncidentesTab incidentes={ctx.incidentes} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('incidentes')} canEdit={ctx.canEdit('incidentes')} onRefresh={ctx.onRefresh} /> },
+    <IncidentesTab incidentes={ctx.incidentes} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('incidentes')} canEdit={ctx.canEdit('incidentes')} canDelete={ctx.canDelete('incidentes')} onRefresh={ctx.onRefresh} /> },
   { id: 'checklist_areas', label: 'Checklist', icon: '🗒️', render: (ctx) =>
-    <ChecklistAreasTab checklists={ctx.checklistAreas} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('checklist_areas')} canEdit={ctx.canEdit('checklist_areas')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
+    <ChecklistAreasTab checklists={ctx.checklistAreas} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('checklist_areas')} canEdit={ctx.canEdit('checklist_areas')} canDelete={ctx.canDelete('checklist_areas')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'prog_limpieza', label: 'Limpieza', icon: '🧹', render: (ctx) =>
     <ProgramacionLimpiezaTab personal={ctx.personal} cargos={ctx.cargosPersonal} areas={ctx.areas} plantillas={ctx.plantillasCargo} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('prog_limpieza')} canEdit={ctx.canEdit('prog_limpieza')} canDelete={ctx.canDelete('prog_limpieza')} onRefresh={ctx.onRefresh} /> },
   { id: 'consumo_energia', label: 'Consumo Energía', icon: '⚡', render: (ctx) =>
