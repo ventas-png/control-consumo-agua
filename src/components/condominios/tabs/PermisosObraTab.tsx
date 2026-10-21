@@ -12,6 +12,7 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -42,7 +43,7 @@ const inputStyle: CSSProperties = {
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }
 
-export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [selected, setSelected] = useState<PermisoObraUnidad | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -104,6 +105,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
   }
 
   const handleDelete = async (p: PermisoObraUnidad) => {
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar permiso?', text: p.descripcion, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('permisos_obra_unidad', p.id)
@@ -269,7 +271,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {canEdit && <button onClick={() => openEdit(selected)} style={{ padding: '6px 14px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>✏️ Editar</button>}
-                  <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>
+                  {canDelete && <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>}
                 </div>
               </div>
 

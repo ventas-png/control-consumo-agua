@@ -21,6 +21,7 @@ interface Props {
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -38,7 +39,7 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
   cerrado:    { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
-export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, autorNombre = '', proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
+export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, autorNombre = '', proyectoNombre = 'Condominio', canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('todos')
@@ -161,6 +162,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   }
 
   async function eliminar(id: string) {
+    if (!canDelete) return
     const result = await confirm({ title: '¿Eliminar ticket?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
     await softDelete('tickets_mantenimiento', { id })
@@ -374,7 +376,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
                       style={{ padding: '4px 11px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
                       💬 Conversación
                     </button>
-                    <button onClick={() => eliminar(t.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
+                    {canDelete && <button onClick={() => eliminar(t.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>}
                   </div>
                 </div>
               </div>

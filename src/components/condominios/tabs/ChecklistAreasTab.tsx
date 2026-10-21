@@ -29,6 +29,7 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   /** Visibilidad del tab Áreas: decide si se ofrece el atajo para configurarlas. */
   puedeConfigurarAreas: boolean
   onIrATab: (tabId: 'areas_config') => void
@@ -63,7 +64,7 @@ function calcEstado(items: ChecklistItem[]): ChecklistArea['estado'] {
   return 'pendiente'
 }
 
-export function ChecklistAreasTab({ checklists, areas, proyectoId, companyId, canCreate, canEdit, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
+export function ChecklistAreasTab({ checklists, areas, proyectoId, companyId, canCreate, canEdit, canDelete, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
   const [selected, setSelected] = useState<ChecklistArea | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -160,6 +161,7 @@ export function ChecklistAreasTab({ checklists, areas, proyectoId, companyId, ca
   }
 
   const handleDelete = async (c: ChecklistArea) => {
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar checklist?', text: `${nombreArea(c)} · ${c.fecha}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('checklist_areas', c.id)
@@ -335,7 +337,7 @@ export function ChecklistAreasTab({ checklists, areas, proyectoId, companyId, ca
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {canEdit && <button onClick={() => openEdit(selected)} style={{ padding: '6px 14px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>✏️ Editar</button>}
-                  <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>
+                  {canDelete && <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>}
                 </div>
               </div>
 

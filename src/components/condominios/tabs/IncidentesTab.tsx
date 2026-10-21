@@ -13,6 +13,7 @@ interface Props {
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -43,7 +44,7 @@ const inputStyle: CSSProperties = {
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }
 
-export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
+export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombre = 'Condominio', canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [selected, setSelected] = useState<IncidenteSeguridad | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -95,6 +96,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
   }
 
   const handleDelete = async (i: IncidenteSeguridad) => {
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar incidente?', text: i.descripcion, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('incidentes_seguridad', i.id)
@@ -285,7 +287,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {canEdit && <button onClick={() => openEdit(selected)} style={{ padding: '6px 14px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>✏️ Editar</button>}
-                  <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>
+                  {canDelete && <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>}
                 </div>
               </div>
 

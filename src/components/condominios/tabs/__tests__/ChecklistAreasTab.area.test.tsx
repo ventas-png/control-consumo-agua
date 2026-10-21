@@ -66,6 +66,7 @@ function renderTab(props: Partial<Parameters<typeof ChecklistAreasTab>[0]> = {})
       companyId="co1"
       canCreate
       canEdit
+      canDelete
       puedeConfigurarAreas
       onIrATab={mocks.irATab}
       onRefresh={mocks.onRefresh}
@@ -189,5 +190,24 @@ describe('ChecklistAreasTab — el área viene del catálogo', () => {
     fireEvent.click(screen.getByText('+ Nuevo checklist'))
     expect(screen.queryByText('Crearlas en el tab Áreas')).toBeNull()
     expect(screen.getByText(/Se dan de alta en el tab Áreas/)).toBeTruthy()
+  })
+})
+
+describe('ChecklistAreasTab — Eliminar exige el permiso de eliminar del tab', () => {
+  it.each([
+    ['solo consulta', { canCreate: false, canEdit: false, canDelete: false }],
+    ['editar sin eliminar', { canDelete: false }],
+  ])('%s: el detalle no ofrece Eliminar', (_caso, permisos) => {
+    renderTab({ checklists: [checklist()], ...permisos })
+    fireEvent.click(screen.getByText(/2026-09-01/))
+    expect(screen.queryByText('🗑 Eliminar')).toBeNull()
+  })
+
+  it('con permiso de eliminar (aunque no edite) el botón borra el checklist', async () => {
+    renderTab({ checklists: [checklist()], canEdit: false })
+    fireEvent.click(screen.getByText(/2026-09-01/))
+    fireEvent.click(screen.getByText('🗑 Eliminar'))
+
+    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('checklist_areas', 'c1'))
   })
 })

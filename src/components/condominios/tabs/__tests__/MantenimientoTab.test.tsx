@@ -1,0 +1,79 @@
+// Eliminar un ticket exige condominios.tab.mantenimiento.delete (canDelete).
+//
+// El 🗑 de cada tarjeta se mostraba y borraba sin mirar ningún permiso, así
+// que un rol de solo consulta podía eliminar tickets. Lo que se vigila aquí:
+//
+//   1. Sin permiso de eliminar no hay 🗑, tampoco para quien sí puede editar.
+//   2. Con el permiso, el botón borra (soft delete) aunque no se pueda editar.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import type { TicketMantenimiento } from '../../../../types'
+
+const mocks = vi.hoisted(() => ({
+  softDelete: vi.fn(async () => ({ error: null })),
+  notify: vi.fn(),
+  confirm: vi.fn(async () => ({ isConfirmed: true })),
+  onRefresh: vi.fn(),
+}))
+
+vi.mock('../../../../lib/supabase', () => ({
+  supabase: { from: () => ({}) },
+  db: { from: () => ({}) },
+}))
+vi.mock('../../../../domain/condominios/tabMutations', () => ({
+  createCondominioRow: vi.fn(async () => ({ error: null })),
+  updateCondominioRow: vi.fn(async () => ({ error: null })),
+}))
+vi.mock('../../../../lib/softDelete', () => ({ softDelete: mocks.softDelete }))
+vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: mocks.confirm }))
+vi.mock('../exportUtils', () => ({ exportarPDFTabla: vi.fn(), exportarExcel: vi.fn() }))
+
+const { MantenimientoTab } = await import('../MantenimientoTab')
+
+function ticket(over: Partial<TicketMantenimiento> = {}): TicketMantenimiento {
+  return {
+    id: 't1', company_id: 'co1', project_id: 'p1',
+    tipo: 'correctivo', titulo: 'Fuga en lobby', prioridad: 'media', estado: 'abierto',
+    foto_urls: [], archivo_urls: [],
+    created_at: '2026-09-01T00:00:00.000Z', updated_at: '2026-09-01T00:00:00.000Z',
+    ...over,
+  }
+}
+
+function renderTab(props: Partial<Parameters<typeof MantenimientoTab>[0]> = {}) {
+  return render(
+    <MantenimientoTab
+      tickets={[ticket()]}
+      unidades={[]}
+      proyectoId="p1"
+      companyId="co1"
+      userId="user1"
+      canCreate
+      canEdit
+      canDelete
+      onRefresh={mocks.onRefresh}
+      {...props}
+    />,
+  )
+}
+
+beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
+afterEach(() => { cleanup() })
+
+describe('MantenimientoTab — Eliminar exige el permiso de eliminar del tab', () => {
+  it.each([
+    ['solo consulta', { canCreate: false, canEdit: false, canDelete: false }],
+    ['editar sin eliminar', { canDelete: false }],
+  ])('%s: la tarjeta no ofrece Eliminar', (_caso, permisos) => {
+    renderTab(permisos)
+    expect(screen.getByText('Fuga en lobby')).toBeTruthy()
+    expect(screen.queryByTitle('Eliminar')).toBeNull()
+  })
+
+  it('con permiso de eliminar (aunque no edite) el botón borra el ticket', async () => {
+    renderTab({ canEdit: false })
+    fireEvent.click(screen.getByTitle('Eliminar'))
+
+    await waitFor(() => expect(mocks.softDelete).toHaveBeenCalledWith('tickets_mantenimiento', { id: 't1' }))
+  })
+})
