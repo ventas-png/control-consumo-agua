@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { EventoCalendario, TipoEvento, Asamblea, AgendaItem } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   eventos: EventoCalendario[]
@@ -263,7 +264,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
             ) : (
               <div style={{ padding: '8px' }}>
                 {selectedEvents.map(e => (
-                  <div key={e.id} style={{ padding: '8px 10px', marginBottom: '6px', background: 'var(--at-surface)', border: `1.5px solid ${e.color}30`, borderLeft: `4px solid ${e.color}`, borderRadius: '8px' }}>
+                  <div key={e.id} style={{ padding: '8px 10px', marginBottom: '6px', background: 'var(--at-surface)', border: `1.5px solid ${tint(e.color, 19)}`, borderLeft: `4px solid ${e.color}`, borderRadius: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink)' }}>{e.titulo}</div>
                       {canEdit && e.source === 'evento' && (

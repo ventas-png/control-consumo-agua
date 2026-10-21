@@ -5,6 +5,7 @@ import {
   GastoCondominio, CuotaCondominio,
 } from '../../../types'
 import { formatFechaCalendario } from '../../../lib/format'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   visitantes: Visitante[]
@@ -207,7 +208,7 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 12, paddingBottom: 6 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--at-surface)', border: `2px solid ${cfg.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0, zIndex: 1, boxShadow: `0 0 0 2px ${cfg.color}22` }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--at-surface)', border: `2px solid ${cfg.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0, zIndex: 1, boxShadow: `0 0 0 2px ${tint(cfg.color, 13)}` }}>
                       {cfg.icon}
                     </div>
                     <div style={{ flex: 1, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px', marginBottom: 0 }}>

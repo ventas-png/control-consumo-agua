@@ -1,6 +1,7 @@
 import { hoyLocalISO } from '../../../lib/format'
 import { useMemo, useState } from 'react'
 import { Unidad, ContratoArrendamiento, Mascota, VehiculoResidente } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   unidades: Unidad[]
@@ -122,7 +123,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
           { label: 'Mascotas',       val: String(resumen.totalMascotas),  color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
           { label: 'Vehículos',      val: String(resumen.totalVehiculos), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 90px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '8px 12px' }}>
+          <div key={k.label} style={{ flex: '1 1 90px', background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '8px 12px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: k.color, marginTop: 1 }}>{k.val}</div>
           </div>
@@ -136,7 +137,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
           const activo = filtro === f
           return (
             <button key={f} onClick={() => setFiltro(f)}
-              style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${cfg.color}44`, fontSize: 11, cursor: 'pointer',
+              style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${tint(cfg.color, 27)}`, fontSize: 11, cursor: 'pointer',
                 background: activo ? cfg.color : cfg.bg, color: activo ? 'white' : cfg.color, fontWeight: activo ? 700 : 400 }}>
               {cfg.label}
             </button>
@@ -179,7 +180,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
                   {d.u.piso != null && <div style={{ fontSize: 9, color: 'var(--at-ink-3)' }}>Piso {d.u.piso}</div>}
                 </div>
                 <div style={{ width: 70 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: estadoColor, background: `${estadoColor}15`,
+                  <span style={{ fontSize: 10, fontWeight: 700, color: estadoColor, background: tint(estadoColor, 8),
                     padding: '2px 6px', borderRadius: 8 }}>{d.estado.replace('_', ' ')}</span>
                 </div>
                 <div style={{ flex: 1 }}>

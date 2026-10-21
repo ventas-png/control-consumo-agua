@@ -6,6 +6,7 @@ import { reservarAmenidad, cancelarReservaAmenidad } from '../../../domain/porta
 import { useSignedUrls } from '../../../lib/storageUrls'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
 import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana, addMinutosToTime } from '../../../lib/amenidadesReglas'
+import { tint } from '../../shared/statusTone'
 
 // Card de amenidad con background-image signed-URL. La URL viene firmada
 // del padre vía useSignedUrls (batch) — antes cada card llamaba al hook
@@ -459,7 +460,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, mo
                     <div style={{ fontSize: 11.5, color: 'var(--at-danger-strong)', marginTop: 3, fontStyle: 'italic', background: 'var(--at-danger-tint)', padding: '3px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
                   )}
                 </div>
-                <span style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: ec.bg, color: ec.color, flexShrink: 0, border: `1px solid ${ec.color}33` }}>{ec.label}</span>
+                <span style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: ec.bg, color: ec.color, flexShrink: 0, border: `1px solid ${tint(ec.color, 20)}` }}>{ec.label}</span>
                 {vistaFutura && r.estado !== 'cancelada' && (
                   <button onClick={() => cancelarReserva(r.id)} style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: 'var(--at-danger)', fontWeight: 700, flexShrink: 0 }}>
                     Cancelar

@@ -1,5 +1,6 @@
 import { CuotaCondominio, GastoCondominio, TicketMantenimiento, Visitante, Unidad, PolizaSeguro, ContratoProveedor, InspeccionNormativa, SugerenciaCondominio } from '../../../types'
 import { escapeHtml } from '../../../lib/printHtml'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -224,7 +225,7 @@ ${morosos > 5 ? `<div class="alert-box"><div class="alert-title">Alto nivel de m
           { label: 'Deuda acumulada', val: `${moneda} ${cuotas.filter(c => c.estado === 'pendiente' || c.estado === 'moroso').reduce((s, c) => s + c.monto, 0).toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
           { label: 'Unidades', val: String(unidades.length), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
         ].map(k => (
-          <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
+          <div key={k.label} style={{ background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>

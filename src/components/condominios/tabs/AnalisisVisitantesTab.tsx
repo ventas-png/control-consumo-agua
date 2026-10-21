@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Visitante, Unidad } from '../../../types'
 import { EmptyState } from '../../shared/EmptyState'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   visitantes: Visitante[]
@@ -93,7 +94,7 @@ export default function AnalisisVisitantesTab({ visitantes, unidades }: Props) {
               { label: 'Con vehículo', val: String(stats.conPlaca), color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
               { label: 'Duración prom.', val: stats.promDuracion > 0 ? `${Math.round(stats.promDuracion)} min` : '—', color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
             ].map(k => (
-              <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '10px 14px' }}>
+              <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${tint(k.color, 13)}`, borderRadius: 10, padding: '10px 14px' }}>
                 <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
               </div>

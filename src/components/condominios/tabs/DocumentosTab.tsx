@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { DocumentoCondominio, CategoriaDocumento, VisibilidadDocumento } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   documentos: DocumentoCondominio[]
@@ -235,7 +236,7 @@ function DocumentCard({ doc, catInfo, visInfo, canEdit, onEdit, onDelete, onTogg
         {doc.version && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>v{doc.version}</div>}
         {doc.descripcion && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '3px' }}>{doc.descripcion}</div>}
         <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: `${vi.color}15`, color: vi.color }}>{vi.label}</span>
+          <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: tint(vi.color, 8), color: vi.color }}>{vi.label}</span>
           {!doc.vigente && <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>Histórico</span>}
         </div>
         <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>

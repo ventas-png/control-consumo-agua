@@ -5,6 +5,7 @@ import { Icon } from '../../shared/Icon'
 import { parseFecha } from '../../../lib/format'
 import { TIPO_AGUA_LABELS } from '../../../lib/portalDashboard'
 import { ESTADO_COLORS } from './ui'
+import { tint } from '../../shared/statusTone'
 
 export function ServiciosTab({ ctx }: { ctx: PortalCtx }) {
   const { companies, companyActivoMap, projects, unidades, contadores, lecturas, expandedContador, setExpandedContador } = ctx
@@ -35,7 +36,7 @@ export function ServiciosTab({ ctx }: { ctx: PortalCtx }) {
                 >
                   <div style={{
                     width: '40px', height: '40px', borderRadius: '10px',
-                    background: `${s.color}18`,
+                    background: tint(s.color, 9),
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '18px', flexShrink: 0,
                   }}>{s.icon}</div>

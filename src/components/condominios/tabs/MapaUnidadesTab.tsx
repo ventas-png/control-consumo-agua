@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { CuotaCondominio, Unidad, ContratoArrendamiento } from '../../../types'
 import { Button } from '../../shared/Button'
 import { EmptyState } from '../../shared/EmptyState'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   unidades: Unidad[]
@@ -99,7 +100,7 @@ export default function MapaUnidadesTab({ unidades, cuotas, contratos, moneda }:
                   style={{
                     background: cfg.bg, border: `1.5px solid ${isOpen ? cfg.color : cfg.border}`,
                     borderRadius: 10, padding: '10px 6px', textAlign: 'center', cursor: 'pointer',
-                    boxShadow: isOpen ? `0 0 0 2px ${cfg.color}44` : 'none', transition: 'all 0.15s',
+                    boxShadow: isOpen ? `0 0 0 2px ${tint(cfg.color, 27)}` : 'none', transition: 'all 0.15s',
                   }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: cfg.color }}>{info.unidad.nombre}</div>
                   <div style={{ fontSize: 9, color: cfg.color, marginTop: 2 }}>{cfg.icon}</div>

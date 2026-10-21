@@ -1,3 +1,5 @@
+import { tint } from '../shared/statusTone'
+
 interface Props {
   onNavigate: (section: 'mapa' | 'rutas' | 'contadores' | 'calidad') => void
 }
@@ -51,7 +53,7 @@ export function AdminQuickActions({ onNavigate }: Props) {
             style={{
               padding: '16px',
               background: 'var(--at-surface)',
-              border: `2px solid ${action.color}20`,
+              border: `2px solid ${tint(action.color, 12)}`,
               borderRadius: '12px',
               cursor: 'pointer',
               textAlign: 'center',
@@ -63,9 +65,9 @@ export function AdminQuickActions({ onNavigate }: Props) {
             }}
             onMouseEnter={(e) => {
               const el = e.currentTarget
-              el.style.background = `${action.color}10`
+              el.style.background = tint(action.color, 6)
               el.style.transform = 'translateY(-2px)'
-              el.style.boxShadow = `0 8px 16px ${action.color}20`
+              el.style.boxShadow = `0 8px 16px ${tint(action.color, 12)}`
             }}
             onMouseLeave={(e) => {
               const el = e.currentTarget

@@ -5,6 +5,7 @@ import type { AlertaCondominio, TipoAlerta, PolizaSeguro, ContratoProveedor, Ins
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
+import { tint } from '../../shared/statusTone'
 
 type TFunc = (key: TranslationKey, params?: Record<string, string | number>) => string
 
@@ -266,7 +267,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
             {autoAlerts.map(a => {
               const cfg = TIPO_LABELS[a.tipo]
               return (
-                <div key={a.key} style={{ background: cfg.bg, border: `1.5px solid ${cfg.color}30`, borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div key={a.key} style={{ background: cfg.bg, border: `1.5px solid ${tint(cfg.color, 19)}`, borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{a.titulo}</div>

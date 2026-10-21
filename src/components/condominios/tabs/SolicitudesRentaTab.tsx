@@ -8,6 +8,7 @@ import {
   ResponsablesServiciosDetalle, EstadoContratoSolicitud,
 } from '../SolicitudRentaDetalle'
 import type { SolicitudRentaUnidad, TipoRenta, EstadoSolicitudRenta, Unidad } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   solicitudes: SolicitudRentaUnidad[]
@@ -168,7 +169,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, moneda = 'Q', autor
           { label: 'Rechazadas', count: rechazadas, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
         ].map(k => (
           <div key={k.label} style={{
-            background: k.bg, border: `1px solid ${k.color}30`,
+            background: k.bg, border: `1px solid ${tint(k.color, 19)}`,
             borderRadius: '10px', padding: '12px 20px', minWidth: '110px',
           }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: k.color }}>{k.count}</div>

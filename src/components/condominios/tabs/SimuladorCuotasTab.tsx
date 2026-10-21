@@ -1,6 +1,7 @@
 import { mesLocalISO } from '../../../lib/format'
 import { useState, useMemo, type ReactElement} from 'react'
 import { CuotaCondominio, GastoCondominio, Unidad } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -157,7 +158,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
               { label: 'Punto de equilibrio', val: `${moneda} ${puntoEquilibrio.toLocaleString('es')}/unidad`, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
               { label: 'Potencial máximo/mes', val: `${moneda} ${Math.round(cuotaMensual * totalUnidades).toLocaleString('es')}`, color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
             ].map(k => (
-              <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
+              <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
                 <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
               </div>
