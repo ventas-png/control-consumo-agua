@@ -13,11 +13,20 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
   const { tarifas, unidades, moneda, form, setForm, editingId, loading, cancelForm, handleGuardar } = ctx
 
   return (
-    <EditModal title={editingId ? 'Editar Contador' : 'Nuevo Contador'} onClose={cancelForm} maxWidth="820px">
+    <EditModal
+      title={editingId ? 'Editar Contador' : 'Nuevo Contador'}
+      onClose={cancelForm}
+      maxWidth="820px"
+      fullScreenOnMobile
+      // Guardando: ni Escape ni un toque en el fondo la cierran a medias.
+      closeOnBackdropClick={!loading}
+      closeOnEscape={!loading}
+    >
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
         <div>
-          <label style={labelStyle}>Número de Serie *</label>
+          <label htmlFor="ctr-serie" style={labelStyle}>Número de Serie *</label>
           <input
+            id="ctr-serie"
             style={inputStyle}
             value={form.numero_serie}
             onChange={e => setForm(f => ({ ...f, numero_serie: e.target.value }))}
@@ -26,8 +35,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           />
         </div>
         <div>
-          <label style={labelStyle}>Tipología / Tipo de Agua *</label>
+          <label htmlFor="ctr-tipo-agua" style={labelStyle}>Tipología / Tipo de Agua *</label>
           <select
+            id="ctr-tipo-agua"
             style={inputStyle}
             value={form.tipo_agua}
             onChange={e => setForm(f => ({ ...f, tipo_agua: e.target.value as TipoAgua, tarifa_id: '' }))}
@@ -38,8 +48,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Tarifa aplicable</label>
+          <label htmlFor="ctr-tarifa" style={labelStyle}>Tarifa aplicable</label>
           <select
+            id="ctr-tarifa"
             style={inputStyle}
             value={form.tarifa_id}
             onChange={e => setForm(f => ({ ...f, tarifa_id: e.target.value }))}
@@ -57,8 +68,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
         </div>
         {unidades.length > 0 && (
           <div>
-            <label style={labelStyle}>Unidad asignada</label>
+            <label htmlFor="ctr-unidad" style={labelStyle}>Unidad asignada</label>
             <select
+              id="ctr-unidad"
               style={inputStyle}
               value={form.unidad_id}
               onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
@@ -71,8 +83,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </div>
         )}
         <div>
-          <label style={labelStyle}>Marca</label>
+          <label htmlFor="ctr-marca" style={labelStyle}>Marca</label>
           <input
+            id="ctr-marca"
             style={inputStyle}
             value={form.marca}
             onChange={e => setForm(f => ({ ...f, marca: e.target.value }))}
@@ -81,8 +94,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           />
         </div>
         <div>
-          <label style={labelStyle}>Modelo</label>
+          <label htmlFor="ctr-modelo" style={labelStyle}>Modelo</label>
           <input
+            id="ctr-modelo"
             style={inputStyle}
             value={form.modelo}
             onChange={e => setForm(f => ({ ...f, modelo: e.target.value }))}
@@ -91,8 +105,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           />
         </div>
         <div>
-          <label style={labelStyle}>Fecha de Instalación</label>
+          <label htmlFor="ctr-fecha-instalacion" style={labelStyle}>Fecha de Instalación</label>
           <input
+            id="ctr-fecha-instalacion"
             style={inputStyle}
             type="date"
             value={form.fecha_instalacion}
@@ -100,8 +115,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           />
         </div>
         <div>
-          <label style={labelStyle}>Lectura Inicial (m³)</label>
+          <label htmlFor="ctr-lectura-inicial" style={labelStyle}>Lectura Inicial (m³)</label>
           <input
+            id="ctr-lectura-inicial"
             style={inputStyle}
             type="number"
             min="0"
@@ -118,8 +134,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </div>
         </div>
         <div>
-          <label style={labelStyle}>Medida del Contador</label>
+          <label htmlFor="ctr-medida" style={labelStyle}>Medida del Contador</label>
           <select
+            id="ctr-medida"
             style={inputStyle}
             value={form.medida}
             onChange={e => setForm(f => ({ ...f, medida: e.target.value }))}
@@ -129,8 +146,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Material del Contador</label>
+          <label htmlFor="ctr-material" style={labelStyle}>Material del Contador</label>
           <select
+            id="ctr-material"
             style={inputStyle}
             value={form.material}
             onChange={e => setForm(f => ({ ...f, material: e.target.value }))}
@@ -140,8 +158,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Tipo de Contador</label>
+          <label htmlFor="ctr-tipo-contador" style={labelStyle}>Tipo de Contador</label>
           <select
+            id="ctr-tipo-contador"
             style={inputStyle}
             value={form.tipo_contador}
             onChange={e => setForm(f => ({ ...f, tipo_contador: e.target.value }))}
@@ -151,8 +170,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Válvula de Cheque instalada</label>
+          <label htmlFor="ctr-valvula-cheque" style={labelStyle}>Válvula de Cheque instalada</label>
           <select
+            id="ctr-valvula-cheque"
             style={inputStyle}
             value={form.valvula_cheque}
             onChange={e => setForm(f => ({ ...f, valvula_cheque: e.target.value }))}
@@ -162,8 +182,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Tipo de Llave instalada</label>
+          <label htmlFor="ctr-tipo-llave" style={labelStyle}>Tipo de Llave instalada</label>
           <select
+            id="ctr-tipo-llave"
             style={inputStyle}
             value={form.tipo_llave}
             onChange={e => setForm(f => ({ ...f, tipo_llave: e.target.value }))}
@@ -173,8 +194,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Llave Antifraude instalada</label>
+          <label htmlFor="ctr-llave-antifraude" style={labelStyle}>Llave Antifraude instalada</label>
           <select
+            id="ctr-llave-antifraude"
             style={inputStyle}
             value={form.llave_antifraude}
             onChange={e => setForm(f => ({ ...f, llave_antifraude: e.target.value }))}
@@ -184,8 +206,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Válvula Liberadora de Aire</label>
+          <label htmlFor="ctr-valvula-aire" style={labelStyle}>Válvula Liberadora de Aire</label>
           <select
+            id="ctr-valvula-aire"
             style={inputStyle}
             value={form.valvula_aire}
             onChange={e => setForm(f => ({ ...f, valvula_aire: e.target.value }))}
@@ -195,8 +218,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Fecha Sugerida de Reemplazo</label>
+          <label htmlFor="ctr-fecha-reemplazo" style={labelStyle}>Fecha Sugerida de Reemplazo</label>
           <input
+            id="ctr-fecha-reemplazo"
             style={inputStyle}
             type="date"
             value={form.fecha_reemplazo_sugerida}
@@ -204,8 +228,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           />
         </div>
         <div>
-          <label style={labelStyle}>Contratista / Instalador</label>
+          <label htmlFor="ctr-contratista" style={labelStyle}>Contratista / Instalador</label>
           <input
+            id="ctr-contratista"
             style={inputStyle}
             value={form.contratista_instalador}
             onChange={e => setForm(f => ({ ...f, contratista_instalador: e.target.value }))}
@@ -214,8 +239,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           />
         </div>
         <div>
-          <label style={labelStyle}>Garantía de Instalación Vence</label>
+          <label htmlFor="ctr-garantia" style={labelStyle}>Garantía de Instalación Vence</label>
           <input
+            id="ctr-garantia"
             style={inputStyle}
             type="date"
             value={form.garantia_instalacion_vence}
@@ -223,8 +249,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           />
         </div>
         <div>
-          <label style={labelStyle}>N° Derecho de Servicio (Título de Agua)</label>
+          <label htmlFor="ctr-derecho-numero" style={labelStyle}>N° Derecho de Servicio (Título de Agua)</label>
           <input
+            id="ctr-derecho-numero"
             style={inputStyle}
             value={form.numero_derecho_servicio}
             onChange={e => setForm(f => ({ ...f, numero_derecho_servicio: e.target.value }))}
@@ -233,8 +260,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           />
         </div>
         <div>
-          <label style={labelStyle}>Cantidad Derecho de Servicio (m³)</label>
+          <label htmlFor="ctr-derecho-cantidad" style={labelStyle}>Cantidad Derecho de Servicio (m³)</label>
           <input
+            id="ctr-derecho-cantidad"
             style={inputStyle}
             type="number"
             min="0"
@@ -245,8 +273,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           />
         </div>
         <div>
-          <label style={labelStyle}>Periodicidad de Lectura (días)</label>
+          <label htmlFor="ctr-periodicidad" style={labelStyle}>Periodicidad de Lectura (días)</label>
           <input
+            id="ctr-periodicidad"
             style={inputStyle}
             type="number"
             min="1"
@@ -257,8 +286,9 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           />
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label style={labelStyle}>Descripción</label>
+          <label htmlFor="ctr-descripcion" style={labelStyle}>Descripción</label>
           <textarea
+            id="ctr-descripcion"
             style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }}
             value={form.descripcion}
             onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
@@ -286,7 +316,7 @@ export function ContadorFormModal({ ctx }: { ctx: ContadoresCtx }) {
           </button>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: '10px' }}>
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button
           onClick={handleGuardar}
           disabled={loading}

@@ -1,6 +1,8 @@
 import { hoyLocalISO, parseFechaCalendario, dateLocalISO } from '../../../lib/format'
 import { useState, useEffect, useCallback, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import {
   createCondominioRow,
   createCondominioRowReturning,
@@ -44,7 +46,9 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
-  const [selected, setSelected] = useState<PlanPagoCond | null>(null)
+  // Por id y no la fila: al pagar la última cuota el plan pasa a "completado"
+  // y, tras onRefresh, la ventana muestra el estado nuevo (la copia quedaba vieja).
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [cuotas, setCuotas] = useState<CuotaPlanPago[]>([])
   const [loadingCuotas, setLoadingCuotas] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'activo' | 'completado' | 'incumplido' | 'cancelado'>('todos')
@@ -57,7 +61,18 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
     setLoadingCuotas(false)
   }, [])
 
-  useEffect(() => { if (selected) fetchCuotas(selected.id) }, [selected, fetchCuotas])
+  useEffect(() => { if (selectedId) fetchCuotas(selectedId) }, [selectedId, fetchCuotas])
+
+  function cerrarDetalle() {
+    setSelectedId(null)
+    // Sin esto, al abrir otro plan se verían un instante las cuotas del anterior.
+    setCuotas([])
+  }
+
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false)
+  }
 
   async function handleSave() {
     if (!form.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Seleccione una unidad.' })
@@ -95,7 +110,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
     const r = await confirm({ title: '¿Eliminar plan de pago?', text: 'Se eliminarán todas sus cuotas.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('planes_pago_condominio', id)
-    if (selected?.id === id) { setSelected(null); setCuotas([]) }
+    if (selectedId === id) { setSelectedId(null); setCuotas([]) }
     onRefresh()
   }
 
@@ -110,22 +125,26 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
     await updateCondominioRow('cuotas_plan_pago', cuota.id, update)
 
     // Check if plan is complete
-    if (pagado && selected) {
-      const all = await fetchCuotasPlanPago<CuotaPlanPago>(selected.id)
+    if (pagado && selectedId) {
+      const all = await fetchCuotasPlanPago<CuotaPlanPago>(selectedId)
       const todasPagadas = all.every(c => c.id === cuota.id ? true : c.pagado)
-      if (todasPagadas) await updateCondominioRow('planes_pago_condominio', selected.id, { estado: 'completado' })
+      if (todasPagadas) await updateCondominioRow('planes_pago_condominio', selectedId, { estado: 'completado' })
     }
-    fetchCuotas(selected!.id)
+    fetchCuotas(selectedId!)
     onRefresh()
   }
 
   const today = hoyLocalISO()
   const filtered = filtroEstado === 'todos' ? planes : planes.filter(p => p.estado === filtroEstado)
+  // De `planes` y no de `filtered`: cambiar el filtro no cierra la ventana.
+  const selected = selectedId ? planes.find(p => p.id === selectedId) ?? null : null
   const montoCuotaPreview = form.monto_total && form.num_cuotas
     ? (parseFloat(form.monto_total) / parseInt(form.num_cuotas)).toFixed(2)
     : ''
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
+  const pill = (bg: string, color: string): CSSProperties => ({ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: bg, color, whiteSpace: 'nowrap' })
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -134,7 +153,9 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
           <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Planes de Pago</h2>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>Acuerdos de pago para unidades con saldo en mora</p>
         </div>
-        {canCreate && !showForm && (
+        {/* Sin `!showForm`: el botón sigue montado detrás de la ventana y
+            recupera el foco al cerrarla. */}
+        {canCreate && (
           <button onClick={() => setShowForm(true)}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Plan
@@ -152,29 +173,42 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
         ))}
       </div>
 
-      {/* Form */}
+      {/* Form en ventana (antes se desplegaba arriba de la lista y en el
+          teléfono la empujaba fuera de la pantalla). */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nuevo Plan de Pago</h3>
+        <EditModal
+          title="Nuevo plan de pago"
+          maxWidth="640px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} loadingText="Creando…">Crear plan</Button>
+          </>}
+        >
+          {/* `1 / -1` y no `span 2`: con una sola columna (teléfono) el span
+              creaba una columna implícita y el campo se salía de la ventana. */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Unidad *</label>
-              <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
+              <label htmlFor="plan-unidad" style={labelStyle}>Unidad *</label>
+              <select id="plan-unidad" style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Concepto *</label>
-              <input style={inputStyle} value={form.concepto} onChange={e => setF('concepto', e.target.value)} placeholder="Ej: Deuda cuotas mantenimiento Q1 2026" autoFocus />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="plan-concepto" style={labelStyle}>Concepto *</label>
+              <input id="plan-concepto" style={inputStyle} value={form.concepto} onChange={e => setF('concepto', e.target.value)} placeholder="Ej: Deuda cuotas mantenimiento Q1 2026" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Monto total ({moneda}) *</label>
-              <input style={inputStyle} type="number" step="0.01" value={form.monto_total} onChange={e => setF('monto_total', e.target.value)} placeholder="0.00" />
+              <label htmlFor="plan-monto-total" style={labelStyle}>Monto total ({moneda}) *</label>
+              <input id="plan-monto-total" style={inputStyle} type="number" step="0.01" value={form.monto_total} onChange={e => setF('monto_total', e.target.value)} placeholder="0.00" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Número de cuotas *</label>
-              <input style={inputStyle} type="number" min="1" max="60" value={form.num_cuotas} onChange={e => setF('num_cuotas', e.target.value)} />
+              <label htmlFor="plan-num-cuotas" style={labelStyle}>Número de cuotas *</label>
+              <input id="plan-num-cuotas" style={inputStyle} type="number" min="1" max="60" value={form.num_cuotas} onChange={e => setF('num_cuotas', e.target.value)} />
             </div>
             {montoCuotaPreview && (
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -184,29 +218,19 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
               </div>
             )}
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Primera cuota vence</label>
-              <input style={inputStyle} type="date" value={form.fecha_inicio} onChange={e => setF('fecha_inicio', e.target.value)} />
+              <label htmlFor="plan-fecha-inicio" style={labelStyle}>Primera cuota vence</label>
+              <input id="plan-fecha-inicio" style={inputStyle} type="date" value={form.fecha_inicio} onChange={e => setF('fecha_inicio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Aprobado por</label>
-              <input style={inputStyle} value={form.aprobado_por} onChange={e => setF('aprobado_por', e.target.value)} placeholder="Nombre del aprobador" />
+              <label htmlFor="plan-aprobado-por" style={labelStyle}>Aprobado por</label>
+              <input id="plan-aprobado-por" style={inputStyle} value={form.aprobado_por} onChange={e => setF('aprobado_por', e.target.value)} placeholder="Nombre del aprobador" />
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Notas</label>
-              <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Condiciones, observaciones…" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="plan-notas" style={labelStyle}>Notas</label>
+              <input id="plan-notas" style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Condiciones, observaciones…" />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Creando…' : 'Crear plan'}
-            </button>
-            <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Filter */}
@@ -223,55 +247,72 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1fr' : '1fr', gap: '16px' }}>
-        {/* Plans list */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filtered.length === 0 ? (
-            <EmptyState icon="💳" title="No hay planes de pago" />
-          ) : filtered.map(p => {
-            const unidad = unidades.find(u => u.id === p.unidad_id)
-            const es = ESTADO_STYLE[p.estado] ?? ESTADO_STYLE.activo
-            return (
-              <div key={p.id} onClick={() => setSelected(selected?.id === p.id ? null : p)}
-                style={{ background: 'var(--at-surface)', border: `1.5px solid ${selected?.id === p.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: '13px' }}>{p.concepto}</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      {unidad && <span>🏠 {unidad.nombre}</span>}
-                      <span>💰 {fmt(Number(p.monto_total), moneda)}</span>
-                      <span>📋 {p.num_cuotas} cuotas de {fmt(Number(p.monto_cuota), moneda)}</span>
-                      <span>📅 Desde {p.fecha_inicio}</span>
-                    </div>
-                    {p.aprobado_por && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>Aprobado por: {p.aprobado_por}</div>}
-                  </div>
-                  {canEdit && (
-                    <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                      {p.estado === 'activo' && (
-                        <button onClick={() => cambiarEstadoPlan(p.id, 'incumplido')}
-                          style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
-                          Incumplido
-                        </button>
-                      )}
-                      <button onClick={() => handleDelete(p.id)}
-                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                    </div>
-                  )}
+      {/* Lista a todo el ancho — las cuotas de cada plan se abren en ventana.
+          Antes iban en una columna al lado que en el teléfono dejaba la lista
+          en una franja y las cuotas fuera de la pantalla. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {filtered.length === 0 ? (
+          <EmptyState icon="💳" title="No hay planes de pago" />
+        ) : filtered.map(p => {
+          const unidad = unidades.find(u => u.id === p.unidad_id)
+          const es = ESTADO_STYLE[p.estado] ?? ESTADO_STYLE.activo
+          return (
+            <div key={p.id}
+              style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px', paddingRight: '10px' }}>
+              <button type="button" className="cond-row-main" onClick={() => setSelectedId(p.id)}
+                style={{ flex: '1 1 260px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: '12px 4px 12px 14px', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 700, fontSize: '13px' }}>{p.concepto}</span>
+                  <span style={pill(es.bg, es.color)}>{es.label}</span>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '4px 10px', flexWrap: 'wrap' }}>
+                  {unidad && <span>🏠 {unidad.nombre}</span>}
+                  <span>💰 {fmt(Number(p.monto_total), moneda)}</span>
+                  <span>📋 {p.num_cuotas} cuotas de {fmt(Number(p.monto_cuota), moneda)}</span>
+                  <span>📅 Desde {p.fecha_inicio}</span>
+                </div>
+                {p.aprobado_por && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>Aprobado por: {p.aprobado_por}</div>}
+              </button>
+              {canEdit && (
+                <div style={{ display: 'flex', gap: '3px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
+                  {p.estado === 'activo' && (
+                    <button onClick={() => cambiarEstadoPlan(p.id, 'incumplido')}
+                      style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                      Incumplido
+                    </button>
+                  )}
+                  <button onClick={() => handleDelete(p.id)} aria-label={`Eliminar plan ${p.concepto}`}
+                    style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
-        {/* Cuotas panel */}
-        {selected && (
-          <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-            <h3 style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700 }}>
-              Cuotas — {selected.concepto}
-            </h3>
+      {/* Cuotas del plan en ventana: a pantalla completa en el teléfono. */}
+      {selected && (() => {
+        const unidad = unidades.find(u => u.id === selected.unidad_id)
+        const es = ESTADO_STYLE[selected.estado] ?? ESTADO_STYLE.activo
+        return (
+          <EditModal
+            title={selected.concepto}
+            subtitle={<span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={pill(es.bg, es.color)}>{es.label}</span>
+              {unidad && <span>🏠 {unidad.nombre}</span>}
+              <span>{selected.num_cuotas} cuotas de {fmt(Number(selected.monto_cuota), moneda)}</span>
+            </span>}
+            maxWidth="640px"
+            fullScreenOnMobile
+            onClose={cerrarDetalle}
+            // Las mismas acciones de la fila: con la ventana abierta la lista
+            // queda detrás y no se alcanzan.
+            footer={canEdit ? <>
+              <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar plan">🗑️</Button>
+              {selected.estado === 'activo' && <Button variant="outline-danger" onClick={() => cambiarEstadoPlan(selected.id, 'incumplido')}>Marcar incumplido</Button>}
+            </> : undefined}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Cuotas</div>
             {loadingCuotas ? (
               <EmptyState icon="📋" title="Cargando…" />
             ) : (
@@ -292,7 +333,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
                   {cuotas.map(c => {
                     const vencida = !c.pagado && c.fecha_vencimiento < today
                     return (
-                      <div key={c.id} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '8px 10px', border: `1px solid ${vencida ? 'var(--at-danger-border)' : 'var(--at-line)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div key={c.id} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '8px 10px', border: `1px solid ${vencida ? 'var(--at-danger-border)' : 'var(--at-line)'}`, display: 'flex', flexWrap: 'wrap', gap: '6px 10px', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)' }}>Cuota #{c.numero}</span>
                           <span style={{ fontSize: '12px', color: 'var(--at-primary)', fontWeight: 600, marginLeft: '8px' }}>{fmt(Number(c.monto), moneda)}</span>
@@ -313,9 +354,9 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
                 </div>
               </>
             )}
-          </div>
-        )}
-      </div>
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }

@@ -4,7 +4,8 @@ import type { Registro } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 import { calcularRecargoTarjeta, type RecargoTarjetaRow } from '../../lib/businessPagos'
 import { iniciarPagoRegistro, confirmarPago } from '../../domain/portal/mutations'
-import { ModalPortal } from '../shared/ModalPortal'
+import { EditModal } from '../shared/EditModal'
+import { parseFecha } from '../../lib/format'
 import { avisoConfirmacionPago } from '../../domain/portal/avisoConfirmacionPago'
 
 interface Props {
@@ -85,45 +86,62 @@ export function PagoEnLineaModal({ registro, moneda, recargoRows, canalPago, onC
     }
   }
 
+  // Mientras se procesa el cobro no se cierra la ventana (ni con Esc, ni con
+  // el fondo, ni con la ×): cerrar a mitad de un cobro dejaba al cliente sin
+  // saber si se le cobró.
+  const cerrar = () => { if (!loading) onClose() }
+
   return (
-    <ModalPortal>
-    <div
-      role="dialog"
-      aria-modal="true"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '16px',
-      }}
-      onClick={e => e.target === e.currentTarget && !loading && onClose()}
-    >
-      <div
-        style={{
-          background: 'var(--at-surface)',
-          borderRadius: '16px',
-          padding: '32px',
-          width: '100%',
-          maxWidth: '480px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)', margin: 0 }}>💳 Pagar en línea</h2>
+    <EditModal
+      title="💳 Pagar en línea"
+      subtitle={`Recibo de la lectura del ${parseFecha(registro.fecha).toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+      maxWidth="480px"
+      fullScreenOnMobile
+      onClose={cerrar}
+      closeOnBackdropClick={!loading}
+      closeOnEscape={!loading}
+      footer={
+        <div style={{ width: '100%', display: 'flex', gap: '12px' }}>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={cerrar}
             disabled={loading}
-            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--at-ink-3)' }}
+            style={{
+              flex: 1,
+              padding: '12px',
+              borderRadius: '10px',
+              border: '1.5px solid var(--at-line)',
+              background: 'var(--at-surface)',
+              color: 'var(--at-ink-2)',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
           >
-            ✕
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void handlePagar()}
+            disabled={loading}
+            style={{
+              flex: 2,
+              padding: '12px',
+              borderRadius: '10px',
+              border: 'none',
+              background: loading ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
+              color: 'white',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {loading ? '⏳ Procesando...' : '💳 Pagar'}
           </button>
         </div>
-
-        <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
+      }
+    >
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid var(--at-line)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
             <div>
               <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Total Cargo</div>
@@ -136,11 +154,12 @@ export function PagoEnLineaModal({ registro, moneda, recargoRows, canalPago, onC
           </div>
         </div>
 
-        <div style={{ marginBottom: '24px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
+        <div>
+          <label htmlFor="pago-linea-monto" style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
             Monto a Pagar ({moneda}) <span style={{ fontWeight: 400, color: 'var(--at-ink-3)' }}>— podés abonar un monto menor</span>
           </label>
           <input
+            id="pago-linea-monto"
             type="number"
             step="0.01"
             min="0.01"
@@ -153,12 +172,14 @@ export function PagoEnLineaModal({ registro, moneda, recargoRows, canalPago, onC
             style={{
               width: '100%',
               padding: '12px',
-              borderRadius: '8px',
+              borderRadius: '10px',
               border: '1.5px solid var(--at-line)',
               fontSize: '16px',
               fontWeight: 700,
               fontFamily: 'inherit',
               boxSizing: 'border-box',
+              background: 'var(--at-surface)',
+              color: 'var(--at-ink)',
             }}
           />
           {recargo != null && (
@@ -176,45 +197,6 @@ export function PagoEnLineaModal({ registro, moneda, recargoRows, canalPago, onC
             </div>
           )}
         </div>
-
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button
-            onClick={onClose}
-            disabled={loading}
-            style={{
-              flex: 1,
-              padding: '12px',
-              borderRadius: '8px',
-              border: '1.5px solid var(--at-line)',
-              background: 'var(--at-surface)',
-              color: 'var(--at-ink-3)',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={() => void handlePagar()}
-            disabled={loading}
-            style={{
-              flex: 2,
-              padding: '12px',
-              borderRadius: '8px',
-              border: 'none',
-              background: loading ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
-              color: 'white',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {loading ? '⏳ Procesando...' : '💳 Pagar'}
-          </button>
-        </div>
-      </div>
-    </div>
-    </ModalPortal>
+    </EditModal>
   )
 }

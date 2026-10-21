@@ -1,6 +1,8 @@
 import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { createCondominioRow, deleteCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ComunicadoCondominio, TipoComunicado, DestinatarioComunicado, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -130,28 +132,45 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
     win.print()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
+
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false)
+  }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Comunicados Formales</h2>
         {canCreate && (
-          <button onClick={() => { setShowForm(v => !v); setSelectedId(null) }}
+          <button onClick={() => { setShowForm(true); setSelectedId(null) }}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Comunicado
           </button>
         )}
       </div>
 
-      {/* Form */}
+      {/* Form — en ventana: antes se desplegaba arriba de la lista y en el
+          teléfono empujaba todo hacia abajo. */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 700 }}>Nuevo comunicado</h3>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <EditModal
+          title="Nuevo comunicado"
+          maxWidth="640px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} loadingText="Guardando…">Guardar</Button>
+          </>}
+        >
+          <div role="group" aria-label="Tipo de comunicado" style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
             {(Object.keys(TIPO_LABELS) as TipoComunicado[]).map(t => (
-              <button key={t} onClick={() => applyTemplate(t)}
-                style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
+              <button key={t} type="button" onClick={() => applyTemplate(t)} aria-pressed={form.tipo === t}
+                style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
                   background: form.tipo === t ? 'var(--at-ink)' : 'var(--at-surface)',
                   color: form.tipo === t ? 'white' : 'var(--at-ink-3)',
                   borderColor: form.tipo === t ? 'var(--at-ink)' : 'var(--at-line)' }}>
@@ -159,14 +178,16 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
               </button>
             ))}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: '10px', marginBottom: '10px' }}>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Título *</label>
-              <input style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Asunto del comunicado" autoFocus />
+          {/* `1 / -1` y no `span 2`: con una sola columna (teléfono) el span
+              creaba una columna implícita y el campo se salía de la ventana. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: '12px' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="com-titulo" style={labelStyle}>Título *</label>
+              <input id="com-titulo" style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Asunto del comunicado" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Destinatario</label>
-              <select style={inputStyle} value={form.destinatario} onChange={e => setF('destinatario', e.target.value as DestinatarioComunicado)}>
+              <label htmlFor="com-destinatario" style={labelStyle}>Destinatario</label>
+              <select id="com-destinatario" style={inputStyle} value={form.destinatario} onChange={e => setF('destinatario', e.target.value as DestinatarioComunicado)}>
                 {(Object.keys(DEST_LABELS) as DestinatarioComunicado[]).map(d => (
                   <option key={d} value={d}>{DEST_LABELS[d]}</option>
                 ))}
@@ -174,50 +195,40 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
             </div>
             {form.destinatario === 'especifico' && (
               <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Unidad *</label>
-                <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
+                <label htmlFor="com-unidad" style={labelStyle}>Unidad *</label>
+                <select id="com-unidad" style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                   <option value="">— Seleccionar —</option>
                   {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                 </select>
               </div>
             )}
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha emisión</label>
-              <input style={inputStyle} type="date" value={form.fecha_envio} onChange={e => setF('fecha_envio', e.target.value)} />
+              <label htmlFor="com-fecha" style={labelStyle}>Fecha emisión</label>
+              <input id="com-fecha" style={inputStyle} type="date" value={form.fecha_envio} onChange={e => setF('fecha_envio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Emitido por</label>
-              <input style={inputStyle} value={form.enviado_por} onChange={e => setF('enviado_por', e.target.value)} placeholder="Administración / nombre" />
+              <label htmlFor="com-emisor" style={labelStyle}>Emitido por</label>
+              <input id="com-emisor" style={inputStyle} value={form.enviado_por} onChange={e => setF('enviado_por', e.target.value)} placeholder="Administración / nombre" />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '38px', alignSelf: 'end' }}>
               <input type="checkbox" checked={form.firmado} onChange={e => setF('firmado', e.target.checked)} id="firmado_chk" />
-              <label htmlFor="firmado_chk" style={{ fontSize: '12px', color: 'var(--at-ink-3)', cursor: 'pointer' }}>Documento firmado</label>
+              <label htmlFor="firmado_chk" style={{ fontSize: '13px', color: 'var(--at-ink-2)', cursor: 'pointer' }}>Documento firmado</label>
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Contenido *</label>
-              <textarea style={{ ...inputStyle, minHeight: '140px', resize: 'vertical', fontFamily: 'Georgia, serif', lineHeight: '1.6' }}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="com-contenido" style={labelStyle}>Contenido *</label>
+              <textarea id="com-contenido" style={{ ...inputStyle, minHeight: '180px', resize: 'vertical', fontFamily: 'Georgia, serif', lineHeight: '1.6' }}
                 value={form.contenido} onChange={e => setF('contenido', e.target.value)}
                 placeholder="Redacte el contenido del comunicado…" />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
-      {/* Filter + list + preview */}
+      {/* Filtro */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
         {(['all',...Object.keys(TIPO_LABELS)] as const).map(t => (
-          <button key={t} onClick={() => setFiltroTipo(t as TipoComunicado | 'all')}
-            style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
+          <button key={t} onClick={() => setFiltroTipo(t as TipoComunicado | 'all')} aria-pressed={filtroTipo === t}
+            style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
               background: filtroTipo === t ? 'var(--at-ink)' : 'var(--at-surface)',
               color: filtroTipo === t ? 'white' : 'var(--at-ink-3)',
               borderColor: filtroTipo === t ? 'var(--at-ink)' : 'var(--at-line)' }}>
@@ -226,81 +237,74 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 420px' : '1fr', gap: '16px' }}>
-        {/* List */}
-        <div>
-          {filtered.length === 0 ? (
-            <EmptyState icon="📋" title="No hay comunicados" />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {filtered.map(c => {
-                const tl = TIPO_LABELS[c.tipo]
-                return (
-                  <div key={c.id} onClick={() => setSelectedId(selectedId === c.id ? null : c.id)}
-                    style={{ background: selectedId === c.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${selectedId === c.id ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderLeft: `4px solid ${tl.color}`, borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{tl.icon} {c.titulo}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
-                          {tl.label} — {DEST_LABELS[c.destinatario]}{c.unidad_nombre ? ` (${c.unidad_nombre})` : ''} — {c.fecha_envio}
-                          {c.firmado && <span style={{ marginLeft: '6px', color: 'var(--at-success)', fontWeight: 700 }}>✓ Firmado</span>}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
-                        {canCreate && (
-                          <button onClick={e => { e.stopPropagation(); publicarEnPortal(c) }}
-                            title="Publicar en portal del residente"
-                            style={{ padding: '3px 7px', background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-primary)', fontWeight: 600 }}>📢 Portal</button>
-                        )}
-                        {canEdit && (
-                          <button onClick={e => { e.stopPropagation(); handleDelete(c.id) }}
-                            style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                        )}
-                      </div>
-                    </div>
+      {/* Lista — cada comunicado se abre en ventana (antes la vista previa iba
+          en una columna fija de 420px que en el teléfono dejaba la lista en
+          una franja y el texto fuera de la pantalla). */}
+      {filtered.length === 0 ? (
+        <EmptyState icon="📋" title="No hay comunicados" />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {filtered.map(c => {
+            const tl = TIPO_LABELS[c.tipo]
+            return (
+              <div key={c.id}
+                style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderLeft: `4px solid ${tl.color}`, borderRadius: '10px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px', paddingRight: '10px' }}>
+                <button type="button" className="cond-row-main" onClick={() => setSelectedId(c.id)}
+                  style={{ flex: '1 1 240px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: '12px 4px 12px 14px', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{tl.icon} {c.titulo}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
+                    {tl.label} · {DEST_LABELS[c.destinatario]}{c.unidad_nombre ? ` (${c.unidad_nombre})` : ''} · {c.fecha_envio}
+                    {c.firmado && <span style={{ marginLeft: '6px', color: 'var(--at-success)', fontWeight: 700 }}>✓ Firmado</span>}
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Preview panel */}
-        {selected && (
-          <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden', alignSelf: 'start' }}>
-            <div style={{ padding: '10px 14px', background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-3)' }}>Vista previa</span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {canCreate && (
-                  <button onClick={() => publicarEnPortal(selected)}
-                    style={{ padding: '4px 10px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                    📢 Publicar en portal
-                  </button>
-                )}
-                <button onClick={() => handlePrint(selected)}
-                  style={{ padding: '4px 10px', background: 'var(--at-ink)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                  🖨️ Imprimir
+                  <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)', marginTop: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {c.contenido}
+                  </div>
                 </button>
-                <button onClick={() => setSelectedId(null)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '16px' }}>×</button>
+                {(canCreate || canEdit) && (
+                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
+                    {canCreate && (
+                      <button onClick={() => publicarEnPortal(c)}
+                        title="Publicar en portal del residente"
+                        style={{ padding: '6px 10px', background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-primary)', fontWeight: 600 }}>📢 Portal</button>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => handleDelete(c.id)} aria-label={`Eliminar ${c.titulo}`}
+                        style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                    )}
+                  </div>
+                )}
               </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Vista previa en ventana: a pantalla completa en el teléfono. */}
+      {selected && (
+        <EditModal
+          title={selected.titulo}
+          subtitle={`${TIPO_LABELS[selected.tipo].icon} ${TIPO_LABELS[selected.tipo].label} · ${DEST_LABELS[selected.destinatario]}${selected.unidad_nombre ? ` · ${selected.unidad_nombre}` : ''}`}
+          maxWidth="680px"
+          fullScreenOnMobile
+          onClose={() => setSelectedId(null)}
+          footer={<>
+            <Button variant="secondary" onClick={() => handlePrint(selected)}>🖨️ Imprimir</Button>
+            {canCreate && <Button onClick={() => publicarEnPortal(selected)}>📢 Publicar en portal</Button>}
+          </>}
+        >
+          <article style={{ fontFamily: 'Georgia, serif', lineHeight: '1.7', fontSize: '14.5px', color: 'var(--at-ink)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '14px', fontFamily: 'inherit' }}>
+              Fecha: {selected.fecha_envio}{selected.enviado_por ? ` · Emitido por: ${selected.enviado_por}` : ''}
             </div>
-            <div style={{ padding: '16px', fontFamily: 'Georgia, serif', lineHeight: '1.7', fontSize: '13px', maxHeight: '500px', overflowY: 'auto' }}>
-              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '12px' }}>
-                {TIPO_LABELS[selected.tipo].label} — {DEST_LABELS[selected.destinatario]}{selected.unidad_nombre ? ` — ${selected.unidad_nombre}` : ''}<br />
-                Fecha: {selected.fecha_envio}{selected.enviado_por ? ` — Emitido por: ${selected.enviado_por}` : ''}
+            <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{selected.contenido}</div>
+            {selected.firmado && (
+              <div style={{ marginTop: '30px', borderTop: '1px solid var(--at-line)', paddingTop: '12px', textAlign: 'center', fontSize: '12px', color: 'var(--at-success)', fontWeight: 600 }}>
+                ✓ Documento firmado
               </div>
-              <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 800, textAlign: 'center', color: 'var(--at-ink)' }}>{selected.titulo}</h3>
-              <div style={{ whiteSpace: 'pre-wrap', color: 'var(--at-ink)' }}>{selected.contenido}</div>
-              {selected.firmado && (
-                <div style={{ marginTop: '30px', borderTop: '1px solid var(--at-line)', paddingTop: '12px', textAlign: 'center', fontSize: '11px', color: 'var(--at-success)', fontWeight: 600 }}>
-                  ✓ Documento firmado
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+            )}
+          </article>
+        </EditModal>
+      )}
     </div>
   )
 }

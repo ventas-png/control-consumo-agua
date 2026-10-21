@@ -1,5 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import {
   createCondominioRow,
   updateCondominioRow,
@@ -44,7 +46,9 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK_EVENTO })
   const [saving, setSaving] = useState(false)
-  const [selected, setSelected] = useState<EventoComunidad | null>(null)
+  // Por id y no la fila: la ventana lee el evento vigente de `eventos` tras
+  // cada refresco (la copia guardada quedaba vieja si se editaba el evento).
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showAsistenteForm, setShowAsistenteForm] = useState(false)
   const [formAsistente, setFormAsistente] = useState({ ...BLANK_ASISTENTE })
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'programado' | 'en_curso' | 'realizado' | 'cancelado'>('todos')
@@ -56,6 +60,29 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
     setEditId(e.id)
     setForm({ titulo: e.titulo, descripcion: e.descripcion ?? '', tipo: e.tipo, fecha: e.fecha, hora_inicio: e.hora_inicio ?? '', hora_fin: e.hora_fin ?? '', lugar: e.lugar ?? '', capacidad_max: e.capacidad_max ? String(e.capacidad_max) : '', estado: e.estado, asistentes_real: e.asistentes_real ? String(e.asistentes_real) : '', costo_estimado: e.costo_estimado ? String(e.costo_estimado) : '' })
     setShowForm(true)
+  }
+
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false)
+    setEditId(null)
+  }
+
+  // Cada ventana de asistentes arranca sin el subformulario abierto (antes
+  // quedaba abierto, con lo escrito, al pasar a otro evento).
+  function abrirDetalle(id: string) {
+    setSelectedId(id)
+    cancelarAsistente()
+  }
+
+  function cerrarDetalle() {
+    setSelectedId(null)
+    cancelarAsistente()
+  }
+
+  function cancelarAsistente() {
+    setShowAsistenteForm(false)
+    setFormAsistente({ ...BLANK_ASISTENTE })
   }
 
   async function handleSave() {
@@ -84,16 +111,16 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
     const r = await confirm({ title: '¿Eliminar evento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('eventos_comunidad', id)
-    if (selected?.id === id) setSelected(null)
+    if (selectedId === id) cerrarDetalle()
     onRefresh()
   }
 
   async function handleSaveAsistente() {
-    if (!selected) return
+    if (!selectedId) return
     if (!formAsistente.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Seleccione una unidad.' })
     if (!formAsistente.nombre.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El nombre es obligatorio.' })
     const { error } = await upsertCondominioRow('registro_asistentes_evento', {
-      company_id: companyId, evento_id: selected.id,
+      company_id: companyId, evento_id: selectedId,
       unidad_id: formAsistente.unidad_id, nombre: formAsistente.nombre.trim(),
       num_personas: parseInt(formAsistente.num_personas) || 1, confirmado: formAsistente.confirmado,
     }, 'evento_id,unidad_id')
@@ -112,9 +139,12 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
   }
 
   const filtered = filtroEstado === 'todos' ? eventos : eventos.filter(e => e.estado === filtroEstado)
+  const selected = selectedId ? eventos.find(e => e.id === selectedId) ?? null : null
   const selectedAsistentes = selected ? asistentes.filter(a => a.evento_id === selected.id) : []
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
+  const pill = (bg: string, color: string): CSSProperties => ({ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: bg, color, whiteSpace: 'nowrap' })
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -131,72 +161,75 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
         )}
       </div>
 
-      {/* Form */}
+      {/* Form en ventana (antes se desplegaba arriba de la lista y en el
+          teléfono empujaba todo hacia abajo). */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar evento' : 'Nuevo Evento'}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Título *</label>
-              <input style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Ej: Noche de talentos" autoFocus />
+        <EditModal
+          title={editId ? 'Editar evento' : 'Nuevo Evento'}
+          maxWidth="640px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} loadingText="Guardando…">Guardar</Button>
+          </>}
+        >
+          {/* `1 / -1` y no `span 2`: en una sola columna (teléfono) el span
+              creaba una columna implícita y el campo se salía de la ventana. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="evc-titulo" style={labelStyle}>Título *</label>
+              <input id="evc-titulo" style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Ej: Noche de talentos" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Tipo</label>
-              <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
+              <label htmlFor="evc-tipo" style={labelStyle}>Tipo</label>
+              <select id="evc-tipo" style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                 {Object.entries(TIPO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
-              <select style={inputStyle} value={form.estado} onChange={e => setF('estado', e.target.value)}>
+              <label htmlFor="evc-estado" style={labelStyle}>Estado</label>
+              <select id="evc-estado" style={inputStyle} value={form.estado} onChange={e => setF('estado', e.target.value)}>
                 {Object.entries(ESTADO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha *</label>
-              <input style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
+              <label htmlFor="evc-fecha" style={labelStyle}>Fecha *</label>
+              <input id="evc-fecha" style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Hora inicio</label>
-              <input style={inputStyle} type="time" value={form.hora_inicio} onChange={e => setF('hora_inicio', e.target.value)} />
+              <label htmlFor="evc-hora-inicio" style={labelStyle}>Hora inicio</label>
+              <input id="evc-hora-inicio" style={inputStyle} type="time" value={form.hora_inicio} onChange={e => setF('hora_inicio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Hora fin</label>
-              <input style={inputStyle} type="time" value={form.hora_fin} onChange={e => setF('hora_fin', e.target.value)} />
+              <label htmlFor="evc-hora-fin" style={labelStyle}>Hora fin</label>
+              <input id="evc-hora-fin" style={inputStyle} type="time" value={form.hora_fin} onChange={e => setF('hora_fin', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Lugar</label>
-              <input style={inputStyle} value={form.lugar} onChange={e => setF('lugar', e.target.value)} placeholder="Salón comunal…" />
+              <label htmlFor="evc-lugar" style={labelStyle}>Lugar</label>
+              <input id="evc-lugar" style={inputStyle} value={form.lugar} onChange={e => setF('lugar', e.target.value)} placeholder="Salón comunal…" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Capacidad máx.</label>
-              <input style={inputStyle} type="number" value={form.capacidad_max} onChange={e => setF('capacidad_max', e.target.value)} placeholder="50" />
+              <label htmlFor="evc-capacidad" style={labelStyle}>Capacidad máx.</label>
+              <input id="evc-capacidad" style={inputStyle} type="number" value={form.capacidad_max} onChange={e => setF('capacidad_max', e.target.value)} placeholder="50" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Asistentes reales</label>
-              <input style={inputStyle} type="number" value={form.asistentes_real} onChange={e => setF('asistentes_real', e.target.value)} />
+              <label htmlFor="evc-asistentes-real" style={labelStyle}>Asistentes reales</label>
+              <input id="evc-asistentes-real" style={inputStyle} type="number" value={form.asistentes_real} onChange={e => setF('asistentes_real', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Costo estimado</label>
-              <input style={inputStyle} type="number" value={form.costo_estimado} onChange={e => setF('costo_estimado', e.target.value)} placeholder="0.00" />
+              <label htmlFor="evc-costo" style={labelStyle}>Costo estimado</label>
+              <input id="evc-costo" style={inputStyle} type="number" value={form.costo_estimado} onChange={e => setF('costo_estimado', e.target.value)} placeholder="0.00" />
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Descripción</label>
-              <textarea style={{ ...inputStyle, minHeight: '55px', resize: 'vertical', fontFamily: 'inherit' }}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="evc-descripcion" style={labelStyle}>Descripción</label>
+              <textarea id="evc-descripcion" style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
                 value={form.descripcion} onChange={e => setF('descripcion', e.target.value)} placeholder="Detalles del evento…" />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Filter */}
@@ -213,92 +246,105 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1fr' : '1fr', gap: '16px' }}>
-        {/* Events list */}
+      {/* Lista a todo el ancho — cada evento abre sus asistentes en ventana.
+          Antes el panel ocupaba media pantalla al lado y en el teléfono
+          dejaba la lista en una franja. */}
+      {filtered.length === 0 ? (
+        <EmptyState icon="📋" title="No hay eventos" />
+      ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filtered.length === 0 ? (
-            <EmptyState icon="📋" title="No hay eventos" />
-          ) : filtered.map(ev => {
+          {filtered.map(ev => {
             const ts = TIPO_STYLE[ev.tipo] ?? TIPO_STYLE.otro
             const es = ESTADO_STYLE[ev.estado] ?? ESTADO_STYLE.programado
             const asistCount = asistentes.filter(a => a.evento_id === ev.id).length
             return (
-              <div key={ev.id} onClick={() => setSelected(selected?.id === ev.id ? null : ev)}
-                style={{ background: 'var(--at-surface)', border: `1.5px solid ${selected?.id === ev.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: '13px' }}>{ev.titulo}</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: ts.bg, color: ts.color }}>{ts.label}</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      <span>📅 {ev.fecha}</span>
-                      {ev.hora_inicio && <span>🕐 {ev.hora_inicio}{ev.hora_fin ? ` – ${ev.hora_fin}` : ''}</span>}
-                      {ev.lugar && <span>📍 {ev.lugar}</span>}
-                      {asistCount > 0 && <span>👥 {asistCount} unidades registradas</span>}
-                    </div>
+              <div key={ev.id}
+                style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px', paddingRight: '10px' }}>
+                <button type="button" className="cond-row-main" onClick={() => abrirDetalle(ev.id)}
+                  style={{ flex: '1 1 240px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: '12px 4px 12px 14px', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: '13px' }}>{ev.titulo}</span>
+                    <span style={pill(ts.bg, ts.color)}>{ts.label}</span>
+                    <span style={pill(es.bg, es.color)}>{es.label}</span>
                   </div>
-                  {canEdit && (
-                    <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                      {ev.estado === 'programado' && (
-                        <button onClick={() => cambiarEstado(ev.id, 'en_curso')}
-                          style={{ padding: '3px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
-                          Iniciar
-                        </button>
-                      )}
-                      {ev.estado === 'en_curso' && (
-                        <button onClick={() => cambiarEstado(ev.id, 'realizado')}
-                          style={{ padding: '3px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
-                          Finalizar
-                        </button>
-                      )}
-                      <button onClick={() => startEdit(ev)}
-                        style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(ev.id)}
-                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                    </div>
-                  )}
-                </div>
+                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <span>📅 {ev.fecha}</span>
+                    {ev.hora_inicio && <span>🕐 {ev.hora_inicio}{ev.hora_fin ? ` – ${ev.hora_fin}` : ''}</span>}
+                    {ev.lugar && <span>📍 {ev.lugar}</span>}
+                    {asistCount > 0 && <span>👥 {asistCount} unidades registradas</span>}
+                  </div>
+                </button>
+                {canEdit && (
+                  <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
+                    {ev.estado === 'programado' && (
+                      <button onClick={() => cambiarEstado(ev.id, 'en_curso')}
+                        style={{ padding: '3px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                        Iniciar
+                      </button>
+                    )}
+                    {ev.estado === 'en_curso' && (
+                      <button onClick={() => cambiarEstado(ev.id, 'realizado')}
+                        style={{ padding: '3px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                        Finalizar
+                      </button>
+                    )}
+                    <button onClick={() => startEdit(ev)} aria-label={`Editar ${ev.titulo}`}
+                      style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => handleDelete(ev.id)} aria-label={`Eliminar ${ev.titulo}`}
+                      style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
+      )}
 
-        {/* Asistentes panel */}
-        {selected && (
-          <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>Asistentes — {selected.titulo}</h3>
-              {canCreate && !showAsistenteForm && (
-                <button onClick={() => setShowAsistenteForm(true)}
-                  style={{ padding: '4px 10px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
-                  + Agregar
-                </button>
-              )}
+      {/* Asistentes en ventana: a pantalla completa en el teléfono. */}
+      {selected && (() => {
+        const ts = TIPO_STYLE[selected.tipo] ?? TIPO_STYLE.otro
+        const es = ESTADO_STYLE[selected.estado] ?? ESTADO_STYLE.programado
+        return (
+          <EditModal
+            title={selected.titulo}
+            subtitle={<span style={{ display: 'inline-flex', gap: '4px 10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={pill(ts.bg, ts.color)}>{ts.label}</span>
+              <span style={pill(es.bg, es.color)}>{es.label}</span>
+              <span>📅 {selected.fecha}</span>
+              {selected.hora_inicio && <span>🕐 {selected.hora_inicio}{selected.hora_fin ? ` – ${selected.hora_fin}` : ''}</span>}
+              {selected.lugar && <span>📍 {selected.lugar}</span>}
+            </span>}
+            maxWidth="600px"
+            fullScreenOnMobile
+            onClose={cerrarDetalle}
+            footer={showAsistenteForm ? <>
+              <Button variant="secondary" onClick={cancelarAsistente}>Cancelar</Button>
+              <Button onClick={handleSaveAsistente}>Guardar asistente</Button>
+            </> : canCreate ? (
+              <Button onClick={() => setShowAsistenteForm(true)}>+ Agregar asistente</Button>
+            ) : undefined}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+              Asistentes ({selectedAsistentes.length})
             </div>
             {showAsistenteForm && (
-              <div style={{ background: 'var(--at-surface)', borderRadius: '8px', padding: '10px', marginBottom: '10px', border: '1px solid var(--at-line)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px', marginBottom: '10px', border: '1px solid var(--at-line)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px' }}>
                   <div>
-                    <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '2px' }}>Unidad</label>
-                    <select style={{ ...inputStyle, fontSize: '12px' }} value={formAsistente.unidad_id} onChange={e => setFA('unidad_id', e.target.value)}>
+                    <label htmlFor="evc-asis-unidad" style={labelStyle}>Unidad</label>
+                    <select id="evc-asis-unidad" style={inputStyle} value={formAsistente.unidad_id} onChange={e => setFA('unidad_id', e.target.value)} autoFocus>
                       <option value="">— Seleccionar —</option>
                       {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '2px' }}>Nombre contacto</label>
-                    <input style={{ ...inputStyle, fontSize: '12px' }} value={formAsistente.nombre} onChange={e => setFA('nombre', e.target.value)} placeholder="Nombre del residente" />
+                    <label htmlFor="evc-asis-nombre" style={labelStyle}>Nombre contacto</label>
+                    <input id="evc-asis-nombre" style={inputStyle} value={formAsistente.nombre} onChange={e => setFA('nombre', e.target.value)} placeholder="Nombre del residente" />
                   </div>
                   <div>
-                    <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '2px' }}>Nº personas</label>
-                    <input style={{ ...inputStyle, fontSize: '12px' }} type="number" min="1" value={formAsistente.num_personas} onChange={e => setFA('num_personas', e.target.value)} />
+                    <label htmlFor="evc-asis-personas" style={labelStyle}>Nº personas</label>
+                    <input id="evc-asis-personas" style={inputStyle} type="number" min="1" value={formAsistente.num_personas} onChange={e => setFA('num_personas', e.target.value)} />
                   </div>
-                </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button onClick={handleSaveAsistente} style={{ padding: '5px 12px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Guardar</button>
-                  <button onClick={() => { setShowAsistenteForm(false); setFormAsistente({ ...BLANK_ASISTENTE }) }} style={{ padding: '5px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
                 </div>
               </div>
             )}
@@ -309,15 +355,15 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
                 {selectedAsistentes.map(a => {
                   const unidad = unidades.find(u => u.id === a.unidad_id)
                   return (
-                    <div key={a.id} style={{ background: 'var(--at-surface)', borderRadius: '8px', padding: '8px 10px', border: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={a.id} style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '8px 10px', border: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: '12px' }}>{a.nombre} <span style={{ color: 'var(--at-ink-3)', fontWeight: 400 }}>({a.num_personas} persona{a.num_personas !== 1 ? 's' : ''})</span></div>
-                        {unidad && <div style={{ fontSize: '11px', color: 'var(--at-primary)' }}>🏠 {unidad.nombre}</div>}
+                        <div style={{ fontWeight: 600, fontSize: '13px' }}>{a.nombre} <span style={{ color: 'var(--at-ink-3)', fontWeight: 400 }}>({a.num_personas} persona{a.num_personas !== 1 ? 's' : ''})</span></div>
+                        {unidad && <div style={{ fontSize: '12px', color: 'var(--at-primary)' }}>🏠 {unidad.nombre}</div>}
                       </div>
                       {canEdit && (
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <button onClick={() => marcarAsistio(a.id, !a.asistio)}
-                            style={{ padding: '3px 7px', background: a.asistio ? 'var(--at-success-tint)' : 'var(--at-chip)', color: a.asistio ? 'var(--at-success)' : 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                            style={{ padding: '4px 8px', background: a.asistio ? 'var(--at-success-tint)' : 'var(--at-chip)', color: a.asistio ? 'var(--at-success)' : 'var(--at-ink-3)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
                             {a.asistio ? '✓ Asistió' : 'Sin confirmar'}
                           </button>
                         </div>
@@ -327,9 +373,9 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
                 })}
               </div>
             )}
-          </div>
-        )}
-      </div>
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }

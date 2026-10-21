@@ -1,6 +1,8 @@
 import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { BitacoraManto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -38,7 +40,10 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
   const [form, setForm] = useState({ ...BLANK })
   const [tareas, setTareas] = useState<TareaItem[]>([])
   const [saving, setSaving] = useState(false)
-  const [selected, setSelected] = useState<BitacoraManto | null>(null)
+  // Por id y no la fila: con la copia, marcar una tarea no se veía hasta
+  // reabrir y la segunda marca se calculaba sobre la lista vieja, deshaciendo
+  // la primera. Derivado de `registros`, cada cambio parte del dato refrescado.
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filtroTurno, setFiltroTurno] = useState<'todos' | 'mañana' | 'tarde' | 'noche'>('todos')
   const [filtroFecha, setFiltroFecha] = useState('')
 
@@ -52,7 +57,12 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
     setForm({ fecha: r.fecha, turno: r.turno, responsable: r.responsable, area: r.area ?? '', observaciones: r.observaciones ?? '' })
     setTareas((r.tareas ?? []) as TareaItem[])
     setShowForm(true)
-    setSelected(null)
+    setSelectedId(null)
+  }
+
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false); setEditId(null); setTareas([])
   }
 
   async function handleSave() {
@@ -78,7 +88,7 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
     const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('bitacora_manto', id)
-    if (selected?.id === id) setSelected(null)
+    if (selectedId === id) setSelectedId(null)
     onRefresh()
   }
 
@@ -123,8 +133,11 @@ ${r.observaciones ? raw(printHtml`<p><strong>Observaciones generales:</strong> $
   let filtered = registros
   if (filtroTurno !== 'todos') filtered = filtered.filter(r => r.turno === filtroTurno)
   if (filtroFecha) filtered = filtered.filter(r => r.fecha === filtroFecha)
+  // De `registros` y no de `filtered`: cambiar el filtro no cierra la ventana.
+  const selected = selectedId ? registros.find(r => r.id === selectedId) ?? null : null
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -133,7 +146,9 @@ ${r.observaciones ? raw(printHtml`<p><strong>Observaciones generales:</strong> $
           <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Bitácora de Mantenimiento</h2>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>{registros.length} registro(s) · {registros.filter(r => r.firmado).length} firmado(s)</p>
         </div>
-        {canCreate && !showForm && (
+        {/* Sin `!showForm`: el botón sigue montado detrás de la ventana y
+            recupera el foco al cerrarla. */}
+        {canCreate && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setTareas([]); setShowForm(true) }}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Registro
@@ -141,47 +156,60 @@ ${r.observaciones ? raw(printHtml`<p><strong>Observaciones generales:</strong> $
         )}
       </div>
 
-      {/* Form */}
+      {/* Form en ventana (antes se desplegaba arriba de la lista y en el
+          teléfono la empujaba fuera de la pantalla). */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar registro' : 'Nuevo Registro de Mantenimiento'}</h3>
+        <EditModal
+          title={editId ? 'Editar registro' : 'Nuevo registro de mantenimiento'}
+          maxWidth="720px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} loadingText="Guardando…">Guardar</Button>
+          </>}
+        >
+          {/* `1 / -1` y no `span 2`: con una sola columna (teléfono) el span
+              creaba una columna implícita y el campo se salía de la ventana. */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha</label>
-              <input style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
+              <label htmlFor="bit-fecha" style={labelStyle}>Fecha</label>
+              <input id="bit-fecha" style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Turno</label>
-              <select style={inputStyle} value={form.turno} onChange={e => setF('turno', e.target.value)}>
+              <label htmlFor="bit-turno" style={labelStyle}>Turno</label>
+              <select id="bit-turno" style={inputStyle} value={form.turno} onChange={e => setF('turno', e.target.value)}>
                 {Object.entries(TURNO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.icon} {s.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Responsable *</label>
-              <input style={inputStyle} value={form.responsable} onChange={e => setF('responsable', e.target.value)} placeholder="Nombre del técnico" autoFocus />
+              <label htmlFor="bit-responsable" style={labelStyle}>Responsable *</label>
+              <input id="bit-responsable" style={inputStyle} value={form.responsable} onChange={e => setF('responsable', e.target.value)} placeholder="Nombre del técnico" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Área</label>
-              <input style={inputStyle} value={form.area} onChange={e => setF('area', e.target.value)} placeholder="Zona, edificio…" />
+              <label htmlFor="bit-area" style={labelStyle}>Área</label>
+              <input id="bit-area" style={inputStyle} value={form.area} onChange={e => setF('area', e.target.value)} placeholder="Zona, edificio…" />
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Observaciones generales</label>
-              <textarea style={{ ...inputStyle, minHeight: '50px', resize: 'vertical', fontFamily: 'inherit' }}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="bit-observaciones" style={labelStyle}>Observaciones generales</label>
+              <textarea id="bit-observaciones" style={{ ...inputStyle, minHeight: '50px', resize: 'vertical', fontFamily: 'inherit' }}
                 value={form.observaciones} onChange={e => setF('observaciones', e.target.value)} placeholder="Novedades, incidencias…" />
             </div>
           </div>
 
           {/* Tareas */}
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)' }}>Lista de tareas</label>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <select style={{ padding: '3px 6px', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', background: 'var(--at-surface-2)' }}
+          <div role="group" aria-labelledby="bit-tareas-titulo">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+              <span id="bit-tareas-titulo" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)' }}>Lista de tareas</span>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <select aria-label="Agregar tarea predefinida" style={{ padding: '3px 6px', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', background: 'var(--at-surface-2)', color: 'var(--at-ink)', fontFamily: 'inherit', maxWidth: '100%' }}
                   onChange={e => { if (e.target.value) { addTarea(e.target.value); e.target.value = '' } }}>
                   <option value="">+ Tarea predefinida</option>
                   {TAREAS_PREDEFINIDAS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <button onClick={() => addTarea()}
+                <button type="button" onClick={() => addTarea()}
                   style={{ padding: '3px 9px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
                   + Personalizada
                 </button>
@@ -190,27 +218,20 @@ ${r.observaciones ? raw(printHtml`<p><strong>Observaciones generales:</strong> $
             {tareas.length === 0 ? (
               <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', padding: '8px', textAlign: 'center' }}>Sin tareas. Use los botones para agregar.</div>
             ) : tareas.map((t, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: 'auto 2fr 1.5fr auto', gap: '6px', marginBottom: '5px', alignItems: 'center' }}>
-                <input type="checkbox" checked={t.completado} onChange={e => setTarea(i, 'completado', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                <input style={{ ...inputStyle, fontSize: '12px', textDecoration: t.completado ? 'line-through' : 'none', color: t.completado ? 'var(--at-ink-3)' : 'var(--at-ink)' }}
-                  value={t.tarea} onChange={e => setTarea(i, 'tarea', e.target.value)} placeholder="Descripción de la tarea" />
-                <input style={{ ...inputStyle, fontSize: '12px' }} value={t.observaciones} onChange={e => setTarea(i, 'observaciones', e.target.value)} placeholder="Notas…" />
-                <button onClick={() => removeTarea(i)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>✕</button>
+              // Casilla y ✕ a los lados; los dos campos se apilan en el teléfono
+              // en vez de quedar en dos columnas de 80px.
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: '6px', marginBottom: '5px', alignItems: 'center' }}>
+                <input type="checkbox" aria-label={`Completada: ${t.tarea || `tarea ${i + 1}`}`} checked={t.completado} onChange={e => setTarea(i, 'completado', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  <input aria-label={`Tarea ${i + 1}`} style={{ ...inputStyle, fontSize: '12px', flex: '2 1 180px', width: 'auto', minWidth: 0, textDecoration: t.completado ? 'line-through' : 'none', color: t.completado ? 'var(--at-ink-3)' : 'var(--at-ink)' }}
+                    value={t.tarea} onChange={e => setTarea(i, 'tarea', e.target.value)} placeholder="Descripción de la tarea" />
+                  <input aria-label={`Notas de la tarea ${i + 1}`} style={{ ...inputStyle, fontSize: '12px', flex: '1 1 130px', width: 'auto', minWidth: 0 }} value={t.observaciones} onChange={e => setTarea(i, 'observaciones', e.target.value)} placeholder="Notas…" />
+                </div>
+                <button type="button" onClick={() => removeTarea(i)} aria-label={`Quitar tarea ${i + 1}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>✕</button>
               </div>
             ))}
           </div>
-
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button onClick={() => { setShowForm(false); setEditId(null); setTareas([]) }}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Filters */}
@@ -230,110 +251,117 @@ ${r.observaciones ? raw(printHtml`<p><strong>Observaciones generales:</strong> $
         {filtroFecha && <button onClick={() => setFiltroFecha('')} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>✕ Limpiar fecha</button>}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1fr' : '1fr', gap: '16px' }}>
-        {/* List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filtered.length === 0 ? (
-            <EmptyState icon="📋" title="No hay registros de mantenimiento" />
-          ) : filtered.map(r => {
-            const ts = TURNO_STYLE[r.turno] ?? TURNO_STYLE['mañana']
-            const tareasList = (r.tareas ?? []) as TareaItem[]
-            const completadas = tareasList.filter(t => t.completado).length
-            return (
-              <div key={r.id} onClick={() => setSelected(selected?.id === r.id ? null : r)}
-                style={{ background: 'var(--at-surface)', border: `1.5px solid ${selected?.id === r.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px' }}>
-                      <span style={{ fontSize: '14px' }}>{ts.icon}</span>
-                      <span style={{ fontWeight: 700, fontSize: '13px' }}>{r.fecha}</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: ts.bg, color: ts.color }}>{ts.label}</span>
-                      {r.firmado && <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px', background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>✓ Firmado</span>}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      <span>👤 {r.responsable}</span>
-                      {r.area && <span>📍 {r.area}</span>}
-                      {tareasList.length > 0 && (
-                        <span style={{ color: completadas === tareasList.length ? 'var(--at-success)' : 'var(--at-warning)', fontWeight: 600 }}>
-                          ✓ {completadas}/{tareasList.length} tareas
-                        </span>
-                      )}
-                    </div>
-                    {tareasList.length > 0 && (
-                      <div style={{ height: '4px', background: 'var(--at-line)', borderRadius: '2px', marginTop: '5px', overflow: 'hidden', maxWidth: '200px' }}>
-                        <div style={{ height: '100%', width: `${completadas / tareasList.length * 100}%`, background: completadas === tareasList.length ? 'var(--at-success)' : 'var(--at-primary)', borderRadius: '2px' }} />
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => handlePrint(r)}
-                      style={{ padding: '3px 7px', background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
-                    {canEdit && <>
-                      <button onClick={() => startEdit(r)}
-                        style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(r.id)}
-                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                    </>}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Detail */}
-        {selected && (() => {
-          const ts = TURNO_STYLE[selected.turno] ?? TURNO_STYLE['mañana']
-          const tareasList = (selected.tareas ?? []) as TareaItem[]
+      {/* Lista a todo el ancho — cada registro se abre en ventana. Antes el
+          detalle ocupaba media pantalla a la derecha y en el teléfono partía
+          la lista. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {filtered.length === 0 ? (
+          <EmptyState icon="📋" title="No hay registros de mantenimiento" />
+        ) : filtered.map(r => {
+          const ts = TURNO_STYLE[r.turno] ?? TURNO_STYLE['mañana']
+          const tareasList = (r.tareas ?? []) as TareaItem[]
+          const completadas = tareasList.filter(t => t.completado).length
           return (
-            <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>{ts.icon} {selected.fecha} — {ts.label}</h3>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {canEdit && (
-                    <button onClick={() => toggleFirmado(selected)}
-                      style={{ padding: '4px 9px', background: selected.firmado ? 'var(--at-success-tint)' : 'var(--at-surface)', border: `1px solid ${selected.firmado ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600, color: selected.firmado ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
-                      {selected.firmado ? '✓ Firmado' : 'Firmar'}
-                    </button>
+            <div key={r.id}
+              style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px', paddingRight: '10px' }}>
+              <button type="button" className="cond-row-main" onClick={() => setSelectedId(r.id)}
+                style={{ flex: '1 1 240px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: '12px 4px 12px 14px', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '14px' }}>{ts.icon}</span>
+                  <span style={{ fontWeight: 700, fontSize: '13px' }}>{r.fecha}</span>
+                  <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: ts.bg, color: ts.color }}>{ts.label}</span>
+                  {r.firmado && <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px', background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>✓ Firmado</span>}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '4px 10px', flexWrap: 'wrap' }}>
+                  <span>👤 {r.responsable}</span>
+                  {r.area && <span>📍 {r.area}</span>}
+                  {tareasList.length > 0 && (
+                    <span style={{ color: completadas === tareasList.length ? 'var(--at-success)' : 'var(--at-warning)', fontWeight: 600 }}>
+                      ✓ {completadas}/{tareasList.length} tareas
+                    </span>
                   )}
-                  <button onClick={() => handlePrint(selected)}
-                    style={{ padding: '4px 9px', background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
-                    🖨️ Imprimir
-                  </button>
                 </div>
+                {tareasList.length > 0 && (
+                  <div style={{ height: '4px', background: 'var(--at-line)', borderRadius: '2px', marginTop: '5px', overflow: 'hidden', maxWidth: '200px' }}>
+                    <div style={{ height: '100%', width: `${completadas / tareasList.length * 100}%`, background: completadas === tareasList.length ? 'var(--at-success)' : 'var(--at-primary)', borderRadius: '2px' }} />
+                  </div>
+                )}
+              </button>
+              <div style={{ display: 'flex', gap: '3px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
+                <button onClick={() => handlePrint(r)} aria-label={`Imprimir registro del ${r.fecha}`}
+                  style={{ padding: '3px 7px', background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
+                {canEdit && <>
+                  <button onClick={() => startEdit(r)} aria-label={`Editar registro del ${r.fecha}`}
+                    style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                  <button onClick={() => handleDelete(r.id)} aria-label={`Eliminar registro del ${r.fecha}`}
+                    style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                </>}
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginBottom: '10px' }}>
-                <span style={{ fontWeight: 600 }}>Responsable:</span> {selected.responsable}
-                {selected.area && <><span style={{ margin: '0 8px', color: 'var(--at-line)' }}>|</span><span style={{ fontWeight: 600 }}>Área:</span> {selected.area}</>}
-              </div>
-              {selected.observaciones && (
-                <div style={{ background: 'var(--at-surface)', borderRadius: '8px', padding: '8px', border: '1px solid var(--at-line)', marginBottom: '10px', fontSize: '12px', color: 'var(--at-ink-2)', fontStyle: 'italic' }}>
-                  {selected.observaciones}
-                </div>
-              )}
-              {tareasList.length === 0 ? (
-                <EmptyState icon="📋" title="Sin tareas registradas" />
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {tareasList.map((t, i) => (
-                    <div key={i} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '7px 10px', border: '1px solid var(--at-line)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {canEdit ? (
-                        <input type="checkbox" checked={t.completado} onChange={() => toggleTareaCompletada(selected, i)} style={{ width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }} />
-                      ) : (
-                        <span style={{ fontSize: '14px', color: t.completado ? 'var(--at-success)' : 'var(--at-line)' }}>{t.completado ? '✓' : '○'}</span>
-                      )}
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: t.completado ? 'var(--at-ink-3)' : 'var(--at-ink-2)', textDecoration: t.completado ? 'line-through' : 'none' }}>{t.tarea}</div>
-                        {t.observaciones && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{t.observaciones}</div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )
-        })()}
+        })}
       </div>
+
+      {/* Detalle en ventana: a pantalla completa en el teléfono. */}
+      {selected && (() => {
+        const ts = TURNO_STYLE[selected.turno] ?? TURNO_STYLE['mañana']
+        const tareasList = (selected.tareas ?? []) as TareaItem[]
+        const completadas = tareasList.filter(t => t.completado).length
+        return (
+          <EditModal
+            title={`${ts.icon} ${selected.fecha} — ${ts.label}`}
+            subtitle={<span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>✓ {completadas}/{tareasList.length} tareas</span>
+              {selected.firmado && <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px', background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>✓ Firmado</span>}
+            </span>}
+            maxWidth="680px"
+            fullScreenOnMobile
+            onClose={() => setSelectedId(null)}
+            // Firmar e Imprimir venían en la cabecera del panel; editar y
+            // eliminar repiten los de la fila, que queda detrás de la ventana.
+            // Envueltos para que bajen de línea en el teléfono.
+            footer={<div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+              {canEdit && <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar registro">🗑️</Button>}
+              {canEdit && <Button variant="secondary" onClick={() => startEdit(selected)}>✏️ Editar</Button>}
+              {canEdit && (
+                <Button variant={selected.firmado ? 'success' : 'secondary'} onClick={() => toggleFirmado(selected)}>
+                  {selected.firmado ? '✓ Firmado' : 'Firmar'}
+                </Button>
+              )}
+              <Button variant="secondary" onClick={() => handlePrint(selected)}>🖨️ Imprimir</Button>
+            </div>}
+          >
+            <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginBottom: '10px' }}>
+              <span style={{ fontWeight: 600 }}>Responsable:</span> {selected.responsable}
+              {selected.area && <><span style={{ margin: '0 8px', color: 'var(--at-line)' }}>|</span><span style={{ fontWeight: 600 }}>Área:</span> {selected.area}</>}
+            </div>
+            {selected.observaciones && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '8px', border: '1px solid var(--at-line)', marginBottom: '10px', fontSize: '12px', color: 'var(--at-ink-2)', fontStyle: 'italic', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                {selected.observaciones}
+              </div>
+            )}
+            {tareasList.length === 0 ? (
+              <EmptyState icon="📋" title="Sin tareas registradas" />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                {tareasList.map((t, i) => (
+                  <div key={i} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '7px 10px', border: '1px solid var(--at-line)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {canEdit ? (
+                      <input type="checkbox" aria-label={`Completada: ${t.tarea}`} checked={t.completado} onChange={() => toggleTareaCompletada(selected, i)} style={{ width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }} />
+                    ) : (
+                      <span style={{ fontSize: '14px', color: t.completado ? 'var(--at-success)' : 'var(--at-line)' }}>{t.completado ? '✓' : '○'}</span>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: t.completado ? 'var(--at-ink-3)' : 'var(--at-ink-2)', textDecoration: t.completado ? 'line-through' : 'none' }}>{t.tarea}</div>
+                      {t.observaciones && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{t.observaciones}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }

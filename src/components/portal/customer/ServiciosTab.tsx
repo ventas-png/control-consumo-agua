@@ -1,14 +1,16 @@
-// Vista extraída de CustomerPortal (refactor P1 #3): JSX idéntico al original.
+// Vista extraída de CustomerPortal (refactor P1 #3).
 import type { PortalCtx } from './ctx'
-import { EmptyState } from '../../shared/EmptyState'
-import { Icon } from '../../shared/Icon'
 import { parseFecha } from '../../../lib/format'
 import { TIPO_AGUA_LABELS } from '../../../lib/portalDashboard'
-import { ESTADO_COLORS } from './ui'
 import { tint } from '../../shared/statusTone'
+import { ContadorDetalleModal } from './ContadorDetalleModal'
 
 export function ServiciosTab({ ctx }: { ctx: PortalCtx }) {
   const { companies, companyActivoMap, projects, unidades, contadores, lecturas, expandedContador, setExpandedContador } = ctx
+  // `expandedContador` ya no despliega la tarjeta: es el contador cuya ventana está abierta.
+  const abierto = expandedContador ? contadores.find(c => c.id === expandedContador) ?? null : null
+  const unidadAbierta = abierto ? unidades.find(u => u.id === abierto.unidad_id) : undefined
+  const proyectoAbierto = abierto ? projects.find(p => p.id === (unidadAbierta?.project_id ?? abierto.project_id)) : undefined
   return (
           <div>
             {/* Summary cards */}
@@ -113,132 +115,59 @@ export function ServiciosTab({ ctx }: { ctx: PortalCtx }) {
                     </h2>
                   </div>
 
-                  {/* Contadores for this company */}
+                  {/* Contadores: cada tarjeta abre su historial en ventana emergente
+                      (ContadorDetalleModal); antes se desplegaba una tabla ancha. */}
                   {companyContadores.map(contador => {
                     const unidad = unidades.find(u => u.id === contador.unidad_id)
                     const project = companyProjects.find(p => p.id === (unidad?.project_id ?? contador.project_id))
-                    const moneda = project?.moneda ?? 'Q'
-                    const contLecturas = lecturas
-                      .filter(l => l.contador_id === contador.id)
-                      .slice(0, 12)
-                    const isExpanded = expandedContador === contador.id
-
+                    const ultima = lecturas.find(l => l.contador_id === contador.id)
                     return (
-                      <div
+                      <button
                         key={contador.id}
-                        className="portal-card"
+                        type="button"
+                        className="portal-card contador-row"
+                        onClick={() => setExpandedContador(contador.id)}
                         style={{
-                          background: 'var(--at-surface)', borderRadius: '14px',
-                          marginBottom: '12px',
+                          width: '100%', textAlign: 'left', cursor: 'pointer', color: 'var(--at-ink)',
+                          background: 'var(--at-surface)', borderRadius: '14px', border: 'none',
+                          marginBottom: '12px', padding: '16px 18px',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                          overflow: 'hidden',
+                          display: 'flex', alignItems: 'center', gap: '12px',
                           transition: 'all 0.2s',
                         }}
                       >
-                        {/* Meter header row */}
-                        <div
-                          className="contador-row"
-                          onClick={() => setExpandedContador(isExpanded ? null : contador.id)}
-                          style={{
-                            padding: '16px 20px',
-                            display: 'flex', alignItems: 'center',
-                            justifyContent: 'space-between', gap: '12px',
-                            transition: 'background 0.15s',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                            <div style={{
-                              width: '36px', height: '36px', borderRadius: '9px', flexShrink: 0,
-                              background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: '16px', color: 'white',
-                            }}>💧</div>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontWeight: 600, color: 'var(--at-ink)', fontSize: '14.5px' }}>
-                                Contador #{contador.numero_serie}
-                              </div>
-                              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
-                                {TIPO_AGUA_LABELS[contador.tipo_agua] ?? contador.tipo_agua}
-                                {unidad && ` · ${unidad.nombre}`}
-                                {project && ` · ${project.nombre}`}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                            <span style={{
-                              padding: '3px 10px', borderRadius: '20px',
-                              background: 'var(--at-success-tint)', color: 'var(--at-success-strong)',
-                              fontSize: '11px', fontWeight: 600,
-                            }}>Activo</span>
-                            <span style={{ color: 'var(--at-ink-3)', fontSize: '16px', transition: 'transform 0.2s', display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
-                          </div>
-                        </div>
-
-                        {/* Reading history */}
-                        {isExpanded && (
-                          <div style={{ borderTop: '1px solid var(--at-chip)' }}>
-                            {contLecturas.length === 0 ? (
-                              <EmptyState
-                                compact
-                                audience="resident"
-                                icon={<Icon name="gauge" size={24} />}
-                                title="No hay lecturas registradas para este contador."
-                              />
-                            ) : (
-                              <div className="table-scroll-wrapper">
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                                  <thead>
-                                    <tr style={{ background: 'var(--at-surface-2)' }}>
-                                      {['Fecha', 'Período', 'Lect. anterior', 'Lect. actual', 'Consumo (m³)', `Monto (${moneda})`, 'Estado'].map(h => (
-                                        <th scope="col" key={h} style={{
-                                          padding: '10px 14px', textAlign: 'left',
-                                          fontSize: '11.5px', fontWeight: 600,
-                                          color: 'var(--at-ink-3)', whiteSpace: 'nowrap',
-                                          borderBottom: '1px solid var(--at-line)',
-                                        }}>{h}</th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {contLecturas.map(lectura => {
-                                      const est = ESTADO_COLORS[lectura.estado] ?? ESTADO_COLORS.pendiente
-                                      return (
-                                        <tr key={lectura.id} className="lectura-row">
-                                          <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)', whiteSpace: 'nowrap' }}>
-                                            {parseFecha(lectura.fecha).toLocaleDateString('es-GT')}
-                                          </td>
-                                          <td style={{ padding: '10px 14px', color: 'var(--at-ink-3)' }}>
-                                            {lectura.dias_servicio != null ? `${lectura.dias_servicio} días` : lectura.mes ? `Mes ${lectura.mes}` : '—'}
-                                          </td>
-                                          <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)', textAlign: 'right' }}>
-                                            {lectura.lectura_anterior.toFixed(2)}
-                                          </td>
-                                          <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)', textAlign: 'right' }}>
-                                            {lectura.lectura_actual.toFixed(2)}
-                                          </td>
-                                          <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--at-primary)', textAlign: 'right' }}>
-                                            {lectura.consumo.toFixed(2)}
-                                          </td>
-                                          <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--at-ink)', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                            {moneda} {lectura.monto_calculado.toFixed(2)}
-                                          </td>
-                                          <td style={{ padding: '10px 14px' }}>
-                                            <span style={{
-                                              padding: '3px 9px', borderRadius: '20px',
-                                              background: est.bg, color: est.color,
-                                              fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap',
-                                            }}>{est.label}</span>
-                                          </td>
-                                        </tr>
-                                      )
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                        <span aria-hidden="true" style={{
+                          width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0,
+                          background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '18px', color: 'white',
+                        }}>💧</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', fontWeight: 700, fontSize: '14.5px' }}>
+                            Contador #{contador.numero_serie}
+                          </span>
+                          <span style={{ display: 'block', fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
+                            {TIPO_AGUA_LABELS[contador.tipo_agua] ?? contador.tipo_agua}
+                            {unidad && ` · ${unidad.nombre}`}
+                            {project && ` · ${project.nombre}`}
+                          </span>
+                          <span style={{ display: 'block', fontSize: '12.5px', color: 'var(--at-ink-2)', marginTop: '4px' }}>
+                            {ultima
+                              ? <>Última lectura: <strong style={{ color: 'var(--at-primary)' }}>{ultima.consumo.toFixed(2)} m³</strong> · {parseFecha(ultima.fecha).toLocaleDateString('es-GT', { day: 'numeric', month: 'short' })}</>
+                              : 'Sin lecturas todavía'}
+                          </span>
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: '20px',
+                            background: 'var(--at-success-tint)', color: 'var(--at-success-strong)',
+                            fontSize: '11px', fontWeight: 600,
+                          }}>Activo</span>
+                          <svg width="16" height="16" fill="none" stroke="var(--at-ink-3)" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </span>
+                      </button>
                     )
                   })}
 
@@ -278,6 +207,17 @@ export function ServiciosTab({ ctx }: { ctx: PortalCtx }) {
                 </div>
               )
             })}
+
+            {abierto && (
+              <ContadorDetalleModal
+                contador={abierto}
+                unidadNombre={unidadAbierta?.nombre}
+                proyectoNombre={proyectoAbierto?.nombre}
+                moneda={proyectoAbierto?.moneda ?? 'Q'}
+                lecturas={lecturas.filter(l => l.contador_id === abierto.id).slice(0, 12)}
+                onClose={() => setExpandedContador(null)}
+              />
+            )}
           </div>
   )
 }

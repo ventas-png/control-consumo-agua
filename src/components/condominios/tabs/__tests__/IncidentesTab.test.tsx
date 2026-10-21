@@ -1,92 +1,159 @@
-// Eliminar un incidente exige condominios.tab.incidentes.delete (canDelete).
-//
-// "🗑 Eliminar" del detalle se mostraba y borraba sin mirar ningún permiso,
-// así que un rol de solo consulta podía eliminar incidentes. Lo que se vigila:
-//
-//   1. Sin permiso de eliminar no hay botón, tampoco para quien sí puede editar.
-//   2. Con el permiso, el botón borra aunque no se pueda editar.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react'
 import type { IncidenteSeguridad } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
-  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
-  notify: vi.fn(),
-  confirm: vi.fn(async () => ({ isConfirmed: true })),
-  onRefresh: vi.fn(),
-}))
-
-vi.mock('../../../../lib/supabase', () => ({
-  supabase: { from: () => ({}) },
-  db: { from: () => ({}) },
-}))
-vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
+  confirm: vi.fn(async () => ({ isConfirmed: true })),
+  notify: vi.fn(),
+}))
+
+vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
+vi.mock('../../../../domain/condominios/tabMutations', () => ({
+  createCondominioRow: mocks.createCondominioRow,
+  updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
 }))
-vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: mocks.confirm }))
-vi.mock('../exportUtils', () => ({ exportarPDFTabla: vi.fn(), exportarExcel: vi.fn() }))
+vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
+// jsPDF / xlsx no hacen falta para estas pruebas.
+vi.mock('../../exportUtils', () => ({ exportarPDFTabla: vi.fn(), exportarExcel: vi.fn() }))
 
 const { IncidentesTab } = await import('../IncidentesTab')
 
 function incidente(over: Partial<IncidenteSeguridad> = {}): IncidenteSeguridad {
   return {
-    id: 'i1', company_id: 'co1', project_id: 'p1',
-    fecha: '2026-09-01', tipo: 'robo', descripcion: 'Bicicleta robada en parqueo',
-    estado: 'reportado', created_at: '2026-09-01T00:00:00.000Z',
+    id: 'i1', company_id: 'co1', project_id: 'p1', fecha: '2026-10-19', hora: '23:40',
+    tipo: 'vandalismo', descripcion: 'Grafiti en el muro del parqueo', area: 'Parqueo 3',
+    reportado_por: 'Guardia nocturno', estado: 'reportado', involucrados: 'Desconocidos',
+    seguimiento: 'Se revisan las cámaras.', created_at: '2026-10-20T00:00:00Z',
     ...over,
   }
 }
 
 function renderTab(props: Partial<Parameters<typeof IncidentesTab>[0]> = {}) {
   return render(
-    <IncidentesTab
-      incidentes={[incidente()]}
-      proyectoId="p1"
-      companyId="co1"
-      canCreate
-      canEdit
-      canDelete
-      onRefresh={mocks.onRefresh}
-      {...props}
-    />,
+    <IncidentesTab incidentes={[incidente()]} proyectoId="p1" companyId="co1"
+      canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
-function abrirDetalle() {
-  fireEvent.click(screen.getByText('Bicicleta robada en parqueo'))
-}
-
 beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
-afterEach(() => { cleanup() })
+afterEach(cleanup)
 
-describe('IncidentesTab — Eliminar exige el permiso de eliminar del tab', () => {
-  it.each([
-    ['solo consulta', { canCreate: false, canEdit: false, canDelete: false }],
-    ['editar sin eliminar', { canDelete: false }],
-  ])('%s: el detalle no ofrece Eliminar', (_caso, permisos) => {
-    renderTab(permisos)
-    abrirDetalle()
-    expect(screen.queryByText('🗑 Eliminar')).toBeNull()
+describe('IncidentesTab — ventanas', () => {
+  it('la lista ocupa la página y cada incidente se abre en ventana; Escape la cierra', () => {
+    renderTab()
+    expect(screen.queryByText(/Selecciona un incidente/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro del parqueo/ }))
+
+    const dialog = screen.getByRole('dialog', { name: '🔨 Grafiti en el muro del parqueo' })
+    expect(dialog.classList.contains('at-modal--fs-mobile')).toBe(true)
+    expect(within(dialog).getByText('Guardia nocturno')).toBeTruthy()
+    expect(within(dialog).getByText('Se revisan las cámaras.')).toBeTruthy()
+    expect(within(dialog).getByText(/a las 23:40 · Parqueo 3/)).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('con permiso de eliminar (aunque no edite) el botón borra el incidente', async () => {
-    renderTab({ canEdit: false })
-    abrirDetalle()
-    fireEvent.click(screen.getByText('🗑 Eliminar'))
+  it('avanzar de estado desde la ventana, y la ventana muestra la fila refrescada', async () => {
+    const onRefresh = vi.fn()
+    const { rerender } = renderTab({ onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '→ Iniciar Investigación' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', 'i1', { estado: 'investigando' }))
+    expect(onRefresh).toHaveBeenCalled()
 
+    // Llega la lista refrescada: la ventana lee la fila vigente, no una copia.
+    rerender(<IncidentesTab incidentes={[incidente({ estado: 'investigando' })]} proyectoId="p1" companyId="co1"
+      canCreate canEdit canDelete onRefresh={onRefresh} />)
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: '→ Marcar Resuelto' })).toBeTruthy()
+    expect(within(dialog).getByText('Investigando')).toBeTruthy()
+  })
+
+  it('registrar un incidente se hace en ventana y guardar llama a la mutación', async () => {
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: '🚨 Registrar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Registrar incidente' })
+    expect(dialog.classList.contains('at-modal--fs-mobile')).toBe(true)
+
+    fireEvent.change(within(dialog).getByLabelText('Descripción *'), { target: { value: 'Puerta forzada en bodega' } })
+    fireEvent.change(within(dialog).getByLabelText('Área'), { target: { value: 'Bodega' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', expect.objectContaining({
+      descripcion: 'Puerta forzada en bodega', area: 'Bodega', company_id: 'co1', project_id: 'p1',
+    })))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(onRefresh).toHaveBeenCalled()
+  })
+
+  it('editar desde el detalle abre el formulario con los datos y, al cerrarlo, vuelve el detalle', async () => {
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '✏️ Editar' }))
+
+    const form = screen.getByRole('dialog', { name: 'Editar incidente' })
+    expect((within(form).getByLabelText('Área') as HTMLInputElement).value).toBe('Parqueo 3')
+    fireEvent.change(within(form).getByLabelText('Seguimiento'), { target: { value: 'Denuncia presentada.' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', 'i1', expect.objectContaining({
+      seguimiento: 'Denuncia presentada.',
+    })))
+    await waitFor(() => expect(screen.getByRole('dialog', { name: /Grafiti en el muro/ })).toBeTruthy())
+  })
+
+  it('sin permiso de edición no hay editar ni avance de estado; sin crear no hay registrar', () => {
+    renderTab({ canCreate: false, canEdit: false })
+    expect(screen.queryByRole('button', { name: '🚨 Registrar' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByRole('button', { name: /Editar/ })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: /Iniciar Investigación/ })).toBeNull()
+  })
+
+  it('los filtros siguen filtrando la lista', () => {
+    renderTab({ incidentes: [incidente(), incidente({ id: 'i2', descripcion: 'Caída en escaleras', tipo: 'accidente', area: 'Torre B' })] })
+    fireEvent.change(screen.getByLabelText('Buscar por área'), { target: { value: 'torre' } })
+    expect(screen.queryByRole('button', { name: /Grafiti/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Caída en escaleras/ })).toBeTruthy()
+  })
+
+  it('eliminar exige su propio permiso: editar no basta', async () => {
+    renderTab({ canDelete: false })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    let dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: /Editar/ })).toBeTruthy()
+    expect(within(dialog).queryByRole('button', { name: /Eliminar/ })).toBeNull()
+    cleanup()
+
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Eliminar/ }))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('incidentes_seguridad', 'i1'))
+  })
+
+  it('con permiso de eliminar, aunque no edite, borra el incidente', async () => {
+    renderTab({ canEdit: false })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
     await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('incidentes_seguridad', 'i1'))
   })
 
   it('si la base no borra (la RLS lo rechaza), avisa y no da el incidente por eliminado', async () => {
     mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
-    renderTab()
-    abrirDetalle()
-    fireEvent.click(screen.getByText('🗑 Eliminar'))
-
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
-    expect(mocks.onRefresh).not.toHaveBeenCalled()
-    expect(screen.getByText('🗑 Eliminar')).toBeTruthy()
+    expect(onRefresh).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 })

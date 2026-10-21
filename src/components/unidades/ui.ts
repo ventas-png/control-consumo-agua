@@ -68,6 +68,8 @@ export const inputStyle: CSSProperties = {
   border: '2px solid var(--at-line)',
   borderRadius: '8px',
   fontSize: '14px',
+  // Sin esto el <textarea> de Descripción mostraba letra monoespaciada.
+  fontFamily: 'inherit',
   width: '100%',
   boxSizing: 'border-box',
   outline: 'none',

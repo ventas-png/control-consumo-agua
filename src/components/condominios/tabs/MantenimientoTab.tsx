@@ -1,5 +1,5 @@
 import { hoyLocalISO } from '../../../lib/format'
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { softDelete } from '../../../lib/softDelete'
@@ -9,6 +9,9 @@ import { MultiImageUploader } from '../../shared/ImageUploader'
 import { ImageGallery } from '../../shared/ImageGallery'
 import { MultiFileUploader, ListaAdjuntos } from '../../shared/FileUploader'
 import { TicketChatModal } from './TicketChatModal'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
+import { EmptyState } from '../../shared/EmptyState'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -22,6 +25,8 @@ interface Props {
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.<tab>.delete): ver o
+   *  editar no basta. */
   canDelete: boolean
   onRefresh: () => void
 }
@@ -163,12 +168,24 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
     if (!canDelete) return
     const result = await confirm({ title: '¿Eliminar ticket?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
     const { error, count } = await softDelete('tickets_mantenimiento', { id })
     if (error || count === 0) { notify({ variant: 'error', title: 'Error', text: error?.message ?? new SinFilasAfectadasError().message }); return }
     onRefresh()
+  }
+
+  const fieldStyle: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', fontFamily: 'inherit', background: 'var(--at-surface-2)', color: 'var(--at-ink)' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }
+  // Filas de filtros: una sola línea que se desliza de lado en el teléfono en
+  // vez de partirse en tres renglones antes del primer ticket.
+  const filaFiltros: CSSProperties = { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px', scrollbarWidth: 'none' }
+
+  function cerrarForm() {
+    if (saving) return
+    resetForm()
   }
 
   return (
@@ -180,7 +197,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             {conteos.abierto} abiertos · {conteos.en_proceso} en proceso · <span style={{ color: 'var(--at-danger)', fontWeight: 600 }}>{conteos.urgentes} urgentes</span>
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={exportarPDF} disabled={filtrados.length === 0}
             style={{ padding: '9px 14px', background: filtrados.length === 0 ? 'var(--at-chip)' : 'var(--at-primary-tint)', color: filtrados.length === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
             📄 PDF
@@ -197,15 +214,16 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
         </div>
       </div>
 
-      {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
+      {/* KPIs — auto-fit: dos por fila en el teléfono (con 4 columnas fijas
+          cada tarjeta quedaba de 70px y el monto se partía). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {[
           { label: 'Total tickets', val: tickets.length, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', icon: '🔧' },
           { label: 'Urgentes activos', val: urgentesActivos, color: urgentesActivos > 0 ? 'var(--at-danger)' : 'var(--at-success)', bg: urgentesActivos > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', icon: '🚨' },
           { label: 'Costo estimado', val: costoEstimadoTotal > 0 ? costoEstimadoTotal.toFixed(2) : '—', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '💰' },
           { label: `% Resueltos`, val: `${pctResueltos}%`, color: pctResueltos >= 70 ? 'var(--at-success)' : 'var(--at-warning)', bg: pctResueltos >= 70 ? 'var(--at-success-tint)' : 'var(--at-warning-tint)', icon: '✅' },
         ].map(k => (
-          <div key={k.label} style={{ background: k.bg, borderRadius: '10px', padding: '12px 14px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: k.bg, borderRadius: '10px', padding: '12px 14px', textAlign: 'center', minWidth: 0 }}>
             <div style={{ fontSize: '20px', marginBottom: '3px' }}>{k.icon}</div>
             <div style={{ fontSize: '17px', fontWeight: 800, color: k.color }}>{k.val}</div>
             <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 600 }}>{k.label}</div>
@@ -225,51 +243,57 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
       )}
 
       {/* Filtros */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar ticket..."
-          style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-surface-2)' }} />
+      <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar ticket..." aria-label="Buscar ticket"
+        style={{ ...fieldStyle, fontSize: '13.5px', padding: '8px 12px', marginBottom: '10px' }} />
+      <div role="group" aria-label="Filtrar por estado" style={{ ...filaFiltros, marginBottom: '8px' }}>
         {(['todos', 'activos', 'abierto', 'en_proceso', 'resuelto', 'cerrado'] as const).map(e => (
-          <button key={e} onClick={() => setFiltroEstado(e)}
-            style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+          <button key={e} onClick={() => setFiltroEstado(e)} aria-pressed={filtroEstado === e}
+            style={{ flexShrink: 0, padding: '7px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>
             {e === 'en_proceso' ? 'En proceso' : e.charAt(0).toUpperCase() + e.slice(1)}
           </button>
         ))}
       </div>
-
-      {/* Filtro prioridad */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+      <div role="group" aria-label="Filtrar por prioridad" style={{ ...filaFiltros, marginBottom: '16px' }}>
         {(['todos', 'urgente', 'alta', 'media', 'baja'] as const).map(p => (
-          <button key={p} onClick={() => setFiltroPrioridad(p)}
-            style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none',
+          <button key={p} onClick={() => setFiltroPrioridad(p)} aria-pressed={filtroPrioridad === p}
+            style={{ flexShrink: 0, padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none', whiteSpace: 'nowrap',
               background: filtroPrioridad === p ? (p === 'todos' ? 'var(--at-line)' : PRIORIDAD_COLORS[p]?.bg ?? 'var(--at-line)') : 'transparent',
               color: filtroPrioridad === p ? (p === 'todos' ? 'var(--at-ink-2)' : PRIORIDAD_COLORS[p]?.color ?? 'var(--at-ink-2)') : 'var(--at-ink-3)' }}>
-            {p === 'todos' ? 'Todas' : p}
+            {p === 'todos' ? 'Todas las prioridades' : p.charAt(0).toUpperCase() + p.slice(1)}
           </button>
         ))}
       </div>
 
-      {/* Form */}
+      {/* Form — en ventana (a pantalla completa en el teléfono): antes se
+          abría en medio de la página, entre los filtros y la lista. */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nuevo ticket de mantenimiento</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+        <EditModal
+          title="Nuevo ticket de mantenimiento"
+          maxWidth="640px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleGuardar} loading={saving} loadingText="Guardando...">Crear ticket</Button>
+          </>}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Título *</label>
-              <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Descripción breve del problema"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+              <label htmlFor="tk-titulo" style={labelStyle}>Título *</label>
+              <input id="tk-titulo" value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Descripción breve del problema" style={fieldStyle} autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Tipo</label>
-              <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+              <label htmlFor="tk-tipo" style={labelStyle}>Tipo</label>
+              <select id="tk-tipo" value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))} style={fieldStyle}>
                 <option value="correctivo">Correctivo</option>
                 <option value="preventivo">Preventivo</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Prioridad</label>
-              <select value={form.prioridad} onChange={e => setForm(f => ({ ...f, prioridad: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+              <label htmlFor="tk-prioridad" style={labelStyle}>Prioridad</label>
+              <select id="tk-prioridad" value={form.prioridad} onChange={e => setForm(f => ({ ...f, prioridad: e.target.value }))} style={fieldStyle}>
                 <option value="baja">Baja</option>
                 <option value="media">Media</option>
                 <option value="alta">Alta</option>
@@ -277,29 +301,26 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Unidad (opcional)</label>
-              <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+              <label htmlFor="tk-unidad" style={labelStyle}>Unidad (opcional)</label>
+              <select id="tk-unidad" value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))} style={fieldStyle}>
                 <option value="">Área común</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fecha límite</label>
-              <input type="date" value={form.fecha_limite} onChange={e => setForm(f => ({ ...f, fecha_limite: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+              <label htmlFor="tk-fecha" style={labelStyle}>Fecha límite</label>
+              <input id="tk-fecha" type="date" value={form.fecha_limite} onChange={e => setForm(f => ({ ...f, fecha_limite: e.target.value }))} style={fieldStyle} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Costo estimado</label>
-              <input type="number" value={form.costo_estimado} onChange={e => setForm(f => ({ ...f, costo_estimado: e.target.value }))}
-                placeholder="0.00" min="0" step="0.01"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+              <label htmlFor="tk-costo" style={labelStyle}>Costo estimado</label>
+              <input id="tk-costo" type="number" value={form.costo_estimado} onChange={e => setForm(f => ({ ...f, costo_estimado: e.target.value }))}
+                placeholder="0.00" min="0" step="0.01" style={fieldStyle} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Descripción</label>
-              <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
-                placeholder="Detalle el problema o trabajo requerido..." rows={3}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)', resize: 'vertical' }} />
+              <label htmlFor="tk-descripcion" style={labelStyle}>Descripción</label>
+              <textarea id="tk-descripcion" value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
+                placeholder="Detalle el problema o trabajo requerido..." rows={4}
+                style={{ ...fieldStyle, resize: 'vertical' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <MultiImageUploader values={fotoUrls} onChange={setFotoUrls} folder="tickets" label="Fotos del problema" maxFiles={6} />
@@ -308,21 +329,13 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
               <MultiFileUploader values={archivoUrls} onChange={setArchivoUrls} folder="tickets" label="Documentos (cotización, garantía…)" maxFiles={6} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando...' : 'Crear ticket'}
-            </button>
-            <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Lista */}
       {filtrados.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔧</div>
-          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay tickets de mantenimiento</p>
-        </div>
+        <EmptyState icon="🔧" compact title="No hay tickets de mantenimiento"
+          description={tickets.length > 0 ? 'Ningún ticket coincide con los filtros.' : undefined} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filtrados.map(t => {
@@ -330,56 +343,51 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             const eColor = ESTADO_COLORS[t.estado] ?? { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' }
             const vencido = t.fecha_limite && t.fecha_limite < hoyLocalISO() && t.estado !== 'cerrado'
             return (
-              <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.prioridad === 'urgente' && t.estado !== 'cerrado' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px 18px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                      <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: pColor.bg, color: pColor.color }}>{t.prioridad}</span>
-                      <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>{t.tipo}</span>
-                      {vencido && <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>Vencido</span>}
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)', marginBottom: '4px' }}>{t.titulo}</div>
-                    {t.descripcion && <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginBottom: '6px' }}>{t.descripcion}</div>}
-                    <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: 'var(--at-ink-3)', flexWrap: 'wrap' }}>
-                      {t.unidad_nombre && <span>📍 {t.unidad_nombre}</span>}
-                      {t.fecha_limite && <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>📅 {t.fecha_limite}</span>}
-                      {t.costo_estimado && <span>💰 Est. {t.costo_estimado.toFixed(2)}</span>}
-                      {t.costo_real && <span>✅ Real {t.costo_real.toFixed(2)}</span>}
-                      <span>🕐 {new Date(t.created_at).toLocaleDateString('es')}</span>
-                    </div>
-                    {t.foto_urls?.length > 0 && (
-                      <div style={{ marginTop: 8 }}>
-                        <ImageGallery urls={t.foto_urls} maxVisible={4} />
-                      </div>
-                    )}
-                    {t.archivo_urls?.length > 0 && (
-                      <div style={{ marginTop: 8 }}>
-                        <ListaAdjuntos paths={t.archivo_urls} />
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
-                    {canEdit ? (
-                      <select value={t.estado} onChange={e => cambiarEstado(t.id, e.target.value)}
-                        style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, border: 'none', cursor: 'pointer', background: eColor.bg, color: eColor.color }}>
-                        <option value="abierto">Abierto</option>
-                        <option value="en_proceso">En proceso</option>
-                        <option value="resuelto">Resuelto</option>
-                        <option value="cerrado">Cerrado</option>
-                      </select>
-                    ) : (
-                      <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: eColor.bg, color: eColor.color }}>
-                        {t.estado.replace('_', ' ')}
-                      </span>
-                    )}
-                    {/* Mismo hilo que ve el residente en su portal (las notas
-                        internas quedan solo de este lado). */}
-                    <button onClick={() => setConversacion(t)} title="Conversación con el residente"
-                      style={{ padding: '4px 11px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-                      💬 Conversación
-                    </button>
-                    {canDelete && <button onClick={() => eliminar(t.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>}
-                  </div>
+              <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.prioridad === 'urgente' && t.estado !== 'cerrado' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: pColor.bg, color: pColor.color }}>{t.prioridad}</span>
+                  <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>{t.tipo}</span>
+                  {vencido && <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>Vencido</span>}
+                  {canDelete && <button onClick={() => eliminar(t.id)} title="Eliminar" aria-label={`Eliminar ${t.titulo}`}
+                    style={{ marginLeft: 'auto', background: 'none', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 6px' }}>🗑</button>}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)', marginBottom: '3px' }}>{t.titulo}</div>
+                  {t.descripcion && (
+                    <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.descripcion}</div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '4px 14px', fontSize: '12px', color: 'var(--at-ink-3)', flexWrap: 'wrap' }}>
+                  <span>📍 {t.unidad_nombre ?? 'Área común'}</span>
+                  {t.fecha_limite && <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>📅 {t.fecha_limite}</span>}
+                  {t.costo_estimado && <span>💰 Est. {t.costo_estimado.toFixed(2)}</span>}
+                  {t.costo_real && <span>✅ Real {t.costo_real.toFixed(2)}</span>}
+                  <span>🕐 {new Date(t.created_at).toLocaleDateString('es')}</span>
+                </div>
+                {t.foto_urls?.length > 0 && <ImageGallery urls={t.foto_urls} maxVisible={4} />}
+                {t.archivo_urls?.length > 0 && <ListaAdjuntos paths={t.archivo_urls} />}
+                {/* Barra de acciones al pie: estado y conversación (antes eran
+                    una columna a la derecha que en el teléfono estrechaba el
+                    texto del ticket). Mismo hilo que ve el residente; las
+                    notas internas quedan solo de este lado. */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--at-line)' }}>
+                  {canEdit ? (
+                    <select value={t.estado} onChange={e => cambiarEstado(t.id, e.target.value)} aria-label={`Estado de ${t.titulo}`}
+                      style={{ flex: '1 1 130px', padding: '8px 10px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, border: 'none', cursor: 'pointer', background: eColor.bg, color: eColor.color }}>
+                      <option value="abierto">Abierto</option>
+                      <option value="en_proceso">En proceso</option>
+                      <option value="resuelto">Resuelto</option>
+                      <option value="cerrado">Cerrado</option>
+                    </select>
+                  ) : (
+                    <span style={{ padding: '8px 12px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, background: eColor.bg, color: eColor.color, textTransform: 'capitalize' }}>
+                      {t.estado.replace('_', ' ')}
+                    </span>
+                  )}
+                  <button onClick={() => setConversacion(t)} title="Conversación con el residente"
+                    style={{ flex: '2 1 150px', padding: '10px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                    💬 Conversación
+                  </button>
                 </div>
               </div>
             )
