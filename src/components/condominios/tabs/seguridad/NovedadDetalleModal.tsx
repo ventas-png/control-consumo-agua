@@ -5,6 +5,7 @@ import type { SeguridadCtx } from './ctx'
 import { separarDescripcionNovedad } from '../../../../lib/seguridadReglas'
 import { accentPrioridad, PRIORIDAD_CONFIG, TIPO_NOVEDAD_CONFIG } from './ui'
 import { ModalPortal } from '../../../shared/ModalPortal'
+import { tint } from '../../../shared/statusTone'
 
 export function NovedadDetalleModal({ ctx }: { ctx: SeguridadCtx }) {
   const { rondas, canEdit, novedadDetalle, setNovedadDetalle, eliminarNovedad } = ctx
@@ -115,7 +116,7 @@ export function NovedadDetalleModal({ ctx }: { ctx: SeguridadCtx }) {
               <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Tipo</div>
               <div style={{ fontSize: '13.5px', color: 'var(--at-ink-2)', fontWeight: 600 }}>{tc.icon} {tc.label}</div>
             </div>
-            <div style={{ background: pc.bg, borderRadius: '10px', padding: '12px', border: `1px solid ${accentColor}30` }}>
+            <div style={{ background: pc.bg, borderRadius: '10px', padding: '12px', border: `1px solid ${tint(accentColor, 19)}` }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: pc.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Prioridad</div>
               <div style={{ fontSize: '13.5px', color: pc.color, fontWeight: 700 }}>{pc.label}</div>
             </div>

@@ -5,6 +5,7 @@ import {
   Encuesta, PolizaSeguro, ContratoProveedor, PlanMantenimiento,
   SugerenciaCondominio, Unidad,
 } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -200,7 +201,7 @@ export default function IndiceCalidadTab({ cuotas, tickets, incidentes, encuesta
         {subIndices.map(s => {
           const sem = semaforo(s.score)
           return (
-            <div key={s.nombre} style={{ background: 'var(--at-surface)', border: `1px solid ${sem.color}33`, borderRadius: 12, padding: 14 }}>
+            <div key={s.nombre} style={{ background: 'var(--at-surface)', border: `1px solid ${tint(sem.color, 20)}`, borderRadius: 12, padding: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)' }}>{s.nombre}</div>

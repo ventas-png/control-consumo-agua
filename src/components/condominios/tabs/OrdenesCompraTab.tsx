@@ -20,6 +20,7 @@ import { useTransicionOrdenConContrato } from '../../compras/excepcionContrato'
 import { ContratoSelector } from '../../proveedores/ContratoSelector'
 import { ContratoSeguimientoModal } from '../../proveedores/ContratoSeguimientoModal'
 import { usePermisosProveedor } from '../../proveedores/permisos'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   ordenes: OrdenCompra[]
@@ -386,7 +387,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
             const cfg = ESTADO_CFG[orden.estado]
             const isOpen = expandida === orden.id
             return (
-              <div key={orden.id} style={{ background: 'var(--at-surface)', border: `1px solid ${cfg.color}33`, borderRadius: 10, borderLeft: `4px solid ${cfg.color}` }}>
+              <div key={orden.id} style={{ background: 'var(--at-surface)', border: `1px solid ${tint(cfg.color, 20)}`, borderRadius: 10, borderLeft: `4px solid ${cfg.color}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: 'pointer' }}
                   onClick={() => setExpandida(isOpen ? null : orden.id)}>
                   {/* El número REAL de la orden (el mismo en Contabilidad y en el seguimiento), no un contador por posición en la lista. */}
@@ -440,7 +441,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
                       )}
                       {canEdit && cfg.next && puedeAvanzar(cfg.next) && (
                         <button onClick={() => avanzarEstado(orden)}
-                          style={{ padding: '5px 12px', background: ESTADO_CFG[cfg.next!].bg, color: ESTADO_CFG[cfg.next!].color, border: `1px solid ${ESTADO_CFG[cfg.next!].color}66`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                          style={{ padding: '5px 12px', background: ESTADO_CFG[cfg.next!].bg, color: ESTADO_CFG[cfg.next!].color, border: `1px solid ${tint(ESTADO_CFG[cfg.next!].color, 40)}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
                           → {cfg.nextLabel}
                         </button>
                       )}

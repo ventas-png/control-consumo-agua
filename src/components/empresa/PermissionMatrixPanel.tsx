@@ -9,6 +9,7 @@ import type { SectionGroup } from '../../lib/condominiosRoles'
 import { groupStatus, type PermissionEffect } from '../../lib/effectivePermissions'
 import { MODULE_ACTION_LABELS } from '../../lib/moduleConfig'
 import { AccessBadge, Banner, SectionHeader, SubsectionHeader } from './rolesUi'
+import { tint } from '../shared/statusTone'
 
 export interface MatrixSectionBlock {
   label: string
@@ -194,7 +195,7 @@ function PermissionLine({
         {chips.map(r => (
           <span key={r.id} title={r.name} style={{
             fontSize: '9px', fontWeight: 600, padding: '1px 6px', borderRadius: '999px',
-            background: r.color + '22', color: r.color,
+            background: tint(r.color, 13), color: r.color,
             maxWidth: '90px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>{r.name}</span>
         ))}
@@ -208,7 +209,7 @@ function PermissionLine({
 
 function overrideBadgeStyle(color: string): React.CSSProperties {
   return {
-    fontSize: '9px', fontWeight: 700, color, background: color + '1a',
+    fontSize: '9px', fontWeight: 700, color, background: tint(color, 10),
     padding: '1px 5px', borderRadius: '4px', letterSpacing: '0.04em',
     textTransform: 'uppercase', flexShrink: 0,
   }

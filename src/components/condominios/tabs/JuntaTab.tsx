@@ -4,6 +4,7 @@ import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { MiembroJunta, CargoJunta, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   junta: MiembroJunta[]
@@ -181,7 +182,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
           {sortedActivos.map(m => {
             const cl = CARGO_LABELS[m.cargo]
             return (
-              <div key={m.id} style={{ background: 'var(--at-surface)', border: `2px solid ${cl.color}30`, borderTop: `4px solid ${cl.color}`, borderRadius: '10px', padding: '14px' }}>
+              <div key={m.id} style={{ background: 'var(--at-surface)', border: `2px solid ${tint(cl.color, 19)}`, borderTop: `4px solid ${cl.color}`, borderRadius: '10px', padding: '14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                   <div>
                     <div style={{ fontSize: '20px', marginBottom: '4px' }}>{cl.icon}</div>

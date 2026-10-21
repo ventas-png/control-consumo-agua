@@ -5,6 +5,7 @@ import { addMinutosToTime, lunesDeSemana, DIAS_ES } from '../../../../lib/amenid
 import { MOTIVO_LABEL, ESTADO_COLORS, RESERVA_CAL_COLORS } from './ui'
 import { EmptyState } from './comunes'
 import { dateLocalISO } from '../../../../lib/format'
+import { tint } from '../../../shared/statusTone'
 
 export function VistaCalendario({ ctx }: { ctx: AmenidadesCtx }) {
   const { reservas, bloqueos, canCreate, canEdit, setSemana, selectedReserva, setSelectedReserva, hoy, amenidadesActivas, dias, abrirReservaDesdeCalendario, cancelarReserva } = ctx
@@ -122,7 +123,7 @@ export function VistaCalendario({ ctx }: { ctx: AmenidadesCtx }) {
                               return (
                                 <Fragment key={r.id}>
                                   {topPrevia !== null && (
-                                    <div title={`Preparación previa: ${prepPrevia} min`} style={{ position: 'absolute', left: 6, right: 6, top: `${topPrevia}%`, height: `${top - topPrevia}%`, borderRadius: '6px 6px 0 0', background: `${paleta.color}22`, border: `1px dashed ${paleta.border}`, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: paleta.color, fontWeight: 700 }}>
+                                    <div title={`Preparación previa: ${prepPrevia} min`} style={{ position: 'absolute', left: 6, right: 6, top: `${topPrevia}%`, height: `${top - topPrevia}%`, borderRadius: '6px 6px 0 0', background: tint(paleta.color, 13), border: `1px dashed ${paleta.border}`, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: paleta.color, fontWeight: 700 }}>
                                       🔧 {prepPrevia}m
                                     </div>
                                   )}
@@ -145,7 +146,7 @@ export function VistaCalendario({ ctx }: { ctx: AmenidadesCtx }) {
                                     <div style={{ fontSize: 9.5, opacity: 0.85, fontWeight: 600 }}>{r.hora_inicio}–{r.hora_fin}</div>
                                   </div>
                                   {bottomPost !== null && (
-                                    <div title={`Preparación posterior: ${prepPost} min`} style={{ position: 'absolute', left: 6, right: 6, top: `${bottom}%`, height: `${bottomPost - bottom}%`, borderRadius: '0 0 6px 6px', background: `${paleta.color}22`, border: `1px dashed ${paleta.border}`, borderTop: 'none', pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: paleta.color, fontWeight: 700 }}>
+                                    <div title={`Preparación posterior: ${prepPost} min`} style={{ position: 'absolute', left: 6, right: 6, top: `${bottom}%`, height: `${bottomPost - bottom}%`, borderRadius: '0 0 6px 6px', background: tint(paleta.color, 13), border: `1px dashed ${paleta.border}`, borderTop: 'none', pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: paleta.color, fontWeight: 700 }}>
                                       🔧 {prepPost}m
                                     </div>
                                   )}

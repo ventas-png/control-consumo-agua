@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Amenidad, ReservaAmenidad } from '../../../types'
 import { parseFechaCalendario } from '../../../lib/format'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   amenidades: Amenidad[]
@@ -109,7 +110,7 @@ export default function UtilizacionAmenidadesTab({ amenidades, reservas, moneda 
                     { label: 'Invitados', val: String(s.totalInvitados), color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
                     ...(s.depositos > 0 ? [{ label: 'Depósitos', val: `${moneda} ${s.depositos.toLocaleString('es')}`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' }] : []),
                   ].map(k => (
-                    <div key={k.label} style={{ flex: '1 1 70px', background: k.bg, borderRadius: 8, padding: '6px 10px', border: `1px solid ${k.color}22` }}>
+                    <div key={k.label} style={{ flex: '1 1 70px', background: k.bg, borderRadius: 8, padding: '6px 10px', border: `1px solid ${tint(k.color, 13)}` }}>
                       <div style={{ fontSize: 9, color: 'var(--at-ink-3)' }}>{k.label}</div>
                       <div style={{ fontSize: 13, fontWeight: 800, color: k.color }}>{k.val}</div>
                     </div>

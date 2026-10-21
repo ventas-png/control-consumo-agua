@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useHoyDate } from '../../../hooks/useHoy'
 import type { PersonalCondominio, CargoCatalogo } from '../../../types'
 import { etiquetaCargo } from '../../../domain/condominios/rrhhCatalogos'
+import { tint } from '../../shared/statusTone'
 
 interface ClienteBirthday {
   id: string
@@ -175,7 +176,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
           { label: 'Próximos 30d', val: proximos30.length, icon: '🗓️', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
           { label: 'Registrados', val: todos.length, icon: '👤', color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
         ].map(k => (
-          <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.color}33`, borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.val}</div>
             <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { TicketMantenimiento, ReservaAmenidad, PlanMantenimiento, InspeccionNormativa, VencimientoExtra } from '../../../types'
 import { formatFechaCalendario } from '../../../lib/format'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -138,7 +139,7 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
           const activo = filtros.has(tipo)
           return (
             <button key={tipo} onClick={() => toggleFiltro(tipo)}
-              style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${cfg.color}44`, fontSize: 11, cursor: 'pointer',
+              style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${tint(cfg.color, 27)}`, fontSize: 11, cursor: 'pointer',
                 background: activo ? cfg.bg : 'var(--at-surface-2)',
                 color: activo ? cfg.color : 'var(--at-ink-3)', fontWeight: activo ? 600 : 400 }}>
               {cfg.icon} {cfg.label}
@@ -216,7 +217,7 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
                 const cfg = TIPO_CFG[ev.tipo]
                 return (
                   <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10,
-                    padding: '8px 10px', background: ev.bg, borderRadius: 8, border: `1px solid ${ev.color}22` }}>
+                    padding: '8px 10px', background: ev.bg, borderRadius: 8, border: `1px solid ${tint(ev.color, 13)}` }}>
                     <span style={{ fontSize: 16, lineHeight: 1 }}>{cfg.icon}</span>
                     <div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: ev.color }}>{cfg.label}</div>

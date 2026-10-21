@@ -20,6 +20,7 @@ import { SavedReportsModal } from './SavedReportsModal'
 import { SYSTEM_ROLE_IDS, type AguaSystemRoleKey, type CondominiosSystemRoleKey } from '../../lib/systemRoleIds'
 import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
 import type { Usuario } from '../../domain/empresa/queries'
+import { tint } from '../shared/statusTone'
 
 interface Props {
   currentUser: UserSession
@@ -387,8 +388,8 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '160px' }}>
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                    background: `${roleBadgeColor[u.role] ?? 'var(--at-ink-3)'}22`,
-                    border: `1px solid ${roleBadgeColor[u.role] ?? 'var(--at-ink-3)'}44`,
+                    background: tint(roleBadgeColor[u.role] ?? 'var(--at-ink-3)', 13),
+                    border: `1px solid ${tint(roleBadgeColor[u.role] ?? 'var(--at-ink-3)', 27)}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: roleBadgeColor[u.role] ?? 'var(--at-ink-3)', fontSize: '13px', fontWeight: 700,
                   }}>
@@ -410,7 +411,7 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
                           <span key={r.id} style={{
                             padding: '1px 8px', borderRadius: '20px',
                             fontSize: '11px', fontWeight: 600,
-                            background: r.color + '22', color: r.color,
+                            background: tint(r.color, 13), color: r.color,
                           }}>
                             {icon} {r.name}
                           </span>

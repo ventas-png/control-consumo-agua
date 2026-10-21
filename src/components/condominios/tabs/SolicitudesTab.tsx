@@ -4,6 +4,7 @@ import type { SolicitudResidente, TipoSolicitud, EstadoSolicitud, PrioridadSolic
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   solicitudes: SolicitudResidente[]
@@ -247,7 +248,7 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
             key: 'prioridad', header: t('condominios.solicitudes.header_prioridad'), sortable: true,
             render: s => {
               const prioColor = PRIORIDAD_COLOR[s.prioridad]
-              return <span style={{ fontSize: '10px', fontWeight: 700, color: prioColor, background: `${prioColor}15`, padding: '2px 6px', borderRadius: '20px' }}>{t(PRIORIDAD_LABEL_KEY[s.prioridad]).toUpperCase()}</span>
+              return <span style={{ fontSize: '10px', fontWeight: 700, color: prioColor, background: tint(prioColor, 8), padding: '2px 6px', borderRadius: '20px' }}>{t(PRIORIDAD_LABEL_KEY[s.prioridad]).toUpperCase()}</span>
             },
           },
           {
