@@ -15,6 +15,9 @@ interface Props {
   userId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.<tab>.delete): ver o
+   *  editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -31,7 +34,7 @@ const VOTO_CONFIG: Record<TipoVoto, { label: string; bg: string; color: string }
   abstencion: { label: 'Abstención', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
-export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -133,6 +136,8 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar asamblea?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('asambleas', id)
@@ -267,7 +272,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                 ) : (
                   <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                 )}
-                <button onClick={() => eliminar(a.id)} aria-label={`Eliminar ${a.titulo}`} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px', padding: '4px 6px' }}>🗑</button>
+                {canDelete && <button onClick={() => eliminar(a.id)} aria-label={`Eliminar ${a.titulo}`} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px', padding: '4px 6px' }}>🗑</button>}
               </div>
             </div>
           )

@@ -35,7 +35,7 @@ function incidente(over: Partial<IncidenteSeguridad> = {}): IncidenteSeguridad {
 function renderTab(props: Partial<Parameters<typeof IncidentesTab>[0]> = {}) {
   return render(
     <IncidentesTab incidentes={[incidente()]} proyectoId="p1" companyId="co1"
-      canCreate canEdit onRefresh={() => {}} {...props} />,
+      canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -68,7 +68,7 @@ describe('IncidentesTab — ventanas', () => {
 
     // Llega la lista refrescada: la ventana lee la fila vigente, no una copia.
     rerender(<IncidentesTab incidentes={[incidente({ estado: 'investigando' })]} proyectoId="p1" companyId="co1"
-      canCreate canEdit onRefresh={onRefresh} />)
+      canCreate canEdit canDelete onRefresh={onRefresh} />)
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('button', { name: '→ Marcar Resuelto' })).toBeTruthy()
     expect(within(dialog).getByText('Investigando')).toBeTruthy()
@@ -122,5 +122,20 @@ describe('IncidentesTab — ventanas', () => {
     fireEvent.change(screen.getByLabelText('Buscar por área'), { target: { value: 'torre' } })
     expect(screen.queryByRole('button', { name: /Grafiti/ })).toBeNull()
     expect(screen.getByRole('button', { name: /Caída en escaleras/ })).toBeTruthy()
+  })
+
+  it('eliminar exige su propio permiso: editar no basta', async () => {
+    renderTab({ canDelete: false })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    let dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: /Editar/ })).toBeTruthy()
+    expect(within(dialog).queryByRole('button', { name: /Eliminar/ })).toBeNull()
+    cleanup()
+
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Eliminar/ }))
+    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', 'i1'))
   })
 })

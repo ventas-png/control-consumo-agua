@@ -30,7 +30,7 @@ const ticket = {
 function renderTab(props: Partial<Parameters<typeof MantenimientoTab>[0]> = {}) {
   return render(
     <MantenimientoTab tickets={[ticket]} unidades={[] as Unidad[]} proyectoId="p1" companyId="co1" userId="u1"
-      canCreate canEdit onRefresh={() => {}} {...props} />,
+      canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -68,5 +68,15 @@ describe('MantenimientoTab', () => {
     expect(within(estados).getByRole('button', { name: 'Activos' }).getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(within(estados).getByRole('button', { name: 'Cerrado' }))
     expect(screen.getByText('No hay tickets de mantenimiento')).toBeTruthy()
+  })
+
+  it('eliminar exige su propio permiso: editar no basta', async () => {
+    renderTab({ canDelete: false })
+    expect(screen.queryByRole('button', { name: 'Eliminar Fuga en el lobby' })).toBeNull()
+    cleanup()
+
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
   })
 })

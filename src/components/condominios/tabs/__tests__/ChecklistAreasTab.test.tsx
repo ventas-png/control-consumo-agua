@@ -42,7 +42,7 @@ type Props = Parameters<typeof ChecklistAreasTab>[0]
 function props(over: Partial<Props> = {}): Props {
   return {
     checklists: [checklist()], areas, proyectoId: 'p1', companyId: 'co1',
-    canCreate: true, canEdit: true, puedeConfigurarAreas: true,
+    canCreate: true, canEdit: true, canDelete: true, puedeConfigurarAreas: true,
     onIrATab: () => {}, onRefresh: () => {}, ...over,
   }
 }
@@ -119,5 +119,20 @@ describe('ChecklistAreasTab — ventanas', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).queryByRole('checkbox')).toBeNull()
     expect(within(dialog).queryByRole('button', { name: '✏️ Editar' })).toBeNull()
+  })
+
+  it('eliminar exige su propio permiso: editar no basta', async () => {
+    render(<ChecklistAreasTab {...props({ canDelete: false })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Piscina.*2026-10-20/ }))
+    let dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: '✏️ Editar' })).toBeTruthy()
+    expect(within(dialog).queryByRole('button', { name: /Eliminar/ })).toBeNull()
+    cleanup()
+
+    render(<ChecklistAreasTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: /Piscina.*2026-10-20/ }))
+    dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Eliminar/ }))
+    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalled())
   })
 })

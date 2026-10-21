@@ -24,6 +24,9 @@ interface Props {
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.<tab>.delete): ver o
+   *  editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -41,7 +44,7 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
   cerrado:    { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
-export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, autorNombre = '', proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
+export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, autorNombre = '', proyectoNombre = 'Condominio', canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('todos')
@@ -164,6 +167,8 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const result = await confirm({ title: '¿Eliminar ticket?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
     await softDelete('tickets_mantenimiento', { id })
@@ -341,8 +346,8 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
                   <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: pColor.bg, color: pColor.color }}>{t.prioridad}</span>
                   <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>{t.tipo}</span>
                   {vencido && <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>Vencido</span>}
-                  <button onClick={() => eliminar(t.id)} title="Eliminar" aria-label={`Eliminar ${t.titulo}`}
-                    style={{ marginLeft: 'auto', background: 'none', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 6px' }}>🗑</button>
+                  {canDelete && <button onClick={() => eliminar(t.id)} title="Eliminar" aria-label={`Eliminar ${t.titulo}`}
+                    style={{ marginLeft: 'auto', background: 'none', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 6px' }}>🗑</button>}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)', marginBottom: '3px' }}>{t.titulo}</div>
