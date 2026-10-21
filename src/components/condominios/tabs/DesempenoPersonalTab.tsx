@@ -6,6 +6,7 @@ import type {
 } from '../../../types'
 import { etiquetaCargo, etiquetaTurno } from '../../../domain/condominios/rrhhCatalogos'
 import { hoyLocalISO, sumarDiasCalendario, diaLocalDeInstante } from '../../../lib/format'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   bloques:       BloqueTurno[]
@@ -218,7 +219,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
 
                   {/* Score */}
                   {score > 0 && (
-                    <div style={{ background: scoreBg(score), border: `1.5px solid ${scoreColor(score)}33`, borderRadius: '12px', padding: '10px 18px', textAlign: 'center', flexShrink: 0 }}>
+                    <div style={{ background: scoreBg(score), border: `1.5px solid ${tint(scoreColor(score), 20)}`, borderRadius: '12px', padding: '10px 18px', textAlign: 'center', flexShrink: 0 }}>
                       <div style={{ fontSize: '26px', fontWeight: 900, color: scoreColor(score), lineHeight: 1 }}>{score}%</div>
                       <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>puntaje</div>
                     </div>
@@ -275,7 +276,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
                 {/* Progress bar */}
                 {score > 0 && (
                   <div style={{ marginTop: '12px', background: 'var(--at-chip)', borderRadius: '6px', height: '6px', overflow: 'hidden' }}>
-                    <div style={{ width: `${score}%`, height: '100%', background: `linear-gradient(90deg,${scoreColor(score)},${scoreColor(score)}aa)`, borderRadius: '6px', transition: 'width 0.6s ease' }} />
+                    <div style={{ width: `${score}%`, height: '100%', background: `linear-gradient(90deg,${scoreColor(score)},${tint(scoreColor(score), 67)})`, borderRadius: '6px', transition: 'width 0.6s ease' }} />
                   </div>
                 )}
               </div>

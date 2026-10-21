@@ -3,6 +3,7 @@ import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '.
 import type { ContactoEmergencia, TipoContactoEmergencia } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { ImportEmergenciasModal } from '../ImportEmergenciasModal'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   contactos: ContactoEmergencia[]
@@ -105,7 +106,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
               const ti = tipoInfo(c.tipo)
               return (
                 <a key={c.id} href={`tel:${c.telefono}`}
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--at-surface)', borderRadius: '8px', border: `1.5px solid ${ti.color}20`, textDecoration: 'none', cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--at-surface)', borderRadius: '8px', border: `1.5px solid ${tint(ti.color, 12)}`, textDecoration: 'none', cursor: 'pointer' }}>
                   <span style={{ fontSize: '22px' }}>{ti.icon}</span>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--at-ink)' }}>{c.nombre}</div>
@@ -191,7 +192,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
         </button>
         {TIPOS.filter(t => contactos.some(c => c.tipo === t.value)).map(t => (
           <button key={t.value} onClick={() => setFiltroTipo(t.value)}
-            style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroTipo === t.value ? t.color : 'var(--at-line)', background: filtroTipo === t.value ? `${t.color}20` : 'var(--at-surface)', color: filtroTipo === t.value ? t.color : 'var(--at-ink-3)' }}>
+            style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroTipo === t.value ? t.color : 'var(--at-line)', background: filtroTipo === t.value ? tint(t.color, 12) : 'var(--at-surface)', color: filtroTipo === t.value ? t.color : 'var(--at-ink-3)' }}>
             {t.icon} {t.label}
           </button>
         ))}
@@ -209,7 +210,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
             return (
               <div key={c.id} style={{ background: c.activo ? 'var(--at-surface)' : 'var(--at-surface-2)', border: `1.5px solid ${c.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '10px', padding: '14px', opacity: c.activo ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: `${ti.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: tint(ti.color, 8), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>
                     {ti.icon}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>

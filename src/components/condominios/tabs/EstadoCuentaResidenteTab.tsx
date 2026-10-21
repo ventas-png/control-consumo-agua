@@ -9,6 +9,7 @@ import { exportarPDFEstadoCuenta } from '../exportUtils'
 import type { CuotaConEstado } from '../../../domain/condominios/queries'
 import { printHtml, raw } from '../../../lib/printHtml'
 import { CuotaEstadoBadge } from './CuotasUi'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -212,7 +213,7 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
           { label: 'Saldo', val: saldo <= 0 ? '✓ Al día' : `${moneda} ${saldo.toFixed(2)}`, color: saldo <= 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: saldo <= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)' },
           { label: 'Cuotas pendientes', val: String(pendientes), color: pendientes === 0 ? 'var(--at-success)' : 'var(--at-warning)', bg: pendientes === 0 ? 'var(--at-success-tint)' : 'var(--at-warning-tint)' },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '8px 12px' }}>
+          <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${tint(k.color, 13)}`, borderRadius: 10, padding: '8px 12px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>

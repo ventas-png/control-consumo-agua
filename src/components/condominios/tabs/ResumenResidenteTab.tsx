@@ -5,6 +5,7 @@ import {
   AnuncioComunidad, TicketMantenimiento, Unidad,
 } from '../../../types'
 import { printHtml, raw } from '../../../lib/printHtml'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -163,7 +164,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
           { label: 'Tickets activos', val: String(ticketsUnidad.length), color: ticketsUnidad.length > 0 ? 'var(--at-warning)' : 'var(--at-success)', bg: ticketsUnidad.length > 0 ? 'var(--at-warning-tint)' : 'var(--at-success-tint)' },
           { label: 'Reservas próx.', val: String(reservasUnidad.length), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '8px 12px' }}>
+          <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${tint(k.color, 13)}`, borderRadius: 10, padding: '8px 12px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
@@ -182,7 +183,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
                 const cfg = ESTADO_CUOTA_CFG[c.estado] ?? { color: 'var(--at-ink-2)', bg: 'var(--at-chip)', label: c.estado }
                 return (
                   <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '7px 10px', background: cfg.bg, borderRadius: 8, border: `1px solid ${cfg.color}22` }}>
+                    padding: '7px 10px', background: cfg.bg, borderRadius: 8, border: `1px solid ${tint(cfg.color, 13)}` }}>
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink)' }}>{c.concepto}</div>
                       <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>Período {c.periodo}</div>
@@ -223,7 +224,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
                 const cfg = ESTADO_TICKET_CFG[t.estado] ?? { color: 'var(--at-ink-2)', bg: 'var(--at-chip)' }
                 return (
                   <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '7px 10px', background: cfg.bg, borderRadius: 8, marginBottom: 6, border: `1px solid ${cfg.color}22` }}>
+                    padding: '7px 10px', background: cfg.bg, borderRadius: 8, marginBottom: 6, border: `1px solid ${tint(cfg.color, 13)}` }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink)', flex: 1 }}>{t.titulo}</div>
                     <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'var(--at-surface)', color: cfg.color, fontWeight: 600, flexShrink: 0 }}>
                       {t.estado.replace('_', ' ')}

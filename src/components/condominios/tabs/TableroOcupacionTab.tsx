@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Unidad, ContratoArrendamiento, CuotaCondominio } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   unidades: Unidad[]
@@ -93,7 +94,7 @@ export default function TableroOcupacionTab({ unidades, contratos, cuotas, moned
           { label: 'Renta mensual', val: `${moneda} ${resumen.rentaMensual.toLocaleString('es')}`, color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
           { label: 'Con deuda',     val: String(resumen.conDeuda), color: resumen.conDeuda > 0 ? 'var(--at-danger)' : 'var(--at-success)', bg: resumen.conDeuda > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)' },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
+          <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>

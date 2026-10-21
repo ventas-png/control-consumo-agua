@@ -3,6 +3,7 @@ import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { BitacoraGuardia, TurnoGuardia, EstadoBitacoraGuardia, TipoNovedadGuardia, NovedadGuardia } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   registros: BitacoraGuardia[]
@@ -227,7 +228,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
               {selected.novedades.map((n, i) => {
                 const tipo = TIPOS_NOV.find(t => t.value === n.tipo)
                 return (
-                  <div key={i} style={{ padding: '8px 10px', background: 'var(--at-surface)', borderRadius: 6, marginBottom: 6, border: `1px solid ${tipo?.color}30`, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div key={i} style={{ padding: '8px 10px', background: 'var(--at-surface)', borderRadius: 6, marginBottom: 6, border: `1px solid ${tint(tipo?.color ?? 'var(--at-ink-3)', 19)}`, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                     <span style={{ padding: '2px 8px', borderRadius: 10, background: tipo?.color, color: 'white', fontSize: 11, flexShrink: 0 }}>{tipo?.label}</span>
                     <span style={{ fontSize: 12, color: 'var(--at-ink-3)', flexShrink: 0 }}>{n.hora}</span>
                     <span style={{ fontSize: 13 }}>{n.descripcion}</span>

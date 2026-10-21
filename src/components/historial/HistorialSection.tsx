@@ -14,6 +14,7 @@ import {
   type HistorialFiltros,
 } from '../../lib/historialFiltros'
 import { ModalPortal } from '../shared/ModalPortal'
+import { tint } from '../shared/statusTone'
 
 interface Props {
   registros: Registro[]
@@ -694,9 +695,9 @@ function StatCard({ label, value, color, icon, moneda }: {
   return (
     <div style={{
       flex: 1, minWidth: 200, padding: 16,
-      background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`,
+      background: `linear-gradient(135deg, ${tint(color, 12)} 0%, ${tint(color, 6)} 100%)`,
       borderLeft: `4px solid ${color}`,
-      borderRadius: 12, border: `1px solid ${color}40`,
+      borderRadius: 12, border: `1px solid ${tint(color, 25)}`,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--at-ink-3)', fontWeight: 600, marginBottom: 8 }}>
         {icon} {label}

@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { FondoReservaMovimiento } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   movimientos: FondoReservaMovimiento[]
@@ -103,7 +104,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
           { label: 'Retiros este mes', val: `${moneda} ${retirosMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: retirosMes > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)', bg: retirosMes > 0 ? 'var(--at-danger-tint)' : 'var(--at-surface-2)' },
           { label: 'Total movimientos', val: String(movimientos.length), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
+          <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
@@ -121,7 +122,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {(Object.entries(TIPO_CFG) as [TipoMov, typeof TIPO_CFG[TipoMov]][]).map(([t, cfg]) => (
                   <button key={t} onClick={() => setForm(f => ({ ...f, tipo: t }))}
-                    style={{ padding: '4px 10px', borderRadius: 8, border: `1px solid ${cfg.color}44`, fontSize: 11, cursor: 'pointer',
+                    style={{ padding: '4px 10px', borderRadius: 8, border: `1px solid ${tint(cfg.color, 27)}`, fontSize: 11, cursor: 'pointer',
                       background: form.tipo === t ? cfg.bg : 'var(--at-surface)', color: cfg.color, fontWeight: form.tipo === t ? 700 : 400 }}>
                     {cfg.label}
                   </button>

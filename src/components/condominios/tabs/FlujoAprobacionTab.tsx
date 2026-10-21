@@ -4,6 +4,7 @@ import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { FlujoAprobacionCond, TipoFlujoAprobacion, EstadoFlujoAprobacion } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   flujos: FlujoAprobacionCond[]
@@ -187,7 +188,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
             const tipoCfg = TIPO_CFG[f.tipo]
             const estCfg = ESTADO_CFG[f.estado]
             return (
-              <div key={f.id} style={{ background: 'var(--at-surface)', border: `1px solid ${estCfg.color}33`, borderRadius: 10, padding: '12px 14px', borderLeft: `4px solid ${estCfg.color}` }}>
+              <div key={f.id} style={{ background: 'var(--at-surface)', border: `1px solid ${tint(estCfg.color, 20)}`, borderRadius: 10, padding: '12px 14px', borderLeft: `4px solid ${estCfg.color}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>

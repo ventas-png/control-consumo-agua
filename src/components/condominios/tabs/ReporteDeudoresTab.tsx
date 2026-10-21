@@ -4,6 +4,7 @@ import { CuotaCondominio, Unidad } from '../../../types'
 import { exportarExcel, exportarPDFCartaCobro } from '../exportUtils'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { ROLES_RESPONSABLE_CUOTA } from './CuotasUi'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -158,7 +159,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
           { label: '+90 días', val: `${moneda} ${totales.t90plus.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-danger-strong)', bg: 'var(--at-danger-tint)' },
           { label: 'Unidades deudoras', val: String(deudores.length), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
+          <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Encuesta, RespuestaEncuesta } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   encuestas: Encuesta[]
@@ -125,7 +126,7 @@ export default function EncuestaDashboardTab({ encuestas, respuestas }: Props) {
                   { label: 'Preguntas', val: String(preguntas.length), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
                   { label: 'Estado', val: ESTADO_CFG[encuesta.estado]?.label ?? encuesta.estado, color: ESTADO_CFG[encuesta.estado]?.color ?? 'var(--at-ink-2)', bg: ESTADO_CFG[encuesta.estado]?.bg ?? 'var(--at-surface-2)' },
                 ].map(k => (
-                  <div key={k.label} style={{ flex: '1 1 110px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '10px 14px' }}>
+                  <div key={k.label} style={{ flex: '1 1 110px', background: k.bg, border: `1px solid ${tint(k.color, 13)}`, borderRadius: 10, padding: '10px 14px' }}>
                     <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
                     <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
                   </div>

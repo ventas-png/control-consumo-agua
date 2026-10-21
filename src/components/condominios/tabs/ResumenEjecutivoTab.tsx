@@ -6,6 +6,7 @@ import {
   InspeccionNormativa, VencimientoExtra, SugerenciaCondominio,
 } from '../../../types'
 import { escapeHtml } from '../../../lib/printHtml'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -187,7 +188,7 @@ ${venc30.length > 0 ? `
           { label: 'Cartera vencida', val: `${moneda} ${financiero.montoMora.toLocaleString('es', { maximumFractionDigits: 0 })}`, sub: 'Saldo en mora', color: 'var(--at-danger)' },
           { label: 'Ejecución presup.', val: `${ejecPct}%`, sub: `${moneda} ${financiero.gastosMes.toLocaleString('es', { maximumFractionDigits: 0 })} gastado`, color: ejecPct > 100 ? 'var(--at-danger)' : ejecPct > 80 ? 'var(--at-warning)' : 'var(--at-success)' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'var(--at-surface)', border: `1px solid ${k.color}33`, borderRadius: 10, padding: '12px 14px', borderTop: `3px solid ${k.color}` }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '12px 14px', borderTop: `3px solid ${k.color}` }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.val}</div>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)', fontWeight: 600 }}>{k.label}</div>
             <div style={{ fontSize: 9, color: 'var(--at-ink-3)' }}>{k.sub}</div>

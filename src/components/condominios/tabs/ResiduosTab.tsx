@@ -4,6 +4,7 @@ import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '.
 import type { RegistroResiduo, TipoResiduo, EstadoResiduo } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   residuos: RegistroResiduo[]
@@ -212,7 +213,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
           <button key={t.value} onClick={() => setFiltroTipo(filtroTipo === t.value ? 'todos' : t.value)}
             style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: filtroTipo === t.value ? t.color : 'var(--at-line)',
-              background: filtroTipo === t.value ? `${t.color}18` : 'var(--at-surface)',
+              background: filtroTipo === t.value ? tint(t.color, 9) : 'var(--at-surface)',
               color: filtroTipo === t.value ? t.color : 'var(--at-ink-3)' }}>
             {t.icon} {t.label} ({residuos.filter(r => r.tipo_residuo === t.value).length})
           </button>

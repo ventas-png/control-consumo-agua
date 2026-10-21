@@ -7,6 +7,7 @@ import {
   SolicitudConcierge, SolicitudCertificado, SolicitudRentaUnidad,
   SolicitudMudanzaUnidad, ComunicadoCondominio,
 } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -321,7 +322,7 @@ export default function CentroNotificacionesTab({
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: cfg.color }}>{n.titulo}</span>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: cfg.color, background: `${cfg.color}22`,
+                    <span style={{ fontSize: 9, fontWeight: 700, color: cfg.color, background: tint(cfg.color, 13),
                       padding: '2px 7px', borderRadius: 10, border: `1px solid ${cfg.border}` }}>
                       {cfg.label}
                     </span>

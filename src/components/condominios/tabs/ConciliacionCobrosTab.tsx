@@ -5,6 +5,7 @@ import { createCondominioRow, updateCondominioRow } from '../../../domain/condom
 import { fetchCuotaCondominioNotas } from '../../../domain/condominios/tabQueries'
 import { CuotaCondominio, Unidad, ConciliacionCobrosLog } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -116,7 +117,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
           { label: 'Conciliadas hoy', val: conciliacionesHoy.length, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
           { label: 'Cobrado hoy', val: `${moneda} ${montoConciliadoHoy.toLocaleString('es', { maximumFractionDigits: 0 })}`, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
+          <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>

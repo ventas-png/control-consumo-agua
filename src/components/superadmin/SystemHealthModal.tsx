@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react'
 import { ModalPortal } from '../shared/ModalPortal'
+import { tint } from '../shared/statusTone'
 
 // ============================================================================
 // SystemHealthModal — F4.4.3: dashboard de salud del sistema para superadmin.
@@ -264,7 +265,7 @@ function StatusDot({ variant, large = false }: { variant: 'ok' | 'degraded' | 'e
       style={{
         display: 'inline-block', width: size, height: size, borderRadius: '50%',
         background: statusColor(variant),
-        boxShadow: variant === 'ok' && large ? `0 0 0 4px ${statusColor(variant)}33` : undefined,
+        boxShadow: variant === 'ok' && large ? `0 0 0 4px ${tint(statusColor(variant), 20)}` : undefined,
       }}
     />
   )

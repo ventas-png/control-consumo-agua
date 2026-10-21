@@ -3,6 +3,7 @@ import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { TicketMantenimiento, EstadoTicket, PrioridadTicket } from '../../../types'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -142,7 +143,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
         {COLUMNAS.map(col => (
           <div key={col.estado} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {/* Column header */}
-            <div style={{ background: col.bgHeader, border: `1px solid ${col.color}33`, borderRadius: '10px 10px 0 0', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ background: col.bgHeader, border: `1px solid ${tint(col.color, 20)}`, borderRadius: '10px 10px 0 0', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 700, fontSize: 12, color: col.color }}>{col.label}</span>
               <span style={{ background: col.color, color: 'white', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
                 {porColumna[col.estado].length}
@@ -150,7 +151,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
             </div>
 
             {/* Cards */}
-            <div style={{ background: col.bg, border: `1px solid ${col.color}22`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 8, minHeight: 120, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ background: col.bg, border: `1px solid ${tint(col.color, 13)}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 8, minHeight: 120, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {porColumna[col.estado].length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--at-line-strong)', fontSize: 12 }}>Sin tickets</div>
               ) : (

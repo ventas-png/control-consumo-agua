@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { GastoCondominio, PresupuestoCondominio, CategoriaGasto } from '../../../types'
 import { parseFechaCalendario } from '../../../lib/format'
+import { tint } from '../../shared/statusTone'
 
 interface Props {
   gastos: GastoCondominio[]
@@ -105,7 +106,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
           { label: 'Variación', val: fmt(totalReal - totalPresup, moneda), color: totalReal <= totalPresup ? 'var(--at-success)' : 'var(--at-danger)', bg: 'var(--at-surface-2)' },
           { ...semaforo(totalPct), label: 'Ejecución', val: `${totalPct}%` },
         ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '10px 14px' }}>
+          <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${tint(k.color, 13)}`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 2 }}>{k.label}</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.val}</div>
           </div>
