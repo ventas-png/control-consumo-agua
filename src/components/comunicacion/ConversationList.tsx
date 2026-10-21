@@ -1,5 +1,7 @@
 import type { Conversation } from '../../types'
-import { STATUS_COLORS, STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, CATEGORY_LABELS, formatDate } from './conversationConstants'
+import { EmptyState } from '../shared/EmptyState'
+import { PriorityPill, StatusPill } from './ConversationBadges'
+import { CATEGORY_ICONS, CATEGORY_LABELS, formatDate, initials } from './conversationConstants'
 
 interface Props {
   conversations: Conversation[]
@@ -21,77 +23,91 @@ export function ConversationList({ conversations, activeId, onSelect, filter, un
 
   if (filtered.length === 0) {
     return (
-      <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--at-ink-3)' }}>
-        <div style={{ fontSize: '32px', marginBottom: '8px' }}>💬</div>
-        <div style={{ fontSize: '13px' }}>No hay conversaciones</div>
-      </div>
+      <EmptyState
+        compact
+        icon="💬"
+        title={filter ? `Sin resultados para “${filter}”` : 'No hay conversaciones'}
+        description={filter ? 'Prueba con otro nombre o asunto.' : 'Cuando haya conversaciones aparecerán aquí.'}
+      />
     )
   }
 
   return (
-    <div>
+    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {filtered.map(conv => {
         const isActive = conv.id === activeId
         const isUnseen = unseenConvIds.has(conv.id)
+        // "Media"/"Baja" en cada fila era ruido: solo se destaca lo que pide atención.
+        const showPriority = conv.priority === 'alta' || conv.priority === 'urgente'
         return (
-          <button
-            key={conv.id}
-            onClick={() => onSelect(conv.id)}
-            style={{
-              width: '100%', textAlign: 'left', padding: '12px 14px',
-              border: 'none', borderBottom: '1px solid var(--at-chip)',
-              background: isActive ? 'var(--at-primary-tint)' : isUnseen ? 'var(--at-warning-tint)' : 'var(--at-surface)',
-              cursor: 'pointer', transition: 'background 0.12s',
-              display: 'flex', flexDirection: 'column', gap: '4px',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-              <span style={{
-                fontSize: '13px', fontWeight: isUnseen ? 700 : 600,
-                color: isActive ? 'var(--at-primary-hover)' : 'var(--at-ink)', lineHeight: '1.3',
-                flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                display: 'flex', alignItems: 'center', gap: '6px',
+          <li key={conv.id}>
+            <button
+              type="button"
+              className="conv-row"
+              onClick={() => onSelect(conv.id)}
+              aria-current={isActive ? 'true' : undefined}
+              style={{
+                width: '100%', textAlign: 'left', padding: '12px 14px 12px 12px',
+                borderTop: 'none', borderRight: 'none', borderBottom: '1px solid var(--at-line)',
+                borderLeft: `3px solid ${isActive ? 'var(--at-primary)' : isUnseen ? 'var(--at-warning)' : 'transparent'}`,
+                background: isActive ? 'var(--at-primary-tint)' : isUnseen ? 'var(--at-warning-tint)' : 'var(--at-surface)',
+                cursor: 'pointer', transition: 'background 0.12s',
+                display: 'flex', alignItems: 'flex-start', gap: '12px',
+                color: 'var(--at-ink)',
+              }}
+            >
+              {/* Avatar: iniciales del cliente, o el edificio para el equipo */}
+              <span aria-hidden="true" style={{
+                width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: conv.is_internal ? '18px' : '14px', fontWeight: 700,
+                background: conv.is_internal ? 'var(--at-accent-tint)' : 'var(--at-primary-soft)',
+                color: conv.is_internal ? 'var(--at-accent-dark)' : 'var(--at-primary-hover)',
               }}>
-                {isUnseen && (
-                  <span className="new-assignment-dot" style={{
-                    display: 'inline-block', width: '8px', height: '8px',
-                    borderRadius: '50%', background: 'var(--at-warning)', flexShrink: 0,
-                  }} />
-                )}
-                {conv.subject}
+                {conv.is_internal ? '🏢' : initials(conv.cliente_nombre)}
               </span>
-              <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', flexShrink: 0 }}>
-                {formatDate(conv.updated_at)}
-              </span>
-            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                {conv.cliente_nombre ?? 'Cliente'}
-              </span>
-              <span style={{
-                fontSize: '10px', padding: '1px 6px', borderRadius: '999px',
-                background: STATUS_COLORS[conv.status] + '18', color: STATUS_COLORS[conv.status],
-                fontWeight: 600, flexShrink: 0,
-              }}>
-                {STATUS_LABELS[conv.status]}
-              </span>
-              <span style={{
-                fontSize: '10px', padding: '1px 6px', borderRadius: '999px',
-                background: PRIORITY_COLORS[conv.priority] + '18', color: PRIORITY_COLORS[conv.priority],
-                fontWeight: 600, flexShrink: 0,
-              }}>
-                {PRIORITY_LABELS[conv.priority]}
-              </span>
-            </div>
+              <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <span style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                  <span style={{
+                    flex: 1, minWidth: 0, fontSize: '14px', fontWeight: isUnseen ? 800 : 700,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                  }}>
+                    {isUnseen && (
+                      <span className="new-assignment-dot" title="Asignada a ti, sin ver" style={{
+                        display: 'inline-block', width: '8px', height: '8px',
+                        borderRadius: '50%', background: 'var(--at-warning)', flexShrink: 0,
+                      }} />
+                    )}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.subject}</span>
+                  </span>
+                  <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', flexShrink: 0 }}>
+                    {formatDate(conv.updated_at)}
+                  </span>
+                </span>
 
-            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
-              {CATEGORY_LABELS[conv.category]}
-              {conv.assigned_name && ` · Asignado: ${conv.assigned_name}`}
-            </div>
-          </button>
+                <span style={{ fontSize: '12.5px', color: 'var(--at-ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {conv.is_internal ? 'Discusión de equipo' : (conv.cliente_nombre ?? 'Cliente')}
+                </span>
+
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                  <StatusPill status={conv.status} />
+                  {showPriority && <PriorityPill priority={conv.priority} />}
+                  <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>
+                    {CATEGORY_ICONS[conv.category]} {CATEGORY_LABELS[conv.category]}
+                  </span>
+                  {conv.assigned_name && (
+                    <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>
+                      · 👤 {conv.assigned_name}
+                    </span>
+                  )}
+                </span>
+              </span>
+            </button>
+          </li>
         )
       })}
-    </div>
+    </ul>
   )
 }

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { notify } from '../shared/Dialog'
+import { Button } from '../shared/Button'
+import { EditModal } from '../shared/EditModal'
 import { useConversations } from '../../hooks/useConversations'
 import { useTeamUsersQuery } from '../../domain/comunicacion/queries'
 import { sanitizeInput } from '../../lib/validation'
@@ -19,7 +21,7 @@ import { AssignToUsersModal } from './AssignToUsersModal'
 import { AccessRulesPanel } from './AccessRulesPanel'
 import { ConversationStatsBar } from './ConversationStatsBar'
 import { ConversationListPanel } from './ConversationListPanel'
-import { ConversationDetailView } from './ConversationDetailView'
+import { ConversationDetailModal } from './ConversationDetailModal'
 import { NotificationPreferencesPanel } from './NotificationPreferencesPanel'
 import type {
   UserSession,
@@ -155,7 +157,10 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
   const unidadesVisibles = useMemo(() => filterUnidadesByProjectAccess(unidades, scope), [unidades, scope])
 
   const [mainTab, setMainTab] = useState<MainTab>('conversaciones')
-  const [view, setView] = useState<'list' | 'detail' | 'config'>('list')
+  // El detalle y la configuración se abren como ventanas emergentes sobre la
+  // lista (antes compartían la fila con ella y en el teléfono no cabían).
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [showConfig, setShowConfig] = useState(false)
   const [convTab, setConvTab] = useState<'clientes' | 'equipo'>('clientes')
   const [filterText, setFilterText] = useState('')
   const [filterStatus, setFilterStatus] = useState<ConversationStatus | 'todas'>('todas')
@@ -215,7 +220,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       setShowNuevaModal(false)
       if (conv) {
         loadMessages(conv.id)
-        setView('detail')
+        setDetailOpen(true)
       }
     } catch {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo crear la conversación.' })
@@ -232,7 +237,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       setShowNuevaInternaModal(false)
       if (conv) {
         loadMessages(conv.id)
-        setView('detail')
+        setDetailOpen(true)
       }
     } catch {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo crear la discusión.' })
@@ -249,8 +254,11 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
 
   function handleSelectConversation(id: string) {
     loadMessages(id)
-    setView('detail')
+    setDetailOpen(true)
+    // El borrador (texto y adjunto) es de la conversación en la que se
+    // escribió: no debe viajar a la siguiente que se abra.
     setMessageText('')
+    setPendingFile(null)
     // Si hay una asignación no vista para el usuario actual, marcarla como vista
     const hasUnseen = assignments.some(
       a => a.conversation_id === id && a.user_id === currentUser.user_id && !a.seen_at
@@ -389,17 +397,27 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* ── Main tabs: Conversaciones / Difusión / Notificaciones ── */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid var(--at-line)', paddingBottom: '0' }}>
+      {/* ── Main tabs: Conversaciones / Difusión / Notificaciones ──
+          Una sola fila con scroll horizontal: en el teléfono "Notificaciones"
+          quedaba cortada contra el borde. */}
+      <div
+        role="tablist"
+        aria-label="Centro de comunicación"
+        className="tab-strip-scrollable"
+        style={{ display: 'flex', gap: '4px', borderBottom: '2px solid var(--at-line)', overflowX: 'auto' }}
+      >
         {mainTabs.map(tab => {
           const active = mainTab === tab
           return (
             <button
               key={tab}
+              type="button"
+              role="tab"
+              aria-selected={active}
               onClick={() => setMainTab(tab)}
               style={{
-                padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
-                fontSize: '14px', fontWeight: active ? 700 : 500,
+                padding: '10px 16px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: '14px', fontWeight: active ? 700 : 500, whiteSpace: 'nowrap', flexShrink: 0,
                 color: active ? 'var(--at-primary)' : 'var(--at-ink-3)',
                 borderBottom: active ? '2px solid var(--at-primary)' : '2px solid transparent',
                 marginBottom: '-2px', transition: 'all 0.13s ease',
@@ -439,60 +457,95 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Centro de Comunicación</h2>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: 'var(--at-ink)' }}>Centro de Comunicación</h2>
           <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
-            Gestión de conversaciones con clientes
+            {convTab === 'equipo'
+              ? 'Discusiones internas del equipo'
+              : `Conversaciones con ${clientesTabLabel.toLowerCase()}`}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {canCreate && convTab === 'clientes' && (
-            <button
-              onClick={() => setShowNuevaModal(true)}
-              style={{ padding: '8px 14px', border: 'none', borderRadius: '8px', background: 'var(--at-primary)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
+            <Button variant="primary" onClick={() => setShowNuevaModal(true)}>
               + Nueva conversación
-            </button>
+            </Button>
           )}
           {canCreate && convTab === 'equipo' && (
-            <button
-              onClick={() => setShowNuevaInternaModal(true)}
-              style={{ padding: '8px 14px', border: 'none', borderRadius: '8px', background: 'var(--at-accent-hover)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
+            <Button variant="gradient-accent" onClick={() => setShowNuevaInternaModal(true)}>
               + Nueva discusión
-            </button>
+            </Button>
           )}
           {isAdmin && (
-            <button
-              onClick={() => setView(view === 'config' ? 'list' : 'config')}
-              style={{
-                padding: '8px 14px',
-                border: '1px solid var(--at-line-strong)',
-                borderRadius: '8px',
-                background: view === 'config' ? 'var(--at-primary-tint)' : 'var(--at-surface)',
-                color: 'var(--at-ink-2)',
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              ⚙️ Configurar accesos
-            </button>
+            <Button variant="secondary" onClick={() => setShowConfig(true)} iconLeft={TAB_ICONS.preferencias}>
+              Configurar accesos
+            </Button>
           )}
         </div>
       </div>
 
-      {/* ── Stats rápidas ── */}
-      <ConversationStatsBar stats={stats} />
+      {/* ── Stats rápidas (también filtran la lista) ── */}
+      <ConversationStatsBar
+        stats={stats}
+        activeStatus={convTab === 'clientes' ? filterStatus : 'todas'}
+        onSelectStatus={status => { setConvTab('clientes'); setFilterStatus(status) }}
+      />
 
-      {/* ── Vista Configuración ── */}
-      {view === 'config' && isAdmin && (
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 700, color: 'var(--at-ink)' }}>
-            Reglas de Acceso por Rol
-          </h3>
+      {/* ── Lista (el detalle se abre en ventana emergente) ── */}
+      <ConversationListPanel
+        convTab={convTab}
+        onChangeTab={setConvTab}
+        clientesTabLabel={clientesTabLabel}
+        clientConvCount={clientConvs.length}
+        teamConvCount={teamConvs.length}
+        filterText={filterText}
+        onFilterText={setFilterText}
+        filterStatus={filterStatus}
+        onFilterStatus={setFilterStatus}
+        filterCategory={filterCategory}
+        onFilterCategory={setFilterCategory}
+        serviceType={serviceType}
+        loading={loading}
+        visibleConversations={visibleConversations}
+        activeConversationId={activeConversationId}
+        onSelect={handleSelectConversation}
+        unseenConvIds={unseenConvIds}
+      />
+
+      {/* ── Ventana: detalle de conversación ── */}
+      {detailOpen && activeConversation && (
+        <ConversationDetailModal
+          conversation={activeConversation}
+          messages={messages}
+          canCreate={canCreate}
+          canEdit={canEdit}
+          currentUserId={currentUser.user_id}
+          activeAssignments={activeAssignments}
+          onClose={() => setDetailOpen(false)}
+          onChangeStatus={handleChangeStatus}
+          onAssignToMe={handleAssignToMe}
+          onUnassign={handleUnassign}
+          onOpenAssignModal={handleOpenAssignModal}
+          onRemoveAssignment={handleRemoveAssignment}
+          messageText={messageText}
+          onChangeMessage={setMessageText}
+          isInternalNote={isInternalNote}
+          onToggleInternalNote={setIsInternalNote}
+          pendingFile={pendingFile}
+          onPickFile={setPendingFile}
+          sending={sending}
+          onSendMessage={handleSendMessage}
+        />
+      )}
+
+      {/* ── Ventana: reglas de acceso por rol ── */}
+      {showConfig && isAdmin && (
+        <EditModal
+          title="Reglas de acceso por rol"
+          size="md"
+          onClose={() => setShowConfig(false)}
+          footer={<Button variant="secondary" size="sm" onClick={() => setShowConfig(false)}>Cerrar</Button>}
+        >
           <AccessRulesPanel
             companyId={currentUser.company_id!}
             accessRules={accessRules}
@@ -500,64 +553,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
             canEdit={canEditRules}
             serviceType={serviceType}
           />
-        </div>
-      )}
-
-      {/* ── Vista Lista + Detalle ── */}
-      {view !== 'config' && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: view === 'detail' ? '320px 1fr' : '1fr',
-          gap: '16px',
-          alignItems: 'start',
-          minHeight: '500px',
-        }}>
-          <ConversationListPanel
-            convTab={convTab}
-            onChangeTab={tab => { setConvTab(tab); setView('list') }}
-            clientesTabLabel={clientesTabLabel}
-            clientConvCount={clientConvs.length}
-            teamConvCount={teamConvs.length}
-            filterText={filterText}
-            onFilterText={setFilterText}
-            filterStatus={filterStatus}
-            onFilterStatus={setFilterStatus}
-            filterCategory={filterCategory}
-            onFilterCategory={setFilterCategory}
-            serviceType={serviceType}
-            loading={loading}
-            visibleConversations={visibleConversations}
-            activeConversationId={activeConversationId}
-            onSelect={handleSelectConversation}
-            unseenConvIds={unseenConvIds}
-          />
-
-          {/* Detalle */}
-          {view === 'detail' && activeConversation && (
-            <ConversationDetailView
-              conversation={activeConversation}
-              messages={messages}
-              canCreate={canCreate}
-              canEdit={canEdit}
-              currentUserId={currentUser.user_id}
-              activeAssignments={activeAssignments}
-              onBack={() => setView('list')}
-              onChangeStatus={handleChangeStatus}
-              onAssignToMe={handleAssignToMe}
-              onUnassign={handleUnassign}
-              onOpenAssignModal={handleOpenAssignModal}
-              onRemoveAssignment={handleRemoveAssignment}
-              messageText={messageText}
-              onChangeMessage={setMessageText}
-              isInternalNote={isInternalNote}
-              onToggleInternalNote={setIsInternalNote}
-              pendingFile={pendingFile}
-              onPickFile={setPendingFile}
-              sending={sending}
-              onSendMessage={handleSendMessage}
-            />
-          )}
-        </div>
+        </EditModal>
       )}
 
       {/* ── Modal Nueva Conversación (cliente) ── */}
@@ -582,7 +578,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
         />
       )}
 
-      {/* ── Modal Asignar a usuarios ── */}
+      {/* ── Modal Asignar a usuarios (se apila sobre la conversación abierta) ── */}
       {showAssignModal && activeConversationId && (
         <AssignToUsersModal
           teamUsers={teamUsers}

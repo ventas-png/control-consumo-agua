@@ -6,6 +6,7 @@ import { NotificationPreferencesPanel } from '../comunicacion/NotificationPrefer
 import { sanitizeInput } from '../../lib/validation'
 import { SecureImage } from '../shared/SecureImage'
 import { useSignedUrl } from '../../lib/storageUrls'
+import { tint } from '../comunicacion/conversationConstants'
 
 function ChatAttachmentImage({ src, name, body }: { src: string; name?: string | null; body?: string | null }) {
   const signed = useSignedUrl(src, 'conv-attachments')
@@ -438,7 +439,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     padding: '6px 14px',
                     border: `2px solid ${newPriority === val ? color : 'var(--at-line)'}`,
                     borderRadius: '999px',
-                    background: newPriority === val ? color + '18' : 'var(--at-surface)',
+                    background: newPriority === val ? tint(color) : 'var(--at-surface)',
                     color: newPriority === val ? color : 'var(--at-ink-3)',
                     fontSize: '12px',
                     fontWeight: 600,
@@ -596,7 +597,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   <span style={{
                     fontSize: '11.5px', padding: '2px 9px',
                     borderRadius: '999px',
-                    background: STATUS_COLORS[conv.status] + '18',
+                    background: tint(STATUS_COLORS[conv.status]),
                     color: STATUS_COLORS[conv.status],
                     fontWeight: 600,
                   }}>
@@ -646,7 +647,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               <span style={{
                 fontSize: '11.5px', padding: '3px 10px',
                 borderRadius: '999px',
-                background: STATUS_COLORS[activeConversation.status] + '18',
+                background: tint(STATUS_COLORS[activeConversation.status]),
                 color: STATUS_COLORS[activeConversation.status],
                 fontWeight: 600,
               }}>

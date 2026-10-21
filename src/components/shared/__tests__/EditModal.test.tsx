@@ -151,6 +151,38 @@ describe('EditModal — size variants', () => {
   })
 })
 
+describe('EditModal — height y fullScreenOnMobile', () => {
+  it('height fija el alto del panel, acotado a 90vh', () => {
+    const { baseElement } = render(
+      <EditModal title="Chat" height="820px" onClose={() => {}}>
+        <p>x</p>
+      </EditModal>,
+    )
+    const card = baseElement.querySelector('[role="dialog"]')?.firstChild as HTMLElement
+    expect(card.style.height).toBe('min(820px, 90vh)')
+  })
+
+  it('sin height el panel conserva su alto natural', () => {
+    const { baseElement } = render(<EditModal title="x" onClose={() => {}}><p>x</p></EditModal>)
+    const card = baseElement.querySelector('[role="dialog"]')?.firstChild as HTMLElement
+    expect(card.style.height).toBe('')
+  })
+
+  it('fullScreenOnMobile marca el overlay para las reglas de index.css', () => {
+    const { baseElement } = render(
+      <EditModal title="Chat" fullScreenOnMobile onClose={() => {}}>
+        <p>x</p>
+      </EditModal>,
+    )
+    expect(baseElement.querySelector('[role="dialog"]')?.classList.contains('at-modal--fs-mobile')).toBe(true)
+  })
+
+  it('sin fullScreenOnMobile el overlay no lleva la clase', () => {
+    const { baseElement } = render(<EditModal title="x" onClose={() => {}}><p>x</p></EditModal>)
+    expect(baseElement.querySelector('[role="dialog"]')?.classList.contains('at-modal--fs-mobile')).toBe(false)
+  })
+})
+
 describe('EditModal — noPadding', () => {
   it('body sin padding cuando noPadding=true', () => {
     const { baseElement } = render(
@@ -210,6 +242,22 @@ describe('EditModal — comportamiento controlable', () => {
     )
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('con modales anidados, Escape cierra solo el de arriba', () => {
+    const cerrarExterno = vi.fn()
+    const cerrarInterno = vi.fn()
+    render(<EditModal title="Conversación" onClose={cerrarExterno}><p>a</p></EditModal>)
+    const interno = render(<EditModal title="Asignar a…" onClose={cerrarInterno}><p>b</p></EditModal>)
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(cerrarInterno).toHaveBeenCalledTimes(1)
+    expect(cerrarExterno).not.toHaveBeenCalled()
+
+    // Cerrado el de arriba, el siguiente Escape ya es del de abajo.
+    interno.unmount()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(cerrarExterno).toHaveBeenCalledTimes(1)
   })
 
   it('NO cierra con Escape cuando closeOnEscape=false', () => {

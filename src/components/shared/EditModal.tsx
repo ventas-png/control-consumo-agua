@@ -10,6 +10,12 @@ export type EditModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full'
 let scrollLockCount = 0
 let overflowOriginal = ''
 
+// ── Pila de modales abiertos (el último es el de arriba) ─────────────────────
+// Cada instancia escucha Escape en el `document`, así que con modales anidados
+// —"Asignar a…" sobre una conversación abierta— una sola pulsación cerraba los
+// dos. Solo reacciona el que está en la cima de la pila.
+const modalStack: object[] = []
+
 const SIZE_WIDTHS: Record<EditModalSize, string> = {
   sm: '480px',
   md: '760px', // legacy default (mantener para retro-compat)
@@ -49,6 +55,19 @@ interface EditModalProps {
 
   /** Default true: cerrar al presionar Escape. */
   closeOnEscape?: boolean
+
+  /**
+   * Alto fijo del panel (se acota a 90vh). Para contenidos que crecen después
+   * de abrir —un chat que baja sus mensajes— y no deben hacer "saltar" el modal.
+   */
+  height?: string
+
+  /**
+   * En teléfonos (<768px) el panel ocupa toda la pantalla en vez de flotar
+   * centrado con márgenes. Pensado para vistas de trabajo (un chat) donde
+   * cada píxel cuenta; las reglas viven en index.css (`.at-modal--fs-mobile`).
+   */
+  fullScreenOnMobile?: boolean
 }
 
 export function EditModal({
@@ -63,6 +82,8 @@ export function EditModal({
   noPadding = false,
   closeOnBackdropClick = true,
   closeOnEscape = true,
+  height,
+  fullScreenOnMobile = false,
 }: EditModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   /** Elemento que tenía el foco antes de abrir, para devolvérselo al cerrar. */
@@ -102,10 +123,22 @@ export function EditModal({
     }
   }, [])
 
+  const stackIdRef = useRef<object>({})
+  useEffect(() => {
+    const id = stackIdRef.current
+    modalStack.push(id)
+    return () => {
+      const i = modalStack.lastIndexOf(id)
+      if (i !== -1) modalStack.splice(i, 1)
+    }
+  }, [])
+
   useEffect(() => {
     if (!closeOnEscape) return
     function handleKeyDown(e: globalThis.KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      if (modalStack[modalStack.length - 1] !== stackIdRef.current) return
+      onClose()
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
@@ -140,6 +173,7 @@ export function EditModal({
          de tabulación, así el focus trap de abajo tampoco lo lista. */
       tabIndex={-1}
       onKeyDown={handleFocusTrap}
+      className={fullScreenOnMobile ? 'at-modal--fs-mobile' : undefined}
       style={{
         position: 'fixed',
         inset: 0,
@@ -157,12 +191,14 @@ export function EditModal({
       }}
     >
       <div
+        className="at-modal-panel"
         style={{
           background: 'var(--at-surface)',
           borderRadius: '16px',
           width: '100%',
           maxWidth: `min(${resolvedMaxWidth}, 95vw)`,
           maxHeight: '90vh',
+          height: height ? `min(${height}, 90vh)` : undefined,
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
@@ -170,6 +206,7 @@ export function EditModal({
       >
         {/* Header */}
         <div
+          className="at-modal-header"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -228,6 +265,7 @@ export function EditModal({
         {/* Sticky footer */}
         {footer && (
           <div
+            className="at-modal-footer"
             style={{
               display: 'flex',
               alignItems: 'center',
