@@ -81,7 +81,7 @@ describe('ImportModal — cierre', () => {
         onImportado={() => {}}
       />
     )
-    fireEvent.click(screen.getByLabelText('Cerrar'))
+    fireEvent.click(screen.getByLabelText('Cerrar modal'))
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -97,10 +97,9 @@ describe('ImportModal — cierre', () => {
         onImportado={() => {}}
       />
     )
-    // El overlay ya no cuelga del contenedor de render: va por portal al body
-    // (ver ModalPortal), así que se busca ahí.
-    const overlay = document.body.querySelector('[data-testid="import-modal-overlay"]')
-    fireEvent.click(overlay as Element)
+    // El fondo de la ventana es el propio role="dialog" (EditModal, por portal).
+    const overlay = screen.getByRole('dialog')
+    fireEvent.click(overlay)
     expect(onClose).toHaveBeenCalled()
   })
 })

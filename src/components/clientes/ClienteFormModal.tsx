@@ -8,8 +8,18 @@ import { USO_CFDI_OPCIONES } from './usoCfdi'
 
 export function ClienteFormModal({ ctx }: { ctx: ClientesCtx }) {
   const { esFEL, esCFDI, muestraFiscal, form, setForm, editingId, loading, onboardingStep, setOnboardingStep, lookupForm, setLookupForm, lookupResult, modalTitle, cancelForm, handleLookup, proceedToFullForm, handleGuardar } = ctx
+  // Mientras se busca/vincula o se guarda, ni Escape ni un toque en el fondo
+  // cierran la ventana a medio camino.
+  const ocupado = loading || onboardingStep === 'lookup_loading'
   return (
-        <EditModal title={modalTitle} onClose={cancelForm} maxWidth="700px">
+        <EditModal
+          title={modalTitle}
+          onClose={cancelForm}
+          maxWidth="700px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!ocupado}
+          closeOnEscape={!ocupado}
+        >
 
       {/* Lookup Form - Step 1 */}
       {(onboardingStep === 'lookup' || onboardingStep === 'lookup_loading') && (
@@ -57,7 +67,7 @@ export function ClienteFormModal({ ctx }: { ctx: ClientesCtx }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
             <button
               onClick={handleLookup}
               disabled={onboardingStep === 'lookup_loading'}
@@ -125,7 +135,7 @@ export function ClienteFormModal({ ctx }: { ctx: ClientesCtx }) {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button
               onClick={() => setOnboardingStep('lookup')}
               style={{
@@ -179,7 +189,8 @@ export function ClienteFormModal({ ctx }: { ctx: ClientesCtx }) {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          {/* flexWrap: los tres botones no caben en una línea del teléfono. */}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button
               onClick={proceedToFullForm}
               style={{
@@ -466,7 +477,7 @@ export function ClienteFormModal({ ctx }: { ctx: ClientesCtx }) {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button
               onClick={handleGuardar}
               disabled={loading}

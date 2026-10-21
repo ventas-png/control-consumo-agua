@@ -337,7 +337,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
 
   const inputStyle = {
     padding: '9px 12px', border: '2px solid var(--at-line)', borderRadius: '8px',
-    fontSize: '14px', width: '100%', boxSizing: 'border-box' as const, outline: 'none',
+    fontSize: '14px', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' as const, outline: 'none',
   }
   const labelStyle = {
     fontSize: '13px', fontWeight: 600 as const, color: 'var(--at-ink-2)',
@@ -357,11 +357,18 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
   const unidadNombre = (id: string) =>
     clienteUnidades.find(u => u.id === id)?.nombre ?? id
 
+  // Con un contrato o una reserva guardándose, Escape o un toque en el fondo
+  // no cierran la ventana.
+  const guardando = savingContrato || savingSTR
+
   return (
     <EditModal
       title={`Rentas — ${cliente.nombre}`}
       onClose={onClose}
       maxWidth="860px"
+      fullScreenOnMobile
+      closeOnBackdropClick={!guardando}
+      closeOnEscape={!guardando}
     >
       {/* Client units summary */}
       {clienteUnidades.length === 0 ? (
@@ -398,7 +405,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 style={{
-                  padding: '10px 20px', border: 'none', cursor: 'pointer',
+                  // Relleno lateral que se encoge en el teléfono: con 20px fijos
+                  // la segunda pestaña partía su nombre en dos líneas.
+                  padding: '10px clamp(10px, 3vw, 20px)', border: 'none', cursor: 'pointer',
                   fontWeight: 600, fontSize: '14px', background: 'transparent',
                   borderBottom: activeTab === tab ? '3px solid var(--at-primary)' : '3px solid transparent',
                   color: activeTab === tab ? 'var(--at-primary)' : 'var(--at-ink-3)',
@@ -439,8 +448,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                         {clienteUnidades.length > 1 && (
                           <div>
-                            <label style={labelStyle}>Unidad *</label>
+                            <label htmlFor="renta-unidad" style={labelStyle}>Unidad *</label>
                             <select
+                              id="renta-unidad"
                               style={inputStyle}
                               value={contratoForm.unidad_id}
                               onChange={e => setContratoForm(f => ({ ...f, unidad_id: e.target.value }))}
@@ -453,8 +463,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           </div>
                         )}
                         <div style={{ gridColumn: clienteUnidades.length > 1 ? 'auto' : '1 / -1' }}>
-                          <label style={labelStyle}>Nombre del Arrendatario *</label>
+                          <label htmlFor="renta-nombre" style={labelStyle}>Nombre del Arrendatario *</label>
                           <input
+                            id="renta-nombre"
                             style={inputStyle}
                             value={contratoForm.arrendatario_nombre}
                             onChange={e => setContratoForm(f => ({ ...f, arrendatario_nombre: e.target.value }))}
@@ -463,8 +474,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Identificación (DPI/DUI)</label>
+                          <label htmlFor="renta-identificacion" style={labelStyle}>Identificación (DPI/DUI)</label>
                           <input
+                            id="renta-identificacion"
                             style={inputStyle}
                             value={contratoForm.arrendatario_identificacion}
                             onChange={e => setContratoForm(f => ({ ...f, arrendatario_identificacion: e.target.value }))}
@@ -473,8 +485,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Teléfono</label>
+                          <label htmlFor="renta-telefono" style={labelStyle}>Teléfono</label>
                           <input
+                            id="renta-telefono"
                             style={inputStyle}
                             value={contratoForm.arrendatario_telefono}
                             onChange={e => setContratoForm(f => ({ ...f, arrendatario_telefono: e.target.value }))}
@@ -483,8 +496,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Correo Electrónico</label>
+                          <label htmlFor="renta-email" style={labelStyle}>Correo Electrónico</label>
                           <input
+                            id="renta-email"
                             style={inputStyle}
                             type="email"
                             value={contratoForm.arrendatario_email}
@@ -494,8 +508,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Monto de Renta *</label>
+                          <label htmlFor="renta-monto" style={labelStyle}>Monto de Renta *</label>
                           <input
+                            id="renta-monto"
                             style={inputStyle}
                             type="number"
                             min="0"
@@ -506,8 +521,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Día de Pago</label>
+                          <label htmlFor="renta-dia-pago" style={labelStyle}>Día de Pago</label>
                           <input
+                            id="renta-dia-pago"
                             style={inputStyle}
                             type="number"
                             min="1" max="31"
@@ -516,8 +532,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Fecha de Inicio *</label>
+                          <label htmlFor="renta-inicio" style={labelStyle}>Fecha de Inicio *</label>
                           <input
+                            id="renta-inicio"
                             style={inputStyle}
                             type="date"
                             value={contratoForm.fecha_inicio}
@@ -525,8 +542,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Fecha de Fin</label>
+                          <label htmlFor="renta-fin" style={labelStyle}>Fecha de Fin</label>
                           <input
+                            id="renta-fin"
                             style={inputStyle}
                             type="date"
                             value={contratoForm.fecha_fin}
@@ -534,8 +552,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Depósito</label>
+                          <label htmlFor="renta-deposito" style={labelStyle}>Depósito</label>
                           <input
+                            id="renta-deposito"
                             style={inputStyle}
                             type="number"
                             min="0"
@@ -546,8 +565,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div style={{ gridColumn: '1 / -1' }}>
-                          <label style={labelStyle}>Notas</label>
+                          <label htmlFor="renta-notas" style={labelStyle}>Notas</label>
                           <input
+                            id="renta-notas"
                             style={inputStyle}
                             value={contratoForm.notas}
                             onChange={e => setContratoForm(f => ({ ...f, notas: e.target.value }))}
@@ -667,8 +687,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                         {clienteUnidades.length > 1 && (
                           <div>
-                            <label style={labelStyle}>Unidad *</label>
+                            <label htmlFor="str-unidad" style={labelStyle}>Unidad *</label>
                             <select
+                              id="str-unidad"
                               style={inputStyle}
                               value={strForm.unidad_id}
                               onChange={e => setStrForm(f => ({ ...f, unidad_id: e.target.value }))}
@@ -681,8 +702,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           </div>
                         )}
                         <div style={{ gridColumn: clienteUnidades.length > 1 ? 'auto' : '1 / -1' }}>
-                          <label style={labelStyle}>Nombre del Huésped *</label>
+                          <label htmlFor="str-nombre" style={labelStyle}>Nombre del Huésped *</label>
                           <input
+                            id="str-nombre"
                             style={inputStyle}
                             value={strForm.huesped_nombre}
                             onChange={e => setStrForm(f => ({ ...f, huesped_nombre: e.target.value }))}
@@ -691,8 +713,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Correo Electrónico</label>
+                          <label htmlFor="str-email" style={labelStyle}>Correo Electrónico</label>
                           <input
+                            id="str-email"
                             style={inputStyle}
                             type="email"
                             value={strForm.huesped_email}
@@ -702,8 +725,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Teléfono</label>
+                          <label htmlFor="str-telefono" style={labelStyle}>Teléfono</label>
                           <input
+                            id="str-telefono"
                             style={inputStyle}
                             value={strForm.huesped_telefono}
                             onChange={e => setStrForm(f => ({ ...f, huesped_telefono: e.target.value }))}
@@ -712,8 +736,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Plataforma</label>
+                          <label htmlFor="str-plataforma" style={labelStyle}>Plataforma</label>
                           <select
+                            id="str-plataforma"
                             style={inputStyle}
                             value={strForm.plataforma}
                             onChange={e => setStrForm(f => ({ ...f, plataforma: e.target.value as PlataformaSTR }))}
@@ -724,8 +749,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           </select>
                         </div>
                         <div>
-                          <label style={labelStyle}>Fecha de Entrada *</label>
+                          <label htmlFor="str-entrada" style={labelStyle}>Fecha de Entrada *</label>
                           <input
+                            id="str-entrada"
                             style={inputStyle}
                             type="date"
                             value={strForm.fecha_entrada}
@@ -736,8 +762,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Fecha de Salida *</label>
+                          <label htmlFor="str-salida" style={labelStyle}>Fecha de Salida *</label>
                           <input
+                            id="str-salida"
                             style={inputStyle}
                             type="date"
                             value={strForm.fecha_salida}
@@ -748,8 +775,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Adultos</label>
+                          <label htmlFor="str-adultos" style={labelStyle}>Adultos</label>
                           <input
+                            id="str-adultos"
                             style={inputStyle}
                             type="number" min="1"
                             value={strForm.num_adultos}
@@ -757,8 +785,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Niños</label>
+                          <label htmlFor="str-ninos" style={labelStyle}>Niños</label>
                           <input
+                            id="str-ninos"
                             style={inputStyle}
                             type="number" min="0"
                             value={strForm.num_ninos}
@@ -766,8 +795,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Monto por Noche</label>
+                          <label htmlFor="str-monto-noche" style={labelStyle}>Monto por Noche</label>
                           <input
+                            id="str-monto-noche"
                             style={inputStyle}
                             type="number" min="0" step="0.01"
                             value={strForm.monto_noche}
@@ -779,7 +809,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>
+                          <label htmlFor="str-monto-total" style={labelStyle}>
                             Monto Total
                             {strForm.fecha_entrada && strForm.fecha_salida && (
                               <span style={{ fontWeight: 400, color: 'var(--at-ink-3)', marginLeft: '6px' }}>
@@ -788,6 +818,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                             )}
                           </label>
                           <input
+                            id="str-monto-total"
                             style={inputStyle}
                             type="number" min="0" step="0.01"
                             value={strForm.monto_total}
@@ -796,8 +827,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Estado</label>
+                          <label htmlFor="str-estado" style={labelStyle}>Estado</label>
                           <select
+                            id="str-estado"
                             style={inputStyle}
                             value={strForm.estado}
                             onChange={e => setStrForm(f => ({ ...f, estado: e.target.value as EstadoSTR }))}
@@ -808,8 +840,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
                           </select>
                         </div>
                         <div style={{ gridColumn: '1 / -1' }}>
-                          <label style={labelStyle}>Notas</label>
+                          <label htmlFor="str-notas" style={labelStyle}>Notas</label>
                           <input
+                            id="str-notas"
                             style={inputStyle}
                             value={strForm.notas}
                             onChange={e => setStrForm(f => ({ ...f, notas: e.target.value }))}

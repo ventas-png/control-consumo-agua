@@ -1,4 +1,4 @@
-import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent} from 'react'
+import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent, type KeyboardEvent } from 'react'
 import { notify } from '../shared/Dialog'
 import type { Cliente } from '../../types'
 import { fetchClientesForDedup } from '../../domain/clientes/queries'
@@ -8,7 +8,7 @@ import { validatedInsertMany } from '../../lib/validatedInsert'
 import { clienteInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput, validateEmail, validatePhoneNumber } from '../../lib/validation'
 import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
-import { ModalPortal } from '../shared/ModalPortal'
+import { EditModal } from '../shared/EditModal'
 
 function normalizeDate(raw: unknown): string | null {
   if (raw === null || raw === undefined || raw === '') return null
@@ -364,25 +364,10 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
   }
 
   // ── Styles ───────────────────────────────────────────────────────────────────
-  const overlayStyle: CSSProperties = {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 1000, padding: '16px',
-  }
-  const modalStyle: CSSProperties = {
-    background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '860px',
-    maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-  }
-  const headerStyle: CSSProperties = {
-    padding: '24px 28px 20px', borderBottom: '1px solid var(--at-line)',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  }
-  const bodyStyle: CSSProperties = {
-    padding: '24px 28px', overflowY: 'auto', flex: 1,
-  }
+  // Overlay, panel, cabecera y cuerpo los pone EditModal. El pie conserva su
+  // reparto (Volver a la izquierda, acciones a la derecha) dentro del de EditModal.
   const footerStyle: CSSProperties = {
-    padding: '16px 28px', borderTop: '1px solid var(--at-line)',
+    width: '100%',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px',
     flexWrap: 'wrap',
   }
@@ -427,287 +412,28 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
     return ''
   }
 
+  // Abrir el selector de archivo también con teclado (antes solo con clic).
+  function handleDropZoneKey(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      fileInputRef.current?.click()
+    }
+  }
+
+  // Durante la importación no se cierra con Escape ni tocando el fondo: el
+  // ciclo de lotes sigue en curso y el aviso pide no cerrar la ventana.
+  const importando = step === 'importing'
+
   return (
-    <ModalPortal>
-    <div style={overlayStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={modalStyle}>
-        {/* Header */}
-        <div style={headerStyle}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>
-              Importar clientes desde Excel
-            </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
-              {stepLabel()}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '22px', lineHeight: 1, padding: '4px' }}
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Body */}
-        <div style={bodyStyle}>
-
-          {/* Step: upload */}
-          {step === 'upload' && (
-            <div>
-              {/* Template download */}
-              <div style={{ marginBottom: '24px', padding: '16px 20px', background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontWeight: 600, color: 'var(--at-primary-hover)', fontSize: '14px' }}>Paso 1 — Descarga la plantilla</div>
-                  <div style={{ fontSize: '13px', color: 'var(--at-primary)', marginTop: '2px' }}>
-                    Incluye encabezados y 2 filas de ejemplo con los campos aceptados.
-                  </div>
-                </div>
-                <button onClick={descargarPlantilla} style={{ ...btnPrimary, background: 'var(--at-primary)', whiteSpace: 'nowrap' }}>
-                  ⬇ plantilla_clientes.xlsx
-                </button>
-              </div>
-
-              {/* Fields reference */}
-              <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1px solid var(--at-line)' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>Columnas de la plantilla:</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {['nombre *', 'codigo *', 'email', 'telefono', 'whatsapp', 'direccion', 'nacionalidad', 'cui_dui', 'fecha_nacimiento', 'numero_facturacion', 'telefono_alterno'].map(col => (
-                    <span
-                      key={col}
-                      style={{
-                        fontSize: '12px',
-                        background: col.endsWith('*') ? 'var(--at-primary-soft)' : 'var(--at-line)',
-                        color: col.endsWith('*') ? 'var(--at-ink-deep)' : 'var(--at-ink-2)',
-                        padding: '2px 8px', borderRadius: '4px', fontFamily: 'monospace',
-                      }}
-                    >
-                      {col}
-                    </span>
-                  ))}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '8px' }}>
-                  * Requerido — <code>fecha_nacimiento</code>: formato YYYY-MM-DD — teléfonos: 8 dígitos
-                </div>
-              </div>
-
-              {/* Drop zone */}
-              <div
-                onDrop={handleDrop}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-                onDragLeave={() => setDragOver(false)}
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  border: `2px dashed ${dragOver ? 'var(--at-primary)' : 'var(--at-line-strong)'}`,
-                  borderRadius: '12px',
-                  padding: '48px 24px',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  background: dragOver ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{ fontSize: '36px', marginBottom: '12px' }}>📂</div>
-                <div style={{ fontWeight: 600, color: 'var(--at-ink-2)', fontSize: '15px', marginBottom: '6px' }}>
-                  Paso 2 — Arrastra tu archivo aquí o haz clic para seleccionar
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>Formatos aceptados: .xlsx, .xls, .csv</div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleFileInput}
-                  style={{ display: 'none' }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Step: preview */}
-          {step === 'preview' && (
-            <div>
-              {/* Summary badges */}
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                <span style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
-                  ✅ {nuevos.length} nuevo{nuevos.length !== 1 ? 's' : ''}
-                </span>
-                <span style={{ padding: '6px 14px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
-                  🔁 {yaExisten.length} ya en sistema
-                </span>
-                {conErrores.length > 0 && (
-                  <span style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
-                    ❌ {conErrores.length} con error{conErrores.length !== 1 ? 'es' : ''}
-                  </span>
-                )}
-              </div>
-
-              {/* Tabs */}
-              <div style={{ display: 'flex', borderBottom: '1px solid var(--at-line)', marginBottom: '16px', gap: '4px' }}>
-                <button style={tabStyle(activeTab === 'nuevos')} onClick={() => setActiveTab('nuevos')}>
-                  Nuevos ({nuevos.length})
-                </button>
-                <button style={tabStyle(activeTab === 'yaExisten')} onClick={() => setActiveTab('yaExisten')}>
-                  Ya en sistema ({yaExisten.length})
-                </button>
-                <button style={tabStyle(activeTab === 'conErrores')} onClick={() => setActiveTab('conErrores')}>
-                  Con errores ({conErrores.length})
-                </button>
-              </div>
-
-              {/* Tab: Nuevos */}
-              {activeTab === 'nuevos' && (
-                <div>
-                  {nuevos.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: '14px' }}>
-                      No hay clientes nuevos para agregar.
-                    </p>
-                  ) : (
-                    <>
-                      <p style={{ fontSize: '13px', color: 'var(--at-success-strong)', background: 'var(--at-success-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-success-border)' }}>
-                        ✅ Estos {nuevos.length} cliente{nuevos.length !== 1 ? 's' : ''} serán agregados a tu empresa al confirmar.
-                      </p>
-                      <div className="table-scroll-wrapper" style={{ border: '1px solid var(--at-line)', borderRadius: '8px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                          <thead>
-                            <tr style={{ background: 'var(--at-surface-2)' }}>
-                              {['Fila', 'Nombre', 'Código', 'Email', 'Teléfono'].map(h => (
-                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {nuevos.map(row => (
-                              <tr key={row.index} style={{ background: 'var(--at-success-tint)', borderBottom: '1px solid var(--at-line)' }}>
-                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
-                                <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.data.nombre ?? '—'}</td>
-                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.data.codigo ?? '—'}</td>
-                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.data.email ?? '—'}</td>
-                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.data.telefono ?? '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Tab: Ya en sistema */}
-              {activeTab === 'yaExisten' && (
-                <div>
-                  {yaExisten.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: '14px' }}>
-                      Ningún cliente del archivo ya existe en tu empresa.
-                    </p>
-                  ) : (
-                    <>
-                      <p style={{ fontSize: '13px', color: 'var(--at-primary-hover)', background: 'var(--at-primary-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-primary-soft-2)' }}>
-                        🔁 Estos clientes ya existen en el sistema y serán vinculados a tu empresa al confirmar.
-                      </p>
-                      <div className="table-scroll-wrapper" style={{ border: '1px solid var(--at-line)', borderRadius: '8px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                          <thead>
-                            <tr style={{ background: 'var(--at-surface-2)' }}>
-                              {['Fila', 'Nombre', 'Código', 'Motivo'].map(h => (
-                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {yaExisten.map(row => (
-                              <tr key={row.index} style={{ background: 'var(--at-primary-tint)', borderBottom: '1px solid var(--at-line)' }}>
-                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
-                                <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.data.nombre ?? '—'}</td>
-                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.data.codigo ?? '—'}</td>
-                                <td style={{ padding: '9px 14px', color: 'var(--at-primary-hover)', fontSize: '12px' }}>{row.duplicateReason}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Tab: Con errores */}
-              {activeTab === 'conErrores' && (
-                <div>
-                  {conErrores.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: '14px' }}>
-                      No se encontraron filas con errores. ¡Excelente!
-                    </p>
-                  ) : (
-                    <>
-                      <p style={{ fontSize: '13px', color: 'var(--at-warning-strong)', background: 'var(--at-warning-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-warning-border)' }}>
-                        ⚠️ Estas {conErrores.length} fila{conErrores.length !== 1 ? 's' : ''} contienen errores y no serán importadas. Descárgalas para revisarlas y corregirlas.
-                      </p>
-                      <div className="table-scroll-wrapper" style={{ border: '1px solid var(--at-line)', borderRadius: '8px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                          <thead>
-                            <tr style={{ background: 'var(--at-surface-2)' }}>
-                              {['Fila', 'Nombre', 'Código', 'Error'].map(h => (
-                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {conErrores.map(row => (
-                              <tr key={row.index} style={{ background: 'var(--at-danger-tint)', borderBottom: '1px solid var(--at-line)' }}>
-                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
-                                <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.rawData['nombre'] || '—'}</td>
-                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.rawData['codigo'] || '—'}</td>
-                                <td style={{ padding: '9px 14px' }}>
-                                  <span title={row.errors.join('\n')} style={{ color: 'var(--at-danger)', cursor: 'help' }}>
-                                    ❌ {row.errors[0]}{row.errors.length > 1 ? ` (+${row.errors.length - 1})` : ''}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step: importing */}
-          {step === 'importing' && (
-            <div style={{ textAlign: 'center', padding: '48px 0' }}>
-              <div style={{ fontSize: '40px', marginBottom: '16px' }}>⏳</div>
-              <div style={{ fontWeight: 600, color: 'var(--at-ink-2)', fontSize: '16px' }}>Importando clientes...</div>
-              <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginTop: '6px' }}>Por favor espera, no cierres esta ventana.</div>
-            </div>
-          )}
-
-          {/* Step: done */}
-          {step === 'done' && (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <div style={{ fontSize: '52px', marginBottom: '16px' }}>✅</div>
-              <div style={{ fontWeight: 700, color: 'var(--at-success-strong)', fontSize: '20px', marginBottom: '12px' }}>
-                {importados} cliente{importados !== 1 ? 's' : ''} importado{importados !== 1 ? 's' : ''} correctamente
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '16px', fontSize: '14px', color: 'var(--at-ink-3)' }}>
-                {analyzed.yaExisten.length > 0 && (
-                  <span style={{ padding: '6px 14px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontWeight: 600 }}>
-                    🔁 {analyzed.yaExisten.length} vinculado{analyzed.yaExisten.length !== 1 ? 's' : ''} al proyecto
-                  </span>
-                )}
-                {analyzed.conErrores.length > 0 && (
-                  <span style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', borderRadius: '20px', fontWeight: 600 }}>
-                    ❌ {analyzed.conErrores.length} con errores
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
+    <EditModal
+      title="Importar clientes desde Excel"
+      subtitle={stepLabel()}
+      maxWidth="860px"
+      fullScreenOnMobile
+      onClose={onClose}
+      closeOnBackdropClick={!importando}
+      closeOnEscape={!importando}
+      footer={importando ? undefined : (
         <div style={footerStyle}>
           {step === 'upload' && (
             <button onClick={onClose} style={btnSecondary}>Cancelar</button>
@@ -750,8 +476,266 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
             </>
           )}
         </div>
-      </div>
-    </div>
-    </ModalPortal>
+      )}
+    >
+      {/* Step: upload */}
+      {step === 'upload' && (
+        <div>
+          {/* Template download */}
+          <div style={{ marginBottom: '24px', padding: '16px 20px', background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--at-primary-hover)', fontSize: '14px' }}>Paso 1 — Descarga la plantilla</div>
+              <div style={{ fontSize: '13px', color: 'var(--at-primary)', marginTop: '2px' }}>
+                Incluye encabezados y 2 filas de ejemplo con los campos aceptados.
+              </div>
+            </div>
+            <button onClick={descargarPlantilla} style={{ ...btnPrimary, background: 'var(--at-primary)', whiteSpace: 'nowrap' }}>
+              ⬇ plantilla_clientes.xlsx
+            </button>
+          </div>
+
+          {/* Fields reference */}
+          <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1px solid var(--at-line)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>Columnas de la plantilla:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {['nombre *', 'codigo *', 'email', 'telefono', 'whatsapp', 'direccion', 'nacionalidad', 'cui_dui', 'fecha_nacimiento', 'numero_facturacion', 'telefono_alterno'].map(col => (
+                <span
+                  key={col}
+                  style={{
+                    fontSize: '12px',
+                    background: col.endsWith('*') ? 'var(--at-primary-soft)' : 'var(--at-line)',
+                    color: col.endsWith('*') ? 'var(--at-ink-deep)' : 'var(--at-ink-2)',
+                    padding: '2px 8px', borderRadius: '4px', fontFamily: 'monospace',
+                  }}
+                >
+                  {col}
+                </span>
+              ))}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '8px' }}>
+              * Requerido — <code>fecha_nacimiento</code>: formato YYYY-MM-DD — teléfonos: 8 dígitos
+            </div>
+          </div>
+
+          {/* Drop zone */}
+          <div
+            role="button"
+            tabIndex={0}
+            onKeyDown={handleDropZoneKey}
+            onDrop={handleDrop}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              border: `2px dashed ${dragOver ? 'var(--at-primary)' : 'var(--at-line-strong)'}`,
+              borderRadius: '12px',
+              padding: '48px 24px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              background: dragOver ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
+              transition: 'all 0.15s',
+            }}
+          >
+            <div style={{ fontSize: '36px', marginBottom: '12px' }}>📂</div>
+            <div style={{ fontWeight: 600, color: 'var(--at-ink-2)', fontSize: '15px', marginBottom: '6px' }}>
+              Paso 2 — Arrastra tu archivo aquí o haz clic para seleccionar
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>Formatos aceptados: .xlsx, .xls, .csv</div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleFileInput}
+              style={{ display: 'none' }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Step: preview */}
+      {step === 'preview' && (
+        <div>
+          {/* Summary badges */}
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <span style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+              ✅ {nuevos.length} nuevo{nuevos.length !== 1 ? 's' : ''}
+            </span>
+            <span style={{ padding: '6px 14px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+              🔁 {yaExisten.length} ya en sistema
+            </span>
+            {conErrores.length > 0 && (
+              <span style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+                ❌ {conErrores.length} con error{conErrores.length !== 1 ? 'es' : ''}
+              </span>
+            )}
+          </div>
+
+          {/* Tabs — se deslizan de lado si no caben (teléfono) en vez de salirse. */}
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--at-line)', marginBottom: '16px', gap: '4px', overflowX: 'auto' }}>
+            <button style={tabStyle(activeTab === 'nuevos')} onClick={() => setActiveTab('nuevos')}>
+              Nuevos ({nuevos.length})
+            </button>
+            <button style={tabStyle(activeTab === 'yaExisten')} onClick={() => setActiveTab('yaExisten')}>
+              Ya en sistema ({yaExisten.length})
+            </button>
+            <button style={tabStyle(activeTab === 'conErrores')} onClick={() => setActiveTab('conErrores')}>
+              Con errores ({conErrores.length})
+            </button>
+          </div>
+
+          {/* Tab: Nuevos */}
+          {activeTab === 'nuevos' && (
+            <div>
+              {nuevos.length === 0 ? (
+                <p style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: '14px' }}>
+                  No hay clientes nuevos para agregar.
+                </p>
+              ) : (
+                <>
+                  <p style={{ fontSize: '13px', color: 'var(--at-success-strong)', background: 'var(--at-success-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-success-border)' }}>
+                    ✅ Estos {nuevos.length} cliente{nuevos.length !== 1 ? 's' : ''} serán agregados a tu empresa al confirmar.
+                  </p>
+                  <div className="table-scroll-wrapper" style={{ border: '1px solid var(--at-line)', borderRadius: '8px' }}>
+                    {/* En el teléfono cada fila se lee como tarjeta (data-label por
+                        celda) en vez de arrastrar la tabla de lado. */}
+                    <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--at-surface-2)' }}>
+                          {['Fila', 'Nombre', 'Código', 'Email', 'Teléfono'].map(h => (
+                            <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {nuevos.map(row => (
+                          <tr key={row.index} style={{ background: 'var(--at-success-tint)', borderBottom: '1px solid var(--at-line)' }}>
+                            <td data-label="Fila" style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
+                            <td data-label="Nombre" style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.data.nombre ?? '—'}</td>
+                            <td data-label="Código" style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.data.codigo ?? '—'}</td>
+                            <td data-label="Email" style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.data.email ?? '—'}</td>
+                            <td data-label="Teléfono" style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.data.telefono ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Ya en sistema */}
+          {activeTab === 'yaExisten' && (
+            <div>
+              {yaExisten.length === 0 ? (
+                <p style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: '14px' }}>
+                  Ningún cliente del archivo ya existe en tu empresa.
+                </p>
+              ) : (
+                <>
+                  <p style={{ fontSize: '13px', color: 'var(--at-primary-hover)', background: 'var(--at-primary-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-primary-soft-2)' }}>
+                    🔁 Estos clientes ya existen en el sistema y serán vinculados a tu empresa al confirmar.
+                  </p>
+                  <div className="table-scroll-wrapper" style={{ border: '1px solid var(--at-line)', borderRadius: '8px' }}>
+                    <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--at-surface-2)' }}>
+                          {['Fila', 'Nombre', 'Código', 'Motivo'].map(h => (
+                            <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {yaExisten.map(row => (
+                          <tr key={row.index} style={{ background: 'var(--at-primary-tint)', borderBottom: '1px solid var(--at-line)' }}>
+                            <td data-label="Fila" style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
+                            <td data-label="Nombre" style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.data.nombre ?? '—'}</td>
+                            <td data-label="Código" style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.data.codigo ?? '—'}</td>
+                            <td data-label="Motivo" style={{ padding: '9px 14px', color: 'var(--at-primary-hover)', fontSize: '12px' }}>{row.duplicateReason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Con errores */}
+          {activeTab === 'conErrores' && (
+            <div>
+              {conErrores.length === 0 ? (
+                <p style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: '14px' }}>
+                  No se encontraron filas con errores. ¡Excelente!
+                </p>
+              ) : (
+                <>
+                  <p style={{ fontSize: '13px', color: 'var(--at-warning-strong)', background: 'var(--at-warning-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-warning-border)' }}>
+                    ⚠️ Estas {conErrores.length} fila{conErrores.length !== 1 ? 's' : ''} contienen errores y no serán importadas. Descárgalas para revisarlas y corregirlas.
+                  </p>
+                  <div className="table-scroll-wrapper" style={{ border: '1px solid var(--at-line)', borderRadius: '8px' }}>
+                    <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--at-surface-2)' }}>
+                          {['Fila', 'Nombre', 'Código', 'Error'].map(h => (
+                            <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {conErrores.map(row => (
+                          <tr key={row.index} style={{ background: 'var(--at-danger-tint)', borderBottom: '1px solid var(--at-line)' }}>
+                            <td data-label="Fila" style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
+                            <td data-label="Nombre" style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.rawData['nombre'] || '—'}</td>
+                            <td data-label="Código" style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.rawData['codigo'] || '—'}</td>
+                            <td data-label="Error" style={{ padding: '9px 14px' }}>
+                              <span title={row.errors.join('\n')} style={{ color: 'var(--at-danger)', cursor: 'help' }}>
+                                ❌ {row.errors[0]}{row.errors.length > 1 ? ` (+${row.errors.length - 1})` : ''}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step: importing */}
+      {step === 'importing' && (
+        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+          <div style={{ fontSize: '40px', marginBottom: '16px' }}>⏳</div>
+          <div style={{ fontWeight: 600, color: 'var(--at-ink-2)', fontSize: '16px' }}>Importando clientes...</div>
+          <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginTop: '6px' }}>Por favor espera, no cierres esta ventana.</div>
+        </div>
+      )}
+
+      {/* Step: done */}
+      {step === 'done' && (
+        <div style={{ textAlign: 'center', padding: '32px 0' }}>
+          <div style={{ fontSize: '52px', marginBottom: '16px' }}>✅</div>
+          <div style={{ fontWeight: 700, color: 'var(--at-success-strong)', fontSize: '20px', marginBottom: '12px' }}>
+            {importados} cliente{importados !== 1 ? 's' : ''} importado{importados !== 1 ? 's' : ''} correctamente
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '16px', fontSize: '14px', color: 'var(--at-ink-3)' }}>
+            {analyzed.yaExisten.length > 0 && (
+              <span style={{ padding: '6px 14px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontWeight: 600 }}>
+                🔁 {analyzed.yaExisten.length} vinculado{analyzed.yaExisten.length !== 1 ? 's' : ''} al proyecto
+              </span>
+            )}
+            {analyzed.conErrores.length > 0 && (
+              <span style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', borderRadius: '20px', fontWeight: 600 }}>
+                ❌ {analyzed.conErrores.length} con errores
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </EditModal>
   )
 }

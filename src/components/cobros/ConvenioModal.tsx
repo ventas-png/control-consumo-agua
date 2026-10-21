@@ -90,14 +90,21 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
     }
   }
 
+  // No se cierra a mitad del guardado: tras crear el convenio aún faltan
+  // marcar los cargos en mora; cerrar ahí escondería el resultado (o el error).
+  const cerrar = () => { if (!saving) onClose() }
+
   return (
     <EditModal
       title="🤝 Crear Convenio de Pago"
       size="sm"
-      onClose={onClose}
+      fullScreenOnMobile
+      onClose={cerrar}
+      closeOnBackdropClick={!saving}
+      closeOnEscape={!saving}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
           <Button
             type="submit"
             form="convenio-form"
@@ -147,7 +154,8 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+        {/* Dos por fila si caben; en el teléfono, uno debajo del otro. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px', marginBottom: '16px' }}>
           <div>
             <label htmlFor="conv-cuotas" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
               Número de cuotas

@@ -106,15 +106,22 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
     }
   }
 
+  // No se cierra a mitad del cobro: el pago ya puede estar insertado y falta
+  // aplicarlo a la lectura; cerrar ahí escondería el resultado (o el error).
+  const cerrar = () => { if (!saving) onClose() }
+
   return (
     <EditModal
       title="💰 Aplicar Pago"
       size="sm"
       maxWidth="520px"
-      onClose={onClose}
+      fullScreenOnMobile
+      onClose={cerrar}
+      closeOnBackdropClick={!saving}
+      closeOnEscape={!saving}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
           <Button
             type="submit"
             form="pago-form"
@@ -150,7 +157,9 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
               <FacturaDesglose factura={factura} moneda={moneda} />
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px' }}>
+          {/* minmax(0, 1fr) + overflowWrap: con '1fr' un monto largo ensanchaba
+              su columna y la terna se salía de la ventana en el teléfono. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px', fontSize: '13px', overflowWrap: 'anywhere' }}>
             <div>
               <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Total a pagar</div>
               <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {total.toFixed(2)}</div>
@@ -169,12 +178,14 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
       <form id="pago-form" onSubmit={handleSubmit}>
         {/* Tipo de aplicación */}
           <div style={{ marginBottom: '18px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
+            {/* Rotula un par de botones, no un campo: grupo con aria-labelledby
+                en vez de un <label> sin control asociado. */}
+            <div id="pago-tipo-aplicacion" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Tipo de Aplicación
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            </div>
+            <div role="group" aria-labelledby="pago-tipo-aplicacion" style={{ display: 'flex', gap: '8px' }}>
               {([['pago_total', '✅ Pago Total'], ['abono', '💳 Abono Parcial']] as const).map(([val, lbl]) => (
-                <button key={val} type="button" onClick={() => {
+                <button key={val} type="button" aria-pressed={tipoAplicacion === val} onClick={() => {
                   setTipoAplicacion(val)
                   if (val === 'pago_total') setMonto(saldo.toFixed(2))
                 }} style={{
@@ -183,7 +194,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
                   background: tipoAplicacion === val ? 'var(--at-primary-tint)' : 'var(--at-surface)',
                   color: tipoAplicacion === val ? 'var(--at-primary-hover)' : 'var(--at-ink-2)',
                   fontWeight: tipoAplicacion === val ? 700 : 500,
-                  fontSize: '13px', cursor: 'pointer',
+                  fontSize: '13px', fontFamily: 'inherit', cursor: 'pointer',
                 }}>
                   {lbl}
                 </button>
@@ -193,26 +204,28 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
 
           {/* Monto */}
           <div style={{ marginBottom: '18px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
+            <label htmlFor="pago-monto" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Monto a Aplicar ({moneda}) *
             </label>
             <input
+              id="pago-monto"
               type="number" step="0.01" min="0.01" max={saldo}
               value={monto} onChange={e => setMonto(e.target.value)}
               required
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '16px', fontWeight: 700, fontFamily: 'inherit' }}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '16px', fontWeight: 700, fontFamily: 'inherit' }}
             />
           </div>
 
           {/* Forma de pago */}
           <div style={{ marginBottom: '18px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
+            <label htmlFor="pago-forma" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Forma de Pago *
             </label>
             <select
+              id="pago-forma"
               value={formaPago} onChange={e => setFormaPago(e.target.value as FormaPago)}
               required
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'var(--at-surface)' }}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'var(--at-surface)' }}
             >
               {(Object.entries(formasPagoLabels) as [FormaPago, string][]).map(([val, lbl]) => (
                 <option key={val} value={val}>{lbl}</option>
@@ -222,41 +235,44 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
 
           {/* Número de documento */}
           <div style={{ marginBottom: '18px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
+            <label htmlFor="pago-documento" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Número de Documento
               <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--at-ink-3)', marginLeft: '6px' }}>
                 (# recibo, ref. transferencia, # cheque, etc.)
               </span>
             </label>
             <input
+              id="pago-documento"
               type="text" value={numeroDocumento} onChange={e => setNumeroDocumento(e.target.value)}
               placeholder="Ej: TRF-001234 / CHQ-5678"
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
             />
           </div>
 
           {/* Referencia adicional */}
           <div style={{ marginBottom: '18px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
+            <label htmlFor="pago-referencia" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Referencia / Banco
             </label>
             <input
+              id="pago-referencia"
               type="text" value={referencia} onChange={e => setReferencia(e.target.value)}
               placeholder="Ej: Banco Industrial, Cuenta XXX"
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
             />
           </div>
 
           {/* Notas */}
           <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
+            <label htmlFor="pago-notas" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Notas
             </label>
             <textarea
+              id="pago-notas"
               value={notas} onChange={e => setNotas(e.target.value)}
               placeholder="Observaciones sobre el pago..."
               rows={2}
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
             />
           </div>
 

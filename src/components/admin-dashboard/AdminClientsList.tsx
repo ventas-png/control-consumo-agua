@@ -76,6 +76,10 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
             const stats = getClienteStats(cliente.id)
             const estadoInfo = getEstadoColor(stats.estado)
 
+            // Fila flexible en vez de `1fr 1fr 1fr 1fr auto`: en el escritorio
+            // queda igual (cuatro columnas parejas + estado), y en el teléfono
+            // las celdas bajan de línea de a dos en vez de apretarse a ~60px.
+            const celda = { flex: '1 1 130px', minWidth: 0 }
             return (
               <div
                 key={cliente.id}
@@ -84,15 +88,15 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
                   borderRadius: '12px',
                   padding: '16px',
                   border: '1px solid var(--at-line)',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
+                  display: 'flex',
+                  flexWrap: 'wrap',
                   gap: '16px',
                   alignItems: 'center',
                 }}
               >
                 {/* Nombre y código */}
-                <div>
-                  <div style={{ fontWeight: '600', color: 'var(--at-ink)', marginBottom: '4px' }}>
+                <div style={celda}>
+                  <div style={{ fontWeight: '600', color: 'var(--at-ink)', marginBottom: '4px', overflowWrap: 'anywhere' }}>
                     {cliente.nombre}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
@@ -101,7 +105,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
                 </div>
 
                 {/* Consumo total */}
-                <div>
+                <div style={celda}>
                   <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>
                     Consumo Total
                   </div>
@@ -111,7 +115,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
                 </div>
 
                 {/* Recaudo total */}
-                <div>
+                <div style={celda}>
                   <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>
                     Recaudo Total
                   </div>
@@ -121,7 +125,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
                 </div>
 
                 {/* Última lectura */}
-                <div>
+                <div style={celda}>
                   <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>
                     Última Lectura
                   </div>
@@ -136,6 +140,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
                 {/* Estado */}
                 <div
                   style={{
+                    flex: '0 0 auto',
                     background: estadoInfo.bg,
                     color: estadoInfo.color,
                     padding: '8px 12px',

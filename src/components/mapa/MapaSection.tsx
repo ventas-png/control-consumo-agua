@@ -95,7 +95,9 @@ export function MapaSection({ clientes, registros, companyId, canConfigurar = fa
     <div style={{ background: 'var(--at-surface)', borderRadius: '24px', height: 'calc(100vh - 200px)', minHeight: '300px', maxHeight: '700px', overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '15px 20px', background: 'var(--at-surface)', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <h3 style={{ margin: 0, fontSize: '18px' }}>Geolocalización de Medidores</h3>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        {/* wrap: los cinco chips (~500px) no caben en un teléfono y los últimos
+            ("Calor", "Fijar centro") quedaban fuera, recortados por la tarjeta. */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {ESTADOS.map(e => {
             const active = visibles.has(e.key)
             return (

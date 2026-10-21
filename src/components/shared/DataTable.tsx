@@ -441,8 +441,10 @@ export function DataTable<T>({
                         // data-label se usa por el CSS .table-cards-on-mobile
                         // para mostrar el header como label de la celda en
                         // phones. Si col.header no es string, fallback al key.
+                        // Un header vacío (columna de acciones) no lleva
+                        // etiqueta: así el CSS la centra en su propia línea.
                         const labelStr = mobileCardLayout
-                          ? (typeof col.header === 'string' ? col.header : col.key)
+                          ? (typeof col.header === 'string' ? col.header || undefined : col.key)
                           : undefined
                         return (
                           <td

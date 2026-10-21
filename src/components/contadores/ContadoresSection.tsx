@@ -346,12 +346,14 @@ export function ContadoresSection({
       {/* Form Modal */}
       {isModalOpen && canEdit && <ContadorFormModal ctx={ctx} />}
 
-      {/* Table */}
+      {/* Table — en el teléfono cada contador es una tarjeta (la tabla de 8+
+          columnas se cortaba a la derecha). */}
       <DataTable<Contador>
         data={filtered}
         columns={columns}
         rowKey="id"
         pageSize={50}
+        mobileCardLayout
         defaultSort={{ key: 'serie', direction: 'asc' }}
         emptyState={{
           icon: '🔧',
