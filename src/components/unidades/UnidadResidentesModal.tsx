@@ -117,6 +117,10 @@ export function UnidadResidentesModal({ unidad, clientes, onClose }: Props) {
       title={`👥 Residentes — ${unidad.nombre}`}
       size="sm"
       onClose={onClose}
+      fullScreenOnMobile
+      // Asignando o cambiando el pagador: ni Escape ni el fondo la cierran.
+      closeOnBackdropClick={!saving}
+      closeOnEscape={!saving}
       footer={<Button variant="secondary" onClick={onClose}>Cerrar</Button>}
     >
       <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--at-ink-3)' }}>
@@ -137,8 +141,11 @@ export function UnidadResidentesModal({ unidad, clientes, onClose }: Props) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {residentes.map(r => (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px solid var(--at-line)', borderRadius: 10, background: r.activo ? 'var(--at-surface)' : 'var(--at-surface-2)' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
+              // flexWrap + base de 160px para el nombre: en el teléfono la
+              // etiqueta y los botones bajan de línea en vez de dejar el nombre
+              // en una franja de pocos píxeles.
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 12px', border: '1px solid var(--at-line)', borderRadius: 10, background: r.activo ? 'var(--at-surface)' : 'var(--at-surface-2)' }}>
+                <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>{r.cliente_nombre ?? '—'}</div>
                   <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
                     {r.cliente_codigo ? `${r.cliente_codigo} · ` : ''}{TIPO_LABEL(r.tipo)}{!r.activo ? ' · inactivo' : ''}
@@ -169,14 +176,18 @@ export function UnidadResidentesModal({ unidad, clientes, onClose }: Props) {
       {/* Alta de residente */}
       <div style={{ borderTop: '1px solid var(--at-line)', paddingTop: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: 10 }}>Asignar residente</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 10, marginBottom: 12 }}>
-          <select value={clienteId} onChange={e => setClienteId(e.target.value)} style={selectStyle}>
+        {/* Cliente y tipo en una fila (tipo a 140px, como antes); si no caben
+            —teléfono— cada uno baja a su propia línea a todo el ancho. Los
+            factores de crecimiento 999:1 dejan casi todo el espacio libre al
+            cliente cuando comparten fila. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+          <select aria-label="Cliente" value={clienteId} onChange={e => setClienteId(e.target.value)} style={{ ...selectStyle, flex: '999 1 200px', width: 'auto', minWidth: 0 }}>
             <option value="">Elegí un cliente…</option>
             {clientesOrdenados.map(c => (
               <option key={c.id} value={c.id}>{c.nombre}{c.codigo ? ` (${c.codigo})` : ''}</option>
             ))}
           </select>
-          <select value={tipo} onChange={e => setTipo(e.target.value as TipoResidente)} style={selectStyle}>
+          <select aria-label="Tipo de residente" value={tipo} onChange={e => setTipo(e.target.value as TipoResidente)} style={{ ...selectStyle, flex: '1 0 140px', width: 'auto' }}>
             {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>

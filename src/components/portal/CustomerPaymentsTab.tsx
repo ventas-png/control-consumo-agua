@@ -3,6 +3,7 @@ import { notify } from '../shared/Dialog'
 import { fetchPortalPaymentConfig, fetchPortalRecargoTarjeta } from '../../domain/portal/queries'
 import type { Registro, Cliente, UserSession } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
+import { parseFecha } from '../../lib/format'
 import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 import { PagoEnLineaModal } from './PagoEnLineaModal'
 import { PagoManualModal } from './PagoManualModal'
@@ -121,30 +122,32 @@ export function CustomerPaymentsTab({ registros, currentUser, companyId, moneda,
       {/* Resumen */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-        marginBottom: '28px',
+        // Las dos tarjetas lado a lado también en el teléfono: una sobre otra
+        // ocupaban media pantalla antes del primer cargo.
+        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+        gap: '12px',
+        marginBottom: '24px',
       }}>
         <div style={{
           background: 'linear-gradient(135deg, var(--at-warning), var(--at-warning))',
           borderRadius: '16px',
-          padding: '20px',
+          padding: '16px 18px',
           color: 'white',
           boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
         }}>
           <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '6px', fontWeight: 500 }}>Total por Pagar</div>
-          <div style={{ fontSize: '28px', fontWeight: 700 }}>{moneda} {totalPendiente.toFixed(2)}</div>
+          <div style={{ fontSize: '24px', fontWeight: 800, whiteSpace: 'nowrap' }}>{moneda} {totalPendiente.toFixed(2)}</div>
         </div>
 
         <div style={{
           background: 'linear-gradient(135deg, var(--at-primary-2), var(--at-primary-hover))',
           borderRadius: '16px',
-          padding: '20px',
+          padding: '16px 18px',
           color: 'white',
           boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
         }}>
           <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '6px', fontWeight: 500 }}>Cargos Pendientes</div>
-          <div style={{ fontSize: '28px', fontWeight: 700 }}>{registrosPendientes.length}</div>
+          <div style={{ fontSize: '24px', fontWeight: 800 }}>{registrosPendientes.length}</div>
         </div>
       </div>
 
@@ -167,11 +170,15 @@ export function CustomerPaymentsTab({ registros, currentUser, companyId, moneda,
                 boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
               }}
             >
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', alignItems: 'start' }}>
-                <div>
+              {/* Datos a la izquierda y botones a la derecha; en el teléfono los
+                  botones bajan a lo ancho (antes quedaban en una columna de
+                  140px que estrujaba los montos). El flex-grow 999 de los datos
+                  deja los botones en ~180px mientras comparten fila. */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-start' }}>
+                <div style={{ flex: '999 1 260px', minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
                     <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--at-ink)' }}>
-                      Lectura: {new Date(registro.fecha).toLocaleDateString('es-GT')}
+                      Lectura del {parseFecha(registro.fecha).toLocaleDateString('es-GT', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                     {esMora && (
                       <span style={{
@@ -187,7 +194,7 @@ export function CustomerPaymentsTab({ registros, currentUser, companyId, moneda,
                     )}
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', fontSize: '13px', marginTop: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px', fontSize: '13px', marginTop: '12px' }}>
                     <div>
                       <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Consumo</div>
                       <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{registro.consumo.toFixed(2)} m³</div>
@@ -206,7 +213,7 @@ export function CustomerPaymentsTab({ registros, currentUser, companyId, moneda,
                 </div>
 
                 {/* Botones de pago */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '140px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 0 180px', maxWidth: '100%' }}>
                   {pagoEnLineaActivo && (
                     <button
                       onClick={() => setPagoModal(registro)}

@@ -1,13 +1,13 @@
 import { hoyLocalISO, datetimeLocalISO, parseFechaCalendario } from '../../lib/format'
 import { useState, useMemo, type CSSProperties, type ChangeEvent} from 'react'
-import * as RDialog from '@radix-ui/react-dialog'
 import { notify } from '../shared/Dialog'
 import type { FuenteAgua, RegistroCalidad, TipoAgua } from '../../types'
 import { fetchFuentes, fetchRegistrosCalidad, getReporteCalidadSignedUrl } from '../../domain/calidad/queries'
 import { createFuente, updateFuente, setFuenteActiva, createRegistroCalidad, uploadReporteCalidad } from '../../domain/calidad/mutations'
 import { sanitizeInput, sanitizeHTML } from '../../lib/validation'
-import { scrollAppToTop } from '../../lib/scroll'
 import { TabStrip, type TabStripItem } from '../shared/TabStrip'
+import { EditModal } from '../shared/EditModal'
+import { Button } from '../shared/Button'
 import { TIPOLOGIAS_CALIDAD, calcularCumplimiento } from './constants'
 import { validarValorParametro, severidadParametro, SEVERIDAD_META } from '../../lib/calidadSeveridad'
 import { CalidadTendencia } from './CalidadTendencia'
@@ -43,6 +43,7 @@ export function CalidadSection({
   const [subTab, setSubTab] = useState<SubTab>('fuentes')
 
   // Fuentes form state
+  const [fuenteFormAbierto, setFuenteFormAbierto] = useState(false)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [fuenteForm, setFuenteForm] = useState({ identificador: '', nombre: '', tipo_agua: '' as TipoAgua | '', descripcion: '', frecuencia_muestreo_dias: '' })
   const [savingFuente, setSavingFuente] = useState(false)
@@ -98,6 +99,7 @@ export function CalidadSection({
       onFuentesUpdated(await fetchFuentes())
       setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '', frecuencia_muestreo_dias: '' })
       setEditandoId(null)
+      setFuenteFormAbierto(false)
       notify({ variant: 'success', title: editandoId ? 'Fuente actualizada' : 'Fuente registrada', duration: 1500 })
     } catch (e) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar la fuente: ' + (e instanceof Error ? e.message : '') })
@@ -106,11 +108,26 @@ export function CalidadSection({
     }
   }
 
+  // Alta y edición comparten la misma ventana: antes el formulario vivía fijo
+  // arriba de la lista y en el teléfono empujaba la tabla fuera de la vista.
+  function nuevaFuente() {
+    setEditandoId(null)
+    setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '', frecuencia_muestreo_dias: '' })
+    setFuenteFormAbierto(true)
+  }
+
   function editarFuente(f: FuenteAgua) {
     setEditandoId(f.id)
     setFuenteForm({ identificador: f.identificador, nombre: f.nombre, tipo_agua: f.tipo_agua, descripcion: f.descripcion ?? '', frecuencia_muestreo_dias: f.frecuencia_muestreo_dias != null ? String(f.frecuencia_muestreo_dias) : '' })
-    setSubTab('fuentes')
-    scrollAppToTop()
+    setFuenteFormAbierto(true)
+  }
+
+  function cerrarFuenteForm() {
+    // Mientras guarda no se cierra: el resultado (y su aviso) debe verse.
+    if (savingFuente) return
+    setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '', frecuencia_muestreo_dias: '' })
+    setEditandoId(null)
+    setFuenteFormAbierto(false)
   }
 
   async function toggleFuente(id: string, activo: boolean) {
@@ -266,6 +283,11 @@ export function CalidadSection({
 
   const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px', display: 'block' }
+  // Dentro de la ventana no llega la tipografía de la página a los controles.
+  const modalInputStyle: CSSProperties = { ...inputStyle, fontFamily: 'inherit' }
+  // 32px de relleno en un teléfono de 375px dejaban ~287px útiles; el clamp
+  // solo lo reduce en pantallas angostas (en escritorio sigue en 32px).
+  const panelStyle: CSSProperties = { background: 'var(--at-surface)', borderRadius: '24px', padding: 'clamp(16px, 4vw, 32px)', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }
 
   const cvl = cumplimientoEnVivo()
 
@@ -294,64 +316,31 @@ export function CalidadSection({
       {/* FUENTES */}
       {subTab === 'fuentes' && (
         <div>
-          <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', marginBottom: '20px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>
-              {editandoId ? '✏️ Editar Fuente' : '🗂️ Fuentes de Agua'}
+          <div style={panelStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700 }}>🗂️ Fuentes Registradas</div>
+              <Button onClick={nuevaFuente}>+ Nueva fuente</Button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
-              <div>
-                <label style={labelStyle}>Identificador *</label>
-                <input type="text" value={fuenteForm.identificador} onChange={e => setFuenteForm(p => ({ ...p, identificador: e.target.value }))} placeholder="Ej: FA-001" maxLength={50} style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Nombre / Descripción *</label>
-                <input type="text" value={fuenteForm.nombre} onChange={e => setFuenteForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Piscina principal" maxLength={100} style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Tipología de Agua *</label>
-                <select value={fuenteForm.tipo_agua} onChange={e => setFuenteForm(p => ({ ...p, tipo_agua: e.target.value as TipoAgua }))} style={inputStyle}>
-                  <option value="">— Seleccione tipo —</option>
-                  {tipoOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>Descripción adicional</label>
-                <input type="text" value={fuenteForm.descripcion} onChange={e => setFuenteForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Ubicación, observaciones..." maxLength={200} style={inputStyle} />
-              </div>
-              {/* serv:S26 — frecuencia de muestreo (opcional): base del estado de muestreo. */}
-              <div>
-                <label style={labelStyle}>Frecuencia de muestreo (días)</label>
-                <input type="number" min={1} max={3650} value={fuenteForm.frecuencia_muestreo_dias} onChange={e => setFuenteForm(p => ({ ...p, frecuencia_muestreo_dias: e.target.value }))} placeholder="Ej: 30 — opcional" style={inputStyle} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={guardarFuente} disabled={savingFuente} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
-                {savingFuente ? 'Guardando...' : `💾 ${editandoId ? 'Actualizar Fuente' : 'Guardar Fuente'}`}
-              </button>
-              <button onClick={() => { setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '', frecuencia_muestreo_dias: '' }); setEditandoId(null) }} style={{ padding: '12px 24px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
-                ✕ Cancelar
-              </button>
-            </div>
-          </div>
-
-          <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>Fuentes Registradas</div>
-            <div className="table-scroll-wrapper">
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            {/* Por debajo de 480px cada fuente pasa a tarjeta (etiquetas desde
+                data-label); el ID corto se oculta en teléfonos. Sin la clase
+                .table-scroll-wrapper a propósito: su degradado lateral (≤640px)
+                tapaba el borde derecho de las tarjetas. */}
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                 <thead><tr style={{ background: 'var(--at-chip)' }}>
-                  {['ID', 'Identificador', 'Nombre', 'Tipología', 'Muestreo', 'Estado', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
+                  {['ID', 'Identificador', 'Nombre', 'Tipología', 'Muestreo', 'Estado', 'Acciones'].map(h => <th scope="col" key={h} className={h === 'ID' ? 'table-col-secondary' : undefined} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {fuentesAgua.map(f => {
                     const tipologia = TIPOLOGIAS_CALIDAD[f.tipo_agua]
                     return (
                       <tr key={f.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                        <td style={{ padding: '10px', fontSize: '12px', color: 'var(--at-ink-3)' }}>{f.id.substring(0, 8)}…</td>
-                        <td style={{ padding: '10px', fontWeight: 600, color: 'var(--at-primary-hover)' }}>{sanitizeHTML(f.identificador)}</td>
-                        <td style={{ padding: '10px' }}>{sanitizeHTML(f.nombre)}</td>
-                        <td style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? f.tipo_agua}</td>
+                        <td data-label="ID" className="table-col-secondary" style={{ padding: '10px', fontSize: '12px', color: 'var(--at-ink-3)' }}>{f.id.substring(0, 8)}…</td>
+                        <td data-label="Identificador" style={{ padding: '10px', fontWeight: 600, color: 'var(--at-primary-hover)' }}>{sanitizeHTML(f.identificador)}</td>
+                        <td data-label="Nombre" style={{ padding: '10px' }}>{sanitizeHTML(f.nombre)}</td>
+                        <td data-label="Tipología" style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? f.tipo_agua}</td>
                         {/* serv:S26 — estado de muestreo: frecuencia vs. última muestra registrada. */}
-                        <td style={{ padding: '10px' }}>
+                        <td data-label="Muestreo" style={{ padding: '10px' }}>
                           {(() => {
                             const m = estadoMuestreo(ultimaMuestra.get(f.id) ?? null, f.frecuencia_muestreo_dias, hoyISO)
                             const meta = MUESTREO_META[m.estado]
@@ -365,7 +354,7 @@ export function CalidadSection({
                             )
                           })()}
                         </td>
-                        <td style={{ padding: '10px' }}>
+                        <td data-label="Estado" style={{ padding: '10px' }}>
                           <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, background: f.activo ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', color: f.activo ? 'var(--at-success-strong)' : 'var(--at-danger-strong)' }}>
                             {f.activo ? 'Activa' : 'Inactiva'}
                           </span>
@@ -391,7 +380,7 @@ export function CalidadSection({
 
       {/* ANÁLISIS */}
       {subTab === 'analisis' && (
-        <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+        <div style={panelStyle}>
           <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>🧪 Nuevo Análisis de Calidad</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
             <div>
@@ -477,7 +466,7 @@ export function CalidadSection({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button onClick={guardarAnalisis} disabled={savingAnalisis} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               {savingAnalisis ? 'Guardando...' : '💾 Guardar Análisis'}
             </button>
@@ -490,7 +479,7 @@ export function CalidadSection({
 
       {/* HISTORIAL */}
       {subTab === 'historial' && (
-        <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+        <div style={panelStyle}>
           <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>📋 Historial de Análisis de Calidad</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
             <div>
@@ -544,8 +533,9 @@ export function CalidadSection({
           </div>
           {/* serv:S25 — tendencia de cumplimiento de los análisis filtrados. */}
           <CalidadTendencia registros={historialFiltrado} />
-          <div className="table-scroll-wrapper">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+          {/* Mismo trato que la tabla de fuentes: tarjetas por debajo de 480px. */}
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead><tr style={{ background: 'var(--at-chip)' }}>
                 {['Fecha', 'Fuente', 'Tipología', 'Resultado', 'Observaciones', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: h === 'Resultado' || h === 'Acciones' ? 'center' : 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
               </tr></thead>
@@ -555,15 +545,15 @@ export function CalidadSection({
                   const tipologia = fuente ? TIPOLOGIAS_CALIDAD[fuente.tipo_agua] : null
                   return (
                     <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                      <td style={{ padding: '10px', fontSize: '13px' }}>{new Date(r.fecha).toLocaleString('es-GT')}</td>
-                      <td style={{ padding: '10px', fontWeight: 600, color: 'var(--at-primary-hover)' }}>{fuente ? sanitizeHTML(fuente.identificador) : '—'}</td>
-                      <td style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? fuente?.tipo_agua ?? '—'}</td>
-                      <td style={{ padding: '10px', textAlign: 'center' }}>
+                      <td data-label="Fecha" style={{ padding: '10px', fontSize: '13px' }}>{new Date(r.fecha).toLocaleString('es-GT')}</td>
+                      <td data-label="Fuente" style={{ padding: '10px', fontWeight: 600, color: 'var(--at-primary-hover)' }}>{fuente ? sanitizeHTML(fuente.identificador) : '—'}</td>
+                      <td data-label="Tipología" style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? fuente?.tipo_agua ?? '—'}</td>
+                      <td data-label="Resultado" style={{ padding: '10px', textAlign: 'center' }}>
                         <span style={{ background: r.cumple_total ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', color: r.cumple_total ? 'var(--at-success-strong)' : 'var(--at-danger-strong)', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>
                           {r.cumple_total ? '✅ CUMPLE' : '❌ NO CUMPLE'}
                         </span>
                       </td>
-                      <td style={{ padding: '10px', fontSize: '13px', color: 'var(--at-ink-3)' }}>{sanitizeHTML(r.observaciones ?? '—')}</td>
+                      <td data-label="Observaciones" style={{ padding: '10px', fontSize: '13px', color: 'var(--at-ink-3)' }}>{sanitizeHTML(r.observaciones ?? '—')}</td>
                       <td style={{ padding: '10px' }}>
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
                           <button onClick={() => verDetalle(r)} style={{ background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>🔍 Detalle</button>
@@ -584,104 +574,118 @@ export function CalidadSection({
         </div>
       )}
 
-      {/* F3.8: Modal accesible para ver detalle del analisis de calidad. */}
-      {/* Reemplaza Swal.fire({html: ...}) con HTML rico. Usa Radix Dialog */}
-      {/* para a11y completa (focus trap, ESC, role=dialog, aria-labelledby). */}
-      <RDialog.Root open={!!detalleViewer} onOpenChange={(open) => { if (!open) setDetalleViewer(null) }}>
-        <RDialog.Portal>
-          <RDialog.Overlay style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-            zIndex: 9998, animation: 'at-dialog-overlay-in 120ms ease-out',
-          }} />
-          <RDialog.Content
-            style={{
-              position: 'fixed', top: '50%', left: '50%',
-              transform: 'translate(-50%, -50%)',
-              background: 'var(--at-surface)', borderRadius: '16px',
-              padding: '24px 28px', maxWidth: '760px', width: 'calc(100vw - 32px)',
-              maxHeight: 'calc(100vh - 32px)', overflowY: 'auto',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.25)', zIndex: 9999,
-              animation: 'at-dialog-content-in 160ms ease-out',
-            }}
+      {/* Alta / edición de fuente en ventana (pantalla completa en el teléfono).
+          `min(100%, …)`: la rejilla nunca pide más ancho que el de la ventana. */}
+      {fuenteFormAbierto && (
+        <EditModal
+          title={editandoId ? 'Editar fuente' : 'Nueva fuente'}
+          subtitle={editandoId ? fuentesAgua.find(f => f.id === editandoId)?.identificador : undefined}
+          maxWidth="640px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!savingFuente}
+          closeOnEscape={!savingFuente}
+          onClose={cerrarFuenteForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarFuenteForm} disabled={savingFuente}>Cancelar</Button>
+            <Button onClick={() => { void guardarFuente() }} loading={savingFuente} loadingText="Guardando…">Guardar</Button>
+          </>}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 240px), 1fr))', gap: '16px' }}>
+            <div>
+              <label htmlFor="fuente-identificador" style={labelStyle}>Identificador *</label>
+              <input id="fuente-identificador" type="text" value={fuenteForm.identificador} onChange={e => setFuenteForm(p => ({ ...p, identificador: e.target.value }))} placeholder="Ej: FA-001" maxLength={50} style={modalInputStyle} autoFocus />
+            </div>
+            <div>
+              <label htmlFor="fuente-nombre" style={labelStyle}>Nombre / Descripción *</label>
+              <input id="fuente-nombre" type="text" value={fuenteForm.nombre} onChange={e => setFuenteForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Piscina principal" maxLength={100} style={modalInputStyle} />
+            </div>
+            <div>
+              <label htmlFor="fuente-tipo" style={labelStyle}>Tipología de Agua *</label>
+              <select id="fuente-tipo" value={fuenteForm.tipo_agua} onChange={e => setFuenteForm(p => ({ ...p, tipo_agua: e.target.value as TipoAgua }))} style={modalInputStyle}>
+                <option value="">— Seleccione tipo —</option>
+                {tipoOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="fuente-descripcion" style={labelStyle}>Descripción adicional</label>
+              <input id="fuente-descripcion" type="text" value={fuenteForm.descripcion} onChange={e => setFuenteForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Ubicación, observaciones..." maxLength={200} style={modalInputStyle} />
+            </div>
+            {/* serv:S26 — frecuencia de muestreo (opcional): base del estado de muestreo. */}
+            <div>
+              <label htmlFor="fuente-frecuencia" style={labelStyle}>Frecuencia de muestreo (días)</label>
+              <input id="fuente-frecuencia" type="number" min={1} max={3650} value={fuenteForm.frecuencia_muestreo_dias} onChange={e => setFuenteForm(p => ({ ...p, frecuencia_muestreo_dias: e.target.value }))} placeholder="Ej: 30 — opcional" style={modalInputStyle} />
+            </div>
+          </div>
+        </EditModal>
+      )}
+
+      {/* F3.8: detalle del análisis de calidad. Antes era un Radix Dialog con
+          posición propia (centrado con márgenes también en el teléfono); ahora
+          usa la ventana de la casa, a pantalla completa en el teléfono. */}
+      {detalleViewer && (() => {
+        const r = detalleViewer
+        const fuente = r.fuentes_agua
+        const tipologia = fuente ? TIPOLOGIAS_CALIDAD[fuente.tipo_agua] : null
+        return (
+          <EditModal
+            title={`Análisis — ${fuente?.identificador ?? ''}`}
+            subtitle={`${new Date(r.fecha).toLocaleString('es-GT')} · ${tipologia?.label ?? fuente?.tipo_agua ?? ''}`}
+            maxWidth="760px"
+            fullScreenOnMobile
+            onClose={() => setDetalleViewer(null)}
+            footer={<Button onClick={() => setDetalleViewer(null)}>Cerrar</Button>}
           >
-            {detalleViewer && (() => {
-              const r = detalleViewer
-              const fuente = r.fuentes_agua
-              const tipologia = fuente ? TIPOLOGIAS_CALIDAD[fuente.tipo_agua] : null
-              return (
-                <>
-                  <RDialog.Title style={{ margin: '0 0 6px', fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>
-                    Análisis — {fuente?.identificador ?? ''}
-                  </RDialog.Title>
-                  <RDialog.Description style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-2)' }}>
-                    {new Date(r.fecha).toLocaleString('es-GT')} · {tipologia?.label ?? fuente?.tipo_agua ?? ''}
-                  </RDialog.Description>
-                  <div style={{ margin: '12px 0' }}>
-                    {r.observaciones && (
-                      <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--at-ink-2)' }}>
-                        <strong>Observaciones:</strong> {r.observaciones}
-                      </p>
-                    )}
-                    <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: r.cumple_total ? 'var(--at-success-strong)' : 'var(--at-danger-strong)' }}>
-                      Resultado: {r.cumple_total ? '✅ CUMPLE' : '❌ NO CUMPLE'}
-                    </p>
-                  </div>
-                  {tipologia && (
-                    <div className="table-scroll-wrapper">
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                        <thead>
-                          <tr style={{ background: 'var(--at-chip)' }}>
-                            <th scope="col" style={{ padding: '8px', textAlign: 'left' }}>Parámetro</th>
-                            <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Unidad</th>
-                            <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Valor</th>
-                            <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Rango</th>
-                            <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {tipologia.parametros.map(p => {
-                            const val = r.parametros[p.key]
-                            const cumple = r.cumplimiento[p.key]
-                            const rango = p.min === p.max && p.min === 0 ? '= 0' : p.min > 0 ? `${p.min} – ${p.max}` : `≤ ${p.max}`
-                            const bg = cumple === false ? '#fff5f5' : cumple === true ? 'var(--at-success-tint)' : 'transparent'
-                            return (
-                              <tr key={p.key} style={{ borderBottom: '1px solid var(--at-chip)', background: bg }}>
-                                <td style={{ padding: '8px' }}>{p.label}</td>
-                                <td style={{ padding: '8px', textAlign: 'center' }}>{p.unidad || '—'}</td>
-                                <td style={{ padding: '8px', textAlign: 'center' }}>{val !== undefined ? val : '—'}</td>
-                                <td style={{ padding: '8px', textAlign: 'center' }}>{rango}</td>
-                                <td style={{ padding: '8px', textAlign: 'center' }}>
-                                  {cumple === null || val === undefined ? <span style={{ color: 'var(--at-ink-3)' }}>—</span>
-                                    : cumple ? <span style={{ color: 'var(--at-success-strong)', fontWeight: 600 }}>✅ CUMPLE</span>
-                                    : <span style={{ color: 'var(--at-danger-strong)', fontWeight: 600 }}>❌ NO CUMPLE</span>}
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-                    <RDialog.Close asChild>
-                      <button
-                        type="button"
-                        style={{
-                          padding: '9px 18px', borderRadius: '10px', border: 'none',
-                          background: 'var(--at-primary)', color: 'white',
-                          fontSize: '14px', fontWeight: 700, cursor: 'pointer',
-                        }}
-                      >
-                        Cerrar
-                      </button>
-                    </RDialog.Close>
-                  </div>
-                </>
-              )
-            })()}
-          </RDialog.Content>
-        </RDialog.Portal>
-      </RDialog.Root>
+            <div style={{ margin: '0 0 12px' }}>
+              {r.observaciones && (
+                <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--at-ink-2)' }}>
+                  <strong>Observaciones:</strong> {r.observaciones}
+                </p>
+              )}
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: r.cumple_total ? 'var(--at-success-strong)' : 'var(--at-danger-strong)' }}>
+                Resultado: {r.cumple_total ? '✅ CUMPLE' : '❌ NO CUMPLE'}
+              </p>
+            </div>
+            {/* Sin .table-scroll-wrapper: a 375px la tabla cabe justa y el
+                degradado lateral de esa clase tapaba la columna Estado. */}
+            {tipologia && (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--at-chip)' }}>
+                      <th scope="col" style={{ padding: '8px', textAlign: 'left' }}>Parámetro</th>
+                      <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Unidad</th>
+                      <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Valor</th>
+                      <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Rango</th>
+                      <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tipologia.parametros.map(p => {
+                      const val = r.parametros[p.key]
+                      const cumple = r.cumplimiento[p.key]
+                      const rango = p.min === p.max && p.min === 0 ? '= 0' : p.min > 0 ? `${p.min} – ${p.max}` : `≤ ${p.max}`
+                      const bg = cumple === false ? '#fff5f5' : cumple === true ? 'var(--at-success-tint)' : 'transparent'
+                      return (
+                        <tr key={p.key} style={{ borderBottom: '1px solid var(--at-chip)', background: bg }}>
+                          <td style={{ padding: '8px' }}>{p.label}</td>
+                          <td style={{ padding: '8px', textAlign: 'center' }}>{p.unidad || '—'}</td>
+                          <td style={{ padding: '8px', textAlign: 'center' }}>{val !== undefined ? val : '—'}</td>
+                          <td style={{ padding: '8px', textAlign: 'center' }}>{rango}</td>
+                          <td style={{ padding: '8px', textAlign: 'center' }}>
+                            {cumple === null || val === undefined ? <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+                              : cumple ? <span style={{ color: 'var(--at-success-strong)', fontWeight: 600 }}>✅ CUMPLE</span>
+                              : <span style={{ color: 'var(--at-danger-strong)', fontWeight: 600 }}>❌ NO CUMPLE</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }

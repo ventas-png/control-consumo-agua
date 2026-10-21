@@ -249,8 +249,12 @@ export function FacturacionConfigSection({ proyectos, moneda = 'Q' }: Props) {
         {mostrarForm && canEdit && (
           <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
             <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>{editId ? 'Editar regla' : 'Nueva regla de mora'}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
-              <div style={{ gridColumn: 'span 3' }}>
+            {/* Como mucho 3 columnas (el mínimo de cada una es un tercio del
+                ancho, menos holgura por el gap) y menos cuando no llegan a 160px:
+                en el teléfono una, antes 3 fijas de ~90px. `1 / -1` y no
+                `span 3`: con menos columnas el span creaba columnas implícitas. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(max(160px, calc(33.333% - 9px)), 1fr))', gap: 12, marginBottom: 12 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
                 <label style={lbl}>Nombre de la regla *</label>
                 <input style={inp} value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej. Mora del 5% a los 30 días" />
               </div>
@@ -307,8 +311,10 @@ export function FacturacionConfigSection({ proyectos, moneda = 'Q' }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {reglasDelProyecto.map(r => (
               <div key={r.id} style={{ background: 'var(--at-surface-2)', border: `1px solid ${r.activa ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: 10, padding: '12px 16px', opacity: r.activa ? 1 : 0.65 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                  <div style={{ flex: 1 }}>
+                {/* En el teléfono los botones bajan bajo el texto en vez de
+                    dejarlo en una franja de pocos píxeles. */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 220px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 14 }}>{r.nombre}</span>
                       <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: r.activa ? 'var(--at-success-tint)' : 'var(--at-chip)', color: r.activa ? 'var(--at-success-strong)' : 'var(--at-ink-3)' }}>

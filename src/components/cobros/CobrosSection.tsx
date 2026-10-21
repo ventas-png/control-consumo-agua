@@ -1,5 +1,5 @@
 import { hoyLocalISO, mesLocalISO, formatFechaCalendario } from '../../lib/format'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { TabStrip } from '../shared/TabStrip'
 import { openPromptDialog } from '../shared/PromptDialog'
@@ -76,6 +76,23 @@ function getTotal(r: Registro) {
 
 function getSaldo(r: Registro) {
   return Math.max(0, getTotal(r) - (r.monto_pagado ?? 0))
+}
+
+// En ≤480px `.table-cards-on-mobile` (index.css) pinta cada cargo como tarjeta y
+// oculta el <thead>, y con él la casilla de «seleccionar todo». Se escucha el
+// mismo corte para ofrecerla fuera de la tabla solo entonces. Sin matchMedia
+// (jsdom) se asume escritorio.
+const MQ_TARJETAS = '(max-width: 480px)'
+
+function suscribirTarjetas(onCambio: () => void) {
+  if (typeof window.matchMedia !== 'function') return () => {}
+  const mq = window.matchMedia(MQ_TARJETAS)
+  mq.addEventListener('change', onCambio)
+  return () => mq.removeEventListener('change', onCambio)
+}
+
+function leerTarjetas() {
+  return typeof window.matchMedia === 'function' && window.matchMedia(MQ_TARJETAS).matches
 }
 
 const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
@@ -244,6 +261,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
   const countMora = registrosPendientes.filter(r => r.estado === 'mora').length
 
   const bulk = useBulkSelection(registrosFiltrados, r => r.id)
+  const enTarjetas = useSyncExternalStore(suscribirTarjetas, leerTarjetas, () => false)
 
   // getTotal/getSaldo viven ahora en el módulo (ver arriba): son puros sobre el
   // registro, así que sacarlos del cuerpo del componente elimina la
@@ -541,21 +559,29 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
 
   return (
     <div>
-      {/* Header con resumen */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '16px', marginBottom: '28px' }}>
+      {/* Header con resumen: cuatro KPIs por fila si a cada uno le tocan ≥200px
+          (contenedor ≥836px); si no, dos (uno solo bajo ~316px de pantalla).
+          Con minmax(200px) el teléfono mostraba uno por fila y los cuatro
+          llenaban la pantalla; con minmax(140px) a secas, la tablet quedaba en
+          3+1 con las cifras partidas. `(836px - 100%) * 999` hace de escalón:
+          enorme bajo 836px (manda `50% - 7px` → dos columnas) y ≤0 desde ahí
+          (manda 140px y auto-fit reparte los cuatro). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(max(140px, min(calc(50% - 7px), calc((836px - 100%) * 999))), 1fr))', gap: '12px', marginBottom: '28px' }}>
         {[
           { label: 'Total por Cobrar', value: `${moneda} ${totalPendiente.toFixed(2)}`, icon: '💰', bg: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', },
           { label: 'En Mora', value: `${countMora} cobro${countMora !== 1 ? 's' : ''}`, icon: '⚠️', bg: 'linear-gradient(135deg,var(--at-danger),var(--at-danger))', },
           { label: 'Pagos Hoy', value: pagos.filter(p => p.created_at?.startsWith(hoyLocalISO())).length.toString(), icon: '✅', bg: 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))', },
           { label: 'Convenios Activos', value: convenios.filter(c => c.estado === 'activo').length.toString(), icon: '🤝', bg: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', },
         ].map((s, i) => (
-          <div key={i} style={{ background: s.bg, borderRadius: '16px', padding: '20px', color: 'white', boxShadow: '0 8px 20px rgba(0,0,0,0.12)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
+          <div key={i} style={{ background: s.bg, borderRadius: '16px', padding: 'clamp(12px, 3.5vw, 20px)', color: 'white', boxShadow: '0 8px 20px rgba(0,0,0,0.12)', minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+              {/* minWidth 0 + overflowWrap: un monto largo («Q 12450.75») parte
+                  línea dentro de la tarjeta en vez de desbordarla. */}
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '12px', opacity: 0.85, fontWeight: 500, marginBottom: '6px' }}>{s.label}</div>
-                <div style={{ fontSize: '26px', fontWeight: 700 }}>{s.value}</div>
+                <div style={{ fontSize: 'clamp(18px, 5vw, 26px)', fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>{s.value}</div>
               </div>
-              <div style={{ fontSize: '28px', opacity: 0.8 }}>{s.icon}</div>
+              <div aria-hidden="true" style={{ fontSize: 'clamp(20px, 5vw, 28px)', opacity: 0.8, flexShrink: 0 }}>{s.icon}</div>
             </div>
           </div>
         ))}
@@ -623,6 +649,24 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
             )}
           </div>
 
+          {/* En tarjetas el <thead> no se ve: «seleccionar todo» se ofrece aquí
+              con la misma acción que la casilla del encabezado. */}
+          {canEdit && enTarjetas && registrosFiltrados.length > 0 && (
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px',
+              padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--at-line)',
+              background: 'var(--at-surface)', fontSize: '14px', fontWeight: 600, color: 'var(--at-ink-2)', cursor: 'pointer',
+            }}>
+              <input
+                type="checkbox"
+                checked={bulk.isAllSelected}
+                onChange={bulk.toggleAll}
+                style={{ cursor: 'pointer', width: '18px', height: '18px', margin: 0 }}
+              />
+              {bulk.isAllSelected ? 'Deseleccionar todo' : 'Seleccionar todo'} ({registrosFiltrados.length})
+            </label>
+          )}
+
           {/* Bulk actions toolbar (sticky) */}
           {canEdit && (
             <SelectionToolbar
@@ -641,10 +685,15 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
             />
           )}
 
-          {/* Tabla */}
-          <div style={{ background: 'var(--at-surface)', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
-            <div className="table-scroll-wrapper">
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+          {/* Tabla — en ≤480px `.table-cards-on-mobile` convierte cada fila en
+              tarjeta: el `data-label` de cada celda es su rótulo y las acciones
+              (celda sin rótulo) quedan al pie, partiendo línea si no caben.
+              En tarjetas va sin caja ni `.table-scroll-wrapper`: su degradado de
+              «hay más a la derecha» caía sobre el borde de cada tarjeta y lavaba
+              los montos alineados a la derecha. */}
+          <div style={enTarjetas ? undefined : { background: 'var(--at-surface)', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+            <div className={enTarjetas ? undefined : 'table-scroll-wrapper'}>
+              <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                 <thead style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                   <tr>
                     {canEdit && (
@@ -710,9 +759,11 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
                       // cada petición que la propia tabla dispara.
                       <tr key={r.id} data-registro-id={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: bulk.isSelected(r.id) ? 'var(--at-primary-tint)' : undefined }}
                         onMouseEnter={e => { if (!bulk.isSelected(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-surface-2)' }}
-                        onMouseLeave={e => { if (!bulk.isSelected(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'transparent' }}>
+                        // '' y no 'transparent': devuelve el fondo a la hoja, que en
+                        // tarjeta es el de la tarjeta (tras un toque quedaba hueca).
+                        onMouseLeave={e => { if (!bulk.isSelected(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = '' }}>
                         {canEdit && (
-                          <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                          <td data-label="Seleccionar" style={{ padding: '14px 16px', textAlign: 'center' }}>
                             <input
                               type="checkbox"
                               aria-label={`Seleccionar fila ${cliente?.nombre ?? r.cliente_nombre ?? r.id}`}
@@ -722,32 +773,38 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
                             />
                           </td>
                         )}
-                        <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{cliente?.nombre ?? r.cliente_nombre}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{cliente?.codigo}</div>
+                        <td data-label="Cliente" style={{ padding: '14px 16px' }}>
+                          {/* Un solo hijo: en tarjeta la celda es flex y nombre y
+                              código, sueltos, se repartían a lo ancho. */}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{cliente?.nombre ?? r.cliente_nombre}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{cliente?.codigo}</div>
+                          </div>
                         </td>
-                        <td className="table-col-secondary" style={{ padding: '14px 16px', color: 'var(--at-ink-2)', whiteSpace: 'nowrap' }}>
+                        <td data-label="Fecha" className="table-col-secondary" style={{ padding: '14px 16px', color: 'var(--at-ink-2)', whiteSpace: 'nowrap' }}>
                           {new Date(r.fecha).toLocaleDateString('es-GT')}
                         </td>
-                        <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--at-ink)' }}>
+                        <td data-label={`Cargo (${moneda})`} style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--at-ink)' }}>
                           {total.toFixed(2)}
                         </td>
-                        <td className="table-col-secondary" style={{ padding: '14px 16px', textAlign: 'right', color: abonado > 0 ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
+                        <td data-label="Abonado" className="table-col-secondary" style={{ padding: '14px 16px', textAlign: 'right', color: abonado > 0 ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                           {abonado > 0 ? abonado.toFixed(2) : '—'}
                         </td>
-                        <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: isMora ? 'var(--at-danger)' : 'var(--at-warning)', fontSize: '15px' }}>
+                        <td data-label="Saldo" style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: isMora ? 'var(--at-danger)' : 'var(--at-warning)', fontSize: '15px' }}>
                           {saldo.toFixed(2)}
                         </td>
-                        <td style={{ padding: '14px 16px' }}>
+                        <td data-label="Estado" style={{ padding: '14px 16px' }}>
+                          {/* nowrap como el badge de Factura: partida, la píldora
+                              quedaba en dos renglones con el fondo cortado. */}
                           <span style={{
-                            padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
+                            padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap',
                             background: isMora ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)',
                             color: isMora ? 'var(--at-danger)' : 'var(--at-warning-strong)',
                           }}>
                             {isMora ? '⚠ Mora' : '⏳ Pendiente'}
                           </span>
                         </td>
-                        <td className="table-col-secondary" style={{ padding: '14px 16px' }}>
+                        <td data-label="Factura" className="table-col-secondary" style={{ padding: '14px 16px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
                             <FacturaEstadoBadge estado={estadoFactura} />
                             {/* serv:S11 — estatus de timbrado (solo si ya hay comprobante). */}
@@ -855,8 +912,12 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
                         boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
                       }}
                     >
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', alignItems: 'start' }}>
-                        <div>
+                      {/* Flex que parte línea: en el teléfono los botones bajan al pie
+                          a todo el ancho; antes eran una columna fija de 160px
+                          que dejaba los datos del pago en una franja angosta. El
+                          crecimiento 999:1 los mantiene a la derecha en escritorio. */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-start' }}>
+                        <div style={{ flex: '999 1 240px', minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
                             <div>
                               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>
@@ -904,11 +965,12 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
 
                         {/* Autorizar/denegar el pago: solo con permiso de aprobación (RBAC). */}
                         {canApprove && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '160px' }}>
+                        <div style={{ flex: '1 1 160px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                           <button
                             onClick={() => void handleVerificarPago(pago.id, true)}
                             disabled={verificando === pago.id}
                             style={{
+                              flex: '1 1 140px',
                               padding: '10px',
                               borderRadius: '8px',
                               border: 'none',
@@ -926,6 +988,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
                             onClick={() => void handleVerificarPago(pago.id, false)}
                             disabled={verificando === pago.id}
                             style={{
+                              flex: '1 1 140px',
                               padding: '10px',
                               borderRadius: '8px',
                               border: '1.5px solid var(--at-danger)',

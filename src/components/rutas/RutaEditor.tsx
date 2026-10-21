@@ -22,7 +22,9 @@ export function RutaEditor({ ctx }: { ctx: RutasCtx }) {
   } = ctx
 
   return (
-    <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+    // clamp: en un teléfono de 375px los 32px de relleno dejaban ~287px útiles;
+    // en el escritorio sigue en 32px.
+    <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: 'clamp(16px, 4vw, 32px)', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
       <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '24px', borderBottom: '2px solid var(--at-line)', paddingBottom: '12px' }}>
         {editando ? 'Editar Ruta' : 'Nueva Ruta de Lecturas'}
       </div>
@@ -277,7 +279,8 @@ export function RutaEditor({ ctx }: { ctx: RutasCtx }) {
       {/* Selector de tipo de ruta */}
       <div style={{ marginBottom: '20px' }}>
         <div style={{ fontWeight: 700, marginBottom: '10px', color: 'var(--at-ink-2)', fontSize: '14px' }}>Tipo de Ruta</div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        {/* wrap: los tres botones (~350px) no caben en un teléfono. */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {(['clientes', 'contadores', 'unidades'] as const).map(tipo => {
             const labels = { clientes: 'Por cliente', contadores: 'Por contador', unidades: 'Por unidad' }
             const active = tipoRuta === tipo
@@ -304,8 +307,10 @@ export function RutaEditor({ ctx }: { ctx: RutasCtx }) {
         </div>
       </div>
 
-      {/* Panel de selección de elementos */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+      {/* Panel de selección de elementos. Con `1fr 1fr` fijo, en el teléfono
+          "disponibles" y "en esta ruta" quedaban de ~140px cada una; así se
+          apilan en pantallas angostas y siguen lado a lado en el escritorio. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '20px', marginBottom: '24px' }}>
 
         {/* ── MODO CLIENTES ── */}
         {tipoRuta === 'clientes' && (

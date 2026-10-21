@@ -496,6 +496,17 @@ button:focus:not(:focus-visible) {
   .table-cards-on-mobile tbody td:not(:last-child) {
     border-bottom: 1px solid var(--at-chip) !important;
   }
+  /* La última celda VISIBLE no lleva divisor: si las columnas finales están
+   * ocultas (.table-col-secondary), :last-child apunta a una oculta y quedaba
+   * una raya suelta al pie de la tarjeta. */
+  .table-cards-on-mobile tbody td:not(:has(~ td:not(.table-col-secondary))) {
+    border-bottom: none !important;
+  }
+  /* En tarjetas ya no hay nada que deslizar de lado: el degradado del borde
+   * derecho (pensado para la tabla) tapaba el final de cada tarjeta. */
+  .table-scroll-wrapper:has(> .table-cards-on-mobile)::after {
+    display: none !important;
+  }
   .table-cards-on-mobile tbody td::before {
     content: attr(data-label);
     font-weight: 600;
@@ -804,6 +815,77 @@ button:focus:not(:focus-visible) {
   }
   .conv-stat-label {
     font-size: 10.5px !important;
+  }
+}
+
+/* ─── Panel de Condominios en el teléfono ─────────────────────────────────
+ *
+ * Las ~190 pestañas del módulo se escribieron para escritorio, con rejillas de
+ * columnas fijas inline (más de 200: `'1fr 1fr'`, `'repeat(4,1fr)'`, …). En
+ * un teléfono eso daba formularios de campos de 140px, KPIs de 70px y
+ * columnas laterales que se salían de la pantalla. En vez de tocar
+ * archivo por archivo, el cuerpo del módulo (`.cond-panel`, en
+ * CondominiosSection) reacomoda esas rejillas por el valor que el navegador
+ * serializa en el atributo style — siempre normalizado ("repeat(4, 1fr)"
+ * con espacio, aunque el código diga 'repeat(4,1fr)').
+ *
+ * Quedan fuera, a propósito: los calendarios (`repeat(7, …)`), las filas de
+ * tabla hechas con grid que mezclan px/auto, y las rejillas que ya son
+ * auto-fill/auto-fit. Los modales se pintan en un portal fuera de
+ * `.cond-panel`, así que esto no los toca. `!important` porque todo va
+ * inline. */
+@media (max-width: 767px) {
+  /* Cabecera y cuerpo de cada pestaña: sus 24px laterales se sumaban a los
+   * 12px de .app-main y dejaban ~300px útiles en un iPhone. */
+  .cond-header {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+  .cond-panel > [style*="padding: 24px;"],
+  .cond-panel > [style*="padding: 20px 24px;"],
+  .cond-panel > [style*="padding: 20px;"] {
+    padding: 14px 0 !important;
+  }
+  /* 3 a 6 columnas (KPIs, mayormente) → 2 por fila. */
+  .cond-panel [style*="grid-template-columns: repeat(3, 1fr);"],
+  .cond-panel [style*="grid-template-columns: repeat(4, 1fr);"],
+  .cond-panel [style*="grid-template-columns: repeat(5, 1fr);"],
+  .cond-panel [style*="grid-template-columns: repeat(6, 1fr);"],
+  .cond-panel [style*="grid-template-columns: 1fr 1fr 1fr;"],
+  .cond-panel [style*="grid-template-columns: 1fr 1fr 1fr 1fr;"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* Columnas laterales fijas (resúmenes, pisos, simuladores): una sola
+   * columna, la lateral debajo en vez de fuera de la pantalla. Las vistas
+   * lista|detalle ya abren el detalle en ventana (EditModal). */
+  .cond-panel [style*="grid-template-columns: 1fr 290px;"],
+  .cond-panel [style*="grid-template-columns: 1fr 240px;"],
+  .cond-panel [style*="grid-template-columns: 1fr 220px;"],
+  .cond-panel [style*="grid-template-columns: 280px 1fr;"],
+  .cond-panel [style*="grid-template-columns: 300px 1fr;"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  /* Con menos columnas, un hijo que pedía "span 2/3" o arrancar en la 2
+   * crearía columnas implícitas y desbordaría: ocupa la fila entera. */
+  .cond-panel [style*="grid-column: span"],
+  .cond-panel [style*="grid-column: 2 / -1;"] {
+    grid-column: 1 / -1 !important;
+  }
+}
+/* Tarjetas KPI del Panel General que llevan a su pestaña. */
+.cond-kpi-link {
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cond-kpi-link:hover {
+  border-color: var(--at-primary-soft-2) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+}
+@media (max-width: 480px) {
+  /* Dos campos (o lista y detalle) por fila no caben en un teléfono
+   * angosto. */
+  .cond-panel [style*="grid-template-columns: 1fr 1fr;"],
+  .cond-panel [style*="grid-template-columns: repeat(2, 1fr);"] {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 }
 

@@ -507,6 +507,20 @@ describe('DataTable — mobile responsive', () => {
     expect(firstCell?.hasAttribute('data-label')).toBe(false)
   })
 
+  it('mobileCardLayout: una columna con header vacío (acciones) no lleva etiqueta', () => {
+    const { container } = render(
+      <DataTable
+        data={rows}
+        columns={[...columns, { key: 'acciones', header: '', render: () => <button>Editar</button> }]}
+        rowKey="id"
+        mobileCardLayout
+        pageSize={0}
+      />
+    )
+    const celdas = container.querySelectorAll('tbody tr:first-child td')
+    expect(celdas[celdas.length - 1].hasAttribute('data-label')).toBe(false)
+  })
+
   it('mobileCardLayout fallback a col.key cuando header no es string', () => {
     const cols: DataTableColumn<Row>[] = [
       { key: 'nombre', header: <span>Nombre rico</span> }, // ReactNode, no string

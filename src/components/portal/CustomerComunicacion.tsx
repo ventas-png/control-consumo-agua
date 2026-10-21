@@ -3,6 +3,7 @@ import { notify } from '../shared/Dialog'
 import { Button } from '../shared/Button'
 import { EmptyState } from '../shared/EmptyState'
 import { Skeleton } from '../shared/Skeleton'
+import { EditModal } from '../shared/EditModal'
 import { useConversations } from '../../hooks/useConversations'
 import { useBroadcasts } from '../../hooks/useBroadcasts'
 import { NotificationPreferencesPanel } from '../comunicacion/NotificationPreferencesPanel'
@@ -73,7 +74,8 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
   const [pendingFile, setPendingFile] = useState<File | null>(null)
 
   const [mainTab, setMainTab] = useState<MainTab>('conversaciones')
-  const [expandedBroadcast, setExpandedBroadcast] = useState<string | null>(null)
+  // Comunicado abierto en ventana (antes se desplegaba dentro de la lista).
+  const [comunicadoAbierto, setComunicadoAbierto] = useState<string | null>(null)
 
   const { clienteBroadcasts, loadClienteBroadcasts, markAsRead } = useBroadcasts()
 
@@ -321,101 +323,92 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {mainTab === 'comunicados' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>Comunicados</h3>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--at-ink)' }}>Comunicados</h3>
             <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
               Mensajes informativos de la empresa
             </p>
           </div>
           {clienteBroadcasts.length === 0 ? (
             <div style={{
-              padding: '48px 24px', textAlign: 'center',
               background: 'var(--at-surface)', borderRadius: '14px',
-              border: '1px solid var(--at-line)',
-              boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
+              border: '1px solid var(--at-line)', boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
             }}>
-              <div style={{ fontSize: '40px', marginBottom: '12px' }}>📢</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '4px' }}>
-                Sin comunicados
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>
-                Aquí aparecerán los mensajes informativos de la empresa.
-              </div>
+              <EmptyState
+                audience="resident"
+                icon="📢"
+                title="Sin comunicados"
+                description="Aquí aparecerán los mensajes informativos de la empresa."
+              />
             </div>
           ) : (
             clienteBroadcasts.map(recipient => {
               const bc = recipient.broadcast!
-              const isExpanded = expandedBroadcast === recipient.id
               const isUnread = !recipient.read_at
               return (
-                <div
+                <button
                   key={recipient.id}
+                  type="button"
+                  className="conv-row"
+                  onClick={() => {
+                    setComunicadoAbierto(recipient.id)
+                    if (isUnread) markAsRead(recipient.id)
+                  }}
                   style={{
-                    background: 'var(--at-surface)',
-                    border: `1px solid ${isUnread ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`,
-                    borderRadius: '14px',
-                    overflow: 'hidden',
+                    width: '100%', textAlign: 'left', cursor: 'pointer', color: 'var(--at-ink)',
+                    background: isUnread ? 'var(--at-primary-tint)' : 'var(--at-surface)',
+                    borderTop: `1px solid ${isUnread ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`,
+                    borderRight: `1px solid ${isUnread ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`,
+                    borderBottom: `1px solid ${isUnread ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`,
+                    borderLeft: `4px solid ${isUnread ? 'var(--at-primary)' : 'var(--at-line)'}`,
+                    borderRadius: '14px', padding: '14px 16px',
                     boxShadow: isUnread ? '0 1px 8px rgba(47, 93, 79,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
+                    display: 'flex', alignItems: 'flex-start', gap: '12px',
                   }}
                 >
-                  <button
-                    onClick={() => {
-                      if (!isExpanded) {
-                        setExpandedBroadcast(recipient.id)
-                        if (isUnread) markAsRead(recipient.id)
-                      } else {
-                        setExpandedBroadcast(null)
-                      }
-                    }}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '14px 18px',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                    }}
-                  >
-                    {isUnread && (
-                      <span style={{
-                        width: '8px', height: '8px', borderRadius: '50%',
-                        background: 'var(--at-primary-2)', flexShrink: 0,
-                      }} />
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: isUnread ? 700 : 600, fontSize: '13.5px', color: 'var(--at-ink)' }}>
-                        {bc.title}
-                      </div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
-                        {bc.sent_by_name} · {new Date(bc.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </div>
-                    </div>
-                    <svg
-                      width="14" height="14"
-                      fill="none" stroke="var(--at-ink-3)" strokeWidth="2"
-                      viewBox="0 0 24 24"
-                      style={{ flexShrink: 0, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                  </button>
-                  {isExpanded && (
-                    <div style={{ padding: '0 18px 18px', borderTop: '1px solid var(--at-chip)' }}>
-                      <div style={{
-                        paddingTop: '14px',
-                        fontSize: '14px', color: 'var(--at-ink-2)',
-                        lineHeight: '1.65', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                      }}>
-                        {bc.body}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  <span aria-hidden="true" style={{ fontSize: '22px', lineHeight: 1.2, flexShrink: 0 }}>📢</span>
+                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {isUnread && (
+                        <span title="Sin leer" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--at-primary-2)', flexShrink: 0 }} />
+                      )}
+                      <span style={{ fontWeight: isUnread ? 800 : 700, fontSize: '14.5px' }}>{bc.title}</span>
+                    </span>
+                    {/* Extracto de dos líneas; el comunicado completo se abre en ventana. */}
+                    <span style={{
+                      fontSize: '13px', color: 'var(--at-ink-2)', lineHeight: 1.5,
+                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    }}>
+                      {bc.body}
+                    </span>
+                    <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <span>{bc.sent_by_name} · {new Date(bc.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                      <span style={{ marginLeft: 'auto', color: 'var(--at-primary)', fontWeight: 700 }}>Leer completo ›</span>
+                    </span>
+                  </span>
+                </button>
               )
             })
           )}
+
+          {comunicadoAbierto && (() => {
+            const r = clienteBroadcasts.find(x => x.id === comunicadoAbierto)
+            if (!r?.broadcast) return null
+            const bc = r.broadcast
+            return (
+              <EditModal
+                title={bc.title}
+                subtitle={`${bc.sent_by_name} · ${new Date(bc.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}`}
+                maxWidth="620px"
+                fullScreenOnMobile
+                onClose={() => setComunicadoAbierto(null)}
+                footer={<Button variant="secondary" onClick={() => setComunicadoAbierto(null)}>Cerrar</Button>}
+              >
+                <div style={{ fontSize: '15px', color: 'var(--at-ink-2)', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {bc.body}
+                </div>
+              </EditModal>
+            )
+          })()}
         </div>
       )}
 

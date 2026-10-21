@@ -1,7 +1,7 @@
 import { useState, useRef, type ReactNode, type CSSProperties, type ChangeEvent, type DragEvent } from 'react'
 import { notify } from '../shared/Dialog'
 import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
-import { ModalPortal } from './ModalPortal'
+import { EditModal } from './EditModal'
 
 // ── Tipos públicos ────────────────────────────────────────────────────────
 
@@ -224,26 +224,48 @@ export function ImportModal<T>({
   }
 
   // ── Render ──────────────────────────────────────────────────────────────
+  // Ventana compartida (EditModal): foco atrapado, Esc y pantalla completa en
+  // el teléfono. Mientras guarda no se puede cerrar —antes un toque fuera
+  // cortaba la importación a medias—.
+  const importando = step === 'importing'
+  const cerrar = () => { if (!importando) onClose() }
   return (
-    <ModalPortal>
-    <div data-testid="import-modal-overlay" style={overlayStyle} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={modalStyle}>
-        <div style={headerStyle}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>
-              Importar {plural} desde Excel
-            </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
-              {step === 'upload' && 'Descarga la plantilla, complétala y sube el archivo.'}
-              {step === 'preview' && `${rows.length} fila${rows.length !== 1 ? 's' : ''} — ${validCount} válida${validCount !== 1 ? 's' : ''}, ${invalidCount} con error${invalidCount !== 1 ? 'es' : ''}`}
-              {step === 'importing' && `Guardando ${plural} en la base de datos…`}
-              {step === 'done' && `${importedCount} ${importedCount === 1 ? entityLabel : plural} importado${importedCount === 1 ? '' : 's'} exitosamente.`}
-            </p>
-          </div>
-          <button onClick={onClose} style={closeBtnStyle} aria-label="Cerrar">✕</button>
-        </div>
-
-        <div style={bodyStyle}>
+    <EditModal
+      title={`Importar ${plural} desde Excel`}
+      subtitle={<>
+        {step === 'upload' && 'Descarga la plantilla, complétala y sube el archivo.'}
+        {step === 'preview' && `${rows.length} fila${rows.length !== 1 ? 's' : ''} — ${validCount} válida${validCount !== 1 ? 's' : ''}, ${invalidCount} con error${invalidCount !== 1 ? 'es' : ''}`}
+        {step === 'importing' && `Guardando ${plural} en la base de datos…`}
+        {step === 'done' && `${importedCount} ${importedCount === 1 ? entityLabel : plural} importado${importedCount === 1 ? '' : 's'} exitosamente.`}
+      </>}
+      maxWidth="780px"
+      fullScreenOnMobile
+      closeOnBackdropClick={!importando}
+      closeOnEscape={!importando}
+      onClose={cerrar}
+      footer={importando ? undefined : <div style={footerStyle}>
+          {step === 'preview' && validCount > 0 && importDisabled && importDisabledReason && (
+            <span style={{ fontSize: '12px', color: 'var(--at-danger-strong)', alignSelf: 'center', marginRight: 'auto' }}>
+              {importDisabledReason}
+            </span>
+          )}
+          {step === 'preview' && validCount > 0 && (
+            <button
+              onClick={() => void handleImportar()}
+              disabled={importDisabled}
+              style={importDisabled ? { ...btnPrimary, opacity: 0.5, cursor: 'not-allowed' } : btnPrimary}
+            >
+              Importar {validCount} {validCount === 1 ? entityLabel : plural}
+            </button>
+          )}
+          {step === 'done' && (
+            <button onClick={onClose} style={btnPrimary}>Cerrar</button>
+          )}
+          {(step === 'upload' || step === 'preview') && (
+            <button onClick={onClose} style={btnSecondary}>Cancelar</button>
+          )}
+        </div>}
+    >
           {optionsPanel && (step === 'upload' || step === 'preview') && (
             <div style={{ marginBottom: '20px' }}>{optionsPanel}</div>
           )}
@@ -283,30 +305,6 @@ export function ImportModal<T>({
               </p>
             </div>
           )}
-        </div>
-
-        <div style={footerStyle}>
-          {step === 'preview' && validCount > 0 && importDisabled && importDisabledReason && (
-            <span style={{ fontSize: '12px', color: 'var(--at-danger-strong)', alignSelf: 'center', marginRight: 'auto' }}>
-              {importDisabledReason}
-            </span>
-          )}
-          {step === 'preview' && validCount > 0 && (
-            <button
-              onClick={() => void handleImportar()}
-              disabled={importDisabled}
-              style={importDisabled ? { ...btnPrimary, opacity: 0.5, cursor: 'not-allowed' } : btnPrimary}
-            >
-              Importar {validCount} {validCount === 1 ? entityLabel : plural}
-            </button>
-          )}
-          {step === 'done' && (
-            <button onClick={onClose} style={btnPrimary}>Cerrar</button>
-          )}
-          {(step === 'upload' || step === 'preview') && (
-            <button onClick={onClose} style={btnSecondary}>Cancelar</button>
-          )}
-        </div>
 
         <input
           ref={fileInputRef}
@@ -315,9 +313,7 @@ export function ImportModal<T>({
           onChange={handleFileInput}
           style={{ display: 'none' }}
         />
-      </div>
-    </div>
-    </ModalPortal>
+    </EditModal>
   )
 }
 
@@ -353,6 +349,10 @@ function UploadStep({
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onClick={onClickFile}
+        // Sin esto, con teclado no había forma de subir el archivo.
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClickFile() } }}
         style={dropZoneStyle(dragOver)}
       >
         <div style={{ fontSize: '32px', marginBottom: '10px' }}>📤</div>
@@ -444,24 +444,8 @@ function normalizeCell(v: unknown): string | number | boolean | null | undefined
 
 // ── Styles ────────────────────────────────────────────────────────────────
 
-const overlayStyle: CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  zIndex: 1000, padding: '16px',
-}
-const modalStyle: CSSProperties = {
-  background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '780px',
-  maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-}
-const headerStyle: CSSProperties = {
-  padding: '24px 28px 20px', borderBottom: '1px solid var(--at-line)',
-  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-}
-const bodyStyle: CSSProperties = { padding: '24px 28px', overflowY: 'auto', flex: 1 }
 const footerStyle: CSSProperties = {
-  padding: '16px 28px', borderTop: '1px solid var(--at-line)',
-  display: 'flex', justifyContent: 'flex-end', gap: '10px',
+  display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%',
 }
 const btnPrimary: CSSProperties = {
   padding: '10px 22px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
@@ -472,10 +456,6 @@ const btnSecondary: CSSProperties = {
   padding: '10px 22px', background: 'var(--at-chip)', color: 'var(--at-ink-2)',
   border: '1px solid var(--at-line)', borderRadius: '8px',
   fontWeight: 600, fontSize: '14px', cursor: 'pointer',
-}
-const closeBtnStyle: CSSProperties = {
-  background: 'none', border: 'none', cursor: 'pointer',
-  color: 'var(--at-ink-3)', fontSize: '22px', lineHeight: 1, padding: '4px',
 }
 const uploadBannerStyle: CSSProperties = {
   marginBottom: '24px', padding: '16px 20px',

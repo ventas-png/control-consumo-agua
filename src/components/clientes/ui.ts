@@ -6,6 +6,8 @@ export const inputStyle: CSSProperties = {
   border: '2px solid var(--at-line)',
   borderRadius: '8px',
   fontSize: '14px',
+  // Los controles no heredan la fuente de la app por defecto.
+  fontFamily: 'inherit',
   width: '100%',
   boxSizing: 'border-box',
   outline: 'none',

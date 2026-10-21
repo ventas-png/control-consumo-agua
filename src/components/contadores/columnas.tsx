@@ -41,7 +41,9 @@ export function buildContadoresColumns(ctx: ContadoresCtx): DataTableColumn<Cont
       },
     },
     {
-      key: 'marcaModelo', header: 'Marca / Modelo',
+      // Secundarias en el teléfono (<640px): la tarjeta queda en serie,
+      // tipología, unidad, tarifa, estado y acciones.
+      key: 'marcaModelo', header: 'Marca / Modelo', hideOnMobile: true,
       accessor: c => `${c.marca ?? ''} ${c.modelo ?? ''}`.trim(),
       render: c => {
         if (!c.marca && !c.modelo) return <span style={{ color: 'var(--at-line-strong)' }}>—</span>
@@ -59,7 +61,7 @@ export function buildContadoresColumns(ctx: ContadoresCtx): DataTableColumn<Cont
       render: c => <CaracteristicasCell contador={c} />,
     },
     {
-      key: 'lecturaInicial', header: 'Lect. Inicial', sortable: true, align: 'right',
+      key: 'lecturaInicial', header: 'Lect. Inicial', sortable: true, align: 'right', hideOnMobile: true,
       accessor: c => Number(c.lectura_inicial),
       render: c => (
         <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>
@@ -131,7 +133,8 @@ export function buildContadoresColumns(ctx: ContadoresCtx): DataTableColumn<Cont
     cols.push({
       key: 'acciones', header: 'Acciones', align: 'center',
       render: c => (
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+        // flexWrap: en la tarjeta del teléfono los botones bajan de línea.
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
             onClick={() => startEdit(c)}
             style={{

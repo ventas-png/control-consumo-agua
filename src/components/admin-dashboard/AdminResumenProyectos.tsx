@@ -112,7 +112,10 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
     {
       key: 'nombre', header: 'Proyecto', sortable: true,
       accessor: p => p.nombre,
-      render: p => <span style={{ fontWeight: 600, color: 'var(--at-ink)', whiteSpace: 'nowrap' }}>{p.nombre}</span>,
+      // Sin `nowrap`: en el teléfono un nombre largo ("Cascadas de Vista
+      // Hermosa") empujaba la columna de recaudo fuera de la pantalla. En el
+      // escritorio hay ancho de sobra y el nombre sigue en una línea.
+      render: p => <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{p.nombre}</span>,
     },
     {
       key: 'totalM3', header: '💧 Total m³', sortable: true, align: 'center',
@@ -178,8 +181,11 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
             {activeTipos.map(tipo => {
               const m3 = totals.byTipo.get(tipo)
               const meta = TIPOLOGIA_META[tipo]
+              // Misma clase que sus columnas (hideOnMobile): sin ella, en el
+              // teléfono el pie seguía con estas celdas, el total de recaudo
+              // caía bajo otra columna y la tabla se ensanchaba.
               return (
-                <td key={tipo} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: meta?.color ?? 'var(--at-ink)', fontSize: '12px' }}>
+                <td key={tipo} className="table-col-secondary" style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: meta?.color ?? 'var(--at-ink)', fontSize: '12px' }}>
                   {m3 && m3 > 0 ? m3.toFixed(1) : '—'}
                 </td>
               )

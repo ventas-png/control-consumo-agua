@@ -161,7 +161,7 @@ describe('PortalMiUnidadTab — conversación del mensaje', () => {
     await screen.findByLabelText('Mensaje')
 
     fireEvent.change(screen.getByLabelText('Mensaje'), { target: { value: 'Sigue igual' } })
-    fireEvent.click(screen.getByText('➤ Enviar mensaje'))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
 
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     const [tabla, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
@@ -171,7 +171,7 @@ describe('PortalMiUnidadTab — conversación del mensaje', () => {
       autor_nombre: 'Marco Santos', contenido: 'Sigue igual', es_interno: false,
     })
     // El residente no puede marcar notas internas ni mover el mensaje.
-    expect(screen.queryByText('Nota interna')).toBeNull()
+    expect(screen.queryByRole('radio', { name: /Nota interna/ })).toBeNull()
     expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
   })
 
@@ -180,9 +180,9 @@ describe('PortalMiUnidadTab — conversación del mensaje', () => {
     fireEvent.click(screen.getByText('💬 Responder'))
     await screen.findByLabelText('Mensaje')
 
-    expect(screen.getByText('Nota interna')).toBeTruthy()
+    expect(screen.getByRole('radio', { name: /Nota interna/ })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Mensaje'), { target: { value: 'Lo revisamos hoy' } })
-    fireEvent.click(screen.getByText('➤ Enviar mensaje'))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
 
     await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1))
     const [tabla, id, patch] = mocks.updateCondominioRow.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
@@ -197,8 +197,9 @@ describe('PortalMiUnidadTab — conversación del mensaje', () => {
     await screen.findByLabelText('Mensaje')
 
     fireEvent.change(screen.getByLabelText('Mensaje'), { target: { value: 'Revisar con el guardia' } })
-    fireEvent.click(screen.getByRole('checkbox'))
-    fireEvent.click(screen.getByText('➤ Enviar mensaje'))
+    fireEvent.click(screen.getByRole('radio', { name: /Nota interna/ }))
+    // Con "Nota interna" elegida, el botón deja claro que no le llega al residente.
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar nota interna' }))
 
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     const [, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]

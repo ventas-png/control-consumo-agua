@@ -137,6 +137,10 @@ export function EditModal({
     if (!closeOnEscape) return
     function handleKeyDown(e: globalThis.KeyboardEvent) {
       if (e.key !== 'Escape') return
+      // Un confirm()/prompt (Radix) abierto encima ya atendió este Escape —lo
+      // escucha en captura y marca el evento—: cierra solo ese diálogo, no
+      // también la ventana de abajo.
+      if (e.defaultPrevented) return
       if (modalStack[modalStack.length - 1] !== stackIdRef.current) return
       onClose()
     }

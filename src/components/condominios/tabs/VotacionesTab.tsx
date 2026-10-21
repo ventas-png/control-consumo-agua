@@ -1,5 +1,7 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchVotosVotacion } from '../../../domain/condominios/tabQueries'
 import type { Votacion, Voto, Unidad, Asamblea, TipoVotacion } from '../../../types'
@@ -100,11 +102,24 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
 
   const totalVotos = votos.length
   const counts = votacion ? votacion.opciones.map(o => ({ id: o.id, texto: o.texto, count: votos.filter(v => v.opcion_id === o.id).length })) : []
   const maxCount = Math.max(...counts.map(c => c.count), 1)
+
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false)
+  }
+
+  function cerrarDetalle() {
+    setSelected(null)
+    // Sin esto, al abrir otra votación se veían un instante los votos de la
+    // anterior (y faltaban esas unidades en "Registrar voto").
+    setVotos([])
+  }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -113,7 +128,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
           <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Votaciones</h2>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>Votaciones digitales vinculadas a asambleas</p>
         </div>
-        {canCreate && !showForm && (
+        {canCreate && (
           <button onClick={() => setShowForm(true)}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nueva Votación
@@ -121,47 +136,61 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
         )}
       </div>
 
+      {/* Form en ventana: antes se desplegaba arriba de la lista y en el
+          teléfono la empujaba fuera de la vista. */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nueva Votación</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Título *</label>
-              <input style={inputStyle} value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej: Aprobación del presupuesto 2026" autoFocus />
+        <EditModal
+          title="Nueva votación"
+          maxWidth="640px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} loadingText="Guardando…">Crear Votación</Button>
+          </>}
+        >
+          {/* `1 / -1` y no `span 2`: con una sola columna (teléfono) el span
+              creaba una columna implícita y el campo se salía de la ventana. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="vot-titulo" style={labelStyle}>Título *</label>
+              <input id="vot-titulo" style={inputStyle} value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej: Aprobación del presupuesto 2026" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Asamblea (opcional)</label>
-              <select style={inputStyle} value={form.asamblea_id} onChange={e => setForm(f => ({ ...f, asamblea_id: e.target.value }))}>
+              <label htmlFor="vot-asamblea" style={labelStyle}>Asamblea (opcional)</label>
+              <select id="vot-asamblea" style={inputStyle} value={form.asamblea_id} onChange={e => setForm(f => ({ ...f, asamblea_id: e.target.value }))}>
                 <option value="">— Ninguna —</option>
                 {asambleas.map(a => <option key={a.id} value={a.id}>{a.titulo} ({a.fecha})</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Tipo</label>
-              <select style={inputStyle} value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as 'simple' | 'multiple' | 'ponderada' }))}>
+              <label htmlFor="vot-tipo" style={labelStyle}>Tipo</label>
+              <select id="vot-tipo" style={inputStyle} value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as 'simple' | 'multiple' | 'ponderada' }))}>
                 <option value="simple">Simple (1 opción)</option>
                 <option value="multiple">Múltiple</option>
                 <option value="ponderada">Ponderada</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Quórum mínimo</label>
-              <input style={inputStyle} type="number" min="0" value={form.quorum_requerido} onChange={e => setForm(f => ({ ...f, quorum_requerido: parseInt(e.target.value) || 0 }))} placeholder="0 = sin mínimo" />
+              <label htmlFor="vot-quorum" style={labelStyle}>Quórum mínimo</label>
+              <input id="vot-quorum" style={inputStyle} type="number" min="0" value={form.quorum_requerido} onChange={e => setForm(f => ({ ...f, quorum_requerido: parseInt(e.target.value) || 0 }))} placeholder="0 = sin mínimo" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha de cierre</label>
-              <input style={inputStyle} type="datetime-local" value={form.fecha_cierre} onChange={e => setForm(f => ({ ...f, fecha_cierre: e.target.value }))} />
+              <label htmlFor="vot-cierre" style={labelStyle}>Fecha de cierre</label>
+              <input id="vot-cierre" style={inputStyle} type="datetime-local" value={form.fecha_cierre} onChange={e => setForm(f => ({ ...f, fecha_cierre: e.target.value }))} />
             </div>
           </div>
           <div style={{ marginTop: '12px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '6px' }}>Opciones de voto *</label>
+            <div style={{ ...labelStyle, marginBottom: '6px' }}>Opciones de voto *</div>
             {form.opciones.map((op, i) => (
               <div key={op.id} style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-                <input style={{ ...inputStyle, flex: 1 }} value={op.texto}
+                <input style={{ ...inputStyle, flex: 1, minWidth: 0 }} value={op.texto}
                   onChange={e => setForm(f => ({ ...f, opciones: f.opciones.map((o, j) => j === i ? { ...o, texto: e.target.value } : o) }))}
-                  placeholder={`Opción ${i + 1}`} />
+                  placeholder={`Opción ${i + 1}`} aria-label={`Opción ${i + 1}`} />
                 {form.opciones.length > 2 && (
-                  <button onClick={() => setForm(f => ({ ...f, opciones: f.opciones.filter((_, j) => j !== i) }))}
+                  <button onClick={() => setForm(f => ({ ...f, opciones: f.opciones.filter((_, j) => j !== i) }))} aria-label={`Quitar opción ${i + 1}`}
                     style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>✕</button>
                 )}
               </div>
@@ -171,61 +200,53 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
               + Agregar opción
             </button>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Crear Votación'}
-            </button>
-            <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: votacion ? '300px 1fr' : '1fr', gap: '16px' }}>
-        {/* List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {votaciones.length === 0 ? (
-            <EmptyState icon="📋" title="No hay votaciones. Crea una para comenzar" />
-          ) : (
-            votaciones.map(v => {
-              const ec = ESTADO_COLORS[v.estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' }
-              return (
-                <div key={v.id} onClick={() => setSelected(selected === v.id ? null : v.id)}
-                  style={{ background: selected === v.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${selected === v.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)', marginBottom: '2px' }}>{v.titulo}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{v.fecha_inicio.slice(0, 10)} · {v.opciones.length} opciones</div>
-                      {v.resultado && <div style={{ fontSize: '11px', color: 'var(--at-primary-hover)', fontWeight: 600, marginTop: '2px' }}>→ {v.resultado}</div>}
-                    </div>
-                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: ec.bg, color: ec.color, flexShrink: 0 }}>
-                      {v.estado}
-                    </span>
-                  </div>
+      {/* Lista — cada votación se abre en ventana. Antes el detalle iba al
+          lado de una columna fija de 300px que en el teléfono partía la
+          pantalla y dejaba los resultados fuera de la vista. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {votaciones.length === 0 ? (
+          <EmptyState icon="📋" title="No hay votaciones. Crea una para comenzar" />
+        ) : (
+          votaciones.map(v => {
+            const ec = ESTADO_COLORS[v.estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' }
+            return (
+              <button key={v.id} type="button" onClick={() => setSelected(v.id)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', cursor: 'pointer' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)', marginBottom: '2px' }}>{v.titulo}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{v.fecha_inicio.slice(0, 10)} · {v.opciones.length} opciones</div>
+                  {v.resultado && <div style={{ fontSize: '11px', color: 'var(--at-primary-hover)', fontWeight: 600, marginTop: '2px' }}>→ {v.resultado}</div>}
                 </div>
-              )
-            })
-          )}
-        </div>
+                <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: ec.bg, color: ec.color, flexShrink: 0 }}>
+                  {v.estado}
+                </span>
+              </button>
+            )
+          })
+        )}
+      </div>
 
-        {/* Detail */}
-        {votacion && (
-          <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '8px' }}>
-              <div>
-                <h3 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: 700 }}>{votacion.titulo}</h3>
-                {votacion.descripcion && <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>{votacion.descripcion}</p>}
-              </div>
-              {canEdit && votacion.estado === 'abierta' && (
-                <button onClick={() => handleCerrar(votacion.id)}
-                  style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-                  Cerrar votación
-                </button>
-              )}
-            </div>
+      {/* Detalle en ventana (a pantalla completa en el teléfono). */}
+      {votacion && (() => {
+        const ec = ESTADO_COLORS[votacion.estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' }
+        return (
+          <EditModal
+            title={votacion.titulo}
+            subtitle={<span style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: ec.bg, color: ec.color }}>{votacion.estado}</span>
+              <span>{votacion.fecha_inicio.slice(0, 10)} · {votacion.opciones.length} opciones</span>
+            </span>}
+            maxWidth="640px"
+            fullScreenOnMobile
+            onClose={cerrarDetalle}
+            footer={canEdit && votacion.estado === 'abierta' ? (
+              <Button variant="danger" onClick={() => handleCerrar(votacion.id)}>Cerrar votación</Button>
+            ) : undefined}
+          >
+            {votacion.descripcion && <p style={{ margin: '0 0 14px', fontSize: '13px', color: 'var(--at-ink-3)', whiteSpace: 'pre-wrap' }}>{votacion.descripcion}</p>}
 
             {/* Results */}
             <div style={{ marginBottom: '16px' }}>
@@ -238,9 +259,9 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
               ) : (
                 counts.map(c => (
                   <div key={c.id} style={{ marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12px', marginBottom: '3px' }}>
                       <span style={{ fontWeight: 600 }}>{c.texto}</span>
-                      <span style={{ color: 'var(--at-ink-3)' }}>{c.count} · {totalVotos > 0 ? Math.round(c.count / totalVotos * 100) : 0}%</span>
+                      <span style={{ color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>{c.count} · {totalVotos > 0 ? Math.round(c.count / totalVotos * 100) : 0}%</span>
                     </div>
                     <div style={{ height: '8px', background: 'var(--at-chip)', borderRadius: '4px', overflow: 'hidden' }}>
                       <div style={{ height: '100%', borderRadius: '4px', transition: 'width 0.3s',
@@ -256,10 +277,10 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
             {canCreate && votacion.estado === 'abierta' && (
               <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '8px' }}>Registrar voto</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px', marginBottom: '8px' }}>
                   <div>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Unidad</label>
-                    <select style={inputStyle} value={selUnidad} onChange={e => setSelUnidad(e.target.value)}>
+                    <label htmlFor="vot-voto-unidad" style={labelStyle}>Unidad</label>
+                    <select id="vot-voto-unidad" style={inputStyle} value={selUnidad} onChange={e => setSelUnidad(e.target.value)}>
                       <option value="">— Seleccionar —</option>
                       {unidades.filter(u => !votos.some(v => v.unidad_id === u.id)).map(u => (
                         <option key={u.id} value={u.id}>{u.nombre}</option>
@@ -267,8 +288,8 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
                     </select>
                   </div>
                   <div>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Opción</label>
-                    <select style={inputStyle} value={selOpcion} onChange={e => setSelOpcion(e.target.value)}>
+                    <label htmlFor="vot-voto-opcion" style={labelStyle}>Opción</label>
+                    <select id="vot-voto-opcion" style={inputStyle} value={selOpcion} onChange={e => setSelOpcion(e.target.value)}>
                       <option value="">— Seleccionar —</option>
                       {votacion.opciones.map(o => <option key={o.id} value={o.id}>{o.texto}</option>)}
                     </select>
@@ -304,9 +325,9 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
                 ✓ Resultado: {votacion.resultado}
               </div>
             )}
-          </div>
-        )}
-      </div>
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }

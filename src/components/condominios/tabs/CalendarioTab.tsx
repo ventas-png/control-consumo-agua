@@ -1,4 +1,6 @@
 import { useState, type CSSProperties} from 'react'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { createCondominioRow, deleteCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { EventoCalendario, TipoEvento, Asamblea, AgendaItem } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -36,9 +38,16 @@ const TIPO_COLOR: Record<string, string> = {
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DIAS  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+const DIAS_LARGOS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
 
 function toDateStr(y: number, m: number, d: number) {
   return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+}
+
+/** "2026-10-14" → "Miércoles 14 de octubre" (título de la ventana del día). */
+function tituloDia(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return `${DIAS_LARGOS[new Date(y, m - 1, d).getDay()]} ${d} de ${MESES[m - 1].toLowerCase()}`
 }
 
 function buildMonthGrid(year: number, month: number): (number | null)[] {
@@ -118,8 +127,14 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
     onRefresh()
   }
 
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false)
+  }
+
   const selectedEvents = selectedDay ? eventsForDay(selectedDay) : []
-  const inputStyle: CSSProperties = { width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -136,7 +151,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
             ))}
           </div>
           {canCreate && (
-            <button onClick={() => { setShowForm(v => !v); setSelectedDay(null) }}
+            <button onClick={() => { setShowForm(true); setSelectedDay(null) }}
               style={{ padding: '7px 14px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               + Evento
             </button>
@@ -144,36 +159,49 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
         </div>
       </div>
 
-      {/* Add form */}
+      {/* Add form — en ventana (antes se desplegaba arriba del calendario y
+          en el teléfono lo empujaba hacia abajo). */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nuevo evento</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Título *</label>
-              <input style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Nombre del evento" autoFocus />
+        <EditModal
+          title="Nuevo evento"
+          maxWidth="600px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} loadingText="Guardando…">Guardar</Button>
+          </>}
+        >
+          {/* `1 / -1` y no `span 2`: en una sola columna (teléfono) el span
+              creaba una columna implícita y el campo se salía de la ventana. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="cal-titulo" style={labelStyle}>Título *</label>
+              <input id="cal-titulo" style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Nombre del evento" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Tipo *</label>
-              <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value as TipoEvento)}>
+              <label htmlFor="cal-tipo" style={labelStyle}>Tipo *</label>
+              <select id="cal-tipo" style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value as TipoEvento)}>
                 {(['evento','mantenimiento','asamblea','vencimiento','recordatorio'] as TipoEvento[]).map(t => (
                   <option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha inicio *</label>
-              <input style={inputStyle} type="date" value={form.fecha_inicio} onChange={e => setF('fecha_inicio', e.target.value)} />
+              <label htmlFor="cal-fecha" style={labelStyle}>Fecha inicio *</label>
+              <input id="cal-fecha" style={inputStyle} type="date" value={form.fecha_inicio} onChange={e => setF('fecha_inicio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>
+              <label style={labelStyle}>
                 <input type="checkbox" checked={form.todo_el_dia} onChange={e => setF('todo_el_dia', e.target.checked)} style={{ marginRight: '4px' }} />
                 Todo el día
               </label>
-              {!form.todo_el_dia && <input style={inputStyle} type="time" value={form.hora_inicio} onChange={e => setF('hora_inicio', e.target.value)} />}
+              {!form.todo_el_dia && <input style={inputStyle} type="time" aria-label="Hora de inicio" value={form.hora_inicio} onChange={e => setF('hora_inicio', e.target.value)} />}
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Color</label>
+              <label style={labelStyle}>Color</label>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
                 {['var(--at-primary)','var(--at-success)','var(--at-warning)','var(--at-danger)','var(--at-accent)','#ec4899','var(--at-ink)'].map(c => (
                   <div key={c} onClick={() => setF('color', c)}
@@ -181,106 +209,106 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
                 ))}
               </div>
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Descripción</label>
-              <input style={inputStyle} value={form.descripcion} onChange={e => setF('descripcion', e.target.value)} placeholder="Descripción opcional" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="cal-descripcion" style={labelStyle}>Descripción</label>
+              <input id="cal-descripcion" style={inputStyle} value={form.descripcion} onChange={e => setF('descripcion', e.target.value)} placeholder="Descripción opcional" />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: selectedDay ? '1fr 280px' : '1fr', gap: '16px' }}>
-        {/* Calendar grid */}
-        <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
-          {/* Month nav */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
-            <button onClick={prevMonth} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>‹</button>
-            <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--at-ink)' }}>{MESES[viewMonth]} {viewYear}</span>
-            <button onClick={nextMonth} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>›</button>
-          </div>
-          {/* Day headers */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
-            {DIAS.map(d => (
-              <div key={d} style={{ padding: '6px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)' }}>{d}</div>
-            ))}
-          </div>
-          {/* Days */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
-            {days.map((day, idx) => {
-              const dateStr = day ? toDateStr(viewYear, viewMonth, day) : ''
-              const dayEvents = day ? eventsForDay(dateStr) : []
-              const isToday = dateStr === todayStr
-              const isSelected = dateStr === selectedDay
-              return (
-                <div key={idx} onClick={() => day && setSelectedDay(isSelected ? null : dateStr)}
-                  style={{
-                    minHeight: '70px', padding: '6px', borderRight: (idx + 1) % 7 !== 0 ? '1px solid var(--at-chip)' : 'none',
-                    borderBottom: '1px solid var(--at-chip)', cursor: day ? 'pointer' : 'default',
-                    background: isSelected ? 'var(--at-primary-tint)' : isToday ? 'var(--at-warning-tint)' : day ? 'var(--at-surface)' : 'var(--at-surface-2)',
-                  }}>
-                  {day && (
-                    <>
-                      <div style={{ fontSize: '12px', fontWeight: isToday ? 800 : 500, marginBottom: '4px',
-                        background: isToday ? 'var(--at-primary)' : 'transparent', color: isToday ? 'white' : 'var(--at-ink)',
-                        width: isToday ? '22px' : 'auto', height: isToday ? '22px' : 'auto',
-                        borderRadius: isToday ? '50%' : '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {day}
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
-                        {dayEvents.slice(0, 3).map(e => (
-                          <div key={e.id} style={{ fontSize: '10px', background: e.color, color: 'white', borderRadius: '3px', padding: '1px 4px', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {e.titulo}
-                          </div>
-                        ))}
-                        {dayEvents.length > 3 && <div style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>+{dayEvents.length - 3}</div>}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+      {/* Calendar grid — a todo el ancho; el día se abre en ventana (la
+          columna de 280px al lado lo apretaba en el teléfono). */}
+      <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
+        {/* Month nav */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
+          <button onClick={prevMonth} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>‹</button>
+          <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--at-ink)' }}>{MESES[viewMonth]} {viewYear}</span>
+          <button onClick={nextMonth} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>›</button>
         </div>
-
-        {/* Selected day panel */}
-        {selectedDay && (
-          <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden', alignSelf: 'start' }}>
-            <div style={{ padding: '12px 14px', background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{selectedDay}</span>
-              <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '16px' }}>×</button>
-            </div>
-            {selectedEvents.length === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--at-ink-3)', fontSize: '12px' }}>Sin eventos este día.</div>
-            ) : (
-              <div style={{ padding: '8px' }}>
-                {selectedEvents.map(e => (
-                  <div key={e.id} style={{ padding: '8px 10px', marginBottom: '6px', background: 'var(--at-surface)', border: `1.5px solid ${tint(e.color, 19)}`, borderLeft: `4px solid ${e.color}`, borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink)' }}>{e.titulo}</div>
-                      {canEdit && e.source === 'evento' && (
-                        <button onClick={() => handleDelete(e.id)}
-                          style={{ padding: '2px 6px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', color: 'var(--at-danger)', flexShrink: 0, marginLeft: '6px' }}>🗑️</button>
-                      )}
+        {/* Day headers */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
+          {DIAS.map(d => (
+            <div key={d} style={{ padding: '6px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)' }}>{d}</div>
+          ))}
+        </div>
+        {/* Days — cada día es un botón (antes un div con onClick, fuera del
+            alcance del teclado); los huecos del mes siguen siendo div. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+          {days.map((day, idx) => {
+            const borderRight = (idx + 1) % 7 !== 0 ? '1px solid var(--at-chip)' : 'none'
+            if (!day) {
+              return (
+                <div key={idx}
+                  style={{ minHeight: '70px', padding: '6px', borderRight, borderBottom: '1px solid var(--at-chip)', background: 'var(--at-surface-2)' }} />
+              )
+            }
+            const dateStr = toDateStr(viewYear, viewMonth, day)
+            const dayEvents = eventsForDay(dateStr)
+            const isToday = dateStr === todayStr
+            const isSelected = dateStr === selectedDay
+            return (
+              <button key={idx} type="button" onClick={() => setSelectedDay(dateStr)}
+                aria-label={`${tituloDia(dateStr)} de ${viewYear}${dayEvents.length ? `, ${dayEvents.length} evento${dayEvents.length !== 1 ? 's' : ''}` : ''}`}
+                aria-current={isToday ? 'date' : undefined}
+                style={{
+                  minHeight: '70px', minWidth: 0, padding: '6px',
+                  borderTop: 'none', borderLeft: 'none', borderRight, borderBottom: '1px solid var(--at-chip)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start',
+                  textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer',
+                  background: isSelected ? 'var(--at-primary-tint)' : isToday ? 'var(--at-warning-tint)' : 'var(--at-surface)',
+                }}>
+                <div style={{ fontSize: '12px', fontWeight: isToday ? 800 : 500, marginBottom: '4px',
+                  background: isToday ? 'var(--at-primary)' : 'transparent', color: isToday ? 'white' : 'var(--at-ink)',
+                  width: isToday ? '22px' : 'auto', height: isToday ? '22px' : 'auto',
+                  borderRadius: isToday ? '50%' : '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {day}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
+                  {dayEvents.slice(0, 3).map(e => (
+                    <div key={e.id} style={{ fontSize: '10px', background: e.color, color: 'white', borderRadius: '3px', padding: '1px 4px', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {e.titulo}
                     </div>
-                    {e.hora && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>🕐 {e.hora}</div>}
-                    <div style={{ fontSize: '10px', color: e.color, fontWeight: 600, marginTop: '2px', textTransform: 'capitalize' }}>{e.tipo}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                  ))}
+                  {dayEvents.length > 3 && <div style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>+{dayEvents.length - 3}</div>}
+                </div>
+              </button>
+            )
+          })}
+        </div>
       </div>
+
+      {/* Detalle del día en ventana: la columna de 280px al lado del
+          calendario lo apretaba en el teléfono. */}
+      {selectedDay && (
+        <EditModal
+          title={tituloDia(selectedDay)}
+          subtitle={`${selectedDay.slice(0, 4)} · ${selectedEvents.length === 0 ? 'Sin eventos' : `${selectedEvents.length} evento${selectedEvents.length !== 1 ? 's' : ''}`}`}
+          maxWidth="560px"
+          fullScreenOnMobile
+          onClose={() => setSelectedDay(null)}
+        >
+          {selectedEvents.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--at-ink-3)', fontSize: '13px' }}>Sin eventos este día.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {selectedEvents.map(e => (
+                <div key={e.id} style={{ padding: '10px 12px', background: 'var(--at-surface)', border: `1.5px solid ${tint(e.color, 19)}`, borderLeft: `4px solid ${e.color}`, borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)', minWidth: 0, overflowWrap: 'anywhere' }}>{e.titulo}</div>
+                    {canEdit && e.source === 'evento' && (
+                      <button onClick={() => handleDelete(e.id)} aria-label={`Eliminar ${e.titulo}`}
+                        style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)', flexShrink: 0 }}>🗑️</button>
+                    )}
+                  </div>
+                  {e.hora && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>🕐 {e.hora}</div>}
+                  <div style={{ fontSize: '11px', color: e.color, fontWeight: 600, marginTop: '2px', textTransform: 'capitalize' }}>{e.tipo}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </EditModal>
+      )}
     </div>
   )
 }
