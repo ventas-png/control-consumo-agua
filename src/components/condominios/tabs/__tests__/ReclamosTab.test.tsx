@@ -34,7 +34,7 @@ function reclamo(over: Partial<ReclamoCondominio> = {}): ReclamoCondominio {
 function renderTab(props: Partial<Parameters<typeof ReclamosTab>[0]> = {}) {
   return render(
     <ReclamosTab reclamos={[reclamo(), reclamo({ id: 'r2', asunto: 'Gracias por el jardín', tipo: 'sugerencia', estado: 'cerrado' })]}
-      unidades={unidades} proyectoId="p1" companyId="co1" canCreate canEdit onRefresh={() => {}} {...props} />,
+      unidades={unidades} proyectoId="p1" companyId="co1" canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -91,5 +91,18 @@ describe('ReclamosTab — ventanas', () => {
     expect(within(dialog).queryByRole('button', { name: '✍️ Responder' })).toBeNull()
     expect(within(dialog).queryByRole('button', { name: /Editar/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'En revisión' })).toBeNull()
+  })
+
+  it('eliminar exige su propio permiso: editar no basta, y sin editar sí se borra', async () => {
+    renderTab({ canDelete: false })
+    fireEvent.click(screen.getByRole('button', { name: /Ruido de la piscina/ }))
+    expect(within(screen.getByRole('dialog')).getByRole('button', { name: /Editar/ })).toBeTruthy()
+    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: 'Eliminar reclamo' })).toBeNull()
+    cleanup()
+
+    renderTab({ canEdit: false })
+    fireEvent.click(screen.getByRole('button', { name: /Ruido de la piscina/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Eliminar reclamo' }))
+    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('reclamos_condominio', 'r1'))
   })
 })

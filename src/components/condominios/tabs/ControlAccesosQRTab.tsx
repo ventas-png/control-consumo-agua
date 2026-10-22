@@ -31,7 +31,7 @@ interface QRGenerado {
 // B5: el generador se extrajo a lib/tokens para compartirlo con paquetería
 // (12 chars × ~4.95 bits ≈ 59 bits — no adivinable en la ventana del pase).
 
-export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, companyId, canCreate: _canCreate, onRefresh }: Props) {
+export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, companyId, canCreate, onRefresh }: Props) {
   const hoy = hoyLocalISO()
   const [tab, setTab] = useState<'generar' | 'validar' | 'pendientes'>('generar')
   const [form, setForm] = useState({ nombre: '', motivo: '', unidadId: '', validoHasta: hoy, identificacion: '' })
@@ -68,7 +68,8 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
   }
 
   async function guardarPreAutorizacion() {
-    if (!qrGenerado) return
+    // Registrar visitantes es «Crear» en este tab; la base exige lo mismo.
+    if (!canCreate || !qrGenerado) return
     setRegistrando(true)
     // cond:C2 — pre-validación Zod.
     const { error } = await validatedInsert('visitantes', visitanteInputSchema, {
@@ -106,7 +107,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
   }
 
   async function registrarEntradaDesdeQR() {
-    if (!resultadoValidacion?.visitante) return
+    if (!canCreate || !resultadoValidacion?.visitante) return
     setRegistrando(true)
     const { error } = await updateCondominioRow('visitantes', resultadoValidacion.visitante.id, { hora_entrada: new Date().toISOString() })
     setRegistrando(false)
@@ -117,6 +118,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
   }
 
   async function registrarSalida(v: Visitante) {
+    if (!canCreate) return
     await updateCondominioRow('visitantes', v.id, { hora_salida: new Date().toISOString() })
     onRefresh()
   }
@@ -207,10 +209,12 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                   Token: {qrGenerado.token}
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                  <button onClick={guardarPreAutorizacion} disabled={registrando}
-                    style={{ padding: '8px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-                    {registrando ? 'Guardando…' : '✓ Guardar pre-autorización'}
-                  </button>
+                  {canCreate && (
+                    <button onClick={guardarPreAutorizacion} disabled={registrando}
+                      style={{ padding: '8px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                      {registrando ? 'Guardando…' : '✓ Guardar pre-autorización'}
+                    </button>
+                  )}
                   <button onClick={() => setQrGenerado(null)}
                     style={{ padding: '8px 12px', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: 'var(--at-surface-2)' }}>
                     Descartar
@@ -254,7 +258,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                     <div>Válido hasta: {resultadoValidacion.visitante.valido_hasta && diaValidez(resultadoValidacion.visitante.valido_hasta)}</div>
                   </div>
                 )}
-                {resultadoValidacion.ok && !resultadoValidacion.visitante?.hora_entrada && (
+                {canCreate && resultadoValidacion.ok && !resultadoValidacion.visitante?.hora_entrada && (
                   <button onClick={registrarEntradaDesdeQR} disabled={registrando}
                     style={{ width: '100%', padding: '8px 0', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
                     {registrando ? 'Registrando…' : '🚪 Registrar entrada'}
@@ -294,7 +298,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                       {v.hora_entrada && ` · Entró ${v.hora_entrada.slice(11, 16)}`}
                     </div>
                   </div>
-                  {v.hora_entrada && !v.hora_salida && (
+                  {canCreate && v.hora_entrada && !v.hora_salida && (
                     <button onClick={() => registrarSalida(v)}
                       style={{ padding: '5px 12px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-warning)', fontWeight: 600 }}>
                       Registrar salida

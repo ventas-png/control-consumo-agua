@@ -10,6 +10,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.vis_frecuentes.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -24,7 +26,7 @@ const RELACIONES: { value: RelacionVisitaFrecuente; label: string; icon: string 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 const DIAS_LABEL: Record<string, string> = { lunes: 'L', martes: 'M', miercoles: 'X', jueves: 'J', viernes: 'V', sabado: 'S', domingo: 'D' }
 
-export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [selected, setSelected] = useState<VisitaFrecuente | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -90,6 +92,8 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
   }
 
   async function eliminar(v: VisitaFrecuente) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const res = await confirm({ title: 'Eliminar visita frecuente', text: `¿Eliminar a ${v.nombre}?`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
     await deleteCondominioRow('visitas_frecuentes', v.id)
@@ -227,16 +231,20 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
                             <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 3 }}>⏰ {v.hora_desde || '00:00'} – {v.hora_hasta || '23:59'}</div>
                           )}
                         </div>
-                        {canEdit && (
+                        {(canEdit || canDelete) && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <button onClick={() => toggleActivo(v)} title={v.activo ? 'Desactivar' : 'Activar'}
-                              style={{ padding: '4px 8px', background: v.activo ? 'var(--at-chip)' : 'var(--at-success-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
-                              {v.activo ? '⏸' : '▶'}
-                            </button>
-                            <button onClick={() => eliminar(v)} title="Eliminar"
-                              style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>
-                              🗑
-                            </button>
+                            {canEdit && (
+                              <button onClick={() => toggleActivo(v)} title={v.activo ? 'Desactivar' : 'Activar'}
+                                style={{ padding: '4px 8px', background: v.activo ? 'var(--at-chip)' : 'var(--at-success-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                                {v.activo ? '⏸' : '▶'}
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button onClick={() => eliminar(v)} title="Eliminar" aria-label={`Eliminar ${v.nombre}`}
+                                style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>
+                                🗑
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
