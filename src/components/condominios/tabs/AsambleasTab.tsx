@@ -124,9 +124,12 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function registrarVoto(puntoId: string, unidadId: string, voto: TipoVoto) {
-    await upsertCondominioRow('votos_asamblea', {
+    const { error } = await upsertCondominioRow('votos_asamblea', {
       punto_id: puntoId, unidad_id: unidadId, voto, registrado_por: userId,
     }, 'punto_id,unidad_id')
+    // Antes se ignoraba: un voto rechazado (RLS, candado de plan) no avisaba y
+    // la agenda recargada lo mostraba sin cambios, como si nada.
+    if (error) { toast.error(error.message); return }
     if (selectedId) cargarPuntos(selectedId)
   }
 

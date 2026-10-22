@@ -257,15 +257,20 @@ export async function fetchPuntosAsambleaConVotos(
   return (data as Array<Record<string, unknown>> | null) ?? []
 }
 
-/** Asambleas digitales de un proyecto (20 más recientes). Degrada a `[]`. */
-export async function fetchAsambleasDigital<T>(projectId: string): Promise<T[]> {
+/**
+ * Asambleas clásicas de un proyecto (20 más recientes), las del portal del
+ * residente: sus puntos y votos cuelgan de `asambleas` (no de
+ * asambleas_digital). Degrada a `[]`.
+ */
+export async function fetchAsambleasProyecto<T>(projectId: string): Promise<T[]> {
   const { data, error } = await db
-    .from('asambleas_digital')
+    .from('asambleas')
     .select('*')
     .eq('project_id', projectId)
-    .order('fecha_hora', { ascending: false })
+    .order('fecha', { ascending: false })
+    .order('hora_inicio', { ascending: false })
     .limit(20)
-  reportDegradedQuery('condominios.fetchAsambleasDigital', error)
+  reportDegradedQuery('condominios.fetchAsambleasProyecto', error)
   return (data as T[] | null) ?? []
 }
 
@@ -288,6 +293,28 @@ export async function fetchVotosUnidad<T>(unidadId: string): Promise<T[]> {
     .eq('unidad_id', unidadId)
   reportDegradedQuery('condominios.fetchVotosUnidad', error)
   return (data as T[] | null) ?? []
+}
+
+/** Totales de un punto de votación: lo único que el portal ve de los votos ajenos. */
+export interface ConteoVotosPunto {
+  punto_id: string
+  a_favor: number
+  en_contra: number
+  abstencion: number
+}
+
+/**
+ * Totales por punto de las asambleas FINALIZADAS de los condominios del
+ * residente (RPC SECURITY DEFINER; nunca devuelve el voto de cada unidad).
+ * `supabase` laxo: el RPC aún no está en el esquema generado. Degrada a `[]`.
+ */
+export async function fetchConteoVotosAsambleas(asambleaIds: string[]): Promise<ConteoVotosPunto[]> {
+  if (asambleaIds.length === 0) return []
+  const { data, error } = await supabase.rpc('portal_conteo_votos_asambleas', {
+    p_asamblea_ids: asambleaIds,
+  })
+  reportDegradedQuery('condominios.fetchConteoVotosAsambleas', error)
+  return (data as ConteoVotosPunto[] | null) ?? []
 }
 
 /** Votos de una votación con el nombre de la unidad (join). Degrada a `[]`. */

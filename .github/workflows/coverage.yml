@@ -1011,6 +1011,19 @@ jobs:
       - name: Acciones por permiso — sección seguridad
         run: node supabase/tests/rls_acciones/run.mjs seguridad
 
+      # 20261104000050: el residente ve las asambleas clásicas de su condominio
+      # y el PROPIETARIO vota desde el portal (firmado, una vez por unidad, en
+      # puntos de votación de una asamblea en curso, sin cambiarlo ni
+      # borrarlo); totales de las finalizadas por una función que no expone el
+      # voto de cada unidad; CHECK de los valores de voto. Control previo,
+      # cadena completa con las migraciones posteriores, huella del auditor,
+      # guardas que abortan y dieciséis mutantes.
+      - name: Voto del residente en asambleas — portal, propietario, append-only
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55576
+        run: supabase/tests/voto_residente_asambleas/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

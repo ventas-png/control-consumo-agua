@@ -5,8 +5,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => {
-  const state: { byTable: Record<string, unknown>; fallback: unknown } = {
-    byTable: {}, fallback: { data: null, count: null, error: null },
+  const state: {
+    byTable: Record<string, unknown>
+    byRpc: Record<string, unknown>
+    rpcCalls: Array<{ fn: string; args: unknown }>
+    fallback: unknown
+  } = {
+    byTable: {}, byRpc: {}, rpcCalls: [], fallback: { data: null, count: null, error: null },
   }
   function makeBuilder(table: string) {
     const b: Record<string, unknown> = {}
@@ -14,12 +19,16 @@ const h = vi.hoisted(() => {
     b.then = (resolve: (v: unknown) => void) => resolve(state.byTable[table] ?? state.fallback)
     return b
   }
-  return { state, from: (t: string) => makeBuilder(t) }
+  function rpc(fn: string, args: unknown) {
+    state.rpcCalls.push({ fn, args })
+    return Promise.resolve(state.byRpc[fn] ?? state.fallback)
+  }
+  return { state, from: (t: string) => makeBuilder(t), rpc }
 })
 
 // `db` es la misma instancia que `supabase` (retipada); el mock espeja eso.
 vi.mock('../../../lib/supabase', () => {
-  const client = { from: h.from }
+  const client = { from: h.from, rpc: h.rpc }
   return { supabase: client, db: client }
 })
 
@@ -34,7 +43,8 @@ import {
   fetchGastosAnioMontos,
   fetchEjecucionesMantenimiento,
   fetchPuntosAsambleaConVotos,
-  fetchAsambleasDigital,
+  fetchAsambleasProyecto,
+  fetchConteoVotosAsambleas,
   fetchPuntosByAsambleaIds,
   fetchVotosUnidad,
   fetchVotosVotacion,
@@ -53,7 +63,10 @@ import {
   fetchRecursosPlantillas,
 } from '../tabQueries'
 
-beforeEach(() => { h.state.byTable = {}; h.state.fallback = { data: null, count: null, error: null } })
+beforeEach(() => {
+  h.state.byTable = {}; h.state.byRpc = {}; h.state.rpcCalls = []
+  h.state.fallback = { data: null, count: null, error: null }
+})
 
 describe('fetchDirectorioResidentes', () => {
   it('devuelve filas de unidades+clientes', async () => {
@@ -150,9 +163,23 @@ describe('asambleas / votaciones', () => {
   it('fetchPuntosAsambleaConVotos sin data → []', async () => {
     expect(await fetchPuntosAsambleaConVotos('a1')).toEqual([])
   })
-  it('fetchAsambleasDigital devuelve filas', async () => {
-    h.state.byTable.asambleas_digital = { data: [{ id: 'a1' }], error: null }
-    expect(await fetchAsambleasDigital('proj1')).toEqual([{ id: 'a1' }])
+  it('fetchAsambleasProyecto lee las asambleas CLÁSICAS (las de puntos_asamblea), no asambleas_digital', async () => {
+    h.state.byTable.asambleas = { data: [{ id: 'a1' }], error: null }
+    h.state.byTable.asambleas_digital = { data: [{ id: 'digital' }], error: null }
+    expect(await fetchAsambleasProyecto('proj1')).toEqual([{ id: 'a1' }])
+  })
+  it('fetchConteoVotosAsambleas llama al RPC del portal con los ids', async () => {
+    h.state.byRpc.portal_conteo_votos_asambleas = {
+      data: [{ punto_id: 'p1', a_favor: 2, en_contra: 1, abstencion: 0 }], error: null,
+    }
+    expect(await fetchConteoVotosAsambleas(['a1', 'a2'])).toEqual([{ punto_id: 'p1', a_favor: 2, en_contra: 1, abstencion: 0 }])
+    expect(h.state.rpcCalls).toEqual([{ fn: 'portal_conteo_votos_asambleas', args: { p_asamblea_ids: ['a1', 'a2'] } }])
+  })
+  it('fetchConteoVotosAsambleas sin ids no llama al RPC; con error degrada a []', async () => {
+    expect(await fetchConteoVotosAsambleas([])).toEqual([])
+    expect(h.state.rpcCalls).toEqual([])
+    h.state.byRpc.portal_conteo_votos_asambleas = { data: null, error: { message: 'boom' } }
+    expect(await fetchConteoVotosAsambleas(['a1'])).toEqual([])
   })
   it('fetchPuntosByAsambleaIds (.in) devuelve filas', async () => {
     h.state.byTable.puntos_asamblea = { data: [{ id: 'p1', asamblea_id: 'a1' }], error: null }

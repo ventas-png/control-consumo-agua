@@ -637,6 +637,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 <PortalAsambleasTab
                   unidadId={selectedUnidadId}
                   proyectoId={proyectoId}
+                  userId={currentUser.user_id}
+                  esPropietario={(unidad.rol ?? 'propietario') === 'propietario'}
                 />
               </FeatureGate>
             )}

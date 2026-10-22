@@ -501,6 +501,15 @@ const PORTAL_PADRON_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   { name: 'portal_baja_vehiculo', args: () => ({ p_vehiculo_id: SOLICITUD_ID_INEXISTENTE }) },
 ]
 
+// ── RPC de resultados de asambleas del portal (20261104000050) ───────────────
+// De LECTURA: devuelve totales por punto de las asambleas finalizadas de los
+// condominios donde el cliente de la sesión tiene unidad. No hay gate que
+// lance error: A (staff, sin cliente) obtiene CERO filas, cualquiera sea el id.
+// Por eso es garantía de ROL (residencia), no de tenant.
+const PORTAL_ASAMBLEAS_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
+  { name: 'portal_conteo_votos_asambleas', args: () => ({ p_asamblea_ids: [SOLICITUD_ID_INEXISTENTE] }) },
+]
+
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -1260,6 +1269,24 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} sobre datos ajenos debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
+      })
+    }
+  })
+
+  describe('guard RPCs de resultados de asambleas del portal (20261104000050) — garantía de ROL', () => {
+    for (const { name, args } of PORTAL_ASAMBLEAS_RPCS) {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args(B))
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+
+      // De lectura y sin gate que lance: el filtro de residencia deja a A
+      // (staff, sin unidades) sin ninguna fila.
+      it(`${idEvidencia(name, 'authenticated-cross-tenant')} authenticated (A, staff) NO obtiene totales de ${name}`, async () => {
+        const { data, error } = await userA.rpc(name, args(B))
+        const negado = error !== null || (data ?? []).length === 0
+        expect(negado, `${name} no debe devolver totales a quien no reside en el condominio`).toBe(true)
       })
     }
   })

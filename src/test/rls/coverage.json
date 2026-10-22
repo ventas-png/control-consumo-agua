@@ -565,6 +565,16 @@
         "anon",
         "authenticated-cross-tenant"
       ]
+    },
+    {
+      "nombre": "portal_conteo_votos_asambleas",
+      "dominio": "asambleas-portal",
+      "porQue": "20261104000050 — totales de votos de asambleas finalizadas, acotados a los condominios del cliente de la sesión (mis_proyectos_ids()); sin sesión de residente no devuelve nada",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     }
   ],
   "_sandbox": [

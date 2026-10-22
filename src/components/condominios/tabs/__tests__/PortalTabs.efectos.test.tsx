@@ -7,12 +7,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, act } from '@testing-library/react'
 import { StrictMode } from 'react'
-import type { AsambleaDigital } from '../../../../types'
+import type { Asamblea } from '../../../../types'
 
 const h = vi.hoisted(() => ({
-  fetchAsambleasDigital: vi.fn(async (): Promise<AsambleaDigital[]> => []),
+  fetchAsambleasProyecto: vi.fn(async (): Promise<Asamblea[]> => []),
   fetchPuntosByAsambleaIds: vi.fn(async (): Promise<unknown[]> => []),
   fetchVotosUnidad: vi.fn(async (): Promise<unknown[]> => []),
+  fetchConteoVotosAsambleas: vi.fn(async (): Promise<unknown[]> => []),
   fetchFondoReservaAprobado: vi.fn(async (): Promise<unknown[]> => []),
   fetchFondoReservaMovimientos: vi.fn(async (): Promise<unknown[]> => []),
   fetchPresupuestosAnio: vi.fn(async (): Promise<unknown[]> => []),
@@ -24,9 +25,10 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
 }))
 vi.mock('../../../../domain/condominios/tabQueries', () => ({
-  fetchAsambleasDigital: h.fetchAsambleasDigital,
+  fetchAsambleasProyecto: h.fetchAsambleasProyecto,
   fetchPuntosByAsambleaIds: h.fetchPuntosByAsambleaIds,
   fetchVotosUnidad: h.fetchVotosUnidad,
+  fetchConteoVotosAsambleas: h.fetchConteoVotosAsambleas,
   fetchFondoReservaAprobado: h.fetchFondoReservaAprobado,
   fetchFondoReservaMovimientos: h.fetchFondoReservaMovimientos,
   fetchPresupuestosAnio: h.fetchPresupuestosAnio,
@@ -36,11 +38,11 @@ vi.mock('../../../../domain/condominios/tabQueries', () => ({
 const { PortalAsambleasTab } = await import('../PortalAsambleasTab')
 const { PortalTransparenciaTab } = await import('../PortalTransparenciaTab')
 
-function asamblea(id: string, titulo: string): AsambleaDigital {
+function asamblea(id: string, titulo: string): Asamblea {
   return {
-    id, titulo, estado: 'programada', modalidad: 'virtual',
-    fecha: '2026-09-01T18:00:00.000Z',
-  } as unknown as AsambleaDigital
+    id, titulo, estado: 'programada', tipo: 'ordinaria',
+    fecha: '2026-09-01', hora_inicio: '18:00',
+  } as unknown as Asamblea
 }
 
 beforeEach(() => {
@@ -51,46 +53,46 @@ afterEach(cleanup)
 
 describe('PortalAsambleasTab — el efecto declara `cargar`', () => {
   it('recarga al cambiar de proyecto', async () => {
-    const { rerender } = render(<PortalAsambleasTab unidadId="u1" proyectoId="p1" />)
+    const { rerender } = render(<PortalAsambleasTab unidadId="u1" proyectoId="p1" userId="user1" esPropietario />)
     await act(async () => {})
-    expect(h.fetchAsambleasDigital).toHaveBeenCalledWith('p1')
+    expect(h.fetchAsambleasProyecto).toHaveBeenCalledWith('p1')
 
-    rerender(<PortalAsambleasTab unidadId="u1" proyectoId="p2" />)
+    rerender(<PortalAsambleasTab unidadId="u1" proyectoId="p2" userId="user1" esPropietario />)
     await act(async () => {})
 
-    expect(h.fetchAsambleasDigital).toHaveBeenCalledTimes(2)
-    expect(h.fetchAsambleasDigital).toHaveBeenLastCalledWith('p2')
+    expect(h.fetchAsambleasProyecto).toHaveBeenCalledTimes(2)
+    expect(h.fetchAsambleasProyecto).toHaveBeenLastCalledWith('p2')
   })
 
   it('recarga al cambiar de unidad (los votos son por unidad)', async () => {
-    h.fetchAsambleasDigital.mockResolvedValue([asamblea('a1', 'Ordinaria')])
-    const { rerender } = render(<PortalAsambleasTab unidadId="u1" proyectoId="p1" />)
+    h.fetchAsambleasProyecto.mockResolvedValue([asamblea('a1', 'Ordinaria')])
+    const { rerender } = render(<PortalAsambleasTab unidadId="u1" proyectoId="p1" userId="user1" esPropietario />)
     await act(async () => {})
     expect(h.fetchVotosUnidad).toHaveBeenLastCalledWith('u1')
 
-    rerender(<PortalAsambleasTab unidadId="u2" proyectoId="p1" />)
+    rerender(<PortalAsambleasTab unidadId="u2" proyectoId="p1" userId="user1" esPropietario />)
     await act(async () => {})
 
     expect(h.fetchVotosUnidad).toHaveBeenLastCalledWith('u2')
   })
 
   it('NO recarga al re-renderizar con las mismas props (sin ciclo)', async () => {
-    const { rerender } = render(<PortalAsambleasTab unidadId="u1" proyectoId="p1" />)
+    const { rerender } = render(<PortalAsambleasTab unidadId="u1" proyectoId="p1" userId="user1" esPropietario />)
     await act(async () => {})
-    rerender(<PortalAsambleasTab unidadId="u1" proyectoId="p1" />)
-    rerender(<PortalAsambleasTab unidadId="u1" proyectoId="p1" />)
+    rerender(<PortalAsambleasTab unidadId="u1" proyectoId="p1" userId="user1" esPropietario />)
+    rerender(<PortalAsambleasTab unidadId="u1" proyectoId="p1" userId="user1" esPropietario />)
     await act(async () => {})
 
-    expect(h.fetchAsambleasDigital).toHaveBeenCalledTimes(1)
+    expect(h.fetchAsambleasProyecto).toHaveBeenCalledTimes(1)
   })
 
   it('descarta la respuesta del proyecto abandonado (fuera de orden)', async () => {
-    let resolverPrimera: (v: AsambleaDigital[]) => void = () => {}
-    h.fetchAsambleasDigital.mockImplementationOnce(() => new Promise(res => { resolverPrimera = res }))
-    h.fetchAsambleasDigital.mockImplementationOnce(async () => [asamblea('a2', 'Asamblea del proyecto NUEVO')])
+    let resolverPrimera: (v: Asamblea[]) => void = () => {}
+    h.fetchAsambleasProyecto.mockImplementationOnce(() => new Promise(res => { resolverPrimera = res }))
+    h.fetchAsambleasProyecto.mockImplementationOnce(async () => [asamblea('a2', 'Asamblea del proyecto NUEVO')])
 
-    const { rerender } = render(<PortalAsambleasTab unidadId="u1" proyectoId="p1" />)
-    rerender(<PortalAsambleasTab unidadId="u1" proyectoId="p2" />)
+    const { rerender } = render(<PortalAsambleasTab unidadId="u1" proyectoId="p1" userId="user1" esPropietario />)
+    rerender(<PortalAsambleasTab unidadId="u1" proyectoId="p2" userId="user1" esPropietario />)
     await act(async () => {})
     expect(screen.getByText(/proyecto NUEVO/)).toBeTruthy()
 
@@ -101,8 +103,8 @@ describe('PortalAsambleasTab — el efecto declara `cargar`', () => {
   })
 
   it('bajo StrictMode el doble montaje no duplica el estado visible', async () => {
-    h.fetchAsambleasDigital.mockResolvedValue([asamblea('a1', 'Ordinaria 2026')])
-    render(<StrictMode><PortalAsambleasTab unidadId="u1" proyectoId="p1" /></StrictMode>)
+    h.fetchAsambleasProyecto.mockResolvedValue([asamblea('a1', 'Ordinaria 2026')])
+    render(<StrictMode><PortalAsambleasTab unidadId="u1" proyectoId="p1" userId="user1" esPropietario /></StrictMode>)
     await act(async () => {})
 
     expect(screen.getAllByText(/Ordinaria 2026/)).toHaveLength(1)
