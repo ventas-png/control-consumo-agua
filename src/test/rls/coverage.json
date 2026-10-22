@@ -527,6 +527,26 @@
       ]
     },
     {
+      "nombre": "portal_asambleas_unidad",
+      "dominio": "asambleas-portal",
+      "porQue": "20261105000000 — única vía de lectura del residente sobre asambleas, puntos y su voto; sobre una unidad ajena expondría el voto de otra unidad",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
+    },
+    {
+      "nombre": "portal_votar_punto",
+      "dominio": "asambleas-portal",
+      "porQue": "20261105000000 — única vía de escritura del residente sobre votos_asamblea (sus policies no tienen rama de residente); sobre una unidad ajena votaría por otro propietario",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
+    },
+    {
       "nombre": "portal_saldos_favor",
       "dominio": "saldo-favor-portal",
       "porQue": "20261011000000 — lista saldos a favor del cliente de la sesión; sin sesión de residente no devuelve nada ajeno",
