@@ -6,7 +6,7 @@ import { EmptyState } from './comunes'
 import { formatFechaCalendario } from '../../../../lib/format'
 
 export function VistaAmenidades({ ctx }: { ctx: AmenidadesCtx }) {
-  const { amenidades, reservas, moneda, canCreate, canEdit, showAmenidadForm, setShowAmenidadForm, saving, amenidadFotoUrl, setAmenidadFotoUrl, amenidadForm, setAmenidadForm, editingAmenidad, setEditingAmenidad, editAmenidadFotoUrl, setEditAmenidadFotoUrl, editAmenidadForm, setEditAmenidadForm, savingEdit, hoy, amenidadFotoUrls, guardarAmenidad, guardarEdicion, toggleAmenidad, eliminarAmenidad, abrirEdicion } = ctx
+  const { amenidades, reservas, moneda, canCreate, canEdit, canDelete, showAmenidadForm, setShowAmenidadForm, saving, amenidadFotoUrl, setAmenidadFotoUrl, amenidadForm, setAmenidadForm, editingAmenidad, setEditingAmenidad, editAmenidadFotoUrl, setEditAmenidadFotoUrl, editAmenidadForm, setEditAmenidadForm, savingEdit, hoy, amenidadFotoUrls, guardarAmenidad, guardarEdicion, toggleAmenidad, eliminarAmenidad, abrirEdicion } = ctx
   return (
         <>
           {showAmenidadForm && (
@@ -316,20 +316,24 @@ export function VistaAmenidades({ ctx }: { ctx: AmenidadesCtx }) {
                           <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)' }}>Próxima: {proxima.fecha === hoy ? 'HOY' : formatFechaCalendario(proxima.fecha, { day: '2-digit', month: 'short' }, 'es', '—')} {proxima.hora_inicio}</div>
                         )}
                       </div>
-                      {canEdit && (
+                      {(canEdit || canDelete) && (
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => abrirEdicion(a)} title="Editar amenidad"
-                            style={{ padding: '5px 11px', background: editingAmenidad?.id === a.id ? 'var(--at-primary-soft)' : 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: `1px solid ${editingAmenidad?.id === a.id ? 'var(--at-primary-mint)' : 'var(--at-primary-soft-2)'}`, borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-primary-soft)' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = editingAmenidad?.id === a.id ? 'var(--at-primary-soft)' : 'var(--at-primary-tint)' }}>
-                            ✎ Editar
-                          </button>
-                          <button onClick={() => eliminarAmenidad(a.id)} title="Eliminar amenidad"
-                            style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-danger-tint)' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--at-danger-tint)' }}>
-                            🗑
-                          </button>
+                          {canEdit && (
+                            <button onClick={() => abrirEdicion(a)} title="Editar amenidad"
+                              style={{ padding: '5px 11px', background: editingAmenidad?.id === a.id ? 'var(--at-primary-soft)' : 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: `1px solid ${editingAmenidad?.id === a.id ? 'var(--at-primary-mint)' : 'var(--at-primary-soft-2)'}`, borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-primary-soft)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = editingAmenidad?.id === a.id ? 'var(--at-primary-soft)' : 'var(--at-primary-tint)' }}>
+                              ✎ Editar
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button onClick={() => eliminarAmenidad(a.id)} title="Eliminar amenidad" aria-label={`Eliminar ${a.nombre}`}
+                              style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-danger-tint)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'var(--at-danger-tint)' }}>
+                              🗑
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
