@@ -32,7 +32,7 @@ async function altaConError(error: { message: string; code?: string }) {
   h.createCondominioRow.mockResolvedValueOnce({ error })
   render(
     <I18nProvider>
-      <VehiculosTab vehiculos={[]} unidades={unidades} proyectoId="p1" companyId="c1" canCreate canEdit onRefresh={() => {}} />
+      <VehiculosTab vehiculos={[]} unidades={unidades} proyectoId="p1" companyId="c1" canCreate canEdit canDelete onRefresh={() => {}} />
     </I18nProvider>,
   )
   fireEvent.click(screen.getAllByRole('button').find(b => /\+/.test(b.textContent ?? ''))!)
