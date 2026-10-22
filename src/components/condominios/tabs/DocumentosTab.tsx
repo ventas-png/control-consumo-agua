@@ -11,6 +11,8 @@ interface Props {
   userId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.documentos.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -35,7 +37,7 @@ const blank = (): Partial<DocumentoCondominio> => ({
   version: '', vigente: true, visibilidad: 'admin',
 })
 
-export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaDocumento | 'todos'>('todos')
   const [filtroVigente, setFiltroVigente] = useState<boolean | 'todos'>(true)
   const [busqueda, setBusqueda] = useState('')
@@ -81,6 +83,8 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar documento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('documentos_condominio', id)
@@ -195,7 +199,7 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
       ) : filtroCategoria !== 'todos' ? (
         // Vista plana cuando hay filtro de categoría
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
-          {filtered.map(d => <DocumentCard key={d.id} doc={d} catInfo={catInfo} visInfo={visInfo} canEdit={canEdit} onEdit={startEdit} onDelete={handleDelete} onToggle={toggleVigente} />)}
+          {filtered.map(d => <DocumentCard key={d.id} doc={d} catInfo={catInfo} visInfo={visInfo} canEdit={canEdit} canDelete={canDelete} onEdit={startEdit} onDelete={handleDelete} onToggle={toggleVigente} />)}
         </div>
       ) : (
         // Vista agrupada por categoría
@@ -208,7 +212,7 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
                 <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>({grouped[cat.value].length})</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
-                {grouped[cat.value].map(d => <DocumentCard key={d.id} doc={d} catInfo={catInfo} visInfo={visInfo} canEdit={canEdit} onEdit={startEdit} onDelete={handleDelete} onToggle={toggleVigente} />)}
+                {grouped[cat.value].map(d => <DocumentCard key={d.id} doc={d} catInfo={catInfo} visInfo={visInfo} canEdit={canEdit} canDelete={canDelete} onEdit={startEdit} onDelete={handleDelete} onToggle={toggleVigente} />)}
               </div>
             </div>
           ))}
@@ -218,11 +222,12 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
   )
 }
 
-function DocumentCard({ doc, catInfo, visInfo, canEdit, onEdit, onDelete, onToggle }: {
+function DocumentCard({ doc, catInfo, visInfo, canEdit, canDelete, onEdit, onDelete, onToggle }: {
   doc: DocumentoCondominio
   catInfo: (c: CategoriaDocumento) => { icon: string; label: string }
   visInfo: (v: VisibilidadDocumento) => { label: string; color: string }
   canEdit: boolean
+  canDelete: boolean
   onEdit: (d: DocumentoCondominio) => void
   onDelete: (id: string) => void
   onToggle: (d: DocumentoCondominio) => void
@@ -246,7 +251,7 @@ function DocumentCard({ doc, catInfo, visInfo, canEdit, onEdit, onDelete, onTogg
           </a>
           {canEdit && <button onClick={() => onEdit(doc)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
           {canEdit && <button onClick={() => onToggle(doc)} style={{ padding: '4px 8px', background: doc.vigente ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }} title={doc.vigente ? 'Archivar' : 'Reactivar'}>{doc.vigente ? '📦' : '♻️'}</button>}
-          {canEdit && <button onClick={() => onDelete(doc.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
+          {canDelete && <button onClick={() => onDelete(doc.id)} title="Eliminar" aria-label={`Eliminar ${doc.titulo}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
         </div>
       </div>
     </div>

@@ -14,6 +14,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.libro_novedades.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -34,7 +36,7 @@ const TURNO_COLORS: Record<string, { bg: string; color: string; icon: string }> 
 }
 const TIPO_INCIDENTE = ['observacion', 'incidente', 'emergencia', 'visita', 'reparacion', 'otro']
 
-export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
@@ -72,9 +74,12 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar entrada?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('libro_novedades', id)
+    const { error } = await deleteCondominioRow('libro_novedades', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -257,7 +262,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
                     <button onClick={() => toggleFirmado(n.id, n.firmado)}
                       style={{ padding: '3px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Firmar</button>
                   )}
-                  {canEdit && (
+                  {canDelete && (
                     <button onClick={() => handleDelete(n.id)} aria-label={`Eliminar entrada del ${n.fecha} (${n.turno})`}
                       style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
                   )}
