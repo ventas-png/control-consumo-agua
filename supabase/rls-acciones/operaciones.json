@@ -1,0 +1,126 @@
+{
+  "_migracion": "20261104000600_rls_acciones_operaciones.sql",
+  "_titulo": "Operaciones: escribir exige la ACCIÓN del tab, también en la base",
+  "_porque": [
+    "POR QUÉ",
+    "La pantalla decide cada escritura de estos tabs con su acción (canCreate /",
+    "canEdit / canDelete). Las policies de INSERT y UPDATE sólo pedían ver el tab",
+    "—quien sólo consulta podía crear y editar por la API— y las de DELETE sólo",
+    "dejaban a company_owner/admin, aunque la pantalla ofreciera «Eliminar» a",
+    "quien tuviera la acción. La rama del residente (comentar su propio ticket)",
+    "no cambia.",
+    "",
+    "Tabs: Áreas, Bitácora de mantenimiento, Contratos de proveedores, Control de",
+    "plagas, Evaluación de proveedores, Garantías, Inventario, Mantenimiento",
+    "preventivo (y sus ejecuciones), Mensajes de tickets, Obras, Préstamos de",
+    "equipo, Proyectos y Suministros (y sus movimientos).",
+    "",
+    "Queda fuera tickets_mantenimiento: 20261103000400 ya exige la acción para",
+    "crear, editar y dar de baja; su DELETE físico sigue reservado al admin."
+  ],
+  "tablas": {
+    "areas_condominio": {
+      "tab": "areas_config",
+      "otras_claves": ["checklist_areas"],
+      "porque": [
+        "El catálogo de áreas se administra sólo en el tab Áreas (AreasCatalog, con canCreate / canEdit /",
+        "canDelete de areas_config). checklist_areas dejaba escribir sólo con verlo y desde 20260910000000",
+        "ya no hospeda el catálogo: su átomo pasa a pedir la acción de Áreas. condominios.areas.manage",
+        "no es una clave de tab sino un permiso de escritura explícito, y se conserva."
+      ]
+    },
+    "bitacora_manto": {
+      "tab": "bitacora_manto"
+    },
+    "comentarios_ticket": {
+      "tab": "kanban_tickets",
+      "otras_claves": ["mantenimiento"],
+      "INSERT": [
+        "kanban_tickets.create",
+        "mantenimiento.edit",
+        "portal.edit"
+      ],
+      "porque": [
+        "Los mensajes de un ticket se escriben desde la conversación de Mantenimiento (canWrite =",
+        "canEdit('mantenimiento')) y desde la vista previa del Portal del residente (canEdit('portal'))."
+      ],
+      "evidencia": {
+        "mantenimiento": [
+          "components/condominios/tabs/MantenimientoTab.tsx",
+          "components/condominios/tabs/TicketChatModal.tsx"
+        ],
+        "portal": [
+          "components/condominios/tabs/PortalResidenteTab.tsx",
+          "components/condominios/tabs/PortalMisTicketsTab.tsx",
+          "components/condominios/tabs/TicketChatModal.tsx"
+        ]
+      }
+    },
+    "contratos_proveedores": {
+      "tab": "proveedores",
+      "receta": {
+        "proveedor_id": "ra.padre('public.proveedores', ra.id('A'), 1) ->> 'id'",
+        "estado": "'borrador'",
+        "modalidad": "'por_demanda'"
+      },
+      "porque": "Un contrato nuevo nace en borrador, con modalidad y vinculado a un proveedor del catálogo (trigger de contratos): la fila de la prueba lo cumple."
+    },
+    "control_plagas": {
+      "tab": "control_plagas"
+    },
+    "ejecuciones_mantenimiento": {
+      "tab": "mantenimiento",
+      "INSERT": [
+        "mantenimiento.create",
+        "mant_preventivo.create"
+      ],
+      "porque": "«Registrar ejecución» de un plan se ofrece en Mantenimiento preventivo con canCreate('mant_preventivo').",
+      "evidencia": {
+        "mant_preventivo": [
+          "components/condominios/tabs/MantenimientoPrevTab.tsx"
+        ]
+      }
+    },
+    "evaluaciones_proveedor": {
+      "tab": "eval_proveedor",
+      "receta": {
+        "proveedor_catalogo_id": "ra.padre('public.proveedores', ra.id('A'), 1) ->> 'id'"
+      },
+      "porque": "La evaluación se hace sobre un proveedor del catálogo (trigger de evaluaciones): la fila de la prueba lo trae."
+    },
+    "garantias_equipo": {
+      "tab": "garantias"
+    },
+    "inventario_condominio": {
+      "tab": "inventario"
+    },
+    "movimientos_suministro": {
+      "tab": "suministros",
+      "INSERT": [
+        "suministros.create",
+        "suministros.edit"
+      ],
+      "porque": "«+ Movimiento» de un insumo se ofrece con canEdit('suministros'): mueve su stock."
+    },
+    "obras_mejoras": {
+      "tab": "obras"
+    },
+    "planes_mantenimiento": {
+      "tab": "mant_preventivo",
+      "UPDATE": [
+        "mant_preventivo.edit",
+        "mant_preventivo.create"
+      ],
+      "porque": "Registrar una ejecución (canCreate) actualiza la última y la próxima fecha del plan."
+    },
+    "prestamos_equipo": {
+      "tab": "prestamos"
+    },
+    "proyectos_condominio": {
+      "tab": "proyectos_cond"
+    },
+    "suministros_condominio": {
+      "tab": "suministros"
+    }
+  }
+}

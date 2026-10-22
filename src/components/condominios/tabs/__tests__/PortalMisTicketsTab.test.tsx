@@ -172,6 +172,17 @@ describe('PortalMisTicketsTab — conversación del ticket', () => {
     expect(screen.queryByLabelText('Cambiar estado del ticket')).toBeNull()
   })
 
+  it('la vista previa del panel sin canEdit(portal) muestra el hilo pero no deja escribir', async () => {
+    // La base exige condominios.tab.portal.edit al mensaje del staff (supabase/rls-acciones/operaciones.json).
+    mocks.fetchComentariosTicket.mockResolvedValue([comentario()])
+    renderTab({ canWrite: false })
+    fireEvent.click(screen.getByText('💬 Escribir al equipo'))
+
+    expect(await screen.findByText('Vamos hoy en la tarde')).toBeTruthy()
+    expect(screen.queryByLabelText('Mensaje')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Enviar mensaje' })).toBeNull()
+  })
+
   it('el hilo acepta documentos, no solo fotos', async () => {
     renderTab()
     fireEvent.click(screen.getByText('💬 Escribir al equipo'))

@@ -18,6 +18,12 @@ interface Props {
   autorNombre?: string
   /** auth user id del residente: distingue sus mensajes en el hilo. */
   autorUserId?: string
+  /**
+   * Escribir en la conversación de un ticket. El residente siempre (la base lo
+   * deja por su unidad); la vista previa del panel, con canEdit('portal'), lo
+   * mismo que la base exige al staff.
+   */
+  canWrite?: boolean
   onRefresh: () => void
 }
 
@@ -43,7 +49,7 @@ function blankForm() {
 }
 
 export function PortalMisTicketsTab({
-  tickets, unidadId, proyectoId, companyId, autorNombre = '', autorUserId, onRefresh,
+  tickets, unidadId, proyectoId, companyId, autorNombre = '', autorUserId, canWrite = true, onRefresh,
 }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving]     = useState(false)
@@ -245,6 +251,7 @@ export function PortalMisTicketsTab({
           companyId={companyId}
           autorNombre={autorNombre}
           autorUserId={autorUserId}
+          canWrite={canWrite}
           onClose={() => { setConversacion(null); void cargarConteos() }}
         />
       )}

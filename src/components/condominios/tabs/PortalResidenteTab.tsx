@@ -170,6 +170,7 @@ export function PortalResidenteTab({
                 companyId={companyId}
                 autorNombre={autorNombre}
                 autorUserId={autorUserId}
+                canWrite={canEdit}
                 onRefresh={onRefresh}
               />
             )}

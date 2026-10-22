@@ -33,9 +33,13 @@ GRANT SELECT ON ra.ids TO PUBLIC;
 CREATE FUNCTION ra.id(p_alias text) RETURNS uuid LANGUAGE sql STABLE AS
 $$ SELECT id FROM ra.ids WHERE alias = p_alias $$;
 
--- Recetas del mapa (`receta` de cada tabla): valor SQL fijo para una columna,
--- cuando la regla es de VARIAS columnas (CHECK hora_fin > hora_inicio) y el
--- valor por tipo no la cumple. Una columna con receta se incluye siempre.
+-- Recetas del mapa (`receta` de cada tabla): valor SQL para una columna, cuando
+-- una regla de negocio no la cumple con el valor por tipo (CHECK hora_fin >
+-- hora_inicio; un trigger que exige un proveedor del catálogo en una columna
+-- opcional). Una columna con receta se incluye siempre. Se EVALÚA al fabricar
+-- —como el admin de la empresa, igual que los padres— y la sentencia lleva el
+-- resultado como literal: así puede fabricar un padre (ra.padre) que la
+-- persona de la prueba no podría.
 CREATE TABLE ra.recetas (tabla regclass, col text, valor text NOT NULL, PRIMARY KEY (tabla, col));
 
 -- Padres ya fabricados, por tabla y empresa: una FK los reutiliza.
@@ -148,6 +152,10 @@ BEGIN
     CONTINUE WHEN v_val IS NULL AND NOT (
       (v_col.attnotnull AND NOT v_col.tiene_default)
       OR v_col.attname IN ('company_id', 'project_id', 'unidad_id'));
+    IF v_val IS NOT NULL THEN
+      EXECUTE format('SELECT (%s)::text', v_val) INTO v_val;
+      v_val := quote_nullable(v_val) || '::' || format_type(v_col.atttypid, NULL);
+    END IF;
 
     -- FK de una sola columna
     SELECT c.confrelid::regclass, (SELECT attname FROM pg_attribute WHERE attrelid = c.confrelid AND attnum = c.confkey[1])
