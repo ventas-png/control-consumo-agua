@@ -611,6 +611,15 @@ jobs:
           PGPORT_TEST: 55502
         run: supabase/tests/policies_rondas/run.sh
 
+      # 20261104000150 retira `str_cliente_portal`, la FOR ALL legada de
+      # reservas_str cuyo WITH CHECK era una tautología: un residente con
+      # alguna renta corta aprobada daba de alta reservas en cualquier unidad
+      # de cualquier empresa. Producción nunca la tuvo. Sobre la cadena
+      # completa: reproduce el agujero, aplica la migración, comprueba que el
+      # residente sigue gestionando SU unidad, e idempotencia.
+      - name: reservas_str sin la policy legada del portal
+        run: node supabase/tests/reservas_str_portal/run.mjs
+
       # 20260923000000 cierra la escritura cruzada de `empresa` (#826 §3.3), y
       # la cierra en DOS capas: las cuatro policies que sólo existen en
       # producción y los grants de tabla que las hacían alcanzables. El arnés
