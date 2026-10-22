@@ -12,6 +12,8 @@ interface Props {
   userId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.memoria.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -28,7 +30,7 @@ const blank = (): Partial<MemoriaLabores> => ({
   incidencias_atendidas: undefined, estado: 'borrador',
 })
 
-export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [filtroTipo, setFiltroTipo] = useState<TipoPeriodo | 'todos'>('todos')
   // Por id y no la fila: la ventana lee la versión vigente de `memorias` tras
   // cada refresco y se cierra sola si la memoria ya no está.
@@ -92,6 +94,8 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar memoria?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('memoria_labores', id)
@@ -227,14 +231,18 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
                   {m.estado === 'publicado' ? '✅ Publicado' : '📝 Borrador'}
                 </span>
               </button>
-              {m.estado === 'borrador' && canEdit && (
+              {m.estado === 'borrador' && (canEdit || canDelete) && (
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
-                  <button onClick={() => handlePublicar(m.id)} style={{ padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Publicar</button>
-                  <button onClick={() => startEdit(m)} aria-label={`Editar ${m.titulo}`} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                  <button onClick={() => handleDelete(m.id)} aria-label={`Eliminar ${m.titulo}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                  {canEdit && (
+                    <button onClick={() => handlePublicar(m.id)} style={{ padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Publicar</button>
+                  )}
+                  {canEdit && (
+                    <button onClick={() => startEdit(m)} aria-label={`Editar ${m.titulo}`} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                  )}
+                  {canDelete && <button onClick={() => handleDelete(m.id)} aria-label={`Eliminar ${m.titulo}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                 </div>
               )}
-              {m.estado === 'publicado' && canEdit && (
+              {m.estado === 'publicado' && canDelete && (
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
                   <button onClick={() => handleDelete(m.id)} aria-label={`Eliminar ${m.titulo}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                 </div>

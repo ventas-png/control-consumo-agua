@@ -41,13 +41,15 @@ interface Props {
   userId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.seguridad.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
 export function SeguridadTab({
   rondas, novedades, rutas, puntosControl, visitasControl, areas,
   visitantes: _visitantes, unidades, reservasSTR,
-  proyectoId, companyId, userId, canCreate, canEdit, onRefresh,
+  proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh,
 }: Props) {
   const [vista, setVista] = useState<'novedades' | 'rondas'>('novedades')
   const [showAccesosModal, setShowAccesosModal] = useState(false)
@@ -195,9 +197,12 @@ export function SeguridadTab({
   }
 
   async function eliminarNovedad(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar novedad?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('novedades_seguridad', id)
+    const { error } = await deleteCondominioRow('novedades_seguridad', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -317,7 +322,7 @@ export function SeguridadTab({
 
   const ctx: SeguridadCtx = {
     rondas, novedades, rutas, puntosControl, visitasControl, areas, unidades, reservasSTR,
-    proyectoId, canCreate, canEdit,
+    proyectoId, canCreate, canEdit, canDelete,
     saving, filtroPrioridad, setFiltroPrioridad, novedadDetalle, setNovedadDetalle,
     novedadForm, setNovedadForm, fotosNovedadForm, setFotosNovedadForm,
     rondaForm, setRondaForm, setShowNovedadForm, setShowRondaForm,

@@ -1,0 +1,132 @@
+{
+  "_migracion": "20261104000400_rls_acciones_administracion.sql",
+  "_titulo": "Administración: escribir exige la ACCIÓN del tab, también en la base",
+  "_porque": [
+    "POR QUÉ",
+    "La pantalla decide cada escritura de estos tabs con su acción (canCreate /",
+    "canEdit / canApprove / canDelete). Las policies de INSERT y UPDATE sólo",
+    "pedían ver el tab —quien sólo consulta podía crear y editar por la API— y",
+    "las de DELETE sólo dejaban a company_owner/admin, aunque la pantalla",
+    "ofreciera «Eliminar» a quien tuviera la acción.",
+    "",
+    "Tabs: Automatizaciones (y reglas de notificación), Bitácora de acciones,",
+    "Configuración, Documentos, Firmas, Flujo de aprobación, Inspecciones, Libro",
+    "de novedades (y las novedades de seguridad), Memoria de labores, Notas,",
+    "Plantillas de mensaje, Pólizas, Propuestas, Registro de autoridades,",
+    "Reglamento y Vencimientos críticos.",
+    "",
+    "Queda fuera paquetes_recibidos: su policy elige la clave del tab por la",
+    "clase del paquete (CASE clase); va con los casos especiales."
+  ],
+  "tablas": {
+    "automatizaciones_cond": {
+      "tab": "automatizaciones"
+    },
+    "bitacora_acciones": {
+      "tab": "bitacora_acciones"
+    },
+    "configuracion_condominio": {
+      "tab": "configuracion_cond",
+      "INSERT": [
+        "configuracion_cond.create",
+        "configuracion.edit"
+      ],
+      "UPDATE": [
+        "configuracion_cond.edit",
+        "configuracion.edit"
+      ],
+      "porque": "La escribe la pestaña Configuración con canEdit('configuracion'): guardar crea la fila la primera vez.",
+      "evidencia": {
+        "configuracion": [
+          "components/condominios/tabs/ConfiguracionTab.tsx"
+        ]
+      }
+    },
+    "documentos_condominio": {
+      "tab": "documentos"
+    },
+    "firmas_digitales": {
+      "tab": "firmas"
+    },
+    "flujo_aprobacion_cond": {
+      "tab": "flujo_aprobacion",
+      "UPDATE": [
+        "flujo_aprobacion.edit",
+        "flujo_aprobacion.approve"
+      ],
+      "porque": "Aprobar o rechazar una solicitud se ofrece con canApprove('flujo_aprobacion')."
+    },
+    "inspecciones_normativas": {
+      "tab": "inspecciones"
+    },
+    "libro_novedades": {
+      "tab": "libro_novedades"
+    },
+    "memoria_labores": {
+      "tab": "memoria"
+    },
+    "notas_admin": {
+      "tab": "notas_admin"
+    },
+    "novedades_seguridad": {
+      "tab": "libro_novedades",
+      "INSERT": [
+        "libro_novedades.create",
+        "seguridad.create",
+        "visitantes.create"
+      ],
+      "DELETE": [
+        "libro_novedades.delete",
+        "seguridad.delete"
+      ],
+      "porque": "Seguridad registra y borra novedades; Visitantes registra la de una salida con novedad.",
+      "evidencia": {
+        "seguridad": [
+          "components/condominios/tabs/SeguridadTab.tsx"
+        ],
+        "visitantes": [
+          "components/condominios/tabs/VisitantesTab.tsx"
+        ]
+      }
+    },
+    "plantillas_mensaje_cond": {
+      "tab": "plantillas_mensaje"
+    },
+    "polizas_seguro": {
+      "tab": "polizas"
+    },
+    "propuestas_inversion": {
+      "tab": "propuestas"
+    },
+    "registro_autoridades": {
+      "tab": "reg_autoridades"
+    },
+    "reglamento_condominio": {
+      "tab": "reglamento"
+    },
+    "reglas_notificacion": {
+      "tab": "automatizaciones",
+      "INSERT": [
+        "automatizaciones.create",
+        "notificaciones.create"
+      ],
+      "UPDATE": [
+        "automatizaciones.edit",
+        "notificaciones.edit"
+      ],
+      "DELETE": [
+        "automatizaciones.delete",
+        "notificaciones.delete"
+      ],
+      "porque": "Las reglas las administra la pestaña Notificaciones, con sus propias acciones.",
+      "evidencia": {
+        "notificaciones": [
+          "components/condominios/tabs/NotificacionesTab.tsx"
+        ]
+      }
+    },
+    "vencimientos_extra": {
+      "tab": "vencimientos_criticos"
+    }
+  }
+}

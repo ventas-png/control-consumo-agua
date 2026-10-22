@@ -16,6 +16,8 @@ interface Props {
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.polizas.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -43,7 +45,7 @@ const blank = (): Partial<PolizaSeguro> => ({
   agente_nombre: '', agente_telefono: '', agente_email: '', documento_url: '', notas: '',
 })
 
-export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
+export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, canDelete, onRefresh }: Props) {
   const hoy = hoyLocalISO()
   const [filtroEstado, setFiltroEstado] = useState<EstadoPoliza | 'todos'>('vigente')
   const [form, setForm] = useState<Partial<PolizaSeguro>>(blank())
@@ -98,6 +100,8 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar póliza?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('polizas_seguro', id)
@@ -330,7 +334,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
                 )}
                 {p.documento_url && <SecureFileLink src={p.documento_url} style={{ padding: '4px 8px', background: 'var(--at-chip)', borderRadius: 6, fontSize: 12, textDecoration: 'none', color: 'var(--at-ink-2)' }}>📄</SecureFileLink>}
                 {canEdit && <button onClick={(e) => { e.stopPropagation(); startEdit(p) }} aria-label={`Editar ${p.numero_poliza}`} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>✏️</button>}
-                {canEdit && <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} aria-label={`Eliminar ${p.numero_poliza}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
+                {canDelete && <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} aria-label={`Eliminar ${p.numero_poliza}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
               </div>
             ) },
         ] satisfies DataTableColumn<PolizaSeguro>[]}

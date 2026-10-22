@@ -22,6 +22,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.plan_pago.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -42,7 +44,7 @@ function addMonths(dateStr: string, months: number): string {
   return dateLocalISO(d)
 }
 
-export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
@@ -107,9 +109,12 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar plan de pago?', text: 'Se eliminarán todas sus cuotas.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('planes_pago_condominio', id)
+    const { error } = await deleteCondominioRow('planes_pago_condominio', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selectedId === id) { setSelectedId(null); setCuotas([]) }
     onRefresh()
   }
@@ -273,16 +278,18 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
                 </div>
                 {p.aprobado_por && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>Aprobado por: {p.aprobado_por}</div>}
               </button>
-              {canEdit && (
+              {(canEdit || canDelete) && (
                 <div style={{ display: 'flex', gap: '3px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
-                  {p.estado === 'activo' && (
+                  {canEdit && p.estado === 'activo' && (
                     <button onClick={() => cambiarEstadoPlan(p.id, 'incumplido')}
                       style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                       Incumplido
                     </button>
                   )}
-                  <button onClick={() => handleDelete(p.id)} aria-label={`Eliminar plan ${p.concepto}`}
-                    style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                  {canDelete && (
+                    <button onClick={() => handleDelete(p.id)} aria-label={`Eliminar plan ${p.concepto}`}
+                      style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                  )}
                 </div>
               )}
             </div>
@@ -307,9 +314,9 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
             onClose={cerrarDetalle}
             // Las mismas acciones de la fila: con la ventana abierta la lista
             // queda detrás y no se alcanzan.
-            footer={canEdit ? <>
-              <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar plan">🗑️</Button>
-              {selected.estado === 'activo' && <Button variant="outline-danger" onClick={() => cambiarEstadoPlan(selected.id, 'incumplido')}>Marcar incumplido</Button>}
+            footer={canEdit || canDelete ? <>
+              {canDelete && <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar plan">🗑️</Button>}
+              {canEdit && selected.estado === 'activo' && <Button variant="outline-danger" onClick={() => cambiarEstadoPlan(selected.id, 'incumplido')}>Marcar incumplido</Button>}
             </> : undefined}
           >
             <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Cuotas</div>

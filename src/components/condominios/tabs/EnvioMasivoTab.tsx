@@ -14,6 +14,8 @@ interface Props {
   companyId: string
   moneda: string
   proyectoNombre?: string
+  /** Registrar el envío crea filas en notificaciones_enviadas: exige crear en Envío masivo. */
+  canCreate: boolean
   onRefresh: () => void
 }
 
@@ -49,7 +51,7 @@ function resolverVariables(cuerpo: string, unidad: Unidad, cuotasU: CuotaCondomi
     .replace(/\{\{proyecto\}\}/g, proyecto)
 }
 
-export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas, proyectoId, companyId, moneda, proyectoNombre, onRefresh }: Props) {
+export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas, proyectoId, companyId, moneda, proyectoNombre, canCreate, onRefresh }: Props) {
   const hoy = hoyLocalISO()
   const [plantillaId, setPlantillaId] = useState('')
   const [segmento, setSegmento] = useState<SegmentoEnvio>('todos')
@@ -93,7 +95,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
   }, [plantilla, destinatarios, cuotas, moneda, proyectoNombre])
 
   async function enviar() {
-    if (!plantilla || destinatarios.length === 0) return
+    if (!canCreate || !plantilla || destinatarios.length === 0) return
     setEnviando(true)
 
     const rows = destinatarios.map(u => ({
@@ -208,10 +210,12 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
               <div style={{ fontWeight: 700, fontSize: 13 }}>Vista previa del envío</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setPaso(1)} style={{ padding: '6px 14px', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: 'var(--at-surface-2)' }}>← Volver</button>
-                <button onClick={enviar} disabled={enviando}
-                  style={{ padding: '6px 18px', background: canalCfg?.color, color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: enviando ? 0.7 : 1 }}>
-                  {enviando ? 'Registrando…' : `${canalCfg?.icon} Enviar a ${destinatarios.length} unidades`}
-                </button>
+                {canCreate && (
+                  <button onClick={enviar} disabled={enviando}
+                    style={{ padding: '6px 18px', background: canalCfg?.color, color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: enviando ? 0.7 : 1 }}>
+                    {enviando ? 'Registrando…' : `${canalCfg?.icon} Enviar a ${destinatarios.length} unidades`}
+                  </button>
+                )}
               </div>
             </div>
 
