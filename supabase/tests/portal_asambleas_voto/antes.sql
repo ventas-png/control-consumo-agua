@@ -1,5 +1,5 @@
 -- ============================================================================
--- CONTROL PREVIO: el estado de ANTES de 20261105000000 (con 20261104000120, el
+-- CONTROL PREVIO: el estado de ANTES de 20261105000000 (con 20261104000450, el
 -- candado de plan ya corregido), sobre el mismo padrón.
 --
 -- Reproduce, una por una, las causas por las que el portal no podía votar:
