@@ -13,6 +13,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.junta.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -34,7 +36,7 @@ const BLANK = {
   periodo_fin: '', notas: '', activo: true,
 }
 
-export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
@@ -84,9 +86,12 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar miembro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('junta_directiva', id)
+    const { error } = await deleteCondominioRow('junta_directiva', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -188,10 +193,10 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
                     <div style={{ fontSize: '20px', marginBottom: '4px' }}>{cl.icon}</div>
                     <div style={{ fontSize: '11px', fontWeight: 700, color: cl.color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{cl.label}</div>
                   </div>
-                  {canEdit && (
+                  {(canEdit || canDelete) && (
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button onClick={() => startEdit(m)} style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(m.id)} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                      {canEdit && <button onClick={() => startEdit(m)} style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>}
+                      {canDelete && <button onClick={() => handleDelete(m.id)} title="Eliminar" aria-label={`Eliminar ${m.nombre}`} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                     </div>
                   )}
                 </div>
@@ -227,8 +232,8 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
                     <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--at-ink-3)' }}>{m.nombre}</span>
                     <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginLeft: '8px' }}>{CARGO_LABELS[m.cargo].label} — {m.periodo_inicio}{m.periodo_fin ? ` a ${m.periodo_fin}` : ''}</span>
                   </div>
-                  {canEdit && (
-                    <button onClick={() => handleDelete(m.id)} style={{ padding: '2px 6px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                  {canDelete && (
+                    <button onClick={() => handleDelete(m.id)} title="Eliminar" aria-label={`Eliminar ${m.nombre}`} style={{ padding: '2px 6px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                   )}
                 </div>
               ))}

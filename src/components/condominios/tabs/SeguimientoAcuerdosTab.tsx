@@ -12,6 +12,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.acuerdos.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -25,7 +27,7 @@ const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }>
 
 const BLANK = { acta_id: '', titulo: '', descripcion: '', responsable: '', fecha_limite: '', estado: 'pendiente', notas_seguimiento: '' }
 
-export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
@@ -66,9 +68,12 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar acuerdo?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('seguimiento_acuerdos', id)
+    const { error } = await deleteCondominioRow('seguimiento_acuerdos', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -215,24 +220,28 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
                       <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '4px', fontStyle: 'italic' }}>{a.notas_seguimiento}</div>
                     )}
                   </div>
-                  {canEdit && (
+                  {(canEdit || canDelete) && (
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                      {a.estado === 'pendiente' && (
+                      {canEdit && a.estado === 'pendiente' && (
                         <button onClick={() => cambiarEstado(a.id, 'en_proceso')}
                           style={{ padding: '3px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                           Iniciar
                         </button>
                       )}
-                      {['pendiente', 'en_proceso', 'vencido'].includes(a.estado) && (
+                      {canEdit && ['pendiente', 'en_proceso', 'vencido'].includes(a.estado) && (
                         <button onClick={() => cambiarEstado(a.id, 'cumplido')}
                           style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                           ✓ Cumplido
                         </button>
                       )}
-                      <button onClick={() => startEdit(a as SeguimientoAcuerdo)}
-                        style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(a.id)}
-                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                      {canEdit && (
+                        <button onClick={() => startEdit(a as SeguimientoAcuerdo)}
+                          style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => handleDelete(a.id)} title="Eliminar" aria-label={`Eliminar ${a.titulo}`}
+                          style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                      )}
                     </div>
                   )}
                 </div>

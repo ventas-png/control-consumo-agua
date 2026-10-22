@@ -41,11 +41,17 @@
 //                              "DELETE": ["<tab>.delete", …],   // por defecto [tab.delete]
 //                              "otras_claves": ["<tab2>"],      // átomos de otro tab, reconocidos
 //                              "evidencia": { "<tab ajeno>": ["<componente del tab>", …, "<archivo que escribe>"] },
-//                              "porque": "…" } } }
+//                              "porque": "…" } },
+//     "_sin_clave": { "<tab>": "por qué el catálogo no siembra sus claves" } }
 // Un tab AJENO en un comando amplía quién escribe la tabla: `evidencia` dice
 // qué pantalla de ese tab la escribe (cadena de imports desde el componente
 // del registro hasta la escritura); src/__tests__/rlsAccionesMapas.test.ts lo
 // comprueba, junto con que toda pantalla que escribe la tabla esté en el mapa.
+// `_sin_clave` declara los tabs cuyas claves no existen en `permissions` (hoy
+// sólo los exentos actúan en ellos); el arnés rechaza cualquier otro par que
+// no esté en el catálogo: sería una errata que deja la acción en «sólo admin».
+// Un comando sin ninguna policy permisiva (p. ej. votos no tiene UPDATE) no se
+// crea: nadie lo hace, antes y después; el mapa no puede declararlo.
 //
 // USO
 //   node scripts/rls-acciones/generar.mjs <sección>            → escribe la migración
@@ -72,6 +78,7 @@ export function cargarMapa(seccion) {
   if (!/^\d{14}_[a-z0-9_]+\.sql$/.test(mapa._migracion ?? '')) throw new Error(`${seccion}: _migracion inválida`)
   for (const [tabla, t] of Object.entries(mapa.tablas)) {
     if (!/^[a-z_]+$/.test(t.tab ?? '')) throw new Error(`${tabla}: falta "tab"`)
+    t.declarados = COMANDOS.filter(cmd => t[cmd] !== undefined)
     for (const cmd of COMANDOS) {
       t[cmd] ??= [`${t.tab}.${ACCION[cmd]}`]
       if (!Array.isArray(t[cmd]) || t[cmd].length === 0) throw new Error(`${tabla}.${cmd}: lista vacía`)
@@ -80,6 +87,10 @@ export function cargarMapa(seccion) {
       }
     }
     t.otras_claves ??= []
+  }
+  mapa._sin_clave ??= {}
+  for (const tab of Object.keys(mapa._sin_clave)) {
+    if (!/^[a-z_]+$/.test(tab)) throw new Error(`${seccion}: _sin_clave «${tab}» inválido`)
   }
   mapa.version = mapa._migracion.slice(0, 14)
   return mapa
@@ -97,6 +108,13 @@ export function baseAntesDe(version, log = () => {}) {
   if (db.fallos.length) { db.destruir(); throw new Error(`la cadena no aplica: ${JSON.stringify(db.fallos)}`) }
   return db
 }
+
+/**
+ * ¿La tabla no tiene NINGUNA policy permisiva para el comando? Entonces nadie
+ * (ni el admin) lo hace por la API, antes y después: la migración no la crea.
+ */
+export const sinPolicy = (todas, tabla, cmd) =>
+  !todas.some(p => p.tabla === tabla && p.permisiva === 'PERMISSIVE' && (p.cmd === cmd || p.cmd === 'ALL'))
 
 /** Las policies de escritura de las tablas, tal como están en la base. */
 export function leerPolicies(psql, tablas, bd = 'postgres') {
@@ -120,6 +138,9 @@ const ATOMOS = [
   { re: /\(current_user_role\(\) = ANY \(ARRAY\['company_owner'::text, 'admin'::text\]\)\)/g, clave: false },
 ]
 const RESTO = [/user_has_permission\(\s*'condominios\.tab\./, /user_has_permission\(\s*CASE/, /ARRAY\['company_owner'::text, 'admin'::text\]/]
+
+/** ¿La expresión lleva algún átomo de permiso (sustituible o no)? */
+export const tieneAtomos = s => ATOMOS.some(a => new RegExp(a.re.source).test(s)) || RESTO.some(re => re.test(s))
 
 export function accionSql(pares) {
   const terminos = pares.map(p => {
@@ -146,6 +167,9 @@ function sustituir(expr, pares, t, donde) {
   for (const re of RESTO) {
     if (re.test(texto)) throw new Error(`${donde}: queda un átomo de permiso sin sustituir: ${texto}`)
   }
+  // «visibilidad OR rol» (tablas hijas) queda «acción OR acción»: se deja una.
+  const a = accionSql(pares)
+  texto = texto.split(`(${a} OR ${a})`).join(a)
   return { texto, n }
 }
 
@@ -155,8 +179,7 @@ export function transformar(mapa, policies) {
   for (const p of policies) {
     const t = mapa.tablas[p.tabla]
     const donde = `${p.tabla}.${p.nombre}`
-    const tiene = s => ATOMOS.some(a => new RegExp(a.re.source).test(s)) || RESTO.some(re => re.test(s))
-    if (!tiene(p.using) && !tiene(p.check)) continue   // sin átomos (feature, MFA, …): no se toca
+    if (!tieneAtomos(p.using) && !tieneAtomos(p.check)) continue   // sin átomos (feature, MFA, …): no se toca
     if (!(p.cmd in ACCION)) throw new Error(`${donde}: policy FOR ${p.cmd} con átomos de permiso; resuélvela a mano`)
     const pares = t[p.cmd]
     const u = sustituir(p.using, pares, t, `${donde} USING`)
@@ -181,7 +204,8 @@ function crear(p, using, check) {
 const q = n => (/^[a-z_][a-z0-9_]*$/.test(n) ? n : `"${n.replace(/"/g, '""')}"`)
 
 /** La migración (o su reversión) como texto. */
-export function sql(mapa, nuevas, { revertir = false, todas = [] } = {}) {
+export function sql(mapa, nuevas, { revertir = false, todas } = {}) {
+  if (!todas?.length) throw new Error('sql(): faltan las policies vigentes (todas)')
   const porTabla = new Map()
   for (const p of nuevas) porTabla.set(p.tabla, (porTabla.get(p.tabla) ?? []).concat(p))
   const tablas = Object.keys(mapa.tablas).sort()
@@ -193,14 +217,18 @@ export function sql(mapa, nuevas, { revertir = false, todas = [] } = {}) {
     const m = mapa.tablas[t]
     const cab = [`-- ── ${t} ${'─'.repeat(Math.max(3, 72 - t.length))}`]
     if (!revertir) {
-      for (const cmd of COMANDOS) cab.push(`--   ${cmd.padEnd(6)} ${m[cmd].join(' · ')}`)
+      for (const cmd of COMANDOS) {
+        if (!sinPolicy(todas, t, cmd)) cab.push(`--   ${cmd.padEnd(6)} ${m[cmd].join(' · ')}`)
+        else if (m.declarados.includes(cmd)) throw new Error(`${t}.${cmd}: el mapa lo declara, pero la tabla no tiene policy de ${cmd}`)
+        else cab.push(`--   ${cmd.padEnd(6)} sin policy: nadie (no se crea)`)
+      }
       if (m.porque) cab.push(...[].concat(m.porque).map(l => `--   ${l}`))
     }
     return cab.concat(ps.map(p => (revertir ? crear(p, p.using, p.check) : crear(p, p.usingNuevo, p.checkNuevo)))).join('\n')
   }).join('\n\n')
   if (revertir) return `-- REVERSIÓN de ${mapa._migracion} (generada; no es una migración)\n\n${cuerpo}\n`
 
-  const total = t => todas.filter(p => p.tabla === t).length || porTabla.get(t).length
+  const total = t => todas.filter(p => p.tabla === t).length
   const conteo = tablas.map(t => `    ('${t}', ${porTabla.get(t).length}, ${total(t)})`).join(',\n')
   const guarda = `-- ── Guarda de postcondición ${'─'.repeat(52)}
 -- Ninguna policy de escritura de estas tablas conserva la visibilidad del tab

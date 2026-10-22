@@ -16,6 +16,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.infracciones.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -36,7 +38,7 @@ const ESTADO_CONFIG: Record<EstadoInfraccion, { labelKey: TranslationKey; bg: st
   anulada:      { labelKey: 'condominios.infracciones.estado_anulada',     bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
-export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const { t } = useTranslation()
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -83,9 +85,12 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: t('condominios.infracciones.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('infracciones_condominio', id)
+    const { error } = await deleteCondominioRow('infracciones_condominio', id)
+    if (error) { toast.error(error.message); return }
     onRefresh()
   }
 
@@ -251,7 +256,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
                 {!['resuelta', 'anulada'].includes(i.estado) && (
                   <button onClick={() => notificarWA(i)} title={t('condominios.infracciones.wa_notify')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-success)', fontSize: '15px', padding: '2px 4px' }}>💬</button>
                 )}
-                <button onClick={() => eliminar(i.id)} aria-label={t('condominios.comun.delete')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
+                {canDelete && <button onClick={() => eliminar(i.id)} aria-label={t('condominios.comun.delete')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>}
               </div>
             ),
           },
