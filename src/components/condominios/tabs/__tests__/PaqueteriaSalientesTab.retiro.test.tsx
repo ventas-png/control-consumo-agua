@@ -62,7 +62,7 @@ function renderTab(paquetes: PaqueteRecibido[], props: { canEdit?: boolean } = {
   return render(
     <PaqueteriaSalientesTab
       paquetes={paquetes} unidades={[]} proyectoId="pr1" companyId="c1" userId="guardia-1"
-      canCreate canEdit={props.canEdit ?? true} onRefresh={() => {}}
+      canCreate canEdit={props.canEdit ?? true} canDelete={false} onRefresh={() => {}}
     />,
   )
 }

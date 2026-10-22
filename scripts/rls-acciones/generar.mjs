@@ -48,6 +48,9 @@
 //                              "agregar_en": { "<CMD>": "<fragmento>" }, // policy SIN átomo: la acción va junto al fragmento
 //                              "receta": { "<columna>": "<valor SQL>" },  // sólo para la fila que fabrica el arnés
 //                              "evidencia": { "<tab ajeno>": ["<componente del tab>", …, "<archivo que escribe>"] },
+//                              "ramas": { "columna": "<col>", "valores": { "<valor>": {   // policy que ELIGE el tab por columna
+//                                  "tab": "<tab>", "INSERT": [...], "UPDATE": [...], "DELETE": [...],
+//                                  "receta": { … } } } },
 //                              "porque": "…" } },
 //     "_sin_clave": { "<tab>": "por qué el catálogo no siembra sus claves" },
 //     "_recetas": { "<tabla padre fuera del mapa>": { "<columna>": "<valor SQL>" } } }
@@ -60,6 +63,14 @@
 // no esté en el catálogo: sería una errata que deja la acción en «sólo admin».
 // Un comando sin ninguna policy permisiva (p. ej. votos no tiene UPDATE) no se
 // crea: nadie lo hace, antes y después; el mapa no puede declararlo.
+// `ramas` es para la policy que elige la clave del tab por el valor de una
+// columna —user_has_permission(CASE clase WHEN 'correspondencia' THEN
+// 'condominios.tab.correspondencia' ELSE 'condominios.tab.paqueteria' END)—:
+// cada WHEN pasa a pedir la acción de su rama y el ELSE la de la tabla. El CASE
+// tiene que coincidir con el mapa (columna, valores, tabs) o el generador se
+// detiene. Los comandos que una rama no declara no se sustituyen en ella: si
+// su policy la resuelve sin átomo (p. ej. «sólo company_owner»), queda igual.
+// La fila de la tabla es la del ELSE; cada rama fabrica la suya con su receta.
 //
 // USO
 //   node scripts/rls-acciones/generar.mjs <sección>            → escribe la migración
@@ -101,6 +112,25 @@ export function cargarMapa(seccion) {
     t.agregar_en ??= {}
     for (const [cmd, frag] of Object.entries(t.agregar_en)) {
       if (!COMANDOS.includes(cmd) || typeof frag !== 'string' || !frag) throw new Error(`${tabla}.agregar_en: «${cmd}» inválido`)
+    }
+    if (t.ramas !== undefined) {
+      const { columna, valores } = t.ramas
+      if (!/^[a-z_][a-z0-9_]*$/.test(columna ?? '') || !valores || !Object.keys(valores).length) throw new Error(`${tabla}.ramas: falta "columna" o "valores"`)
+      for (const [valor, r] of Object.entries(valores)) {
+        const donde = `${tabla}.ramas.${valor}`
+        if (!/^[a-z_]+$/.test(r.tab ?? '') || r.tab === t.tab) throw new Error(`${donde}: "tab" inválido (tiene que ser otro que el de la tabla)`)
+        r.declarados = COMANDOS.filter(cmd => r[cmd] !== undefined)
+        if (!r.declarados.length) throw new Error(`${donde}: no declara ningún comando`)
+        for (const cmd of r.declarados) {
+          if (!Array.isArray(r[cmd]) || r[cmd].length === 0) throw new Error(`${donde}.${cmd}: lista vacía`)
+          for (const par of r[cmd]) {
+            if (!/^[a-z_]+\.(create|edit|delete|change_status|approve)$/.test(par)) throw new Error(`${donde}.${cmd}: par inválido «${par}»`)
+          }
+        }
+        for (const [col, valor] of Object.entries(r.receta ?? {})) {
+          if (!/^[a-z_][a-z0-9_]*$/.test(col) || typeof valor !== 'string') throw new Error(`${donde}.receta: «${col}» inválida`)
+        }
+      }
     }
   }
   // Recetas de tablas PADRE que no están en el mapa (la fila de prueba de una
@@ -162,6 +192,8 @@ const ATOMOS = [
   { re: /\(current_user_role\(\) = ANY \(ARRAY\['company_owner'::text, 'admin'::text\]\)\)/g, clave: false },
 ]
 const RESTO = [/user_has_permission\(\s*'condominios\.tab\./, /user_has_permission\(\s*CASE/, /ARRAY\['company_owner'::text, 'admin'::text\]/]
+// La clave elegida por columna (ver `ramas`), como la imprime pg_get_expr.
+const ATOMO_CASE = /user_has_permission\(\s*CASE (\w+)\s+((?:WHEN '[^']+'::text THEN 'condominios\.tab\.[a-z_]+'::text\s+)+)ELSE 'condominios\.tab\.([a-z_]+)'::text\s+END\)/g
 
 /** ¿La expresión lleva algún átomo de permiso (sustituible o no)? */
 export const tieneAtomos = s => ATOMOS.some(a => new RegExp(a.re.source).test(s)) || RESTO.some(re => re.test(s))
@@ -175,10 +207,26 @@ export function accionSql(pares) {
 }
 
 /** Sustituye los átomos de una expresión. Devuelve { texto, n }. */
-function sustituir(expr, pares, t, donde) {
+function sustituir(expr, pares, t, donde, cmd, usadas) {
   if (!expr) return { texto: expr, n: 0 }
   let n = 0
-  let texto = expr
+  let texto = expr.replace(ATOMO_CASE, (_m, columna, whens, otro) => {
+    if (!t.ramas) throw new Error(`${donde}: la policy elige el tab por «${columna}»; decláralo en "ramas"`)
+    if (columna !== t.ramas.columna) throw new Error(`${donde}: el CASE es por «${columna}», el mapa dice «${t.ramas.columna}»`)
+    if (otro !== t.tab) throw new Error(`${donde}: el ELSE del CASE es «${otro}», el tab de la tabla es «${t.tab}»`)
+    const ramas = [...whens.matchAll(/WHEN '([^']+)'::text THEN 'condominios\.tab\.([a-z_]+)'::text/g)].map(([, valor, tab]) => {
+      const r = t.ramas.valores[valor]
+      if (!r) throw new Error(`${donde}: el CASE tiene la rama «${valor}» y el mapa no`)
+      if (r.tab !== tab) throw new Error(`${donde}: la rama «${valor}» pide «${tab}», el mapa dice «${r.tab}»`)
+      if (!r[cmd]) throw new Error(`${donde}: la rama «${valor}» no declara ${cmd}`)
+      usadas.add(`${valor}.${cmd}`)
+      return `    WHEN '${valor}'::text THEN ${accionSql(r[cmd])}`
+    })
+    const sinCase = Object.keys(t.ramas.valores).filter(v => !ramas.some(l => l.includes(`WHEN '${v}'::text`)))
+    if (sinCase.length) throw new Error(`${donde}: el mapa declara la rama «${sinCase.join(', ')}» y el CASE no la tiene`)
+    n++
+    return `CASE ${columna}\n${ramas.join('\n')}\n    ELSE ${accionSql(pares)}\nEND`
+  })
   for (const { re, clave } of ATOMOS) {
     texto = texto.replace(re, (_m, tab) => {
       if (clave && tab !== t.tab && !t.otras_claves.includes(tab)) {
@@ -200,6 +248,7 @@ function sustituir(expr, pares, t, donde) {
 /** Para cada policy de escritura con átomos: su versión nueva. */
 export function transformar(mapa, policies) {
   const salida = []
+  const usadas = new Map(Object.keys(mapa.tablas).map(t => [t, new Set()]))
   for (const p of policies) {
     const t = mapa.tablas[p.tabla]
     const donde = `${p.tabla}.${p.nombre}`
@@ -217,10 +266,18 @@ export function transformar(mapa, policies) {
     if (frag) throw new Error(`${donde}: agregar_en declarado, pero la policy ya tiene átomos de permiso`)
     if (!(p.cmd in ACCION)) throw new Error(`${donde}: policy FOR ${p.cmd} con átomos de permiso; resuélvela a mano`)
     const pares = t[p.cmd]
-    const u = sustituir(p.using, pares, t, `${donde} USING`)
-    const c = sustituir(p.check, pares, t, `${donde} WITH CHECK`)
+    const u = sustituir(p.using, pares, t, `${donde} USING`, p.cmd, usadas.get(p.tabla))
+    const c = sustituir(p.check, pares, t, `${donde} WITH CHECK`, p.cmd, usadas.get(p.tabla))
     if (u.n + c.n === 0) throw new Error(`${donde}: no se sustituyó ningún átomo`)
     salida.push({ ...p, usingNuevo: u.texto, checkNuevo: c.texto, pares })
+  }
+  // Una rama que declara un comando cuyo CASE no existe ampliaría el mapa en falso.
+  for (const [tabla, t] of Object.entries(mapa.tablas)) {
+    for (const [valor, r] of Object.entries(t.ramas?.valores ?? {})) {
+      for (const cmd of r.declarados) {
+        if (!usadas.get(tabla).has(`${valor}.${cmd}`)) throw new Error(`${tabla}.ramas.${valor}.${cmd}: ninguna policy de ${cmd} elige el tab por «${t.ramas.columna}»`)
+      }
+    }
   }
   return salida
 }
@@ -256,6 +313,9 @@ export function sql(mapa, nuevas, { revertir = false, todas } = {}) {
         if (!sinPolicy(todas, t, cmd)) cab.push(`--   ${cmd.padEnd(6)} ${m[cmd].join(' · ')}`)
         else if (m.declarados.includes(cmd)) throw new Error(`${t}.${cmd}: el mapa lo declara, pero la tabla no tiene policy de ${cmd}`)
         else cab.push(`--   ${cmd.padEnd(6)} sin policy: nadie (no se crea)`)
+      }
+      for (const [valor, r] of Object.entries(m.ramas?.valores ?? {})) {
+        cab.push(`--   ${m.ramas.columna} = '${valor}': ${COMANDOS.map(cmd => `${cmd} ${r[cmd]?.join(' · ') ?? 'sin sustituir'}`).join(' / ')}`)
       }
       if (m.porque) cab.push(...[].concat(m.porque).map(l => `--   ${l}`))
     }

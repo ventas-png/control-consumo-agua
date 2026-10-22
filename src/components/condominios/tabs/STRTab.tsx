@@ -40,6 +40,7 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -75,7 +76,7 @@ function calcNoches(entrada: string, salida: string) {
   return Math.max(0, Math.round((d2.getTime() - d1.getTime()) / 86400000))
 }
 
-export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoSTR | 'todos'>('todos')
   const [form, setForm] = useState<Partial<ReservaSTR>>(blank())
   const [editId, setEditId] = useState<string | null>(null)
@@ -265,6 +266,8 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar reserva?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('reservas_str', id)
@@ -628,16 +631,16 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                     </span>
                   )}
                 </div>
-                {canEdit && (
+                {(canEdit || canDelete) && (
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {r.estado === 'confirmada' && (
+                    {canEdit && r.estado === 'confirmada' && (
                       <button onClick={() => handleEstado(r.id, 'en_curso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Check-in</button>
                     )}
-                    {r.estado === 'en_curso' && (
+                    {canEdit && r.estado === 'en_curso' && (
                       <button onClick={() => handleEstado(r.id, 'completada')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Check-out</button>
                     )}
-                    <button onClick={() => startEdit(r)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDelete(r.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                    {canEdit && <button onClick={() => startEdit(r)} aria-label={`Editar la reserva de ${r.huesped_nombre}`} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+                    {canDelete && <button onClick={() => handleDelete(r.id)} aria-label={`Eliminar la reserva de ${r.huesped_nombre}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                   </div>
                 )}
               </div>

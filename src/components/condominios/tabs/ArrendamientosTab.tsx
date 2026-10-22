@@ -17,6 +17,7 @@ interface Props {
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -26,7 +27,7 @@ const ESTADO_CONFIG: Record<EstadoContrato, { label: string; bg: string; color: 
   terminado: { label: 'Terminado', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
-export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
+export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoContrato | 'todos'>('activo')
@@ -148,9 +149,12 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar contrato?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('contratos_arrendamiento', id)
+    const { error } = await deleteCondominioRow('contratos_arrendamiento', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -366,7 +370,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
                       style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--at-success)' }}>💬</button>
                   )}
                   {canEdit && <button onClick={(e) => { e.stopPropagation(); startEdit(c) }} aria-label={`Editar ${c.arrendatario_nombre}`} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--at-ink-3)' }}>✏️</button>}
-                  <button onClick={(e) => { e.stopPropagation(); eliminar(c.id) }} aria-label={`Eliminar ${c.arrendatario_nombre}`} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--at-danger)' }}>🗑</button>
+                  {canDelete && <button onClick={(e) => { e.stopPropagation(); eliminar(c.id) }} aria-label={`Eliminar ${c.arrendatario_nombre}`} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--at-danger)' }}>🗑</button>}
                 </div>
               )
             } },

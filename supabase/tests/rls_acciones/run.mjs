@@ -25,6 +25,9 @@
 //                 UPDATE y DELETE se intentan y se DESHACEN. Pasa quien el
 //                 mapa dice, y nadie más: ni quien sólo ve, ni otra empresa.
 //                 El admin de la empresa, siempre.
+//                 Una tabla con `ramas` (la policy elige el tab por una
+//                 columna) fabrica además una fila por rama, que se prueba
+//                 con los pares de su rama.
 //                 Y el RESIDENTE (cliente dueño de una unidad) obtiene en cada
 //                 tabla y comando exactamente lo mismo que antes: sus ramas en
 //                 las policies no dependen de ningún tab y no se tocan.
@@ -59,9 +62,19 @@ const ok = m => console.log(`  ✓ ${m}`)
 const mal = m => { console.log(`  ✗ ${m}`); fallo = true }
 const salir = () => { if (fallo) { console.log('\n❌ rls_acciones: hay invariantes incumplidas'); process.exit(1) } }
 
+// Las filas de la matriz: una por tabla y una por cada rama («tabla:valor»).
+const ramasDe = t => Object.entries(mapa.tablas[t].ramas?.valores ?? {})
+const filas = tablas.flatMap(t => [{ clave: t, tabla: t, variante: '' }, ...ramasDe(t).map(([v]) => ({ clave: `${t}:${v}`, tabla: t, variante: v }))])
+const filaDe = clave => filas.find(f => f.clave === clave)
+/** Los pares que el mapa da a un comando de una fila; undefined si su rama no lo declara. */
+const paresDe = (clave, cmd) => {
+  const f = filaDe(clave)
+  return f.variante ? mapa.tablas[f.tabla].ramas.valores[f.variante][cmd] : mapa.tablas[f.tabla][cmd]
+}
+
 // Pares «tab.acción» y tabs de la sección: el universo de las personas.
-const pares = [...new Set(tablas.flatMap(t => COMANDOS.flatMap(c => mapa.tablas[t][c])))].sort()
-const tabsSeccion = [...new Set(tablas.map(t => mapa.tablas[t].tab).concat(pares.map(p => p.split('.')[0])))].sort()
+const pares = [...new Set(filas.flatMap(f => COMANDOS.flatMap(c => paresDe(f.clave, c) ?? [])))].sort()
+const tabsSeccion = [...new Set(tablas.flatMap(t => [mapa.tablas[t].tab, ...ramasDe(t).map(([, r]) => r.tab)]).concat(pares.map(p => p.split('.')[0])))].sort()
 const alias = p => 'P_' + p.replace('.', '__')
 
 console.log(`── 1/6 · cadena de migraciones anteriores a ${mapa.version}`)
@@ -130,8 +143,9 @@ try {
   const compuertas = todas.filter(p => p.permisiva === 'RESTRICTIVE' && !tieneAtomos(p.using) && !tieneAtomos(p.check))
   writeFileSync(join(trabajo, 'compuertas.sql'), compuertas.map(p => `DROP POLICY "${p.nombre.replace(/"/g, '""')}" ON public.${p.tabla};`).join('\n') + '\n')
   const lit = v => `'${String(v).replace(/'/g, "''")}'`
-  const recetas = [...tablas.map(t => [t, mapa.tablas[t].receta ?? {}]), ...Object.entries(mapa._recetas)]
-    .flatMap(([t, receta]) => Object.entries(receta).map(([col, valor]) => `INSERT INTO ra.recetas VALUES ('public.${t}', ${lit(col)}, ${lit(valor)});`))
+  const recetas = [...tablas.map(t => [t, '', mapa.tablas[t].receta ?? {}]), ...Object.entries(mapa._recetas).map(([t, r]) => [t, '', r]),
+    ...tablas.flatMap(t => ramasDe(t).map(([v, r]) => [t, v, r.receta ?? {}]))]
+    .flatMap(([t, variante, receta]) => Object.entries(receta).map(([col, valor]) => `INSERT INTO ra.recetas (tabla, variante, col, valor) VALUES ('public.${t}', ${lit(variante)}, ${lit(col)}, ${lit(valor)});`))
   writeFileSync(join(trabajo, 'recetas.sql'), recetas.join('\n') + '\n')
   const padron = bd => {
     aplicar(bd, join(AQUI, 'fabricar.sql'))
@@ -153,26 +167,27 @@ try {
       'CREATE TABLE ra.control (tabla text, cmd text, resultado text);',
       'GRANT SELECT ON ra.base, ra.altas TO PUBLIC;',
       `SELECT ra.como('ADM');`]
-    for (const t of soloTablas) {
-      f1.push(`DO $$ DECLARE v_sql text := ra.sql_alta('public.${t}', ra.id('A')); v_fila jsonb; v_col text := ra.columna_editable('public.${t}'); BEGIN
-  IF v_sql IS NULL THEN INSERT INTO ra.control VALUES ('${t}', 'FABRICA', 'sin receta'); RETURN; END IF;
+    const unidades = filas.filter(f => soloTablas.includes(f.tabla))
+    for (const { clave: k, tabla: t, variante: v } of unidades) {
+      f1.push(`DO $$ DECLARE v_sql text := ra.sql_alta('public.${t}', ra.id('A'), 0, '${v}'); v_fila jsonb; v_col text := ra.columna_editable('public.${t}'); BEGIN
+  IF v_sql IS NULL THEN INSERT INTO ra.control VALUES ('${k}', 'FABRICA', 'sin receta'); RETURN; END IF;
   BEGIN EXECUTE v_sql || ' RETURNING to_jsonb(${t}.*)' INTO v_fila;
-  EXCEPTION WHEN OTHERS THEN INSERT INTO ra.control VALUES ('${t}', 'FABRICA', SQLSTATE || ' ' || left(SQLERRM, 160)); RETURN; END;
-  INSERT INTO ra.base VALUES ('${t}', v_fila,
+  EXCEPTION WHEN OTHERS THEN INSERT INTO ra.control VALUES ('${k}', 'FABRICA', SQLSTATE || ' ' || left(SQLERRM, 160)); RETURN; END;
+  INSERT INTO ra.base VALUES ('${k}', v_fila,
     format('UPDATE public.${t} SET %I = %I WHERE %s', v_col, v_col, ra.donde('public.${t}', v_fila)),
     format('DELETE FROM public.${t} WHERE %s', ra.donde('public.${t}', v_fila)));
-  INSERT INTO ra.altas SELECT '${t}', p, ra.sql_alta('public.${t}', ra.id(CASE p WHEN 'OTRA' THEN 'A' ELSE 'A' END))
+  INSERT INTO ra.altas SELECT '${k}', p, ra.sql_alta('public.${t}', ra.id(CASE p WHEN 'OTRA' THEN 'A' ELSE 'A' END), 0, '${v}')
     FROM unnest(ARRAY[${personas.map(p => `'${p}'`).join(', ')}, 'CONTROL']) AS p;
   INSERT INTO ra.control VALUES
-    ('${t}', 'INSERT', ra.intento((SELECT sql FROM ra.altas WHERE tabla = '${t}' AND persona = 'CONTROL'))),
-    ('${t}', 'UPDATE', ra.intento((SELECT sql_update FROM ra.base WHERE tabla = '${t}'))),
-    ('${t}', 'DELETE', ra.intento((SELECT sql_delete FROM ra.base WHERE tabla = '${t}')));
+    ('${k}', 'INSERT', ra.intento((SELECT sql FROM ra.altas WHERE tabla = '${k}' AND persona = 'CONTROL'))),
+    ('${k}', 'UPDATE', ra.intento((SELECT sql_update FROM ra.base WHERE tabla = '${k}'))),
+    ('${k}', 'DELETE', ra.intento((SELECT sql_delete FROM ra.base WHERE tabla = '${k}')));
 END $$;`)
     }
     const f2 = ['\\set ON_ERROR_STOP on']
     for (const p of personas) {
       f2.push(`SELECT ra.como('${p}');`, 'SET ROLE authenticated;')
-      for (const t of soloTablas) {
+      for (const { clave: t } of unidades) {
         f2.push(`INSERT INTO ra.resultados SELECT '${p}', '${t}', 'INSERT', ra.intento(sql) FROM ra.altas WHERE tabla = '${t}' AND persona = '${p}';`,
           `INSERT INTO ra.resultados SELECT '${p}', '${t}', 'UPDATE', ra.intento(sql_update) FROM ra.base WHERE tabla = '${t}';`,
           `INSERT INTO ra.resultados SELECT '${p}', '${t}', 'DELETE', ra.intento(sql_delete) FROM ra.base WHERE tabla = '${t}';`)
@@ -199,20 +214,25 @@ END $$;`)
   const reglaAntes = (t, cmd) => {
     const txt = todas.filter(p => p.tabla === t && p.permisiva === 'PERMISSIVE' && (p.cmd === cmd || p.cmd === 'ALL'))
       .map(p => `${p.using} ${p.check}`).join(' ')
-    if (/user_has_permission\('condominios\.tab\./.test(txt)) return 'visibilidad'
+    if (/user_has_permission\(\s*('condominios\.tab\.|CASE)/.test(txt)) return 'visibilidad'   // CASE: la clave la elige una columna (`ramas`)
     if (/ARRAY\['company_owner'::text, 'admin'::text\]/.test(txt)) return 'rol'
     if (mapa.tablas[t].agregar_en[cmd]) return 'empresa'
     return 'intocado'
   }
 
-  /** Lo que el mapa dice que pasa: persona → tabla → comando → permitido. */
-  const permitido = (persona, t, cmd) => {
+  /**
+   * Lo que el mapa dice que pasa: persona → fila → comando → permitido. Una
+   * rama que no declara el comando no lo sustituye (p. ej. un DELETE «sólo
+   * company_owner»): no se prueba aquí, ni antes ni después.
+   */
+  const permitido = (persona, clave, cmd) => {
+    const t = filaDe(clave).tabla
     if (persona === 'RES') return null   // se compara contra «antes», no contra el mapa
     if (sinPolicy(todas, t, cmd)) return false   // sin policy permisiva: nadie, ni antes ni después
-    if (reglaAntes(t, cmd) === 'intocado') return null
+    if (reglaAntes(t, cmd) === 'intocado' || !paresDe(clave, cmd)) return null
     if (persona === 'ADM') return true
     if (persona === 'VER' || persona === 'OTRA') return false
-    return mapa.tablas[t][cmd].map(alias).includes(persona)
+    return paresDe(clave, cmd).map(alias).includes(persona)
   }
 
   /** Compara; devuelve las diferencias (y las tablas fuera de la matriz). */
@@ -238,23 +258,26 @@ END $$;`)
     const r = matriz('antes')
     // Antes: con la visibilidad (o sólo la empresa) pasa toda persona de A —todas
     // ven los tabs de la sección—; con el rol, sólo el admin.
-    const { difs, fuera } = evaluar(r, (p, t, cmd) => {
+    const { difs, fuera } = evaluar(r, (p, clave, cmd) => {
+      const t = filaDe(clave).tabla
       if (p === 'RES') return null
       if (sinPolicy(todas, t, cmd)) return false
       const regla = reglaAntes(t, cmd)
-      if (regla === 'intocado') return null
+      if (regla === 'intocado' || !paresDe(clave, cmd)) return null
       return p === 'ADM' || (p !== 'OTRA' && regla !== 'rol')
     })
     residenteAntes = new Map(r.resultados.filter(([p]) => p === 'RES').map(([, t, cmd, res]) => [`${t}.${cmd}`, res]))
-    const probadas = tablas.filter(t => !fuera.has(`${t}.FABRICA`))
+    const probadas = filas.filter(f => !fuera.has(`${f.clave}.FABRICA`))
     for (const p of compuertas) console.log(`  · compuerta retirada en la prueba: ${p.tabla}.${p.nombre} (${p.cmd}: ${(p.check || p.using).replace(/\s+/g, ' ')})`)
     const vacios = tablas.flatMap(t => COMANDOS.filter(c => sinPolicy(todas, t, c)).map(c => `${t}.${c}`))
     if (vacios.length) console.log(`  · sin policy permisiva (nadie, ni antes ni después): ${vacios.join(', ')}`)
     const intocados = tablas.flatMap(t => COMANDOS.filter(c => !sinPolicy(todas, t, c) && reglaAntes(t, c) === 'intocado').map(c => `${t}.${c}`))
     if (intocados.length) console.log(`  · sin permiso que sustituir (la migración no los toca): ${intocados.join(', ')}`)
+    const ramaSin = filas.filter(f => f.variante).flatMap(f => COMANDOS.filter(c => !sinPolicy(todas, f.tabla, c) && !paresDe(f.clave, c)).map(c => `${f.clave}.${c}`))
+    if (ramaSin.length) console.log(`  · rama sin sustituir (su policy la resuelve sin átomo; no se prueba aquí): ${ramaSin.join(', ')}`)
     const visibles = tablas.flatMap(t => COMANDOS.filter(c => c !== 'INSERT' && c !== 'UPDATE' && reglaAntes(t, c) === 'visibilidad').map(c => `${t}.${c}`))
     if (difs.length) for (const d of difs.slice(0, 20)) mal(`antes · ${d}`)
-    else ok(`antes · en ${probadas.length} tablas, quien sólo VE crea y edita, y nadie salvo el admin borra${visibles.length ? ` (salvo ${visibles.join(', ')}: también borraba quien sólo veía)` : ''}`)
+    else ok(`antes · en ${probadas.length} filas (${tablas.length} tablas y sus ramas), quien sólo VE crea y edita, y nadie salvo el admin borra${visibles.length ? ` (salvo ${visibles.join(', ')}: también borraba quien sólo veía)` : ''}`)
   }
   salir()
 
@@ -281,9 +304,11 @@ END $$;`)
   const r = matriz('matriz')
   const { difs, fuera } = evaluar(r)
   const conFila = tablas.filter(t => !fuera.has(`${t}.FABRICA`))
+  const ramasConFila = filas.filter(f => f.variante && !fuera.has(`${f.clave}.FABRICA`))
   for (const [k, v] of fuera) console.log(`  · fuera de la matriz ${k}: ${v}`)
   if (difs.length) for (const d of difs) mal(d)
-  else ok(`${conFila.length}/${tablas.length} tablas con fila fabricada · ${r.resultados.length} intentos · ${personas.length} personas: pasa exactamente quien el mapa dice`)
+  else ok(`${conFila.length}/${tablas.length} tablas con fila fabricada${ramasConFila.length ? ` (y ${ramasConFila.length} rama${ramasConFila.length > 1 ? 's' : ''}: ${ramasConFila.map(f => f.clave).join(', ')})` : ''} · ${r.resultados.length} intentos · ${personas.length} personas: pasa exactamente quien el mapa dice`)
+  if (filas.some(f => f.variante && fuera.has(`${f.clave}.FABRICA`))) mal('una rama quedó fuera de la matriz: su receta no fabrica la fila')
   const residente = r.resultados.filter(([p, t, cmd]) => p === 'RES' && !fuera.has(`${t}.FABRICA`) && !fuera.has(`${t}.${cmd}`))
   const cambios = residente.filter(([, t, cmd, res]) => residenteAntes.get(`${t}.${cmd}`) !== res)
   if (cambios.length) for (const [, t, cmd, res] of cambios) mal(`residente · ${t} ${cmd}: antes «${residenteAntes.get(`${t}.${cmd}`)}», ahora «${res}»`)
@@ -291,18 +316,27 @@ END $$;`)
   salir()
 
   console.log('── 6/6 · mutantes: con un comando devuelto a la regla vieja, la matriz debe fallar')
-  const mutables = conFila
-  for (const [i, t] of mutables.entries()) {
-    const cmd = COMANDOS[i % COMANDOS.length]
-    const pol = nuevas.find(p => p.tabla === t && p.cmd === cmd && !fuera.has(`${t}.${cmd}`)) ?? nuevas.find(p => p.tabla === t && !fuera.has(`${t}.${p.cmd}`))
-    if (!pol) continue
-    const vieja = pol.cmd === 'DELETE' ? `(SELECT public.user_has_permission('condominios.tab.${mapa.tablas[t].tab}'))` : `(SELECT public.user_has_permission('condominios.tab.${mapa.tablas[t].tab}'))`
+  // Uno por tabla (un comando, rotando) y uno por rama (su primer comando).
+  const mutables = [
+    ...conFila.map((t, i) => {
+      const cmd = COMANDOS[i % COMANDOS.length]
+      const pol = nuevas.find(p => p.tabla === t && p.cmd === cmd && !fuera.has(`${t}.${cmd}`)) ?? nuevas.find(p => p.tabla === t && !fuera.has(`${t}.${p.cmd}`))
+      return pol && { t, nombre: t, pol, pares: pol.pares, tab: mapa.tablas[t].tab }
+    }),
+    ...ramasConFila.map(f => {
+      const r = mapa.tablas[f.tabla].ramas.valores[f.variante]
+      const pol = nuevas.find(p => p.tabla === f.tabla && r.declarados.includes(p.cmd) && !fuera.has(`${f.clave}.${p.cmd}`))
+      return pol && { t: f.tabla, nombre: f.clave, pol, pares: r[pol.cmd], tab: r.tab }
+    }),
+  ].filter(Boolean)
+  for (const { t, nombre, pol, pares: paresMutados, tab } of mutables) {
+    const vieja = `(SELECT public.user_has_permission('condominios.tab.${tab}'))`
     const texto = enRepo.slice(0, enRepo.indexOf('-- ── Guarda de postcondición'))
     const bloque = `CREATE POLICY ${/^[a-z_][a-z0-9_]*$/.test(pol.nombre) ? pol.nombre : `"${pol.nombre}"`} ON public.${t}`
     const ini = texto.indexOf(bloque)
     const fin = texto.indexOf(';', ini)
-    const mutada = texto.slice(0, ini) + texto.slice(ini, fin).split(accionSql(pol.pares)).join(vieja) + texto.slice(fin)
-    if (mutada === texto) { mal(`mutante ${t} ${pol.cmd}: no encontró el texto a mutar`); continue }
+    const mutada = texto.slice(0, ini) + texto.slice(ini, fin).split(accionSql(paresMutados)).join(vieja) + texto.slice(fin)
+    if (mutada === texto) { mal(`mutante ${nombre} ${pol.cmd}: no encontró el texto a mutar`); continue }
     writeFileSync(join(trabajo, 'mutante.sql'), mutada)
     copia('base', 'mutante')
     aplicar('mutante', join(trabajo, 'mutante.sql'))
@@ -310,8 +344,8 @@ END $$;`)
     padron('mutante')
     const rm = matriz('mutante', [t])
     const { difs: dm } = evaluar(rm)
-    if (dm.length) ok(`sin la acción en ${t} ${pol.cmd}, la matriz falla (${dm[0]})`)
-    else mal(`mutante ${t} ${pol.cmd} (visibilidad en vez de acción) pasó la matriz: esa regla no está probada`)
+    if (dm.length) ok(`sin la acción en ${nombre} ${pol.cmd}, la matriz falla (${dm[0]})`)
+    else mal(`mutante ${nombre} ${pol.cmd} (visibilidad en vez de acción) pasó la matriz: esa regla no está probada`)
   }
   salir()
   console.log(`\n✅ rls_acciones/${seccion}: la migración es la generada, el padrón reproduce el hueco,`)
