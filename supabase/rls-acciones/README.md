@@ -49,6 +49,11 @@ La regla para armarlo:
 - Si la tabla no tiene policy permisiva para un comando (p. ej. `votos` no
   tiene UPDATE), nadie lo hace, antes y después: no se crea, y el mapa no
   puede declararlo.
+- Una policy de escritura que no pide ningún permiso (p. ej. un UPDATE que
+  sólo mira la empresa) se declara en `agregar_en` con el fragmento literal
+  junto al que va la acción; el generador escribe «(fragmento AND acción)».
+- `receta` fija el valor de columnas para la fila que fabrica el arnés,
+  cuando un CHECK de varias columnas rechaza el valor por tipo.
 - Toda clave `condominios.tab.<tab>[.<acción>]` del mapa debe existir en
   `permissions`. Un tab cuyas claves el catálogo no siembra a propósito (hoy
   sólo lo ven company_owner/admin) se declara en `_sin_clave`; cualquier otro

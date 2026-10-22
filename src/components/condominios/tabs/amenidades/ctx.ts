@@ -67,6 +67,8 @@ export interface AmenidadesCtx {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar amenidades y bloqueos tiene su propio permiso (condominios.tab.amenidades.delete). */
+  canDelete: boolean
   onRefresh: () => void
 
   // ── Estado compartido ──
