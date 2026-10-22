@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-// Guards ESTÁTICOS de 20261104000050: el residente ve las asambleas clásicas
+// Guards ESTÁTICOS de 20261104000060: el residente ve las asambleas clásicas
 // de su condominio y el propietario vota desde el portal.
 //
 // ALCANCE Y LÍMITE. Esto lee el SQL y el código del repo; no ejecuta nada. La
@@ -16,7 +16,7 @@ import { resolve } from 'node:path'
 // sí misma; si el portal vuelve a leer otra tabla, a mandar otros valores de
 // voto o a votar sin firmar, el arnés sigue verde y el voto se rechaza.
 
-const MIGRACION = resolve('supabase/migrations/20261104000050_asambleas_voto_residente.sql')
+const MIGRACION = resolve('supabase/migrations/20261104000060_asambleas_voto_residente.sql')
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
 const sql = readFileSync(MIGRACION, 'utf8').replace(/--[^\n]*/g, '')
 const portal = readFileSync(resolve('src/components/condominios/tabs/PortalAsambleasTab.tsx'), 'utf8')
@@ -40,7 +40,7 @@ function consulta(nombre: string): string {
   return consultas.slice(desde, hasta < 0 ? undefined : hasta)
 }
 
-describe('20261104000050 · la pantalla y la base usan los mismos valores', () => {
+describe('20261104000060 · la pantalla y la base usan los mismos valores', () => {
   it('el CHECK de votos_asamblea admite exactamente TipoVoto', () => {
     const m = sql.match(/CHECK \(voto IN \(([^)]*)\)\)/)
     expect(m).not.toBeNull()
@@ -62,7 +62,7 @@ describe('20261104000050 · la pantalla y la base usan los mismos valores', () =
   })
 })
 
-describe('20261104000050 · el portal lee y escribe lo que la RLS abre', () => {
+describe('20261104000060 · el portal lee y escribe lo que la RLS abre', () => {
   it('las asambleas del portal son las clásicas, de las que cuelgan puntos_asamblea', () => {
     expect(portal).toContain('fetchAsambleasProyecto')
     expect(portal).not.toMatch(/asambleas_digital|AsambleaDigital|fetchAsambleasDigital/)
@@ -90,7 +90,7 @@ describe('20261104000050 · el portal lee y escribe lo que la RLS abre', () => {
   })
 })
 
-describe('20261104000050 · el arnés corre en CI', () => {
+describe('20261104000060 · el arnés corre en CI', () => {
   it('coverage.yml ejecuta supabase/tests/voto_residente_asambleas/run.sh', () => {
     expect(coverage).toContain('run: supabase/tests/voto_residente_asambleas/run.sh')
   })

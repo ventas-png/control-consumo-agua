@@ -1,5 +1,5 @@
 -- ============================================================================
--- INVARIANTES de 20261104000050 sobre el padrón (fixture.sql).
+-- INVARIANTES de 20261104000060 sobre el padrón (fixture.sql).
 --
 -- El residente ve las asambleas y puntos de los condominios donde tiene unidad
 -- y sólo el voto de sus unidades. El PROPIETARIO vota, firmado, una vez por

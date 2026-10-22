@@ -3,7 +3,7 @@
 // Antes listaba asambleas_digital, buscaba sus puntos con ids que nunca
 // coincidían, mandaba una columna asamblea_id que votos_asamblea no tiene y los
 // valores 'favor'/'contra' en vez de los del panel. Vota el propietario, una vez,
-// y de las finalizadas sólo ve totales (20261104000050_asambleas_voto_residente).
+// y de las finalizadas sólo ve totales (20261104000060_asambleas_voto_residente).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, act, waitFor } from '@testing-library/react'
 import type { Asamblea, PuntoAsamblea } from '../../../../types'

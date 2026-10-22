@@ -1,5 +1,5 @@
 -- ============================================================================
--- PADRÓN DE LA SUITE «voto_residente_asambleas» (20261104000050)
+-- PADRÓN DE LA SUITE «voto_residente_asambleas» (20261104000060)
 --
 -- Se carga sobre la cadena REAL de migraciones: lo que se prueba son las
 -- policies que de verdad tiene el repositorio, con mis_unidades_ids(),

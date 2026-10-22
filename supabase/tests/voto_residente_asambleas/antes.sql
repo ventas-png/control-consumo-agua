@@ -1,11 +1,11 @@
 -- ============================================================================
--- CONTROL PREVIO: el estado de ANTES de 20261104000050, sobre el mismo padrón.
+-- CONTROL PREVIO: el estado de ANTES de 20261104000060, sobre el mismo padrón.
 --
 -- Reproduce lo que rompía el portal en la base: el residente no ve ninguna
 -- asamblea, ni puntos, ni el voto de su propia unidad, y su voto se rechaza.
 -- Y votos_asamblea acepta cualquier texto como voto ('favor', 'contra' del
 -- portal viejo se mezclaban con 'a_favor', 'en_contra' del panel).
--- El staff, en cambio, ya vota (el candado de plan de 20261103000600 está):
+-- El staff, en cambio, ya vota (el candado de plan de 20261104000050 está):
 -- el residente es lo único que falta.
 --
 -- Si esto no se reproduce, el padrón no prueba lo que dice: la suite de después

@@ -988,18 +988,6 @@ jobs:
           PGPORT_TEST: 55571
         run: supabase/tests/acciones_por_permiso/run.sh
 
-      # 20261103000600: el candado de plan (asambleas_digitales) de
-      # puntos_asamblea y votos_asamblea buscaba la empresa en asambleas_digital
-      # y rechazaba TODA alta, también la del admin de una empresa con la
-      # feature. Ahora la resuelve por asambleas. Control previo que reproduce
-      # el fallo, cadena completa, huella del auditor, guarda que aborta con un
-      # candado viejo de más y diez mutantes.
-      - name: Candado de plan de asambleas — puntos y votos por la empresa de la asamblea
-        env:
-          PGBIN: ${{ steps.pg.outputs.bin }}
-          PGPORT_TEST: 55574
-        run: supabase/tests/candado_plan_asambleas/run.sh
-
       # «Escribir exige la ACCIÓN del tab» (scripts/rls-acciones/generar.mjs),
       # una migración por sección desde supabase/rls-acciones/<sección>.json. El
       # arnés comprueba que la migración es la generada, reproduce el hueco de
@@ -1011,7 +999,19 @@ jobs:
       - name: Acciones por permiso — sección seguridad
         run: node supabase/tests/rls_acciones/run.mjs seguridad
 
-      # 20261104000050: el residente ve las asambleas clásicas de su condominio
+      # 20261104000050: el candado de plan (asambleas_digitales) de
+      # puntos_asamblea y votos_asamblea buscaba la empresa en asambleas_digital
+      # y rechazaba TODA alta, también la del admin de una empresa con la
+      # feature. Ahora la resuelve por asambleas. Control previo que reproduce
+      # el fallo, cadena completa, huella del auditor, guarda que aborta con un
+      # candado viejo de más y diez mutantes.
+      - name: Candado de plan de asambleas — puntos y votos por la empresa de la asamblea
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55574
+        run: supabase/tests/candado_plan_asambleas/run.sh
+
+      # 20261104000060: el residente ve las asambleas clásicas de su condominio
       # y el PROPIETARIO vota desde el portal (firmado, una vez por unidad, en
       # puntos de votación de una asamblea en curso, sin cambiarlo ni
       # borrarlo); totales de las finalizadas por una función que no expone el

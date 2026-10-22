@@ -44,7 +44,7 @@
 --       asambleas finalizadas de sus condominios.
 --   6 · Guarda de postcondición.
 --   El candado de plan (votos_asamblea_feature_gate, RESTRICTIVO,
---   20261103000600) no se toca y también aplica al residente: su subconsulta
+--   20261104000050) no se toca y también aplica al residente: su subconsulta
 --   lee puntos_asamblea y asambleas con la RLS de quien inserta, por eso la
 --   rama de SELECT del paso 3 es también la que le deja pasar el candado.
 --
@@ -256,7 +256,7 @@ BEGIN
 
   -- Una sola permisiva de INSERT en votos, con la rama del propietario firmada.
   -- El candado de plan no cuenta: que siga RESTRICTIVO lo exige la guarda de
-  -- 20261103000600, y su arnés lo vuelve permisivo a propósito en un mutante
+  -- 20261104000050, y su arnés lo vuelve permisivo a propósito en un mutante
   -- que tiene que caer en sus invariantes, no aquí.
   SELECT count(*), max(with_check) INTO v_n, v_texto
   FROM pg_policies

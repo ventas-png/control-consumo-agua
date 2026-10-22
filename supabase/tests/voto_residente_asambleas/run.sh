@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20261104000050: el residente ve las asambleas de
+# Verificación EJECUTABLE de 20261104000060: el residente ve las asambleas de
 # su condominio y el PROPIETARIO vota desde el portal, una vez por unidad.
 #
 # POR QUÉ EXISTE
@@ -39,8 +39,8 @@ trap 'rc=$?; echo "❌ run.sh terminó con rc=$rc en la línea $LINENO: $BASH_CO
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-NUESTRA="$MIGS/20261104000050_asambleas_voto_residente.sql"
-VERSION=20261104000050
+NUESTRA="$MIGS/20261104000060_asambleas_voto_residente.sql"
+VERSION=20261104000060
 HUELLA="$RAIZ/scripts/schema-drift/fingerprint.sql"
 [ -f "$NUESTRA" ] || { echo "❌ no existe $NUESTRA"; exit 1; }
 

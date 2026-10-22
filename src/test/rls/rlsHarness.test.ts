@@ -501,7 +501,7 @@ const PORTAL_PADRON_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   { name: 'portal_baja_vehiculo', args: () => ({ p_vehiculo_id: SOLICITUD_ID_INEXISTENTE }) },
 ]
 
-// ── RPC de resultados de asambleas del portal (20261104000050) ───────────────
+// ── RPC de resultados de asambleas del portal (20261104000060) ───────────────
 // De LECTURA: devuelve totales por punto de las asambleas finalizadas de los
 // condominios donde el cliente de la sesión tiene unidad. No hay gate que
 // lance error: A (staff, sin cliente) obtiene CERO filas, cualquiera sea el id.
@@ -1273,7 +1273,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     }
   })
 
-  describe('guard RPCs de resultados de asambleas del portal (20261104000050) — garantía de ROL', () => {
+  describe('guard RPCs de resultados de asambleas del portal (20261104000060) — garantía de ROL', () => {
     for (const { name, args } of PORTAL_ASAMBLEAS_RPCS) {
       it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))

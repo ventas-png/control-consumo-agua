@@ -26,7 +26,7 @@ import type { Asamblea, EstadoAsamblea, PuntoAsamblea, TipoAsamblea, TipoPunto, 
 // el staff caen en el mismo conteo. Vota el PROPIETARIO, una vez por unidad y
 // punto, sin poder cambiarlo; de las finalizadas el residente ve los totales,
 // nunca el voto de otra unidad. La base exige lo mismo
-// (20261104000050_asambleas_voto_residente).
+// (20261104000060_asambleas_voto_residente).
 
 interface Props {
   unidadId: string
