@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { validarFacturaEnergia, type FacturaValidable } from '../businessEnergia'
-import type { FacturaEnergia } from '../../types'
+import { validarFacturaEnergia, totalFacturaEnergia, calcularFacturaEnergia, type FacturaValidable } from '../businessEnergia'
+import { redondear2 } from '../business'
+import type { FacturaEnergia, TarifaEnergia } from '../../types'
 
 // Las facturas existentes solo se leen por id/fuente_energia_id/periodo_fin/numero_factura.
 const fact = (o: { id?: string; fuente_energia_id?: string; periodo_fin?: string; numero_factura?: string }): FacturaEnergia =>
@@ -80,5 +81,49 @@ describe('validarFacturaEnergia · numero_factura duplicado (serv:S12)', () => {
     const previas = [fact({ id: 'a', fuente_energia_id: 'F2', numero_factura: 'INV-100' })]
     expect(validarFacturaEnergia(base, previas).valido).toBe(true)
     expect(validarFacturaEnergia({ ...base, numero_factura: '   ' }, previas).valido).toBe(true)
+  })
+})
+
+describe('totalFacturaEnergia', () => {
+  it('suma el desglose: energía + potencia + cargo fijo + alumbrado + IVA + otros', () => {
+    expect(totalFacturaEnergia({
+      monto_energia: 100, monto_potencia: 20.5, monto_cargo_fijo: 12.5,
+      monto_alumbrado: 3, monto_iva: 16.32, monto_otros: 1.18,
+    })).toBe(153.5)
+  })
+
+  it('una factura capturada a mano ya no queda en 0', () => {
+    expect(totalFacturaEnergia({ monto_energia: 250, monto_iva: 30 })).toBe(280)
+  })
+
+  it('el crédito por exportación resta con cualquier signo', () => {
+    const desglose = { monto_energia: 100, monto_iva: 12 }
+    expect(totalFacturaEnergia({ ...desglose, monto_credito_exportacion: -20 })).toBe(92)
+    expect(totalFacturaEnergia({ ...desglose, monto_credito_exportacion: 20 })).toBe(92)
+  })
+
+  it('"otros" suma con su signo (un descuento va en negativo)', () => {
+    expect(totalFacturaEnergia({ monto_energia: 100, monto_otros: -15 })).toBe(85)
+  })
+
+  it('campos vacíos o no numéricos cuentan 0', () => {
+    expect(totalFacturaEnergia({})).toBe(0)
+    expect(totalFacturaEnergia({ monto_energia: NaN, monto_iva: undefined, monto_otros: 5 })).toBe(5)
+  })
+
+  it('trabaja a centavos, como numeric(12,2)', () => {
+    // Cada monto se redondea como lo guarda la base y el total no arrastra
+    // error de coma flotante (0.1 + 0.2).
+    expect(totalFacturaEnergia({ monto_energia: 0.1, monto_iva: 0.2 })).toBe(0.3)
+    expect(totalFacturaEnergia({ monto_energia: 123.4567, monto_iva: 1.005 })).toBe(124.47)
+  })
+
+  it('coincide con el total del cálculo desde tarifa una vez redondeado', () => {
+    const tarifa = {
+      precio_kwh_energia: 1.234567, precio_kw_potencia: 45.12, cargo_fijo: 12.5,
+      alumbrado_publico: 13, alumbrado_tipo: 'porcentual', iva_porcentaje: 12, precio_kwh_exportado: 0.8,
+    } as unknown as TarifaEnergia
+    const calculo = calcularFacturaEnergia({ tarifa, kwhConsumidos: 100, kwhExportados: 10, kwDemandaMax: 3 })
+    expect(totalFacturaEnergia(calculo)).toBe(redondear2(calculo.monto_total))
   })
 })
