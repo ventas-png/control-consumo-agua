@@ -5,7 +5,7 @@ import { SecureFileLink } from '../../../shared/SecureFileLink'
 import { ModalPortal } from '../../../shared/ModalPortal'
 
 export function VisitanteDetalle({ ctx }: { ctx: VisitantesCtx }) {
-  const { visitantes, visitanteDetalle, setVisitanteDetalle, hoy, iniciarSalida } = ctx
+  const { visitantes, visitanteDetalle, setVisitanteDetalle, hoy, iniciarSalida, canCreate } = ctx
   if (!visitanteDetalle) return null
   return (
         <ModalPortal>
@@ -92,7 +92,7 @@ export function VisitanteDetalle({ ctx }: { ctx: VisitantesCtx }) {
                   const esSTR = visitanteDetalle.motivo?.startsWith('Renta corta')
                   const fechaSalidaSTR = (esSTR && !visitanteDetalle.reserva_str_id) ? (visitanteDetalle.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
                   const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
-                  return salidaHabilitada ? (
+                  return canCreate && salidaHabilitada ? (
                     <button onClick={() => { setVisitanteDetalle(null); iniciarSalida(visitanteDetalle) }}
                       style={{ padding: '9px 18px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
                       Registrar salida
