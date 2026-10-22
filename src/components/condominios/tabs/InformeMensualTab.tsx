@@ -74,6 +74,8 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
   }
 
   async function publicar(c: InformeMensual) {
+    // Se publica con la misma acción con la que se genera; la base exige lo mismo.
+    if (!canCreate) return
     const result = await openPromptDialog({
       title: `Publicar informe ${c.periodo}`,
       fields: [{
@@ -184,7 +186,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
                 style={{ width: '100%', marginTop: 14, padding: '8px 0', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                 📄 Descargar PDF
               </button>
-              {selected.estado === 'borrador' && (
+              {canCreate && selected.estado === 'borrador' && (
                 <button onClick={() => publicar(selected)}
                   style={{ width: '100%', marginTop: 8, padding: '8px 0', background: 'var(--at-accent-2)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                   📢 Publicar informe

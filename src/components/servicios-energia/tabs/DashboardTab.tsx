@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { FacturaEnergia, FuenteEnergia } from '../../../types'
 
 interface DashboardTabProps {
@@ -50,68 +51,38 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
     <div>
       <h2 style={{ marginBottom: '1.5rem' }}>📊 Dashboard de Consumo Energético</h2>
 
-      {/* Tarjetas de resumen global */}
+      {/* Tarjetas de resumen global: dos por fila en el teléfono (antes una sola,
+          de 250px mínimo, con mucho relleno). */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '1rem',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))',
+          gap: '0.75rem',
           marginBottom: '2rem',
         }}
       >
-        <div
-          style={{
-            backgroundColor: 'var(--at-primary-tint)',
-            padding: '1.5rem',
-            borderRadius: '8px',
-            borderLeft: '4px solid var(--at-primary)',
-          }}
-        >
+        <div style={{ ...tarjetaKpi, backgroundColor: 'var(--at-primary-tint)', borderLeft: '4px solid var(--at-primary)' }}>
           <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>kWh Consumidos</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--at-primary)' }}>
+          <div style={{ ...valorKpi, color: 'var(--at-primary)' }}>
             {totalesGlobales.kwh_consumidos.toFixed(2)}
           </div>
         </div>
-
-        <div
-          style={{
-            backgroundColor: 'var(--at-warning-tint)',
-            padding: '1.5rem',
-            borderRadius: '8px',
-            borderLeft: '4px solid var(--at-warning)',
-          }}
-        >
+        <div style={{ ...tarjetaKpi, backgroundColor: 'var(--at-warning-tint)', borderLeft: '4px solid var(--at-warning)' }}>
           <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>kWh Generados</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--at-warning)' }}>
+          <div style={{ ...valorKpi, color: 'var(--at-warning)' }}>
             {totalesGlobales.kwh_generados.toFixed(2)}
           </div>
         </div>
-
-        <div
-          style={{
-            backgroundColor: '#F4EBE3',
-            padding: '1.5rem',
-            borderRadius: '8px',
-            borderLeft: '4px solid var(--at-accent)',
-          }}
-        >
+        <div style={{ ...tarjetaKpi, backgroundColor: 'var(--at-accent-tint)', borderLeft: '4px solid var(--at-accent)' }}>
           <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>kWh Netos</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--at-accent)' }}>
+          <div style={{ ...valorKpi, color: 'var(--at-accent)' }}>
             {(totalesGlobales.kwh_consumidos - totalesGlobales.kwh_exportados).toFixed(2)}
           </div>
         </div>
-
-        <div
-          style={{
-            backgroundColor: 'var(--at-success-tint)',
-            padding: '1.5rem',
-            borderRadius: '8px',
-            borderLeft: '4px solid var(--at-success)',
-          }}
-        >
+        <div style={{ ...tarjetaKpi, backgroundColor: 'var(--at-success-tint)', borderLeft: '4px solid var(--at-success)' }}>
           <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>Costo Total</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--at-success)' }}>
-            {moneda} {totalesGlobales.monto_total.toFixed(2)}
+          <div style={{ ...valorKpi, color: 'var(--at-success)' }}>
+            {moneda}{'\u00A0'}{totalesGlobales.monto_total.toFixed(2)}
           </div>
         </div>
       </div>
@@ -122,78 +93,77 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 120px), 1fr))',
+            gap: '1rem 0.75rem',
           }}
         >
           <div>
             <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Energía</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{moneda} {totalesGlobales.monto_energia.toFixed(2)}</div>
+            <div style={valorDesglose}>{moneda}{'\u00A0'}{totalesGlobales.monto_energia.toFixed(2)}</div>
           </div>
           <div>
             <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Potencia</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{moneda} {totalesGlobales.monto_potencia.toFixed(2)}</div>
+            <div style={valorDesglose}>{moneda}{'\u00A0'}{totalesGlobales.monto_potencia.toFixed(2)}</div>
           </div>
           <div>
             <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Cargo Fijo</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{moneda} {totalesGlobales.monto_cargo_fijo.toFixed(2)}</div>
+            <div style={valorDesglose}>{moneda}{'\u00A0'}{totalesGlobales.monto_cargo_fijo.toFixed(2)}</div>
           </div>
           <div>
             <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Alumbrado</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{moneda} {totalesGlobales.monto_alumbrado.toFixed(2)}</div>
+            <div style={valorDesglose}>{moneda}{'\u00A0'}{totalesGlobales.monto_alumbrado.toFixed(2)}</div>
           </div>
           <div>
             <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>IVA</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{moneda} {totalesGlobales.monto_iva.toFixed(2)}</div>
+            <div style={valorDesglose}>{moneda}{'\u00A0'}{totalesGlobales.monto_iva.toFixed(2)}</div>
           </div>
           <div>
             <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Crédito Exportación</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--at-danger)' }}>
-              {moneda} {totalesGlobales.monto_credito_exportacion.toFixed(2)}
-            </div>
+            <div style={{ ...valorDesglose, color: 'var(--at-danger)' }}>{moneda}{'\u00A0'}{totalesGlobales.monto_credito_exportacion.toFixed(2)}</div>
           </div>
         </div>
       </div>
 
-      {/* Tabla por fuente */}
+      {/* Tabla por fuente: en el teléfono cada fuente (y el total) es una tarjeta. */}
       <div>
         <h3>Consumo por Fuente</h3>
         {totalsPorFuente.length === 0 ? (
           <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic' }}>No hay datos de facturas</p>
         ) : (
           <div className="table-scroll-wrapper">
-          <table style={{ width: '100%', minWidth: 680, borderCollapse: 'collapse' }}>
+          <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
-                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Fuente</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right' }}>kWh Consumidos</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right' }}>kWh Generados</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right' }}>kWh Exportados</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right' }}>kWh Netos</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right' }}>Costo Total {moneda}</th>
-                <th style={{ padding: '0.75rem', textAlign: 'center' }}>Facturas</th>
+                <th scope="col" style={{ padding: '0.75rem', textAlign: 'left' }}>Fuente</th>
+                <th scope="col" style={{ padding: '0.75rem', textAlign: 'right' }}>kWh Consumidos</th>
+                <th scope="col" style={{ padding: '0.75rem', textAlign: 'right' }}>kWh Generados</th>
+                <th scope="col" style={{ padding: '0.75rem', textAlign: 'right' }}>kWh Exportados</th>
+                <th scope="col" style={{ padding: '0.75rem', textAlign: 'right' }}>kWh Netos</th>
+                <th scope="col" style={{ padding: '0.75rem', textAlign: 'right' }}>Costo Total {moneda}</th>
+                <th scope="col" style={{ padding: '0.75rem', textAlign: 'center' }}>Facturas</th>
               </tr>
             </thead>
             <tbody>
               {totalsPorFuente.map(t => (
                 <tr key={t.fuente_id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                  <td style={{ padding: '0.75rem' }}>{t.fuente_nombre}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{t.kwh_consumidos.toFixed(2)}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{t.kwh_generados.toFixed(2)}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{t.kwh_exportados.toFixed(2)}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{t.kwh_netos.toFixed(2)}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>{moneda} {t.monto_total.toFixed(2)}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'center' }}>{t.cantidad_facturas}</td>
+                  <td data-label="Fuente" style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>{t.fuente_nombre}</td>
+                  <td data-label="kWh Consumidos" style={{ padding: '0.75rem', textAlign: 'right' }}>{t.kwh_consumidos.toFixed(2)}</td>
+                  <td data-label="kWh Generados" style={{ padding: '0.75rem', textAlign: 'right' }}>{t.kwh_generados.toFixed(2)}</td>
+                  <td data-label="kWh Exportados" style={{ padding: '0.75rem', textAlign: 'right' }}>{t.kwh_exportados.toFixed(2)}</td>
+                  <td data-label="kWh Netos" style={{ padding: '0.75rem', textAlign: 'right' }}>{t.kwh_netos.toFixed(2)}</td>
+                  <td data-label="Costo Total" style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>{moneda} {t.monto_total.toFixed(2)}</td>
+                  <td data-label="Facturas" style={{ padding: '0.75rem', textAlign: 'center' }}>{t.cantidad_facturas}</td>
                 </tr>
               ))}
               <tr style={{ backgroundColor: 'var(--at-chip)', fontWeight: 'bold', borderTop: '2px solid var(--at-line)' }}>
-                <td style={{ padding: '0.75rem' }}>TOTAL</td>
-                <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalesGlobales.kwh_consumidos.toFixed(2)}</td>
-                <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalesGlobales.kwh_generados.toFixed(2)}</td>
-                <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalesGlobales.kwh_exportados.toFixed(2)}</td>
-                <td style={{ padding: '0.75rem', textAlign: 'right' }}>{(totalesGlobales.kwh_consumidos - totalesGlobales.kwh_exportados).toFixed(2)}</td>
-                <td style={{ padding: '0.75rem', textAlign: 'right' }}>{moneda} {totalesGlobales.monto_total.toFixed(2)}</td>
-                <td style={{ padding: '0.75rem', textAlign: 'center' }}>{totalesGlobales.cantidad_facturas}</td>
+                {/* Sin data-label: en la tarjeta "TOTAL" queda como título centrado. */}
+                <td style={{ padding: '0.75rem', textAlign: 'left' }}>TOTAL</td>
+                <td data-label="kWh Consumidos" style={{ padding: '0.75rem', textAlign: 'right' }}>{totalesGlobales.kwh_consumidos.toFixed(2)}</td>
+                <td data-label="kWh Generados" style={{ padding: '0.75rem', textAlign: 'right' }}>{totalesGlobales.kwh_generados.toFixed(2)}</td>
+                <td data-label="kWh Exportados" style={{ padding: '0.75rem', textAlign: 'right' }}>{totalesGlobales.kwh_exportados.toFixed(2)}</td>
+                <td data-label="kWh Netos" style={{ padding: '0.75rem', textAlign: 'right' }}>{(totalesGlobales.kwh_consumidos - totalesGlobales.kwh_exportados).toFixed(2)}</td>
+                <td data-label="Costo Total" style={{ padding: '0.75rem', textAlign: 'right' }}>{moneda} {totalesGlobales.monto_total.toFixed(2)}</td>
+                <td data-label="Facturas" style={{ padding: '0.75rem', textAlign: 'center' }}>{totalesGlobales.cantidad_facturas}</td>
               </tr>
             </tbody>
           </table>
@@ -203,3 +173,9 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
     </div>
   )
 }
+
+const tarjetaKpi: CSSProperties = { padding: '0.875rem', borderRadius: '8px', minWidth: 0 }
+// Los montos no se salen de la tarjeta angosta: bajan de tamaño en el teléfono
+// y, si aún no caben, parten (la moneda va pegada a la cifra con un espacio duro).
+const valorKpi: CSSProperties = { fontSize: 'clamp(1.05rem, 4.5vw, 1.8rem)', fontWeight: 'bold', overflowWrap: 'anywhere' }
+const valorDesglose: CSSProperties = { fontSize: 'clamp(1.05rem, 4.5vw, 1.3rem)', fontWeight: 'bold', overflowWrap: 'anywhere' }
