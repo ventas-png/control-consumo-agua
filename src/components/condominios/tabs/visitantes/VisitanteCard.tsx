@@ -4,7 +4,7 @@ import type { Visitante } from '../../../../types'
 import { SecureImage } from '../../../shared/SecureImage'
 
 export function VisitanteCard({ ctx, v, isSTRMember = false }: { ctx: VisitantesCtx; v: Visitante; isSTRMember?: boolean }) {
-  const { visitantes, setVisitanteDetalle, hoy, iniciarSalida } = ctx
+  const { visitantes, setVisitanteDetalle, hoy, iniciarSalida, canCreate } = ctx
     const enPremisa = !v.hora_salida
     const esSTR = v.motivo?.startsWith('Renta corta')
     // Date restriction only applies to legacy single-person STR entries (no reserva_str_id).
@@ -87,7 +87,7 @@ export function VisitanteCard({ ctx, v, isSTRMember = false }: { ctx: Visitantes
               style={{ padding: '6px 12px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
               Ver detalle
             </button>
-            {enPremisa && (
+            {canCreate && enPremisa && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
                 <button onClick={() => salidaHabilitada && iniciarSalida(v)}
                   title={!salidaHabilitada ? `Salida programada: ${fechaSalidaSTR}` : undefined}

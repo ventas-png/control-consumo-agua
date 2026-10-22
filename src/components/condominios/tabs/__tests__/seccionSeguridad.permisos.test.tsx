@@ -7,6 +7,8 @@
 //   · Control de accesos QR registra visitantes sólo con canCreate (antes lo
 //     ignoraba: cualquiera que viera el tab registraba entradas y salidas).
 //   · Publicar el informe mensual exige canCreate, como generarlo.
+//   · Visitantes registra la salida sólo con canCreate (antes la ofrecía a
+//     quien viera el tab; la base pide la acción para ese UPDATE).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
@@ -30,10 +32,13 @@ vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db:
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
+  updateCondominioRowsByIds: vi.fn(async () => ({ error: null })),
   upsertCondominioRow: mocks.upsertCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
 }))
-vi.mock('../../../../lib/validatedInsert', () => ({ validatedInsert: mocks.validatedInsert }))
+vi.mock('../../../../domain/condominios/tabQueries', () => ({ fetchHuespedesByReservas: vi.fn(async () => []) }))
+vi.mock('../../../../lib/storageUrls', () => ({ useSignedUrl: () => null, useSignedUrls: () => ({}) }))
+vi.mock('../../../../lib/validatedInsert', () => ({ validatedInsert: mocks.validatedInsert, validatedInsertMany: vi.fn(async () => ({ error: null })) }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
 vi.mock('../../exportUtils', () => ({ exportarPDFInformeMensual: vi.fn() }))
 
@@ -47,6 +52,7 @@ const { AlertasTab } = await import('../AlertasTab')
 const { default: VisitasFrecuentesTab } = await import('../VisitasFrecuentesTab')
 const { default: ControlAccesosQRTab } = await import('../ControlAccesosQRTab')
 const { default: InformeMensualTab } = await import('../InformeMensualTab')
+const { VisitantesTab } = await import('../VisitantesTab')
 
 const conI18n = (ui: ReactNode) => render(<I18nProvider>{ui}</I18nProvider>)
 const unidades = [{ id: 'un1', nombre: 'Casa 4', activo: true }] as unknown as Unidad[]
@@ -142,5 +148,24 @@ describe('Informe mensual — publicar exige canCreate', () => {
     montar(true)
     abrir()
     expect(within(document.body).getByRole('button', { name: /Publicar informe/ })).toBeTruthy()
+  })
+})
+
+describe('Visitantes — registrar la salida exige canCreate', () => {
+  const adentro = como<Visitante>({
+    id: 'vi1', unidad_id: 'un1', unidad_nombre: 'Casa 4', nombre: 'Marta Ruiz', motivo: 'Visita',
+    hora_entrada: new Date().toISOString(), hora_salida: null, created_at: new Date().toISOString(),
+  })
+  const montar = (canCreate: boolean) => render(
+    <VisitantesTab {...base} userId="u1" unidades={unidades} visitantes={[adentro]} reservasSTR={[]} solicitudesMudanza={[]} canCreate={canCreate} />,
+  )
+  it('sin canCreate no se ofrece «Registrar salida»', () => {
+    montar(false)
+    expect(screen.getByText('Marta Ruiz')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Registrar salida' })).toBeNull()
+  })
+  it('con canCreate se ofrece «Registrar salida»', () => {
+    montar(true)
+    expect(screen.getByRole('button', { name: 'Registrar salida' })).toBeTruthy()
   })
 })

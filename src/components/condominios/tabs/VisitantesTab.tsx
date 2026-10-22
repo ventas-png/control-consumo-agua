@@ -329,6 +329,8 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   }
 
   function iniciarSalida(v: Visitante) {
+    // Registrar la salida (y su novedad) escribe: exige canCreate, como registrar la entrada.
+    if (!canCreate) return
     setSalidaPendiente(v)
     setModoSalida('idle')
     setNovedadForm({ tipo: 'incidente', comentarios: '', ubicacion: v.unidad_nombre ?? '', prioridad: 'normal' })
@@ -343,7 +345,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   }
 
   async function confirmarSalida() {
-    if (!salidaPendiente) return
+    if (!salidaPendiente || !canCreate) return
     if (modoSalida === 'con_novedad' && !novedadForm.comentarios.trim()) {
       notify({ variant: 'error', title: 'Error', text: 'Ingrese los comentarios de la novedad.' }); return
     }
