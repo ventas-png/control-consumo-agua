@@ -19,6 +19,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.proformas.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -39,7 +41,7 @@ const BLANK = {
 
 // `proveedores` (contratos) sigue en Props porque el registro de pestañas lo pasa,
 // pero el proveedor de una proforma se elige del catálogo compartido por id.
-export default function ProformasTab({ proformas, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function ProformasTab({ proformas, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoP | ''>('')
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -147,9 +149,12 @@ export default function ProformasTab({ proformas, proyectoId, companyId, moneda,
   }
 
   async function eliminar(p: Proforma) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const res = await confirm({ title: '¿Eliminar?', text: p.concepto, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    await deleteCondominioRow('proformas_condominio', p.id)
+    const { error } = await deleteCondominioRow('proformas_condominio', p.id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -283,8 +288,8 @@ export default function ProformasTab({ proformas, proyectoId, companyId, moneda,
                           </button>
                         </>
                       )}
-                      {canEdit && (p.estado === 'borrador' || p.estado === 'rechazada') && (
-                        <button onClick={() => eliminar(p)}
+                      {canDelete && (p.estado === 'borrador' || p.estado === 'rechazada') && (
+                        <button onClick={() => eliminar(p)} title="Eliminar" aria-label={`Eliminar ${p.concepto}`}
                           style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                           🗑️
                         </button>

@@ -1,0 +1,190 @@
+{
+  "_migracion": "20261104000200_rls_acciones_finanzas.sql",
+  "_titulo": "Finanzas: escribir exige la ACCIÓN del tab, también en la base",
+  "_porque": [
+    "POR QUÉ",
+    "La pantalla decide cada escritura de estos tabs con su acción (canCreate /",
+    "canEdit / canDelete). Las policies de INSERT y UPDATE sólo pedían ver el tab",
+    "—quien sólo consulta podía crear y editar por la API, también cuotas— y las",
+    "de DELETE sólo dejaban a company_owner/admin, aunque la pantalla ofreciera",
+    "«Eliminar» a quien tuviera la acción.",
+    "",
+    "Tabs: Avisos de cobro, Caja chica, Campañas de cobro, Cargos adicionales,",
+    "Cierres mensuales y anual, Cobranza y cobranza judicial, Convenios, Cuotas,",
+    "Planes de pago, Fondo de reserva, Generación de cuotas, Historial de saldos,",
+    "Notificaciones enviadas, Plantillas de cuota, Presupuesto, Proformas,",
+    "Recargos de mora, Recibos digitales y Tarifas.",
+    "",
+    "Quedan fuera, para su propio PR, las tablas que también escriben otros",
+    "módulos con permisos de módulo o de rol: convenios_pago (Cobros),",
+    "gastos_condominio (Compras) y reglas_mora_config (Facturación)."
+  ],
+  "tablas": {
+    "avisos_cobro": {
+      "tab": "avisos_cobro"
+    },
+    "caja_chica": {
+      "tab": "caja_chica"
+    },
+    "campanas_cobro": {
+      "tab": "campanas_cobro"
+    },
+    "cargos_adicionales_unidad": {
+      "tab": "cargos_adicionales"
+    },
+    "cierres_anuales": {
+      "tab": "cierre_anual",
+      "UPDATE": [
+        "cierre_anual.edit",
+        "cierre_anual.create"
+      ],
+      "porque": "«Generar cierre» (canCreate) es un upsert por (proyecto, año): regenerar un año actualiza su fila."
+    },
+    "cierres_mensuales": {
+      "tab": "cierres"
+    },
+    "cobranza_judicial": {
+      "tab": "cobranza_judicial"
+    },
+    "convenios_cuota_cond": {
+      "tab": "convenios_cuota"
+    },
+    "cuotas_condominio": {
+      "tab": "cuotas",
+      "INSERT": [
+        "cuotas.create",
+        "generacion_cuotas.create",
+        "integracion_agua.create",
+        "plantillas_cuota.create",
+        "amenidades.create",
+        "amenidades.edit"
+      ],
+      "UPDATE": [
+        "cuotas.edit",
+        "cuotas.delete",
+        "recargos_mora.create",
+        "conciliacion_cobros.create",
+        "estadocuenta.edit",
+        "automatizaciones.edit"
+      ],
+      "porque": [
+        "Eliminar una cuota es una baja lógica (UPDATE de deleted_at) que la pantalla ofrece con canDelete.",
+        "Crean cuotas el generador, la integración con agua, las plantillas y Amenidades (la tarifa al",
+        "reservar con canCreate; el depósito retenido y la aprobación con canEdit). Las editan el recargo",
+        "masivo (marca la mora aplicada), la conciliación, el estado de cuenta y las automatizaciones."
+      ],
+      "evidencia": {
+        "generacion_cuotas": [
+          "components/condominios/tabs/GeneradorCuotasTab.tsx"
+        ],
+        "integracion_agua": [
+          "components/condominios/tabs/IntegracionAguaTab.tsx"
+        ],
+        "plantillas_cuota": [
+          "components/condominios/tabs/PlantillasCuotaTab.tsx"
+        ],
+        "amenidades": [
+          "components/condominios/tabs/AmenidadesTab.tsx"
+        ],
+        "recargos_mora": [
+          "components/condominios/tabs/RecargosTab.tsx"
+        ],
+        "conciliacion_cobros": [
+          "components/condominios/tabs/ConciliacionCobrosTab.tsx"
+        ],
+        "estadocuenta": [
+          "components/condominios/tabs/EstadoCuentaTab.tsx"
+        ],
+        "automatizaciones": [
+          "components/condominios/tabs/AutomatizacionesTab.tsx",
+          "domain/condominios/tabMutations.ts"
+        ]
+      }
+    },
+    "cuotas_plan_pago": {
+      "tab": "plan_pago"
+    },
+    "fondo_reserva": {
+      "tab": "fondo_reserva",
+      "INSERT": [
+        "fondo_reserva.create",
+        "gestion_fondo.create"
+      ],
+      "porque": "Los movimientos los registra Gestión del fondo con canCreate('gestion_fondo').",
+      "evidencia": {
+        "gestion_fondo": [
+          "components/condominios/tabs/GestionFondoReservaTab.tsx"
+        ]
+      }
+    },
+    "fondo_reserva_condominio": {
+      "tab": "fondo_reserva",
+      "UPDATE": [
+        "fondo_reserva.edit",
+        "fondo_reserva.delete"
+      ],
+      "porque": "Eliminar un movimiento es una baja lógica (UPDATE de deleted_at) que la pantalla ofrece con canDelete."
+    },
+    "generacion_cuotas_log": {
+      "tab": "generacion_cuotas"
+    },
+    "gestion_cobranza": {
+      "tab": "cobranza"
+    },
+    "historial_saldos_unidad": {
+      "tab": "historial_saldos",
+      "UPDATE": [
+        "historial_saldos.edit",
+        "historial_saldos.create"
+      ],
+      "porque": "«Generar snapshot» (canCreate) es un upsert por (proyecto, unidad, periodo): repetir un periodo actualiza sus filas."
+    },
+    "movimientos_caja": {
+      "tab": "caja_chica"
+    },
+    "notificaciones_enviadas": {
+      "tab": "notificaciones_enviadas",
+      "INSERT": [
+        "notificaciones_enviadas.create",
+        "envio_masivo.create"
+      ],
+      "porque": "El registro de cada envío lo crea Envío masivo, con canCreate('envio_masivo').",
+      "evidencia": {
+        "envio_masivo": [
+          "components/condominios/tabs/EnvioMasivoTab.tsx"
+        ]
+      }
+    },
+    "planes_pago_condominio": {
+      "tab": "plan_pago"
+    },
+    "plantillas_cuota": {
+      "tab": "plantillas_cuota"
+    },
+    "presupuesto_condominio": {
+      "tab": "presupuesto"
+    },
+    "proformas_condominio": {
+      "tab": "proformas"
+    },
+    "recargos_mora": {
+      "tab": "recargos_mora"
+    },
+    "recibos_digitales": {
+      "tab": "recibos_digitales",
+      "INSERT": [
+        "recibos_digitales.create",
+        "cuotas.create"
+      ],
+      "porque": "Cuotas crea el recibo de una cuota pagada con canCreate('cuotas').",
+      "evidencia": {
+        "cuotas": [
+          "components/condominios/tabs/CuotasTab.tsx"
+        ]
+      }
+    },
+    "tarifas_condominio": {
+      "tab": "tarifas"
+    }
+  }
+}

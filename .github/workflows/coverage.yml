@@ -1000,6 +1000,8 @@ jobs:
         run: node supabase/tests/rls_acciones/run.mjs seguridad
       - name: Acciones por permiso — sección comunidad
         run: node supabase/tests/rls_acciones/run.mjs comunidad
+      - name: Acciones por permiso — sección finanzas
+        run: node supabase/tests/rls_acciones/run.mjs finanzas
 
   rls-harness:
     name: RLS harness (server-side)

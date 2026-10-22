@@ -16,6 +16,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.caja_chica.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -24,7 +26,7 @@ const BLANK_MOV = { tipo: 'egreso', concepto: '', monto: '', comprobante: '', fe
 
 function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('es', { minimumFractionDigits: 2 })}` }
 
-export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showCajaForm, setShowCajaForm] = useState(false)
   const [formCaja, setFormCaja] = useState({ ...BLANK_CAJA })
   const [savingCaja, setSavingCaja] = useState(false)
@@ -102,9 +104,12 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
   }
 
   async function handleDeleteMovimiento(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar movimiento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('movimientos_caja', id)
+    const { error } = await deleteCondominioRow('movimientos_caja', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -302,7 +307,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
                     {m.comprobante && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginLeft: '6px' }}>#{m.comprobante}</span>}
                     <div style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{m.fecha}</div>
                   </div>
-                  {canEdit && (
+                  {canDelete && (
                     <button onClick={() => handleDeleteMovimiento(m.id)} aria-label={`Eliminar movimiento ${m.concepto}`}
                       style={{ padding: '2px 6px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', color: 'var(--at-danger)', flexShrink: 0 }}>🗑️</button>
                   )}
