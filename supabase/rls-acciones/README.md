@@ -81,7 +81,9 @@ detiene.
   - el residente obtiene lo mismo que antes;
   - un mutante por tabla rompe la matriz.
 - `src/__tests__/rlsAccionesMapas.test.ts`:
-  - toda pantalla que escribe una tabla del mapa está en él;
+  - toda pantalla que escribe una tabla del mapa está en él (y una que la
+    escribe sin recibir ningún permiso, falla);
   - todo tab ajeno trae evidencia válida;
-  - toda pestaña que borra recibe `canDelete`;
+  - toda pestaña que borra —también por baja lógica, `softDelete`— recibe
+    `canDelete`;
   - el arnés está en CI.

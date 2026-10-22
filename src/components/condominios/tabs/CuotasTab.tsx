@@ -58,6 +58,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.cuotas.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -68,7 +70,7 @@ const CONCEPTOS: { value: ConceptoCuota; label: string }[] = [
   { value: 'otro', label: 'Otro' },
 ]
 
-export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [csvRows, setCsvRows] = useState<CSVRow[] | null>(null)
@@ -512,6 +514,8 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const result = await confirm({ title: '¿Eliminar cuota?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
     // El servidor sólo deja eliminar una cuota SIN emitir y sin cobros ni
@@ -995,7 +999,9 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
                     🧾
                   </button>
                 )}
-                <button onClick={() => eliminar(c.id)} aria-label="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
+                {canDelete && (
+                  <button onClick={() => eliminar(c.id)} aria-label="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
+                )}
               </div>
               )
             },

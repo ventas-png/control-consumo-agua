@@ -21,8 +21,11 @@ import { dirname, join, resolve } from 'node:path'
 //      `evidencia`: la cadena de imports desde el componente de ese tab en el
 //      registro hasta el archivo que escribe. Sin ella, el mapa ampliaría
 //      quién escribe sin que ninguna pantalla lo pida.
-//   3. BORRAR. Toda pestaña que borra una tabla del mapa recibe canDelete:
-//      el botón Eliminar y la base exigen la misma acción.
+//      Una pestaña que escribe una tabla del mapa SIN recibir ningún permiso
+//      también falla: no hay acción con la que la base pueda acompañarla.
+//   3. BORRAR. Toda pestaña que borra una tabla del mapa —también por baja
+//      lógica (softDelete)— recibe canDelete: el botón Eliminar y la base
+//      exigen la misma acción.
 //   4. CI. El arnés de cada sección está cableado en coverage.yml.
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -71,11 +74,11 @@ const OPS: Record<string, string[]> = {
   upsertCondominioRow: ['INSERT', 'UPDATE'],
 }
 const VERBO: Record<string, string[]> = { insert: ['INSERT'], update: ['UPDATE'], delete: ['DELETE'], upsert: ['INSERT', 'UPDATE'] }
-function escrituras(archivo: string): { tabla: string; cmd: string }[] {
+function escrituras(archivo: string): { tabla: string; cmd: string; baja?: boolean }[] {
   const s = readFileSync(archivo, 'utf8')
-  const out: { tabla: string; cmd: string }[] = []
+  const out: { tabla: string; cmd: string; baja?: boolean }[] = []
   for (const m of s.matchAll(new RegExp(`\\b(${Object.keys(OPS).join('|')})\\(\\s*['"]([a-z_]+)['"]`, 'g'))) {
-    for (const cmd of OPS[m[1]]) out.push({ tabla: m[2], cmd })
+    for (const cmd of OPS[m[1]]) out.push({ tabla: m[2], cmd, baja: m[1] === 'softDelete' })
   }
   const plano = s.replace(/\s+/g, ' ')
   for (const m of plano.matchAll(/\.from\(\s*['"]([a-z_]+)['"]\s*\)((?:\s*\.\s*\w+\([^()]*(?:\([^()]*\)[^()]*)*\))*?)\s*\.\s*(insert|update|delete|upsert)\b/g)) {
@@ -106,12 +109,11 @@ describe.each(mapas)('mapa %s', (seccion, mapa) => {
   it('1 · COMPLETO: toda pestaña que escribe una tabla del mapa tiene su tab en ese comando', () => {
     const faltan: string[] = []
     for (const [comp, archivo] of archivoDe) {
-      const props = propsDe.get(comp)
-      if (!props) continue
-      const tabsComp = new Set(Object.values(props))
+      const tabsComp = new Set(Object.values(propsDe.get(comp) ?? {}))
       for (const { tabla, cmd } of escrituras(archivo)) {
         const t = mapa.tablas[tabla]
         if (!t) continue
+        if (tabsComp.size === 0) { faltan.push(`${tabla} ${cmd} ← ${comp} (no recibe ningún permiso)`); continue }
         const permitidos = tabsDe(t, cmd)
         if (![...tabsComp].some(x => permitidos.has(x))) faltan.push(`${tabla} ${cmd} ← ${comp} (${[...tabsComp].join(', ')})`)
       }
@@ -145,7 +147,7 @@ describe.each(mapas)('mapa %s', (seccion, mapa) => {
   it('3 · BORRAR: toda pestaña que borra una tabla del mapa recibe canDelete', () => {
     const sin: string[] = []
     for (const [comp, archivo] of archivoDe) {
-      const borra = escrituras(archivo).some(e => e.cmd === 'DELETE' && mapa.tablas[e.tabla])
+      const borra = escrituras(archivo).some(e => (e.cmd === 'DELETE' || e.baja) && mapa.tablas[e.tabla])
       if (borra && !propsDe.get(comp)?.canDelete) sin.push(comp)
     }
     expect(sin).toEqual([])
