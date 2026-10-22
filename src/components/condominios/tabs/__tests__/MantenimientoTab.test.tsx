@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   updateCondominioRow: vi.fn(async () => ({ error: null })),
   notify: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: false })),
+  softDelete: vi.fn(async () => ({ error: null as { message: string } | null, count: 1 as number | null })),
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
@@ -15,6 +16,7 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
 }))
+vi.mock('../../../../lib/softDelete', () => ({ softDelete: mocks.softDelete }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
 vi.mock('../../exportUtils', () => ({ exportarPDFTabla: vi.fn(), exportarExcel: vi.fn() }))
 vi.mock('../TicketChatModal', () => ({ TicketChatModal: ({ ticket }: { ticket: TicketMantenimiento }) => <div role="dialog" aria-label={`Chat ${ticket.titulo}`} /> }))
@@ -78,5 +80,24 @@ describe('MantenimientoTab', () => {
     renderTab()
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
     await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
+  })
+
+  it('con permiso de eliminar, aunque no edite, da de baja el ticket', async () => {
+    mocks.confirm.mockResolvedValueOnce({ isConfirmed: true })
+    const onRefresh = vi.fn()
+    renderTab({ canEdit: false, onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
+    await waitFor(() => expect(mocks.softDelete).toHaveBeenCalledWith('tickets_mantenimiento', { id: 't1' }))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+  })
+
+  it('si la base no da de baja el ticket (la RLS lo rechaza), avisa y no lo da por eliminado', async () => {
+    mocks.confirm.mockResolvedValueOnce({ isConfirmed: true })
+    mocks.softDelete.mockResolvedValueOnce({ error: null, count: 0 })
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
+    expect(onRefresh).not.toHaveBeenCalled()
   })
 })
