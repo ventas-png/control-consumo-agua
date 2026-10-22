@@ -14,6 +14,8 @@ interface Props {
   userId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.objetos.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -38,7 +40,7 @@ const blank = (): Partial<ObjetoPerdido> => ({
   notas: '',
 })
 
-export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const { t } = useTranslation()
   const [filtroEstado, setFiltroEstado] = useState<EstadoObjeto | 'todos'>('en_custodia')
   const [form, setForm] = useState<Partial<ObjetoPerdido>>(blank())
@@ -94,6 +96,8 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const result = await confirm({ title: t('condominios.objetos.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!result.isConfirmed) return
     const { error } = await deleteCondominioRow('objetos_perdidos', id)
@@ -253,9 +257,9 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
           },
           {
             key: 'actions', header: '', align: 'right',
-            render: o => canEdit ? (
+            render: o => (canEdit || canDelete) ? (
               <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                {o.estado === 'en_custodia' && (
+                {canEdit && o.estado === 'en_custodia' && (
                   <>
                     <button onClick={() => handleEstado(o.id, 'reclamado')} style={{ padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                       {t('condominios.objetos.accion_reclamado')}
@@ -268,8 +272,8 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
                     </button>
                   </>
                 )}
-                <button onClick={() => startEdit(o)} aria-label={t('condominios.comun.edit')} style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                <button onClick={() => handleDelete(o.id)} aria-label={t('condominios.comun.delete')} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
+                {canEdit && <button onClick={() => startEdit(o)} aria-label={t('condominios.comun.edit')} style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+                {canDelete && <button onClick={() => handleDelete(o.id)} aria-label={t('condominios.comun.delete')} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>}
               </div>
             ) : null,
           },

@@ -3,8 +3,10 @@ import type { FuenteEnergia, FuenteAgua, ProveedorEnergia, TarifaEnergia, Proyec
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { sanitizeInput } from '../../../lib/validation'
 import { useCrearFuenteEnergiaMutation, useActualizarFuenteEnergiaMutation, useEliminarFuenteEnergiaMutation } from '../../../domain/energia/mutations'
+import { encabezadoTab, etiqueta, campo, rejilla, accionesFila } from '../ui'
 
 interface FuentesTabProps {
   fuentesEnergia: FuenteEnergia[]
@@ -154,8 +156,12 @@ export default function FuentesTab({
     setEditFormData({ ...fuente })
   }
 
+  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
+  const guardando = actualizarMutation.isPending
+  const cerrarEdicion = () => { if (!guardando) setEditingId(null) }
+
   const handleSaveEdit = async () => {
-    if (!editingId) return
+    if (!editingId || guardando) return
     try {
       await actualizarMutation.mutateAsync({ id: editingId, patch: editFormData })
       setEditingId(null)
@@ -187,55 +193,68 @@ export default function FuentesTab({
 
   return (
     <div>
-      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={encabezadoTab}>
         <h2 style={{ margin: 0 }}>Fuentes de Energía</h2>
         {canCreate && (
-          <button onClick={handleCreate} style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            + Nueva Fuente
-          </button>
+          <Button onClick={handleCreate}>+ Nueva Fuente</Button>
         )}
       </div>
 
       {editingId && (
-        <EditModal title="Editar Fuente de Energía" onClose={() => setEditingId(null)} maxWidth="500px">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <EditModal
+          title="Editar Fuente de Energía"
+          onClose={cerrarEdicion}
+          maxWidth="500px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!guardando}
+          closeOnEscape={!guardando}
+          footer={
+            <>
+              <Button variant="secondary" onClick={cerrarEdicion} disabled={guardando}>Cancelar</Button>
+              <Button type="submit" form="fuente-energia-form" loading={guardando} loadingText="Guardando...">Guardar</Button>
+            </>
+          }
+        >
+          <form
+            id="fuente-energia-form"
+            onSubmit={e => { e.preventDefault(); void handleSaveEdit() }}
+            style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+          >
             <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Nombre *</label>
-              <input type="text" value={editFormData.nombre ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nombre: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+              <label htmlFor="fuente-nombre" style={etiqueta}>Nombre *</label>
+              <input id="fuente-nombre" type="text" value={editFormData.nombre ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nombre: e.target.value }))} style={campo} />
             </div>
             <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Modo de suministro</label>
-              <select value={editFormData.modo_suministro ?? 'red'} onChange={e => setEditFormData(prev => ({ ...prev, modo_suministro: e.target.value as ModoSuministroEnergia }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }}>
+              <label htmlFor="fuente-modo" style={etiqueta}>Modo de suministro</label>
+              <select id="fuente-modo" value={editFormData.modo_suministro ?? 'red'} onChange={e => setEditFormData(prev => ({ ...prev, modo_suministro: e.target.value as ModoSuministroEnergia }))} style={campo}>
                 <option value="red">🔌 Red eléctrica</option>
                 <option value="solar_autonomo">☀️ Solar autónomo</option>
                 <option value="hibrido">🔌☀️ Híbrido</option>
               </select>
             </div>
-            <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Número de medidor</label>
-              <input type="text" value={editFormData.numero_medidor ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, numero_medidor: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Número de cuenta (NIS)</label>
-              <input type="text" value={editFormData.numero_cuenta ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, numero_cuenta: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Potencia contratada (kW)</label>
-              <input type="number" step="0.01" value={editFormData.potencia_contratada_kw ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, potencia_contratada_kw: e.target.value === '' ? undefined : parseFloat(e.target.value) }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Capacidad solar (kWp)</label>
-              <input type="number" step="0.01" value={editFormData.capacidad_solar_kwp ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, capacidad_solar_kwp: e.target.value === '' ? undefined : parseFloat(e.target.value) }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+            <div style={rejilla(150)}>
+              <div>
+                <label htmlFor="fuente-medidor" style={etiqueta}>Número de medidor</label>
+                <input id="fuente-medidor" type="text" value={editFormData.numero_medidor ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, numero_medidor: e.target.value }))} style={campo} />
+              </div>
+              <div>
+                <label htmlFor="fuente-cuenta" style={etiqueta}>Número de cuenta (NIS)</label>
+                <input id="fuente-cuenta" type="text" value={editFormData.numero_cuenta ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, numero_cuenta: e.target.value }))} style={campo} />
+              </div>
+              <div>
+                <label htmlFor="fuente-potencia" style={etiqueta}>Potencia contratada (kW)</label>
+                <input id="fuente-potencia" type="number" inputMode="decimal" step="0.01" value={editFormData.potencia_contratada_kw ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, potencia_contratada_kw: e.target.value === '' ? undefined : parseFloat(e.target.value) }))} style={campo} />
+              </div>
+              <div>
+                <label htmlFor="fuente-solar" style={etiqueta}>Capacidad solar (kWp)</label>
+                <input id="fuente-solar" type="number" inputMode="decimal" step="0.01" value={editFormData.capacidad_solar_kwp ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, capacidad_solar_kwp: e.target.value === '' ? undefined : parseFloat(e.target.value) }))} style={campo} />
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <input type="checkbox" id="fuente-activo" checked={editFormData.activo ?? false} onChange={e => setEditFormData(prev => ({ ...prev, activo: e.target.checked }))} />
               <label htmlFor="fuente-activo">Activa</label>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
-              <button onClick={() => setEditingId(null)} style={{ padding: '0.5rem 1rem', border: '1px solid var(--at-line-strong)', borderRadius: '4px', cursor: 'pointer', background: 'var(--at-surface)' }}>Cancelar</button>
-              <button onClick={handleSaveEdit} style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Guardar</button>
-            </div>
-          </div>
+          </form>
         </EditModal>
       )}
 
@@ -243,43 +262,47 @@ export default function FuentesTab({
         <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic', marginTop: '1.5rem' }}>No hay fuentes de energía registradas</p>
       ) : (
         <div className="table-scroll-wrapper">
-        <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', marginTop: '1.5rem', fontSize: '0.9rem' }}>
+        {/* En el teléfono cada fuente es una tarjeta con sus acciones al pie. */}
+        <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem', fontSize: '0.9rem' }}>
           <thead>
             <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
-              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Nombre</th>
-              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Fuente de agua</th>
-              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Modo</th>
-              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Medidor</th>
-              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Capacidad</th>
-              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Estado</th>
-              {(canEdit || canDelete) && <th style={{ padding: '0.5rem', textAlign: 'center' }}>Acciones</th>}
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'left' }}>Nombre</th>
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'left' }}>Fuente de agua</th>
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'left' }}>Modo</th>
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'left' }}>Medidor</th>
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'left' }}>Capacidad</th>
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'left' }}>Estado</th>
+              {(canEdit || canDelete) && <th scope="col" style={{ padding: '0.5rem', textAlign: 'center' }}>Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {fuentesEnergia.map(f => {
               const fa = fuentesAgua.find(x => x.id === f.fuente_agua_id)
+              // Un híbrido tiene las dos: antes salían pegadas ("10 kW12.5 kWp").
+              const capacidad = [
+                f.potencia_contratada_kw ? `${f.potencia_contratada_kw} kW` : null,
+                f.capacidad_solar_kwp ? `${f.capacidad_solar_kwp} kWp` : null,
+              ].filter(Boolean).join(' · ') || '—'
               return (
                 <tr key={f.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                  <td style={{ padding: '0.5rem' }}>{f.nombre}</td>
-                  <td style={{ padding: '0.5rem' }}>{fa?.nombre ?? '—'}</td>
-                  <td style={{ padding: '0.5rem' }}>{modoLabel(f.modo_suministro)}</td>
-                  <td style={{ padding: '0.5rem' }}>{f.numero_medidor || '—'}</td>
-                  <td style={{ padding: '0.5rem' }}>
-                    {f.potencia_contratada_kw ? `${f.potencia_contratada_kw} kW` : ''}
-                    {f.capacidad_solar_kwp ? `${f.capacidad_solar_kwp} kWp` : ''}
-                    {!f.potencia_contratada_kw && !f.capacidad_solar_kwp ? '—' : ''}
-                  </td>
-                  <td style={{ padding: '0.5rem' }}>
+                  <td data-label="Nombre" style={{ padding: '0.5rem', fontWeight: 600 }}>{f.nombre}</td>
+                  <td data-label="Fuente de agua" style={{ padding: '0.5rem' }}>{fa?.nombre ?? '—'}</td>
+                  <td data-label="Modo" style={{ padding: '0.5rem' }}>{modoLabel(f.modo_suministro)}</td>
+                  <td data-label="Medidor" style={{ padding: '0.5rem' }}>{f.numero_medidor || '—'}</td>
+                  <td data-label="Capacidad" style={{ padding: '0.5rem' }}>{capacidad}</td>
+                  <td data-label="Estado" style={{ padding: '0.5rem' }}>
                     <span style={{ color: f.activo ? 'var(--at-primary)' : 'var(--at-danger)' }}>{f.activo ? '● Activa' : '● Inactiva'}</span>
                   </td>
                   {(canEdit || canDelete) && (
                     <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                      {canEdit && (
-                        <button onClick={() => handleStartEdit(f)} style={{ marginRight: '0.5rem', padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Editar</button>
-                      )}
-                      {canDelete && (
-                        <button onClick={() => handleDelete(f.id, f.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Eliminar</button>
-                      )}
+                      <div style={accionesFila}>
+                        {canEdit && (
+                          <Button size="sm" onClick={() => handleStartEdit(f)} aria-label={`Editar ${f.nombre}`}>Editar</Button>
+                        )}
+                        {canDelete && (
+                          <Button size="sm" variant="danger" onClick={() => handleDelete(f.id, f.nombre)} aria-label={`Eliminar ${f.nombre}`}>Eliminar</Button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>

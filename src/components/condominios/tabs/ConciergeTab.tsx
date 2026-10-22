@@ -12,6 +12,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.concierge.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -38,7 +40,7 @@ const blank = (): Partial<SolicitudConcierge> => ({
   hora_solicitud: '', estado: 'pendiente', atendido_por: '', costo: undefined, notas_staff: '',
 })
 
-export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoConcierge | 'todos'>('todos')
   const [form, setForm] = useState<Partial<SolicitudConcierge>>(blank())
   const [editId, setEditId] = useState<string | null>(null)
@@ -87,6 +89,8 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar solicitud?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('solicitudes_concierge', id)
@@ -226,12 +230,12 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
                           {s.atendido_por && <div>👤 {s.atendido_por}</div>}
                           {s.costo && <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>💰 {moneda} {s.costo.toFixed(2)}</div>}
                         </div>
-                        {canEdit && (
+                        {(canEdit || canDelete) && (
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {s.estado === 'pendiente' && <button onClick={() => handleEstado(s.id, 'en_proceso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Iniciar</button>}
-                            {s.estado === 'en_proceso' && <button onClick={() => handleEstado(s.id, 'completado')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Completar</button>}
-                            <button onClick={() => startEdit(s)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                            <button onClick={() => handleDelete(s.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                            {canEdit && s.estado === 'pendiente' && <button onClick={() => handleEstado(s.id, 'en_proceso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Iniciar</button>}
+                            {canEdit && s.estado === 'en_proceso' && <button onClick={() => handleEstado(s.id, 'completado')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Completar</button>}
+                            {canEdit && <button onClick={() => startEdit(s)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+                            {canDelete && <button onClick={() => handleDelete(s.id)} title="Eliminar" aria-label={`Eliminar ${s.descripcion}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                           </div>
                         )}
                       </div>

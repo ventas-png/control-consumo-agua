@@ -15,6 +15,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.reclamos.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -43,7 +45,7 @@ const PRIORIDAD_STYLE: Record<string, { color: string; label: string }> = {
 const BLANK = { unidad_id: '', tipo: 'queja', asunto: '', descripcion: '', prioridad: 'normal', plazo_respuesta: '', anonimo: false }
 const BLANK_RESP = { respuesta_admin: '', respondido_por: '' }
 
-export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
@@ -106,6 +108,8 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar reclamo?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRow('reclamos_condominio', id)
@@ -310,7 +314,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
               <Button variant="secondary" onClick={() => { setShowRespForm(false); setFormResp({ ...BLANK_RESP }) }} disabled={respondiendo}>Cancelar</Button>
               <Button onClick={handleResponder} loading={respondiendo} loadingText="Enviando…">Enviar respuesta</Button>
             </> : <>
-              {canEdit && <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar reclamo">🗑️</Button>}
+              {canDelete && <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar reclamo">🗑️</Button>}
               {canEdit && <Button variant="secondary" onClick={() => startEdit(selected)}>✏️ Editar</Button>}
               {canEdit && selected.estado === 'recibido' && <Button variant="warning" onClick={() => cambiarEstado(selected.id, 'en_revision')}>En revisión</Button>}
               {canEdit && selected.estado === 'respondido' && <Button variant="secondary" onClick={() => cambiarEstado(selected.id, 'cerrado')}>Cerrar reclamo</Button>}

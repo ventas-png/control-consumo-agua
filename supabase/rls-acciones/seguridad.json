@@ -1,0 +1,126 @@
+{
+  "_migracion": "20261104000000_rls_acciones_seguridad.sql",
+  "_titulo": "Seguridad, Panel y especiales: escribir exige la ACCIÓN del tab, también en la base",
+  "_porque": [
+    "POR QUÉ",
+    "La pantalla decide cada escritura de estos tabs con su acción (canCreate /",
+    "canEdit / canDelete). Las policies de INSERT y UPDATE sólo pedían ver el tab",
+    "—quien sólo consulta podía crear y editar por la API— y las de DELETE sólo",
+    "dejaban a company_owner/admin, aunque la pantalla le ofreciera «Eliminar» a",
+    "quien tuviera la acción: la RLS borraba cero filas sin error.",
+    "",
+    "Tabs: Alertas, Informe mensual, Bitácora de guardia, Emergencias, Objetos",
+    "perdidos, Rutas de ronda (puntos de control y de verificación), Reclamos,",
+    "Seguridad (rondas y su checklist), Visitantes, Visitas frecuentes, Locales,",
+    "Residuos y Concierge."
+  ],
+  "tablas": {
+    "alertas_condominio": {
+      "tab": "alertas"
+    },
+    "informes_mensuales": {
+      "tab": "informe_mensual",
+      "UPDATE": [
+        "informe_mensual.edit",
+        "informe_mensual.create"
+      ],
+      "porque": "InformeMensualTab sólo recibe canCreate: con él se genera (upsert) y se publica (update)."
+    },
+    "bitacora_guardia": {
+      "tab": "bitacora_guardia"
+    },
+    "contactos_emergencia": {
+      "tab": "emergencias"
+    },
+    "objetos_perdidos": {
+      "tab": "objetos"
+    },
+    "puntos_control_ruta": {
+      "tab": "rutas_ronda"
+    },
+    "puntos_verificacion": {
+      "tab": "rutas_ronda"
+    },
+    "reclamos_condominio": {
+      "tab": "reclamos"
+    },
+    "rondas_seguridad": {
+      "tab": "rutas_ronda",
+      "INSERT": [
+        "rutas_ronda.create",
+        "seguridad.create"
+      ],
+      "UPDATE": [
+        "rutas_ronda.edit",
+        "seguridad.edit"
+      ],
+      "porque": "La ronda se inicia en Seguridad con canCreate('seguridad') y se cierra con canEdit('seguridad').",
+      "evidencia": {
+        "seguridad": [
+          "components/condominios/tabs/SeguridadTab.tsx"
+        ]
+      }
+    },
+    "visitas_control": {
+      "tab": "rutas_ronda",
+      "INSERT": [
+        "rutas_ronda.create",
+        "seguridad.create"
+      ],
+      "UPDATE": [
+        "rutas_ronda.edit",
+        "seguridad.edit"
+      ],
+      "porque": "El checklist de la ronda nace al iniciarla (canCreate('seguridad')) y cada punto se marca con canEdit('seguridad').",
+      "evidencia": {
+        "seguridad": [
+          "components/condominios/tabs/SeguridadTab.tsx"
+        ]
+      }
+    },
+    "visitantes": {
+      "tab": "visitantes",
+      "INSERT": [
+        "visitantes.create",
+        "seguridad.create",
+        "control_accesos_qr.create",
+        "portal.edit"
+      ],
+      "UPDATE": [
+        "visitantes.edit",
+        "visitantes.create",
+        "control_accesos_qr.create"
+      ],
+      "porque": [
+        "Registran visitantes: Visitantes y Control de accesos QR (canCreate), el acceso de Seguridad",
+        "(canCreate('seguridad')) y el portal en vista de administración (canEdit('portal')). Entrada y",
+        "salida (UPDATE) se marcan en Visitantes y en Control de accesos QR, que sólo reciben canCreate.",
+        "La rama del residente (sus unidades) no cambia."
+      ],
+      "evidencia": {
+        "seguridad": [
+          "components/condominios/tabs/SeguridadTab.tsx"
+        ],
+        "control_accesos_qr": [
+          "components/condominios/tabs/ControlAccesosQRTab.tsx"
+        ],
+        "portal": [
+          "components/condominios/tabs/PortalResidenteTab.tsx",
+          "components/condominios/tabs/PortalVisitantesTab.tsx"
+        ]
+      }
+    },
+    "visitas_frecuentes": {
+      "tab": "vis_frecuentes"
+    },
+    "locales_comerciales": {
+      "tab": "locales"
+    },
+    "registros_residuos": {
+      "tab": "residuos"
+    },
+    "solicitudes_concierge": {
+      "tab": "concierge"
+    }
+  }
+}
