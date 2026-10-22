@@ -3,8 +3,10 @@ import type { ProveedorEnergia, Proyecto } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { sanitizeInput } from '../../../lib/validation'
 import { useCrearProveedorEnergiaMutation, useActualizarProveedorEnergiaMutation, useEliminarProveedorEnergiaMutation } from '../../../domain/energia/mutations'
+import { encabezadoTab, etiqueta, campo, accionesFila } from '../ui'
 
 interface ProveedoresTabProps {
   proveedoresEnergia: ProveedorEnergia[]
@@ -110,8 +112,12 @@ export default function ProveedoresTab({
     setEditFormData({ ...proveedor })
   }
 
+  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
+  const guardando = actualizarMutation.isPending
+  const cerrarEdicion = () => { if (!guardando) setEditingId(null) }
+
   const handleSaveEdit = async () => {
-    if (!editingId) return
+    if (!editingId || guardando) return
     try {
       await actualizarMutation.mutateAsync({ id: editingId, patch: editFormData })
       setEditingId(null)
@@ -140,33 +146,48 @@ export default function ProveedoresTab({
 
   return (
     <div>
-      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={encabezadoTab}>
         <h2 style={{ margin: 0 }}>Proveedores de Energía</h2>
         {canCreate && (
-          <button onClick={handleCreate} style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            + Nuevo Proveedor
-          </button>
+          <Button onClick={handleCreate}>+ Nuevo Proveedor</Button>
         )}
       </div>
 
       {editingId && (
-        <EditModal title="Editar Proveedor" onClose={() => setEditingId(null)} maxWidth="480px">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <EditModal
+          title="Editar Proveedor"
+          onClose={cerrarEdicion}
+          maxWidth="480px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!guardando}
+          closeOnEscape={!guardando}
+          footer={
+            <>
+              <Button variant="secondary" onClick={cerrarEdicion} disabled={guardando}>Cancelar</Button>
+              <Button type="submit" form="prov-energia-form" loading={guardando} loadingText="Guardando...">Guardar</Button>
+            </>
+          }
+        >
+          <form
+            id="prov-energia-form"
+            onSubmit={e => { e.preventDefault(); void handleSaveEdit() }}
+            style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+          >
             <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Nombre *</label>
-              <input type="text" value={editFormData.nombre ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nombre: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+              <label htmlFor="prov-nombre" style={etiqueta}>Nombre *</label>
+              <input id="prov-nombre" type="text" value={editFormData.nombre ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nombre: e.target.value }))} style={campo} />
             </div>
             <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>NIT</label>
-              <input type="text" value={editFormData.nit ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nit: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+              <label htmlFor="prov-nit" style={etiqueta}>NIT</label>
+              <input id="prov-nit" type="text" value={editFormData.nit ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nit: e.target.value }))} style={campo} />
             </div>
             <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Contacto</label>
-              <input type="text" value={editFormData.contacto ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, contacto: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+              <label htmlFor="prov-contacto" style={etiqueta}>Contacto</label>
+              <input id="prov-contacto" type="text" value={editFormData.contacto ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, contacto: e.target.value }))} style={campo} />
             </div>
             <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Tipo</label>
-              <select value={editFormData.tipo ?? 'distribuidora'} onChange={e => setEditFormData(prev => ({ ...prev, tipo: e.target.value as ProveedorEnergia['tipo'] }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }}>
+              <label htmlFor="prov-tipo" style={etiqueta}>Tipo</label>
+              <select id="prov-tipo" value={editFormData.tipo ?? 'distribuidora'} onChange={e => setEditFormData(prev => ({ ...prev, tipo: e.target.value as ProveedorEnergia['tipo'] }))} style={campo}>
                 <option value="distribuidora">Distribuidora</option>
                 <option value="comercializadora">Comercializadora</option>
                 <option value="autogeneracion">Autogeneración</option>
@@ -176,11 +197,7 @@ export default function ProveedoresTab({
               <input type="checkbox" id="prov-activo" checked={editFormData.activo ?? false} onChange={e => setEditFormData(prev => ({ ...prev, activo: e.target.checked }))} />
               <label htmlFor="prov-activo">Activo</label>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
-              <button onClick={() => setEditingId(null)} style={{ padding: '0.5rem 1rem', border: '1px solid var(--at-line-strong)', borderRadius: '4px', cursor: 'pointer', background: 'var(--at-surface)' }}>Cancelar</button>
-              <button onClick={handleSaveEdit} style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Guardar</button>
-            </div>
-          </div>
+          </form>
         </EditModal>
       )}
 
@@ -188,39 +205,39 @@ export default function ProveedoresTab({
         <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic', marginTop: '1.5rem' }}>No hay proveedores registrados</p>
       ) : (
         <div className="table-scroll-wrapper">
-        <table style={{ width: '100%', minWidth: 680, borderCollapse: 'collapse', marginTop: '1.5rem' }}>
+        {/* En el teléfono cada proveedor es una tarjeta (data-label por celda)
+            con sus acciones al pie, en vez de una tabla que se arrastraba de lado. */}
+        <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem' }}>
           <thead>
             <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
-              <th style={{ padding: '0.75rem', textAlign: 'left' }}>Nombre</th>
-              <th style={{ padding: '0.75rem', textAlign: 'left' }}>NIT</th>
-              <th style={{ padding: '0.75rem', textAlign: 'left' }}>Tipo</th>
-              <th style={{ padding: '0.75rem', textAlign: 'left' }}>Contacto</th>
-              <th style={{ padding: '0.75rem', textAlign: 'left' }}>Estado</th>
-              {(canEdit || canDelete) && <th style={{ padding: '0.75rem', textAlign: 'center' }}>Acciones</th>}
+              <th scope="col" style={{ padding: '0.75rem', textAlign: 'left' }}>Nombre</th>
+              <th scope="col" style={{ padding: '0.75rem', textAlign: 'left' }}>NIT</th>
+              <th scope="col" style={{ padding: '0.75rem', textAlign: 'left' }}>Tipo</th>
+              <th scope="col" style={{ padding: '0.75rem', textAlign: 'left' }}>Contacto</th>
+              <th scope="col" style={{ padding: '0.75rem', textAlign: 'left' }}>Estado</th>
+              {(canEdit || canDelete) && <th scope="col" style={{ padding: '0.75rem', textAlign: 'center' }}>Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {proveedoresEnergia.map(p => (
               <tr key={p.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                <td style={{ padding: '0.75rem' }}>{p.nombre}</td>
-                <td style={{ padding: '0.75rem' }}>{p.nit || '-'}</td>
-                <td style={{ padding: '0.75rem', textTransform: 'capitalize' }}>{p.tipo}</td>
-                <td style={{ padding: '0.75rem' }}>{p.contacto || '-'}</td>
-                <td style={{ padding: '0.75rem' }}>
+                <td data-label="Nombre" style={{ padding: '0.75rem', fontWeight: 600 }}>{p.nombre}</td>
+                <td data-label="NIT" style={{ padding: '0.75rem' }}>{p.nit || '-'}</td>
+                <td data-label="Tipo" style={{ padding: '0.75rem', textTransform: 'capitalize' }}>{p.tipo}</td>
+                <td data-label="Contacto" style={{ padding: '0.75rem' }}>{p.contacto || '-'}</td>
+                <td data-label="Estado" style={{ padding: '0.75rem' }}>
                   <span style={{ color: p.activo ? 'var(--at-primary)' : 'var(--at-danger)' }}>{p.activo ? '● Activo' : '● Inactivo'}</span>
                 </td>
                 {(canEdit || canDelete) && (
                   <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                    {canEdit && (
-                      <button onClick={() => handleStartEdit(p)} style={{ marginRight: '0.5rem', padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>
-                        Editar
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button onClick={() => handleDelete(p.id, p.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>
-                        Eliminar
-                      </button>
-                    )}
+                    <div style={accionesFila}>
+                      {canEdit && (
+                        <Button size="sm" onClick={() => handleStartEdit(p)} aria-label={`Editar ${p.nombre}`}>Editar</Button>
+                      )}
+                      {canDelete && (
+                        <Button size="sm" variant="danger" onClick={() => handleDelete(p.id, p.nombre)} aria-label={`Eliminar ${p.nombre}`}>Eliminar</Button>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>
