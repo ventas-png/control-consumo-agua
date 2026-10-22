@@ -20,6 +20,14 @@ interface ErrorLike {
   details?: string | null
 }
 
+/** ¿El error es una violación de unicidad (código o CUI/DUI ya usados)? */
+export function esErrorDuplicado(error: ErrorLike | string | null | undefined): boolean {
+  if (!error) return false
+  const err: ErrorLike = typeof error === 'string' ? { message: error } : error
+  const texto = `${err.message ?? ''} ${err.details ?? ''}`
+  return err.code === '23505' || /duplicate key|llave duplicada/i.test(texto)
+}
+
 export function mensajeErrorGuardarCliente(
   error: ErrorLike | string | null | undefined,
   accion: 'guardar' | 'actualizar' = 'guardar',
@@ -32,8 +40,7 @@ export function mensajeErrorGuardarCliente(
   if (isValidationError(err)) return err.message ?? fallback
 
   const texto = `${err.message ?? ''} ${err.details ?? ''}`
-  const esDuplicado = err.code === '23505' || /duplicate key|llave duplicada/i.test(texto)
-  if (esDuplicado) {
+  if (esErrorDuplicado(err)) {
     if (/cui_dui/i.test(texto)) {
       return 'Ya existe un cliente registrado con ese CUI/DUI en la plataforma. ' +
         'Verifique el número ingresado; si se trata del mismo cliente, use «Solicitar Cliente» ' +
