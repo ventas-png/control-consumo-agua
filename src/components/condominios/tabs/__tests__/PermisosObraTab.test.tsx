@@ -124,13 +124,19 @@ describe('PermisosObraTab — ventanas', () => {
     await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('permisos_obra_unidad', 'po1'))
   })
 
-  it('eliminar no depende de editar; si la base no borra (la RLS lo rechaza), avisa y no lo da por eliminado', async () => {
-    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
-    const onRefresh = vi.fn()
-    render(<PermisosObraTab {...props({ canEdit: false, onRefresh })} />)
+  it('con permiso de eliminar, aunque no edite, borra el permiso', async () => {
+    render(<PermisosObraTab {...props({ canEdit: false })} />)
     fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('permisos_obra_unidad', 'po1'))
+  })
 
+  it('si la base no borra (la RLS lo rechaza), avisa y no da el permiso por eliminado', async () => {
+    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
+    const onRefresh = vi.fn()
+    render(<PermisosObraTab {...props({ onRefresh })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Remodelar cocina/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
     expect(onRefresh).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog')).toBeTruthy()

@@ -5,7 +5,7 @@ import type { Asamblea, Unidad } from '../../../../types'
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
-  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
   upsertCondominioRow: vi.fn(async () => ({ error: null })),
   fetchPuntosAsambleaConVotos: vi.fn(async () => [
     {
@@ -163,12 +163,17 @@ describe('AsambleasTab — ventanas', () => {
     await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('asambleas', 'a1'))
   })
 
-  it('eliminar no depende de editar; si la base no borra (la RLS lo rechaza), avisa y no la da por eliminada', async () => {
-    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } } as never)
-    const onRefresh = vi.fn()
-    renderTab({ canEdit: false, onRefresh })
+  it('con permiso de eliminar, aunque no edite, borra la asamblea', async () => {
+    renderTab({ canEdit: false })
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar Asamblea Ordinaria Abril' }))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('asambleas', 'a1'))
+  })
 
+  it('si la base no borra (la RLS lo rechaza), avisa y no da la asamblea por eliminada', async () => {
+    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Asamblea Ordinaria Abril' }))
     await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('El servidor no aplicó el cambio'))
     expect(onRefresh).not.toHaveBeenCalled()
   })

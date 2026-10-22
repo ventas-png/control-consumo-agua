@@ -5,9 +5,9 @@ import type { TicketMantenimiento, Unidad } from '../../../../types'
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
-  softDelete: vi.fn(async () => ({ error: null as { message: string } | null, count: 1 as number | null })),
   notify: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: false })),
+  softDelete: vi.fn(async () => ({ error: null as { message: string } | null, count: 1 as number | null })),
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
@@ -82,12 +82,11 @@ describe('MantenimientoTab', () => {
     await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
   })
 
-  it('eliminar no depende de editar: da de baja el ticket y refresca', async () => {
+  it('con permiso de eliminar, aunque no edite, da de baja el ticket', async () => {
     mocks.confirm.mockResolvedValueOnce({ isConfirmed: true })
     const onRefresh = vi.fn()
     renderTab({ canEdit: false, onRefresh })
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
-
     await waitFor(() => expect(mocks.softDelete).toHaveBeenCalledWith('tickets_mantenimiento', { id: 't1' }))
     await waitFor(() => expect(onRefresh).toHaveBeenCalled())
   })
@@ -98,7 +97,6 @@ describe('MantenimientoTab', () => {
     const onRefresh = vi.fn()
     renderTab({ onRefresh })
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
-
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
     expect(onRefresh).not.toHaveBeenCalled()
   })

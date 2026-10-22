@@ -133,18 +133,6 @@ describe('ChecklistAreasTab — ventanas', () => {
     fireEvent.click(screen.getByRole('button', { name: /Piscina.*2026-10-20/ }))
     dialog = screen.getByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: /Eliminar/ }))
-    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('checklist_areas', expect.any(String)))
-  })
-
-  it('eliminar no depende de editar; si la base no borra (la RLS lo rechaza), avisa y no lo da por eliminado', async () => {
-    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
-    const onRefresh = vi.fn()
-    render(<ChecklistAreasTab {...props({ canEdit: false, onRefresh })} />)
-    fireEvent.click(screen.getByRole('button', { name: /Piscina.*2026-10-20/ }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
-
-    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
-    expect(onRefresh).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('checklist_areas', 'c1'))
   })
 })

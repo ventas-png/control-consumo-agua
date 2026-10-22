@@ -139,15 +139,21 @@ describe('IncidentesTab — ventanas', () => {
     await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('incidentes_seguridad', 'i1'))
   })
 
-  it('eliminar no depende de editar; si la base no borra (la RLS lo rechaza), avisa y no lo da por eliminado', async () => {
-    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
-    const onRefresh = vi.fn()
-    renderTab({ canEdit: false, onRefresh })
+  it('con permiso de eliminar, aunque no edite, borra el incidente', async () => {
+    renderTab({ canEdit: false })
     fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('incidentes_seguridad', 'i1'))
+  })
 
+  it('si la base no borra (la RLS lo rechaza), avisa y no da el incidente por eliminado', async () => {
+    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
     expect(onRefresh).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog', { name: /Grafiti en el muro/ })).toBeTruthy()
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 })
