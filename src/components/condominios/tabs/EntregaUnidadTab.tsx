@@ -12,6 +12,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.entrega_unidad.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -42,7 +44,7 @@ const CONDICION_STYLE: Record<string, { label: string; color: string; bg: string
   malo:      { label: 'Malo',      color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
-export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm]     = useState(false)
   const [editId, setEditId]         = useState<string | null>(null)
   const [form, setForm]             = useState<FormData>({ ...BLANK })
@@ -88,9 +90,12 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar acta de entrega?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('entrega_unidades', id)
+    const { error } = await deleteCondominioRow('entrega_unidades', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === id) setSelected(null)
     onRefresh()
   }
@@ -301,7 +306,7 @@ ${raw(inventarioHtml)}
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button onClick={() => handlePrint(e)} style={{ padding: '6px 14px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>🖨️ Imprimir</button>
                       {canEdit && <button onClick={() => startEdit(e)} style={{ padding: '6px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>✏️ Editar</button>}
-                      {canEdit && <button onClick={() => handleDelete(e.id)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>🗑️ Eliminar</button>}
+                      {canDelete && <button onClick={() => handleDelete(e.id)} title="Eliminar" aria-label="Eliminar entrega" style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>🗑️ Eliminar</button>}
                     </div>
                   </div>
                 )}
