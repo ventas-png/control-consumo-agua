@@ -18,7 +18,7 @@ import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
-import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { createCondominioRow, deleteCondominioRowAfectando, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { nombreAreaDe } from '../../../domain/condominios/areas'
 import type { AreaCondominio, ChecklistArea, ChecklistItem } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
@@ -182,7 +182,8 @@ export function ChecklistAreasTab({ checklists, areas, proyectoId, companyId, ca
     if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar checklist?', text: `${nombreArea(c)} · ${c.fecha}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('checklist_areas', c.id)
+    const { error } = await deleteCondominioRowAfectando('checklist_areas', c.id)
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     if (selectedId === c.id) setSelectedId(null)
     onRefresh()
   }

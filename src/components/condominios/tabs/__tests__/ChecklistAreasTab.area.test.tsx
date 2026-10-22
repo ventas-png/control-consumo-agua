@@ -18,7 +18,7 @@ import type { AreaCondominio, ChecklistArea } from '../../../../types'
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
   updateCondominioRow: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
-  deleteCondominioRow: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
   notify: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   irATab: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock('../../../../lib/supabase', () => ({
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
-  deleteCondominioRow: mocks.deleteCondominioRow,
+  deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
 }))
 vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: mocks.confirm }))
 

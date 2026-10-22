@@ -289,6 +289,41 @@ export function piezaAvisable(
     && (p.destinatario_tipo ?? 'unidad') === 'unidad'
 }
 
+/**
+ * Lo que espera al residente en portería: entradas avisables aún sin entregar.
+ *
+ * Es la lista del aviso "Tienes paquetes en portería" del portal. Antes ese
+ * aviso contaba toda fila `pendiente`, y un paquete que el residente DEJÓ para
+ * que lo recoja otra persona también está `pendiente` mientras nadie lo retira:
+ * el portal le decía que fuera a buscar lo que él mismo había dejado.
+ */
+export function piezasPorRetirar<T extends Pick<PiezaRecepcion, 'estado' | 'direccion' | 'unidad_id' | 'destinatario_tipo'>>(
+  piezas: T[],
+): T[] {
+  return piezas.filter(p => p.estado === 'pendiente' && piezaAvisable(p))
+}
+
+/** Ventana durante la que el portal le recuerda al residente un retiro ya hecho. */
+export const DIAS_AVISO_RETIRO = 7
+
+/**
+ * Salidas del residente que la persona autorizada ya retiró en los últimos
+ * `dias`. Es la contraparte de `piezasPorRetirar`: de lo que el residente dejó
+ * en portería, lo que le interesa saber es cuándo se lo llevaron.
+ */
+export function salidasRetiradasRecientes<T extends Pick<PiezaRecepcion, 'estado' | 'direccion' | 'hora_entrega'>>(
+  piezas: T[],
+  ahoraISO: string,
+  dias = DIAS_AVISO_RETIRO,
+): T[] {
+  const desde = new Date(ahoraISO).getTime() - dias * 86_400_000
+  return piezas.filter(p =>
+    esPiezaSaliente(p)
+    && p.estado === 'entregado'
+    && !!p.hora_entrega
+    && new Date(p.hora_entrega).getTime() >= desde)
+}
+
 /** Estado con el vocabulario del residente, según entre o salga la pieza. */
 const ESTADO_RESIDENTE_ENTRADA: Record<string, string> = {
   pendiente: 'Pendiente de retiro',

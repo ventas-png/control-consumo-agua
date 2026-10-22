@@ -10,6 +10,8 @@
 //   3. El borrador propio se retoma ("Continuar registro"); el ajeno no se ve.
 //   4. Retirar / dar de baja solo lo ofrece a quien lo registró o al propietario.
 //   5. El vehículo autorizado muestra su TAG de ingreso.
+//   6. El registro abre en ventana emergente sobre la lista; cerrarlo con datos
+//      llenos pregunta antes (× y Escape lo cierran de un toque).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, act, fireEvent, within } from '@testing-library/react'
 import type { Mascota, VehiculoResidente } from '../../../../types'
@@ -23,13 +25,14 @@ const h = vi.hoisted(() => ({
   darDeBajaPadron: vi.fn(async () => ({ error: null as string | null })),
   uploadPadronDoc: vi.fn(async () => ({ error: null as string | null })),
   notify: vi.fn(),
+  confirm: vi.fn(async () => ({ isConfirmed: true })),
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
 vi.mock('../../../../lib/storageUrls', () => ({
   useSignedUrl: (src: string | null) => (src ? `https://firmado.test/${src}` : null),
 }))
-vi.mock('../../../shared/Dialog', () => ({ notify: h.notify, confirm: vi.fn(async () => ({ isConfirmed: true })) }))
+vi.mock('../../../shared/Dialog', () => ({ notify: h.notify, confirm: h.confirm }))
 vi.mock('../../../../domain/portal/padron', () => ({
   carpetaPadron: (tipo: string, u: string, id: string) => `${u}/${tipo === 'mascota' ? 'mascotas' : 'vehiculos'}/${id}`,
   fetchMascotasUnidad: vi.fn(async () => ({ data: h.mascotas, error: null })),
@@ -109,6 +112,21 @@ describe('PortalMascotasTab', () => {
     )
   })
 
+  it('abre en ventana sobre la lista; cerrar con la ficha llena pregunta antes', async () => {
+    await montar(<PortalMascotasTab unidadId="u1" unidadNombre="Apto 1D" clienteId="cli-1" esPropietario />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Registrar mascota' }))
+    await act(async () => {})
+    expect(screen.getByRole('dialog', { name: 'Registrar mascota' })).toBeTruthy()
+    expect(screen.getByText('🐾 Mascotas — Apto 1D')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Rabia (antirrábica)' }))
+    h.confirm.mockResolvedValueOnce({ isConfirmed: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    await act(async () => {})
+    expect(h.confirm).toHaveBeenCalledWith(expect.objectContaining({ title: '¿Cerrar sin enviar?' }))
+    expect(screen.getByRole('dialog', { name: 'Registrar mascota' })).toBeTruthy()
+  })
+
   it('retoma el borrador propio y no muestra el ajeno', async () => {
     h.mascotas = [
       { ...base, id: 'b-propio', nombre: '', especie: 'perro', activo: false, estado: 'borrador', cliente_id: 'cli-1' },
@@ -159,6 +177,36 @@ describe('PortalVehiculosTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitud' }))
     await act(async () => {})
     expect(h.enviarVehiculo).toHaveBeenCalledWith('v-1', expect.objectContaining({ placa: 'P 123 ABC', tipo: 'auto', anio: 2022 }), [])
+  })
+
+  it('abre en ventana sobre la lista; cerrar con datos llenos pregunta antes', async () => {
+    await montar(<PortalVehiculosTab unidadId="u1" unidadNombre="Apto 1D" clienteId="cli-1" esPropietario />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Registrar vehículo' }))
+    await act(async () => {})
+    expect(screen.getByRole('dialog', { name: 'Registrar vehículo' })).toBeTruthy()
+    // La lista sigue montada detrás de la ventana.
+    expect(screen.getByText('🚗 Vehículos — Apto 1D')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Placa *'), { target: { value: 'P-123ABC' } })
+    h.confirm.mockResolvedValueOnce({ isConfirmed: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    await act(async () => {})
+    expect(h.confirm).toHaveBeenCalledWith(expect.objectContaining({ title: '¿Cerrar sin enviar?' }))
+    expect(screen.getByRole('dialog', { name: 'Registrar vehículo' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    await act(async () => {})
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('cerrar sin haber llenado nada no pregunta', async () => {
+    await montar(<PortalVehiculosTab unidadId="u1" unidadNombre="Apto 1D" clienteId="cli-1" esPropietario />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Registrar vehículo' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    await act(async () => {})
+    expect(h.confirm).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('rechaza una placa inválida antes de llamar al servidor', async () => {
