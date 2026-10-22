@@ -38,7 +38,7 @@
 -- ni escribir estas tablas directamente.
 --
 -- El RPC salta el RLS, así que repite a mano el candado de plan de
--- 20261104000050 (feature `asambleas_digitales` de la empresa de la asamblea),
+-- 20261104000120 (feature `asambleas_digitales` de la empresa de la asamblea),
 -- igual que el FeatureGate del tab.
 --
 -- CAMBIOS

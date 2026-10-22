@@ -11,7 +11,7 @@
 #
 # QUÉ HACE
 #   1 · cadena     bootstrap + TODAS las migraciones anteriores (incluido el
-#                  candado de plan corregido de 20261104000050)
+#                  candado de plan corregido de 20261104000120)
 #   2 · antes      sobre ese estado, el padrón REPRODUCE cada causa
 #   3 · migra      la migración DOS veces: idempotente, y la huella del auditor
 #                  cambia EXACTAMENTE en el CHECK de votos_asamblea y los dos
