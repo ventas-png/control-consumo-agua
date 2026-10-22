@@ -1,5 +1,5 @@
 -- ============================================================================
--- PADRÓN DE LA SUITE «candado_plan_asambleas» (20261104000120)
+-- PADRÓN DE LA SUITE «candado_plan_asambleas» (20261104000450)
 --
 -- Se carga sobre la cadena REAL de migraciones: lo que se prueba son las
 -- policies que de verdad tiene el repositorio, con company_has_feature, los
