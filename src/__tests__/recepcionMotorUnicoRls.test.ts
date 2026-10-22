@@ -52,27 +52,37 @@ describe('policies de paquetes_recibidos tras la unificación', () => {
     }
   })
 
-  // SELECT/INSERT/UPDATE se gobiernan por PERMISO de la clase.
-  for (const nombre of [
-    'paquetes_recibidos_select',
-    'paquetes_recibidos_insert',
-    'paquetes_recibidos_update',
-  ]) {
-    it(`${nombre} resuelve el permiso por clase, no por tabla`, () => {
+  // SELECT se gobierna por PERMISO de la clase.
+  it('paquetes_recibidos_select resuelve el permiso por clase, no por tabla', () => {
+    const policy = vigentes.get('paquetes_recibidos_select')
+    expect(policy, 'falta paquetes_recibidos_select').toBeDefined()
+    // Ambos permisos presentes = el CASE sobre `clase` sigue ahí. Si alguien
+    // la reescribe con un solo permiso fijo, esto falla.
+    expect(policy!.cuerpo).toContain(PERM_CORRESPONDENCIA)
+    expect(policy!.cuerpo).toContain(PERM_PAQUETERIA)
+    expect(policy!.cuerpo).toMatch(/CASE\s+clase/i)
+  })
+
+  // INSERT/UPDATE: la clase elige el tab, y desde 20261104000800 se pide la
+  // ACCIÓN de ese tab (crear / editar), no sólo verlo.
+  for (const [nombre, accion] of [['paquetes_recibidos_insert', 'create'], ['paquetes_recibidos_update', 'edit']]) {
+    it(`${nombre} resuelve la acción por clase, no por tabla`, () => {
       const policy = vigentes.get(nombre)
       expect(policy, `falta ${nombre}`).toBeDefined()
-      // Ambos permisos presentes = el CASE sobre `clase` sigue ahí. Si alguien
-      // la reescribe con un solo permiso fijo, esto falla.
-      expect(policy!.cuerpo).toContain(PERM_CORRESPONDENCIA)
-      expect(policy!.cuerpo).toContain(PERM_PAQUETERIA)
       expect(policy!.cuerpo).toMatch(/CASE\s+clase/i)
+      expect(policy!.cuerpo).toMatch(new RegExp(`WHEN\\s+'correspondencia'(::text)?\\s+THEN\\s+\\(\\s*SELECT\\s+\\(public\\.condominios_puede_actuar\\('correspondencia', '${accion}'\\)\\)`))
+      expect(policy!.cuerpo).toMatch(new RegExp(`ELSE\\s+\\(\\s*SELECT\\s+\\(public\\.condominios_puede_actuar\\('paqueteria', '${accion}'\\)\\)`))
+      expect(policy!.cuerpo).not.toMatch(/user_has_permission/)
     })
   }
 
-  // DELETE va por ROL, no por permiso: `user_has_permission` devuelve true a
-  // cualquier clave para super_admin/company_owner/admin (20260518000008), así
-  // que un gate de permiso colocado detrás de un filtro de rol no filtra nada.
-  describe('DELETE se gobierna por rol, no por el helper de permisos', () => {
+  // DELETE: la correspondencia va por ROL (sólo company_owner), no por permiso:
+  // `user_has_permission` devuelve true a cualquier clave para
+  // super_admin/company_owner/admin (20260518000008), así que un gate de
+  // permiso no distinguiría al admin del dueño. Paquetería, desde
+  // 20261104000800, pide la acción de borrar de su tab (el admin la tiene por
+  // exento, como antes).
+  describe('DELETE: correspondencia por rol, paquetería por la acción del tab', () => {
     const cuerpo = () => vigentes.get('paquetes_recibidos_delete')!.cuerpo
 
     it('NO usa user_has_permission (sería una condición siempre verdadera)', () => {
@@ -80,17 +90,17 @@ describe('policies de paquetes_recibidos tras la unificación', () => {
     })
 
     it('la correspondencia solo la borra company_owner: `admin` no aparece en su rama', () => {
-      // La rama de correspondencia compara contra 'company_owner' a secas; el
-      // ARRAY con 'admin' es la rama de paquetería.
-      expect(cuerpo()).toMatch(/WHEN\s+'correspondencia'\s+THEN\s+public\.current_user_role\(\)\s*=\s*'company_owner'/)
+      // La rama de correspondencia compara contra 'company_owner' a secas.
+      expect(cuerpo()).toMatch(/WHEN\s+'correspondencia'(::text)?\s+THEN\s+\(?(public\.)?current_user_role\(\)\s*=\s*'company_owner'(::text)?\)?\s+ELSE/)
+      expect(cuerpo()).not.toMatch(/'admin'/)
     })
 
-    it('paquetería conserva company_owner y admin', () => {
-      expect(cuerpo()).toMatch(/ELSE\s+public\.current_user_role\(\)\s*=\s*ANY\(ARRAY\['company_owner','admin'\]\)/)
+    it('paquetería pide la acción de borrar de su tab', () => {
+      expect(cuerpo()).toMatch(/ELSE\s+\(\s*SELECT\s+\(public\.condominios_puede_actuar\('paqueteria', 'delete'\)\)/)
     })
 
     it('sigue acotado a la empresa y con la llave de soporte', () => {
-      expect(cuerpo()).toMatch(/company_id = public\.get_my_company_id\(\)/)
+      expect(cuerpo()).toMatch(/company_id = (public\.)?get_my_company_id\(\)/)
       expect(cuerpo()).toMatch(/is_super_admin\(\)/)
     })
   })
