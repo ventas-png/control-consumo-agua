@@ -999,7 +999,7 @@ jobs:
       - name: Acciones por permiso — sección seguridad
         run: node supabase/tests/rls_acciones/run.mjs seguridad
 
-      # 20261103000600: el candado de plan (asambleas_digitales) de
+      # 20261104000050: el candado de plan (asambleas_digitales) de
       # puntos_asamblea y votos_asamblea buscaba la empresa en asambleas_digital
       # y rechazaba TODA alta, también la del admin de una empresa con la
       # feature. Ahora la resuelve por asambleas. Control previo que reproduce
