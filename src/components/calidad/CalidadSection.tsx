@@ -38,9 +38,13 @@ interface Props {
 export function CalidadSection({
   fuentesAgua, registrosCalidad, empresa, userId,
   onFuentesUpdated, onRegistrosCalidadUpdated,
-  canCreate: _canCreate = true, canEdit: _canEdit = true,
+  canCreate = true, canEdit = true,
 }: Props) {
   const [subTab, setSubTab] = useState<SubTab>('fuentes')
+  // Permisos del módulo (agua.calidad.*): antes llegaban como props pero no se
+  // usaban, y crear/editar/activar fuentes o registrar análisis lo podía hacer
+  // cualquiera que viera la sección. Consultar e imprimir no cambia.
+  const subTabs = canCreate ? SUB_TABS : SUB_TABS.filter(t => t.id !== 'analisis')
 
   // Fuentes form state
   const [fuenteFormAbierto, setFuenteFormAbierto] = useState(false)
@@ -71,6 +75,8 @@ export function CalidadSection({
 
   // Fuentes CRUD
   async function guardarFuente() {
+    // Los botones ya se ocultan sin permiso; esto cubre cualquier otra vía.
+    if (editandoId ? !canEdit : !canCreate) return
     if (!fuenteForm.identificador.trim()) return notify({ variant: 'warning', title: 'Atención', text: 'El identificador es obligatorio.' })
     if (!fuenteForm.nombre.trim() || fuenteForm.nombre.length < 2) return notify({ variant: 'warning', title: 'Atención', text: 'El nombre es obligatorio (mín. 2 caracteres).' })
     if (!fuenteForm.tipo_agua) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione la tipología de agua.' })
@@ -111,12 +117,14 @@ export function CalidadSection({
   // Alta y edición comparten la misma ventana: antes el formulario vivía fijo
   // arriba de la lista y en el teléfono empujaba la tabla fuera de la vista.
   function nuevaFuente() {
+    if (!canCreate) return
     setEditandoId(null)
     setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '', frecuencia_muestreo_dias: '' })
     setFuenteFormAbierto(true)
   }
 
   function editarFuente(f: FuenteAgua) {
+    if (!canEdit) return
     setEditandoId(f.id)
     setFuenteForm({ identificador: f.identificador, nombre: f.nombre, tipo_agua: f.tipo_agua, descripcion: f.descripcion ?? '', frecuencia_muestreo_dias: f.frecuencia_muestreo_dias != null ? String(f.frecuencia_muestreo_dias) : '' })
     setFuenteFormAbierto(true)
@@ -131,6 +139,7 @@ export function CalidadSection({
   }
 
   async function toggleFuente(id: string, activo: boolean) {
+    if (!canEdit) return
     const { error } = await setFuenteActiva(id, !activo)
     if (error) return notify({ variant: 'error', title: 'Error', text: error })
     onFuentesUpdated(await fetchFuentes())
@@ -160,6 +169,7 @@ export function CalidadSection({
   }
 
   async function guardarAnalisis() {
+    if (!canCreate) return
     if (!analisisFuenteId) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione una fuente de agua.' })
     if (!analisisFecha) return notify({ variant: 'warning', title: 'Atención', text: 'Indique la fecha del análisis.' })
     if (!fuenteSeleccionada || !tipologiaActual) return
@@ -307,7 +317,7 @@ export function CalidadSection({
           un teléfono antes de llegar al formulario. */}
       <TabStrip
         ariaLabel="Secciones de calidad de agua"
-        items={SUB_TABS}
+        items={subTabs}
         value={subTab}
         onChange={setSubTab}
         marginBottom={20}
@@ -319,7 +329,7 @@ export function CalidadSection({
           <div style={panelStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
               <div style={{ fontSize: '20px', fontWeight: 700 }}>🗂️ Fuentes Registradas</div>
-              <Button onClick={nuevaFuente}>+ Nueva fuente</Button>
+              {canCreate && <Button onClick={nuevaFuente}>+ Nueva fuente</Button>}
             </div>
             {/* Por debajo de 480px cada fuente pasa a tarjeta (etiquetas desde
                 data-label); el ID corto se oculta en teléfonos. Sin la clase
@@ -328,7 +338,7 @@ export function CalidadSection({
             <div style={{ overflowX: 'auto' }}>
               <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                 <thead><tr style={{ background: 'var(--at-chip)' }}>
-                  {['ID', 'Identificador', 'Nombre', 'Tipología', 'Muestreo', 'Estado', 'Acciones'].map(h => <th scope="col" key={h} className={h === 'ID' ? 'table-col-secondary' : undefined} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
+                  {['ID', 'Identificador', 'Nombre', 'Tipología', 'Muestreo', 'Estado', ...(canEdit ? ['Acciones'] : [])].map(h => <th scope="col" key={h} className={h === 'ID' ? 'table-col-secondary' : undefined} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {fuentesAgua.map(f => {
@@ -359,18 +369,18 @@ export function CalidadSection({
                             {f.activo ? 'Activa' : 'Inactiva'}
                           </span>
                         </td>
-                        <td style={{ padding: '10px' }}>
+                        {canEdit && <td style={{ padding: '10px' }}>
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <button onClick={() => editarFuente(f)} style={{ background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>✏️ Editar</button>
                             <button onClick={() => toggleFuente(f.id, f.activo)} style={{ background: f.activo ? 'var(--at-warning)' : 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>
                               {f.activo ? '⏸ Desactivar' : '▶ Activar'}
                             </button>
                           </div>
-                        </td>
+                        </td>}
                       </tr>
                     )
                   })}
-                  {fuentesAgua.length === 0 && <tr><td colSpan={7} style={{ padding: '20px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Sin fuentes registradas</td></tr>}
+                  {fuentesAgua.length === 0 && <tr><td colSpan={canEdit ? 7 : 6} style={{ padding: '20px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Sin fuentes registradas</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -379,7 +389,7 @@ export function CalidadSection({
       )}
 
       {/* ANÁLISIS */}
-      {subTab === 'analisis' && (
+      {subTab === 'analisis' && canCreate && (
         <div style={panelStyle}>
           <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>🧪 Nuevo Análisis de Calidad</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
