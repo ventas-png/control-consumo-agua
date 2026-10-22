@@ -434,7 +434,10 @@ export function DataTable<T>({
                         ...(rowStyle ? rowStyle(row) : {}),
                       }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-table-row-hover)' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = '' }}
+                      // Al salir vuelve el fondo de rowStyle (fila marcada,
+                      // seleccionada, con alerta); antes quedaba en blanco
+                      // tras pasar el mouse una vez.
+                      onMouseLeave={e => { e.currentTarget.style.background = String(rowStyle?.(row).background ?? '') }}
                     >
                       {columns.map((col, colIdx) => {
                         const isStickyCol = stickyFirstColumn && colIdx === 0
