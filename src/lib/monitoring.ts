@@ -14,6 +14,9 @@ const RELEASE = import.meta.env.VITE_APP_VERSION as string | undefined
 
 let enabled = false
 
+// Claves con IP o datos de proxy que Sentry 10 quitaba con `sendDefaultPii: false`.
+const PII_KEY_SNIPPETS = ['forwarded', '-ip', 'remote-', 'via', '-user']
+
 export function initMonitoring(): void {
   if (!DSN || enabled) return
   Sentry.init({
@@ -55,7 +58,21 @@ export function initMonitoring(): void {
     // pestañas), la que lo pierde lanza este AbortError y sigue funcionando.
     ignoreErrors: ["Lock broken by another request with the 'steal' option."],
     // Don't attach IP / cookies. We set a minimal user (id/company/role) explicitly.
-    sendDefaultPii: false,
+    // Sentry 11 retiró `sendDefaultPii`, y sus valores por defecto de
+    // `dataCollection` SÍ recogen IP, cookies, cabeceras y cuerpos. Esto
+    // reproduce el viejo `sendDefaultPii: false` según la tabla de @sentry/core
+    // 10 (defaultPiiToCollectionOptions): sin IP inferida ni user.* automático,
+    // sin cuerpos HTTP, y cabeceras/cookies/query params sin las claves de IP o
+    // proxy.
+    dataCollection: {
+      userInfo: false,
+      cookies: { deny: PII_KEY_SNIPPETS },
+      httpHeaders: { deny: PII_KEY_SNIPPETS },
+      httpBodies: [],
+      urlQueryParams: { deny: PII_KEY_SNIPPETS },
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+    },
   })
   enabled = true
 }
