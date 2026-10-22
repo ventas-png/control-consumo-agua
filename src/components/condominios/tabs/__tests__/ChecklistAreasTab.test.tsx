@@ -135,4 +135,21 @@ describe('ChecklistAreasTab — ventanas', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /Eliminar/ }))
     await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('checklist_areas', 'c1'))
   })
+  it('con permiso de eliminar, aunque no edite, borra el checklist', async () => {
+    render(<ChecklistAreasTab {...props({ canEdit: false })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Piscina.*2026-10-20/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('checklist_areas', 'c1'))
+  })
+
+  it('si la base no borra (la RLS lo rechaza), avisa y no da el checklist por eliminado', async () => {
+    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
+    const onRefresh = vi.fn()
+    render(<ChecklistAreasTab {...props({ onRefresh })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Piscina.*2026-10-20/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
+    expect(onRefresh).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
 })
