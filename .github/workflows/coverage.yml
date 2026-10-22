@@ -998,6 +998,8 @@ jobs:
       # y elige su propio puerto.
       - name: Acciones por permiso — sección seguridad
         run: node supabase/tests/rls_acciones/run.mjs seguridad
+      - name: Acciones por permiso — sección comunidad
+        run: node supabase/tests/rls_acciones/run.mjs comunidad
 
   rls-harness:
     name: RLS harness (server-side)

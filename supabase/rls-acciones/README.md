@@ -34,7 +34,8 @@ exentos) y `super_admin`, como antes.
       "evidencia": { "<otro>": ["components/…/OtroTab.tsx", "…/Hijo.tsx"] },
       "porque": "…"
     }
-  }
+  },
+  "_sin_clave": { "<tab>": "por qué el catálogo no siembra sus claves" }
 }
 ```
 
@@ -45,6 +46,13 @@ La regla para armarlo:
   controla en la UI (p. ej. Seguridad inicia rondas con `canCreate('seguridad')`).
 - Un tab ajeno necesita `evidencia`: la cadena de imports desde su componente
   en `tabRegistry` hasta el archivo que escribe.
+- Si la tabla no tiene policy permisiva para un comando (p. ej. `votos` no
+  tiene UPDATE), nadie lo hace, antes y después: no se crea, y el mapa no
+  puede declararlo.
+- Toda clave `condominios.tab.<tab>[.<acción>]` del mapa debe existir en
+  `permissions`. Un tab cuyas claves el catálogo no siembra a propósito (hoy
+  sólo lo ven company_owner/admin) se declara en `_sin_clave`; cualquier otro
+  par ausente es una errata y el arnés falla.
 
 ## Cómo se usa
 
@@ -67,7 +75,9 @@ detiene.
   - la migración es la generada;
   - el hueco de antes existe;
   - la huella cambia sólo en las policies de la sección;
-  - la matriz por persona y comando coincide con el mapa;
+  - la matriz por persona y comando coincide con el mapa (las compuertas
+    RESTRICTIVE ajenas al permiso —plan contratado, MFA— no las toca la
+    migración y se retiran en la prueba, antes y después por igual);
   - el residente obtiene lo mismo que antes;
   - un mutante por tabla rompe la matriz.
 - `src/__tests__/rlsAccionesMapas.test.ts`:

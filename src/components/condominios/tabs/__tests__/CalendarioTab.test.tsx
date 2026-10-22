@@ -42,7 +42,7 @@ const asambleas = [
 function renderTab(props: Partial<Parameters<typeof CalendarioTab>[0]> = {}) {
   return render(
     <CalendarioTab eventos={eventos} asambleas={asambleas} agenda={[]} proyectoId="p1" companyId="co1"
-      canCreate canEdit onRefresh={() => {}} {...props} />,
+      canCreate canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -101,7 +101,7 @@ describe('CalendarioTab — ventana del día', () => {
   })
 
   it('sin permisos no se crea ni se borra, pero el día se puede consultar', () => {
-    renderTab({ canCreate: false, canEdit: false })
+    renderTab({ canCreate: false, canDelete: false })
     expect(screen.queryByRole('button', { name: '+ Evento' })).toBeNull()
     fireEvent.click(celda(15))
     const dialog = screen.getByRole('dialog')

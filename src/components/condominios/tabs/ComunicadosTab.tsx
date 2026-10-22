@@ -15,7 +15,8 @@ interface Props {
   companyId: string
   userId: string
   canCreate: boolean
-  canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.comunicados.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -53,7 +54,7 @@ const TIPO_A_ANUNCIO: Record<TipoComunicado, string> = {
   circular: 'aviso', carta: 'aviso', aviso: 'aviso', certificado: 'aviso', acta: 'aviso',
 }
 
-export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, userId, canCreate, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
@@ -109,9 +110,12 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar comunicado?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('comunicados_condominio', id)
+    const { error } = await deleteCondominioRow('comunicados_condominio', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selectedId === id) setSelectedId(null)
     onRefresh()
   }
@@ -260,14 +264,14 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
                     {c.contenido}
                   </div>
                 </button>
-                {(canCreate || canEdit) && (
+                {(canCreate || canDelete) && (
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
                     {canCreate && (
                       <button onClick={() => publicarEnPortal(c)}
                         title="Publicar en portal del residente"
                         style={{ padding: '6px 10px', background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-primary)', fontWeight: 600 }}>📢 Portal</button>
                     )}
-                    {canEdit && (
+                    {canDelete && (
                       <button onClick={() => handleDelete(c.id)} aria-label={`Eliminar ${c.titulo}`}
                         style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     )}

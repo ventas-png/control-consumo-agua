@@ -35,7 +35,7 @@ function acta(over: Partial<ActaReunion> = {}): ActaReunion {
 
 function renderTab(props: Partial<Parameters<typeof ActasTab>[0]> = {}) {
   return render(
-    <ActasTab actas={[acta()]} proyectoId="p1" companyId="co1" canCreate canEdit onRefresh={() => {}} {...props} />,
+    <ActasTab actas={[acta()]} proyectoId="p1" companyId="co1" canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -67,7 +67,7 @@ describe('ActasTab — ventanas', () => {
     expect(onRefresh).toHaveBeenCalled()
 
     // Al refrescar, la ventana lee la fila nueva (no una copia del clic).
-    rerender(<ActasTab actas={[acta({ aprobada: true })]} proyectoId="p1" companyId="co1" canCreate canEdit onRefresh={onRefresh} />)
+    rerender(<ActasTab actas={[acta({ aprobada: true })]} proyectoId="p1" companyId="co1" canCreate canEdit canDelete onRefresh={onRefresh} />)
     const dialog = screen.getByRole('dialog', { name: 'Asamblea Ordinaria Q1' })
     expect(within(dialog).getByRole('button', { name: '↩ Quitar aprobación' })).toBeTruthy()
     expect(within(dialog).getByText('✓ Aprobada')).toBeTruthy()
@@ -106,7 +106,7 @@ describe('ActasTab — ventanas', () => {
   })
 
   it('sin permiso de edición no hay acciones en la fila ni al pie de la ventana', () => {
-    renderTab({ canCreate: false, canEdit: false })
+    renderTab({ canCreate: false, canEdit: false, canDelete: false })
     expect(screen.queryByRole('button', { name: '+ Nueva Acta' })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Eliminar/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Imprimir/ })).toBeNull()
