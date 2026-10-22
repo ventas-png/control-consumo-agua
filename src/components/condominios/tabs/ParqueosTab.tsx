@@ -10,6 +10,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.parqueos.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -25,7 +27,7 @@ const TIPO_COLORS: Record<TipoParqueo, { bg: string; color: string }> = {
   discapacitado: { bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
 }
 
-export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState<TipoParqueo | 'todos'>('todos')
@@ -88,9 +90,12 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar parqueo?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('parqueos_condominio', id)
+    const { error } = await deleteCondominioRow('parqueos_condominio', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -192,11 +197,17 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
                 {p.unidad_nombre && <div style={{ fontSize: '12.5px', color: 'var(--at-primary)', fontWeight: 600, marginBottom: '4px' }}>📍 {p.unidad_nombre}</div>}
                 {p.placa_vehiculo && <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)', marginBottom: '2px' }}>🚗 {p.placa_vehiculo}{p.marca_vehiculo ? ` · ${p.marca_vehiculo}` : ''}{p.color_vehiculo ? ` · ${p.color_vehiculo}` : ''}</div>}
                 {!tieneUnidad && <div style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 600 }}>Disponible</div>}
-                {canEdit && (
+                {(canEdit || canDelete) && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                    <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '6px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)' }}>✏️ Editar</button>
-                    <button onClick={() => toggleActivo(p)} style={{ padding: '6px 10px', background: p.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px' }}>{p.activo ? '⏸' : '▶'}</button>
-                    <button onClick={() => eliminar(p.id)} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px' }}>🗑</button>
+                    {canEdit && (
+                      <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '6px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)' }}>✏️ Editar</button>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => toggleActivo(p)} style={{ padding: '6px 10px', background: p.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px' }}>{p.activo ? '⏸' : '▶'}</button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => eliminar(p.id)} title="Eliminar" aria-label={`Eliminar parqueo ${p.numero}`} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px' }}>🗑</button>
+                    )}
                   </div>
                 )}
               </div>

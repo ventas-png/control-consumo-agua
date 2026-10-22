@@ -129,8 +129,13 @@ try {
   // ellas puestas, el AND sólo puede quitar permisos, nunca darlos.
   const compuertas = todas.filter(p => p.permisiva === 'RESTRICTIVE' && !tieneAtomos(p.using) && !tieneAtomos(p.check))
   writeFileSync(join(trabajo, 'compuertas.sql'), compuertas.map(p => `DROP POLICY "${p.nombre.replace(/"/g, '""')}" ON public.${p.tabla};`).join('\n') + '\n')
+  const lit = v => `'${String(v).replace(/'/g, "''")}'`
+  const recetas = tablas.flatMap(t => Object.entries(mapa.tablas[t].receta ?? {})
+    .map(([col, valor]) => `INSERT INTO ra.recetas VALUES ('public.${t}', ${lit(col)}, ${lit(valor)});`))
+  writeFileSync(join(trabajo, 'recetas.sql'), recetas.join('\n') + '\n')
   const padron = bd => {
     aplicar(bd, join(AQUI, 'fabricar.sql'))
+    aplicar(bd, join(trabajo, 'recetas.sql'))
     aplicar(bd, join(AQUI, 'padron.sql'))
     aplicar(bd, join(trabajo, 'usuarios.sql'))
     aplicar(bd, join(trabajo, 'compuertas.sql'))

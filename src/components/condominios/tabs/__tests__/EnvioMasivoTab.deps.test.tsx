@@ -27,7 +27,7 @@ function renderTab(proyectoNombre: string) {
     <EnvioMasivoTab
       plantillas={[plantilla]} cuotas={[]} unidades={unidades} reservas={[]}
       proyectoId="p1" companyId="c1" moneda="Q"
-      proyectoNombre={proyectoNombre} onRefresh={() => {}}
+      proyectoNombre={proyectoNombre} canCreate onRefresh={() => {}}
     />,
   )
 }
@@ -36,7 +36,7 @@ function props(proyectoNombre: string) {
   return {
     plantillas: [plantilla], cuotas: [], unidades, reservas: [],
     proyectoId: 'p1', companyId: 'c1', moneda: 'Q',
-    proyectoNombre, onRefresh: () => {},
+    proyectoNombre, canCreate: true, onRefresh: () => {},
   }
 }
 

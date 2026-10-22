@@ -42,7 +42,7 @@ function props(over: Partial<Parameters<typeof CajaChicaTab>[0]> = {}): Paramete
   return {
     cajas: [caja(), caja({ id: 'cj2', responsable: 'Luis Gómez', estado: 'cerrada', monto_inicial: 500 })],
     movimientos, proyectoId: 'p1', companyId: 'co1', moneda: 'USD',
-    canCreate: true, canEdit: true, onRefresh: () => {}, ...over,
+    canCreate: true, canEdit: true, canDelete: true, onRefresh: () => {}, ...over,
   }
 }
 
@@ -117,7 +117,7 @@ describe('CajaChicaTab — ventanas', () => {
   })
 
   it('sin permisos no se abre, cierra ni mueve caja, pero se puede consultar', () => {
-    render(<CajaChicaTab {...props({ canCreate: false, canEdit: false })} />)
+    render(<CajaChicaTab {...props({ canCreate: false, canEdit: false, canDelete: false })} />)
     expect(screen.queryByRole('button', { name: '+ Abrir Caja' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Cerrar' })).toBeNull()
 

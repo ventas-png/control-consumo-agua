@@ -44,7 +44,7 @@ const cuotas = [
 function props(over: Partial<Parameters<typeof PlanPagoCondTab>[0]> = {}): Parameters<typeof PlanPagoCondTab>[0] {
   return {
     planes: [plan()], unidades, proyectoId: 'p1', companyId: 'co1', moneda: 'USD',
-    canCreate: true, canEdit: true, onRefresh: () => {}, ...over,
+    canCreate: true, canEdit: true, canDelete: true, onRefresh: () => {}, ...over,
   }
 }
 
@@ -111,7 +111,7 @@ describe('PlanPagoCondTab — ventanas', () => {
   })
 
   it('sin permiso de edición la ventana es de solo lectura', async () => {
-    render(<PlanPagoCondTab {...props({ canCreate: false, canEdit: false })} />)
+    render(<PlanPagoCondTab {...props({ canCreate: false, canEdit: false, canDelete: false })} />)
     expect(screen.queryByRole('button', { name: '+ Nuevo Plan' })).toBeNull()
     // El único "Incumplido" es el chip de filtro, no la acción de la fila.
     expect(screen.getAllByRole('button', { name: 'Incumplido' })).toHaveLength(1)

@@ -14,6 +14,8 @@ interface Props {
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.fondo_reserva.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -43,7 +45,7 @@ function fmt(n: number, m: string) {
   return `${m} ${n.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
+export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({ ...BLANK })
@@ -86,9 +88,12 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
   }
 
   const handleDelete = async (m: FondoReserva) => {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar movimiento?', text: m.concepto, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await softDelete('fondo_reserva_condominio', { id: m.id })
+    const { error } = await softDelete('fondo_reserva_condominio', { id: m.id })
+    if (error) { notify({ variant: 'error', title: 'No se eliminó el movimiento', text: error.message }); return }
     onRefresh()
   }
 
@@ -278,12 +283,14 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
                     Saldo: {fmt(m.saldo, moneda)}
                   </div>
                 </div>
-                {(canEdit || canCreate) && (
+                {(canEdit || canDelete) && (
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                     {canEdit && (
                       <button onClick={() => openEdit(m)} style={{ padding: '5px 10px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
                     )}
-                    <button onClick={() => handleDelete(m)} style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>
+                    {canDelete && (
+                      <button onClick={() => handleDelete(m)} title="Eliminar" aria-label={`Eliminar ${m.concepto}`} style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>
+                    )}
                   </div>
                 )}
               </div>

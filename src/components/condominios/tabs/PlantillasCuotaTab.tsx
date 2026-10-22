@@ -17,6 +17,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.plantillas_cuota.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -39,7 +41,7 @@ function calcularMontoPorUnidad(unidad: Unidad, rubros: RubroConfig[], totalM2: 
   }, 0)
 }
 
-export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [generando, setGenerando] = useState<string | null>(null)
@@ -114,9 +116,12 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar plantilla?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('plantillas_cuota', id)
+    const { error } = await deleteCondominioRow('plantillas_cuota', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -344,8 +349,10 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
                     <>
                       <button onClick={() => startEdit(p)} style={{ padding: '7px 12px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                       <button onClick={() => toggleActiva(p)} style={{ padding: '7px 12px', background: p.activa ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{p.activa ? '⏸' : '▶'}</button>
-                      <button onClick={() => eliminar(p.id)} style={{ padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: 14 }}>🗑</button>
                     </>
+                  )}
+                  {canDelete && (
+                    <button onClick={() => eliminar(p.id)} title="Eliminar" aria-label={`Eliminar ${p.nombre}`} style={{ padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: 14 }}>🗑</button>
                   )}
                 </div>
               </div>

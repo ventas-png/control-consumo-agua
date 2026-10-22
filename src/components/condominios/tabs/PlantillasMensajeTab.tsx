@@ -10,6 +10,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.plantillas_mensaje.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -30,7 +32,7 @@ function extraerVariables(texto: string): string[] {
   return [...new Set(matches)]
 }
 
-export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [form, setForm] = useState({ ...BLANK })
   const [editId, setEditId] = useState<string | null>(null)
   const [preview, setPreview] = useState<PlantillaMensajeCond | null>(null)
@@ -85,9 +87,12 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
   }
 
   async function eliminar(p: PlantillaMensajeCond) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar plantilla?', text: p.nombre, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('plantillas_mensaje_cond', p.id)
+    const { error } = await deleteCondominioRow('plantillas_mensaje_cond', p.id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -145,7 +150,7 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
                       <button onClick={() => setPreview(p)} style={{ fontSize: 11, padding: '3px 8px', border: '1px solid var(--at-line)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-surface-2)' }}>👁</button>
                       {canEdit && <button onClick={() => abrirEditar(p)} style={{ fontSize: 11, padding: '3px 8px', border: '1px solid var(--at-line)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-surface-2)' }}>✏️</button>}
                       {canEdit && <button onClick={() => toggleActiva(p)} style={{ fontSize: 11, padding: '3px 8px', border: '1px solid var(--at-line)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-surface-2)' }}>{p.activa ? '⏸' : '▶'}</button>}
-                      {canEdit && <button onClick={() => eliminar(p)} style={{ fontSize: 11, padding: '3px 8px', border: '1px solid var(--at-danger-border)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>🗑</button>}
+                      {canDelete && <button onClick={() => eliminar(p)} title="Eliminar" aria-label={`Eliminar ${p.nombre}`} style={{ fontSize: 11, padding: '3px 8px', border: '1px solid var(--at-danger-border)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>🗑</button>}
                     </div>
                   </div>
                 </div>
