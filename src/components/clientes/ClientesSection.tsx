@@ -617,10 +617,9 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
           userId={userId}
           companyId={companyId}
           onClose={() => setShowImportModal(false)}
-          onImportado={(nuevos) => {
-            nuevos.forEach(c => onClienteAdded(c))
-            setShowImportModal(false)
-          }}
+          // No se cierra aquí: la ventana muestra el resumen (importados,
+          // rechazados, «Descargar errores») y el usuario la cierra.
+          onImportado={(nuevos) => nuevos.forEach(c => onClienteAdded(c))}
         />
         </Suspense>
       )}
