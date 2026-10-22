@@ -9,7 +9,9 @@
 --     aunque admitan NULL: sin ellas ninguna policy por empresa pasa);
 --   · FK de una columna → el padre se FABRICA también (recursivo, profundidad
 --     acotada), salvo los padres del padrón: empresa, proyecto, unidad,
---     usuario, cliente;
+--     usuario, cliente. Se reutiliza, salvo cuando la columna integra una
+--     clave ÚNICA de la fila que se prueba (un voto por votación y unidad):
+--     entonces cada alta lleva su padre propio, o chocaría con la anterior;
 --   · CHECK de enumeración sobre la columna (= ANY (ARRAY[...]) / IN (...))
 --     → el primer literal permitido;
 --   · el resto, por tipo.
@@ -156,7 +158,10 @@ BEGIN
       IF ra.padre_del_padron(v_ref, p_empresa) IS NOT NULL THEN
         v_val := quote_literal(ra.padre_del_padron(v_ref, p_empresa)) || '::uuid';
       ELSE
-        v_padre := ra.padre(v_ref, p_empresa, p_prof + 1);
+        v_padre := ra.padre(v_ref, p_empresa, p_prof + 1, p_prof = 0 AND EXISTS (
+          SELECT 1 FROM pg_index i
+          WHERE i.indrelid = p_tabla AND i.indisunique AND NOT i.indisprimary
+            AND (SELECT attnum FROM pg_attribute WHERE attrelid = p_tabla AND attname = v_col.attname) = ANY (i.indkey)));
         IF v_padre IS NULL THEN RETURN NULL; END IF;
         v_val := quote_literal(v_padre ->> v_refc) || '::' || format_type(v_col.atttypid, NULL);
       END IF;
@@ -180,14 +185,17 @@ END;
 $$;
 
 -- Un padre de `p_ref` en la empresa: el ya fabricado, o uno nuevo (confirmado).
-CREATE FUNCTION ra.padre(p_ref regclass, p_empresa uuid, p_prof int) RETURNS jsonb
+-- `p_propio`: siempre uno nuevo, que no se guarda para reutilizar.
+CREATE FUNCTION ra.padre(p_ref regclass, p_empresa uuid, p_prof int, p_propio boolean DEFAULT false) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE AS $$
 DECLARE
   v_sql  text;
   v_fila jsonb;
 BEGIN
-  SELECT fila INTO v_fila FROM ra.padres WHERE tabla = p_ref AND empresa = p_empresa;
-  IF v_fila IS NOT NULL THEN RETURN v_fila; END IF;
+  IF NOT p_propio THEN
+    SELECT fila INTO v_fila FROM ra.padres WHERE tabla = p_ref AND empresa = p_empresa;
+    IF v_fila IS NOT NULL THEN RETURN v_fila; END IF;
+  END IF;
   v_sql := ra.sql_alta(p_ref, p_empresa, p_prof);
   IF v_sql IS NULL THEN RETURN NULL; END IF;
   BEGIN
@@ -195,7 +203,7 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     RETURN NULL;
   END;
-  INSERT INTO ra.padres VALUES (p_ref, p_empresa, v_fila);
+  IF NOT p_propio THEN INSERT INTO ra.padres VALUES (p_ref, p_empresa, v_fila); END IF;
   RETURN v_fila;
 END;
 $$;

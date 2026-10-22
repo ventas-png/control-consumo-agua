@@ -43,7 +43,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DIR_MIGRACIONES, listarMigraciones } from '../../../scripts/schema-drift/reconstruir.mjs'
-import { baseAntesDe, cargarMapa, COMANDOS, leerPolicies, sql as generarSql, transformar, accionSql } from '../../../scripts/rls-acciones/generar.mjs'
+import { baseAntesDe, cargarMapa, COMANDOS, leerPolicies, sql as generarSql, transformar, accionSql, sinPolicy, tieneAtomos } from '../../../scripts/rls-acciones/generar.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const HUELLA = join(AQUI, '../../../scripts/schema-drift/fingerprint.sql')
@@ -90,10 +90,24 @@ try {
     salir()
   }
 
+  // ── Catálogo: toda clave de la sección existe, salvo los tabs declarados ──
+  const clavesDe = ps => [...new Set(tabsSeccion.map(t => `condominios.tab.${t}`).concat(ps.map(p => `condominios.tab.${p}`)))]
+  const usadas = clavesDe(pares)
+  const ausentes = psql('base', ['-tA', '-c', `SELECT k FROM unnest(ARRAY[${usadas.map(k => `'${k}'`).join(', ')}]) AS k WHERE NOT EXISTS (SELECT 1 FROM public.permissions p WHERE p.key = k) ORDER BY k`]).trim().split('\n').filter(Boolean)
+  const tabDe = k => k.split('.')[2]
+  const sinDeclarar = ausentes.filter(k => !(tabDe(k) in mapa._sin_clave))
+  const declaradasPresentes = Object.keys(mapa._sin_clave).filter(t => !ausentes.some(k => tabDe(k) === t))
+  if (sinDeclarar.length) mal(`claves que el catálogo no tiene (¿errata?; si es así a propósito, declara el tab en "_sin_clave"): ${sinDeclarar.join(', ')}`)
+  if (declaradasPresentes.length) mal(`"_sin_clave" declara tabs cuyas claves ya están en el catálogo: ${declaradasPresentes.join(', ')}`)
+  salir()
+  if (ausentes.length) ok(`claves de la sección en el catálogo; sin sembrar a propósito (la prueba las agrega): ${ausentes.join(', ')}`)
+  else ok(`las ${usadas.length} claves de la sección existen en el catálogo`)
+
   // ── Padrón y personas ───────────────────────────────────────────────────────
   const usuariosSql = () => {
     const filas = [['VER', []], ...pares.map(p => [alias(p), [p]]), ['OTRA', pares]]
     const l = ['\\set ON_ERROR_STOP on']
+    if (ausentes.length) l.push(`INSERT INTO public.permissions (key, category, label) SELECT k, 'condominios', k FROM unnest(ARRAY[${ausentes.map(k => `'${k}'`).join(', ')}]) AS k;`)
     filas.forEach(([a], i) => l.push(`INSERT INTO ra.ids VALUES ('${a}', '${`c3000000-0000-0000-0000-${String(i + 1).padStart(12, '0')}`}');`))
     for (const [a, ps] of filas) {
       const empresa = a === 'OTRA' ? 'B' : 'A'
@@ -102,16 +116,24 @@ try {
         `INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES (ra.id('${a}'), ra.id('${empresa}1'), 'total');`,
         `INSERT INTO public.roles (id, company_id, name) VALUES (ra.id('${a}'), ra.id('${empresa}'), 'rls_acciones ${a}');`,
         `INSERT INTO public.user_roles (user_id, role_id) VALUES (ra.id('${a}'), ra.id('${a}'));`)
-      const claves = [...new Set(tabsSeccion.map(t => `condominios.tab.${t}`).concat(ps.map(p => `condominios.tab.${p}`)))]
+      const claves = clavesDe(ps)
       l.push(`INSERT INTO public.role_permissions (role_id, permission_key, effect) SELECT ra.id('${a}'), k, 'allow' FROM unnest(ARRAY[${claves.map(k => `'${k}'`).join(', ')}]) AS k;`)
     }
     return l.join('\n') + '\n'
   }
   writeFileSync(join(trabajo, 'usuarios.sql'), usuariosSql())
+  // Compuertas RESTRICTIVE ajenas al permiso (plan contratado, MFA): la
+  // migración no las toca —la guarda y la huella lo comprueban— y no dependen
+  // del tab ni de la acción. Se retiran en cada base de la prueba (antes,
+  // después y mutantes por igual) para observar la rama de permisos; con
+  // ellas puestas, el AND sólo puede quitar permisos, nunca darlos.
+  const compuertas = todas.filter(p => p.permisiva === 'RESTRICTIVE' && !tieneAtomos(p.using) && !tieneAtomos(p.check))
+  writeFileSync(join(trabajo, 'compuertas.sql'), compuertas.map(p => `DROP POLICY "${p.nombre.replace(/"/g, '""')}" ON public.${p.tabla};`).join('\n') + '\n')
   const padron = bd => {
     aplicar(bd, join(AQUI, 'fabricar.sql'))
     aplicar(bd, join(AQUI, 'padron.sql'))
     aplicar(bd, join(trabajo, 'usuarios.sql'))
+    aplicar(bd, join(trabajo, 'compuertas.sql'))
   }
 
   // ── Matriz ──────────────────────────────────────────────────────────────────
@@ -166,6 +188,7 @@ END $$;`)
   /** Lo que el mapa dice que pasa: persona → tabla → comando → permitido. */
   const permitido = (persona, t, cmd) => {
     if (persona === 'RES') return null   // se compara contra «antes», no contra el mapa
+    if (sinPolicy(todas, t, cmd)) return false   // sin policy permisiva: nadie, ni antes ni después
     if (persona === 'ADM') return true
     if (persona === 'VER' || persona === 'OTRA') return false
     return mapa.tablas[t][cmd].map(alias).includes(persona)
@@ -193,9 +216,12 @@ END $$;`)
   {
     const r = matriz('antes')
     // Antes: INSERT/UPDATE con la visibilidad (todas las personas de A la tienen), DELETE sólo admin.
-    const { difs, fuera } = evaluar(r, (p, _t, cmd) => (p === 'RES' ? null : p === 'ADM' || (p !== 'OTRA' && cmd !== 'DELETE')))
+    const { difs, fuera } = evaluar(r, (p, t, cmd) => (p === 'RES' ? null : !sinPolicy(todas, t, cmd) && (p === 'ADM' || (p !== 'OTRA' && cmd !== 'DELETE'))))
     residenteAntes = new Map(r.resultados.filter(([p]) => p === 'RES').map(([, t, cmd, res]) => [`${t}.${cmd}`, res]))
     const probadas = tablas.filter(t => !fuera.has(`${t}.FABRICA`))
+    for (const p of compuertas) console.log(`  · compuerta retirada en la prueba: ${p.tabla}.${p.nombre} (${p.cmd}: ${(p.check || p.using).replace(/\s+/g, ' ')})`)
+    const vacios = tablas.flatMap(t => COMANDOS.filter(c => sinPolicy(todas, t, c)).map(c => `${t}.${c}`))
+    if (vacios.length) console.log(`  · sin policy permisiva (nadie, ni antes ni después): ${vacios.join(', ')}`)
     if (difs.length) for (const d of difs.slice(0, 20)) mal(`antes · ${d}`)
     else ok(`antes · en ${probadas.length} tablas, quien sólo VE crea y edita, y nadie salvo el admin borra`)
   }

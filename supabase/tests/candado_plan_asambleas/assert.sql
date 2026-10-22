@@ -1,5 +1,5 @@
 -- ============================================================================
--- INVARIANTES de 20261104000050 sobre el padrón (fixture.sql).
+-- INVARIANTES de 20261104000120 sobre el padrón (fixture.sql).
 --
 -- El candado de plan de puntos y votos mira el plan de la empresa de la
 -- ASAMBLEA (public.asambleas): con la feature asambleas_digitales se agregan

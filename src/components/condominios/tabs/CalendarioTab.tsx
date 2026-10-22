@@ -13,7 +13,8 @@ interface Props {
   proyectoId: string
   companyId: string
   canCreate: boolean
-  canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.calendario.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -69,7 +70,7 @@ function mergeAll(eventos: EventoCalendario[], asambleas: Asamblea[], agenda: Ag
 
 const BLANK_FORM = { titulo: '', tipo: 'evento' as TipoEvento, fecha_inicio: '', hora_inicio: '', fecha_fin: '', descripcion: '', color: 'var(--at-primary)', todo_el_dia: true }
 
-export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyId, canCreate, canDelete, onRefresh }: Props) {
   const now = new Date()
   const [viewYear, setViewYear] = useState(now.getFullYear())
   const [viewMonth, setViewMonth] = useState(now.getMonth())
@@ -121,9 +122,12 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar evento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('eventos_calendario', id)
+    const { error } = await deleteCondominioRow('eventos_calendario', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -296,7 +300,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
                 <div key={e.id} style={{ padding: '10px 12px', background: 'var(--at-surface)', border: `1.5px solid ${tint(e.color, 19)}`, borderLeft: `4px solid ${e.color}`, borderRadius: '8px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                     <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)', minWidth: 0, overflowWrap: 'anywhere' }}>{e.titulo}</div>
-                    {canEdit && e.source === 'evento' && (
+                    {canDelete && e.source === 'evento' && (
                       <button onClick={() => handleDelete(e.id)} aria-label={`Eliminar ${e.titulo}`}
                         style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)', flexShrink: 0 }}>🗑️</button>
                     )}

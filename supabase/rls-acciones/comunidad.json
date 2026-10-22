@@ -1,0 +1,161 @@
+{
+  "_migracion": "20261104000100_rls_acciones_comunidad.sql",
+  "_titulo": "Comunidad: escribir exige la ACCIÓN del tab, también en la base",
+  "_porque": [
+    "POR QUÉ",
+    "La pantalla decide cada escritura de estos tabs con su acción (canCreate /",
+    "canEdit / canDelete). Las policies de INSERT y UPDATE sólo pedían ver el tab",
+    "—quien sólo consulta podía crear y editar por la API— y las de DELETE sólo",
+    "dejaban a company_owner/admin, aunque la pantalla le ofreciera «Eliminar» a",
+    "quien tuviera la acción: la RLS borraba cero filas sin error.",
+    "",
+    "Tabs: Actas, Acuerdos, Agenda (y su calendario), Asambleas (puntos y votos),",
+    "Asamblea digital, Buzón de sugerencias, Comunicados (y el tablón de",
+    "Comunidad), Encuestas, Eventos de la comunidad, Infracciones, Junta,",
+    "Programa de actividades, Recordatorios, Sanciones y Votaciones."
+  ],
+  "_sin_clave": {
+    "calendario": "El catálogo no siembra condominios.tab.calendario: hoy sólo company_owner/admin ven la pestaña (y pasan como exentos). La base pide la misma acción que la pantalla, para que funcione el día que se siembre."
+  },
+  "tablas": {
+    "actas_reunion": {
+      "tab": "actas"
+    },
+    "agenda_operativa": {
+      "tab": "agenda"
+    },
+    "anuncios_comunidad": {
+      "tab": "comunicados",
+      "INSERT": [
+        "comunicados.create",
+        "comunidad.create"
+      ],
+      "UPDATE": [
+        "comunicados.edit",
+        "comunidad.edit"
+      ],
+      "DELETE": [
+        "comunicados.delete",
+        "comunidad.delete"
+      ],
+      "porque": "El tablón de Comunidad publica, activa/desactiva y borra anuncios con sus propias acciones; Comunicados los publica en el portal.",
+      "evidencia": {
+        "comunidad": [
+          "components/condominios/tabs/ComunidadTab.tsx"
+        ]
+      }
+    },
+    "asambleas_digital": {
+      "tab": "asamblea_digital"
+    },
+    "comunicados_condominio": {
+      "tab": "comunicados"
+    },
+    "encuestas": {
+      "tab": "encuestas"
+    },
+    "eventos_calendario": {
+      "tab": "agenda",
+      "INSERT": [
+        "agenda.create",
+        "calendario.create"
+      ],
+      "DELETE": [
+        "agenda.delete",
+        "calendario.delete"
+      ],
+      "porque": "Los eventos los crea y borra la pestaña Calendario, con sus propias acciones.",
+      "evidencia": {
+        "calendario": [
+          "components/condominios/tabs/CalendarioTab.tsx"
+        ]
+      }
+    },
+    "eventos_comunidad": {
+      "tab": "eventos_comunidad"
+    },
+    "infracciones_condominio": {
+      "tab": "infracciones",
+      "UPDATE": [
+        "infracciones.edit",
+        "gestion_conflictos.edit"
+      ],
+      "porque": "Gestión de conflictos avanza el estado de la infracción con canEdit('gestion_conflictos').",
+      "evidencia": {
+        "gestion_conflictos": [
+          "components/condominios/tabs/GestionConflictosTab.tsx"
+        ]
+      }
+    },
+    "junta_directiva": {
+      "tab": "junta"
+    },
+    "programa_actividades": {
+      "tab": "programa_actividades"
+    },
+    "puntos_asamblea": {
+      "tab": "asambleas",
+      "INSERT": [
+        "asambleas.create",
+        "asambleas.edit"
+      ],
+      "porque": "«+ Punto» se ofrece con canEdit('asambleas'): agregar un punto a la agenda es editar la asamblea."
+    },
+    "recordatorios_condominio": {
+      "tab": "recordatorios"
+    },
+    "registro_asistentes_evento": {
+      "tab": "eventos_comunidad",
+      "UPDATE": [
+        "eventos_comunidad.edit",
+        "eventos_comunidad.create"
+      ],
+      "porque": "«Agregar asistente» (canCreate) es un upsert por (evento, unidad): anotar de nuevo una unidad actualiza su fila."
+    },
+    "respuestas_encuesta": {
+      "tab": "encuestas"
+    },
+    "sanciones_condominio": {
+      "tab": "sanciones"
+    },
+    "seguimiento_acuerdos": {
+      "tab": "acuerdos"
+    },
+    "sugerencias_condominio": {
+      "tab": "buzon_sugerencias",
+      "UPDATE": [
+        "buzon_sugerencias.edit",
+        "gestion_conflictos.edit"
+      ],
+      "porque": "Gestión de conflictos responde y archiva sugerencias con canEdit('gestion_conflictos').",
+      "evidencia": {
+        "gestion_conflictos": [
+          "components/condominios/tabs/GestionConflictosTab.tsx"
+        ]
+      }
+    },
+    "votaciones": {
+      "tab": "votaciones"
+    },
+    "votos": {
+      "tab": "votaciones"
+    },
+    "votos_asamblea": {
+      "tab": "votaciones",
+      "INSERT": [
+        "votaciones.create",
+        "asambleas.edit"
+      ],
+      "UPDATE": [
+        "votaciones.edit",
+        "asambleas.edit"
+      ],
+      "porque": "Asambleas registra el voto de cada unidad (upsert por punto y unidad) con canEdit('asambleas').",
+      "evidencia": {
+        "asambleas": [
+          "components/condominios/tabs/AsambleasTab.tsx"
+        ]
+      }
+    }
+  }
+}

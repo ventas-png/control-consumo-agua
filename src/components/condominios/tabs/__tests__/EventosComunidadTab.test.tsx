@@ -43,7 +43,7 @@ const asistentes = [
 function renderTab(props: Partial<Parameters<typeof EventosComunidadTab>[0]> = {}) {
   return render(
     <EventosComunidadTab eventos={[evento()]} asistentes={asistentes} unidades={unidades}
-      proyectoId="p1" companyId="co1" canCreate canEdit onRefresh={() => {}} {...props} />,
+      proyectoId="p1" companyId="co1" canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -74,7 +74,7 @@ describe('EventosComunidadTab — ventanas', () => {
 
     rerender(
       <EventosComunidadTab eventos={[evento({ titulo: 'Noche de talentos 2026', estado: 'en_curso' })]} asistentes={asistentes} unidades={unidades}
-        proyectoId="p1" companyId="co1" canCreate canEdit onRefresh={() => {}} />,
+        proyectoId="p1" companyId="co1" canCreate canEdit canDelete onRefresh={() => {}} />,
     )
     const dialog = screen.getByRole('dialog', { name: 'Noche de talentos 2026' })
     expect(within(dialog).getByText('En curso')).toBeTruthy()
@@ -131,7 +131,7 @@ describe('EventosComunidadTab — ventanas', () => {
   })
 
   it('sin permisos no hay acciones en la lista ni en la ventana', () => {
-    renderTab({ canCreate: false, canEdit: false })
+    renderTab({ canCreate: false, canEdit: false, canDelete: false })
     expect(screen.queryByRole('button', { name: '+ Nuevo Evento' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Iniciar' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Eliminar/ })).toBeNull()

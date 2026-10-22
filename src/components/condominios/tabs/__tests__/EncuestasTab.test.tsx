@@ -50,7 +50,7 @@ const respuestas = [
 function renderTab(props: Partial<Parameters<typeof EncuestasTab>[0]> = {}) {
   return render(
     <EncuestasTab encuestas={encuestas} respuestas={respuestas} unidades={unidades} proyectoId="p1" companyId="co1"
-      canCreate canEdit onRefresh={() => {}} {...props} />,
+      canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -126,9 +126,8 @@ describe('EncuestasTab — ventanas', () => {
     await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('encuestas', 'e1', expect.objectContaining({ titulo: 'Satisfacción servicios Q1' })))
   })
 
-  it('sin permiso de edición no hay acciones de gestión, pero se puede responder una encuesta activa', () => {
-    renderTab({ canCreate: false, canEdit: false })
-    expect(screen.queryByRole('button', { name: '+ Nueva Encuesta' })).toBeNull()
+  it('con crear pero sin editar no hay acciones de gestión, pero se puede responder una encuesta activa', () => {
+    renderTab({ canCreate: true, canEdit: false, canDelete: false })
     expect(screen.queryByRole('button', { name: /^Editar/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Activar' })).toBeNull()
 
@@ -143,5 +142,13 @@ describe('EncuestasTab — ventanas', () => {
     dialog = screen.getByRole('dialog', { name: 'Encuesta de piscina' })
     expect(within(dialog).queryByRole('button', { name: '+ Respuesta' })).toBeNull()
     expect(within(dialog).getByText('Aún no hay respuestas')).toBeTruthy()
+  })
+
+  it('sólo consulta: ni gestión ni «+ Respuesta» (registrar una respuesta es crear una fila)', () => {
+    renderTab({ canCreate: false, canEdit: false, canDelete: false })
+    expect(screen.queryByRole('button', { name: '+ Nueva Encuesta' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Satisfacción servicios Q1/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByRole('button', { name: /\+ Respuesta|Editar|Eliminar|Cerrar encuesta/ })).toBeNull()
   })
 })
