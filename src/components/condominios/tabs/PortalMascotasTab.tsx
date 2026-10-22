@@ -7,6 +7,7 @@
 // (domain/portal/padron); la tabla no se toca directo.
 import { useCallback, useEffect, useState } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
+import { EditModal } from '../../shared/EditModal'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { hoyLocalISO } from '../../../lib/format'
@@ -157,18 +158,45 @@ function MascotaForm({ unidadId, borradorId, onCerrar, onEnviada }: {
     onEnviada()
   }
 
+  // Lo escrito vive solo en este formulario: al cerrarlo se pierde (el borrador
+  // conserva el id, no la ficha). × y Escape lo cierran de un toque, así que si
+  // ya hay algo lleno se pregunta antes.
+  const sucio = JSON.stringify(ficha) !== JSON.stringify(blankFicha())
+    || !!fotoUrl || Object.keys(marcadas).length > 0 || otras.length > 0 || docs.length > 0
+
+  async function cerrar() {
+    if (saving) return
+    if (sucio) {
+      const r = await confirm({ title: '¿Cerrar sin enviar?', text: 'Se perderá lo que llenaste en el formulario.', icon: 'warning', confirmText: 'Cerrar sin enviar', cancelText: 'Seguir llenando' })
+      if (!r.isConfirmed) return
+    }
+    onCerrar()
+  }
+
   const catalogo = VACUNAS_POR_ESPECIE[ficha.especie]
   const bloqueado = saving || subiendo || !id
 
   return (
-    <div style={{ maxWidth: '680px' }}>
-      <div style={{ marginBottom: '16px' }}>
-        <h3 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700, color: 'var(--at-ink)' }}>🐾 Registrar mascota</h3>
-        <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-3)' }}>
-          Completa la ficha de tu mascota y solicita la autorización de la administración para tenerla en tu unidad.
-        </p>
-      </div>
-
+    <EditModal
+      title="Registrar mascota"
+      subtitle="Completa la ficha de tu mascota y solicita la autorización de la administración para tenerla en tu unidad."
+      size="md"
+      fullScreenOnMobile
+      onClose={cerrar}
+      /* Sin cierre por backdrop: en móvil un roce fuera del panel cerraría la ficha a medio llenar. */
+      closeOnBackdropClick={false}
+      footer={
+        <>
+          <button onClick={cerrar} disabled={saving} style={{ padding: '10px 18px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '9px', fontSize: '13.5px', cursor: 'pointer' }}>
+            Cerrar
+          </button>
+          <button onClick={enviar} disabled={bloqueado} style={{
+            padding: '10px 24px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: '9px',
+            fontWeight: 600, fontSize: '14px', cursor: bloqueado ? 'not-allowed' : 'pointer', opacity: bloqueado ? 0.7 : 1,
+          }}>{saving ? 'Enviando…' : 'Enviar solicitud'}</button>
+        </>
+      }
+    >
       {errorReserva && (
         <div role="alert" style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: 'var(--at-danger)' }}>
           No se pudo preparar el registro: {errorReserva}
@@ -321,21 +349,14 @@ function MascotaForm({ unidadId, borradorId, onCerrar, onEnviada }: {
         placeholderEtiqueta="Etiqueta (ej. Carnet de vacunación)"
       />
 
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <button onClick={enviar} disabled={bloqueado} style={{
-          padding: '10px 24px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: '9px',
-          fontWeight: 600, fontSize: '14px', cursor: bloqueado ? 'not-allowed' : 'pointer', opacity: bloqueado ? 0.7 : 1,
-        }}>{saving ? 'Enviando…' : 'Enviar solicitud'}</button>
-        <button onClick={onCerrar} disabled={saving} style={{ padding: '10px 18px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '9px', fontSize: '13.5px', cursor: 'pointer' }}>
-          Cerrar
+      {/* Fuera del footer: tres botones no caben a lo ancho de un teléfono, y la
+          acción destructiva no debe quedar junto a "Enviar solicitud". */}
+      {id && (
+        <button onClick={descartar} disabled={saving} style={{ padding: '10px 18px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '9px', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer' }}>
+          Descartar registro
         </button>
-        {id && (
-          <button onClick={descartar} disabled={saving} style={{ padding: '10px 18px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '9px', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer' }}>
-            Descartar registro
-          </button>
-        )}
-      </div>
-    </div>
+      )}
+    </EditModal>
   )
 }
 
@@ -382,20 +403,18 @@ export function PortalMascotasTab({ unidadId, unidadNombre, clienteId, esPropiet
     cargar()
   }
 
-  if (formAbierto) {
-    return (
-      <MascotaForm
-        key={borrador?.id ?? 'nuevo'}
-        unidadId={unidadId}
-        borradorId={borrador?.id ?? null}
-        onCerrar={() => { setFormAbierto(false); cargar() }}
-        onEnviada={() => { setFormAbierto(false); cargar() }}
-      />
-    )
-  }
-
   return (
     <div>
+      {formAbierto && (
+        <MascotaForm
+          key={borrador?.id ?? 'nuevo'}
+          unidadId={unidadId}
+          borradorId={borrador?.id ?? null}
+          onCerrar={() => { setFormAbierto(false); cargar() }}
+          onEnviada={() => { setFormAbierto(false); cargar() }}
+        />
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
         <div>
           <h3 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: 700, color: 'var(--at-ink)' }}>🐾 Mascotas — {unidadNombre}</h3>

@@ -8,7 +8,8 @@ import {
   construirBandejaRecepcion, buscarEnRecepcion, duplicadosPorGuia,
   normalizarGuia, diasParaVencer, diasEnCustodia, piezasEnRiesgo, piezaAItemRecepcion,
   estadoLabel, subtipoDePieza, claseDePieza,
-  esPiezaSaliente, piezaAvisable, etiquetaEstadoResidente, nombreAcuse, nombreAcuseValido,
+  esPiezaSaliente, piezaAvisable, piezasPorRetirar, salidasRetiradasRecientes,
+  etiquetaEstadoResidente, nombreAcuse, nombreAcuseValido,
 } from '../recepcion'
 import type { PiezaRecepcion } from '../../../types'
 
@@ -293,6 +294,38 @@ describe('dirección de la pieza', () => {
       expect(piezaAvisable({ direccion: 'entrante', unidad_id: null, destinatario_tipo: 'administracion' })).toBe(false)
       // Ni aunque alguien deje una unidad colgada con destinatario 'administracion'.
       expect(piezaAvisable({ direccion: 'entrante', unidad_id: 'u1', destinatario_tipo: 'administracion' })).toBe(false)
+    })
+  })
+
+  describe('piezasPorRetirar', () => {
+    it('cuenta solo las ENTRADAS pendientes', () => {
+      const lista = [
+        paquete({ id: 'entra' }),
+        paquete({ id: 'ya', estado: 'entregado' }),
+        // El caso reportado: el residente dejó un paquete para un tercero y el
+        // portal le avisaba que tenía un paquete esperándolo.
+        paquete({ id: 'dejado', direccion: 'saliente_tercero' }),
+      ]
+      expect(piezasPorRetirar(lista).map(p => p.id)).toEqual(['entra'])
+    })
+  })
+
+  describe('salidasRetiradasRecientes', () => {
+    const ahora = '2026-10-22T12:00:00Z'
+
+    it('devuelve las salidas retiradas dentro de la ventana', () => {
+      const lista = [
+        paquete({ id: 'hoy', direccion: 'saliente_tercero', estado: 'entregado', hora_entrega: '2026-10-22T09:00:00Z' }),
+        paquete({ id: 'vieja', direccion: 'saliente_tercero', estado: 'entregado', hora_entrega: '2026-10-10T09:00:00Z' }),
+        paquete({ id: 'esperando', direccion: 'saliente_tercero', estado: 'pendiente' }),
+        paquete({ id: 'devuelta', direccion: 'saliente_tercero', estado: 'devuelto', hora_entrega: '2026-10-22T09:00:00Z' }),
+      ]
+      expect(salidasRetiradasRecientes(lista, ahora).map(p => p.id)).toEqual(['hoy'])
+    })
+
+    it('ignora las entradas: firmarlas no es "te lo recogieron"', () => {
+      const entrada = paquete({ estado: 'entregado', hora_entrega: '2026-10-22T09:00:00Z' })
+      expect(salidasRetiradasRecientes([entrada], ahora)).toEqual([])
     })
   })
 

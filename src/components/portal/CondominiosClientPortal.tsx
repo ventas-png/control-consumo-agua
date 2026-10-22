@@ -24,7 +24,8 @@ import { PortalRentasTab }     from '../condominios/tabs/PortalRentasTab'
 import { PortalMudanzaTab }    from '../condominios/tabs/PortalMudanzaTab'
 import { PortalMascotasTab }   from '../condominios/tabs/PortalMascotasTab'
 import { PortalVehiculosTab }  from '../condominios/tabs/PortalVehiculosTab'
-import { PortalPaquetesTab }   from '../condominios/tabs/PortalPaquetesTab'
+import { PortalPaquetesTab, type VistaPaquetes } from '../condominios/tabs/PortalPaquetesTab'
+import { piezasPorRetirar, salidasRetiradasRecientes } from '../../domain/condominios/recepcion'
 import { PortalCorrespondenciaTab } from '../condominios/tabs/PortalCorrespondenciaTab'
 import { MediaScopeProvider }  from '../shared/MediaScopeContext'
 // F3.12: Portal residente ampliado (asambleas + transparencia)
@@ -70,6 +71,23 @@ const SECCION_A_TAB: Record<string, PortalTab> = {
 // PORTAL_TABS y la visibilidad por rol viven en lib/portalTabs (módulo puro,
 // testeable sin montar el portal).
 
+// Aviso de paquetería al entrar. Lo que espera al residente en portería se le
+// recuerda una vez por sesión hasta que lo retire (sessionStorage); que ya
+// recogieron lo que él dejó es una noticia, se le da una sola vez (localStorage).
+const PAQ_PENDIENTES_VISTOS = 'paq_popup_seen'
+const PAQ_RETIROS_VISTOS = 'paq_retiros_vistos'
+
+function leerIdsVistos(store: () => Storage, clave: string): string[] {
+  try {
+    const v: unknown = JSON.parse(store().getItem(clave) ?? '[]')
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  } catch { return [] }
+}
+
+function guardarIdsVistos(store: () => Storage, clave: string, ids: string[]) {
+  try { store().setItem(clave, JSON.stringify(ids)) } catch { /* ignore */ }
+}
+
 // Los estilos .condo-skeleton/.condo-tab (y keyframes) viven ahora en
 // src/styles/runtime.css (I24).
 
@@ -99,6 +117,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [correspondencia, setCorrespondencia]     = useState<PiezaRecepcion[]>([])
   const [comunicados, setComunicados]             = useState<ComunicadoCondominio[]>([])
   const [popupOpen, setPopupOpen]                 = useState(false)
+  const [retirosVistos, setRetirosVistos]         = useState<string[]>(() => leerIdsVistos(() => localStorage, PAQ_RETIROS_VISTOS))
+  const [vistaPaquetes, setVistaPaquetes]         = useState<VistaPaquetes>('recibidos')
 
   const cargarDatos = useCallback(async () => {
     if (!clienteId) { setLoading(false); return }
@@ -213,16 +233,18 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     void marcarAnunciosLeidos(visibles, clienteId, resolvedCompanyId)
   }, [tab, loading, anuncios, unidades, selectedUnidadId, clienteId, resolvedCompanyId])
 
-  // Pop-up de aviso: muestra los paquetes pendientes una vez por sesión (set de
-  // ids vistos en sessionStorage para no repetir en cada refresco).
+  // Pop-up de aviso: los envíos que esperan al residente en portería (una vez
+  // por sesión) y los que él dejó para un tercero y ya se retiraron (una sola
+  // vez). Solo cuentan las ENTRADAS como "por recoger": lo que el residente
+  // dejó también está 'pendiente' mientras nadie lo retira, y antes el aviso le
+  // pedía que fuera a buscar su propio paquete.
   useEffect(() => {
     if (loading) return
-    const pend = paquetes.filter(p => p.estado === 'pendiente')
-    if (pend.length === 0) return
-    let seen: string[] = []
-    try { seen = JSON.parse(sessionStorage.getItem('paq_popup_seen') ?? '[]') } catch { seen = [] }
-    if (pend.some(p => !seen.includes(p.id))) setPopupOpen(true)
-  }, [loading, paquetes])
+    const pendVistos = leerIdsVistos(() => sessionStorage, PAQ_PENDIENTES_VISTOS)
+    const hayPendientes = piezasPorRetirar(paquetes).some(p => !pendVistos.includes(p.id))
+    const hayRetiros = salidasRetiradasRecientes(paquetes, new Date().toISOString()).some(p => !retirosVistos.includes(p.id))
+    if (hayPendientes || hayRetiros) setPopupOpen(true)
+  }, [loading, paquetes, retirosVistos])
 
   // Visibilidad por rol: si el tab activo no está permitido para la unidad
   // seleccionada (p.ej. la campana navegó, o el cliente pasó de una unidad
@@ -287,12 +309,26 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const correspondenciaU = correspondencia.filter(c => c.unidad_id === selectedUnidadId)
   const mensajesU      = mensajes.filter(m => m.unidad_id === selectedUnidadId)
   const comunicadosU   = comunicados.filter(c => c.unidad_id === selectedUnidadId)
-  const paquetesPendientes = paquetes.filter(p => p.estado === 'pendiente')
+  const paquetesPendientes = piezasPorRetirar(paquetes)
+  const retirosRecientes   = salidasRetiradasRecientes(paquetes, new Date().toISOString())
+  const retirosNuevos      = retirosRecientes.filter(p => !retirosVistos.includes(p.id))
 
-  function cerrarPopup(irA?: boolean) {
-    try { sessionStorage.setItem('paq_popup_seen', JSON.stringify(paquetesPendientes.map(p => p.id))) } catch { /* ignore */ }
+  function cerrarPopup(irA?: VistaPaquetes) {
+    guardarIdsVistos(() => sessionStorage, PAQ_PENDIENTES_VISTOS, paquetesPendientes.map(p => p.id))
+    // Solo los de la ventana: lo que sale de ella ya no se vuelve a avisar, así
+    // que la lista no crece sin fin.
+    const vistos = retirosRecientes.map(p => p.id)
+    guardarIdsVistos(() => localStorage, PAQ_RETIROS_VISTOS, vistos)
+    setRetirosVistos(vistos)
     setPopupOpen(false)
-    if (irA) setTab('paquetes')
+    if (!irA) return
+    // El aviso junta todas las unidades del residente; si lo que lleva a ver es
+    // de una sola, se abre esa (y no la que estaba seleccionada).
+    const listados = irA === 'recibidos' ? paquetesPendientes : retirosNuevos
+    const unidadesListadas = [...new Set(listados.map(p => p.unidad_id).filter((id): id is string => !!id))]
+    if (unidadesListadas.length === 1 && unidades.some(u => u.id === unidadesListadas[0])) setSelectedUnidadId(unidadesListadas[0])
+    setVistaPaquetes(irA)
+    setTab('paquetes')
   }
   // Most recent rental authorization for the selected unit (null = none submitted)
   const solicitudRentaU = solicitudesRenta.find(s => s.unidad_id === selectedUnidadId) ?? null
@@ -537,6 +573,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 paquetes={paquetesU}
                 unidadId={selectedUnidadId}
                 nombrePrefill={currentUser.name}
+                vista={vistaPaquetes}
+                onVistaChange={setVistaPaquetes}
                 onRefresh={cargarDatos}
               />
             )}
@@ -623,36 +661,64 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         )}
       </div>
 
-      {popupOpen && paquetesPendientes.length > 0 && (
-        <EditModal title="📦 Tienes paquetes en portería" onClose={() => cerrarPopup()} maxWidth="440px">
-          <p style={{ margin: '0 0 14px', fontSize: '14px', color: 'var(--at-ink-2)', lineHeight: 1.5 }}>
-            {paquetesPendientes.length === 1 ? 'Hay un envío esperándote' : `Hay ${paquetesPendientes.length} envíos esperándote`} en portería. Al retirarlo podrás firmar la recepción desde tu portal.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px', maxHeight: '240px', overflowY: 'auto' }}>
-            {paquetesPendientes.map(p => (
-              <div key={p.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '10px', padding: '10px 12px' }}>
-                <span style={{ fontSize: '22px', flexShrink: 0 }}>📦</span>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--at-ink)' }}>{p.descripcion}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
-                    {p.unidad_nombre ? `📍 ${p.unidad_nombre}` : ''}{p.remitente ? ` · De: ${p.remitente}` : ''}
-                  </div>
-                </div>
+      {popupOpen && (paquetesPendientes.length > 0 || retirosNuevos.length > 0) && (
+        <EditModal
+          title={paquetesPendientes.length === 0
+            ? (retirosNuevos.length === 1 ? '✅ Ya recogieron tu paquete' : '✅ Ya recogieron tus paquetes')
+            : retirosNuevos.length === 0 ? '📦 Tienes paquetes en portería' : '📦 Novedades de paquetería'}
+          onClose={() => cerrarPopup()}
+          maxWidth="440px"
+        >
+          {paquetesPendientes.length > 0 && (
+            <>
+              <p style={{ margin: '0 0 12px', fontSize: '14px', color: 'var(--at-ink-2)', lineHeight: 1.5 }}>
+                {paquetesPendientes.length === 1 ? 'Hay un envío esperándote' : `Hay ${paquetesPendientes.length} envíos esperándote`} en portería. Al retirarlo podrás firmar la recepción desde tu portal.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px', maxHeight: '220px', overflowY: 'auto' }}>
+                {paquetesPendientes.map(p => (
+                  <AvisoPaqueteFila key={p.id} icono="📦" titulo={p.descripcion}
+                    detalle={[p.unidad_nombre && `📍 ${p.unidad_nombre}`, p.remitente && `De: ${p.remitente}`].filter(Boolean).join(' · ')} />
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
+          {retirosNuevos.length > 0 && (
+            <>
+              <p style={{ margin: '0 0 12px', fontSize: '14px', color: 'var(--at-ink-2)', lineHeight: 1.5 }}>
+                {retirosNuevos.length === 1 ? 'La persona que autorizaste ya retiró lo que dejaste' : 'Las personas que autorizaste ya retiraron lo que dejaste'} en portería.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px', maxHeight: '220px', overflowY: 'auto' }}>
+                {retirosNuevos.map(p => (
+                  <AvisoPaqueteFila key={p.id} icono="✅" titulo={p.descripcion}
+                    detalle={`Retirado por ${p.entregado_a_nombre || p.autorizado_nombre || 'la persona autorizada'}${p.hora_entrega ? ` · ${new Date(p.hora_entrega).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}`} />
+                ))}
+              </div>
+            </>
+          )}
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => cerrarPopup(true)} style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent))', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
-              Ver y firmar
+            <button onClick={() => cerrarPopup(paquetesPendientes.length > 0 ? 'recibidos' : 'salidas')} style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent))', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+              {paquetesPendientes.length > 0 ? 'Ver y firmar' : 'Ver detalle'}
             </button>
             <button onClick={() => cerrarPopup()} style={{ padding: '11px 18px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>
-              Después
+              {paquetesPendientes.length > 0 ? 'Después' : 'Entendido'}
             </button>
           </div>
         </EditModal>
       )}
     </div>
     </MediaScopeProvider>
+  )
+}
+
+function AvisoPaqueteFila({ icono, titulo, detalle }: { icono: string; titulo: string; detalle: string }) {
+  return (
+    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '10px', padding: '10px 12px' }}>
+      <span aria-hidden="true" style={{ fontSize: '22px', flexShrink: 0 }}>{icono}</span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--at-ink)' }}>{titulo}</div>
+        {detalle && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{detalle}</div>}
+      </div>
+    </div>
   )
 }
 

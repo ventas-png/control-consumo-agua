@@ -1,7 +1,8 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia } from '../../types'
 import { notify } from '../shared/Dialog'
-import { calcularFacturaEnergia, validarFacturaEnergia } from '../../lib/businessEnergia'
+import { calcularFacturaEnergia, validarFacturaEnergia, totalFacturaEnergia } from '../../lib/businessEnergia'
+import { redondear2 } from '../../lib/business'
 import { sanitizeInput } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
@@ -62,14 +63,25 @@ export default function FacturaEnergiaModal({
       kwDemandaMax: formData.kw_demanda_max || 0,
     })
 
+    // Solo los montos, a centavos como los guarda la base. Antes se copiaba el
+    // resultado entero, con `subtotal`, que no es columna de facturas_energia:
+    // guardar después de calcular fallaba. El total sale del desglose.
     setFormData(prev => ({
       ...prev,
-      ...calculo,
+      monto_energia: redondear2(calculo.monto_energia),
+      monto_potencia: redondear2(calculo.monto_potencia),
+      monto_cargo_fijo: redondear2(calculo.monto_cargo_fijo),
+      monto_alumbrado: redondear2(calculo.monto_alumbrado),
+      monto_iva: redondear2(calculo.monto_iva),
+      monto_credito_exportacion: redondear2(calculo.monto_credito_exportacion),
       moneda: tarifa.moneda,
     }))
 
     notify({ variant: 'success', title: 'Éxito', text: 'Montos calculados desde la tarifa' })
   }
+
+  // Se recalcula con cada cambio del desglose y es lo que se guarda.
+  const total = totalFacturaEnergia(formData)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -95,9 +107,11 @@ export default function FacturaEnergiaModal({
         monto_cargo_fijo: parseFloat(String(formData.monto_cargo_fijo || 0)),
         monto_alumbrado: parseFloat(String(formData.monto_alumbrado || 0)),
         monto_iva: parseFloat(String(formData.monto_iva || 0)),
-        monto_credito_exportacion: parseFloat(String(formData.monto_credito_exportacion || 0)),
+        // El crédito se guarda siempre en negativo, como lo deja el cálculo desde
+        // tarifa: así el Dashboard no mezcla signos al sumarlo.
+        monto_credito_exportacion: -Math.abs(parseFloat(String(formData.monto_credito_exportacion || 0))),
         monto_otros: parseFloat(String(formData.monto_otros || 0)),
-        monto_total: parseFloat(String(formData.monto_total || 0)),
+        monto_total: total,
       }
 
       // serv:S6 — valida kWh no negativos + secuencialidad del período.
@@ -289,7 +303,9 @@ export default function FacturaEnergiaModal({
               </div>
               <div style={{ fontWeight: 'bold' }}>
                 <div style={etiquetaChica}>Total</div>
-                <div style={{ padding: '0.5rem', backgroundColor: 'var(--at-primary-tint)', borderRadius: '4px' }}>{moneda} {(formData.monto_total || 0).toFixed(2)}</div>
+                {/* <output>: resultado de un cálculo; el lector de pantalla anuncia el total nuevo. */}
+                <output aria-label="Total de la factura" style={{ display: 'block', padding: '0.5rem', backgroundColor: 'var(--at-primary-tint)', borderRadius: '4px' }}>{moneda} {total.toFixed(2)}</output>
+                <div style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--at-ink-3)', marginTop: '0.25rem' }}>Suma del desglose; el crédito resta.</div>
               </div>
             </div>
           </div>
