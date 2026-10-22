@@ -14,6 +14,9 @@ interface Props {
   companyId: string
   userId: string
   canCreate: boolean
+  canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.comunidad.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -24,7 +27,7 @@ const TIPO_CONFIG: Record<TipoAnuncio, { label: string; bg: string; color: strin
   mantenimiento: { label: 'Mantenimiento', bg: 'var(--at-warning-tint)', color: 'var(--at-warning)', icon: '🔧' },
 }
 
-export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreate, onRefresh }: Props) {
+export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState<TipoAnuncio | 'todos'>('todos')
@@ -84,15 +87,19 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
   }
 
   async function toggleActivo(anuncio: AnuncioComunidad) {
+    if (!canEdit) return
     const { error } = await updateCondominioRow('anuncios_comunidad', anuncio.id, { activo: !anuncio.activo })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const result = await confirm({ title: '¿Eliminar anuncio?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
-    await deleteCondominioRow('anuncios_comunidad', id)
+    const { error } = await deleteCondominioRow('anuncios_comunidad', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -221,13 +228,13 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-                    {canCreate && (
+                    {canEdit && (
                       <button onClick={() => toggleActivo(a)} title={a.activo ? 'Desactivar' : 'Activar'}
                         style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid var(--at-line)', background: a.activo ? 'var(--at-success-tint)' : 'var(--at-surface-2)', color: a.activo ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                         {a.activo ? '✓ Activo' : '○ Inactivo'}
                       </button>
                     )}
-                    <button onClick={() => eliminar(a.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '4px', textAlign: 'center' }}>🗑</button>
+                    {canDelete && <button onClick={() => eliminar(a.id)} title="Eliminar" aria-label={`Eliminar ${a.titulo}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '4px', textAlign: 'center' }}>🗑</button>}
                   </div>
                 </div>
               </div>

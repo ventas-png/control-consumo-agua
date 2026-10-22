@@ -27,7 +27,7 @@ const comunicado = {
 function renderTab(props: Partial<Parameters<typeof ComunicadosTab>[0]> = {}) {
   return render(
     <ComunicadosTab comunicados={[comunicado]} unidades={[]} proyectoId="p1" companyId="co1" userId="u1"
-      canCreate canEdit onRefresh={() => {}} {...props} />,
+      canCreate canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -72,7 +72,7 @@ describe('ComunicadosTab — ventanas', () => {
   })
 
   it('sin permiso de crear no hay botón de nuevo ni de publicar', () => {
-    renderTab({ canCreate: false, canEdit: false })
+    renderTab({ canCreate: false, canDelete: false })
     expect(screen.queryByRole('button', { name: '+ Nuevo Comunicado' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Portal/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /^📌 Corte de agua/ }))

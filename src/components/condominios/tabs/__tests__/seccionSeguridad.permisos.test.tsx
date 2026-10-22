@@ -14,6 +14,7 @@ import type {
   AlertaCondominio, ContactoEmergencia, InformeMensual, LocalComercial, ObjetoPerdido,
   RegistroResiduo, SolicitudConcierge, Unidad, Visitante, VisitaFrecuente,
 } from '../../../../types'
+import { eliminarExigeSuPermiso } from '../../../../test/eliminarExigeSuPermiso'
 
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
@@ -55,65 +56,40 @@ const como = <T,>(o: Record<string, unknown>) => o as unknown as T
 beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
 afterEach(cleanup)
 
-/** Las tres verificaciones de cada pestaña con Eliminar. */
-function eliminarExigeSuPermiso(
-  nombre: string,
-  montar: (p: { canEdit: boolean; canDelete: boolean }) => void,
-  boton: RegExp,
-  tabla: string,
-  id: string,
-) {
-  describe(`${nombre} — Eliminar exige canDelete`, () => {
-    it('editar sin eliminar: no hay botón Eliminar', () => {
-      montar({ canEdit: true, canDelete: false })
-      expect(screen.queryByRole('button', { name: boton })).toBeNull()
-    })
-    it('sólo consulta: no hay botón Eliminar', () => {
-      montar({ canEdit: false, canDelete: false })
-      expect(screen.queryByRole('button', { name: boton })).toBeNull()
-    })
-    it('eliminar sin editar: el botón borra la fila', async () => {
-      montar({ canEdit: false, canDelete: true })
-      fireEvent.click(screen.getAllByRole('button', { name: boton })[0])
-      await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith(tabla, id))
-    })
-  })
-}
-
 eliminarExigeSuPermiso('Objetos perdidos', p => conI18n(
   <ObjetosTab {...base} userId="u1" canCreate {...p}
     objetos={[como<ObjetoPerdido>({ id: 'o1', descripcion: 'Llaves con llavero rojo', categoria: 'llaves', lugar_encontrado: 'Lobby', fecha_encontrado: '2026-10-10', estado: 'en_custodia', created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^(Eliminar|Delete)$/, 'objetos_perdidos', 'o1')
+), /^(Eliminar|Delete)$/, mocks.deleteCondominioRow, 'objetos_perdidos', 'o1')
 
 eliminarExigeSuPermiso('Emergencias', p => render(
   <EmergenciasTab {...base} canCreate {...p}
     contactos={[como<ContactoEmergencia>({ id: 'e1', nombre: 'Bomberos zona 10', tipo: 'bomberos', telefono: '122', activo: true, disponible_24h: true, orden: 1, created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^Eliminar Bomberos zona 10$/, 'contactos_emergencia', 'e1')
+), /^Eliminar Bomberos zona 10$/, mocks.deleteCondominioRow, 'contactos_emergencia', 'e1')
 
 eliminarExigeSuPermiso('Residuos', p => render(
   <ResiduosTab {...base} userId="u1" canCreate {...p}
     residuos={[como<RegistroResiduo>({ id: 'rs1', fecha: '2026-10-10', tipo: 'reciclable', cantidad_kg: 12, estado: 'pendiente', created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^Eliminar registro$/, 'registros_residuos', 'rs1')
+), /^Eliminar registro$/, mocks.deleteCondominioRow, 'registros_residuos', 'rs1')
 
 eliminarExigeSuPermiso('Locales comerciales', p => conI18n(
   <LocalesTab {...base} moneda="Q" canCreate {...p}
     locales={[como<LocalComercial>({ id: 'l1', numero: 'L-01', nombre_negocio: 'Farmacia', giro: 'comercio', estado: 'ocupado', created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^(Eliminar|Delete)$/, 'locales_comerciales', 'l1')
+), /^(Eliminar|Delete)$/, mocks.deleteCondominioRow, 'locales_comerciales', 'l1')
 
 eliminarExigeSuPermiso('Concierge', p => render(
   <ConciergeTab {...base} moneda="Q" unidades={unidades} canCreate {...p}
     solicitudes={[como<SolicitudConcierge>({ id: 'c1', tipo: 'limpieza', descripcion: 'Limpieza profunda', fecha_solicitud: '2026-10-10', estado: 'pendiente', created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^Eliminar Limpieza profunda$/, 'solicitudes_concierge', 'c1')
+), /^Eliminar Limpieza profunda$/, mocks.deleteCondominioRow, 'solicitudes_concierge', 'c1')
 
 eliminarExigeSuPermiso('Alertas', p => conI18n(
   <AlertasTab {...base} polizas={[]} contratos={[]} inspecciones={[]} llaves={[]} canCreate {...p}
     alertas={[como<AlertaCondominio>({ id: 'a1', tipo: 'aviso', titulo: 'Revisar extintores', fecha_alerta: '2026-10-30', estado: 'activa', created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^(Eliminar|Delete)$/, 'alertas_condominio', 'a1')
+), /^(Eliminar|Delete)$/, mocks.deleteCondominioRow, 'alertas_condominio', 'a1')
 
 eliminarExigeSuPermiso('Visitas frecuentes', p => render(
   <VisitasFrecuentesTab {...base} unidades={unidades} canCreate {...p}
     visitas={[como<VisitaFrecuente>({ id: 'v1', unidad_id: 'un1', nombre: 'Ana Pérez', relacion: 'familiar', activo: true, dias_semana: [], created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^Eliminar Ana Pérez$/, 'visitas_frecuentes', 'v1')
+), /^Eliminar Ana Pérez$/, mocks.deleteCondominioRow, 'visitas_frecuentes', 'v1')
 
 describe('Control de accesos QR — registrar exige canCreate', () => {
   const dentro = como<Visitante>({

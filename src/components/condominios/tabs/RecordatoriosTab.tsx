@@ -12,6 +12,8 @@ interface Props {
   autorNombre: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.recordatorios.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -25,7 +27,7 @@ const TIPO_LABELS: Record<TipoEntidadRecordatorio, string> = {
   cuota: 'Cuota', contrato: 'Contrato', inspeccion: 'Inspección', mantenimiento: 'Mantenimiento', general: 'General',
 }
 
-export default function RecordatoriosTab({ recordatorios, proyectoId, companyId, userId, autorNombre, canCreate, canEdit, onRefresh }: Props) {
+export default function RecordatoriosTab({ recordatorios, proyectoId, companyId, userId, autorNombre, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<'pendientes' | 'completados' | 'todos'>('pendientes')
@@ -79,17 +81,22 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
   }
 
   async function marcarCompletado(r: RecordatorioCondominio) {
-    await updateCondominioRow('recordatorios_condominio', r.id, {
+    if (!canEdit) return
+    const { error } = await updateCondominioRow('recordatorios_condominio', r.id, {
       completado: !r.completado,
       fecha_completado: !r.completado ? new Date().toISOString() : null,
     })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const res = await confirm({ title: '¿Eliminar recordatorio?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    await deleteCondominioRow('recordatorios_condominio', id)
+    const { error } = await deleteCondominioRow('recordatorios_condominio', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -193,8 +200,10 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
             const pcfg = PRIORIDAD_CFG[r.prioridad]
             return (
               <div key={r.id} style={{ background: r.completado ? 'var(--at-surface-2)' : vencido ? 'var(--at-danger-tint)' : urgente ? 'var(--at-warning-tint)' : 'var(--at-surface)', border: `1px solid ${vencido ? 'var(--at-danger-border)' : urgente ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="checkbox" checked={r.completado} onChange={() => marcarCompletado(r)}
-                  style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }} />
+                {/* Completar es editar: sin canEdit, el estado sólo se muestra. */}
+                <input type="checkbox" checked={r.completado} onChange={() => marcarCompletado(r)} disabled={!canEdit}
+                  aria-label={`Completado: ${r.titulo}`}
+                  style={{ width: 18, height: 18, cursor: canEdit ? 'pointer' : 'default', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                     <span style={{ fontWeight: 600, fontSize: 13, color: r.completado ? 'var(--at-ink-3)' : 'var(--at-ink)', textDecoration: r.completado ? 'line-through' : 'none' }}>{r.titulo}</span>
@@ -213,8 +222,8 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
                     }
                   </div>
                 </div>
-                {canEdit && !r.completado && (
-                  <button onClick={() => eliminar(r.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: 16, flexShrink: 0 }}>🗑</button>
+                {canDelete && !r.completado && (
+                  <button onClick={() => eliminar(r.id)} title="Eliminar" aria-label={`Eliminar ${r.titulo}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: 16, flexShrink: 0 }}>🗑</button>
                 )}
               </div>
             )
