@@ -998,6 +998,8 @@ jobs:
       # y elige su propio puerto.
       - name: Acciones por permiso — sección seguridad
         run: node supabase/tests/rls_acciones/run.mjs seguridad
+      - name: Acciones por permiso — sección comunidad
+        run: node supabase/tests/rls_acciones/run.mjs comunidad
 
       # 20261104000050: el candado de plan (asambleas_digitales) de
       # puntos_asamblea y votos_asamblea buscaba la empresa en asambleas_digital

@@ -7,6 +7,8 @@
 //   · Control de accesos QR registra visitantes sólo con canCreate (antes lo
 //     ignoraba: cualquiera que viera el tab registraba entradas y salidas).
 //   · Publicar el informe mensual exige canCreate, como generarlo.
+//   · Visitantes registra la salida sólo con canCreate (antes la ofrecía a
+//     quien viera el tab; la base pide la acción para ese UPDATE).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
@@ -14,6 +16,7 @@ import type {
   AlertaCondominio, ContactoEmergencia, InformeMensual, LocalComercial, ObjetoPerdido,
   RegistroResiduo, SolicitudConcierge, Unidad, Visitante, VisitaFrecuente,
 } from '../../../../types'
+import { eliminarExigeSuPermiso } from '../../../../test/eliminarExigeSuPermiso'
 
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
@@ -29,10 +32,13 @@ vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db:
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
+  updateCondominioRowsByIds: vi.fn(async () => ({ error: null })),
   upsertCondominioRow: mocks.upsertCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
 }))
-vi.mock('../../../../lib/validatedInsert', () => ({ validatedInsert: mocks.validatedInsert }))
+vi.mock('../../../../domain/condominios/tabQueries', () => ({ fetchHuespedesByReservas: vi.fn(async () => []) }))
+vi.mock('../../../../lib/storageUrls', () => ({ useSignedUrl: () => null, useSignedUrls: () => ({}) }))
+vi.mock('../../../../lib/validatedInsert', () => ({ validatedInsert: mocks.validatedInsert, validatedInsertMany: vi.fn(async () => ({ error: null })) }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
 vi.mock('../../exportUtils', () => ({ exportarPDFInformeMensual: vi.fn() }))
 
@@ -46,6 +52,7 @@ const { AlertasTab } = await import('../AlertasTab')
 const { default: VisitasFrecuentesTab } = await import('../VisitasFrecuentesTab')
 const { default: ControlAccesosQRTab } = await import('../ControlAccesosQRTab')
 const { default: InformeMensualTab } = await import('../InformeMensualTab')
+const { VisitantesTab } = await import('../VisitantesTab')
 
 const conI18n = (ui: ReactNode) => render(<I18nProvider>{ui}</I18nProvider>)
 const unidades = [{ id: 'un1', nombre: 'Casa 4', activo: true }] as unknown as Unidad[]
@@ -55,65 +62,40 @@ const como = <T,>(o: Record<string, unknown>) => o as unknown as T
 beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
 afterEach(cleanup)
 
-/** Las tres verificaciones de cada pestaña con Eliminar. */
-function eliminarExigeSuPermiso(
-  nombre: string,
-  montar: (p: { canEdit: boolean; canDelete: boolean }) => void,
-  boton: RegExp,
-  tabla: string,
-  id: string,
-) {
-  describe(`${nombre} — Eliminar exige canDelete`, () => {
-    it('editar sin eliminar: no hay botón Eliminar', () => {
-      montar({ canEdit: true, canDelete: false })
-      expect(screen.queryByRole('button', { name: boton })).toBeNull()
-    })
-    it('sólo consulta: no hay botón Eliminar', () => {
-      montar({ canEdit: false, canDelete: false })
-      expect(screen.queryByRole('button', { name: boton })).toBeNull()
-    })
-    it('eliminar sin editar: el botón borra la fila', async () => {
-      montar({ canEdit: false, canDelete: true })
-      fireEvent.click(screen.getAllByRole('button', { name: boton })[0])
-      await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith(tabla, id))
-    })
-  })
-}
-
 eliminarExigeSuPermiso('Objetos perdidos', p => conI18n(
   <ObjetosTab {...base} userId="u1" canCreate {...p}
     objetos={[como<ObjetoPerdido>({ id: 'o1', descripcion: 'Llaves con llavero rojo', categoria: 'llaves', lugar_encontrado: 'Lobby', fecha_encontrado: '2026-10-10', estado: 'en_custodia', created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^(Eliminar|Delete)$/, 'objetos_perdidos', 'o1')
+), /^(Eliminar|Delete)$/, mocks.deleteCondominioRow, 'objetos_perdidos', 'o1')
 
 eliminarExigeSuPermiso('Emergencias', p => render(
   <EmergenciasTab {...base} canCreate {...p}
     contactos={[como<ContactoEmergencia>({ id: 'e1', nombre: 'Bomberos zona 10', tipo: 'bomberos', telefono: '122', activo: true, disponible_24h: true, orden: 1, created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^Eliminar Bomberos zona 10$/, 'contactos_emergencia', 'e1')
+), /^Eliminar Bomberos zona 10$/, mocks.deleteCondominioRow, 'contactos_emergencia', 'e1')
 
 eliminarExigeSuPermiso('Residuos', p => render(
   <ResiduosTab {...base} userId="u1" canCreate {...p}
     residuos={[como<RegistroResiduo>({ id: 'rs1', fecha: '2026-10-10', tipo: 'reciclable', cantidad_kg: 12, estado: 'pendiente', created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^Eliminar registro$/, 'registros_residuos', 'rs1')
+), /^Eliminar registro$/, mocks.deleteCondominioRow, 'registros_residuos', 'rs1')
 
 eliminarExigeSuPermiso('Locales comerciales', p => conI18n(
   <LocalesTab {...base} moneda="Q" canCreate {...p}
     locales={[como<LocalComercial>({ id: 'l1', numero: 'L-01', nombre_negocio: 'Farmacia', giro: 'comercio', estado: 'ocupado', created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^(Eliminar|Delete)$/, 'locales_comerciales', 'l1')
+), /^(Eliminar|Delete)$/, mocks.deleteCondominioRow, 'locales_comerciales', 'l1')
 
 eliminarExigeSuPermiso('Concierge', p => render(
   <ConciergeTab {...base} moneda="Q" unidades={unidades} canCreate {...p}
     solicitudes={[como<SolicitudConcierge>({ id: 'c1', tipo: 'limpieza', descripcion: 'Limpieza profunda', fecha_solicitud: '2026-10-10', estado: 'pendiente', created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^Eliminar Limpieza profunda$/, 'solicitudes_concierge', 'c1')
+), /^Eliminar Limpieza profunda$/, mocks.deleteCondominioRow, 'solicitudes_concierge', 'c1')
 
 eliminarExigeSuPermiso('Alertas', p => conI18n(
   <AlertasTab {...base} polizas={[]} contratos={[]} inspecciones={[]} llaves={[]} canCreate {...p}
     alertas={[como<AlertaCondominio>({ id: 'a1', tipo: 'aviso', titulo: 'Revisar extintores', fecha_alerta: '2026-10-30', estado: 'activa', created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^(Eliminar|Delete)$/, 'alertas_condominio', 'a1')
+), /^(Eliminar|Delete)$/, mocks.deleteCondominioRow, 'alertas_condominio', 'a1')
 
 eliminarExigeSuPermiso('Visitas frecuentes', p => render(
   <VisitasFrecuentesTab {...base} unidades={unidades} canCreate {...p}
     visitas={[como<VisitaFrecuente>({ id: 'v1', unidad_id: 'un1', nombre: 'Ana Pérez', relacion: 'familiar', activo: true, dias_semana: [], created_at: '2026-10-10T00:00:00Z' })]} />,
-), /^Eliminar Ana Pérez$/, 'visitas_frecuentes', 'v1')
+), /^Eliminar Ana Pérez$/, mocks.deleteCondominioRow, 'visitas_frecuentes', 'v1')
 
 describe('Control de accesos QR — registrar exige canCreate', () => {
   const dentro = como<Visitante>({
@@ -166,5 +148,24 @@ describe('Informe mensual — publicar exige canCreate', () => {
     montar(true)
     abrir()
     expect(within(document.body).getByRole('button', { name: /Publicar informe/ })).toBeTruthy()
+  })
+})
+
+describe('Visitantes — registrar la salida exige canCreate', () => {
+  const adentro = como<Visitante>({
+    id: 'vi1', unidad_id: 'un1', unidad_nombre: 'Casa 4', nombre: 'Marta Ruiz', motivo: 'Visita',
+    hora_entrada: new Date().toISOString(), hora_salida: null, created_at: new Date().toISOString(),
+  })
+  const montar = (canCreate: boolean) => render(
+    <VisitantesTab {...base} userId="u1" unidades={unidades} visitantes={[adentro]} reservasSTR={[]} solicitudesMudanza={[]} canCreate={canCreate} />,
+  )
+  it('sin canCreate no se ofrece «Registrar salida»', () => {
+    montar(false)
+    expect(screen.getByText('Marta Ruiz')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Registrar salida' })).toBeNull()
+  })
+  it('con canCreate se ofrece «Registrar salida»', () => {
+    montar(true)
+    expect(screen.getByRole('button', { name: 'Registrar salida' })).toBeTruthy()
   })
 })

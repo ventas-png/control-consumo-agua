@@ -14,6 +14,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.actas.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -34,7 +36,7 @@ const BLANK_FORM = {
   acuerdos: '', observaciones: '', redactada_por: '', aprobada: false,
 }
 
-export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK_FORM })
@@ -106,9 +108,12 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar acta?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('actas_reunion', id)
+    const { error } = await deleteCondominioRow('actas_reunion', id)
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     if (viewId === id) setViewId(null)
     onRefresh()
   }
@@ -296,15 +301,17 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
                     {(a.asistentes as unknown[]).length > 0 ? ` — ${(a.asistentes as unknown[]).length} asistentes` : ''}
                   </div>
                 </button>
-                {canEdit && (
+                {(canEdit || canDelete) && (
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
-                    <button onClick={() => handlePrint(a)} aria-label={`Imprimir ${a.titulo}`} title="Imprimir" style={{ padding: '6px 9px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>🖨️</button>
-                    <button onClick={() => toggleAprobada(a)} aria-label={a.aprobada ? `Quitar aprobación de ${a.titulo}` : `Aprobar ${a.titulo}`} title={a.aprobada ? 'Quitar aprobación' : 'Aprobar'}
-                      style={{ padding: '6px 9px', background: a.aprobada ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>
-                      {a.aprobada ? '↩' : '✓'}
-                    </button>
-                    <button onClick={() => startEdit(a)} aria-label={`Editar ${a.titulo}`} title="Editar" style={{ padding: '6px 9px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDelete(a.id)} aria-label={`Eliminar ${a.titulo}`} title="Eliminar" style={{ padding: '6px 9px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                    {canEdit && <>
+                      <button onClick={() => handlePrint(a)} aria-label={`Imprimir ${a.titulo}`} title="Imprimir" style={{ padding: '6px 9px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>🖨️</button>
+                      <button onClick={() => toggleAprobada(a)} aria-label={a.aprobada ? `Quitar aprobación de ${a.titulo}` : `Aprobar ${a.titulo}`} title={a.aprobada ? 'Quitar aprobación' : 'Aprobar'}
+                        style={{ padding: '6px 9px', background: a.aprobada ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>
+                        {a.aprobada ? '↩' : '✓'}
+                      </button>
+                      <button onClick={() => startEdit(a)} aria-label={`Editar ${a.titulo}`} title="Editar" style={{ padding: '6px 9px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    </>}
+                    {canDelete && <button onClick={() => handleDelete(a.id)} aria-label={`Eliminar ${a.titulo}`} title="Eliminar" style={{ padding: '6px 9px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                   </div>
                 )}
               </div>
@@ -333,13 +340,15 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
             maxWidth="680px"
             fullScreenOnMobile
             onClose={() => setViewId(null)}
-            footer={canEdit ? (
+            footer={canEdit || canDelete ? (
               // Envuelve: con cuatro botones el pie no cabe a lo ancho del teléfono.
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end' }}>
-                <Button variant="outline-danger" onClick={() => handleDelete(viewed.id)} aria-label="Eliminar acta">🗑️</Button>
-                <Button variant="secondary" onClick={() => startEdit(viewed)}>✏️ Editar</Button>
-                <Button variant="secondary" onClick={() => toggleAprobada(viewed)}>{viewed.aprobada ? '↩ Quitar aprobación' : '✓ Aprobar'}</Button>
-                <Button onClick={() => handlePrint(viewed)}>🖨️ Imprimir</Button>
+                {canDelete && <Button variant="outline-danger" onClick={() => handleDelete(viewed.id)} aria-label="Eliminar acta">🗑️</Button>}
+                {canEdit && <>
+                  <Button variant="secondary" onClick={() => startEdit(viewed)}>✏️ Editar</Button>
+                  <Button variant="secondary" onClick={() => toggleAprobada(viewed)}>{viewed.aprobada ? '↩ Quitar aprobación' : '✓ Aprobar'}</Button>
+                  <Button onClick={() => handlePrint(viewed)}>🖨️ Imprimir</Button>
+                </>}
               </div>
             ) : undefined}
           >

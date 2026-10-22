@@ -20,6 +20,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.encuestas.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -35,7 +37,7 @@ const blankEncuesta = (): Partial<Encuesta> => ({
   titulo: '', descripcion: '', preguntas: [], fecha_inicio: '', fecha_fin: '', estado: 'borrador',
 })
 
-export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showEncuestaForm, setShowEncuestaForm] = useState(false)
   const [editEncuestaId, setEditEncuestaId] = useState<string | null>(null)
@@ -82,6 +84,8 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
   }
 
   async function handleDeleteEncuesta(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar encuesta?', text: 'Se borrarán también las respuestas.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await deleteCondominioRowBy('respuestas_encuesta', 'encuesta_id', id)
@@ -106,7 +110,8 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
   }
 
   async function handleSaveRespuesta() {
-    if (!selectedId) return
+    // Registrar una respuesta es crear una fila: exige canCreate, como el botón.
+    if (!selectedId || !canCreate) return
     setSavingResp(true)
     const payload = {
       company_id: companyId, project_id: proyectoId, encuesta_id: selectedId,
@@ -237,12 +242,12 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
                     {enc.fecha_inicio && ` · ${enc.fecha_inicio}`}
                   </div>
                 </button>
-                {canEdit && (
+                {(canEdit || canDelete) && (
                   <div style={{ display: 'flex', gap: '5px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
-                    {enc.estado === 'borrador' && <button onClick={() => handleEstadoEncuesta(enc.id, 'activa')} style={{ padding: '5px 9px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Activar</button>}
-                    {enc.estado === 'activa'   && <button onClick={() => handleEstadoEncuesta(enc.id, 'cerrada')} style={{ padding: '5px 9px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Cerrar</button>}
-                    <button onClick={() => startEditEncuesta(enc)} aria-label={`Editar ${enc.titulo}`} title="Editar" style={{ padding: '5px 9px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDeleteEncuesta(enc.id)} aria-label={`Eliminar ${enc.titulo}`} title="Eliminar" style={{ padding: '5px 9px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                    {canEdit && enc.estado === 'borrador' && <button onClick={() => handleEstadoEncuesta(enc.id, 'activa')} style={{ padding: '5px 9px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Activar</button>}
+                    {canEdit && enc.estado === 'activa'   && <button onClick={() => handleEstadoEncuesta(enc.id, 'cerrada')} style={{ padding: '5px 9px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Cerrar</button>}
+                    {canEdit && <button onClick={() => startEditEncuesta(enc)} aria-label={`Editar ${enc.titulo}`} title="Editar" style={{ padding: '5px 9px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+                    {canDelete && <button onClick={() => handleDeleteEncuesta(enc.id)} aria-label={`Eliminar ${enc.titulo}`} title="Eliminar" style={{ padding: '5px 9px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                   </div>
                 )}
               </div>
@@ -272,14 +277,14 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
             closeOnBackdropClick={!savingResp}
             closeOnEscape={!savingResp}
             onClose={cerrarDetalle}
-            footer={canEdit || activa ? (
+            footer={canEdit || canDelete || (canCreate && activa) ? (
               // Envuelve: con cuatro botones el pie no cabe a lo ancho del teléfono.
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end' }}>
-                {canEdit && <Button variant="outline-danger" onClick={() => handleDeleteEncuesta(selectedEncuesta.id)} aria-label="Eliminar encuesta">🗑️</Button>}
+                {canDelete && <Button variant="outline-danger" onClick={() => handleDeleteEncuesta(selectedEncuesta.id)} aria-label="Eliminar encuesta">🗑️</Button>}
                 {canEdit && <Button variant="secondary" onClick={() => { cerrarDetalle(); startEditEncuesta(selectedEncuesta) }}>✏️ Editar</Button>}
                 {canEdit && selectedEncuesta.estado === 'borrador' && <Button variant="success" onClick={() => handleEstadoEncuesta(selectedEncuesta.id, 'activa')}>Activar</Button>}
                 {canEdit && activa && <Button variant="secondary" onClick={() => handleEstadoEncuesta(selectedEncuesta.id, 'cerrada')}>Cerrar encuesta</Button>}
-                {activa && <Button onClick={startRespForm}>+ Respuesta</Button>}
+                {canCreate && activa && <Button onClick={startRespForm}>+ Respuesta</Button>}
               </div>
             ) : undefined}
           >

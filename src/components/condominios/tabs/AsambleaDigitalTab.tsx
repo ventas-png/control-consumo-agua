@@ -12,6 +12,8 @@ interface Props {
   userId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.asamblea_digital.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -36,7 +38,7 @@ const BLANK = {
   link_reunion: '', quorum_requerido: '50',
 }
 
-export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoA | ''>('')
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -107,9 +109,12 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   }
 
   async function eliminar(a: AsambleaDigital) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const res = await confirm({ title: '¿Eliminar asamblea?', text: a.titulo, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    await deleteCondominioRow('asambleas_digital', a.id)
+    const { error } = await deleteCondominioRow('asambleas_digital', a.id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -120,7 +125,8 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   }
 
   async function guardarActa() {
-    if (!actaAsamblea) return
+    // Registrar el acta es editar la asamblea.
+    if (!actaAsamblea || !canEdit) return
     setSavingActa(true)
     const { error } = await updateCondominioRow('asambleas_digital', actaAsamblea.id, { acta_url: actaTexto.trim() || null })
     setSavingActa(false)
@@ -173,15 +179,19 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
           <textarea
             value={actaTexto}
             onChange={e => setActaTexto(e.target.value)}
+            readOnly={!canEdit}
+            aria-label="Acta de la asamblea"
             rows={16}
             placeholder="Escriba el acta completa de la asamblea: quórum, puntos tratados, acuerdos alcanzados, votaciones y cierre..."
             style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button onClick={guardarActa} disabled={savingActa}
-              style={{ padding: '8px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
-              {savingActa ? 'Guardando…' : '💾 Guardar acta'}
-            </button>
+            {canEdit && (
+              <button onClick={guardarActa} disabled={savingActa}
+                style={{ padding: '8px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                {savingActa ? 'Guardando…' : '💾 Guardar acta'}
+              </button>
+            )}
             <button onClick={() => imprimirActa({ ...actaAsamblea, acta_url: actaTexto })}
               style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer' }}>
               🖨️ Imprimir
@@ -330,10 +340,10 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                               ✅ Finalizar
                             </button>
                           )}
-                          {(a.estado === 'en_curso' || a.estado === 'finalizada') && (
+                          {(a.estado === 'en_curso' || a.estado === 'finalizada') && (canEdit || a.acta_url) && (
                             <button onClick={() => abrirActa(a)}
                               style={{ padding: '6px 14px', background: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)', border: '1px solid var(--at-accent-hover)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                              📝 {a.acta_url ? 'Ver/editar acta' : 'Registrar acta'}
+                              📝 {!canEdit ? 'Ver acta' : a.acta_url ? 'Ver/editar acta' : 'Registrar acta'}
                             </button>
                           )}
                           {a.acta_url && (
@@ -342,7 +352,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                               🖨️ Imprimir
                             </button>
                           )}
-                          {canEdit && a.estado !== 'en_curso' && (
+                          {canDelete && a.estado !== 'en_curso' && (
                             <button onClick={() => eliminar(a)}
                               style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                               🗑️ Eliminar
