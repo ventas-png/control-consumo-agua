@@ -10,6 +10,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.manual_residente.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -23,7 +25,7 @@ const SECCIONES: { id: SeccionManual; label: string; icon: string }[] = [
 
 const BLANK = { seccion: 'normas' as SeccionManual, titulo: '', contenido: '', orden: 0 }
 
-export default function ManualResidenteTab({ articulos, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export default function ManualResidenteTab({ articulos, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroSeccion, setFiltroSeccion] = useState<SeccionManual | ''>('')
@@ -56,9 +58,12 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const { isConfirmed } = await confirm({ title: '¿Eliminar artículo?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await deleteCondominioRow('manual_residente_cond', id)
+    const { error } = await deleteCondominioRow('manual_residente_cond', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -169,12 +174,14 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
                         {!a.activo && <span style={{ fontSize: 10, background: 'var(--at-warning-tint)', color: 'var(--at-warning)', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>Oculto</span>}
                         <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>{a.titulo}</span>
                         <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>#{a.orden}</span>
-                        {canEdit && (
+                        {(canEdit || canDelete) && (
                           <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
-                            <Button variant="ghost" size="sm" onClick={() => toggleActivo(a.id, a.activo)} style={{ padding: '3px 8px', fontSize: 10 }}>
-                              {a.activo ? 'Ocultar' : 'Mostrar'}
-                            </Button>
-                            <Button variant="outline-danger" size="sm" onClick={() => eliminar(a.id)} style={{ padding: '3px 8px', fontSize: 10, border: 'none', background: 'var(--at-danger-tint)' }} aria-label="Eliminar">✕</Button>
+                            {canEdit && (
+                              <Button variant="ghost" size="sm" onClick={() => toggleActivo(a.id, a.activo)} style={{ padding: '3px 8px', fontSize: 10 }}>
+                                {a.activo ? 'Ocultar' : 'Mostrar'}
+                              </Button>
+                            )}
+                            {canDelete && <Button variant="outline-danger" size="sm" onClick={() => eliminar(a.id)} style={{ padding: '3px 8px', fontSize: 10, border: 'none', background: 'var(--at-danger-tint)' }} aria-label="Eliminar">✕</Button>}
                           </div>
                         )}
                         <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{expandido === a.id ? '▲' : '▼'}</span>

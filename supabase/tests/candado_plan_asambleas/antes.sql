@@ -1,5 +1,5 @@
 -- ============================================================================
--- CONTROL PREVIO: el estado de ANTES de 20261104000450, sobre el mismo padrón.
+-- CONTROL PREVIO: el estado de ANTES de 20261104000550, sobre el mismo padrón.
 --
 -- Reproduce el fallo: con el candado de 20260602000010 (que busca la empresa en
 -- asambleas_digital), NADIE da de alta puntos ni votos, ni siquiera el admin de

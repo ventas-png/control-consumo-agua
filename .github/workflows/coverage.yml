@@ -1015,8 +1015,10 @@ jobs:
         run: node supabase/tests/rls_acciones/run.mjs instalaciones
       - name: Acciones por permiso — sección administración
         run: node supabase/tests/rls_acciones/run.mjs administracion
+      - name: Acciones por permiso — sección residentes
+        run: node supabase/tests/rls_acciones/run.mjs residentes
 
-      # 20261104000450: el candado de plan (asambleas_digitales) de
+      # 20261104000550: el candado de plan (asambleas_digitales) de
       # puntos_asamblea y votos_asamblea buscaba la empresa en asambleas_digital
       # y rechazaba TODA alta, también la del admin de una empresa con la
       # feature. Ahora la resuelve por asambleas. Control previo que reproduce

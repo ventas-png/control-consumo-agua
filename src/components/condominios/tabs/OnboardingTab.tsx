@@ -11,6 +11,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.onboarding.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -38,7 +40,7 @@ const blank = (): Partial<OnboardingResidente> => ({
   bienvenida_enviada: false, notas: '',
 })
 
-export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoOnboarding | 'todos'>('en_proceso')
   const [form, setForm] = useState<Partial<OnboardingResidente>>(blank())
   const [editId, setEditId] = useState<string | null>(null)
@@ -114,6 +116,8 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar onboarding?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('onboarding_residentes', id)
@@ -243,7 +247,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
                       </button>
                     )}
                     {canEdit && <button onClick={() => startEdit(o)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                    {canEdit && <button onClick={() => handleDelete(o.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
+                    {canDelete && <button onClick={() => handleDelete(o.id)} title="Eliminar" aria-label={`Eliminar onboarding de ${o.nombre_residente}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                   </div>
                 </div>
 
