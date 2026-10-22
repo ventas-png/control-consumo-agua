@@ -30,7 +30,7 @@ afterEach(cleanup)
 describe('MascotasTab (panel) — formulario en ventana', () => {
   it('el alta abre en ventana sobre la lista y Cancelar la cierra', () => {
     const mascotas = [{ ...base, id: 'm1', nombre: 'Luna', especie: 'gato' }] as Mascota[]
-    render(<I18nProvider><MascotasTab mascotas={mascotas} unidades={unidades} proyectoId="p1" companyId="c1" canCreate canEdit onRefresh={() => {}} /></I18nProvider>)
+    render(<I18nProvider><MascotasTab mascotas={mascotas} unidades={unidades} proyectoId="p1" companyId="c1" canCreate canEdit canDelete onRefresh={() => {}} /></I18nProvider>)
 
     fireEvent.click(screen.getByRole('button', { name: '+ Registrar mascota' }))
     const ventana = screen.getByRole('dialog', { name: 'Registrar mascota' })
@@ -46,7 +46,7 @@ describe('MascotasTab (panel) — formulario en ventana', () => {
 describe('VehiculosTab (panel) — formulario en ventana', () => {
   it('Editar abre la ventana con los datos del vehículo', () => {
     const vehiculos = [{ ...base, id: 'v1', placa: 'P-111AAA', tipo: 'auto', marca: 'Toyota' }] as VehiculoResidente[]
-    render(<I18nProvider><VehiculosTab vehiculos={vehiculos} unidades={unidades} proyectoId="p1" companyId="c1" canCreate canEdit onRefresh={() => {}} /></I18nProvider>)
+    render(<I18nProvider><VehiculosTab vehiculos={vehiculos} unidades={unidades} proyectoId="p1" companyId="c1" canCreate canEdit canDelete onRefresh={() => {}} /></I18nProvider>)
 
     fireEvent.click(screen.getAllByRole('button', { name: /Editar/ })[0])
     const ventana = within(screen.getByRole('dialog', { name: 'Editar vehículo' }))
