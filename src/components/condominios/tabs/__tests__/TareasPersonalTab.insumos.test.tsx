@@ -110,6 +110,7 @@ function montar(insumos: TareaBloqueSuministro[], tarea: TareaBloque = TAREA) {
       userId="u1"
       canCreate
       canEdit
+      canDelete
       onRefresh={() => {}}
     />,
   )

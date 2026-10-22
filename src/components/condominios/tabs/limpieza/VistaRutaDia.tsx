@@ -98,6 +98,7 @@ export function VistaRutaDia({
         userId={userId}
         canCreate={false}
         canEdit={canEdit}
+        canDelete={false}
         onRefresh={recargar}
         modoRuta={{
           titulo: 'Ruta del día',

@@ -1,0 +1,230 @@
+{
+  "_migracion": "20261104000700_rls_acciones_recursos_humanos.sql",
+  "_titulo": "Recursos humanos: escribir exige la ACCIÓN del tab, también en la base",
+  "_porque": [
+    "POR QUÉ",
+    "La pantalla decide cada escritura de estos tabs con su acción (canCreate /",
+    "canEdit / canDelete). Las policies de INSERT y UPDATE sólo pedían ver el tab",
+    "—quien sólo consulta podía crear y editar por la API—, las de DELETE sólo",
+    "dejaban a company_owner/admin (o, en los catálogos de limpieza y de",
+    "plantillas, a quien sólo viera el tab), aunque la pantalla ofreciera",
+    "«Eliminar» a quien tuviera la acción.",
+    "",
+    "Tabs: Ausencias (y días no laborables), Capacitación, Personal, Plantillas de",
+    "cargo (actividades y sus recursos), Presencia, Programación de limpieza",
+    "(rutinas, recorridos y ejecuciones), Revisión de tareas, Tareas, Tareas por",
+    "turno (y sus insumos) y Turnos (reglas, jornadas y cupos de pausa).",
+    "",
+    "No cambia bloques_turno: 20260916221839 ya lo autoriza por acción (borrar un",
+    "bloque es editar el turno). La DELETE de ejecuciones_limpieza sigue siendo",
+    "sólo de super_admin: no lleva permiso que sustituir."
+  ],
+  "tablas": {
+    "asignaciones_turno": {
+      "tab": "turnos"
+    },
+    "ausencias_personal": {
+      "tab": "ausencias"
+    },
+    "capacitacion_personal_cond": {
+      "tab": "capacitacion_personal"
+    },
+    "dias_no_laborables": {
+      "tab": "ausencias",
+      "receta": {
+        "fecha": "current_date + (random() * 100000)::int"
+      }
+    },
+    "ejecuciones_limpieza": {
+      "tab": "prog_limpieza",
+      "UPDATE": [
+        "prog_limpieza.edit",
+        "revision_tareas.edit"
+      ],
+      "porque": "«Atender» una novedad baja su bandera de mantenimiento (atenderNovedad) desde Programación de limpieza y desde Revisión de tareas, con canEdit.",
+      "evidencia": {
+        "revision_tareas": [
+          "components/condominios/tabs/RevisionTareasTab.tsx",
+          "domain/condominios/tabMutations.ts"
+        ]
+      }
+    },
+    "personal_condominio": {
+      "tab": "personal"
+    },
+    "plantilla_cupos_pausa": {
+      "tab": "turnos",
+      "receta": {
+        "plantilla_horario_id": "ra.padre('public.plantillas_horario', ra.id('A'), 1, true) ->> 'id'",
+        "tipo": "'almuerzo'"
+      },
+      "INSERT": [
+        "turnos.create",
+        "turnos.edit"
+      ],
+      "DELETE": [
+        "turnos.delete",
+        "turnos.edit"
+      ],
+      "porque": [
+        "Guardar una jornada —nueva con canCreate, existente con canEdit— reemplaza sus cupos de pausa",
+        "(turnos_guardar_jornada, SECURITY INVOKER: corre con la RLS de quien guarda). Sigue exigiendo",
+        "además turnos_puede_administrar_jornada."
+      ]
+    },
+    "plantilla_tarea_herramientas": {
+      "tab": "plantillas_cargo",
+      "receta": {
+        "plantilla_tarea_id": "ra.padre('public.plantillas_tarea_cargo', ra.id('A'), 1) ->> 'id'",
+        "inventario_id": "ra.padre('public.inventario_condominio', ra.id('A'), 1, true) ->> 'id'"
+      },
+      "INSERT": [
+        "plantillas_cargo.create",
+        "plantillas_cargo.edit"
+      ],
+      "DELETE": [
+        "plantillas_cargo.delete",
+        "plantillas_cargo.edit"
+      ],
+      "porque": [
+        "Agregar o quitar una herramienta de una actividad —una a una o en bloque",
+        "(plantillas_recursos_en_bloque, SECURITY INVOKER)— es editar la actividad: se ofrece con canEdit.",
+        "Importar actividades (canCreate) las trae con sus recursos."
+      ]
+    },
+    "plantilla_tarea_suministros": {
+      "tab": "plantillas_cargo",
+      "receta": {
+        "plantilla_tarea_id": "ra.padre('public.plantillas_tarea_cargo', ra.id('A'), 1) ->> 'id'",
+        "suministro_id": "ra.padre('public.suministros_condominio', ra.id('A'), 1, true) ->> 'id'"
+      },
+      "INSERT": [
+        "plantillas_cargo.create",
+        "plantillas_cargo.edit"
+      ],
+      "DELETE": [
+        "plantillas_cargo.delete",
+        "plantillas_cargo.edit"
+      ],
+      "porque": [
+        "Agregar o quitar un insumo de una actividad —uno a uno o en bloque",
+        "(plantillas_recursos_en_bloque, SECURITY INVOKER)— es editar la actividad: se ofrece con canEdit.",
+        "Importar actividades (canCreate) las trae con sus recursos."
+      ]
+    },
+    "plantillas_horario": {
+      "tab": "turnos"
+    },
+    "plantillas_tarea_cargo": {
+      "tab": "plantillas_cargo",
+      "receta": {
+        "cargo": "ra.padre('public.rrhh_cargos', ra.id('A'), 1) ->> 'codigo'"
+      }
+    },
+    "presencia_personal": {
+      "tab": "presencia"
+    },
+    "programacion_limpieza": {
+      "tab": "prog_limpieza"
+    },
+    "revisiones_tarea": {
+      "tab": "revision_tareas",
+      "INSERT": [
+        "revision_tareas.create",
+        "revision_tareas.edit"
+      ],
+      "porque": "«Revisar» una tarea se ofrece con canEdit('revision_tareas'): la primera revisión crea la fila."
+    },
+    "rutina_actividades": {
+      "tab": "prog_limpieza",
+      "receta": {
+        "rutina_id": "ra.padre('public.rutinas_limpieza', ra.id('A'), 1) ->> 'id'",
+        "plantilla_tarea_id": "ra.padre('public.plantillas_tarea_cargo', ra.id('A'), 1, true) ->> 'id'"
+      },
+      "INSERT": [
+        "prog_limpieza.create",
+        "prog_limpieza.edit"
+      ],
+      "DELETE": [
+        "prog_limpieza.delete",
+        "prog_limpieza.edit"
+      ],
+      "porque": "Guardar el recorrido de una rutina —nueva con canCreate, existente con canEdit— reconcilia sus actividades (guardar_recorrido_rutina, SECURITY INVOKER)."
+    },
+    "rutina_areas": {
+      "tab": "prog_limpieza",
+      "receta": {
+        "rutina_id": "ra.padre('public.rutinas_limpieza', ra.id('A'), 1) ->> 'id'",
+        "area_id": "ra.padre('public.areas_condominio', ra.id('A'), 1, true) ->> 'id'"
+      },
+      "INSERT": [
+        "prog_limpieza.create",
+        "prog_limpieza.edit"
+      ],
+      "DELETE": [
+        "prog_limpieza.delete",
+        "prog_limpieza.edit"
+      ],
+      "porque": "Guardar el recorrido de una rutina —nueva con canCreate, existente con canEdit— reconcilia sus áreas (guardar_recorrido_rutina, SECURITY INVOKER)."
+    },
+    "rutinas_limpieza": {
+      "tab": "prog_limpieza"
+    },
+    "tarea_bloque_suministros": {
+      "tab": "tareas_personal",
+      "receta": {
+        "suministro_id": "ra.padre('public.suministros_condominio', ra.id('A'), 1, true) ->> 'id'"
+      },
+      "otras_claves": [
+        "turnos",
+        "prog_limpieza",
+        "revision_tareas"
+      ],
+      "porque": [
+        "Ninguna pantalla la escribe directamente: la llenan y la consumen funciones SECURITY DEFINER",
+        "(tarea_copiar_insumos_plantilla, cerrar_tarea_y_consumir_insumos). Ver Turnos, Limpieza o",
+        "Revisión ya no basta para escribirla por la API."
+      ]
+    },
+    "tareas_bloque": {
+      "tab": "tareas_personal",
+      "otras_claves": [
+        "turnos",
+        "prog_limpieza",
+        "revision_tareas"
+      ],
+      "UPDATE": [
+        "tareas_personal.edit",
+        "prog_limpieza.edit",
+        "revision_tareas.edit"
+      ],
+      "porque": [
+        "La ruta del día de Limpieza ejecuta las tareas con la misma pantalla (canEdit('prog_limpieza')), y",
+        "«Atender» una novedad baja su bandera desde Limpieza y desde Revisión de tareas, con canEdit.",
+        "Turnos no escribe tareas: ver Turnos ya no basta."
+      ],
+      "evidencia": {
+        "prog_limpieza": [
+          "components/condominios/tabs/ProgramacionLimpiezaTab.tsx",
+          "components/condominios/tabs/limpieza/VistaRutaDia.tsx",
+          "components/condominios/tabs/TareasPersonalTab.tsx"
+        ],
+        "revision_tareas": [
+          "components/condominios/tabs/RevisionTareasTab.tsx",
+          "domain/condominios/tabMutations.ts"
+        ]
+      }
+    },
+    "tareas_condominio": {
+      "tab": "tareas_cond"
+    }
+  },
+  "_recetas": {
+    "bloques_turno": {
+      "personal_id": "ra.padre('public.personal_condominio', ra.id('A'), 1) ->> 'id'"
+    },
+    "rrhh_cargos": {
+      "codigo": "'rla_cargo'"
+    }
+  }
+}

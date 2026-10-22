@@ -1010,6 +1010,8 @@ jobs:
         run: node supabase/tests/rls_acciones/run.mjs residentes
       - name: Acciones por permiso — sección operaciones
         run: node supabase/tests/rls_acciones/run.mjs operaciones
+      - name: Acciones por permiso — sección recursos humanos
+        run: node supabase/tests/rls_acciones/run.mjs recursos_humanos
 
   rls-harness:
     name: RLS harness (server-side)

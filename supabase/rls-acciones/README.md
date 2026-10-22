@@ -57,6 +57,9 @@ La regla para armarlo:
   columnas, un trigger que exige un proveedor del catálogo). Es SQL y se
   evalúa al fabricar, como el admin de la empresa: puede pedir un padre
   (`ra.padre('public.proveedores', ra.id('A'), 1) ->> 'id'`).
+  Con `true` como cuarto argumento, el padre es propio de cada fila (para
+  columnas de una clave única). Una tabla padre que no está en el mapa lleva
+  su receta en `_recetas` (p. ej. el código de un cargo, que tiene formato).
 - Toda clave `condominios.tab.<tab>[.<acción>]` del mapa debe existir en
   `permissions`. Un tab cuyas claves el catálogo no siembra a propósito (hoy
   sólo lo ven company_owner/admin) se declara en `_sin_clave`; cualquier otro

@@ -16,6 +16,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import type {
   AreaCondominio, BloqueTurno, PersonalCondominio, PlantillaTareaCargo, TareaBloque,
 } from '../../../../types'
+import { eliminarExigeSuPermiso } from '../../../../test/eliminarExigeSuPermiso'
 
 type RowError = { message: string; code?: string } | null
 
@@ -97,6 +98,7 @@ function montar(tareas: TareaBloque[]) {
       userId="u1"
       canCreate
       canEdit
+      canDelete
       onRefresh={() => {}}
     />,
   )
@@ -235,3 +237,16 @@ describe('TareasPersonalTab · la tarjeta muestra lo reportado', () => {
     expect(screen.getByText(/🛠 Requiere mantenimiento/)).toBeTruthy()
   })
 })
+
+// supabase/rls-acciones/recursos_humanos.json: quitar una tarea pendiente exige
+// canDelete (condominios.tab.tareas_personal.delete), lo mismo que la base.
+// Borrar el TURNO sigue siendo editarlo (bloques_turno_delete pide editar).
+eliminarExigeSuPermiso('Tareas por turno (tarea)', p => {
+  render(
+    <TareasPersonalTab bloques={[bloque]} tareas={[tarea()]} plantillas={[] as PlantillaTareaCargo[]} personal={[persona]}
+      areas={[] as AreaCondominio[]} proyectoId="p1" companyId="co1" userId="u1" canCreate {...p} onRefresh={() => {}} />,
+  )
+  fireEvent.click(screen.getByText('▾'))
+  const lista = screen.queryByText('☰ Ver lista completa')
+  if (lista) fireEvent.click(lista)
+}, /^Eliminar Barrer el borde$/, mocks.deleteCondominioRow, 'tareas_bloque', 'tar1')
