@@ -11,6 +11,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.emergencias.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -31,7 +33,7 @@ const blank = (): Partial<ContactoEmergencia> => ({
   descripcion: '', disponible_24h: true, orden: 0, activo: true,
 })
 
-export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [form, setForm] = useState<Partial<ContactoEmergencia>>(blank())
   const [editId, setEditId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -76,6 +78,8 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar contacto?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('contactos_emergencia', id)
@@ -222,13 +226,17 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
                       <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--at-ink-3)', background: 'var(--at-chip)', padding: '1px 6px', borderRadius: '4px' }}>{ti.label}</span>
                     </div>
                   </div>
-                  {canEdit && (
+                  {(canEdit || canDelete) && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <button onClick={() => startEdit(c)} style={{ padding: '4px 6px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => toggleActivo(c)} style={{ padding: '4px 6px', background: c.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }} title={c.activo ? 'Desactivar' : 'Activar'}>
-                        {c.activo ? '⏸️' : '▶️'}
-                      </button>
-                      <button onClick={() => handleDelete(c.id)} style={{ padding: '4px 6px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                      {canEdit && (
+                        <>
+                          <button onClick={() => startEdit(c)} style={{ padding: '4px 6px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                          <button onClick={() => toggleActivo(c)} style={{ padding: '4px 6px', background: c.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }} title={c.activo ? 'Desactivar' : 'Activar'}>
+                            {c.activo ? '⏸️' : '▶️'}
+                          </button>
+                        </>
+                      )}
+                      {canDelete && <button onClick={() => handleDelete(c.id)} title="Eliminar" aria-label={`Eliminar ${c.nombre}`} style={{ padding: '4px 6px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                     </div>
                   )}
                 </div>
