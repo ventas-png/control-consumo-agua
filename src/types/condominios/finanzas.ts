@@ -621,19 +621,6 @@ export interface AsambleaDigital {
   created_at: string
 }
 
-export interface PuntoAsamblea2 {
-  id: string
-  asamblea_id: string
-  orden: number
-  titulo: string
-  descripcion?: string | null
-  tipo: 'informativo' | 'aprobacion' | 'eleccion'
-  resultado?: string | null
-  votos_favor: number
-  votos_contra: number
-  votos_abstencion: number
-}
-
 // ── Fase 38 ───────────────────────────────────────────────────────────────────
 export type EstadoProforma = 'borrador' | 'enviada' | 'aprobada' | 'convertida_oc' | 'rechazada'
 export interface Proforma {

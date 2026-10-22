@@ -124,9 +124,12 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function registrarVoto(puntoId: string, unidadId: string, voto: TipoVoto) {
-    await upsertCondominioRow('votos_asamblea', {
+    const { error } = await upsertCondominioRow('votos_asamblea', {
       punto_id: puntoId, unidad_id: unidadId, voto, registrado_por: userId,
     }, 'punto_id,unidad_id')
+    // Antes el error se ignoraba: un voto rechazado (RLS, candado de plan)
+    // parecía registrado hasta que la recarga lo desmentía en silencio.
+    if (error) { toast.error(`No se registró el voto: ${error.message}`); return }
     if (selectedId) cargarPuntos(selectedId)
   }
 

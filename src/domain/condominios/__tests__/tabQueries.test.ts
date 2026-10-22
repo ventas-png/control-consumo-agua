@@ -34,9 +34,6 @@ import {
   fetchGastosAnioMontos,
   fetchEjecucionesMantenimiento,
   fetchPuntosAsambleaConVotos,
-  fetchAsambleasDigital,
-  fetchPuntosByAsambleaIds,
-  fetchVotosUnidad,
   fetchVotosVotacion,
   fetchHuespedesByReservas,
   fetchVisitantesActivosByReservas,
@@ -149,17 +146,6 @@ describe('asambleas / votaciones', () => {
   })
   it('fetchPuntosAsambleaConVotos sin data → []', async () => {
     expect(await fetchPuntosAsambleaConVotos('a1')).toEqual([])
-  })
-  it('fetchAsambleasDigital devuelve filas', async () => {
-    h.state.byTable.asambleas_digital = { data: [{ id: 'a1' }], error: null }
-    expect(await fetchAsambleasDigital('proj1')).toEqual([{ id: 'a1' }])
-  })
-  it('fetchPuntosByAsambleaIds (.in) devuelve filas', async () => {
-    h.state.byTable.puntos_asamblea = { data: [{ id: 'p1', asamblea_id: 'a1' }], error: null }
-    expect(await fetchPuntosByAsambleaIds(['a1'])).toEqual([{ id: 'p1', asamblea_id: 'a1' }])
-  })
-  it('fetchVotosUnidad degrada a []', async () => {
-    expect(await fetchVotosUnidad('u1')).toEqual([])
   })
   it('fetchVotosVotacion devuelve filas con join', async () => {
     h.state.byTable.votos = { data: [{ id: 'v1', unidades: { nombre: 'A-1' } }], error: null }

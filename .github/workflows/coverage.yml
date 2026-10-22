@@ -1000,6 +1000,17 @@ jobs:
           PGPORT_TEST: 55574
         run: supabase/tests/candado_plan_asambleas/run.sh
 
+      # 20261105000000: el propietario ve las asambleas (clásicas) de su
+      # condominio y vota desde el portal, una vez por unidad y con la asamblea
+      # en curso, por dos RPC SECURITY DEFINER; CHECK del vocabulario del voto.
+      # Control previo que reproduce las cuatro causas del fallo, huella del
+      # auditor, normalización, guarda que aborta y catorce mutantes.
+      - name: Portal de asambleas — el propietario vota por su unidad
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55585
+        run: supabase/tests/portal_asambleas_voto/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

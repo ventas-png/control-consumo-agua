@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
   deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
-  upsertCondominioRow: vi.fn(async () => ({ error: null })),
+  upsertCondominioRow: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
   fetchPuntosAsambleaConVotos: vi.fn(async () => [
     {
       id: 'pt1', asamblea_id: 'a1', orden: 1, titulo: 'Aprobar presupuesto', descripcion: null, tipo: 'votacion',
@@ -85,6 +85,17 @@ describe('AsambleasTab — ventanas', () => {
       punto_id: 'pt1', unidad_id: 'u2', voto: 'en_contra', registrado_por: 'user1',
     }, 'punto_id,unidad_id'))
     await waitFor(() => expect(mocks.fetchPuntosAsambleaConVotos).toHaveBeenCalledTimes(2))
+  })
+
+  it('un voto rechazado por el servidor se avisa y no recarga como si se hubiera guardado', async () => {
+    mocks.upsertCondominioRow.mockResolvedValueOnce({ error: { message: 'new row violates row-level security policy', code: '42501' } })
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Ordinaria Abril/ }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'En contra — Casa 2' }))
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith(
+      'No se registró el voto: new row violates row-level security policy'))
+    expect(mocks.fetchPuntosAsambleaConVotos).toHaveBeenCalledTimes(1)
   })
 
   it('"+ Punto" al pie abre el subformulario y agregar crea el punto', async () => {
