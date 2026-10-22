@@ -13,6 +13,8 @@ interface Props {
   userId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.residuos.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -37,7 +39,7 @@ const blank = (): Partial<RegistroResiduo> => ({
   estado: 'pendiente', incidencia: false, descripcion_incidencia: '', notas: '',
 })
 
-export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [filtroTipo, setFiltroTipo] = useState<TipoResiduo | 'todos'>('todos')
   const [filtroEstado, setFiltroEstado] = useState<EstadoResiduo | 'todos'>('todos')
   const [form, setForm] = useState<Partial<RegistroResiduo>>(blank())
@@ -91,6 +93,8 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('registros_residuos', id)
@@ -280,7 +284,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
             render: (r) => (
               <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                 {canEdit && <button onClick={(e) => { e.stopPropagation(); startEdit(r) }} aria-label="Editar registro" style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>✏️</button>}
-                {canEdit && <button onClick={(e) => { e.stopPropagation(); handleDelete(r.id) }} aria-label="Eliminar registro" style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
+                {canDelete && <button onClick={(e) => { e.stopPropagation(); handleDelete(r.id) }} aria-label="Eliminar registro" style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
               </div>
             ) },
         ] satisfies DataTableColumn<RegistroResiduo>[]}

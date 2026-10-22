@@ -1,4 +1,5 @@
 import type { TarifaEnergia, FacturaEnergia } from '../types'
+import { redondear2 } from './business'
 
 export interface CalculoFacturaInput {
   tarifa: TarifaEnergia
@@ -69,6 +70,45 @@ export function calcularFacturaEnergia(input: CalculoFacturaInput): CalculoFactu
     monto_total,
     subtotal,
   }
+}
+
+/** Montos del desglose de una factura de energía que forman su total. */
+export type DesgloseFacturaEnergia = Pick<
+  FacturaEnergia,
+  | 'monto_energia'
+  | 'monto_potencia'
+  | 'monto_cargo_fijo'
+  | 'monto_alumbrado'
+  | 'monto_iva'
+  | 'monto_credito_exportacion'
+  | 'monto_otros'
+>
+
+/**
+ * Total de la factura a partir de su desglose, a centavos (la columna es
+ * numeric(12,2)): energía + potencia + cargo fijo + alumbrado + IVA + otros −
+ * crédito por exportación.
+ *
+ * El total se deriva siempre del desglose: antes solo lo llenaba "Calcular
+ * desde tarifa", y una factura capturada a mano (p. ej. una fuente solar sin
+ * tarifa) se guardaba con total 0.
+ *
+ * - El crédito siempre resta, venga con el signo que venga: el cálculo desde
+ *   tarifa lo deja en negativo, pero a mano suele escribirse en positivo.
+ * - "Otros" suma con su signo (un descuento va en negativo).
+ * - Un campo vacío o no numérico cuenta 0.
+ */
+export function totalFacturaEnergia(desglose: Partial<DesgloseFacturaEnergia>): number {
+  const monto = (n: number | undefined) => redondear2(Number(n) || 0)
+  return redondear2(
+    monto(desglose.monto_energia) +
+      monto(desglose.monto_potencia) +
+      monto(desglose.monto_cargo_fijo) +
+      monto(desglose.monto_alumbrado) +
+      monto(desglose.monto_iva) +
+      monto(desglose.monto_otros) -
+      Math.abs(monto(desglose.monto_credito_exportacion)),
+  )
 }
 
 // serv:S6 — Validación de facturas de energía antes de guardar.

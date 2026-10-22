@@ -3,8 +3,10 @@ import type { TarifaEnergia, ProveedorEnergia, Proyecto } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { sanitizeInput } from '../../../lib/validation'
 import { useCrearTarifaEnergiaMutation, useActualizarTarifaEnergiaMutation, useEliminarTarifaEnergiaMutation } from '../../../domain/energia/mutations'
+import { encabezadoTab, etiqueta, campo, rejilla, accionesFila } from '../ui'
 
 interface TarifasTabProps {
   tarifasEnergia: TarifaEnergia[]
@@ -135,8 +137,12 @@ export default function TarifasTab({
     setEditFormData({ ...tarifa })
   }
 
+  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
+  const guardando = actualizarMutation.isPending
+  const cerrarEdicion = () => { if (!guardando) setEditingId(null) }
+
   const handleSaveEdit = async () => {
-    if (!editingId) return
+    if (!editingId || guardando) return
     try {
       await actualizarMutation.mutateAsync({ id: editingId, patch: editFormData })
       setEditingId(null)
@@ -165,68 +171,79 @@ export default function TarifasTab({
 
   return (
     <div>
-      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={encabezadoTab}>
         <h2 style={{ margin: 0 }}>Tarifas de Energía</h2>
         {canCreate && (
-          <button onClick={handleCreate} style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            + Nueva Tarifa
-          </button>
+          <Button onClick={handleCreate}>+ Nueva Tarifa</Button>
         )}
       </div>
 
       {editingId && (
-        <EditModal title="Editar Tarifa" onClose={() => setEditingId(null)} maxWidth="520px">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <EditModal
+          title="Editar Tarifa"
+          onClose={cerrarEdicion}
+          maxWidth="520px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!guardando}
+          closeOnEscape={!guardando}
+          footer={
+            <>
+              <Button variant="secondary" onClick={cerrarEdicion} disabled={guardando}>Cancelar</Button>
+              <Button type="submit" form="tarifa-energia-form" loading={guardando} loadingText="Guardando...">Guardar</Button>
+            </>
+          }
+        >
+          <form
+            id="tarifa-energia-form"
+            onSubmit={e => { e.preventDefault(); void handleSaveEdit() }}
+            style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+          >
             <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Nombre *</label>
-              <input type="text" value={editFormData.nombre ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nombre: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+              <label htmlFor="tarifa-nombre" style={etiqueta}>Nombre *</label>
+              <input id="tarifa-nombre" type="text" value={editFormData.nombre ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nombre: e.target.value }))} style={campo} />
             </div>
             <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Descripción</label>
-              <textarea value={editFormData.descripcion ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, descripcion: e.target.value }))} rows={2} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+              <label htmlFor="tarifa-descripcion" style={etiqueta}>Descripción</label>
+              <textarea id="tarifa-descripcion" value={editFormData.descripcion ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, descripcion: e.target.value }))} rows={2} style={{ ...campo, fontFamily: 'inherit' }} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <div style={rejilla(150, '0.5rem')}>
               <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Precio kWh (energía)</label>
-                <input type="number" step="0.000001" value={editFormData.precio_kwh_energia ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, precio_kwh_energia: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+                <label htmlFor="tarifa-kwh" style={etiqueta}>Precio kWh (energía)</label>
+                <input id="tarifa-kwh" type="number" inputMode="decimal" step="0.000001" value={editFormData.precio_kwh_energia ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, precio_kwh_energia: parseFloat(e.target.value) || 0 }))} style={campo} />
               </div>
               <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Precio kW (potencia)</label>
-                <input type="number" step="0.0001" value={editFormData.precio_kw_potencia ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, precio_kw_potencia: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+                <label htmlFor="tarifa-kw" style={etiqueta}>Precio kW (potencia)</label>
+                <input id="tarifa-kw" type="number" inputMode="decimal" step="0.0001" value={editFormData.precio_kw_potencia ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, precio_kw_potencia: parseFloat(e.target.value) || 0 }))} style={campo} />
               </div>
               <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Cargo fijo ({moneda})</label>
-                <input type="number" step="0.01" value={editFormData.cargo_fijo ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, cargo_fijo: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+                <label htmlFor="tarifa-cargo-fijo" style={etiqueta}>Cargo fijo ({moneda})</label>
+                <input id="tarifa-cargo-fijo" type="number" inputMode="decimal" step="0.01" value={editFormData.cargo_fijo ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, cargo_fijo: parseFloat(e.target.value) || 0 }))} style={campo} />
               </div>
               <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Alumbrado público</label>
-                <input type="number" step="0.0001" value={editFormData.alumbrado_publico ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, alumbrado_publico: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+                <label htmlFor="tarifa-alumbrado" style={etiqueta}>Alumbrado público</label>
+                <input id="tarifa-alumbrado" type="number" inputMode="decimal" step="0.0001" value={editFormData.alumbrado_publico ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, alumbrado_publico: parseFloat(e.target.value) || 0 }))} style={campo} />
               </div>
               <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Tipo alumbrado</label>
-                <select value={editFormData.alumbrado_tipo ?? 'fijo'} onChange={e => setEditFormData(prev => ({ ...prev, alumbrado_tipo: e.target.value as TarifaEnergia['alumbrado_tipo'] }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }}>
+                <label htmlFor="tarifa-alumbrado-tipo" style={etiqueta}>Tipo alumbrado</label>
+                <select id="tarifa-alumbrado-tipo" value={editFormData.alumbrado_tipo ?? 'fijo'} onChange={e => setEditFormData(prev => ({ ...prev, alumbrado_tipo: e.target.value as TarifaEnergia['alumbrado_tipo'] }))} style={campo}>
                   <option value="fijo">Fijo</option>
                   <option value="porcentual">Porcentual (%)</option>
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>IVA (%)</label>
-                <input type="number" step="0.01" value={editFormData.iva_porcentaje ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, iva_porcentaje: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+                <label htmlFor="tarifa-iva" style={etiqueta}>IVA (%)</label>
+                <input id="tarifa-iva" type="number" inputMode="decimal" step="0.01" value={editFormData.iva_porcentaje ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, iva_porcentaje: parseFloat(e.target.value) || 0 }))} style={campo} />
               </div>
               <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Precio kWh exportado</label>
-                <input type="number" step="0.000001" value={editFormData.precio_kwh_exportado ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, precio_kwh_exportado: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
+                <label htmlFor="tarifa-kwh-exportado" style={etiqueta}>Precio kWh exportado</label>
+                <input id="tarifa-kwh-exportado" type="number" inputMode="decimal" step="0.000001" value={editFormData.precio_kwh_exportado ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, precio_kwh_exportado: parseFloat(e.target.value) || 0 }))} style={campo} />
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <input type="checkbox" id="tarifa-activa" checked={editFormData.activa ?? false} onChange={e => setEditFormData(prev => ({ ...prev, activa: e.target.checked }))} />
               <label htmlFor="tarifa-activa">Activa</label>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
-              <button onClick={() => setEditingId(null)} style={{ padding: '0.5rem 1rem', border: '1px solid var(--at-line-strong)', borderRadius: '4px', cursor: 'pointer', background: 'var(--at-surface)' }}>Cancelar</button>
-              <button onClick={handleSaveEdit} style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Guardar</button>
-            </div>
-          </div>
+          </form>
         </EditModal>
       )}
 
@@ -234,16 +251,17 @@ export default function TarifasTab({
         <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic', marginTop: '1.5rem' }}>No hay tarifas registradas</p>
       ) : (
         <div className="table-scroll-wrapper">
-        <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', marginTop: '1.5rem', fontSize: '0.9rem' }}>
+        {/* En el teléfono cada tarifa es una tarjeta con sus acciones al pie. */}
+        <table className="table-cards-on-mobile" style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem', fontSize: '0.9rem' }}>
           <thead>
             <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
-              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Nombre</th>
-              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Proveedor</th>
-              <th style={{ padding: '0.5rem', textAlign: 'right' }}>kWh</th>
-              <th style={{ padding: '0.5rem', textAlign: 'right' }}>Cargo fijo</th>
-              <th style={{ padding: '0.5rem', textAlign: 'right' }}>IVA%</th>
-              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Estado</th>
-              {(canEdit || canDelete) && <th style={{ padding: '0.5rem', textAlign: 'center' }}>Acciones</th>}
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'left' }}>Nombre</th>
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'left' }}>Proveedor</th>
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'right' }}>kWh</th>
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'right' }}>Cargo fijo</th>
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'right' }}>IVA%</th>
+              <th scope="col" style={{ padding: '0.5rem', textAlign: 'left' }}>Estado</th>
+              {(canEdit || canDelete) && <th scope="col" style={{ padding: '0.5rem', textAlign: 'center' }}>Acciones</th>}
             </tr>
           </thead>
           <tbody>
@@ -251,22 +269,24 @@ export default function TarifasTab({
               const prov = proveedoresEnergia.find(p => p.id === t.proveedor_id)
               return (
                 <tr key={t.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                  <td style={{ padding: '0.5rem' }}>{t.nombre}</td>
-                  <td style={{ padding: '0.5rem' }}>{prov?.nombre ?? '—'}</td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right' }}>{Number(t.precio_kwh_energia).toFixed(4)}</td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right' }}>{moneda} {Number(t.cargo_fijo).toFixed(2)}</td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right' }}>{Number(t.iva_porcentaje).toFixed(2)}</td>
-                  <td style={{ padding: '0.5rem' }}>
+                  <td data-label="Nombre" style={{ padding: '0.5rem', fontWeight: 600 }}>{t.nombre}</td>
+                  <td data-label="Proveedor" style={{ padding: '0.5rem' }}>{prov?.nombre ?? '—'}</td>
+                  <td data-label="Precio kWh" style={{ padding: '0.5rem', textAlign: 'right' }}>{Number(t.precio_kwh_energia).toFixed(4)}</td>
+                  <td data-label="Cargo fijo" style={{ padding: '0.5rem', textAlign: 'right' }}>{moneda} {Number(t.cargo_fijo).toFixed(2)}</td>
+                  <td data-label="IVA%" style={{ padding: '0.5rem', textAlign: 'right' }}>{Number(t.iva_porcentaje).toFixed(2)}</td>
+                  <td data-label="Estado" style={{ padding: '0.5rem' }}>
                     <span style={{ color: t.activa ? 'var(--at-primary)' : 'var(--at-danger)' }}>{t.activa ? '● Activa' : '● Inactiva'}</span>
                   </td>
                   {(canEdit || canDelete) && (
                     <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                      {canEdit && (
-                        <button onClick={() => handleStartEdit(t)} style={{ marginRight: '0.5rem', padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Editar</button>
-                      )}
-                      {canDelete && (
-                        <button onClick={() => handleDelete(t.id, t.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Eliminar</button>
-                      )}
+                      <div style={accionesFila}>
+                        {canEdit && (
+                          <Button size="sm" onClick={() => handleStartEdit(t)} aria-label={`Editar ${t.nombre}`}>Editar</Button>
+                        )}
+                        {canDelete && (
+                          <Button size="sm" variant="danger" onClick={() => handleDelete(t.id, t.nombre)} aria-label={`Eliminar ${t.nombre}`}>Eliminar</Button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>

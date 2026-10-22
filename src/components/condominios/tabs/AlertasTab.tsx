@@ -19,6 +19,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.alertas.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -136,7 +138,7 @@ const BLANK: Omit<AlertaCondominio, 'id' | 'company_id' | 'project_id' | 'create
   referencia_id: undefined,
 }
 
-export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const { t } = useTranslation()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ ...BLANK })
@@ -181,6 +183,8 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: t('condominios.alertas.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
     await deleteCondominioRow('alertas_condominio', id)
@@ -369,7 +373,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
                       </button>
                     </>
                   )}
-                  {canEdit && (
+                  {canDelete && (
                     <button onClick={() => handleDelete(a.id)} aria-label={t('condominios.comun.delete')}
                       style={{ padding: '4px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>
                       🗑️
