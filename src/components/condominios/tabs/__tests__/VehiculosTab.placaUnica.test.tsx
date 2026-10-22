@@ -2,7 +2,7 @@
 // base rechaza el alta por placa duplicada, el panel lo dice con palabras y no
 // con el texto crudo de Postgres. Cualquier otro error se muestra tal cual.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, act, fireEvent, within } from '@testing-library/react'
 import type { Unidad } from '../../../../types'
 
 const h = vi.hoisted(() => ({
@@ -36,10 +36,12 @@ async function altaConError(error: { message: string; code?: string }) {
     </I18nProvider>,
   )
   fireEvent.click(screen.getAllByRole('button').find(b => /\+/.test(b.textContent ?? ''))!)
-  const [unidad] = screen.getAllByRole('combobox')
+  // El formulario abre en ventana: se busca dentro de ella, no entre los filtros de la tabla.
+  const ventana = within(screen.getByRole('dialog'))
+  const [unidad] = ventana.getAllByRole('combobox')
   fireEvent.change(unidad, { target: { value: 'u1' } })
-  fireEvent.change(screen.getByPlaceholderText(/ABC|placa/i), { target: { value: 'p-777aaa' } })
-  const guardar = screen.getAllByRole('button').find(b => b.textContent === 'Guardar' || /guardar|save/i.test(b.textContent ?? ''))!
+  fireEvent.change(ventana.getByPlaceholderText(/ABC|placa/i), { target: { value: 'p-777aaa' } })
+  const guardar = ventana.getAllByRole('button').find(b => b.textContent === 'Guardar' || /guardar|save/i.test(b.textContent ?? ''))!
   await act(async () => { fireEvent.click(guardar) })
 }
 

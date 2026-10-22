@@ -5,7 +5,7 @@ import type { IncidenteSeguridad } from '../../../../types'
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
-  deleteCondominioRow: vi.fn(async () => ({ error: null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   notify: vi.fn(),
 }))
@@ -14,7 +14,7 @@ vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db:
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
-  deleteCondominioRow: mocks.deleteCondominioRow,
+  deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
 }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
 // jsPDF / xlsx no hacen falta para estas pruebas.
@@ -136,6 +136,24 @@ describe('IncidentesTab — ventanas', () => {
     fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
     dialog = screen.getByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: /Eliminar/ }))
-    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', 'i1'))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('incidentes_seguridad', 'i1'))
+  })
+
+  it('con permiso de eliminar, aunque no edite, borra el incidente', async () => {
+    renderTab({ canEdit: false })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('incidentes_seguridad', 'i1'))
+  })
+
+  it('si la base no borra (la RLS lo rechaza), avisa y no da el incidente por eliminado', async () => {
+    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Eliminar/ }))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
+    expect(onRefresh).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 })

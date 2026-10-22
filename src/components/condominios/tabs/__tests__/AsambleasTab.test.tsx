@@ -5,7 +5,7 @@ import type { Asamblea, Unidad } from '../../../../types'
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
-  deleteCondominioRow: vi.fn(async () => ({ error: null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
   upsertCondominioRow: vi.fn(async () => ({ error: null })),
   fetchPuntosAsambleaConVotos: vi.fn(async () => [
     {
@@ -22,7 +22,7 @@ vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db:
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
-  deleteCondominioRow: mocks.deleteCondominioRow,
+  deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
   upsertCondominioRow: mocks.upsertCondominioRow,
 }))
 vi.mock('../../../../domain/condominios/tabQueries', () => ({ fetchPuntosAsambleaConVotos: mocks.fetchPuntosAsambleaConVotos }))
@@ -160,6 +160,21 @@ describe('AsambleasTab — ventanas', () => {
 
     renderTab()
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar Asamblea Ordinaria Abril' }))
-    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('asambleas', 'a1'))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('asambleas', 'a1'))
+  })
+
+  it('con permiso de eliminar, aunque no edite, borra la asamblea', async () => {
+    renderTab({ canEdit: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Asamblea Ordinaria Abril' }))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('asambleas', 'a1'))
+  })
+
+  it('si la base no borra (la RLS lo rechaza), avisa y no da la asamblea por eliminada', async () => {
+    mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Asamblea Ordinaria Abril' }))
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('El servidor no aplicó el cambio'))
+    expect(onRefresh).not.toHaveBeenCalled()
   })
 })

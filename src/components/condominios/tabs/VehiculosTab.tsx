@@ -3,6 +3,8 @@ import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '.
 import type { VehiculoResidente } from '../../../types'
 import type { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -87,6 +89,12 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
     setShowForm(false); setEditId(null); setForm({ ...BLANK }); onRefresh()
   }
 
+  /** ×, Escape y Cancelar: no se cierra mientras se guarda. */
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false); setEditId(null)
+  }
+
   async function handleDelete(id: string) {
     const r = await confirm({ title: t('condominios.vehiculos.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
@@ -167,67 +175,70 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
         })}
       </div>
 
-      {/* Form */}
+      {/* Form en ventana: antes se desplegaba arriba de la lista y en el
+          teléfono la empujaba fuera de la vista. */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? t('condominios.vehiculos.form_title_edit') : t('condominios.vehiculos.form_title_new')}</h3>
+        <EditModal
+          title={editId ? t('condominios.vehiculos.form_title_edit') : t('condominios.vehiculos.form_title_new')}
+          maxWidth="720px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>{t('condominios.comun.cancel')}</Button>
+            <Button onClick={handleSave} loading={saving} loadingText={t('condominios.comun.saving')}>{t('condominios.comun.save')}</Button>
+          </>}
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.comun.unit_required')}</label>
-              <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
+              <label htmlFor="veh-unidad" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.comun.unit_required')}</label>
+              <select id="veh-unidad" style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">{t('condominios.comun.select_dash')}</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.vehiculos.placa')}</label>
-              <input style={inputStyle} value={form.placa} onChange={e => setF('placa', e.target.value)} placeholder={t('condominios.vehiculos.placa_placeholder')} autoFocus />
+              <label htmlFor="veh-placa" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.vehiculos.placa')}</label>
+              <input id="veh-placa" style={inputStyle} value={form.placa} onChange={e => setF('placa', e.target.value)} placeholder={t('condominios.vehiculos.placa_placeholder')} autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.comun.type')}</label>
-              <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
+              <label htmlFor="veh-tipo" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.comun.type')}</label>
+              <select id="veh-tipo" style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                 {Object.keys(TIPO_LABEL_KEY).map(v => <option key={v} value={v}>{t(TIPO_LABEL_KEY[v])}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.vehiculos.marca')}</label>
-              <input style={inputStyle} value={form.marca} onChange={e => setF('marca', e.target.value)} placeholder={t('condominios.vehiculos.marca_placeholder')} />
+              <label htmlFor="veh-marca" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.vehiculos.marca')}</label>
+              <input id="veh-marca" style={inputStyle} value={form.marca} onChange={e => setF('marca', e.target.value)} placeholder={t('condominios.vehiculos.marca_placeholder')} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.vehiculos.modelo')}</label>
-              <input style={inputStyle} value={form.modelo} onChange={e => setF('modelo', e.target.value)} placeholder={t('condominios.vehiculos.modelo_placeholder')} />
+              <label htmlFor="veh-modelo" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.vehiculos.modelo')}</label>
+              <input id="veh-modelo" style={inputStyle} value={form.modelo} onChange={e => setF('modelo', e.target.value)} placeholder={t('condominios.vehiculos.modelo_placeholder')} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.vehiculos.color')}</label>
-              <input style={inputStyle} value={form.color} onChange={e => setF('color', e.target.value)} placeholder={t('condominios.vehiculos.color_placeholder')} />
+              <label htmlFor="veh-color" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.vehiculos.color')}</label>
+              <input id="veh-color" style={inputStyle} value={form.color} onChange={e => setF('color', e.target.value)} placeholder={t('condominios.vehiculos.color_placeholder')} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.vehiculos.anio')}</label>
-              <input style={inputStyle} type="number" value={form.anio} onChange={e => setF('anio', e.target.value)} placeholder={t('condominios.vehiculos.anio_placeholder')} min="1990" max="2030" />
+              <label htmlFor="veh-anio" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.vehiculos.anio')}</label>
+              <input id="veh-anio" style={inputStyle} type="number" value={form.anio} onChange={e => setF('anio', e.target.value)} placeholder={t('condominios.vehiculos.anio_placeholder')} min="1990" max="2030" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.comun.status')}</label>
-              <select style={inputStyle} value={form.activo ? 'true' : 'false'} onChange={e => setF('activo', e.target.value === 'true')}>
+              <label htmlFor="veh-estado" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.comun.status')}</label>
+              <select id="veh-estado" style={inputStyle} value={form.activo ? 'true' : 'false'} onChange={e => setF('activo', e.target.value === 'true')}>
                 <option value="true">{t('condominios.comun.active')}</option>
                 <option value="false">{t('condominios.comun.inactive')}</option>
               </select>
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.comun.notes')}</label>
-              <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder={t('condominios.vehiculos.notas_placeholder')} />
+            {/* `1 / -1` y no `span 2`: con una sola columna (teléfono) el span
+                creaba una columna implícita y el campo se salía de la ventana. */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="veh-notas" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.comun.notes')}</label>
+              <input id="veh-notas" style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder={t('condominios.vehiculos.notas_placeholder')} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? t('condominios.comun.saving') : t('condominios.comun.save')}
-            </button>
-            <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              {t('condominios.comun.cancel')}
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* List — cond:B2: migrado a <DataTable> shared */}

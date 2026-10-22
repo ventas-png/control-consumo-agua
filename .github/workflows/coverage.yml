@@ -974,6 +974,20 @@ jobs:
           PGPORT_TEST: 55570
         run: supabase/tests/limpieza_calendario/run.sh
 
+      # 20261103000200 · 000300 · 000400: en Mantenimiento, Incidentes,
+      # Asambleas, Checklist de áreas y Permisos de obra, crear exige «Crear»,
+      # editar «Editar» y borrar «Eliminar» del tab también en la base (antes:
+      # INSERT y UPDATE —también la baja de tickets— con sólo VER el tab, y
+      # DELETE sólo de admin). El Kanban sigue editando tickets con su propio
+      # permiso y el residente sigue reportándolos desde el portal. Control
+      # previo que reproduce los huecos, cadena completa, huella del auditor,
+      # guardas que abortan con una policy de más y veinte mutantes.
+      - name: Acciones por permiso — «Crear»/«Editar»/«Eliminar» del tab en cinco tablas
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55571
+        run: supabase/tests/acciones_por_permiso/run.sh
+
       # «Escribir exige la ACCIÓN del tab» (scripts/rls-acciones/generar.mjs),
       # una migración por sección desde supabase/rls-acciones/<sección>.json. El
       # arnés comprueba que la migración es la generada, reproduce el hueco de

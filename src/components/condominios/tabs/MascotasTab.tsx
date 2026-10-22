@@ -1,6 +1,8 @@
 import { hoyLocalISO, diasEntreFechasCalendario } from '../../../lib/format'
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { Mascota, Unidad, EspecieMascota } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -63,6 +65,12 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
     setForm({ unidad_id: '', nombre: '', especie: 'perro', raza: '', color: '', fecha_nacimiento: '', fecha_ultima_vacuna: '', notas: '' })
     setFotoUrl(null)
     setShowForm(false); setEditingId(null)
+  }
+
+  /** ×, Escape y Cancelar: no se cierra mientras se guarda. */
+  function cerrarForm() {
+    if (saving) return
+    resetForm()
   }
 
   function startEdit(m: Mascota) {
@@ -133,27 +141,40 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
         </div>
       )}
 
-      {/* Form */}
+      {/* Form en ventana: antes se desplegaba arriba de la lista y en el
+          teléfono la empujaba fuera de la vista. */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editingId ? t('condominios.mascotas.form_title_edit') : t('condominios.mascotas.form_title_new')}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+        <EditModal
+          title={editingId ? t('condominios.mascotas.form_title_edit') : t('condominios.mascotas.form_title_new')}
+          maxWidth="720px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>{t('condominios.comun.cancel')}</Button>
+            <Button onClick={handleGuardar} loading={saving} loadingText={t('condominios.comun.saving')}>{t('condominios.comun.save')}</Button>
+          </>}
+        >
+          {/* auto-fill en vez de `1fr 1fr`: en el teléfono las dos columnas fijas
+              dejaban cada campo en la mitad del ancho. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.name')}</label>
-              <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder={t('condominios.mascotas.name_placeholder')}
+              <label htmlFor="mas-nombre" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.name')}</label>
+              <input id="mas-nombre" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder={t('condominios.mascotas.name_placeholder')} autoFocus
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.comun.unit_required')}</label>
-              <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
+              <label htmlFor="mas-unidad" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.comun.unit_required')}</label>
+              <select id="mas-unidad" value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
                 style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 <option value="">{t('condominios.comun.select_placeholder')}</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.especie')}</label>
-              <select value={form.especie} onChange={e => setForm(f => ({ ...f, especie: e.target.value as EspecieMascota }))}
+              <label htmlFor="mas-especie" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.especie')}</label>
+              <select id="mas-especie" value={form.especie} onChange={e => setForm(f => ({ ...f, especie: e.target.value as EspecieMascota }))}
                 style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 <option value="perro">{t('condominios.mascotas.especie_perro')}</option>
                 <option value="gato">{t('condominios.mascotas.especie_gato')}</option>
@@ -162,41 +183,35 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.raza')}</label>
-              <input value={form.raza} onChange={e => setForm(f => ({ ...f, raza: e.target.value }))} placeholder={t('condominios.mascotas.raza_placeholder')}
+              <label htmlFor="mas-raza" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.raza')}</label>
+              <input id="mas-raza" value={form.raza} onChange={e => setForm(f => ({ ...f, raza: e.target.value }))} placeholder={t('condominios.mascotas.raza_placeholder')}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.color')}</label>
-              <input value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} placeholder={t('condominios.mascotas.color_placeholder')}
+              <label htmlFor="mas-color" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.color')}</label>
+              <input id="mas-color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} placeholder={t('condominios.mascotas.color_placeholder')}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.fecha_nacimiento')}</label>
-              <input type="date" value={form.fecha_nacimiento} onChange={e => setForm(f => ({ ...f, fecha_nacimiento: e.target.value }))}
+              <label htmlFor="mas-nacimiento" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.fecha_nacimiento')}</label>
+              <input id="mas-nacimiento" type="date" value={form.fecha_nacimiento} onChange={e => setForm(f => ({ ...f, fecha_nacimiento: e.target.value }))}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.ultima_vacuna')}</label>
-              <input type="date" value={form.fecha_ultima_vacuna} onChange={e => setForm(f => ({ ...f, fecha_ultima_vacuna: e.target.value }))}
+              <label htmlFor="mas-vacuna" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.mascotas.ultima_vacuna')}</label>
+              <input id="mas-vacuna" type="date" value={form.fecha_ultima_vacuna} onChange={e => setForm(f => ({ ...f, fecha_ultima_vacuna: e.target.value }))}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.comun.notes')}</label>
-              <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder={t('condominios.mascotas.notas_placeholder')}
+              <label htmlFor="mas-notas" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{t('condominios.comun.notes')}</label>
+              <input id="mas-notas" value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder={t('condominios.mascotas.notas_placeholder')}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
               <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="mascotas" label={t('condominios.mascotas.foto_label')} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? t('condominios.comun.saving') : t('condominios.comun.save')}
-            </button>
-            <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>{t('condominios.comun.cancel')}</button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Lista — cond:B2: migrado a <DataTable> shared */}
