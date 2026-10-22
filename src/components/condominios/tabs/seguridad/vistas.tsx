@@ -7,7 +7,7 @@ import { accentPrioridad, ESTADO_RONDA, PRIORIDAD_CONFIG, TIPO_NOVEDAD_CONFIG } 
 
 export function VistaNovedades({ ctx }: { ctx: SeguridadCtx }) {
   const {
-    rondas, canEdit, filtroPrioridad, setFiltroPrioridad,
+    rondas, canDelete, filtroPrioridad, setFiltroPrioridad,
     novedadesFiltradas, setNovedadDetalle, eliminarNovedad,
   } = ctx
 
@@ -69,8 +69,8 @@ export function VistaNovedades({ ctx }: { ctx: SeguridadCtx }) {
                           style={{ fontSize: '12px', color: 'var(--at-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: '0', fontWeight: 600, marginLeft: 'auto' }}>
                           Ver detalle →
                         </button>
-                        {canEdit && (
-                          <button onClick={() => eliminarNovedad(n.id)}
+                        {canDelete && (
+                          <button onClick={() => eliminarNovedad(n.id)} aria-label="Eliminar novedad"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px', padding: '2px 4px' }}>
                             🗑
                           </button>

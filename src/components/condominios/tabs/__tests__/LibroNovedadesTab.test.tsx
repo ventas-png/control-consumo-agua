@@ -31,7 +31,7 @@ const entrada = {
 function renderTab(props: Partial<Parameters<typeof LibroNovedadesTab>[0]> = {}) {
   return render(
     <LibroNovedadesTab novedades={[entrada]} proyectoId="p1" companyId="co1"
-      canCreate canEdit onRefresh={() => {}} {...props} />,
+      canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -94,7 +94,7 @@ describe('LibroNovedadesTab — ventanas', () => {
   })
 
   it('sin permisos no hay nueva entrada, firmar ni eliminar; el detalle se puede ver', () => {
-    renderTab({ canCreate: false, canEdit: false })
+    renderTab({ canCreate: false, canEdit: false, canDelete: false })
     expect(screen.queryByRole('button', { name: '+ Nueva entrada' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Firmar' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Eliminar entrada/ })).toBeNull()

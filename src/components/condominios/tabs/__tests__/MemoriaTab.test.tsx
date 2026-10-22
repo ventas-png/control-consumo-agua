@@ -33,7 +33,7 @@ function memoria(over: Partial<MemoriaLabores> = {}): MemoriaLabores {
 function renderTab(props: Partial<Parameters<typeof MemoriaTab>[0]> = {}) {
   return render(
     <MemoriaTab memorias={[memoria(), memoria({ id: 'm2', titulo: 'Informe Anual 2025', periodo: '2025', tipo_periodo: 'anual', estado: 'publicado' })]}
-      proyectoId="p1" companyId="co1" userId="u1" canCreate canEdit onRefresh={() => {}} {...props} />,
+      proyectoId="p1" companyId="co1" userId="u1" canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
   )
 }
 
@@ -63,7 +63,7 @@ describe('MemoriaTab — ventanas', () => {
     const { rerender } = renderTab()
     fireEvent.click(screen.getByRole('button', { name: /^Informe Anual 2025/ }))
     expect(screen.getByRole('dialog', { name: 'Informe Anual 2025' })).toBeTruthy()
-    rerender(<MemoriaTab memorias={[memoria()]} proyectoId="p1" companyId="co1" userId="u1" canCreate canEdit onRefresh={() => {}} />)
+    rerender(<MemoriaTab memorias={[memoria()]} proyectoId="p1" companyId="co1" userId="u1" canCreate canEdit canDelete onRefresh={() => {}} />)
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -103,7 +103,7 @@ describe('MemoriaTab — ventanas', () => {
   })
 
   it('sin permisos no hay acciones, pero la memoria se puede leer', () => {
-    renderTab({ canCreate: false, canEdit: false })
+    renderTab({ canCreate: false, canEdit: false, canDelete: false })
     expect(screen.queryByRole('button', { name: '+ Nueva Memoria' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Publicar' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Eliminar/ })).toBeNull()
