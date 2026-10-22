@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20261104000450: el candado de plan de
+# Verificación EJECUTABLE de 20261104000550: el candado de plan de
 # puntos_asamblea y votos_asamblea resuelve la empresa por `asambleas`.
 #
 # POR QUÉ EXISTE
@@ -37,8 +37,8 @@ trap 'rc=$?; echo "❌ run.sh terminó con rc=$rc en la línea $LINENO: $BASH_CO
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-NUESTRA="$MIGS/20261104000450_asambleas_candado_plan_por_asambleas.sql"
-VERSION=20261104000450
+NUESTRA="$MIGS/20261104000550_asambleas_candado_plan_por_asambleas.sql"
+VERSION=20261104000550
 HUELLA="$RAIZ/scripts/schema-drift/fingerprint.sql"
 [ -f "$NUESTRA" ] || { echo "❌ no existe $NUESTRA"; exit 1; }
 
