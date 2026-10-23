@@ -13,6 +13,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.prestamos.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -32,7 +34,7 @@ const BLANK = {
   entregado_por: '', observaciones: '',
 }
 
-export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
@@ -94,9 +96,12 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('prestamos_equipo', id)
+    const { error } = await deleteCondominioRow('prestamos_equipo', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -240,9 +245,9 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
               return <span style={{ background: es.bg, color: es.color, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{es.label}</span>
             } },
           { key: 'actions', header: '', align: 'right',
-            render: (p) => canEdit ? (
+            render: (p) => (canEdit || canDelete) ? (
               <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                {p.estado === 'prestado' && (
+                {canEdit && p.estado === 'prestado' && (
                   <>
                     <button onClick={(e) => { e.stopPropagation(); marcarDevuelto(p) }}
                       style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
@@ -254,8 +259,10 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
                     </button>
                   </>
                 )}
-                <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} aria-label="Eliminar préstamo"
-                  style={{ padding: '3px 7px', background: 'var(--at-chip)', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer', color: 'var(--at-ink-3)' }}>🗑️</button>
+                {canDelete && (
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} aria-label="Eliminar préstamo"
+                    style={{ padding: '3px 7px', background: 'var(--at-chip)', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer', color: 'var(--at-ink-3)' }}>🗑️</button>
+                )}
               </div>
             ) : null },
         ] satisfies DataTableColumn<PrestamoEquipo>[]}

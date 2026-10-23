@@ -53,7 +53,10 @@ La regla para armarlo:
   sólo mira la empresa) se declara en `agregar_en` con el fragmento literal
   junto al que va la acción; el generador escribe «(fragmento AND acción)».
 - `receta` fija el valor de columnas para la fila que fabrica el arnés,
-  cuando un CHECK de varias columnas rechaza el valor por tipo.
+  cuando una regla de negocio rechaza el valor por tipo (un CHECK de varias
+  columnas, un trigger que exige un proveedor del catálogo). Es SQL y se
+  evalúa al fabricar, como el admin de la empresa: puede pedir un padre
+  (`ra.padre('public.proveedores', ra.id('A'), 1) ->> 'id'`).
 - Toda clave `condominios.tab.<tab>[.<acción>]` del mapa debe existir en
   `permissions`. Un tab cuyas claves el catálogo no siembra a propósito (hoy
   sólo lo ven company_owner/admin) se declara en `_sin_clave`; cualquier otro

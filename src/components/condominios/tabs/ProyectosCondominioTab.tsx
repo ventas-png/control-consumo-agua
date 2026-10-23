@@ -11,6 +11,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.proyectos_cond.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -36,7 +38,7 @@ const BLANK = {
   porcentaje_avance: '0', presupuesto: '', costo_real: '', notas: '',
 }
 
-export default function ProyectosCondominioTab({ proyectos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function ProyectosCondominioTab({ proyectos, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<ProyectoCondominio | null>(null)
@@ -111,9 +113,12 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const { isConfirmed } = await confirm({ title: '¿Eliminar proyecto?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await deleteCondominioRow('proyectos_condominio', id)
+    const { error } = await deleteCondominioRow('proyectos_condominio', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -288,20 +293,26 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
                 </div>
               ))}
               {selected.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 8 }}>{selected.notas}</div>}
-              {canEdit && (
+              {(canEdit || canDelete) && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-                  <button onClick={() => actualizarAvance(selected)}
-                    style={{ flex: 1, padding: '7px 0', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                    📊 Avance
-                  </button>
-                  <button onClick={() => abrirEditar(selected)}
-                    style={{ flex: 1, padding: '7px 0', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                    ✏️ Editar
-                  </button>
-                  <button onClick={() => eliminar(selected.id)}
-                    style={{ padding: '7px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                    🗑
-                  </button>
+                  {canEdit && (
+                    <button onClick={() => actualizarAvance(selected)}
+                      style={{ flex: 1, padding: '7px 0', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      📊 Avance
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button onClick={() => abrirEditar(selected)}
+                      style={{ flex: 1, padding: '7px 0', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      ✏️ Editar
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button onClick={() => eliminar(selected.id)} title="Eliminar" aria-label={`Eliminar ${selected.nombre}`}
+                      style={{ padding: '7px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      🗑
+                    </button>
+                  )}
                 </div>
               )}
             </div>

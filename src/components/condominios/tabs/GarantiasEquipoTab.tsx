@@ -13,6 +13,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.garantias.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -35,7 +37,7 @@ const BLANK = { equipo: '', area: '', numero_serie: '', proveedor: '', contacto_
 function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('es', { minimumFractionDigits: 2 })}` }
 function addDays(d: string, days: number) { return sumarDiasCalendario(d, days) ?? d }
 
-export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const { t } = useTranslation()
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -73,9 +75,12 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: t('condominios.garantias.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('garantias_equipo', id)
+    const { error } = await deleteCondominioRow('garantias_equipo', id)
+    if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); return }
     onRefresh()
   }
 
@@ -276,18 +281,22 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
           },
           {
             key: 'actions', header: '', align: 'right',
-            render: g => canEdit ? (
+            render: g => (canEdit || canDelete) ? (
               <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                {g.estado === 'vigente' && (
+                {canEdit && g.estado === 'vigente' && (
                   <button onClick={() => cambiarEstado(g.id, 'reclamada')}
                     style={{ padding: '3px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                     {t('condominios.garantias.accion_reclamar')}
                   </button>
                 )}
-                <button onClick={() => startEdit(g)} aria-label={t('condominios.comun.edit')}
-                  style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                <button onClick={() => handleDelete(g.id)} aria-label={t('condominios.comun.delete')}
-                  style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                {canEdit && (
+                  <button onClick={() => startEdit(g)} aria-label={t('condominios.comun.edit')}
+                    style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                )}
+                {canDelete && (
+                  <button onClick={() => handleDelete(g.id)} aria-label={t('condominios.comun.delete')}
+                    style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                )}
               </div>
             ) : null,
           },

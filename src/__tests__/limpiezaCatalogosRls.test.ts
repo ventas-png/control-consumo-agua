@@ -102,23 +102,23 @@ describe('policies de areas_condominio tras el ensanche', () => {
     expect(cuerpo).not.toMatch(/user_has_permission/)
   })
 
-  for (const nombre of ['areas_condominio_insert', 'areas_condominio_update']) {
+  for (const [nombre, accion] of [['areas_condominio_insert', 'create'], ['areas_condominio_update', 'edit']]) {
     it(`${nombre} exige autorización ESPECÍFICA, no un tab consumidor`, () => {
       // Ver rutas_ronda o prog_limpieza (tabs que CONSUMEN el catálogo) no
-      // puede bastar para administrarlo: hace falta el gate canónico o el
-      // permiso dedicado.
+      // puede bastar para administrarlo: hace falta la ACCIÓN del tab que lo
+      // administra (areas_config, desde 20261104000600; ver checklist_areas ya
+      // no basta) o el permiso dedicado.
       const cuerpo = vigentes.get(nombre)!.cuerpo
-      expect(cuerpo).toContain(PERM_CHECKLIST)
       expect(cuerpo).toContain(PERM_AREAS_MANAGE)
-      // El tab dedicado ES autorización específica: administra el catálogo, no
-      // lo consume. Ver rutas_ronda o prog_limpieza sigue sin bastar.
-      expect(cuerpo).toContain(PERM_AREAS_TAB)
+      expect(cuerpo).toContain(`condominios_puede_actuar('areas_config', '${accion}')`)
+      expect(cuerpo).not.toContain(PERM_CHECKLIST)
+      expect(cuerpo).not.toContain(PERM_AREAS_TAB)
       expect(cuerpo).not.toContain(PERM_RONDAS)
       expect(cuerpo).not.toContain(PERM_LIMPIEZA)
-      // El helper puede ir desnudo o envuelto en (SELECT …) — desde
-      // 20260906000100 lo segundo es lo exigido; el invariante de esta prueba
-      // es el acote a la empresa, no la forma.
-      expect(cuerpo).toMatch(/company_id = \(?\s*(?:SELECT\s+)?public\.get_my_company_id\(\)/)
+      // El helper puede ir desnudo o envuelto en (SELECT …), con o sin esquema
+      // (la migración generada lo escribe como lo devuelve pg_get_expr); el
+      // invariante de esta prueba es el acote a la empresa, no la forma.
+      expect(cuerpo).toMatch(/company_id = \(?\s*(?:SELECT\s+)?(?:public\.)?get_my_company_id\(\)/)
     })
   }
 
@@ -130,12 +130,14 @@ describe('policies de areas_condominio tras el ensanche', () => {
     expect(sql).toMatch(/'00000000-0000-0000-0000-000000000005', 'condominios\.areas\.manage'/)
   })
 
-  it('el DELETE se gobierna por rol, no por el helper de permisos', () => {
-    // user_has_permission devuelve true a cualquier clave para owner/admin
-    // (20260518000008): un gate de permiso detrás del filtro de rol no filtra.
+  it('el DELETE exige la acción de borrar de Áreas, no la visibilidad', () => {
+    // Desde 20261104000600 borrar un área pide condominios.tab.areas_config.delete
+    // (lo mismo que ofrece la pantalla con canDelete); antes era sólo de
+    // company_owner/admin. Ver el tab nunca basta.
     const cuerpo = vigentes.get('areas_condominio_delete')!.cuerpo
+    expect(cuerpo).toContain("condominios_puede_actuar('areas_config', 'delete')")
     expect(cuerpo).not.toMatch(/user_has_permission/)
-    expect(cuerpo).toMatch(/ANY\(ARRAY\['company_owner', ?'admin'\]\)/)
+    expect(cuerpo).toMatch(/company_id = \(?\s*(?:SELECT\s+)?(?:public\.)?get_my_company_id\(\)/)
   })
 })
 

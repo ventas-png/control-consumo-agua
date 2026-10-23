@@ -14,6 +14,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.bitacora_manto.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -34,7 +36,7 @@ const TAREAS_PREDEFINIDAS = [
   'Limpieza de piscina', 'Limpieza de gimnasio', 'Revisión de cámaras', 'Revisión de portones',
 ]
 
-export function BitacoraManto({ registros, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function BitacoraManto({ registros, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
@@ -85,9 +87,12 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('bitacora_manto', id)
+    const { error } = await deleteCondominioRow('bitacora_manto', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selectedId === id) setSelectedId(null)
     onRefresh()
   }
@@ -290,12 +295,14 @@ ${r.observaciones ? raw(printHtml`<p><strong>Observaciones generales:</strong> $
               <div style={{ display: 'flex', gap: '3px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
                 <button onClick={() => handlePrint(r)} aria-label={`Imprimir registro del ${r.fecha}`}
                   style={{ padding: '3px 7px', background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
-                {canEdit && <>
+                {canEdit && (
                   <button onClick={() => startEdit(r)} aria-label={`Editar registro del ${r.fecha}`}
                     style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                )}
+                {canDelete && (
                   <button onClick={() => handleDelete(r.id)} aria-label={`Eliminar registro del ${r.fecha}`}
                     style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                </>}
+                )}
               </div>
             </div>
           )
@@ -321,7 +328,7 @@ ${r.observaciones ? raw(printHtml`<p><strong>Observaciones generales:</strong> $
             // eliminar repiten los de la fila, que queda detrás de la ventana.
             // Envueltos para que bajen de línea en el teléfono.
             footer={<div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
-              {canEdit && <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar registro">🗑️</Button>}
+              {canDelete && <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar registro">🗑️</Button>}
               {canEdit && <Button variant="secondary" onClick={() => startEdit(selected)}>✏️ Editar</Button>}
               {canEdit && (
                 <Button variant={selected.firmado ? 'success' : 'secondary'} onClick={() => toggleFirmado(selected)}>
