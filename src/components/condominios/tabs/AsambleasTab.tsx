@@ -28,6 +28,16 @@ const ESTADO_CONFIG: Record<EstadoAsamblea, { label: string; bg: string; color: 
   cancelada:  { label: 'Cancelada',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
+// Las mismas que impone la base (asambleas_tg_transicion_estado): una asamblea
+// finalizada o cancelada ya no cambia de estado, y su agenda y sus votos
+// quedan congelados.
+const TRANSICIONES: Record<EstadoAsamblea, EstadoAsamblea[]> = {
+  programada: ['en_curso', 'cancelada'],
+  en_curso:   ['finalizada', 'cancelada'],
+  finalizada: [],
+  cancelada:  [],
+}
+
 const VOTO_CONFIG: Record<TipoVoto, { label: string; bg: string; color: string }> = {
   a_favor:    { label: 'A favor',    bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   en_contra:  { label: 'En contra',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
@@ -92,7 +102,8 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function cambiarEstado(id: string, estado: EstadoAsamblea) {
-    await updateCondominioRow('asambleas', id, { estado })
+    const { error } = await updateCondominioRow('asambleas', id, { estado })
+    if (error) { toast.error(`No se cambió el estado: ${error.message}`); return }
     onRefresh()
   }
 
@@ -134,7 +145,8 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function guardarActa(id: string, acta: string) {
-    await updateCondominioRow('asambleas', id, { acta })
+    const { error } = await updateCondominioRow('asambleas', id, { acta })
+    if (error) { toast.error(`No se guardó el acta: ${error.message}`); return }
     onRefresh()
   }
 
@@ -266,11 +278,11 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                 </div>
               </button>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
-                {canEdit ? (
+                {canEdit && TRANSICIONES[a.estado].length > 0 ? (
                   <select value={a.estado} onChange={e => cambiarEstado(a.id, e.target.value as EstadoAsamblea)} aria-label={`Estado de ${a.titulo}`}
                     style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, border: 'none', cursor: 'pointer', background: ec.bg, color: ec.color }}>
-                    {(Object.entries(ESTADO_CONFIG) as [EstadoAsamblea, typeof ESTADO_CONFIG[EstadoAsamblea]][]).map(([v, c]) => (
-                      <option key={v} value={v}>{c.label}</option>
+                    {[a.estado, ...TRANSICIONES[a.estado]].map(v => (
+                      <option key={v} value={v}>{ESTADO_CONFIG[v].label}</option>
                     ))}
                   </select>
                 ) : (
@@ -286,6 +298,8 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
       {/* Agenda y votación en ventana (a pantalla completa en el teléfono). */}
       {selectedId && selectedAsamblea && (() => {
         const ec = ESTADO_CONFIG[selectedAsamblea.estado]
+        // Finalizada o cancelada: la base ya no acepta cambios en la agenda.
+        const agendaAbierta = canEdit && TRANSICIONES[selectedAsamblea.estado].length > 0
         return (
           <EditModal
             title={selectedAsamblea.titulo}
@@ -296,7 +310,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
             maxWidth="720px"
             fullScreenOnMobile
             onClose={cerrarDetalle}
-            footer={canEdit ? (
+            footer={agendaAbierta ? (
               <Button variant="secondary" onClick={() => setShowPuntoForm(v => !v)} aria-expanded={showPuntoForm}>+ Punto</Button>
             ) : undefined}
           >
@@ -304,7 +318,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
               <strong style={{ color: 'var(--at-ink)' }}>Agenda</strong> · {puntos.length} puntos · {unidades.filter(u => u.activo).length} unidades
             </p>
 
-            {showPuntoForm && (
+            {agendaAbierta && showPuntoForm && (
               <div style={{ background: 'var(--at-surface-2)', borderRadius: '10px', padding: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {/* autoFocus: el botón que lo abre está al pie, así el campo queda a la vista. */}
                 <input value={puntoForm.titulo} onChange={e => setPuntoForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Título del punto" aria-label="Título del punto"

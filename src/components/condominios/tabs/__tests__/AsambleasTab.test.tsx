@@ -180,6 +180,57 @@ describe('AsambleasTab — ventanas', () => {
     await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('asambleas', 'a1'))
   })
 
+  it('el estado sólo ofrece las transiciones que la base acepta; finalizada y cancelada no cambian', () => {
+    renderTab({ asambleas: [
+      asamblea({ id: 'p', titulo: 'Programada', estado: 'programada' }),
+      asamblea({ id: 'c', titulo: 'En curso', estado: 'en_curso' }),
+      asamblea({ id: 'f', titulo: 'Finalizada', estado: 'finalizada' }),
+      asamblea({ id: 'x', titulo: 'Cancelada', estado: 'cancelada' }),
+    ] })
+    const opciones = (titulo: string) =>
+      within(screen.getByRole('combobox', { name: `Estado de ${titulo}` })).getAllByRole('option').map(o => o.textContent)
+    expect(opciones('Programada')).toEqual(['Programada', 'En curso', 'Cancelada'])
+    expect(opciones('En curso')).toEqual(['En curso', 'Finalizada', 'Cancelada'])
+    expect(screen.queryByRole('combobox', { name: 'Estado de Finalizada' })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Estado de Cancelada' })).toBeNull()
+  })
+
+  it('un cambio de estado rechazado por la base se avisa y no recarga', async () => {
+    mocks.updateCondominioRow.mockResolvedValueOnce({ error: { message: 'ASAMBLEA_TRANSICION: una asamblea en_curso no puede pasar a programada' } } as never)
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Estado de Asamblea Ordinaria Abril' }), { target: { value: 'finalizada' } })
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith(
+      'No se cambió el estado: ASAMBLEA_TRANSICION: una asamblea en_curso no puede pasar a programada'))
+    expect(mocks.updateCondominioRow).toHaveBeenCalledWith('asambleas', 'a1', { estado: 'finalizada' })
+    expect(onRefresh).not.toHaveBeenCalled()
+  })
+
+  it('un acta que la base no guarda se avisa y no recarga', async () => {
+    mocks.updateCondominioRow.mockResolvedValueOnce({ error: { message: 'permission denied for table asambleas' } } as never)
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Extraordinaria Mayo/ }))
+    const acta = within(screen.getByRole('dialog')).getByLabelText('📝 Acta de la asamblea')
+    fireEvent.change(acta, { target: { value: 'Acta corregida' } })
+    fireEvent.blur(acta)
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('No se guardó el acta: permission denied for table asambleas'))
+    expect(onRefresh).not.toHaveBeenCalled()
+  })
+
+  it('con la asamblea finalizada la agenda ya no recibe puntos', async () => {
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Extraordinaria Mayo/ }))
+    const finalizada = screen.getByRole('dialog', { name: 'Asamblea Extraordinaria Mayo' })
+    await within(finalizada).findByText('Aprobar presupuesto')
+    expect(within(finalizada).queryByRole('button', { name: '+ Punto' })).toBeNull()
+    expect(within(finalizada).getByLabelText('📝 Acta de la asamblea')).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Ordinaria Abril/ }))
+    expect(within(screen.getByRole('dialog')).getByRole('button', { name: '+ Punto' })).toBeTruthy()
+  })
+
   it('si la base no borra (la RLS lo rechaza), avisa y no da la asamblea por eliminada', async () => {
     mocks.deleteCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'El servidor no aplicó el cambio', code: 'SIN_FILAS' } })
     const onRefresh = vi.fn()

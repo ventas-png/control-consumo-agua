@@ -188,10 +188,13 @@ INSERT INTO public.unidad_residentes (unidad_id, cliente_id, company_id, project
   (pv.id('U_P'),  pv.id('CLI_INQ'),   pv.id('A'), pv.id('A1'), 'arrendatario');
 
 -- ── Asambleas, puntos y votos ───────────────────────────────────────────────
+-- ASA_FIN sigue el ciclo real: nace en curso, recibe su punto y sus votos, y
+-- recién entonces se finaliza (20261105000100 congela la agenda y los votos
+-- de una asamblea cerrada, así que no se le pueden cargar después).
 INSERT INTO public.asambleas (id, company_id, project_id, titulo, fecha, hora_inicio, estado, acta) VALUES
   (pv.id('ASA_CUR'),  pv.id('A'), pv.id('A1'), 'Ordinaria en curso',  CURRENT_DATE,      '18:00', 'en_curso',   'Borrador del acta'),
   (pv.id('ASA_PROG'), pv.id('A'), pv.id('A1'), 'Extraordinaria',      CURRENT_DATE + 30, '18:00', 'programada', NULL),
-  (pv.id('ASA_FIN'),  pv.id('A'), pv.id('A1'), 'Ordinaria anterior',  CURRENT_DATE - 60, '18:00', 'finalizada', 'Acta firmada'),
+  (pv.id('ASA_FIN'),  pv.id('A'), pv.id('A1'), 'Ordinaria anterior',  CURRENT_DATE - 60, '18:00', 'en_curso',   'Acta firmada'),
   (pv.id('ASA_CAN'),  pv.id('A'), pv.id('A1'), 'Cancelada',           CURRENT_DATE - 30, '18:00', 'cancelada',  NULL),
   (pv.id('ASA_A2'),   pv.id('A'), pv.id('A2'), 'Asamblea de A2',      CURRENT_DATE,      '18:00', 'en_curso',   NULL),
   (pv.id('ASA_C'),    pv.id('C'), pv.id('C1'), 'Asamblea de C1',      CURRENT_DATE,      '18:00', 'en_curso',   NULL);
@@ -208,6 +211,8 @@ INSERT INTO public.votos_asamblea (id, punto_id, unidad_id, voto) VALUES
   (pv.id('VOT_O'), pv.id('PUN_V'),   pv.id('U_O'),  'a_favor'),
   (DEFAULT,        pv.id('PUN_FIN'), pv.id('U_O'),  'a_favor'),
   (DEFAULT,        pv.id('PUN_FIN'), pv.id('U_P2'), 'en_contra');
+
+UPDATE public.asambleas SET estado = 'finalizada' WHERE id = pv.id('ASA_FIN');
 
 INSERT INTO public.asambleas_digital (id, company_id, project_id, titulo, fecha_hora, estado, created_by)
 VALUES (pv.id('ASA_DIG'), pv.id('A'), pv.id('A1'), 'Asamblea digital', now(), 'en_curso', pv.id('ADM_A'));

@@ -1057,6 +1057,19 @@ jobs:
           PGPORT_TEST: 55585
         run: supabase/tests/portal_asambleas_voto/run.sh
 
+      # 20261105000100: tipo y estado de asambleas y tipo de punto con
+      # vocabulario cerrado, el estado sólo avanza, una asamblea finalizada o
+      # cancelada congela su agenda y sus votos (aun para service_role) sin
+      # trabar las cascadas de la purga, la unidad o el usuario, y cada cambio
+      # de voto queda en audit_log para el admin de su empresa. Control previo
+      # que reproduce los huecos, huella del auditor, normalización, guarda que
+      # aborta sin tocar filas y dieciséis mutantes.
+      - name: Integridad de asambleas — estado, agenda y votos congelados al cerrar
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55586
+        run: supabase/tests/asambleas_integridad/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
