@@ -128,7 +128,7 @@ describe('Piscina — nuevo registro en ventana', () => {
   it('sin permiso de crear no hay botón; sin editar no hay Abrir/Cerrar', () => {
     render(<ControlPiscinaTab {...props({ canCreate: false, canEdit: false })} />)
     expect(screen.queryByRole('button', { name: '+ Nuevo registro' })).toBeNull()
-    expect(screen.queryByRole('button', { name: /^(Abrir|Cerrar) .* registro del/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^(Abrir|Cerrar) / })).toBeNull()
   })
 })
 
@@ -176,8 +176,43 @@ describe('Piscina — historial y detalle', () => {
 
   it('«Abrir» en la fila no abre el detalle', async () => {
     render(<ControlPiscinaTab {...props()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir Infantil (registro del 2026-10-20)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir Infantil' }))
     await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('control_piscina', 'i1', { estado: 'abierta' }))
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
+// El estado de la piscina es el de su último registro. Antes cada fila tenía
+// Abrir/Cerrar: «Abrir» en el registro del 19 (cerrado por química) lo
+// cambiaba a él y la tarjeta de Principal seguía igual.
+describe('Piscina — Abrir/Cerrar sólo en el último registro', () => {
+  it('cada piscina tiene un solo botón de estado, el de su último registro', () => {
+    render(<ControlPiscinaTab {...props()} />)
+    const botones = screen.getAllByRole('button', { name: /^(Abrir|Cerrar) / }).map(b => b.getAttribute('aria-label'))
+    expect(botones.sort()).toEqual(['Abrir Infantil', 'Cerrar Principal por mantenimiento'])
+  })
+
+  it('el detalle de un registro viejo no cambia el estado y lleva al último', () => {
+    render(<ControlPiscinaTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver registro de Principal del 2026-10-19 08:30' }))
+    let detalle = screen.getByRole('dialog', { name: '🏊 Principal' })
+    expect(within(detalle).queryByRole('button', { name: '✅ Marcar abierta' })).toBeNull()
+    expect(within(detalle).getByText(/Hay un registro más reciente de Principal/)).toBeTruthy()
+
+    fireEvent.click(within(detalle).getByRole('button', { name: 'Ver el último' }))
+    detalle = screen.getByRole('dialog', { name: '🏊 Principal' })
+    expect(within(detalle).getByText('2026-10-20 · 08:30')).toBeTruthy()
+    expect(within(detalle).getByRole('button', { name: '🔧 Cerrar por mantenimiento' })).toBeTruthy()
+    expect(within(detalle).queryByText(/Hay un registro más reciente/)).toBeNull()
+  })
+
+  it('con la misma fecha y hora, el último es el que se capturó después', () => {
+    render(<ControlPiscinaTab {...props({ registros: [
+      registro({ id: 'a', estado: 'abierta', created_at: '2026-10-20T14:31:00Z' }),
+      registro({ id: 'b', estado: 'cerrada_incidente', created_at: '2026-10-20T14:35:00Z' }),
+    ] })} />)
+    expect(screen.getByRole('button', { name: 'Ver último registro de Principal: Cerrada (incidente)' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir Principal' }))
+    expect(mocks.updateCondominioRow).toHaveBeenCalledWith('control_piscina', 'b', { estado: 'abierta' })
   })
 })
