@@ -1096,6 +1096,21 @@ jobs:
           PGPORT_TEST: 55588
         run: supabase/tests/asambleas_escrutinio/run.sh
 
+      # 20261106000300: un solo modelo de asambleas. asambleas_digital se funde
+      # en asambleas (modalidad, link http/https, acta; la hora en el huso de la
+      # empresa) y se borra; el acta formal se liga a UNA asamblea finalizada de
+      # su condominio y se levanta desde ella (asistencia, orden del día,
+      # resultados, quórum) para quien la ve y crea actas; votaciones es una
+      # consulta con reglas (opciones válidas, una unidad y una empresa de la
+      # votación, congelada al cerrar, resultado de la base). Control previo,
+      # huella del auditor, la fusión, guardas que abortan sin tocar filas y
+      # veintiocho mutantes.
+      - name: Asambleas — fusión de la digital, acta ligada y consultas con reglas
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55589
+        run: supabase/tests/asambleas_unificacion/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

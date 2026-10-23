@@ -605,22 +605,6 @@ export interface OrdenCompra {
   aprobada_at?: string | null
 }
 
-export interface AsambleaDigital {
-  id: string
-  company_id: string
-  project_id: string
-  titulo: string
-  descripcion?: string | null
-  fecha_hora: string
-  modalidad: 'presencial' | 'virtual' | 'hibrida'
-  link_reunion?: string | null
-  quorum_requerido: number
-  estado: 'programada' | 'en_curso' | 'finalizada' | 'cancelada'
-  acta_url?: string | null
-  created_by?: string | null
-  created_at: string
-}
-
 // ── Fase 38 ───────────────────────────────────────────────────────────────────
 export type EstadoProforma = 'borrador' | 'enviada' | 'aprobada' | 'convertida_oc' | 'rechazada'
 export interface Proforma {

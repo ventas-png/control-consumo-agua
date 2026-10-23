@@ -11,7 +11,7 @@ import { UpgradeCTA } from '../shared/UpgradeCTA'
 import type { ContratoProveedorCatalogo } from '../../types/proveedores'
 import type {
   UserSession, Proyecto, Unidad,
-  OrdenCompra, AsambleaDigital, Proforma,
+  OrdenCompra, Proforma,
   CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento, AnuncioComunidad,
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
@@ -92,7 +92,7 @@ export type CondominioTab =
   | 'exportacion' | 'multi_condominio' | 'automatizaciones' | 'scoring_unidades'
   | 'panel_turno' | 'plantillas_mensaje' | 'flujo_aprobacion' | 'cuadro_mando'
   | 'generacion_cuotas' | 'mapa_unidades' | 'envio_masivo' | 'resumen_ejecutivo'
-  | 'ordenes_compra' | 'graficas_tendencias' | 'control_accesos_qr' | 'asamblea_digital'
+  | 'ordenes_compra' | 'graficas_tendencias' | 'control_accesos_qr'
   | 'comparativo_presupuesto' | 'proformas' | 'bitacora_eventos' | 'indice_calidad'
   | 'kanban_tickets' | 'conciliacion_cobros' | 'estado_cuenta_residente' | 'pronostico_financiero'
   | 'simulador_cuotas' | 'calendario_mantenimiento' | 'reporte_deudores' | 'resumen_residente'
@@ -281,7 +281,6 @@ export interface CondominiosTabContext {
   plantillasMensaje: PlantillaMensajeCond[]
   flujoAprobacion: FlujoAprobacionCond[]
   ordenesCompra: OrdenCompra[]
-  asambleasDigital: AsambleaDigital[]
   proformas: Proforma[]
   conciliaciones: ConciliacionCobrosLog[]
   fondoReservaMovs: FondoReservaMovimiento[]
@@ -456,7 +455,6 @@ const OrdenesCompraTab = lazy(() => import('./tabs/OrdenesCompraTab'))
 const GraficasTendenciasTab = lazy(() => import('./tabs/GraficasTendenciasTab'))
 const ControlAccesosQRTab = lazy(() => import('./tabs/ControlAccesosQRTab'))
 const CentroNotificacionesTab = lazy(() => import('./tabs/CentroNotificacionesTab'))
-const AsambleaDigitalTab = lazy(() => import('./tabs/AsambleaDigitalTab'))
 const ComparativoPresupuestoTab = lazy(() => import('./tabs/ComparativoPresupuestoTab'))
 const ProformasTab = lazy(() => import('./tabs/ProformasTab'))
 const BitacoraEventosTab = lazy(() => import('./tabs/BitacoraEventosTab'))
@@ -531,7 +529,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'arrendamientos', label: 'Arrendamientos', icon: '📄', render: (ctx) =>
     <ArrendamientosTab contratos={ctx.contratos} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('arrendamientos')} canEdit={ctx.canEdit('arrendamientos')} canDelete={ctx.canDelete('arrendamientos')} onRefresh={ctx.onRefresh} /> },
   { id: 'asambleas', label: 'Asambleas', icon: '🗳️', render: (ctx) =>
-    <AsambleasTab asambleas={ctx.asambleas} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('asambleas')} canEdit={ctx.canEdit('asambleas')} canDelete={ctx.canDelete('asambleas')} onRefresh={ctx.onRefresh} /> },
+    <AsambleasTab asambleas={ctx.asambleas} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('asambleas')} canEdit={ctx.canEdit('asambleas')} canDelete={ctx.canDelete('asambleas')} actas={ctx.actas} canCrearActa={ctx.canCreate('actas')} onRefresh={ctx.onRefresh} /> },
   { id: 'proveedores', label: 'Contratos', icon: '🤝', render: (ctx) =>
     <ContratosProveedorTab contratos={ctx.contratosProveedores as ContratoProveedorCatalogo[]} proyectoId={ctx.proyectoId} proyectoNombre={ctx.proyectoActual?.nombre} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proveedores')} canEdit={ctx.canEdit('proveedores')} canDelete={ctx.canDelete('proveedores')} onRefresh={ctx.onRefresh} /> },
   { id: 'objetos', label: 'Obj. Perdidos', icon: '🔍', render: (ctx) =>
@@ -619,7 +617,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'comunicacion_condominios', label: 'Conversaciones', icon: '💬', render: (ctx) =>
     <ComunicacionSection currentUser={ctx.currentUser} clientes={[]} proyectos={ctx.proyectosActivos} unidades={ctx.unidadesProyecto} canCreate={ctx.canCreate('comunicacion_condominios')} canEdit={ctx.canEdit('comunicacion_condominios')} serviceType="condominios" /> },
   { id: 'actas', label: 'Actas', icon: '📝', render: (ctx) =>
-    <ActasTab actas={ctx.actas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('actas')} canEdit={ctx.canEdit('actas')} canDelete={ctx.canDelete('actas')} onRefresh={ctx.onRefresh} /> },
+    <ActasTab actas={ctx.actas} asambleas={ctx.asambleas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('actas')} canEdit={ctx.canEdit('actas')} canDelete={ctx.canDelete('actas')} onRefresh={ctx.onRefresh} /> },
   { id: 'cierres', label: 'Cierres', icon: '🔒', render: (ctx) =>
     <CierresMensualesTab cierres={ctx.cierres} cuotas={ctx.cuotas} gastos={ctx.gastos} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('cierres')} canEdit={ctx.canEdit('cierres')} canDelete={ctx.canDelete('cierres')} onRefresh={ctx.onRefresh} /> },
   { id: 'notificaciones', label: 'Notificaciones', icon: '🔔', render: (ctx) =>
@@ -627,7 +625,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'medidores_unidad', label: 'Medidores', icon: '💧', render: (ctx) =>
     <MedidoresUnidadTab medidores={ctx.medidores} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('medidores_unidad')} canEdit={ctx.canEdit('medidores_unidad')} onRefresh={ctx.onRefresh} /> },
   { id: 'votaciones', label: 'Votaciones', icon: '🗳️', render: (ctx) =>
-    <VotacionesTab votaciones={ctx.votaciones} unidades={ctx.unidadesProyecto} asambleas={ctx.asambleas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('votaciones')} canEdit={ctx.canEdit('votaciones')} onRefresh={ctx.onRefresh} /> },
+    <VotacionesTab votaciones={ctx.votaciones} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('votaciones')} canEdit={ctx.canEdit('votaciones')} onRefresh={ctx.onRefresh} /> },
   { id: 'sanciones', label: 'Sanciones', icon: '⚖️', render: (ctx) =>
     <SancionesTab sanciones={ctx.sanciones} unidades={ctx.unidadesProyecto} infracciones={ctx.infracciones} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('sanciones')} canEdit={ctx.canEdit('sanciones')} onRefresh={ctx.onRefresh} /> },
   { id: 'mant_preventivo', label: 'Mant. Prev.', icon: '🔩', render: (ctx) =>
@@ -848,14 +846,12 @@ export const TAB_REGISTRY: TabDef[] = [
     <GraficasTendenciasTab cuotas={ctx.cuotas} tickets={ctx.tickets} gastos={ctx.gastos} incidentes={ctx.incidentes} moneda={ctx.moneda} /> },
   { id: 'control_accesos_qr', label: 'Accesos QR', icon: '📱', render: (ctx) =>
     <ControlAccesosQRTab visitantes={ctx.visitantes} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('control_accesos_qr')} onRefresh={ctx.onRefresh} /> },
-  { id: 'asamblea_digital', label: 'Asamblea digital', icon: '🖥️', render: (ctx) =>
-    <AsambleaDigitalTab asambleas={ctx.asambleasDigital} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('asamblea_digital')} canEdit={ctx.canEdit('asamblea_digital')} canDelete={ctx.canDelete('asamblea_digital')} onRefresh={ctx.onRefresh} /> },
   { id: 'comparativo_presupuesto', label: 'Ppto. vs Real', icon: '📋', render: (ctx) =>
     <ComparativoPresupuestoTab gastos={ctx.gastos} presupuestos={ctx.presupuestos} moneda={ctx.moneda} /> },
   { id: 'proformas', label: 'Proformas', icon: '📑', render: (ctx) =>
     <ProformasTab proformas={ctx.proformas} proveedores={ctx.contratosProveedores} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proformas')} canEdit={ctx.canEdit('proformas')} canDelete={ctx.canDelete('proformas')} onRefresh={ctx.onRefresh} /> },
   { id: 'bitacora_eventos', label: 'Bitácora eventos', icon: '📰', render: (ctx) =>
-    <BitacoraEventosTab visitantes={ctx.visitantes} tickets={ctx.tickets} incidentes={ctx.incidentes} anuncios={ctx.anuncios} ordenesCompra={ctx.ordenesCompra} asambleas={ctx.asambleasDigital} gastos={ctx.gastos} cuotas={ctx.cuotas} moneda={ctx.moneda} /> },
+    <BitacoraEventosTab visitantes={ctx.visitantes} tickets={ctx.tickets} incidentes={ctx.incidentes} anuncios={ctx.anuncios} ordenesCompra={ctx.ordenesCompra} asambleas={ctx.asambleas} gastos={ctx.gastos} cuotas={ctx.cuotas} moneda={ctx.moneda} /> },
   { id: 'indice_calidad', label: 'Índice calidad', icon: '🏆', render: (ctx) =>
     <IndiceCalidadTab cuotas={ctx.cuotas} tickets={ctx.tickets} incidentes={ctx.incidentes} encuestas={ctx.encuestas} polizas={ctx.polizas} contratosProveedores={ctx.contratosProveedores} planesMantenimiento={ctx.planesMantenimiento} sugerencias={ctx.sugerencias} unidades={ctx.unidadesProyecto} moneda={ctx.moneda} /> },
   { id: 'kanban_tickets', label: 'Kanban tickets', icon: '🗂️', render: (ctx) =>

@@ -214,8 +214,16 @@ INSERT INTO public.votos_asamblea (id, punto_id, unidad_id, voto) VALUES
 
 UPDATE public.asambleas SET estado = 'finalizada' WHERE id = pv.id('ASA_FIN');
 
-INSERT INTO public.asambleas_digital (id, company_id, project_id, titulo, fecha_hora, estado, created_by)
-VALUES (pv.id('ASA_DIG'), pv.id('A'), pv.id('A1'), 'Asamblea digital', now(), 'en_curso', pv.id('ADM_A'));
+-- Sólo la usa el control previo (antes.sql). 20261106000300 funde
+-- asambleas_digital en asambleas y la borra: sobre la cadena posterior, la
+-- asamblea digital ya no existe.
+DO $$
+BEGIN
+  IF to_regclass('public.asambleas_digital') IS NOT NULL THEN
+    INSERT INTO public.asambleas_digital (id, company_id, project_id, titulo, fecha_hora, estado, created_by)
+    VALUES (pv.id('ASA_DIG'), pv.id('A'), pv.id('A1'), 'Asamblea digital', now(), 'en_curso', pv.id('ADM_A'));
+  END IF;
+END $$;
 
 -- ── Precondiciones del padrón ───────────────────────────────────────────────
 DO $$

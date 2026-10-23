@@ -23,7 +23,7 @@ import { useClientesCumple } from '../../domain/condominios/cumpleanos'
 import { CondominioContextBar } from './CondominioContextBar'
 import type {
   UserSession, Proyecto, Unidad,
-  OrdenCompra, AsambleaDigital, Proforma,
+  OrdenCompra, Proforma,
   CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento, AnuncioComunidad,
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
@@ -342,7 +342,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   // Fase 36 — GeneracionCuotasLog loaded on demand inside GeneradorCuotasTab
   // Fase 37
   const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>([])
-  const [asambleasDigital, setAsambleasDigital] = useState<AsambleaDigital[]>([])
   // Fase 38
   const [proformas, setProformas] = useState<Proforma[]>([])
   const [conciliaciones, setConciliaciones] = useState<ConciliacionCobrosLog[]>([])
@@ -443,7 +442,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
       plantillasMensajeRes,
       flujoAprobacionRes,
       ordenesCompraRes,
-      asambleasDigitalRes,
       proformasRes,
       conciliacionesRes,
       fondoReservaMovsRes,
@@ -708,7 +706,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     setPlantillasMensaje((plantillasMensajeRes.data ?? []) as PlantillaMensajeCond[])
     setFlujoAprobacion((flujoAprobacionRes.data ?? []) as FlujoAprobacionCond[])
     setOrdenesCompra((ordenesCompraRes.data ?? []) as OrdenCompra[])
-    setAsambleasDigital((asambleasDigitalRes.data ?? []) as AsambleaDigital[])
     setProformas((proformasRes.data ?? []) as Proforma[])
     setConciliaciones((conciliacionesRes.data ?? []) as ConciliacionCobrosLog[])
     setFondoReservaMovs((fondoReservaMovsRes.data ?? []) as FondoReservaMovimiento[])
@@ -783,7 +780,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     campanasCobro, cierresAnuales, cobranzaJudicial, recibosDigitales,
     informesMensuales, sugerencias, vencimientosExtra, capacitaciones,
     proyectosCond, articulosManual, automatizaciones, plantillasMensaje,
-    flujoAprobacion, ordenesCompra, asambleasDigital, proformas, conciliaciones,
+    flujoAprobacion, ordenesCompra, proformas, conciliaciones,
     fondoReservaMovs, configCondominio,
   }), [
     canCreate, canEdit, canChangeStatus, canApprove, canDelete, canView,
@@ -818,7 +815,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     campanasCobro, cierresAnuales, cobranzaJudicial, recibosDigitales,
     informesMensuales, sugerencias, vencimientosExtra, capacitaciones,
     proyectosCond, articulosManual, automatizaciones, plantillasMensaje,
-    flujoAprobacion, ordenesCompra, asambleasDigital, proformas, conciliaciones,
+    flujoAprobacion, ordenesCompra, proformas, conciliaciones,
     fondoReservaMovs, configCondominio,
   ])
 

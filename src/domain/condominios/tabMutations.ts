@@ -196,6 +196,17 @@ export async function firmarRecepcionPaquete(
   return { error }
 }
 
+/**
+ * Levanta el acta formal (actas_reunion) de una asamblea finalizada con su
+ * asistencia, orden del día, resultados y quórum (`asamblea_generar_acta`,
+ * 20261106000300). Si ya existe, devuelve la que hay. Pide ver la asamblea y
+ * crear actas.
+ */
+export async function generarActaAsamblea(asambleaId: string): Promise<{ data: string | null; error: RowError }> {
+  const { data, error } = await db.rpc('asamblea_generar_acta', { p_asamblea_id: asambleaId })
+  return { data: (data as string | null) ?? null, error }
+}
+
 /** Parámetros del acuse de correspondencia (`correspondencia_registrar_acuse`). */
 export interface AcuseCorrespondenciaParams {
   piezaId: string

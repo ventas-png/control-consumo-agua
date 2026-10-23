@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import type {
-  ActaReunion, AgendaItem, AnuncioComunidad, AsambleaDigital, ComunicadoCondominio, Encuesta, EventoCalendario,
+  ActaReunion, AgendaItem, AnuncioComunidad, ComunicadoCondominio, Encuesta, EventoCalendario,
   EventoComunidad, InfraccionCondominio, MiembroJunta, RecordatorioCondominio, SeguimientoAcuerdo, Unidad,
 } from '../../../../types'
 import { eliminarExigeSuPermiso } from '../../../../test/eliminarExigeSuPermiso'
@@ -41,7 +41,6 @@ const { I18nProvider } = await import('../../../../lib/i18n')
 const { ComunidadTab } = await import('../ComunidadTab')
 const { ActasTab } = await import('../ActasTab')
 const { AgendaTab } = await import('../AgendaTab')
-const { default: AsambleaDigitalTab } = await import('../AsambleaDigitalTab')
 const { ComunicadosTab } = await import('../ComunicadosTab')
 const { EncuestasTab } = await import('../EncuestasTab')
 const { CalendarioTab } = await import('../CalendarioTab')
@@ -74,12 +73,6 @@ eliminarExigeSuPermiso('Agenda', p => render(
   <AgendaTab {...base} userId="u1" canCreate {...p}
     agenda={[como<AgendaItem>({ id: 'ag1', titulo: 'Revisar bombas', tipo: 'tarea', fecha: '2099-01-10', estado: 'pendiente', prioridad: 'media', ...creado })]} />,
 ), /^Eliminar Revisar bombas$/, mocks.deleteCondominioRow, 'agenda_operativa', 'ag1')
-
-eliminarExigeSuPermiso('Asamblea digital', p => {
-  render(<AsambleaDigitalTab {...base} userId="u1" unidades={unidades} canCreate {...p}
-    asambleas={[como<AsambleaDigital>({ id: 'ad1', titulo: 'Asamblea anual', fecha_hora: '2099-02-01T18:00:00Z', modalidad: 'virtual', estado: 'programada', quorum_requerido: 50, ...creado })]} />)
-  fireEvent.click(screen.getByText('Asamblea anual'))
-}, /Eliminar$/, mocks.deleteCondominioRow, 'asambleas_digital', 'ad1')
 
 eliminarExigeSuPermiso('Comunicados', p => render(
   <ComunicadosTab {...base} userId="u1" unidades={[]} canCreate canDelete={p.canDelete}
@@ -175,22 +168,3 @@ describe('Recordatorios — completar exige canEdit', () => {
   })
 })
 
-describe('Asamblea digital — el acta se guarda con canEdit', () => {
-  const finalizada = como<AsambleaDigital>({ id: 'ad2', titulo: 'Asamblea extraordinaria', fecha_hora: '2026-09-01T18:00:00Z', modalidad: 'presencial', estado: 'finalizada', quorum_requerido: 50, acta_url: 'Se aprobó el presupuesto.', ...creado })
-  const abrirActa = (canEdit: boolean) => {
-    render(<AsambleaDigitalTab {...base} userId="u1" unidades={unidades} asambleas={[finalizada]} canCreate={false} canEdit={canEdit} canDelete={false} />)
-    fireEvent.click(screen.getByText('Asamblea extraordinaria'))
-    fireEvent.click(screen.getByRole('button', { name: canEdit ? /Ver\/editar acta/ : /Ver acta/ }))
-  }
-  it('sin canEdit el acta se lee pero no se guarda', () => {
-    abrirActa(false)
-    expect((screen.getByRole('textbox', { name: 'Acta de la asamblea' }) as HTMLTextAreaElement).readOnly).toBe(true)
-    expect(screen.queryByRole('button', { name: /Guardar acta/ })).toBeNull()
-  })
-  it('con canEdit se guarda', async () => {
-    abrirActa(true)
-    fireEvent.change(screen.getByRole('textbox', { name: 'Acta de la asamblea' }), { target: { value: 'Acta corregida' } })
-    fireEvent.click(screen.getByRole('button', { name: /Guardar acta/ }))
-    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('asambleas_digital', 'ad2', { acta_url: 'Acta corregida' }))
-  })
-})

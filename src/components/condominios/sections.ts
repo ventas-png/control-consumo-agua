@@ -60,7 +60,7 @@ export const SECTIONS: SectionDef[] = [
     'rutas_ronda',
   ]},
   { id: 'comunidad', label: 'Comunidad', tabs: [
-    'asambleas', 'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos',
+    'asambleas', 'votaciones', 'junta', 'actas', 'acuerdos',
     'infracciones', 'sanciones', 'gestion_conflictos', 'eventos_comunidad',
     'agenda', 'cumpleanos', 'programa_actividades',
   ]},

@@ -525,6 +525,8 @@ export interface ActaReunion {
   observaciones?: string | null
   redactada_por?: string | null
   aprobada: boolean
+  /** Asamblea de la que es acta formal (20261106000300); null en juntas, comités y otras reuniones. */
+  asamblea_id?: string | null
   created_at: string
 }
 
@@ -573,24 +575,25 @@ export interface MedidorUnidad {
   unidad_nombre?: string
 }
 
-export type TipoVotacion = 'simple' | 'multiple' | 'ponderada'
 export type EstadoVotacion = 'abierta' | 'cerrada' | 'anulada'
 export interface OpcionVoto { id: string; texto: string }
 export interface Votacion {
   id: string
   company_id: string
   project_id: string
-  asamblea_id?: string | null
   titulo: string
   descripcion?: string | null
-  tipo: TipoVotacion
   opciones: OpcionVoto[]
   estado: EstadoVotacion
+  /** Mínimo de votos para que la consulta decida (null o 0: sin mínimo). */
   quorum_requerido?: number | null
   total_unidades?: number | null
   fecha_inicio: string
   fecha_cierre?: string | null
+  /** Lo escribe la base al cerrar: la opción ganadora, 'Empate', 'Sin votos' o 'Sin quórum'. */
   resultado?: string | null
+  /** Votos por opción ({id: n}), escritos por la base al cerrar. */
+  conteo?: Record<string, number> | null
   created_at: string
 }
 

@@ -102,6 +102,7 @@ export type Database = {
         Row: {
           acuerdos: string | null
           aprobada: boolean
+          asamblea_id: string | null
           asistentes: Json
           company_id: string
           creado_por: string | null
@@ -123,6 +124,7 @@ export type Database = {
         Insert: {
           acuerdos?: string | null
           aprobada?: boolean
+          asamblea_id?: string | null
           asistentes?: Json
           company_id: string
           creado_por?: string | null
@@ -144,6 +146,7 @@ export type Database = {
         Update: {
           acuerdos?: string | null
           aprobada?: boolean
+          asamblea_id?: string | null
           asistentes?: Json
           company_id?: string
           creado_por?: string | null
@@ -163,6 +166,13 @@ export type Database = {
           titulo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "actas_reunion_asamblea_id_fkey"
+            columns: ["asamblea_id"]
+            isOneToOne: true
+            referencedRelation: "asambleas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "actas_reunion_company_id_fkey"
             columns: ["company_id"]
@@ -892,13 +902,16 @@ export type Database = {
           company_id: string
           convocado_por: string | null
           created_at: string
+          descripcion: string | null
           escrutinio: Json | null
           estado: string
           fecha: string
           hora_fin: string | null
           hora_inicio: string
           id: string
+          link_reunion: string | null
           lugar: string | null
+          modalidad: string
           project_id: string
           quorum_alcanzado: number | null
           quorum_requerido: number
@@ -911,13 +924,16 @@ export type Database = {
           company_id: string
           convocado_por?: string | null
           created_at?: string
+          descripcion?: string | null
           escrutinio?: Json | null
           estado?: string
           fecha: string
           hora_fin?: string | null
           hora_inicio: string
           id?: string
+          link_reunion?: string | null
           lugar?: string | null
+          modalidad?: string
           project_id: string
           quorum_alcanzado?: number | null
           quorum_requerido?: number
@@ -930,13 +946,16 @@ export type Database = {
           company_id?: string
           convocado_por?: string | null
           created_at?: string
+          descripcion?: string | null
           escrutinio?: Json | null
           estado?: string
           fecha?: string
           hora_fin?: string | null
           hora_inicio?: string
           id?: string
+          link_reunion?: string | null
           lugar?: string | null
+          modalidad?: string
           project_id?: string
           quorum_alcanzado?: number | null
           quorum_requerido?: number
@@ -967,90 +986,6 @@ export type Database = {
           },
           {
             foreignKeyName: "asambleas_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      asambleas_digital: {
-        Row: {
-          acta_url: string | null
-          company_id: string
-          created_at: string | null
-          created_by: string | null
-          descripcion: string | null
-          estado: string
-          fecha_hora: string
-          id: string
-          link_reunion: string | null
-          modalidad: string
-          project_id: string
-          quorum_requerido: number
-          titulo: string
-        }
-        Insert: {
-          acta_url?: string | null
-          company_id: string
-          created_at?: string | null
-          created_by?: string | null
-          descripcion?: string | null
-          estado?: string
-          fecha_hora: string
-          id?: string
-          link_reunion?: string | null
-          modalidad?: string
-          project_id: string
-          quorum_requerido?: number
-          titulo: string
-        }
-        Update: {
-          acta_url?: string | null
-          company_id?: string
-          created_at?: string | null
-          created_by?: string | null
-          descripcion?: string | null
-          estado?: string
-          fecha_hora?: string
-          id?: string
-          link_reunion?: string | null
-          modalidad?: string
-          project_id?: string
-          quorum_requerido?: number
-          titulo?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "asambleas_digital_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "asambleas_digital_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies_safe"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "asambleas_digital_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "mv_superadmin_empresa_counts"
-            referencedColumns: ["company_id"]
-          },
-          {
-            foreignKeyName: "asambleas_digital_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "app_users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "asambleas_digital_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -23123,8 +23058,8 @@ export type Database = {
       }
       votaciones: {
         Row: {
-          asamblea_id: string | null
           company_id: string
+          conteo: Json | null
           created_at: string
           descripcion: string | null
           estado: string
@@ -23135,13 +23070,12 @@ export type Database = {
           project_id: string
           quorum_requerido: number | null
           resultado: string | null
-          tipo: string
           titulo: string
           total_unidades: number | null
         }
         Insert: {
-          asamblea_id?: string | null
           company_id: string
+          conteo?: Json | null
           created_at?: string
           descripcion?: string | null
           estado?: string
@@ -23152,13 +23086,12 @@ export type Database = {
           project_id: string
           quorum_requerido?: number | null
           resultado?: string | null
-          tipo?: string
           titulo: string
           total_unidades?: number | null
         }
         Update: {
-          asamblea_id?: string | null
           company_id?: string
+          conteo?: Json | null
           created_at?: string
           descripcion?: string | null
           estado?: string
@@ -23169,18 +23102,10 @@ export type Database = {
           project_id?: string
           quorum_requerido?: number | null
           resultado?: string | null
-          tipo?: string
           titulo?: string
           total_unidades?: number | null
         }
         Relationships: [
-          {
-            foreignKeyName: "votaciones_asamblea_id_fkey"
-            columns: ["asamblea_id"]
-            isOneToOne: false
-            referencedRelation: "asambleas"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "votaciones_company_id_fkey"
             columns: ["company_id"]
@@ -24195,6 +24120,7 @@ export type Database = {
       }
       areas_normalizar_nombre: { Args: { p_nombre: string }; Returns: string }
       asamblea_escrutinio: { Args: { p_asamblea_id: string }; Returns: Json }
+      asamblea_generar_acta: { Args: { p_asamblea_id: string }; Returns: string }
       asignar_tag_vehiculo: {
         Args: { p_tag_codigo: string; p_tag_tipo?: string; p_vehiculo_id: string }
         Returns: undefined

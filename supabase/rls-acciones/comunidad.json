@@ -135,10 +135,16 @@
       }
     },
     "votaciones": {
-      "tab": "votaciones"
+      "tab": "votaciones",
+      "receta": {
+        "opciones": "'[{\"id\": \"1\", \"texto\": \"Sí\"}, {\"id\": \"2\", \"texto\": \"No\"}]'::jsonb"
+      }
     },
     "votos": {
-      "tab": "votaciones"
+      "tab": "votaciones",
+      "receta": {
+        "opcion_id": "'1'"
+      }
     },
     "votos_asamblea": {
       "tab": "votaciones",

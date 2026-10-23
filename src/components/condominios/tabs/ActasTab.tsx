@@ -4,12 +4,14 @@ import { EmptyState } from '../../shared/EmptyState'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import type { ActaReunion, TipoActa } from '../../../types'
+import type { ActaReunion, Asamblea, TipoActa } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { printHtml, raw } from '../../../lib/printHtml'
 
 interface Props {
   actas: ActaReunion[]
+  /** Asambleas del condominio: el acta formal de una finalizada se liga a ella (una por asamblea). */
+  asambleas?: Asamblea[]
   proyectoId: string
   companyId: string
   canCreate: boolean
@@ -34,9 +36,10 @@ const BLANK_FORM = {
   titulo: '', tipo: 'ordinaria' as TipoActa, fecha: hoyLocalISO(),
   hora_inicio: '', hora_fin: '', lugar: '', quorum: '', quorum_requerido: '',
   acuerdos: '', observaciones: '', redactada_por: '', aprobada: false,
+  asamblea_id: '',
 }
 
-export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
+export function ActasTab({ actas, asambleas = [], proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK_FORM })
@@ -76,6 +79,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, can
       quorum_requerido: a.quorum_requerido != null ? String(a.quorum_requerido) : '',
       acuerdos: a.acuerdos ?? '', observaciones: a.observaciones ?? '',
       redactada_por: a.redactada_por ?? '', aprobada: a.aprobada,
+      asamblea_id: a.asamblea_id ?? '',
     })
     setAsistentes((a.asistentes as AsistenteFila[]).length > 0 ? a.asistentes as AsistenteFila[] : [{ nombre: '', unidad: '', rol: '' }])
     setPuntos((a.orden_del_dia as PuntoAgenda[]).length > 0 ? a.orden_del_dia as PuntoAgenda[] : [{ punto: '', descripcion: '', acuerdo: '' }])
@@ -95,6 +99,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, can
       orden_del_dia: puntos.filter(p => p.punto.trim()),
       acuerdos: form.acuerdos || null, observaciones: form.observaciones || null,
       redactada_por: form.redactada_por || null, aprobada: form.aprobada,
+      asamblea_id: form.asamblea_id || null,
     }
     let error
     if (editId) {
@@ -153,6 +158,11 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, can
   }
 
   const viewed = viewId ? actas.find(a => a.id === viewId) : null
+  const asambleaDe = (id?: string | null) => (id ? asambleas.find(x => x.id === id) : undefined)
+  // Se liga a una asamblea finalizada que todavía no tenga su acta (la base
+  // exige las dos cosas: actas_reunion_asamblea y actas_reunion_asamblea_key).
+  const ligables = asambleas.filter(x => x.estado === 'finalizada'
+    && (x.id === form.asamblea_id || !actas.some(a => a.asamblea_id === x.id && a.id !== editId)))
   const inputStyle: CSSProperties = { width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
   const aprobadaPill: CSSProperties = { fontSize: '10px', fontWeight: 700, color: 'var(--at-success)', background: 'var(--at-success-tint)', padding: '2px 6px', borderRadius: '20px' }
@@ -195,6 +205,13 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, can
               <label htmlFor="acta-tipo" style={labelStyle}>Tipo</label>
               <select id="acta-tipo" style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value as TipoActa)}>
                 {(Object.keys(TIPO_LABELS) as TipoActa[]).map(t => <option key={t} value={t}>{TIPO_LABELS[t].label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="acta-asamblea" style={labelStyle}>Asamblea</label>
+              <select id="acta-asamblea" style={inputStyle} value={form.asamblea_id} onChange={e => setF('asamblea_id', e.target.value)}>
+                <option value="">— Ninguna (junta, comité…) —</option>
+                {ligables.map(x => <option key={x.id} value={x.id}>{x.titulo} ({x.fecha})</option>)}
               </select>
             </div>
             <div>
@@ -294,6 +311,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, can
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{tl.icon} {a.titulo}</span>
                     {a.aprobada && <span style={aprobadaPill}>✓ Aprobada</span>}
+                    {asambleaDe(a.asamblea_id) && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>🏛️ {asambleaDe(a.asamblea_id)!.titulo}</span>}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                     {tl.label} — {a.fecha}{a.lugar ? ` — ${a.lugar}` : ''}{a.hora_inicio ? ` — ${a.hora_inicio}` : ''}
@@ -334,6 +352,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, can
               <span>
                 {tl.icon} {tl.label} · {viewed.fecha}{viewed.hora_inicio ? ` · ${viewed.hora_inicio}` : ''}{viewed.lugar ? ` · ${viewed.lugar}` : ''}
                 {viewed.quorum != null ? ` · Quórum: ${viewed.quorum}/${viewed.quorum_requerido ?? '?'}` : ''}
+                {asambleaDe(viewed.asamblea_id) ? ` · De la asamblea «${asambleaDe(viewed.asamblea_id)!.titulo}»` : ''}
               </span>
               {viewed.aprobada && <span style={aprobadaPill}>✓ Aprobada</span>}
             </span>}
