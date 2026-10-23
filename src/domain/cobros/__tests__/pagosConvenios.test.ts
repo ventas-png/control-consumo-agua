@@ -6,6 +6,8 @@ import { describe, it, expect, vi } from 'vitest'
 const order = vi.fn()
 const insert = vi.fn()
 const updateEq = vi.fn()
+/** `.select('id')` tras el `.eq()` del UPDATE: las filas que el servidor cambió. */
+const updateSelect = vi.fn()
 /** Cuerpo de cada `.update()`, en orden. */
 const updates: unknown[] = []
 /** Filtros `.is(col, valor)` que recibió cada consulta, por tabla. */
@@ -24,7 +26,11 @@ vi.mock('../../../lib/supabase', () => {
       return {
         select: () => (tabla === 'conta_anticipos' ? Promise.resolve(anticipos) : conFiltros),
         insert,
-        update: (cuerpo: unknown) => { updates.push(cuerpo); return { eq: updateEq } },
+        // verifyPago/rejectPago esperan el `.eq()`; setConvenioEstado pide además `.select('id')`.
+        update: (cuerpo: unknown) => {
+          updates.push(cuerpo)
+          return { eq: (...a: unknown[]) => Object.assign(Promise.resolve(updateEq(...a)), { select: updateSelect }) }
+        },
       }
     },
   }
@@ -34,6 +40,7 @@ vi.mock('../../../lib/supabase', () => {
 
 import { fetchPagosYConvenios, esCobroDeCargoAdicional } from '../queries'
 import { createPago, verifyPago, rejectPago, createConvenio, setConvenioEstado } from '../mutations'
+import { SinFilasAfectadasError } from '../../queryFetch'
 
 describe('fetchPagosYConvenios', () => {
   it('devuelve pagos + convenios', async () => {
@@ -149,8 +156,22 @@ describe('cobros manuales — mutaciones', () => {
     expect(await createConvenio({})).toEqual({ error: null })
   })
 
-  it('setConvenioEstado éxito → { error: null }', async () => {
-    updateEq.mockResolvedValueOnce({ error: null })
+  it('setConvenioEstado éxito → { error: null } y pide de vuelta la fila cambiada', async () => {
+    updates.length = 0
+    updateSelect.mockResolvedValueOnce({ data: [{ id: 'c1' }], error: null })
     expect(await setConvenioEstado('c1', 'completado')).toEqual({ error: null })
+    expect(updates).toEqual([{ estado: 'completado' }])
+    expect(updateEq).toHaveBeenLastCalledWith('id', 'c1')
+    expect(updateSelect).toHaveBeenLastCalledWith('id')
+  })
+
+  it('setConvenioEstado con cero filas (la RLS no dejó tocarla) → error, no éxito', async () => {
+    updateSelect.mockResolvedValueOnce({ data: [], error: null })
+    expect(await setConvenioEstado('c1', 'incumplido')).toEqual({ error: new SinFilasAfectadasError().message })
+  })
+
+  it('setConvenioEstado propaga el error del servidor', async () => {
+    updateSelect.mockResolvedValueOnce({ data: null, error: { message: 'denied' } })
+    expect(await setConvenioEstado('c1', 'completado')).toEqual({ error: 'denied' })
   })
 })

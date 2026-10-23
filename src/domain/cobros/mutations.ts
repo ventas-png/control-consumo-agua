@@ -13,7 +13,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 // `db` = la misma instancia tipada (tablas/columnas chequeadas); `supabase` queda
 // para functions.invoke (edges) y storage, que no pasan por el esquema generado.
 import { db, supabase } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { runQuery, SinFilasAfectadasError } from '../queryFetch'
 import { payfacKeys } from './keys'
 import type { TablesInsert, TablesUpdate } from '../../types/database.types'
 
@@ -281,10 +281,18 @@ export async function createConvenio(payload: Record<string, unknown>): Promise<
   return { error: error?.message ?? null }
 }
 
-/** Cambia el estado de un convenio (activo/completado/incumplido/cancelado). */
+/**
+ * Cambia el estado de un convenio (activo/completado/incumplido/cancelado).
+ *
+ * Exige que el servidor haya cambiado la fila: un UPDATE que la RLS no deja
+ * tocar (otra empresa, sin permiso del tab, convenio ya borrado) devuelve éxito
+ * con cero filas, y la pantalla lo mostraba como «Estado actualizado».
+ */
 export async function setConvenioEstado(id: string, estado: string): Promise<{ error: string | null }> {
-  const { error } = await db.from('convenios_pago').update({ estado }).eq('id', id)
-  return { error: error?.message ?? null }
+  const { data, error } = await db.from('convenios_pago').update({ estado }).eq('id', id).select('id')
+  if (error) return { error: error.message }
+  if (!data || data.length === 0) return { error: new SinFilasAfectadasError().message }
+  return { error: null }
 }
 
 /**

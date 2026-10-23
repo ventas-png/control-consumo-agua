@@ -1067,6 +1067,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
           clientes={clientes}
           moneda={moneda}
           currentUserId={currentUser.user_id}
+          companyId={companyId}
           onClose={() => setConvenioModal(null)}
           onSuccess={() => {
             setConvenioModal(null)
@@ -1098,10 +1099,12 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
 
   async function cambiarEstado(id: string, estado: string) {
     const { error } = await setConvenioEstado(id, estado)
-    if (!error) {
-      onRefresh()
-      notify({ variant: 'success', title: 'Estado actualizado', duration: 1200 })
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo actualizar el convenio', text: error })
+      return
     }
+    onRefresh()
+    notify({ variant: 'success', title: 'Estado actualizado', duration: 1200 })
   }
 
   if (convenios.length === 0) {
