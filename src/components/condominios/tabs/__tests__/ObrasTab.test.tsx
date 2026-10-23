@@ -33,7 +33,7 @@ function obra(over: Partial<ObraMejora> = {}): ObraMejora {
 function props(over: Partial<Parameters<typeof ObrasTab>[0]> = {}): Parameters<typeof ObrasTab>[0] {
   return {
     obras: [obra(), obra({ id: 'o2', titulo: 'Bomba de piscina', estado: 'completada', progreso: 100, notas: null })],
-    proyectoId: 'p1', companyId: 'co1', moneda: 'USD', canCreate: true, canEdit: true, onRefresh: () => {}, ...over,
+    proyectoId: 'p1', companyId: 'co1', moneda: 'USD', canCreate: true, canEdit: true, canDelete: true, onRefresh: () => {}, ...over,
   }
 }
 
@@ -105,7 +105,7 @@ describe('ObrasTab — ventanas', () => {
   })
 
   it('sin permiso de edición la ventana es de solo lectura', () => {
-    render(<ObrasTab {...props({ canCreate: false, canEdit: false })} />)
+    render(<ObrasTab {...props({ canCreate: false, canEdit: false, canDelete: false })} />)
     expect(screen.queryByRole('button', { name: '+ Nueva Obra' })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Editar / })).toBeNull()
 
