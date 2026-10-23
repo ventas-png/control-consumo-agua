@@ -1081,6 +1081,21 @@ jobs:
           PGPORT_TEST: 55587
         run: supabase/tests/asambleas_integridad/run.sh
 
+      # 20261106000200: quórum y resultados reales. Al abrir, cada asamblea
+      # toma la base de votación de su condominio (por unidad o por alícuota,
+      # con los m² de respaldo) y su padrón; la asistencia (presencial, virtual
+      # o por poder con apoderado y documento) va sólo con la asamblea en curso
+      # y para el padrón; vota sólo el padrón; con votos, la mayoría del punto
+      # no cambia; al finalizar la base escribe quórum, escrutinio y resultado
+      # (simple, absoluta o calificada). Control previo, huella del auditor,
+      # las asambleas que ya existían, guardas que abortan sin tocar filas y
+      # treinta mutantes.
+      - name: Asambleas — padrón, asistencia, quórum y escrutinio
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55588
+        run: supabase/tests/asambleas_escrutinio/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

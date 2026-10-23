@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react'
-import type { Asamblea, Unidad } from '../../../../types'
+import type { Asamblea, Unidad, EscrutinioAsamblea, PadronAsamblea, AsistenciaAsamblea } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
       votos_asamblea: [{ id: 'v1', punto_id: 'pt1', unidad_id: 'u1', voto: 'a_favor', unidades: { nombre: 'Casa 1' } }],
     },
   ] as Record<string, unknown>[]),
+  fetchPadronAsamblea: vi.fn(async (): Promise<PadronAsamblea[]> => []),
+  fetchAsistenciaAsamblea: vi.fn(async (): Promise<AsistenciaAsamblea[]> => []),
+  fetchEscrutinioAsamblea: vi.fn(async (): Promise<EscrutinioAsamblea | null> => null),
+  removeCondominiosMedia: vi.fn(async () => ({ error: null })),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
@@ -25,7 +29,21 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
   upsertCondominioRow: mocks.upsertCondominioRow,
 }))
-vi.mock('../../../../domain/condominios/tabQueries', () => ({ fetchPuntosAsambleaConVotos: mocks.fetchPuntosAsambleaConVotos }))
+vi.mock('../../../../domain/condominios/tabQueries', () => ({
+  fetchPuntosAsambleaConVotos: mocks.fetchPuntosAsambleaConVotos,
+  fetchPadronAsamblea: mocks.fetchPadronAsamblea,
+  fetchAsistenciaAsamblea: mocks.fetchAsistenciaAsamblea,
+  fetchEscrutinioAsamblea: mocks.fetchEscrutinioAsamblea,
+}))
+vi.mock('../../../../domain/shared/storage', () => ({ removeCondominiosMedia: mocks.removeCondominiosMedia }))
+// El uploader real sube a storage; aquí «sube» un path del condominio.
+vi.mock('../../../shared/FileUploader', () => ({
+  FileUploader: ({ onChange, label }: { onChange: (path: string | null) => void; label: string }) =>
+    <button type="button" onClick={() => onChange('p1/asambleas/poderes/carta.pdf')}>{label}</button>,
+}))
+vi.mock('../../../shared/SecureFileLink', () => ({
+  SecureFileLink: ({ src, children }: { src: string; children: React.ReactNode }) => <a href={`#${src}`}>{children}</a>,
+}))
 vi.mock('../../../../lib/toast', () => ({ toast: { success: mocks.toastSuccess, error: mocks.toastError } }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: vi.fn() }))
 
@@ -57,7 +75,14 @@ function renderTab(props: Partial<Parameters<typeof AsambleasTab>[0]> = {}) {
   )
 }
 
-beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
+beforeEach(() => {
+  Object.values(mocks).forEach(m => m.mockClear())
+  // Por omisión, sin padrón, asistencia ni escrutinio (como una programada o
+  // una lectura degradada): cada prueba de la Fase 2 pone los suyos.
+  mocks.fetchPadronAsamblea.mockReset().mockResolvedValue([])
+  mocks.fetchAsistenciaAsamblea.mockReset().mockResolvedValue([])
+  mocks.fetchEscrutinioAsamblea.mockReset().mockResolvedValue(null)
+})
 afterEach(cleanup)
 
 describe('AsambleasTab — ventanas', () => {
@@ -238,5 +263,176 @@ describe('AsambleasTab — ventanas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar Asamblea Ordinaria Abril' }))
     await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('El servidor no aplicó el cambio'))
     expect(onRefresh).not.toHaveBeenCalled()
+  })
+})
+
+// ── Fase 2: padrón, asistencia, mayoría y escrutinio ─────────────────────────
+function escrutinio(over: Partial<EscrutinioAsamblea> = {}): EscrutinioAsamblea {
+  const cero = { unidades: 0, peso: 0 }
+  return {
+    base: 'unidad', padron: { unidades: 2, peso: 2 }, presentes: { unidades: 1, peso: 1 },
+    quorum_pct: 50, quorum_requerido: 50, hay_quorum: true,
+    puntos: [{ punto_id: 'pt1', titulo: 'Aprobar presupuesto', mayoria: 'simple', mayoria_pct: null,
+      a_favor: { unidades: 1, peso: 1 }, en_contra: cero, abstencion: cero, decision: 'aprobado' }],
+    ...over,
+  }
+}
+
+const padronCur: PadronAsamblea[] = [
+  { asamblea_id: 'a1', unidad_id: 'u1', unidad_nombre: 'Casa 1', peso: 1 },
+  { asamblea_id: 'a1', unidad_id: 'u3', unidad_nombre: 'Casa 3', peso: 1 },
+]
+
+function asistencia(over: Partial<AsistenciaAsamblea> = {}): AsistenciaAsamblea {
+  return { id: 's1', asamblea_id: 'a1', unidad_id: 'u3', modalidad: 'virtual', apoderado_nombre: null,
+    poder_documento: null, registrado_por: 'user1', created_at: '2026-04-20T18:05:00Z', ...over }
+}
+
+async function abrirEnCurso() {
+  renderTab()
+  fireEvent.click(screen.getByRole('button', { name: /^Asamblea Ordinaria Abril/ }))
+  const dialog = screen.getByRole('dialog')
+  await within(dialog).findByText('Aprobar presupuesto')
+  return dialog
+}
+
+describe('AsambleasTab — quórum y resultados', () => {
+  it('un punto de votación lleva su regla de mayoría; la calificada, su porcentaje', async () => {
+    const dialog = await abrirEnCurso()
+    fireEvent.click(within(dialog).getByRole('button', { name: '+ Punto' }))
+    fireEvent.change(within(dialog).getByLabelText('Título del punto'), { target: { value: 'Reforma de estatutos' } })
+    expect(within(dialog).queryByLabelText('Mayoría')).toBeNull()
+    fireEvent.change(within(dialog).getByLabelText('Tipo de punto'), { target: { value: 'votacion' } })
+    fireEvent.change(within(dialog).getByLabelText('Mayoría'), { target: { value: 'calificada' } })
+
+    fireEvent.change(within(dialog).getByLabelText('Porcentaje del padrón'), { target: { value: '50' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Agregar' }))
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('La mayoría calificada va de más del 50 % hasta el 100 % del padrón.'))
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+
+    fireEvent.change(within(dialog).getByLabelText('Porcentaje del padrón'), { target: { value: '75' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Agregar' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('puntos_asamblea', expect.objectContaining({
+      titulo: 'Reforma de estatutos', tipo: 'votacion', mayoria: 'calificada', mayoria_pct: 75,
+    })))
+  })
+
+  it('un punto que no es de votación queda con mayoría simple y sin porcentaje', async () => {
+    const dialog = await abrirEnCurso()
+    fireEvent.click(within(dialog).getByRole('button', { name: '+ Punto' }))
+    fireEvent.change(within(dialog).getByLabelText('Título del punto'), { target: { value: 'Informe' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Agregar' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('puntos_asamblea', expect.objectContaining({
+      tipo: 'informativo', mayoria: 'simple', mayoria_pct: null,
+    })))
+  })
+
+  it('en curso: muestra el quórum de la base y vota el padrón, no las unidades de hoy', async () => {
+    mocks.fetchPadronAsamblea.mockResolvedValue(padronCur)
+    mocks.fetchEscrutinioAsamblea.mockResolvedValue(escrutinio())
+    const dialog = await abrirEnCurso()
+    expect(mocks.fetchEscrutinioAsamblea).toHaveBeenCalledWith('a1')
+    const quorum = within(dialog).getByRole('region', { name: 'Quórum' })
+    expect(within(quorum).getByText('Presentes 1 de 2 (50 %)')).toBeTruthy()
+    expect(within(quorum).getByText('Hay quórum')).toBeTruthy()
+    expect(within(dialog).getByRole('button', { name: 'A favor — Casa 3' })).toBeTruthy()
+    expect(within(dialog).queryByRole('button', { name: 'A favor — Casa 2' })).toBeNull()
+    expect(within(dialog).getByText('Total: 1/2')).toBeTruthy()
+  })
+
+  it('registra la asistencia presencial; quien ya votó figura presente sin registrarla', async () => {
+    mocks.fetchPadronAsamblea.mockResolvedValue(padronCur)
+    const dialog = await abrirEnCurso()
+    expect(within(dialog).getByText('Votó (presente)')).toBeTruthy()
+    expect(within(dialog).queryByRole('button', { name: 'Presencial — Casa 1' })).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Presencial — Casa 3' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('asistencia_asamblea', {
+      asamblea_id: 'a1', unidad_id: 'u3', modalidad: 'presencial', apoderado_nombre: null, poder_documento: null, registrado_por: 'user1',
+    }))
+    await waitFor(() => expect(mocks.fetchPuntosAsambleaConVotos).toHaveBeenCalledTimes(2))
+  })
+
+  it('por poder: exige apoderado y documento; cancelar borra el documento subido', async () => {
+    mocks.fetchPadronAsamblea.mockResolvedValue(padronCur)
+    const dialog = await abrirEnCurso()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Por poder — Casa 3' }))
+    const guardar = within(dialog).getByRole('button', { name: 'Guardar poder' }) as HTMLButtonElement
+    expect(guardar.disabled).toBe(true)
+    fireEvent.change(within(dialog).getByLabelText('Apoderado de Casa 3'), { target: { value: 'Juana Pérez' } })
+    expect(guardar.disabled).toBe(true)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Documento del poder' }))
+    expect(guardar.disabled).toBe(false)
+    fireEvent.click(guardar)
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('asistencia_asamblea', expect.objectContaining({
+      unidad_id: 'u3', modalidad: 'poder', apoderado_nombre: 'Juana Pérez', poder_documento: 'p1/asambleas/poderes/carta.pdf',
+    })))
+    await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Guardar poder' })).toBeNull())
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Por poder — Casa 3' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Documento del poder' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar poder' }))
+    expect(mocks.removeCondominiosMedia).toHaveBeenCalledWith(['p1/asambleas/poderes/carta.pdf'])
+  })
+
+  it('una asistencia que la base rechaza se avisa y el poder sigue abierto', async () => {
+    mocks.fetchPadronAsamblea.mockResolvedValue(padronCur)
+    mocks.createCondominioRow.mockResolvedValueOnce({ error: { message: 'ASAMBLEA_PADRON: la unidad no está en el padrón de esta asamblea' } } as never)
+    const dialog = await abrirEnCurso()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Por poder — Casa 3' }))
+    fireEvent.change(within(dialog).getByLabelText('Apoderado de Casa 3'), { target: { value: 'Juana Pérez' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Documento del poder' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar poder' }))
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith(
+      'No se registró la asistencia: ASAMBLEA_PADRON: la unidad no está en el padrón de esta asamblea'))
+    expect(within(dialog).getByRole('button', { name: 'Guardar poder' })).toBeTruthy()
+  })
+
+  it('quita una asistencia mal registrada', async () => {
+    mocks.fetchPadronAsamblea.mockResolvedValue(padronCur)
+    mocks.fetchAsistenciaAsamblea.mockResolvedValue([asistencia({ modalidad: 'poder', apoderado_nombre: 'Juana Pérez', poder_documento: 'p1/asambleas/poderes/carta.pdf' })])
+    const dialog = await abrirEnCurso()
+    expect(within(dialog).getByText('Por poder: Juana Pérez')).toBeTruthy()
+    expect(within(dialog).getByRole('link', { name: 'Ver poder' })).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Quitar asistencia — Casa 3' }))
+    await waitFor(() => expect(mocks.deleteCondominioRowAfectando).toHaveBeenCalledWith('asistencia_asamblea', 's1'))
+  })
+
+  it('finalizada: el resultado y el conteo ponderado son los que escribió la base, sin botones', async () => {
+    mocks.fetchPadronAsamblea.mockResolvedValue([
+      { asamblea_id: 'a2', unidad_id: 'u1', unidad_nombre: 'Local 1', peso: 40 },
+      { asamblea_id: 'a2', unidad_id: 'u3', unidad_nombre: 'Local 3', peso: 20 },
+    ])
+    mocks.fetchAsistenciaAsamblea.mockResolvedValue([asistencia({ asamblea_id: 'a2', modalidad: 'presencial' })])
+    mocks.fetchEscrutinioAsamblea.mockResolvedValue(escrutinio({
+      base: 'alicuota', padron: { unidades: 2, peso: 60 }, presentes: { unidades: 2, peso: 60 }, quorum_pct: 100,
+      puntos: [{ punto_id: 'pt1', titulo: 'Aprobar presupuesto', mayoria: 'simple', mayoria_pct: null,
+        a_favor: { unidades: 1, peso: 20 }, en_contra: { unidades: 1, peso: 40 }, abstencion: { unidades: 0, peso: 0 }, decision: 'rechazado' }],
+    }))
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Extraordinaria Mayo/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Asamblea Extraordinaria Mayo' })
+    expect(await within(dialog).findByText('Rechazado')).toBeTruthy()
+    expect(within(dialog).getByText('A favor: 1 · 20 %')).toBeTruthy()
+    expect(within(dialog).getByText('En contra: 1 · 40 %')).toBeTruthy()
+    expect(within(dialog).getByText('Presentes 2 de 2 · 100 % de las alícuotas')).toBeTruthy()
+    expect(within(dialog).getByText('Presencial')).toBeTruthy()
+    expect(within(dialog).queryByRole('button', { name: /Quitar asistencia/ })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: /A favor —/ })).toBeNull()
+  })
+
+  it('programada: no pide padrón, asistencia ni escrutinio', async () => {
+    renderTab({ asambleas: [asamblea({ estado: 'programada' })] })
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Ordinaria Abril/ }))
+    await within(screen.getByRole('dialog')).findByText('Aprobar presupuesto')
+    expect(mocks.fetchPadronAsamblea).not.toHaveBeenCalled()
+    expect(mocks.fetchEscrutinioAsamblea).not.toHaveBeenCalled()
+  })
+
+  it('la lista muestra el quórum alcanzado de una finalizada contra el requerido', () => {
+    renderTab({ asambleas: [asamblea({ estado: 'finalizada', quorum_alcanzado: 63.16 })] })
+    expect(screen.getByText('Quórum: 63.16 % de 50 %')).toBeTruthy()
+    cleanup()
+    renderTab({ asambleas: [asamblea({ estado: 'programada' })] })
+    expect(screen.getByText('Quórum requerido: 50 %')).toBeTruthy()
   })
 })

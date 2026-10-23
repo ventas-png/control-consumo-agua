@@ -1,11 +1,17 @@
 import { useRef, useState, type CSSProperties } from 'react'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
+import { FileUploader } from '../../shared/FileUploader'
+import { SecureFileLink } from '../../shared/SecureFileLink'
 import { createCondominioRow, updateCondominioRow, deleteCondominioRowAfectando, upsertCondominioRow } from '../../../domain/condominios/tabMutations'
-import { fetchPuntosAsambleaConVotos } from '../../../domain/condominios/tabQueries'
+import { fetchPuntosAsambleaConVotos, fetchPadronAsamblea, fetchAsistenciaAsamblea, fetchEscrutinioAsamblea } from '../../../domain/condominios/tabQueries'
+import { removeCondominiosMedia } from '../../../domain/shared/storage'
 import { toast } from '../../../lib/toast'
 import { confirm } from '../../shared/Dialog'
-import type { Asamblea, PuntoAsamblea, VotoAsamblea, Unidad, TipoAsamblea, EstadoAsamblea, TipoPunto, TipoVoto } from '../../../types'
+import type {
+  Asamblea, PuntoAsamblea, VotoAsamblea, Unidad, TipoAsamblea, EstadoAsamblea, TipoPunto, TipoVoto,
+  TipoMayoria, ModalidadAsistencia, DecisionPunto, PadronAsamblea, AsistenciaAsamblea, EscrutinioAsamblea, EscrutinioPunto,
+} from '../../../types'
 
 interface Props {
   asambleas: Asamblea[]
@@ -44,12 +50,45 @@ const VOTO_CONFIG: Record<TipoVoto, { label: string; bg: string; color: string }
   abstencion: { label: 'Abstención', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
+// Las reglas que aplica la base al finalizar (asambleas_calcular_escrutinio).
+const MAYORIA_CONFIG: Record<TipoMayoria, { label: string; regla: string }> = {
+  simple:     { label: 'Mayoría simple',   regla: 'Más votos a favor que en contra.' },
+  absoluta:   { label: 'Mayoría absoluta', regla: 'A favor más de la mitad de lo presente.' },
+  calificada: { label: 'Calificada',       regla: 'A favor, al menos ese porcentaje del padrón completo.' },
+}
+
+const MODALIDAD_LABEL: Record<ModalidadAsistencia, string> = {
+  presencial: 'Presencial',
+  virtual:    'Virtual',
+  poder:      'Por poder',
+}
+
+const DECISION_CONFIG: Record<DecisionPunto, { label: string; bg: string; color: string }> = {
+  aprobado:   { label: 'Aprobado',   bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  rechazado:  { label: 'Rechazado',  bg: 'var(--at-danger-tint)',  color: 'var(--at-danger)' },
+  sin_quorum: { label: 'Sin quórum', bg: 'var(--at-surface-2)',    color: 'var(--at-ink-3)' },
+}
+
+function pct(n: number): string {
+  return `${Number(n).toLocaleString('es-MX', { maximumFractionDigits: 2 })} %`
+}
+
+function etiquetaMayoria(p: Pick<PuntoAsamblea, 'mayoria' | 'mayoria_pct'>): string {
+  const m = p.mayoria ?? 'simple'
+  return m === 'calificada' && p.mayoria_pct != null ? `Calificada ${pct(p.mayoria_pct)}` : MAYORIA_CONFIG[m].label
+}
+
 export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [puntos, setPuntos] = useState<(PuntoAsamblea & { votos: VotoAsamblea[] })[]>([])
+  const [padron, setPadron] = useState<PadronAsamblea[]>([])
+  const [asistencia, setAsistencia] = useState<AsistenciaAsamblea[]>([])
+  const [escrutinio, setEscrutinio] = useState<EscrutinioAsamblea | null>(null)
   const [loadingPuntos, setLoadingPuntos] = useState(false)
+  // Asistencia por poder en curso de captura: una unidad a la vez.
+  const [poder, setPoder] = useState<{ unidadId: string; apoderado: string; documento: string | null } | null>(null)
   const [showPuntoForm, setShowPuntoForm] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoAsamblea | 'todos'>('todos')
 
@@ -58,7 +97,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
     fecha: '', hora_inicio: '', hora_fin: '', lugar: '',
     quorum_requerido: '50',
   })
-  const [puntoForm, setPuntoForm] = useState({ titulo: '', descripcion: '', tipo: 'informativo' as TipoPunto })
+  const [puntoForm, setPuntoForm] = useState({ titulo: '', descripcion: '', tipo: 'informativo' as TipoPunto, mayoria: 'simple' as TipoMayoria, mayoria_pct: '66.67' })
   const actaRef = useRef<HTMLTextAreaElement>(null)
 
   const filtradas = filtroEstado === 'todos' ? asambleas : asambleas.filter(a => a.estado === filtroEstado)
@@ -79,6 +118,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
     // El acta se guarda en onBlur, pero al cerrar con Escape el textarea se
     // desmontaba con el foco puesto y ese blur no llegaba: se perdía lo escrito.
     if (actaRef.current && document.activeElement === actaRef.current) actaRef.current.blur()
+    descartarPoder()
     setSelectedId(null)
     setShowPuntoForm(false)
   }
@@ -108,9 +148,18 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function cargarPuntos(asambleaId: string) {
+    // Otra asamblea: que no se vea el quórum de la anterior mientras carga.
+    if (asambleaId !== selectedId) { setPadron([]); setAsistencia([]); setEscrutinio(null) }
     setSelectedId(asambleaId)
     setLoadingPuntos(true)
-    const puntosData = await fetchPuntosAsambleaConVotos(asambleaId)
+    // Programada: todavía no hay padrón, asistencia ni escrutinio.
+    const abierta = asambleas.find(a => a.id === asambleaId)?.estado !== 'programada'
+    const [puntosData, padronData, asistenciaData, esc] = await Promise.all([
+      fetchPuntosAsambleaConVotos(asambleaId),
+      abierta ? fetchPadronAsamblea<PadronAsamblea>(asambleaId) : Promise.resolve([]),
+      abierta ? fetchAsistenciaAsamblea<AsistenciaAsamblea>(asambleaId) : Promise.resolve([]),
+      abierta ? fetchEscrutinioAsamblea<EscrutinioAsamblea>(asambleaId) : Promise.resolve(null),
+    ])
     setPuntos(puntosData.map((p: Record<string, unknown>) => ({
       ...p,
       votos: ((p.votos_asamblea as Record<string, unknown>[]) ?? []).map((v: Record<string, unknown>) => ({
@@ -118,18 +167,28 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
         unidad_nombre: (v.unidades as { nombre: string } | null)?.nombre,
       } as VotoAsamblea)),
     } as PuntoAsamblea & { votos: VotoAsamblea[] })))
+    setPadron(padronData)
+    setAsistencia(asistenciaData)
+    setEscrutinio(esc)
     setLoadingPuntos(false)
   }
 
   async function agregarPunto() {
     if (!puntoForm.titulo.trim() || !selectedId) return
+    const votacion = puntoForm.tipo === 'votacion'
+    const mayoria: TipoMayoria = votacion ? puntoForm.mayoria : 'simple'
+    const mayoriaPct = mayoria === 'calificada' ? Number(puntoForm.mayoria_pct) : null
+    if (mayoriaPct !== null && !(mayoriaPct > 50 && mayoriaPct <= 100)) {
+      toast.error('La mayoría calificada va de más del 50 % hasta el 100 % del padrón.'); return
+    }
     const maxOrden = puntos.length > 0 ? Math.max(...puntos.map(p => p.orden)) + 1 : 1
     const { error } = await createCondominioRow('puntos_asamblea', {
       asamblea_id: selectedId, orden: maxOrden,
       titulo: puntoForm.titulo.trim(), descripcion: puntoForm.descripcion.trim() || null, tipo: puntoForm.tipo,
+      mayoria, mayoria_pct: mayoriaPct,
     })
     if (error) { toast.error(error.message); return }
-    setPuntoForm({ titulo: '', descripcion: '', tipo: 'informativo' })
+    setPuntoForm({ titulo: '', descripcion: '', tipo: 'informativo', mayoria: 'simple', mayoria_pct: '66.67' })
     setShowPuntoForm(false)
     cargarPuntos(selectedId)
   }
@@ -141,6 +200,40 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
     // Antes el error se ignoraba: un voto rechazado (RLS, candado de plan)
     // parecía registrado hasta que la recarga lo desmentía en silencio.
     if (error) { toast.error(`No se registró el voto: ${error.message}`); return }
+    if (selectedId) cargarPuntos(selectedId)
+  }
+
+  async function registrarAsistencia(unidadId: string, modalidad: ModalidadAsistencia, apoderado: string | null = null, documento: string | null = null) {
+    if (!selectedId) return false
+    const { error } = await createCondominioRow('asistencia_asamblea', {
+      asamblea_id: selectedId, unidad_id: unidadId, modalidad,
+      apoderado_nombre: apoderado, poder_documento: documento, registrado_por: userId,
+    })
+    if (error) { toast.error(`No se registró la asistencia: ${error.message}`); return false }
+    cargarPuntos(selectedId)
+    return true
+  }
+
+  async function guardarPoder() {
+    if (!poder) return
+    if (!poder.apoderado.trim() || !poder.documento) { toast.error('El poder lleva el nombre del apoderado y el documento.'); return }
+    if (await registrarAsistencia(poder.unidadId, 'poder', poder.apoderado.trim(), poder.documento)) setPoder(null)
+  }
+
+  // Un documento subido para un poder que no se guardó queda huérfano en storage.
+  function descartarPoder() {
+    if (poder?.documento) void removeCondominiosMedia([poder.documento])
+    setPoder(null)
+  }
+
+  function abrirPoder(unidadId: string) {
+    descartarPoder()
+    setPoder({ unidadId, apoderado: '', documento: null })
+  }
+
+  async function quitarAsistencia(id: string) {
+    const { error } = await deleteCondominioRowAfectando('asistencia_asamblea', id)
+    if (error) { toast.error(`No se quitó la asistencia: ${error.message}`); return }
     if (selectedId) cargarPuntos(selectedId)
   }
 
@@ -274,7 +367,9 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                 <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '4px 10px', flexWrap: 'wrap' }}>
                   <span>📅 {a.fecha} {a.hora_inicio}</span>
                   {a.lugar && <span>📍 {a.lugar}</span>}
-                  <span>Quórum: {a.quorum_requerido}%</span>
+                  <span>{a.quorum_alcanzado != null
+                    ? `Quórum: ${pct(a.quorum_alcanzado)} de ${pct(a.quorum_requerido)}`
+                    : `Quórum requerido: ${pct(a.quorum_requerido)}`}</span>
                 </div>
               </button>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
@@ -300,6 +395,16 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
         const ec = ESTADO_CONFIG[selectedAsamblea.estado]
         // Finalizada o cancelada: la base ya no acepta cambios en la agenda.
         const agendaAbierta = canEdit && TRANSICIONES[selectedAsamblea.estado].length > 0
+        const enCurso = selectedAsamblea.estado === 'en_curso'
+        // Votan las unidades del padrón (tomado al abrir); sin padrón (programada,
+        // o una lectura fallida), las activas de hoy, como antes.
+        const votantes = padron.length > 0
+          ? padron.map(p => ({ id: p.unidad_id, nombre: p.unidad_nombre }))
+          : unidades.filter(u => u.activo).map(u => ({ id: u.id, nombre: u.nombre }))
+        const porAlicuota = escrutinio?.base === 'alicuota'
+        const asistenciaDe = new Map(asistencia.map(s => [s.unidad_id, s]))
+        const votaron = new Set(puntos.flatMap(p => (p.votos ?? []).map(v => v.unidad_id)))
+        const escrutinioDe = new Map((escrutinio?.puntos ?? []).map(e => [e.punto_id, e]))
         return (
           <EditModal
             title={selectedAsamblea.titulo}
@@ -314,8 +419,86 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
               <Button variant="secondary" onClick={() => setShowPuntoForm(v => !v)} aria-expanded={showPuntoForm}>+ Punto</Button>
             ) : undefined}
           >
+            {escrutinio && (
+              <section aria-label="Quórum" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 14px', background: 'var(--at-surface-2)', borderRadius: '10px', padding: '10px 14px', marginBottom: '14px', fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
+                <strong style={{ color: 'var(--at-ink)' }}>Quórum</strong>
+                <span>Presentes {escrutinio.presentes.unidades} de {escrutinio.padron.unidades}{porAlicuota ? ` · ${pct(escrutinio.quorum_pct)} de las alícuotas` : ` (${pct(escrutinio.quorum_pct)})`}</span>
+                <span>Requerido {pct(escrutinio.quorum_requerido)}</span>
+                <span>{porAlicuota ? 'Vota por alícuota' : 'Vota por unidad'}</span>
+                <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
+                  background: escrutinio.hay_quorum ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+                  color: escrutinio.hay_quorum ? 'var(--at-success)' : 'var(--at-danger)' }}>
+                  {escrutinio.hay_quorum ? 'Hay quórum' : 'Sin quórum'}
+                </span>
+              </section>
+            )}
+
+            {/* Asistencia: en curso se toma; cerrada queda a la vista. Votar
+                también cuenta como presente (el voto del portal es asistencia
+                virtual). */}
+            {padron.length > 0 && (enCurso || asistencia.length > 0) && (
+              <details style={{ marginBottom: '14px' }} open={enCurso && canEdit}>
+                <summary style={{ cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)' }}>
+                  Asistencia · {asistencia.length} registradas
+                </summary>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+                  {padron.map(u => {
+                    const s = asistenciaDe.get(u.unidad_id)
+                    return (
+                      <div key={u.unidad_id}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '12.5px' }}>
+                          <span style={{ flex: '1 1 140px', color: 'var(--at-ink-2)' }}>
+                            {u.unidad_nombre}{porAlicuota && <span style={{ color: 'var(--at-ink-3)' }}> · {pct(u.peso)}</span>}
+                          </span>
+                          {s ? (
+                            <>
+                              <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>
+                                {MODALIDAD_LABEL[s.modalidad]}{s.apoderado_nombre ? `: ${s.apoderado_nombre}` : ''}
+                              </span>
+                              {s.poder_documento && <SecureFileLink src={s.poder_documento} style={{ fontSize: '11.5px' }}>Ver poder</SecureFileLink>}
+                              {canEdit && enCurso && (
+                                <button onClick={() => quitarAsistencia(s.id)} aria-label={`Quitar asistencia — ${u.unidad_nombre}`}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '11.5px' }}>Quitar</button>
+                              )}
+                            </>
+                          ) : votaron.has(u.unidad_id) ? (
+                            <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Votó (presente)</span>
+                          ) : canEdit && enCurso ? (
+                            (['presencial', 'virtual', 'poder'] as ModalidadAsistencia[]).map(m => (
+                              <button key={m} aria-label={`${MODALIDAD_LABEL[m]} — ${u.unidad_nombre}`}
+                                onClick={() => m === 'poder' ? abrirPoder(u.unidad_id) : registrarAsistencia(u.unidad_id, m)}
+                                style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1px solid var(--at-line)', background: 'var(--at-surface)', color: 'var(--at-ink-3)' }}>
+                                {MODALIDAD_LABEL[m]}
+                              </button>
+                            ))
+                          ) : (
+                            <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Ausente</span>
+                          )}
+                        </div>
+                        {poder?.unidadId === u.unidad_id && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px', marginTop: '6px' }}>
+                            <input value={poder.apoderado} onChange={e => setPoder(p => p && { ...p, apoderado: e.target.value })}
+                              placeholder="Nombre del apoderado" aria-label={`Apoderado de ${u.unidad_nombre}`} style={puntoInputStyle} autoFocus />
+                            <FileUploader value={poder.documento} onChange={documento => setPoder(p => p && { ...p, documento })}
+                              folder="asambleas/poderes" label="Documento del poder" />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button onClick={guardarPoder} disabled={!poder.apoderado.trim() || !poder.documento}
+                                style={{ padding: '7px 14px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: 600, fontSize: '12.5px', opacity: !poder.apoderado.trim() || !poder.documento ? 0.5 : 1 }}>
+                                Guardar poder
+                              </button>
+                              <button onClick={descartarPoder} aria-label="Cancelar poder" style={{ padding: '7px 12px', background: 'var(--at-chip)', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12.5px' }}>✕</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </details>
+            )}
+
             <p style={{ margin: '0 0 14px', fontSize: '12.5px', color: 'var(--at-ink-3)' }}>
-              <strong style={{ color: 'var(--at-ink)' }}>Agenda</strong> · {puntos.length} puntos · {unidades.filter(u => u.activo).length} unidades
+              <strong style={{ color: 'var(--at-ink)' }}>Agenda</strong> · {puntos.length} puntos · {votantes.length} {padron.length > 0 ? 'unidades en el padrón' : 'unidades'}
             </p>
 
             {agendaAbierta && showPuntoForm && (
@@ -332,6 +515,18 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                     <option value="votacion">Votación</option>
                     <option value="debate">Debate</option>
                   </select>
+                  {puntoForm.tipo === 'votacion' && (
+                    <select value={puntoForm.mayoria} onChange={e => setPuntoForm(f => ({ ...f, mayoria: e.target.value as TipoMayoria }))} aria-label="Mayoría"
+                      title={MAYORIA_CONFIG[puntoForm.mayoria].regla}
+                      style={{ ...puntoInputStyle, flex: 1, width: 'auto', minWidth: 0 }}>
+                      {(Object.keys(MAYORIA_CONFIG) as TipoMayoria[]).map(m => <option key={m} value={m}>{MAYORIA_CONFIG[m].label}</option>)}
+                    </select>
+                  )}
+                  {puntoForm.tipo === 'votacion' && puntoForm.mayoria === 'calificada' && (
+                    <input type="number" min="50.01" max="100" step="0.01" value={puntoForm.mayoria_pct}
+                      onChange={e => setPuntoForm(f => ({ ...f, mayoria_pct: e.target.value }))} aria-label="Porcentaje del padrón"
+                      style={{ ...puntoInputStyle, width: '84px' }} />
+                  )}
                   <button onClick={agregarPunto} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>Agregar</button>
                   <button onClick={() => setShowPuntoForm(false)} aria-label="Cancelar punto" style={{ padding: '8px 12px', background: 'var(--at-chip)', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px' }}>✕</button>
                 </div>
@@ -348,9 +543,14 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {puntos.map((p, idx) => {
                   const votosMap = Object.fromEntries((p.votos ?? []).map(v => [v.unidad_id, v.voto]))
+                  // Con escrutinio, el de la base (sólo el padrón, con su peso);
+                  // sin él, el conteo de los votos registrados.
+                  const esc: EscrutinioPunto | undefined = escrutinioDe.get(p.id)
                   const conteo = { a_favor: 0, en_contra: 0, abstencion: 0 }
-                  Object.values(votosMap).forEach(v => { if (v in conteo) conteo[v as TipoVoto]++ })
+                  if (esc) (['a_favor', 'en_contra', 'abstencion'] as TipoVoto[]).forEach(v => { conteo[v] = esc[v].unidades })
+                  else Object.values(votosMap).forEach(v => { if (v in conteo) conteo[v as TipoVoto]++ })
                   const totalVotos = Object.values(conteo).reduce((a, b) => a + b, 0)
+                  const decision = selectedAsamblea.estado === 'finalizada' ? esc?.decision : undefined
 
                   return (
                     <div key={p.id} style={{ border: '1px solid var(--at-line)', borderRadius: '10px', overflow: 'hidden' }}>
@@ -360,26 +560,39 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                           <span style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--at-ink)' }}>{p.titulo}</span>
                           {p.descripcion && <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginLeft: '8px' }}>{p.descripcion}</span>}
                         </div>
+                        {p.tipo === 'votacion' && (
+                          <span title={MAYORIA_CONFIG[p.mayoria ?? 'simple'].regla} style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{etiquetaMayoria(p)}</span>
+                        )}
                         <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '20px', background: p.tipo === 'votacion' ? 'var(--at-primary-tint)' : 'var(--at-chip)', color: p.tipo === 'votacion' ? 'var(--at-primary)' : 'var(--at-ink-3)', fontWeight: 600 }}>{p.tipo}</span>
                       </div>
 
                       {p.tipo === 'votacion' && (
                         <div style={{ padding: '12px 14px' }}>
                           {/* Resultados */}
+                          {decision && (
+                            <p style={{ margin: '0 0 8px' }}>
+                              <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: DECISION_CONFIG[decision].bg, color: DECISION_CONFIG[decision].color }}>
+                                {DECISION_CONFIG[decision].label}
+                              </span>
+                            </p>
+                          )}
+                          {!decision && selectedAsamblea.estado === 'finalizada' && p.resultado && (
+                            <p style={{ margin: '0 0 8px', fontSize: '12.5px', color: 'var(--at-ink-2)' }}>Resultado: {p.resultado}</p>
+                          )}
                           {totalVotos > 0 && (
                             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
                               {(['a_favor', 'en_contra', 'abstencion'] as TipoVoto[]).map(v => (
                                 <span key={v} style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: VOTO_CONFIG[v].bg, color: VOTO_CONFIG[v].color }}>
-                                  {VOTO_CONFIG[v].label}: {conteo[v]}
+                                  {VOTO_CONFIG[v].label}: {conteo[v]}{porAlicuota && esc ? ` · ${pct(esc[v].peso)}` : ''}
                                 </span>
                               ))}
-                              <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', alignSelf: 'center' }}>Total: {totalVotos}/{unidades.filter(u => u.activo).length}</span>
+                              <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', alignSelf: 'center' }}>Total: {totalVotos}/{votantes.length}</span>
                             </div>
                           )}
                           {/* Registro de votos por unidad */}
-                          {canEdit && selectedAsamblea.estado === 'en_curso' && (
+                          {canEdit && enCurso && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto' }}>
-                              {unidades.filter(u => u.activo).map(u => (
+                              {votantes.map(u => (
                                 <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
                                   <span style={{ flex: 1, color: 'var(--at-ink-2)' }}>{u.nombre}</span>
                                   {(['a_favor', 'en_contra', 'abstencion'] as TipoVoto[]).map(v => (

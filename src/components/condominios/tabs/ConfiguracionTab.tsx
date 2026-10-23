@@ -15,9 +15,12 @@ interface Props {
 interface ConfigKey {
   clave: string
   label: string
-  tipo: 'texto' | 'numero' | 'texto_largo'
+  tipo: 'texto' | 'numero' | 'texto_largo' | 'opciones'
   placeholder?: string
   group: string
+  /** Para `opciones`: los valores que acepta la base; el primero es el de omisión. */
+  opciones?: { value: string; label: string }[]
+  ayuda?: string
 }
 
 const CONFIG_SCHEMA: ConfigKey[] = [
@@ -34,7 +37,19 @@ const CONFIG_SCHEMA: ConfigKey[] = [
   { clave: 'horario_acceso_fin',     label: 'Horario acceso fin',           tipo: 'texto',       placeholder: '22:00',                          group: 'Operacional' },
   { clave: 'reglamento',             label: 'Reglamento del condominio',    tipo: 'texto_largo', placeholder: 'Texto del reglamento interno…',  group: 'Documentos' },
   { clave: 'notas_generales',        label: 'Notas generales',              tipo: 'texto_largo', placeholder: 'Información adicional…',         group: 'Documentos' },
+  // El CHECK configuracion_condominio_base_votacion_check acepta sólo estos dos.
+  { clave: 'asambleas_base_votacion', label: 'Base de votación',             tipo: 'opciones',                                                  group: 'Asambleas',
+    opciones: [
+      { value: 'unidad',   label: 'Por unidad: cada unidad vale 1' },
+      { value: 'alicuota', label: 'Por alícuota (sin alícuota, por m²)' },
+    ],
+    ayuda: 'Cada asamblea la fija al abrirse: cambiarla no altera las que ya están en curso.' },
 ]
+
+/** Lo que guarda la columna `tipo` (su CHECK no conoce 'texto_largo' ni 'opciones'). */
+function tipoDb(schema: ConfigKey): 'texto' | 'numero' {
+  return schema.tipo === 'numero' ? 'numero' : 'texto'
+}
 
 const GROUPS = [...new Set(CONFIG_SCHEMA.map(c => c.group))]
 
@@ -60,7 +75,7 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
     if (!schema) return
     setSaving(clave)
     const existing = configuracion.find(c => c.clave === clave)
-    const tipo = schema.tipo === 'texto_largo' ? 'texto' : schema.tipo
+    const tipo = tipoDb(schema)
 
     if (existing) {
       const { error } = await updateCondominioRow('configuracion_condominio', existing.id, { valor: values[clave] || null, updated_at: new Date().toISOString() })
@@ -85,7 +100,7 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
       const schema = CONFIG_SCHEMA.find(s => s.clave === clave)
       if (!schema) continue
       const existing = configuracion.find(c => c.clave === clave)
-      const tipo = schema.tipo === 'texto_largo' ? 'texto' : schema.tipo
+      const tipo = tipoDb(schema)
       if (existing) {
         await updateCondominioRow('configuracion_condominio', existing.id, { valor: values[clave] || null, updated_at: new Date().toISOString() })
       } else {
@@ -144,7 +159,20 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
                       </Button>
                     )}
                   </div>
-                  {schema.tipo === 'texto_largo' ? (
+                  {schema.tipo === 'opciones' ? (
+                    <>
+                      <select
+                        aria-label={schema.label}
+                        value={values[schema.clave] || schema.opciones?.[0]?.value}
+                        onChange={e => canEdit && handleChange(schema.clave, e.target.value)}
+                        disabled={!canEdit}
+                        style={{ ...inputStyle, border: `1.5px solid ${isDirty ? 'var(--at-accent-2)' : 'var(--at-line)'}` }}
+                      >
+                        {schema.opciones?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                      {schema.ayuda && <p style={{ margin: '6px 0 0', fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{schema.ayuda}</p>}
+                    </>
+                  ) : schema.tipo === 'texto_largo' ? (
                     <textarea
                       value={values[schema.clave] ?? ''}
                       onChange={e => canEdit && handleChange(schema.clave, e.target.value)}
