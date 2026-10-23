@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { ImportModal, type ImportColumn, type RowValidationResult } from '../ImportModal'
 import { checkA11y } from '../../../test/a11y'
@@ -105,6 +105,14 @@ describe('ImportModal — cierre', () => {
 })
 
 describe('ImportModal — descarga plantilla', () => {
+  // La plantilla se arma con exceljs, que `writeXlsx` importa bajo demanda.
+  // La primera importación cuesta cientos de ms (segundos con la suite entera
+  // corriendo en paralelo) y caía dentro del `waitFor` de 1 s: la prueba
+  // fallaba sin que nada estuviera roto. Se paga aquí, fuera de la espera, y
+  // la espera tiene margen para escribir el libro con la máquina cargada.
+  beforeAll(async () => { await import('exceljs') }, 30_000)
+  const ESPERA_DESCARGA = { timeout: 5_000 }
+
   it('dispara writeXlsx con la sheet correcta al clickear "Descargar plantilla"', async () => {
     let capturedDownload: string | undefined
     const origCreate = document.createElement.bind(document)
@@ -126,7 +134,7 @@ describe('ImportModal — descarga plantilla', () => {
       />
     )
     fireEvent.click(screen.getByText(/Descargar plantilla/i))
-    await waitFor(() => expect(capturedDownload).toBe('plantilla_amenidades.xlsx'))
+    await waitFor(() => expect(capturedDownload).toBe('plantilla_amenidades.xlsx'), ESPERA_DESCARGA)
   })
 
   it('respeta templateFilename custom', async () => {
@@ -150,7 +158,7 @@ describe('ImportModal — descarga plantilla', () => {
       />
     )
     fireEvent.click(screen.getByText(/Descargar plantilla/i))
-    await waitFor(() => expect(capturedDownload).toBe('custom_template.xlsx'))
+    await waitFor(() => expect(capturedDownload).toBe('custom_template.xlsx'), ESPERA_DESCARGA)
   })
 })
 
