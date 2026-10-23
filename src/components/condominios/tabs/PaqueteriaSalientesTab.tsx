@@ -23,6 +23,7 @@ interface Props {
   userId: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -48,7 +49,7 @@ const TONO_ESCANEO = {
   ok:   { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', color: 'var(--at-success)' },
 }
 
-export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   // Deep link del QR de retiro: .../condominios/paqueteria#retiro=<código>.
@@ -186,9 +187,12 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('paquetes_recibidos', id)
+    const { error } = await deleteCondominioRow('paquetes_recibidos', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -374,7 +378,7 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
                       ↩ Devolver
                     </button>
                   )}
-                  <button onClick={() => eliminar(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
+                  {canDelete && <button onClick={() => eliminar(p.id)} aria-label={`Eliminar ${p.descripcion}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>}
                 </div>
               </div>
             )

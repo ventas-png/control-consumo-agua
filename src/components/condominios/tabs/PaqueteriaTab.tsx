@@ -29,6 +29,7 @@ interface Props {
   userId: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   puedeVerCorrespondencia: boolean
   onIrATab?: (tab: 'paqueteria' | 'correspondencia') => void
   onRefresh: () => void
@@ -63,7 +64,7 @@ function fechaCorta(iso?: string | null): string {
 
 export function PaqueteriaTab({
   paquetes, correspondencia, unidades, proyectoId, companyId, userId,
-  canCreate, canEdit, puedeVerCorrespondencia, onIrATab, onRefresh,
+  canCreate, canEdit, canDelete, puedeVerCorrespondencia, onIrATab, onRefresh,
 }: Props) {
   // Si venimos del QR de retiro (#retiro=<código>) arrancamos en Salidas: es
   // donde vive la entrega y donde PaqueteriaSalientesTab consume el fragmento.
@@ -175,9 +176,12 @@ export function PaqueteriaTab({
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('paquetes_recibidos', id)
+    const { error } = await deleteCondominioRow('paquetes_recibidos', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -272,6 +276,7 @@ export function PaqueteriaTab({
           userId={userId}
           canCreate={canCreate}
           canEdit={canEdit}
+          canDelete={canDelete}
           onRefresh={onRefresh}
         />
       ) : (
@@ -405,7 +410,7 @@ export function PaqueteriaTab({
                           ↩ Devolver
                         </button>
                       )}
-                      <button onClick={() => eliminar(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
+                      {canDelete && <button onClick={() => eliminar(p.id)} aria-label={`Eliminar ${p.descripcion}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>}
                     </div>
                   </div>
                 )

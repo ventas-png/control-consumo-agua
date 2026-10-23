@@ -1,0 +1,117 @@
+{
+  "_migracion": "20261104090100_rls_acciones_especiales.sql",
+  "_titulo": "Casos especiales: escribir exige la ACCIÓN del tab, también en la base",
+  "_porque": [
+    "POR QUÉ",
+    "La pantalla decide cada escritura de estos tabs con su acción (canCreate /",
+    "canEdit / canDelete). Las policies de INSERT y UPDATE sólo pedían ver el tab",
+    "—quien sólo consulta podía crear y editar por la API—, y las de DELETE sólo",
+    "dejaban a company_owner/admin, aunque la pantalla ofreciera «Eliminar».",
+    "",
+    "Son las tablas que quedaron fuera de su sección: Arrendamientos, Convenios",
+    "de pago, Gastos (Contabilidad), Huéspedes y reservas de renta corta,",
+    "Paquetería y Correspondencia, y Reglas de mora.",
+    "",
+    "OTROS MÓDULOS. Clientes (contratos y reservas), Compras («Enlazar» un gasto",
+    "a su factura), Tarifas › Facturación (reglas de mora) y Cobros (convenios)",
+    "también escriben estas tablas, con permisos de su módulo. Para verlas ya",
+    "hacía falta el permiso del tab de condominios; para escribirlas, ahora, su",
+    "acción. No se amplía a nadie: quien no tenía el tab de condominios sigue",
+    "sin leerlas ni escribirlas.",
+    "",
+    "Paquetería y Correspondencia comparten paquetes_recibidos: la policy elige",
+    "el tab por la clase de la fila (CASE clase). Cada rama pasa a pedir la",
+    "acción de su tab. Borrar correspondencia sigue siendo sólo de",
+    "company_owner (20260829000600: es la constancia de una notificación legal),",
+    "y la residente sigue viendo lo suyo.",
+    "",
+    "Las ramas del residente (portal de rentas) no cambian."
+  ],
+  "tablas": {
+    "contratos_arrendamiento": {
+      "tab": "arrendamientos",
+      "porque": [
+        "Clientes también los escribe (ClienteRentasModal, con platform.clientes.edit/delete); como para",
+        "verlos, sigue haciendo falta el tab Arrendamientos. Aprobar una solicitud de renta crea el",
+        "contrato en una RPC SECURITY DEFINER (aprobar_solicitud_renta), que no pasa por RLS."
+      ]
+    },
+    "convenios_pago": {
+      "tab": "convenios_cuota",
+      "porque": [
+        "Ninguna pestaña de condominios la escribe: la escribe Cobros (crear un convenio y cambiar su",
+        "estado). Su policy pedía ver Convenios (convenios_cuota); ahora pide la acción de ese tab."
+      ]
+    },
+    "gastos_condominio": {
+      "tab": "contabilidad",
+      "porque": "«Enlazar» un gasto a su factura (Compras, con platform.contabilidad.create) es editarlo: como para verlo, sigue haciendo falta el tab Gastos."
+    },
+    "huespedes_str": {
+      "tab": "str",
+      "INSERT": [
+        "str.create",
+        "str.edit"
+      ],
+      "UPDATE": [
+        "str.edit",
+        "visitantes.create"
+      ],
+      "DELETE": [
+        "str.delete",
+        "str.edit"
+      ],
+      "porque": [
+        "Guardar una reserva —nueva con canCreate, existente con canEdit— agrega, cambia y quita sus",
+        "huéspedes. Registrar en Visitantes la entrada de un huésped (canCreate('visitantes')) lo enlaza",
+        "con su visita."
+      ],
+      "evidencia": {
+        "visitantes": [
+          "components/condominios/tabs/VisitantesTab.tsx"
+        ]
+      }
+    },
+    "paquetes_recibidos": {
+      "tab": "paqueteria",
+      "receta": {
+        "clase": "'paquete'",
+        "tipo": "'paquete'"
+      },
+      "ramas": {
+        "columna": "clase",
+        "valores": {
+          "correspondencia": {
+            "tab": "correspondencia",
+            "INSERT": [
+              "correspondencia.create"
+            ],
+            "UPDATE": [
+              "correspondencia.edit"
+            ],
+            "receta": {
+              "clase": "'correspondencia'",
+              "tipo": "'carta'"
+            }
+          }
+        }
+      },
+      "porque": [
+        "Borrar correspondencia sigue siendo sólo de company_owner: ninguna pantalla lo ofrece, y",
+        "retirarla de la operación sin destruirla es archivarla (editar)."
+      ]
+    },
+    "reglas_mora_config": {
+      "tab": "reglas_mora",
+      "porque": "Tarifas › Facturación también las escribe (con agua.tarifas.edit); como para verlas, sigue haciendo falta el tab Reglas de mora."
+    },
+    "reservas_str": {
+      "tab": "str",
+      "porque": [
+        "Clientes también las escribe (ClienteRentasModal); como para verlas, sigue haciendo falta el",
+        "tab Renta corta. La carga masiva inserta con str_reservas_importar_aplicar, SECURITY INVOKER,",
+        "que ya exigía la misma regla que canCreate('str') (str_import_puede_crear)."
+      ]
+    }
+  }
+}
