@@ -1,94 +1,73 @@
 import { useCallback, useEffect, useState } from 'react'
-import { createCondominioRow } from '../../../domain/condominios/tabMutations'
-import { fetchAsambleasDigital, fetchPuntosByAsambleaIds, fetchVotosUnidad } from '../../../domain/condominios/tabQueries'
+import { fetchAsambleasUnidad, votarPunto } from '../../../domain/portal/asambleas'
 import { EmptyState } from '../../shared/EmptyState'
 import { StatusBadge } from '../../shared/StatusBadge'
-import { notify } from '../../shared/Dialog'
-import type { AsambleaDigital } from '../../../types'
+import { confirm, notify } from '../../shared/Dialog'
+import type { AsambleaPortal, EstadoAsamblea, PuntoAsambleaPortal, TipoVoto } from '../../../types'
 
 // F3.12: Portal residente — vista de asambleas + votación.
-// Antes: portal residente solo veía cuotas, tickets, paquetes.
-// Ahora: ve asambleas programadas/en curso, descarga acta de las
-// finalizadas, y puede votar en puntos de aprobación.
 //
-// Cierra el gap B9 del design critique ("Portal residente subutilizado
-// — solo lee cuotas y tickets. Sin votaciones de asamblea ni
-// transparencia financiera").
-
-interface PuntoAsamblea2 {
-  id: string
-  asamblea_id: string
-  orden: number
-  titulo: string
-  descripcion?: string | null
-  tipo: 'informativo' | 'aprobacion' | 'eleccion'
-  resultado?: string | null
-  votos_favor: number
-  votos_contra: number
-  votos_abstencion: number
-}
-
-interface VotoUnidad {
-  punto_id: string
-  voto: 'favor' | 'contra' | 'abstencion'
-}
+// Son las asambleas CLÁSICAS (asambleas + puntos_asamblea + votos_asamblea),
+// las mismas que el tab «Asambleas» del panel: un solo registro de votos, con
+// el vocabulario del panel ('a_favor' | 'en_contra' | 'abstencion').
+// Todo pasa por los RPC de 20261105000000, que deciden server-side:
+//   · sólo el propietario de la unidad lee y vota (tabsForRol ya esconde el
+//     tab al inquilino);
+//   · se vota en puntos de votación con la asamblea en curso, una vez por
+//     unidad: el voto es definitivo desde el portal;
+//   · los totales y el acta salen con la asamblea finalizada.
 
 interface Props {
   unidadId: string
-  proyectoId: string
 }
 
-const ESTADO_LABELS: Record<AsambleaDigital['estado'], { label: string; tone: 'info' | 'success' | 'warning' | 'neutral' }> = {
+const ESTADO_LABELS: Record<EstadoAsamblea, { label: string; tone: 'info' | 'success' | 'warning' | 'neutral' }> = {
   programada: { label: 'Programada', tone: 'info' },
   en_curso:   { label: 'En curso',   tone: 'warning' },
   finalizada: { label: 'Finalizada', tone: 'success' },
   cancelada:  { label: 'Cancelada',  tone: 'neutral' },
 }
 
-const MODALIDAD_LABELS = {
-  presencial: '🏛️ Presencial',
-  virtual:    '💻 Virtual',
-  hibrida:    '🔀 Híbrida',
+const VOTO_LABELS: Record<TipoVoto, string> = {
+  a_favor:    'A favor',
+  en_contra:  'En contra',
+  abstencion: 'Abstención',
 }
 
-export function PortalAsambleasTab({ unidadId, proyectoId }: Props) {
-  const [asambleas, setAsambleas] = useState<AsambleaDigital[]>([])
-  const [puntos, setPuntos] = useState<Record<string, PuntoAsamblea2[]>>({})
-  const [misVotos, setMisVotos] = useState<Record<string, VotoUnidad['voto']>>({})
+const TIPO_PUNTO_LABELS: Record<PuntoAsambleaPortal['tipo'], string> = {
+  informativo: 'Informativo',
+  votacion:    'Votación',
+  debate:      'Debate',
+}
+
+function fechaAsamblea(a: AsambleaPortal): string {
+  const d = new Date(`${a.fecha}T${a.hora_inicio}`)
+  return Number.isNaN(d.getTime())
+    ? a.fecha
+    : d.toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+export function PortalAsambleasTab({ unidadId }: Props) {
+  const [asambleas, setAsambleas] = useState<AsambleaPortal[]>([])
   const [loading, setLoading] = useState(true)
+  const [errorCarga, setErrorCarga] = useState<string | null>(null)
   const [voting, setVoting] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  // `cargar` como useCallback (antes función suelta, recreada por render): el
-  // efecto declara su dependencia real en vez de una lista paralela que había
-  // que mantener a mano. `cancelado` evita que una respuesta de un proyecto ya
-  // abandonado pise el estado del actual.
+  // `cancelado` evita que la respuesta de una unidad ya abandonada pise el
+  // estado de la actual (los votos son por unidad).
   const cargar = useCallback(async (estaCancelado: () => boolean = () => false) => {
     setLoading(true)
-    const list = await fetchAsambleasDigital<AsambleaDigital>(proyectoId)
+    const { data, error } = await fetchAsambleasUnidad(unidadId)
     if (estaCancelado()) return
-    setAsambleas(list)
-
-    if (list.length > 0) {
-      const ids = list.map(a => a.id)
-      const pts = await fetchPuntosByAsambleaIds<PuntoAsamblea2>(ids)
-      if (estaCancelado()) return
-      const byAsamblea: Record<string, PuntoAsamblea2[]> = {}
-      pts.forEach(p => {
-        if (!byAsamblea[p.asamblea_id]) byAsamblea[p.asamblea_id] = []
-        byAsamblea[p.asamblea_id].push(p)
-      })
-      setPuntos(byAsamblea)
-
-      // Cargar votos previos del residente
-      const votos = await fetchVotosUnidad<VotoUnidad>(unidadId)
-      if (estaCancelado()) return
-      const votosMap: Record<string, VotoUnidad['voto']> = {}
-      votos.forEach(v => { votosMap[v.punto_id] = v.voto })
-      setMisVotos(votosMap)
-    }
+    setAsambleas(data)
+    setErrorCarga(error)
+    // Se conserva la que estaba abierta si sigue en la lista (recarga tras un
+    // voto); si no (otra unidad), se abre la asamblea en curso: es donde hay
+    // algo que hacer.
+    setExpanded(prev => (prev && data.some(a => a.id === prev) ? prev : data.find(a => a.estado === 'en_curso')?.id ?? null))
     setLoading(false)
-  }, [proyectoId, unidadId])
+  }, [unidadId])
 
   useEffect(() => {
     let cancelado = false
@@ -96,37 +75,56 @@ export function PortalAsambleasTab({ unidadId, proyectoId }: Props) {
     return () => { cancelado = true }
   }, [cargar])
 
-  async function votar(punto: PuntoAsamblea2, voto: VotoUnidad['voto']) {
-    if (misVotos[punto.id]) {
-      notify({ variant: 'warning', title: 'Ya votaste', text: 'Ya emitiste tu voto en este punto.' })
-      return
-    }
-    setVoting(punto.id)
-    const { error } = await createCondominioRow('votos_asamblea', {
-      punto_id: punto.id,
-      asamblea_id: punto.asamblea_id,
-      unidad_id: unidadId,
-      voto,
+  async function votar(punto: PuntoAsambleaPortal, voto: TipoVoto) {
+    const r = await confirm({
+      title: `¿Votar «${VOTO_LABELS[voto]}»?`,
+      text: `Punto: ${punto.titulo}. El voto es por unidad y no se puede cambiar desde el portal.`,
+      confirmText: 'Votar',
+      icon: 'question',
     })
+    if (!r.isConfirmed) return
+    setVoting(punto.id)
+    const { error, yaVotado } = await votarPunto(punto.id, unidadId, voto)
     setVoting(null)
-    if (error) {
-      notify({ variant: 'error', title: 'Error', text: error.message })
+    if (yaVotado) {
+      notify({ variant: 'warning', title: 'Ya votaste', text: 'Esta unidad ya tiene un voto registrado en este punto.' })
+      void cargar()
       return
     }
-    setMisVotos(prev => ({ ...prev, [punto.id]: voto }))
-    notify({ variant: 'success', title: 'Voto registrado', text: `Tu voto fue: ${voto === 'favor' ? 'A favor' : voto === 'contra' ? 'En contra' : 'Abstención'}`, duration: 1800 })
+    if (error) {
+      notify({ variant: 'error', title: 'No se registró el voto', text: error })
+      return
+    }
+    setAsambleas(prev => prev.map(a => ({
+      ...a,
+      puntos: a.puntos.map(p => (p.id === punto.id ? { ...p, mi_voto: voto } : p)),
+    })))
+    notify({ variant: 'success', title: 'Voto registrado', text: `Tu voto fue: ${VOTO_LABELS[voto]}`, duration: 1800 })
   }
 
   if (loading) {
     return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Cargando asambleas…</div>
   }
 
+  if (errorCarga) {
+    return (
+      <EmptyState
+        audience="resident"
+        icon="⚠️"
+        title="No se pudieron cargar las asambleas"
+        description={errorCarga}
+        action={<button type="button" onClick={() => void cargar()} style={btnReintentar}>Reintentar</button>}
+      />
+    )
+  }
+
   if (asambleas.length === 0) {
     return (
       <EmptyState
+        audience="resident"
         icon="🏛️"
         title="No hay asambleas registradas"
-        description="Cuando la administración programe una asamblea, podrás verla aquí y votar en los puntos de aprobación."
+        description="Cuando la administración convoque una asamblea, podrás verla aquí y votar en los puntos de votación mientras esté en curso."
       />
     )
   }
@@ -138,15 +136,13 @@ export function PortalAsambleasTab({ unidadId, proyectoId }: Props) {
           🏛️ Asambleas
         </h2>
         <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-3)' }}>
-          Programadas, en curso y finalizadas. Vota en los puntos de aprobación cuando la asamblea esté activa.
+          Programadas, en curso y finalizadas. Vota por tu unidad en los puntos de votación mientras la asamblea está en curso.
         </p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {asambleas.map(a => {
           const isExpanded = expanded === a.id
-          const asambleaPuntos = puntos[a.id] ?? []
-          const fechaFmt = new Date(a.fecha_hora).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })
           return (
             <article
               key={a.id}
@@ -167,40 +163,30 @@ export function PortalAsambleasTab({ unidadId, proyectoId }: Props) {
                     <StatusBadge tone={ESTADO_LABELS[a.estado].tone}>{ESTADO_LABELS[a.estado].label}</StatusBadge>
                   </div>
                   <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-3)' }}>
-                    {fechaFmt} · {MODALIDAD_LABELS[a.modalidad]}
-                    {a.link_reunion && a.estado !== 'finalizada' && (
-                      <> · <a href={a.link_reunion} target="_blank" rel="noopener" style={{ color: 'var(--at-primary)', textDecoration: 'none', fontWeight: 600 }}>🔗 Unirse</a></>
-                    )}
+                    {fechaAsamblea(a)} · {a.tipo === 'extraordinaria' ? 'Extraordinaria' : 'Ordinaria'}
+                    {a.lugar && <> · 📍 {a.lugar}</>}
                   </p>
-                  {a.descripcion && (
-                    <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'var(--at-ink-2)' }}>{a.descripcion}</p>
-                  )}
                 </div>
                 <button
                   type="button"
                   aria-expanded={isExpanded}
-                  aria-label={isExpanded ? 'Ocultar puntos' : 'Ver puntos'}
+                  aria-label={isExpanded ? `Ocultar puntos de ${a.titulo}` : `Ver puntos de ${a.titulo}`}
                   style={{
                     background: 'var(--at-chip)', border: 'none', borderRadius: '8px',
                     padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)',
                   }}
                 >
-                  {isExpanded ? '▲' : '▼'} {asambleaPuntos.length} {asambleaPuntos.length === 1 ? 'punto' : 'puntos'}
+                  {isExpanded ? '▲' : '▼'} {a.puntos.length} {a.puntos.length === 1 ? 'punto' : 'puntos'}
                 </button>
               </header>
 
               {isExpanded && (
                 <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--at-line)' }}>
-                  {a.acta_url && a.estado === 'finalizada' && (
-                    <p style={{ margin: '0 0 10px', fontSize: '13px' }}>
-                      📜 <a href={a.acta_url} target="_blank" rel="noopener" style={{ color: 'var(--at-primary)', fontWeight: 600 }}>Descargar acta</a>
-                    </p>
-                  )}
-                  {asambleaPuntos.length === 0 ? (
+                  {a.puntos.length === 0 ? (
                     <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-3)' }}>Sin puntos en el orden del día.</p>
                   ) : (
                     <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {asambleaPuntos.map(p => (
+                      {a.puntos.map(p => (
                         <li key={p.id} style={{
                           background: 'var(--at-surface-2)', borderRadius: '10px', padding: '12px 14px',
                         }}>
@@ -214,55 +200,59 @@ export function PortalAsambleasTab({ unidadId, proyectoId }: Props) {
                             <span style={{
                               fontSize: '10px', fontWeight: 700,
                               padding: '2px 8px', borderRadius: '20px',
-                              background: p.tipo === 'aprobacion' ? 'var(--at-warning-tint)' : 'var(--at-chip)',
-                              color: p.tipo === 'aprobacion' ? 'var(--at-warning-strong)' : 'var(--at-ink-3)',
+                              background: p.tipo === 'votacion' ? 'var(--at-warning-tint)' : 'var(--at-chip)',
+                              color: p.tipo === 'votacion' ? 'var(--at-warning-strong)' : 'var(--at-ink-3)',
                               flexShrink: 0,
                             }}>
-                              {p.tipo}
+                              {TIPO_PUNTO_LABELS[p.tipo] ?? p.tipo}
                             </span>
                           </div>
 
-                          {/* Voto del residente */}
-                          {p.tipo === 'aprobacion' && a.estado === 'en_curso' && (
+                          {p.tipo === 'votacion' && p.mi_voto && (
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-success)' }}>
+                              ✓ Tu unidad votó: {VOTO_LABELS[p.mi_voto]}
+                            </span>
+                          )}
+
+                          {/* Voto del propietario: sólo con la asamblea en curso */}
+                          {p.tipo === 'votacion' && a.estado === 'en_curso' && !p.mi_voto && (
                             <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                              {misVotos[p.id] ? (
-                                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-success)' }}>
-                                  ✓ Votaste: {misVotos[p.id] === 'favor' ? 'A favor' : misVotos[p.id] === 'contra' ? 'En contra' : 'Abstención'}
-                                </span>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => votar(p, 'favor')}
-                                    disabled={voting === p.id}
-                                    style={{ ...btnVoto, background: 'var(--at-success-tint)', color: 'var(--at-success-strong)' }}
-                                  >
-                                    👍 A favor
-                                  </button>
-                                  <button
-                                    onClick={() => votar(p, 'contra')}
-                                    disabled={voting === p.id}
-                                    style={{ ...btnVoto, background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)' }}
-                                  >
-                                    👎 En contra
-                                  </button>
-                                  <button
-                                    onClick={() => votar(p, 'abstencion')}
-                                    disabled={voting === p.id}
-                                    style={{ ...btnVoto, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}
-                                  >
-                                    ⊘ Abstención
-                                  </button>
-                                </>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => votar(p, 'a_favor')}
+                                disabled={voting === p.id}
+                                style={{ ...btnVoto, background: 'var(--at-success-tint)', color: 'var(--at-success-strong)' }}
+                              >
+                                👍 A favor
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => votar(p, 'en_contra')}
+                                disabled={voting === p.id}
+                                style={{ ...btnVoto, background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)' }}
+                              >
+                                👎 En contra
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => votar(p, 'abstencion')}
+                                disabled={voting === p.id}
+                                style={{ ...btnVoto, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}
+                              >
+                                ⊘ Abstención
+                              </button>
                             </div>
                           )}
 
-                          {/* Resultado (asamblea finalizada) */}
-                          {a.estado === 'finalizada' && p.tipo === 'aprobacion' && (
-                            <div style={{ marginTop: '8px', fontSize: '12px', display: 'flex', gap: '14px', color: 'var(--at-ink-3)' }}>
-                              <span>👍 {p.votos_favor}</span>
-                              <span>👎 {p.votos_contra}</span>
-                              <span>⊘ {p.votos_abstencion}</span>
+                          {/* Resultado (asamblea finalizada): totales, nunca votos de otras unidades */}
+                          {p.conteo && (
+                            <div
+                              aria-label={`Resultado de ${p.titulo}`}
+                              style={{ marginTop: '8px', fontSize: '12px', display: 'flex', gap: '14px', color: 'var(--at-ink-3)' }}
+                            >
+                              <span>👍 {p.conteo.a_favor}</span>
+                              <span>👎 {p.conteo.en_contra}</span>
+                              <span>⊘ {p.conteo.abstencion}</span>
                               {p.resultado && (
                                 <span style={{ marginLeft: 'auto', fontWeight: 700, color: 'var(--at-ink)' }}>
                                   → {p.resultado}
@@ -273,6 +263,13 @@ export function PortalAsambleasTab({ unidadId, proyectoId }: Props) {
                         </li>
                       ))}
                     </ol>
+                  )}
+
+                  {a.acta && (
+                    <details style={{ marginTop: '12px', fontSize: '13px' }}>
+                      <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--at-primary)' }}>📜 Acta</summary>
+                      <p style={{ margin: '8px 0 0', whiteSpace: 'pre-wrap', color: 'var(--at-ink-2)' }}>{a.acta}</p>
+                    </details>
                   )}
                 </div>
               )}
@@ -290,5 +287,15 @@ const btnVoto: React.CSSProperties = {
   border: 'none',
   fontSize: '12px',
   fontWeight: 700,
+  cursor: 'pointer',
+}
+
+const btnReintentar: React.CSSProperties = {
+  padding: '8px 16px',
+  borderRadius: '8px',
+  border: '1.5px solid var(--at-line)',
+  background: 'var(--at-surface)',
+  fontSize: '13px',
+  fontWeight: 600,
   cursor: 'pointer',
 }

@@ -257,39 +257,6 @@ export async function fetchPuntosAsambleaConVotos(
   return (data as Array<Record<string, unknown>> | null) ?? []
 }
 
-/** Asambleas digitales de un proyecto (20 más recientes). Degrada a `[]`. */
-export async function fetchAsambleasDigital<T>(projectId: string): Promise<T[]> {
-  const { data, error } = await db
-    .from('asambleas_digital')
-    .select('*')
-    .eq('project_id', projectId)
-    .order('fecha_hora', { ascending: false })
-    .limit(20)
-  reportDegradedQuery('condominios.fetchAsambleasDigital', error)
-  return (data as T[] | null) ?? []
-}
-
-/** Puntos de varias asambleas por id (`.in`), ordenados. Degrada a `[]`. */
-export async function fetchPuntosByAsambleaIds<T>(ids: string[]): Promise<T[]> {
-  const { data, error } = await db
-    .from('puntos_asamblea')
-    .select('*')
-    .in('asamblea_id', ids)
-    .order('orden')
-  reportDegradedQuery('condominios.fetchPuntosByAsambleaIds', error)
-  return (data as T[] | null) ?? []
-}
-
-/** Votos previos de una unidad (punto_id + voto) para precargar el portal. */
-export async function fetchVotosUnidad<T>(unidadId: string): Promise<T[]> {
-  const { data, error } = await db
-    .from('votos_asamblea')
-    .select('punto_id, voto')
-    .eq('unidad_id', unidadId)
-  reportDegradedQuery('condominios.fetchVotosUnidad', error)
-  return (data as T[] | null) ?? []
-}
-
 /** Votos de una votación con el nombre de la unidad (join). Degrada a `[]`. */
 export async function fetchVotosVotacion(
   votacionId: string,

@@ -503,6 +503,21 @@ const PORTAL_PADRON_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   { name: 'portal_baja_vehiculo', args: () => ({ p_vehiculo_id: SOLICITUD_ID_INEXISTENTE }) },
 ]
 
+// RPCs de asambleas del portal (20261105000000): las asambleas, puntos y votos
+// sólo los lee y escribe el residente por estas dos, acotadas por
+// mis_unidades_propietario_ids(). El usuario A es STAFF, no propietario de
+// ninguna unidad: el gate de propietario lo rechaza antes de mirar el punto, así
+// que un punto inexistente basta y la garantía es de ROL. La pertenencia
+// (propietario, inquilino, otra unidad, otro condominio, otra empresa) la prueba
+// supabase/tests/portal_asambleas_voto sobre Postgres desechable.
+const PORTAL_ASAMBLEAS_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
+  { name: 'portal_asambleas_unidad', args: (b) => ({ p_unidad_id: b.unidadId }) },
+  {
+    name: 'portal_votar_punto',
+    args: (b) => ({ p_punto_id: SOLICITUD_ID_INEXISTENTE, p_unidad_id: b.unidadId, p_voto: 'a_favor' }),
+  },
+]
+
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -1264,6 +1279,35 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
     }
+  })
+
+  // ────────────────────────────────────────────────────────────────────────
+  // guard RPCs de asambleas del portal (20261105000000)
+  // ────────────────────────────────────────────────────────────────────────
+  describe('guard RPCs de asambleas del portal (20261105000000) — garantía de ROL', () => {
+    for (const { name, args } of PORTAL_ASAMBLEAS_RPCS) {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args(B))
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+    }
+
+    // De lectura: con una unidad ajena devuelve 0 filas (el predicado "unidad
+    // propia" filtra), nunca las asambleas ni los votos de otro.
+    it(`${idEvidencia('portal_asambleas_unidad', 'authenticated-cross-tenant')} authenticated (A) NO lista asambleas de una unidad ajena`, async () => {
+      const { data, error } = await userA.rpc('portal_asambleas_unidad', { p_unidad_id: B.unidadId })
+      const negado = error !== null || (data ?? []).length === 0
+      expect(negado, 'portal_asambleas_unidad no debe exponer asambleas de una unidad ajena').toBe(true)
+    })
+
+    it(`${idEvidencia('portal_votar_punto', 'authenticated-cross-tenant')} authenticated (A) NO vota por una unidad ajena`, async () => {
+      const { data, error } = await userA.rpc('portal_votar_punto', {
+        p_punto_id: SOLICITUD_ID_INEXISTENTE, p_unidad_id: B.unidadId, p_voto: 'a_favor',
+      })
+      expect(error, 'portal_votar_punto sobre una unidad ajena debe fallar').not.toBeNull()
+      expect(data ?? null, 'portal_votar_punto no debe devolver datos').toBeNull()
+    })
   })
 })
 

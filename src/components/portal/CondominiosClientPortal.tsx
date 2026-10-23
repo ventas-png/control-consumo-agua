@@ -634,10 +634,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                   />
                 }
               >
-                <PortalAsambleasTab
-                  unidadId={selectedUnidadId}
-                  proyectoId={proyectoId}
-                />
+                <PortalAsambleasTab unidadId={selectedUnidadId} />
               </FeatureGate>
             )}
             {tab === 'transparencia' && (

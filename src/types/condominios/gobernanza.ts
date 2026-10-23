@@ -56,6 +56,37 @@ export interface VotoAsamblea {
   unidad_nombre?: string
 }
 
+/** Punto de una asamblea tal como lo proyecta portal_asambleas_unidad(). */
+export interface PuntoAsambleaPortal {
+  id: string
+  orden: number
+  titulo: string
+  descripcion: string | null
+  tipo: TipoPunto
+  resultado: string | null
+  /** Voto de la unidad consultada (nunca el de otra). */
+  mi_voto: TipoVoto | null
+  /** Totales del punto; sólo en puntos de votación de asambleas finalizadas. */
+  conteo: Record<TipoVoto, number> | null
+}
+
+/** Asamblea del condominio de una unidad propia (portal del propietario). */
+export interface AsambleaPortal {
+  id: string
+  titulo: string
+  tipo: TipoAsamblea
+  fecha: string
+  hora_inicio: string
+  hora_fin: string | null
+  lugar: string | null
+  estado: EstadoAsamblea
+  quorum_requerido: number
+  quorum_alcanzado: number | null
+  /** Sólo con la asamblea finalizada. */
+  acta: string | null
+  puntos: PuntoAsambleaPortal[]
+}
+
 export interface ContratoProveedor {
   id: string
   company_id: string
