@@ -531,7 +531,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'asambleas', label: 'Asambleas', icon: '🗳️', render: (ctx) =>
     <AsambleasTab asambleas={ctx.asambleas} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('asambleas')} canEdit={ctx.canEdit('asambleas')} canDelete={ctx.canDelete('asambleas')} onRefresh={ctx.onRefresh} /> },
   { id: 'proveedores', label: 'Contratos', icon: '🤝', render: (ctx) =>
-    <ContratosProveedorTab contratos={ctx.contratosProveedores as ContratoProveedorCatalogo[]} proyectoId={ctx.proyectoId} proyectoNombre={ctx.proyectoActual?.nombre} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proveedores')} canEdit={ctx.canEdit('proveedores')} onRefresh={ctx.onRefresh} /> },
+    <ContratosProveedorTab contratos={ctx.contratosProveedores as ContratoProveedorCatalogo[]} proyectoId={ctx.proyectoId} proyectoNombre={ctx.proyectoActual?.nombre} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proveedores')} canEdit={ctx.canEdit('proveedores')} canDelete={ctx.canDelete('proveedores')} onRefresh={ctx.onRefresh} /> },
   { id: 'objetos', label: 'Obj. Perdidos', icon: '🔍', render: (ctx) =>
     <ObjetosTab objetos={ctx.objetos} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('objetos')} canEdit={ctx.canEdit('objetos')} canDelete={ctx.canDelete('objetos')} onRefresh={ctx.onRefresh} /> },
   { id: 'agenda', label: 'Agenda', icon: '📅', render: (ctx) =>
@@ -539,7 +539,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'cumpleanos', label: 'Cumpleaños', icon: '🎂', render: (ctx) =>
     <CumpleanosTab personal={ctx.personal} cargos={ctx.cargosPersonal} clientesBirthday={ctx.clientesBirthday} proyectoNombre={ctx.proyectoActual?.nombre} /> },
   { id: 'inventario', label: 'Inventario', icon: '🗃️', render: (ctx) =>
-    <InventarioTab inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('inventario')} canEdit={ctx.canEdit('inventario')} onRefresh={ctx.onRefresh} /> },
+    <InventarioTab inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('inventario')} canEdit={ctx.canEdit('inventario')} canDelete={ctx.canDelete('inventario')} onRefresh={ctx.onRefresh} /> },
   // Etiqueta "Seguros": el id/tab gestiona pólizas de SEGURO; el nombre "Pólizas"
   // ahora pertenece a los asientos del módulo Contabilidad (partida doble).
   { id: 'polizas', label: 'Seguros', icon: '🛡️', render: (ctx) =>
@@ -611,7 +611,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'junta', label: 'Junta Directiva', icon: '👑', render: (ctx) =>
     <JuntaTab junta={ctx.junta} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('junta')} canEdit={ctx.canEdit('junta')} canDelete={ctx.canDelete('junta')} onRefresh={ctx.onRefresh} /> },
   { id: 'prestamos', label: 'Préstamo Equip.', icon: '🪑', render: (ctx) =>
-    <PrestamoEquiposTab prestamos={ctx.prestamos} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('prestamos')} canEdit={ctx.canEdit('prestamos')} onRefresh={ctx.onRefresh} /> },
+    <PrestamoEquiposTab prestamos={ctx.prestamos} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('prestamos')} canEdit={ctx.canEdit('prestamos')} canDelete={ctx.canDelete('prestamos')} onRefresh={ctx.onRefresh} /> },
   { id: 'comunicados', label: 'Comunicados', icon: '✉️', render: (ctx) =>
     <ComunicadosTab comunicados={ctx.comunicados} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('comunicados')} canDelete={ctx.canDelete('comunicados')} onRefresh={ctx.onRefresh} /> },
   { id: 'comunicacion_condominios', label: 'Conversaciones', icon: '💬', render: (ctx) =>
@@ -647,21 +647,21 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'caja_chica', label: 'Caja Chica', icon: '💵', render: (ctx) =>
     <CajaChicaTab cajas={ctx.cajasChicas} movimientos={ctx.movimientosCaja} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('caja_chica')} canEdit={ctx.canEdit('caja_chica')} canDelete={ctx.canDelete('caja_chica')} onRefresh={ctx.onRefresh} /> },
   { id: 'obras', label: 'Obras', icon: '🏗️', render: (ctx) =>
-    <ObrasTab obras={ctx.obras} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('obras')} canEdit={ctx.canEdit('obras')} onRefresh={ctx.onRefresh} /> },
+    <ObrasTab obras={ctx.obras} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('obras')} canEdit={ctx.canEdit('obras')} canDelete={ctx.canDelete('obras')} onRefresh={ctx.onRefresh} /> },
   { id: 'plan_pago', label: 'Planes Pago', icon: '📆', render: (ctx) =>
     <PlanPagoCondTab planes={ctx.planesPage} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('plan_pago')} canEdit={ctx.canEdit('plan_pago')} canDelete={ctx.canDelete('plan_pago')} onRefresh={ctx.onRefresh} /> },
   { id: 'accesos_res', label: 'Accesos', icon: '🔐', render: (ctx) =>
     <AccesosResTab accesos={ctx.accesosRes} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('accesos_res')} canEdit={ctx.canEdit('accesos_res')} canDelete={ctx.canDelete('accesos_res')} onRefresh={ctx.onRefresh} /> },
   { id: 'garantias', label: 'Garantías', icon: '🛡️', render: (ctx) =>
-    <GarantiasEquipoTab garantias={ctx.garantias} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('garantias')} canEdit={ctx.canEdit('garantias')} onRefresh={ctx.onRefresh} /> },
+    <GarantiasEquipoTab garantias={ctx.garantias} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('garantias')} canEdit={ctx.canEdit('garantias')} canDelete={ctx.canDelete('garantias')} onRefresh={ctx.onRefresh} /> },
   { id: 'entrega_unidad', label: 'Entregas', icon: '🔑', render: (ctx) =>
     <EntregaUnidadTab entregas={ctx.entregas} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('entrega_unidad')} canEdit={ctx.canEdit('entrega_unidad')} canDelete={ctx.canDelete('entrega_unidad')} onRefresh={ctx.onRefresh} /> },
   { id: 'avisos_cobro', label: 'Avisos Cobro', icon: '📬', render: (ctx) =>
     <AvisosCobroTab avisos={ctx.avisosCobro} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('avisos_cobro')} canEdit={ctx.canEdit('avisos_cobro')} canDelete={ctx.canDelete('avisos_cobro')} onRefresh={ctx.onRefresh} /> },
   { id: 'bitacora_manto', label: 'Bitácora Manto', icon: '🛠️', render: (ctx) =>
-    <BitacoraMantoTab registros={ctx.bitacoraRegistros} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('bitacora_manto')} canEdit={ctx.canEdit('bitacora_manto')} onRefresh={ctx.onRefresh} /> },
+    <BitacoraMantoTab registros={ctx.bitacoraRegistros} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('bitacora_manto')} canEdit={ctx.canEdit('bitacora_manto')} canDelete={ctx.canDelete('bitacora_manto')} onRefresh={ctx.onRefresh} /> },
   { id: 'eval_proveedor', label: 'Eval. Proveedor', icon: '⭐', render: (ctx) =>
-    <EvaluacionProveedorTab evaluaciones={ctx.evaluacionesProv} proveedores={ctx.contratosProveedores} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('eval_proveedor')} canEdit={ctx.canEdit('eval_proveedor')} onRefresh={ctx.onRefresh} /> },
+    <EvaluacionProveedorTab evaluaciones={ctx.evaluacionesProv} proveedores={ctx.contratosProveedores} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('eval_proveedor')} canEdit={ctx.canEdit('eval_proveedor')} canDelete={ctx.canDelete('eval_proveedor')} onRefresh={ctx.onRefresh} /> },
   { id: 'reclamos', label: 'Reclamos', icon: '📝', render: (ctx) =>
     <ReclamosTab reclamos={ctx.reclamos} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('reclamos')} canEdit={ctx.canEdit('reclamos')} canDelete={ctx.canDelete('reclamos')} onRefresh={ctx.onRefresh} /> },
   { id: 'fondo_reserva', label: 'Fondo Reserva', icon: '🏦', render: (ctx) =>
@@ -775,7 +775,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'capacitacion_personal', label: 'Capacitación', icon: '🎓', render: (ctx) =>
     <CapacitacionPersonalTab capacitaciones={ctx.capacitaciones} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('capacitacion_personal')} canEdit={ctx.canEdit('capacitacion_personal')} onRefresh={ctx.onRefresh} /> },
   { id: 'proyectos_cond', label: 'Proyectos', icon: '🏗️', render: (ctx) =>
-    <ProyectosCondominioTab proyectos={ctx.proyectosCond} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proyectos_cond')} canEdit={ctx.canEdit('proyectos_cond')} onRefresh={ctx.onRefresh} /> },
+    <ProyectosCondominioTab proyectos={ctx.proyectosCond} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proyectos_cond')} canEdit={ctx.canEdit('proyectos_cond')} canDelete={ctx.canDelete('proyectos_cond')} onRefresh={ctx.onRefresh} /> },
   { id: 'metricas_servicio', label: 'Métricas servicio', icon: '📊', render: (ctx) =>
     <MetricasServicioTab tickets={ctx.tickets} sugerencias={ctx.sugerencias} visitantes={ctx.visitantes} cuotas={ctx.cuotas} moneda={ctx.moneda} /> },
   { id: 'analisis_cartera', label: 'Cartera', icon: '📉', render: (ctx) =>

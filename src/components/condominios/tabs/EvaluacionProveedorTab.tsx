@@ -17,6 +17,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.eval_proveedor.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -48,7 +50,7 @@ function avg(values: (number | undefined | null)[]): number {
   return Math.round(valid.reduce((s, v) => s + v, 0) / valid.length * 10) / 10
 }
 
-export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
@@ -100,9 +102,12 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar evaluación?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('evaluaciones_proveedor', id)
+    const { error } = await deleteCondominioRow('evaluaciones_proveedor', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -291,12 +296,16 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
                       </div>
                       {e.comentarios && <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '4px', fontStyle: 'italic' }}>{e.comentarios}</div>}
                     </div>
-                    {canEdit && (
+                    {(canEdit || canDelete) && (
                       <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
-                        <button onClick={() => startEdit(e)}
-                          style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                        <button onClick={() => handleDelete(e.id)}
-                          style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                        {canEdit && (
+                          <button onClick={() => startEdit(e)}
+                            style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => handleDelete(e.id)} title="Eliminar" aria-label="Eliminar evaluación"
+                            style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                        )}
                       </div>
                     )}
                   </div>

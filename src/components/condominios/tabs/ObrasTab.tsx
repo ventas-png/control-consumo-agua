@@ -13,6 +13,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.obras.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -28,7 +30,7 @@ const BLANK = { titulo: '', descripcion: '', area: '', contratista: '', monto_co
 
 function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('es', { minimumFractionDigits: 2 })}` }
 
-export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
@@ -73,9 +75,12 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar obra?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('obras_mejoras', id)
+    const { error } = await deleteCondominioRow('obras_mejoras', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selectedId === id) setSelectedId(null)
     onRefresh()
   }
@@ -242,12 +247,16 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
                   <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-2)', minWidth: '30px' }}>{progreso}%</span>
                 </div>
               </button>
-              {canEdit && (
+              {(canEdit || canDelete) && (
                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
-                  <button onClick={() => startEdit(o)} aria-label={`Editar ${o.titulo}`}
-                    style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                  <button onClick={() => handleDelete(o.id)} aria-label={`Eliminar ${o.titulo}`}
-                    style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                  {canEdit && (
+                    <button onClick={() => startEdit(o)} aria-label={`Editar ${o.titulo}`}
+                      style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                  )}
+                  {canDelete && (
+                    <button onClick={() => handleDelete(o.id)} aria-label={`Eliminar ${o.titulo}`}
+                      style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                  )}
                 </div>
               )}
             </div>
@@ -271,9 +280,9 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
             onClose={() => setSelectedId(null)}
             // Las mismas acciones de la fila: con la ventana abierta la lista
             // queda detrás y no se alcanzan.
-            footer={canEdit ? <>
-              <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar obra">🗑️</Button>
-              <Button variant="secondary" onClick={() => { setSelectedId(null); startEdit(selected) }}>✏️ Editar</Button>
+            footer={(canEdit || canDelete) ? <>
+              {canDelete && <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar obra">🗑️</Button>}
+              {canEdit && <Button variant="secondary" onClick={() => { setSelectedId(null); startEdit(selected) }}>✏️ Editar</Button>}
             </> : undefined}
           >
             {/* Tarjetas que se reacomodan: dentro de la ventana no aplican las

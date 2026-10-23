@@ -64,6 +64,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar un borrador tiene su propio permiso (condominios.tab.proveedores.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -105,7 +107,7 @@ const vacio = (moneda: string): FormState => ({
 const num = (s: string): number | null => (s.trim() === '' ? null : Number(s))
 const txt = (s: string): string | null => (s.trim() === '' ? null : s.trim())
 
-export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const { data: proveedores = [] } = useProveedoresQuery(companyId)
   const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
   const { data: responsables = [] } = useResponsablesQuery(companyId)
@@ -342,6 +344,8 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
   }
 
   async function borrar(c: ContratoProveedorCatalogo) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({
       title: '¿Eliminar borrador?',
       text: 'Solo se pueden eliminar borradores sin documentos relacionados. Un contrato que ya estuvo activo se termina o se cancela, con su motivo.',
@@ -474,7 +478,7 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
                             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void subirRespaldo(c, f) }} />
                         </label>
                       )}
-                      {canEdit && c.estado === 'borrador' && (
+                      {canDelete && c.estado === 'borrador' && (
                         <button type="button" style={{ ...btnLink, color: 'var(--at-danger)' }} onClick={() => void borrar(c)}>Eliminar</button>
                       )}
                     </td>
