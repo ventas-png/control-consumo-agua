@@ -10,7 +10,8 @@
 -- empresa, que es el que una RLS por empresa no ve.
 --
 -- Personas:
---   OPL   operador de D con el rol «Limpieza» (condominios.tab.prog_limpieza)
+--   OPL   operador de D con el rol «Limpieza» (condominios.tab.prog_limpieza: ver,
+--         crear, editar y eliminar; desde 20261104000700 escribir pide la acción)
 --   SINP  operador de D SIN ese permiso
 --   OPC   operador de C con el rol «Limpieza» de C
 --
@@ -89,9 +90,15 @@ ON CONFLICT (key) DO NOTHING;
 INSERT INTO public.roles (id, company_id, name) VALUES
   (rr.id('ROL_D'), rr.id('D'), 'Limpieza D'),
   (rr.id('ROL_C'), rr.id('C'), 'Limpieza C');
-INSERT INTO public.role_permissions (role_id, permission_key, effect) VALUES
-  (rr.id('ROL_D'), 'condominios.tab.prog_limpieza', 'allow'),
-  (rr.id('ROL_C'), 'condominios.tab.prog_limpieza', 'allow');
+INSERT INTO public.permissions (key, category, label)
+SELECT 'condominios.tab.prog_limpieza.' || a, 'recursos_humanos', 'Programación de limpieza · ' || a
+FROM unnest(ARRAY['create', 'edit', 'delete']) AS a
+ON CONFLICT (key) DO NOTHING;
+INSERT INTO public.role_permissions (role_id, permission_key, effect)
+SELECT r, k, 'allow'
+FROM unnest(ARRAY[rr.id('ROL_D'), rr.id('ROL_C')]) AS r
+CROSS JOIN unnest(ARRAY['condominios.tab.prog_limpieza', 'condominios.tab.prog_limpieza.create',
+                        'condominios.tab.prog_limpieza.edit', 'condominios.tab.prog_limpieza.delete']) AS k;
 INSERT INTO public.user_roles (user_id, role_id) VALUES
   (rr.id('OPL'), rr.id('ROL_D')),
   (rr.id('OPC'), rr.id('ROL_C'));

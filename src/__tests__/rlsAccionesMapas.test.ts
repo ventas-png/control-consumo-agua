@@ -74,11 +74,37 @@ const OPS: Record<string, string[]> = {
   upsertCondominioRow: ['INSERT', 'UPDATE'],
 }
 const VERBO: Record<string, string[]> = { insert: ['INSERT'], update: ['UPDATE'], delete: ['DELETE'], upsert: ['INSERT', 'UPDATE'] }
+
+// Una escritura cuya tabla sale de un mapa constante exportado —
+// `updateCondominioRow(TABLA_DE_FUENTE[fuente], …)`— escribe cualquiera de las
+// tablas del mapa. Se buscan sus valores en src/ (`export const NOMBRE … = { … }`).
+const tablasDeMapa = (() => {
+  const fuentes: string[] = []
+  const recorrer = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) { if (e.name !== '__tests__') recorrer(join(dir, e.name)) }
+      else if (/\.tsx?$/.test(e.name)) fuentes.push(join(dir, e.name))
+    }
+  }
+  recorrer(SRC)
+  const cache = new Map<string, string[]>()
+  return (nombre: string): string[] => {
+    if (!cache.has(nombre)) {
+      const re = new RegExp(`export const ${nombre}\\b[^=]*=\\s*\\{([^}]*)\\}`)
+      const cuerpo = fuentes.map(f => readFileSync(f, 'utf8').match(re)?.[1]).find(Boolean) ?? ''
+      cache.set(nombre, [...cuerpo.matchAll(/:\s*['"]([a-z_]+)['"]/g)].map(m => m[1]))
+    }
+    return cache.get(nombre)!
+  }
+})()
 function escrituras(archivo: string): { tabla: string; cmd: string; baja?: boolean }[] {
   const s = readFileSync(archivo, 'utf8')
   const out: { tabla: string; cmd: string; baja?: boolean }[] = []
   for (const m of s.matchAll(new RegExp(`\\b(${Object.keys(OPS).join('|')})\\(\\s*['"]([a-z_]+)['"]`, 'g'))) {
     for (const cmd of OPS[m[1]]) out.push({ tabla: m[2], cmd, baja: m[1] === 'softDelete' })
+  }
+  for (const m of s.matchAll(new RegExp(`\\b(${Object.keys(OPS).join('|')})\\(\\s*([A-Z][A-Z0-9_]*)\\[`, 'g'))) {
+    for (const tabla of tablasDeMapa(m[2])) for (const cmd of OPS[m[1]]) out.push({ tabla, cmd, baja: m[1] === 'softDelete' })
   }
   const plano = s.replace(/\s+/g, ' ')
   for (const m of plano.matchAll(/\.from\(\s*['"]([a-z_]+)['"]\s*\)((?:\s*\.\s*\w+\([^()]*(?:\([^()]*\)[^()]*)*\))*?)\s*\.\s*(insert|update|delete|upsert)\b/g)) {

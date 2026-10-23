@@ -27,6 +27,8 @@ interface Props {
   userId?: string | null
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.ausencias.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -89,7 +91,7 @@ const formDiaVacio = {
  */
 export default function AusenciasTab({
   ausencias, diasNoLaborables, personal, proyectoId, companyId, userId,
-  canCreate, canEdit, onRefresh,
+  canCreate, canEdit, canDelete, onRefresh,
 }: Props) {
   const hoy = hoyLocalISO()
   const [vista, setVista] = useState<Vista>('ausencias')
@@ -174,6 +176,8 @@ export default function AusenciasTab({
   }
 
   async function borrarAusencia(a: AusenciaPersonal) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const { isConfirmed } = await confirm({
       title: 'Eliminar la ausencia',
       text: 'Los turnos que se dejaron de generar por esta ausencia no se recuperan solos: volvé a generar el mes si hace falta.',
@@ -228,6 +232,8 @@ export default function AusenciasTab({
   }
 
   async function borrarDia(d: DiaNoLaborable) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const { isConfirmed } = await confirm({
       title: `Eliminar «${d.nombre}»`,
       text: 'Los turnos generados no cambian; sí cambia el recargo que se computa a partir de ahora.',
@@ -351,8 +357,10 @@ export default function AusenciasTab({
                       {canEdit && (
                         <>
                           <button onClick={() => abrirAusencia(a)} style={{ padding: '5px 10px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-ink)' }}>Editar</button>
-                          <button onClick={() => borrarAusencia(a)} style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>Eliminar</button>
                         </>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => borrarAusencia(a)} style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>Eliminar</button>
                       )}
                     </div>
                   </div>
@@ -399,10 +407,14 @@ export default function AusenciasTab({
                   <div style={{ fontSize: 11, color: d.paga_recargo ? 'var(--at-warning)' : 'var(--at-ink-3)', marginTop: 3 }}>
                     {d.paga_recargo ? `Trabajarlo se paga ×${Number(d.factor_recargo).toFixed(2)}` : 'Sin recargo'}
                   </div>
-                  {canEdit && (
+                  {(canEdit || canDelete) && (
                     <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                      <button onClick={() => abrirDia(d)} style={{ padding: '4px 10px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-ink)' }}>Editar</button>
-                      <button onClick={() => borrarDia(d)} style={{ padding: '4px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>Eliminar</button>
+                      {canEdit && (
+                        <button onClick={() => abrirDia(d)} style={{ padding: '4px 10px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-ink)' }}>Editar</button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => borrarDia(d)} style={{ padding: '4px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>Eliminar</button>
+                      )}
                     </div>
                   )}
                 </div>

@@ -130,8 +130,8 @@ try {
   const compuertas = todas.filter(p => p.permisiva === 'RESTRICTIVE' && !tieneAtomos(p.using) && !tieneAtomos(p.check))
   writeFileSync(join(trabajo, 'compuertas.sql'), compuertas.map(p => `DROP POLICY "${p.nombre.replace(/"/g, '""')}" ON public.${p.tabla};`).join('\n') + '\n')
   const lit = v => `'${String(v).replace(/'/g, "''")}'`
-  const recetas = tablas.flatMap(t => Object.entries(mapa.tablas[t].receta ?? {})
-    .map(([col, valor]) => `INSERT INTO ra.recetas VALUES ('public.${t}', ${lit(col)}, ${lit(valor)});`))
+  const recetas = [...tablas.map(t => [t, mapa.tablas[t].receta ?? {}]), ...Object.entries(mapa._recetas)]
+    .flatMap(([t, receta]) => Object.entries(receta).map(([col, valor]) => `INSERT INTO ra.recetas VALUES ('public.${t}', ${lit(col)}, ${lit(valor)});`))
   writeFileSync(join(trabajo, 'recetas.sql'), recetas.join('\n') + '\n')
   const padron = bd => {
     aplicar(bd, join(AQUI, 'fabricar.sql'))
@@ -190,10 +190,26 @@ END $$;`)
     }
   }
 
+  /**
+   * Qué pedía ANTES cada comando, leído de su policy permisiva: la visibilidad
+   * del tab, el rol company_owner/admin, sólo la empresa (lo que el mapa declara
+   * en `agregar_en`) o nada que la migración sustituya —p. ej. un DELETE sólo de
+   * super_admin—: ese no se toca, y no se prueba ni antes ni después.
+   */
+  const reglaAntes = (t, cmd) => {
+    const txt = todas.filter(p => p.tabla === t && p.permisiva === 'PERMISSIVE' && (p.cmd === cmd || p.cmd === 'ALL'))
+      .map(p => `${p.using} ${p.check}`).join(' ')
+    if (/user_has_permission\('condominios\.tab\./.test(txt)) return 'visibilidad'
+    if (/ARRAY\['company_owner'::text, 'admin'::text\]/.test(txt)) return 'rol'
+    if (mapa.tablas[t].agregar_en[cmd]) return 'empresa'
+    return 'intocado'
+  }
+
   /** Lo que el mapa dice que pasa: persona → tabla → comando → permitido. */
   const permitido = (persona, t, cmd) => {
     if (persona === 'RES') return null   // se compara contra «antes», no contra el mapa
     if (sinPolicy(todas, t, cmd)) return false   // sin policy permisiva: nadie, ni antes ni después
+    if (reglaAntes(t, cmd) === 'intocado') return null
     if (persona === 'ADM') return true
     if (persona === 'VER' || persona === 'OTRA') return false
     return mapa.tablas[t][cmd].map(alias).includes(persona)
@@ -220,15 +236,25 @@ END $$;`)
   padron('antes')
   {
     const r = matriz('antes')
-    // Antes: INSERT/UPDATE con la visibilidad (todas las personas de A la tienen), DELETE sólo admin.
-    const { difs, fuera } = evaluar(r, (p, t, cmd) => (p === 'RES' ? null : !sinPolicy(todas, t, cmd) && (p === 'ADM' || (p !== 'OTRA' && cmd !== 'DELETE'))))
+    // Antes: con la visibilidad (o sólo la empresa) pasa toda persona de A —todas
+    // ven los tabs de la sección—; con el rol, sólo el admin.
+    const { difs, fuera } = evaluar(r, (p, t, cmd) => {
+      if (p === 'RES') return null
+      if (sinPolicy(todas, t, cmd)) return false
+      const regla = reglaAntes(t, cmd)
+      if (regla === 'intocado') return null
+      return p === 'ADM' || (p !== 'OTRA' && regla !== 'rol')
+    })
     residenteAntes = new Map(r.resultados.filter(([p]) => p === 'RES').map(([, t, cmd, res]) => [`${t}.${cmd}`, res]))
     const probadas = tablas.filter(t => !fuera.has(`${t}.FABRICA`))
     for (const p of compuertas) console.log(`  · compuerta retirada en la prueba: ${p.tabla}.${p.nombre} (${p.cmd}: ${(p.check || p.using).replace(/\s+/g, ' ')})`)
     const vacios = tablas.flatMap(t => COMANDOS.filter(c => sinPolicy(todas, t, c)).map(c => `${t}.${c}`))
     if (vacios.length) console.log(`  · sin policy permisiva (nadie, ni antes ni después): ${vacios.join(', ')}`)
+    const intocados = tablas.flatMap(t => COMANDOS.filter(c => !sinPolicy(todas, t, c) && reglaAntes(t, c) === 'intocado').map(c => `${t}.${c}`))
+    if (intocados.length) console.log(`  · sin permiso que sustituir (la migración no los toca): ${intocados.join(', ')}`)
+    const visibles = tablas.flatMap(t => COMANDOS.filter(c => c !== 'INSERT' && c !== 'UPDATE' && reglaAntes(t, c) === 'visibilidad').map(c => `${t}.${c}`))
     if (difs.length) for (const d of difs.slice(0, 20)) mal(`antes · ${d}`)
-    else ok(`antes · en ${probadas.length} tablas, quien sólo VE crea y edita, y nadie salvo el admin borra`)
+    else ok(`antes · en ${probadas.length} tablas, quien sólo VE crea y edita, y nadie salvo el admin borra${visibles.length ? ` (salvo ${visibles.join(', ')}: también borraba quien sólo veía)` : ''}`)
   }
   salir()
 

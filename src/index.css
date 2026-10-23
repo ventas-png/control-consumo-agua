@@ -880,6 +880,10 @@ button:focus:not(:focus-visible) {
   border-color: var(--at-primary-soft-2) !important;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
 }
+/* Filas de gráfica de barras que abren su detalle (Sostenibilidad). */
+.cond-barra-fila:hover {
+  background: var(--at-surface-2) !important;
+}
 @media (max-width: 480px) {
   /* Dos campos (o lista y detalle) por fila no caben en un teléfono
    * angosto. */

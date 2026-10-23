@@ -142,7 +142,7 @@ describe('ConvenioModal en el teléfono', () => {
     render(
       <ConvenioModal
         registros={[registro('r1'), registro('r2', { monto_pagado: 40 })]} clientes={clientes}
-        moneda="Q" currentUserId="u1" onClose={onClose} onSuccess={vi.fn()}
+        moneda="Q" currentUserId="u1" companyId="emp-1" onClose={onClose} onSuccess={vi.fn()}
       />,
     )
     return onClose
