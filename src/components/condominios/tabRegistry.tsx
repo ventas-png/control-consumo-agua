@@ -106,6 +106,7 @@ export type CondominioTab =
   | 'benchmarking'
   | 'turnos' | 'ausencias' | 'horas_extra'
   | 'areas_config' | 'rrhh_config'
+  | 'portal_config'
 
 // ── Contexto pasado a cada `render(ctx)` ─────────────────────────────────────
 // Centraliza todo el estado y derivados que CondominiosSection tenía dispersos
@@ -364,6 +365,7 @@ const VotacionesTab = lazy(() => import('./tabs/VotacionesTab').then(m => ({ def
 const SancionesTab = lazy(() => import('./tabs/SancionesTab').then(m => ({ default: m.SancionesTab })))
 const MantenimientoPrevTab = lazy(() => import('./tabs/MantenimientoPrevTab').then(m => ({ default: m.MantenimientoPrevTab })))
 const PortalResidenteTab = lazy(() => import('./tabs/PortalResidenteTab').then(m => ({ default: m.PortalResidenteTab })))
+const PortalPestanasTab = lazy(() => import('./tabs/PortalPestanasTab').then(m => ({ default: m.PortalPestanasTab })))
 const CorrespondenciaCondTab = lazy(() => import('./tabs/CorrespondenciaCondTab').then(m => ({ default: m.CorrespondenciaCondTab })))
 const LibroNovedadesTab = lazy(() => import('./tabs/LibroNovedadesTab').then(m => ({ default: m.LibroNovedadesTab })))
 const SeguimientoAcuerdosTab = lazy(() => import('./tabs/SeguimientoAcuerdosTab').then(m => ({ default: m.SeguimientoAcuerdosTab })))
@@ -632,6 +634,12 @@ export const TAB_REGISTRY: TabDef[] = [
     <MantenimientoPrevTab planes={ctx.planesMantenimiento} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('mant_preventivo')} canEdit={ctx.canEdit('mant_preventivo')} onRefresh={ctx.onRefresh} /> },
   { id: 'portal', label: 'Portal Resid.', icon: '👤', render: (ctx) =>
     <PortalResidenteTab unidades={ctx.unidadesProyecto} cuotas={ctx.cuotas} tickets={ctx.tickets} amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueosAmenidades={ctx.bloqueosAmenidades} visitantes={ctx.visitantes} anuncios={ctx.anuncios} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canEdit={ctx.canEdit('portal')} autorNombre={ctx.currentUser.name ?? ''} autorUserId={ctx.uid} onRefresh={ctx.onRefresh} /> },
+  // Qué pestañas ve el residente en su portal (projects.portal_tabs_ocultos,
+  // 20261106000000). Sin clave RBAC en el catálogo a propósito: la escritura
+  // pasa por projects_update (propietario/administrador de la empresa), así que
+  // la pestaña es sólo de los roles exentos.
+  { id: 'portal_config', label: 'Config. portal', icon: '🎛️', render: (ctx) =>
+    <PortalPestanasTab proyectoId={ctx.proyectoId} proyectoNombre={ctx.proyectoActual?.nombre} canEdit={ctx.canEdit('portal_config')} /> },
   { id: 'correspondencia', label: 'Correspondencia', icon: '📬', render: (ctx) =>
     <CorrespondenciaCondTab correspondencia={ctx.correspondencia} paquetes={ctx.paquetes} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('correspondencia')} canEdit={ctx.canEdit('correspondencia')} puedeVerPaqueteria={ctx.canView('paqueteria')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'libro_novedades', label: 'Libro Novedades', icon: '📖', render: (ctx) =>

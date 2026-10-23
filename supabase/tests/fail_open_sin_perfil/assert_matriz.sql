@@ -6,6 +6,8 @@
 -- Requiere, en la base CON la migración: fos.resultados (matriz.sql corrida aquí)
 -- y fos.antes (la misma matriz corrida en la base SIN la migración, con el mismo
 -- padrón). Los resultados están normalizados (uuids y marcas de tiempo nuevas).
+-- Opcional: fos.serie (la matriz con la migración y SIN las migraciones posteriores;
+-- run.sh la carga en fos_post). Ver la sección 1.
 -- ============================================================================
 
 -- 0. La matriz cubre el inventario entero, no una muestra. Las únicas funciones que pueden
@@ -34,17 +36,28 @@ BEGIN
   END IF;
 END $$;
 
+-- Lo que se compara con «antes» (secciones 1 y 4) es el efecto de LA SERIE: si existe
+-- fos.serie, la matriz con la migración y sin las posteriores; si no (base «antes»,
+-- mutantes), fos.resultados. Una migración posterior puede cambiar con razón lo que
+-- devuelve una función legítima —una columna nueva en una tabla que exporta
+-- export_company_data— sin que la serie tenga nada que ver.
+CREATE TABLE IF NOT EXISTS fos.serie (LIKE fos.resultados);
+CREATE OR REPLACE VIEW fos.despues_serie AS
+  SELECT * FROM fos.serie
+  UNION ALL
+  SELECT * FROM fos.resultados WHERE NOT EXISTS (SELECT 1 FROM fos.serie);
+
 -- 1. Sesiones legítimas y de backend: el MISMO resultado en cada función.
 DO $$
 DECLARE v_actor text; c record; v_n int; v_dif int;
 BEGIN
   FOREACH v_actor IN ARRAY ARRAY['OWN_D', 'ADM_D', 'OPE_D', 'VIS_D', 'SA', 'OWN_C', 'OP_C', 'SERVICIO', 'SISTEMA'] LOOP
-    SELECT count(*) INTO v_n FROM fos.antes a JOIN fos.resultados d USING (firma, actor) WHERE a.actor = v_actor;
+    SELECT count(*) INTO v_n FROM fos.antes a JOIN fos.despues_serie d USING (firma, actor) WHERE a.actor = v_actor;
     IF v_n < 200 THEN RAISE EXCEPTION '% · sólo % celdas comparadas', v_actor, v_n; END IF;
     v_dif := 0;
     FOR c IN
       SELECT a.firma, a.resultado AS antes, d.resultado AS despues
-        FROM fos.antes a JOIN fos.resultados d USING (firma, actor)
+        FROM fos.antes a JOIN fos.despues_serie d USING (firma, actor)
        WHERE a.actor = v_actor AND a.resultado IS DISTINCT FROM d.resultado
        ORDER BY a.firma
     LOOP
@@ -54,6 +67,23 @@ BEGIN
     IF v_dif = 0 THEN
       RAISE NOTICE '✓ % · las % funciones responden igual antes y después', v_actor, v_n;
     END IF;
+  END LOOP;
+END $$;
+
+-- 1b. Lo que cambiaron las migraciones POSTERIORES para esas mismas sesiones: no es un
+--     veredicto (cada una tiene su propio arnés), pero queda a la vista.
+DO $$
+DECLARE c record;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM fos.serie) THEN RETURN; END IF;
+  FOR c IN
+    SELECT s.firma, string_agg(s.actor, ',' ORDER BY s.actor) AS actores
+      FROM fos.serie s JOIN fos.resultados r USING (firma, actor)
+     WHERE s.actor IN ('OWN_D', 'ADM_D', 'OPE_D', 'VIS_D', 'SA', 'OWN_C', 'OP_C', 'SERVICIO', 'SISTEMA')
+       AND s.resultado IS DISTINCT FROM r.resultado
+     GROUP BY s.firma ORDER BY s.firma
+  LOOP
+    RAISE NOTICE '· cambió por migraciones posteriores (no por la serie): % para %', c.firma, c.actores;
   END LOOP;
 END $$;
 
@@ -110,7 +140,7 @@ DECLARE r record; v_n int := 0;
 BEGIN
   FOR r IN
     SELECT a.firma, a.resultado AS antes, d.resultado AS despues
-      FROM fos.antes a JOIN fos.resultados d USING (firma, actor)
+      FROM fos.antes a JOIN fos.despues_serie d USING (firma, actor)
      WHERE a.actor = 'CLI' AND a.resultado IS DISTINCT FROM d.resultado
        AND NOT EXISTS (SELECT 1 FROM fos.fugas f WHERE f.firma = a.firma AND f.actor = 'CLI')
   LOOP

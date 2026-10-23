@@ -1057,6 +1057,17 @@ jobs:
           PGPORT_TEST: 55585
         run: supabase/tests/portal_asambleas_voto/run.sh
 
+      # 20261106000000: projects.portal_tabs_ocultos — la empresa apaga pestañas
+      # del portal del residente por condominio. Sin policy propia: escribe
+      # projects_update (propietario/admin de la empresa) y lee el residente por
+      # projects_select. Padrón cargado ANTES de la migración (proyectos de
+      # siempre), huella del auditor, invariantes y cuatro mutantes.
+      - name: Portal — pestañas por condominio
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55586
+        run: supabase/tests/portal_pestanas/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

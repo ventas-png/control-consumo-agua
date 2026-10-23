@@ -36,7 +36,7 @@ export const SECTIONS: SectionDef[] = [
   ]},
   { id: 'residentes', label: 'Residentes', tabs: [
     'tablero_ocupacion', 'directorio_comunidad', 'directorio', 'arrendamientos', 'onboarding',
-    'entrega_unidad', 'portal', 'resumen_residente', 'solicitudes', 'solicitudes_renta', 'solicitudes_mudanza', 'vehiculos', 'mascotas',
+    'entrega_unidad', 'portal', 'portal_config', 'resumen_residente', 'solicitudes', 'solicitudes_renta', 'solicitudes_mudanza', 'vehiculos', 'mascotas',
     'accesos_res', 'control_accesos_qr', 'certificados', 'manual_residente', 'mapa_unidades',
     'scoring_unidades',
   ]},
