@@ -1,5 +1,7 @@
-// Vistas de listas de novedades y rondas (P1 #3, extraídas de SeguridadTab
-// con el JSX intacto).
+// Vistas de listas de novedades y rondas (P1 #3, extraídas de SeguridadTab).
+// Cada tarjeta abre su detalle en ventana al tocarla; «Ver detalle» / «Ver» son
+// el camino de teclado. En el teléfono, el estado y los botones de una ronda
+// bajan a otra línea en vez de apretar la fecha.
 import type { PrioridadNovedad } from '../../../../types'
 import type { SeguridadCtx } from './ctx'
 import { duracionRondaMin } from '../../../../lib/seguridadReglas'
@@ -15,7 +17,7 @@ export function VistaNovedades({ ctx }: { ctx: SeguridadCtx }) {
     <>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
         {(['todos', 'normal', 'alta', 'critica'] as const).map(p => (
-          <button key={p} onClick={() => setFiltroPrioridad(p)}
+          <button key={p} onClick={() => setFiltroPrioridad(p)} aria-pressed={filtroPrioridad === p}
             style={{ padding: '6px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none',
               background: filtroPrioridad === p ? (p === 'todos' ? 'var(--at-line)' : PRIORIDAD_CONFIG[p as PrioridadNovedad]?.bg) : 'transparent',
               color: filtroPrioridad === p ? (p === 'todos' ? 'var(--at-ink-2)' : PRIORIDAD_CONFIG[p as PrioridadNovedad]?.color) : 'var(--at-ink-3)' }}>
@@ -36,10 +38,11 @@ export function VistaNovedades({ ctx }: { ctx: SeguridadCtx }) {
             const rondaVinculada = n.ronda_id ? rondas.find(r => r.id === n.ronda_id) : null
             const accentColor = accentPrioridad(n.prioridad)
             return (
-              <div key={n.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden', display: 'flex' }}>
+              <div key={n.id} onClick={() => setNovedadDetalle(n)}
+                style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden', display: 'flex', cursor: 'pointer' }}>
                 {/* Accent stripe */}
                 <div style={{ width: '5px', background: accentColor, flexShrink: 0 }} />
-                <div style={{ flex: 1, padding: '14px 16px' }}>
+                <div style={{ flex: 1, minWidth: 0, padding: '14px 16px' }}>
                   {/* Top row */}
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <span style={{ fontSize: '22px', flexShrink: 0, lineHeight: 1 }}>{tc.icon}</span>
@@ -52,7 +55,7 @@ export function VistaNovedades({ ctx }: { ctx: SeguridadCtx }) {
                         </span>
                       </div>
                       {/* Description */}
-                      <p style={{ margin: '0 0 8px', fontSize: '13.5px', color: 'var(--at-ink-2)', lineHeight: 1.5 }}>{n.descripcion}</p>
+                      <p style={{ margin: '0 0 8px', fontSize: '13.5px', color: 'var(--at-ink-2)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{n.descripcion}</p>
                       {/* Metadata footer */}
                       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                         {n.ubicacion && (
@@ -65,12 +68,12 @@ export function VistaNovedades({ ctx }: { ctx: SeguridadCtx }) {
                             🛡 Ronda {new Date(rondaVinculada.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         )}
-                        <button onClick={() => setNovedadDetalle(n)}
+                        <button onClick={e => { e.stopPropagation(); setNovedadDetalle(n) }}
                           style={{ fontSize: '12px', color: 'var(--at-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: '0', fontWeight: 600, marginLeft: 'auto' }}>
                           Ver detalle →
                         </button>
                         {canDelete && (
-                          <button onClick={() => eliminarNovedad(n.id)} aria-label="Eliminar novedad"
+                          <button onClick={e => { e.stopPropagation(); void eliminarNovedad(n.id) }} aria-label="Eliminar novedad"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px', padding: '2px 4px' }}>
                             🗑
                           </button>
@@ -89,7 +92,7 @@ export function VistaNovedades({ ctx }: { ctx: SeguridadCtx }) {
 }
 
 export function VistaRondas({ ctx }: { ctx: SeguridadCtx }) {
-  const { rondas, novedades, rutas, visitasControl, canEdit, finalizarRonda } = ctx
+  const { rondas, novedades, rutas, visitasControl, canEdit, finalizarRonda, finalizando, setRondaDetalle } = ctx
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -107,13 +110,13 @@ export function VistaRondas({ ctx }: { ctx: SeguridadCtx }) {
         const novCount = visitasR.filter(v => v.estado === 'novedad').length
         const omitCount = visitasR.filter(v => v.estado === 'omitido').length
         const rutaNombre = r.ruta_id ? rutas.find(rt => rt.id === r.ruta_id)?.nombre : null
+        const fecha = `${new Date(r.inicio).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })} — ${new Date(r.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}`
         return (
-          <div key={r.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div key={r.id} onClick={() => setRondaDetalle(r)}
+            style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '8px 14px', flexWrap: 'wrap', cursor: 'pointer' }}>
             <span style={{ fontSize: '22px', flexShrink: 0 }}>🛡️</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>
-                {new Date(r.inicio).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })} — {new Date(r.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
-              </div>
+            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{fecha}</div>
               <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', marginTop: '3px', flexWrap: 'wrap' }}>
                 <span>⏱ {duracion} min{r.fin ? '' : ' (en curso)'}</span>
                 {rutaNombre && <span>🗺 {rutaNombre}</span>}
@@ -128,12 +131,18 @@ export function VistaRondas({ ctx }: { ctx: SeguridadCtx }) {
                 {r.notas && <span>· {r.notas}</span>}
               </div>
             </div>
-            <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: ec.bg, color: ec.color, flexShrink: 0 }}>{ec.label}</span>
-            {canEdit && r.estado === 'en_curso' && (
-              <button onClick={() => finalizarRonda(r.id, 'completada')} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, flexShrink: 0 }}>
-                ✓ Completar
+            <span style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', marginLeft: 'auto' }} onClick={e => e.stopPropagation()}>
+              <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: ec.bg, color: ec.color, flexShrink: 0 }}>{ec.label}</span>
+              {canEdit && r.estado === 'en_curso' && (
+                <button onClick={() => void finalizarRonda(r.id, 'completada')} disabled={finalizando !== null} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '8px', cursor: finalizando ? 'default' : 'pointer', fontSize: '12px', fontWeight: 600, flexShrink: 0, opacity: finalizando ? 0.6 : 1 }}>
+                  {finalizando === r.id ? 'Cerrando…' : '✓ Completar'}
+                </button>
+              )}
+              <button onClick={() => setRondaDetalle(r)} aria-label={`Ver ronda del ${fecha}`}
+                style={{ padding: '6px 12px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                Ver
               </button>
-            )}
+            </span>
           </div>
         )
       })}

@@ -1,12 +1,13 @@
 // Modal de verificación/registro de accesos (DPI y renta corta) (P1 #3,
-// extraído de SeguridadTab con el JSX intacto).
+// extraído de SeguridadTab). En ventana a pantalla completa en el teléfono, que
+// es donde se usa en la garita; Esc la cierra, salvo mientras registra.
 import { hoyLocalISO } from '../../../../lib/format'
 import { SecureImage } from '../../../shared/SecureImage'
 import { ImageUploader } from '../../../shared/ImageUploader'
 import type { SeguridadCtx } from './ctx'
 import { filtrarReservasSTRAcceso, nochesReserva } from '../../../../lib/seguridadReglas'
 import { PLATAFORMA_COLOR, PLATAFORMA_LABEL } from './ui'
-import { ModalPortal } from '../../../shared/ModalPortal'
+import { EditModal } from '../../../shared/EditModal'
 
 export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
   const {
@@ -20,38 +21,27 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
     resetAccesos, cambiarModo, precargarDesdeSTR, buscarPorDpi, handleRegistrarAcceso,
   } = ctx
 
+  const cerrar = () => { if (!regSaving) resetAccesos() }
+
   return (
-    <ModalPortal>
-    <div onClick={resetAccesos}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }}>
-      <div onClick={e => e.stopPropagation()}
-        style={{ background: 'var(--at-surface)', borderRadius: '18px', width: '100%', maxWidth: '680px', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.4)', marginBottom: '24px' }}>
-
-        {/* Header del modal */}
-        <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent-dark))', color: 'white', borderRadius: '18px 18px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Control de Seguridad</div>
-            <div style={{ fontSize: 19, fontWeight: 800, marginTop: 2 }}>🚪 Registro de acceso</div>
-            <div style={{ fontSize: 12.5, opacity: 0.88, marginTop: 4 }}>
-              {modoModal === 'dpi' ? 'Busque por DPI para ver historial o registrar entrada' : 'Seleccione una reserva STR para registrar el ingreso'}
-            </div>
-          </div>
-          <button onClick={resetAccesos}
-            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '10px', color: 'white', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '6px 10px', flexShrink: 0 }}>
-            ✕
-          </button>
-        </div>
-
-        {/* Cuerpo del modal */}
-        <div style={{ padding: '20px 24px' }}>
+    <EditModal
+      title="🚪 Registro de acceso"
+      subtitle={modoModal === 'dpi' ? 'Busque por DPI para ver historial o registrar entrada' : 'Seleccione una reserva STR para registrar el ingreso'}
+      maxWidth="680px"
+      fullScreenOnMobile
+      onClose={cerrar}
+      closeOnBackdropClick={!regSaving}
+      closeOnEscape={!regSaving}
+    >
+        <div>
 
           {/* Tabs de modo */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1.5px solid var(--at-chip)', paddingBottom: '16px' }}>
-            <button onClick={() => cambiarModo('dpi')}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1.5px solid var(--at-chip)', paddingBottom: '16px', flexWrap: 'wrap' }}>
+            <button onClick={() => cambiarModo('dpi')} aria-pressed={modoModal === 'dpi'}
               style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'dpi' ? 'var(--at-accent-hover)' : 'var(--at-line)', background: modoModal === 'dpi' ? 'var(--at-accent-tint-2)' : 'var(--at-surface)', color: modoModal === 'dpi' ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
               🔍 Verificar por DPI
             </button>
-            <button onClick={() => cambiarModo('str')}
+            <button onClick={() => cambiarModo('str')} aria-pressed={modoModal === 'str'}
               style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'str' ? 'var(--at-accent-hover)' : 'var(--at-line)', background: modoModal === 'str' ? 'var(--at-accent-tint-2)' : 'var(--at-surface)', color: modoModal === 'str' ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
               🏠 Renta corta
             </button>
@@ -62,15 +52,16 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
             <>
           {/* Buscador DPI */}
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>DPI / Identificación</label>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <label htmlFor="accesos-dpi" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>DPI / Identificación</label>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <input
+                id="accesos-dpi"
                 value={dpiSearch}
                 onChange={e => setDpiSearch(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && buscarPorDpi()}
+                onKeyDown={e => { if (e.key === 'Enter') void buscarPorDpi() }}
                 placeholder="Ingrese número de DPI o identificación..."
                 autoFocus
-                style={{ flex: 1, padding: '11px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: 'var(--at-surface-2)' }}
+                style={{ flex: '1 1 200px', minWidth: 0, boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: 'var(--at-surface-2)', color: 'var(--at-ink)' }}
               />
               <button
                 onClick={buscarPorDpi}
@@ -98,8 +89,8 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
                         {searchResultVisitantes[0]?.nombre.charAt(0).toUpperCase()}
                       </div>
                   }
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-success-strong)' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-success-strong)', overflowWrap: 'anywhere' }}>
                       {searchResultVisitantes[0]?.nombre}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
@@ -120,9 +111,9 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
                 {searchResultVisitantes.map(v => {
                   const enPremisa = !v.hora_salida
                   return (
-                    <div key={v.id} style={{ background: enPremisa ? 'var(--at-success-tint)' : 'var(--at-surface-2)', border: `1.5px solid ${enPremisa ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '10px 14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div key={v.id} style={{ background: enPremisa ? 'var(--at-success-tint)' : 'var(--at-surface-2)', border: `1.5px solid ${enPremisa ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '10px 14px', display: 'flex', gap: '6px 10px', alignItems: 'center', flexWrap: 'wrap' }}>
                       {v.foto_url && <SecureImage src={v.foto_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--at-ink)' }}>
                           {new Date(v.hora_entrada).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
                           {' · '}
@@ -175,6 +166,7 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
               {/* Buscador de huésped */}
               <div style={{ marginBottom: '16px' }}>
                 <input
+                  aria-label="Buscar reserva"
                   value={strSearch}
                   onChange={e => setStrSearch(e.target.value)}
                   placeholder="Buscar por nombre de huésped o unidad..."
@@ -206,8 +198,8 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
                       const plat = PLATAFORMA_COLOR[r.plataforma] ?? PLATAFORMA_COLOR.otro
                       const enCurso = r.estado === 'en_curso'
                       return (
-                        <div key={r.id} style={{ background: enCurso ? 'var(--at-success-tint)' : 'var(--at-surface-2)', border: `1.5px solid ${enCurso ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                        <div key={r.id} style={{ background: enCurso ? 'var(--at-success-tint)' : 'var(--at-surface-2)', border: `1.5px solid ${enCurso ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '8px 12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                               <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{r.huesped_nombre}</span>
                               <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: plat.bg, color: plat.color }}>
@@ -250,38 +242,38 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
               <h3 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700, color: 'var(--at-ink)' }}>
                 {modoModal === 'str' ? 'Registrar ingreso del huésped' : searchResult === 'found' ? 'Registrar nueva entrada' : 'Registrar nuevo visitante'}
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '12px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
-                  <input value={regForm.nombre} onChange={e => setRegForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre del visitante"
+                  <label htmlFor="acceso-nombre" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
+                  <input id="acceso-nombre" value={regForm.nombre} onChange={e => setRegForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre del visitante"
                     style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
-                  <select value={regForm.unidad_id} onChange={e => setRegForm(f => ({ ...f, unidad_id: e.target.value }))}
+                  <label htmlFor="acceso-unidad" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
+                  <select id="acceso-unidad" value={regForm.unidad_id} onChange={e => setRegForm(f => ({ ...f, unidad_id: e.target.value }))}
                     style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                     <option value="">Seleccionar...</option>
                     {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
-                  <input value={regForm.identificacion} onChange={e => setRegForm(f => ({ ...f, identificacion: e.target.value }))} placeholder="Número de documento"
+                  <label htmlFor="acceso-identificacion" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
+                  <input id="acceso-identificacion" value={regForm.identificacion} onChange={e => setRegForm(f => ({ ...f, identificacion: e.target.value }))} placeholder="Número de documento"
                     style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
-                  <input value={regForm.placa_vehiculo} onChange={e => setRegForm(f => ({ ...f, placa_vehiculo: e.target.value }))} placeholder="Ej. ABC-123"
+                  <label htmlFor="acceso-placa" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
+                  <input id="acceso-placa" value={regForm.placa_vehiculo} onChange={e => setRegForm(f => ({ ...f, placa_vehiculo: e.target.value }))} placeholder="Ej. ABC-123"
                     style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
-                  <input value={regForm.motivo} onChange={e => setRegForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Ej. Entrega, Social..."
+                  <label htmlFor="acceso-motivo" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
+                  <input id="acceso-motivo" value={regForm.motivo} onChange={e => setRegForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Ej. Entrega, Social..."
                     style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
-                  <input value={regForm.notas} onChange={e => setRegForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
+                  <label htmlFor="acceso-notas" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
+                  <input id="acceso-notas" value={regForm.notas} onChange={e => setRegForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
                     style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
@@ -290,7 +282,7 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
                       ⚠️ Una o más fotos tienen más de 90 días. Se recomienda renovarlas.
                     </div>
                   )}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: '12px' }}>
                     <div>
                       <ImageUploader value={fotoPersonaUrl} onChange={setFotoPersonaUrl} folder="visitantes" label="Foto del visitante" capture />
                       {fotosExpiradas.foto && <div style={{ fontSize: 11, color: 'var(--at-warning)', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
@@ -306,21 +298,19 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={handleRegistrarAcceso} disabled={regSaving}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
+                <button onClick={() => void handleRegistrarAcceso()} disabled={regSaving}
                   style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: regSaving ? 'not-allowed' : 'pointer', opacity: regSaving ? 0.7 : 1 }}>
                   {regSaving ? 'Registrando...' : '✓ Registrar entrada'}
                 </button>
-                <button onClick={() => setShowRegForm(false)}
-                  style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                <button onClick={() => setShowRegForm(false)} disabled={regSaving}
+                  style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: regSaving ? 'default' : 'pointer', fontWeight: 600 }}>
                   Cancelar
                 </button>
               </div>
             </div>
           )}
         </div>
-      </div>
-    </div>
-    </ModalPortal>
+    </EditModal>
   )
 }

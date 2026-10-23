@@ -54,10 +54,15 @@ export interface SeguridadCtx {
 
   // ── Estado compartido ──
   saving: boolean
+  /** La ronda que se está cerrando, si hay una. */
+  finalizando: string | null
   filtroPrioridad: PrioridadNovedad | 'todos'
   setFiltroPrioridad: Dispatch<SetStateAction<PrioridadNovedad | 'todos'>>
+  /** Se lee de la lista vigente por id. */
   novedadDetalle: NovedadSeguridad | null
-  setNovedadDetalle: Dispatch<SetStateAction<NovedadSeguridad | null>>
+  setNovedadDetalle: (n: NovedadSeguridad | null) => void
+  rondaDetalle: RondaSeguridad | null
+  setRondaDetalle: (r: RondaSeguridad | null) => void
   novedadForm: NovedadFormState
   setNovedadForm: Dispatch<SetStateAction<NovedadFormState>>
   fotosNovedadForm: string[]
@@ -109,14 +114,17 @@ export interface SeguridadCtx {
 
   // ── Acciones ──
   iniciarRonda: () => Promise<void>
-  finalizarRonda: (id: string, estado: EstadoRonda) => Promise<void>
-  marcarVisita: (visitaId: string, estado: EstadoVisitaControl, notas?: string, fotos?: string[]) => Promise<void>
+  /** true si se cerró. */
+  finalizarRonda: (id: string, estado: EstadoRonda) => Promise<boolean>
+  /** true si se guardó. */
+  marcarVisita: (visitaId: string, estado: EstadoVisitaControl, notas?: string, fotos?: string[]) => Promise<boolean>
   /** Abre el modal de cierre (novedad, o punto que exige imagen). */
   abrirMarcaPunto: (visitaId: string, punto: PuntoControlRuta, estado: 'ok' | 'novedad') => void
   /** Cierra la parada con lo capturado en el modal. */
   confirmarMarcaPunto: () => Promise<void>
   registrarNovedad: () => Promise<void>
-  eliminarNovedad: (id: string) => Promise<void>
+  /** true si se eliminó. */
+  eliminarNovedad: (id: string) => Promise<boolean>
   resetAccesos: () => void
   cambiarModo: (modo: 'dpi' | 'str') => void
   precargarDesdeSTR: (r: ReservaSTR) => void

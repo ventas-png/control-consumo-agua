@@ -880,7 +880,7 @@ button:focus:not(:focus-visible) {
   border-color: var(--at-primary-soft-2) !important;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
 }
-/* Filas de lista o de gráfica que abren su detalle (Sostenibilidad, Jardinería, Elevadores, Cisternas, Incendio). */
+/* Filas de lista o de gráfica que abren su detalle (Sostenibilidad, Jardinería, Elevadores, Cisternas, Incendio, Seguridad). */
 .cond-barra-fila:hover {
   background: var(--at-surface-2) !important;
 }
