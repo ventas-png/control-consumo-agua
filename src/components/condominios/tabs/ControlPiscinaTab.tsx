@@ -56,6 +56,10 @@ const STATUS_TEXTO = { ok: 'En rango', warn: 'Revisar: cerca del límite', bad: 
 
 const horaActual = () => new Date().toTimeString().slice(0, 5)
 
+/** El más reciente: por fecha, hora y, si coinciden, por hora de captura. */
+const masReciente = (a: ControlPiscina, b: ControlPiscina) =>
+  b.fecha.localeCompare(a.fecha) || (b.hora ?? '').localeCompare(a.hora ?? '') || (b.created_at ?? '').localeCompare(a.created_at ?? '')
+
 /** pH o cloro con su color de rango y, si no está bien, un aviso que no depende del color. */
 function Medida({ value, nivel }: { value: number | null | undefined; nivel: Nivel }) {
   if (value == null) return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
@@ -100,10 +104,14 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
   const lista = registros.filter(r => filtroPiscina === '' || r.piscina === filtroPiscina)
 
   const ultimo = piscinas.reduce<Record<string, ControlPiscina>>((acc, p) => {
-    const rec = registros.filter(r => r.piscina === p).sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.hora ?? '').localeCompare(a.hora ?? ''))[0]
+    const rec = registros.filter(r => r.piscina === p).sort(masReciente)[0]
     if (rec) acc[p] = rec
     return acc
   }, {})
+  // El estado de una piscina es el de su último registro: sólo ése se abre o
+  // se cierra. Antes cada fila del historial tenía su botón y «Abrir» en un
+  // registro viejo no cambiaba la tarjeta de la piscina.
+  const esUltimo = (r: ControlPiscina) => ultimo[r.piscina]?.id === r.id
 
   // Fecha y hora se toman al abrir: con la pestaña abierta desde la mañana,
   // la hora de montaje ya no era la de la medición.
@@ -164,15 +172,15 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
   // Se lee el registro vigente, no una copia.
   const detalle = detalleId ? registros.find(r => r.id === detalleId) ?? null : null
 
-  /** Abrir / cerrar por mantenimiento, como antes, ahora con aviso si falla. */
+  /** Abrir / cerrar por mantenimiento (sólo en el último registro de la piscina), con aviso si falla. */
   const botonEstado = (r: ControlPiscina, size: 'sm' | 'md') => r.estado !== 'abierta' ? (
     <Button size={size} variant="success" onClick={() => void cambiarEstado(r, 'abierta')} loading={cambiandoId === r.id}
-      aria-label={size === 'sm' ? `Abrir ${r.piscina} (registro del ${r.fecha})` : undefined}>
+      aria-label={size === 'sm' ? `Abrir ${r.piscina}` : undefined}>
       {size === 'sm' ? 'Abrir' : '✅ Marcar abierta'}
     </Button>
   ) : (
     <Button size={size} variant="warning" onClick={() => void cambiarEstado(r, 'cerrada_mantenimiento')} loading={cambiandoId === r.id}
-      aria-label={size === 'sm' ? `Cerrar ${r.piscina} por mantenimiento (registro del ${r.fecha})` : undefined}>
+      aria-label={size === 'sm' ? `Cerrar ${r.piscina} por mantenimiento` : undefined}>
       {size === 'sm' ? 'Cerrar' : '🔧 Cerrar por mantenimiento'}
     </Button>
   )
@@ -326,11 +334,17 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
           onClose={() => setDetalleId(null)}
           footer={
             <>
-              {canEdit && botonEstado(detalle, 'md')}
+              {canEdit && esUltimo(detalle) && botonEstado(detalle, 'md')}
               <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
             </>
           }
         >
+          {!esUltimo(detalle) && ultimo[detalle.piscina] && (
+            <div style={{ display: 'flex', gap: '6px 10px', alignItems: 'center', flexWrap: 'wrap', background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: 'var(--at-ink-3)' }}>
+              <span style={{ flex: '1 1 200px' }}>Hay un registro más reciente de {detalle.piscina}: el estado actual se cambia desde ése.</span>
+              <Button size="sm" variant="secondary" onClick={() => setDetalleId(ultimo[detalle.piscina].id)}>Ver el último</Button>
+            </div>
+          )}
           <RegistroDetalle registro={detalle} />
         </EditModal>
       )}
@@ -369,7 +383,7 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
               <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                 {r.observaciones && <span aria-hidden="true" style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>📝</span>}
                 <Button size="sm" variant="secondary" onClick={() => setDetalleId(r.id)} aria-label={`Ver registro de ${r.piscina} del ${r.fecha} ${r.hora?.slice(0, 5) ?? ''}`.trim()}>Ver</Button>
-                {canEdit && botonEstado(r, 'sm')}
+                {canEdit && esUltimo(r) && botonEstado(r, 'sm')}
               </span>
             ) },
         ] satisfies DataTableColumn<ControlPiscina>[]}

@@ -70,6 +70,28 @@ describe('Sostenibilidad — cifras y meses', () => {
   })
 })
 
+describe('Sostenibilidad — % de reciclaje', () => {
+  it('cuenta lo reciclable y lo electrónico, igual que la pestaña Residuos', () => {
+    montar([
+      registro({ id: 'a', tipo_residuo: 'reciclable', cantidad_kg: 30 }),
+      registro({ id: 'b', tipo_residuo: 'electronico', cantidad_kg: 10 }),
+      registro({ id: 'c', tipo_residuo: 'organico', cantidad_kg: 60 }),
+    ])
+    expect(screen.getByRole('heading', { name: 'Sostenibilidad · residuos' })).toBeTruthy()
+    expect(screen.getByText('40%')).toBeTruthy()
+    expect(screen.getByText('reciclable + electrónico')).toBeTruthy()
+    // El CO₂ ahorrado sale de esos mismos 40 kg (1.5 kg por kg reciclado).
+    expect(screen.getByText('40 kg')).toBeTruthy() // reciclado, en el panel de CO₂
+    expect(screen.getByText('60 kg')).toBeTruthy() // KPI «CO₂ ahorrado»
+  })
+
+  it('sin kg registrados el porcentaje queda en blanco (antes, 0 %)', () => {
+    montar([])
+    const kpi = screen.getByText('% Reciclaje').parentElement!
+    expect(within(kpi).getByText('—')).toBeTruthy()
+  })
+})
+
 describe('Sostenibilidad — detalle en ventana', () => {
   it('un mes abre sus registros a pantalla completa, con la incidencia', () => {
     montar()
