@@ -1,7 +1,10 @@
-import { hoyLocalISO, esFechaCalendarioVencida } from '../../../lib/format'
-import { useState, type CSSProperties} from 'react'
+import { hoyLocalISO, esFechaCalendarioVencida, formatNumber } from '../../../lib/format'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { MantenimientoJardineria, TipoJardineria, EstadoJardineria } from '../../../types'
 
 interface Props {
@@ -33,22 +36,33 @@ const ESTADOS: { value: EstadoJardineria; label: string; color: string; bg: stri
 
 const AREAS_COMUNES = ['Jardín principal', 'Jardín lateral', 'Área de piscina', 'Acceso vehicular', 'Acceso peatonal', 'Área de juegos', 'Área BBQ', 'Estacionamiento', 'Perímetro', 'Terraza']
 
+const formVacio = () => ({
+  fecha: hoyLocalISO(),
+  tipo: 'mantenimiento_general' as TipoJardineria,
+  areas: [] as string[],
+  proveedor: '', trabajadores: '', horas_trabajo: '',
+  insumos: '', costo: '', estado: 'completado' as EstadoJardineria,
+  proxima_visita: '', observaciones: '',
+})
+
+const tipoDe = (t: TipoJardineria) => TIPOS.find(x => x.value === t)
+const estadoDe = (e: EstadoJardineria) => ESTADOS.find(x => x.value === e)
+
+function EstadoBadge({ estado }: { estado: EstadoJardineria }) {
+  const est = estadoDe(estado)
+  return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: est?.bg, color: est?.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{est?.label ?? estado}</span>
+}
+
 export default function MantenimientoJardineriaTab({ registros, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
-  const [selected, setSelected] = useState<MantenimientoJardineria | null>(null)
+  const [detalleId, setDetalleId] = useState<string | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [cambiando, setCambiando] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState<TipoJardineria | ''>('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoJardineria | ''>('')
   const [areaCustom, setAreaCustom] = useState('')
 
-  const [form, setForm] = useState({
-    fecha: hoyLocalISO(),
-    tipo: 'mantenimiento_general' as TipoJardineria,
-    areas: [] as string[],
-    proveedor: '', trabajadores: '', horas_trabajo: '',
-    insumos: '', costo: '', estado: 'completado' as EstadoJardineria,
-    proxima_visita: '', observaciones: '',
-  })
+  const [form, setForm] = useState(formVacio)
 
   const lista = registros.filter(r =>
     (filtroTipo === '' || r.tipo === filtroTipo) &&
@@ -57,6 +71,9 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
 
   const totalCosto = registros.filter(r => r.estado === 'completado' && r.costo).reduce((s, r) => s + (r.costo ?? 0), 0)
   const proximos = registros.filter(r => r.proxima_visita && !esFechaCalendarioVencida(r.proxima_visita)).sort((a, b) => a.proxima_visita!.localeCompare(b.proxima_visita!))
+
+  // Montos con el formato regional de la app (antes, el del navegador y sin decimales fijos).
+  const dinero = (v: number) => `${moneda}\u00a0${formatNumber(v, 2)}`
 
   function toggleArea(area: string) {
     setForm(p => ({
@@ -72,7 +89,19 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
     setAreaCustom('')
   }
 
+  // Las áreas propias se agregaban pero no se veían: ni para confirmar ni para quitarlas.
+  const areasOfrecidas = [...AREAS_COMUNES, ...form.areas.filter(a => !AREAS_COMUNES.includes(a))]
+
+  function abrirForm() {
+    setDetalleId(null)
+    setMostrarForm(true)
+  }
+
+  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
+  const cerrarForm = () => { if (!saving) setMostrarForm(false) }
+
   async function guardar() {
+    if (saving) return
     if (!form.fecha || form.areas.length === 0) {
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Fecha y al menos un área son obligatorios' }); return
     }
@@ -91,247 +120,280 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ fecha: hoyLocalISO(), tipo: 'mantenimiento_general', areas: [], proveedor: '', trabajadores: '', horas_trabajo: '', insumos: '', costo: '', estado: 'completado', proxima_visita: '', observaciones: '' })
+    setForm(formVacio())
+    setAreaCustom('')
     setMostrarForm(false)
     onRefresh()
   }
 
   async function cambiarEstado(r: MantenimientoJardineria, estado: EstadoJardineria) {
-    await updateCondominioRow('mantenimiento_jardineria', r.id, { estado })
-    if (selected?.id === r.id) setSelected(prev => prev ? { ...prev, estado } : null)
+    if (cambiando) return
+    setCambiando(true)
+    const { error } = await updateCondominioRow('mantenimiento_jardineria', r.id, { estado })
+    setCambiando(false)
+    // Antes el error se ignoraba: el botón no hacía nada y no decía por qué.
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', minWidth: 0, background: 'var(--at-surface)', color: 'var(--at-ink)' }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
+  // Se lee el registro vigente, no una copia (antes el panel guardaba la fila
+  // y había que parcharla a mano al cambiar el estado).
+  const detalle = detalleId ? registros.find(r => r.id === detalleId) ?? null : null
+
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>Jardinería ({lista.length})</span>
-            {canCreate && (
-              <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nuevo
-              </button>
-            )}
-          </div>
-          <select style={{ ...inp, marginBottom: 6 }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoJardineria | '')}>
+    <div style={{ padding: 16 }}>
+      {/* KPIs: dos por fila en el teléfono */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: 12, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px', minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Costo total (completados)</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-success)', overflowWrap: 'anywhere' }}>{dinero(totalCosto)}</div>
+        </div>
+        <div style={{ background: 'var(--at-accent-tint)', borderRadius: 10, padding: '12px 16px', minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>Total registros</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-accent)' }}>{registros.length}</div>
+        </div>
+      </div>
+
+      {/* Próximas visitas: cada una abre su registro */}
+      {proximos.length > 0 && (
+        <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: 'var(--at-success)', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase' }}>📅 Próximas visitas</div>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 2 }}>
+            {proximos.slice(0, 3).map(r => {
+              const tipo = tipoDe(r.tipo)
+              return (
+                <li key={r.id}>
+                  <button type="button" onClick={() => setDetalleId(r.id)} className="cond-barra-fila"
+                    style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 6, padding: '4px 6px', font: 'inherit', fontSize: 13, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
+                    {tipo?.icon} <strong>{r.proxima_visita}</strong> · {tipo?.label}
+                    {r.proveedor && <span style={{ color: 'var(--at-ink-3)' }}> · {r.proveedor}</span>}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* Filtros + botón */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', flex: '1 1 260px' }}>
+          <select aria-label="Filtrar por tipo" style={{ ...inp, width: 'auto', flex: '1 1 170px' }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoJardineria | '')}>
             <option value="">Todos los tipos</option>
             {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
           </select>
-          <select style={inp} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoJardineria | '')}>
+          <select aria-label="Filtrar por estado" style={{ ...inp, width: 'auto', flex: '1 1 170px' }} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoJardineria | '')}>
             <option value="">Todos los estados</option>
             {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
           </select>
+          <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{lista.length} registros</span>
         </div>
-
-        {proximos.length > 0 && (
-          <div style={{ padding: '8px 12px', background: 'var(--at-success-tint)', borderBottom: '1px solid var(--at-line)' }}>
-            <div style={{ fontSize: 10, color: 'var(--at-success)', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>📅 Próximas visitas</div>
-            {proximos.slice(0, 3).map(r => {
-              const tipo = TIPOS.find(t => t.value === r.tipo)
-              return (
-                <div key={r.id} style={{ fontSize: 11, color: 'var(--at-ink-2)', marginBottom: 2 }}>
-                  {tipo?.icon} {r.proxima_visita} · {tipo?.label}
-                  {r.proveedor && <span style={{ color: 'var(--at-ink-3)' }}> · {r.proveedor}</span>}
-                </div>
-              )
-            })}
-          </div>
+        {canCreate && (
+          <Button variant="success" onClick={abrirForm}>+ Nuevo servicio</Button>
         )}
-
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
-
-        {lista.map(r => {
-          const tipo = TIPOS.find(t => t.value === r.tipo)
-          const est = ESTADOS.find(e => e.value === r.estado)
-          return (
-            <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-success-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${tipo?.color}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
-                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.label}</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.fecha}{r.proveedor ? ` · ${r.proveedor}` : ''}</div>
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.areas.slice(0, 2).join(', ')}{r.areas.length > 2 ? ` +${r.areas.length - 2}` : ''}</div>
-            </div>
-          )
-        })}
       </div>
 
-      {/* Panel derecho */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {!mostrarForm && !selected && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-              <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px' }}>
-                <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Costo total (completados)</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {totalCosto.toLocaleString()}</div>
-              </div>
-              <div style={{ background: 'var(--at-accent-tint)', borderRadius: 10, padding: '12px 16px' }}>
-                <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>Total registros</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-accent)' }}>{registros.length}</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: 'var(--at-ink-3)', fontSize: 14 }}>
-              Selecciona un registro o crea uno nuevo
-            </div>
-          </div>
-        )}
-
-        {mostrarForm && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Nuevo servicio de jardinería</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={lbl}>Fecha *</label>
-                <input type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Tipo</label>
-                <select style={inp} value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as TipoJardineria }))}>
-                  {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Estado</label>
-                <select style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoJardineria }))}>
-                  {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Proveedor</label>
-                <input style={inp} placeholder="Empresa o persona" value={form.proveedor} onChange={e => setForm(p => ({ ...p, proveedor: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Trabajadores</label>
-                <input type="number" style={inp} value={form.trabajadores} onChange={e => setForm(p => ({ ...p, trabajadores: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Horas trabajo</label>
-                <input type="number" step="0.5" style={inp} value={form.horas_trabajo} onChange={e => setForm(p => ({ ...p, horas_trabajo: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Costo ({moneda})</label>
-                <input type="number" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Próxima visita</label>
-                <input type="date" style={inp} value={form.proxima_visita} onChange={e => setForm(p => ({ ...p, proxima_visita: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Insumos usados</label>
-                <input style={inp} placeholder="Fertilizante, herbicida…" value={form.insumos} onChange={e => setForm(p => ({ ...p, insumos: e.target.value }))} />
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Áreas tratadas *</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
-                  {AREAS_COMUNES.map(a => (
-                    <button key={a} type="button" onClick={() => toggleArea(a)}
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid', fontSize: 11, cursor: 'pointer', background: form.areas.includes(a) ? 'var(--at-success)' : 'var(--at-surface)', color: form.areas.includes(a) ? 'white' : 'var(--at-ink-2)', borderColor: form.areas.includes(a) ? 'var(--at-success)' : 'var(--at-line-strong)' }}>
-                      {a}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input style={{ ...inp, flex: 1 }} placeholder="Agregar área personalizada" value={areaCustom} onChange={e => setAreaCustom(e.target.value)} onKeyDown={e => e.key === 'Enter' && agregarAreaCustom()} />
-                  <button type="button" onClick={agregarAreaCustom} style={{ padding: '7px 12px', background: 'var(--at-chip)', border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>+</button>
-                </div>
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Observaciones</label>
-                <input style={inp} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : '✅ Registrar'}
-              </button>
-              <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!mostrarForm && selected && (() => {
-          const tipo = TIPOS.find(t => t.value === selected.tipo)
-          const est = ESTADOS.find(e => e.value === selected.estado)
-          return (
+      {/* Nuevo servicio en ventana (antes, en un panel al lado de una lista de
+          300px fijos: en el teléfono no cabían los dos). */}
+      {mostrarForm && (
+        <EditModal
+          title="🌿 Nuevo servicio de jardinería"
+          maxWidth="640px"
+          fullScreenOnMobile
+          onClose={cerrarForm}
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          footer={
+            <>
+              <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+              <Button type="submit" form="jardineria-form" variant="success" loading={saving} loadingText="Guardando…">✅ Registrar</Button>
+            </>
+          }
+        >
+          <form
+            id="jardineria-form"
+            onSubmit={e => { e.preventDefault(); void guardar() }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12, alignItems: 'start' }}
+          >
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: tipo?.color, fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>{tipo?.icon} {tipo?.label}</div>
-                  <div style={{ fontWeight: 700, fontSize: 18 }}>{selected.fecha}</div>
-                  {selected.proveedor && <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>🤝 {selected.proveedor}</div>}
-                </div>
-                <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, background: est?.bg, color: est?.color, fontWeight: 600 }}>{est?.label}</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
-                {selected.trabajadores != null && (
-                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Trabajadores</div>
-                    <div style={{ fontSize: 16, fontWeight: 700 }}>{selected.trabajadores}</div>
-                  </div>
-                )}
-                {selected.horas_trabajo != null && (
-                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Horas</div>
-                    <div style={{ fontSize: 16, fontWeight: 700 }}>{selected.horas_trabajo}h</div>
-                  </div>
-                )}
-                {selected.costo != null && (
-                  <div style={{ background: 'var(--at-success-tint)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Costo</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {selected.costo.toLocaleString()}</div>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 6 }}>ÁREAS TRATADAS</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {selected.areas.map(a => (
-                    <span key={a} style={{ padding: '3px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', borderRadius: 6, fontSize: 12, border: '1px solid var(--at-success-border)' }}>{a}</span>
-                  ))}
-                </div>
-              </div>
-
-              {selected.insumos && (
-                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 }}>
-                  <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Insumos: </span>{selected.insumos}
-                </div>
-              )}
-
-              {selected.proxima_visita && (
-                <div style={{ background: 'var(--at-accent-tint)', border: '1px solid var(--at-accent-soft)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--at-accent)' }}>
-                  📅 Próxima visita: <strong>{selected.proxima_visita}</strong>
-                </div>
-              )}
-
-              {selected.observaciones && (
-                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--at-ink-2)', marginBottom: 12 }}>
-                  {selected.observaciones}
-                </div>
-              )}
-
-              {canEdit && selected.estado !== 'completado' && (
-                <button onClick={() => cambiarEstado(selected, 'completado')}
-                  style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                  ✓ Marcar completado
-                </button>
-              )}
+              <label htmlFor="jardineria-fecha" style={lbl}>Fecha *</label>
+              <input id="jardineria-fecha" type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
             </div>
-          )
-        })()}
+            <div>
+              <label htmlFor="jardineria-tipo" style={lbl}>Tipo</label>
+              <select id="jardineria-tipo" style={inp} value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as TipoJardineria }))}>
+                {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="jardineria-estado" style={lbl}>Estado</label>
+              <select id="jardineria-estado" style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoJardineria }))}>
+                {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="jardineria-proveedor" style={lbl}>Proveedor</label>
+              <input id="jardineria-proveedor" style={inp} placeholder="Empresa o persona" value={form.proveedor} onChange={e => setForm(p => ({ ...p, proveedor: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="jardineria-trabajadores" style={lbl}>Trabajadores</label>
+              <input id="jardineria-trabajadores" type="number" inputMode="numeric" min="0" step="1" style={inp} value={form.trabajadores} onChange={e => setForm(p => ({ ...p, trabajadores: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="jardineria-horas" style={lbl}>Horas trabajo</label>
+              {/* Un decimal, como la columna (numeric(5,1)). */}
+              <input id="jardineria-horas" type="number" inputMode="decimal" min="0" step="0.1" style={inp} value={form.horas_trabajo} onChange={e => setForm(p => ({ ...p, horas_trabajo: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="jardineria-costo" style={lbl}>Costo ({moneda})</label>
+              <input id="jardineria-costo" type="number" inputMode="decimal" min="0" step="0.01" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="jardineria-proxima" style={lbl}>Próxima visita</label>
+              <input id="jardineria-proxima" type="date" min={form.fecha || undefined} style={inp} value={form.proxima_visita} onChange={e => setForm(p => ({ ...p, proxima_visita: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="jardineria-insumos" style={lbl}>Insumos usados</label>
+              <input id="jardineria-insumos" style={inp} placeholder="Fertilizante, herbicida…" value={form.insumos} onChange={e => setForm(p => ({ ...p, insumos: e.target.value }))} />
+            </div>
+            <fieldset style={{ gridColumn: '1 / -1', border: 'none', margin: 0, padding: 0, minWidth: 0 }}>
+              <legend style={{ ...lbl, padding: 0 }}>Áreas tratadas *</legend>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                {areasOfrecidas.map(a => {
+                  const activa = form.areas.includes(a)
+                  return (
+                    <button key={a} type="button" aria-pressed={activa} onClick={() => toggleArea(a)}
+                      style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: activa ? 'var(--at-success)' : 'var(--at-surface)', color: activa ? 'var(--at-on-status)' : 'var(--at-ink-2)', borderColor: activa ? 'var(--at-success)' : 'var(--at-line-strong)' }}>
+                      {activa ? '✓ ' : ''}{a}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input aria-label="Agregar área personalizada" style={{ ...inp, flex: 1 }} placeholder="Agregar área personalizada" value={areaCustom} onChange={e => setAreaCustom(e.target.value)}
+                  // Enter agrega el área (sin esto, dentro del formulario lo registraría).
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarAreaCustom() } }} />
+                <Button type="button" variant="secondary" onClick={agregarAreaCustom} disabled={!areaCustom.trim()}>Agregar</Button>
+              </div>
+            </fieldset>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="jardineria-observaciones" style={lbl}>Observaciones</label>
+              <textarea id="jardineria-observaciones" rows={2} style={{ ...inp, fontFamily: 'inherit', resize: 'vertical' }} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
+            </div>
+          </form>
+        </EditModal>
+      )}
+
+      {/* Detalle del servicio en ventana */}
+      {detalle && (
+        <EditModal
+          title={`${tipoDe(detalle.tipo)?.icon ?? '🌿'} ${tipoDe(detalle.tipo)?.label ?? detalle.tipo}`}
+          subtitle={
+            <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>{detalle.fecha}</span>
+              <EstadoBadge estado={detalle.estado} />
+            </span>
+          }
+          maxWidth="500px"
+          fullScreenOnMobile
+          onClose={() => setDetalleId(null)}
+          footer={
+            <>
+              {canEdit && detalle.estado !== 'completado' && (
+                <Button variant="success" onClick={() => void cambiarEstado(detalle, 'completado')} loading={cambiando}>✓ Marcar completado</Button>
+              )}
+              <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
+            </>
+          }
+        >
+          <ServicioDetalle registro={detalle} dinero={dinero} />
+        </EditModal>
+      )}
+
+      {/* Historial: en el teléfono cada servicio es una tarjeta; tocarlo abre
+          su detalle y «Ver» es el camino de teclado. */}
+      <DataTable<MantenimientoJardineria>
+        data={lista}
+        rowKey="id"
+        pageSize={30}
+        mobileCardLayout
+        defaultSort={{ key: 'fecha', direction: 'desc' }}
+        emptyState={{ icon: '🌿', title: 'Sin registros' }}
+        onRowClick={(r) => setDetalleId(r.id)}
+        columns={[
+          { key: 'tipo', header: 'Tipo', sortable: true,
+            accessor: (r) => tipoDe(r.tipo)?.label ?? r.tipo,
+            render: (r) => {
+              const tipo = tipoDe(r.tipo)
+              return <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{tipo?.icon} {tipo?.label ?? r.tipo}</span>
+            } },
+          { key: 'fecha', header: 'Fecha', sortable: true },
+          { key: 'areas', header: 'Áreas',
+            render: (r) => <span style={{ color: 'var(--at-ink-2)' }}>{r.areas.slice(0, 2).join(', ')}{r.areas.length > 2 ? ` +${r.areas.length - 2}` : ''}</span> },
+          { key: 'proveedor', header: 'Proveedor', sortable: true, hideOnMobile: true,
+            accessor: (r) => r.proveedor ?? '',
+            render: (r) => <span style={{ color: 'var(--at-ink-3)' }}>{r.proveedor || '—'}</span> },
+          { key: 'costo', header: 'Costo', align: 'right', sortable: true,
+            accessor: (r) => r.costo ?? 0,
+            render: (r) => r.costo != null ? <span style={{ whiteSpace: 'nowrap' }}>{dinero(r.costo)}</span> : '—' },
+          { key: 'estado', header: 'Estado', sortable: true,
+            accessor: (r) => estadoDe(r.estado)?.label ?? r.estado,
+            render: (r) => <EstadoBadge estado={r.estado} /> },
+          { key: 'ver', header: '', align: 'right',
+            render: (r) => (
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                {r.observaciones && <span aria-hidden="true" style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>📝</span>}
+                <Button size="sm" variant="secondary" onClick={() => setDetalleId(r.id)} aria-label={`Ver ${tipoDe(r.tipo)?.label ?? r.tipo} del ${r.fecha}`}>Ver</Button>
+              </span>
+            ) },
+        ] satisfies DataTableColumn<MantenimientoJardineria>[]}
+      />
+    </div>
+  )
+}
+
+/** Detalle de solo lectura de un servicio de jardinería. */
+function ServicioDetalle({ registro: r, dinero }: { registro: MantenimientoJardineria; dinero: (v: number) => string }) {
+  const fila = (label: string, valor: ReactNode) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 14 }}>
+      <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
+      <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{valor}</span>
+    </div>
+  )
+  return (
+    <div>
+      {fila('Proveedor', r.proveedor || '—')}
+      {fila('Trabajadores', r.trabajadores ?? '—')}
+      {fila('Horas de trabajo', r.horas_trabajo != null ? `${r.horas_trabajo} h` : '—')}
+      {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
+      {fila('Próxima visita', r.proxima_visita ? <strong style={{ color: 'var(--at-accent)' }}>📅 {r.proxima_visita}</strong> : '—')}
+
+      <div style={{ marginTop: 14 }}>
+        <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 6 }}>Áreas tratadas</div>
+        {r.areas.length === 0 ? <span style={{ color: 'var(--at-ink-3)', fontSize: 13 }}>—</span> : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {r.areas.map(a => (
+              <span key={a} style={{ padding: '3px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', borderRadius: 6, fontSize: 12, border: '1px solid var(--at-success-border)' }}>{a}</span>
+            ))}
+          </div>
+        )}
       </div>
+
+      {r.insumos && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Insumos</div>
+          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.insumos}</p>
+        </div>
+      )}
+      {r.observaciones && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
+          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.observaciones}</p>
+        </div>
+      )}
     </div>
   )
 }
