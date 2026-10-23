@@ -15,6 +15,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.avisos_cobro.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -39,7 +41,7 @@ const BLANK_ITEM: DetalleItem = { concepto: '', monto: '', periodo: '' }
 
 function fmt(n: number, moneda: string) { return `${moneda} ${Number(n).toLocaleString('es', { minimumFractionDigits: 2 })}` }
 
-export function AvisosCobroTab({ avisos, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function AvisosCobroTab({ avisos, unidades, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
@@ -84,9 +86,12 @@ export function AvisosCobroTab({ avisos, unidades, proyectoId, companyId, moneda
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar aviso?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('avisos_cobro', id)
+    const { error } = await deleteCondominioRow('avisos_cobro', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -302,9 +307,11 @@ ${a.notas ? raw(printHtml`<p style="margin-top:16px;font-style:italic">${a.notas
                         )}
                         <button onClick={() => startEdit(a)}
                           style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                        <button onClick={() => handleDelete(a.id)}
-                          style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                       </>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => handleDelete(a.id)} title="Eliminar" aria-label={`Eliminar aviso de ${unidad?.nombre ?? "la unidad"}`}
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     )}
                   </div>
                 </div>

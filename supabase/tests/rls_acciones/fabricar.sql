@@ -33,6 +33,15 @@ GRANT SELECT ON ra.ids TO PUBLIC;
 CREATE FUNCTION ra.id(p_alias text) RETURNS uuid LANGUAGE sql STABLE AS
 $$ SELECT id FROM ra.ids WHERE alias = p_alias $$;
 
+-- Recetas del mapa (`receta` de cada tabla): valor SQL para una columna, cuando
+-- una regla de negocio no la cumple con el valor por tipo (CHECK hora_fin >
+-- hora_inicio; un trigger que exige un proveedor del catálogo en una columna
+-- opcional). Una columna con receta se incluye siempre. Se EVALÚA al fabricar
+-- —como el admin de la empresa, igual que los padres— y la sentencia lleva el
+-- resultado como literal: así puede fabricar un padre (ra.padre) que la
+-- persona de la prueba no podría.
+CREATE TABLE ra.recetas (tabla regclass, col text, valor text NOT NULL, PRIMARY KEY (tabla, col));
+
 -- Padres ya fabricados, por tabla y empresa: una FK los reutiliza.
 CREATE TABLE ra.padres (tabla regclass, empresa uuid, fila jsonb NOT NULL, PRIMARY KEY (tabla, empresa));
 
@@ -139,10 +148,14 @@ BEGIN
     ORDER BY a.attnum
   LOOP
     CONTINUE WHEN v_col.attidentity <> '' OR v_col.attgenerated <> '';
-    CONTINUE WHEN NOT (
+    v_val := (SELECT valor FROM ra.recetas WHERE tabla = p_tabla AND col = v_col.attname);
+    CONTINUE WHEN v_val IS NULL AND NOT (
       (v_col.attnotnull AND NOT v_col.tiene_default)
       OR v_col.attname IN ('company_id', 'project_id', 'unidad_id'));
-    v_val := NULL;
+    IF v_val IS NOT NULL THEN
+      EXECUTE format('SELECT (%s)::text', v_val) INTO v_val;
+      v_val := quote_nullable(v_val) || '::' || format_type(v_col.atttypid, NULL);
+    END IF;
 
     -- FK de una sola columna
     SELECT c.confrelid::regclass, (SELECT attname FROM pg_attribute WHERE attrelid = c.confrelid AND attnum = c.confkey[1])
@@ -152,7 +165,9 @@ BEGIN
       AND c.conkey[1] = (SELECT attnum FROM pg_attribute WHERE attrelid = p_tabla AND attname = v_col.attname)
     LIMIT 1;
 
-    IF v_col.attname = 'company_id' THEN
+    IF v_val IS NOT NULL THEN
+      NULL;   -- receta del mapa
+    ELSIF v_col.attname = 'company_id' THEN
       v_val := quote_literal(p_empresa) || '::uuid';
     ELSIF v_ref IS NOT NULL THEN
       IF ra.padre_del_padron(v_ref, p_empresa) IS NOT NULL THEN

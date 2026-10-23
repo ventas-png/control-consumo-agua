@@ -48,7 +48,7 @@ const evalu = (over: Record<string, unknown> = {}) => ({
 
 const montar = (evaluaciones: unknown[] = [], canEdit = true) => {
   const onRefresh = vi.fn()
-  render(<EvaluacionProveedorTab evaluaciones={evaluaciones as never} proveedores={contratos} proyectoId="pr1" companyId="c1" canCreate canEdit={canEdit} onRefresh={onRefresh} />)
+  render(<EvaluacionProveedorTab evaluaciones={evaluaciones as never} proveedores={contratos} proyectoId="pr1" companyId="c1" canCreate canEdit={canEdit} canDelete={canEdit} onRefresh={onRefresh} />)
   return onRefresh
 }
 

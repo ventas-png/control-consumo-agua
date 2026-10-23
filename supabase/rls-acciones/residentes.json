@@ -1,0 +1,95 @@
+{
+  "_migracion": "20261104000500_rls_acciones_residentes.sql",
+  "_titulo": "Residentes: escribir exige la ACCIÓN del tab, también en la base",
+  "_porque": [
+    "POR QUÉ",
+    "La pantalla decide cada escritura de estos tabs con su acción (canCreate /",
+    "canEdit / canApprove / canDelete). Las policies de INSERT y UPDATE sólo",
+    "pedían ver el tab —quien sólo consulta podía crear y editar por la API— y",
+    "las de DELETE sólo dejaban a company_owner/admin, aunque la pantalla",
+    "ofreciera «Eliminar» a quien tuviera la acción. Las ramas del residente",
+    "(solicitar una mudanza desde el portal) no cambian.",
+    "",
+    "Tabs: Accesos de residentes, Entrega de unidades, Directorio (historial),",
+    "Manual del residente, Mascotas, Onboarding, Solicitudes de mudanza y de",
+    "renta, Certificados, Solicitudes y Vehículos.",
+    "",
+    "Quedan fuera, para el PR de módulos compartidos, contratos_arrendamiento,",
+    "reservas_str y huespedes_str: también las escribe el módulo Clientes."
+  ],
+  "_sin_clave": {
+    "historial_res": "El catálogo no siembra condominios.tab.historial_res y la pestaña no está en ninguna sección: hoy sólo company_owner/admin la abren (y pasan como exentos). La base pide la misma acción que la pantalla, para que funcione el día que se siembre."
+  },
+  "tablas": {
+    "accesos_residentes": {
+      "tab": "accesos_res"
+    },
+    "entrega_unidades": {
+      "tab": "entrega_unidad"
+    },
+    "historial_residentes": {
+      "tab": "directorio",
+      "INSERT": [
+        "directorio.create",
+        "historial_res.create"
+      ],
+      "UPDATE": [
+        "directorio.edit",
+        "historial_res.edit"
+      ],
+      "DELETE": [
+        "directorio.delete",
+        "historial_res.delete"
+      ],
+      "porque": "La escribe la pestaña Historial de residentes, con sus propias acciones.",
+      "evidencia": {
+        "historial_res": [
+          "components/condominios/tabs/HistorialResidentesTab.tsx"
+        ]
+      }
+    },
+    "manual_residente_cond": {
+      "tab": "manual_residente"
+    },
+    "mascotas": {
+      "tab": "mascotas"
+    },
+    "onboarding_residentes": {
+      "tab": "onboarding"
+    },
+    "solicitud_mudanza_unidad": {
+      "tab": "solicitudes_mudanza",
+      "UPDATE": [
+        "solicitudes_mudanza.edit",
+        "visitantes.create"
+      ],
+      "porque": "Visitantes pasa la mudanza a «en curso» al registrar su ingreso, con canCreate('visitantes').",
+      "evidencia": {
+        "visitantes": [
+          "components/condominios/tabs/VisitantesTab.tsx"
+        ]
+      }
+    },
+    "solicitud_renta_unidad": {
+      "tab": "solicitudes_renta",
+      "receta": {
+        "estado": "'rechazada'"
+      },
+      "porque": "La fila de la prueba es una solicitud ya resuelta: la unidad admite una sola pendiente o aprobada (idx_solicitud_renta_unidad_activa), y la fabricada y el alta comparten unidad; además, una enviada exige el contrato completo (fn_validar_solicitud_renta_completa), que nada tiene que ver con la acción."
+    },
+    "solicitudes_certificado": {
+      "tab": "certificados"
+    },
+    "solicitudes_residente": {
+      "tab": "solicitudes",
+      "UPDATE": [
+        "solicitudes.edit",
+        "solicitudes.approve"
+      ],
+      "porque": "Aprobar o rechazar una solicitud se ofrece con canApprove('solicitudes')."
+    },
+    "vehiculos_residentes": {
+      "tab": "vehiculos"
+    }
+  }
+}

@@ -14,6 +14,8 @@ interface Props {
   autorNombre: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.campanas_cobro.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -33,7 +35,7 @@ const BLANK = {
   criterio_dias_mora: '', criterio_monto_min: '',
 }
 
-export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoId, companyId, moneda, autorNombre, canCreate, canEdit, onRefresh }: Props) {
+export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoId, companyId, moneda, autorNombre, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<CampanaCobro | null>(null)
@@ -91,9 +93,12 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const { isConfirmed } = await confirm({ title: '¿Eliminar campaña?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await deleteCondominioRow('campanas_cobro', id)
+    const { error } = await deleteCondominioRow('campanas_cobro', id)
+    if (error) { toast.error(error.message); return }
     onRefresh()
   }
 
@@ -248,7 +253,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
                     ✅ Completar
                   </button>
                 )}
-                {selected.estado === 'borrador' && canEdit && (
+                {selected.estado === 'borrador' && canDelete && (
                   <button onClick={() => eliminar(selected.id)}
                     style={{ flex: 1, padding: '7px 0', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     🗑 Eliminar

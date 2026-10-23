@@ -12,6 +12,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.consumo_energia.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -37,7 +39,7 @@ function fmt(n: number, m: string) {
   return `${m} ${n.toLocaleString('es-GT', { minimumFractionDigits: 2 })}`
 }
 
-export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({ ...BLANK })
@@ -86,9 +88,12 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
   }
 
   const handleDelete = async (c: ConsumoEnergiaArea) => {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar registro?', text: `${c.area} · ${c.periodo}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('consumo_energia_areas', c.id)
+    const { error } = await deleteCondominioRow('consumo_energia_areas', c.id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -307,13 +312,15 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
                     ✏️
                   </button>
                 )}
-                <button
-                  onClick={() => handleDelete(c)}
-                  aria-label="Eliminar registro"
-                  style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', color: 'var(--at-danger)' }}
-                >
-                  🗑
-                </button>
+                {canDelete && (
+                  <button
+                    onClick={() => handleDelete(c)}
+                    aria-label="Eliminar registro"
+                    style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', color: 'var(--at-danger)' }}
+                  >
+                    🗑
+                  </button>
+                )}
               </div>
             ),
           },

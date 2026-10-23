@@ -11,6 +11,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.historial_res.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -37,7 +39,7 @@ const BLANK = {
   email: '', telefono: '', estado: 'activo', notas: '',
 }
 
-export function HistorialResidentesTab({ historial, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function HistorialResidentesTab({ historial, unidades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({ ...BLANK })
@@ -87,9 +89,12 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
   }
 
   const handleDelete = async (h: HistorialResidente) => {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar registro?', text: h.nombre_completo, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('historial_residentes', h.id)
+    const { error } = await deleteCondominioRow('historial_residentes', h.id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -264,7 +269,9 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
                               )}
                             </>
                           )}
-                          <button onClick={() => handleDelete(h)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>
+                          {canDelete && (
+                            <button onClick={() => handleDelete(h)} title="Eliminar" aria-label={`Eliminar ${h.nombre_completo}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>
+                          )}
                         </div>
                       </div>
                     )

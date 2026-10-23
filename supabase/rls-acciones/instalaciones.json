@@ -1,0 +1,91 @@
+{
+  "_migracion": "20261104000300_rls_acciones_instalaciones.sql",
+  "_titulo": "Instalaciones: escribir exige la ACCIÓN del tab, también en la base",
+  "_porque": [
+    "POR QUÉ",
+    "La pantalla decide cada escritura de estos tabs con su acción (canCreate /",
+    "canEdit / canDelete). Las policies de INSERT y UPDATE sólo pedían ver el tab",
+    "—quien sólo consulta podía crear y editar por la API— y las de DELETE sólo",
+    "dejaban a company_owner/admin, aunque la pantalla ofreciera «Eliminar» a",
+    "quien tuviera la acción. El UPDATE de reservas de amenidades ni siquiera",
+    "pedía ver el tab: bastaba ser de la empresa.",
+    "",
+    "Tabs: Amenidades (con sus bloqueos y reservas), Bodegas, Consumo de energía,",
+    "Cámaras, Generador, Piscina, Sistema contra incendio, Equipos comunes,",
+    "Estacionamiento de visitas, Elevadores, Gas, Llaves, Cisternas, Jardinería,",
+    "Medidores por unidad y Parqueos."
+  ],
+  "tablas": {
+    "amenidades": {
+      "tab": "amenidades"
+    },
+    "amenidades_bloqueos": {
+      "tab": "amenidades",
+      "INSERT": [
+        "amenidades.create",
+        "amenidades.edit"
+      ],
+      "porque": "«+ Bloqueo» se ofrece con canEdit('amenidades'): bloquear una amenidad es editar su disponibilidad."
+    },
+    "reservas_amenidades": {
+      "tab": "amenidades",
+      "receta": {
+        "hora_inicio": "'08:00'",
+        "hora_fin": "'09:00'"
+      },
+      "agregar_en": {
+        "UPDATE": "(company_id = get_my_company_id())"
+      },
+      "porque": [
+        "El UPDATE sólo exigía la empresa (20260822030000 retiró la rama del residente, que reserva y",
+        "cancela por RPC): se le suma la acción. Check-in, check-out, depósito, aprobación, no-show,",
+        "tarifa pagada y recordatorio se ofrecen con canEdit('amenidades')."
+      ]
+    },
+    "bodegas_condominio": {
+      "tab": "bodegas"
+    },
+    "consumo_energia_areas": {
+      "tab": "consumo_energia"
+    },
+    "control_camaras_seguridad": {
+      "tab": "camaras"
+    },
+    "control_generador": {
+      "tab": "generador"
+    },
+    "control_piscina": {
+      "tab": "control_piscina"
+    },
+    "control_sistema_incendio": {
+      "tab": "incendio"
+    },
+    "equipos_comunes": {
+      "tab": "equipos"
+    },
+    "estacionamiento_visita": {
+      "tab": "estac_visita"
+    },
+    "incidencias_elevador": {
+      "tab": "elevadores"
+    },
+    "lecturas_medidor_gas": {
+      "tab": "gas"
+    },
+    "llaves_condominio": {
+      "tab": "llaves"
+    },
+    "mantenimiento_cisterna": {
+      "tab": "cisternas"
+    },
+    "mantenimiento_jardineria": {
+      "tab": "jardineria"
+    },
+    "medidores_unidad": {
+      "tab": "medidores_unidad"
+    },
+    "parqueos_condominio": {
+      "tab": "parqueos"
+    }
+  }
+}

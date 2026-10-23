@@ -11,6 +11,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.tarifas.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -40,7 +42,7 @@ function fmt(n: number, m: string) {
   return `${m} ${n.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({ ...BLANK })
@@ -88,9 +90,12 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
   }
 
   const handleDelete = async (t: TarifaCondominio) => {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar tarifa?', text: t.concepto, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('tarifas_condominio', t.id)
+    const { error } = await deleteCondominioRow('tarifas_condominio', t.id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -224,7 +229,9 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
                   </div>
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
                     {canEdit && <button onClick={() => openEdit(t)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>}
-                    <button onClick={() => handleDelete(t)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>
+                    {canDelete && (
+                      <button onClick={() => handleDelete(t)} title="Eliminar" aria-label={`Eliminar ${t.concepto}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>
+                    )}
                   </div>
                 </div>
 

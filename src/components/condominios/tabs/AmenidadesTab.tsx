@@ -25,6 +25,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.amenidades.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -50,7 +52,7 @@ import { VistaBloqueos } from './amenidades/VistaBloqueos'
 import { ReservaDetalle } from './amenidades/ReservaDetalle'
 import { VistaRecordatorios } from './amenidades/VistaRecordatorios'
 
-export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [vista, setVista] = useState<Vista>('amenidades')
   const [showAmenidadForm, setShowAmenidadForm] = useState(false)
   const [showReservaForm, setShowReservaForm] = useState(false)
@@ -180,6 +182,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function eliminarAmenidad(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const reservasActivas = reservas.filter(
       r => r.amenidad_id === id && (r.estado === 'confirmada' || r.estado === 'pendiente')
     )
@@ -402,6 +406,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     const mensaje = buildMensajeRecordatorio(r, unidad)
     const url = `https://wa.me/${formatPhoneForWa(tel)}?text=${encodeURIComponent(mensaje)}`
     window.open(url, '_blank', 'noopener,noreferrer')
+    // Abrir WhatsApp no escribe nada; marcar la reserva como recordada es editarla.
+    if (!canEdit) return
     await updateCondominioRow('reservas_amenidades', r.id, { recordatorio_enviado: true, recordatorio_enviado_at: new Date().toISOString() })
     onRefresh()
   }
@@ -605,14 +611,17 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function eliminarBloqueo(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar bloqueo?', icon: 'warning', variant: 'danger', confirmText: 'Sí, eliminar', cancelText: 'No' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('amenidades_bloqueos', id)
+    const { error } = await deleteCondominioRow('amenidades_bloqueos', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
   const ctx: AmenidadesCtx = {
-    amenidades, reservas, bloqueos, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh,
+    amenidades, reservas, bloqueos, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, canDelete, onRefresh,
     showAmenidadForm, setShowAmenidadForm, showReservaForm, setShowReservaForm, showBloqueoForm, setShowBloqueoForm, saving, amenidadFotoUrl, setAmenidadFotoUrl, amenidadForm, setAmenidadForm, reservaForm, setReservaForm, bloqueoForm,
     setBloqueoForm, semana, setSemana, selectedReserva, setSelectedReserva, reservaDetalle, setReservaDetalle, editingAmenidad, setEditingAmenidad, editAmenidadFotoUrl, setEditAmenidadFotoUrl, editAmenidadForm, setEditAmenidadForm, savingEdit,
     hoy, amenidadesActivas, dias, amenidadFotoUrls,

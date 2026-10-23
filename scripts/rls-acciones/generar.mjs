@@ -29,6 +29,11 @@
 // residente, cualquier otra condición— queda IDÉNTICO. company_owner/admin
 // siguen pasando: user_has_permission los trata como exentos.
 //
+// Una policy de escritura PERMISIVA sin ningún átomo (p. ej. un UPDATE que sólo
+// mira la empresa) no pide permiso alguno: el mapa la declara en `agregar_en`
+// con el fragmento literal junto al que va la acción —«(company_id =
+// get_my_company_id())»— y el generador escribe «(fragmento AND acción)».
+//
 // Y se detiene en vez de adivinar: si una policy conserva un átomo que no supo
 // sustituir, si la clave del átomo no es la del tab de la tabla (y el mapa no
 // la reconoce en `otras_claves`), o si una policy FOR ALL tiene átomos.
@@ -40,6 +45,8 @@
 //                              "UPDATE": ["<tab>.edit", …],     // por defecto [tab.edit]
 //                              "DELETE": ["<tab>.delete", …],   // por defecto [tab.delete]
 //                              "otras_claves": ["<tab2>"],      // átomos de otro tab, reconocidos
+//                              "agregar_en": { "<CMD>": "<fragmento>" }, // policy SIN átomo: la acción va junto al fragmento
+//                              "receta": { "<columna>": "<valor SQL>" },  // sólo para la fila que fabrica el arnés
 //                              "evidencia": { "<tab ajeno>": ["<componente del tab>", …, "<archivo que escribe>"] },
 //                              "porque": "…" } },
 //     "_sin_clave": { "<tab>": "por qué el catálogo no siembra sus claves" } }
@@ -87,6 +94,13 @@ export function cargarMapa(seccion) {
       }
     }
     t.otras_claves ??= []
+    for (const [col, valor] of Object.entries(t.receta ?? {})) {
+      if (!/^[a-z_][a-z0-9_]*$/.test(col) || typeof valor !== 'string') throw new Error(`${tabla}.receta: «${col}» inválida`)
+    }
+    t.agregar_en ??= {}
+    for (const [cmd, frag] of Object.entries(t.agregar_en)) {
+      if (!COMANDOS.includes(cmd) || typeof frag !== 'string' || !frag) throw new Error(`${tabla}.agregar_en: «${cmd}» inválido`)
+    }
   }
   mapa._sin_clave ??= {}
   for (const tab of Object.keys(mapa._sin_clave)) {
@@ -179,7 +193,18 @@ export function transformar(mapa, policies) {
   for (const p of policies) {
     const t = mapa.tablas[p.tabla]
     const donde = `${p.tabla}.${p.nombre}`
-    if (!tieneAtomos(p.using) && !tieneAtomos(p.check)) continue   // sin átomos (feature, MFA, …): no se toca
+    const frag = p.permisiva === 'PERMISSIVE' ? t.agregar_en[p.cmd] : undefined
+    if (!tieneAtomos(p.using) && !tieneAtomos(p.check)) {
+      if (!frag) continue   // sin átomos (feature, MFA, …): no se toca
+      // Sin átomo y declarada en agregar_en: la acción se suma al fragmento.
+      const agregar = e => (e ? e.split(frag).join(`(${frag} AND ${accionSql(t[p.cmd])})`) : e)
+      const usingNuevo = agregar(p.using)
+      const checkNuevo = agregar(p.check)
+      if (usingNuevo === p.using && checkNuevo === p.check) throw new Error(`${donde}: agregar_en no encontró «${frag}»`)
+      salida.push({ ...p, usingNuevo, checkNuevo, pares: t[p.cmd] })
+      continue
+    }
+    if (frag) throw new Error(`${donde}: agregar_en declarado, pero la policy ya tiene átomos de permiso`)
     if (!(p.cmd in ACCION)) throw new Error(`${donde}: policy FOR ${p.cmd} con átomos de permiso; resuélvela a mano`)
     const pares = t[p.cmd]
     const u = sustituir(p.using, pares, t, `${donde} USING`)

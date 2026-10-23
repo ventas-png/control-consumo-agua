@@ -14,6 +14,8 @@ interface Props {
   moneda: string
   autorNombre: string
   canCreate: boolean
+  /** Cerrar definitivamente un año es editar su cierre. */
+  canEdit: boolean
   onRefresh: () => void
 }
 
@@ -22,7 +24,7 @@ const ESTADO_CFG: Record<EstadoCierreAnual, { label: string; bg: string; color: 
   cerrado:  { label: 'Cerrado',  bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
 }
 
-export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, companyId, moneda, autorNombre, canCreate, onRefresh }: Props) {
+export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, companyId, moneda, autorNombre, canCreate, canEdit, onRefresh }: Props) {
   const [selected, setSelected] = useState<CierreAnual | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -77,6 +79,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
   }
 
   async function firmar(c: CierreAnual) {
+    if (!canEdit) return
     const { isConfirmed } = await confirm({
       title: `¿Cerrar definitivamente el año ${c.anio}?`,
       text: 'Esta acción marca el cierre como definitivo. No podrá volver a estado borrador.',
@@ -85,9 +88,10 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
       confirmText: 'Sí, cerrar',
     })
     if (!isConfirmed) return
-    await updateCondominioRow('cierres_anuales', c.id, {
+    const { error } = await updateCondominioRow('cierres_anuales', c.id, {
       estado: 'cerrado', firmado_por: autorNombre, fecha_cierre: new Date().toISOString(),
     })
+    if (error) { toast.error(error.message); return }
     onRefresh()
   }
 
@@ -181,7 +185,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
                 </div>
               ))}
               {selected.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 8 }}>{selected.notas}</div>}
-              {selected.estado === 'borrador' && (
+              {canEdit && selected.estado === 'borrador' && (
                 <button onClick={() => firmar(selected)}
                   style={{ width: '100%', marginTop: 14, padding: '8px 0', background: 'var(--at-accent-2)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                   🔒 Cerrar definitivamente

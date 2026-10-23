@@ -5,7 +5,7 @@ import { MOTIVO_LABEL } from './ui'
 import { EmptyState } from './comunes'
 
 export function VistaBloqueos({ ctx }: { ctx: AmenidadesCtx }) {
-  const { amenidades, bloqueos, canEdit, showBloqueoForm, setShowBloqueoForm, saving, bloqueoForm, setBloqueoForm, hoy, guardarBloqueo, eliminarBloqueo } = ctx
+  const { amenidades, bloqueos, canEdit, canDelete, showBloqueoForm, setShowBloqueoForm, saving, bloqueoForm, setBloqueoForm, hoy, guardarBloqueo, eliminarBloqueo } = ctx
   return (
         <>
           {showBloqueoForm && (
@@ -103,8 +103,8 @@ export function VistaBloqueos({ ctx }: { ctx: AmenidadesCtx }) {
                       <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, background: vigente ? 'var(--at-warning-tint)' : 'var(--at-chip)', color: vigente ? 'var(--at-warning-strong)' : 'var(--at-ink-3)' }}>
                         {vigente ? 'Vigente' : 'Pasado'}
                       </span>
-                      {canEdit && (
-                        <button onClick={() => eliminarBloqueo(b.id)} style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                      {canDelete && (
+                        <button onClick={() => eliminarBloqueo(b.id)} aria-label={`Eliminar bloqueo de ${b.amenidad_nombre ?? 'la amenidad'}`} style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                           Eliminar
                         </button>
                       )}

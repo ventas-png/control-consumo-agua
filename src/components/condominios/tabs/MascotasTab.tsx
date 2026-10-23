@@ -19,6 +19,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.mascotas.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -30,7 +32,7 @@ const ESPECIE_LABEL_KEY: Record<EspecieMascota, TranslationKey> = {
   otro:  'condominios.mascotas.especie_otro_label',
 }
 
-export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const { t } = useTranslation()
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -106,9 +108,12 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: t('condominios.mascotas.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('mascotas', id)
+    const { error } = await deleteCondominioRow('mascotas', id)
+    if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); return }
     onRefresh()
   }
 
@@ -280,10 +285,14 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
           },
           {
             key: 'actions', header: '', align: 'right',
-            render: m => canEdit ? (
+            render: m => (canEdit || canDelete) ? (
               <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                <button onClick={() => startEdit(m)} aria-label={t('condominios.comun.edit')} style={{ padding: '6px 10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)' }}>✏️ {t('condominios.comun.edit')}</button>
-                <button onClick={() => eliminar(m.id)} aria-label={t('condominios.comun.delete')} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px' }}>🗑</button>
+                {canEdit && (
+                  <button onClick={() => startEdit(m)} aria-label={t('condominios.comun.edit')} style={{ padding: '6px 10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)' }}>✏️ {t('condominios.comun.edit')}</button>
+                )}
+                {canDelete && (
+                  <button onClick={() => eliminar(m.id)} aria-label={t('condominios.comun.delete')} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px' }}>🗑</button>
+                )}
               </div>
             ) : null,
           },

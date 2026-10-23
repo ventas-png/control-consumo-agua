@@ -12,6 +12,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.propuestas.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -45,7 +47,7 @@ const blank = (): Partial<PropuestaInversion> => ({
   votos_favor: 0, votos_contra: 0, notas: '',
 })
 
-export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoPropuesta | 'todos'>('todos')
   const [form, setForm] = useState<Partial<PropuestaInversion>>(blank())
   const [editId, setEditId] = useState<string | null>(null)
@@ -113,6 +115,8 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar propuesta?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('propuestas_inversion', id)
@@ -246,7 +250,7 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
                       </select>
                     )}
                     {canEdit && <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                    {canEdit && <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
+                    {canDelete && <button onClick={() => handleDelete(p.id)} title="Eliminar" aria-label={`Eliminar ${p.titulo}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                   </div>
                 </div>
 

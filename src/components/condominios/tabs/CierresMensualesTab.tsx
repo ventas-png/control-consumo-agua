@@ -15,6 +15,8 @@ interface Props {
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.cierres.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -32,7 +34,7 @@ function calcCierre(periodo: string, cuotas: CuotaCondominio[], gastos: GastoCon
   return { totalEmitidas, totalCobradas, totalGastos, saldo: totalCobradas - totalGastos, unidadesMorosas }
 }
 
-export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
+export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, canDelete, onRefresh }: Props) {
   const now = new Date()
   const [periodoNuevo, setPeriodoNuevo] = useState(getPeriodo(new Date(now.getFullYear(), now.getMonth() - 1)))
   const [notas, setNotas] = useState('')
@@ -103,9 +105,12 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar cierre?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('cierres_mensuales', id)
+    const { error } = await deleteCondominioRow('cierres_mensuales', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -205,14 +210,14 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
                 <button onClick={(e) => { e.stopPropagation(); exportarPDF(c) }}
                   style={{ padding: '3px 7px', background: 'var(--at-primary-tint)', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer', color: 'var(--at-primary)', fontWeight: 600 }} title="Exportar PDF" aria-label="Exportar PDF">📄</button>
                 {canEdit && (
-                  <>
-                    <button onClick={(e) => { e.stopPropagation(); toggleEstado(c) }}
-                      style={{ padding: '3px 8px', background: c.estado === 'cerrado' ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', color: c.estado === 'cerrado' ? 'var(--at-warning-strong)' : 'var(--at-success)', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                      {c.estado === 'cerrado' ? '↩ Reabrir' : '✓ Cerrar'}
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id) }} aria-label="Eliminar cierre"
-                      style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                  </>
+                  <button onClick={(e) => { e.stopPropagation(); toggleEstado(c) }}
+                    style={{ padding: '3px 8px', background: c.estado === 'cerrado' ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', color: c.estado === 'cerrado' ? 'var(--at-warning-strong)' : 'var(--at-success)', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                    {c.estado === 'cerrado' ? '↩ Reabrir' : '✓ Cerrar'}
+                  </button>
+                )}
+                {canDelete && (
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id) }} aria-label="Eliminar cierre"
+                    style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                 )}
               </div>
             ) },

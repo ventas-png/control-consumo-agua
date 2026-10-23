@@ -8,7 +8,7 @@ import { ModalPortal } from '../../../shared/ModalPortal'
 import { tint } from '../../../shared/statusTone'
 
 export function NovedadDetalleModal({ ctx }: { ctx: SeguridadCtx }) {
-  const { rondas, canEdit, novedadDetalle, setNovedadDetalle, eliminarNovedad } = ctx
+  const { rondas, canDelete, novedadDetalle, setNovedadDetalle, eliminarNovedad } = ctx
 
   if (!novedadDetalle) return null
 
@@ -124,7 +124,7 @@ export function NovedadDetalleModal({ ctx }: { ctx: SeguridadCtx }) {
 
           {/* Acciones */}
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid var(--at-chip)' }}>
-            {canEdit && (
+            {canDelete && (
               <button onClick={async () => { setNovedadDetalle(null); await eliminarNovedad(novedadDetalle.id) }}
                 style={{ padding: '9px 16px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1.5px solid var(--at-danger-border)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
                 🗑 Eliminar

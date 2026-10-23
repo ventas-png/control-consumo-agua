@@ -98,6 +98,7 @@ import { ContratosProveedorTab } from '../ContratosProveedorTab'
 import { ImportarProveedoresModal } from '../ImportarProveedoresModal'
 import { ReglasCompraSection } from '../ReglasCompraSection'
 import type { ContratoProveedorCatalogo, ProveedorCatalogo } from '../../../types/proveedores'
+import { eliminarExigeSuPermiso } from '../../../test/eliminarExigeSuPermiso'
 
 const PROVS = [
   { id: 'p1', company_id: 'c1', nombre: 'Aguas del Norte', nit: '1234567-8', pais: 'GT', codigo: 'PRV-00001', estado: 'autorizado', alcance: 'empresa', activo: true, dias_credito: 0 },
@@ -146,7 +147,7 @@ describe('ProveedorSelector', () => {
 })
 
 describe('ContratosProveedorTab', () => {
-  const props = { proyectoId: 'pr1', proyectoNombre: 'Torre Sur', companyId: 'c1', moneda: 'GTQ', canCreate: true, canEdit: true, onRefresh: vi.fn() }
+  const props = { proyectoId: 'pr1', proyectoNombre: 'Torre Sur', companyId: 'c1', moneda: 'GTQ', canCreate: true, canEdit: true, canDelete: true, onRefresh: vi.fn() }
 
   it('declara empresa y proyecto activos y se llama «Contratos», no «Proveedores»', () => {
     render(<ContratosProveedorTab {...props} contratos={[]} />)
@@ -201,10 +202,16 @@ describe('ContratosProveedorTab', () => {
     expect(screen.queryByText('+ Nuevo contrato')).toBeNull()
     expect(screen.getByText('Historial')).toBeTruthy()
   })
+
+  // Eliminar un borrador exige condominios.tab.proveedores.delete, lo mismo que la base
+  // (supabase/rls-acciones/operaciones.json): editar no basta, y sin editar sí se borra.
+  eliminarExigeSuPermiso('Contratos (borrador)', p => render(
+    <ContratosProveedorTab {...props} {...p} contratos={[contrato({ estado: 'borrador' })]} />,
+  ), /^Eliminar$/, m.eliminar, 'k1')
 })
 
 describe('ContratosProveedorTab · conectado a las compras', () => {
-  const props = { proyectoId: 'pr1', proyectoNombre: 'Torre Sur', companyId: 'c1', moneda: 'GTQ', canCreate: true, canEdit: true, onRefresh: vi.fn() }
+  const props = { proyectoId: 'pr1', proyectoNombre: 'Torre Sur', companyId: 'c1', moneda: 'GTQ', canCreate: true, canEdit: true, canDelete: true, onRefresh: vi.fn() }
   const activo = (over: Partial<ContratoProveedorCatalogo> = {}) => contrato({
     estado: 'activo', modalidad: 'por_demanda', moneda: 'GTQ', monto_maximo: 1000, responsable_id: 'u1',
     fecha_inicio: '2020-01-01', fecha_fin: '2099-12-31', referencia: 'CT-01', ...over,

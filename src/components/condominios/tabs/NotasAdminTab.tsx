@@ -11,6 +11,8 @@ interface Props {
   autorNombre: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.notas_admin.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -29,7 +31,7 @@ const PRIORIDADES: { value: PrioridadNota; label: string; color: string; bg: str
   { value: 'urgente', label: 'Urgente', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 ]
 
-export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombre, canCreate, canEdit, onRefresh }: Props) {
+export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombre, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [selected, setSelected] = useState<NotaAdmin | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -108,9 +110,12 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
   }
 
   async function eliminar(n: NotaAdmin) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const res = await confirm({ title: 'Eliminar nota', text: '¿Eliminar esta nota?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    await deleteCondominioRow('notas_admin', n.id)
+    const { error } = await deleteCondominioRow('notas_admin', n.id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === n.id) setSelected(null)
     onRefresh()
   }
@@ -292,16 +297,20 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
                 {selected.contenido}
               </div>
 
-              {canEdit && !selected.resuelta && (
+              {(canEdit || canDelete) && !selected.resuelta && (
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => resolver(selected)}
-                    style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                    ✓ Resolver
-                  </button>
-                  <button onClick={() => eliminar(selected)}
-                    style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                    🗑 Eliminar
-                  </button>
+                  {canEdit && (
+                    <button onClick={() => resolver(selected)}
+                      style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      ✓ Resolver
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button onClick={() => eliminar(selected)}
+                      style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      🗑 Eliminar
+                    </button>
+                  )}
                 </div>
               )}
             </div>

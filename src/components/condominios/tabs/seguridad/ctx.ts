@@ -49,6 +49,8 @@ export interface SeguridadCtx {
   proyectoId: string
   canCreate: boolean
   canEdit: boolean
+  /** Borrar una novedad tiene su propio permiso (condominios.tab.seguridad.delete). */
+  canDelete: boolean
 
   // ── Estado compartido ──
   saving: boolean

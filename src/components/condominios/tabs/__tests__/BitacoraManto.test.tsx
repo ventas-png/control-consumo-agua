@@ -33,7 +33,7 @@ function registro(over: Partial<BitacoraMantoRow> = {}): BitacoraMantoRow {
 }
 
 function props(over: Partial<Parameters<typeof BitacoraManto>[0]> = {}): Parameters<typeof BitacoraManto>[0] {
-  return { registros: [registro()], proyectoId: 'p1', companyId: 'co1', canCreate: true, canEdit: true, onRefresh: () => {}, ...over }
+  return { registros: [registro()], proyectoId: 'p1', companyId: 'co1', canCreate: true, canEdit: true, canDelete: true, onRefresh: () => {}, ...over }
 }
 
 beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })

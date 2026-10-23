@@ -487,7 +487,7 @@ describe('Contratos de proveedor › cambiar el estado: cero filas NO es éxito'
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
     const invalidar = vi.spyOn(qc, 'invalidateQueries')
     montarConSesion(
-      <ContratosProveedorTab contratos={[contrato] as never} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit onRefresh={onRefresh} />,
+      <ContratosProveedorTab contratos={[contrato] as never} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit canDelete onRefresh={onRefresh} />,
       { permisos: VER_Y_EDITAR, queryClient: qc },
     )
     fireEvent.click(screen.getByText('Suspender'))

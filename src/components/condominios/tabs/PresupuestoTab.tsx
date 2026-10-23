@@ -13,6 +13,8 @@ interface Props {
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.presupuesto.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -38,7 +40,7 @@ function barColor(p: number) {
   return 'var(--at-success)'
 }
 
-export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canEdit, onRefresh }: Props) {
+export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canEdit, canDelete, onRefresh }: Props) {
   const currentYear = new Date().getFullYear()
   const [anio, setAnio] = useState(currentYear)
   const [editCat, setEditCat] = useState<CategoriaGasto | null>(null)
@@ -91,9 +93,12 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar presupuesto?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('presupuesto_condominio', id)
+    const { error } = await deleteCondominioRow('presupuesto_condominio', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -224,12 +229,12 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
                     ) : <span style={{ color: 'var(--at-line-strong)', fontSize: '12px' }}>—</span>}
                   </td>
                   <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                    {canEdit && (
+                    {(canEdit || canDelete) && (
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                        <button onClick={() => startEdit(cat)} style={{ padding: '3px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        {canEdit && <button onClick={() => startEdit(cat)} style={{ padding: '3px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                           {presupuestado > 0 ? '✏️' : '+ Asignar'}
-                        </button>
-                        {p && <button onClick={() => handleDelete(p.id)} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
+                        </button>}
+                        {canDelete && p && <button onClick={() => handleDelete(p.id)} title="Eliminar" aria-label={`Eliminar presupuesto de ${CAT_LABELS[cat].label}`} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                       </div>
                     )}
                   </td>

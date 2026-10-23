@@ -10,6 +10,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.notificaciones.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -43,7 +45,7 @@ const BLANK = {
   dias_anticipacion: 0, mensaje_template: '', activo: true,
 }
 
-export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
@@ -90,9 +92,12 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar regla?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('reglas_notificacion', id)
+    const { error } = await deleteCondominioRow('reglas_notificacion', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -217,14 +222,20 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
                       </div>
                     )}
                   </div>
-                  {canEdit && (
+                  {(canEdit || canDelete) && (
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                      <button onClick={() => toggleActivo(r)}
-                        style={{ padding: '3px 8px', background: r.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', color: r.activo ? 'var(--at-warning-strong)' : 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                        {r.activo ? 'Desactivar' : 'Activar'}
-                      </button>
-                      <button onClick={() => startEdit(r)} style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(r.id)} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                      {canEdit && (
+                        <button onClick={() => toggleActivo(r)}
+                          style={{ padding: '3px 8px', background: r.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', color: r.activo ? 'var(--at-warning-strong)' : 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                          {r.activo ? 'Desactivar' : 'Activar'}
+                        </button>
+                      )}
+                      {canEdit && (
+                        <button onClick={() => startEdit(r)} style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => handleDelete(r.id)} title="Eliminar" aria-label={`Eliminar ${r.nombre}`} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                      )}
                     </div>
                   )}
                 </div>
