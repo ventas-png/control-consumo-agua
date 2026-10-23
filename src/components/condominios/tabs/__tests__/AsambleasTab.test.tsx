@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react'
-import type { Asamblea, Unidad, EscrutinioAsamblea, PadronAsamblea, AsistenciaAsamblea } from '../../../../types'
+import type { Asamblea, Unidad, EscrutinioAsamblea, PadronAsamblea, AsistenciaAsamblea, ActaReunion } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
   deleteCondominioRowAfectando: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
   upsertCondominioRow: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
+  generarActaAsamblea: vi.fn(async () => ({ data: 'acta1' as string | null, error: null as { message: string; code?: string } | null })),
   fetchPuntosAsambleaConVotos: vi.fn(async () => [
     {
       id: 'pt1', asamblea_id: 'a1', orden: 1, titulo: 'Aprobar presupuesto', descripcion: null, tipo: 'votacion',
@@ -28,6 +29,7 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
   upsertCondominioRow: mocks.upsertCondominioRow,
+  generarActaAsamblea: mocks.generarActaAsamblea,
 }))
 vi.mock('../../../../domain/condominios/tabQueries', () => ({
   fetchPuntosAsambleaConVotos: mocks.fetchPuntosAsambleaConVotos,
@@ -434,5 +436,147 @@ describe('AsambleasTab — quórum y resultados', () => {
     cleanup()
     renderTab({ asambleas: [asamblea({ estado: 'programada' })] })
     expect(screen.getByText('Quórum requerido: 50 %')).toBeTruthy()
+  })
+})
+
+// ── Fase 3: modalidad, edición y acta formal ─────────────────────────────────
+describe('AsambleasTab — modalidad, edición y acta formal', () => {
+  it('una asamblea virtual se convoca con su link y su descripción', async () => {
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: '+ Convocar asamblea' }))
+    const dialog = screen.getByRole('dialog', { name: 'Convocar asamblea' })
+    expect(within(dialog).queryByLabelText('Link de reunión')).toBeNull()
+
+    fireEvent.change(within(dialog).getByLabelText('Título *'), { target: { value: 'Asamblea Julio' } })
+    fireEvent.change(within(dialog).getByLabelText('Fecha *'), { target: { value: '2026-07-10' } })
+    fireEvent.change(within(dialog).getByLabelText('Hora inicio *'), { target: { value: '19:00' } })
+    fireEvent.change(within(dialog).getByLabelText('Modalidad'), { target: { value: 'virtual' } })
+    fireEvent.change(within(dialog).getByLabelText('Link de reunión'), { target: { value: ' https://meet.google.com/abc ' } })
+    fireEvent.change(within(dialog).getByLabelText('Descripción'), { target: { value: 'Elección de junta' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '📅 Convocar' }))
+
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('asambleas', expect.objectContaining({
+      titulo: 'Asamblea Julio', modalidad: 'virtual', link_reunion: 'https://meet.google.com/abc', descripcion: 'Elección de junta',
+    })))
+  })
+
+  it('un link que no es una dirección web se avisa antes de guardar; presencial no guarda link', async () => {
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: '+ Convocar asamblea' }))
+    const dialog = screen.getByRole('dialog', { name: 'Convocar asamblea' })
+    fireEvent.change(within(dialog).getByLabelText('Título *'), { target: { value: 'Asamblea Julio' } })
+    fireEvent.change(within(dialog).getByLabelText('Fecha *'), { target: { value: '2026-07-10' } })
+    fireEvent.change(within(dialog).getByLabelText('Hora inicio *'), { target: { value: '19:00' } })
+    fireEvent.change(within(dialog).getByLabelText('Modalidad'), { target: { value: 'hibrida' } })
+    fireEvent.change(within(dialog).getByLabelText('Link de reunión'), { target: { value: 'meet.google.com/abc' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '📅 Convocar' }))
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('El link de reunión es una dirección web completa (https://…).'))
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+
+    // Vuelta a presencial: el link escrito no viaja.
+    fireEvent.change(within(dialog).getByLabelText('Modalidad'), { target: { value: 'presencial' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '📅 Convocar' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('asambleas', expect.objectContaining({
+      modalidad: 'presencial', link_reunion: null, descripcion: null,
+    })))
+  })
+
+  it('editar una programada guarda los datos y el quórum', async () => {
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh, asambleas: [asamblea({ estado: 'programada', modalidad: 'virtual', link_reunion: 'https://meet.google.com/abc' })] })
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Asamblea Ordinaria Abril' }))
+    const dialog = screen.getByRole('dialog', { name: 'Editar asamblea' })
+    expect((within(dialog).getByLabelText('Link de reunión') as HTMLInputElement).value).toBe('https://meet.google.com/abc')
+    fireEvent.change(within(dialog).getByLabelText('Lugar'), { target: { value: 'Casa club' } })
+    fireEvent.change(within(dialog).getByLabelText('Quórum requerido (%)'), { target: { value: '60' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '💾 Guardar' }))
+
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('asambleas', 'a1', expect.objectContaining({
+      lugar: 'Casa club', modalidad: 'virtual', link_reunion: 'https://meet.google.com/abc', quorum_requerido: 60,
+    })))
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('Asamblea actualizada')
+    expect(onRefresh).toHaveBeenCalled()
+  })
+
+  it('en curso el quórum ya no se edita (la base lo fijó al abrir); finalizada no se edita', async () => {
+    renderTab()
+    expect(screen.queryByRole('button', { name: 'Editar Asamblea Extraordinaria Mayo' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Asamblea Ordinaria Abril' }))
+    const dialog = screen.getByRole('dialog', { name: 'Editar asamblea' })
+    expect((within(dialog).getByLabelText('Quórum requerido (%)') as HTMLInputElement).disabled).toBe(true)
+    fireEvent.change(within(dialog).getByLabelText('Lugar'), { target: { value: 'Casa club' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '💾 Guardar' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalled())
+    const [, , cambios] = mocks.updateCondominioRow.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
+    expect(cambios.lugar).toBe('Casa club')
+    expect(cambios).not.toHaveProperty('quorum_requerido')
+  })
+
+  it('una asamblea abierta con link ofrece unirse; la lista y el detalle dicen la modalidad', async () => {
+    renderTab({ asambleas: [asamblea({ modalidad: 'hibrida', link_reunion: 'https://meet.google.com/abc', descripcion: 'Elección de junta' })] })
+    expect(screen.getByText('🔀 Híbrida')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Ordinaria Abril/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Elección de junta')).toBeTruthy()
+    expect(within(dialog).getByRole('link', { name: '🔗 Unirse a la reunión' }).getAttribute('href')).toBe('https://meet.google.com/abc')
+    expect(within(dialog).getByText(/🔀 Híbrida/)).toBeTruthy()
+  })
+
+  it('finalizada: levantar el acta formal la crea en la base y recarga', async () => {
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh, canCrearActa: true })
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Extraordinaria Mayo/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Asamblea Extraordinaria Mayo' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '📄 Levantar acta formal' }))
+    await waitFor(() => expect(mocks.generarActaAsamblea).toHaveBeenCalledWith('a2'))
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('Acta formal levantada: la encuentras en Actas para revisarla y aprobarla.')
+    expect(onRefresh).toHaveBeenCalled()
+  })
+
+  it('un acta que la base no levanta se avisa y no recarga', async () => {
+    mocks.generarActaAsamblea.mockResolvedValueOnce({ data: null, error: { message: 'No autorizado: levantar el acta pide crear actas', code: '42501' } })
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh, canCrearActa: true })
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Extraordinaria Mayo/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '📄 Levantar acta formal' }))
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('No se levantó el acta: No autorizado: levantar el acta pide crear actas'))
+    expect(onRefresh).not.toHaveBeenCalled()
+  })
+
+  it('sin permiso de crear actas no se ofrece; con el acta ya levantada se nombra en vez del botón', () => {
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Extraordinaria Mayo/ }))
+    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: '📄 Levantar acta formal' })).toBeNull()
+    cleanup()
+
+    const acta = { id: 'ac1', asamblea_id: 'a2', titulo: 'Acta — Asamblea Extraordinaria Mayo', aprobada: true } as unknown as ActaReunion
+    renderTab({ canCrearActa: true, actas: [acta] })
+    fireEvent.click(screen.getByRole('button', { name: /^Asamblea Extraordinaria Mayo/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByRole('button', { name: '📄 Levantar acta formal' })).toBeNull()
+    expect(within(dialog).getByText('Acta — Asamblea Extraordinaria Mayo')).toBeTruthy()
+    expect(within(dialog).getByText(/\(en Actas\) · aprobada/)).toBeTruthy()
+  })
+
+  it('imprimir el acta abre la hoja con el texto del acta escapado', async () => {
+    const write = vi.fn()
+    const win = { document: { write, close: vi.fn() }, print: vi.fn() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(win as unknown as Window)
+    try {
+      renderTab({ asambleas: [asamblea({ id: 'a2', estado: 'finalizada', acta: 'Se aprobó <b>todo</b>.' })] })
+      fireEvent.click(screen.getByRole('button', { name: /^Asamblea Ordinaria Abril/ }))
+      const dialog = screen.getByRole('dialog')
+      await within(dialog).findByText('Aprobar presupuesto')
+      fireEvent.click(within(dialog).getByRole('button', { name: '🖨️ Imprimir acta' }))
+      expect(open).toHaveBeenCalledWith('', '_blank')
+      const html = write.mock.calls[0][0] as string
+      expect(html).toContain('ACTA DE ASAMBLEA — Asamblea Ordinaria Abril')
+      expect(html).toContain('Aprobar presupuesto')
+      expect(html).toContain('Se aprobó &lt;b&gt;todo&lt;/b&gt;.')
+      expect(win.print).toHaveBeenCalled()
+    } finally {
+      open.mockRestore()
+    }
   })
 })

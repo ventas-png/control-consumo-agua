@@ -3,14 +3,16 @@ import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
 import { FileUploader } from '../../shared/FileUploader'
 import { SecureFileLink } from '../../shared/SecureFileLink'
-import { createCondominioRow, updateCondominioRow, deleteCondominioRowAfectando, upsertCondominioRow } from '../../../domain/condominios/tabMutations'
+import { createCondominioRow, updateCondominioRow, deleteCondominioRowAfectando, upsertCondominioRow, generarActaAsamblea } from '../../../domain/condominios/tabMutations'
 import { fetchPuntosAsambleaConVotos, fetchPadronAsamblea, fetchAsistenciaAsamblea, fetchEscrutinioAsamblea } from '../../../domain/condominios/tabQueries'
 import { removeCondominiosMedia } from '../../../domain/shared/storage'
 import { toast } from '../../../lib/toast'
+import { printHtml, raw } from '../../../lib/printHtml'
 import { confirm } from '../../shared/Dialog'
 import type {
   Asamblea, PuntoAsamblea, VotoAsamblea, Unidad, TipoAsamblea, EstadoAsamblea, TipoPunto, TipoVoto,
   TipoMayoria, ModalidadAsistencia, DecisionPunto, PadronAsamblea, AsistenciaAsamblea, EscrutinioAsamblea, EscrutinioPunto,
+  ModalidadAsamblea, ActaReunion,
 } from '../../../types'
 
 interface Props {
@@ -24,6 +26,10 @@ interface Props {
   /** Eliminar tiene su propio permiso (condominios.tab.<tab>.delete): ver o
    *  editar no basta. */
   canDelete: boolean
+  /** Actas formales del condominio: la de cada asamblea finalizada se liga por asamblea_id. */
+  actas?: ActaReunion[]
+  /** Levantar el acta formal pide crear actas (condominios.tab.actas.create). */
+  canCrearActa?: boolean
   onRefresh: () => void
 }
 
@@ -57,6 +63,16 @@ const MAYORIA_CONFIG: Record<TipoMayoria, { label: string; regla: string }> = {
   calificada: { label: 'Calificada',       regla: 'A favor, al menos ese porcentaje del padrón completo.' },
 }
 
+// La asamblea digital de antes es una asamblea virtual o híbrida (20261106000300).
+const MODALIDAD_ASAMBLEA: Record<ModalidadAsamblea, { label: string; icon: string }> = {
+  presencial: { label: 'Presencial', icon: '🏛️' },
+  virtual:    { label: 'Virtual',    icon: '💻' },
+  hibrida:    { label: 'Híbrida',    icon: '🔀' },
+}
+
+// El CHECK asambleas_link_reunion_check: sólo http/https, sin espacios.
+const LINK_VALIDO = /^https?:\/\/\S+$/i
+
 const MODALIDAD_LABEL: Record<ModalidadAsistencia, string> = {
   presencial: 'Presencial',
   virtual:    'Virtual',
@@ -78,8 +94,18 @@ function etiquetaMayoria(p: Pick<PuntoAsamblea, 'mayoria' | 'mayoria_pct'>): str
   return m === 'calificada' && p.mayoria_pct != null ? `Calificada ${pct(p.mayoria_pct)}` : MAYORIA_CONFIG[m].label
 }
 
-export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh }: Props) {
+const FORM_VACIO = {
+  titulo: '', tipo: 'ordinaria' as TipoAsamblea,
+  fecha: '', hora_inicio: '', hora_fin: '', lugar: '',
+  quorum_requerido: '50',
+  modalidad: 'presencial' as ModalidadAsamblea, link_reunion: '', descripcion: '',
+}
+
+export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userId, canCreate, canEdit, canDelete, actas = [], canCrearActa = false, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
+  // Asamblea que se edita en la ventana de convocatoria (null: una nueva).
+  const [editId, setEditId] = useState<string | null>(null)
+  const [levantando, setLevantando] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [puntos, setPuntos] = useState<(PuntoAsamblea & { votos: VotoAsamblea[] })[]>([])
@@ -92,11 +118,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   const [showPuntoForm, setShowPuntoForm] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoAsamblea | 'todos'>('todos')
 
-  const [form, setForm] = useState({
-    titulo: '', tipo: 'ordinaria' as TipoAsamblea,
-    fecha: '', hora_inicio: '', hora_fin: '', lugar: '',
-    quorum_requerido: '50',
-  })
+  const [form, setForm] = useState({ ...FORM_VACIO })
   const [puntoForm, setPuntoForm] = useState({ titulo: '', descripcion: '', tipo: 'informativo' as TipoPunto, mayoria: 'simple' as TipoMayoria, mayoria_pct: '66.67' })
   const actaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -105,8 +127,19 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   const selectedAsamblea = asambleas.find(a => a.id === selectedId)
 
   function resetForm() {
-    setForm({ titulo: '', tipo: 'ordinaria', fecha: '', hora_inicio: '', hora_fin: '', lugar: '', quorum_requerido: '50' })
+    setForm({ ...FORM_VACIO })
+    setEditId(null)
     setShowForm(false)
+  }
+
+  function abrirEditar(a: Asamblea) {
+    setForm({
+      titulo: a.titulo, tipo: a.tipo, fecha: a.fecha, hora_inicio: a.hora_inicio?.slice(0, 5) ?? '',
+      hora_fin: a.hora_fin?.slice(0, 5) ?? '', lugar: a.lugar ?? '', quorum_requerido: String(a.quorum_requerido),
+      modalidad: a.modalidad ?? 'presencial', link_reunion: a.link_reunion ?? '', descripcion: a.descripcion ?? '',
+    })
+    setEditId(a.id)
+    setShowForm(true)
   }
 
   function cerrarForm() {
@@ -126,19 +159,60 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   async function handleGuardar() {
     if (!form.titulo.trim()) { toast.error('Ingrese el título.'); return }
     if (!form.fecha || !form.hora_inicio) { toast.error('Ingrese fecha y hora de inicio.'); return }
-    setSaving(true)
-    const { error } = await createCondominioRow('asambleas', {
-      company_id: companyId, project_id: proyectoId,
+    const presencial = form.modalidad === 'presencial'
+    const link = presencial ? '' : form.link_reunion.trim()
+    if (link && !LINK_VALIDO.test(link)) { toast.error('El link de reunión es una dirección web completa (https://…).'); return }
+    const datos = {
       titulo: form.titulo.trim(), tipo: form.tipo,
       fecha: form.fecha, hora_inicio: form.hora_inicio,
       hora_fin: form.hora_fin || null, lugar: form.lugar.trim() || null,
-      quorum_requerido: Number(form.quorum_requerido),
-      estado: 'programada', convocado_por: userId,
-    })
+      modalidad: form.modalidad, link_reunion: link || null, descripcion: form.descripcion.trim() || null,
+    }
+    const editando = editId ? asambleas.find(a => a.id === editId) : undefined
+    setSaving(true)
+    const { error } = editId
+      // El quórum requerido se fija al convocar: la base no lo deja cambiar
+      // con la asamblea abierta (ASAMBLEA_QUORUM).
+      ? await updateCondominioRow('asambleas', editId, editando?.estado === 'programada'
+          ? { ...datos, quorum_requerido: Number(form.quorum_requerido) } : datos)
+      : await createCondominioRow('asambleas', {
+          ...datos, company_id: companyId, project_id: proyectoId,
+          quorum_requerido: Number(form.quorum_requerido),
+          estado: 'programada', convocado_por: userId,
+        })
     setSaving(false)
     if (error) { toast.error(error.message); return }
-    toast.success('Asamblea convocada')
+    toast.success(editId ? 'Asamblea actualizada' : 'Asamblea convocada')
     resetForm(); onRefresh()
+  }
+
+  async function levantarActa(asambleaId: string) {
+    setLevantando(true)
+    const { error } = await generarActaAsamblea(asambleaId)
+    setLevantando(false)
+    if (error) { toast.error(`No se levantó el acta: ${error.message}`); return }
+    toast.success('Acta formal levantada: la encuentras en Actas para revisarla y aprobarla.')
+    onRefresh()
+  }
+
+  function imprimirActa(a: Asamblea) {
+    const win = window.open('', '_blank')
+    if (!win) return
+    const mod = MODALIDAD_ASAMBLEA[a.modalidad ?? 'presencial']
+    const lineas = puntos.map((p, i) => {
+      const e = (escrutinio?.puntos ?? []).find(x => x.punto_id === p.id)
+      const resultado = e ? `${DECISION_CONFIG[e.decision].label} — a favor ${e.a_favor.unidades}, en contra ${e.en_contra.unidades}, abstención ${e.abstencion.unidades} (${etiquetaMayoria(p)})` : (p.resultado ?? '')
+      return printHtml`<li><strong>${i + 1}. ${p.titulo}</strong>${resultado ? raw(printHtml` — ${resultado}`) : ''}</li>`
+    }).join('')
+    win.document.write(printHtml`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta — ${a.titulo}</title>
+    <style>body{font-family:Arial,sans-serif;padding:40px;max-width:800px;margin:auto;font-size:13px;line-height:1.6}h1{font-size:20px}.meta{background:#f4f4f4;padding:12px;border-radius:8px;margin:16px 0;font-size:12px}pre{white-space:pre-wrap;font-family:inherit}</style>
+    </head><body>
+    <h1>ACTA DE ASAMBLEA — ${a.titulo}</h1>
+    <div class="meta">${a.tipo} · ${a.fecha} ${a.hora_inicio}${a.lugar ? ` · ${a.lugar}` : ''} · ${mod.label}${escrutinio ? ` · Quórum ${pct(escrutinio.quorum_pct)} de ${pct(escrutinio.quorum_requerido)}` : ''}</div>
+    ${lineas ? raw(printHtml`<h2>Orden del día</h2><ul>${raw(lineas)}</ul>`) : ''}
+    <h2>Acta</h2><pre>${a.acta ?? '(Sin acta registrada)'}</pre>
+    </body></html>`)
+    win.document.close(); win.print()
   }
 
   async function cambiarEstado(id: string, estado: EstadoAsamblea) {
@@ -288,7 +362,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
           teléfono la empujaba fuera de la vista. */}
       {showForm && (
         <EditModal
-          title="Convocar asamblea"
+          title={editId ? 'Editar asamblea' : 'Convocar asamblea'}
           maxWidth="620px"
           fullScreenOnMobile
           closeOnBackdropClick={!saving}
@@ -296,7 +370,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
           onClose={cerrarForm}
           footer={<>
             <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
-            <Button onClick={handleGuardar} loading={saving} loadingText="Guardando...">📅 Convocar</Button>
+            <Button onClick={handleGuardar} loading={saving} loadingText="Guardando...">{editId ? '💾 Guardar' : '📅 Convocar'}</Button>
           </>}
         >
           {/* Columnas que se acomodan al ancho: con `1fr 1fr` fijo cada campo
@@ -317,7 +391,9 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
             </div>
             <div>
               <label htmlFor="asam-quorum" style={labelStyle}>Quórum requerido (%)</label>
+              {/* Se fija al convocar: con la asamblea abierta la base no lo deja cambiar. */}
               <input id="asam-quorum" type="number" value={form.quorum_requerido} onChange={e => setForm(f => ({ ...f, quorum_requerido: e.target.value }))} min="1" max="100"
+                disabled={!!editId && asambleas.find(a => a.id === editId)?.estado !== 'programada'}
                 style={inputStyle} />
             </div>
             <div>
@@ -339,6 +415,27 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
               <label htmlFor="asam-lugar" style={labelStyle}>Lugar</label>
               <input id="asam-lugar" value={form.lugar} onChange={e => setForm(f => ({ ...f, lugar: e.target.value }))} placeholder="Salón de reuniones, Área BBQ..."
                 style={inputStyle} />
+            </div>
+            <div>
+              <label htmlFor="asam-modalidad" style={labelStyle}>Modalidad</label>
+              <select id="asam-modalidad" value={form.modalidad} onChange={e => setForm(f => ({ ...f, modalidad: e.target.value as ModalidadAsamblea }))}
+                style={inputStyle}>
+                {(Object.keys(MODALIDAD_ASAMBLEA) as ModalidadAsamblea[]).map(m => (
+                  <option key={m} value={m}>{MODALIDAD_ASAMBLEA[m].icon} {MODALIDAD_ASAMBLEA[m].label}</option>
+                ))}
+              </select>
+            </div>
+            {form.modalidad !== 'presencial' && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label htmlFor="asam-link" style={labelStyle}>Link de reunión</label>
+                <input id="asam-link" type="url" value={form.link_reunion} onChange={e => setForm(f => ({ ...f, link_reunion: e.target.value }))} placeholder="https://meet.google.com/..."
+                  style={inputStyle} />
+              </div>
+            )}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="asam-descripcion" style={labelStyle}>Descripción</label>
+              <textarea id="asam-descripcion" value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} rows={2}
+                placeholder="Lo que se convoca a tratar (los puntos se agregan en la agenda)" style={{ ...inputStyle, resize: 'vertical' }} />
             </div>
           </div>
         </EditModal>
@@ -367,6 +464,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                 <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '4px 10px', flexWrap: 'wrap' }}>
                   <span>📅 {a.fecha} {a.hora_inicio}</span>
                   {a.lugar && <span>📍 {a.lugar}</span>}
+                  {a.modalidad && a.modalidad !== 'presencial' && <span>{MODALIDAD_ASAMBLEA[a.modalidad].icon} {MODALIDAD_ASAMBLEA[a.modalidad].label}</span>}
                   <span>{a.quorum_alcanzado != null
                     ? `Quórum: ${pct(a.quorum_alcanzado)} de ${pct(a.quorum_requerido)}`
                     : `Quórum requerido: ${pct(a.quorum_requerido)}`}</span>
@@ -382,6 +480,9 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                   </select>
                 ) : (
                   <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
+                )}
+                {canEdit && TRANSICIONES[a.estado].length > 0 && (
+                  <button onClick={() => abrirEditar(a)} aria-label={`Editar ${a.titulo}`} title="Editar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '14px', padding: '4px 6px' }}>✏️</button>
                 )}
                 {canDelete && <button onClick={() => eliminar(a.id)} aria-label={`Eliminar ${a.titulo}`} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px', padding: '4px 6px' }}>🗑</button>}
               </div>
@@ -405,12 +506,14 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
         const asistenciaDe = new Map(asistencia.map(s => [s.unidad_id, s]))
         const votaron = new Set(puntos.flatMap(p => (p.votos ?? []).map(v => v.unidad_id)))
         const escrutinioDe = new Map((escrutinio?.puntos ?? []).map(e => [e.punto_id, e]))
+        const modalidad = MODALIDAD_ASAMBLEA[selectedAsamblea.modalidad ?? 'presencial']
+        const actaFormal = actas.find(x => x.asamblea_id === selectedAsamblea.id)
         return (
           <EditModal
             title={selectedAsamblea.titulo}
             subtitle={<span style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
-              <span>{selectedAsamblea.tipo} · 📅 {selectedAsamblea.fecha} {selectedAsamblea.hora_inicio}{selectedAsamblea.lugar ? ` · 📍 ${selectedAsamblea.lugar}` : ''}</span>
+              <span>{selectedAsamblea.tipo} · 📅 {selectedAsamblea.fecha} {selectedAsamblea.hora_inicio}{selectedAsamblea.lugar ? ` · 📍 ${selectedAsamblea.lugar}` : ''} · {modalidad.icon} {modalidad.label}</span>
             </span>}
             maxWidth="720px"
             fullScreenOnMobile
@@ -419,6 +522,16 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
               <Button variant="secondary" onClick={() => setShowPuntoForm(v => !v)} aria-expanded={showPuntoForm}>+ Punto</Button>
             ) : undefined}
           >
+            {(selectedAsamblea.descripcion || (selectedAsamblea.link_reunion && TRANSICIONES[selectedAsamblea.estado].length > 0)) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 14px', marginBottom: '14px', fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
+                {selectedAsamblea.descripcion && <span style={{ flex: '1 1 240px', whiteSpace: 'pre-wrap' }}>{selectedAsamblea.descripcion}</span>}
+                {/* El CHECK de la base sólo deja http/https: es seguro como href. */}
+                {selectedAsamblea.link_reunion && TRANSICIONES[selectedAsamblea.estado].length > 0 && (
+                  <a href={selectedAsamblea.link_reunion} target="_blank" rel="noreferrer" style={{ fontWeight: 600, color: 'var(--at-primary)' }}>🔗 Unirse a la reunión</a>
+                )}
+              </div>
+            )}
+
             {escrutinio && (
               <section aria-label="Quórum" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 14px', background: 'var(--at-surface-2)', borderRadius: '10px', padding: '10px 14px', marginBottom: '14px', fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
                 <strong style={{ color: 'var(--at-ink)' }}>Quórum</strong>
@@ -629,6 +742,20 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
               <div style={{ marginTop: '14px', borderTop: '1px solid var(--at-line)', paddingTop: '12px' }}>
                 <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>📝 Acta</p>
                 <p style={{ fontSize: '13.5px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{selectedAsamblea.acta}</p>
+              </div>
+            )}
+            {/* El acta formal (Actas) se levanta desde la asamblea con lo que la
+                base ya sabe: asistencia, orden del día, resultados y quórum. */}
+            {selectedAsamblea.estado === 'finalizada' && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 12px', marginTop: '14px' }}>
+                <Button variant="secondary" size="sm" onClick={() => imprimirActa(selectedAsamblea)}>🖨️ Imprimir acta</Button>
+                {actaFormal ? (
+                  <span style={{ fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
+                    📄 Acta formal: <strong>{actaFormal.titulo}</strong> (en Actas){actaFormal.aprobada ? ' · aprobada' : ''}
+                  </span>
+                ) : canCrearActa && (
+                  <Button size="sm" onClick={() => levantarActa(selectedAsamblea.id)} loading={levantando} loadingText="Levantando…">📄 Levantar acta formal</Button>
+                )}
               </div>
             )}
           </EditModal>

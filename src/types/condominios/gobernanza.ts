@@ -17,6 +17,7 @@ export type TipoMayoria = 'simple' | 'absoluta' | 'calificada'
 export type BaseVotacion = 'unidad' | 'alicuota'
 export type ModalidadAsistencia = 'presencial' | 'virtual' | 'poder'
 export type DecisionPunto = 'aprobado' | 'rechazado' | 'sin_quorum'
+export type ModalidadAsamblea = 'presencial' | 'virtual' | 'hibrida'
 export type ServicioProveedor = 'limpieza' | 'jardineria' | 'seguridad' | 'mantenimiento' | 'elevadores' | 'piscina' | 'otro'
 export type EstadoObjeto = 'en_custodia' | 'reclamado' | 'donado' | 'descartado'
 export type TipoAgenda = 'tarea' | 'evento' | 'mantenimiento' | 'reunion' | 'otro'
@@ -32,6 +33,11 @@ export interface Asamblea {
   hora_inicio: string
   hora_fin?: string
   lugar?: string
+  /** 20261106000300: presencial | virtual | hibrida (antes, la «asamblea digital»). */
+  modalidad?: ModalidadAsamblea
+  /** Sólo http/https (CHECK asambleas_link_reunion_check). */
+  link_reunion?: string | null
+  descripcion?: string | null
   estado: EstadoAsamblea
   quorum_requerido: number
   /** Lo escribe la base al finalizar (escrutinio). */

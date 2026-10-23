@@ -4,13 +4,12 @@ import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchVotosVotacion } from '../../../domain/condominios/tabQueries'
-import type { Votacion, Voto, Unidad, Asamblea, TipoVotacion } from '../../../types'
+import type { Votacion, Voto, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   votaciones: Votacion[]
   unidades: Unidad[]
-  asambleas: Asamblea[]
   proyectoId: string
   companyId: string
   canCreate: boolean
@@ -19,14 +18,14 @@ interface Props {
 }
 
 interface FormState {
-  titulo: string; descripcion: string; tipo: TipoVotacion
+  titulo: string; descripcion: string
   opciones: { id: string; texto: string }[]
-  quorum_requerido: number; fecha_cierre: string; asamblea_id: string
+  quorum_requerido: number; fecha_cierre: string
 }
 const BLANK: FormState = {
-  titulo: '', descripcion: '', tipo: 'simple',
+  titulo: '', descripcion: '',
   opciones: [{ id: '1', texto: '' }, { id: '2', texto: '' }],
-  quorum_requerido: 0, fecha_cierre: '', asamblea_id: '',
+  quorum_requerido: 0, fecha_cierre: '',
 }
 
 const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
@@ -35,7 +34,7 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
   anulada: { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
 
-export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function VotacionesTab({ votaciones, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
   const [selected, setSelected] = useState<string | null>(null)
   const [votos, setVotos] = useState<Voto[]>([])
   const [loadingVotos, setLoadingVotos] = useState(false)
@@ -66,11 +65,10 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
     const { error } = await createCondominioRow('votaciones', {
       company_id: companyId, project_id: proyectoId,
       titulo: form.titulo.trim(), descripcion: form.descripcion || null,
-      tipo: form.tipo, opciones: form.opciones.map(o => ({ id: o.id, texto: o.texto.trim() })),
+      opciones: form.opciones.map(o => ({ id: o.id, texto: o.texto.trim() })),
       quorum_requerido: form.quorum_requerido || null,
       total_unidades: unidades.length,
       fecha_cierre: form.fecha_cierre || null,
-      asamblea_id: form.asamblea_id || null,
       estado: 'abierta',
     })
     setSaving(false)
@@ -93,12 +91,11 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
   async function handleCerrar(id: string) {
     const r = await confirm({ title: '¿Cerrar votación?', text: 'No se podrán registrar más votos.', icon: 'warning', variant: 'danger', confirmText: 'Cerrar' })
     if (!r.isConfirmed) return
-    const v = votaciones.find(x => x.id === id)
-    const counts = (v?.opciones ?? []).map(o => ({ texto: o.texto, count: votos.filter(vt => vt.opcion_id === o.id).length }))
-    const max = Math.max(...counts.map(c => c.count), 0)
-    const winners = counts.filter(c => c.count === max && c.count > 0)
-    const resultado = winners.length === 0 ? 'sin votos' : winners.length > 1 ? 'empate' : winners[0].texto.slice(0, 60)
-    await updateCondominioRow('votaciones', id, { estado: 'cerrada', fecha_cierre: new Date().toISOString(), resultado })
+    // El conteo, el resultado y la fecha de cierre los escribe la base
+    // (votaciones_tg_integridad, 20261106000300): antes los calculaba el
+    // navegador con los votos que alcanzaba a ver.
+    const { error } = await updateCondominioRow('votaciones', id, { estado: 'cerrada' })
+    if (error) return notify({ variant: 'error', title: 'No se cerró la votación', text: error.message })
     onRefresh()
   }
 
@@ -126,7 +123,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Votaciones</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>Votaciones digitales vinculadas a asambleas</p>
+          <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>Consultas a los propietarios entre asambleas (en asamblea se votan los puntos)</p>
         </div>
         {canCreate && (
           <button onClick={() => setShowForm(true)}
@@ -159,22 +156,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
               <input id="vot-titulo" style={inputStyle} value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej: Aprobación del presupuesto 2026" autoFocus />
             </div>
             <div>
-              <label htmlFor="vot-asamblea" style={labelStyle}>Asamblea (opcional)</label>
-              <select id="vot-asamblea" style={inputStyle} value={form.asamblea_id} onChange={e => setForm(f => ({ ...f, asamblea_id: e.target.value }))}>
-                <option value="">— Ninguna —</option>
-                {asambleas.map(a => <option key={a.id} value={a.id}>{a.titulo} ({a.fecha})</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="vot-tipo" style={labelStyle}>Tipo</label>
-              <select id="vot-tipo" style={inputStyle} value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as 'simple' | 'multiple' | 'ponderada' }))}>
-                <option value="simple">Simple (1 opción)</option>
-                <option value="multiple">Múltiple</option>
-                <option value="ponderada">Ponderada</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="vot-quorum" style={labelStyle}>Quórum mínimo</label>
+              <label htmlFor="vot-quorum" style={labelStyle}>Mínimo de votos</label>
               <input id="vot-quorum" style={inputStyle} type="number" min="0" value={form.quorum_requerido} onChange={e => setForm(f => ({ ...f, quorum_requerido: parseInt(e.target.value) || 0 }))} placeholder="0 = sin mínimo" />
             </div>
             <div>
@@ -252,7 +234,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
             <div style={{ marginBottom: '16px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '10px' }}>
                 Resultados · {totalVotos} voto(s) de {votacion.total_unidades ?? unidades.length} unidades
-                {votacion.quorum_requerido ? ` · Quórum: ${votacion.quorum_requerido}` : ''}
+                {votacion.quorum_requerido ? ` · Mínimo: ${votacion.quorum_requerido} votos` : ''}
               </div>
               {loadingVotos ? (
                 <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Cargando votos…</div>

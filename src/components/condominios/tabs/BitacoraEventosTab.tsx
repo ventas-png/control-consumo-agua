@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   Visitante, TicketMantenimiento, IncidenteSeguridad,
-  AnuncioComunidad, OrdenCompra, AsambleaDigital,
+  AnuncioComunidad, OrdenCompra, Asamblea,
   GastoCondominio, CuotaCondominio,
 } from '../../../types'
 import { formatFechaCalendario } from '../../../lib/format'
@@ -13,7 +13,7 @@ interface Props {
   incidentes: IncidenteSeguridad[]
   anuncios: AnuncioComunidad[]
   ordenesCompra: OrdenCompra[]
-  asambleas: AsambleaDigital[]
+  asambleas: Asamblea[]
   gastos: GastoCondominio[]
   cuotas: CuotaCondominio[]
   moneda: string
@@ -104,9 +104,9 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
 
     asambleas.forEach(a => list.push({
       id: `asm-${a.id}`, tipo: 'asamblea',
-      fecha: a.fecha_hora?.slice(0, 10) ?? '',
+      fecha: a.fecha ?? '',
       titulo: a.titulo,
-      subtitulo: a.modalidad,
+      subtitulo: a.modalidad ?? 'presencial',
       badge: a.estado,
       badgeColor: a.estado === 'finalizada' ? 'var(--at-success)' : a.estado === 'en_curso' ? 'var(--at-warning)' : 'var(--at-primary)',
     }))

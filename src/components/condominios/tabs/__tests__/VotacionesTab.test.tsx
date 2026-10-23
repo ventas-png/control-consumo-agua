@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react'
-import type { Votacion, Unidad, Asamblea } from '../../../../types'
+import type { Votacion, Unidad } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
@@ -28,16 +28,16 @@ const unidades = [
 ] as unknown as Unidad[]
 
 const votacion = {
-  id: 'v1', company_id: 'co1', project_id: 'p1', asamblea_id: null,
+  id: 'v1', company_id: 'co1', project_id: 'p1',
   titulo: 'Aprobación del presupuesto 2026', descripcion: 'Presupuesto anual de mantenimiento.',
-  tipo: 'simple', opciones: [{ id: 'o1', texto: 'A favor' }, { id: 'o2', texto: 'En contra' }],
+  opciones: [{ id: 'o1', texto: 'A favor' }, { id: 'o2', texto: 'En contra' }],
   estado: 'abierta', quorum_requerido: null, total_unidades: 2,
   fecha_inicio: '2026-10-01T10:00:00Z', fecha_cierre: null, resultado: null, created_at: '2026-10-01T10:00:00Z',
 } as unknown as Votacion
 
 function renderTab(props: Partial<Parameters<typeof VotacionesTab>[0]> = {}) {
   return render(
-    <VotacionesTab votaciones={[votacion]} unidades={unidades} asambleas={[] as Asamblea[]} proyectoId="p1" companyId="co1"
+    <VotacionesTab votaciones={[votacion]} unidades={unidades} proyectoId="p1" companyId="co1"
       canCreate canEdit onRefresh={() => {}} {...props} />,
   )
 }
@@ -80,7 +80,7 @@ describe('VotacionesTab — ventanas', () => {
     }))
   })
 
-  it('"Cerrar votación" al pie cierra con el resultado ganador', async () => {
+  it('"Cerrar votación" al pie sólo pide cerrar: el conteo y el resultado los escribe la base', async () => {
     const onRefresh = vi.fn()
     renderTab({ onRefresh })
     fireEvent.click(screen.getByRole('button', { name: /^Aprobación del presupuesto 2026/ }))
@@ -88,10 +88,30 @@ describe('VotacionesTab — ventanas', () => {
     await within(dialog).findByText('1 · 100%')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar votación' }))
 
-    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('votaciones', 'v1', expect.objectContaining({
-      estado: 'cerrada', resultado: 'A favor',
-    })))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('votaciones', 'v1', { estado: 'cerrada' }))
     expect(onRefresh).toHaveBeenCalled()
+  })
+
+  it('si la base no cierra la votación, se avisa y no recarga', async () => {
+    mocks.updateCondominioRow.mockResolvedValueOnce({ error: { message: 'VOTACION_CERRADA: la votación está anulada; ya no cambia' } } as never)
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: /^Aprobación del presupuesto 2026/ }))
+    const dialog = screen.getByRole('dialog')
+    await within(dialog).findByText('1 · 100%')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar votación' }))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'error', text: 'VOTACION_CERRADA: la votación está anulada; ya no cambia',
+    })))
+    expect(onRefresh).not.toHaveBeenCalled()
+  })
+
+  it('una votación cerrada muestra el resultado que escribió la base', async () => {
+    renderTab({ votaciones: [{ ...votacion, estado: 'cerrada', resultado: 'Empate' } as Votacion] })
+    fireEvent.click(screen.getByRole('button', { name: /^Aprobación del presupuesto 2026/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(await within(dialog).findByText(/Resultado: Empate/)).toBeTruthy()
+    expect(within(dialog).queryByRole('button', { name: 'Cerrar votación' })).toBeNull()
   })
 
   it('el formulario de nueva votación es una ventana y crear guarda las opciones', async () => {
@@ -110,6 +130,11 @@ describe('VotacionesTab — ventanas', () => {
       titulo: 'Cambio de horario de piscina', estado: 'abierta', total_unidades: 2,
       opciones: [{ id: '1', texto: 'Sí' }, { id: '2', texto: 'No' }],
     })))
+    // Sin tipo ni asamblea: la consulta va fuera de asamblea (20261106000300).
+    const payload = (mocks.createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>])[1]
+    expect(payload).not.toHaveProperty('tipo')
+    expect(payload).not.toHaveProperty('asamblea_id')
+    expect(within(dialog).queryByLabelText('Asamblea (opcional)')).toBeNull()
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(onRefresh).toHaveBeenCalled()
   })

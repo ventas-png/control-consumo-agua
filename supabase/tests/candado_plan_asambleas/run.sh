@@ -94,10 +94,11 @@ psql -q -d postgres -c "CREATE DATABASE $BD" >/dev/null
 aplicar() { PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d "$1" -f "$2" >/dev/null; }
 copia()   { PGOPTIONS="-c client_min_messages=warning" psql -q -d postgres -c "DROP DATABASE IF EXISTS $2" -c "CREATE DATABASE $2 TEMPLATE $1" >/dev/null; }
 huella()  { psql -q -v ON_ERROR_STOP=1 -tA -d "$1" -f "$HUELLA" | LC_ALL=C sort; }
-posteriores() {   # aplica, sobre $1, las migraciones de versión mayor que la nuestra
+posteriores() {   # aplica, sobre $1, las migraciones de versión mayor que la nuestra (y menor que $2, si viene)
   for f in "$MIGS"/*.sql; do
     local base; base="$(basename "$f" .sql)"
     [[ "${base:0:14}" > "$VERSION" ]] || continue
+    [[ -z "${2:-}" || "${base:0:14}" < "$2" ]] || continue
     aplicar "$1" "$f"
   done
 }
@@ -171,7 +172,7 @@ echo "── 6/6 · mutantes: con cada regla rota, la suite debe fallar"
 # que la SUITE detecta la regla rota, no que la guarda lo haga por ella. El
 # texto se reemplaza en TODAS sus apariciones; que aparezca al menos una vez es
 # obligatorio.
-mutante() {   # $1 = etiqueta · $2 = texto que se quita · $3 = reemplazo
+mutante() {   # $1 = etiqueta · $2 = texto que se quita · $3 = reemplazo · $4 = posteriores hasta (opcional)
   python3 - "$NUESTRA" "$TRABAJO/mut.sql" "$2" "$3" <<'PY' || { echo "❌ el mutante «$1» no encuentra su texto en la migración"; exit 1; }
 import sys
 src, dst, pat, rep = sys.argv[1:5]
@@ -184,7 +185,7 @@ PY
   chmod 644 "$TRABAJO/mut.sql"
   copia "$BD" cp_mut
   aplicar cp_mut "$TRABAJO/mut.sql"
-  posteriores cp_mut
+  posteriores cp_mut "${4:-}"
   aplicar cp_mut "$AQUI/fixture.sql"
   local salida
   if salida=$(psql -q -v ON_ERROR_STOP=1 -d cp_mut -f "$AQUI/assert.sql" 2>&1); then
@@ -198,12 +199,16 @@ PY
   echo "$salida" | sed -n 's/.*ERROR:  \(.*\) — esperado .*/          → \1/p' | head -1
 }
 
+# Estos dos devuelven el candado a asambleas_digital, que 20261106000300 funde
+# en asambleas y borra: con una policy que depende de ella, su DROP (RESTRICT)
+# se niega —con razón— y la cadena no llega. Ninguna migración desde esa toca
+# los candados, así que se aplican las posteriores hasta ella.
 mutante "puntos: la empresa por asambleas_digital (el fallo original)" \
   $'FROM public.asambleas a\n        WHERE a.id = puntos_asamblea.asamblea_id' \
-  $'FROM public.asambleas_digital a\n        WHERE a.id = puntos_asamblea.asamblea_id'
+  $'FROM public.asambleas_digital a\n        WHERE a.id = puntos_asamblea.asamblea_id' 20261106000300
 mutante "votos: la empresa por asambleas_digital (el fallo original)" \
   'JOIN public.asambleas a ON a.id = p.asamblea_id' \
-  'JOIN public.asambleas_digital a ON a.id = p.asamblea_id'
+  'JOIN public.asambleas_digital a ON a.id = p.asamblea_id' 20261106000300
 mutante "puntos: sin candado" \
   $'CREATE POLICY puntos_asamblea_feature_gate ON public.puntos_asamblea\n  AS RESTRICTIVE\n  FOR INSERT\n  TO authenticated\n  WITH CHECK (\n' \
   $'CREATE POLICY puntos_asamblea_feature_gate ON public.puntos_asamblea\n  AS RESTRICTIVE\n  FOR INSERT\n  TO authenticated\n  WITH CHECK (true OR\n'

@@ -112,7 +112,7 @@ const TODAS_SEGURIDAD = [
 
 const TODA_COMUNIDAD = [
   'comunidad', 'infracciones', 'sanciones', 'gestion_conflictos', 'asambleas',
-  'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos', 'eventos_comunidad',
+  'votaciones', 'junta', 'actas', 'acuerdos', 'eventos_comunidad',
   'agenda', 'cumpleanos', 'programa_actividades', 'buzon_sugerencias', 'encuestas',
   'encuesta_dashboard', 'comunicados', 'recordatorios', 'comunicacion_condominios',
 ]
@@ -171,7 +171,7 @@ export const CONDOMINIOS_TAB_ACCESS: Record<CondominiosRole, Set<string> | null>
     // Residentes: visión general
     'tablero_ocupacion', 'directorio_comunidad', 'mapa_unidades', 'scoring_unidades',
     // Comunidad: gobernanza
-    'asambleas', 'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos',
+    'asambleas', 'votaciones', 'junta', 'actas', 'acuerdos',
     'eventos_comunidad', 'agenda',
     // Administración: gobernanza
     'documentos', 'reglamento', 'propuestas', 'memoria', 'polizas',

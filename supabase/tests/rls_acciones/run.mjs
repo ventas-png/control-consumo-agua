@@ -141,8 +141,11 @@ try {
   // después y mutantes por igual) para observar la rama de permisos; con
   // ellas puestas, el AND sólo puede quitar permisos, nunca darlos.
   const compuertas = todas.filter(p => p.permisiva === 'RESTRICTIVE' && !tieneAtomos(p.using) && !tieneAtomos(p.check))
-  writeFileSync(join(trabajo, 'compuertas.sql'), compuertas.map(p => `DROP POLICY "${p.nombre.replace(/"/g, '""')}" ON public.${p.tabla};`).join('\n') + '\n')
   const lit = v => `'${String(v).replace(/'/g, "''")}'`
+  // Una migración posterior puede retirar la tabla entera (20261106000300 funde
+  // asambleas_digital en asambleas): su compuerta se fue con ella.
+  writeFileSync(join(trabajo, 'compuertas.sql'), compuertas.map(p =>
+    `DO $$ BEGIN IF to_regclass('public.${p.tabla}') IS NOT NULL THEN EXECUTE ${lit(`DROP POLICY "${p.nombre.replace(/"/g, '""')}" ON public.${p.tabla}`)}; END IF; END $$;`).join('\n') + '\n')
   const recetas = [...tablas.map(t => [t, '', mapa.tablas[t].receta ?? {}]), ...Object.entries(mapa._recetas).map(([t, r]) => [t, '', r]),
     ...tablas.flatMap(t => ramasDe(t).map(([v, r]) => [t, v, r.receta ?? {}]))]
     .flatMap(([t, variante, receta]) => Object.entries(receta).map(([col, valor]) => `INSERT INTO ra.recetas (tabla, variante, col, valor) VALUES ('public.${t}', ${lit(variante)}, ${lit(col)}, ${lit(valor)});`))
@@ -300,14 +303,20 @@ END $$;`)
 
   console.log('── 5/6 · matriz: cada comando, cada persona, cada tabla')
   copia('post', 'matriz')
+  // Una migración posterior puede retirar una tabla del mapa (20261106000300
+  // funde asambleas_digital en asambleas y la borra): ya no hay nada que probar.
+  const existentes = new Set(psql('matriz', ['-tA', '-c',
+    `SELECT t FROM unnest(ARRAY[${tablas.map(t => `'${t}'`).join(', ')}]) t WHERE to_regclass('public.' || t) IS NOT NULL`]).trim().split('\n'))
+  const vivas = tablas.filter(t => existentes.has(t))
+  for (const t of tablas.filter(t => !existentes.has(t))) console.log(`  · retirada por una migración posterior: ${t}`)
   padron('matriz')
-  const r = matriz('matriz')
+  const r = matriz('matriz', vivas)
   const { difs, fuera } = evaluar(r)
-  const conFila = tablas.filter(t => !fuera.has(`${t}.FABRICA`))
-  const ramasConFila = filas.filter(f => f.variante && !fuera.has(`${f.clave}.FABRICA`))
+  const conFila = vivas.filter(t => !fuera.has(`${t}.FABRICA`))
+  const ramasConFila = filas.filter(f => f.variante && existentes.has(f.tabla) && !fuera.has(`${f.clave}.FABRICA`))
   for (const [k, v] of fuera) console.log(`  · fuera de la matriz ${k}: ${v}`)
   if (difs.length) for (const d of difs) mal(d)
-  else ok(`${conFila.length}/${tablas.length} tablas con fila fabricada${ramasConFila.length ? ` (y ${ramasConFila.length} rama${ramasConFila.length > 1 ? 's' : ''}: ${ramasConFila.map(f => f.clave).join(', ')})` : ''} · ${r.resultados.length} intentos · ${personas.length} personas: pasa exactamente quien el mapa dice`)
+  else ok(`${conFila.length}/${vivas.length} tablas con fila fabricada${ramasConFila.length ? ` (y ${ramasConFila.length} rama${ramasConFila.length > 1 ? 's' : ''}: ${ramasConFila.map(f => f.clave).join(', ')})` : ''} · ${r.resultados.length} intentos · ${personas.length} personas: pasa exactamente quien el mapa dice`)
   if (filas.some(f => f.variante && fuera.has(`${f.clave}.FABRICA`))) mal('una rama quedó fuera de la matriz: su receta no fabrica la fila')
   const residente = r.resultados.filter(([p, t, cmd]) => p === 'RES' && !fuera.has(`${t}.FABRICA`) && !fuera.has(`${t}.${cmd}`))
   const cambios = residente.filter(([, t, cmd, res]) => residenteAntes.get(`${t}.${cmd}`) !== res)
