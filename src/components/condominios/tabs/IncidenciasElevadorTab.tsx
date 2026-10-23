@@ -1,7 +1,10 @@
-import { hoyLocalISO } from '../../../lib/format'
-import { useState, type CSSProperties} from 'react'
+import { hoyLocalISO, esFechaCalendarioVencida, formatNumber } from '../../../lib/format'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { IncidenciaElevador, TipoIncidenciaElevador, EstadoIncidenciaElevador } from '../../../types'
 
 interface Props {
@@ -29,24 +32,58 @@ const ESTADOS: { value: EstadoIncidenciaElevador; label: string; color: string; 
   { value: 'requiere_seguimiento', label: 'Req. seguimiento',    color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 ]
 
+/**
+ * Siguiente paso de una incidencia. «Requiere seguimiento» también se
+ * resuelve: antes quedaba fuera del flujo y su botón «Resolver» no hacía nada.
+ */
+const SIGUIENTE: Partial<Record<EstadoIncidenciaElevador, EstadoIncidenciaElevador>> = {
+  reportado: 'en_atencion',
+  en_atencion: 'resuelto',
+  requiere_seguimiento: 'resuelto',
+}
+
+const formVacio = () => ({
+  elevador: 'Elevador 1',
+  tipo: 'falla' as TipoIncidenciaElevador,
+  descripcion: '',
+  fecha: hoyLocalISO(),
+  hora_inicio: '', hora_fin: '',
+  empresa_servicio: '', tecnico: '',
+  estado: 'reportado' as EstadoIncidenciaElevador,
+  costo: '', proxima_inspeccion: '', observaciones: '',
+})
+
+const tipoDe = (t: TipoIncidenciaElevador) => TIPOS.find(x => x.value === t)
+const estadoDe = (e: EstadoIncidenciaElevador) => ESTADOS.find(x => x.value === e)
+
+function duracion(ini: string | null | undefined, fin: string | null | undefined): string | null {
+  if (!ini || !fin) return null
+  const [ih, im] = ini.split(':').map(Number)
+  const [fh, fm] = fin.split(':').map(Number)
+  const minutos = (fh * 60 + fm) - (ih * 60 + im)
+  if (minutos < 0) return null
+  const h = Math.floor(minutos / 60)
+  const m = minutos % 60
+  return h > 0 ? `${h}h ${m}min` : `${m}min`
+}
+
+const recortar = (s: string, n: number) => s.length > n ? s.slice(0, n) + '…' : s
+
+function EstadoBadge({ estado }: { estado: EstadoIncidenciaElevador }) {
+  const est = estadoDe(estado)
+  return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: est?.bg, color: est?.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{est?.label ?? estado}</span>
+}
+
 export default function IncidenciasElevadorTab({ registros, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
-  const [selected, setSelected] = useState<IncidenciaElevador | null>(null)
+  const [detalleId, setDetalleId] = useState<string | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [avanzando, setAvanzando] = useState(false)
   const [filtroElevador, setFiltroElevador] = useState('')
   const [filtroTipo, setFiltroTipo] = useState<TipoIncidenciaElevador | ''>('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoIncidenciaElevador | ''>('')
 
-  const [form, setForm] = useState({
-    elevador: 'Elevador 1',
-    tipo: 'falla' as TipoIncidenciaElevador,
-    descripcion: '',
-    fecha: hoyLocalISO(),
-    hora_inicio: '', hora_fin: '',
-    empresa_servicio: '', tecnico: '',
-    estado: 'reportado' as EstadoIncidenciaElevador,
-    costo: '', proxima_inspeccion: '', observaciones: '',
-  })
+  const [form, setForm] = useState(formVacio)
 
   const elevadores = [...new Set(registros.map(r => r.elevador))].sort()
 
@@ -56,21 +93,29 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
     (filtroEstado === '' || r.estado === filtroEstado)
   )
 
-  const fallas = registros.filter(r => r.tipo === 'falla' && r.estado !== 'resuelto').length
-  const proxInspecciones = registros.filter(r => r.proxima_inspeccion).sort((a, b) => a.proxima_inspeccion!.localeCompare(b.proxima_inspeccion!)).slice(0, 3)
+  const esFallaAbierta = (r: IncidenciaElevador) => r.tipo === 'falla' && r.estado !== 'resuelto'
+  const fallas = registros.filter(esFallaAbierta).length
 
-  function duracion(ini: string | null | undefined, fin: string | null | undefined): string | null {
-    if (!ini || !fin) return null
-    const [ih, im] = ini.split(':').map(Number)
-    const [fh, fm] = fin.split(':').map(Number)
-    const minutos = (fh * 60 + fm) - (ih * 60 + im)
-    if (minutos < 0) return null
-    const h = Math.floor(minutos / 60)
-    const m = minutos % 60
-    return h > 0 ? `${h}h ${m}min` : `${m}min`
+  // Próxima inspección de cada elevador: la más lejana que tenga programada.
+  // Antes se ordenaban todas las fechas, también las ya pasadas, y con el
+  // tiempo las viejas tapaban a las que vienen.
+  const proxInspecciones = Object.values(registros.reduce<Record<string, IncidenciaElevador>>((acc, r) => {
+    if (r.proxima_inspeccion && (!acc[r.elevador] || r.proxima_inspeccion > acc[r.elevador].proxima_inspeccion!)) acc[r.elevador] = r
+    return acc
+  }, {})).sort((a, b) => a.proxima_inspeccion!.localeCompare(b.proxima_inspeccion!))
+
+  const dinero = (v: number) => `${moneda}\u00a0${formatNumber(v, 2)}`
+
+  function abrirForm() {
+    setDetalleId(null)
+    setMostrarForm(true)
   }
 
+  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
+  const cerrarForm = () => { if (!saving) setMostrarForm(false) }
+
   async function guardar() {
+    if (saving) return
     if (!form.elevador.trim() || !form.descripcion.trim()) {
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Elevador y descripción son obligatorios' }); return
     }
@@ -90,230 +135,277 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ elevador: 'Elevador 1', tipo: 'falla', descripcion: '', fecha: hoyLocalISO(), hora_inicio: '', hora_fin: '', empresa_servicio: '', tecnico: '', estado: 'reportado', costo: '', proxima_inspeccion: '', observaciones: '' })
+    setForm(formVacio())
     setMostrarForm(false)
     onRefresh()
   }
 
   async function avanzarEstado(r: IncidenciaElevador) {
-    const flujo: EstadoIncidenciaElevador[] = ['reportado', 'en_atencion', 'resuelto']
-    const idx = flujo.indexOf(r.estado)
-    if (idx === -1 || idx >= flujo.length - 1) return
-    const next = flujo[idx + 1]
-    await updateCondominioRow('incidencias_elevador', r.id, { estado: next })
-    if (selected?.id === r.id) setSelected(prev => prev ? { ...prev, estado: next } : null)
+    const next = SIGUIENTE[r.estado]
+    if (!next || avanzando) return
+    setAvanzando(true)
+    const { error } = await updateCondominioRow('incidencias_elevador', r.id, { estado: next })
+    setAvanzando(false)
+    // Antes el error se ignoraba: el botón no hacía nada y no decía por qué.
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', minWidth: 0, background: 'var(--at-surface)', color: 'var(--at-ink)' }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
+  const durForm = duracion(form.hora_inicio, form.hora_fin)
+  const finAntes = !!form.hora_inicio && !!form.hora_fin && !durForm
+
+  // Se lee el registro vigente, no una copia (antes el panel guardaba la fila
+  // y había que parcharla a mano al avanzar el estado).
+  const detalle = detalleId ? registros.find(r => r.id === detalleId) ?? null : null
+
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div>
-              <span style={{ fontWeight: 600, fontSize: 14 }}>Elevadores ({lista.length})</span>
-              {fallas > 0 && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 700 }}>{fallas} falla{fallas > 1 ? 's' : ''}</span>}
-            </div>
-            {canCreate && (
-              <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nuevo
-              </button>
-            )}
-          </div>
-          <select style={{ ...inp, marginBottom: 6 }} value={filtroElevador} onChange={e => setFiltroElevador(e.target.value)}>
+    <div style={{ padding: 16 }}>
+      {fallas > 0 && (
+        <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--at-danger)' }}>
+          ⚠️ <strong>{fallas} falla{fallas > 1 ? 's' : ''} sin resolver</strong>
+        </div>
+      )}
+
+      {/* Próxima inspección de cada elevador: cada una abre su registro */}
+      {proxInspecciones.length > 0 && (
+        <div style={{ background: 'var(--at-accent-tint)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: 'var(--at-accent)', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase' }}>🏛️ Próximas inspecciones</div>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 2 }}>
+            {proxInspecciones.map(r => {
+              const vencida = esFechaCalendarioVencida(r.proxima_inspeccion)
+              return (
+                <li key={r.elevador}>
+                  <button type="button" onClick={() => setDetalleId(r.id)} className="cond-barra-fila"
+                    style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 6, padding: '4px 6px', font: 'inherit', fontSize: 13, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
+                    🛗 {r.elevador} · <strong style={{ color: vencida ? 'var(--at-danger)' : undefined }}>{r.proxima_inspeccion}</strong>
+                    {vencida && <span style={{ color: 'var(--at-danger)', fontWeight: 600 }}> · vencida</span>}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* Filtros + botón */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', flex: '1 1 320px' }}>
+          <select aria-label="Filtrar por elevador" style={{ ...inp, width: 'auto', flex: '1 1 170px' }} value={filtroElevador} onChange={e => setFiltroElevador(e.target.value)}>
             <option value="">Todos los elevadores</option>
             {elevadores.map(e => <option key={e} value={e}>{e}</option>)}
           </select>
-          <select style={{ ...inp, marginBottom: 6 }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoIncidenciaElevador | '')}>
+          <select aria-label="Filtrar por tipo" style={{ ...inp, width: 'auto', flex: '1 1 170px' }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoIncidenciaElevador | '')}>
             <option value="">Todos los tipos</option>
             {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
           </select>
-          <select style={inp} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoIncidenciaElevador | '')}>
+          <select aria-label="Filtrar por estado" style={{ ...inp, width: 'auto', flex: '1 1 170px' }} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoIncidenciaElevador | '')}>
             <option value="">Todos los estados</option>
             {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
           </select>
+          <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{lista.length} registros</span>
         </div>
-
-        {proxInspecciones.length > 0 && (
-          <div style={{ padding: '8px 12px', background: 'var(--at-accent-tint)', borderBottom: '1px solid var(--at-line)' }}>
-            <div style={{ fontSize: 10, color: 'var(--at-accent)', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>🏛️ Próximas inspecciones</div>
-            {proxInspecciones.map(r => (
-              <div key={r.id} style={{ fontSize: 11, color: 'var(--at-ink-2)', marginBottom: 2 }}>
-                {r.elevador} · <strong>{r.proxima_inspeccion}</strong>
-              </div>
-            ))}
-          </div>
+        {canCreate && (
+          <Button onClick={abrirForm}>+ Nueva incidencia</Button>
         )}
-
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
-
-        {lista.map(r => {
-          const tipo = TIPOS.find(t => t.value === r.tipo)
-          const est = ESTADOS.find(e => e.value === r.estado)
-          return (
-            <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${tipo?.color}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {r.elevador}</span>
-                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.label}</span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginTop: 2 }}>{r.descripcion.length > 55 ? r.descripcion.slice(0, 55) + '…' : r.descripcion}</div>
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.fecha}{r.empresa_servicio ? ` · ${r.empresa_servicio}` : ''}</div>
-            </div>
-          )
-        })}
       </div>
 
-      {/* Panel derecho */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {mostrarForm && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Nueva incidencia de elevador</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={lbl}>Elevador *</label>
-                <input style={inp} placeholder="Elevador 1, Torre A…" value={form.elevador} onChange={e => setForm(p => ({ ...p, elevador: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Tipo</label>
-                <select style={inp} value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as TipoIncidenciaElevador }))}>
-                  {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Estado</label>
-                <select style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoIncidenciaElevador }))}>
-                  {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
-                </select>
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Descripción *</label>
-                <textarea style={{ ...inp, height: 70, resize: 'vertical' }} value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Fecha</label>
-                <input type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Hora inicio</label>
-                <input type="time" style={inp} value={form.hora_inicio} onChange={e => setForm(p => ({ ...p, hora_inicio: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Hora fin</label>
-                <input type="time" style={inp} value={form.hora_fin} onChange={e => setForm(p => ({ ...p, hora_fin: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Empresa servicio</label>
-                <input style={inp} value={form.empresa_servicio} onChange={e => setForm(p => ({ ...p, empresa_servicio: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Técnico</label>
-                <input style={inp} value={form.tecnico} onChange={e => setForm(p => ({ ...p, tecnico: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Costo ({moneda})</label>
-                <input type="number" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Próxima inspección</label>
-                <input type="date" style={inp} value={form.proxima_inspeccion} onChange={e => setForm(p => ({ ...p, proxima_inspeccion: e.target.value }))} />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={lbl}>Observaciones</label>
-                <input style={inp} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : '✅ Registrar'}
-              </button>
-              <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!mostrarForm && selected && (() => {
-          const tipo = TIPOS.find(t => t.value === selected.tipo)
-          const est = ESTADOS.find(e => e.value === selected.estado)
-          const dur = duracion(selected.hora_inicio, selected.hora_fin)
-          return (
+      {/* Nueva incidencia en ventana (antes, en un panel al lado de una lista
+          de 300px fijos: en el teléfono no cabían los dos). */}
+      {mostrarForm && (
+        <EditModal
+          title="🛗 Nueva incidencia de elevador"
+          maxWidth="640px"
+          fullScreenOnMobile
+          onClose={cerrarForm}
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          footer={
+            <>
+              <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+              <Button type="submit" form="elevador-form" variant="success" loading={saving} loadingText="Guardando…">✅ Registrar</Button>
+            </>
+          }
+        >
+          <form
+            id="elevador-form"
+            onSubmit={e => { e.preventDefault(); void guardar() }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12, alignItems: 'start' }}
+          >
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: tipo?.color, fontWeight: 700, marginBottom: 4 }}>{tipo?.icon} {tipo?.label}</div>
-                  <div style={{ fontWeight: 700, fontSize: 20 }}>🛗 {selected.elevador}</div>
-                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
-                    {selected.fecha}
-                    {selected.hora_inicio && <span> · {selected.hora_inicio.slice(0, 5)}</span>}
-                    {selected.hora_fin && <span>–{selected.hora_fin.slice(0, 5)}</span>}
-                    {dur && <span style={{ color: 'var(--at-accent)' }}> · {dur}</span>}
-                  </div>
+              <label htmlFor="elevador-nombre" style={lbl}>Elevador *</label>
+              {/* Sugiere los elevadores ya registrados: «elevador 1» y «Elevador 1» eran dos. */}
+              <input id="elevador-nombre" list="elevador-nombres" style={inp} placeholder="Elevador 1, Torre A…" value={form.elevador} onChange={e => setForm(p => ({ ...p, elevador: e.target.value }))} />
+              <datalist id="elevador-nombres">
+                {elevadores.map(e => <option key={e} value={e} />)}
+              </datalist>
+            </div>
+            <div>
+              <label htmlFor="elevador-tipo" style={lbl}>Tipo</label>
+              <select id="elevador-tipo" style={inp} value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as TipoIncidenciaElevador }))}>
+                {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="elevador-estado" style={lbl}>Estado</label>
+              <select id="elevador-estado" style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoIncidenciaElevador }))}>
+                {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+              </select>
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="elevador-descripcion" style={lbl}>Descripción *</label>
+              <textarea id="elevador-descripcion" rows={3} style={{ ...inp, fontFamily: 'inherit', resize: 'vertical' }} value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="elevador-fecha" style={lbl}>Fecha</label>
+              <input id="elevador-fecha" type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="elevador-hora-inicio" style={lbl}>Hora inicio</label>
+              <input id="elevador-hora-inicio" type="time" style={inp} value={form.hora_inicio} onChange={e => setForm(p => ({ ...p, hora_inicio: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="elevador-hora-fin" style={lbl}>Hora fin</label>
+              <input id="elevador-hora-fin" type="time" style={inp} value={form.hora_fin} onChange={e => setForm(p => ({ ...p, hora_fin: e.target.value }))} />
+              {durForm && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 3 }}>Duración: {durForm}</div>}
+              {finAntes && (
+                <div role="alert" style={{ fontSize: 11, color: 'var(--at-warning-strong, var(--at-warning))', background: 'var(--at-warning-tint)', borderRadius: 6, padding: '4px 8px', marginTop: 4 }}>
+                  La hora fin es anterior a la de inicio.
                 </div>
-                <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, background: est?.bg, color: est?.color, fontWeight: 600 }}>{est?.label}</span>
-              </div>
-
-              <div style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '14px 16px', marginBottom: 16, fontSize: 14, color: 'var(--at-ink-2)', lineHeight: 1.6 }}>
-                {selected.descripcion}
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-                {selected.empresa_servicio && (
-                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Empresa</div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.empresa_servicio}</div>
-                  </div>
-                )}
-                {selected.tecnico && (
-                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Técnico</div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.tecnico}</div>
-                  </div>
-                )}
-                {selected.costo != null && (
-                  <div style={{ background: 'var(--at-success-tint)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Costo</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {selected.costo.toLocaleString()}</div>
-                  </div>
-                )}
-                {selected.proxima_inspeccion && (
-                  <div style={{ background: 'var(--at-accent-tint)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>Próx. inspección</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--at-accent)' }}>{selected.proxima_inspeccion}</div>
-                  </div>
-                )}
-              </div>
-
-              {selected.observaciones && (
-                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--at-warning-strong)' }}>
-                  {selected.observaciones}
-                </div>
-              )}
-
-              {canEdit && selected.estado !== 'resuelto' && (
-                <button onClick={() => avanzarEstado(selected)}
-                  style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                  ▶ {selected.estado === 'reportado' ? 'Atender' : 'Resolver'}
-                </button>
               )}
             </div>
-          )
-        })()}
+            <div>
+              <label htmlFor="elevador-empresa" style={lbl}>Empresa de servicio</label>
+              <input id="elevador-empresa" style={inp} value={form.empresa_servicio} onChange={e => setForm(p => ({ ...p, empresa_servicio: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="elevador-tecnico" style={lbl}>Técnico</label>
+              <input id="elevador-tecnico" style={inp} value={form.tecnico} onChange={e => setForm(p => ({ ...p, tecnico: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="elevador-costo" style={lbl}>Costo ({moneda})</label>
+              <input id="elevador-costo" type="number" inputMode="decimal" min="0" step="0.01" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="elevador-proxima" style={lbl}>Próxima inspección</label>
+              <input id="elevador-proxima" type="date" min={form.fecha || undefined} style={inp} value={form.proxima_inspeccion} onChange={e => setForm(p => ({ ...p, proxima_inspeccion: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="elevador-observaciones" style={lbl}>Observaciones</label>
+              <textarea id="elevador-observaciones" rows={2} style={{ ...inp, fontFamily: 'inherit', resize: 'vertical' }} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
+            </div>
+          </form>
+        </EditModal>
+      )}
 
-        {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
-            Selecciona un registro o crea uno nuevo
-          </div>
-        )}
-      </div>
+      {/* Detalle de la incidencia en ventana */}
+      {detalle && (() => {
+        const tipo = tipoDe(detalle.tipo)
+        const dur = duracion(detalle.hora_inicio, detalle.hora_fin)
+        const siguiente = SIGUIENTE[detalle.estado]
+        return (
+          <EditModal
+            title={`🛗 ${detalle.elevador}`}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ color: tipo?.color, fontWeight: 600 }}>{tipo?.icon} {tipo?.label ?? detalle.tipo}</span>
+                <span>
+                  {detalle.fecha}
+                  {detalle.hora_inicio && ` · ${detalle.hora_inicio.slice(0, 5)}`}
+                  {detalle.hora_fin && `–${detalle.hora_fin.slice(0, 5)}`}
+                  {dur && ` · ${dur}`}
+                </span>
+                <EstadoBadge estado={detalle.estado} />
+              </span>
+            }
+            maxWidth="520px"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={
+              <>
+                {canEdit && siguiente && (
+                  <Button variant="success" onClick={() => void avanzarEstado(detalle)} loading={avanzando}>
+                    ▶ {siguiente === 'en_atencion' ? 'Atender' : 'Resolver'}
+                  </Button>
+                )}
+                <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
+              </>
+            }
+          >
+            <IncidenciaDetalle registro={detalle} dinero={dinero} />
+          </EditModal>
+        )
+      })()}
+
+      {/* Historial: en el teléfono cada incidencia es una tarjeta; tocarla abre
+          su detalle y «Ver» es el camino de teclado. */}
+      <DataTable<IncidenciaElevador>
+        data={lista}
+        rowKey="id"
+        pageSize={30}
+        mobileCardLayout
+        defaultSort={{ key: 'fecha', direction: 'desc' }}
+        emptyState={{ icon: '🛗', title: 'Sin registros' }}
+        rowStyle={(r) => esFallaAbierta(r) ? { background: 'var(--at-danger-tint)' } : {}}
+        onRowClick={(r) => setDetalleId(r.id)}
+        columns={[
+          { key: 'elevador', header: 'Elevador', sortable: true,
+            render: (r) => <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>🛗 {r.elevador}</span> },
+          { key: 'tipo', header: 'Tipo', sortable: true,
+            accessor: (r) => tipoDe(r.tipo)?.label ?? r.tipo,
+            render: (r) => {
+              const tipo = tipoDe(r.tipo)
+              return <span style={{ color: tipo?.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{tipo?.icon} {tipo?.label ?? r.tipo}</span>
+            } },
+          { key: 'descripcion', header: 'Descripción',
+            render: (r) => <span style={{ color: 'var(--at-ink-2)' }}>{recortar(r.descripcion, 55)}</span> },
+          { key: 'fecha', header: 'Fecha', sortable: true,
+            accessor: (r) => `${r.fecha} ${r.hora_inicio ?? ''}`,
+            render: (r) => <span style={{ whiteSpace: 'nowrap' }}>{r.fecha}</span> },
+          { key: 'empresa_servicio', header: 'Empresa', sortable: true, hideOnMobile: true,
+            accessor: (r) => r.empresa_servicio ?? '',
+            render: (r) => <span style={{ color: 'var(--at-ink-3)' }}>{r.empresa_servicio || '—'}</span> },
+          { key: 'estado', header: 'Estado', sortable: true,
+            accessor: (r) => estadoDe(r.estado)?.label ?? r.estado,
+            render: (r) => <EstadoBadge estado={r.estado} /> },
+          { key: 'ver', header: '', align: 'right',
+            render: (r) => (
+              <span onClick={e => e.stopPropagation()}>
+                <Button size="sm" variant="secondary" onClick={() => setDetalleId(r.id)} aria-label={`Ver incidencia de ${r.elevador} del ${r.fecha}`}>Ver</Button>
+              </span>
+            ) },
+        ] satisfies DataTableColumn<IncidenciaElevador>[]}
+      />
+    </div>
+  )
+}
+
+/** Detalle de solo lectura de una incidencia de elevador. */
+function IncidenciaDetalle({ registro: r, dinero }: { registro: IncidenciaElevador; dinero: (v: number) => string }) {
+  const fila = (label: string, valor: ReactNode) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 14 }}>
+      <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
+      <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{valor}</span>
+    </div>
+  )
+  const vencida = !!r.proxima_inspeccion && esFechaCalendarioVencida(r.proxima_inspeccion)
+  return (
+    <div>
+      <p style={{ margin: '0 0 14px', whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--at-ink-2)', lineHeight: 1.6 }}>{r.descripcion}</p>
+      {fila('Empresa de servicio', r.empresa_servicio || '—')}
+      {fila('Técnico', r.tecnico || '—')}
+      {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
+      {fila('Próxima inspección', r.proxima_inspeccion
+        ? <strong style={{ color: vencida ? 'var(--at-danger)' : 'var(--at-accent)' }}>{r.proxima_inspeccion}{vencida ? ' · vencida' : ''}</strong>
+        : '—')}
+      {r.observaciones && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
+          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.observaciones}</p>
+        </div>
+      )}
     </div>
   )
 }
