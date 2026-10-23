@@ -40,7 +40,9 @@ $$ SELECT id FROM ra.ids WHERE alias = p_alias $$;
 -- —como el admin de la empresa, igual que los padres— y la sentencia lleva el
 -- resultado como literal: así puede fabricar un padre (ra.padre) que la
 -- persona de la prueba no podría.
-CREATE TABLE ra.recetas (tabla regclass, col text, valor text NOT NULL, PRIMARY KEY (tabla, col));
+-- `variante`: la receta de una rama del mapa (`ramas`); sus columnas mandan
+-- sobre las de la tabla, y sólo en la fila de esa rama (no en sus padres).
+CREATE TABLE ra.recetas (tabla regclass, variante text NOT NULL DEFAULT '', col text, valor text NOT NULL, PRIMARY KEY (tabla, variante, col));
 
 -- Padres ya fabricados, por tabla y empresa: una FK los reutiliza.
 CREATE TABLE ra.padres (tabla regclass, empresa uuid, fila jsonb NOT NULL, PRIMARY KEY (tabla, empresa));
@@ -125,9 +127,10 @@ LANGUAGE sql STABLE AS $$
   END
 $$;
 
--- La sentencia INSERT de una fila válida de `p_tabla` en la empresa dada.
--- Crea (y deja confirmados) los padres que haga falta. NULL si no sabe.
-CREATE FUNCTION ra.sql_alta(p_tabla regclass, p_empresa uuid, p_prof int DEFAULT 0)
+-- La sentencia INSERT de una fila válida de `p_tabla` en la empresa dada (la
+-- de la rama `p_variante`, si se pide). Crea (y deja confirmados) los padres
+-- que haga falta. NULL si no sabe.
+CREATE FUNCTION ra.sql_alta(p_tabla regclass, p_empresa uuid, p_prof int DEFAULT 0, p_variante text DEFAULT '')
 RETURNS text LANGUAGE plpgsql VOLATILE AS $$
 DECLARE
   v_col   record;
@@ -148,7 +151,8 @@ BEGIN
     ORDER BY a.attnum
   LOOP
     CONTINUE WHEN v_col.attidentity <> '' OR v_col.attgenerated <> '';
-    v_val := (SELECT valor FROM ra.recetas WHERE tabla = p_tabla AND col = v_col.attname);
+    v_val := (SELECT valor FROM ra.recetas WHERE tabla = p_tabla AND col = v_col.attname AND variante IN ('', p_variante)
+              ORDER BY variante DESC LIMIT 1);
     CONTINUE WHEN v_val IS NULL AND NOT (
       (v_col.attnotnull AND NOT v_col.tiene_default)
       OR v_col.attname IN ('company_id', 'project_id', 'unidad_id'));

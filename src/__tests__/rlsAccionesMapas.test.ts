@@ -34,12 +34,16 @@ const DIR_MAPAS = resolve('supabase/rls-acciones')
 const REGISTRO = readFileSync(join(SRC, 'components/condominios/tabRegistry.tsx'), 'utf8')
 const ACCION: Record<string, string> = { INSERT: 'create', UPDATE: 'edit', DELETE: 'delete' }
 
-interface Tabla {
+interface Rama {
   tab: string
   INSERT?: string[]
   UPDATE?: string[]
   DELETE?: string[]
+}
+interface Tabla extends Rama {
   evidencia?: Record<string, string[]>
+  /** La policy elige el tab por una columna: cada valor es una rama con su tab. */
+  ramas?: { columna: string; valores: Record<string, Rama> }
 }
 interface Mapa { _migracion: string; tablas: Record<string, Tabla> }
 
@@ -47,8 +51,14 @@ const mapas: [string, Mapa][] = readdirSync(DIR_MAPAS)
   .filter(f => f.endsWith('.json'))
   .map(f => [f.replace(/\.json$/, ''), JSON.parse(readFileSync(join(DIR_MAPAS, f), 'utf8')) as Mapa])
 
-const pares = (t: Tabla, cmd: string) => t[cmd as 'INSERT'] ?? [`${t.tab}.${ACCION[cmd]}`]
+// Los pares de una rama cuentan para el comando: la fila de esa clase la escribe su tab.
+const pares = (t: Tabla, cmd: string) => [
+  ...(t[cmd as 'INSERT'] ?? [`${t.tab}.${ACCION[cmd]}`]),
+  ...Object.values(t.ramas?.valores ?? {}).flatMap(r => r[cmd as 'INSERT'] ?? []),
+]
 const tabsDe = (t: Tabla, cmd: string) => new Set(pares(t, cmd).map(p => p.split('.')[0]))
+/** El tab de la tabla y los de sus ramas: no son ajenos. */
+const propios = (t: Tabla) => new Set([t.tab, ...Object.values(t.ramas?.valores ?? {}).map(r => r.tab)])
 
 // ── Registro: componente → archivo y → tabs de sus props de permiso ─────────
 const archivoDe = new Map<string, string>()
@@ -151,7 +161,7 @@ describe.each(mapas)('mapa %s', (seccion, mapa) => {
     const problemas: string[] = []
     for (const tabla of tablas) {
       const t = mapa.tablas[tabla]
-      const ajenos = new Set(['INSERT', 'UPDATE', 'DELETE'].flatMap(c => [...tabsDe(t, c)]).filter(x => x !== t.tab))
+      const ajenos = new Set(['INSERT', 'UPDATE', 'DELETE'].flatMap(c => [...tabsDe(t, c)]).filter(x => !propios(t).has(x)))
       for (const tab of ajenos) {
         const cadena = t.evidencia?.[tab]?.map(f => join(SRC, f))
         if (!cadena?.length) { problemas.push(`${tabla}: tab ajeno «${tab}» sin evidencia`); continue }

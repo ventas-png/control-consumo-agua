@@ -10,6 +10,7 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -22,7 +23,7 @@ const BLANK = {
   periodo_gracia: '0', notas: '',
 }
 
-export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -63,14 +64,20 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
   }
 
   async function toggleActiva(r: ReglaMoraConfig) {
-    await updateCondominioRow('reglas_mora_config', r.id, { activa: !r.activa })
+    // Pausar o activar es editar la regla.
+    if (!canEdit) return
+    const { error } = await updateCondominioRow('reglas_mora_config', r.id, { activa: !r.activa })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const { isConfirmed } = await confirm({ title: '¿Eliminar regla?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await deleteCondominioRow('reglas_mora_config', id)
+    const { error } = await deleteCondominioRow('reglas_mora_config', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -182,18 +189,20 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
                   {r.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 4 }}>{r.notas}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => toggleActiva(r)}
-                    style={{ padding: '5px 10px', background: r.activa ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: r.activa ? 'var(--at-warning-strong)' : 'var(--at-success-strong)' }}>
-                    {r.activa ? 'Pausar' : 'Activar'}
-                  </button>
                   {canEdit && (
-                    <button onClick={() => abrirEditar(r)}
+                    <button onClick={() => toggleActiva(r)}
+                      style={{ padding: '5px 10px', background: r.activa ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: r.activa ? 'var(--at-warning-strong)' : 'var(--at-success-strong)' }}>
+                      {r.activa ? 'Pausar' : 'Activar'}
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button onClick={() => abrirEditar(r)} aria-label={`Editar ${r.nombre}`}
                       style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-primary)' }}>
                       ✏️
                     </button>
                   )}
-                  {canEdit && (
-                    <button onClick={() => eliminar(r.id)}
+                  {canDelete && (
+                    <button onClick={() => eliminar(r.id)} aria-label={`Eliminar ${r.nombre}`}
                       style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>
                       🗑
                     </button>

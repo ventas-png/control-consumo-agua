@@ -352,8 +352,10 @@ const CLASE_EMPRESA = 'RLS Sandbox — Gate por clase'
 // contrasta contra `user_has_permission`, que es lo que mira la app.
 //
 // `delete` queda FUERA a propósito: el borrado de correspondencia va por ROL
-// (sólo company_owner) y el fixture necesita que los granulares NO puedan, que
-// es justo lo que prueban los escenarios de DELETE del harness.
+// (sólo company_owner), el de paquetería pide la acción de borrar
+// (20261104090100), y el fixture necesita que los granulares NO puedan, que es
+// justo lo que prueban los escenarios de DELETE del harness. Crear y editar sí
+// los necesitan: desde 20261104090100 la base también los exige.
 const ACCIONES_CLASE = ['create', 'edit']
 const permisosDeTab = (tab) => [tab, ...ACCIONES_CLASE.map((a) => `${tab}.${a}`)]
 
