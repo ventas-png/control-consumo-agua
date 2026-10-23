@@ -4,6 +4,7 @@ import {
   dateLocalISO,
   hoyLocalISO,
   mesLocalISO,
+  inicioMesLocalISO,
   datetimeLocalISO,
   formatDate,
   formatDateShort,
@@ -80,6 +81,23 @@ describe('mesLocalISO', () => {
 
   it('sin argumento usa el instante actual', () => {
     expect(mesLocalISO()).toBe(dateLocalISO(new Date()).slice(0, 7))
+  })
+})
+
+describe('inicioMesLocalISO', () => {
+  it('del 29 al 31 no desborda: la ventana de seis meses empieza en febrero', () => {
+    // setMonth(6 - 5) sobre el 31 de julio daba el «31 de febrero» = 3 de marzo.
+    expect(inicioMesLocalISO(5, new Date(2026, 6, 31, 12, 0, 0))).toBe('2026-02-01')
+    expect(inicioMesLocalISO(5, new Date(2026, 4, 30, 12, 0, 0))).toBe('2025-12-01')
+  })
+
+  it('de noche sigue siendo el día 1 local (toISOString daba el 2 en GMT-6)', () => {
+    expect(inicioMesLocalISO(5, new Date(2026, 9, 1, 23, 30, 0))).toBe('2026-05-01')
+  })
+
+  it('cruza el año y con 0 da el mes actual', () => {
+    expect(inicioMesLocalISO(11, new Date(2026, 9, 15))).toBe('2025-11-01')
+    expect(inicioMesLocalISO(0, new Date(2026, 9, 15))).toBe('2026-10-01')
   })
 })
 

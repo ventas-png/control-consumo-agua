@@ -141,7 +141,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
         {[
           { label: 'Total registros', value: String(residuos.length), icon: '📊', color: 'var(--at-primary)' },
           { label: 'Pendientes', value: String(pendientes.length), icon: '⏳', color: 'var(--at-warning)' },
-          { label: 'Total Kg registrado', value: totalKgAll > 0 ? `${totalKgAll.toFixed(1)} kg` : '—', icon: '⚖️', color: 'var(--at-success)' },
+          { label: 'Total Kg registrado', value: totalKgAll > 0 ? `${totalKgAll.toFixed(1)}\u00a0kg` : '—', icon: '⚖️', color: 'var(--at-success)' },
           { label: '% Reciclaje', value: totalKgAll > 0 ? `${pctReciclaje}%` : '—', icon: '♻️', color: '#84cc16' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
