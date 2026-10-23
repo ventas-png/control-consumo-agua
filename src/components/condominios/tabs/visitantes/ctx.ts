@@ -79,8 +79,9 @@ export interface VisitantesCtx extends GruposVisitantes {
   setNovedadForm: Dispatch<SetStateAction<NovedadForm>>
   fotosNovedad: string[]
   setFotosNovedad: Dispatch<SetStateAction<string[]>>
+  /** Se lee de la lista vigente por id. */
   visitanteDetalle: Visitante | null
-  setVisitanteDetalle: Dispatch<SetStateAction<Visitante | null>>
+  setVisitanteDetalle: (v: Visitante | null) => void
   fotoUrl: string | null
   setFotoUrl: Dispatch<SetStateAction<string | null>>
   fotoDocumentoUrl: string | null
