@@ -248,6 +248,8 @@ export interface CondominiosPortalData {
   paquetesData: unknown[] | null
   correspondenciaData: unknown[] | null
   comunicadosData: unknown[] | null
+  /** Pestañas apagadas por condominio: filas `{ id, portal_tabs_ocultos }`. */
+  pestanasData: unknown[] | null
 }
 
 /**
@@ -269,7 +271,7 @@ export async function fetchCondominiosPortalData(
   const [
     projRes, amenidadesRes, cuotasRes, reservasRes, bloqueosRes, ticketsRes,
     anunciosRes, visitantesRes, mensajesRes, solicitudesRentaRes, paquetesRes,
-    correspondenciaRes, comunicadosRes,
+    correspondenciaRes, comunicadosRes, pestanasRes,
   ] = await Promise.all([
     db.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
     db.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
@@ -309,7 +311,13 @@ export async function fetchCondominiosPortalData(
     // (20260602000030, rama `unidad_id IN mis_unidades_ids()`), pero ninguna
     // pantalla las leía.
     db.from('comunicados_condominio').select('*').in('unidad_id', unidadIds).order('fecha_envio', { ascending: false }).limit(100),
+    // Pestañas que la empresa apagó en cada condominio (20261106000000). Va
+    // APARTE de la fila de arriba a propósito: si esta lectura falla (p.ej. el
+    // front llegó antes que la migración), el portal sigue con moneda y empresa
+    // y simplemente muestra todas las pestañas.
+    db.from('projects').select('id, portal_tabs_ocultos').in('id', projectIds),
   ])
+  reportDegradedQuery('portal.fetchCondominiosPortalData.pestanas', pestanasRes.error)
 
   return {
     projData: projRes.data,
@@ -325,6 +333,7 @@ export async function fetchCondominiosPortalData(
     paquetesData: paquetesRes.data,
     correspondenciaData: correspondenciaRes.data,
     comunicadosData: comunicadosRes.data,
+    pestanasData: pestanasRes.data,
   }
 }
 

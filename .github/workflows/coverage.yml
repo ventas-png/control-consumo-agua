@@ -1057,7 +1057,18 @@ jobs:
           PGPORT_TEST: 55585
         run: supabase/tests/portal_asambleas_voto/run.sh
 
-      # 20261105000100: tipo y estado de asambleas y tipo de punto con
+      # 20261106000000: projects.portal_tabs_ocultos — la empresa apaga pestañas
+      # del portal del residente por condominio. Sin policy propia: escribe
+      # projects_update (propietario/admin de la empresa) y lee el residente por
+      # projects_select. Padrón cargado ANTES de la migración (proyectos de
+      # siempre), huella del auditor, invariantes y cuatro mutantes.
+      - name: Portal — pestañas por condominio
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55586
+        run: supabase/tests/portal_pestanas/run.sh
+
+      # 20261106000100: tipo y estado de asambleas y tipo de punto con
       # vocabulario cerrado, el estado sólo avanza, una asamblea finalizada o
       # cancelada congela su agenda y sus votos (aun para service_role) sin
       # trabar las cascadas de la purga, la unidad o el usuario, y cada cambio
@@ -1067,7 +1078,7 @@ jobs:
       - name: Integridad de asambleas — estado, agenda y votos congelados al cerrar
         env:
           PGBIN: ${{ steps.pg.outputs.bin }}
-          PGPORT_TEST: 55586
+          PGPORT_TEST: 55587
         run: supabase/tests/asambleas_integridad/run.sh
 
   rls-harness:

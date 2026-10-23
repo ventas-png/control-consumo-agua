@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { PORTAL_TABS, tabsForRol } from '../portalTabs'
+import {
+  PORTAL_TABS, PORTAL_TABS_CONFIGURABLES, PORTAL_TABS_FIJOS,
+  esTabSoloPropietario, normalizarTabsOcultos, tabsForRol, tabsVisiblesPortal,
+} from '../portalTabs'
 
 // Visibilidad de tabs del portal por rol del residente (portal propietario/
 // inquilino): el propietario ve todo; el inquilino/familiar solo lo operativo.
@@ -52,5 +55,64 @@ describe('tabsForRol', () => {
     for (const rol of ['propietario', 'arrendatario', 'familiar', 'otro']) {
       for (const id of tabsForRol(rol)) expect(todos).toContain(id)
     }
+  })
+})
+
+// Pestañas que la empresa apaga por condominio (projects.portal_tabs_ocultos,
+// 20261106000000). Se suman al recorte por rol: nunca devuelven una pestaña que
+// el rol no tiene.
+describe('configuración del portal por condominio', () => {
+  it('Mi Unidad es la única fija y todas las demás son configurables', () => {
+    expect(PORTAL_TABS_FIJOS).toEqual(['mi_unidad'])
+    expect(PORTAL_TABS_CONFIGURABLES).not.toContain('mi_unidad')
+    expect([...PORTAL_TABS_FIJOS, ...PORTAL_TABS_CONFIGURABLES].sort())
+      .toEqual(PORTAL_TABS.map(t => t.id).sort())
+  })
+
+  it('cada pestaña trae la descripción que lee quien configura el portal', () => {
+    for (const t of PORTAL_TABS) expect(t.descripcion.length, t.id).toBeGreaterThan(10)
+  })
+
+  it('sin nada apagado, el portal es exactamente el recorte por rol de siempre', () => {
+    for (const rol of ['propietario', 'arrendatario', 'familiar', 'otro', null]) {
+      expect(tabsVisiblesPortal(rol, [])).toEqual(tabsForRol(rol))
+      expect(tabsVisiblesPortal(rol, null)).toEqual(tabsForRol(rol))
+      expect(tabsVisiblesPortal(rol, undefined)).toEqual(tabsForRol(rol))
+    }
+  })
+
+  it('quita las apagadas y conserva el orden de PORTAL_TABS', () => {
+    expect(tabsVisiblesPortal('propietario', ['transparencia', 'paquetes', 'rentas'])).toEqual([
+      'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes',
+      'correspondencia', 'anuncios', 'asambleas', 'mudanza', 'mascotas', 'vehiculos',
+    ])
+  })
+
+  it('apagar no le da al inquilino una pestaña que su rol no tiene', () => {
+    const visibles = tabsVisiblesPortal('arrendatario', ['paquetes'])
+    expect(visibles).not.toContain('paquetes')
+    for (const id of visibles) expect(tabsForRol('arrendatario')).toContain(id)
+    expect(visibles).not.toContain('rentas')
+  })
+
+  it('Mi Unidad no se puede apagar aunque la lista lo pida', () => {
+    expect(tabsVisiblesPortal('propietario', ['mi_unidad'])).toContain('mi_unidad')
+    expect(tabsVisiblesPortal('arrendatario', [...PORTAL_TABS_CONFIGURABLES, 'mi_unidad'])).toEqual(['mi_unidad'])
+  })
+
+  it('normaliza lo que llega de la base: sólo ids configurables, sin repetidos, en orden', () => {
+    expect(normalizarTabsOcultos(['vehiculos', 'cuenta', 'cuenta', 'mi_unidad', 'no_existe', 7, null]))
+      .toEqual(['cuenta', 'vehiculos'])
+  })
+
+  it('un dato que no entiende se lee como «nada apagado» (el portal no pierde pestañas)', () => {
+    for (const raw of [null, undefined, 'cuenta', { cuenta: true }, 42]) {
+      expect(normalizarTabsOcultos(raw)).toEqual([])
+    }
+  })
+
+  it('solo-propietario son exactamente rentas, asambleas y transparencia', () => {
+    expect(PORTAL_TABS.filter(t => esTabSoloPropietario(t.id)).map(t => t.id).sort())
+      .toEqual(['asambleas', 'rentas', 'transparencia'])
   })
 })

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20261105000100: vocabulario cerrado, transiciones
+# Verificación EJECUTABLE de 20261106000100: vocabulario cerrado, transiciones
 # de estado, agenda y votos congelados al cerrar la asamblea, e historial de
 # votos.
 #
@@ -36,8 +36,8 @@ trap 'rc=$?; echo "❌ run.sh terminó con rc=$rc en la línea $LINENO: $BASH_CO
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-NUESTRA="$MIGS/20261105000100_asambleas_integridad_estado_y_votos.sql"
-VERSION=20261105000100
+NUESTRA="$MIGS/20261106000100_asambleas_integridad_estado_y_votos.sql"
+VERSION=20261106000100
 HUELLA="$RAIZ/scripts/schema-drift/fingerprint.sql"
 [ -f "$NUESTRA" ] || { echo "❌ no existe $NUESTRA"; exit 1; }
 

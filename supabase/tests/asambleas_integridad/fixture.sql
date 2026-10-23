@@ -1,5 +1,5 @@
 -- ============================================================================
--- PADRÓN DE LA SUITE «asambleas_integridad» (20261105000100)
+-- PADRÓN DE LA SUITE «asambleas_integridad» (20261106000100)
 --
 -- Se carga sobre la cadena REAL de migraciones, antes y después de la
 -- migración: las asambleas siguen el ciclo real (nacen programadas o en curso,

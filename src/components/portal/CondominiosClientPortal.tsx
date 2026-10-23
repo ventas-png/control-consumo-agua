@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { fetchCondominiosPortalData, fetchPortalUnidadesResidente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta, marcarAnunciosLeidos } from '../../domain/portal/queries'
-import { PORTAL_TABS, tabsForRol, type PortalTab } from '../../lib/portalTabs'
+import { PORTAL_TABS, tabsVisiblesPortal, normalizarTabsOcultos, type PortalTab } from '../../lib/portalTabs'
 import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 import { confirmarPagoCuota } from '../../domain/portal/mutations'
 import { notify } from '../shared/Dialog'
@@ -68,8 +68,9 @@ const SECCION_A_TAB: Record<string, PortalTab> = {
   vehiculos: 'vehiculos',
 }
 
-// PORTAL_TABS y la visibilidad por rol viven en lib/portalTabs (módulo puro,
-// testeable sin montar el portal).
+// PORTAL_TABS y la visibilidad (por rol y por las pestañas que la empresa apagó
+// en el condominio) viven en lib/portalTabs (módulo puro, testeable sin montar
+// el portal).
 
 // Aviso de paquetería al entrar. Lo que espera al residente en portería se le
 // recuerda una vez por sesión hasta que lo retire (sessionStorage); que ya
@@ -119,6 +120,12 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [popupOpen, setPopupOpen]                 = useState(false)
   const [retirosVistos, setRetirosVistos]         = useState<string[]>(() => leerIdsVistos(() => localStorage, PAQ_RETIROS_VISTOS))
   const [vistaPaquetes, setVistaPaquetes]         = useState<VistaPaquetes>('recibidos')
+  // Pestañas que la empresa apagó, por condominio (project_id → ids). Un
+  // residente puede tener unidades en varios condominios con distinta config.
+  const [pestanasOcultas, setPestanasOcultas]     = useState<Record<string, PortalTab[]>>({})
+  // La barra de pestañas espera a la primera carga: antes no se sabe ni el rol
+  // de la unidad ni qué apagó la empresa, y se verían pestañas que luego se van.
+  const [pestanasListas, setPestanasListas]       = useState(false)
 
   const cargarDatos = useCallback(async () => {
     if (!clienteId) { setLoading(false); return }
@@ -143,6 +150,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         projData, amenidadesData, cuotasData, reservasData, bloqueosData,
         ticketsData, anunciosData, visitantesData, mensajesData,
         solicitudesRentaData, paquetesData, correspondenciaData, comunicadosData,
+        pestanasData,
       } = await fetchCondominiosPortalData(projectIds, unidadIds)
 
       const proj = (projData as { id: string; company_id: string; moneda_condominios: string | null; moneda: string }[] | null)?.[0]
@@ -168,8 +176,13 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       setCorrespondencia(((correspondenciaData as (PiezaRecepcion & { unidades?: { nombre: string } | null })[]) ?? [])
         .map(r => ({ ...r, unidad_nombre: r.unidades?.nombre })))
       setComunicados((comunicadosData as ComunicadoCondominio[]) ?? [])
+      setPestanasOcultas(Object.fromEntries(
+        ((pestanasData as { id: string; portal_tabs_ocultos?: unknown }[] | null) ?? [])
+          .map(p => [p.id, normalizarTabsOcultos(p.portal_tabs_ocultos)]),
+      ))
     } finally {
       setLoading(false)
+      setPestanasListas(true)
     }
   }, [clienteId, currentUser.company_id])
 
@@ -233,6 +246,16 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     void marcarAnunciosLeidos(visibles, clienteId, resolvedCompanyId)
   }, [tab, loading, anuncios, unidades, selectedUnidadId, clienteId, resolvedCompanyId])
 
+  // Paquetes de las unidades cuyo condominio muestra Paquetería. Si la empresa
+  // apagó la pestaña, el aviso al entrar tampoco sale: llevaría a un lugar que
+  // el residente no tiene.
+  const paquetesAvisables = useMemo(() => {
+    const conPaqueteria = new Set(unidades
+      .filter(u => tabsVisiblesPortal(u.rol, pestanasOcultas[u.project_id ?? '']).includes('paquetes'))
+      .map(u => u.id))
+    return paquetes.filter(p => !!p.unidad_id && conPaqueteria.has(p.unidad_id))
+  }, [paquetes, unidades, pestanasOcultas])
+
   // Pop-up de aviso: los envíos que esperan al residente en portería (una vez
   // por sesión) y los que él dejó para un tercero y ya se retiraron (una sola
   // vez). Solo cuentan las ENTRADAS como "por recoger": lo que el residente
@@ -241,19 +264,20 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   useEffect(() => {
     if (loading) return
     const pendVistos = leerIdsVistos(() => sessionStorage, PAQ_PENDIENTES_VISTOS)
-    const hayPendientes = piezasPorRetirar(paquetes).some(p => !pendVistos.includes(p.id))
-    const hayRetiros = salidasRetiradasRecientes(paquetes, new Date().toISOString()).some(p => !retirosVistos.includes(p.id))
+    const hayPendientes = piezasPorRetirar(paquetesAvisables).some(p => !pendVistos.includes(p.id))
+    const hayRetiros = salidasRetiradasRecientes(paquetesAvisables, new Date().toISOString()).some(p => !retirosVistos.includes(p.id))
     if (hayPendientes || hayRetiros) setPopupOpen(true)
-  }, [loading, paquetes, retirosVistos])
+  }, [loading, paquetesAvisables, retirosVistos])
 
-  // Visibilidad por rol: si el tab activo no está permitido para la unidad
-  // seleccionada (p.ej. la campana navegó, o el cliente pasó de una unidad
-  // propia a una donde es inquilino), volver a Mi Unidad. El selector de unidad
-  // ya resetea a mi_unidad al cambiar; esto cubre el resto de caminos.
+  // Visibilidad por rol y por condominio: si el tab activo no está permitido
+  // para la unidad seleccionada (p.ej. el cliente pasó de una unidad propia a
+  // una donde es inquilino, o la empresa apagó la pestaña), volver a Mi Unidad.
+  // El selector de unidad ya resetea a mi_unidad al cambiar; esto cubre el
+  // resto de caminos.
   useEffect(() => {
-    const rol = (unidades.find(u => u.id === selectedUnidadId) ?? unidades[0])?.rol
-    if (!tabsForRol(rol).includes(tab)) setTab('mi_unidad')
-  }, [tab, unidades, selectedUnidadId])
+    const u = unidades.find(x => x.id === selectedUnidadId) ?? unidades[0]
+    if (!tabsVisiblesPortal(u?.rol, pestanasOcultas[u?.project_id ?? '']).includes(tab)) setTab('mi_unidad')
+  }, [tab, unidades, selectedUnidadId, pestanasOcultas])
 
   // No services guard (only after initial load)
   if (!loading && unidades.length === 0) {
@@ -298,8 +322,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const proyectoId = unidad?.project_id ?? ''
 
   // Tabs visibles según el rol del residente en ESTA unidad (propietario ve
-  // todo; inquilino/familiar solo lo operativo — ver lib/portalTabs).
-  const tabsVisibles = PORTAL_TABS.filter(t => tabsForRol(unidad?.rol).includes(t.id))
+  // todo; inquilino/familiar solo lo operativo) menos las que la empresa apagó
+  // en su condominio — ver lib/portalTabs.
+  const idsVisibles   = tabsVisiblesPortal(unidad?.rol, pestanasOcultas[proyectoId])
+  const tabsVisibles  = PORTAL_TABS.filter(t => idsVisibles.includes(t.id))
 
   // Data filtered to selected unit
   const cuotasU        = cuotas.filter(c => c.unidad_id === selectedUnidadId)
@@ -309,8 +335,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const correspondenciaU = correspondencia.filter(c => c.unidad_id === selectedUnidadId)
   const mensajesU      = mensajes.filter(m => m.unidad_id === selectedUnidadId)
   const comunicadosU   = comunicados.filter(c => c.unidad_id === selectedUnidadId)
-  const paquetesPendientes = piezasPorRetirar(paquetes)
-  const retirosRecientes   = salidasRetiradasRecientes(paquetes, new Date().toISOString())
+  const paquetesPendientes = piezasPorRetirar(paquetesAvisables)
+  const retirosRecientes   = salidasRetiradasRecientes(paquetesAvisables, new Date().toISOString())
   const retirosNuevos      = retirosRecientes.filter(p => !retirosVistos.includes(p.id))
 
   function cerrarPopup(irA?: VistaPaquetes) {
@@ -349,12 +375,14 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     return new Date(a.created_at) >= hace7
   }).length
 
-  const kpiCards = [
-    { label: 'Deuda Pendiente',   value: loading ? '' : `${moneda} ${deudaTotal.toFixed(2)}`, icon: '💳', bg: deudaTotal > 0 ? 'linear-gradient(135deg, var(--at-warning), var(--at-warning))' : 'linear-gradient(135deg, var(--at-success), var(--at-success-strong))' },
-    { label: 'Tickets Abiertos',  value: loading ? '' : String(ticketsAbiertos),              icon: '🔧', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
-    { label: 'Reservas Activas',  value: loading ? '' : String(reservasProx),                 icon: '🏊', bg: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))' },
-    { label: 'Anuncios (7 días)', value: loading ? '' : String(anunciosNuevos),               icon: '📢', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
-  ]
+  // Cada tarjeta resume una pestaña; si la empresa la apagó, la tarjeta tampoco sale.
+  const kpiCards = ([
+    { tab: 'cuenta',   label: 'Deuda Pendiente',   value: loading ? '' : `${moneda} ${deudaTotal.toFixed(2)}`, icon: '💳', bg: deudaTotal > 0 ? 'linear-gradient(135deg, var(--at-warning), var(--at-warning))' : 'linear-gradient(135deg, var(--at-success), var(--at-success-strong))' },
+    { tab: 'tickets',  label: 'Tickets Abiertos',  value: loading ? '' : String(ticketsAbiertos),              icon: '🔧', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
+    { tab: 'reservas', label: 'Reservas Activas',  value: loading ? '' : String(reservasProx),                 icon: '🏊', bg: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))' },
+    { tab: 'anuncios', label: 'Anuncios (7 días)', value: loading ? '' : String(anunciosNuevos),               icon: '📢', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
+  ] satisfies { tab: PortalTab; label: string; value: string; icon: string; bg: string }[])
+    .filter(card => !pestanasListas || idsVisibles.includes(card.tab))
 
   return (
     /* infra:I14 — provides the resident's unit project_id to condominios-media uploaders. */
@@ -411,7 +439,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
             <NotificationBell
               userId={currentUser.user_id}
               onNavigate={s => {
-                if (Object.prototype.hasOwnProperty.call(SECCION_A_TAB, s)) setTab(SECCION_A_TAB[s])
+                // Una notificación de una pestaña apagada no navega: se queda donde está.
+                if (Object.prototype.hasOwnProperty.call(SECCION_A_TAB, s) && idsVisibles.includes(SECCION_A_TAB[s])) setTab(SECCION_A_TAB[s])
               }}
             />
 
@@ -428,7 +457,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
         {/* Tab navigation */}
         <div className="tab-strip-scrollable" style={{ maxWidth: '960px', margin: '0 auto', padding: '0 24px', display: 'flex', gap: '4px', overflowX: 'auto' }}>
-          {tabsVisibles.map(t => (
+          {pestanasListas && tabsVisibles.map(t => (
             <button
               key={t.id}
               className={`condo-tab${tab === t.id ? ' active' : ''}`}
@@ -463,6 +492,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
          * una tarjeta de 150px un importe tipo "Q 1250.00" parte en dos
          * renglones. Con el valor a lo ancho de la tarjeta no envuelve.
          * Los gradientes de marca no cambian. */}
+        {kpiCards.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
           {kpiCards.map(card => (
             <div key={card.label} style={{
@@ -489,6 +519,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
             </div>
           ))}
         </div>
+        )}
 
         {/* Tab content */}
         {loading ? (

@@ -22,8 +22,10 @@
 #   3. CON la migración: cada fuga cerrada con la MISMA respuesta que el forastero;
 #      la matriz antes/después IDÉNTICA, función por función, para propietario,
 #      administrador, operador y visor de D, superadministrador, propietario y
-#      operador de C, service_role y el sistema; el tope no es un oráculo; los
-#      helpers dan false a anon y NULL (como antes) a servicio y sistema;
+#      operador de C, service_role y el sistema —medida sobre la serie SIN las
+#      migraciones posteriores (lo que cambian las posteriores se informa aparte)—;
+#      el tope no es un oráculo; los helpers dan false a anon y NULL (como antes)
+#      a servicio y sistema;
 #   4. el sistema en una sesión NUEVA (sin el GUC del JWT definido, como pg_cron):
 #      insertar proyectos responde igual antes y después;
 #   5. guardas de la migración: un cuerpo inesperado o un rol que no es el
@@ -69,7 +71,8 @@ chmod 777 "$TRABAJO"
 PUERTO=${PGPORT_TEST:-55541}
 BD=fos_base            # cadena anterior, SIN la migración ni el padrón (plantilla de todo)
 BD_ANTES=fos_antes     # + padrón + matriz: el estado de producción
-BD_POST=fos_post       # + migración + padrón + matriz
+BD_POST=fos_post       # + migración + posteriores + padrón + matriz
+BD_SERIE=fos_serie     # + migración SIN las posteriores + padrón + matriz: lo que la serie cambia
 
 COMO=""
 if [ "$(id -u)" = "0" ]; then
@@ -111,6 +114,7 @@ bloque() {           # bloque ARCHIVO ETIQUETA BD
   }
   echo "  ✓ $2 — $(echo "$salida" | grep -c '✓') comprobaciones"
   echo "$salida" | sed -n 's/.*NOTICE:  ✓ /      /p' | grep -E 'funciones responden|celdas|evaluaciones|intentos|matriz cubre' || true
+  echo "$salida" | sed -n 's/.*NOTICE:  · /      · /p'     # informativos (p. ej. lo que cambiaron las posteriores)
 }
 
 # Corre una suite en modo «continuar» y devuelve cuántos veredictos fallaron (en fos.fallos).
@@ -133,6 +137,11 @@ cargar_antes() {     # cargar_antes BD — copia los resultados de $BD_ANTES com
        -c "\\copy fos.antes FROM '$TRABAJO/antes.tsv'" \
        -c "DROP TABLE IF EXISTS fos.posteriores" -c "CREATE TABLE fos.posteriores (firma text PRIMARY KEY)" \
        -c "\\copy fos.posteriores FROM '$TRABAJO/posteriores.txt'" >/dev/null
+}
+cargar_serie() {     # cargar_serie BD — copia los resultados de $BD_SERIE como fos.serie (ver assert_matriz.sql)
+  q "COPY (SELECT * FROM fos.resultados) TO STDOUT" "$BD_SERIE" > "$TRABAJO/serie.tsv"
+  PGOPTIONS="-c client_min_messages=warning" psql -q -d "$1" -c "DROP TABLE IF EXISTS fos.serie" -c "CREATE TABLE fos.serie (LIKE fos.resultados)" \
+       -c "\\copy fos.serie FROM '$TRABAJO/serie.tsv'" >/dev/null
 }
 # El inventario que recorre la matriz (la misma definición que fos.inventario(), sin depender del esquema fos).
 INVENTARIO_SQL="SELECT p.oid::regprocedure::text FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef AND p.prokind = 'f' AND p.prorettype <> 'trigger'::regtype AND has_function_privilege('authenticated', p.oid, 'EXECUTE')"
@@ -199,6 +208,11 @@ echo "  ✓ la huella cambia EXACTAMENTE en 28 grupos: 20 cuerpos de función (s
 # trae una función nueva ejecutable por authenticated, la matriz la recorre igual (sale de
 # pg_proc) y las secciones de sesiones sin perfil la juzgan; lo único que no puede exigirse
 # es que estuviera «antes»: su firma se anota en fos.posteriores (ver assert_matriz.sql).
+# Tampoco puede exigirse que las posteriores dejen IGUAL lo que una función legítima
+# devuelve (una columna nueva en una tabla que exporta export_company_data lo cambia, y es
+# correcto): la comparación antes/después de los legítimos se hace contra la copia de la
+# serie SIN posteriores ($BD_SERIE), y lo que cambian las posteriores se informa aparte.
+copia "$BD_POST" "$BD_SERIE"
 q "$INVENTARIO_SQL" "$BD_POST" | LC_ALL=C sort > "$TRABAJO/inv_sin_posteriores.txt"
 for f in "$MIGS"/*.sql; do
   base="$(basename "$f" .sql)"
@@ -211,7 +225,9 @@ q "$INVENTARIO_SQL" "$BD_POST" | LC_ALL=C sort | LC_ALL=C comm -13 "$TRABAJO/inv
 
 echo "── 4/8 · CON la migración: cierre, matriz, tope y helpers"
 matriz "$BD_POST"
+matriz "$BD_SERIE"
 cargar_antes "$BD_POST"
+cargar_serie "$BD_POST"
 bloque assert_cierre.sql  "las 39 fugas, cerradas con la misma respuesta que el forastero" "$BD_POST"
 bloque assert_matriz.sql  "matriz antes/después"                                       "$BD_POST"
 bloque assert_tope.sql    "el tope de plan no es un oráculo"                           "$BD_POST"

@@ -1,5 +1,5 @@
 -- ============================================================================
--- CONTROL PREVIO: el estado de ANTES de 20261105000100, sobre el mismo padrón.
+-- CONTROL PREVIO: el estado de ANTES de 20261106000100, sobre el mismo padrón.
 --
 -- Reproduce los huecos: con la asamblea finalizada, el admin cambia y borra
 -- votos y agrega puntos; una asamblea finalizada vuelve a «en curso»; tipo y

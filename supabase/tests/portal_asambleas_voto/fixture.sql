@@ -189,7 +189,7 @@ INSERT INTO public.unidad_residentes (unidad_id, cliente_id, company_id, project
 
 -- ── Asambleas, puntos y votos ───────────────────────────────────────────────
 -- ASA_FIN sigue el ciclo real: nace en curso, recibe su punto y sus votos, y
--- recién entonces se finaliza (20261105000100 congela la agenda y los votos
+-- recién entonces se finaliza (20261106000100 congela la agenda y los votos
 -- de una asamblea cerrada, así que no se le pueden cargar después).
 INSERT INTO public.asambleas (id, company_id, project_id, titulo, fecha, hora_inicio, estado, acta) VALUES
   (pv.id('ASA_CUR'),  pv.id('A'), pv.id('A1'), 'Ordinaria en curso',  CURRENT_DATE,      '18:00', 'en_curso',   'Borrador del acta'),

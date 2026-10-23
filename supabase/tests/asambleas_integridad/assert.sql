@@ -1,5 +1,5 @@
 -- ============================================================================
--- INVARIANTES de 20261105000100 sobre el padrón (fixture.sql).
+-- INVARIANTES de 20261106000100 sobre el padrón (fixture.sql).
 --
 -- Vocabulario cerrado; el estado sólo avanza (programada → en curso →
 -- finalizada; se cancela antes de finalizar); con la asamblea finalizada o

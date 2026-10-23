@@ -16582,6 +16582,7 @@ export type Database = {
           nit: string | null
           nombre: string
           nombre_fiscal: string | null
+          portal_tabs_ocultos: string[]
           proveedor_pago: string | null
           proveedor_timbrado: string | null
           regimen_fiscal: string | null
@@ -16616,6 +16617,7 @@ export type Database = {
           nit?: string | null
           nombre: string
           nombre_fiscal?: string | null
+          portal_tabs_ocultos?: string[]
           proveedor_pago?: string | null
           proveedor_timbrado?: string | null
           regimen_fiscal?: string | null
@@ -16650,6 +16652,7 @@ export type Database = {
           nit?: string | null
           nombre?: string
           nombre_fiscal?: string | null
+          portal_tabs_ocultos?: string[]
           proveedor_pago?: string | null
           proveedor_timbrado?: string | null
           regimen_fiscal?: string | null
