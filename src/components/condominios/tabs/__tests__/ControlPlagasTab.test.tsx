@@ -1,9 +1,12 @@
 // Control de plagas: deja la vista dividida (lista de 300px + panel) por una
 // tabla que en el teléfono se lee como tarjetas; la nueva visita y el detalle
-// van en ventana (pantalla completa en el teléfono). La próxima visita es la
-// que dejó programada la visita más reciente (antes se avisaba la de cada
-// registro: una ya hecha seguía «próxima» y una atrasada desaparecía), en días
-// de calendario locales, y las áreas propias se pueden quitar.
+// van en ventana (pantalla completa en el teléfono), y las áreas propias se
+// pueden quitar.
+//
+// Cada tipo lleva su calendario: la próxima visita es la que dejó programada la
+// última visita de ese tipo o, si no dejó, la probable según su frecuencia;
+// con ella se proyectan los próximos 90 días. Al registrar, la próxima visita
+// se propone sola. Los plazos van en días de calendario locales.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, within, waitFor, createEvent } from '@testing-library/react'
 import type { ControlPlagas } from '../../../../types'
@@ -33,11 +36,14 @@ function visita(over: Partial<ControlPlagas>): ControlPlagas {
 }
 
 const registros = [
-  // Ya superada: su próxima visita (20 sep) se hizo.
+  // Fumigaciones cada 46 días; la última (5 oct) no dejó fecha: la probable
+  // es el 5 oct + 46 días = 20 nov.
+  visita({ id: 'v0', fecha: '2026-07-05', created_at: '2026-07-05T10:00:00Z' }),
   visita({ id: 'v1', proxima_visita: '2026-09-20', costo: 450 }),
-  // Mismo día que v2 pero capturada antes: no es la vigente.
+  visita({ id: 'v5', fecha: '2026-10-05', costo: 500, created_at: '2026-10-05T10:00:00Z' }),
+  // Inspección programada para el 25 oct.
   visita({ id: 'v3', tipo: 'inspeccion', fecha: '2026-09-20', proxima_visita: '2026-10-25', created_at: '2026-09-20T09:00:00Z' }),
-  // La más reciente: su próxima visita (20 oct) está atrasada.
+  // Preventivo: su próxima visita (20 oct) está atrasada.
   visita({ id: 'v2', tipo: 'preventivo', fecha: '2026-09-20', proxima_visita: '2026-10-20', resultado: 'requiere_seguimiento',
     hora_inicio: '08:00:00', hora_fin: '10:30:00', areas: ['Lobby', 'Sótano', 'Parqueo', 'Jardines', 'Azotea'],
     observaciones: 'Rastros de roedores en sótano.', costo: 1250.5, created_at: '2026-09-20T15:00:00Z' }),
@@ -96,6 +102,7 @@ describe('Plagas — nueva visita en ventana', () => {
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     expect(mocks.createCondominioRow).toHaveBeenCalledWith('control_plagas', expect.objectContaining({
       company_id: 'co1', project_id: 'p1', tipo: 'fumigacion', fecha: '2026-10-23', areas: ['Lobby', 'Cuarto eléctrico'],
+      proxima_visita: '2026-12-08', // propuesta sola: 23 oct + 46 días
     }))
 
     // Mientras guarda, ni Escape ni la X la cierran.
@@ -131,51 +138,128 @@ describe('Plagas — nueva visita en ventana', () => {
   })
 })
 
-describe('Plagas — próxima visita, lista y detalle', () => {
-  it('la próxima visita es la que dejó la visita más reciente, y avisa si está atrasada', () => {
+describe('Plagas — próxima visita al registrar', () => {
+  const valorProxima = () => (screen.getByLabelText('Próxima visita') as HTMLInputElement).value
+
+  it('se propone con la frecuencia del tipo y sigue al tipo, la fecha y el resultado', () => {
     render(<ControlPlagasTab {...props()} />)
-    const ultima = screen.getByRole('button', { name: /^Ver última visita/ })
-    expect(ultima.textContent).toContain('2026-09-20')
-    expect(ultima.textContent).toContain('Requiere seguimiento')
-    const proxima = screen.getByRole('button', { name: /^Próxima visita/ })
-    expect(proxima.textContent).toBe('⏰ Próxima visita2026-10-20atrasada 3 días')
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva visita' }))
+    expect(valorProxima()).toBe('2026-12-08') // fumigación: 23 oct + 46
+    expect(screen.getByText('Sugerida: cada ~46 días, según el historial de Fumigación.')).toBeTruthy()
 
-    fireEvent.click(proxima)
-    expect(screen.getByRole('dialog', { name: '🛡️ Preventivo' })).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'inspeccion' } })
+    expect(valorProxima()).toBe('2026-11-27') // 23 oct + 35 (lo programado en la única inspección)
+    fireEvent.change(screen.getByLabelText('Fecha *'), { target: { value: '2026-10-20' } })
+    expect(valorProxima()).toBe('2026-11-24')
+
+    // Una visita no realizada no se da por hecha: hay que reponerla.
+    fireEvent.change(screen.getByLabelText('Resultado'), { target: { value: 'no_realizado' } })
+    expect(valorProxima()).toBe('')
+    expect(screen.getByText('No se realizó: programa cuándo se repone.')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Resultado'), { target: { value: 'satisfactorio' } })
+    expect(valorProxima()).toBe('2026-11-24')
+
+    fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'tratamiento' } })
+    expect(valorProxima()).toBe('')
+    expect(screen.getByText('Sin historial de Tratamiento para sugerir: elige un plazo.')).toBeTruthy()
   })
 
-  it('cuenta días de calendario locales, y sin fecha en la última visita lo dice', () => {
+  it('un plazo rápido o una fecha a mano se respetan; «Usar la sugerida» vuelve a la propuesta', async () => {
+    render(<ControlPlagasTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva visita' }))
+    const mas30 = screen.getByRole('button', { name: 'Próxima visita en 30 días' })
+    fireEvent.click(mas30)
+    expect(valorProxima()).toBe('2026-11-22')
+    expect(mas30.getAttribute('aria-pressed')).toBe('true')
+
+    // Ya no se recalcula al cambiar el tipo.
+    fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'inspeccion' } })
+    expect(valorProxima()).toBe('2026-11-22')
+    fireEvent.click(screen.getByRole('button', { name: 'Usar la sugerida (2026-11-27)' }))
+    expect(valorProxima()).toBe('2026-11-27')
+    fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'fumigacion' } })
+    expect(valorProxima()).toBe('2026-12-08')
+
+    fireEvent.change(screen.getByLabelText('Próxima visita'), { target: { value: '2027-01-15' } })
+    fireEvent.change(screen.getByLabelText('Fecha *'), { target: { value: '2026-10-22' } })
+    expect(valorProxima()).toBe('2027-01-15')
+
+    // Tras registrar, la siguiente visita vuelve a proponerse sola.
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Piscina' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Registrar/ }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(mocks.createCondominioRow).toHaveBeenCalledWith('control_plagas', expect.objectContaining({ proxima_visita: '2027-01-15' }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva visita' }))
+    expect(valorProxima()).toBe('2026-12-08')
+  })
+})
+
+describe('Plagas — próximas visitas por tipo, lista y detalle', () => {
+  it('cada tipo tiene su próxima visita (programada o probable), la más urgente primero', () => {
+    render(<ControlPlagasTab {...props()} />)
+    const seccion = screen.getByRole('region', { name: '⏰ Próximas visitas por tipo' })
+    expect(within(seccion).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual([
+      'Preventivo: próxima visita 2026-10-20, programada, atrasada 3 días',
+      'Inspección: próxima visita 2026-10-25, programada, en 2 días',
+      'Fumigación: próxima visita 2026-11-20, probable, en 28 días',
+    ])
+    const preventivo = within(seccion).getAllByRole('button')[0]
+    expect(preventivo.textContent).toContain('Requiere seguimiento')
+    const fumigacion = within(seccion).getAllByRole('button')[2]
+    expect(fumigacion.textContent).toContain('Última 2026-10-05 · cada ~46 días')
+    expect(fumigacion.textContent).toContain('Luego: 2027-01-05')
+
+    // Proyección a 90 días: preventivo 4 (la atrasada y tres más, a Q 1,250.50),
+    // inspección 3 (sin costo) y fumigación 2 (a Q 475 de promedio).
+    expect(within(seccion).getByText('Próximos 90 días: 9 visitas · ≈ Q 5,952.00 (3 sin costo de referencia)')).toBeTruthy()
+
+    fireEvent.click(fumigacion)
+    const detalle = screen.getByRole('dialog', { name: '💨 Fumigación' })
+    expect(within(detalle).getByText('Probable 2026-11-20 · en 28 días')).toBeTruthy()
+    expect(within(detalle).getByText('No se programó; cada ~46 días según el historial')).toBeTruthy()
+  })
+
+  it('cuenta días de calendario locales, y un tipo sin fecha lo dice', () => {
     vi.setSystemTime(new Date(2026, 9, 23, 20, 0, 0)) // 8 de la noche
-    const { rerender } = render(<ControlPlagasTab {...props({ registros: [...registros, visita({ id: 'v4', fecha: '2026-10-01', proxima_visita: '2026-10-24', created_at: '2026-10-01T10:00:00Z' })] })} />)
-    expect(screen.getByRole('button', { name: /^Próxima visita/ }).textContent).toContain('en 1 día')
-
-    rerender(<ControlPlagasTab {...props({ registros: [...registros, visita({ id: 'v4', fecha: '2026-10-01', created_at: '2026-10-01T10:00:00Z' })] })} />)
-    expect(screen.queryByRole('button', { name: /^Próxima visita/ })).toBeNull()
-    expect(screen.getByText('Sin programar en la última visita')).toBeTruthy()
+    render(<ControlPlagasTab {...props({ registros: [...registros,
+      visita({ id: 'v4', tipo: 'inspeccion', fecha: '2026-10-01', proxima_visita: '2026-10-24', created_at: '2026-10-01T10:00:00Z' }),
+      visita({ id: 'v6', tipo: 'tratamiento', fecha: '2026-10-01', created_at: '2026-10-01T11:00:00Z' }),
+    ] })} />)
+    expect(screen.getByRole('button', { name: 'Inspección: próxima visita 2026-10-24, programada, en 1 día' })).toBeTruthy()
+    const tratamiento = screen.getByRole('button', { name: 'Tratamiento: sin próxima visita' })
+    expect(tratamiento.textContent).toContain('Sin fecha: programa la próxima al registrar')
   })
 
-  it('la lista se lee como tarjetas; sólo la próxima visita vigente se marca atrasada', () => {
+  it('la lista se lee como tarjetas; sólo la próxima vigente de cada tipo se marca atrasada', () => {
     const { container } = render(<ControlPlagasTab {...props()} />)
     const tabla = container.querySelector('table')!
     expect(tabla.classList.contains('table-cards-on-mobile')).toBe(true)
     const celdas = Array.from(tabla.querySelectorAll('tbody tr:first-child td'))
     expect(celdas.map(td => td.getAttribute('data-label'))).toEqual(
       ['Fecha', 'Tipo', 'Áreas', 'Empresa', 'Próx. visita', 'Costo', 'Resultado', null])
+    // La fumigación del 20 sep ya pasó, pero hubo otra fumigación después.
     expect(within(tabla).getAllByText(/· atrasada$/).map(e => e.textContent)).toEqual(['2026-10-20 · atrasada'])
+    expect(within(tabla).getByText('≈ 2026-11-20')).toBeTruthy() // la probable de la última fumigación
     expect(within(tabla).getByText('Lobby, Sótano, Parqueo +2')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('Filtrar por tipo'), { target: { value: 'inspeccion' } })
     expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
   })
 
-  it('«Ver» abre el detalle; una visita superada lo dice y no cuenta plazo', () => {
+  it('«Ver» abre el detalle; una visita superada por otra de su tipo lo dice y no cuenta plazo', () => {
     render(<ControlPlagasTab {...props()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Ver Fumigación del 2026-08-20' }))
     const vieja = screen.getByRole('dialog', { name: '💨 Fumigación' })
     expect(vieja.classList.contains('at-modal--fs-mobile')).toBe(true)
-    expect(within(vieja).getByText(/Hay una visita más reciente/)).toBeTruthy()
+    expect(within(vieja).getByText('Hay una visita más reciente de tipo «Fumigación»: la próxima vigente es la que dejó programada esa.')).toBeTruthy()
     expect(within(vieja).getByText('2026-09-20')).toBeTruthy()
     expect(within(vieja).getByText('Q 450.00')).toBeTruthy()
+    fireEvent.click(within(vieja).getByRole('button', { name: 'Cerrar' }))
+
+    // La probable sólo se muestra en la última de su tipo.
+    fireEvent.click(screen.getByRole('button', { name: 'Ver Fumigación del 2026-07-05' }))
+    const masVieja = screen.getByRole('dialog', { name: '💨 Fumigación' })
+    expect(within(masVieja).getByText('Próxima visita').nextElementSibling!.textContent).toBe('—')
   })
 
   it('tocar la fila abre el detalle con horario, plazo, áreas y observaciones', () => {

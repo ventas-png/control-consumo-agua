@@ -1,6 +1,7 @@
-import { hoyLocalISO, diasHastaFechaCalendario, formatNumber } from '../../../lib/format'
+import { hoyLocalISO, diasHastaFechaCalendario, formatNumber, sumarDiasCalendario } from '../../../lib/format'
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
+import { planPorTipo, resumenProyeccion, DIAS_PROYECCION, type PlanTipo } from '../../../domain/condominios/plagas'
 import { notify } from '../../shared/Dialog'
 import { tint } from '../../shared/statusTone'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -37,10 +38,6 @@ const AREAS_COMUNES = ['Lobby', 'Piscina', 'Gimnasio', 'Parqueo', 'Jardines', 'A
 const tipoDe = (t: TipoControlPlagas) => TIPOS.find(x => x.value === t)
 const resultadoDe = (r: ResultadoControlPlagas) => RESULTADOS.find(x => x.value === r)
 
-/** La más reciente: por fecha y, el mismo día, por hora de captura. */
-const masReciente = (a: ControlPlagas, b: ControlPlagas) =>
-  b.fecha.localeCompare(a.fecha) || (b.created_at ?? '').localeCompare(a.created_at ?? '')
-
 /** La base guarda la hora con segundos (08:00:00); se muestra 08:00. */
 const hora = (h?: string | null) => (h ? h.slice(0, 5) : '')
 
@@ -57,6 +54,11 @@ function ResultadoBadge({ resultado }: { resultado: ResultadoControlPlagas }) {
   return <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: res && tint(res.color, 12), color: res?.color, whiteSpace: 'nowrap' }}>{res?.label ?? resultado}</span>
 }
 
+/** Plazos rápidos para la próxima visita, en días desde la fecha de la visita. */
+const PLAZOS = [15, 30, 60, 90]
+
+const tarjeta: CSSProperties = { background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px', textAlign: 'left', font: 'inherit', color: 'inherit', minWidth: 0 }
+
 const formVacio = () => ({
   tipo: 'fumigacion' as TipoControlPlagas,
   empresa: '', tecnico: '', productos: '',
@@ -66,6 +68,7 @@ const formVacio = () => ({
   proxima_visita: '', costo: '', observaciones: '',
   areas: [] as string[],
 })
+type Form = ReturnType<typeof formVacio>
 
 export default function ControlPlagasTab({ registros, proyectoId, companyId, moneda, canCreate, onRefresh }: Props) {
   const [detalleId, setDetalleId] = useState<string | null>(null)
@@ -75,18 +78,23 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
   const [filtroResultado, setFiltroResultado] = useState<ResultadoControlPlagas | ''>('')
   const [areaCustom, setAreaCustom] = useState('')
   const [form, setForm] = useState(formVacio)
+  // Mientras no se toque, la próxima visita sigue a la sugerida.
+  const [proximaManual, setProximaManual] = useState(false)
 
   const lista = registros.filter(r =>
     (filtroTipo === '' || r.tipo === filtroTipo) &&
     (filtroResultado === '' || r.resultado === filtroResultado)
   )
 
-  // La próxima visita vigente es la que dejó programada la visita más
-  // reciente. Antes se contaba la de cada registro: una visita ya hecha seguía
-  // «próxima» y una atrasada desaparecía del aviso.
-  const ultima = [...registros].sort(masReciente)[0] ?? null
-  const esUltima = (r: ControlPlagas) => r.id === ultima?.id
-  const diasProxima = diasHastaFechaCalendario(ultima?.proxima_visita)
+  // Cada tipo lleva su calendario: la próxima fumigación es la que dejó
+  // programada la última fumigación (o, si no dejó, la probable según su
+  // frecuencia). Antes había una sola próxima visita, la de la última visita
+  // de cualquier tipo: una inspección sin fecha «borraba» la fumigación.
+  const hoy = hoyLocalISO()
+  const planes = planPorTipo(registros, hoy)
+  const planDe = (tipo: TipoControlPlagas) => planes.find(p => p.tipo === tipo) ?? null
+  const esVigente = (r: ControlPlagas) => planDe(r.tipo)?.ultima.id === r.id
+  const proyeccion = resumenProyeccion(planes, hoy)
 
   const empresas = [...new Set(registros.map(r => r.empresa?.trim()).filter((e): e is string => !!e))].sort()
 
@@ -107,8 +115,28 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
   // Las áreas propias sólo se listaban como texto: no se podían quitar.
   const areasOfrecidas = [...AREAS_COMUNES, ...form.areas.filter(a => !AREAS_COMUNES.includes(a))]
 
+  /** La fecha más la frecuencia del tipo. Una visita no realizada no se sugiere: hay que reponerla. */
+  function sugerida(f: Form): string | null {
+    if (f.resultado === 'no_realizado') return null
+    const dias = planDe(f.tipo)?.intervaloDias
+    return dias ? sumarDiasCalendario(f.fecha, dias) : null
+  }
+
+  /** Cambia tipo, fecha o resultado y, si la próxima visita no se ha tocado, la recalcula. */
+  function cambiar(cambios: Partial<Form>) {
+    setForm(p => {
+      const n = { ...p, ...cambios }
+      return proximaManual ? n : { ...n, proxima_visita: sugerida(n) ?? '' }
+    })
+  }
+
+  function fijarProxima(valor: string) {
+    setProximaManual(true)
+    setForm(p => ({ ...p, proxima_visita: valor }))
+  }
+
   function abrirForm() {
-    setForm(p => ({ ...p, fecha: hoyLocalISO() }))
+    cambiar({ fecha: hoyLocalISO() })
     setDetalleId(null)
     setMostrarForm(true)
   }
@@ -136,6 +164,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm(formVacio())
+    setProximaManual(false)
     setAreaCustom('')
     setMostrarForm(false)
     onRefresh()
@@ -143,7 +172,6 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', minWidth: 0, background: 'var(--at-surface)', color: 'var(--at-ink)' }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
-  const tarjeta: CSSProperties = { background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px', textAlign: 'left', font: 'inherit', color: 'inherit', minWidth: 0 }
 
   // Montos con el formato regional de la app (antes, el del navegador).
   const dinero = (v: number) => `${moneda}\u00a0${formatNumber(v, 2)}`
@@ -151,37 +179,36 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
   // Se lee el registro vigente, no una copia.
   const detalle = detalleId ? registros.find(r => r.id === detalleId) ?? null : null
 
+  const textoProyeccion = proyeccion.visitas === 0
+    ? `Sin visitas previstas en los próximos ${DIAS_PROYECCION} días`
+    : `Próximos ${DIAS_PROYECCION} días: ${proyeccion.visitas} visita${proyeccion.visitas === 1 ? '' : 's'}`
+      + (proyeccion.costo > 0 ? ` · ≈\u00a0${dinero(proyeccion.costo)}` : '')
+      + (proyeccion.sinCosto > 0 ? ` (${proyeccion.sinCosto} sin costo de referencia)` : '')
+
+  const nombreTipo = tipoDe(form.tipo)?.label ?? form.tipo
+  const sugerenciaForm = sugerida(form)
+  const ayudaProxima = proximaManual
+    ? null
+    : form.resultado === 'no_realizado'
+      ? 'No se realizó: programa cuándo se repone.'
+      : sugerenciaForm
+        ? `Sugerida: cada ~${planDe(form.tipo)?.intervaloDias} días, según el historial de ${nombreTipo}.`
+        : `Sin historial de ${nombreTipo} para sugerir: elige un plazo.`
+
   return (
     <div style={{ padding: 16 }}>
-      {/* Última visita y la próxima que dejó programada: cada tarjeta abre esa visita */}
-      {ultima && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12, marginBottom: 16 }}>
-          <button type="button" className="cond-kpi-link" onClick={() => setDetalleId(ultima.id)} style={{ ...tarjeta, cursor: 'pointer' }}
-            aria-label={`Ver última visita: ${tipoDe(ultima.tipo)?.label ?? ultima.tipo} del ${ultima.fecha}`}>
-            <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 2 }}>Última visita</div>
-            <div style={{ display: 'flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 15, fontWeight: 700 }}>{ultima.fecha}</span>
-              <span style={{ fontSize: 13, color: 'var(--at-ink-2)' }}>{tipoDe(ultima.tipo)?.icon} {tipoDe(ultima.tipo)?.label ?? ultima.tipo}</span>
-              <ResultadoBadge resultado={ultima.resultado} />
-            </div>
-          </button>
-          {ultima.proxima_visita && diasProxima !== null ? (
-            <button type="button" className="cond-kpi-link" onClick={() => setDetalleId(ultima.id)}
-              style={{ ...tarjeta, cursor: 'pointer', background: diasProxima <= 7 ? 'var(--at-danger-tint)' : diasProxima <= 30 ? 'var(--at-warning-tint)' : 'var(--at-surface-2)', borderColor: diasProxima <= 7 ? 'var(--at-danger-border)' : diasProxima <= 30 ? 'var(--at-warning-border)' : 'var(--at-line)' }}
-              aria-label={`Próxima visita ${ultima.proxima_visita}, ${cuandoToca(diasProxima)}`}>
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 2 }}>⏰ Próxima visita</div>
-              <div style={{ display: 'flex', gap: '4px 8px', alignItems: 'baseline', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 15, fontWeight: 700 }}>{ultima.proxima_visita}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: colorPlazo(diasProxima) }}>{cuandoToca(diasProxima)}</span>
-              </div>
-            </button>
-          ) : (
-            <div style={tarjeta}>
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 2 }}>⏰ Próxima visita</div>
-              <div style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>Sin programar en la última visita</div>
-            </div>
-          )}
-        </div>
+      {/* Próxima visita de cada tipo (programada o probable) y la proyección;
+          cada tarjeta abre la última visita de su tipo. */}
+      {planes.length > 0 && (
+        <section aria-labelledby="plagas-proximas" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '2px 12px', flexWrap: 'wrap', marginBottom: 8 }}>
+            <h3 id="plagas-proximas" style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--at-ink)' }}>⏰ Próximas visitas por tipo</h3>
+            <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{textoProyeccion}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
+            {planes.map(p => <TarjetaTipo key={p.tipo} plan={p} onAbrir={() => setDetalleId(p.ultima.id)} />)}
+          </div>
+        </section>
       )}
 
       {/* Filtros + botón */}
@@ -226,17 +253,17 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
           >
             <div>
               <label htmlFor="plagas-tipo" style={lbl}>Tipo</label>
-              <select id="plagas-tipo" style={inp} value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as TipoControlPlagas }))}>
+              <select id="plagas-tipo" style={inp} value={form.tipo} onChange={e => cambiar({ tipo: e.target.value as TipoControlPlagas })}>
                 {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
               </select>
             </div>
             <div>
               <label htmlFor="plagas-fecha" style={lbl}>Fecha *</label>
-              <input id="plagas-fecha" type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
+              <input id="plagas-fecha" type="date" style={inp} value={form.fecha} onChange={e => cambiar({ fecha: e.target.value })} />
             </div>
             <div>
               <label htmlFor="plagas-resultado" style={lbl}>Resultado</label>
-              <select id="plagas-resultado" style={inp} value={form.resultado} onChange={e => setForm(p => ({ ...p, resultado: e.target.value as ResultadoControlPlagas }))}>
+              <select id="plagas-resultado" style={inp} value={form.resultado} onChange={e => cambiar({ resultado: e.target.value as ResultadoControlPlagas })}>
                 {RESULTADOS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
@@ -260,12 +287,38 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
               <input id="plagas-tecnico" style={inp} value={form.tecnico} onChange={e => setForm(p => ({ ...p, tecnico: e.target.value }))} />
             </div>
             <div>
-              <label htmlFor="plagas-proxima" style={lbl}>Próxima visita</label>
-              <input id="plagas-proxima" type="date" min={form.fecha || undefined} style={inp} value={form.proxima_visita} onChange={e => setForm(p => ({ ...p, proxima_visita: e.target.value }))} />
-            </div>
-            <div>
               <label htmlFor="plagas-costo" style={lbl}>Costo ({moneda})</label>
               <input id="plagas-costo" type="number" inputMode="decimal" min="0" step="0.01" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="plagas-proxima" style={lbl}>Próxima visita</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <input id="plagas-proxima" type="date" min={form.fecha || undefined} style={{ ...inp, flex: '1 1 180px', width: 'auto' }} value={form.proxima_visita}
+                  aria-describedby="plagas-proxima-ayuda" onChange={e => fijarProxima(e.target.value)} />
+                {/* Los plazos bajan juntos de línea, no uno suelto. */}
+                <div style={{ display: 'flex', gap: 6, flex: '0 0 auto' }}>
+                  {PLAZOS.map(d => {
+                    const fecha = sumarDiasCalendario(form.fecha, d)
+                    return (
+                      <button key={d} type="button" disabled={!fecha} aria-pressed={!!fecha && form.proxima_visita === fecha}
+                        aria-label={`Próxima visita en ${d} días`} onClick={() => fecha && fijarProxima(fecha)}
+                        style={{ padding: '6px 9px', borderRadius: 6, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: fecha ? 'pointer' : 'default',
+                          background: fecha && form.proxima_visita === fecha ? 'var(--at-accent)' : 'var(--at-surface)', color: fecha && form.proxima_visita === fecha ? 'white' : 'var(--at-ink-2)' }}>
+                        +{d}&nbsp;d
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div id="plagas-proxima-ayuda" style={{ fontSize: 11.5, color: 'var(--at-ink-3)', marginTop: 4 }}>
+                {ayudaProxima}
+                {proximaManual && sugerenciaForm && sugerenciaForm !== form.proxima_visita && (
+                  <button type="button" onClick={() => { setProximaManual(false); setForm(p => ({ ...p, proxima_visita: sugerenciaForm })) }}
+                    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--at-accent)', textDecoration: 'underline', cursor: 'pointer' }}>
+                    Usar la sugerida ({sugerenciaForm})
+                  </button>
+                )}
+              </div>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label htmlFor="plagas-productos" style={lbl}>Productos utilizados</label>
@@ -316,7 +369,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
             onClose={() => setDetalleId(null)}
             footer={<Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>}
           >
-            <VisitaDetalle registro={detalle} vigente={esUltima(detalle)} dinero={dinero} />
+            <VisitaDetalle registro={detalle} vigente={esVigente(detalle)} plan={planDe(detalle.tipo)} dinero={dinero} />
           </EditModal>
         )
       })()}
@@ -346,9 +399,15 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
           { key: 'proxima_visita', header: 'Próx. visita', sortable: true, hideOnMobile: true,
             accessor: (r) => r.proxima_visita ?? '',
             render: (r) => {
-              if (!r.proxima_visita) return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
-              // Sólo la próxima visita vigente (la de la última visita) puede estar atrasada.
-              const atrasada = esUltima(r) && diasProxima !== null && diasProxima < 0
+              const plan = planDe(r.tipo)
+              if (!r.proxima_visita) {
+                // La última de su tipo sin fecha muestra la probable.
+                return esVigente(r) && plan?.origen === 'probable'
+                  ? <span style={{ whiteSpace: 'nowrap', color: 'var(--at-ink-3)', fontStyle: 'italic' }} title="Probable, según la frecuencia del tipo">≈ {plan.proxima}</span>
+                  : <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+              }
+              // Sólo la próxima vigente (la de la última visita de su tipo) puede estar atrasada.
+              const atrasada = esVigente(r) && (diasHastaFechaCalendario(r.proxima_visita) ?? 0) < 0
               return <span style={{ whiteSpace: 'nowrap', color: atrasada ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: atrasada ? 600 : 400 }}>{r.proxima_visita}{atrasada ? ' · atrasada' : ''}</span>
             } },
           { key: 'costo', header: 'Costo', align: 'right', sortable: true, hideOnMobile: true,
@@ -371,20 +430,22 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
 }
 
 /** Detalle de solo lectura de una visita. */
-function VisitaDetalle({ registro: r, vigente, dinero }: { registro: ControlPlagas; vigente: boolean; dinero: (v: number) => string }) {
+function VisitaDetalle({ registro: r, vigente, plan, dinero }: { registro: ControlPlagas; vigente: boolean; plan: PlanTipo | null; dinero: (v: number) => string }) {
   const fila = (label: string, valor: ReactNode) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 14 }}>
       <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
       <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{valor}</span>
     </div>
   )
-  // El plazo sólo se cuenta para la próxima visita vigente.
+  // El plazo sólo se cuenta para la próxima visita vigente (la de la última visita del tipo).
   const dias = vigente ? diasHastaFechaCalendario(r.proxima_visita) : null
+  const probable = vigente && !r.proxima_visita && plan?.origen === 'probable' && plan.proxima ? plan.proxima : null
+  const diasProbable = diasHastaFechaCalendario(probable)
   return (
     <div>
       {!vigente && r.proxima_visita && (
         <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: 'var(--at-ink-3)' }}>
-          Hay una visita más reciente: la próxima visita vigente es la que dejó programada esa.
+          Hay una visita más reciente de tipo «{tipoDe(r.tipo)?.label ?? r.tipo}»: la próxima vigente es la que dejó programada esa.
         </div>
       )}
       {fila('Fecha', r.fecha)}
@@ -394,7 +455,12 @@ function VisitaDetalle({ registro: r, vigente, dinero }: { registro: ControlPlag
       {fila('Productos', r.productos || '—')}
       {fila('Próxima visita', r.proxima_visita
         ? <strong style={{ color: dias !== null ? colorPlazo(dias) : 'var(--at-ink-2)' }}>{r.proxima_visita}{dias !== null ? ` · ${cuandoToca(dias)}` : ''}</strong>
-        : '—')}
+        : probable && diasProbable !== null
+          ? <span>
+              <strong style={{ color: colorPlazo(diasProbable) }}>Probable {probable} · {cuandoToca(diasProbable)}</strong>
+              <span style={{ display: 'block', fontSize: 12, color: 'var(--at-ink-3)' }}>No se programó; cada ~{plan?.intervaloDias} días según el historial</span>
+            </span>
+          : '—')}
       {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
 
       <div style={{ marginTop: 14 }}>
@@ -415,5 +481,48 @@ function VisitaDetalle({ registro: r, vigente, dinero }: { registro: ControlPlag
         </div>
       )}
     </div>
+  )
+}
+
+/** Próxima visita de un tipo: la fecha, si es programada o probable, y cuándo toca. Abre la última visita del tipo. */
+function TarjetaTipo({ plan, onAbrir }: { plan: PlanTipo; onAbrir: () => void }) {
+  const tipo = tipoDe(plan.tipo)
+  const nombre = tipo?.label ?? plan.tipo
+  const dias = diasHastaFechaCalendario(plan.proxima)
+  const origen = plan.origen === 'programada' ? 'Programada' : 'Probable'
+  const fondo = dias === null ? 'var(--at-surface-2)' : dias <= 7 ? 'var(--at-danger-tint)' : dias <= 30 ? 'var(--at-warning-tint)' : 'var(--at-surface-2)'
+  const borde = dias === null ? 'var(--at-line)' : dias <= 7 ? 'var(--at-danger-border)' : dias <= 30 ? 'var(--at-warning-border)' : 'var(--at-line)'
+  return (
+    <button type="button" className="cond-kpi-link" onClick={onAbrir} style={{ ...tarjeta, cursor: 'pointer', background: fondo, borderColor: borde }}
+      aria-label={plan.proxima && dias !== null
+        ? `${nombre}: próxima visita ${plan.proxima}, ${origen.toLowerCase()}, ${cuandoToca(dias)}`
+        : `${nombre}: sin próxima visita`}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>{tipo?.icon} {nombre}</span>
+        {plan.origen && (
+          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '1px 7px', borderRadius: 10, whiteSpace: 'nowrap',
+            background: plan.origen === 'programada' ? 'var(--at-accent-tint)' : 'var(--at-surface)',
+            color: plan.origen === 'programada' ? 'var(--at-accent)' : 'var(--at-ink-3)',
+            border: plan.origen === 'programada' ? '1px solid transparent' : '1px dashed var(--at-line-strong)' }}>
+            {origen}
+          </span>
+        )}
+      </div>
+      {plan.proxima && dias !== null ? (
+        <div style={{ display: 'flex', gap: '2px 8px', alignItems: 'baseline', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 15, fontWeight: 700 }}>{plan.proxima}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: colorPlazo(dias) }}>{cuandoToca(dias)}</span>
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>Sin fecha: programa la próxima al registrar</div>
+      )}
+      <div style={{ display: 'flex', gap: '2px 6px', alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: 'var(--at-ink-3)', marginTop: 4 }}>
+        <span>Última {plan.ultima.fecha}{plan.intervaloDias ? ` · cada ~${plan.intervaloDias} días` : ''}</span>
+        {plan.ultima.resultado !== 'satisfactorio' && <ResultadoBadge resultado={plan.ultima.resultado} />}
+      </div>
+      {plan.siguientes.length > 0 && (
+        <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)', marginTop: 2 }}>Luego: {plan.siguientes.join(', ')}</div>
+      )}
+    </button>
   )
 }
