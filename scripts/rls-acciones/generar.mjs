@@ -142,6 +142,15 @@ export function cargarMapa(seccion) {
       if (!/^[a-z_][a-z0-9_]*$/.test(col) || typeof valor !== 'string') throw new Error(`_recetas.${tabla}: «${col}» inválida`)
     }
   }
+  // Recetas de tablas PADRE que no están en el mapa (la fila de prueba de una
+  // tabla del mapa las fabrica): mismas reglas que `receta`.
+  mapa._recetas ??= {}
+  for (const [tabla, receta] of Object.entries(mapa._recetas)) {
+    if (!/^[a-z_][a-z0-9_]*$/.test(tabla) || mapa.tablas[tabla]) throw new Error(`${seccion}: _recetas «${tabla}» inválida (¿está en el mapa? va en su "receta")`)
+    for (const [col, valor] of Object.entries(receta)) {
+      if (!/^[a-z_][a-z0-9_]*$/.test(col) || typeof valor !== 'string') throw new Error(`_recetas.${tabla}: «${col}» inválida`)
+    }
+  }
   mapa._sin_clave ??= {}
   for (const tab of Object.keys(mapa._sin_clave)) {
     if (!/^[a-z_]+$/.test(tab)) throw new Error(`${seccion}: _sin_clave «${tab}» inválido`)

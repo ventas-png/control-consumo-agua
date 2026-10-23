@@ -535,6 +535,26 @@ describe('DataTable — mobile responsive', () => {
   })
 })
 
+describe('DataTable — rowStyle y hover', () => {
+  it('al quitar el mouse la fila recupera el fondo de rowStyle', () => {
+    const { container } = render(
+      <DataTable data={rows} columns={columns} rowKey="id" pageSize={0}
+        rowStyle={(r) => r.id === rows[0].id ? { background: 'var(--at-danger-tint)' } : {}} />
+    )
+    const [marcada, normal] = Array.from(container.querySelectorAll('tbody tr')) as HTMLElement[]
+    expect(marcada.style.background).toBe('var(--at-danger-tint)')
+
+    fireEvent.mouseEnter(marcada)
+    expect(marcada.style.background).toBe('var(--at-table-row-hover)')
+    fireEvent.mouseLeave(marcada)
+    expect(marcada.style.background).toBe('var(--at-danger-tint)')
+
+    fireEvent.mouseEnter(normal)
+    fireEvent.mouseLeave(normal)
+    expect(normal.style.background).toBe('')
+  })
+})
+
 describe('DataTable — a11y baseline', () => {
   it('renderiza sin violaciones de accesibilidad', async () => {
     const { container } = render(

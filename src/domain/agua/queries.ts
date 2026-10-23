@@ -17,6 +17,7 @@ import { db } from '../../lib/supabase'
 import { isCompanyWideRole } from '../../lib/proyectosAccess'
 import { runQuery, runQueryAll } from '../queryFetch'
 import { aguaKeys } from './keys'
+import { inicioMesLocalISO } from '../../lib/format'
 
 // Columnas de listado de registros. NUNCA incluir `foto`: es base64 (hasta
 // ~15 MB por fila, TOAST) e infla el payload hasta tumbar el statement_timeout
@@ -410,10 +411,8 @@ export function useConsumoMensualPorProyectoQuery(companyId: string, proyectoId:
   return useQuery({
     queryKey: aguaKeys.consumoMensualPorProyecto(proyectoId),
     queryFn: async (): Promise<ConsumoMensual[]> => {
-      const desde = new Date()
-      desde.setMonth(desde.getMonth() - 5)
-      desde.setDate(1)
-      const desdeStr = desde.toISOString().slice(0, 10)
+      // Seis meses con el actual, desde el día 1 LOCAL del primero.
+      const desdeStr = inicioMesLocalISO(5)
 
       const contadores =
         (await runQuery<{ id: string }[]>((signal) =>

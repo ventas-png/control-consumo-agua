@@ -13,11 +13,13 @@ interface Props {
   clientes: Cliente[]
   moneda: string
   currentUserId: string
+  /** Empresa de la sesión. La RLS de `convenios_pago` exige company_id = get_my_company_id(). */
+  companyId: string | undefined
   onClose: () => void
   onSuccess: () => void
 }
 
-export function ConvenioModal({ registros, clientes, moneda, currentUserId, onClose, onSuccess }: Props) {
+export function ConvenioModal({ registros, clientes, moneda, currentUserId, companyId, onClose, onSuccess }: Props) {
   // Saldo (no el cargo bruto): se descuenta lo ya abonado para no incluir en el
   // convenio montos que el cliente ya pagó parcialmente.
   const totalCargos = registros.reduce((acc, r) => {
@@ -28,6 +30,11 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
   // Un convenio es sobre un solo cliente (todos los seleccionados deben ser del mismo)
   const clienteId = registros[0]?.cliente_id
   const cliente = clientes.find(c => c.id === clienteId)
+
+  // Proyecto de los cargos: si todos son del mismo, el convenio queda en él; si
+  // vienen de varios (o sin proyecto), null. La columna lo admite y la RLS no lo usa.
+  const proyectosCargos = new Set(registros.map(r => r.project_id ?? null))
+  const projectId = proyectosCargos.size === 1 ? [...proyectosCargos][0] : null
 
   const [numeroConvenio, setNumeroConvenio] = useState(`CONV-${Date.now().toString().slice(-6)}`)
   const [descripcion, setDescripcion] = useState('')
@@ -47,11 +54,21 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!numeroConvenio.trim()) return
+    // Sin empresa la RLS rechaza el INSERT (salvo super_admin, que dejaría un
+    // convenio que nadie de la empresa puede ver): se avisa antes de intentarlo.
+    if (!companyId) {
+      notify({ variant: 'error', title: 'Error', text: 'Tu usuario no tiene una empresa asignada; no se puede crear el convenio.' })
+      return
+    }
 
     setSaving(true)
     try {
       const { error } = await createConvenio({
         cliente_id: clienteId,
+        // company_id no tiene default ni trigger en la base: sin él la policy
+        // convenios_pago_insert (company_id = get_my_company_id()) da NULL y rechaza.
+        company_id: companyId,
+        project_id: projectId,
         numero_convenio: numeroConvenio.trim(),
         descripcion: descripcion || null,
         monto_total: totalCargos,

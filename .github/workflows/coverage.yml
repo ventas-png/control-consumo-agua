@@ -1024,6 +1024,28 @@ jobs:
       - name: Acciones por permiso — casos especiales
         run: node supabase/tests/rls_acciones/run.mjs especiales
 
+      # 20261104000650: el candado de plan (asambleas_digitales) de
+      # puntos_asamblea y votos_asamblea buscaba la empresa en asambleas_digital
+      # y rechazaba TODA alta, también la del admin de una empresa con la
+      # feature. Ahora la resuelve por asambleas. Control previo que reproduce
+      # el fallo, cadena completa, huella del auditor, guarda que aborta con un
+      # candado viejo de más y diez mutantes.
+      - name: Candado de plan de asambleas — puntos y votos por la empresa de la asamblea
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55574
+        run: supabase/tests/candado_plan_asambleas/run.sh
+
+      # 20261104090000 reescribe montos de facturas de energía ya guardadas:
+      # el total pasa a ser el de su desglose. Hay que ver qué facturas toca y
+      # cuáles no (las de «solo total» no), que deja una constancia en
+      # audit_log por cada una, que una segunda pasada no hace nada y que el
+      # bloque REVERSIÓN del encabezado —leído del archivo— revierte.
+      - name: Facturas de energía — el total guardado pasa a ser el de su desglose
+        env:
+          PGPORT_TEST: 55583
+        run: supabase/tests/energia_total_facturas/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
