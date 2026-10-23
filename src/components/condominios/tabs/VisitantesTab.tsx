@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useHoyDate } from '../../../hooks/useHoy'
 import { notify } from '../../shared/Dialog'
 import { createCondominioRow, updateCondominioRow, updateCondominioRowsByIds } from '../../../domain/condominios/tabMutations'
@@ -46,7 +46,16 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   const [guardandoSalida, setGuardandoSalida] = useState(false)
   const [novedadForm, setNovedadForm] = useState({ tipo: 'incidente' as TipoNovedad, comentarios: '', ubicacion: '', prioridad: 'normal' as PrioridadNovedad })
   const [fotosNovedad, setFotosNovedad] = useState<string[]>([])
-  const [visitanteDetalle, setVisitanteDetalle] = useState<Visitante | null>(null)
+  // El detalle lee el registro vigente de la lista (antes guardaba una copia:
+  // tras registrar la salida seguía diciendo «En premisas»).
+  const [visitanteDetalleId, setVisitanteDetalleId] = useState<string | null>(null)
+  const visitanteDetalle = visitanteDetalleId ? visitantes.find(v => v.id === visitanteDetalleId) ?? null : null
+  const setVisitanteDetalle = (v: Visitante | null) => setVisitanteDetalleId(v?.id ?? null)
+  /**
+   * La salida ya guardada de `salidaPendiente`, si lo que falló fue la novedad:
+   * reintentar sólo crea la novedad, sin volver a escribir la hora de salida.
+   */
+  const salidaYaRegistrada = useRef<{ id: string; hora: string } | null>(null)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
   const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
@@ -243,6 +252,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   }
 
   async function handleRegistrar() {
+    if (saving) return
     if (!form.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del visitante.' }); return }
     if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad a visitar.' }); return }
     setSaving(true)
@@ -275,17 +285,26 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     // `validatedInsert` con returning retorna array; antes `.single()` daba objeto.
     const insertedVisitante = data?.[0] as { id?: string } | undefined
 
+    // Lo que sigue acompaña a la entrada ya guardada: si falla, se avisa (antes
+    // se ignoraba y el huésped seguía «sin ingresar» o la mudanza «aprobada»).
+    const pendientes: string[] = []
+
     // Link pre-registered guest slot to this entry
     if (strCtx?.huespedId && insertedVisitante?.id) {
-      await updateCondominioRow('huespedes_str', strCtx.huespedId, { visitante_id: insertedVisitante.id })
+      const { error: he } = await updateCondominioRow('huespedes_str', strCtx.huespedId, { visitante_id: insertedVisitante.id })
+      if (he) pendientes.push(`no se vinculó al huésped pre-registrado (${he.message})`)
     }
 
     // First ingress of an approved/scheduled mudanza moves it to "en_curso"
     if (mudanzaCtx?.solicitudId) {
       const sol = solicitudesMudanza.find(s => s.id === mudanzaCtx.solicitudId)
       if (sol && (sol.estado === 'aprobada' || sol.estado === 'programada')) {
-        await updateCondominioRow('solicitud_mudanza_unidad', mudanzaCtx.solicitudId, { estado: 'en_curso' })
+        const { error: me } = await updateCondominioRow('solicitud_mudanza_unidad', mudanzaCtx.solicitudId, { estado: 'en_curso' })
+        if (me) pendientes.push(`la mudanza no pasó a «en curso» (${me.message})`)
       }
+    }
+    if (pendientes.length > 0) {
+      notify({ variant: 'warning', title: 'Entrada registrada con pendientes', text: `La entrada quedó guardada, pero ${pendientes.join(' y ')}.` })
     }
 
     if (acompanantes.length > 0 && data) {
@@ -331,6 +350,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   function iniciarSalida(v: Visitante) {
     // Registrar la salida (y su novedad) escribe: exige canCreate, como registrar la entrada.
     if (!canCreate) return
+    salidaYaRegistrada.current = null
     setSalidaPendiente(v)
     setModoSalida('idle')
     setNovedadForm({ tipo: 'incidente', comentarios: '', ubicacion: v.unidad_nombre ?? '', prioridad: 'normal' })
@@ -339,24 +359,34 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   }
 
   function cancelarSalida() {
+    if (guardandoSalida) return
+    salidaYaRegistrada.current = null
     setSalidaPendiente(null)
     setModoSalida('idle')
     setFotosNovedad([])
   }
 
   async function confirmarSalida() {
-    if (!salidaPendiente || !canCreate) return
+    if (!salidaPendiente || !canCreate || guardandoSalida) return
     if (modoSalida === 'con_novedad' && !novedadForm.comentarios.trim()) {
       notify({ variant: 'error', title: 'Error', text: 'Ingrese los comentarios de la novedad.' }); return
     }
     setGuardandoSalida(true)
-    const horaSalida = new Date().toISOString()
-    const { error } = await updateCondominioRow('visitantes', salidaPendiente.id, { hora_salida: horaSalida })
-    if (error) { setGuardandoSalida(false); notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    const yaGuardada = salidaYaRegistrada.current?.id === salidaPendiente.id ? salidaYaRegistrada.current : null
+    const horaSalida = yaGuardada?.hora ?? new Date().toISOString()
+    if (!yaGuardada) {
+      const { error } = await updateCondominioRow('visitantes', salidaPendiente.id, { hora_salida: horaSalida })
+      if (error) { setGuardandoSalida(false); notify({ variant: 'error', title: 'Error', text: error.message }); return }
+      salidaYaRegistrada.current = { id: salidaPendiente.id, hora: horaSalida }
 
-    if (salidaConAcomp) {
-      const acompsActivos = visitantes.filter(v => v.visitante_principal_id === salidaPendiente.id && !v.hora_salida)
-      await updateCondominioRowsByIds('visitantes', acompsActivos.map(a => a.id), { hora_salida: horaSalida })
+      if (salidaConAcomp) {
+        const acompsActivos = visitantes.filter(v => v.visitante_principal_id === salidaPendiente.id && !v.hora_salida)
+        if (acompsActivos.length > 0) {
+          const { error: ae } = await updateCondominioRowsByIds('visitantes', acompsActivos.map(a => a.id), { hora_salida: horaSalida })
+          // Antes se ignoraba: los acompañantes seguían «en premisas» sin aviso.
+          if (ae) notify({ variant: 'warning', title: 'Salida registrada', text: `Los acompañantes siguen en premisas: ${ae.message}` })
+        }
+      }
     }
 
     if (modoSalida === 'con_novedad') {
@@ -382,8 +412,16 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
         foto_url: fotosNovedad[0] ?? null,
         fotos: fotosNovedad.length > 0 ? fotosNovedad : null,
       })
-      if (ne) { setGuardandoSalida(false); notify({ variant: 'error', title: 'Error al registrar novedad', text: ne.message }); return }
+      if (ne) {
+        // La salida ya quedó: la ventana sigue abierta con la novedad, y
+        // reintentar sólo la crea (antes también reescribía la hora de salida).
+        setGuardandoSalida(false)
+        notify({ variant: 'error', title: 'Error al registrar novedad', text: `La salida quedó registrada, pero la novedad no: ${ne.message}` })
+        onRefresh()
+        return
+      }
     }
+    salidaYaRegistrada.current = null
     setGuardandoSalida(false)
     setSalidaPendiente(null)
     setModoSalida('idle')
@@ -443,7 +481,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1100px' }}>
+    <div style={{ padding: '16px', maxWidth: '1100px' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
@@ -479,15 +517,16 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div style={{ display: 'flex', background: 'var(--at-surface)', borderRadius: '12px', border: '1px solid var(--at-line)', overflow: 'hidden', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', flexWrap: 'wrap' }}>
+      {/* KPI Cards: los separadores son el hueco de la grilla, así no queda una
+          raya suelta al borde cuando en el teléfono van de dos en dos. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '1px', background: 'var(--at-chip)', borderRadius: '12px', border: '1px solid var(--at-line)', overflow: 'hidden', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
         {([
           { label: 'Hoy', value: visitasHoy, icon: '📅', color: 'var(--at-primary)' },
           { label: 'En premisas', value: enPremisas, icon: '🟢', color: 'var(--at-success)' },
           { label: 'Esta semana', value: estaSemana, icon: '📆', color: 'var(--at-accent-hover)' },
           { label: 'Total histórico', value: totalHistorico, icon: '📊', color: 'var(--at-ink-2)' },
-        ] as const).map((kpi, i) => (
-          <div key={kpi.label} style={{ flex: '1 1 120px', padding: '10px 16px', borderRight: i < 3 ? '1px solid var(--at-chip)' : undefined, display: 'flex', alignItems: 'center', gap: '10px' }}>
+        ] as const).map(kpi => (
+          <div key={kpi.label} style={{ background: 'var(--at-surface)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
             <span style={{ fontSize: '18px' }}>{kpi.icon}</span>
             <div>
               <div style={{ fontSize: '20px', fontWeight: 800, color: kpi.color, lineHeight: 1.1 }}>{kpi.value}</div>
@@ -499,10 +538,10 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
 
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar visitante o DPI..."
-          style={{ flex: 1, minWidth: '180px', padding: '9px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+        <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar visitante o DPI..." aria-label="Buscar visitante o DPI"
+          style={{ flex: '1 1 180px', minWidth: 0, boxSizing: 'border-box', padding: '9px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: 'var(--at-surface-2)', color: 'var(--at-ink)' }} />
         {(['hoy', 'semana', 'mes', 'todos'] as FiltroFecha[]).map(f => (
-          <button key={f} onClick={() => setFiltroFecha(f)}
+          <button key={f} onClick={() => setFiltroFecha(f)} aria-pressed={filtroFecha === f}
             style={{
               padding: '6px 12px', borderRadius: '10px', border: '1.5px solid', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600,
               background: filtroFecha === f ? 'var(--at-ink)' : 'var(--at-surface-2)',

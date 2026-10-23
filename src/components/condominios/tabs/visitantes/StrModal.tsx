@@ -1,29 +1,23 @@
-// Bloque extraído de VisitantesTab (fase B): JSX idéntico al original.
+// Elegir la reserva de renta corta (y el huésped) que ingresa (bloque
+// extraído de VisitantesTab), en ventana: pantalla completa en el teléfono, Esc.
 import type { VisitantesCtx } from './ctx'
 import { PLATAFORMA_LABEL, PLATAFORMA_COLOR } from './ui'
-import { ModalPortal } from '../../../shared/ModalPortal'
+import { EditModal } from '../../../shared/EditModal'
 import { diasEntreFechasCalendario } from '../../../../lib/format'
 
 export function StrModal({ ctx }: { ctx: VisitantesCtx }) {
   const { visitantes, reservasSTR, setShowStrModal, strSearch, setStrSearch, strHuespedes, hoy, abrirRegistroSTR } = ctx
+  const cerrar = () => { setShowStrModal(false); setStrSearch('') }
   return (
-        <ModalPortal>
-        <div onClick={e => { if (e.target === e.currentTarget) { setShowStrModal(false); setStrSearch('') } }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '660px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px', overflow: 'hidden' }}>
-            <div style={{ background: 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent-dark))', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Renta Corta</div>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'white' }}>🏠 Registrar ingreso STR</h3>
-              </div>
-              <button onClick={() => { setShowStrModal(false); setStrSearch('') }}
-                style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', fontSize: 18, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                ×
-              </button>
-            </div>
-            <div style={{ padding: '20px 24px' }}>
-              <input value={strSearch} onChange={e => setStrSearch(e.target.value)}
+    <EditModal
+      title="🏠 Registrar ingreso STR"
+      subtitle="Renta corta: elija la reserva y, si está pre-registrado, el huésped."
+      maxWidth="660px"
+      fullScreenOnMobile
+      onClose={cerrar}
+    >
+            <div>
+              <input value={strSearch} onChange={e => setStrSearch(e.target.value)} aria-label="Buscar reserva"
                 placeholder="Buscar por nombre de huésped o unidad..."
                 autoFocus
                 style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: 'var(--at-surface-2)', marginBottom: '14px' }} />
@@ -170,8 +164,6 @@ export function StrModal({ ctx }: { ctx: VisitantesCtx }) {
                 )
               })()}
             </div>
-          </div>
-        </div>
-        </ModalPortal>
+    </EditModal>
   )
 }

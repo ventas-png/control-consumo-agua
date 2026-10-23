@@ -1,6 +1,10 @@
-import { useState, type CSSProperties} from 'react'
+import { esFechaCalendarioVencida } from '../../../lib/format'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { ControlCamaraSeguridad, TipoCamara, EstadoCamara } from '../../../types'
 
 interface Props {
@@ -28,35 +32,59 @@ const ESTADOS: { value: EstadoCamara; label: string; color: string; bg: string; 
   { value: 'inactiva',      label: 'Inactiva',       color: 'var(--at-ink-3)', bg: 'var(--at-chip)', icon: '⭕' },
 ]
 
+const formVacio = () => ({
+  codigo: '', nombre: '', ubicacion: '',
+  tipo: 'domo' as TipoCamara,
+  resolucion: '1080p', ip_address: '',
+  grabacion: true, dias_retencion: '30',
+  estado: 'activa' as EstadoCamara,
+  ultimo_mantenimiento: '', proximo_mantenimiento: '',
+  observaciones: '',
+})
+
+const tipoDe = (t: TipoCamara) => TIPOS.find(x => x.value === t)
+const estadoDe = (e: EstadoCamara) => ESTADOS.find(x => x.value === e)
+const conFalla = (c: ControlCamaraSeguridad) => c.estado === 'falla' || c.estado === 'sin_señal'
+
+function EstadoBadge({ estado }: { estado: EstadoCamara }) {
+  const est = estadoDe(estado)
+  return <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: est?.bg, color: est?.color, whiteSpace: 'nowrap' }}>{est?.icon} {est?.label ?? estado}</span>
+}
+
 export default function ControlCamarasTab({ camaras, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
-  const [selected, setSelected] = useState<ControlCamaraSeguridad | null>(null)
+  const [detalleId, setDetalleId] = useState<string | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
-  const [editando, setEditando] = useState(false)
+  // Cámara en edición (null: alta nueva). Antes se editaba «la seleccionada»
+  // y, al guardar, el panel seguía mostrando la copia vieja.
+  const [editId, setEditId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [cambiando, setCambiando] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoCamara | ''>('')
   const [soloActivas, setSoloActivas] = useState(true)
 
-  const [form, setForm] = useState({
-    codigo: '', nombre: '', ubicacion: '',
-    tipo: 'domo' as TipoCamara,
-    resolucion: '1080p', ip_address: '',
-    grabacion: true, dias_retencion: '30',
-    estado: 'activa' as EstadoCamara,
-    ultimo_mantenimiento: '', proximo_mantenimiento: '',
-    observaciones: '',
-  })
+  const [form, setForm] = useState(formVacio)
 
   const lista = camaras.filter(c =>
     (!soloActivas || c.activo) &&
     (filtroEstado === '' || c.estado === filtroEstado)
   )
 
-  const porEstado = ESTADOS.map(e => ({ ...e, count: camaras.filter(c => c.estado === e.value && c.activo).length }))
-  const totalActivas = camaras.filter(c => c.estado === 'activa').length
-  const totalFallas = camaras.filter(c => c.estado === 'falla' || c.estado === 'sin_señal').length
+  // Los contadores son de las cámaras en uso: antes «Activas» y «Con fallas»
+  // contaban también las desactivadas (una dada de baja con falla seguía
+  // sumando), mientras el desglose por estado no las contaba.
+  const enUso = camaras.filter(c => c.activo)
+  const porEstado = ESTADOS.map(e => ({ ...e, count: enUso.filter(c => c.estado === e.value).length }))
+  const totalActivas = enUso.filter(c => c.estado === 'activa').length
+  const totalFallas = enUso.filter(conFalla).length
 
-  function resetForm() {
-    setForm({ codigo: '', nombre: '', ubicacion: '', tipo: 'domo', resolucion: '1080p', ip_address: '', grabacion: true, dias_retencion: '30', estado: 'activa', ultimo_mantenimiento: '', proximo_mantenimiento: '', observaciones: '' })
+  // Código repetido: se avisa (no se bloquea) al dar de alta o al cambiarlo.
+  const codigoRepetido = !!form.codigo.trim() && camaras.some(c => c.id !== editId && c.codigo.trim().toLowerCase() === form.codigo.trim().toLowerCase())
+
+  function abrirAlta() {
+    setForm(formVacio())
+    setEditId(null)
+    setDetalleId(null)
+    setMostrarForm(true)
   }
 
   function iniciarEdicion(c: ControlCamaraSeguridad) {
@@ -69,11 +97,16 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
       proximo_mantenimiento: c.proximo_mantenimiento ?? '',
       observaciones: c.observaciones ?? '',
     })
-    setEditando(true)
+    setEditId(c.id)
+    setDetalleId(null)
     setMostrarForm(true)
   }
 
+  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
+  const cerrarForm = () => { if (!saving) { setMostrarForm(false); setEditId(null) } }
+
   async function guardar() {
+    if (saving) return
     if (!form.codigo.trim() || !form.nombre.trim() || !form.ubicacion.trim()) {
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Código, nombre y ubicación son obligatorios' }); return
     }
@@ -89,270 +122,283 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
       proximo_mantenimiento: form.proximo_mantenimiento || null,
       observaciones: form.observaciones.trim() || null,
     }
-    let error
-    if (editando && selected) {
-      const res = await updateCondominioRow('control_camaras_seguridad', selected.id, payload)
-      error = res.error
-    } else {
-      const res = await createCondominioRow('control_camaras_seguridad', payload)
-      error = res.error
-    }
+    const { error } = editId
+      ? await updateCondominioRow('control_camaras_seguridad', editId, payload)
+      : await createCondominioRow('control_camaras_seguridad', payload)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    resetForm(); setMostrarForm(false); setEditando(false)
+    const editada = editId
+    setForm(formVacio()); setMostrarForm(false); setEditId(null)
+    // Tras editar se vuelve al detalle de esa cámara, ya con los datos nuevos.
+    if (editada) setDetalleId(editada)
     onRefresh()
   }
 
-  async function cambiarEstado(c: ControlCamaraSeguridad, estado: EstadoCamara) {
-    await updateCondominioRow('control_camaras_seguridad', c.id, { estado })
-    if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, estado } : null)
+  // Antes estos cambios ignoraban el error: el botón no hacía nada y no decía por qué.
+  async function actualizar(c: ControlCamaraSeguridad, cambios: Partial<ControlCamaraSeguridad>) {
+    if (cambiando) return
+    setCambiando(true)
+    const { error } = await updateCondominioRow('control_camaras_seguridad', c.id, cambios)
+    setCambiando(false)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
-  async function toggleActivo(c: ControlCamaraSeguridad) {
-    await updateCondominioRow('control_camaras_seguridad', c.id, { activo: !c.activo })
-    onRefresh()
-  }
-
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', minWidth: 0, background: 'var(--at-surface)', color: 'var(--at-ink)' }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
+  // Se lee la cámara vigente, no una copia.
+  const detalle = detalleId ? camaras.find(c => c.id === detalleId) ?? null : null
+
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div>
-              <span style={{ fontWeight: 600, fontSize: 14 }}>Cámaras ({lista.length})</span>
-              {totalFallas > 0 && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 700 }}>{totalFallas} falla{totalFallas > 1 ? 's' : ''}</span>}
-            </div>
-            {canCreate && (
-              <button onClick={() => { resetForm(); setEditando(false); setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nueva
-              </button>
-            )}
-          </div>
-          {/* KPI mini */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-            {porEstado.filter(e => e.count > 0).map(e => (
-              <span key={e.value} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: e.bg, color: e.color, fontWeight: 600 }}>
-                {e.icon} {e.count}
-              </span>
-            ))}
-          </div>
-          <select style={{ ...inp, marginBottom: 6 }} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoCamara | '')}>
+    <div style={{ padding: 16 }}>
+      {/* KPIs de las cámaras en uso */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: 12, marginBottom: 12 }}>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--at-success)' }}>{totalActivas}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Activas</div>
+        </div>
+        <div style={{ background: totalFallas > 0 ? 'var(--at-danger-tint)' : 'var(--at-chip)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: totalFallas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{totalFallas}</div>
+          <div style={{ fontSize: 11, color: totalFallas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>Con fallas</div>
+        </div>
+        <div style={{ background: 'var(--at-accent-tint)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--at-accent)' }}>{camaras.length}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>Total registradas</div>
+        </div>
+      </div>
+
+      {/* Desglose por estado de las cámaras en uso */}
+      {porEstado.some(e => e.count > 0) && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }} aria-label="Cámaras en uso por estado">
+          {porEstado.filter(e => e.count > 0).map(e => (
+            <span key={e.value} style={{ fontSize: 12, padding: '3px 9px', borderRadius: 10, background: e.bg, color: e.color, fontWeight: 600 }}>
+              {e.icon} {e.label}: {e.count}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Filtros + botón */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', gap: '8px 12px', flexWrap: 'wrap', alignItems: 'center', flex: '1 1 260px' }}>
+          <select aria-label="Filtrar por estado" style={{ ...inp, width: 'auto', flex: '1 1 170px', maxWidth: 280 }} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoCamara | '')}>
             <option value="">Todos los estados</option>
             {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.icon} {e.label}</option>)}
           </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
             <input type="checkbox" checked={soloActivas} onChange={e => setSoloActivas(e.target.checked)} />
-            Solo activas
+            Solo en uso
           </label>
+          <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{lista.length} cámaras</span>
         </div>
-
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin cámaras</div>}
-
-        {lista.map(c => {
-          const tipo = TIPOS.find(t => t.value === c.tipo)
-          const est = ESTADOS.find(e => e.value === c.estado)
-          return (
-            <div key={c.id} onClick={() => { setSelected(c); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === c.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${est?.color}`, opacity: c.activo ? 1 : 0.5 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {c.codigo} — {c.nombre}</span>
-                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.icon}</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>📍 {c.ubicacion}</div>
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 1 }}>
-                {c.resolucion && <span>{c.resolucion} · </span>}
-                {c.grabacion ? '🔴 Grab.' : '⭕ Sin grab.'}
-                {c.dias_retencion && <span> · {c.dias_retencion}d</span>}
-              </div>
-            </div>
-          )
-        })}
+        {canCreate && (
+          <Button onClick={abrirAlta}>+ Nueva cámara</Button>
+        )}
       </div>
 
-      {/* Panel derecho */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {mostrarForm && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>{editando ? 'Editar cámara' : 'Nueva cámara'}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={lbl}>Código *</label>
-                <input style={inp} placeholder="CAM-001" value={form.codigo} onChange={e => setForm(p => ({ ...p, codigo: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Nombre *</label>
-                <input style={inp} placeholder="Entrada principal" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Tipo</label>
-                <select style={inp} value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as TipoCamara }))}>
-                  {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-                </select>
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={lbl}>Ubicación *</label>
-                <input style={inp} placeholder="Lobby, Estacionamiento nivel 1…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Estado</label>
-                <select style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoCamara }))}>
-                  {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.icon} {e.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Resolución</label>
-                <input style={inp} placeholder="1080p, 4K…" value={form.resolucion} onChange={e => setForm(p => ({ ...p, resolucion: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>IP address</label>
-                <input style={inp} placeholder="192.168.1.10" value={form.ip_address} onChange={e => setForm(p => ({ ...p, ip_address: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Retención (días)</label>
-                <input type="number" style={inp} value={form.dias_retencion} onChange={e => setForm(p => ({ ...p, dias_retencion: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Último mantenimiento</label>
-                <input type="date" style={inp} value={form.ultimo_mantenimiento} onChange={e => setForm(p => ({ ...p, ultimo_mantenimiento: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Próximo mantenimiento</label>
-                <input type="date" style={inp} value={form.proximo_mantenimiento} onChange={e => setForm(p => ({ ...p, proximo_mantenimiento: e.target.value }))} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 20 }}>
-                <input type="checkbox" id="grab_check" checked={form.grabacion} onChange={e => setForm(p => ({ ...p, grabacion: e.target.checked }))} />
-                <label htmlFor="grab_check" style={{ fontSize: 13, cursor: 'pointer' }}>🔴 Grabación activa</label>
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Observaciones</label>
-                <input style={inp} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Registrar'}`}
-              </button>
-              <button onClick={() => { setMostrarForm(false); setEditando(false); resetForm() }}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!mostrarForm && selected && (() => {
-          const tipo = TIPOS.find(t => t.value === selected.tipo)
-          const est = ESTADOS.find(e => e.value === selected.estado)
-          return (
+      {/* Alta y edición en ventana (antes, en un panel al lado de una lista
+          de 300px fijos: en el teléfono no cabían los dos). */}
+      {mostrarForm && (
+        <EditModal
+          title={editId ? '✏️ Editar cámara' : '📷 Nueva cámara'}
+          maxWidth="640px"
+          fullScreenOnMobile
+          onClose={cerrarForm}
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          footer={
+            <>
+              <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+              <Button type="submit" form="camara-form" variant="success" loading={saving} loadingText="Guardando…">✅ {editId ? 'Actualizar' : 'Registrar'}</Button>
+            </>
+          }
+        >
+          <form
+            id="camara-form"
+            onSubmit={e => { e.preventDefault(); void guardar() }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12, alignItems: 'start' }}
+          >
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', fontWeight: 600, marginBottom: 4 }}>{tipo?.icon} {tipo?.label} · {selected.codigo}</div>
-                  <div style={{ fontWeight: 700, fontSize: 20 }}>📷 {selected.nombre}</div>
-                  <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>📍 {selected.ubicacion}</div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-                  <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, background: est?.bg, color: est?.color, fontWeight: 600 }}>{est?.icon} {est?.label}</span>
-                  {!selected.activo && <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Inactiva</span>}
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
-                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Resolución</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.resolucion ?? '—'}</div>
-                </div>
-                <div style={{ background: selected.grabacion ? 'var(--at-danger-tint)' : 'var(--at-chip)', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Grabación</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: selected.grabacion ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{selected.grabacion ? '🔴 Activa' : '⭕ Inactiva'}</div>
-                </div>
-                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Retención</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.dias_retencion ? `${selected.dias_retencion} días` : '—'}</div>
-                </div>
-                {selected.ip_address && (
-                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>IP</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>{selected.ip_address}</div>
-                  </div>
-                )}
-                {selected.ultimo_mantenimiento && (
-                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Último manto.</div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.ultimo_mantenimiento}</div>
-                  </div>
-                )}
-                {selected.proximo_mantenimiento && (
-                  <div style={{ background: 'var(--at-accent-tint)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>Próximo manto.</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--at-accent)' }}>{selected.proximo_mantenimiento}</div>
-                  </div>
-                )}
-              </div>
-
-              {selected.observaciones && (
-                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--at-warning-strong)' }}>
-                  {selected.observaciones}
+              <label htmlFor="camara-codigo" style={lbl}>Código *</label>
+              <input id="camara-codigo" style={inp} placeholder="CAM-001" value={form.codigo} onChange={e => setForm(p => ({ ...p, codigo: e.target.value }))} />
+              {codigoRepetido && (
+                <div role="alert" style={{ fontSize: 11, color: 'var(--at-warning-strong, var(--at-warning))', background: 'var(--at-warning-tint)', borderRadius: 6, padding: '4px 8px', marginTop: 4 }}>
+                  Ya hay otra cámara con este código.
                 </div>
               )}
+            </div>
+            <div>
+              <label htmlFor="camara-nombre" style={lbl}>Nombre *</label>
+              <input id="camara-nombre" style={inp} placeholder="Entrada principal" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="camara-tipo" style={lbl}>Tipo</label>
+              <select id="camara-tipo" style={inp} value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as TipoCamara }))}>
+                {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+              </select>
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="camara-ubicacion" style={lbl}>Ubicación *</label>
+              <input id="camara-ubicacion" style={inp} placeholder="Lobby, Estacionamiento nivel 1…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="camara-estado" style={lbl}>Estado</label>
+              <select id="camara-estado" style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoCamara }))}>
+                {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.icon} {e.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="camara-resolucion" style={lbl}>Resolución</label>
+              <input id="camara-resolucion" style={inp} placeholder="1080p, 4K…" value={form.resolucion} onChange={e => setForm(p => ({ ...p, resolucion: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="camara-ip" style={lbl}>Dirección IP</label>
+              <input id="camara-ip" style={{ ...inp, fontFamily: 'monospace' }} inputMode="decimal" placeholder="192.168.1.10" value={form.ip_address} onChange={e => setForm(p => ({ ...p, ip_address: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="camara-retencion" style={lbl}>Retención (días)</label>
+              <input id="camara-retencion" type="number" inputMode="numeric" min="0" step="1" style={inp} value={form.dias_retencion} onChange={e => setForm(p => ({ ...p, dias_retencion: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="camara-ultimo" style={lbl}>Último mantenimiento</label>
+              <input id="camara-ultimo" type="date" style={inp} value={form.ultimo_mantenimiento} onChange={e => setForm(p => ({ ...p, ultimo_mantenimiento: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="camara-proximo" style={lbl}>Próximo mantenimiento</label>
+              <input id="camara-proximo" type="date" min={form.ultimo_mantenimiento || undefined} style={inp} value={form.proximo_mantenimiento} onChange={e => setForm(p => ({ ...p, proximo_mantenimiento: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.grabacion} onChange={e => setForm(p => ({ ...p, grabacion: e.target.checked }))} />
+                🔴 Grabación activa
+              </label>
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="camara-observaciones" style={lbl}>Observaciones</label>
+              <textarea id="camara-observaciones" rows={2} style={{ ...inp, fontFamily: 'inherit', resize: 'vertical' }} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
+            </div>
+          </form>
+        </EditModal>
+      )}
 
+      {/* Detalle de la cámara en ventana */}
+      {detalle && (
+        <EditModal
+          title={`📷 ${detalle.nombre}`}
+          subtitle={
+            <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>{tipoDe(detalle.tipo)?.icon} {tipoDe(detalle.tipo)?.label ?? detalle.tipo} · {detalle.codigo} · 📍 {detalle.ubicacion}</span>
+              <EstadoBadge estado={detalle.estado} />
+              {!detalle.activo && <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>Fuera de uso</span>}
+            </span>
+          }
+          maxWidth="520px"
+          fullScreenOnMobile
+          onClose={() => setDetalleId(null)}
+          footer={
+            // Envuelve: con cuatro botones no caben en una línea del teléfono.
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, width: '100%' }}>
               {canEdit && (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button onClick={() => iniciarEdicion(selected)}
-                    style={{ padding: '6px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                    ✏️ Editar
-                  </button>
-                  {selected.estado !== 'activa' && (
-                    <button onClick={() => cambiarEstado(selected, 'activa')}
-                      style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                      ✅ Marcar activa
-                    </button>
-                  )}
-                  {selected.estado === 'activa' && (
-                    <button onClick={() => cambiarEstado(selected, 'falla')}
-                      style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                      ⚠️ Reportar falla
-                    </button>
-                  )}
-                  <button onClick={() => toggleActivo(selected)}
-                    style={{ padding: '6px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                    {selected.activo ? 'Desactivar' : 'Activar'}
-                  </button>
-                </div>
+                <>
+                  <Button variant="secondary" onClick={() => iniciarEdicion(detalle)}>✏️ Editar</Button>
+                  {detalle.estado !== 'activa'
+                    ? <Button variant="success" loading={cambiando} onClick={() => void actualizar(detalle, { estado: 'activa' })}>✅ Marcar activa</Button>
+                    : <Button variant="outline-danger" loading={cambiando} onClick={() => void actualizar(detalle, { estado: 'falla' })}>⚠️ Reportar falla</Button>}
+                  <Button variant="secondary" disabled={cambiando} onClick={() => void actualizar(detalle, { activo: !detalle.activo })}>
+                    {detalle.activo ? 'Poner fuera de uso' : 'Volver a poner en uso'}
+                  </Button>
+                </>
               )}
+              <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
             </div>
-          )
-        })()}
+          }
+        >
+          <CamaraDetalle camara={detalle} />
+        </EditModal>
+      )}
 
-        {!mostrarForm && !selected && (
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-              <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--at-success)' }}>{totalActivas}</div>
-                <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Activas</div>
-              </div>
-              <div style={{ background: totalFallas > 0 ? 'var(--at-danger-tint)' : 'var(--at-chip)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: totalFallas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{totalFallas}</div>
-                <div style={{ fontSize: 11, color: totalFallas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>Con fallas</div>
-              </div>
-              <div style={{ background: 'var(--at-accent-tint)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--at-accent)' }}>{camaras.length}</div>
-                <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>Total registradas</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: 'var(--at-ink-3)', fontSize: 14 }}>
-              Selecciona una cámara o registra una nueva
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Cámaras: en el teléfono cada una es una tarjeta; tocarla abre su
+          detalle y «Ver» es el camino de teclado. */}
+      <DataTable<ControlCamaraSeguridad>
+        data={lista}
+        rowKey="id"
+        pageSize={30}
+        mobileCardLayout
+        defaultSort={{ key: 'codigo', direction: 'asc' }}
+        searchableKeys={['codigo', 'nombre', 'ubicacion']}
+        searchPlaceholder="Buscar código, nombre o ubicación..."
+        emptyState={{ icon: '📷', title: 'Sin cámaras' }}
+        rowStyle={(c) => !c.activo ? { opacity: 0.6 } : conFalla(c) ? { background: 'var(--at-danger-tint)' } : {}}
+        onRowClick={(c) => setDetalleId(c.id)}
+        columns={[
+          { key: 'codigo', header: 'Cámara', sortable: true,
+            render: (c) => (
+              <span>
+                <span style={{ fontWeight: 600 }}>{tipoDe(c.tipo)?.icon} {c.codigo}</span>
+                <span style={{ color: 'var(--at-ink-2)' }}> — {c.nombre}</span>
+              </span>
+            ) },
+          { key: 'ubicacion', header: 'Ubicación', sortable: true,
+            render: (c) => <span style={{ color: 'var(--at-ink-2)' }}>{c.ubicacion}</span> },
+          { key: 'grabacion', header: 'Grabación', hideOnMobile: true,
+            accessor: (c) => c.grabacion ? 1 : 0,
+            render: (c) => <span style={{ fontSize: 12, color: c.grabacion ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
+              {c.grabacion ? '🔴 Grabando' : '⭕ Sin grabación'}{c.dias_retencion ? ` · ${c.dias_retencion} d` : ''}
+            </span> },
+          { key: 'proximo_mantenimiento', header: 'Próx. manto.', sortable: true, hideOnMobile: true,
+            accessor: (c) => c.proximo_mantenimiento ?? '',
+            render: (c) => {
+              if (!c.proximo_mantenimiento) return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+              const vencido = c.activo && esFechaCalendarioVencida(c.proximo_mantenimiento)
+              return <span style={{ whiteSpace: 'nowrap', color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: vencido ? 600 : 400 }}>{c.proximo_mantenimiento}{vencido ? ' · vencido' : ''}</span>
+            } },
+          { key: 'estado', header: 'Estado', sortable: true,
+            accessor: (c) => estadoDe(c.estado)?.label ?? c.estado,
+            render: (c) => (
+              <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <EstadoBadge estado={c.estado} />
+                {!c.activo && <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>· fuera de uso</span>}
+              </span>
+            ) },
+          { key: 'ver', header: '', align: 'right',
+            render: (c) => (
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                {c.observaciones && <span aria-hidden="true" style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>📝</span>}
+                <Button size="sm" variant="secondary" onClick={() => setDetalleId(c.id)} aria-label={`Ver cámara ${c.codigo}`}>Ver</Button>
+              </span>
+            ) },
+        ] satisfies DataTableColumn<ControlCamaraSeguridad>[]}
+      />
+    </div>
+  )
+}
+
+/** Detalle de solo lectura de una cámara. */
+function CamaraDetalle({ camara: c }: { camara: ControlCamaraSeguridad }) {
+  const fila = (label: string, valor: ReactNode) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 14 }}>
+      <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
+      <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{valor}</span>
+    </div>
+  )
+  const vencido = c.activo && !!c.proximo_mantenimiento && esFechaCalendarioVencida(c.proximo_mantenimiento)
+  return (
+    <div>
+      {fila('Resolución', c.resolucion || '—')}
+      {fila('Grabación', <span style={{ color: c.grabacion ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: 600 }}>{c.grabacion ? '🔴 Activa' : '⭕ Inactiva'}</span>)}
+      {fila('Retención', c.dias_retencion ? `${c.dias_retencion} días` : '—')}
+      {fila('Dirección IP', c.ip_address ? <span style={{ fontFamily: 'monospace' }}>{c.ip_address}</span> : '—')}
+      {fila('Último mantenimiento', c.ultimo_mantenimiento || '—')}
+      {fila('Próximo mantenimiento', c.proximo_mantenimiento
+        ? <strong style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-accent)' }}>{c.proximo_mantenimiento}{vencido ? ' · vencido' : ''}</strong>
+        : '—')}
+      {c.observaciones && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
+          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{c.observaciones}</p>
+        </div>
+      )}
     </div>
   )
 }

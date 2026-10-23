@@ -1,4 +1,4 @@
-import { hoyLocalISO, diasEntreFechasCalendario } from '../../../lib/format'
+import { hoyLocalISO, diasEntreFechasCalendario, diaLocalDeInstante } from '../../../lib/format'
 import { useState } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import {
@@ -25,6 +25,7 @@ import { VistaNovedades, VistaRondas } from './seguridad/vistas'
 import { NovedadDetalleModal } from './seguridad/NovedadDetalleModal'
 import { MarcarPuntoModal } from './seguridad/MarcarPuntoModal'
 import { AccesosModal } from './seguridad/AccesosModal'
+import { RondaDetalleModal } from './seguridad/RondaDetalleModal'
 
 interface Props {
   rondas: RondaSeguridad[]
@@ -56,8 +57,16 @@ export function SeguridadTab({
   const [showNovedadForm, setShowNovedadForm] = useState(false)
   const [showRondaForm, setShowRondaForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  /** La ronda que se está cerrando (completar / marcar incompleta): su botón espera. */
+  const [finalizando, setFinalizando] = useState<string | null>(null)
   const [filtroPrioridad, setFiltroPrioridad] = useState<PrioridadNovedad | 'todos'>('todos')
-  const [novedadDetalle, setNovedadDetalle] = useState<NovedadSeguridad | null>(null)
+  // Los detalles leen el registro vigente de la lista, no una copia.
+  const [novedadDetalleId, setNovedadDetalleId] = useState<string | null>(null)
+  const novedadDetalle = novedadDetalleId ? novedades.find(n => n.id === novedadDetalleId) ?? null : null
+  const setNovedadDetalle = (n: NovedadSeguridad | null) => setNovedadDetalleId(n?.id ?? null)
+  const [rondaDetalleId, setRondaDetalleId] = useState<string | null>(null)
+  const rondaDetalle = rondaDetalleId ? rondas.find(r => r.id === rondaDetalleId) ?? null : null
+  const setRondaDetalle = (r: RondaSeguridad | null) => setRondaDetalleId(r?.id ?? null)
 
   const [novedadForm, setNovedadForm] = useState<NovedadFormState>({
     tipo: 'observacion' as TipoNovedad, descripcion: '', ubicacion: '',
@@ -96,8 +105,12 @@ export function SeguridadTab({
 
   const rondaEnCurso = rondas.find(r => r.estado === 'en_curso')
   const hoy = hoyLocalISO()
-  const novedadesHoy = novedades.filter(n => n.created_at.startsWith(hoy))
-  const criticas = novedades.filter(n => n.prioridad === 'critica').length
+  // El día de la novedad es el local: comparar el prefijo del timestamp UTC
+  // sacaba de «hoy» lo registrado después de las 18:00 en Guatemala.
+  const novedadesHoy = novedades.filter(n => diaLocalDeInstante(n.created_at) === hoy)
+  // Junto a «N novedades hoy», las críticas también son las de hoy (antes,
+  // las de todo el historial).
+  const criticas = novedadesHoy.filter(n => n.prioridad === 'critica').length
 
   // Checklist de la ronda en curso
   const visitasRondaActual = rondaEnCurso
@@ -111,6 +124,7 @@ export function SeguridadTab({
   const rutasActivas = rutas.filter(r => r.activo)
 
   async function iniciarRonda() {
+    if (saving) return
     setSaving(true)
     const { data: rondaData, error } = await createCondominioRowReturning('rondas_seguridad', {
       company_id: companyId, project_id: proyectoId,
@@ -124,21 +138,32 @@ export function SeguridadTab({
     if (rondaForm.ruta_id && rondaData) {
       const puntos = puntosControl.filter(p => p.ruta_id === rondaForm.ruta_id).sort((a, b) => a.orden - b.orden)
       if (puntos.length > 0) {
-        await createCondominioRow('visitas_control',
+        const { error: errChecklist } = await createCondominioRow('visitas_control',
           puntos.map(p => ({ ronda_id: rondaData.id as string, punto_id: p.id, estado: 'pendiente' }))
         )
+        // La ronda ya existe; antes, si el checklist fallaba, arrancaba sin
+        // puntos y nadie se enteraba.
+        if (errChecklist) {
+          notify({ variant: 'error', title: 'La ronda se inició sin su checklist', text: `No se pudieron crear los puntos de control: ${errChecklist.message}` })
+        }
       }
     }
     setSaving(false); setRondaForm({ notas: '', ruta_id: '' }); setShowRondaForm(false)
     onRefresh()
   }
 
-  async function finalizarRonda(id: string, estado: EstadoRonda) {
-    await updateCondominioRow('rondas_seguridad', id, { estado, fin: new Date().toISOString() })
+  async function finalizarRonda(id: string, estado: EstadoRonda): Promise<boolean> {
+    if (finalizando) return false
+    setFinalizando(id)
+    const { error } = await updateCondominioRow('rondas_seguridad', id, { estado, fin: new Date().toISOString() })
+    setFinalizando(null)
+    // Antes el error se ignoraba: la ronda seguía «en curso» sin explicación.
+    if (error) { notify({ variant: 'error', title: 'No se pudo cerrar la ronda', text: error.message }); return false }
     onRefresh()
+    return true
   }
 
-  async function marcarVisita(visitaId: string, estado: EstadoVisitaControl, notas?: string, fotos?: string[]) {
+  async function marcarVisita(visitaId: string, estado: EstadoVisitaControl, notas?: string, fotos?: string[]): Promise<boolean> {
     const { error } = await updateCondominioRow('visitas_control', visitaId, {
       estado, notas: notas ?? null,
       foto_urls: fotos ?? [],
@@ -149,9 +174,10 @@ export function SeguridadTab({
       // donde el punto la exige. La UI ya lo impide, así que llegar aquí
       // significa que el catálogo cambió mientras la ronda estaba abierta.
       notify({ variant: 'error', title: 'No se pudo cerrar el punto', text: error.message })
-      return
+      return false
     }
     onRefresh()
+    return true
   }
 
   /**
@@ -170,13 +196,18 @@ export function SeguridadTab({
     const { visitaId, punto, estado } = marcandoPunto
     if (estado === 'novedad' && !notasPunto.trim()) return
     if (puntoExigeFoto(punto) && fotosPunto.length === 0) return
+    if (saving) return
     setSaving(true)
-    await marcarVisita(visitaId, estado, notasPunto.trim() || undefined, fotosPunto)
+    const ok = await marcarVisita(visitaId, estado, notasPunto.trim() || undefined, fotosPunto)
     setSaving(false)
+    // Si falla, la ventana sigue abierta con lo escrito y las fotos (antes se
+    // cerraba igual y había que volver a capturar todo).
+    if (!ok) return
     setMarcandoPunto(null); setNotasPunto(''); setFotosPunto([])
   }
 
   async function registrarNovedad() {
+    if (saving) return
     if (!novedadForm.descripcion.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese la descripción.' }); return }
     setSaving(true)
     const { error } = await createCondominioRow('novedades_seguridad', {
@@ -196,14 +227,16 @@ export function SeguridadTab({
     setShowNovedadForm(false); onRefresh()
   }
 
-  async function eliminarNovedad(id: string) {
+  /** true si se eliminó (el detalle sólo se cierra entonces). */
+  async function eliminarNovedad(id: string): Promise<boolean> {
     // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
-    if (!canDelete) return
+    if (!canDelete) return false
     const r = await confirm({ title: '¿Eliminar novedad?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
-    if (!r.isConfirmed) return
+    if (!r.isConfirmed) return false
     const { error } = await deleteCondominioRow('novedades_seguridad', id)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
     onRefresh()
+    return true
   }
 
   function resetAccesos() {
@@ -257,7 +290,7 @@ export function SeguridadTab({
 
   async function buscarPorDpi() {
     const dpi = dpiSearch.trim()
-    if (!dpi) return
+    if (!dpi || searching) return
     setSearching(true)
     setSearchResult('idle')
     setSearchResultVisitantes([])
@@ -290,6 +323,7 @@ export function SeguridadTab({
   }
 
   async function handleRegistrarAcceso() {
+    if (regSaving) return
     if (!regForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del visitante.' }); return }
     if (!regForm.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad a visitar.' }); return }
     setRegSaving(true)
@@ -323,7 +357,8 @@ export function SeguridadTab({
   const ctx: SeguridadCtx = {
     rondas, novedades, rutas, puntosControl, visitasControl, areas, unidades, reservasSTR,
     proyectoId, canCreate, canEdit, canDelete,
-    saving, filtroPrioridad, setFiltroPrioridad, novedadDetalle, setNovedadDetalle,
+    saving, finalizando, filtroPrioridad, setFiltroPrioridad, novedadDetalle, setNovedadDetalle,
+    rondaDetalle, setRondaDetalle,
     novedadForm, setNovedadForm, fotosNovedadForm, setFotosNovedadForm,
     rondaForm, setRondaForm, setShowNovedadForm, setShowRondaForm,
     marcandoPunto, setMarcandoPunto, notasPunto, setNotasPunto, fotosPunto, setFotosPunto,
@@ -341,13 +376,13 @@ export function SeguridadTab({
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1100px' }}>
+    <div style={{ padding: '16px', maxWidth: '1100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Seguridad</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
-            {novedadesHoy.length} novedades hoy
-            {criticas > 0 && <span style={{ color: 'var(--at-danger)', fontWeight: 700 }}> · {criticas} críticas</span>}
+            {novedadesHoy.length} novedad{novedadesHoy.length !== 1 ? 'es' : ''} hoy
+            {criticas > 0 && <span style={{ color: 'var(--at-danger)', fontWeight: 700 }}> · {criticas} crítica{criticas !== 1 ? 's' : ''}</span>}
             {rondaEnCurso && <span style={{ color: 'var(--at-primary)', fontWeight: 600 }}> · Ronda en curso</span>}
           </p>
         </div>
@@ -366,8 +401,8 @@ export function SeguridadTab({
                 </button>
               )}
               {rondaEnCurso && (
-                <button onClick={() => finalizarRonda(rondaEnCurso.id, 'completada')} style={{ padding: '9px 16px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
-                  ✓ Finalizar ronda
+                <button onClick={() => void finalizarRonda(rondaEnCurso.id, 'completada')} disabled={finalizando !== null} style={{ padding: '9px 16px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '9px', fontWeight: 600, cursor: finalizando ? 'default' : 'pointer', fontSize: '13.5px', opacity: finalizando ? 0.6 : 1 }}>
+                  {finalizando === rondaEnCurso.id ? 'Cerrando…' : '✓ Finalizar ronda'}
                 </button>
               )}
             </>
@@ -380,20 +415,18 @@ export function SeguridadTab({
 
       {/* Vista toggle */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button onClick={() => setVista('novedades')}
+        <button onClick={() => setVista('novedades')} aria-pressed={vista === 'novedades'}
           style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'novedades' ? 'var(--at-primary)' : 'var(--at-line)', background: vista === 'novedades' ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: vista === 'novedades' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           📋 Novedades ({novedades.length})
         </button>
-        <button onClick={() => setVista('rondas')}
+        <button onClick={() => setVista('rondas')} aria-pressed={vista === 'rondas'}
           style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'rondas' ? 'var(--at-primary)' : 'var(--at-line)', background: vista === 'rondas' ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: vista === 'rondas' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           🛡 Rondas ({rondas.length})
         </button>
       </div>
 
-      {/* Form novedad */}
+      {/* Formularios en ventana (antes, encima de la lista, empujándola) */}
       {showNovedadForm && <NovedadForm ctx={ctx} />}
-
-      {/* Form ronda */}
       {showRondaForm && <RondaForm ctx={ctx} />}
 
       {/* Novedades view */}
@@ -402,7 +435,10 @@ export function SeguridadTab({
       {/* Rondas view */}
       {vista === 'rondas' && <VistaRondas ctx={ctx} />}
 
-      {/* Modal detalle de novedad */}
+      {/* Detalle de una ronda: sus puntos y sus novedades */}
+      {rondaDetalle && <RondaDetalleModal ctx={ctx} />}
+
+      {/* Detalle de novedad (después del de ronda: se abre encima de él) */}
       {novedadDetalle && <NovedadDetalleModal ctx={ctx} />}
 
       {/* Modal de cierre de un punto de la ronda (novedad / evidencia) */}

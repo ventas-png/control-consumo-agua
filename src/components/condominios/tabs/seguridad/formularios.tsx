@@ -1,9 +1,16 @@
-// Formularios inline de novedad y de inicio de ronda (P1 #3, extraídos de
-// SeguridadTab con el JSX intacto).
+// Formularios de novedad y de inicio de ronda, en ventana (pantalla completa
+// en el teléfono). Antes iban encima de la lista, empujándola; ahora no se
+// cierran mientras guardan y, si guardar falla, conservan lo escrito.
+import type { CSSProperties } from 'react'
 import { MultiImageUploader } from '../../../shared/ImageUploader'
+import { EditModal } from '../../../shared/EditModal'
+import { Button } from '../../../shared/Button'
 import type { TipoNovedad, PrioridadNovedad } from '../../../../types'
 import type { SeguridadCtx } from './ctx'
 import { TIPO_NOVEDAD_CONFIG } from './ui'
+
+const lbl: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }
+const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)', color: 'var(--at-ink)' }
 
 export function NovedadForm({ ctx }: { ctx: SeguridadCtx }) {
   const {
@@ -11,42 +18,57 @@ export function NovedadForm({ ctx }: { ctx: SeguridadCtx }) {
     fotosNovedadForm, setFotosNovedadForm, setShowNovedadForm, registrarNovedad,
   } = ctx
 
+  const cerrar = () => { if (!saving) { setShowNovedadForm(false); setFotosNovedadForm([]) } }
+
   return (
-    <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Registrar novedad</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+    <EditModal
+      title="Registrar novedad"
+      maxWidth="600px"
+      fullScreenOnMobile
+      onClose={cerrar}
+      closeOnBackdropClick={!saving}
+      closeOnEscape={!saving}
+      footer={
+        <>
+          <Button variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
+          <Button type="submit" form="seguridad-novedad-form" loading={saving} loadingText="Guardando…">Registrar</Button>
+        </>
+      }
+    >
+      <form
+        id="seguridad-novedad-form"
+        onSubmit={e => { e.preventDefault(); void registrarNovedad() }}
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '14px', alignItems: 'start' }}
+      >
         <div>
-          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Tipo</label>
-          <select value={novedadForm.tipo} onChange={e => setNovedadForm(f => ({ ...f, tipo: e.target.value as TipoNovedad }))}
-            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+          <label htmlFor="novedad-tipo" style={lbl}>Tipo</label>
+          <select id="novedad-tipo" value={novedadForm.tipo} onChange={e => setNovedadForm(f => ({ ...f, tipo: e.target.value as TipoNovedad }))} style={inp}>
             {(Object.entries(TIPO_NOVEDAD_CONFIG) as [TipoNovedad, typeof TIPO_NOVEDAD_CONFIG[TipoNovedad]][]).map(([v, c]) => (
               <option key={v} value={v}>{c.icon} {c.label}</option>
             ))}
           </select>
         </div>
         <div>
-          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Prioridad</label>
-          <select value={novedadForm.prioridad} onChange={e => setNovedadForm(f => ({ ...f, prioridad: e.target.value as PrioridadNovedad }))}
-            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+          <label htmlFor="novedad-prioridad" style={lbl}>Prioridad</label>
+          <select id="novedad-prioridad" value={novedadForm.prioridad} onChange={e => setNovedadForm(f => ({ ...f, prioridad: e.target.value as PrioridadNovedad }))} style={inp}>
             <option value="normal">Normal</option>
             <option value="alta">Alta</option>
             <option value="critica">Crítica</option>
           </select>
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Descripción *</label>
-          <textarea value={novedadForm.descripcion} onChange={e => setNovedadForm(f => ({ ...f, descripcion: e.target.value }))}
+          <label htmlFor="novedad-descripcion" style={lbl}>Descripción *</label>
+          <textarea id="novedad-descripcion" value={novedadForm.descripcion} onChange={e => setNovedadForm(f => ({ ...f, descripcion: e.target.value }))}
             placeholder="Detalle la novedad..." rows={3}
-            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)', resize: 'vertical' }} />
+            style={{ ...inp, resize: 'vertical', fontFamily: 'inherit' }} />
         </div>
         <div>
-          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Ubicación</label>
-          <input value={novedadForm.ubicacion} onChange={e => setNovedadForm(f => ({ ...f, ubicacion: e.target.value }))} placeholder="Ej. Entrada principal, Nivel 3..."
-            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+          <label htmlFor="novedad-ubicacion" style={lbl}>Ubicación</label>
+          <input id="novedad-ubicacion" value={novedadForm.ubicacion} onChange={e => setNovedadForm(f => ({ ...f, ubicacion: e.target.value }))} placeholder="Ej. Entrada principal, Nivel 3..." style={inp} />
         </div>
         {rondaEnCurso && (
           <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Vincular a ronda actual</label>
+            <span style={lbl}>Vincular a ronda actual</span>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', color: 'var(--at-ink-2)', cursor: 'pointer', marginTop: '8px' }}>
               <input type="checkbox" checked={novedadForm.ronda_id === rondaEnCurso.id}
                 onChange={e => setNovedadForm(f => ({ ...f, ronda_id: e.target.checked ? rondaEnCurso.id : '' }))} />
@@ -64,28 +86,39 @@ export function NovedadForm({ ctx }: { ctx: SeguridadCtx }) {
             maxFiles={10}
           />
         </div>
-      </div>
-      <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-        <button onClick={registrarNovedad} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-          {saving ? 'Guardando...' : 'Registrar'}
-        </button>
-        <button onClick={() => { setShowNovedadForm(false); setFotosNovedadForm([]) }} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-      </div>
-    </div>
+      </form>
+    </EditModal>
   )
 }
 
 export function RondaForm({ ctx }: { ctx: SeguridadCtx }) {
   const { saving, rondaForm, setRondaForm, setShowRondaForm, iniciarRonda, rutasActivas, puntosControl } = ctx
 
+  const cerrar = () => { if (!saving) setShowRondaForm(false) }
+
   return (
-    <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Iniciar ronda de seguridad</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-        <div style={{ gridColumn: '1 / -1' }}>
-          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Ruta de ronda</label>
-          <select value={rondaForm.ruta_id} onChange={e => setRondaForm(f => ({ ...f, ruta_id: e.target.value }))}
-            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+    <EditModal
+      title="🛡 Iniciar ronda de seguridad"
+      maxWidth="520px"
+      fullScreenOnMobile
+      onClose={cerrar}
+      closeOnBackdropClick={!saving}
+      closeOnEscape={!saving}
+      footer={
+        <>
+          <Button variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
+          <Button type="submit" form="seguridad-ronda-form" loading={saving} loadingText="Iniciando…">🛡 Iniciar ahora</Button>
+        </>
+      }
+    >
+      <form
+        id="seguridad-ronda-form"
+        onSubmit={e => { e.preventDefault(); void iniciarRonda() }}
+        style={{ display: 'grid', gap: '14px' }}
+      >
+        <div>
+          <label htmlFor="ronda-ruta" style={lbl}>Ruta de ronda</label>
+          <select id="ronda-ruta" value={rondaForm.ruta_id} onChange={e => setRondaForm(f => ({ ...f, ruta_id: e.target.value }))} style={inp}>
             <option value="">Sin ruta específica</option>
             {rutasActivas.map(r => {
               const cantPuntos = puntosControl.filter(p => p.ruta_id === r.id).length
@@ -98,18 +131,11 @@ export function RondaForm({ ctx }: { ctx: SeguridadCtx }) {
             </p>
           )}
         </div>
-        <div style={{ gridColumn: '1 / -1' }}>
-          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas (opcional)</label>
-          <input value={rondaForm.notas} onChange={e => setRondaForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones iniciales..."
-            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+        <div>
+          <label htmlFor="ronda-notas" style={lbl}>Notas (opcional)</label>
+          <input id="ronda-notas" value={rondaForm.notas} onChange={e => setRondaForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones iniciales..." style={inp} />
         </div>
-      </div>
-      <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-        <button onClick={iniciarRonda} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-          🛡 Iniciar ahora
-        </button>
-        <button onClick={() => setShowRondaForm(false)} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-      </div>
-    </div>
+      </form>
+    </EditModal>
   )
 }

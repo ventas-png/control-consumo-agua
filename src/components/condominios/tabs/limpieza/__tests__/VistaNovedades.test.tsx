@@ -10,7 +10,7 @@
 // «Marcar atendida» delegue en el padre en vez de escribir, y que aparezca sólo
 // donde tiene sentido.
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import type { NovedadOperativa } from '../../../../../domain/condominios/novedades'
 
 vi.mock('../../../../../lib/supabase', () => ({
@@ -88,6 +88,22 @@ describe('VistaNovedades · atender lo decide el padre', () => {
   it('sin mantenimiento pendiente tampoco: no hay nada que atender', () => {
     render(<VistaNovedades novedades={[nov({ requiere_mantenimiento: false })]} canEdit onAtender={() => {}} />)
     expect(screen.queryByText('✓ Marcar atendida')).toBeNull()
+  })
+
+  it('mientras se marca, el botón espera: un segundo toque no la manda dos veces', async () => {
+    let terminar!: () => void
+    const onAtender = vi.fn(() => new Promise<void>(res => { terminar = res }))
+    render(<VistaNovedades novedades={[nov({ requiere_mantenimiento: true }), nov({ clave: 'limpieza:eje2', id: 'eje2', requiere_mantenimiento: true })]} canEdit onAtender={onAtender} />)
+    fireEvent.click(screen.getAllByText('✓ Marcar atendida')[0])
+    const ocupado = screen.getByText('Marcando…').closest('button')!
+    expect(ocupado.disabled).toBe(true)
+    // Ni ese ni el de otra novedad aceptan otro toque mientras tanto.
+    fireEvent.click(ocupado)
+    fireEvent.click(screen.getByText('✓ Marcar atendida'))
+    expect(onAtender).toHaveBeenCalledTimes(1)
+
+    terminar()
+    await waitFor(() => expect(screen.getAllByText('✓ Marcar atendida')).toHaveLength(2))
   })
 })
 

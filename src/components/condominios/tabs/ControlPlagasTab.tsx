@@ -1,8 +1,11 @@
-import { hoyLocalISO } from '../../../lib/format'
-import { useState, type CSSProperties} from 'react'
+import { hoyLocalISO, diasHastaFechaCalendario, formatNumber } from '../../../lib/format'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { tint } from '../../shared/statusTone'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { ControlPlagas, TipoControlPlagas, ResultadoControlPlagas } from '../../../types'
 
 interface Props {
@@ -31,50 +34,98 @@ const RESULTADOS: { value: ResultadoControlPlagas; label: string; color: string 
 
 const AREAS_COMUNES = ['Lobby', 'Piscina', 'Gimnasio', 'Parqueo', 'Jardines', 'Azotea', 'Cuarto de basura', 'Cuarto de máquinas', 'Pasillos', 'Escaleras', 'Sótano']
 
-function diasParaProxima(fecha?: string | null): number | null {
-  if (!fecha) return null
-  return Math.round((new Date(fecha).getTime() - Date.now()) / 86400000)
+const tipoDe = (t: TipoControlPlagas) => TIPOS.find(x => x.value === t)
+const resultadoDe = (r: ResultadoControlPlagas) => RESULTADOS.find(x => x.value === r)
+
+/** La más reciente: por fecha y, el mismo día, por hora de captura. */
+const masReciente = (a: ControlPlagas, b: ControlPlagas) =>
+  b.fecha.localeCompare(a.fecha) || (b.created_at ?? '').localeCompare(a.created_at ?? '')
+
+/** La base guarda la hora con segundos (08:00:00); se muestra 08:00. */
+const hora = (h?: string | null) => (h ? h.slice(0, 5) : '')
+
+/** «en 5 días», «hoy», «atrasada 3 días». Días de calendario locales. */
+function cuandoToca(dias: number): string {
+  if (dias < 0) return `atrasada ${-dias} día${dias === -1 ? '' : 's'}`
+  if (dias === 0) return 'hoy'
+  return `en ${dias} día${dias === 1 ? '' : 's'}`
+}
+const colorPlazo = (dias: number) => dias <= 7 ? 'var(--at-danger)' : dias <= 30 ? 'var(--at-warning-strong)' : 'var(--at-accent)'
+
+function ResultadoBadge({ resultado }: { resultado: ResultadoControlPlagas }) {
+  const res = resultadoDe(resultado)
+  return <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: res && tint(res.color, 12), color: res?.color, whiteSpace: 'nowrap' }}>{res?.label ?? resultado}</span>
 }
 
+const formVacio = () => ({
+  tipo: 'fumigacion' as TipoControlPlagas,
+  empresa: '', tecnico: '', productos: '',
+  fecha: hoyLocalISO(),
+  hora_inicio: '', hora_fin: '',
+  resultado: 'satisfactorio' as ResultadoControlPlagas,
+  proxima_visita: '', costo: '', observaciones: '',
+  areas: [] as string[],
+})
+
 export default function ControlPlagasTab({ registros, proyectoId, companyId, moneda, canCreate, onRefresh }: Props) {
-  const [selected, setSelected] = useState<ControlPlagas | null>(null)
+  const [detalleId, setDetalleId] = useState<string | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [areasSeleccionadas, setAreasSeleccionadas] = useState<string[]>([])
+  const [filtroTipo, setFiltroTipo] = useState<TipoControlPlagas | ''>('')
+  const [filtroResultado, setFiltroResultado] = useState<ResultadoControlPlagas | ''>('')
   const [areaCustom, setAreaCustom] = useState('')
+  const [form, setForm] = useState(formVacio)
 
-  const [form, setForm] = useState({
-    tipo: 'fumigacion' as TipoControlPlagas,
-    empresa: '', tecnico: '', productos: '',
-    fecha: hoyLocalISO(),
-    hora_inicio: '', hora_fin: '',
-    resultado: 'satisfactorio' as ResultadoControlPlagas,
-    proxima_visita: '', costo: '', observaciones: '',
-  })
+  const lista = registros.filter(r =>
+    (filtroTipo === '' || r.tipo === filtroTipo) &&
+    (filtroResultado === '' || r.resultado === filtroResultado)
+  )
 
-  const proximas = registros.filter(r => {
-    const d = diasParaProxima(r.proxima_visita)
-    return d !== null && d <= 30 && d >= 0
-  })
+  // La próxima visita vigente es la que dejó programada la visita más
+  // reciente. Antes se contaba la de cada registro: una visita ya hecha seguía
+  // «próxima» y una atrasada desaparecía del aviso.
+  const ultima = [...registros].sort(masReciente)[0] ?? null
+  const esUltima = (r: ControlPlagas) => r.id === ultima?.id
+  const diasProxima = diasHastaFechaCalendario(ultima?.proxima_visita)
+
+  const empresas = [...new Set(registros.map(r => r.empresa?.trim()).filter((e): e is string => !!e))].sort()
 
   function toggleArea(area: string) {
-    setAreasSeleccionadas(prev => prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area])
+    setForm(p => ({
+      ...p,
+      areas: p.areas.includes(area) ? p.areas.filter(a => a !== area) : [...p.areas, area],
+    }))
   }
 
-  function addAreaCustom() {
+  function agregarAreaCustom() {
     const a = areaCustom.trim()
     if (!a) return
-    if (!areasSeleccionadas.includes(a)) setAreasSeleccionadas(prev => [...prev, a])
+    if (!form.areas.includes(a)) setForm(p => ({ ...p, areas: [...p.areas, a] }))
     setAreaCustom('')
   }
 
+  // Las áreas propias sólo se listaban como texto: no se podían quitar.
+  const areasOfrecidas = [...AREAS_COMUNES, ...form.areas.filter(a => !AREAS_COMUNES.includes(a))]
+
+  function abrirForm() {
+    setForm(p => ({ ...p, fecha: hoyLocalISO() }))
+    setDetalleId(null)
+    setMostrarForm(true)
+  }
+
+  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
+  const cerrarForm = () => { if (!saving) setMostrarForm(false) }
+
   async function guardar() {
-    if (areasSeleccionadas.length === 0) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Selecciona al menos un área' }); return }
+    if (saving) return
+    if (!form.fecha || form.areas.length === 0) {
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Fecha y al menos un área son obligatorios' }); return
+    }
     setSaving(true)
     const { error } = await createCondominioRow('control_plagas', {
       company_id: companyId, project_id: proyectoId,
       tipo: form.tipo, empresa: form.empresa.trim() || null,
-      tecnico: form.tecnico.trim() || null, areas: areasSeleccionadas,
+      tecnico: form.tecnico.trim() || null, areas: form.areas,
       productos: form.productos.trim() || null, fecha: form.fecha,
       hora_inicio: form.hora_inicio || null, hora_fin: form.hora_fin || null,
       resultado: form.resultado,
@@ -84,209 +135,285 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ tipo: 'fumigacion', empresa: '', tecnico: '', productos: '', fecha: hoyLocalISO(), hora_inicio: '', hora_fin: '', resultado: 'satisfactorio', proxima_visita: '', costo: '', observaciones: '' })
-    setAreasSeleccionadas([])
+    setForm(formVacio())
+    setAreaCustom('')
     setMostrarForm(false)
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', minWidth: 0, background: 'var(--at-surface)', color: 'var(--at-ink)' }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
+  const tarjeta: CSSProperties = { background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px', textAlign: 'left', font: 'inherit', color: 'inherit', minWidth: 0 }
+
+  // Montos con el formato regional de la app (antes, el del navegador).
+  const dinero = (v: number) => `${moneda}\u00a0${formatNumber(v, 2)}`
+
+  // Se lee el registro vigente, no una copia.
+  const detalle = detalleId ? registros.find(r => r.id === detalleId) ?? null : null
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      <div style={{ width: 300, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Registros ({registros.length})</span>
-          {canCreate && (
-            <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-              style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-              + Nuevo
+    <div style={{ padding: 16 }}>
+      {/* Última visita y la próxima que dejó programada: cada tarjeta abre esa visita */}
+      {ultima && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12, marginBottom: 16 }}>
+          <button type="button" className="cond-kpi-link" onClick={() => setDetalleId(ultima.id)} style={{ ...tarjeta, cursor: 'pointer' }}
+            aria-label={`Ver última visita: ${tipoDe(ultima.tipo)?.label ?? ultima.tipo} del ${ultima.fecha}`}>
+            <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 2 }}>Última visita</div>
+            <div style={{ display: 'flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>{ultima.fecha}</span>
+              <span style={{ fontSize: 13, color: 'var(--at-ink-2)' }}>{tipoDe(ultima.tipo)?.icon} {tipoDe(ultima.tipo)?.label ?? ultima.tipo}</span>
+              <ResultadoBadge resultado={ultima.resultado} />
+            </div>
+          </button>
+          {ultima.proxima_visita && diasProxima !== null ? (
+            <button type="button" className="cond-kpi-link" onClick={() => setDetalleId(ultima.id)}
+              style={{ ...tarjeta, cursor: 'pointer', background: diasProxima <= 7 ? 'var(--at-danger-tint)' : diasProxima <= 30 ? 'var(--at-warning-tint)' : 'var(--at-surface-2)', borderColor: diasProxima <= 7 ? 'var(--at-danger-border)' : diasProxima <= 30 ? 'var(--at-warning-border)' : 'var(--at-line)' }}
+              aria-label={`Próxima visita ${ultima.proxima_visita}, ${cuandoToca(diasProxima)}`}>
+              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 2 }}>⏰ Próxima visita</div>
+              <div style={{ display: 'flex', gap: '4px 8px', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 15, fontWeight: 700 }}>{ultima.proxima_visita}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: colorPlazo(diasProxima) }}>{cuandoToca(diasProxima)}</span>
+              </div>
             </button>
+          ) : (
+            <div style={tarjeta}>
+              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 2 }}>⏰ Próxima visita</div>
+              <div style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>Sin programar en la última visita</div>
+            </div>
           )}
         </div>
+      )}
 
-        {proximas.length > 0 && (
-          <div style={{ padding: '8px 12px', background: 'var(--at-warning-tint)', borderBottom: '1px solid var(--at-warning-border)', fontSize: 12, color: 'var(--at-warning-strong)' }}>
-            ⏰ {proximas.length} visita(s) próxima(s) en los próximos 30 días
-          </div>
+      {/* Filtros + botón */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', flex: '1 1 260px' }}>
+          <select aria-label="Filtrar por tipo" style={{ ...inp, width: 'auto', flex: '1 1 170px' }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoControlPlagas | '')}>
+            <option value="">Todos los tipos</option>
+            {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+          </select>
+          <select aria-label="Filtrar por resultado" style={{ ...inp, width: 'auto', flex: '1 1 170px' }} value={filtroResultado} onChange={e => setFiltroResultado(e.target.value as ResultadoControlPlagas | '')}>
+            <option value="">Todos los resultados</option>
+            {RESULTADOS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+          <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{lista.length} registros</span>
+        </div>
+        {canCreate && (
+          <Button onClick={abrirForm}>+ Nueva visita</Button>
         )}
-
-        {registros.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
-
-        {registros.map(r => {
-          const tipo = TIPOS.find(t => t.value === r.tipo)
-          const res = RESULTADOS.find(re => re.value === r.resultado)
-          const diasProx = diasParaProxima(r.proxima_visita)
-          return (
-            <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-accent-tint)' : 'var(--at-surface)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
-                <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: res && tint(res.color, 12), color: res?.color }}>{res?.label}</span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
-                {r.fecha}
-                {r.empresa && <span> · {r.empresa}</span>}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{r.areas.slice(0, 3).join(', ')}{r.areas.length > 3 ? ` +${r.areas.length - 3}` : ''}</div>
-              {diasProx !== null && diasProx <= 30 && (
-                <div style={{ fontSize: 11, color: diasProx <= 7 ? 'var(--at-danger)' : 'var(--at-warning)', marginTop: 2 }}>
-                  ⏰ Próx. visita en {diasProx} días
-                </div>
-              )}
-            </div>
-          )
-        })}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {mostrarForm && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Nuevo registro de control de plagas</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={lbl}>Tipo</label>
-                <select style={inp} value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as TipoControlPlagas }))}>
-                  {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Empresa</label>
-                <input style={inp} placeholder="Nombre de la empresa" value={form.empresa} onChange={e => setForm(p => ({ ...p, empresa: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Técnico</label>
-                <input style={inp} value={form.tecnico} onChange={e => setForm(p => ({ ...p, tecnico: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Fecha</label>
-                <input type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Hora inicio</label>
-                <input type="time" style={inp} value={form.hora_inicio} onChange={e => setForm(p => ({ ...p, hora_inicio: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Hora fin</label>
-                <input type="time" style={inp} value={form.hora_fin} onChange={e => setForm(p => ({ ...p, hora_fin: e.target.value }))} />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={lbl}>Productos utilizados</label>
-                <input style={inp} placeholder="Nombre y concentración de productos" value={form.productos} onChange={e => setForm(p => ({ ...p, productos: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Resultado</label>
-                <select style={inp} value={form.resultado} onChange={e => setForm(p => ({ ...p, resultado: e.target.value as ResultadoControlPlagas }))}>
-                  {RESULTADOS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Próxima visita</label>
-                <input type="date" style={inp} value={form.proxima_visita} onChange={e => setForm(p => ({ ...p, proxima_visita: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Costo ({moneda})</label>
-                <input type="number" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
-              </div>
-            </div>
-
-            {/* Áreas */}
-            <div style={{ marginBottom: 12 }}>
-              <label style={lbl}>Áreas tratadas *</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                {AREAS_COMUNES.map(a => (
-                  <button key={a} type="button" onClick={() => toggleArea(a)}
-                    style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: areasSeleccionadas.includes(a) ? 'var(--at-accent)' : 'var(--at-surface)', color: areasSeleccionadas.includes(a) ? 'white' : 'var(--at-ink-2)', borderColor: areasSeleccionadas.includes(a) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
-                    {a}
-                  </button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input style={{ ...inp, flex: 1 }} placeholder="Otra área…" value={areaCustom} onChange={e => setAreaCustom(e.target.value)} onKeyDown={e => e.key === 'Enter' && addAreaCustom()} />
-                <button onClick={addAreaCustom} style={{ padding: '7px 12px', background: 'var(--at-chip)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>+ Agregar</button>
-              </div>
-              {areasSeleccionadas.length > 0 && (
-                <div style={{ marginTop: 6, fontSize: 12, color: 'var(--at-accent)' }}>
-                  Seleccionadas: {areasSeleccionadas.join(', ')}
-                </div>
-              )}
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={lbl}>Observaciones</label>
-              <textarea style={{ ...inp, height: 70, resize: 'vertical' }} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : '✅ Guardar'}
-              </button>
-              <button onClick={() => { setMostrarForm(false); setAreasSeleccionadas([]) }}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!mostrarForm && selected && (() => {
-          const tipo = TIPOS.find(t => t.value === selected.tipo)
-          const res = RESULTADOS.find(r => r.value === selected.resultado)
-          const diasProx = diasParaProxima(selected.proxima_visita)
-          return (
+      {/* Nueva visita en ventana (antes, en un panel al lado de una lista de
+          300px fijos: en el teléfono no cabían los dos). */}
+      {mostrarForm && (
+        <EditModal
+          title="🧪 Nueva visita de control de plagas"
+          maxWidth="640px"
+          fullScreenOnMobile
+          onClose={cerrarForm}
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          footer={
+            <>
+              <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+              <Button type="submit" form="plagas-form" variant="success" loading={saving} loadingText="Guardando…">✅ Registrar</Button>
+            </>
+          }
+        >
+          <form
+            id="plagas-form"
+            onSubmit={e => { e.preventDefault(); void guardar() }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12, alignItems: 'start' }}
+          >
             <div>
-              <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 4 }}>{tipo?.icon} {tipo?.label}</div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-                <span style={{ padding: '4px 12px', borderRadius: 10, background: res && tint(res.color, 12), color: res?.color, fontWeight: 600, fontSize: 13 }}>{res?.label}</span>
-                <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{selected.fecha}</span>
-                {selected.hora_inicio && <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{selected.hora_inicio} – {selected.hora_fin || '?'}</span>}
-              </div>
-
-              {diasProx !== null && diasProx <= 30 && (
-                <div style={{ background: diasProx <= 7 ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)', border: `1px solid ${diasProx <= 7 ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: diasProx <= 7 ? 'var(--at-danger)' : 'var(--at-warning-strong)' }}>
-                  ⏰ Próxima visita: {selected.proxima_visita} ({diasProx} días)
-                </div>
-              )}
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-                {[
-                  { label: 'Empresa', value: selected.empresa || '—' },
-                  { label: 'Técnico', value: selected.tecnico || '—' },
-                  { label: 'Productos', value: selected.productos || '—' },
-                  { label: `Costo (${moneda})`, value: selected.costo?.toLocaleString() ?? '—' },
-                  { label: 'Próxima visita', value: selected.proxima_visita || '—' },
-                ].map(d => (
-                  <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 6, padding: '7px 12px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{d.label}</div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{d.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Áreas tratadas</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-                {selected.areas.map(a => (
-                  <span key={a} style={{ padding: '4px 10px', background: 'var(--at-accent-tint)', color: 'var(--at-accent)', borderRadius: 8, fontSize: 12 }}>{a}</span>
-                ))}
-              </div>
-
-              {selected.observaciones && (
-                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 3 }}>Observaciones</div>
-                  {selected.observaciones}
-                </div>
-              )}
+              <label htmlFor="plagas-tipo" style={lbl}>Tipo</label>
+              <select id="plagas-tipo" style={inp} value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as TipoControlPlagas }))}>
+                {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+              </select>
             </div>
-          )
-        })()}
+            <div>
+              <label htmlFor="plagas-fecha" style={lbl}>Fecha *</label>
+              <input id="plagas-fecha" type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="plagas-resultado" style={lbl}>Resultado</label>
+              <select id="plagas-resultado" style={inp} value={form.resultado} onChange={e => setForm(p => ({ ...p, resultado: e.target.value as ResultadoControlPlagas }))}>
+                {RESULTADOS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="plagas-inicio" style={lbl}>Hora inicio</label>
+              <input id="plagas-inicio" type="time" style={inp} value={form.hora_inicio} onChange={e => setForm(p => ({ ...p, hora_inicio: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="plagas-fin" style={lbl}>Hora fin</label>
+              <input id="plagas-fin" type="time" style={inp} value={form.hora_fin} onChange={e => setForm(p => ({ ...p, hora_fin: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="plagas-empresa" style={lbl}>Empresa</label>
+              <input id="plagas-empresa" list="plagas-empresas" style={inp} placeholder="Nombre de la empresa" value={form.empresa} onChange={e => setForm(p => ({ ...p, empresa: e.target.value }))} />
+              <datalist id="plagas-empresas">
+                {empresas.map(e => <option key={e} value={e} />)}
+              </datalist>
+            </div>
+            <div>
+              <label htmlFor="plagas-tecnico" style={lbl}>Técnico</label>
+              <input id="plagas-tecnico" style={inp} value={form.tecnico} onChange={e => setForm(p => ({ ...p, tecnico: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="plagas-proxima" style={lbl}>Próxima visita</label>
+              <input id="plagas-proxima" type="date" min={form.fecha || undefined} style={inp} value={form.proxima_visita} onChange={e => setForm(p => ({ ...p, proxima_visita: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="plagas-costo" style={lbl}>Costo ({moneda})</label>
+              <input id="plagas-costo" type="number" inputMode="decimal" min="0" step="0.01" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="plagas-productos" style={lbl}>Productos utilizados</label>
+              <input id="plagas-productos" style={inp} placeholder="Nombre y concentración de productos" value={form.productos} onChange={e => setForm(p => ({ ...p, productos: e.target.value }))} />
+            </div>
+            <fieldset style={{ gridColumn: '1 / -1', border: 'none', margin: 0, padding: 0, minWidth: 0 }}>
+              <legend style={{ ...lbl, padding: 0 }}>Áreas tratadas *</legend>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                {areasOfrecidas.map(a => {
+                  const activa = form.areas.includes(a)
+                  return (
+                    <button key={a} type="button" aria-pressed={activa} onClick={() => toggleArea(a)}
+                      style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: activa ? 'var(--at-accent)' : 'var(--at-surface)', color: activa ? 'white' : 'var(--at-ink-2)', borderColor: activa ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
+                      {activa ? '✓ ' : ''}{a}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input aria-label="Agregar otra área" style={{ ...inp, flex: 1 }} placeholder="Otra área…" value={areaCustom} onChange={e => setAreaCustom(e.target.value)}
+                  // Enter agrega el área (sin esto, dentro del formulario lo registraría).
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarAreaCustom() } }} />
+                <Button type="button" variant="secondary" onClick={agregarAreaCustom} disabled={!areaCustom.trim()}>Agregar</Button>
+              </div>
+            </fieldset>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="plagas-observaciones" style={lbl}>Observaciones</label>
+              <textarea id="plagas-observaciones" rows={2} style={{ ...inp, fontFamily: 'inherit', resize: 'vertical' }} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
+            </div>
+          </form>
+        </EditModal>
+      )}
 
-        {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
-            Selecciona un registro o crea uno nuevo
+      {/* Detalle de la visita en ventana */}
+      {detalle && (() => {
+        const tipo = tipoDe(detalle.tipo)
+        return (
+          <EditModal
+            title={`${tipo?.icon ?? '🧪'} ${tipo?.label ?? detalle.tipo}`}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span>{detalle.fecha}{detalle.hora_inicio ? ` · ${hora(detalle.hora_inicio)}–${hora(detalle.hora_fin) || '?'}` : ''}</span>
+                <ResultadoBadge resultado={detalle.resultado} />
+              </span>
+            }
+            maxWidth="520px"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={<Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>}
+          >
+            <VisitaDetalle registro={detalle} vigente={esUltima(detalle)} dinero={dinero} />
+          </EditModal>
+        )
+      })()}
+
+      {/* Historial: en el teléfono cada visita es una tarjeta; tocarla abre su
+          detalle y «Ver» es el camino de teclado. */}
+      <DataTable<ControlPlagas>
+        data={lista}
+        rowKey="id"
+        pageSize={30}
+        mobileCardLayout
+        defaultSort={{ key: 'fecha', direction: 'desc' }}
+        emptyState={{ icon: '🧪', title: 'Sin registros' }}
+        onRowClick={(r) => setDetalleId(r.id)}
+        columns={[
+          { key: 'fecha', header: 'Fecha', sortable: true,
+            accessor: (r) => `${r.fecha} ${r.created_at ?? ''}`,
+            render: (r) => <span style={{ whiteSpace: 'nowrap' }}>{r.fecha}</span> },
+          { key: 'tipo', header: 'Tipo', sortable: true,
+            accessor: (r) => tipoDe(r.tipo)?.label ?? r.tipo,
+            render: (r) => <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{tipoDe(r.tipo)?.icon} {tipoDe(r.tipo)?.label ?? r.tipo}</span> },
+          { key: 'areas', header: 'Áreas',
+            render: (r) => <span style={{ color: 'var(--at-ink-2)' }}>{r.areas.slice(0, 3).join(', ')}{r.areas.length > 3 ? ` +${r.areas.length - 3}` : ''}</span> },
+          { key: 'empresa', header: 'Empresa', sortable: true, hideOnMobile: true,
+            accessor: (r) => r.empresa ?? '',
+            render: (r) => <span style={{ color: 'var(--at-ink-3)' }}>{r.empresa || '—'}</span> },
+          { key: 'proxima_visita', header: 'Próx. visita', sortable: true, hideOnMobile: true,
+            accessor: (r) => r.proxima_visita ?? '',
+            render: (r) => {
+              if (!r.proxima_visita) return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+              // Sólo la próxima visita vigente (la de la última visita) puede estar atrasada.
+              const atrasada = esUltima(r) && diasProxima !== null && diasProxima < 0
+              return <span style={{ whiteSpace: 'nowrap', color: atrasada ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: atrasada ? 600 : 400 }}>{r.proxima_visita}{atrasada ? ' · atrasada' : ''}</span>
+            } },
+          { key: 'costo', header: 'Costo', align: 'right', sortable: true, hideOnMobile: true,
+            accessor: (r) => r.costo ?? 0,
+            render: (r) => r.costo != null ? <span style={{ whiteSpace: 'nowrap' }}>{dinero(r.costo)}</span> : '—' },
+          { key: 'resultado', header: 'Resultado', sortable: true,
+            accessor: (r) => resultadoDe(r.resultado)?.label ?? r.resultado,
+            render: (r) => <ResultadoBadge resultado={r.resultado} /> },
+          { key: 'ver', header: '', align: 'right',
+            render: (r) => (
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                {r.observaciones && <span aria-hidden="true" style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>📝</span>}
+                <Button size="sm" variant="secondary" onClick={() => setDetalleId(r.id)} aria-label={`Ver ${tipoDe(r.tipo)?.label ?? r.tipo} del ${r.fecha}`}>Ver</Button>
+              </span>
+            ) },
+        ] satisfies DataTableColumn<ControlPlagas>[]}
+      />
+    </div>
+  )
+}
+
+/** Detalle de solo lectura de una visita. */
+function VisitaDetalle({ registro: r, vigente, dinero }: { registro: ControlPlagas; vigente: boolean; dinero: (v: number) => string }) {
+  const fila = (label: string, valor: ReactNode) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 14 }}>
+      <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
+      <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{valor}</span>
+    </div>
+  )
+  // El plazo sólo se cuenta para la próxima visita vigente.
+  const dias = vigente ? diasHastaFechaCalendario(r.proxima_visita) : null
+  return (
+    <div>
+      {!vigente && r.proxima_visita && (
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: 'var(--at-ink-3)' }}>
+          Hay una visita más reciente: la próxima visita vigente es la que dejó programada esa.
+        </div>
+      )}
+      {fila('Fecha', r.fecha)}
+      {fila('Horario', r.hora_inicio || r.hora_fin ? `${hora(r.hora_inicio) || '?'} – ${hora(r.hora_fin) || '?'}` : '—')}
+      {fila('Empresa', r.empresa || '—')}
+      {fila('Técnico', r.tecnico || '—')}
+      {fila('Productos', r.productos || '—')}
+      {fila('Próxima visita', r.proxima_visita
+        ? <strong style={{ color: dias !== null ? colorPlazo(dias) : 'var(--at-ink-2)' }}>{r.proxima_visita}{dias !== null ? ` · ${cuandoToca(dias)}` : ''}</strong>
+        : '—')}
+      {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
+
+      <div style={{ marginTop: 14 }}>
+        <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 6 }}>Áreas tratadas</div>
+        {r.areas.length === 0 ? <span style={{ color: 'var(--at-ink-3)', fontSize: 13 }}>—</span> : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {r.areas.map(a => (
+              <span key={a} style={{ padding: '3px 10px', background: 'var(--at-accent-tint)', color: 'var(--at-accent)', borderRadius: 6, fontSize: 12 }}>{a}</span>
+            ))}
           </div>
         )}
       </div>
+
+      {r.observaciones && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
+          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.observaciones}</p>
+        </div>
+      )}
     </div>
   )
 }

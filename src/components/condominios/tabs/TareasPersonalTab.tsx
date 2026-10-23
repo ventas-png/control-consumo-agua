@@ -823,13 +823,14 @@ export function TareasPersonalTab({
 
             return (
               <div key={bloque.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${isOpen ? 'var(--at-warning)' : 'var(--at-line)'}`, borderRadius: '16px', overflow: 'hidden' }}>
-                {/* Header del bloque */}
-                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', background: isOpen ? 'var(--at-warning-tint)' : 'var(--at-surface)' }}
+                {/* Header del bloque. En el teléfono el estado y los botones bajan
+                    a otra línea: antes apretaban el nombre a una palabra por línea. */}
+                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '8px 12px', flexWrap: 'wrap', cursor: 'pointer', background: isOpen ? 'var(--at-warning-tint)' : 'var(--at-surface)' }}
                   onClick={() => setBloqueAbierto(isOpen ? null : bloque.id)}>
                   <span style={{ fontSize: '22px' }}>{tc.icon}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)' }}>
-                      {nombreEmpleado} — {cargoEmpleado ? etiquetaCargo(cargoEmpleado, cargos) : ''}
+                      {nombreEmpleado}{cargoEmpleado ? ` — ${etiquetaCargo(cargoEmpleado, cargos)}` : ''}
                     </div>
                     <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '2px' }}>
                       <span style={{ background: tc.bg, color: tc.color, padding: '1px 8px', borderRadius: '20px', fontWeight: 600 }}>{tc.label}</span>

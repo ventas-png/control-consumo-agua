@@ -1,7 +1,11 @@
-import { hoyLocalISO, esFechaCalendarioVencida, diasHastaFechaCalendario } from '../../../lib/format'
-import { useState, type CSSProperties} from 'react'
+import { hoyLocalISO, esFechaCalendarioVencida, diasHastaFechaCalendario, formatNumber } from '../../../lib/format'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
+import { tint } from '../../shared/statusTone'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { ControlSistemaIncendio, TipoSistemaIncendio, TipoInspeccionIncendio, ResultadoInspeccionIncendio } from '../../../types'
 
 interface Props {
@@ -39,8 +43,25 @@ const RESULTADOS: { value: ResultadoInspeccionIncendio; label: string; color: st
   { value: 'fuera_servicio',        label: 'Fuera de servicio',    color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '🚫' },
 ]
 
+const tipoDe = (t: TipoSistemaIncendio) => TIPOS_SISTEMA.find(x => x.value === t)
+const inspeccionDe = (t: TipoInspeccionIncendio) => TIPOS_INSPECCION.find(x => x.value === t)
+const resultadoDe = (r: ResultadoInspeccionIncendio) => RESULTADOS.find(x => x.value === r)
+const conProblema = (r: ControlSistemaIncendio) => r.resultado === 'fuera_servicio' || r.resultado === 'requiere_mantenimiento'
+
+/** Un equipo es su tipo más su identificador (EXT-001, ALM-05…). */
+const claveEquipo = (r: Pick<ControlSistemaIncendio, 'tipo_sistema' | 'identificador'>) => `${r.tipo_sistema}|${r.identificador.trim()}`
+
+/** El más reciente: por fecha y, el mismo día, por hora de captura. */
+const masReciente = (a: ControlSistemaIncendio, b: ControlSistemaIncendio) =>
+  b.fecha.localeCompare(a.fecha) || (b.created_at ?? '').localeCompare(a.created_at ?? '')
+
+function ResultadoBadge({ resultado }: { resultado: ResultadoInspeccionIncendio }) {
+  const res = resultadoDe(resultado)
+  return <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: res?.bg, color: res?.color, whiteSpace: 'nowrap' }}>{res?.icon} {res?.label ?? resultado}</span>
+}
+
 export default function ControlSistemaIncendioTab({ registros, proyectoId, companyId, moneda, canCreate, onRefresh }: Props) {
-  const [selected, setSelected] = useState<ControlSistemaIncendio | null>(null)
+  const [detalleId, setDetalleId] = useState<string | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState<TipoSistemaIncendio | ''>('')
@@ -61,19 +82,54 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
     (filtroResultado === '' || r.resultado === filtroResultado)
   )
 
-  const vencidosHoy = registros.filter(r => esFechaCalendarioVencida(r.fecha_vencimiento))
-  const proximosVencer = registros.filter(r => {
+  // Estado vigente de cada equipo: su inspección más reciente. Antes los
+  // vencimientos y los problemas se contaban sobre todos los registros, así
+  // que un extintor ya recargado seguía «vencido» por su registro viejo y una
+  // falla ya corregida seguía contando.
+  const vigentes = Object.values(registros.reduce<Record<string, ControlSistemaIncendio>>((acc, r) => {
+    const k = claveEquipo(r)
+    if (!acc[k] || masReciente(r, acc[k]) < 0) acc[k] = r
+    return acc
+  }, {}))
+  const esVigente = (r: ControlSistemaIncendio) => vigentes.some(v => v.id === r.id)
+
+  const vencidos = vigentes.filter(r => esFechaCalendarioVencida(r.fecha_vencimiento))
+    .sort((a, b) => a.fecha_vencimiento!.localeCompare(b.fecha_vencimiento!))
+  const proximosVencer = vigentes.filter(r => {
     const diff = diasHastaFechaCalendario(r.fecha_vencimiento)
     return diff !== null && diff >= 0 && diff <= 30
-  })
+  }).sort((a, b) => a.fecha_vencimiento!.localeCompare(b.fecha_vencimiento!))
 
   const resumenPorTipo = TIPOS_SISTEMA.map(t => ({
     ...t,
-    total: registros.filter(r => r.tipo_sistema === t.value).length,
-    problemas: registros.filter(r => r.tipo_sistema === t.value && (r.resultado === 'fuera_servicio' || r.resultado === 'requiere_mantenimiento')).length,
+    total: vigentes.filter(r => r.tipo_sistema === t.value).length,
+    problemas: vigentes.filter(r => r.tipo_sistema === t.value && conProblema(r)).length,
   })).filter(t => t.total > 0)
 
+  const identificadores = [...new Set(registros.map(r => r.identificador.trim()))].sort()
+
+  // Al escribir un equipo ya registrado se proponen su tipo y su ubicación,
+  // si la ubicación aún está vacía.
+  function elegirIdentificador(valor: string) {
+    const previo = registros.filter(r => r.identificador.trim() === valor.trim()).sort(masReciente)[0]
+    setForm(p => ({
+      ...p,
+      identificador: valor,
+      ...(previo && !p.ubicacion.trim() ? { ubicacion: previo.ubicacion, tipo_sistema: previo.tipo_sistema } : {}),
+    }))
+  }
+
+  function abrirForm() {
+    setForm(p => ({ ...p, fecha: hoyLocalISO() }))
+    setDetalleId(null)
+    setMostrarForm(true)
+  }
+
+  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
+  const cerrarForm = () => { if (!saving) setMostrarForm(false) }
+
   async function guardar() {
+    if (saving) return
     if (!form.identificador.trim() || !form.ubicacion.trim()) {
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Identificador y ubicación son obligatorios' }); return
     }
@@ -97,219 +153,277 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', minWidth: 0, background: 'var(--at-surface)', color: 'var(--at-ink)' }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
+  const filaAviso: CSSProperties = { width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 6, padding: '3px 6px', font: 'inherit', fontSize: 13, color: 'var(--at-ink-2)', cursor: 'pointer' }
+
+  const dinero = (v: number) => `${moneda}\u00a0${formatNumber(v, 2)}`
+
+  // Se lee el registro vigente, no una copia.
+  const detalle = detalleId ? registros.find(r => r.id === detalleId) ?? null : null
+  const historialDetalle = detalle
+    ? registros.filter(r => claveEquipo(r) === claveEquipo(detalle)).sort(masReciente)
+    : []
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div>
-              <span style={{ fontWeight: 600, fontSize: 14 }}>Incendio ({lista.length})</span>
-              {vencidosHoy.length > 0 && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 700 }}>{vencidosHoy.length} venc.</span>}
-            </div>
-            {canCreate && (
-              <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nuevo
+    <div style={{ padding: 16 }}>
+      {/* Atención: equipos cuya inspección vigente venció o vence en 30 días */}
+      {(vencidos.length > 0 || proximosVencer.length > 0) && (
+        <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-danger)', marginBottom: 4 }}>🚨 Atención requerida</div>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 1 }}>
+            {vencidos.map(r => (
+              <li key={r.id}>
+                <button type="button" className="cond-barra-fila" style={filaAviso} onClick={() => setDetalleId(r.id)}>
+                  ⚠ <strong>{r.identificador}</strong> · {r.ubicacion} — <span style={{ color: 'var(--at-danger)', fontWeight: 600 }}>vencido ({r.fecha_vencimiento})</span>
+                </button>
+              </li>
+            ))}
+            {proximosVencer.map(r => (
+              <li key={r.id}>
+                <button type="button" className="cond-barra-fila" style={filaAviso} onClick={() => setDetalleId(r.id)}>
+                  ⏰ <strong>{r.identificador}</strong> · {r.ubicacion} — vence pronto ({r.fecha_vencimiento})
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Resumen por tipo: equipos y cuántos tienen problema; tocar filtra */}
+      {resumenPorTipo.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 150px), 1fr))', gap: 8, marginBottom: 16 }}>
+          {resumenPorTipo.map(t => {
+            const activo = filtroTipo === t.value
+            return (
+              <button key={t.value} type="button" aria-pressed={activo} onClick={() => setFiltroTipo(activo ? '' : t.value)}
+                style={{ textAlign: 'left', padding: '8px 12px', borderRadius: 10, border: `1.5px solid ${activo ? t.color : 'var(--at-line)'}`, background: activo ? tint(t.color, 9) : 'var(--at-surface)', font: 'inherit', color: 'var(--at-ink)', cursor: 'pointer', minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{t.icon} {t.label}</div>
+                <div style={{ fontSize: 11, color: t.problemas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: t.problemas > 0 ? 600 : 400 }}>
+                  {t.total} equipo{t.total === 1 ? '' : 's'}{t.problemas > 0 ? ` · ${t.problemas} con problema` : ''}
+                </div>
               </button>
-            )}
-          </div>
-          <select style={{ ...inp, marginBottom: 6 }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoSistemaIncendio | '')}>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Filtros + botón */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', flex: '1 1 260px' }}>
+          <select aria-label="Filtrar por sistema" style={{ ...inp, width: 'auto', flex: '1 1 170px' }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoSistemaIncendio | '')}>
             <option value="">Todos los sistemas</option>
             {TIPOS_SISTEMA.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
           </select>
-          <select style={inp} value={filtroResultado} onChange={e => setFiltroResultado(e.target.value as ResultadoInspeccionIncendio | '')}>
+          <select aria-label="Filtrar por resultado" style={{ ...inp, width: 'auto', flex: '1 1 170px' }} value={filtroResultado} onChange={e => setFiltroResultado(e.target.value as ResultadoInspeccionIncendio | '')}>
             <option value="">Todos los resultados</option>
             {RESULTADOS.map(r => <option key={r.value} value={r.value}>{r.icon} {r.label}</option>)}
           </select>
+          <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{lista.length} registros</span>
         </div>
-
-        {/* Resumen */}
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--at-line)' }}>
-          {resumenPorTipo.map(t => (
-            <div key={t.value} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-              <span>{t.icon} {t.label}</span>
-              <span style={{ color: t.problemas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
-                {t.total}{t.problemas > 0 ? ` (${t.problemas} ⚠)` : ''}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
-
-        {lista.map(r => {
-          const tipo = TIPOS_SISTEMA.find(t => t.value === r.tipo_sistema)
-          const res = RESULTADOS.find(x => x.value === r.resultado)
-          const vencido = esFechaCalendarioVencida(r.fecha_vencimiento)
-          return (
-            <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-danger-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${vencido ? 'var(--at-danger)' : tipo?.color}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {r.identificador}</span>
-                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: res?.bg, color: res?.color }}>{res?.icon} {res?.label}</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.ubicacion}</div>
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
-                {r.fecha}
-                {r.fecha_vencimiento && <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}> · Vence: {r.fecha_vencimiento}</span>}
-              </div>
-            </div>
-          )
-        })}
+        {canCreate && (
+          <Button variant="danger" onClick={abrirForm}>+ Nueva inspección</Button>
+        )}
       </div>
 
-      {/* Panel derecho */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {mostrarForm && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Nueva inspección sistema contra incendios</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={lbl}>Tipo sistema</label>
-                <select style={inp} value={form.tipo_sistema} onChange={e => setForm(p => ({ ...p, tipo_sistema: e.target.value as TipoSistemaIncendio }))}>
-                  {TIPOS_SISTEMA.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Identificador *</label>
-                <input style={inp} placeholder="EXT-001, ALM-05…" value={form.identificador} onChange={e => setForm(p => ({ ...p, identificador: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Ubicación *</label>
-                <input style={inp} placeholder="Lobby, Piso 3…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Fecha inspección</label>
-                <input type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Tipo inspección</label>
-                <select style={inp} value={form.tipo_inspeccion} onChange={e => setForm(p => ({ ...p, tipo_inspeccion: e.target.value as TipoInspeccionIncendio }))}>
-                  {TIPOS_INSPECCION.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Resultado</label>
-                <select style={inp} value={form.resultado} onChange={e => setForm(p => ({ ...p, resultado: e.target.value as ResultadoInspeccionIncendio }))}>
-                  {RESULTADOS.map(r => <option key={r.value} value={r.value}>{r.icon} {r.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Fecha vencimiento</label>
-                <input type="date" style={inp} value={form.fecha_vencimiento} onChange={e => setForm(p => ({ ...p, fecha_vencimiento: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Próxima inspección</label>
-                <input type="date" style={inp} value={form.proxima_inspeccion} onChange={e => setForm(p => ({ ...p, proxima_inspeccion: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Empresa servicio</label>
-                <input style={inp} value={form.empresa_servicio} onChange={e => setForm(p => ({ ...p, empresa_servicio: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Técnico</label>
-                <input style={inp} value={form.tecnico} onChange={e => setForm(p => ({ ...p, tecnico: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Costo ({moneda})</label>
-                <input type="number" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Observaciones</label>
-                <input style={inp} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : '✅ Registrar'}
-              </button>
-              <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!mostrarForm && selected && (() => {
-          const tipo = TIPOS_SISTEMA.find(t => t.value === selected.tipo_sistema)
-          const res = RESULTADOS.find(x => x.value === selected.resultado)
-          const tipoInsp = TIPOS_INSPECCION.find(t => t.value === selected.tipo_inspeccion)
-          const vencido = esFechaCalendarioVencida(selected.fecha_vencimiento)
-          return (
+      {/* Nueva inspección en ventana (antes, en un panel al lado de una lista
+          de 300px fijos: en el teléfono no cabían los dos). */}
+      {mostrarForm && (
+        <EditModal
+          title="🧯 Nueva inspección contra incendios"
+          maxWidth="640px"
+          fullScreenOnMobile
+          onClose={cerrarForm}
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          footer={
+            <>
+              <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+              <Button type="submit" form="incendio-form" variant="success" loading={saving} loadingText="Guardando…">✅ Registrar</Button>
+            </>
+          }
+        >
+          <form
+            id="incendio-form"
+            onSubmit={e => { e.preventDefault(); void guardar() }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12, alignItems: 'start' }}
+          >
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: tipo?.color, fontWeight: 700, marginBottom: 4 }}>{tipo?.icon} {tipo?.label}</div>
-                  <div style={{ fontWeight: 700, fontSize: 20 }}>{selected.identificador}</div>
-                  <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>📍 {selected.ubicacion}</div>
-                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>{selected.fecha} · {tipoInsp?.label}</div>
-                </div>
-                <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, background: res?.bg, color: res?.color, fontWeight: 600 }}>{res?.icon} {res?.label}</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-                {selected.fecha_vencimiento && (
-                  <div style={{ background: vencido ? 'var(--at-danger-tint)' : 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', border: vencido ? '1px solid var(--at-danger-border)' : 'none' }}>
-                    <div style={{ fontSize: 11, color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>Fecha vencimiento</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: vencido ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>{selected.fecha_vencimiento}{vencido ? ' ⚠ VENCIDO' : ''}</div>
-                  </div>
-                )}
-                {selected.proxima_inspeccion && (
-                  <div style={{ background: 'var(--at-accent-tint)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>Próxima inspección</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--at-accent)' }}>{selected.proxima_inspeccion}</div>
-                  </div>
-                )}
-                {selected.empresa_servicio && (
-                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Empresa</div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.empresa_servicio}</div>
-                  </div>
-                )}
-                {selected.tecnico && (
-                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Técnico</div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.tecnico}</div>
-                  </div>
-                )}
-                {selected.costo != null && (
-                  <div style={{ background: 'var(--at-success-tint)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Costo</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {selected.costo.toLocaleString()}</div>
-                  </div>
-                )}
-              </div>
-
-              {selected.observaciones && (
-                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--at-warning-strong)' }}>
-                  {selected.observaciones}
-                </div>
-              )}
+              <label htmlFor="incendio-identificador" style={lbl}>Identificador *</label>
+              <input id="incendio-identificador" list="incendio-identificadores" style={inp} placeholder="EXT-001, ALM-05…" value={form.identificador} onChange={e => elegirIdentificador(e.target.value)} />
+              <datalist id="incendio-identificadores">
+                {identificadores.map(i => <option key={i} value={i} />)}
+              </datalist>
             </div>
-          )
-        })()}
+            <div>
+              <label htmlFor="incendio-tipo" style={lbl}>Tipo de sistema</label>
+              <select id="incendio-tipo" style={inp} value={form.tipo_sistema} onChange={e => setForm(p => ({ ...p, tipo_sistema: e.target.value as TipoSistemaIncendio }))}>
+                {TIPOS_SISTEMA.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="incendio-ubicacion" style={lbl}>Ubicación *</label>
+              <input id="incendio-ubicacion" style={inp} placeholder="Lobby, Piso 3…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="incendio-fecha" style={lbl}>Fecha de inspección</label>
+              <input id="incendio-fecha" type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="incendio-inspeccion" style={lbl}>Tipo de inspección</label>
+              <select id="incendio-inspeccion" style={inp} value={form.tipo_inspeccion} onChange={e => setForm(p => ({ ...p, tipo_inspeccion: e.target.value as TipoInspeccionIncendio }))}>
+                {TIPOS_INSPECCION.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="incendio-resultado" style={lbl}>Resultado</label>
+              <select id="incendio-resultado" style={inp} value={form.resultado} onChange={e => setForm(p => ({ ...p, resultado: e.target.value as ResultadoInspeccionIncendio }))}>
+                {RESULTADOS.map(r => <option key={r.value} value={r.value}>{r.icon} {r.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="incendio-vencimiento" style={lbl}>Fecha de vencimiento</label>
+              <input id="incendio-vencimiento" type="date" style={inp} value={form.fecha_vencimiento} onChange={e => setForm(p => ({ ...p, fecha_vencimiento: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="incendio-proxima" style={lbl}>Próxima inspección</label>
+              <input id="incendio-proxima" type="date" min={form.fecha || undefined} style={inp} value={form.proxima_inspeccion} onChange={e => setForm(p => ({ ...p, proxima_inspeccion: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="incendio-empresa" style={lbl}>Empresa de servicio</label>
+              <input id="incendio-empresa" style={inp} value={form.empresa_servicio} onChange={e => setForm(p => ({ ...p, empresa_servicio: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="incendio-tecnico" style={lbl}>Técnico</label>
+              <input id="incendio-tecnico" style={inp} value={form.tecnico} onChange={e => setForm(p => ({ ...p, tecnico: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="incendio-costo" style={lbl}>Costo ({moneda})</label>
+              <input id="incendio-costo" type="number" inputMode="decimal" min="0" step="0.01" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="incendio-observaciones" style={lbl}>Observaciones</label>
+              <textarea id="incendio-observaciones" rows={2} style={{ ...inp, fontFamily: 'inherit', resize: 'vertical' }} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
+            </div>
+          </form>
+        </EditModal>
+      )}
 
-        {!mostrarForm && !selected && (
-          <div>
-            {(vencidosHoy.length > 0 || proximosVencer.length > 0) && (
-              <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-danger)', marginBottom: 6 }}>🚨 Atención requerida</div>
-                {vencidosHoy.map(r => <div key={r.id} style={{ fontSize: 12, color: 'var(--at-ink-2)', marginBottom: 2 }}>⚠ {r.identificador} — vencido ({r.fecha_vencimiento})</div>)}
-                {proximosVencer.filter(r => !vencidosHoy.find(v => v.id === r.id)).map(r => <div key={r.id} style={{ fontSize: 12, color: 'var(--at-ink-2)', marginBottom: 2 }}>⏰ {r.identificador} — vence pronto ({r.fecha_vencimiento})</div>)}
+      {/* Detalle de la inspección en ventana, con el historial del equipo */}
+      {detalle && (() => {
+        const tipo = tipoDe(detalle.tipo_sistema)
+        return (
+          <EditModal
+            title={`${tipo?.icon ?? '🧯'} ${detalle.identificador}`}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span>{tipo?.label ?? detalle.tipo_sistema} · 📍 {detalle.ubicacion}</span>
+                <ResultadoBadge resultado={detalle.resultado} />
+              </span>
+            }
+            maxWidth="520px"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={<Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>}
+          >
+            <InspeccionDetalle registro={detalle} vigente={esVigente(detalle)} dinero={dinero} />
+            {historialDetalle.length > 1 && (
+              <div style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: 4 }}>Historial del equipo ({historialDetalle.length})</div>
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  {historialDetalle.map(h => (
+                    <li key={h.id}>
+                      <button type="button" className="cond-barra-fila" onClick={() => setDetalleId(h.id)} aria-current={h.id === detalle.id ? 'true' : undefined}
+                        style={{ width: '100%', display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', textAlign: 'left', background: h.id === detalle.id ? 'var(--at-surface-2)' : 'none', border: 'none', borderRadius: 6, padding: '6px 8px', font: 'inherit', fontSize: 13, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
+                        <span>{h.fecha} · {inspeccionDe(h.tipo_inspeccion)?.label ?? h.tipo_inspeccion}</span>
+                        <ResultadoBadge resultado={h.resultado} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: 'var(--at-ink-3)', fontSize: 14 }}>
-              Selecciona un registro o crea uno nuevo
-            </div>
-          </div>
-        )}
-      </div>
+          </EditModal>
+        )
+      })()}
+
+      {/* Historial: en el teléfono cada inspección es una tarjeta; tocarla
+          abre su detalle y «Ver» es el camino de teclado. */}
+      <DataTable<ControlSistemaIncendio>
+        data={lista}
+        rowKey="id"
+        pageSize={30}
+        mobileCardLayout
+        defaultSort={{ key: 'fecha', direction: 'desc' }}
+        emptyState={{ icon: '🧯', title: 'Sin registros' }}
+        rowStyle={(r) => esVigente(r) && esFechaCalendarioVencida(r.fecha_vencimiento) ? { background: 'var(--at-danger-tint)' } : {}}
+        onRowClick={(r) => setDetalleId(r.id)}
+        columns={[
+          { key: 'identificador', header: 'Equipo', sortable: true,
+            render: (r) => <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{tipoDe(r.tipo_sistema)?.icon} {r.identificador}</span> },
+          { key: 'ubicacion', header: 'Ubicación', sortable: true,
+            render: (r) => <span style={{ color: 'var(--at-ink-2)' }}>{r.ubicacion}</span> },
+          { key: 'fecha', header: 'Fecha', sortable: true,
+            accessor: (r) => `${r.fecha} ${r.created_at ?? ''}`,
+            render: (r) => <span style={{ whiteSpace: 'nowrap' }}>{r.fecha}</span> },
+          { key: 'tipo_inspeccion', header: 'Inspección', sortable: true, hideOnMobile: true,
+            accessor: (r) => inspeccionDe(r.tipo_inspeccion)?.label ?? r.tipo_inspeccion,
+            render: (r) => <span style={{ color: 'var(--at-ink-3)' }}>{inspeccionDe(r.tipo_inspeccion)?.label ?? r.tipo_inspeccion}</span> },
+          { key: 'fecha_vencimiento', header: 'Vence', sortable: true,
+            accessor: (r) => r.fecha_vencimiento ?? '',
+            render: (r) => {
+              if (!r.fecha_vencimiento) return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+              const vencido = esVigente(r) && esFechaCalendarioVencida(r.fecha_vencimiento)
+              return <span style={{ whiteSpace: 'nowrap', color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: vencido ? 600 : 400 }}>{r.fecha_vencimiento}{vencido ? ' · vencido' : ''}</span>
+            } },
+          { key: 'resultado', header: 'Resultado', sortable: true,
+            accessor: (r) => resultadoDe(r.resultado)?.label ?? r.resultado,
+            render: (r) => <ResultadoBadge resultado={r.resultado} /> },
+          { key: 'ver', header: '', align: 'right',
+            render: (r) => (
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                {r.observaciones && <span aria-hidden="true" style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>📝</span>}
+                <Button size="sm" variant="secondary" onClick={() => setDetalleId(r.id)} aria-label={`Ver inspección de ${r.identificador} del ${r.fecha}`}>Ver</Button>
+              </span>
+            ) },
+        ] satisfies DataTableColumn<ControlSistemaIncendio>[]}
+      />
+    </div>
+  )
+}
+
+/** Detalle de solo lectura de una inspección. */
+function InspeccionDetalle({ registro: r, vigente, dinero }: { registro: ControlSistemaIncendio; vigente: boolean; dinero: (v: number) => string }) {
+  const fila = (label: string, valor: ReactNode) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 14 }}>
+      <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
+      <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{valor}</span>
+    </div>
+  )
+  // Sólo la inspección vigente del equipo cuenta como vencida.
+  const vencido = vigente && esFechaCalendarioVencida(r.fecha_vencimiento)
+  return (
+    <div>
+      {!vigente && (
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: 'var(--at-ink-3)' }}>
+          Hay una inspección más reciente de este equipo (ver historial abajo).
+        </div>
+      )}
+      {fila('Fecha', r.fecha)}
+      {fila('Tipo de inspección', inspeccionDe(r.tipo_inspeccion)?.label ?? r.tipo_inspeccion)}
+      {fila('Vencimiento', r.fecha_vencimiento
+        ? <strong style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>{r.fecha_vencimiento}{vencido ? ' · vencido' : ''}</strong>
+        : '—')}
+      {fila('Próxima inspección', r.proxima_inspeccion ? <strong style={{ color: 'var(--at-accent)' }}>{r.proxima_inspeccion}</strong> : '—')}
+      {fila('Empresa de servicio', r.empresa_servicio || '—')}
+      {fila('Técnico', r.tecnico || '—')}
+      {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
+      {r.observaciones && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
+          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.observaciones}</p>
+        </div>
+      )}
     </div>
   )
 }

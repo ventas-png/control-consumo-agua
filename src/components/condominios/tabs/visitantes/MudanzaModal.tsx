@@ -1,28 +1,22 @@
-// Bloque extraído de VisitantesTab (fase B): JSX idéntico al original.
+// Elegir la mudanza autorizada que ingresa (bloque extraído de
+// VisitantesTab), en ventana: pantalla completa en el teléfono, Esc.
 import type { VisitantesCtx } from './ctx'
 import { TIPO_MUDANZA_LABEL } from './ui'
-import { ModalPortal } from '../../../shared/ModalPortal'
+import { EditModal } from '../../../shared/EditModal'
 
 export function MudanzaModal({ ctx }: { ctx: VisitantesCtx }) {
   const { visitantes, setShowMudanzaModal, mudanzaSearch, setMudanzaSearch, hoy, mudanzasElegibles, abrirRegistroMudanza } = ctx
+  const cerrar = () => { setShowMudanzaModal(false); setMudanzaSearch('') }
   return (
-        <ModalPortal>
-        <div onClick={e => { if (e.target === e.currentTarget) { setShowMudanzaModal(false); setMudanzaSearch('') } }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '660px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px', overflow: 'hidden' }}>
-            <div style={{ background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Mudanza autorizada</div>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'white' }}>🚛 Registrar ingreso de mudanza</h3>
-              </div>
-              <button onClick={() => { setShowMudanzaModal(false); setMudanzaSearch('') }}
-                style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', fontSize: 18, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                ×
-              </button>
-            </div>
-            <div style={{ padding: '20px 24px' }}>
-              <input value={mudanzaSearch} onChange={e => setMudanzaSearch(e.target.value)}
+    <EditModal
+      title="🚛 Registrar ingreso de mudanza"
+      subtitle="Mudanzas autorizadas: aprobadas, programadas o en curso."
+      maxWidth="660px"
+      fullScreenOnMobile
+      onClose={cerrar}
+    >
+            <div>
+              <input value={mudanzaSearch} onChange={e => setMudanzaSearch(e.target.value)} aria-label="Buscar mudanza"
                 placeholder="Buscar por unidad o empresa de mudanza..."
                 autoFocus
                 style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: 'var(--at-surface-2)', marginBottom: '14px' }} />
@@ -101,8 +95,6 @@ export function MudanzaModal({ ctx }: { ctx: VisitantesCtx }) {
                 )
               })()}
             </div>
-          </div>
-        </div>
-        </ModalPortal>
+    </EditModal>
   )
 }

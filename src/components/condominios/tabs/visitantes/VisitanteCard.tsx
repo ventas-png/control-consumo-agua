@@ -1,4 +1,5 @@
-// Bloque extraído de VisitantesTab (fase B): JSX idéntico al original.
+// Tarjeta de un visitante (bloque extraído de VisitantesTab). Tocarla abre su
+// detalle; «Ver detalle» es el camino de teclado.
 import type { VisitantesCtx } from './ctx'
 import type { Visitante } from '../../../../types'
 import { SecureImage } from '../../../shared/SecureImage'
@@ -23,8 +24,9 @@ export function VisitanteCard({ ctx, v, isSTRMember = false }: { ctx: Visitantes
       : esAcompanante ? '4px solid var(--at-accent-2)' : undefined
 
     return (
-      <div key={v.id}
+      <div onClick={() => setVisitanteDetalle(v)}
         style={{
+          cursor: 'pointer',
           background: 'var(--at-surface)',
           border: `1.5px solid ${borderColor}`,
           borderRadius: '12px',
@@ -53,7 +55,7 @@ export function VisitanteCard({ ctx, v, isSTRMember = false }: { ctx: Visitantes
           }
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{v.nombre}</span>
+              <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>{v.nombre}</span>
               {v.es_menor && (
                 <span style={{ padding: '2px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Menor</span>
               )}
@@ -82,14 +84,14 @@ export function VisitanteCard({ ctx, v, isSTRMember = false }: { ctx: Visitantes
             {v.hora_salida && <span style={{ color: 'var(--at-ink-3)' }}>· Salida: {new Date(v.hora_salida).toLocaleString('es', { hour: '2-digit', minute: '2-digit' })}</span>}
             {enPremisa && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: isSTRMember ? 'var(--at-accent-tint)' : esAcompanante ? 'var(--at-primary-soft)' : 'var(--at-success-tint)', color: isSTRMember ? 'var(--at-accent-dark)' : esAcompanante ? 'var(--at-primary-hover)' : 'var(--at-success)', fontWeight: 700 }}>En premisas</span>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-            <button onClick={() => setVisitanteDetalle(v)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setVisitanteDetalle(v)} aria-label={`Ver detalle de ${v.nombre}`}
               style={{ padding: '6px 12px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
               Ver detalle
             </button>
             {canCreate && enPremisa && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                <button onClick={() => salidaHabilitada && iniciarSalida(v)}
+                <button onClick={() => salidaHabilitada && iniciarSalida(v)} disabled={!salidaHabilitada} aria-label={`Registrar salida de ${v.nombre}`}
                   title={!salidaHabilitada ? `Salida programada: ${fechaSalidaSTR}` : undefined}
                   style={{ padding: '6px 12px', background: salidaHabilitada ? 'var(--at-warning-tint)' : 'var(--at-chip)', color: salidaHabilitada ? 'var(--at-warning-strong)' : 'var(--at-ink-3)', border: `1px solid ${salidaHabilitada ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: '8px', cursor: salidaHabilitada ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                   Registrar salida

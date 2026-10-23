@@ -26,6 +26,14 @@ interface Props {
 export function VistaNovedades({ novedades, canEdit, onAtender }: Props) {
   const [soloMantenimiento, setSoloMantenimiento] = useState(false)
   const [filtroPrioridad, setFiltroPrioridad] = useState('')
+  /** La que se está marcando: su botón espera en vez de aceptar un segundo toque. */
+  const [atendiendo, setAtendiendo] = useState<string | null>(null)
+
+  async function atender(nov: NovedadOperativa) {
+    if (atendiendo) return
+    setAtendiendo(nov.clave)
+    try { await onAtender(nov) } finally { setAtendiendo(null) }
+  }
 
   const visibles = useMemo(() => novedades
     .filter(n => !soloMantenimiento || n.requiere_mantenimiento)
@@ -39,7 +47,7 @@ export function VistaNovedades({ novedades, canEdit, onAtender }: Props) {
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div>
           <label style={labelStyle} htmlFor="novedades-filtro-prioridad">Prioridad</label>
-          <select id="novedades-filtro-prioridad" style={{ ...inputStyle, width: '150px' }} value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value)}>
+          <select id="novedades-filtro-prioridad" style={{ ...inputStyle, width: '150px', maxWidth: '100%' }} value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value)}>
             <option value="">Todas</option>
             {Object.entries(PRIORIDAD_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
@@ -88,8 +96,13 @@ export function VistaNovedades({ novedades, canEdit, onAtender }: Props) {
                 )}
 
                 {canEdit && nov.requiere_mantenimiento && (
-                  <button onClick={() => void onAtender(nov)} style={btn('var(--at-success)', 'var(--at-on-status)', { padding: '6px 14px', fontSize: '12px', fontWeight: 700 })}>
-                    ✓ Marcar atendida
+                  <button
+                    onClick={() => void atender(nov)}
+                    disabled={atendiendo !== null}
+                    aria-busy={atendiendo === nov.clave}
+                    style={btn('var(--at-success)', 'var(--at-on-status)', { padding: '6px 14px', fontSize: '12px', fontWeight: 700, opacity: atendiendo !== null ? 0.6 : 1, cursor: atendiendo !== null ? 'default' : 'pointer' })}
+                  >
+                    {atendiendo === nov.clave ? 'Marcando…' : '✓ Marcar atendida'}
                   </button>
                 )}
               </div>

@@ -1,39 +1,40 @@
-// Bloque extraído de VisitantesTab (fase B): JSX idéntico al original.
+// Registro de entrada de un visitante (bloque extraído de VisitantesTab), en
+// ventana: pantalla completa en el teléfono, Cancelar y Registrar al pie.
+// Cerrar descarta lo capturado (fotos y acompañantes incluidos), así que no
+// se cierra con un toque fuera de la ventana ni a mitad del guardado.
 import type { VisitantesCtx } from './ctx'
 import { ImageUploader } from '../../../shared/ImageUploader'
+import { EditModal } from '../../../shared/EditModal'
+import { Button } from '../../../shared/Button'
 import { defaultAcompForm } from './ctx'
-import { ModalPortal } from '../../../shared/ModalPortal'
 
 export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
   const { unidades, saving, fotoUrl, setFotoUrl, fotoDocumentoUrl, setFotoDocumentoUrl, fotoVehiculoUrl, setFotoVehiculoUrl, fotosExpiradas, strCtx, mudanzaCtx, form, setForm, formEsMenor, setFormEsMenor, formFechaNacimiento, setFormFechaNacimiento, acompanantes, showAcompForm, setShowAcompForm, acompForm, setAcompForm, sugerencias, acompSugerencias, resetForm, autocompletar, autocompletarAcompanante, agregarAcompanante, quitarAcompanante, handleRegistrar } = ctx
+  const cerrar = () => { if (!saving) resetForm() }
   return (
-        <ModalPortal>
-        <div
-          onClick={e => { if (e.target === e.currentTarget) resetForm() }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '640px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Registrar visitante</h3>
-                {strCtx && (
-                  <div style={{ fontSize: '11px', color: 'var(--at-accent-hover)', fontWeight: 600, marginTop: '2px' }}>🏠 Renta corta — ingreso al grupo</div>
-                )}
-                {mudanzaCtx && (
-                  <div style={{ fontSize: '11px', color: 'var(--at-warning)', fontWeight: 600, marginTop: '2px' }}>🚛 Mudanza autorizada — ingreso al grupo</div>
-                )}
-              </div>
-              <button onClick={resetForm}
-                style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--at-chip)', border: 'none', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--at-ink-3)', lineHeight: 1 }}>
-                ×
-              </button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+    <EditModal
+      title="Registrar visitante"
+      subtitle={strCtx ? '🏠 Renta corta — ingreso al grupo' : mudanzaCtx ? '🚛 Mudanza autorizada — ingreso al grupo' : undefined}
+      maxWidth="640px"
+      fullScreenOnMobile
+      onClose={cerrar}
+      closeOnBackdropClick={false}
+      closeOnEscape={!saving}
+      footer={
+        <>
+          <Button variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
+          <Button onClick={() => void handleRegistrar()} loading={saving} loadingText="Registrando…">
+            {`✓ Registrar entrada${acompanantes.length > 0 ? ` (+${acompanantes.length})` : ''}`}
+          </Button>
+        </>
+      }
+    >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '14px' }}>
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
-                <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+                <label htmlFor="visita-nombre" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
+                <input id="visita-nombre" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
                   placeholder="Nombre del visitante"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
                 {sugerencias.length > 0 && (
                   <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Frecuente:</span>
@@ -47,9 +48,9 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                 )}
               </div>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
-                <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                  style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+                <label htmlFor="visita-unidad" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
+                <select id="visita-unidad" value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
+                  style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                   <option value="">Seleccionar...</option>
                   {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                 </select>
@@ -66,16 +67,16 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                 </div>
                 {formEsMenor ? (
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fecha de nacimiento (opcional)</label>
-                    <input type="date" value={formFechaNacimiento} onChange={e => setFormFechaNacimiento(e.target.value)}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                    <label htmlFor="visita-nacimiento" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fecha de nacimiento (opcional)</label>
+                    <input id="visita-nacimiento" type="date" value={formFechaNacimiento} onChange={e => setFormFechaNacimiento(e.target.value)}
+                      style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
                   </div>
                 ) : (
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
-                    <input value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
+                    <label htmlFor="visita-identificacion" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
+                    <input id="visita-identificacion" value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
                       placeholder="Número de documento"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                      style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
                     {sugerencias.length > 0 && (
                       <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                         <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Frecuente:</span>
@@ -91,22 +92,22 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                 )}
               </div>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
-                <input value={form.placa_vehiculo} onChange={e => setForm(f => ({ ...f, placa_vehiculo: e.target.value }))}
+                <label htmlFor="visita-placa" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
+                <input id="visita-placa" value={form.placa_vehiculo} onChange={e => setForm(f => ({ ...f, placa_vehiculo: e.target.value }))}
                   placeholder="Ej. ABC-123"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
               </div>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
-                <input value={form.motivo} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
+                <label htmlFor="visita-motivo" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
+                <input id="visita-motivo" value={form.motivo} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
                   placeholder="Ej. Entrega, Social, Mantenimiento..."
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
               </div>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
-                <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
+                <label htmlFor="visita-notas" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
+                <input id="visita-notas" value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
                   placeholder="Opcional"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 {(fotosExpiradas.foto || fotosExpiradas.documento || fotosExpiradas.vehiculo) && (
@@ -114,7 +115,7 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                     ⚠️ Una o más fotos tienen más de 90 días. Se recomienda renovarlas.
                   </div>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: '14px' }}>
                   <div>
                     <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" capture />
                     {fotosExpiradas.foto && <div style={{ fontSize: 11, color: 'var(--at-warning)', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
@@ -137,7 +138,7 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
 
             {/* Companions section */}
             <div style={{ marginTop: '20px', borderTop: '1.5px solid var(--at-chip)', paddingTop: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   👥 Acompañantes
                   {acompanantes.length > 0 && (
@@ -169,7 +170,7 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                             : a.identificacion ? `DPI: ${a.identificacion}` : 'Sin documento'}
                         </div>
                       </div>
-                      <button type="button" onClick={() => quitarAcompanante(a.tempId)}
+                      <button type="button" onClick={() => quitarAcompanante(a.tempId)} aria-label={`Quitar a ${a.nombre}`}
                         style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--at-danger-tint)', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         ×
                       </button>
@@ -182,8 +183,8 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                 <div style={{ padding: '14px', background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)' }}>Datos del acompañante</div>
                   <div>
-                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '3px' }}>Nombre *</label>
-                    <input value={acompForm.nombre} onChange={e => setAcompForm(f => ({ ...f, nombre: e.target.value }))}
+                    <label htmlFor="acomp-nombre" style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '3px' }}>Nombre *</label>
+                    <input id="acomp-nombre" value={acompForm.nombre} onChange={e => setAcompForm(f => ({ ...f, nombre: e.target.value }))}
                       placeholder="Nombre completo"
                       style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
                     {acompSugerencias.length > 0 && (
@@ -205,14 +206,14 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                   </label>
                   {acompForm.es_menor ? (
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '3px' }}>Fecha de nacimiento (opcional)</label>
-                      <input type="date" value={acompForm.fecha_nacimiento} onChange={e => setAcompForm(f => ({ ...f, fecha_nacimiento: e.target.value }))}
+                      <label htmlFor="acomp-nacimiento" style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '3px' }}>Fecha de nacimiento (opcional)</label>
+                      <input id="acomp-nacimiento" type="date" value={acompForm.fecha_nacimiento} onChange={e => setAcompForm(f => ({ ...f, fecha_nacimiento: e.target.value }))}
                         style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
                     </div>
                   ) : (
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '3px' }}>DPI / Identificación (opcional)</label>
-                      <input value={acompForm.identificacion} onChange={e => setAcompForm(f => ({ ...f, identificacion: e.target.value }))}
+                      <label htmlFor="acomp-identificacion" style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '3px' }}>DPI / Identificación (opcional)</label>
+                      <input id="acomp-identificacion" value={acompForm.identificacion} onChange={e => setAcompForm(f => ({ ...f, identificacion: e.target.value }))}
                         placeholder="Número de documento"
                         style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
                       {acompSugerencias.length > 0 && (
@@ -230,7 +231,7 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                   )}
                   <div>
                     <label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fotografías (opcional)</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: acompForm.es_menor ? '1fr' : '1fr 1fr', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: acompForm.es_menor ? '1fr' : 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '10px' }}>
                       <div>
                         <div style={{ fontSize: '10.5px', color: 'var(--at-ink-3)', marginBottom: '3px' }}>Foto de la persona</div>
                         <ImageUploader value={acompForm.foto_url} onChange={v => setAcompForm(f => ({ ...f, foto_url: v }))} folder="visitantes" label="Foto" capture />
@@ -256,16 +257,6 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                 </div>
               )}
             </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-              <button onClick={handleRegistrar} disabled={saving}
-                style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-                {saving ? 'Registrando...' : `✓ Registrar entrada${acompanantes.length > 0 ? ` (+${acompanantes.length})` : ''}`}
-              </button>
-              <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
-            </div>
-          </div>
-        </div>
-        </ModalPortal>
+    </EditModal>
   )
 }

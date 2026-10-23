@@ -9,7 +9,7 @@
 // Qué entra: los turnos de ese día que tienen al menos una rutina asignada. Del
 // turno se traen TODAS sus tareas, no sólo las de rutina: cerrar el turno calcula
 // su puntaje sobre lo que ve, y con una lista parcial escribiría uno falso.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchCalendarioLimpieza, fetchTareasDeTurnos } from '../../../../domain/condominios/tabQueries'
 import { hoyLocalISO } from '../../../../lib/format'
 import { TareasPersonalTab } from '../TareasPersonalTab'
@@ -61,11 +61,20 @@ export function VistaRutaDia({
   const [tareas, setTareas] = useState<TareaBloque[]>([])
   const [error, setError] = useState<string | null>(null)
 
+  // Sólo vale la respuesta del último día pedido. Antes, si la del día que se
+  // dejaba llegaba después, reemplazaba a la del día elegido y el tablero —que
+  // muestra sólo los turnos de su fecha— quedaba vacío.
+  const ultimaCarga = useRef(0)
+
   const cargar = useCallback(async (dia: string) => {
+    const vez = ++ultimaCarga.current
+    const vigente = () => vez === ultimaCarga.current
     const cal = await fetchCalendarioLimpieza(proyectoId, dia, dia)
+    if (!vigente()) return
     if (cal.error) { setError(cal.error.message); return }
     const conRutina = cal.turnos.filter(t => t.rutinas.length > 0 && t.estado !== 'cancelado')
     const tar = await fetchTareasDeTurnos(conRutina.map(t => t.bloque_id))
+    if (!vigente()) return
     if (tar.error) { setError(tar.error.message); return }
     setError(null)
     setBloques(conRutina.map(t => aBloque(t, companyId, proyectoId)))

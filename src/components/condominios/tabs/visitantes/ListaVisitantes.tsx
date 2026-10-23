@@ -1,4 +1,5 @@
-// Bloque extraído de VisitantesTab (fase B): JSX idéntico al original.
+// Bloque extraído de VisitantesTab (fase B). Cada tarjeta lleva su `key`
+// (antes la llevaba sólo el div de adentro, que no cuenta para React).
 import type { VisitantesCtx } from './ctx'
 import { VisitanteCard } from './VisitanteCard'
 import { TIPO_MUDANZA_LABEL } from './ui'
@@ -15,7 +16,7 @@ export function ListaVisitantes({ ctx }: { ctx: VisitantesCtx }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Regular visitors */}
-          {regulares.map(v => <VisitanteCard ctx={ctx} v={v} />)}
+          {regulares.map(v => <VisitanteCard key={v.id} ctx={ctx} v={v} />)}
 
           {/* STR group blocks */}
           {[...strGruposMap.values()].map(({ reserva, miembros }) => {
@@ -44,7 +45,7 @@ export function ListaVisitantes({ ctx }: { ctx: VisitantesCtx }) {
                 </div>
                 {/* Group members */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '16px' }}>
-                  {miembros.map(v => <VisitanteCard ctx={ctx} v={v} isSTRMember />)}
+                  {miembros.map(v => <VisitanteCard key={v.id} ctx={ctx} v={v} isSTRMember />)}
                 </div>
               </div>
             )
@@ -75,7 +76,7 @@ export function ListaVisitantes({ ctx }: { ctx: VisitantesCtx }) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '16px' }}>
-                  {miembros.map(v => <VisitanteCard ctx={ctx} v={v} isSTRMember />)}
+                  {miembros.map(v => <VisitanteCard key={v.id} ctx={ctx} v={v} isSTRMember />)}
                 </div>
               </div>
             )
