@@ -1020,6 +1020,18 @@ jobs:
       - name: Acciones por permiso — sección operaciones
         run: node supabase/tests/rls_acciones/run.mjs operaciones
 
+      # 20261104000650: el candado de plan (asambleas_digitales) de
+      # puntos_asamblea y votos_asamblea buscaba la empresa en asambleas_digital
+      # y rechazaba TODA alta, también la del admin de una empresa con la
+      # feature. Ahora la resuelve por asambleas. Control previo que reproduce
+      # el fallo, cadena completa, huella del auditor, guarda que aborta con un
+      # candado viejo de más y diez mutantes.
+      - name: Candado de plan de asambleas — puntos y votos por la empresa de la asamblea
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55574
+        run: supabase/tests/candado_plan_asambleas/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
