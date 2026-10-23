@@ -38,6 +38,8 @@ interface Props {
   userId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.tareas_personal.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
   /**
    * «Ruta del día» de Limpieza (20261103000000): el mismo tablero, sólo para
@@ -83,7 +85,7 @@ function sin<T>(m: Record<string, T>, clave: string): Record<string, T> {
 
 export function TareasPersonalTab({
   bloques, tareas, plantillas, personal, areas,
-  proyectoId, companyId, userId, canCreate, canEdit, onRefresh, cargos = [], modoRuta,
+  proyectoId, companyId, userId, canCreate, canEdit, canDelete, onRefresh, cargos = [], modoRuta,
 }: Props) {
   const hoy = hoyLocalISO()
   const [saving, setSaving] = useState(false)
@@ -98,6 +100,9 @@ export function TareasPersonalTab({
   /** En la ruta sólo se ejecuta: el alta y el borrado viven en «Tareas por turno». */
   const puedeArmar = canCreate && !modoRuta
   const puedeBorrar = canEdit && !modoRuta
+  // Borrar un TURNO es editarlo (bloques_turno_delete pide editar, 20260916221839);
+  // quitar una TAREA pendiente es eliminarla: condominios.tab.tareas_personal.delete.
+  const puedeQuitarTarea = canDelete && !modoRuta
   const [bloqueAbierto, setBloqueAbierto] = useState<string | null>(null)
 
   // Tareas a agregar al bloque
@@ -574,7 +579,10 @@ export function TareasPersonalTab({
   }
 
   async function deleteTarea(id: string) {
-    await deleteCondominioRow('tareas_bloque', id)
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
+    const { error } = await deleteCondominioRow('tareas_bloque', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -977,8 +985,8 @@ export function TareasPersonalTab({
                                   )}
                                 </div>
                               )}
-                              {puedeBorrar && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
-                                <button onClick={() => deleteTarea(t.id)} style={{ padding: '5px 8px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '13px', flexShrink: 0 }}>✕</button>
+                              {puedeQuitarTarea && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
+                                <button onClick={() => deleteTarea(t.id)} aria-label={`Eliminar ${t.titulo}`} title="Eliminar" style={{ padding: '5px 8px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '13px', flexShrink: 0 }}>✕</button>
                               )}
                             </div>
                             {evidenciaDe === t.id && panelEjecucion(t, () => void marcarTarea(t.id, 'completada', motivoDe(t.id).trim()))}

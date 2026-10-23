@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import type { AusenciaPersonal, DiaNoLaborable, PersonalCondominio } from '../../../../types'
+import { eliminarExigeSuPermiso } from '../../../../test/eliminarExigeSuPermiso'
 
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
@@ -59,6 +60,7 @@ function renderTab(props: Partial<Parameters<typeof AusenciasTab>[0]> = {}) {
       userId="user-1"
       canCreate
       canEdit
+      canDelete
       onRefresh={() => {}}
       {...props}
     />,
@@ -190,7 +192,7 @@ describe('AusenciasTab — ausencias y calendario laboral', () => {
   })
 
   it('sin permiso de edición no ofrece autorizar ni eliminar', () => {
-    renderTab({ canCreate: false, canEdit: false })
+    renderTab({ canCreate: false, canEdit: false, canDelete: false })
     expect(screen.queryByText('✔ Autorizar')).toBeNull()
     expect(screen.queryByText('+ Registrar ausencia')).toBeNull()
   })
@@ -200,3 +202,11 @@ describe('AusenciasTab — ausencias y calendario laboral', () => {
     expect(screen.getByText('Sin ausencias registradas')).toBeTruthy()
   })
 })
+
+// supabase/rls-acciones/recursos_humanos.json: Eliminar exige canDelete
+// (condominios.tab.ausencias.delete), lo mismo que la base. Editar no basta.
+eliminarExigeSuPermiso('Ausencias', p => renderTab(p), /^Eliminar$/, mocks.deleteCondominioRow, 'ausencias_personal', 'a1')
+eliminarExigeSuPermiso('Días no laborables', p => {
+  renderTab(p)
+  fireEvent.click(screen.getByRole('tab', { name: /Días no laborables/ }))
+}, /^Eliminar$/, mocks.deleteCondominioRow, 'dias_no_laborables', 'd1')

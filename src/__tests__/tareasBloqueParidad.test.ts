@@ -202,10 +202,12 @@ describe('20260907000100 · el re-gateo nombra a los consumidores REALES', () =>
   it('el borrado de la tarea ejecutada está cerrado: se anula, no se borra', () => {
     const cuerpo = POLICIES_TAREAS.get('tareas_bloque_delete')!.cuerpo
     expect(cuerpo).toMatch(/completada_en\s+IS\s+NULL/i)
-    // El envoltorio `(SELECT …)` es indiferente aquí —lo exige rlsInitplan y
-    // no cambia a quién deja borrar—, así que el patrón lo admite.
-    expect(cuerpo).toMatch(/current_user_role\(\)\)?\s*=\s*ANY/i)
-    expect(permisosDe(cuerpo).size, 'el DELETE no se abre por permiso de tab').toBe(0)
+    // Desde 20261104000700 quitar una tarea pendiente pide la acción de borrar
+    // de Tareas por turno (lo que ofrece la pantalla con canDelete); antes era
+    // sólo de company_owner/admin. Ver el tab nunca basta.
+    expect(permisosDe(cuerpo)).toEqual(new Set([PERM_TAREAS]))
+    expect(accionesDe(cuerpo)).toEqual(new Set(['delete']))
+    expect(cuerpo).not.toMatch(/user_has_permission/)
   })
 })
 

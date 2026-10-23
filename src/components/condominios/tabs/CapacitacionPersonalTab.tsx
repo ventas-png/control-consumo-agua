@@ -11,6 +11,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.capacitacion_personal.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -28,7 +30,7 @@ const BLANK = {
   costo: '', estado: 'completado' as EstadoCapacitacion, notas: '',
 }
 
-export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoCapacitacion | ''>('')
@@ -79,9 +81,12 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
   }
 
   async function eliminar(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const { isConfirmed } = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await deleteCondominioRow('capacitacion_personal_cond', id)
+    const { error } = await deleteCondominioRow('capacitacion_personal_cond', id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -226,14 +231,16 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
                             {certVence && ` · Cert. vence: ${certVence}`}
                           </div>
                         </div>
-                        {canEdit && (
+                        {(canEdit || canDelete) && (
                           <div style={{ display: 'flex', gap: 4 }}>
-                            {c.estado !== 'completado' && (
+                            {canEdit && c.estado !== 'completado' && (
                               <button onClick={() => cambiarEstado(c.id, 'completado')}
                                 style={{ padding: '4px 8px', background: 'var(--at-success-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: 'var(--at-success)' }}>✓</button>
                             )}
-                            <button onClick={() => eliminar(c.id)}
-                              style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: 'var(--at-danger)' }}>✕</button>
+                            {canDelete && (
+                              <button onClick={() => eliminar(c.id)} title="Eliminar" aria-label={`Eliminar ${c.curso}`}
+                                style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: 'var(--at-danger)' }}>✕</button>
+                            )}
                           </div>
                         )}
                       </div>

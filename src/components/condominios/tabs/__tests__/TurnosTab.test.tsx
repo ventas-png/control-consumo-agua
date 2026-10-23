@@ -4,6 +4,7 @@ import type {
   AsignacionTurno, AusenciaPersonal, BloqueTurno, CupoPausa, DiaNoLaborable,
   ExcepcionTurno, PersonalCondominio, PlantillaHorario,
 } from '../../../../types'
+import { eliminarExigeSuPermiso } from '../../../../test/eliminarExigeSuPermiso'
 
 // Mismo patrón que MensajesPortalTab.test: el tab entra a Supabase solo por la
 // capa domain, así que se mockea ahí (y el cliente, importado de forma
@@ -141,6 +142,7 @@ function renderTab(props: Partial<Parameters<typeof TurnosTab>[0]> = {}) {
       companyId="c1"
       canCreate
       canEdit
+      canDelete
       onRefresh={() => {}}
       {...props}
     />,
@@ -277,7 +279,7 @@ describe('TurnosTab — asignación de turnos', () => {
   })
 
   it('sin permiso de edición no ofrece acciones', () => {
-    renderTab({ canCreate: false, canEdit: false })
+    renderTab({ canCreate: false, canEdit: false, canDelete: false })
     fireEvent.click(screen.getByText(/^Reglas/))
     expect(screen.queryByText('+ Nueva regla')).toBeNull()
     expect(screen.queryByText('Editar')).toBeNull()
@@ -514,6 +516,7 @@ function dosConsultas() {
       companyId="c1"
       canCreate
       canEdit
+      canDelete
       onRefresh={() => {}}
     />,
   )
@@ -1008,3 +1011,10 @@ describe('regla por días del mes', () => {
     expect(payload.dias_mes).toEqual([])
   })
 })
+
+// supabase/rls-acciones/recursos_humanos.json: eliminar una regla exige canDelete
+// (condominios.tab.turnos.delete), lo mismo que la base. Editar no basta.
+eliminarExigeSuPermiso('Turnos (reglas)', p => {
+  renderTab(p)
+  fireEvent.click(screen.getByText(/^Reglas/))
+}, /^Eliminar la regla$/, mocks.deleteCondominioRow, 'asignaciones_turno', 'r1')

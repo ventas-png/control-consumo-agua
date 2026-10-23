@@ -108,6 +108,7 @@ function montar(estado: BloqueTurno['estado'], tareas: TareaBloque[]) {
       userId="u1"
       canCreate
       canEdit
+      canDelete
       onRefresh={() => {}}
     />,
   )

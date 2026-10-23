@@ -153,18 +153,24 @@ describe('policies de plantillas_tarea_cargo tras el catálogo de actividades', 
     expect(cuerpo).toContain(PERM_LIMPIEZA)
   })
 
-  for (const nombre of ['plantillas_tarea_cargo_insert', 'plantillas_tarea_cargo_update']) {
+  for (const [nombre, accion] of [['plantillas_tarea_cargo_insert', 'create'], ['plantillas_tarea_cargo_update', 'edit']]) {
     it(`${nombre} se gatea SOLO por plantillas_cargo`, () => {
+      // Desde 20261104000700 pide la ACCIÓN del tab, no sólo verlo.
       const cuerpo = vigentes.get(nombre)!.cuerpo
-      expect(cuerpo).toContain(PERM_PLANTILLAS)
-      expect(cuerpo).not.toContain(PERM_TAREAS)
+      expect(cuerpo).toContain(`condominios_puede_actuar('plantillas_cargo', '${accion}')`)
+      expect(cuerpo).not.toContain("'tareas_personal'")
+      expect(cuerpo).not.toMatch(/user_has_permission/)
     })
   }
 
-  it('el DELETE se gobierna por rol', () => {
+  it('el DELETE exige la acción de borrar de Plantillas de cargo, no la visibilidad', () => {
+    // Desde 20261104000700 borrar una actividad pide
+    // condominios.tab.plantillas_cargo.delete (lo que ofrece la pantalla con
+    // canDelete); antes era sólo de company_owner/admin.
     const cuerpo = vigentes.get('plantillas_tarea_cargo_delete')!.cuerpo
+    expect(cuerpo).toContain("condominios_puede_actuar('plantillas_cargo', 'delete')")
     expect(cuerpo).not.toMatch(/user_has_permission/)
-    expect(cuerpo).toMatch(/ANY\(ARRAY\['company_owner', ?'admin'\]\)/)
+    expect(cuerpo).toMatch(/company_id = \(?\s*(?:SELECT\s+)?(?:public\.)?get_my_company_id\(\)/)
   })
 })
 
@@ -186,14 +192,18 @@ for (const tabla of ['plantilla_tarea_suministros', 'plantilla_tarea_herramienta
       expect(cuerpo).toMatch(/company_id = public\.get_my_company_id\(\)/)
     })
 
-    for (const op of ['insert', 'update', 'delete']) {
+    for (const [op, acciones] of [['insert', ['create', 'edit']], ['update', ['edit']], ['delete', ['delete', 'edit']]] as const) {
       it(`${op} se gatea por plantillas_cargo y queda acotado a la empresa`, () => {
-        // DELETE incluido A PROPÓSITO (desviación documentada en 20260904000300):
-        // quitar un recurso de una plantilla es edición de catálogo, no
-        // destrucción de historial — eso lo protegen los RESTRICT.
+        // Desde 20261104000700 pide la ACCIÓN del tab. Agregar o quitar un
+        // recurso es editar la actividad (se ofrece con canEdit), por eso el
+        // INSERT y el DELETE admiten también edit: quitar un recurso de una
+        // plantilla es edición de catálogo, no destrucción de historial —eso
+        // lo protegen los RESTRICT—.
         const cuerpo = vigentes.get(`${tabla}_${op}`)!.cuerpo
-        expect(cuerpo).toContain(PERM_PLANTILLAS)
-        expect(cuerpo).toMatch(/company_id = public\.get_my_company_id\(\)/)
+        expect(new Set([...cuerpo.matchAll(/condominios_puede_actuar\('plantillas_cargo', '([a-z]+)'\)/g)].map(m => m[1])))
+          .toEqual(new Set(acciones))
+        expect(cuerpo).not.toMatch(/user_has_permission/)
+        expect(cuerpo).toMatch(/company_id = \(?\s*(?:SELECT\s+)?(?:public\.)?get_my_company_id\(\)/)
       })
     }
   })

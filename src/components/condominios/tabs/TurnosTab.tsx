@@ -61,6 +61,8 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.turnos.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -125,7 +127,7 @@ interface DiaEnEdicion { fecha: string; personalId: string }
  */
 export default function TurnosTab({
   plantillas, asignaciones, bloques, ausencias, diasNoLaborables, excepciones, personal,
-  proyectoId, companyId, canCreate, canEdit, onRefresh,
+  proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh,
 }: Props) {
   const hoy = hoyLocalISO()
   const [vista, setVista] = useState<Vista>('calendario')
@@ -477,6 +479,8 @@ export default function TurnosTab({
   }
 
   async function borrarRegla(r: AsignacionTurno) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const { isConfirmed } = await confirm({
       title: 'Eliminar la regla',
       text: 'Los turnos ya generados NO se borran: quedan como estaban y se pueden ajustar uno a uno.',
@@ -916,10 +920,12 @@ export default function TurnosTab({
                           <button onClick={() => abrirRegla(r)} style={{ padding: '5px 10px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-ink)' }}>
                             Editar
                           </button>
-                          <button onClick={() => borrarRegla(r)} style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>
-                            Eliminar
-                          </button>
                         </>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => borrarRegla(r)} aria-label="Eliminar la regla" style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>
+                          Eliminar
+                        </button>
                       )}
                     </div>
                   </div>

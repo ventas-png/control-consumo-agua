@@ -49,7 +49,8 @@
 //                              "receta": { "<columna>": "<valor SQL>" },  // sólo para la fila que fabrica el arnés
 //                              "evidencia": { "<tab ajeno>": ["<componente del tab>", …, "<archivo que escribe>"] },
 //                              "porque": "…" } },
-//     "_sin_clave": { "<tab>": "por qué el catálogo no siembra sus claves" } }
+//     "_sin_clave": { "<tab>": "por qué el catálogo no siembra sus claves" },
+//     "_recetas": { "<tabla padre fuera del mapa>": { "<columna>": "<valor SQL>" } } }
 // Un tab AJENO en un comando amplía quién escribe la tabla: `evidencia` dice
 // qué pantalla de ese tab la escribe (cadena de imports desde el componente
 // del registro hasta la escritura); src/__tests__/rlsAccionesMapas.test.ts lo
@@ -100,6 +101,15 @@ export function cargarMapa(seccion) {
     t.agregar_en ??= {}
     for (const [cmd, frag] of Object.entries(t.agregar_en)) {
       if (!COMANDOS.includes(cmd) || typeof frag !== 'string' || !frag) throw new Error(`${tabla}.agregar_en: «${cmd}» inválido`)
+    }
+  }
+  // Recetas de tablas PADRE que no están en el mapa (la fila de prueba de una
+  // tabla del mapa las fabrica): mismas reglas que `receta`.
+  mapa._recetas ??= {}
+  for (const [tabla, receta] of Object.entries(mapa._recetas)) {
+    if (!/^[a-z_][a-z0-9_]*$/.test(tabla) || mapa.tablas[tabla]) throw new Error(`${seccion}: _recetas «${tabla}» inválida (¿está en el mapa? va en su "receta")`)
+    for (const [col, valor] of Object.entries(receta)) {
+      if (!/^[a-z_][a-z0-9_]*$/.test(col) || typeof valor !== 'string') throw new Error(`_recetas.${tabla}: «${col}» inválida`)
     }
   }
   mapa._sin_clave ??= {}

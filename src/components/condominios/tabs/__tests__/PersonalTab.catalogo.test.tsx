@@ -76,6 +76,7 @@ function renderTab(props: Partial<Parameters<typeof PersonalTab>[0]> = {}) {
       moneda="Q"
       canCreate
       canEdit
+      canDelete
       onRefresh={() => {}}
       {...props}
     />,

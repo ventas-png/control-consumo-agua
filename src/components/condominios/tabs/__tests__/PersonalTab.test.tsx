@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import type { PersonalCondominio, UsuarioAsignablePersonal } from '../../../../types'
+import { eliminarExigeSuPermiso } from '../../../../test/eliminarExigeSuPermiso'
 
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null as { message: string } | null })),
@@ -60,6 +61,7 @@ function renderTab(props: Partial<Parameters<typeof PersonalTab>[0]> = {}) {
       moneda="Q"
       canCreate
       canEdit
+      canDelete
       onRefresh={() => {}}
       {...props}
     />,
@@ -280,3 +282,7 @@ describe('PersonalTab — usuario de ingreso del empleado', () => {
     await waitFor(() => expect(mocks.fetchUsuariosAsignablesPersonal).toHaveBeenCalledTimes(2))
   })
 })
+
+// supabase/rls-acciones/recursos_humanos.json: Eliminar exige canDelete
+// (condominios.tab.personal.delete), lo mismo que la base. Editar no basta.
+eliminarExigeSuPermiso('Personal', p => renderTab(p), /^Eliminar Dina Villatoro$/, mocks.deleteCondominioRow, 'personal_condominio', 'emp1')

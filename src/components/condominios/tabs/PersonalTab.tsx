@@ -29,6 +29,8 @@ interface Props {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Eliminar tiene su propio permiso (condominios.tab.personal.delete): editar no basta. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -71,7 +73,7 @@ function mensajeGuardado(raw: string): string {
   return raw
 }
 
-export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const cargoInicial = primerActivo(cargos, CARGOS_DEFAULT)
   const turnoInicial = primerActivo(tiposTurno, TURNOS_DEFAULT)
   const [filtroCargo, setFiltroCargo] = useState<string>('todos')
@@ -208,6 +210,8 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
   }
 
   async function handleDelete(id: string) {
+    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
+    if (!canDelete) return
     const r = await confirm({ title: '¿Eliminar personal?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('personal_condominio', id)
@@ -743,8 +747,10 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
                         </button>
                       )}
                       <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
                     </>
+                  )}
+                  {canDelete && (
+                    <button onClick={() => handleDelete(p.id)} title="Eliminar" aria-label={`Eliminar ${p.nombre}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
                   )}
                 </div>
               </div>

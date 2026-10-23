@@ -1019,6 +1019,8 @@ jobs:
         run: node supabase/tests/rls_acciones/run.mjs residentes
       - name: Acciones por permiso — sección operaciones
         run: node supabase/tests/rls_acciones/run.mjs operaciones
+      - name: Acciones por permiso — sección recursos humanos
+        run: node supabase/tests/rls_acciones/run.mjs recursos_humanos
 
       # 20261104000650: el candado de plan (asambleas_digitales) de
       # puntos_asamblea y votos_asamblea buscaba la empresa en asambleas_digital
