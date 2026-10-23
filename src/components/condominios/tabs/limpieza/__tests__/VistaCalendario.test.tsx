@@ -3,8 +3,9 @@
 // Lo que se cubre es lo que la suite SQL no ve, porque es de la vista: que
 // soltar una rutina sobre un día llame a la RPC con ESE turno; que ＋ asigne
 // varias en el orden marcado; que mover sea asignar en el destino ANTES de
-// quitar del origen; que sólo se ofrezca quitar lo que la base dejaría quitar;
-// y que un día pasado o un turno cerrado no reciban nada. La base vuelve a
+// quitar del origen; que tocar una rutina abra su detalle en ventana y sólo
+// ofrezca quitar lo que la base dejaría quitar; y que un día pasado o un turno
+// cerrado no reciban nada. La base vuelve a
 // exigir todo eso (supabase/tests/limpieza_calendario).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
@@ -221,17 +222,44 @@ describe('VistaCalendario · asignar', () => {
 })
 
 describe('VistaCalendario · quitar y mover', () => {
-  it('tocar una rutina sin trabajar ofrece quitarla del día', async () => {
+  it('tocar una rutina sin trabajar abre su detalle en ventana y deja quitarla del día', async () => {
     cargar([turno({ rutinas: [enTurno('rN')] })])
     montar()
     await screen.findByRole('region', { name: 'Calendario de Ana Pérez' })
     await waitFor(() => expect(screen.getByRole('button', { name: /^Niveles, Ana Pérez/ })).toBeTruthy())
 
     fireEvent.click(screen.getByRole('button', { name: /^Niveles, Ana Pérez/ }))
+    const detalle = screen.getByRole('dialog', { name: '🧭 Niveles' })
+    expect(detalle.classList.contains('at-modal--fs-mobile')).toBe(true)
+    expect(detalle.textContent).toContain('Ana Pérez · jue 22 oct · Mañana')
+    expect(detalle.textContent).toMatch(/Pendientes3/)
+    expect(detalle.textContent).toMatch(/Duración estimada5 h/)
+    expect(within(detalle).getByText(/quitarla del día borra sus tareas de ese turno/)).toBeTruthy()
+
+    // Mientras quita, la ventana no se cierra.
+    let terminar!: (v: { data: number; error: null }) => void
+    mocks.quitarRutinaTurno.mockImplementationOnce(() => new Promise(res => { terminar = res }) as never)
+    fireEvent.click(within(detalle).getByRole('button', { name: 'Quitar del día' }))
     await waitFor(() => expect(mocks.quitarRutinaTurno).toHaveBeenCalledWith('b22', 'rN'))
-    const [args] = mocks.confirm.mock.calls[0] as unknown as [{ title: string; confirmText: string }]
-    expect(args.title).toBe('¿Quitar «Niveles»?')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getByRole('dialog', { name: '🧭 Niveles' })).toBeTruthy()
+    cargar([turno()])
+    terminar({ data: 3, error: null })
     expect(await screen.findByText('«Niveles» quitada de Ana Pérez el jue 22 oct.')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(mocks.confirm).not.toHaveBeenCalled()
+  })
+
+  it('si quitar falla, la ventana sigue abierta y lo dice', async () => {
+    mocks.quitarRutinaTurno.mockResolvedValue({ data: null, error: { message: 'sin red' } })
+    cargar([turno({ rutinas: [enTurno('rN')] })])
+    montar()
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Niveles, Ana Pérez/ })).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: /^Niveles, Ana Pérez/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Quitar del día' }))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error', text: 'sin red' })))
+    expect(screen.getByRole('dialog', { name: '🧭 Niveles' })).toBeTruthy()
   })
 
   it('con tareas trabajadas no se ofrece quitar: se explica dónde se corrige', async () => {
@@ -240,11 +268,10 @@ describe('VistaCalendario · quitar y mover', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /^Niveles, Ana Pérez/ })).toBeTruthy())
 
     fireEvent.click(screen.getByRole('button', { name: /^Niveles, Ana Pérez/ }))
-    await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
-    const [args] = mocks.notify.mock.calls[0] as unknown as [{ text: string }]
-    expect(args.text).toMatch(/Ya tiene tareas trabajadas/)
-    expect(args.text).toMatch(/Revisión/)
-    expect(mocks.confirm).not.toHaveBeenCalled()
+    const detalle = screen.getByRole('dialog', { name: '🧭 Niveles' })
+    expect(within(detalle).getByText(/Ya tiene tareas trabajadas/).textContent).toMatch(/Revisión/)
+    expect(detalle.textContent).toMatch(/Hechas1/)
+    expect(within(detalle).queryByRole('button', { name: 'Quitar del día' })).toBeNull()
     expect(mocks.quitarRutinaTurno).not.toHaveBeenCalled()
   })
 
@@ -289,7 +316,9 @@ describe('VistaCalendario · sin permiso de edición', () => {
     expect(screen.queryByRole('list', { name: 'Rutinas para asignar' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Agregar rutinas a/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /^Niveles, Ana Pérez/ }))
-    await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
-    expect(mocks.confirm).not.toHaveBeenCalled()
+    const detalle = screen.getByRole('dialog', { name: '🧭 Niveles' })
+    expect(within(detalle).queryByRole('button', { name: 'Quitar del día' })).toBeNull()
+    // Sin permiso no hay nada que explicar sobre quitar.
+    expect(within(detalle).queryByText(/borra sus tareas|Ya tiene tareas trabajadas/)).toBeNull()
   })
 })

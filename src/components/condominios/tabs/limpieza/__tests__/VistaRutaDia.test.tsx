@@ -5,7 +5,8 @@
 // esos turnos se traigan TODAS sus tareas (cerrar el turno calcula el puntaje
 // sobre lo que ve); que la persona se nombre con lo que trae el turno aunque no
 // se lea el tab Personal; que en la ruta sólo se ejecute (sin alta ni borrado de
-// turnos o tareas sueltas); y que cambiar la fecha cargue ese día.
+// turnos o tareas sueltas); que cambiar la fecha cargue ese día; y que la
+// respuesta tardía del día que se dejó no reemplace a la del día elegido.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import type { TareaBloque, TurnoCalendarioLimpieza } from '../../../../../types'
@@ -109,5 +110,40 @@ describe('VistaRutaDia', () => {
     await screen.findByText(/Ana Pérez/)
     fireEvent.change(container.querySelector('input[type="date"]')!, { target: { value: '2026-10-22' } })
     await waitFor(() => expect(mocks.fetchCalendarioLimpieza).toHaveBeenCalledWith('p1', '2026-10-22', '2026-10-22'))
+  })
+
+  it('una respuesta que llega tarde (de un día ya dejado) no pisa la del día vigente', async () => {
+    let tardia!: (v: { turnos: TurnoCalendarioLimpieza[]; error: null }) => void
+    mocks.fetchCalendarioLimpieza
+      .mockImplementationOnce(() => new Promise(res => { tardia = res }) as never)
+      .mockResolvedValueOnce({ turnos: [turno({ fecha: '2026-10-22', personal_nombre: 'Marta Ruiz' })], error: null })
+    const { container } = montar()
+    fireEvent.change(container.querySelector('input[type="date"]')!, { target: { value: '2026-10-22' } })
+    expect(await screen.findByText(/Marta Ruiz/)).toBeTruthy()
+
+    // Llega por fin la de hoy: se ignora, sin pedir siquiera sus tareas.
+    tardia({ turnos: [turno()], error: null })
+    await new Promise(r => setTimeout(r, 0))
+    expect(mocks.fetchTareasDeTurnos).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/Ana Pérez/)).toBeNull()
+    expect(screen.getByText(/Marta Ruiz/)).toBeTruthy()
+  })
+
+  it('tampoco si lo que llega tarde son las tareas del día dejado', async () => {
+    let tardias!: (v: { tareas: TareaBloque[]; error: null }) => void
+    mocks.fetchCalendarioLimpieza
+      .mockResolvedValueOnce({ turnos: [turno()], error: null })
+      .mockResolvedValueOnce({ turnos: [turno({ bloque_id: 'b9', fecha: '2026-10-22', personal_nombre: 'Marta Ruiz' })], error: null })
+    mocks.fetchTareasDeTurnos
+      .mockImplementationOnce(() => new Promise(res => { tardias = res }) as never)
+      .mockResolvedValueOnce({ tareas: [], error: null })
+    const { container } = montar()
+    await waitFor(() => expect(mocks.fetchTareasDeTurnos).toHaveBeenCalledWith(['b1']))
+    fireEvent.change(container.querySelector('input[type="date"]')!, { target: { value: '2026-10-22' } })
+    expect(await screen.findByText(/Marta Ruiz/)).toBeTruthy()
+
+    tardias({ tareas: [], error: null })
+    await new Promise(r => setTimeout(r, 0))
+    expect(screen.getByText(/Marta Ruiz/)).toBeTruthy()
   })
 })

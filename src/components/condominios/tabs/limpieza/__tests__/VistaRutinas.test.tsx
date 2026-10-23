@@ -334,7 +334,9 @@ describe('VistaRutinas · ＋ agrega varias de una vez y después se ordenan con
     expect(within(v).getByText('2 marcadas')).toBeTruthy()
     fireEvent.click(agregar())
 
-    expect(screen.queryByRole('dialog')).toBeNull()
+    // Se cierra la lista; el editor sigue abierto debajo.
+    expect(screen.queryByRole('dialog', { name: 'Agregar áreas al recorrido' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Editar «Rutina Lunes AM»' })).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Área 1: Apartamento 1C' })).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Área 2: Gradas' })).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Área 3: Apartamento 1AB' })).toBeTruthy()
@@ -372,7 +374,7 @@ describe('VistaRutinas · ＋ agrega varias de una vez y después se ordenan con
     expect(v.textContent).toMatch(/Suman 22 min · ⚠ 1 sin duración/)
     fireEvent.click(within(v).getByRole('button', { name: 'Agregar 3 actividades' }))
 
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Actividades en «Apartamento 1AB»' })).toBeNull()
     expect(screen.getByText('3 actividades agregadas a «Apartamento 1AB». Ordenalas con ↑ ↓.')).toBeTruthy()
     // Sólo en 1AB; 1C no se tocó.
     expect(within(seccionArea(/Apartamento 1C/)).getByText(/Soltá aquí las actividades/)).toBeTruthy()
@@ -398,7 +400,7 @@ describe('VistaRutinas · ＋ agrega varias de una vez y después se ordenan con
     expect(within(v).getByText('3 marcadas')).toBeTruthy()
 
     fireEvent.click(within(v).getByRole('button', { name: 'Cancelar' }))
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Agregar áreas al recorrido' })).toBeNull()
     expect(screen.queryByRole('region', { name: /^Área/ })).toBeNull()
 
     // Al volver a abrir, sin marcas; «Marcar todas» sin filtro, y Esc también cierra sin agregar.
@@ -407,8 +409,10 @@ describe('VistaRutinas · ＋ agrega varias de una vez y después se ordenan con
     expect(within(v).getByText('Ninguna marcada')).toBeTruthy()
     fireEvent.click(within(v).getByRole('button', { name: 'Marcar todas' }))
     expect(within(v).getByText('3 marcadas')).toBeTruthy()
+    // Esc cierra sólo la lista de arriba, no también el editor.
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Agregar áreas al recorrido' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Nueva rutina' })).toBeTruthy()
     expect(screen.queryByRole('region', { name: /^Área/ })).toBeNull()
   })
 
@@ -476,6 +480,34 @@ describe('VistaRutinas · guardado y errores', () => {
     await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
     expect(mocks.createCondominioRowReturning).not.toHaveBeenCalled()
     expect(mocks.guardarRecorridoRutina).not.toHaveBeenCalled()
+  })
+
+  it('el editor es una ventana (pantalla completa en el teléfono): Esc con cambios pregunta, y mientras guarda no se cierra', async () => {
+    let terminar!: (v: { data: Record<string, number>; error: null }) => void
+    mocks.guardarRecorridoRutina.mockImplementationOnce(() => new Promise(res => { terminar = res }) as never)
+    montar()
+    fireEvent.click(await screen.findByText('+ Nueva rutina'))
+    const ventana = screen.getByRole('dialog', { name: 'Nueva rutina' })
+    expect(ventana.classList.contains('at-modal--fs-mobile')).toBe(true)
+
+    // Con cambios, Esc pide confirmación; si no se confirma, el borrador sigue.
+    mocks.confirm.mockResolvedValueOnce({ isConfirmed: false })
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Vespertina' } })
+    fireEvent.click(screen.getByLabelText('Agregar Gradas al recorrido'))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('dialog', { name: 'Nueva rutina' })).toBeTruthy()
+
+    // Mientras guarda, ni Esc ni la X la cierran ni preguntan.
+    fireEvent.click(within(ventana).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalledTimes(1))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(within(ventana).getByLabelText('Cerrar modal'))
+    expect(mocks.confirm).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('dialog', { name: 'Nueva rutina' })).toBeTruthy()
+
+    terminar({ data: { paradas: 1, pasos: 0 }, error: null })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
   it('el choque de nombre (23505) se explica y el recorrido no se intenta', async () => {

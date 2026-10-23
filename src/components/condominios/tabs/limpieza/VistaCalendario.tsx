@@ -4,8 +4,8 @@
 //
 // CÓMO SE ASIGNA. Se arrastra una rutina de la paleta y se suelta sobre el día,
 // o se toca ＋ en el día para marcar varias de una vez. Arrastrar una rutina ya
-// puesta la MUEVE a otro día (o a otra persona). Tocarla muestra cómo va y deja
-// quitarla mientras nada suyo se haya trabajado.
+// puesta la MUEVE a otro día (o a otra persona). Tocarla abre su detalle en una
+// ventana: cómo va y, mientras nada suyo se haya trabajado, «Quitar del día».
 //
 // LA ASIGNACIÓN ES LA TAREA. Asignar crea en ese turno las tareas del recorrido
 // (limpieza_asignar_rutinas); no hay que «generar» después. Por eso no hay
@@ -15,7 +15,9 @@
 // «Asignación turnos», y un turno con tareas allá ya no se re-planifica —quitar
 // sus rutinas lo libera—.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react'
-import { confirm, notify } from '../../../shared/Dialog'
+import { notify } from '../../../shared/Dialog'
+import { EditModal } from '../../../shared/EditModal'
+import { Button } from '../../../shared/Button'
 import { fetchCalendarioLimpieza, fetchRutinasLimpieza } from '../../../../domain/condominios/tabQueries'
 import { asignarRutinasTurno, quitarRutinaTurno } from '../../../../domain/condominios/tabMutations'
 import {
@@ -82,6 +84,8 @@ export function VistaCalendario({ proyectoId, companyId, plantillas, cargos = []
   const [cargo, setCargo] = useState('')
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [ventana, setVentana] = useState<TurnoCalendarioLimpieza | null>(null)
+  /** La rutina asignada cuyo detalle está abierto: se lee del mes vigente, no de una copia. */
+  const [detalle, setDetalle] = useState<{ bloqueId: string; rutinaId: string } | null>(null)
   const [aviso, setAviso] = useState('')
   /** En la lista (pantallas angostas), los días ya pasados del mes van plegados. */
   const [verPasados, setVerPasados] = useState(false)
@@ -202,22 +206,9 @@ export function VistaCalendario({ proyectoId, companyId, plantillas, cargos = []
     onCambio?.()
   }
 
-  async function verRutina(t: TurnoCalendarioLimpieza, r: RutinaEnTurno) {
-    const nombre = nombreRutina(r.rutina_id)
-    const estado = `${r.tareas} tarea${r.tareas !== 1 ? 's' : ''} · ${r.hechas} hecha${r.hechas !== 1 ? 's' : ''} · ${r.pendientes} pendiente${r.pendientes !== 1 ? 's' : ''}`
-    const lugar = `${t.personal_nombre}, ${etiquetaDia(t.fecha)}`
-    if (!canEdit || !rutinaQuitable(t, r, hoy)) {
-      const porque = !canEdit ? '' : motivoNoProgramable(t, hoy)
-        ?? 'Ya tiene tareas trabajadas: no se quita. Una tarea que no corresponde se anula con motivo desde Revisión.'
-      notify({ variant: 'info', title: `«${nombre}» · ${lugar}`, text: `${estado}.${porque ? ` ${porque}` : ''}` })
-      return
-    }
-    const res = await confirm({
-      title: `¿Quitar «${nombre}»?`,
-      text: `${lugar}. ${estado}. Se borran sus tareas de ese turno; ninguna se ha trabajado todavía.`,
-      icon: 'warning', variant: 'danger', confirmText: 'Quitar del día',
-    })
-    if (res.isConfirmed) await quitar(t, r.rutina_id)
+  /** Quitar desde el detalle: la ventana se cierra sólo si de verdad se quitó. */
+  async function quitarDesdeDetalle(t: TurnoCalendarioLimpieza, rutinaId: string) {
+    if (await quitar(t, rutinaId)) setDetalle(null)
   }
 
   // ── Arrastre ────────────────────────────────────────────────────────────────
@@ -268,7 +259,7 @@ export function VistaCalendario({ proyectoId, companyId, plantillas, cargos = []
         draggable={quitable}
         onDragStart={e => empezar(e, { tipo: 'puesta', rutinaId: r.rutina_id, bloqueId: t.bloque_id }, nombre)}
         onDragEnd={terminar}
-        onClick={() => void verRutina(t, r)}
+        onClick={() => setDetalle({ bloqueId: t.bloque_id, rutinaId: r.rutina_id })}
         aria-label={`${nombre}, ${t.personal_nombre} el ${etiquetaDia(t.fecha)}: ${r.hechas} de ${r.tareas} hechas`}
         title={`${nombre} · ${r.hechas}/${r.tareas} hechas`}
         style={{
@@ -565,6 +556,60 @@ export function VistaCalendario({ proyectoId, companyId, plantillas, cargos = []
           onCerrar={() => setVentana(null)}
         />
       )}
+
+      {/* Detalle de una rutina asignada (antes, un aviso o una confirmación sueltos). */}
+      {detalle && (() => {
+        const t = turnoPorBloque.get(detalle.bloqueId)
+        const r = t?.rutinas.find(x => x.rutina_id === detalle.rutinaId)
+        if (!t || !r) return null
+        const quitable = canEdit && rutinaQuitable(t, r, hoy)
+        const quitando = ocupado === t.bloque_id
+        const d = duraciones.get(r.rutina_id)
+        const cerrar = () => { if (!quitando) setDetalle(null) }
+        const fila = (label: string, valor: string) => (
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: '14px' }}>
+            <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
+            <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{valor}</span>
+          </div>
+        )
+        // Por qué no se ofrece quitar: el turno no se programa, o ya se trabajó.
+        const porque = !canEdit || quitable ? null : motivoNoProgramable(t, hoy)
+          ?? 'Ya tiene tareas trabajadas: no se quita. Una tarea que no corresponde se anula con motivo desde Revisión.'
+        return (
+          <EditModal
+            title={`🧭 ${nombreRutina(r.rutina_id)}`}
+            subtitle={`${t.personal_nombre} · ${etiquetaDia(t.fecha)}${t.jornada_nombre ? ` · ${t.jornada_nombre}` : ''}`}
+            size="sm"
+            fullScreenOnMobile
+            onClose={cerrar}
+            closeOnBackdropClick={!quitando}
+            closeOnEscape={!quitando}
+            footer={
+              <>
+                {quitable && (
+                  <Button variant="outline-danger" onClick={() => void quitarDesdeDetalle(t, r.rutina_id)} loading={quitando} loadingText="Quitando…">
+                    Quitar del día
+                  </Button>
+                )}
+                <Button variant="secondary" onClick={cerrar} disabled={quitando}>Cerrar</Button>
+              </>
+            }
+          >
+            {fila('Tareas', String(r.tareas))}
+            {fila('Hechas', String(r.hechas))}
+            {fila('Pendientes', String(r.pendientes))}
+            {d && fila('Duración estimada', `${formatearMinutos(d.minutos)}${d.sinDato ? ` (+${d.sinDato} sin duración)` : ''}`)}
+            {quitable && (
+              <p style={{ margin: '12px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
+                Ninguna de sus tareas se ha trabajado todavía: quitarla del día borra sus tareas de ese turno.
+              </p>
+            )}
+            {porque && (
+              <p style={{ margin: '12px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>{porque}</p>
+            )}
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }

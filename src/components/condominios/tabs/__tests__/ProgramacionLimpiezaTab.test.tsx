@@ -181,6 +181,15 @@ describe('ProgramacionLimpiezaTab · indicadores sobre las tareas de las rutinas
     expect(indicador(/Requieren manto/).textContent).toMatch(/1/)
     expect(screen.getByRole('tab', { name: /Novedades \(1\)/ })).toBeTruthy()
   })
+
+  it('si la lectura falla lo dice (no se queda en ceros como si no hubiera nada) y deja reintentar', async () => {
+    mocks.fetchNovedadesRutinas.mockResolvedValueOnce({ tareas: [], error: { message: 'sin red' } })
+    montar()
+    const aviso = await screen.findByText(/No se pudieron cargar los indicadores ni las novedades: sin red/)
+    fireEvent.click(within(aviso.closest('[role="alert"]') as HTMLElement).getByRole('button', { name: 'Reintentar' }))
+    await waitFor(() => expect(screen.queryByText(/No se pudieron cargar los indicadores/)).toBeNull())
+    expect(mocks.fetchNovedadesRutinas).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('ProgramacionLimpiezaTab · novedades de las rutinas', () => {

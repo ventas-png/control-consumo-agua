@@ -74,6 +74,8 @@ export function ProgramacionLimpiezaTab({
   // días (con el nombre de su persona) y las tareas de rutina con hallazgo.
   const [turnos, setTurnos] = useState<TurnoCalendarioLimpieza[]>([])
   const [tareasNovedad, setTareasNovedad] = useState<TareaBloque[]>([])
+  /** Si la lectura falla se dice: antes los indicadores quedaban en 0 como si no hubiera nada. */
+  const [errorOperacion, setErrorOperacion] = useState<string | null>(null)
 
   const cargarOperacion = useCallback(async () => {
     const desde = sumarDias(hoy, -DIAS_NOVEDADES)
@@ -83,6 +85,7 @@ export function ProgramacionLimpiezaTab({
     ])
     if (!cal.error) setTurnos(cal.turnos)
     if (!nov.error) setTareasNovedad(nov.tareas)
+    setErrorOperacion(cal.error?.message ?? nov.error?.message ?? null)
   }, [proyectoId, hoy])
 
   useEffect(() => { void cargarOperacion() }, [cargarOperacion])
@@ -114,9 +117,16 @@ export function ProgramacionLimpiezaTab({
   }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1060px', margin: '0 auto' }}>
-      {/* Indicadores */}
-      <div aria-label="Indicadores de limpieza" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '18px' }}>
+    <div style={{ padding: '16px', maxWidth: '1060px', margin: '0 auto' }}>
+      {errorOperacion && (
+        <div role="alert" style={{ padding: '10px 12px', borderRadius: '10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontSize: '13px', marginBottom: '12px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ flex: '1 1 200px' }}>No se pudieron cargar los indicadores ni las novedades: {errorOperacion}</span>
+          <button type="button" onClick={() => void cargarOperacion()} style={{ padding: '3px 10px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Reintentar</button>
+        </div>
+      )}
+
+      {/* Indicadores: dos por fila en el teléfono */}
+      <div aria-label="Indicadores de limpieza" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '12px', marginBottom: '18px' }}>
         {[
           { label: `Atrasadas (${DIAS_ATRASO} días)`, value: kpis.atrasadas, icon: '🔴', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
           { label: `Pendientes hoy (de ${kpis.totalHoy})`, value: kpis.pendientesHoy, icon: '🟡', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
@@ -124,7 +134,7 @@ export function ProgramacionLimpiezaTab({
           { label: 'Turnos de hoy sin rutina', value: kpis.turnosHoySinRutina, icon: '👤', bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
           { label: 'Requieren manto.', value: kpis.conManto, icon: '🛠', bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)' },
         ].map(k => (
-          <div key={k.label} style={{ background: k.bg, borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: k.bg, borderRadius: '12px', padding: '14px', textAlign: 'center', minWidth: 0 }}>
             <div style={{ fontSize: '20px', marginBottom: '2px' }}>{k.icon}</div>
             <div style={{ fontSize: '22px', fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 600 }}>{k.label}</div>

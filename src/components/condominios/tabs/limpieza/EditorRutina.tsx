@@ -25,8 +25,14 @@
 // recorrido se guardan juntos, el recorrido en UNA transacción
 // (`guardar_recorrido_rutina`). Cancelar nunca deja cambios a medias, y un
 // arrastre que reordena todo no queda nunca medio aplicado.
+//
+// EN VENTANA. El editor se abre en su propia ventana (a pantalla completa en el
+// teléfono) en vez de empujar la lista hacia abajo; cerrarla es «Cancelar» —con
+// la misma confirmación si hay cambios— y mientras guarda no se cierra.
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react'
 import { notify, confirm } from '../../../shared/Dialog'
+import { EditModal } from '../../../shared/EditModal'
+import { Button } from '../../../shared/Button'
 import {
   createCondominioRowReturning,
   guardarRecorridoRutina,
@@ -356,6 +362,8 @@ export function EditorRutina({
   }
 
   async function cancelar() {
+    // A mitad del guardado no se cierra: cerrar ahí escondería el resultado.
+    if (saving) return
     if (sucio && !soloLectura) {
       const r = await confirm({
         title: '¿Descartar los cambios?',
@@ -673,18 +681,25 @@ export function EditorRutina({
   const porcentaje = minutosDeJornada > 0 ? Math.min(100, Math.round((tiempo.minutos / minutosDeJornada) * 100)) : 0
 
   return (
-    <div style={{ marginBottom: '16px', padding: '14px', background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
-        <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--at-ink)' }}>
-          {soloLectura ? `Recorrido de «${rutina?.nombre ?? ''}»` : rutina ? `Editar «${rutina.nombre}»` : 'Nueva rutina'}
-        </h4>
-        {!soloLectura && (
-          <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>
-            Borrador: nada se guarda hasta «Guardar»
-          </span>
-        )}
-      </div>
-
+    <EditModal
+      title={soloLectura ? `Recorrido de «${rutina?.nombre ?? ''}»` : rutina ? `Editar «${rutina.nombre}»` : 'Nueva rutina'}
+      subtitle={soloLectura ? undefined : 'Borrador: nada se guarda hasta «Guardar»'}
+      size="xl"
+      fullScreenOnMobile
+      onClose={() => void cancelar()}
+      closeOnBackdropClick={!saving}
+      closeOnEscape={!saving}
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => void cancelar()} disabled={saving}>
+            {soloLectura ? 'Cerrar' : 'Cancelar'}
+          </Button>
+          {!soloLectura && (
+            <Button onClick={() => void guardar()} loading={saving} loadingText="Guardando…">Guardar</Button>
+          )}
+        </>
+      }
+    >
       {!soloLectura && (
         <>
           <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
@@ -845,16 +860,6 @@ export function EditorRutina({
         )
       })()}
 
-      <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-        {!soloLectura && (
-          <button onClick={() => void guardar()} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: saving ? 'default' : 'pointer', fontSize: '13px', fontWeight: 700, opacity: saving ? 0.6 : 1 }}>
-            {saving ? 'Guardando…' : 'Guardar'}
-          </button>
-        )}
-        <button onClick={() => void cancelar()} style={{ padding: '8px 16px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-ink-2)' }}>
-          {soloLectura ? 'Cerrar' : 'Cancelar'}
-        </button>
-      </div>
-    </div>
+    </EditModal>
   )
 }
