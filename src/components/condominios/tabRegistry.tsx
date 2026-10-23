@@ -568,7 +568,7 @@ export const TAB_REGISTRY: TabDef[] = [
     <STRTab reservasSTR={ctx.reservasSTR} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('str')} canEdit={ctx.canEdit('str')} canDelete={ctx.canDelete('str')} onRefresh={ctx.onRefresh} /> },
   { id: 'locales', label: 'Locales', icon: '🏪', render: (ctx) =>
     <LocalesTab locales={ctx.locales} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('locales')} canEdit={ctx.canEdit('locales')} canDelete={ctx.canDelete('locales')} onRefresh={ctx.onRefresh} /> },
-  { id: 'sostenibilidad', label: 'Sostenibilidad', icon: '🌱', render: (ctx) =>
+  { id: 'sostenibilidad', label: 'Sostenibilidad · residuos', icon: '🌱', render: (ctx) =>
     <SostenibilidadTab residuos={ctx.residuos} proyectoId={ctx.proyectoId} companyId={ctx.cid} /> },
   { id: 'housekeeping', label: 'Housekeeping', icon: '🧹', render: (ctx) =>
     <HousekeepingTab servicios={ctx.serviciosHK} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} moneda={ctx.moneda} canCreate={ctx.canCreate('housekeeping')} canEdit={ctx.canEdit('housekeeping')} onRefresh={ctx.onRefresh} /> },
@@ -890,7 +890,7 @@ export const TAB_REGISTRY: TabDef[] = [
     <TableroOcupacionTab unidades={ctx.unidadesProyecto} contratos={ctx.contratos} cuotas={ctx.cuotas} moneda={ctx.moneda} /> },
   { id: 'gestion_fondo', label: 'Fondo de reserva', icon: '🏦', render: (ctx) =>
     <GestionFondoReservaTab movimientos={ctx.fondoReservaMovs} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('gestion_fondo')} onRefresh={ctx.onRefresh} /> },
-  { id: 'dashboard_sostenibilidad', label: 'Sostenibilidad', icon: '🌿', render: (ctx) =>
+  { id: 'dashboard_sostenibilidad', label: 'Sostenibilidad · gastos', icon: '🌿', render: (ctx) =>
     <DashboardSostenibilidadTab gastos={ctx.gastos} unidades={ctx.unidadesProyecto} moneda={ctx.moneda} /> },
   { id: 'configuracion_cond', label: 'Config. condominio', icon: '⚙️', render: (ctx) =>
     <ConfiguracionCondominioTab config={ctx.configCondominio} proyectoId={ctx.proyectoId} companyId={ctx.cid} canEdit={ctx.canEdit('configuracion_cond')} onRefresh={ctx.onRefresh} /> },

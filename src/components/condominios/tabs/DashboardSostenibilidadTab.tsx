@@ -5,6 +5,7 @@ import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
 import { tint } from '../../shared/statusTone'
+import { variacionMismoPeriodo } from '../../../domain/condominios/sostenibilidad'
 
 interface Props {
   gastos: GastoCondominio[]
@@ -80,9 +81,16 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
   const unidadesActivas = unidades.filter(u => u.activo).length || 1
   const costoUnitario = promMensual / unidadesActivas
 
-  // Tendencia de variación: último mes vs promedio
   const mesActualData = tendencia[tendencia.length - 1]
-  const pctVariacion  = promMensual > 0 ? ((mesActualData.total - promMensual) / promMensual) * 100 : 0
+  // El mes en curso contra el mismo periodo del mes anterior (del 1 al mismo
+  // día). Contra el promedio de meses completos, a mitad de mes siempre salía
+  // muy por debajo.
+  const variacion = variacionMismoPeriodo(gastosActivos.filter(g => esCatSost(g.categoria)))
+  const pctVariacion = variacion.pct
+  const periodo = (hasta: string) => `1–${Number(hasta.slice(8, 10))} ${MESES_L[Number(hasta.slice(5, 7)) - 1]}`
+  const tonoVariacion = pctVariacion === null ? { color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' }
+    : pctVariacion >= 10 ? { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' }
+    : { color: 'var(--at-success)', bg: 'var(--at-success-tint)' }
 
   const maxTend = Math.max(...tendencia.map(t => t.total), 1)
 
@@ -99,7 +107,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)', marginBottom: 2 }}>Dashboard de Sostenibilidad</div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)', marginBottom: 2 }}>Sostenibilidad · gastos</div>
       <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 14 }}>
         Basado en gastos de servicios, limpieza y obras — últimos 12 meses
       </div>
@@ -110,13 +118,18 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
           { label: 'Gasto total 12m', val: dinero(totalGeneral), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
           { label: 'Promedio mensual', val: dinero(promMensual, 0), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
           { label: 'Costo/unidad/mes', val: dinero(costoUnitario, 0), color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-          // El mes en curso aún no termina: se compara contra el promedio tal como va.
-          { label: 'Mes en curso vs. promedio', val: `${pctVariacion >= 0 ? '+' : ''}${pctVariacion.toFixed(1)}%`, color: Math.abs(pctVariacion) < 10 ? 'var(--at-success)' : pctVariacion > 0 ? 'var(--at-danger)' : 'var(--at-success)', bg: Math.abs(pctVariacion) < 10 ? 'var(--at-success-tint)' : pctVariacion > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)' },
+          { label: 'Mes en curso vs. mes anterior',
+            val: pctVariacion === null ? '—' : `${pctVariacion >= 0 ? '+' : ''}${pctVariacion.toFixed(1)}%`,
+            nota: pctVariacion === null
+              ? `Sin gastos del ${periodo(variacion.hastaAnterior)} para comparar`
+              : `${periodo(variacion.hastaActual)} vs. ${periodo(variacion.hastaAnterior)}`,
+            color: tonoVariacion.color, bg: tonoVariacion.bg },
           { label: 'CO₂ estimado 12m', val: `${(co2Estimado / 1000).toFixed(2)}\u00a0ton`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, border: `1px solid ${tint(k.color, 20)}`, borderRadius: 10, padding: '10px 14px', minWidth: 0 }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: k.color, marginTop: 2, overflowWrap: 'anywhere' }}>{k.val}</div>
+            {k.nota && <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 2 }}>{k.nota}</div>}
           </div>
         ))}
       </div>

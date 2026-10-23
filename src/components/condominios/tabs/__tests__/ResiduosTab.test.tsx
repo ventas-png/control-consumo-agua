@@ -203,3 +203,28 @@ describe('Residuos — lista y detalle', () => {
     expect(within(detalle).getAllByText('Pendiente').length).toBeGreaterThan(0)
   })
 })
+
+// El % de reciclaje es el mismo que en Sostenibilidad: reciclable más
+// electrónico. Antes aquí contaba sólo lo reciclable.
+describe('Residuos — % de reciclaje', () => {
+  it('cuenta lo reciclable y lo electrónico, y lo dice', () => {
+    render(<ResiduosTab {...props({ residuos: [
+      ...residuos, // reciclable 12.5 kg + peligroso 3 kg
+      registro({ id: 'r3', tipo_residuo: 'electronico', cantidad_kg: 4.5 }),
+    ] })} />)
+    expect(screen.getByText('85%')).toBeTruthy() // (12.5 + 4.5) / 20
+    expect(screen.getByText('20.0 kg')).toBeTruthy()
+  })
+
+  it('el total lleva separador de miles, como en Sostenibilidad', () => {
+    render(<ResiduosTab {...props({ residuos: [registro({ id: 'r1', cantidad_kg: 1200.5 }), registro({ id: 'r2', cantidad_kg: 174.5 })] })} />)
+    expect(screen.getByText('1,375.0 kg').textContent).toBe('1,375.0\u00a0kg')
+    expect(screen.getByText('reciclable + electrónico')).toBeTruthy()
+  })
+
+  it('sin kg registrados no muestra un porcentaje', () => {
+    render(<ResiduosTab {...props({ residuos: [registro({ id: 'r1', cantidad_kg: null })] })} />)
+    const kpi = screen.getByText('% Reciclaje').parentElement!
+    expect(within(kpi).getByText('—')).toBeTruthy()
+  })
+})
