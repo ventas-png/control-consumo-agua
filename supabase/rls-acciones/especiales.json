@@ -1,5 +1,5 @@
 {
-  "_migracion": "20261104000800_rls_acciones_especiales.sql",
+  "_migracion": "20261104090100_rls_acciones_especiales.sql",
   "_titulo": "Casos especiales: escribir exige la ACCIÓN del tab, también en la base",
   "_porque": [
     "POR QUÉ",

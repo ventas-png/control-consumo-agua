@@ -63,7 +63,7 @@ describe('policies de paquetes_recibidos tras la unificación', () => {
     expect(policy!.cuerpo).toMatch(/CASE\s+clase/i)
   })
 
-  // INSERT/UPDATE: la clase elige el tab, y desde 20261104000800 se pide la
+  // INSERT/UPDATE: la clase elige el tab, y desde 20261104090100 se pide la
   // ACCIÓN de ese tab (crear / editar), no sólo verlo.
   for (const [nombre, accion] of [['paquetes_recibidos_insert', 'create'], ['paquetes_recibidos_update', 'edit']]) {
     it(`${nombre} resuelve la acción por clase, no por tabla`, () => {
@@ -80,7 +80,7 @@ describe('policies de paquetes_recibidos tras la unificación', () => {
   // `user_has_permission` devuelve true a cualquier clave para
   // super_admin/company_owner/admin (20260518000008), así que un gate de
   // permiso no distinguiría al admin del dueño. Paquetería, desde
-  // 20261104000800, pide la acción de borrar de su tab (el admin la tiene por
+  // 20261104090100, pide la acción de borrar de su tab (el admin la tiene por
   // exento, como antes).
   describe('DELETE: correspondencia por rol, paquetería por la acción del tab', () => {
     const cuerpo = () => vigentes.get('paquetes_recibidos_delete')!.cuerpo

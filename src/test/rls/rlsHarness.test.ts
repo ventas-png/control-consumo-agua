@@ -78,13 +78,13 @@ const B_PASS = process.env.RLS_USER_B_PASSWORD
 // distintos que comprobar y ninguno se expresa con A/B (empresas distintas):
 //
 //   · SELECT/INSERT/UPDATE se gobiernan por PERMISO de la clase (desde
-//     20261104000800, crear y editar piden además su acción: .create/.edit).
+//     20261104090100, crear y editar piden además su acción: .create/.edit).
 //     Solo distingue a usuarios SIN rol admin: `user_has_permission` devuelve
 //     true a todo para super_admin/company_owner/admin (20260518000008), así
 //     que un admin no sirve para probarlo.
 //   · DELETE: correspondencia solo la borra company_owner (por ROL). Aquí sí
 //     hace falta un admin, para ver que NO puede. Paquetería pide la acción de
-//     borrar del tab (20261104000800), que el admin tiene por ser exento.
+//     borrar del tab (20261104090100), que el admin tiene por ser exento.
 //
 //   RLS_USER_PAQ_*    rol granular (operator o similar) con condominios.tab.paqueteria
 //   RLS_USER_CORR_*   rol granular con condominios.tab.correspondencia
