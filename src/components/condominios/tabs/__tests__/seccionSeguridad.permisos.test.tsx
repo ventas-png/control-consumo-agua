@@ -159,13 +159,16 @@ describe('Visitantes — registrar la salida exige canCreate', () => {
   const montar = (canCreate: boolean) => render(
     <VisitantesTab {...base} userId="u1" unidades={unidades} visitantes={[adentro]} reservasSTR={[]} solicitudesMudanza={[]} canCreate={canCreate} />,
   )
+  // El botón nombra a la persona para lectores de pantalla («Registrar salida
+  // de Marta Ruiz»): se busca por el comienzo, así la prueba sin permiso no
+  // pasa sola por un cambio de nombre.
   it('sin canCreate no se ofrece «Registrar salida»', () => {
     montar(false)
     expect(screen.getByText('Marta Ruiz')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Registrar salida' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Registrar salida/ })).toBeNull()
   })
   it('con canCreate se ofrece «Registrar salida»', () => {
     montar(true)
-    expect(screen.getByRole('button', { name: 'Registrar salida' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Registrar salida de Marta Ruiz' })).toBeTruthy()
   })
 })
