@@ -78,3 +78,34 @@ describe('Dashboard de sostenibilidad', () => {
     expect(within(screen.getByRole('dialog')).getByText('Sin gastos de servicios, limpieza u obras este mes.')).toBeTruthy()
   })
 })
+
+// El mes en curso se compara con el mismo tramo del mes anterior (del 1 al
+// mismo día). Antes se comparaba contra el promedio de doce meses completos y a
+// mitad de mes siempre salía muy por debajo.
+describe('Dashboard de sostenibilidad — variación del mes', () => {
+  const kpi = () => screen.getByText('Mes en curso vs. mes anterior').parentElement!
+
+  it('compara del 1 al 15 de octubre contra del 1 al 15 de septiembre', () => {
+    montar()
+    expect(screen.getByText('Sostenibilidad · gastos')).toBeTruthy()
+    // Sep 1–15: 12,345.67 (el de limpieza del 20 queda fuera); Oct 1–15: 300.
+    expect(within(kpi()).getByText('-97.6%')).toBeTruthy()
+    expect(within(kpi()).getByText('1–15 Oct vs. 1–15 Sep')).toBeTruthy()
+  })
+
+  it('un alza de 10 % o más se marca; sin gastos el mes anterior no hay porcentaje', () => {
+    render(<DashboardSostenibilidadTab gastos={[
+      gasto({ id: 'a', monto: 100, fecha: '2026-09-10' }),
+      gasto({ id: 'b', monto: 150, fecha: '2026-10-10' }),
+      // No cuentan: otra categoría y un anulado.
+      gasto({ id: 'c', categoria: 'administrativo', monto: 1000, fecha: '2026-10-05' }),
+      gasto({ id: 'd', monto: 1000, fecha: '2026-09-05', estado: 'anulado' }),
+    ]} unidades={unidades} moneda="Q" />)
+    expect(within(kpi()).getByText('+50.0%').style.color).toBe('var(--at-danger)')
+    cleanup()
+
+    render(<DashboardSostenibilidadTab gastos={[gasto({ id: 'b', monto: 150, fecha: '2026-10-10' })]} unidades={unidades} moneda="Q" />)
+    expect(within(kpi()).getByText('—')).toBeTruthy()
+    expect(within(kpi()).getByText('Sin gastos del 1–15 Sep para comparar')).toBeTruthy()
+  })
+})

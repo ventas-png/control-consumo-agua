@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties } from 'react'
 import type { RegistroResiduo, TipoResiduo, EstadoResiduo } from '../../../types'
 import { formatNumber, mesLocalISO } from '../../../lib/format'
 import { useConsumoMensualPorProyectoQuery } from '../../../domain/agua/queries'
+import { resumenReciclaje, TIPOS_RECICLADOS } from '../../../domain/condominios/sostenibilidad'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
 
@@ -10,8 +11,6 @@ interface Props {
   proyectoId: string
   companyId: string
 }
-
-const TIPO_RECICLABLE: Set<TipoResiduo> = new Set(['reciclable', 'electronico'])
 
 const TIPO_LABELS: Record<TipoResiduo, string> = {
   general: '🗑️ General', reciclable: '♻️ Reciclable', organico: '🌿 Orgánico',
@@ -54,12 +53,11 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
   const meses = useMemo(() => ultimosMeses(6), [])
 
   // ── Métricas residuos ──
-  const totalKg = residuos.reduce((s, r) => s + (r.cantidad_kg ?? 0), 0)
-  const reciclableKg = residuos.filter(r => TIPO_RECICLABLE.has(r.tipo_residuo)).reduce((s, r) => s + (r.cantidad_kg ?? 0), 0)
-  const pctReciclaje = totalKg > 0 ? (reciclableKg / totalKg) * 100 : 0
+  // Misma definición de reciclaje que la pestaña Residuos.
+  const { totalKg, recicladoKg, pct: pctReciclaje } = resumenReciclaje(residuos)
 
   // kg CO2 equivalentes ahorrados por reciclaje (estimado IPCC)
-  const co2Ahorrado = reciclableKg * 1.5
+  const co2Ahorrado = recicladoKg * 1.5
 
   // Residuos por mes (últimos 6)
   const residuosMeses = meses.map(mes => {
@@ -95,7 +93,8 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
 
   return (
     <div style={{ padding: '20px 24px' }}>
-      <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Dashboard de Sostenibilidad</h2>
+      <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Sostenibilidad · residuos</h2>
+      <p style={{ margin: '-14px 0 20px', fontSize: '12px', color: 'var(--at-ink-3)' }}>Residuos, reciclaje, consumo de agua y su CO₂ equivalente</p>
 
       {/* KPIs globales: dos por fila en el teléfono */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 150px), 1fr))', gap: '12px', marginBottom: '24px' }}>
@@ -103,13 +102,14 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
           { label: 'Agua consumida (6m)', value: cifra(totalM3Agua, 'm³'), icon: '💧', color: 'var(--at-primary)' },
           { label: 'CO₂ equiv. agua',     value: cifra(co2Agua, 'kg'),      icon: '🌊', color: 'var(--at-accent-hover)' },
           { label: 'Residuos totales',    value: cifra(totalKg, 'kg'),      icon: '🗑️', color: 'var(--at-ink-3)' },
-          { label: '% Reciclaje',         value: `${pctReciclaje.toFixed(0)}%`, icon: '♻️', color: 'var(--at-success)' },
+          { label: '% Reciclaje',         value: pctReciclaje === null ? '—' : `${Math.round(pctReciclaje)}%`, icon: '♻️', color: 'var(--at-success)', nota: 'reciclable + electrónico' },
           { label: 'CO₂ ahorrado',        value: cifra(co2Ahorrado, 'kg'),  icon: '🌱', color: 'var(--at-success)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center', minWidth: 0 }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color, overflowWrap: 'anywhere' }}>{k.value}</div>
             <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
+            {k.nota && <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{k.nota}</div>}
           </div>
         ))}
       </div>
@@ -169,7 +169,7 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
                   etiqueta={TIPO_LABELS[tipo]}
                   valor={cifra(kg, 'kg', 1)}
                   ancho={barWidth(kg, maxTipo)}
-                  color={TIPO_RECICLABLE.has(tipo) ? 'var(--at-success)' : 'var(--at-ink-3)'}
+                  color={TIPOS_RECICLADOS.has(tipo) ? 'var(--at-success)' : 'var(--at-ink-3)'}
                   onAbrir={() => setDetalle({ por: 'tipo', tipo })}
                   ariaLabel={`Ver residuos de tipo ${TIPO_LABELS[tipo].replace(/^\S+\s/, '')}: ${cifra(kg, 'kg', 1)}`}
                 />
@@ -185,7 +185,7 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {[
               { icon: '💧', label: 'Agua tratada', detail: cifra(totalM3Agua, 'm³'), co2: co2Agua, desc: 'CO₂ equiv. generado' },
-              { icon: '♻️', label: 'Reciclaje',    detail: cifra(reciclableKg, 'kg'), co2: co2Ahorrado, desc: 'CO₂ equiv. ahorrado', saved: true },
+              { icon: '♻️', label: 'Reciclaje',    detail: cifra(recicladoKg, 'kg'), co2: co2Ahorrado, desc: 'CO₂ equiv. ahorrado', saved: true },
             ].map(item => (
               <div key={item.label} style={{ background: 'var(--at-surface)', borderRadius: '8px', padding: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>

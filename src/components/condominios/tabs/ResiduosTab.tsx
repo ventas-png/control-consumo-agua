@@ -1,6 +1,7 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, formatNumber } from '../../../lib/format'
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { resumenReciclaje } from '../../../domain/condominios/sostenibilidad'
 import type { RegistroResiduo, TipoResiduo, EstadoResiduo } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -63,9 +64,9 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
 
   // Stats
   const totalKg = filtered.filter(r => r.cantidad_kg).reduce((s, r) => s + (r.cantidad_kg ?? 0), 0)
-  const reciclableKg = residuos.filter(r => r.tipo_residuo === 'reciclable' && r.cantidad_kg).reduce((s, r) => s + (r.cantidad_kg ?? 0), 0)
-  const totalKgAll = residuos.filter(r => r.cantidad_kg).reduce((s, r) => s + (r.cantidad_kg ?? 0), 0)
-  const pctReciclaje = totalKgAll > 0 ? Math.round((reciclableKg / totalKgAll) * 100) : 0
+  // Reciclable + electrónico, igual que en Sostenibilidad (antes aquí sólo
+  // contaba lo reciclable y las dos pestañas daban porcentajes distintos).
+  const { totalKg: totalKgAll, pct: pctReciclaje } = resumenReciclaje(residuos)
 
   function startEdit(r: RegistroResiduo) {
     setForm({
@@ -141,13 +142,14 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
         {[
           { label: 'Total registros', value: String(residuos.length), icon: '📊', color: 'var(--at-primary)' },
           { label: 'Pendientes', value: String(pendientes.length), icon: '⏳', color: 'var(--at-warning)' },
-          { label: 'Total Kg registrado', value: totalKgAll > 0 ? `${totalKgAll.toFixed(1)}\u00a0kg` : '—', icon: '⚖️', color: 'var(--at-success)' },
-          { label: '% Reciclaje', value: totalKgAll > 0 ? `${pctReciclaje}%` : '—', icon: '♻️', color: '#84cc16' },
+          { label: 'Total Kg registrado', value: totalKgAll > 0 ? `${formatNumber(totalKgAll, 1)}\u00a0kg` : '—', icon: '⚖️', color: 'var(--at-success)' },
+          { label: '% Reciclaje', value: pctReciclaje === null ? '—' : `${Math.round(pctReciclaje)}%`, icon: '♻️', color: '#84cc16', nota: 'reciclable + electrónico' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '16px', fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
+            {k.nota && <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{k.nota}</div>}
           </div>
         ))}
       </div>
@@ -155,7 +157,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>
           Registros
-          {totalKg > 0 && filtroTipo !== 'todos' && <span style={{ fontWeight: 400, fontSize: '13px', color: 'var(--at-ink-3)', marginLeft: '8px' }}>{totalKg.toFixed(1)} kg filtrados</span>}
+          {totalKg > 0 && filtroTipo !== 'todos' && <span style={{ fontWeight: 400, fontSize: '13px', color: 'var(--at-ink-3)', marginLeft: '8px' }}>{formatNumber(totalKg, 1)}{'\u00a0'}kg filtrados</span>}
         </h2>
         {canCreate && (
           <Button onClick={() => { setEditId(null); setForm(blank()); setShowForm(true) }}>+ Registrar</Button>
