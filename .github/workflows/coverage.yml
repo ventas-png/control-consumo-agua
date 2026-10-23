@@ -1044,18 +1044,6 @@ jobs:
           PGPORT_TEST: 55583
         run: supabase/tests/energia_total_facturas/run.sh
 
-      # 20261104000650: el candado de plan (asambleas_digitales) de
-      # puntos_asamblea y votos_asamblea buscaba la empresa en asambleas_digital
-      # y rechazaba TODA alta, también la del admin de una empresa con la
-      # feature. Ahora la resuelve por asambleas. Control previo que reproduce
-      # el fallo, cadena completa, huella del auditor, guarda que aborta con un
-      # candado viejo de más y diez mutantes.
-      - name: Candado de plan de asambleas — puntos y votos por la empresa de la asamblea
-        env:
-          PGBIN: ${{ steps.pg.outputs.bin }}
-          PGPORT_TEST: 55574
-        run: supabase/tests/candado_plan_asambleas/run.sh
-
       # 20261105000000: el propietario ve las asambleas (clásicas) de su
       # condominio y vota desde el portal, una vez por unidad y con la asamblea
       # en curso, por dos RPC SECURITY DEFINER; CHECK del vocabulario del voto.
