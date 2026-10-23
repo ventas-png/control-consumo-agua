@@ -260,6 +260,19 @@ export function mesLocalISO(d: Date = new Date()): string {
 }
 
 /**
+ * Primer día LOCAL ('YYYY-MM-01') del mes que queda `mesesAtras` meses antes
+ * del de `d`: el inicio de una ventana de «últimos N meses» (N − 1 atrás).
+ *
+ * Reemplaza `setMonth(getMonth() - n); setDate(1); toISOString()`, que fallaba
+ * dos veces: del 29 al 31 `setMonth` desborda al mes siguiente (el 31 de julio
+ * menos 5 meses daba el 3 de marzo, y la ventana perdía febrero), y en GMT-6,
+ * desde las 18:00, `toISOString` ya daba el día 2 y dejaba fuera el 1.
+ */
+export function inicioMesLocalISO(mesesAtras: number, d: Date = new Date()): string {
+  return dateLocalISO(new Date(d.getFullYear(), d.getMonth() - mesesAtras, 1))
+}
+
+/**
  * Fecha-hora LOCAL como 'YYYY-MM-DDTHH:mm', el formato que espera
  * `<input type="datetime-local">`. El patrón `toISOString().slice(0, 16)`
  * prellenaba el control con la hora UTC: en GMT-6, seis horas en el futuro.
