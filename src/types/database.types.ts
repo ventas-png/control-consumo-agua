@@ -888,9 +888,11 @@ export type Database = {
       asambleas: {
         Row: {
           acta: string | null
+          base_votacion: string | null
           company_id: string
           convocado_por: string | null
           created_at: string
+          escrutinio: Json | null
           estado: string
           fecha: string
           hora_fin: string | null
@@ -905,9 +907,11 @@ export type Database = {
         }
         Insert: {
           acta?: string | null
+          base_votacion?: string | null
           company_id: string
           convocado_por?: string | null
           created_at?: string
+          escrutinio?: Json | null
           estado?: string
           fecha: string
           hora_fin?: string | null
@@ -922,9 +926,11 @@ export type Database = {
         }
         Update: {
           acta?: string | null
+          base_votacion?: string | null
           company_id?: string
           convocado_por?: string | null
           created_at?: string
+          escrutinio?: Json | null
           estado?: string
           fecha?: string
           hora_fin?: string | null
@@ -1160,6 +1166,54 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asistencia_asamblea: {
+        Row: {
+          apoderado_nombre: string | null
+          asamblea_id: string
+          created_at: string
+          id: string
+          modalidad: string
+          poder_documento: string | null
+          registrado_por: string | null
+          unidad_id: string
+        }
+        Insert: {
+          apoderado_nombre?: string | null
+          asamblea_id: string
+          created_at?: string
+          id?: string
+          modalidad: string
+          poder_documento?: string | null
+          registrado_por?: string | null
+          unidad_id: string
+        }
+        Update: {
+          apoderado_nombre?: string | null
+          asamblea_id?: string
+          created_at?: string
+          id?: string
+          modalidad?: string
+          poder_documento?: string | null
+          registrado_por?: string | null
+          unidad_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asistencia_asamblea_asamblea_id_fkey"
+            columns: ["asamblea_id"]
+            isOneToOne: false
+            referencedRelation: "asambleas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asistencia_asamblea_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
             referencedColumns: ["id"]
           },
         ]
@@ -13764,6 +13818,42 @@ export type Database = {
           },
         ]
       }
+      padron_asamblea: {
+        Row: {
+          asamblea_id: string
+          peso: number
+          unidad_id: string
+          unidad_nombre: string
+        }
+        Insert: {
+          asamblea_id: string
+          peso: number
+          unidad_id: string
+          unidad_nombre: string
+        }
+        Update: {
+          asamblea_id?: string
+          peso?: number
+          unidad_id?: string
+          unidad_nombre?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "padron_asamblea_asamblea_id_fkey"
+            columns: ["asamblea_id"]
+            isOneToOne: false
+            referencedRelation: "asambleas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "padron_asamblea_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pagos: {
         Row: {
           boleta_url: string | null
@@ -17102,6 +17192,8 @@ export type Database = {
           created_at: string
           descripcion: string | null
           id: string
+          mayoria: string
+          mayoria_pct: number | null
           orden: number
           resultado: string | null
           tipo: string
@@ -17112,6 +17204,8 @@ export type Database = {
           created_at?: string
           descripcion?: string | null
           id?: string
+          mayoria?: string
+          mayoria_pct?: number | null
           orden?: number
           resultado?: string | null
           tipo?: string
@@ -17122,6 +17216,8 @@ export type Database = {
           created_at?: string
           descripcion?: string | null
           id?: string
+          mayoria?: string
+          mayoria_pct?: number | null
           orden?: number
           resultado?: string | null
           tipo?: string
@@ -24098,6 +24194,7 @@ export type Database = {
         Returns: Json
       }
       areas_normalizar_nombre: { Args: { p_nombre: string }; Returns: string }
+      asamblea_escrutinio: { Args: { p_asamblea_id: string }; Returns: Json }
       asignar_tag_vehiculo: {
         Args: { p_tag_codigo: string; p_tag_tipo?: string; p_vehiculo_id: string }
         Returns: undefined

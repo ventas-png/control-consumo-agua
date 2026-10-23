@@ -257,6 +257,38 @@ export async function fetchPuntosAsambleaConVotos(
   return (data as Array<Record<string, unknown>> | null) ?? []
 }
 
+/** Padrón de una asamblea (tomado al abrirla). Degrada a `[]`. */
+export async function fetchPadronAsamblea<T>(asambleaId: string): Promise<T[]> {
+  const { data, error } = await db
+    .from('padron_asamblea')
+    .select('*')
+    .eq('asamblea_id', asambleaId)
+    .order('unidad_nombre')
+  reportDegradedQuery('condominios.fetchPadronAsamblea', error)
+  return (data as T[] | null) ?? []
+}
+
+/** Asistencia registrada en una asamblea. Degrada a `[]`. */
+export async function fetchAsistenciaAsamblea<T>(asambleaId: string): Promise<T[]> {
+  const { data, error } = await db
+    .from('asistencia_asamblea')
+    .select('*')
+    .eq('asamblea_id', asambleaId)
+  reportDegradedQuery('condominios.fetchAsistenciaAsamblea', error)
+  return (data as T[] | null) ?? []
+}
+
+/**
+ * Escrutinio de una asamblea (RPC asamblea_escrutinio): en curso, el conteo de
+ * ahora; finalizada, el que escribió la base al cerrar; si no, `null`.
+ * Degrada a `null`.
+ */
+export async function fetchEscrutinioAsamblea<T>(asambleaId: string): Promise<T | null> {
+  const { data, error } = await db.rpc('asamblea_escrutinio', { p_asamblea_id: asambleaId })
+  reportDegradedQuery('condominios.fetchEscrutinioAsamblea', error)
+  return (data as T | null) ?? null
+}
+
 /** Votos de una votación con el nombre de la unidad (join). Degrada a `[]`. */
 export async function fetchVotosVotacion(
   votacionId: string,

@@ -11,6 +11,12 @@ export type TipoAsamblea = 'ordinaria' | 'extraordinaria'
 export type EstadoAsamblea = 'programada' | 'en_curso' | 'finalizada' | 'cancelada'
 export type TipoPunto = 'informativo' | 'votacion' | 'debate'
 export type TipoVoto = 'a_favor' | 'en_contra' | 'abstencion'
+/** Regla con que se decide un punto de votación (20261106000200). */
+export type TipoMayoria = 'simple' | 'absoluta' | 'calificada'
+/** Cuánto vale cada unidad: 1, o su alícuota (configuración del condominio). */
+export type BaseVotacion = 'unidad' | 'alicuota'
+export type ModalidadAsistencia = 'presencial' | 'virtual' | 'poder'
+export type DecisionPunto = 'aprobado' | 'rechazado' | 'sin_quorum'
 export type ServicioProveedor = 'limpieza' | 'jardineria' | 'seguridad' | 'mantenimiento' | 'elevadores' | 'piscina' | 'otro'
 export type EstadoObjeto = 'en_custodia' | 'reclamado' | 'donado' | 'descartado'
 export type TipoAgenda = 'tarea' | 'evento' | 'mantenimiento' | 'reunion' | 'otro'
@@ -28,7 +34,12 @@ export interface Asamblea {
   lugar?: string
   estado: EstadoAsamblea
   quorum_requerido: number
-  quorum_alcanzado?: number
+  /** Lo escribe la base al finalizar (escrutinio). */
+  quorum_alcanzado?: number | null
+  /** La base que rige la asamblea, fijada al abrirla; null mientras está programada. */
+  base_votacion?: BaseVotacion | null
+  /** Escrito por la base al finalizar; null antes (y en las finalizadas de antes del escrutinio). */
+  escrutinio?: EscrutinioAsamblea | null
   acta?: string
   convocado_por?: string
   created_at: string
@@ -41,9 +52,58 @@ export interface PuntoAsamblea {
   titulo: string
   descripcion?: string
   tipo: TipoPunto
+  /** 'Aprobado' | 'Rechazado' | 'Sin quórum' en los de votación, al finalizar. */
   resultado?: string
+  mayoria?: TipoMayoria
+  /** Sólo en la calificada: porcentaje del padrón (50 < x ≤ 100). */
+  mayoria_pct?: number | null
   created_at: string
   votos?: VotoAsamblea[]
+}
+
+/** Unidad con derecho a voto en una asamblea, tomada al abrirla. */
+export interface PadronAsamblea {
+  asamblea_id: string
+  unidad_id: string
+  unidad_nombre: string
+  /** 1 por unidad; por alícuota, su porcentaje. */
+  peso: number
+}
+
+export interface AsistenciaAsamblea {
+  id: string
+  asamblea_id: string
+  unidad_id: string
+  modalidad: ModalidadAsistencia
+  /** Sólo por poder: quién representa a la unidad y el path del documento. */
+  apoderado_nombre: string | null
+  poder_documento: string | null
+  registrado_por: string | null
+  created_at: string
+}
+
+export interface ConteoEscrutinio { unidades: number; peso: number }
+
+export interface EscrutinioPunto {
+  punto_id: string
+  titulo: string
+  mayoria: TipoMayoria
+  mayoria_pct: number | null
+  a_favor: ConteoEscrutinio
+  en_contra: ConteoEscrutinio
+  abstencion: ConteoEscrutinio
+  decision: DecisionPunto
+}
+
+/** asambleas_calcular_escrutinio(): presente = asistió o votó; sólo cuenta el padrón. */
+export interface EscrutinioAsamblea {
+  base: BaseVotacion | null
+  padron: ConteoEscrutinio
+  presentes: ConteoEscrutinio
+  quorum_pct: number
+  quorum_requerido: number
+  hay_quorum: boolean
+  puntos: EscrutinioPunto[]
 }
 
 export interface VotoAsamblea {
