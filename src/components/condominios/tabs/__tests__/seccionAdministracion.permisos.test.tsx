@@ -4,7 +4,7 @@
 // decidía canEdit y la base sólo dejaba borrar a company_owner/admin.
 // Seguridad, que también registra y borra novedades del libro, sigue la misma
 // regla.
-import { vi, beforeEach, afterEach } from 'vitest'
+import { vi, beforeEach, afterEach, expect } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import type { Unidad } from '../../../../types'
 import { eliminarExigeSuPermiso } from '../../../../test/eliminarExigeSuPermiso'
@@ -52,10 +52,16 @@ const borrar = mocks.deleteCondominioRow
 beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
 afterEach(cleanup)
 
-eliminarExigeSuPermiso('Pólizas', p => render(
-  <PolizasTab {...base} moneda="Q" canCreate {...p}
-    polizas={[fila({ id: 'po1', numero_poliza: 'POL-77', aseguradora: 'Seguros GT', tipo: 'incendio', fecha_inicio: '2026-01-01', fecha_vencimiento: '2099-01-01', estado: 'vigente', prima: 1000, cobertura: 50000 })]} />,
-), /^Eliminar POL-77$/, borrar, 'polizas_seguro', 'po1')
+// Eliminar vive en el detalle de la póliza: se abre antes de buscarlo, así la
+// prueba sin permiso no pasa sola por no haber abierto la ventana.
+eliminarExigeSuPermiso('Pólizas', p => {
+  render(
+    <PolizasTab {...base} moneda="Q" canCreate {...p}
+      polizas={[fila({ id: 'po1', numero_poliza: 'POL-77', aseguradora: 'Seguros GT', tipo: 'incendio', fecha_inicio: '2026-01-01', fecha_vencimiento: '2099-01-01', estado: 'vigente', prima: 1000, cobertura: 50000 })]} />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Ver póliza POL-77' }))
+  expect(screen.getByRole('dialog', { name: /Póliza POL-77/ })).toBeTruthy()
+}, /^Eliminar POL-77$/, borrar, 'polizas_seguro', 'po1')
 
 eliminarExigeSuPermiso('Inspecciones', p => render(
   <InspeccionesTab {...base} canCreate {...p}
