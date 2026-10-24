@@ -37,6 +37,10 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   deleteCondominioRow: mocks.deleteCondominioRow,
 }))
 vi.mock('../../../../domain/condominios/tabQueries', () => ({ fetchHuespedesByReservas: vi.fn(async () => []) }))
+vi.mock('../../../../domain/condominios/visitasFrecuentesConfig', () => ({
+  fetchDiasAvisoRenovacion: vi.fn(async () => ({ dias: 30, error: null })),
+  guardarDiasAvisoRenovacion: vi.fn(async () => ({ error: null })),
+}))
 vi.mock('../../../../lib/storageUrls', () => ({ useSignedUrl: () => null, useSignedUrls: () => ({}) }))
 vi.mock('../../../../lib/validatedInsert', () => ({ validatedInsert: mocks.validatedInsert, validatedInsertMany: vi.fn(async () => ({ error: null })) }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
