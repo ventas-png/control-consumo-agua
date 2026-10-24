@@ -67,6 +67,50 @@ export function fechaLocalYMD(d: Date): string {
 }
 
 /**
+ * Una pre-autorización dura como máximo 6 meses (CHECK en la tabla,
+ * 20261107000100). Pasada la fecha hay que renovarla.
+ */
+export const VIGENCIA_MAXIMA_MESES = 6
+
+/**
+ * Suma meses a una fecha 'YYYY-MM-DD' como lo hace Postgres (`date +
+ * interval 'n months'`): si el día no existe en el mes destino, se recorta al
+ * último día (31 ago + 6 → 28/29 feb).
+ */
+export function sumarMeses(ymd: string, meses: number): string {
+  const [y, m, d] = ymd.slice(0, 10).split('-').map(Number)
+  const destino = new Date(y, m - 1 + meses, 1)
+  const ultimoDia = new Date(destino.getFullYear(), destino.getMonth() + 1, 0).getDate()
+  destino.setDate(Math.min(d, ultimoDia))
+  return fechaLocalYMD(destino)
+}
+
+/** Último `vigente_hasta` admisible para un `vigente_desde` dado. */
+export function vigenciaMaxima(desde: string): string {
+  return sumarMeses(desde, VIGENCIA_MAXIMA_MESES)
+}
+
+/** ¿El rango [desde, hasta] es válido y cabe en el máximo? */
+export function vigenciaValida(desde: string, hasta: string): boolean {
+  const d = desde.slice(0, 10), h = hasta.slice(0, 10)
+  return h >= d && h <= vigenciaMaxima(d)
+}
+
+/** ¿La autorización ya pasó su último día (hoy LOCAL)? Sin fecha = no vence (filas legadas). */
+export function estaVencida(v: Pick<VisitaFrecuente, 'vigente_hasta'>, ahora: Date = new Date()): boolean {
+  const hasta = v.vigente_hasta?.slice(0, 10)
+  return !!hasta && fechaLocalYMD(ahora) > hasta
+}
+
+/** ¿Vence en los próximos `dias` días (incluido hoy)? */
+export function venceEnDias(v: Pick<VisitaFrecuente, 'vigente_hasta'>, dias: number, ahora: Date = new Date()): boolean {
+  const hasta = v.vigente_hasta?.slice(0, 10)
+  if (!hasta) return false
+  const hoy = fechaLocalYMD(ahora)
+  return hasta >= hoy && hasta <= fechaLocalYMD(new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + dias))
+}
+
+/**
  * Normaliza una hora que puede venir de Postgres (`time` → 'HH:MM:SS') o de un
  * <input type="time"> ('HH:MM') a 'HH:MM'. Devuelve null si está vacía.
  */
@@ -88,6 +132,25 @@ export function horaDentroDeFranja(hora: string, desde: string | null, hasta: st
   if (!desde && hasta) return hora <= hasta
   if (desde! <= hasta!) return hora >= desde! && hora <= hasta!
   return hora >= desde! || hora <= hasta!
+}
+
+/**
+ * Cómo se ve la autorización en una etiqueta: 'Aprobada' sólo si además está
+ * activa y no venció. 'Vencida' manda sobre 'Suspendida' (hay que renovar
+ * antes de que reactivarla sirva de algo).
+ */
+export type EtiquetaVisita = EstadoVisitaFrecuente | 'vencida' | 'suspendida'
+export function etiquetaVisita(v: Pick<VisitaFrecuente, 'estado' | 'activo' | 'vigente_hasta'>, ahora: Date = new Date()): EtiquetaVisita {
+  const estado = estadoVisita(v)
+  if (estado !== 'aprobada') return estado
+  if (estaVencida(v, ahora)) return 'vencida'
+  if (!v.activo) return 'suspendida'
+  return 'aprobada'
+}
+export const ETIQUETA_VISITA_LABEL: Record<EtiquetaVisita, string> = {
+  ...ESTADO_VISITA_LABEL,
+  vencida: 'Vencida · renovar',
+  suspendida: 'Suspendida',
 }
 
 /** Días permitidos efectivos: lista vacía o nula = todos los días. */
@@ -153,7 +216,7 @@ export function evaluarVisitaFrecuente(v: VisitaFrecuente, ahora: Date = new Dat
   const desde = v.vigente_desde?.slice(0, 10)
   const hasta = v.vigente_hasta?.slice(0, 10)
   if (desde && hoy < desde) motivos.push(`La autorización inicia el ${desde}`)
-  if (hasta && hoy > hasta) motivos.push(`La autorización venció el ${hasta}`)
+  if (hasta && hoy > hasta) motivos.push(`La autorización venció el ${hasta}: requiere renovación`)
 
   const dia = diaSemanaLocal(ahora)
   const dias = diasPermitidos(v)
@@ -199,7 +262,7 @@ export function buscarVisitasFrecuentes(
   const ident = soloAlfanumerico(c.identificacion ?? '')
   const placa = soloAlfanumerico(c.placa ?? '')
   if (nombre.length < 3 && ident.length < 3 && placa.length < 3) return []
-  const peso = (v: VisitaFrecuente) => (estadoVisita(v) === 'aprobada' && v.activo ? 0 : estadoVisita(v) === 'pendiente' ? 1 : 2)
+  const peso = (v: VisitaFrecuente) => (estadoVisita(v) === 'aprobada' && v.activo && !estaVencida(v) ? 0 : estadoVisita(v) === 'pendiente' ? 1 : 2)
   return lista
     .filter(v => !c.unidadId || v.unidad_id === c.unidadId)
     .filter(v =>

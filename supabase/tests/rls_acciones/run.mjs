@@ -30,7 +30,9 @@
 //                 con los pares de su rama.
 //                 Y el RESIDENTE (cliente dueño de una unidad) obtiene en cada
 //                 tabla y comando exactamente lo mismo que antes: sus ramas en
-//                 las policies no dependen de ningún tab y no se tocan.
+//                 las policies no dependen de ningún tab y no se tocan —salvo
+//                 lo que una migración posterior cambió a propósito y el mapa
+//                 declara en `_residente_despues`, que entonces TIENE que verse.
 //   6 · mutantes  por tabla, la migración con UN comando devuelto a la regla
 //                 vieja: la matriz DEBE fallar en esa tabla
 //
@@ -319,9 +321,18 @@ END $$;`)
   else ok(`${conFila.length}/${vivas.length} tablas con fila fabricada${ramasConFila.length ? ` (y ${ramasConFila.length} rama${ramasConFila.length > 1 ? 's' : ''}: ${ramasConFila.map(f => f.clave).join(', ')})` : ''} · ${r.resultados.length} intentos · ${personas.length} personas: pasa exactamente quien el mapa dice`)
   if (filas.some(f => f.variante && fuera.has(`${f.clave}.FABRICA`))) mal('una rama quedó fuera de la matriz: su receta no fabrica la fila')
   const residente = r.resultados.filter(([p, t, cmd]) => p === 'RES' && !fuera.has(`${t}.FABRICA`) && !fuera.has(`${t}.${cmd}`))
-  const cambios = residente.filter(([, t, cmd, res]) => residenteAntes.get(`${t}.${cmd}`) !== res)
-  if (cambios.length) for (const [, t, cmd, res] of cambios) mal(`residente · ${t} ${cmd}: antes «${residenteAntes.get(`${t}.${cmd}`)}», ahora «${res}»`)
-  else ok(`el residente obtiene lo mismo que antes en ${residente.length} intentos (${residente.filter(x => x[3] === 'ok').length} permitidos: sus ramas siguen intactas)`)
+  // Lo que una migración posterior cambió a propósito en las ramas del
+  // residente (declarado en el mapa) se exige tal cual; el resto, como antes.
+  const declarado = (t, cmd) => mapa._residente_despues[t]?.[cmd]
+  const esperadoRes = (t, cmd) => declarado(t, cmd)?.resultado ?? residenteAntes.get(`${t}.${cmd}`)
+  const cambios = residente.filter(([, t, cmd, res]) => esperadoRes(t, cmd) !== res)
+  for (const [t, cmds] of Object.entries(mapa._residente_despues)) for (const [cmd, d] of Object.entries(cmds)) {
+    if (!residente.some(([, rt, rcmd]) => rt === t && rcmd === cmd)) mal(`_residente_despues.${t}.${cmd}: declarado pero fuera de la matriz`)
+    else if (d.resultado === residenteAntes.get(`${t}.${cmd}`)) mal(`_residente_despues.${t}.${cmd}: declaración obsoleta («${d.resultado}» ya era así antes de ${d.desde})`)
+    else console.log(`  · residente · ${t} ${cmd}: «${residenteAntes.get(`${t}.${cmd}`)}» → «${d.resultado}» desde ${d.desde} (${d.porque})`)
+  }
+  if (cambios.length) for (const [, t, cmd, res] of cambios) mal(`residente · ${t} ${cmd}: ${declarado(t, cmd) ? `el mapa declara «${esperadoRes(t, cmd)}»` : `antes «${residenteAntes.get(`${t}.${cmd}`)}»`}, ahora «${res}»`)
+  else ok(`el residente obtiene lo mismo que antes en ${residente.length} intentos (${residente.filter(x => x[3] === 'ok').length} permitidos: sus ramas siguen intactas salvo lo declarado)`)
   salir()
 
   console.log('── 6/6 · mutantes: con un comando devuelto a la regla vieja, la matriz debe fallar')

@@ -53,7 +53,9 @@
 //                                  "receta": { … } } } },
 //                              "porque": "…" } },
 //     "_sin_clave": { "<tab>": "por qué el catálogo no siembra sus claves" },
-//     "_recetas": { "<tabla padre fuera del mapa>": { "<columna>": "<valor SQL>" } } }
+//     "_recetas": { "<tabla padre fuera del mapa>": { "<columna>": "<valor SQL>" } },
+//     "_residente_despues": { "<tabla>": { "<CMD>": { "resultado": "ok" | "rls",
+//         "desde": "<versión de la migración posterior>", "porque": "…" } } } }
 // Un tab AJENO en un comando amplía quién escribe la tabla: `evidencia` dice
 // qué pantalla de ese tab la escribe (cadena de imports desde el componente
 // del registro hasta la escritura); src/__tests__/rlsAccionesMapas.test.ts lo
@@ -63,6 +65,10 @@
 // no esté en el catálogo: sería una errata que deja la acción en «sólo admin».
 // Un comando sin ninguna policy permisiva (p. ej. votos no tiene UPDATE) no se
 // crea: nadie lo hace, antes y después; el mapa no puede declararlo.
+// `_residente_despues` declara lo que una migración POSTERIOR a la de la
+// sección cambió a propósito en las ramas del residente (el arnés exige que el
+// residente obtenga lo mismo que antes, salvo lo declarado aquí, y que lo
+// declarado se cumpla de verdad: una declaración obsoleta también falla).
 // `ramas` es para la policy que elige la clave del tab por el valor de una
 // columna —user_has_permission(CASE clase WHEN 'correspondencia' THEN
 // 'condominios.tab.correspondencia' ELSE 'condominios.tab.paqueteria' END)—:
@@ -156,6 +162,17 @@ export function cargarMapa(seccion) {
     if (!/^[a-z_]+$/.test(tab)) throw new Error(`${seccion}: _sin_clave «${tab}» inválido`)
   }
   mapa.version = mapa._migracion.slice(0, 14)
+  mapa._residente_despues ??= {}
+  for (const [tabla, cmds] of Object.entries(mapa._residente_despues)) {
+    if (!mapa.tablas[tabla]) throw new Error(`${seccion}: _residente_despues «${tabla}» no está en el mapa`)
+    for (const [cmd, d] of Object.entries(cmds)) {
+      const donde = `_residente_despues.${tabla}.${cmd}`
+      if (!COMANDOS.includes(cmd)) throw new Error(`${donde}: comando inválido`)
+      if (!['ok', 'rls'].includes(d?.resultado)) throw new Error(`${donde}: "resultado" tiene que ser "ok" o "rls"`)
+      if (!/^\d{14}$/.test(d.desde ?? '') || d.desde <= mapa.version) throw new Error(`${donde}: "desde" tiene que ser la versión (14 dígitos) de una migración POSTERIOR a ${mapa.version}`)
+      if (typeof d.porque !== 'string' || !d.porque) throw new Error(`${donde}: falta "porque"`)
+    }
+  }
   return mapa
 }
 

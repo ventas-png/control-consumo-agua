@@ -16,6 +16,7 @@
 //      del `from(...).insert()` — atrapa drifts entre TS y reglas de negocio.
 
 import { z } from 'zod'
+import { VIGENCIA_MAXIMA_MESES, fechaLocalYMD, vigenciaMaxima, vigenciaValida } from '../../lib/visitasFrecuentes'
 
 // ── Helpers compartidos (mismo patrón que agua/schemas) ─────────────────────
 const uuid = z.string().uuid('Debe ser UUID')
@@ -223,8 +224,11 @@ export const visitaFrecuenteInputSchema = z
     dias_permitidos: z.union([z.array(diaSemana), z.null()]).optional(),
     hora_desde: optionalHhmm,
     hora_hasta: optionalHhmm,
+    // Vigencia obligatoria y de 6 meses como máximo (20261107000100). Si no
+    // viene `vigente_desde`, la DB pone hoy y el máximo se mide desde hoy.
     vigente_desde: optionalYmd,
-    vigente_hasta: optionalYmd,
+    vigente_hasta: ymd,
+    renovaciones: z.number().int().min(0).optional(),
     estado: z.enum(['pendiente', 'aprobada', 'rechazada']).optional(),
     autorizado_por: optionalUuid,
     autorizado_en: optionalIsoTimestamp,
@@ -233,11 +237,18 @@ export const visitaFrecuenteInputSchema = z
   })
   .passthrough()
   .superRefine((data, ctx) => {
-    if (data.vigente_desde && data.vigente_hasta && data.vigente_hasta < data.vigente_desde) {
+    const desde = data.vigente_desde ?? fechaLocalYMD(new Date())
+    if (data.vigente_hasta < desde) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['vigente_hasta'],
         message: 'La vigencia no puede terminar antes de empezar',
+      })
+    } else if (!vigenciaValida(desde, data.vigente_hasta)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['vigente_hasta'],
+        message: `La vigencia no puede superar ${VIGENCIA_MAXIMA_MESES} meses (hasta ${vigenciaMaxima(desde)})`,
       })
     }
     // Una autorización aprobada lleva sello de quién la aprobó; una pendiente no.

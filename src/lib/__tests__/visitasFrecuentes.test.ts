@@ -6,10 +6,16 @@ import {
   describirHorario,
   describirVigencia,
   diaSemanaLocal,
+  estaVencida,
   estadoVisita,
+  etiquetaVisita,
   evaluarVisitaFrecuente,
   horaDentroDeFranja,
   horaHHMM,
+  sumarMeses,
+  venceEnDias,
+  vigenciaMaxima,
+  vigenciaValida,
 } from '../visitasFrecuentes'
 import type { VisitaFrecuente } from '../../types'
 
@@ -93,7 +99,7 @@ describe('evaluarVisitaFrecuente', () => {
     }), martes1030)
     expect(ev.cumple).toBe(false)
     expect(ev.motivos).toEqual([
-      'La autorización venció el 2026-10-20',
+      'La autorización venció el 2026-10-20: requiere renovación',
       'Hoy es martes y solo tiene autorizado S, D',
       'Son las 10:30 y su horario autorizado es 14:00–18:00',
     ])
@@ -141,5 +147,36 @@ describe('describirAutorizacionResidente', () => {
   it('registra la negativa', () => {
     expect(describirAutorizacionResidente(null, { decision: 'deniega', medio: 'intercom', quien: '', comentario: '' }))
       .toBe('El residente NO autorizó el ingreso por intercomunicador')
+  })
+})
+
+describe('vigencia máxima de 6 meses', () => {
+  it('suma meses como Postgres: recorta al último día del mes destino', () => {
+    expect(sumarMeses('2026-10-27', 6)).toBe('2027-04-27')
+    expect(sumarMeses('2026-08-31', 6)).toBe('2027-02-28')
+    expect(sumarMeses('2027-08-31', 6)).toBe('2028-02-29')
+    expect(vigenciaMaxima('2026-01-15')).toBe('2026-07-15')
+  })
+  it('acepta hasta el máximo exacto y rechaza un día más o un rango invertido', () => {
+    expect(vigenciaValida('2026-10-27', '2027-04-27')).toBe(true)
+    expect(vigenciaValida('2026-10-27', '2027-04-28')).toBe(false)
+    expect(vigenciaValida('2026-10-27', '2026-10-26')).toBe(false)
+    expect(vigenciaValida('2026-10-27', '2026-10-27')).toBe(true)
+  })
+  it('vencida = pasó el último día; sin fecha (fila legada) no vence', () => {
+    expect(estaVencida({ vigente_hasta: '2026-10-26' }, martes1030)).toBe(true)
+    expect(estaVencida({ vigente_hasta: '2026-10-27' }, martes1030)).toBe(false)
+    expect(estaVencida({ vigente_hasta: null }, martes1030)).toBe(false)
+  })
+  it('avisa cuando vence dentro de N días', () => {
+    expect(venceEnDias({ vigente_hasta: '2026-11-20' }, 30, martes1030)).toBe(true)
+    expect(venceEnDias({ vigente_hasta: '2026-11-30' }, 30, martes1030)).toBe(false)
+    expect(venceEnDias({ vigente_hasta: '2026-10-20' }, 30, martes1030)).toBe(false)
+  })
+  it('la etiqueta: vencida manda sobre suspendida; pendiente y rechazada se respetan', () => {
+    expect(etiquetaVisita({ estado: 'aprobada', activo: true, vigente_hasta: '2027-01-01' }, martes1030)).toBe('aprobada')
+    expect(etiquetaVisita({ estado: 'aprobada', activo: false, vigente_hasta: '2027-01-01' }, martes1030)).toBe('suspendida')
+    expect(etiquetaVisita({ estado: 'aprobada', activo: false, vigente_hasta: '2026-01-01' }, martes1030)).toBe('vencida')
+    expect(etiquetaVisita({ estado: 'pendiente', activo: true, vigente_hasta: '2026-01-01' }, martes1030)).toBe('pendiente')
   })
 })

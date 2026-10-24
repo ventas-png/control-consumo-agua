@@ -8,7 +8,7 @@ import { EditModal } from '../../../shared/EditModal'
 import { Button } from '../../../shared/Button'
 import { defaultAcompForm } from './ctx'
 import { PreautorizacionPanel } from './PreautorizacionPanel'
-import { estadoVisita, relacionLabel } from '../../../../lib/visitasFrecuentes'
+import { ETIQUETA_VISITA_LABEL, etiquetaVisita, relacionLabel } from '../../../../lib/visitasFrecuentes'
 
 export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
   const { unidades, saving, fotoUrl, setFotoUrl, fotoDocumentoUrl, setFotoDocumentoUrl, fotoVehiculoUrl, setFotoVehiculoUrl, fotosExpiradas, strCtx, mudanzaCtx, form, setForm, formEsMenor, setFormEsMenor, formFechaNacimiento, setFormFechaNacimiento, acompanantes, showAcompForm, setShowAcompForm, acompForm, setAcompForm, sugerencias, acompSugerencias, resetForm, autocompletar, autocompletarAcompanante, agregarAcompanante, quitarAcompanante, handleRegistrar } = ctx
@@ -57,13 +57,14 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                   <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Pre-autorizados:</span>
                     {frecuentesSugeridas.map(vf => {
-                      const vigente = estadoVisita(vf) === 'aprobada' && vf.activo
+                      const etiqueta = etiquetaVisita(vf)
+                      const vigente = etiqueta === 'aprobada'
                       return (
                         <button key={vf.id} type="button" onClick={() => seleccionarFrecuente(vf)}
                           aria-label={`Visita frecuente ${vf.nombre}`}
                           style={{ padding: '3px 10px', background: vigente ? 'var(--at-success-tint)' : 'var(--at-warning-tint)', color: vigente ? 'var(--at-success)' : 'var(--at-warning-strong)', border: `1px solid ${vigente ? 'var(--at-success-border)' : 'var(--at-warning-border)'}`, borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                           {vigente ? '✅' : '⚠️'} {vf.nombre}{unidadDe(vf.unidad_id) ? ` · ${unidadDe(vf.unidad_id)}` : ''} · {relacionLabel(vf.relacion)}
-                          {!vigente && <span style={{ fontWeight: 400 }}> · {estadoVisita(vf) !== 'aprobada' ? estadoVisita(vf) : 'suspendida'}</span>}
+                          {!vigente && <span style={{ fontWeight: 400 }}> · {ETIQUETA_VISITA_LABEL[etiqueta].toLowerCase()}</span>}
                         </button>
                       )
                     })}

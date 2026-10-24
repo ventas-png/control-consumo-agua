@@ -22997,10 +22997,11 @@ export type Database = {
           placa_vehiculo: string | null
           project_id: string
           relacion: string
+          renovaciones: number
           telefono: string | null
           unidad_id: string
-          vigente_desde: string | null
-          vigente_hasta: string | null
+          vigente_desde: string
+          vigente_hasta: string
         }
         Insert: {
           activo?: boolean
@@ -23022,6 +23023,7 @@ export type Database = {
           placa_vehiculo?: string | null
           project_id: string
           relacion?: string
+          renovaciones?: number
           telefono?: string | null
           unidad_id: string
           vigente_desde?: string | null
@@ -23047,6 +23049,7 @@ export type Database = {
           placa_vehiculo?: string | null
           project_id?: string
           relacion?: string
+          renovaciones?: number
           telefono?: string | null
           unidad_id?: string
           vigente_desde?: string | null

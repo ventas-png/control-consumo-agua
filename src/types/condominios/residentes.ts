@@ -999,9 +999,15 @@ export interface VisitaFrecuente {
   autorizado_por?: string | null
   autorizado_en?: string | null
   motivo_rechazo?: string | null
-  /** Vigencia en calendario ('YYYY-MM-DD'); NULL = sin límite. */
+  /**
+   * Vigencia en calendario ('YYYY-MM-DD'), obligatoria y de 6 meses como
+   * máximo (20261107000100). Pasado `vigente_hasta` hay que renovar. Opcionales
+   * en TS sólo por las filas leídas antes del backfill.
+   */
   vigente_desde?: string | null
   vigente_hasta?: string | null
+  /** Veces que se renovó la vigencia. */
+  renovaciones?: number
   /** Quién la tecleó (sello del trigger 20260731000000): residente o staff. */
   creado_por?: string | null
   created_at: string

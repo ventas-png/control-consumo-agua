@@ -122,5 +122,14 @@
     "solicitudes_concierge": {
       "tab": "concierge"
     }
+  },
+  "_residente_despues": {
+    "visitas_frecuentes": {
+      "UPDATE": {
+        "resultado": "ok",
+        "desde": "20261107000000",
+        "porque": "Visitas frecuentes como pre-autorización: el residente puede suspender/reactivar la suya (y, vencida, pedir su renovación); el trigger vf_residente_solo_activo acota qué columnas toca."
+      }
+    }
   }
 }

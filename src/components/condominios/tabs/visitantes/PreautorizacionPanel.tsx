@@ -10,7 +10,7 @@
 import type { VisitantesCtx } from './ctx'
 import { SecureImage } from '../../../shared/SecureImage'
 import {
-  ESTADO_VISITA_LABEL, MEDIOS_AUTORIZACION, estadoVisita, relacionLabel,
+  ETIQUETA_VISITA_LABEL, MEDIOS_AUTORIZACION, estadoVisita, etiquetaVisita, relacionLabel,
   type MedioAutorizacionResidente,
 } from '../../../../lib/visitasFrecuentes'
 
@@ -24,12 +24,13 @@ export function PreautorizacionPanel({ ctx }: { ctx: VisitantesCtx }) {
   const estado = estadoVisita(vf)
   const decision = autorizacionResidente.decision
 
-  const estadoChip = estado === 'aprobada' && vf.activo
+  const etiqueta = etiquetaVisita(vf)
+  const estadoChip = etiqueta === 'aprobada'
     ? { bg: 'var(--at-success-tint)', color: 'var(--at-success)', text: 'Aprobada' }
-    : estado === 'pendiente'
-      ? { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', text: ESTADO_VISITA_LABEL.pendiente }
-      : estado === 'rechazada'
-        ? { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', text: ESTADO_VISITA_LABEL.rechazada }
+    : etiqueta === 'pendiente'
+      ? { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', text: ETIQUETA_VISITA_LABEL.pendiente }
+      : etiqueta === 'rechazada' || etiqueta === 'vencida'
+        ? { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', text: ETIQUETA_VISITA_LABEL[etiqueta] }
         : { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', text: 'Suspendida' }
 
   return (
