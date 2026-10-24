@@ -11,9 +11,10 @@ import { avisarConReintento } from '../avisoRecepcion'
 import { crearRegistrador } from '../../../domain/condominios/registroPieza'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
 import { MultiImageUploader } from '../../shared/ImageUploader'
-import { SecureImage } from '../../shared/SecureImage'
 import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { SignaturePad } from '../../shared/SignaturePad'
+import { TIPO_CONFIG, inputStyle, labelStyle, rejillaFormulario, fechaCorta, Chip, Dato, FotosYFirma, Miniatura, TarjetaPaquete } from './paqueteria/comun'
 import { PaqueteriaSalientesTab } from './PaqueteriaSalientesTab'
 import { RecepcionBuscador } from './RecepcionBuscador'
 import { codigoRetiroDesdeURL } from '../../../lib/paquetes'
@@ -45,22 +46,9 @@ const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string; 
   devuelto:  { label: 'Devuelto',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', icon: '↩️' },
 }
 
-const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
-  paquete:   { label: 'Paquete',   icon: '📦' },
-  documento: { label: 'Documento', icon: '📄' },
-  sobre:     { label: 'Sobre',     icon: '✉️' },
-  otro:      { label: 'Otro',      icon: '🎁' },
-}
-
-const inputStyle = {
-  width: '100%', boxSizing: 'border-box' as const, padding: '9px 12px',
-  border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)',
-}
-const labelStyle = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' } as const
-
-function fechaCorta(iso?: string | null): string {
-  return iso ? new Date(iso).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
-}
+const formVacio = () => ({
+  unidad_id: '', tipo: 'paquete' as TipoPaquete, descripcion: '', remitente: '', num_guia: '', empresa_mensajeria: '', notas: '',
+})
 
 export function PaqueteriaTab({
   paquetes, correspondencia, unidades, proyectoId, companyId, userId,
@@ -76,11 +64,12 @@ export function PaqueteriaTab({
   const registrar = useRef(crearRegistrador()).current
   const [filtroEstado, setFiltroEstado] = useState<EstadoPaquete | 'todos'>('todos')
   const [busqueda, setBusqueda] = useState('')
-  const [form, setForm] = useState({
-    unidad_id: '', tipo: 'paquete' as TipoPaquete, descripcion: '', remitente: '', num_guia: '', empresa_mensajeria: '', notas: '',
-  })
+  const [form, setForm] = useState(formVacio)
   const [fotos, setFotos] = useState<string[]>([])
 
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  // Una acción a la vez por paquete: un segundo toque no repite la entrega.
+  const [accionando, setAccionando] = useState<string | null>(null)
   const [firmando, setFirmando] = useState<PaqueteRecibido | null>(null)
   const [firmaNombre, setFirmaNombre] = useState('')
   const [firmaSaving, setFirmaSaving] = useState(false)
@@ -101,12 +90,16 @@ export function PaqueteriaTab({
   const pendientes = entrantes.filter(p => p.estado === 'pendiente').length
 
   function resetForm() {
-    setForm({ unidad_id: '', tipo: 'paquete', descripcion: '', remitente: '', num_guia: '', empresa_mensajeria: '', notas: '' })
+    setForm(formVacio())
     setFotos([])
     setShowForm(false)
   }
 
+  // Cancelar cierra sin borrar lo escrito; no se cierra a mitad del guardado.
+  const cerrarForm = () => { if (!saving) setShowForm(false) }
+
   async function handleRegistrar() {
+    if (saving) return
     if (!form.descripcion.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese una descripción del paquete.' }); return }
     if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad destinataria.' }); return }
     setSaving(true)
@@ -145,9 +138,12 @@ export function PaqueteriaTab({
   }
 
   async function marcarEntregado(id: string) {
+    if (accionando) return
+    setAccionando(id)
     const { error } = await updateCondominioRow('paquetes_recibidos', id, {
       estado: 'entregado', hora_entrega: new Date().toISOString(), entregado_por: userId, entregado_via: 'porteria',
     })
+    setAccionando(null)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
@@ -171,7 +167,12 @@ export function PaqueteriaTab({
   }
 
   async function cambiarEstado(id: string, estado: EstadoPaquete) {
-    await updateCondominioRow('paquetes_recibidos', id, { estado })
+    if (accionando) return
+    setAccionando(id)
+    const { error } = await updateCondominioRow('paquetes_recibidos', id, { estado })
+    setAccionando(null)
+    // Antes el error se ignoraba: el botón no hacía nada y no decía por qué.
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -182,6 +183,7 @@ export function PaqueteriaTab({
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('paquetes_recibidos', id)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    setDetalleId(null)
     onRefresh()
   }
 
@@ -222,8 +224,14 @@ export function PaqueteriaTab({
     })
   }
 
+  // Se lee el registro vigente, no una copia: tras entregar, el detalle ya
+  // dice «Entregado».
+  const detalle = detalleId ? entrantes.find(p => p.id === detalleId) ?? null : null
+  const abrirFirma = (p: PaqueteRecibido) => { setFirmando(p); setFirmaNombre('') }
+  const cerrarFirma = () => { if (!firmaSaving) { setFirmando(null); setFirmaNombre('') } }
+
   const SegBtn = ({ id, label }: { id: 'entrante' | 'saliente_tercero' | 'recepcion'; label: string }) => (
-    <button onClick={() => setVista(id)}
+    <button type="button" onClick={() => setVista(id)} aria-pressed={vista === id}
       style={{ padding: '8px 16px', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
         border: '1.5px solid', borderColor: vista === id ? 'var(--at-primary)' : 'var(--at-line)',
         background: vista === id ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: vista === id ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
@@ -232,7 +240,7 @@ export function PaqueteriaTab({
   )
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1100px' }}>
+    <div style={{ padding: 'clamp(14px, 4vw, 24px)', maxWidth: '1100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Paquetería</h2>
@@ -246,9 +254,7 @@ export function PaqueteriaTab({
           )}
         </div>
         {canCreate && vista === 'entrante' && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
-            + Registrar paquete
-          </button>
+          <Button onClick={() => { setDetalleId(null); setShowForm(true) }}>+ Registrar paquete</Button>
         )}
       </div>
 
@@ -283,10 +289,10 @@ export function PaqueteriaTab({
         <>
           {/* Filtros + exportar */}
           <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por descripción, remitente, guía, unidad..."
-              style={{ flex: 1, minWidth: '200px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-surface-2)' }} />
+            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por descripción, remitente, guía, unidad..." aria-label="Buscar paquetes"
+              style={{ flex: '1 1 200px', minWidth: 0, boxSizing: 'border-box', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-surface-2)', color: 'var(--at-ink)' }} />
             {(['todos', 'pendiente', 'entregado', 'devuelto'] as const).map(e => (
-              <button key={e} onClick={() => setFiltroEstado(e)}
+              <button key={e} type="button" onClick={() => setFiltroEstado(e)} aria-pressed={filtroEstado === e}
                 style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
                 {e === 'todos' ? 'Todos' : ESTADO_CONFIG[e].label}
               </button>
@@ -295,60 +301,67 @@ export function PaqueteriaTab({
             <button onClick={exportarPDFLista} title="Exportar a PDF" style={{ padding: '8px 12px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid var(--at-line)', background: 'var(--at-surface)', color: 'var(--at-ink-2)' }}>⬇ PDF</button>
           </div>
 
-          {/* Form */}
+          {/* Registro en ventana (antes se desplegaba encima de la lista y en el
+              teléfono empujaba todo hacia abajo). No se cierra mientras guarda
+              y, si falla, conserva lo escrito. */}
           {showForm && (
-            <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Registrar paquete recibido</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <EditModal
+              title="📦 Registrar paquete recibido"
+              maxWidth="640px"
+              fullScreenOnMobile
+              onClose={cerrarForm}
+              closeOnBackdropClick={!saving}
+              closeOnEscape={!saving}
+              footer={<>
+                <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+                <Button type="submit" form="paquete-entrante-form" loading={saving} loadingText="Registrando…">📦 Registrar recepción</Button>
+              </>}
+            >
+              <form id="paquete-entrante-form" onSubmit={e => { e.preventDefault(); void handleRegistrar() }} style={rejillaFormulario}>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Descripción *</label>
-                  <input value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Ej. Caja Amazon, sobre TIGO..." style={inputStyle} />
+                  <label htmlFor="paquete-descripcion" style={labelStyle}>Descripción *</label>
+                  <input id="paquete-descripcion" value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Ej. Caja Amazon, sobre TIGO..." style={inputStyle} autoFocus />
                 </div>
                 <div>
-                  <label style={labelStyle}>Tipo</label>
-                  <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoPaquete }))} style={inputStyle}>
+                  <label htmlFor="paquete-tipo" style={labelStyle}>Tipo</label>
+                  <select id="paquete-tipo" value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoPaquete }))} style={inputStyle}>
                     {(Object.keys(TIPO_CONFIG) as TipoPaquete[]).map(t => <option key={t} value={t}>{TIPO_CONFIG[t].icon} {TIPO_CONFIG[t].label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Unidad destinataria *</label>
-                  <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))} style={inputStyle}>
+                  <label htmlFor="paquete-unidad" style={labelStyle}>Unidad destinataria *</label>
+                  <select id="paquete-unidad" value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))} style={inputStyle}>
                     <option value="">Seleccionar...</option>
                     {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Remitente</label>
-                  <input value={form.remitente} onChange={e => setForm(f => ({ ...f, remitente: e.target.value }))} placeholder="Nombre o empresa" style={inputStyle} />
+                  <label htmlFor="paquete-remitente" style={labelStyle}>Remitente</label>
+                  <input id="paquete-remitente" value={form.remitente} onChange={e => setForm(f => ({ ...f, remitente: e.target.value }))} placeholder="Nombre o empresa" style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>No. de guía</label>
-                  <input value={form.num_guia} onChange={e => setForm(f => ({ ...f, num_guia: e.target.value }))} placeholder="Número de rastreo" style={inputStyle} />
+                  <label htmlFor="paquete-guia" style={labelStyle}>No. de guía</label>
+                  <input id="paquete-guia" value={form.num_guia} onChange={e => setForm(f => ({ ...f, num_guia: e.target.value }))} placeholder="Número de rastreo" style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Empresa mensajería</label>
-                  <input value={form.empresa_mensajeria} onChange={e => setForm(f => ({ ...f, empresa_mensajeria: e.target.value }))} placeholder="DHL, FedEx, Amazon..." style={inputStyle} />
+                  <label htmlFor="paquete-mensajeria" style={labelStyle}>Empresa mensajería</label>
+                  <input id="paquete-mensajeria" value={form.empresa_mensajeria} onChange={e => setForm(f => ({ ...f, empresa_mensajeria: e.target.value }))} placeholder="DHL, FedEx, Amazon..." style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Notas</label>
-                  <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional" style={inputStyle} />
+                  <label htmlFor="paquete-notas" style={labelStyle}>Notas</label>
+                  <input id="paquete-notas" value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional" style={inputStyle} />
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <MultiImageUploader values={fotos} onChange={setFotos} folder="paquetes" label="Fotos del paquete" maxFiles={4} capture />
                 </div>
-              </div>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={handleRegistrar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-                  {saving ? 'Registrando...' : '📦 Registrar recepción'}
-                </button>
-                <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-              </div>
-            </div>
+              </form>
+            </EditModal>
           )}
 
-          {/* Lista */}
+          {/* Lista: cada paquete abre su detalle; en la tarjeta queda la acción
+              del día a día (entregar) y el resto vive en el detalle. */}
           {filtrados.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
+            <div style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--at-ink-3)' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>📦</div>
               <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay paquetes registrados</p>
             </div>
@@ -358,80 +371,116 @@ export function PaqueteriaTab({
                 const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente
                 const tcfg = TIPO_CONFIG[p.tipo] ?? TIPO_CONFIG.paquete
                 return (
-                  <div key={p.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${p.estado === 'pendiente' ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    {p.fotos && p.fotos.length > 0 ? (
-                      <SecureImage src={p.fotos[0]} alt="" style={{ width: '46px', height: '46px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0, border: '1px solid var(--at-line)' }} />
-                    ) : (
-                      <div style={{ fontSize: '28px', flexShrink: 0 }}>{cfg.icon}</div>
+                  <TarjetaPaquete key={p.id} resaltada={p.estado === 'pendiente'} onAbrir={() => setDetalleId(p.id)}
+                    miniatura={<Miniatura fotos={p.fotos} icono={cfg.icon} />}
+                    acciones={<>
+                      <Chip bg={cfg.bg} color={cfg.color}>{cfg.label}</Chip>
+                      {canEdit && p.estado === 'pendiente' && (
+                        <Button size="sm" variant="success" onClick={() => abrirFirma(p)} aria-label={`Entregar ${p.descripcion}`}>✍ Entregar</Button>
+                      )}
+                      <Button size="sm" variant="secondary" onClick={() => setDetalleId(p.id)} aria-label={`Ver ${p.descripcion}`}>Ver</Button>
+                    </>}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', display: 'flex', alignItems: 'center', gap: '4px 8px', flexWrap: 'wrap', overflowWrap: 'anywhere' }}>
+                      {p.descripcion}
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', background: 'var(--at-chip)', borderRadius: '20px', padding: '2px 9px', whiteSpace: 'nowrap' }}>{tcfg.icon} {tcfg.label}</span>
+                      {p.fotos && p.fotos.length > 1 && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>📷 {p.fotos.length}</span>}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', display: 'flex', gap: '2px 10px', flexWrap: 'wrap', marginTop: '3px' }}>
+                      {p.unidad_nombre && <span>📍 {p.unidad_nombre}</span>}
+                      {p.remitente && <span>· De: {p.remitente}</span>}
+                      {p.empresa_mensajeria && <span>· {p.empresa_mensajeria}</span>}
+                      {p.num_guia && <span>· #{p.num_guia}</span>}
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '3px' }}>
+                      Recibido: {fechaCorta(p.hora_recepcion)}
+                      {p.hora_entrega && ` · Entregado: ${fechaCorta(p.hora_entrega)}`}
+                    </div>
+                    {p.estado === 'entregado' && (p.firma_path || p.entregado_a_nombre) && (
+                      <div style={{ fontSize: '11.5px', color: 'var(--at-success)', fontWeight: 600, marginTop: '3px' }}>
+                        {p.firma_path ? '✍ Firmado' : '✓ Entregado'}{p.entregado_a_nombre ? ` por ${p.entregado_a_nombre}` : ''}{p.entregado_via === 'portal' ? ' · desde su portal' : p.entregado_via === 'porteria' ? ' · en portería' : ''}
+                      </div>
                     )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        {p.descripcion}
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', background: 'var(--at-chip)', borderRadius: '20px', padding: '2px 9px' }}>{tcfg.icon} {tcfg.label}</span>
-                        {p.fotos && p.fotos.length > 1 && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>📷 {p.fotos.length}</span>}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '3px' }}>
-                        {p.unidad_nombre && <span>📍 {p.unidad_nombre}</span>}
-                        {p.remitente && <span>· De: {p.remitente}</span>}
-                        {p.empresa_mensajeria && <span>· {p.empresa_mensajeria}</span>}
-                        {p.num_guia && <span>· #{p.num_guia}</span>}
-                      </div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '3px' }}>
-                        Recibido: {fechaCorta(p.hora_recepcion)}
-                        {p.hora_entrega && ` · Entregado: ${fechaCorta(p.hora_entrega)}`}
-                      </div>
-                      {p.estado === 'entregado' && (p.firma_path || p.entregado_a_nombre) && (
-                        <div style={{ fontSize: '11.5px', color: 'var(--at-success)', fontWeight: 600, marginTop: '3px' }}>
-                          {p.firma_path ? '✍ Firmado' : '✓ Entregado'}{p.entregado_a_nombre ? ` por ${p.entregado_a_nombre}` : ''}{p.entregado_via === 'portal' ? ' · desde su portal' : p.entregado_via === 'porteria' ? ' · en portería' : ''}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 }}>
-                      {p.firma_path && (
-                        <SecureImage src={p.firma_path} alt="firma" style={{ width: '60px', height: '34px', objectFit: 'contain', background: '#fff', borderRadius: '6px', border: '1px solid var(--at-line)' }} />
-                      )}
-                      <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
-                      {canEdit && p.estado === 'pendiente' && (
-                        <button onClick={() => avisarWhatsApp(p)} title="Notificar residente por WhatsApp"
-                          style={{ padding: '5px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '11.5px', fontWeight: 600 }}>💬 Avisar</button>
-                      )}
-                      {canEdit && p.estado === 'pendiente' && (
-                        <button onClick={() => { setFirmando(p); setFirmaNombre('') }} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                          ✍ Entregar c/ firma
-                        </button>
-                      )}
-                      {canEdit && p.estado === 'pendiente' && (
-                        <button onClick={() => marcarEntregado(p.id)} style={{ padding: '5px 10px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '11.5px' }}>
-                          ✓ Entregar sin firma
-                        </button>
-                      )}
-                      {canEdit && p.estado === 'pendiente' && (
-                        <button onClick={() => cambiarEstado(p.id, 'devuelto')} style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '11.5px' }}>
-                          ↩ Devolver
-                        </button>
-                      )}
-                      {canDelete && <button onClick={() => eliminar(p.id)} aria-label={`Eliminar ${p.descripcion}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>}
-                    </div>
-                  </div>
+                  </TarjetaPaquete>
                 )
               })}
             </div>
           )}
 
-          {/* Entrega con firma (portería) */}
+          {/* Detalle en ventana: todos los datos, todas las fotos, la firma y
+              las acciones (antes eran cinco botones apilados en cada fila). */}
+          {detalle && (() => {
+            const cfg = ESTADO_CONFIG[detalle.estado] ?? ESTADO_CONFIG.pendiente
+            const tcfg = TIPO_CONFIG[detalle.tipo] ?? TIPO_CONFIG.paquete
+            const pendiente = detalle.estado === 'pendiente'
+            const ocupado = accionando === detalle.id
+            return (
+              <EditModal
+                title={`${tcfg.icon} ${detalle.descripcion}`}
+                subtitle={
+                  <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {detalle.unidad_nombre && <span>📍 {detalle.unidad_nombre}</span>}
+                    <Chip bg={cfg.bg} color={cfg.color}>{cfg.label}</Chip>
+                  </span>
+                }
+                maxWidth="560px"
+                fullScreenOnMobile
+                onClose={() => setDetalleId(null)}
+                footer={<>
+                  <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
+                  {canEdit && pendiente && <Button variant="success" onClick={() => abrirFirma(detalle)} disabled={ocupado}>✍ Entregar con firma</Button>}
+                </>}
+              >
+                <Dato label="Tipo">{tcfg.icon} {tcfg.label}</Dato>
+                <Dato label="Unidad">{detalle.unidad_nombre || '—'}</Dato>
+                <Dato label="Remitente">{detalle.remitente || '—'}</Dato>
+                <Dato label="Mensajería">{detalle.empresa_mensajeria || '—'}</Dato>
+                <Dato label="No. de guía">{detalle.num_guia || '—'}</Dato>
+                <Dato label="Recibido">{fechaCorta(detalle.hora_recepcion) || '—'}</Dato>
+                {detalle.estado === 'entregado' && <>
+                  <Dato label="Entregado">{fechaCorta(detalle.hora_entrega) || '—'}</Dato>
+                  <Dato label="Recibió">{detalle.entregado_a_nombre || '—'}</Dato>
+                  <Dato label="Vía">{detalle.entregado_via === 'portal' ? 'Desde su portal' : detalle.entregado_via === 'porteria' ? 'En portería' : '—'}</Dato>
+                </>}
+                {detalle.notas && (
+                  <div style={{ marginTop: '12px', padding: '8px 10px', background: 'var(--at-surface-2)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>{detalle.notas}</div>
+                )}
+                <FotosYFirma fotos={detalle.fotos} firma={detalle.firma_path} />
+
+                {((canEdit && pendiente) || canDelete) && (
+                  <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--at-line)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Otras acciones</div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {canEdit && pendiente && <>
+                        <Button size="sm" variant="secondary" onClick={() => avisarWhatsApp(detalle)}>💬 Avisar por WhatsApp</Button>
+                        <Button size="sm" variant="secondary" onClick={() => void marcarEntregado(detalle.id)} disabled={!!accionando} loading={ocupado}>✓ Entregar sin firma</Button>
+                        <Button size="sm" variant="outline-danger" onClick={() => void cambiarEstado(detalle.id, 'devuelto')} disabled={!!accionando}>↩ Devolver al remitente</Button>
+                      </>}
+                      {canDelete && <Button size="sm" variant="outline-danger" onClick={() => void eliminar(detalle.id)} aria-label={`Eliminar ${detalle.descripcion}`}>🗑 Eliminar</Button>}
+                    </div>
+                  </div>
+                )}
+              </EditModal>
+            )
+          })()}
+
+          {/* Entrega con firma (portería). Encima del detalle si se abrió desde él. */}
           {firmando && (
             <EditModal
               title={`Firmar entrega · ${firmando.unidad_nombre ?? ''}`}
-              onClose={() => { if (!firmaSaving) { setFirmando(null); setFirmaNombre('') } }}
+              onClose={cerrarFirma}
+              closeOnBackdropClick={!firmaSaving}
+              closeOnEscape={!firmaSaving}
               maxWidth="460px"
+              fullScreenOnMobile
             >
               <div style={{ marginBottom: '14px' }}>
                 <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--at-ink)' }}>{firmando.descripcion}</div>
                 <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>Capture la firma de quien recibe para confirmar la entrega.</div>
               </div>
-              <label style={labelStyle}>Nombre de quien recibe</label>
-              <input value={firmaNombre} onChange={e => setFirmaNombre(e.target.value)} placeholder="Nombre y apellido" style={{ ...inputStyle, marginBottom: '14px' }} />
-              <SignaturePad onSave={handleFirmaPorteria} onCancel={() => { setFirmando(null); setFirmaNombre('') }} saving={firmaSaving} saveLabel="Confirmar entrega" />
+              <label htmlFor="paquete-firma-nombre" style={labelStyle}>Nombre de quien recibe</label>
+              <input id="paquete-firma-nombre" value={firmaNombre} onChange={e => setFirmaNombre(e.target.value)} placeholder="Nombre y apellido" style={{ ...inputStyle, marginBottom: '14px' }} />
+              <SignaturePad onSave={handleFirmaPorteria} onCancel={cerrarFirma} saving={firmaSaving} saveLabel="Confirmar entrega" />
             </EditModal>
           )}
         </>
