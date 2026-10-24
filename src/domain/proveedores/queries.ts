@@ -144,9 +144,22 @@ export function useResumenVinculacionQuery(companyId?: string, enabled = true) {
   })
 }
 
-/** Suministros y proformas históricos con proveedor solo en texto (identificados, nunca unidos solos). */
+/**
+ * Tablas de Operaciones e Instalaciones cuyo proveedor sale del catálogo
+ * compartido por `proveedor_id` (espejo de `operaciones_vincular_proveedor()`).
+ */
+export type TablaOperacionConProveedor =
+  | 'suministros_condominio'
+  | 'proformas_condominio'
+  | 'mantenimiento_cisterna'
+  | 'incidencias_elevador'
+  | 'mantenimiento_jardineria'
+  | 'control_generador'
+  | 'control_sistema_incendio'
+
+/** Registros históricos con proveedor solo en texto (identificados, nunca unidos solos). */
 export interface OperacionLegado {
-  tabla: 'suministros_condominio' | 'proformas_condominio'
+  tabla: TablaOperacionConProveedor
   registro_id: string
   project_id: string
   texto: string

@@ -6687,6 +6687,7 @@ export type Database = {
           observaciones: string | null
           operador: string | null
           project_id: string
+          proveedor_id: string | null
           proximo_mantenimiento: string | null
           tipo: string
           voltaje: number | null
@@ -6708,6 +6709,7 @@ export type Database = {
           observaciones?: string | null
           operador?: string | null
           project_id: string
+          proveedor_id: string | null
           proximo_mantenimiento?: string | null
           tipo?: string
           voltaje?: number | null
@@ -6729,6 +6731,7 @@ export type Database = {
           observaciones?: string | null
           operador?: string | null
           project_id?: string
+          proveedor_id?: string | null
           proximo_mantenimiento?: string | null
           tipo?: string
           voltaje?: number | null
@@ -6952,6 +6955,7 @@ export type Database = {
           identificador: string
           observaciones: string | null
           project_id: string
+          proveedor_id: string | null
           proxima_inspeccion: string | null
           resultado: string
           tecnico: string | null
@@ -6971,6 +6975,7 @@ export type Database = {
           identificador: string
           observaciones?: string | null
           project_id: string
+          proveedor_id: string | null
           proxima_inspeccion?: string | null
           resultado?: string
           tecnico?: string | null
@@ -6990,6 +6995,7 @@ export type Database = {
           identificador?: string
           observaciones?: string | null
           project_id?: string
+          proveedor_id?: string | null
           proxima_inspeccion?: string | null
           resultado?: string
           tecnico?: string | null
@@ -10662,6 +10668,7 @@ export type Database = {
           id: string
           observaciones: string | null
           project_id: string
+          proveedor_id: string | null
           proxima_inspeccion: string | null
           tecnico: string | null
           tipo: string
@@ -10681,6 +10688,7 @@ export type Database = {
           id?: string
           observaciones?: string | null
           project_id: string
+          proveedor_id: string | null
           proxima_inspeccion?: string | null
           tecnico?: string | null
           tipo?: string
@@ -10700,6 +10708,7 @@ export type Database = {
           id?: string
           observaciones?: string | null
           project_id?: string
+          proveedor_id?: string | null
           proxima_inspeccion?: string | null
           tecnico?: string | null
           tipo?: string
@@ -11834,6 +11843,7 @@ export type Database = {
           observaciones: string | null
           ph: number | null
           project_id: string
+          proveedor_id: string | null
           proxima_revision: string | null
           tecnico: string | null
           tipo: string
@@ -11853,6 +11863,7 @@ export type Database = {
           observaciones?: string | null
           ph?: number | null
           project_id: string
+          proveedor_id: string | null
           proxima_revision?: string | null
           tecnico?: string | null
           tipo?: string
@@ -11872,6 +11883,7 @@ export type Database = {
           observaciones?: string | null
           ph?: number | null
           project_id?: string
+          proveedor_id?: string | null
           proxima_revision?: string | null
           tecnico?: string | null
           tipo?: string
@@ -11922,6 +11934,7 @@ export type Database = {
           observaciones: string | null
           project_id: string
           proveedor: string | null
+          proveedor_id: string | null
           proxima_visita: string | null
           tipo: string
           trabajadores: number | null
@@ -11940,6 +11953,7 @@ export type Database = {
           observaciones?: string | null
           project_id: string
           proveedor?: string | null
+          proveedor_id?: string | null
           proxima_visita?: string | null
           tipo?: string
           trabajadores?: number | null
@@ -11958,6 +11972,7 @@ export type Database = {
           observaciones?: string | null
           project_id?: string
           proveedor?: string | null
+          proveedor_id?: string | null
           proxima_visita?: string | null
           tipo?: string
           trabajadores?: number | null

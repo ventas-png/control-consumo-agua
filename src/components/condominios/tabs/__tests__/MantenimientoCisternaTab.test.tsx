@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async (..._args: unknown[]) => ({ error: null as { message: string } | null })),
   updateCondominioRow: vi.fn(async (..._args: unknown[]) => ({ error: null as { message: string } | null })),
   notify: vi.fn(),
+  legado: [] as unknown[],
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
@@ -21,6 +22,23 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   deleteCondominioRow: vi.fn(),
 }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: vi.fn(), notify: mocks.notify }))
+// La empresa de servicio sale del catálogo compartido (consultas de react-query, aquí fijas).
+vi.mock('../../../../domain/cxp/queries', () => ({
+  useProveedoresQuery: () => ({
+    data: [
+      { id: 'prov1', company_id: 'co1', nombre: 'Aguas GT', nit: '1234567-8', rfc: null, pais: 'GT', codigo: 'PRV-00001', estado: 'autorizado', alcance: 'empresa', activo: true, dias_credito: 0 },
+      { id: 'prov2', company_id: 'co1', nombre: 'Jardines El Roble', nit: '7654321-0', rfc: null, pais: 'GT', codigo: 'PRV-00002', estado: 'autorizado', alcance: 'empresa', activo: true, dias_credito: 0 },
+    ],
+    isLoading: false,
+  }),
+}))
+vi.mock('../../../../domain/proveedores/queries', () => ({
+  useAsignacionesQuery: () => ({ data: [], isLoading: false }),
+  useOperacionesLegadoQuery: () => ({ data: mocks.legado, isLoading: false }),
+}))
+vi.mock('../../../../domain/proveedores/mutations', () => ({
+  useVincularOperacionMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
 
 const { default: MantenimientoCisternaTab } = await import('../MantenimientoCisternaTab')
 
@@ -57,6 +75,7 @@ function esperar() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.legado = []
   mocks.createCondominioRow.mockResolvedValue({ error: null })
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
 })
@@ -75,6 +94,15 @@ describe('Cisternas — nuevo registro en ventana', () => {
     fireEvent.change(screen.getByLabelText('Cisterna'), { target: { value: 'Cisterna Ala B' } })
     fireEvent.change(screen.getByLabelText('Nivel de agua (%)'), { target: { value: '55.25' } })
     fireEvent.change(screen.getByLabelText('Cloro residual (ppm)'), { target: { value: '0.125' } })
+    // La empresa de servicio se ELIGE del catálogo de proveedores (no se escribe).
+    const empresa = screen.getByLabelText('Empresa de servicio')
+    expect(empresa.getAttribute('role')).toBe('combobox')
+    fireEvent.focus(empresa)
+    fireEvent.change(empresa, { target: { value: 'aguas' } })
+    const opciones = within(screen.getByRole('listbox')).getAllByRole('option')   // las del selector, no las de los <select>
+    expect(opciones).toHaveLength(1)
+    fireEvent.mouseDown(opciones[0])
+    expect(within(ventana).getByTestId('proveedor-seleccionado').textContent).toContain('Aguas GT')
 
     const guardado = esperar()
     mocks.createCondominioRow.mockReturnValueOnce(guardado.promesa)
@@ -82,6 +110,7 @@ describe('Cisternas — nuevo registro en ventana', () => {
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     expect(mocks.createCondominioRow).toHaveBeenCalledWith('mantenimiento_cisterna', expect.objectContaining({
       company_id: 'co1', project_id: 'p1', cisterna: 'Cisterna Ala B', nivel_agua_pct: 55.25, cloro_residual: 0.125,
+      proveedor_id: 'prov1', empresa_servicio: 'Aguas GT',
     }))
 
     // Mientras guarda, ni Escape ni la X la cierran.
@@ -124,6 +153,32 @@ describe('Cisternas — nuevo registro en ventana', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Registrar/ }))
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error', text: 'Sin conexión' })))
     expect((screen.getByLabelText('Observaciones') as HTMLTextAreaElement).value).toBe('Tapa sin candado')
+  })
+
+  it('sin empresa elegida el registro va sin vínculo al catálogo', async () => {
+    render(<MantenimientoCisternaTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nuevo registro' }))
+    const ventana = screen.getByRole('dialog', { name: '🏗️ Nuevo registro de cisterna' })
+    fireEvent.click(within(ventana).getByRole('button', { name: /Registrar/ }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    expect(mocks.createCondominioRow).toHaveBeenCalledWith('mantenimiento_cisterna', expect.objectContaining({ proveedor_id: null, empresa_servicio: null }))
+  })
+
+  it('los registros históricos con empresa solo en texto se listan para vincularlos uno a uno', () => {
+    mocks.legado = [
+      { tabla: 'mantenimiento_cisterna', registro_id: 'c1', project_id: 'p1', texto: 'Aguas GT', clasificacion: 'inequivoca',
+        candidatos: [{ id: 'prov1', codigo: 'PRV-00001', nombre: 'Aguas GT', estado: 'autorizado' }] },
+      { tabla: 'control_generador', registro_id: 'g1', project_id: 'p1', texto: 'Energía GT', clasificacion: 'sin_coincidencia', candidatos: [] },
+    ]
+    render(<MantenimientoCisternaTab {...props()} />)
+    const panel = screen.getByTestId('operaciones-legado')
+    expect(panel.textContent).toContain('Registros con proveedor solo en texto (1)')
+    expect(panel.textContent).toContain('«Aguas GT»')
+    expect(panel.textContent).not.toContain('Energía GT')   // es del generador, no de cisternas
+    expect(within(panel).getByRole('button', { name: 'Vincular' })).toBeTruthy()
+    // En el detalle, lo no vinculado se dice.
+    fireEvent.click(screen.getAllByRole('button', { name: /^Ver registro/ })[0])
+    expect(screen.getByRole('dialog').textContent).toContain('(sin vincular al catálogo)')
   })
 
   it('sin permiso de crear no hay botón; sin editar no hay Normalizar', () => {

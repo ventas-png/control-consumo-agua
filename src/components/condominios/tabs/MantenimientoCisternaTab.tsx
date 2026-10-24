@@ -6,6 +6,11 @@ import { tint } from '../../shared/statusTone'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
+import { useProveedoresQuery } from '../../../domain/cxp/queries'
+import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
+import type { ProveedorCatalogo } from '../../../types/proveedores'
+import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
+import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
 import { MantenimientoCisterna, TipoMantenimientoCisterna, EstadoCisterna } from '../../../types'
 
 interface Props {
@@ -84,7 +89,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
     tipo: 'lectura' as TipoMantenimientoCisterna,
     nivel_agua_pct: '', cloro_residual: '', ph: '',
     estado: 'normal' as EstadoCisterna,
-    empresa_servicio: '', tecnico: '',
+    proveedor_id: '', empresa_servicio: '', tecnico: '',
     costo: '', proxima_revision: '', observaciones: '',
   })
 
@@ -115,6 +120,12 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
   // No se cierra a mitad del guardado: cerrar ahí escondería el error.
   const cerrarForm = () => { if (!saving) setMostrarForm(false) }
 
+  // La empresa de servicio sale del CATÁLOGO COMPARTIDO por id (el mismo de
+  // Contabilidad y Operaciones), no de texto libre: así el registro sabe si el
+  // proveedor sigue autorizado en este proyecto y el servidor lo valida al guardar.
+  const { data: catalogo = [] } = useProveedoresQuery(companyId)
+  const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
+
   async function guardar() {
     if (saving) return
     if (!form.cisterna.trim()) {
@@ -129,6 +140,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
       cloro_residual: form.cloro_residual ? parseFloat(form.cloro_residual) : null,
       ph: form.ph ? parseFloat(form.ph) : null,
       estado: form.estado,
+      proveedor_id: form.proveedor_id || null,
       empresa_servicio: form.empresa_servicio.trim() || null,
       tecnico: form.tecnico.trim() || null,
       costo: form.costo ? parseFloat(form.costo) : null,
@@ -322,8 +334,11 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
               </select>
             </div>
             <div>
-              <label htmlFor="cisterna-empresa" style={lbl}>Empresa de servicio</label>
-              <input id="cisterna-empresa" style={inp} value={form.empresa_servicio} onChange={e => setForm(p => ({ ...p, empresa_servicio: e.target.value }))} />
+              <ProveedorSelector
+                proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
+                value={form.proveedor_id || null} soloHabilitados label="Empresa de servicio"
+                onChange={(id, pr) => setForm(p => ({ ...p, proveedor_id: id ?? '', empresa_servicio: pr?.nombre ?? '' }))}
+              />
             </div>
             <div>
               <label htmlFor="cisterna-tecnico" style={lbl}>Técnico</label>
@@ -410,6 +425,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
             ) },
         ] satisfies DataTableColumn<MantenimientoCisterna>[]}
       />
+      <OperacionesLegadoPanel companyId={companyId} tabla="mantenimiento_cisterna" projectId={proyectoId} canEdit={canEdit} />
     </div>
   )
 }
@@ -440,7 +456,7 @@ function RegistroDetalle({ registro: r, dinero }: { registro: MantenimientoCiste
         : '—')}
       {fila('Cloro residual (ppm)', medida(r.cloro_residual, CLORO_MIN, CLORO_MAX))}
       {fila('pH', medida(r.ph, PH_MIN, PH_MAX))}
-      {fila('Empresa de servicio', r.empresa_servicio || '—')}
+      {fila('Empresa de servicio', r.empresa_servicio ? <>{r.empresa_servicio}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)' }}> (sin vincular al catálogo)</span>}</> : '—')}
       {fila('Técnico', r.tecnico || '—')}
       {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
       {fila('Próxima revisión', r.proxima_revision

@@ -12,7 +12,8 @@
 #   · factura: parcial, varias, diferencias de cantidad/precio/IVA/moneda, duplicado,
 #     moneda extranjera con tasa mensual, periodo cerrado, configuración faltante;
 #   · seguimiento compartido y su alcance por permisos;
-#   · suministros y proformas con proveedor del catálogo;
+#   · suministros, proformas e Instalaciones (cisternas, elevadores, jardinería,
+#     generador, contra incendios) con proveedor del catálogo;
 #   · y, con SESIONES REALES simultáneas: dos recepciones que no caben juntas,
 #     dos aprobaciones de factura por las mismas unidades y la misma clave de
 #     idempotencia dos veces.
@@ -149,7 +150,7 @@ bloque assert_ciclo.sql        "5a · ciclo de la orden: transiciones, congelami
 bloque assert_recepcion.sql    "5b · recepción por línea, servicios, activos, inventario"
 bloque assert_factura.sql      "5c · factura parcial/múltiple, diferencias, moneda, periodo, configuración"
 bloque assert_seguimiento.sql  "5d · seguimiento compartido y su alcance"
-bloque assert_operaciones.sql  "5e · suministros y proformas con proveedor del catálogo"
+bloque assert_operaciones.sql  "5e · suministros, proformas e Instalaciones con proveedor del catálogo"
 bloque assert_correcciones.sql "5f · correcciones de revisión: cuentas semánticas, condiciones congeladas, recepción transaccional"
 # Van AL FINAL: las suites comparten base y las de seguimiento cuentan órdenes por filtro.
 bloque assert_factura_crear.sql "5g · factura creada por UNA operación de servidor: todo o nada, idempotente, validada"

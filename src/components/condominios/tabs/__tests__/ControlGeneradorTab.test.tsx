@@ -11,6 +11,7 @@ import type { ControlGenerador } from '../../../../types'
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async (..._args: unknown[]) => ({ error: null as { message: string } | null })),
   notify: vi.fn(),
+  legado: [] as unknown[],
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
@@ -20,6 +21,23 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   deleteCondominioRow: vi.fn(),
 }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: vi.fn(), notify: mocks.notify }))
+// La empresa de servicio sale del catálogo compartido (consultas de react-query, aquí fijas).
+vi.mock('../../../../domain/cxp/queries', () => ({
+  useProveedoresQuery: () => ({
+    data: [
+      { id: 'prov1', company_id: 'co1', nombre: 'Aguas GT', nit: '1234567-8', rfc: null, pais: 'GT', codigo: 'PRV-00001', estado: 'autorizado', alcance: 'empresa', activo: true, dias_credito: 0 },
+      { id: 'prov2', company_id: 'co1', nombre: 'Jardines El Roble', nit: '7654321-0', rfc: null, pais: 'GT', codigo: 'PRV-00002', estado: 'autorizado', alcance: 'empresa', activo: true, dias_credito: 0 },
+    ],
+    isLoading: false,
+  }),
+}))
+vi.mock('../../../../domain/proveedores/queries', () => ({
+  useAsignacionesQuery: () => ({ data: [], isLoading: false }),
+  useOperacionesLegadoQuery: () => ({ data: mocks.legado, isLoading: false }),
+}))
+vi.mock('../../../../domain/proveedores/mutations', () => ({
+  useVincularOperacionMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
 
 const { default: ControlGeneradorTab } = await import('../ControlGeneradorTab')
 

@@ -5,6 +5,11 @@ import { notify } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
+import { useProveedoresQuery } from '../../../domain/cxp/queries'
+import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
+import type { ProveedorCatalogo } from '../../../types/proveedores'
+import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
+import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
 import { IncidenciaElevador, TipoIncidenciaElevador, EstadoIncidenciaElevador } from '../../../types'
 
 interface Props {
@@ -48,7 +53,7 @@ const formVacio = () => ({
   descripcion: '',
   fecha: hoyLocalISO(),
   hora_inicio: '', hora_fin: '',
-  empresa_servicio: '', tecnico: '',
+  proveedor_id: '', empresa_servicio: '', tecnico: '',
   estado: 'reportado' as EstadoIncidenciaElevador,
   costo: '', proxima_inspeccion: '', observaciones: '',
 })
@@ -114,6 +119,12 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
   // No se cierra a mitad del guardado: cerrar ahí escondería el error.
   const cerrarForm = () => { if (!saving) setMostrarForm(false) }
 
+  // La empresa de servicio sale del CATÁLOGO COMPARTIDO por id (el mismo de
+  // Contabilidad y Operaciones), no de texto libre: así el registro sabe si el
+  // proveedor sigue autorizado en este proyecto y el servidor lo valida al guardar.
+  const { data: catalogo = [] } = useProveedoresQuery(companyId)
+  const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
+
   async function guardar() {
     if (saving) return
     if (!form.elevador.trim() || !form.descripcion.trim()) {
@@ -126,6 +137,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
       descripcion: form.descripcion.trim(), fecha: form.fecha,
       hora_inicio: form.hora_inicio || null,
       hora_fin: form.hora_fin || null,
+      proveedor_id: form.proveedor_id || null,
       empresa_servicio: form.empresa_servicio.trim() || null,
       tecnico: form.tecnico.trim() || null,
       estado: form.estado,
@@ -277,8 +289,11 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
               )}
             </div>
             <div>
-              <label htmlFor="elevador-empresa" style={lbl}>Empresa de servicio</label>
-              <input id="elevador-empresa" style={inp} value={form.empresa_servicio} onChange={e => setForm(p => ({ ...p, empresa_servicio: e.target.value }))} />
+              <ProveedorSelector
+                proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
+                value={form.proveedor_id || null} soloHabilitados label="Empresa de servicio"
+                onChange={(id, pr) => setForm(p => ({ ...p, proveedor_id: id ?? '', empresa_servicio: pr?.nombre ?? '' }))}
+              />
             </div>
             <div>
               <label htmlFor="elevador-tecnico" style={lbl}>Técnico</label>
@@ -378,6 +393,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
             ) },
         ] satisfies DataTableColumn<IncidenciaElevador>[]}
       />
+      <OperacionesLegadoPanel companyId={companyId} tabla="incidencias_elevador" projectId={proyectoId} canEdit={canEdit} />
     </div>
   )
 }
@@ -394,7 +410,7 @@ function IncidenciaDetalle({ registro: r, dinero }: { registro: IncidenciaElevad
   return (
     <div>
       <p style={{ margin: '0 0 14px', whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--at-ink-2)', lineHeight: 1.6 }}>{r.descripcion}</p>
-      {fila('Empresa de servicio', r.empresa_servicio || '—')}
+      {fila('Empresa de servicio', r.empresa_servicio ? <>{r.empresa_servicio}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)' }}> (sin vincular al catálogo)</span>}</> : '—')}
       {fila('Técnico', r.tecnico || '—')}
       {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
       {fila('Próxima inspección', r.proxima_inspeccion

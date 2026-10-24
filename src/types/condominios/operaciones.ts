@@ -1141,6 +1141,8 @@ export interface MantenimientoJardineria {
   tipo: TipoJardineria
   areas: string[]
   proveedor?: string | null
+  /** Proveedor del catálogo compartido. null = histórico (solo texto en `proveedor`). */
+  proveedor_id?: string | null
   trabajadores?: number | null
   horas_trabajo?: number | null
   insumos?: string | null
@@ -1165,6 +1167,8 @@ export interface IncidenciaElevador {
   hora_inicio?: string | null
   hora_fin?: string | null
   empresa_servicio?: string | null
+  /** Empresa de servicio del catálogo compartido. null = histórico (solo texto en `empresa_servicio`). */
+  proveedor_id?: string | null
   tecnico?: string | null
   estado: EstadoIncidenciaElevador
   costo?: number | null
@@ -1188,6 +1192,8 @@ export interface MantenimientoCisterna {
   ph?: number | null
   estado: EstadoCisterna
   empresa_servicio?: string | null
+  /** Empresa de servicio del catálogo compartido. null = histórico (solo texto en `empresa_servicio`). */
+  proveedor_id?: string | null
   tecnico?: string | null
   costo?: number | null
   proxima_revision?: string | null
