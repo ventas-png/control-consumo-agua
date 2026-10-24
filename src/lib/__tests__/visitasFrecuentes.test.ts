@@ -6,6 +6,10 @@ import {
   describirHorario,
   describirVigencia,
   diaSemanaLocal,
+  diasParaVencer,
+  necesitaRenovacion,
+  normalizarDiasAviso,
+  tieneRenovacionSolicitada,
   estaVencida,
   estadoVisita,
   etiquetaVisita,
@@ -178,5 +182,33 @@ describe('vigencia máxima de 6 meses', () => {
     expect(etiquetaVisita({ estado: 'aprobada', activo: false, vigente_hasta: '2027-01-01' }, martes1030)).toBe('suspendida')
     expect(etiquetaVisita({ estado: 'aprobada', activo: false, vigente_hasta: '2026-01-01' }, martes1030)).toBe('vencida')
     expect(etiquetaVisita({ estado: 'pendiente', activo: true, vigente_hasta: '2026-01-01' }, martes1030)).toBe('pendiente')
+  })
+})
+
+describe('aviso de renovación', () => {
+  it('normaliza los días de aviso del condominio a 1..90 (por defecto 30)', () => {
+    expect(normalizarDiasAviso(15)).toBe(15)
+    expect(normalizarDiasAviso('45')).toBe(45)
+    expect(normalizarDiasAviso(0)).toBe(1)
+    expect(normalizarDiasAviso(500)).toBe(90)
+    expect(normalizarDiasAviso(null)).toBe(30)
+    expect(normalizarDiasAviso(undefined)).toBe(30)
+  })
+  it('cuenta los días que faltan (negativo = venció)', () => {
+    expect(diasParaVencer({ vigente_hasta: '2026-10-27' }, martes1030)).toBe(0)
+    expect(diasParaVencer({ vigente_hasta: '2026-11-10' }, martes1030)).toBe(14)
+    expect(diasParaVencer({ vigente_hasta: '2026-10-20' }, martes1030)).toBe(-7)
+    expect(diasParaVencer({ vigente_hasta: null }, martes1030)).toBeNull()
+  })
+  it('necesita renovación: aprobada y vencida o dentro de la ventana de aviso', () => {
+    expect(necesitaRenovacion({ estado: 'aprobada', vigente_hasta: '2026-11-10' }, 30, martes1030)).toBe(true)
+    expect(necesitaRenovacion({ estado: 'aprobada', vigente_hasta: '2026-11-10' }, 7, martes1030)).toBe(false)
+    expect(necesitaRenovacion({ estado: 'aprobada', vigente_hasta: '2026-10-01' }, 7, martes1030)).toBe(true)
+    expect(necesitaRenovacion({ estado: 'pendiente', vigente_hasta: '2026-10-01' }, 30, martes1030)).toBe(false)
+    expect(necesitaRenovacion({ estado: 'rechazada', vigente_hasta: '2026-11-01' }, 30, martes1030)).toBe(false)
+  })
+  it('sabe si ya hay una solicitud pendiente', () => {
+    expect(tieneRenovacionSolicitada({ renovacion_solicitada_hasta: '2027-04-01' })).toBe(true)
+    expect(tieneRenovacionSolicitada({ renovacion_solicitada_hasta: null })).toBe(false)
   })
 })

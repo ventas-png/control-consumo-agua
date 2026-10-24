@@ -10,11 +10,13 @@ import { deleteCondominioRow, updateCondominioRow } from '../../../domain/condom
 import { validatedInsert } from '../../../lib/validatedInsert'
 import { visitaFrecuenteInputSchema } from '../../../domain/condominios/schemas'
 import { confirm, notify } from '../../shared/Dialog'
+import { guardarDiasAvisoRenovacion } from '../../../domain/condominios/visitasFrecuentesConfig'
+import { useDiasAvisoRenovacion } from '../../../hooks/useDiasAvisoRenovacion'
 import type { VisitaFrecuente, RelacionVisitaFrecuente, Unidad, Visitante } from '../../../types'
 import {
-  DIAS_SEMANA, DIA_LABEL_CORTO, ETIQUETA_VISITA_LABEL, RELACIONES_VISITA, VIGENCIA_MAXIMA_MESES,
-  describirDias, describirHorario, describirVigencia, estadoVisita, etiquetaVisita, evaluarVisitaFrecuente,
-  fechaLocalYMD, venceEnDias, vigenciaMaxima, vigenciaValida,
+  DIAS_AVISO_RENOVACION_MAX, DIAS_AVISO_RENOVACION_MIN, DIAS_SEMANA, DIA_LABEL_CORTO, ETIQUETA_VISITA_LABEL, RELACIONES_VISITA, VIGENCIA_MAXIMA_MESES,
+  describirDias, describirHorario, describirVigencia, diasParaVencer, estaVencida, estadoVisita, etiquetaVisita, evaluarVisitaFrecuente,
+  fechaLocalYMD, necesitaRenovacion, normalizarDiasAviso, tieneRenovacionSolicitada, vigenciaMaxima, vigenciaValida,
   type DiaSemana, type EtiquetaVisita,
 } from '../../../lib/visitasFrecuentes'
 
@@ -44,9 +46,6 @@ const ESTADO_CHIP: Record<EtiquetaVisita, { bg: string; color: string }> = {
   suspendida: { bg: 'var(--at-chip)',         color: 'var(--at-ink-3)' },
 }
 
-/** Aviso de vencimiento próximo en la lista de administración. */
-const DIAS_AVISO_VENCIMIENTO = 30
-
 // La vigencia es obligatoria y de 6 meses como máximo: el formulario arranca
 // con el máximo desde hoy, que es lo que casi siempre se quiere.
 const formVacio = () => {
@@ -73,19 +72,27 @@ export default function VisitasFrecuentesTab({ visitas, visitantes = [], unidade
   const [form, setForm] = useState(formVacio)
   const hoy = fechaLocalYMD(new Date())
 
+  // Días de aviso de renovación del condominio (projects, 20261107000200):
+  // con esa anticipación el portal avisa al residente y le deja pedirla.
+  const diasAviso = useDiasAvisoRenovacion(proyectoId)
+  const [diasAvisoEdit, setDiasAvisoEdit] = useState<string | null>(null)
+  const [guardandoDias, setGuardandoDias] = useState(false)
+
   const pendientes = visitas.filter(v => estadoVisita(v) === 'pendiente')
   const vencidas = visitas.filter(v => etiquetaVisita(v) === 'vencida')
-  const porVencer = visitas.filter(v => etiquetaVisita(v) === 'aprobada' && venceEnDias(v, DIAS_AVISO_VENCIMIENTO))
+  const porVencer = visitas.filter(v => etiquetaVisita(v) === 'aprobada' && necesitaRenovacion(v, diasAviso))
+  const renovacionesSolicitadas = visitas.filter(v => tieneRenovacionSolicitada(v))
 
   const lista = visitas.filter(v =>
     (filtroUnidad === '' || v.unidad_id === filtroUnidad) &&
     (filtroEstado === 'todas' || etiquetaVisita(v) === filtroEstado) &&
-    // Lo pendiente y lo vencido se muestran siempre: es lo que hay que atender.
-    (!soloActivos || v.activo || estadoVisita(v) === 'pendiente' || etiquetaVisita(v) === 'vencida'),
+    // Lo pendiente, lo vencido y lo que pide renovación se muestran siempre:
+    // es lo que hay que atender.
+    (!soloActivos || v.activo || estadoVisita(v) === 'pendiente' || etiquetaVisita(v) === 'vencida' || tieneRenovacionSolicitada(v)),
   )
 
-  // Agrupadas por unidad, con lo pendiente primero dentro de cada una.
-  const peso = (v: VisitaFrecuente) => (estadoVisita(v) === 'pendiente' ? 0 : estadoVisita(v) === 'aprobada' ? 1 : 2)
+  // Agrupadas por unidad, con lo que hay que atender primero dentro de cada una.
+  const peso = (v: VisitaFrecuente) => (estadoVisita(v) === 'pendiente' || tieneRenovacionSolicitada(v) ? 0 : estadoVisita(v) === 'aprobada' ? 1 : 2)
   const porUnidad = lista
     .slice()
     .sort((a, b) => peso(a) - peso(b) || a.nombre.localeCompare(b.nombre))
@@ -172,9 +179,9 @@ export default function VisitasFrecuentesTab({ visitas, visitantes = [], unidade
   }
 
   /**
-   * Renovación por la administración: rango nuevo desde hoy, queda aprobada
-   * con sello nuevo. (La que pide el residente desde su portal vuelve a
-   * 'pendiente' y pasa por Aprobar como cualquier solicitud.)
+   * Renovación por la administración (directa, o aprobando la que pidió el
+   * residente): rango nuevo desde hoy, queda aprobada con sello nuevo y la
+   * solicitud se limpia.
    */
   async function renovar(v: VisitaFrecuente, hasta: string) {
     if (!canEdit) return
@@ -186,11 +193,39 @@ export default function VisitasFrecuentesTab({ visitas, visitantes = [], unidade
       vigente_desde: hoy, vigente_hasta: hasta,
       estado: 'aprobada', autorizado_por: userId, autorizado_en: new Date().toISOString(), motivo_rechazo: null,
       renovaciones: (v.renovaciones ?? 0) + 1, activo: true,
+      renovacion_solicitada_hasta: null, renovacion_solicitada_en: null,
     })
     setProcesando(null)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setRenovando(null)
     notify({ variant: 'success', title: 'Autorización renovada', text: `${v.nombre} queda autorizado hasta el ${hasta}.`, duration: 2500 })
+    onRefresh()
+  }
+
+  /** Rechazar la renovación que pidió el residente: la autorización actual sigue como estaba. */
+  async function rechazarRenovacion(v: VisitaFrecuente) {
+    if (!canEdit) return
+    const res = await confirm({ title: 'Rechazar renovación', text: `¿Rechazar la renovación que pidió el residente para ${v.nombre}? La autorización actual queda como está${estaVencida(v) ? ' (vencida)' : ` (vence el ${v.vigente_hasta?.slice(0, 10)})`}.`, icon: 'warning', variant: 'danger', confirmText: 'Rechazar' })
+    if (!res.isConfirmed) return
+    setProcesando(v.id)
+    const { error } = await updateCondominioRow('visitas_frecuentes', v.id, { renovacion_solicitada_hasta: null, renovacion_solicitada_en: null })
+    setProcesando(null)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    onRefresh()
+  }
+
+  async function guardarDiasAviso() {
+    if (diasAvisoEdit === null) return
+    const n = Number(diasAvisoEdit)
+    if (!Number.isInteger(n) || n < DIAS_AVISO_RENOVACION_MIN || n > DIAS_AVISO_RENOVACION_MAX) {
+      notify({ variant: 'warning', title: 'Días fuera de rango', text: `Indique entre ${DIAS_AVISO_RENOVACION_MIN} y ${DIAS_AVISO_RENOVACION_MAX} días.` }); return
+    }
+    setGuardandoDias(true)
+    const { error } = await guardarDiasAvisoRenovacion(proyectoId, n)
+    setGuardandoDias(false)
+    if (error) { notify({ variant: 'error', title: 'No se guardó la configuración', text: error }); return }
+    setDiasAvisoEdit(null)
+    notify({ variant: 'success', title: 'Aviso de renovación actualizado', text: `El portal avisará ${normalizarDiasAviso(n)} días antes del vencimiento.`, duration: 2500 })
     onRefresh()
   }
 
@@ -222,6 +257,28 @@ export default function VisitasFrecuentesTab({ visitas, visitantes = [], unidade
         Toda autorización vale como máximo <strong>{VIGENCIA_MAXIMA_MESES} meses</strong>; al vencer deja de servir en portería y hay que renovarla (el residente la solicita y aquí se aprueba, o se renueva directo).
       </div>
 
+      {/* Aviso de renovación: con cuántos días de anticipación se le avisa al residente */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '8px 12px', marginBottom: 14, fontSize: 12.5 }}>
+        <span>⏰ <strong>Aviso de renovación:</strong> el portal le avisa al residente y le deja pedir la renovación</span>
+        {canEdit && diasAvisoEdit !== null ? (
+          <>
+            <input type="number" aria-label="Días de aviso de renovación" min={DIAS_AVISO_RENOVACION_MIN} max={DIAS_AVISO_RENOVACION_MAX} value={diasAvisoEdit}
+              onChange={e => setDiasAvisoEdit(e.target.value)} style={{ ...inp, width: 70, padding: '4px 8px' }} />
+            <span>días antes del vencimiento</span>
+            <button type="button" disabled={guardandoDias} onClick={guardarDiasAviso} style={btnChico('var(--at-success)', 'var(--at-on-status)')}>{guardandoDias ? 'Guardando…' : 'Guardar'}</button>
+            <button type="button" disabled={guardandoDias} onClick={() => setDiasAvisoEdit(null)} style={btnChico('var(--at-chip)', 'var(--at-ink-2)')}>Cancelar</button>
+          </>
+        ) : (
+          <>
+            <strong>{diasAviso} día{diasAviso === 1 ? '' : 's'}</strong>
+            <span>antes del vencimiento.</span>
+            {canEdit && (
+              <button type="button" onClick={() => setDiasAvisoEdit(String(diasAviso))} aria-label="Cambiar días de aviso de renovación" style={btnChico('var(--at-primary-tint)', 'var(--at-primary)')}>Cambiar</button>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -237,8 +294,13 @@ export default function VisitasFrecuentesTab({ visitas, visitantes = [], unidade
               ⌛ {vencidas.length} vencida{vencidas.length !== 1 ? 's' : ''} por renovar
             </button>
           )}
+          {renovacionesSolicitadas.length > 0 && (
+            <span style={{ ...btnChico('var(--at-primary-tint)', 'var(--at-primary)'), padding: '7px 12px', cursor: 'default' }}>
+              🔄 {renovacionesSolicitadas.length} renovaci{renovacionesSolicitadas.length !== 1 ? 'ones solicitadas' : 'ón solicitada'}
+            </span>
+          )}
           {porVencer.length > 0 && (
-            <span style={{ fontSize: 12, color: 'var(--at-warning-strong)' }}>· {porVencer.length} vence{porVencer.length !== 1 ? 'n' : ''} en {DIAS_AVISO_VENCIMIENTO} días</span>
+            <span style={{ fontSize: 12, color: 'var(--at-warning-strong)' }}>· {porVencer.length} vence{porVencer.length !== 1 ? 'n' : ''} en {diasAviso} días</span>
           )}
           <select aria-label="Filtrar por unidad" style={{ ...inp, width: 'auto', padding: '6px 10px' }} value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}>
             <option value="">Todas las unidades</option>
@@ -368,8 +430,9 @@ export default function VisitasFrecuentesTab({ visitas, visitantes = [], unidade
                   const estado = estadoVisita(v)
                   const etiqueta = etiquetaVisita(v)
                   const chip = ESTADO_CHIP[etiqueta]
-                  const esRenovacion = estado === 'pendiente' && (v.renovaciones ?? 0) > 0
-                  const vencePronto = etiqueta === 'aprobada' && venceEnDias(v, DIAS_AVISO_VENCIMIENTO)
+                  const solicitada = tieneRenovacionSolicitada(v)
+                  const vencePronto = etiqueta === 'aprobada' && necesitaRenovacion(v, diasAviso)
+                  const diasRestantes = diasParaVencer(v)
                   const ingresos = ingresosPor[v.id] ?? []
                   const ultimo = ingresos.slice().sort((a, b) => b.hora_entrada.localeCompare(a.hora_entrada))[0]
                   const ev = etiqueta === 'aprobada' ? evaluarVisitaFrecuente(v) : null
@@ -383,9 +446,10 @@ export default function VisitasFrecuentesTab({ visitas, visitantes = [], unidade
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 600, fontSize: 14 }}>{rel?.icon} {v.nombre}</span>
                             <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: chip.bg, color: chip.color }}>
-                              {esRenovacion ? 'Renovación pendiente' : ETIQUETA_VISITA_LABEL[etiqueta]}
+                              {ETIQUETA_VISITA_LABEL[etiqueta]}
                             </span>
-                            {vencePronto && <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' }}>Vence el {v.vigente_hasta?.slice(0, 10)}</span>}
+                            {vencePronto && <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' }}>{diasRestantes === 0 ? 'Vence hoy' : `Vence en ${diasRestantes} día${diasRestantes === 1 ? '' : 's'}`}</span>}
+                            {solicitada && <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'var(--at-primary-tint)', color: 'var(--at-primary)' }}>Renovación solicitada</span>}
                             {(v.renovaciones ?? 0) > 0 && estado !== 'pendiente' && <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: 10.5, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>Renovada {v.renovaciones}×</span>}
                             {ev && (
                               <span title={ev.cumple ? 'Si se presentara ahora, entraría como pre-autorizado' : ev.motivos.join(' · ')}
@@ -487,8 +551,25 @@ export default function VisitasFrecuentesTab({ visitas, visitantes = [], unidade
                         </div>
                       )}
 
+                      {/* Renovación pedida por el residente: aprobar (rango nuevo hasta la fecha pedida) o rechazar */}
+                      {canEdit && solicitada && !enRenovacion && (
+                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--at-line)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ fontSize: 12, color: 'var(--at-ink-2)' }}>
+                            🔄 El residente pide renovar hasta el <strong>{v.renovacion_solicitada_hasta?.slice(0, 10)}</strong>
+                            {v.renovacion_solicitada_en ? ` (solicitado el ${new Date(v.renovacion_solicitada_en).toLocaleDateString('es', { day: '2-digit', month: 'short' })})` : ''}.
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button type="button" disabled={ocupado} onClick={() => renovar(v, vigenciaValida(hoy, v.renovacion_solicitada_hasta!.slice(0, 10)) ? v.renovacion_solicitada_hasta!.slice(0, 10) : vigenciaMaxima(hoy))} aria-label={`Aprobar renovación de ${v.nombre}`} style={btnChico('var(--at-success)', 'var(--at-on-status)')}>
+                              {ocupado ? 'Guardando…' : '✅ Aprobar renovación'}
+                            </button>
+                            <button type="button" disabled={ocupado} onClick={() => setRenovando({ id: v.id, hasta: vigenciaMaxima(hoy) })} style={btnChico('var(--at-primary-tint)', 'var(--at-primary)')}>Otra fecha…</button>
+                            <button type="button" disabled={ocupado} onClick={() => rechazarRenovacion(v)} aria-label={`Rechazar renovación de ${v.nombre}`} style={btnChico('var(--at-danger-tint)', 'var(--at-danger)')}>✕ Rechazar</button>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Renovar (vencida o por vencer): rango nuevo desde hoy, máximo 6 meses */}
-                      {canEdit && (etiqueta === 'vencida' || vencePronto) && (
+                      {canEdit && (etiqueta === 'vencida' || vencePronto || enRenovacion) && (!solicitada || enRenovacion) && (
                         <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--at-line)' }}>
                           {enRenovacion ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

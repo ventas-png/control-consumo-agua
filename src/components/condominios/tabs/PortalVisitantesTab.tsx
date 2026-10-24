@@ -13,6 +13,8 @@ interface Props {
   visitantes: Visitante[]
   /** Pre-autorizaciones de ingreso de esta unidad (en cualquier estado). */
   visitasFrecuentes?: VisitaFrecuente[]
+  /** Días de aviso de renovación del condominio; si no viene, se lee de `projects`. */
+  diasAvisoRenovacion?: number
   unidadId: string
   proyectoId: string
   companyId: string
@@ -47,7 +49,7 @@ function blankForm() {
   }
 }
 
-export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], unidadId, proyectoId, companyId, onRefresh }: Props) {
+export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], diasAvisoRenovacion, unidadId, proyectoId, companyId, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving]     = useState(false)
   const [form, setForm]         = useState(blankForm())
@@ -162,7 +164,7 @@ export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], unidad
   return (
     <div>
       {/* Personas de confianza con ingreso pre-autorizado (la administración aprueba). */}
-      <PortalVisitasFrecuentes visitas={visitasFrecuentes} unidadId={unidadId} proyectoId={proyectoId} companyId={companyId} onRefresh={onRefresh} />
+      <PortalVisitasFrecuentes visitas={visitasFrecuentes} diasAviso={diasAvisoRenovacion} unidadId={unidadId} proyectoId={proyectoId} companyId={companyId} onRefresh={onRefresh} />
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
         <div>

@@ -102,6 +102,48 @@ export function estaVencida(v: Pick<VisitaFrecuente, 'vigente_hasta'>, ahora: Da
   return !!hasta && fechaLocalYMD(ahora) > hasta
 }
 
+/**
+ * Con cuántos días de anticipación avisa el condominio que una autorización
+ * está por vencer (projects.visitas_frecuentes_dias_aviso, 20261107000200).
+ */
+export const DIAS_AVISO_RENOVACION_DEFAULT = 30
+export const DIAS_AVISO_RENOVACION_MIN = 1
+export const DIAS_AVISO_RENOVACION_MAX = 90
+export function normalizarDiasAviso(valor: unknown): number {
+  if (valor === null || valor === undefined || valor === '') return DIAS_AVISO_RENOVACION_DEFAULT
+  const n = typeof valor === 'number' ? valor : Number(valor)
+  if (!Number.isFinite(n)) return DIAS_AVISO_RENOVACION_DEFAULT
+  return Math.min(DIAS_AVISO_RENOVACION_MAX, Math.max(DIAS_AVISO_RENOVACION_MIN, Math.round(n)))
+}
+
+/** Días que faltan para el último día de vigencia (negativo = ya venció). */
+export function diasParaVencer(v: Pick<VisitaFrecuente, 'vigente_hasta'>, ahora: Date = new Date()): number | null {
+  const hasta = v.vigente_hasta?.slice(0, 10)
+  if (!hasta) return null
+  const [y, m, d] = hasta.split('-').map(Number)
+  const fin = new Date(y, m - 1, d)
+  const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate())
+  return Math.round((fin.getTime() - hoy.getTime()) / 86_400_000)
+}
+
+/**
+ * ¿Toca avisar y permitir pedir la renovación? Dentro de la ventana de aviso
+ * del condominio o ya vencida; sólo para autorizaciones aprobadas.
+ */
+export function necesitaRenovacion(
+  v: Pick<VisitaFrecuente, 'estado' | 'vigente_hasta'>,
+  diasAviso: number,
+  ahora: Date = new Date(),
+): boolean {
+  if (estadoVisita(v) !== 'aprobada') return false
+  return estaVencida(v, ahora) || venceEnDias(v, diasAviso, ahora)
+}
+
+/** ¿El residente ya pidió la renovación y la administración no la resolvió? */
+export function tieneRenovacionSolicitada(v: Pick<VisitaFrecuente, 'renovacion_solicitada_hasta'>): boolean {
+  return !!v.renovacion_solicitada_hasta
+}
+
 /** ¿Vence en los próximos `dias` días (incluido hoy)? */
 export function venceEnDias(v: Pick<VisitaFrecuente, 'vigente_hasta'>, dias: number, ahora: Date = new Date()): boolean {
   const hasta = v.vigente_hasta?.slice(0, 10)

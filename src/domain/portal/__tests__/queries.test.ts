@@ -120,7 +120,7 @@ describe('fetchCondominiosPortalData', () => {
     const selectsDeProyectos = h.state.calls
       .filter(([tabla, metodo]) => tabla === 'projects' && metodo === 'select')
       .map(([, , args]) => (args as unknown[])[0])
-    expect(selectsDeProyectos).toEqual(['id, company_id, moneda_condominios, moneda', 'id, portal_tabs_ocultos'])
+    expect(selectsDeProyectos).toEqual(['id, company_id, moneda_condominios, moneda', 'id, portal_tabs_ocultos, visitas_frecuentes_dias_aviso'])
   })
 
   it('separa paquetería de correspondencia por clase, no por tabla', async () => {

@@ -1008,6 +1008,13 @@ export interface VisitaFrecuente {
   vigente_hasta?: string | null
   /** Veces que se renovó la vigencia. */
   renovaciones?: number
+  /**
+   * Renovación pedida por el residente y aún no resuelta (20261107000200):
+   * la fecha de fin que pide y cuándo la pidió. NULL = nada pendiente. La
+   * autorización vigente sigue intacta hasta que la administración apruebe.
+   */
+  renovacion_solicitada_hasta?: string | null
+  renovacion_solicitada_en?: string | null
   /** Quién la tecleó (sello del trigger 20260731000000): residente o staff. */
   creado_por?: string | null
   created_at: string

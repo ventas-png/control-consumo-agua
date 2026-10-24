@@ -16608,6 +16608,7 @@ export type Database = {
           nombre: string
           nombre_fiscal: string | null
           portal_tabs_ocultos: string[]
+          visitas_frecuentes_dias_aviso: number
           proveedor_pago: string | null
           proveedor_timbrado: string | null
           regimen_fiscal: string | null
@@ -16643,6 +16644,7 @@ export type Database = {
           nombre: string
           nombre_fiscal?: string | null
           portal_tabs_ocultos?: string[]
+          visitas_frecuentes_dias_aviso?: number
           proveedor_pago?: string | null
           proveedor_timbrado?: string | null
           regimen_fiscal?: string | null
@@ -16678,6 +16680,7 @@ export type Database = {
           nombre?: string
           nombre_fiscal?: string | null
           portal_tabs_ocultos?: string[]
+          visitas_frecuentes_dias_aviso?: number
           proveedor_pago?: string | null
           proveedor_timbrado?: string | null
           regimen_fiscal?: string | null
@@ -22997,6 +23000,8 @@ export type Database = {
           placa_vehiculo: string | null
           project_id: string
           relacion: string
+          renovacion_solicitada_en: string | null
+          renovacion_solicitada_hasta: string | null
           renovaciones: number
           telefono: string | null
           unidad_id: string
@@ -23023,6 +23028,8 @@ export type Database = {
           placa_vehiculo?: string | null
           project_id: string
           relacion?: string
+          renovacion_solicitada_en?: string | null
+          renovacion_solicitada_hasta?: string | null
           renovaciones?: number
           telefono?: string | null
           unidad_id: string
@@ -23049,6 +23056,8 @@ export type Database = {
           placa_vehiculo?: string | null
           project_id?: string
           relacion?: string
+          renovacion_solicitada_en?: string | null
+          renovacion_solicitada_hasta?: string | null
           renovaciones?: number
           telefono?: string | null
           unidad_id?: string

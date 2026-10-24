@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { fetchCondominiosPortalData, fetchPortalUnidadesResidente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta, marcarAnunciosLeidos } from '../../domain/portal/queries'
 import { PORTAL_TABS, tabsVisiblesPortal, normalizarTabsOcultos, type PortalTab } from '../../lib/portalTabs'
+import { DIAS_AVISO_RENOVACION_DEFAULT, estaVencida, necesitaRenovacion, normalizarDiasAviso, tieneRenovacionSolicitada } from '../../lib/visitasFrecuentes'
 import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 import { confirmarPagoCuota } from '../../domain/portal/mutations'
 import { notify } from '../shared/Dialog'
@@ -77,6 +78,8 @@ const SECCION_A_TAB: Record<string, PortalTab> = {
 // recogieron lo que él dejó es una noticia, se le da una sola vez (localStorage).
 const PAQ_PENDIENTES_VISTOS = 'paq_popup_seen'
 const PAQ_RETIROS_VISTOS = 'paq_retiros_vistos'
+// Aviso de visitas frecuentes por renovar: una vez por sesión por autorización.
+const VF_RENOVACION_VISTOS = 'vf_renovacion_vistos'
 
 function leerIdsVistos(store: () => Storage, clave: string): string[] {
   try {
@@ -113,6 +116,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [anuncios, setAnuncios]                   = useState<AnuncioComunidad[]>([])
   const [visitantes, setVisitantes]               = useState<Visitante[]>([])
   const [visitasFrecuentes, setVisitasFrecuentes] = useState<VisitaFrecuente[]>([])
+  // Días de aviso de renovación de visitas frecuentes, por condominio.
+  const [diasAvisoPorProyecto, setDiasAvisoPorProyecto] = useState<Record<string, number>>({})
   const [mensajes, setMensajes]                   = useState<MensajePortal[]>([])
   const [solicitudesRenta, setSolicitudesRenta]   = useState<SolicitudRentaUnidad[]>([])
   const [paquetes, setPaquetes]                   = useState<PaqueteRecibido[]>([])
@@ -181,6 +186,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       setPestanasOcultas(Object.fromEntries(
         ((pestanasData as { id: string; portal_tabs_ocultos?: unknown }[] | null) ?? [])
           .map(p => [p.id, normalizarTabsOcultos(p.portal_tabs_ocultos)]),
+      ))
+      setDiasAvisoPorProyecto(Object.fromEntries(
+        ((pestanasData as { id: string; visitas_frecuentes_dias_aviso?: unknown }[] | null) ?? [])
+          .map(p => [p.id, normalizarDiasAviso(p.visitas_frecuentes_dias_aviso)]),
       ))
     } finally {
       setLoading(false)
@@ -257,6 +266,26 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       .map(u => u.id))
     return paquetes.filter(p => !!p.unidad_id && conPaqueteria.has(p.unidad_id))
   }, [paquetes, unidades, pestanasOcultas])
+
+  // Aviso al entrar (una vez por sesión): visitas frecuentes del residente que
+  // ya vencieron o vencen dentro de los días de aviso de su condominio y aún
+  // no tienen renovación pedida. Lleva a la pestaña Visitantes de la unidad.
+  useEffect(() => {
+    if (loading) return
+    const vistos = leerIdsVistos(() => sessionStorage, VF_RENOVACION_VISTOS)
+    const porRenovar = visitasFrecuentes.filter(v => {
+      const u = unidades.find(x => x.id === v.unidad_id)
+      if (!u || !tabsVisiblesPortal(u.rol, pestanasOcultas[u.project_id ?? '']).includes('visitantes')) return false
+      return necesitaRenovacion(v, diasAvisoPorProyecto[u.project_id ?? ''] ?? DIAS_AVISO_RENOVACION_DEFAULT) && !tieneRenovacionSolicitada(v) && !vistos.includes(v.id)
+    })
+    if (porRenovar.length === 0) return
+    guardarIdsVistos(() => sessionStorage, VF_RENOVACION_VISTOS, porRenovar.map(v => v.id))
+    const primera = porRenovar[0]
+    const texto = porRenovar.length === 1
+      ? `${primera.nombre} ${estaVencida(primera) ? 'ya venció' : `vence el ${primera.vigente_hasta?.slice(0, 10)}`}. Solicite la renovación en Visitantes → Visitas frecuentes para que siga entrando sin consulta.`
+      : `${porRenovar.length} autorizaciones vencieron o están por vencer. Solicite su renovación en Visitantes → Visitas frecuentes.`
+    notify({ variant: 'warning', title: 'Visitas frecuentes por renovar', text: texto, duration: 12000 })
+  }, [loading, visitasFrecuentes, unidades, pestanasOcultas, diasAvisoPorProyecto])
 
   // Pop-up de aviso: los envíos que esperan al residente en portería (una vez
   // por sesión) y los que él dejó para un tercero y ya se retiraron (una sola
@@ -597,6 +626,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               <PortalVisitantesTab
                 visitantes={visitantesU}
                 visitasFrecuentes={visitasFrecuentesU}
+                diasAvisoRenovacion={diasAvisoPorProyecto[proyectoId]}
                 unidadId={selectedUnidadId}
                 proyectoId={proyectoId}
                 companyId={resolvedCompanyId}
