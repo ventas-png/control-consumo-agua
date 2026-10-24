@@ -493,7 +493,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'cuotas', label: 'Cuotas', icon: '💳', render: (ctx) =>
     <CuotasTab cuotas={ctx.cuotas} unidades={ctx.unidadesProyecto} proyectos={ctx.proyectosActivos} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('cuotas')} canEdit={ctx.canEdit('cuotas')} canDelete={ctx.canDelete('cuotas')} onRefresh={ctx.onRefresh} /> },
   { id: 'visitantes', label: 'Visitantes', icon: '🚪', render: (ctx) =>
-    <VisitantesTab visitantes={ctx.visitantes} unidades={ctx.unidadesProyecto} reservasSTR={ctx.reservasSTR} solicitudesMudanza={ctx.solicitudesMudanza} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('visitantes')} onRefresh={ctx.onRefresh} /> },
+    <VisitantesTab visitantes={ctx.visitantes} unidades={ctx.unidadesProyecto} reservasSTR={ctx.reservasSTR} solicitudesMudanza={ctx.solicitudesMudanza} visitasFrecuentes={ctx.visitasFrecuentes} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('visitantes')} onRefresh={ctx.onRefresh} /> },
   { id: 'amenidades', label: 'Amenidades', icon: '🏊', render: (ctx) =>
     <AmenidadesTab amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueos={ctx.bloqueosAmenidades} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} moneda={ctx.moneda} canCreate={ctx.canCreate('amenidades')} canEdit={ctx.canEdit('amenidades')} canDelete={ctx.canDelete('amenidades')} onRefresh={ctx.onRefresh} /> },
   { id: 'mantenimiento', label: 'Mantenimiento', icon: '🔧', render: (ctx) =>
@@ -631,7 +631,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'mant_preventivo', label: 'Mant. Prev.', icon: '🔩', render: (ctx) =>
     <MantenimientoPrevTab planes={ctx.planesMantenimiento} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('mant_preventivo')} canEdit={ctx.canEdit('mant_preventivo')} onRefresh={ctx.onRefresh} /> },
   { id: 'portal', label: 'Portal Resid.', icon: '👤', render: (ctx) =>
-    <PortalResidenteTab unidades={ctx.unidadesProyecto} cuotas={ctx.cuotas} tickets={ctx.tickets} amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueosAmenidades={ctx.bloqueosAmenidades} visitantes={ctx.visitantes} anuncios={ctx.anuncios} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canEdit={ctx.canEdit('portal')} autorNombre={ctx.currentUser.name ?? ''} autorUserId={ctx.uid} onRefresh={ctx.onRefresh} /> },
+    <PortalResidenteTab unidades={ctx.unidadesProyecto} cuotas={ctx.cuotas} tickets={ctx.tickets} amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueosAmenidades={ctx.bloqueosAmenidades} visitantes={ctx.visitantes} visitasFrecuentes={ctx.visitasFrecuentes} anuncios={ctx.anuncios} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canEdit={ctx.canEdit('portal')} autorNombre={ctx.currentUser.name ?? ''} autorUserId={ctx.uid} onRefresh={ctx.onRefresh} /> },
   // Qué pestañas ve el residente en su portal (projects.portal_tabs_ocultos,
   // 20261106000000). Sin clave RBAC en el catálogo a propósito: la escritura
   // pasa por projects_update (propietario/administrador de la empresa), así que
@@ -709,7 +709,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'certificados', label: 'Certificados', icon: '📜', render: (ctx) =>
     <SolicitudCertificadoTab solicitudes={ctx.certificados} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('certificados')} canEdit={ctx.canEdit('certificados')} onRefresh={ctx.onRefresh} /> },
   { id: 'vis_frecuentes', label: 'Vis. Frecuentes', icon: '👨‍👩‍👧', render: (ctx) =>
-    <VisitasFrecuentesTab visitas={ctx.visitasFrecuentes} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('vis_frecuentes')} canEdit={ctx.canEdit('vis_frecuentes')} canDelete={ctx.canDelete('vis_frecuentes')} onRefresh={ctx.onRefresh} /> },
+    <VisitasFrecuentesTab visitas={ctx.visitasFrecuentes} visitantes={ctx.visitantes} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('vis_frecuentes')} canEdit={ctx.canEdit('vis_frecuentes')} canDelete={ctx.canDelete('vis_frecuentes')} onRefresh={ctx.onRefresh} /> },
   { id: 'reglamento', label: 'Reglamento', icon: '📖', render: (ctx) =>
     <ReglamentoTab articulos={ctx.reglamento} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('reglamento')} canEdit={ctx.canEdit('reglamento')} onRefresh={ctx.onRefresh} /> },
   { id: 'control_plagas', label: 'Control Plagas', icon: '🧪', render: (ctx) =>

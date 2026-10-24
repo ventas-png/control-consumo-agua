@@ -28,6 +28,10 @@ export function VisitanteDetalle({ ctx }: { ctx: VisitantesCtx }) {
     ...(v.fecha_nacimiento ? [{ label: 'Fecha nac.', value: v.fecha_nacimiento }] : []),
     ...(v.placa_vehiculo ? [{ label: 'Vehículo', value: `🚗 ${v.placa_vehiculo}` }] : []),
     ...(v.motivo ? [{ label: 'Motivo', value: v.motivo }] : []),
+    ...(v.autorizacion_ingreso ? [{
+      label: 'Autorización de ingreso',
+      value: `${v.autorizacion_ingreso === 'pre_autorizado' ? 'Pre-autorizado' : 'Autorizó el residente'}${v.autorizacion_detalle ? ` · ${v.autorizacion_detalle}` : ''}`,
+    }] : []),
     ...(v.notas ? [{ label: 'Notas', value: v.notas }] : []),
     ...(v.visitante_principal_id ? (() => {
       const p = visitantes.find(x => x.id === v.visitante_principal_id)
@@ -45,6 +49,8 @@ export function VisitanteDetalle({ ctx }: { ctx: VisitantesCtx }) {
           {v.visitante_principal_id && <span style={chip('var(--at-primary-tint)', 'var(--at-primary-hover)')}>Acompañante</span>}
           {v.reserva_str_id && <span style={chip('var(--at-accent-tint-2)', 'var(--at-accent-hover)')}>STR</span>}
           {v.solicitud_mudanza_id && <span style={chip('var(--at-warning-tint)', 'var(--at-warning)')}>Mudanza</span>}
+          {v.autorizacion_ingreso === 'pre_autorizado' && <span style={chip('var(--at-success-tint)', 'var(--at-success)')}>Pre-autorizado</span>}
+          {v.autorizacion_ingreso === 'residente' && <span style={chip('var(--at-warning-tint)', 'var(--at-warning-strong)')}>Autorizó residente</span>}
         </span>
       }
       maxWidth="520px"

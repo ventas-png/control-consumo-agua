@@ -243,12 +243,14 @@ export interface CondominiosPortalData {
   ticketsData: unknown[] | null
   anunciosData: unknown[] | null
   visitantesData: unknown[] | null
+  /** Visitas frecuentes (pre-autorizaciones) de las unidades del residente, en cualquier estado. */
+  visitasFrecuentesData: unknown[] | null
   mensajesData: unknown[] | null
   solicitudesRentaData: unknown[] | null
   paquetesData: unknown[] | null
   correspondenciaData: unknown[] | null
   comunicadosData: unknown[] | null
-  /** Pestañas apagadas por condominio: filas `{ id, portal_tabs_ocultos }`. */
+  /** Por condominio: filas `{ id, portal_tabs_ocultos, visitas_frecuentes_dias_aviso }`. */
   pestanasData: unknown[] | null
 }
 
@@ -270,7 +272,7 @@ export async function fetchCondominiosPortalData(
 
   const [
     projRes, amenidadesRes, cuotasRes, reservasRes, bloqueosRes, ticketsRes,
-    anunciosRes, visitantesRes, mensajesRes, solicitudesRentaRes, paquetesRes,
+    anunciosRes, visitantesRes, visitasFrecuentesRes, mensajesRes, solicitudesRentaRes, paquetesRes,
     correspondenciaRes, comunicadosRes, pestanasRes,
   ] = await Promise.all([
     db.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
@@ -289,6 +291,10 @@ export async function fetchCondominiosPortalData(
       .limit(200),
     db.from('anuncios_comunidad').select('*').in('project_id', projectIds).eq('activo', true).order('created_at', { ascending: false }),
     db.from('visitantes').select('*').in('unidad_id', unidadIds).order('hora_entrada', { ascending: false }).limit(200),
+    // Pre-autorizaciones de ingreso (20261107000000): el residente las
+    // solicita aquí y ve si la administración ya las aprobó. La RLS ya le
+    // concedía las filas de su unidad (20260602000050).
+    db.from('visitas_frecuentes').select('*').in('unidad_id', unidadIds).order('nombre'),
     db.from('mensajes_portal').select('*').in('unidad_id', unidadIds)
       .gte('created_at', sesentaDias)
       .order('created_at', { ascending: false })
@@ -311,11 +317,12 @@ export async function fetchCondominiosPortalData(
     // (20260602000030, rama `unidad_id IN mis_unidades_ids()`), pero ninguna
     // pantalla las leía.
     db.from('comunicados_condominio').select('*').in('unidad_id', unidadIds).order('fecha_envio', { ascending: false }).limit(100),
-    // Pestañas que la empresa apagó en cada condominio (20261106000000). Va
+    // Pestañas que la empresa apagó en cada condominio (20261106000000) y los
+    // días de aviso de renovación de visitas frecuentes (20261107000200). Van
     // APARTE de la fila de arriba a propósito: si esta lectura falla (p.ej. el
-    // front llegó antes que la migración), el portal sigue con moneda y empresa
-    // y simplemente muestra todas las pestañas.
-    db.from('projects').select('id, portal_tabs_ocultos').in('id', projectIds),
+    // front llegó antes que la migración), el portal sigue con moneda y empresa,
+    // muestra todas las pestañas y avisa con los días por defecto.
+    db.from('projects').select('id, portal_tabs_ocultos, visitas_frecuentes_dias_aviso').in('id', projectIds),
   ])
   reportDegradedQuery('portal.fetchCondominiosPortalData.pestanas', pestanasRes.error)
 
@@ -328,6 +335,7 @@ export async function fetchCondominiosPortalData(
     ticketsData: ticketsRes.data,
     anunciosData: anunciosRes.data,
     visitantesData: visitantesRes.data,
+    visitasFrecuentesData: visitasFrecuentesRes.data,
     mensajesData: mensajesRes.data,
     solicitudesRentaData: solicitudesRentaRes.data,
     paquetesData: paquetesRes.data,

@@ -16623,6 +16623,7 @@ export type Database = {
           nombre: string
           nombre_fiscal: string | null
           portal_tabs_ocultos: string[]
+          visitas_frecuentes_dias_aviso: number
           proveedor_pago: string | null
           proveedor_timbrado: string | null
           regimen_fiscal: string | null
@@ -16658,6 +16659,7 @@ export type Database = {
           nombre: string
           nombre_fiscal?: string | null
           portal_tabs_ocultos?: string[]
+          visitas_frecuentes_dias_aviso?: number
           proveedor_pago?: string | null
           proveedor_timbrado?: string | null
           regimen_fiscal?: string | null
@@ -16693,6 +16695,7 @@ export type Database = {
           nombre?: string
           nombre_fiscal?: string | null
           portal_tabs_ocultos?: string[]
+          visitas_frecuentes_dias_aviso?: number
           proveedor_pago?: string | null
           proveedor_timbrado?: string | null
           regimen_fiscal?: string | null
@@ -22782,6 +22785,8 @@ export type Database = {
       }
       visitantes: {
         Row: {
+          autorizacion_detalle: string | null
+          autorizacion_ingreso: string | null
           company_id: string
           created_at: string
           es_menor: boolean
@@ -22806,9 +22811,12 @@ export type Database = {
           solicitud_mudanza_id: string | null
           unidad_id: string
           valido_hasta: string | null
+          visita_frecuente_id: string | null
           visitante_principal_id: string | null
         }
         Insert: {
+          autorizacion_detalle?: string | null
+          autorizacion_ingreso?: string | null
           company_id: string
           created_at?: string
           es_menor?: boolean
@@ -22833,9 +22841,12 @@ export type Database = {
           solicitud_mudanza_id?: string | null
           unidad_id: string
           valido_hasta?: string | null
+          visita_frecuente_id?: string | null
           visitante_principal_id?: string | null
         }
         Update: {
+          autorizacion_detalle?: string | null
+          autorizacion_ingreso?: string | null
           company_id?: string
           created_at?: string
           es_menor?: boolean
@@ -22860,6 +22871,7 @@ export type Database = {
           solicitud_mudanza_id?: string | null
           unidad_id?: string
           valido_hasta?: string | null
+          visita_frecuente_id?: string | null
           visitante_principal_id?: string | null
         }
         Relationships: [
@@ -22917,6 +22929,13 @@ export type Database = {
             columns: ["visitante_principal_id"]
             isOneToOne: false
             referencedRelation: "visitantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visitantes_visita_frecuente_id_fkey"
+            columns: ["visita_frecuente_id"]
+            isOneToOne: false
+            referencedRelation: "visitas_frecuentes"
             referencedColumns: ["id"]
           },
         ]
@@ -22978,60 +22997,87 @@ export type Database = {
       visitas_frecuentes: {
         Row: {
           activo: boolean
+          autorizado_en: string | null
+          autorizado_por: string | null
           company_id: string
           creado_por: string | null
           created_at: string
           dias_permitidos: string[] | null
+          estado: string
           foto_url: string | null
           hora_desde: string | null
           hora_hasta: string | null
           id: string
           identificacion: string | null
+          motivo_rechazo: string | null
           nombre: string
           notas: string | null
           placa_vehiculo: string | null
           project_id: string
           relacion: string
+          renovacion_solicitada_en: string | null
+          renovacion_solicitada_hasta: string | null
+          renovaciones: number
           telefono: string | null
           unidad_id: string
+          vigente_desde: string
+          vigente_hasta: string
         }
         Insert: {
           activo?: boolean
+          autorizado_en?: string | null
+          autorizado_por?: string | null
           company_id: string
           creado_por?: string | null
           created_at?: string
           dias_permitidos?: string[] | null
+          estado?: string
           foto_url?: string | null
           hora_desde?: string | null
           hora_hasta?: string | null
           id?: string
           identificacion?: string | null
+          motivo_rechazo?: string | null
           nombre: string
           notas?: string | null
           placa_vehiculo?: string | null
           project_id: string
           relacion?: string
+          renovacion_solicitada_en?: string | null
+          renovacion_solicitada_hasta?: string | null
+          renovaciones?: number
           telefono?: string | null
           unidad_id: string
+          vigente_desde?: string | null
+          vigente_hasta?: string | null
         }
         Update: {
           activo?: boolean
+          autorizado_en?: string | null
+          autorizado_por?: string | null
           company_id?: string
           creado_por?: string | null
           created_at?: string
           dias_permitidos?: string[] | null
+          estado?: string
           foto_url?: string | null
           hora_desde?: string | null
           hora_hasta?: string | null
           id?: string
           identificacion?: string | null
+          motivo_rechazo?: string | null
           nombre?: string
           notas?: string | null
           placa_vehiculo?: string | null
           project_id?: string
           relacion?: string
+          renovacion_solicitada_en?: string | null
+          renovacion_solicitada_hasta?: string | null
+          renovaciones?: number
           telefono?: string | null
           unidad_id?: string
+          vigente_desde?: string | null
+          vigente_hasta?: string | null
         }
         Relationships: [
           {

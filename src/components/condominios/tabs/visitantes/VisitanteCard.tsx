@@ -62,6 +62,12 @@ export function VisitanteCard({ ctx, v, isSTRMember = false }: { ctx: Visitantes
               {esAcompanante && (
                 <span style={{ padding: '2px 7px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Acompañante</span>
               )}
+              {v.autorizacion_ingreso === 'pre_autorizado' && (
+                <span title={v.autorizacion_detalle ?? undefined} style={{ padding: '2px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Pre-autorizado</span>
+              )}
+              {v.autorizacion_ingreso === 'residente' && (
+                <span title={v.autorizacion_detalle ?? undefined} style={{ padding: '2px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Autorizó residente</span>
+              )}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '3px' }}>
               {v.unidad_nombre && <span>📍 {v.unidad_nombre}</span>}
