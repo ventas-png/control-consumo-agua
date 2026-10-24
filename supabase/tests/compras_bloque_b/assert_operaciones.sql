@@ -2,7 +2,7 @@
 
 -- ============================================================================
 -- INVARIANTES · SUMINISTROS, PROFORMAS E INSTALACIONES CON PROVEEDOR COMPARTIDO
--- (migraciones 20261021000400 y 20261107000000). Corre después de assert_factura (usa P3 y la
+-- (migraciones 20261021000400 y 20261107000300). Corre después de assert_factura (usa P3 y la
 -- orden OF del proveedor P1).
 -- ============================================================================
 \set C   '''cccccccc-cccc-cccc-cccc-cccccccccccc'''
@@ -111,7 +111,7 @@ SELECT public.chk_falla($$ SELECT public.operaciones_vincular_proveedor('suminis
 RESET ROLE;
 SELECT public.chk((SELECT count(*) FROM vp5), 0, '5 · y su vista previa no los lista');
 
--- ── 6. Instalaciones: la empresa de servicio sale del catálogo (20261107000000) ──
+-- ── 6. Instalaciones: la empresa de servicio sale del catálogo (20261107000300) ──
 -- Históricos con empresa solo en texto, como los que ya existen en producción.
 INSERT INTO public.mantenimiento_cisterna (id, company_id, project_id, cisterna, empresa_servicio) VALUES
   ('60000000-0000-0000-0000-0000000000c1', :C::uuid, :C1::uuid, 'Cisterna principal', 'ferretería  BLOQUE b'),
