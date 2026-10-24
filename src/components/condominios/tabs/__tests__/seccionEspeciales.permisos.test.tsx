@@ -90,15 +90,25 @@ describe('Reglas de mora — Pausar exige canEdit', () => {
   })
 })
 
-eliminarExigeSuPermiso('Paquetería', p => render(
-  <PaqueteriaTab {...base} userId="u1" canCreate {...p} puedeVerCorrespondencia={false} unidades={[]} correspondencia={[]}
-    paquetes={[fila({ id: 'pq1', clase: 'paquete', direccion: 'entrante', tipo: 'paquete', descripcion: 'Caja de Amazon',
-      estado: 'pendiente', unidad_id: 'u1', unidad_nombre: 'A-101', hora_recepcion: '2026-10-10T10:00:00Z' })]} />,
-), /^Eliminar Caja de Amazon$/, borrar, 'paquetes_recibidos', 'pq1')
+// Eliminar vive en el detalle del paquete: se abre antes de buscarlo, así la
+// prueba sin permiso no pasa sola por no haber abierto la ventana.
+eliminarExigeSuPermiso('Paquetería', p => {
+  render(
+    <PaqueteriaTab {...base} userId="u1" canCreate {...p} puedeVerCorrespondencia={false} unidades={[]} correspondencia={[]}
+      paquetes={[fila({ id: 'pq1', clase: 'paquete', direccion: 'entrante', tipo: 'paquete', descripcion: 'Caja de Amazon',
+        estado: 'pendiente', unidad_id: 'u1', unidad_nombre: 'A-101', hora_recepcion: '2026-10-10T10:00:00Z' })]} />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Ver Caja de Amazon' }))
+  expect(screen.getByRole('dialog', { name: /Caja de Amazon/ })).toBeTruthy()
+}, /^Eliminar Caja de Amazon$/, borrar, 'paquetes_recibidos', 'pq1')
 
-eliminarExigeSuPermiso('Paquetería — salientes', p => render(
-  <PaqueteriaSalientesTab {...base} userId="u1" canCreate {...p} unidades={[]}
-    paquetes={[fila({ id: 'ps1', clase: 'paquete', direccion: 'saliente_tercero', tipo: 'paquete', descripcion: 'Llaves del depósito',
-      estado: 'pendiente', unidad_id: 'u1', unidad_nombre: 'A-101', autorizado_nombre: 'Juan', codigo_retiro: 'ABC123',
-      hora_recepcion: '2026-10-10T10:00:00Z' })]} />,
-), /^Eliminar Llaves del depósito$/, borrar, 'paquetes_recibidos', 'ps1')
+eliminarExigeSuPermiso('Paquetería — salientes', p => {
+  render(
+    <PaqueteriaSalientesTab {...base} userId="u1" canCreate {...p} unidades={[]}
+      paquetes={[fila({ id: 'ps1', clase: 'paquete', direccion: 'saliente_tercero', tipo: 'paquete', descripcion: 'Llaves del depósito',
+        estado: 'pendiente', unidad_id: 'u1', unidad_nombre: 'A-101', autorizado_nombre: 'Juan', codigo_retiro: 'ABC123',
+        hora_recepcion: '2026-10-10T10:00:00Z' })]} />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Ver Llaves del depósito' }))
+  expect(screen.getByRole('dialog', { name: /Llaves del depósito/ })).toBeTruthy()
+}, /^Eliminar Llaves del depósito$/, borrar, 'paquetes_recibidos', 'ps1')
