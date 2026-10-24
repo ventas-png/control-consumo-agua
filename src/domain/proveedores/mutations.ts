@@ -12,7 +12,7 @@ import { BUCKET_CONTRATOS_RESPALDO } from '../shared/buckets'
 import { comprasKeys } from '../compras/keys'
 import { cxpKeys } from '../cxp/keys'
 import { proveedoresKeys } from './keys'
-import { rpc } from './queries'
+import { rpc, type TablaOperacionConProveedor } from './queries'
 import type {
   ContactoFormInput,
   ContratoFormInput,
@@ -238,11 +238,11 @@ export function useVincularContratoMutation() {
   })
 }
 
-/** Vincula UN suministro o proforma histórico al proveedor del catálogo (decisión de una persona). */
+/** Vincula UN registro histórico (suministros, proformas o Instalaciones) al proveedor del catálogo (decisión de una persona). */
 export function useVincularOperacionMutation() {
   const invalidar = useInvalidarProveedores()
   return useMutation({
-    mutationFn: async (vars: { tabla: 'suministros_condominio' | 'proformas_condominio'; registroId: string; proveedorId: string }) =>
+    mutationFn: async (vars: { tabla: TablaOperacionConProveedor; registroId: string; proveedorId: string }) =>
       await rpc<null>('operaciones_vincular_proveedor', {
         p_tabla: vars.tabla,
         p_registro_id: vars.registroId,

@@ -5,6 +5,11 @@ import { notify } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
+import { useProveedoresQuery } from '../../../domain/cxp/queries'
+import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
+import type { ProveedorCatalogo } from '../../../types/proveedores'
+import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
+import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
 import { MantenimientoJardineria, TipoJardineria, EstadoJardineria } from '../../../types'
 
 interface Props {
@@ -40,7 +45,7 @@ const formVacio = () => ({
   fecha: hoyLocalISO(),
   tipo: 'mantenimiento_general' as TipoJardineria,
   areas: [] as string[],
-  proveedor: '', trabajadores: '', horas_trabajo: '',
+  proveedor_id: '', proveedor: '', trabajadores: '', horas_trabajo: '',
   insumos: '', costo: '', estado: 'completado' as EstadoJardineria,
   proxima_visita: '', observaciones: '',
 })
@@ -100,6 +105,12 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
   // No se cierra a mitad del guardado: cerrar ahí escondería el error.
   const cerrarForm = () => { if (!saving) setMostrarForm(false) }
 
+  // La empresa de servicio sale del CATÁLOGO COMPARTIDO por id (el mismo de
+  // Contabilidad y Operaciones), no de texto libre: así el registro sabe si el
+  // proveedor sigue autorizado en este proyecto y el servidor lo valida al guardar.
+  const { data: catalogo = [] } = useProveedoresQuery(companyId)
+  const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
+
   async function guardar() {
     if (saving) return
     if (!form.fecha || form.areas.length === 0) {
@@ -109,6 +120,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
     const { error } = await createCondominioRow('mantenimiento_jardineria', {
       company_id: companyId, project_id: proyectoId,
       fecha: form.fecha, tipo: form.tipo, areas: form.areas,
+      proveedor_id: form.proveedor_id || null,
       proveedor: form.proveedor.trim() || null,
       trabajadores: form.trabajadores ? parseInt(form.trabajadores) : null,
       horas_trabajo: form.horas_trabajo ? parseFloat(form.horas_trabajo) : null,
@@ -235,8 +247,11 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
               </select>
             </div>
             <div>
-              <label htmlFor="jardineria-proveedor" style={lbl}>Proveedor</label>
-              <input id="jardineria-proveedor" style={inp} placeholder="Empresa o persona" value={form.proveedor} onChange={e => setForm(p => ({ ...p, proveedor: e.target.value }))} />
+              <ProveedorSelector
+                proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
+                value={form.proveedor_id || null} soloHabilitados label="Proveedor"
+                onChange={(id, pr) => setForm(p => ({ ...p, proveedor_id: id ?? '', proveedor: pr?.nombre ?? '' }))}
+              />
             </div>
             <div>
               <label htmlFor="jardineria-trabajadores" style={lbl}>Trabajadores</label>
@@ -351,6 +366,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
             ) },
         ] satisfies DataTableColumn<MantenimientoJardineria>[]}
       />
+      <OperacionesLegadoPanel companyId={companyId} tabla="mantenimiento_jardineria" projectId={proyectoId} canEdit={canEdit} />
     </div>
   )
 }
@@ -365,7 +381,7 @@ function ServicioDetalle({ registro: r, dinero }: { registro: MantenimientoJardi
   )
   return (
     <div>
-      {fila('Proveedor', r.proveedor || '—')}
+      {fila('Proveedor', r.proveedor ? <>{r.proveedor}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)' }}> (sin vincular al catálogo)</span>}</> : '—')}
       {fila('Trabajadores', r.trabajadores ?? '—')}
       {fila('Horas de trabajo', r.horas_trabajo != null ? `${r.horas_trabajo} h` : '—')}
       {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}

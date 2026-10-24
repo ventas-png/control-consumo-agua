@@ -6,6 +6,11 @@ import { tint } from '../../shared/statusTone'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
+import { useProveedoresQuery } from '../../../domain/cxp/queries'
+import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
+import type { ProveedorCatalogo } from '../../../types/proveedores'
+import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
+import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
 import { ControlSistemaIncendio, TipoSistemaIncendio, TipoInspeccionIncendio, ResultadoInspeccionIncendio } from '../../../types'
 
 interface Props {
@@ -60,7 +65,7 @@ function ResultadoBadge({ resultado }: { resultado: ResultadoInspeccionIncendio 
   return <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: res?.bg, color: res?.color, whiteSpace: 'nowrap' }}>{res?.icon} {res?.label ?? resultado}</span>
 }
 
-export default function ControlSistemaIncendioTab({ registros, proyectoId, companyId, moneda, canCreate, onRefresh }: Props) {
+export default function ControlSistemaIncendioTab({ registros, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [detalleId, setDetalleId] = useState<string | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -73,7 +78,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
     identificador: '', ubicacion: '',
     tipo_inspeccion: 'revision_visual' as TipoInspeccionIncendio,
     resultado: 'aprobado' as ResultadoInspeccionIncendio,
-    fecha_vencimiento: '', empresa_servicio: '', tecnico: '',
+    fecha_vencimiento: '', proveedor_id: '', empresa_servicio: '', tecnico: '',
     costo: '', proxima_inspeccion: '', observaciones: '',
   })
 
@@ -128,6 +133,12 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
   // No se cierra a mitad del guardado: cerrar ahí escondería el error.
   const cerrarForm = () => { if (!saving) setMostrarForm(false) }
 
+  // La empresa de servicio sale del CATÁLOGO COMPARTIDO por id (el mismo de
+  // Contabilidad y Operaciones), no de texto libre: así el registro sabe si el
+  // proveedor sigue autorizado en este proyecto y el servidor lo valida al guardar.
+  const { data: catalogo = [] } = useProveedoresQuery(companyId)
+  const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
+
   async function guardar() {
     if (saving) return
     if (!form.identificador.trim() || !form.ubicacion.trim()) {
@@ -140,6 +151,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
       identificador: form.identificador.trim(), ubicacion: form.ubicacion.trim(),
       tipo_inspeccion: form.tipo_inspeccion, resultado: form.resultado,
       fecha_vencimiento: form.fecha_vencimiento || null,
+      proveedor_id: form.proveedor_id || null,
       empresa_servicio: form.empresa_servicio.trim() || null,
       tecnico: form.tecnico.trim() || null,
       costo: form.costo ? parseFloat(form.costo) : null,
@@ -290,8 +302,11 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
               <input id="incendio-proxima" type="date" min={form.fecha || undefined} style={inp} value={form.proxima_inspeccion} onChange={e => setForm(p => ({ ...p, proxima_inspeccion: e.target.value }))} />
             </div>
             <div>
-              <label htmlFor="incendio-empresa" style={lbl}>Empresa de servicio</label>
-              <input id="incendio-empresa" style={inp} value={form.empresa_servicio} onChange={e => setForm(p => ({ ...p, empresa_servicio: e.target.value }))} />
+              <ProveedorSelector
+                proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
+                value={form.proveedor_id || null} soloHabilitados label="Empresa de servicio"
+                onChange={(id, pr) => setForm(p => ({ ...p, proveedor_id: id ?? '', empresa_servicio: pr?.nombre ?? '' }))}
+              />
             </div>
             <div>
               <label htmlFor="incendio-tecnico" style={lbl}>Técnico</label>
@@ -388,6 +403,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
             ) },
         ] satisfies DataTableColumn<ControlSistemaIncendio>[]}
       />
+      <OperacionesLegadoPanel companyId={companyId} tabla="control_sistema_incendio" projectId={proyectoId} canEdit={canEdit} />
     </div>
   )
 }
@@ -415,7 +431,7 @@ function InspeccionDetalle({ registro: r, vigente, dinero }: { registro: Control
         ? <strong style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>{r.fecha_vencimiento}{vencido ? ' · vencido' : ''}</strong>
         : '—')}
       {fila('Próxima inspección', r.proxima_inspeccion ? <strong style={{ color: 'var(--at-accent)' }}>{r.proxima_inspeccion}</strong> : '—')}
-      {fila('Empresa de servicio', r.empresa_servicio || '—')}
+      {fila('Empresa de servicio', r.empresa_servicio ? <>{r.empresa_servicio}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)' }}> (sin vincular al catálogo)</span>}</> : '—')}
       {fila('Técnico', r.tecnico || '—')}
       {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
       {r.observaciones && (

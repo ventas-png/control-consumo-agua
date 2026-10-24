@@ -547,6 +547,8 @@ export interface ControlGenerador {
   frecuencia?: number | null
   operador?: string | null
   empresa_servicio?: string | null
+  /** Empresa de servicio del catálogo compartido. null = histórico (solo texto en `empresa_servicio`). */
+  proveedor_id?: string | null
   costo?: number | null
   proximo_mantenimiento?: string | null
   observaciones?: string | null
@@ -569,6 +571,8 @@ export interface ControlSistemaIncendio {
   resultado: ResultadoInspeccionIncendio
   fecha_vencimiento?: string | null
   empresa_servicio?: string | null
+  /** Empresa de servicio del catálogo compartido. null = histórico (solo texto en `empresa_servicio`). */
+  proveedor_id?: string | null
   tecnico?: string | null
   costo?: number | null
   proxima_inspeccion?: string | null

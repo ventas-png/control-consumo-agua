@@ -6,6 +6,11 @@ import { tint } from '../../shared/statusTone'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
+import { useProveedoresQuery } from '../../../domain/cxp/queries'
+import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
+import type { ProveedorCatalogo } from '../../../types/proveedores'
+import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
+import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
 import { ControlGenerador, TipoRegistroGenerador, EstadoGenerador } from '../../../types'
 
 interface Props {
@@ -53,7 +58,7 @@ function EstadoBadge({ estado }: { estado: EstadoGenerador }) {
   return <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: est?.bg, color: est?.color, whiteSpace: 'nowrap' }}>{est?.icon} {est?.label ?? estado}</span>
 }
 
-export default function ControlGeneradorTab({ registros, proyectoId, companyId, moneda, canCreate, onRefresh }: Props) {
+export default function ControlGeneradorTab({ registros, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [filtroGenerador, setFiltroGenerador] = useState('')
   const [filtroTipo, setFiltroTipo] = useState<TipoRegistroGenerador | ''>('')
   const [mostrarForm, setMostrarForm] = useState(false)
@@ -67,7 +72,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
     nivel_combustible_pct: '', horas_operacion: '', horas_acumuladas: '',
     estado: 'standby' as EstadoGenerador,
     voltaje: '', frecuencia: '',
-    operador: '', empresa_servicio: '', costo: '',
+    operador: '', proveedor_id: '', empresa_servicio: '', costo: '',
     proximo_mantenimiento: '', observaciones: '',
   })
 
@@ -106,6 +111,12 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
   // No se cierra a mitad del guardado: cerrar ahí escondería el error.
   const cerrarForm = () => { if (!saving) setMostrarForm(false) }
 
+  // La empresa de servicio sale del CATÁLOGO COMPARTIDO por id (el mismo de
+  // Contabilidad y Operaciones), no de texto libre: así el registro sabe si el
+  // proveedor sigue autorizado en este proyecto y el servidor lo valida al guardar.
+  const { data: catalogo = [] } = useProveedoresQuery(companyId)
+  const { data: asignaciones = [] } = useAsignacionesQuery(companyId, proyectoId)
+
   async function guardar() {
     if (saving) return
     if (!form.generador.trim()) {
@@ -122,6 +133,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
       voltaje: form.voltaje ? parseFloat(form.voltaje) : null,
       frecuencia: form.frecuencia ? parseFloat(form.frecuencia) : null,
       operador: form.operador.trim() || null,
+      proveedor_id: form.proveedor_id || null,
       empresa_servicio: form.empresa_servicio.trim() || null,
       costo: form.costo ? parseFloat(form.costo) : null,
       proximo_mantenimiento: form.proximo_mantenimiento || null,
@@ -317,8 +329,11 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
               <input id="generador-operador" style={inp} value={form.operador} onChange={e => setForm(p => ({ ...p, operador: e.target.value }))} />
             </div>
             <div>
-              <label htmlFor="generador-empresa" style={lbl}>Empresa de servicio</label>
-              <input id="generador-empresa" style={inp} value={form.empresa_servicio} onChange={e => setForm(p => ({ ...p, empresa_servicio: e.target.value }))} />
+              <ProveedorSelector
+                proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
+                value={form.proveedor_id || null} soloHabilitados label="Empresa de servicio"
+                onChange={(id, pr) => setForm(p => ({ ...p, proveedor_id: id ?? '', empresa_servicio: pr?.nombre ?? '' }))}
+              />
             </div>
             <div>
               <label htmlFor="generador-costo" style={lbl}>Costo ({moneda})</label>
@@ -398,6 +413,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
             ) },
         ] satisfies DataTableColumn<ControlGenerador>[]}
       />
+      <OperacionesLegadoPanel companyId={companyId} tabla="control_generador" projectId={proyectoId} canEdit={canEdit} />
     </div>
   )
 }
@@ -421,7 +437,7 @@ function RegistroDetalle({ registro: r, dinero }: { registro: ControlGenerador; 
       {fila('Voltaje', r.voltaje != null ? `${r.voltaje} V` : '—')}
       {fila('Frecuencia', r.frecuencia != null ? `${r.frecuencia} Hz` : '—')}
       {fila('Operador', r.operador || '—')}
-      {fila('Empresa de servicio', r.empresa_servicio || '—')}
+      {fila('Empresa de servicio', r.empresa_servicio ? <>{r.empresa_servicio}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)' }}> (sin vincular al catálogo)</span>}</> : '—')}
       {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
       {fila('Próximo mantenimiento', r.proximo_mantenimiento
         ? <strong style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-warning)' }}>{r.proximo_mantenimiento}{vencido ? ' · vencido' : ''}</strong>
