@@ -10,7 +10,7 @@ import { NotificationBell } from '../layout/NotificationBell'
 import type {
   UserSession, Unidad, CuotaCondominio, Amenidad,
   ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento,
-  AnuncioComunidad, Visitante, MensajePortal, SolicitudRentaUnidad, PaqueteRecibido, PiezaRecepcion,
+  AnuncioComunidad, Visitante, VisitaFrecuente, MensajePortal, SolicitudRentaUnidad, PaqueteRecibido, PiezaRecepcion,
   ComunicadoCondominio,
 } from '../../types'
 import { PortalReservasTab }   from '../condominios/tabs/PortalReservasTab'
@@ -112,6 +112,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [tickets, setTickets]                     = useState<TicketMantenimiento[]>([])
   const [anuncios, setAnuncios]                   = useState<AnuncioComunidad[]>([])
   const [visitantes, setVisitantes]               = useState<Visitante[]>([])
+  const [visitasFrecuentes, setVisitasFrecuentes] = useState<VisitaFrecuente[]>([])
   const [mensajes, setMensajes]                   = useState<MensajePortal[]>([])
   const [solicitudesRenta, setSolicitudesRenta]   = useState<SolicitudRentaUnidad[]>([])
   const [paquetes, setPaquetes]                   = useState<PaqueteRecibido[]>([])
@@ -148,7 +149,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       // capa domain; el portal muestra actividad reciente, el admin tiene su loader).
       const {
         projData, amenidadesData, cuotasData, reservasData, bloqueosData,
-        ticketsData, anunciosData, visitantesData, mensajesData,
+        ticketsData, anunciosData, visitantesData, visitasFrecuentesData, mensajesData,
         solicitudesRentaData, paquetesData, correspondenciaData, comunicadosData,
         pestanasData,
       } = await fetchCondominiosPortalData(projectIds, unidadIds)
@@ -169,6 +170,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       setTickets((ticketsData as TicketMantenimiento[]) ?? [])
       setAnuncios((anunciosData as AnuncioComunidad[]) ?? [])
       setVisitantes((visitantesData as Visitante[]) ?? [])
+      setVisitasFrecuentes((visitasFrecuentesData as VisitaFrecuente[]) ?? [])
       setMensajes((mensajesData as MensajePortal[]) ?? [])
       setSolicitudesRenta((solicitudesRentaData as SolicitudRentaUnidad[]) ?? [])
       setPaquetes(((paquetesData as (PaqueteRecibido & { unidades?: { nombre: string } | null })[]) ?? [])
@@ -331,6 +333,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const cuotasU        = cuotas.filter(c => c.unidad_id === selectedUnidadId)
   const ticketsU       = tickets.filter(t => t.unidad_id === selectedUnidadId)
   const visitantesU    = visitantes.filter(v => v.unidad_id === selectedUnidadId)
+  const visitasFrecuentesU = visitasFrecuentes.filter(v => v.unidad_id === selectedUnidadId)
   const paquetesU      = paquetes.filter(p => p.unidad_id === selectedUnidadId)
   const correspondenciaU = correspondencia.filter(c => c.unidad_id === selectedUnidadId)
   const mensajesU      = mensajes.filter(m => m.unidad_id === selectedUnidadId)
@@ -593,6 +596,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
             {tab === 'visitantes' && (
               <PortalVisitantesTab
                 visitantes={visitantesU}
+                visitasFrecuentes={visitasFrecuentesU}
                 unidadId={selectedUnidadId}
                 proyectoId={proyectoId}
                 companyId={resolvedCompanyId}

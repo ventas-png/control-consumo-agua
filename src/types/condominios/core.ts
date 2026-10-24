@@ -100,9 +100,20 @@ export interface Visitante {
   visitante_principal_id?: string | null
   reserva_str_id?: string | null
   solicitud_mudanza_id?: string | null
+  /** Visita frecuente (pre-autorización) que amparó este ingreso, si la hubo. */
+  visita_frecuente_id?: string | null
+  /**
+   * Cómo se autorizó el ingreso: 'pre_autorizado' (cumplía la visita
+   * frecuente aprobada), 'residente' (el residente lo autorizó en el momento)
+   * o NULL (registro común del guardia).
+   */
+  autorizacion_ingreso?: AutorizacionIngreso | null
+  autorizacion_detalle?: string | null
   // joins opcionales
   unidad_nombre?: string
 }
+
+export type AutorizacionIngreso = 'pre_autorizado' | 'residente'
 
 export interface Amenidad {
   id: string

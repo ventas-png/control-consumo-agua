@@ -243,6 +243,8 @@ export interface CondominiosPortalData {
   ticketsData: unknown[] | null
   anunciosData: unknown[] | null
   visitantesData: unknown[] | null
+  /** Visitas frecuentes (pre-autorizaciones) de las unidades del residente, en cualquier estado. */
+  visitasFrecuentesData: unknown[] | null
   mensajesData: unknown[] | null
   solicitudesRentaData: unknown[] | null
   paquetesData: unknown[] | null
@@ -270,7 +272,7 @@ export async function fetchCondominiosPortalData(
 
   const [
     projRes, amenidadesRes, cuotasRes, reservasRes, bloqueosRes, ticketsRes,
-    anunciosRes, visitantesRes, mensajesRes, solicitudesRentaRes, paquetesRes,
+    anunciosRes, visitantesRes, visitasFrecuentesRes, mensajesRes, solicitudesRentaRes, paquetesRes,
     correspondenciaRes, comunicadosRes, pestanasRes,
   ] = await Promise.all([
     db.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
@@ -289,6 +291,10 @@ export async function fetchCondominiosPortalData(
       .limit(200),
     db.from('anuncios_comunidad').select('*').in('project_id', projectIds).eq('activo', true).order('created_at', { ascending: false }),
     db.from('visitantes').select('*').in('unidad_id', unidadIds).order('hora_entrada', { ascending: false }).limit(200),
+    // Pre-autorizaciones de ingreso (20261107000000): el residente las
+    // solicita aquí y ve si la administración ya las aprobó. La RLS ya le
+    // concedía las filas de su unidad (20260602000050).
+    db.from('visitas_frecuentes').select('*').in('unidad_id', unidadIds).order('nombre'),
     db.from('mensajes_portal').select('*').in('unidad_id', unidadIds)
       .gte('created_at', sesentaDias)
       .order('created_at', { ascending: false })
@@ -328,6 +334,7 @@ export async function fetchCondominiosPortalData(
     ticketsData: ticketsRes.data,
     anunciosData: anunciosRes.data,
     visitantesData: visitantesRes.data,
+    visitasFrecuentesData: visitasFrecuentesRes.data,
     mensajesData: mensajesRes.data,
     solicitudesRentaData: solicitudesRentaRes.data,
     paquetesData: paquetesRes.data,

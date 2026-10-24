@@ -7,14 +7,31 @@ import { ImageUploader } from '../../../shared/ImageUploader'
 import { EditModal } from '../../../shared/EditModal'
 import { Button } from '../../../shared/Button'
 import { defaultAcompForm } from './ctx'
+import { PreautorizacionPanel } from './PreautorizacionPanel'
+import { estadoVisita, relacionLabel } from '../../../../lib/visitasFrecuentes'
 
 export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
   const { unidades, saving, fotoUrl, setFotoUrl, fotoDocumentoUrl, setFotoDocumentoUrl, fotoVehiculoUrl, setFotoVehiculoUrl, fotosExpiradas, strCtx, mudanzaCtx, form, setForm, formEsMenor, setFormEsMenor, formFechaNacimiento, setFormFechaNacimiento, acompanantes, showAcompForm, setShowAcompForm, acompForm, setAcompForm, sugerencias, acompSugerencias, resetForm, autocompletar, autocompletarAcompanante, agregarAcompanante, quitarAcompanante, handleRegistrar } = ctx
+  const { frecuentesSugeridas, visitaFrecuenteSel, evaluacionFrecuente, requiereAutorizacionResidente, autorizacionResidente, seleccionarFrecuente } = ctx
   const cerrar = () => { if (!saving) resetForm() }
+  const sufijoAcomp = acompanantes.length > 0 ? ` (+${acompanantes.length})` : ''
+  // El botón dice lo que va a pasar: pre-autorizado, con autorización del
+  // residente, denegado (no entra) o el registro común. Sin respuesta del
+  // residente cuando hace falta, no hay botón que apretar.
+  const deniega = requiereAutorizacionResidente && autorizacionResidente.decision === 'deniega'
+  const faltaRespuesta = requiereAutorizacionResidente && autorizacionResidente.decision === ''
+  const etiquetaRegistrar = visitaFrecuenteSel && evaluacionFrecuente?.cumple
+    ? `✓ Registrar ingreso pre-autorizado${sufijoAcomp}`
+    : deniega
+      ? '⛔ Registrar ingreso denegado'
+      : requiereAutorizacionResidente
+        ? `✓ Registrar con autorización del residente${sufijoAcomp}`
+        : `✓ Registrar entrada${sufijoAcomp}`
+  const unidadDe = (id: string) => unidades.find(u => u.id === id)?.nombre
   return (
     <EditModal
       title="Registrar visitante"
-      subtitle={strCtx ? '🏠 Renta corta — ingreso al grupo' : mudanzaCtx ? '🚛 Mudanza autorizada — ingreso al grupo' : undefined}
+      subtitle={strCtx ? '🏠 Renta corta — ingreso al grupo' : mudanzaCtx ? '🚛 Mudanza autorizada — ingreso al grupo' : visitaFrecuenteSel ? '👨‍👩‍👧 Visita frecuente — verificación de pre-autorización' : undefined}
       maxWidth="640px"
       fullScreenOnMobile
       onClose={cerrar}
@@ -23,8 +40,9 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
       footer={
         <>
           <Button variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
-          <Button onClick={() => void handleRegistrar()} loading={saving} loadingText="Registrando…">
-            {`✓ Registrar entrada${acompanantes.length > 0 ? ` (+${acompanantes.length})` : ''}`}
+          <Button variant={deniega ? 'danger' : 'primary'} onClick={() => void handleRegistrar()} loading={saving} loadingText="Registrando…" disabled={faltaRespuesta}
+            title={faltaRespuesta ? 'Confirme con el residente si autoriza el ingreso' : undefined}>
+            {etiquetaRegistrar}
           </Button>
         </>
       }
@@ -35,9 +53,25 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                 <input id="visita-nombre" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
                   placeholder="Nombre del visitante"
                   style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                {frecuentesSugeridas.length > 0 && (
+                  <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Pre-autorizados:</span>
+                    {frecuentesSugeridas.map(vf => {
+                      const vigente = estadoVisita(vf) === 'aprobada' && vf.activo
+                      return (
+                        <button key={vf.id} type="button" onClick={() => seleccionarFrecuente(vf)}
+                          aria-label={`Visita frecuente ${vf.nombre}`}
+                          style={{ padding: '3px 10px', background: vigente ? 'var(--at-success-tint)' : 'var(--at-warning-tint)', color: vigente ? 'var(--at-success)' : 'var(--at-warning-strong)', border: `1px solid ${vigente ? 'var(--at-success-border)' : 'var(--at-warning-border)'}`, borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                          {vigente ? '✅' : '⚠️'} {vf.nombre}{unidadDe(vf.unidad_id) ? ` · ${unidadDe(vf.unidad_id)}` : ''} · {relacionLabel(vf.relacion)}
+                          {!vigente && <span style={{ fontWeight: 400 }}> · {estadoVisita(vf) !== 'aprobada' ? estadoVisita(vf) : 'suspendida'}</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
                 {sugerencias.length > 0 && (
                   <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Frecuente:</span>
+                    <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Anteriores:</span>
                     {sugerencias.map((v, i) => (
                       <button key={i} type="button" onClick={() => autocompletar(v)}
                         style={{ padding: '3px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
@@ -47,6 +81,7 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                   </div>
                 )}
               </div>
+              {visitaFrecuenteSel && <PreautorizacionPanel ctx={ctx} />}
               <div>
                 <label htmlFor="visita-unidad" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
                 <select id="visita-unidad" value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
@@ -79,7 +114,7 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                       style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
                     {sugerencias.length > 0 && (
                       <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Frecuente:</span>
+                        <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Anteriores:</span>
                         {sugerencias.map((v, i) => (
                           <button key={i} type="button" onClick={() => autocompletar(v)}
                             style={{ padding: '3px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
@@ -189,7 +224,7 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                       style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
                     {acompSugerencias.length > 0 && (
                       <div style={{ marginTop: '5px', display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Frecuente:</span>
+                        <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Anteriores:</span>
                         {acompSugerencias.map((v, i) => (
                           <button key={i} type="button" onClick={() => autocompletarAcompanante(v)}
                             style={{ padding: '3px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
@@ -218,7 +253,7 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                         style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
                       {acompSugerencias.length > 0 && (
                         <div style={{ marginTop: '5px', display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
-                          <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Frecuente:</span>
+                          <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Anteriores:</span>
                           {acompSugerencias.map((v, i) => (
                             <button key={i} type="button" onClick={() => autocompletarAcompanante(v)}
                               style={{ padding: '3px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>

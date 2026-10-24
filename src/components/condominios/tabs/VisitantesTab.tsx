@@ -5,8 +5,12 @@ import { createCondominioRow, updateCondominioRow, updateCondominioRowsByIds } f
 import { fetchHuespedesByReservas } from '../../../domain/condominios/tabQueries'
 import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
-import type { Visitante, Unidad, ReservaSTR, HuespedSTR, SolicitudMudanzaUnidad } from '../../../types'
+import type { Visitante, Unidad, ReservaSTR, HuespedSTR, SolicitudMudanzaUnidad, VisitaFrecuente } from '../../../types'
 import { rangosDeFecha, kpisVisitantes, sugerenciasVisitantes, filtrarVisitantes, agruparVisitantes, type FiltroFechaVisitas } from '../../../lib/visitantesFiltros'
+import {
+  autorizacionResidenteVacia, buscarVisitasFrecuentes, describirAutorizacionResidente, evaluarVisitaFrecuente, relacionLabel,
+  type AutorizacionResidenteForm,
+} from '../../../lib/visitasFrecuentes'
 import type { VisitantesCtx } from './visitantes/ctx'
 import { defaultAcompForm, type AcompananteForm, type TipoNovedad, type PrioridadNovedad } from './visitantes/ctx'
 import { PLATAFORMA_LABEL, TIPO_MUDANZA_LABEL } from './visitantes/ui'
@@ -25,6 +29,12 @@ interface Props {
   unidades: Unidad[]
   reservasSTR: ReservaSTR[]
   solicitudesMudanza: SolicitudMudanzaUnidad[]
+  /**
+   * Pre-autorizaciones del proyecto. Al registrar, el guardia las busca por
+   * nombre/DPI/placa y el sistema valida día, horario y vigencia: si cumple el
+   * ingreso queda pre-autorizado; si no, hay que confirmar con el residente.
+   */
+  visitasFrecuentes?: VisitaFrecuente[]
   proyectoId: string
   companyId: string
   userId: string
@@ -35,7 +45,7 @@ interface Props {
 
 type FiltroFecha = FiltroFechaVisitas
 
-export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMudanza, proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, onRefresh }: Props) {
+export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMudanza, visitasFrecuentes = [], proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [busqueda, setBusqueda] = useState('')
@@ -68,6 +78,10 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   const [mudanzaSearch, setMudanzaSearch] = useState('')
   const [mudanzaCtx, setMudanzaCtx] = useState<{ solicitudId: string } | null>(null)
   const [form, setForm] = useState({ unidad_id: '', nombre: '', identificacion: '', placa_vehiculo: '', motivo: '', notas: '' })
+  // Pre-autorización: la visita frecuente elegida para este ingreso y, si no
+  // cumple día/horario/vigencia, lo que respondió el residente.
+  const [visitaFrecuenteSel, setVisitaFrecuenteSel] = useState<VisitaFrecuente | null>(null)
+  const [autorizacionResidente, setAutorizacionResidente] = useState<AutorizacionResidenteForm>(autorizacionResidenteVacia)
 
   // Minor & companions state
   const [formEsMenor, setFormEsMenor] = useState(false)
@@ -114,6 +128,15 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   const filtrados = filtrarVisitantes(visitantes, { busqueda, soloActivos, filtroFecha, rangos })
   const { strGruposMap, mudanzaGruposMap, regulares } = agruparVisitantes(filtrados, reservasSTR, solicitudesMudanza)
 
+  // Pre-autorizados que coinciden con lo tecleado (sólo mientras no haya uno
+  // elegido). La evaluación se hace al render con la hora actual del
+  // dispositivo del guardia y se repite al guardar, que es la que vale.
+  const frecuentesSugeridas = visitaFrecuenteSel
+    ? []
+    : buscarVisitasFrecuentes(visitasFrecuentes, { nombre: form.nombre, identificacion: form.identificacion, placa: form.placa_vehiculo })
+  const evaluacionFrecuente = visitaFrecuenteSel ? evaluarVisitaFrecuente(visitaFrecuenteSel) : null
+  const requiereAutorizacionResidente = !!evaluacionFrecuente && !evaluacionFrecuente.cumple
+
   // Eligible mudanzas for guard check-in: aprobada / programada / en_curso
   const mudanzasElegibles = solicitudesMudanza.filter(s =>
     s.estado === 'aprobada' || s.estado === 'programada' || s.estado === 'en_curso'
@@ -133,7 +156,31 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     setAcompForm(defaultAcompForm())
     setStrCtx(null)
     setMudanzaCtx(null)
+    setVisitaFrecuenteSel(null)
+    setAutorizacionResidente(autorizacionResidenteVacia())
     setShowForm(false)
+  }
+
+  function seleccionarFrecuente(vf: VisitaFrecuente) {
+    setForm(f => ({
+      ...f,
+      nombre: vf.nombre,
+      identificacion: vf.identificacion ?? '',
+      placa_vehiculo: vf.placa_vehiculo ?? f.placa_vehiculo,
+      unidad_id: vf.unidad_id,
+      motivo: f.motivo || `Visita frecuente · ${relacionLabel(vf.relacion)}`,
+    }))
+    if (vf.foto_url) setFotoUrl(vf.foto_url)
+    setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
+    setStrCtx(null)
+    setMudanzaCtx(null)
+    setVisitaFrecuenteSel(vf)
+    setAutorizacionResidente(autorizacionResidenteVacia())
+  }
+
+  function quitarFrecuente() {
+    setVisitaFrecuenteSel(null)
+    setAutorizacionResidente(autorizacionResidenteVacia())
   }
 
   function abrirRegistroMudanza(s: SolicitudMudanzaUnidad) {
@@ -163,6 +210,8 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     setShowAcompForm(false)
     setStrCtx(null)
     setMudanzaCtx({ solicitudId: s.id })
+    setVisitaFrecuenteSel(null)
+    setAutorizacionResidente(autorizacionResidenteVacia())
     setShowMudanzaModal(false)
     setMudanzaSearch('')
     setShowForm(true)
@@ -188,6 +237,8 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     setShowAcompForm(false)
     setStrCtx({ reservaId: r.id, huespedId: huesped?.id })
     setMudanzaCtx(null)
+    setVisitaFrecuenteSel(null)
+    setAutorizacionResidente(autorizacionResidenteVacia())
     setShowStrModal(false)
     setStrSearch('')
     setShowForm(true)
@@ -251,10 +302,83 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     setAcompanantes(prev => prev.filter(a => a.tempId !== tempId))
   }
 
+  /**
+   * El residente NO autorizó a quien se presentó fuera de lo pre-autorizado:
+   * la persona no entra, así que no hay fila en `visitantes`. Queda como
+   * novedad de seguridad (tipo acceso) con todo el detalle para que la
+   * administración lo vea en la misma bitácora que las demás novedades.
+   */
+  async function registrarIngresoDenegado(vf: VisitaFrecuente, detalle: string) {
+    setSaving(true)
+    const unidadNombre = unidades.find(u => u.id === form.unidad_id)?.nombre ?? null
+    const partes: string[] = [`Ingreso denegado: ${form.nombre.trim()}`]
+    if (form.identificacion.trim()) partes.push(`DPI: ${form.identificacion.trim()}`)
+    if (unidadNombre) partes.push(`Unidad: ${unidadNombre}`)
+    if (form.placa_vehiculo.trim()) partes.push(`Vehículo: ${form.placa_vehiculo.trim()}`)
+    partes.push(`Visita frecuente: ${vf.nombre} (${relacionLabel(vf.relacion)})`)
+    if (acompanantes.length > 0) partes.push(`Acompañantes: ${acompanantes.map(a => a.nombre).join(', ')}`)
+    const { error } = await createCondominioRow('novedades_seguridad', {
+      company_id: companyId,
+      project_id: proyectoId,
+      ronda_id: null,
+      tipo: 'acceso',
+      descripcion: `${partes.join(' | ')}\n\n${detalle}`,
+      ubicacion: unidadNombre,
+      prioridad: 'normal',
+      reportado_por: userId,
+      foto_url: fotoUrl,
+      fotos: fotoUrl ? [fotoUrl] : null,
+    })
+    setSaving(false)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    notify({ variant: 'warning', title: 'Ingreso denegado registrado', text: 'Quedó en la bitácora de novedades de seguridad. La persona no se registra como visitante.' })
+    resetForm()
+    onRefresh()
+  }
+
   async function handleRegistrar() {
     if (saving) return
     if (!form.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del visitante.' }); return }
     if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad a visitar.' }); return }
+
+    // Pre-autorización: se vuelve a evaluar AQUÍ, con la hora de este instante
+    // (la del render pudo quedarse vieja con la ventana abierta un rato).
+    const ev = visitaFrecuenteSel ? evaluarVisitaFrecuente(visitaFrecuenteSel) : null
+    if (visitaFrecuenteSel && form.unidad_id !== visitaFrecuenteSel.unidad_id) {
+      // La autorización es DE UNA UNIDAD: ligarla a otra sería dar por
+      // pre-autorizado un ingreso que nadie autorizó.
+      const unidadVf = unidades.find(u => u.id === visitaFrecuenteSel.unidad_id)?.nombre ?? 'otra unidad'
+      notify({ variant: 'warning', title: 'La unidad no coincide', text: `${visitaFrecuenteSel.nombre} está pre-autorizado para ${unidadVf}. Corrija la unidad o quite la visita frecuente.` })
+      return
+    }
+    let autorizacion: { visita_frecuente_id: string; autorizacion_ingreso: 'pre_autorizado' | 'residente'; autorizacion_detalle: string; pre_autorizado_por: string | null } | null = null
+    if (visitaFrecuenteSel && ev) {
+      if (ev.cumple) {
+        autorizacion = {
+          visita_frecuente_id: visitaFrecuenteSel.id,
+          autorizacion_ingreso: 'pre_autorizado',
+          autorizacion_detalle: `Pre-autorizado por administración · ${ev.autorizado}`,
+          pre_autorizado_por: visitaFrecuenteSel.autorizado_por ?? null,
+        }
+      } else {
+        if (autorizacionResidente.decision === '') {
+          notify({ variant: 'warning', title: 'Falta la respuesta del residente', text: `${visitaFrecuenteSel.nombre} no cumple la pre-autorización. Confirme con el residente si autoriza o no el ingreso.` })
+          return
+        }
+        const detalle = describirAutorizacionResidente(ev, autorizacionResidente)
+        if (autorizacionResidente.decision === 'deniega') {
+          await registrarIngresoDenegado(visitaFrecuenteSel, detalle)
+          return
+        }
+        autorizacion = {
+          visita_frecuente_id: visitaFrecuenteSel.id,
+          autorizacion_ingreso: 'residente',
+          autorizacion_detalle: detalle,
+          pre_autorizado_por: null,
+        }
+      }
+    }
+
     setSaving(true)
     const horaEntrada = new Date().toISOString()
     // cond:C2 — pre-validación Zod en boundary de persistencia. El schema
@@ -278,6 +402,10 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
       fecha_nacimiento: formEsMenor && formFechaNacimiento ? formFechaNacimiento : null,
       reserva_str_id: strCtx?.reservaId ?? null,
       solicitud_mudanza_id: mudanzaCtx?.solicitudId ?? null,
+      visita_frecuente_id: autorizacion?.visita_frecuente_id ?? null,
+      autorizacion_ingreso: autorizacion?.autorizacion_ingreso ?? null,
+      autorizacion_detalle: autorizacion?.autorizacion_detalle ?? null,
+      pre_autorizado_por: autorizacion?.pre_autorizado_por ?? null,
     }, { returning: true })
 
     if (error) { setSaving(false); notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -339,9 +467,14 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     }
 
     setSaving(false)
+    const base = autorizacion?.autorizacion_ingreso === 'pre_autorizado'
+      ? 'Ingreso pre-autorizado registrado'
+      : autorizacion?.autorizacion_ingreso === 'residente'
+        ? 'Ingreso registrado con autorización del residente'
+        : 'Visita registrada'
     const msg = acompanantes.length > 0
-      ? `Visita registrada con ${acompanantes.length} acompañante${acompanantes.length > 1 ? 's' : ''}`
-      : 'Visita registrada'
+      ? `${base} con ${acompanantes.length} acompañante${acompanantes.length > 1 ? 's' : ''}`
+      : base
     notify({ variant: 'success', title: msg, duration: 1500 })
     resetForm()
     onRefresh()
@@ -471,12 +604,13 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   }
 
   const ctx: VisitantesCtx = {
-    visitantes, unidades, reservasSTR, solicitudesMudanza, proyectoId, companyId, userId, proyectoNombre, canCreate, onRefresh, showForm, setShowForm,
+    visitantes, unidades, reservasSTR, solicitudesMudanza, visitasFrecuentes, proyectoId, companyId, userId, proyectoNombre, canCreate, onRefresh, showForm, setShowForm,
     saving, busqueda, setBusqueda, soloActivos, setSoloActivos, filtroFecha, setFiltroFecha, salidaPendiente, setSalidaPendiente, modoSalida, setModoSalida, guardandoSalida,
     novedadForm, setNovedadForm, fotosNovedad, setFotosNovedad, visitanteDetalle, setVisitanteDetalle, fotoUrl, setFotoUrl, fotoDocumentoUrl, setFotoDocumentoUrl, fotoVehiculoUrl, setFotoVehiculoUrl,
     fotosExpiradas, setFotosExpiradas, showStrModal, setShowStrModal, strSearch, setStrSearch, strHuespedes, strCtx, setStrCtx, showMudanzaModal, setShowMudanzaModal, mudanzaSearch,
     setMudanzaSearch, mudanzaCtx, setMudanzaCtx, form, setForm, formEsMenor, setFormEsMenor, formFechaNacimiento, setFormFechaNacimiento, acompanantes, setAcompanantes, showAcompForm,
     setShowAcompForm, acompForm, setAcompForm, salidaConAcomp, setSalidaConAcomp, hoy, filtrados, strGruposMap, mudanzaGruposMap, regulares, sugerencias, acompSugerencias,
+    frecuentesSugeridas, visitaFrecuenteSel, evaluacionFrecuente, requiereAutorizacionResidente, autorizacionResidente, setAutorizacionResidente, seleccionarFrecuente, quitarFrecuente,
     mudanzasElegibles, resetForm, abrirRegistroMudanza, abrirRegistroSTR, autocompletar, autocompletarAcompanante, agregarAcompanante, quitarAcompanante, handleRegistrar, iniciarSalida, cancelarSalida, confirmarSalida,
   }
 

@@ -5,11 +5,14 @@ import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { toast } from '../../../lib/toast'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { diaValidez } from '../../../lib/visitantesFiltros'
-import type { Visitante } from '../../../types'
+import type { Visitante, VisitaFrecuente } from '../../../types'
 import { ModalPortal } from '../../shared/ModalPortal'
+import { PortalVisitasFrecuentes } from './PortalVisitasFrecuentes'
 
 interface Props {
   visitantes: Visitante[]
+  /** Pre-autorizaciones de ingreso de esta unidad (en cualquier estado). */
+  visitasFrecuentes?: VisitaFrecuente[]
   unidadId: string
   proyectoId: string
   companyId: string
@@ -44,7 +47,7 @@ function blankForm() {
   }
 }
 
-export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyId, onRefresh }: Props) {
+export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], unidadId, proyectoId, companyId, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving]     = useState(false)
   const [form, setForm]         = useState(blankForm())
@@ -158,6 +161,9 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
 
   return (
     <div>
+      {/* Personas de confianza con ingreso pre-autorizado (la administración aprueba). */}
+      <PortalVisitasFrecuentes visitas={visitasFrecuentes} unidadId={unidadId} proyectoId={proyectoId} companyId={companyId} onRefresh={onRefresh} />
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: 'var(--at-ink)' }}>Mis visitantes</h3>

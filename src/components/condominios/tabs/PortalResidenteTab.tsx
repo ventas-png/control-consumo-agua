@@ -4,7 +4,7 @@ import { fetchPortalPaymentConfig, fetchPortalRecargoTarjeta } from '../../../do
 import type { RecargoTarjetaRow } from '../../../lib/businessPagos'
 import type {
   Unidad, CuotaCondominio, TicketMantenimiento,
-  Amenidad, ReservaAmenidad, BloqueoAmenidad, Visitante, AnuncioComunidad, MensajePortal,
+  Amenidad, ReservaAmenidad, BloqueoAmenidad, Visitante, VisitaFrecuente, AnuncioComunidad, MensajePortal,
 } from '../../../types'
 import { PortalMiCuentaTab }   from './PortalMiCuentaTab'
 import { PortalMisTicketsTab } from './PortalMisTicketsTab'
@@ -21,6 +21,8 @@ interface Props {
   reservas:   ReservaAmenidad[]
   bloqueosAmenidades: BloqueoAmenidad[]
   visitantes: Visitante[]
+  /** Pre-autorizaciones del proyecto; la vista previa filtra por la unidad elegida. */
+  visitasFrecuentes?: VisitaFrecuente[]
   anuncios:   AnuncioComunidad[]
   proyectoId: string
   companyId:  string
@@ -44,7 +46,7 @@ const SUB_TABS: { id: PortalTab; label: string; icon: string }[] = [
 ]
 
 export function PortalResidenteTab({
-  unidades, cuotas, tickets, amenidades, reservas, bloqueosAmenidades, visitantes, anuncios,
+  unidades, cuotas, tickets, amenidades, reservas, bloqueosAmenidades, visitantes, visitasFrecuentes = [], anuncios,
   proyectoId, companyId, moneda, canEdit, autorNombre, autorUserId, onRefresh,
 }: Props) {
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
@@ -86,6 +88,7 @@ export function PortalResidenteTab({
   const cuotasU     = cuotas.filter(c => c.unidad_id === selectedUnidadId)
   const ticketsU    = tickets.filter(t => t.unidad_id === selectedUnidadId)
   const visitantesU = visitantes.filter(v => v.unidad_id === selectedUnidadId)
+  const visitasFrecuentesU = visitasFrecuentes.filter(v => v.unidad_id === selectedUnidadId)
 
   const pendientes = cuotasU.filter(c => c.estado !== 'pagado').length
   const abiertos   = ticketsU.filter(t => t.estado === 'abierto' || t.estado === 'en_proceso').length
@@ -187,6 +190,7 @@ export function PortalResidenteTab({
             {subTab === 'visitantes' && (
               <PortalVisitantesTab
                 visitantes={visitantesU}
+                visitasFrecuentes={visitasFrecuentesU}
                 unidadId={selectedUnidadId}
                 proyectoId={proyectoId}
                 companyId={companyId}

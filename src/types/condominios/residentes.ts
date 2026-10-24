@@ -971,6 +971,13 @@ export interface SolicitudCertificado {
 }
 
 export type RelacionVisitaFrecuente = 'familiar' | 'empleado' | 'proveedor' | 'amigo' | 'otro'
+/**
+ * Ciclo de la pre-autorización (20261107000000): el residente la solicita
+ * ('pendiente'), la administración la aprueba o rechaza. Solo una 'aprobada'
+ * (activa y vigente) ampara un ingreso pre-autorizado en portería. Las filas
+ * anteriores a la migración no traen `estado`: se leen como 'aprobada'.
+ */
+export type EstadoVisitaFrecuente = 'pendiente' | 'aprobada' | 'rechazada'
 export interface VisitaFrecuente {
   id: string
   company_id: string
@@ -987,6 +994,16 @@ export interface VisitaFrecuente {
   hora_hasta?: string | null
   activo: boolean
   notas?: string | null
+  estado?: EstadoVisitaFrecuente
+  /** Quién aprobó o rechazó (administración) y cuándo. */
+  autorizado_por?: string | null
+  autorizado_en?: string | null
+  motivo_rechazo?: string | null
+  /** Vigencia en calendario ('YYYY-MM-DD'); NULL = sin límite. */
+  vigente_desde?: string | null
+  vigente_hasta?: string | null
+  /** Quién la tecleó (sello del trigger 20260731000000): residente o staff. */
+  creado_por?: string | null
   created_at: string
   // join
   unidad_nombre?: string

@@ -8,9 +8,11 @@ import type {
   ReservaSTR,
   SolicitudMudanzaUnidad,
   Unidad,
+  VisitaFrecuente,
   Visitante,
 } from '../../../../types'
 import type { FiltroFechaVisitas, GruposVisitantes } from '../../../../lib/visitantesFiltros'
+import type { AutorizacionResidenteForm, EvaluacionVisitaFrecuente } from '../../../../lib/visitasFrecuentes'
 
 export interface AcompananteForm {
   tempId: string
@@ -53,6 +55,8 @@ export interface VisitantesCtx extends GruposVisitantes {
   unidades: Unidad[]
   reservasSTR: ReservaSTR[]
   solicitudesMudanza: SolicitudMudanzaUnidad[]
+  /** Pre-autorizaciones del proyecto (todas; el guardia las busca al registrar). */
+  visitasFrecuentes: VisitaFrecuente[]
   proyectoId: string
   companyId: string
   userId: string
@@ -117,6 +121,20 @@ export interface VisitantesCtx extends GruposVisitantes {
   setAcompForm: Dispatch<SetStateAction<Omit<AcompananteForm, 'tempId'>>>
   salidaConAcomp: boolean
   setSalidaConAcomp: Dispatch<SetStateAction<boolean>>
+
+  // ── Pre-autorización (lib/visitasFrecuentes) ──
+  /** Visitas frecuentes que coinciden con lo tecleado (nombre, DPI o placa). */
+  frecuentesSugeridas: VisitaFrecuente[]
+  /** La visita frecuente elegida para este ingreso, si la hay. */
+  visitaFrecuenteSel: VisitaFrecuente | null
+  /** Resultado de validar día, horario, vigencia y estado de la elegida. */
+  evaluacionFrecuente: EvaluacionVisitaFrecuente | null
+  /** La elegida NO cumple: el guardia debe confirmar con el residente. */
+  requiereAutorizacionResidente: boolean
+  autorizacionResidente: AutorizacionResidenteForm
+  setAutorizacionResidente: Dispatch<SetStateAction<AutorizacionResidenteForm>>
+  seleccionarFrecuente: (v: VisitaFrecuente) => void
+  quitarFrecuente: () => void
 
   // ── Derivados (lib/visitantesFiltros) ──
   hoy: string
