@@ -16,6 +16,7 @@
 //      del `from(...).insert()` — atrapa drifts entre TS y reglas de negocio.
 
 import { z } from 'zod'
+import { VIGENCIA_MAXIMA_MESES, fechaLocalYMD, vigenciaMaxima, vigenciaValida } from '../../lib/visitasFrecuentes'
 
 // ── Helpers compartidos (mismo patrón que agua/schemas) ─────────────────────
 const uuid = z.string().uuid('Debe ser UUID')
@@ -103,6 +104,11 @@ export const visitanteInputSchema = z
     valido_hasta: optionalYmdOrIsoTimestamp,
     es_menor: z.boolean().optional(),
     fecha_nacimiento: optionalYmd,
+    // Pre-autorización (20261107000000): con qué visita frecuente entró y cómo
+    // se autorizó el ingreso. Un ingreso DENEGADO no pasa por aquí (no crea fila).
+    visita_frecuente_id: optionalUuid,
+    autorizacion_ingreso: z.union([z.enum(['pre_autorizado', 'residente']), z.null()]).optional(),
+    autorizacion_detalle: optionalString,
   })
   // passthrough: preserva campos system-side (id, created_at, etc.) que no
   // están en el schema input pero pertenecen a la fila completa de DB.
@@ -197,3 +203,61 @@ export type AmenidadInput = z.infer<typeof amenidadInputSchema>
 // Re-exportamos `safeValidate` desde agua/schemas para uso compartido —
 // la helper es genérica sobre cualquier schema, no atada al dominio.
 export { safeValidate, type ParseResult, type ParseFailure, type ParseSuccess } from '../agua/schemas'
+
+// ── VisitaFrecuente (pre-autorización de ingreso) ───────────────────────────
+// La escriben dos formularios: el portal del residente (nace 'pendiente') y la
+// pestaña de administración (nace 'aprobada'). Las horas vienen de
+// <input type="time"> → 'HH:MM'; Postgres las guarda como `time`.
+const diaSemana = z.enum(['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'])
+export const visitaFrecuenteInputSchema = z
+  .object({
+    company_id: uuid,
+    project_id: uuid,
+    unidad_id: uuid,
+    nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
+    identificacion: optionalString,
+    relacion: z.enum(['familiar', 'empleado', 'proveedor', 'amigo', 'otro']),
+    telefono: optionalString,
+    placa_vehiculo: optionalString,
+    foto_url: optionalString,
+    // null o lista vacía = todos los días.
+    dias_permitidos: z.union([z.array(diaSemana), z.null()]).optional(),
+    hora_desde: optionalHhmm,
+    hora_hasta: optionalHhmm,
+    // Vigencia obligatoria y de 6 meses como máximo (20261107000100). Si no
+    // viene `vigente_desde`, la DB pone hoy y el máximo se mide desde hoy.
+    vigente_desde: optionalYmd,
+    vigente_hasta: ymd,
+    renovaciones: z.number().int().min(0).optional(),
+    estado: z.enum(['pendiente', 'aprobada', 'rechazada']).optional(),
+    autorizado_por: optionalUuid,
+    autorizado_en: optionalIsoTimestamp,
+    activo: z.boolean().optional(),
+    notas: optionalString,
+  })
+  .passthrough()
+  .superRefine((data, ctx) => {
+    const desde = data.vigente_desde ?? fechaLocalYMD(new Date())
+    if (data.vigente_hasta < desde) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['vigente_hasta'],
+        message: 'La vigencia no puede terminar antes de empezar',
+      })
+    } else if (!vigenciaValida(desde, data.vigente_hasta)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['vigente_hasta'],
+        message: `La vigencia no puede superar ${VIGENCIA_MAXIMA_MESES} meses (hasta ${vigenciaMaxima(desde)})`,
+      })
+    }
+    // Una autorización aprobada lleva sello de quién la aprobó; una pendiente no.
+    if (data.estado === 'aprobada' && !data.autorizado_por) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['autorizado_por'], message: 'Una autorización aprobada requiere quién la aprobó' })
+    }
+    if (data.estado === 'pendiente' && (data.autorizado_por || data.autorizado_en)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['estado'], message: 'Una solicitud pendiente no lleva sello de aprobación' })
+    }
+  })
+
+export type VisitaFrecuenteInput = z.infer<typeof visitaFrecuenteInputSchema>

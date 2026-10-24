@@ -37,6 +37,10 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   deleteCondominioRow: mocks.deleteCondominioRow,
 }))
 vi.mock('../../../../domain/condominios/tabQueries', () => ({ fetchHuespedesByReservas: vi.fn(async () => []) }))
+vi.mock('../../../../domain/condominios/visitasFrecuentesConfig', () => ({
+  fetchDiasAvisoRenovacion: vi.fn(async () => ({ dias: 30, error: null })),
+  guardarDiasAvisoRenovacion: vi.fn(async () => ({ error: null })),
+}))
 vi.mock('../../../../lib/storageUrls', () => ({ useSignedUrl: () => null, useSignedUrls: () => ({}) }))
 vi.mock('../../../../lib/validatedInsert', () => ({ validatedInsert: mocks.validatedInsert, validatedInsertMany: vi.fn(async () => ({ error: null })) }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
@@ -93,7 +97,7 @@ eliminarExigeSuPermiso('Alertas', p => conI18n(
 ), /^(Eliminar|Delete)$/, mocks.deleteCondominioRow, 'alertas_condominio', 'a1')
 
 eliminarExigeSuPermiso('Visitas frecuentes', p => render(
-  <VisitasFrecuentesTab {...base} unidades={unidades} canCreate {...p}
+  <VisitasFrecuentesTab {...base} userId="u1" unidades={unidades} canCreate {...p}
     visitas={[como<VisitaFrecuente>({ id: 'v1', unidad_id: 'un1', nombre: 'Ana Pérez', relacion: 'familiar', activo: true, dias_semana: [], created_at: '2026-10-10T00:00:00Z' })]} />,
 ), /^Eliminar Ana Pérez$/, mocks.deleteCondominioRow, 'visitas_frecuentes', 'v1')
 
