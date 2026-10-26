@@ -1026,6 +1026,10 @@ export interface SuministroCondominio {
   /** Proveedor del catálogo compartido; NULL = histórico sin vincular. */
   proveedor_id?: string | null
   costo_unitario?: number | null
+  /** Cuántos usos (`rendimiento_unidad`) da UNA `unidad_medida`. NULL = no declarado. */
+  rendimiento?: number | null
+  /** En qué se mide el rendimiento: aplicaciones, limpiezas, m², días… */
+  rendimiento_unidad?: string | null
   notas?: string | null
   activo: boolean
   created_at: string
