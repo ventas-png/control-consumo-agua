@@ -10,6 +10,8 @@ import { useProveedoresQuery } from '../../../domain/cxp/queries'
 import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
 import type { ProveedorCatalogo } from '../../../types/proveedores'
 import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
+import { MultiImageUploader } from '../../shared/ImageUploader'
+import { ImageGallery } from '../../shared/ImageGallery'
 import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
 import { nombreAreaDe, normalizarNombreArea } from '../../../domain/condominios/areas'
 import { AreaCondominio, ControlSistemaIncendio, TipoSistemaIncendio, TipoInspeccionIncendio, ResultadoInspeccionIncendio } from '../../../types'
@@ -86,6 +88,7 @@ export default function ControlSistemaIncendioTab({ registros, areas, proyectoId
     resultado: 'aprobado' as ResultadoInspeccionIncendio,
     fecha_vencimiento: '', proveedor_id: '', empresa_servicio: '', tecnico: '',
     costo: '', proxima_inspeccion: '', observaciones: '',
+    fotos: [] as string[],
   })
 
   const lista = registros.filter(r =>
@@ -183,10 +186,11 @@ export default function ControlSistemaIncendioTab({ registros, areas, proyectoId
       costo: form.costo ? parseFloat(form.costo) : null,
       proxima_inspeccion: form.proxima_inspeccion || null,
       observaciones: form.observaciones.trim() || null,
+      fotos: form.fotos,
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm(p => ({ ...p, identificador: '', area_id: '', fecha_vencimiento: '', costo: '', proxima_inspeccion: '', observaciones: '' }))
+    setForm(p => ({ ...p, identificador: '', area_id: '', fecha_vencimiento: '', costo: '', proxima_inspeccion: '', observaciones: '', fotos: [] }))
     setMostrarForm(false)
     onRefresh()
   }
@@ -362,6 +366,10 @@ export default function ControlSistemaIncendioTab({ registros, areas, proyectoId
               <label htmlFor="incendio-observaciones" style={lbl}>Observaciones</label>
               <textarea id="incendio-observaciones" rows={2} style={{ ...inp, fontFamily: 'inherit', resize: 'vertical' }} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
             </div>
+            {/* Etiqueta de recarga, manómetro, sello, el daño encontrado… */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <MultiImageUploader values={form.fotos} onChange={fotos => setForm(p => ({ ...p, fotos }))} folder="incendio" label="Imágenes" maxFiles={10} />
+            </div>
           </form>
         </EditModal>
       )}
@@ -441,6 +449,7 @@ export default function ControlSistemaIncendioTab({ registros, areas, proyectoId
             render: (r) => (
               <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                 {r.observaciones && <span aria-hidden="true" style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>📝</span>}
+                {(r.fotos?.length ?? 0) > 0 && <span aria-hidden="true" style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>📷</span>}
                 <Button size="sm" variant="secondary" onClick={() => setDetalleId(r.id)} aria-label={`Ver inspección de ${r.identificador} del ${r.fecha}`}>Ver</Button>
               </span>
             ) },
@@ -481,6 +490,12 @@ function InspeccionDetalle({ registro: r, vigente, dinero }: { registro: Control
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
           <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.observaciones}</p>
+        </div>
+      )}
+      {r.fotos && r.fotos.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Imágenes ({r.fotos.length})</div>
+          <ImageGallery urls={r.fotos} maxVisible={6} />
         </div>
       )}
     </div>

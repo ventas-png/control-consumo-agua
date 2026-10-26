@@ -4,7 +4,7 @@
 // y los problemas se cuentan por equipo con su inspección más reciente: un
 // extintor ya recargado deja de salir «vencido» por su registro viejo.
 // La ubicación se elige del catálogo de áreas (tab Áreas); lo histórico sin
-// vincular se sigue mostrando con su texto.
+// vincular se sigue mostrando con su texto. La inspección lleva imágenes.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react'
 import type { AreaCondominio, ControlSistemaIncendio } from '../../../../types'
@@ -35,6 +35,15 @@ vi.mock('../../../../domain/cxp/queries', () => ({
 vi.mock('../../../../domain/proveedores/queries', () => ({
   useAsignacionesQuery: () => ({ data: [], isLoading: false }),
   useOperacionesLegadoQuery: () => ({ data: mocks.legado, isLoading: false }),
+}))
+// Subir y firmar imágenes es del storage; aquí basta con qué rutas viajan.
+vi.mock('../../../shared/ImageUploader', () => ({
+  MultiImageUploader: ({ values, onChange, label }: { values: string[]; onChange: (v: string[]) => void; label: string }) => (
+    <button type="button" onClick={() => onChange([...values, `p1/incendio/foto-${values.length + 1}.jpg`])}>{`${label}: agregar (${values.length})`}</button>
+  ),
+}))
+vi.mock('../../../shared/ImageGallery', () => ({
+  ImageGallery: ({ urls }: { urls: string[] }) => <ul aria-label="Galería">{urls.map(u => <li key={u}>{u}</li>)}</ul>,
 }))
 vi.mock('../../../../domain/proveedores/mutations', () => ({
   useVincularOperacionMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -75,7 +84,7 @@ const registros = [
   inspeccion({ id: 'c1', tipo_sistema: 'alarma', identificador: 'ALM-05', area_id: 'ar-n3', ubicacion: 'Piso 3', fecha: '2026-09-01', resultado: 'fuera_servicio',
     observaciones: 'Sirena sin sonido.', created_at: '2026-09-01T10:00:00Z' }),
   inspeccion({ id: 'c2', tipo_sistema: 'alarma', identificador: 'ALM-05', area_id: 'ar-n3', ubicacion: 'Piso 3', fecha: '2026-10-02', tipo_inspeccion: 'prueba_funcional',
-    created_at: '2026-10-02T10:00:00Z' }),
+    fotos: ['p1/incendio/sirena.jpg', 'p1/incendio/panel.jpg'], created_at: '2026-10-02T10:00:00Z' }),
 ]
 
 function props(over: Partial<Parameters<typeof ControlSistemaIncendioTab>[0]> = {}): Parameters<typeof ControlSistemaIncendioTab>[0] {
@@ -190,6 +199,19 @@ describe('Contra incendio — nueva inspección en ventana', () => {
     expect((screen.getByLabelText('Ubicación *') as HTMLSelectElement).value).toBe('ar-lobby')
   })
 
+  it('las imágenes agregadas viajan con la inspección', async () => {
+    render(<ControlSistemaIncendioTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva inspección' }))
+    fireEvent.change(screen.getByLabelText('Identificador *'), { target: { value: 'EXT-009' } })
+    fireEvent.change(screen.getByLabelText('Ubicación *'), { target: { value: 'ar-lobby' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Imágenes: agregar (0)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Imágenes: agregar (1)' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Registrar/ }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('control_sistema_incendio', expect.objectContaining({
+      identificador: 'EXT-009', fotos: ['p1/incendio/foto-1.jpg', 'p1/incendio/foto-2.jpg'],
+    })))
+  })
+
   it('sin permiso de crear no hay botón', () => {
     render(<ControlSistemaIncendioTab {...props({ canCreate: false })} />)
     expect(screen.queryByRole('button', { name: '+ Nueva inspección' })).toBeNull()
@@ -255,5 +277,18 @@ describe('Contra incendio — estado por equipo, lista y detalle', () => {
       .find(tr => tr.textContent?.includes('2026-09-01'))!
     fireEvent.click(fila)
     expect(within(screen.getByRole('dialog', { name: '🔔 ALM-05' })).getByText('Sirena sin sonido.')).toBeTruthy()
+  })
+
+  it('el detalle muestra las imágenes de la inspección', () => {
+    render(<ControlSistemaIncendioTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver inspección de ALM-05 del 2026-10-02' }))
+    const detalle = screen.getByRole('dialog', { name: '🔔 ALM-05' })
+    expect(within(detalle).getByText('Imágenes (2)')).toBeTruthy()
+    expect(within(within(detalle).getByRole('list', { name: 'Galería' })).getAllByRole('listitem').map(li => li.textContent))
+      .toEqual(['p1/incendio/sirena.jpg', 'p1/incendio/panel.jpg'])
+
+    // Sin imágenes no hay sección.
+    fireEvent.click(within(detalle).getByRole('button', { name: /^2026-09-01 · Revisión visual/ }))
+    expect(within(screen.getByRole('dialog', { name: '🔔 ALM-05' })).queryByText(/^Imágenes/)).toBeNull()
   })
 })

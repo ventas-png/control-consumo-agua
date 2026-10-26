@@ -580,6 +580,8 @@ export interface ControlSistemaIncendio {
   costo?: number | null
   proxima_inspeccion?: string | null
   observaciones?: string | null
+  /** Rutas en condominios-media (`<project_id>/incendio/…`); SecureImage las firma al mostrarlas. */
+  fotos?: string[] | null
   created_at: string
 }
 

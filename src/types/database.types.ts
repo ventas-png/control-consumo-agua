@@ -7010,6 +7010,7 @@ export type Database = {
           empresa_servicio: string | null
           fecha: string
           fecha_vencimiento: string | null
+          fotos: string[]
           id: string
           identificador: string
           observaciones: string | null
@@ -7031,6 +7032,7 @@ export type Database = {
           empresa_servicio?: string | null
           fecha?: string
           fecha_vencimiento?: string | null
+          fotos?: string[]
           id?: string
           identificador: string
           observaciones?: string | null
@@ -7052,6 +7054,7 @@ export type Database = {
           empresa_servicio?: string | null
           fecha?: string
           fecha_vencimiento?: string | null
+          fotos?: string[]
           id?: string
           identificador?: string
           observaciones?: string | null
