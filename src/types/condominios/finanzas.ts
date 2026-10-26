@@ -220,18 +220,68 @@ export interface RegistroAutoridad {
 
 export type CategoriaNota = 'general' | 'urgente' | 'recordatorio' | 'seguimiento' | 'reunion' | 'otro'
 export type PrioridadNota = 'normal' | 'alta' | 'urgente'
+
+// ── Minutas de reunión (20261110000000) ──────────────────────────────────────
+// La nota administrativa es una minuta: quiénes participaron, qué puntos se
+// abordaron y qué se acordó o se comprometió en cada uno. Los tres bloques
+// viajan como JSON en la misma fila (como `actas_reunion.asistentes`).
+
+/** De qué lista salió el participante. `otro` es un nombre tecleado. */
+export type TipoParticipanteMinuta = 'empleado' | 'residente' | 'proveedor' | 'otro'
+
+export interface ParticipanteMinuta {
+  /** Id local (uuid): los compromisos lo citan como responsable. */
+  id: string
+  tipo: TipoParticipanteMinuta
+  /** Fila de origen (personal, unidad_residentes o proveedores); null en `otro`. */
+  ref_id?: string | null
+  nombre: string
+  /** Cargo, «Casa 4 · Propietario», contacto del proveedor… */
+  detalle?: string | null
+  /** Quien gestiona la minuta (uno por minuta). */
+  gestiona: boolean
+}
+
+/** Un acuerdo es lo decidido; un compromiso lo asume alguien con fecha límite. */
+export type TipoAcuerdoMinuta = 'acuerdo' | 'compromiso'
+
+export interface AcuerdoMinuta {
+  id: string
+  tipo: TipoAcuerdoMinuta
+  texto: string
+  /** `ParticipanteMinuta.id` del responsable (compromisos). */
+  responsable_id?: string | null
+  fecha_limite?: string | null
+  cumplido: boolean
+  cumplido_at?: string | null
+}
+
+export interface PuntoMinuta {
+  id: string
+  titulo: string
+  descripcion?: string | null
+  acuerdos: AcuerdoMinuta[]
+}
+
 export interface NotaAdmin {
   id: string
   company_id: string
   project_id: string
   titulo: string
+  /** Objetivo o contexto de la reunión (puede ir vacío). */
   contenido: string
   categoria: CategoriaNota
   prioridad: PrioridadNota
   fijada: boolean
+  /** Minuta cerrada: ya no se edita ni se le marcan compromisos. */
   resuelta: boolean
+  /** Próximo seguimiento. */
   fecha_recordatorio?: string | null
   autor?: string | null
+  fecha_reunion?: string | null
+  /** Opcionales: una fila anterior a la migración (o una prueba) puede no traerlos. */
+  participantes?: ParticipanteMinuta[] | null
+  puntos?: PuntoMinuta[] | null
   created_at: string
 }
 

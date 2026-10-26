@@ -1,14 +1,35 @@
-import { useState, type CSSProperties} from 'react'
-import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import { notify, confirm } from '../../shared/Dialog'
+// Minutas de reunión (antes «Notas Admin»; misma tabla y permisos notas_admin).
+//
+// La lista va en tarjetas: quiénes participaron, cuántos puntos, el avance de
+// los compromisos y el próximo seguimiento. El detalle y el formulario abren
+// en ventana; el formulario es un asistente de tres pasos (participantes →
+// puntos → acuerdos), ver minutas/MinutaWizard.
+import { useMemo, useState, type CSSProperties } from 'react'
+import { Button } from '../../shared/Button'
+import { EmptyState } from '../../shared/EmptyState'
+import { FilterChips } from '../../shared/FilterChips'
 import { tint } from '../../shared/statusTone'
-import { NotaAdmin, CategoriaNota, PrioridadNota } from '../../../types'
+import {
+  fechaDeMinuta, gestorDe, participantesDe, plazoCompromiso, puntosDe, resumenCompromisos,
+} from '../../../domain/condominios/minutas'
+import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../lib/format'
+import { normalizarNombre } from '../../../domain/proveedores/identidad'
+import type { CargoCatalogo, CategoriaNota, ContratoArrendamiento, ContratoProveedor, NotaAdmin, PersonalCondominio, Unidad } from '../../../types'
+import { AvataresApilados, BarraAvance, CATEGORIAS, categoriaInfo, inp, prioridadInfo } from './minutas/comun'
+import { MinutaDetalle } from './minutas/MinutaDetalle'
+import { MinutaWizard } from './minutas/MinutaWizard'
 
 interface Props {
   notas: NotaAdmin[]
   proyectoId: string
   companyId: string
   autorNombre: string
+  /** Listas para elegir participantes (las carga la sección). */
+  personal?: PersonalCondominio[]
+  cargos?: CargoCatalogo[]
+  unidades?: Unidad[]
+  contratos?: ContratoArrendamiento[]
+  contratosProveedores?: ContratoProveedor[]
   canCreate: boolean
   canEdit: boolean
   /** Eliminar tiene su propio permiso (condominios.tab.notas_admin.delete): editar no basta. */
@@ -16,313 +37,180 @@ interface Props {
   onRefresh: () => void
 }
 
-const CATEGORIAS: { value: CategoriaNota; label: string; icon: string; color: string }[] = [
-  { value: 'general',       label: 'General',       icon: '📝', color: 'var(--at-ink-3)' },
-  { value: 'urgente',       label: 'Urgente',       icon: '🚨', color: 'var(--at-danger)' },
-  { value: 'recordatorio',  label: 'Recordatorio',  icon: '⏰', color: 'var(--at-warning)' },
-  { value: 'seguimiento',   label: 'Seguimiento',   icon: '🔄', color: 'var(--at-accent)' },
-  { value: 'reunion',       label: 'Reunión',       icon: '👥', color: 'var(--at-success)' },
-  { value: 'otro',          label: 'Otro',          icon: '📌', color: 'var(--at-accent)' },
-]
+type FiltroEstado = 'abiertas' | 'vencidas' | 'cerradas' | 'todas'
 
-const PRIORIDADES: { value: PrioridadNota; label: string; color: string; bg: string }[] = [
-  { value: 'normal',  label: 'Normal',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
-  { value: 'alta',    label: 'Alta',    color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
-  { value: 'urgente', label: 'Urgente', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
-]
+const SIN_LISTA: never[] = []
 
-export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombre, canCreate, canEdit, canDelete, onRefresh }: Props) {
-  const [selected, setSelected] = useState<NotaAdmin | null>(null)
-  const [mostrarForm, setMostrarForm] = useState(false)
-  const [saving, setSaving] = useState(false)
+export default function NotasAdminTab({
+  notas, proyectoId, companyId, autorNombre,
+  personal = SIN_LISTA, cargos = SIN_LISTA, unidades = SIN_LISTA, contratos = SIN_LISTA, contratosProveedores = SIN_LISTA,
+  canCreate, canEdit, canDelete, onRefresh,
+}: Props) {
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [wizard, setWizard] = useState<{ abierto: boolean; nota: NotaAdmin | null }>({ abierto: false, nota: null })
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('abiertas')
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaNota | ''>('')
-  const [filtroResuelta, setFiltroResuelta] = useState<'pendiente' | 'resuelta' | ''>('pendiente')
-  const [editando, setEditando] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
 
-  const [form, setForm] = useState({
-    titulo: '', contenido: '', categoria: 'general' as CategoriaNota,
-    prioridad: 'normal' as PrioridadNota, fijada: false, fecha_recordatorio: '',
-  })
+  // Lo derivado de cada minuta (participantes, puntos, resumen) se calcula una
+  // vez por render de la lista, no por tarjeta y por filtro.
+  const filas = useMemo(() => notas.map(n => {
+    const participantes = participantesDe(n)
+    const puntos = puntosDe(n)
+    return { n, participantes, puntos, gestor: gestorDe(participantes), resumen: resumenCompromisos(puntos), fecha: fechaDeMinuta(n) }
+  }), [notas])
 
-  const fijadas = notas.filter(n => n.fijada && !n.resuelta)
-  const lista = notas.filter(n =>
-    !n.fijada &&
-    (filtroCategoria === '' || n.categoria === filtroCategoria) &&
-    (filtroResuelta === '' || (filtroResuelta === 'pendiente' ? !n.resuelta : n.resuelta))
-  ).sort((a, b) => {
-    const prioOrd: Record<PrioridadNota, number> = { urgente: 0, alta: 1, normal: 2 }
-    return prioOrd[a.prioridad] - prioOrd[b.prioridad] || b.created_at.localeCompare(a.created_at)
-  })
-
-  function diasHastaRecordatorio(fecha: string | null | undefined): number | null {
-    if (!fecha) return null
-    const diff = new Date(fecha).getTime() - new Date().setHours(0, 0, 0, 0)
-    return Math.ceil(diff / 86400000)
+  const abiertas = filas.filter(f => !f.n.resuelta)
+  const totales = {
+    abiertas: abiertas.length,
+    cerradas: filas.length - abiertas.length,
+    pendientes: abiertas.reduce((s, f) => s + f.resumen.pendientes, 0),
+    vencidos: abiertas.reduce((s, f) => s + f.resumen.vencidos, 0),
+    conVencidos: abiertas.filter(f => f.resumen.vencidos > 0).length,
   }
 
-  async function guardar() {
-    if (!form.titulo.trim() || !form.contenido.trim()) {
-      notify({ variant: 'warning', title: 'Faltan datos', text: 'Título y contenido son obligatorios' }); return
-    }
-    setSaving(true)
-    if (editando && selected) {
-      const { error } = await updateCondominioRow('notas_admin', selected.id, {
-        titulo: form.titulo.trim(), contenido: form.contenido.trim(),
-        categoria: form.categoria, prioridad: form.prioridad,
-        fijada: form.fijada,
-        fecha_recordatorio: form.fecha_recordatorio || null,
-      })
-      setSaving(false)
-      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    } else {
-      const { error } = await createCondominioRow('notas_admin', {
-        company_id: companyId, project_id: proyectoId,
-        titulo: form.titulo.trim(), contenido: form.contenido.trim(),
-        categoria: form.categoria, prioridad: form.prioridad,
-        fijada: form.fijada, autor: autorNombre || null,
-        fecha_recordatorio: form.fecha_recordatorio || null,
-      })
-      setSaving(false)
-      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    }
-    resetForm()
-    onRefresh()
-  }
-
-  function resetForm() {
-    setForm({ titulo: '', contenido: '', categoria: 'general', prioridad: 'normal', fijada: false, fecha_recordatorio: '' })
-    setMostrarForm(false)
-    setEditando(false)
-  }
-
-  async function toggleFijada(n: NotaAdmin) {
-    await updateCondominioRow('notas_admin', n.id, { fijada: !n.fijada })
-    if (selected?.id === n.id) setSelected(prev => prev ? { ...prev, fijada: !prev.fijada } : null)
-    onRefresh()
-  }
-
-  async function resolver(n: NotaAdmin) {
-    const res = await confirm({ title: 'Resolver nota', text: '¿Marcar como resuelta?', icon: 'question', confirmText: 'Resolver' })
-    if (!res.isConfirmed) return
-    await updateCondominioRow('notas_admin', n.id, { resuelta: true, fijada: false })
-    if (selected?.id === n.id) setSelected(null)
-    onRefresh()
-  }
-
-  async function eliminar(n: NotaAdmin) {
-    // El botón ya se oculta sin permiso; esto cubre cualquier otra vía.
-    if (!canDelete) return
-    const res = await confirm({ title: 'Eliminar nota', text: '¿Eliminar esta nota?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
-    if (!res.isConfirmed) return
-    const { error } = await deleteCondominioRow('notas_admin', n.id)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    if (selected?.id === n.id) setSelected(null)
-    onRefresh()
-  }
-
-  function iniciarEdicion(n: NotaAdmin) {
-    setForm({ titulo: n.titulo, contenido: n.contenido, categoria: n.categoria, prioridad: n.prioridad, fijada: n.fijada, fecha_recordatorio: n.fecha_recordatorio || '' })
-    setEditando(true)
-    setSelected(n)
-    setMostrarForm(true)
-  }
-
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
-
-  function NotaCard({ n, highlight = false }: { n: NotaAdmin; highlight?: boolean }) {
-    const cat = CATEGORIAS.find(c => c.value === n.categoria)
-    const prio = PRIORIDADES.find(p => p.value === n.prioridad)
-    const dias = diasHastaRecordatorio(n.fecha_recordatorio)
-    return (
-      <div onClick={() => { setSelected(n); setMostrarForm(false) }}
-        style={{ background: highlight ? 'var(--at-warning-tint)' : n.resuelta ? 'var(--at-surface-2)' : 'var(--at-surface)', border: `1px solid ${selected?.id === n.id ? 'var(--at-accent)' : highlight ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', opacity: n.resuelta ? 0.65 : 1, marginBottom: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
-            {n.fijada && <span title="Fijada">📌</span>}
-            <span style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.titulo}</span>
-          </div>
-          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: prio?.bg, color: prio?.color, marginLeft: 6, flexShrink: 0 }}>{prio?.label}</span>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--at-ink-3)', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-          {n.contenido}
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 10, color: cat?.color }}>{cat?.icon} {cat?.label}</span>
-          {dias !== null && (
-            <span style={{ fontSize: 10, color: dias < 0 ? 'var(--at-danger)' : dias === 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
-              ⏰ {dias < 0 ? `Vencido ${Math.abs(dias)}d` : dias === 0 ? 'Hoy' : `En ${dias}d`}
-            </span>
-          )}
-          {n.resuelta && <span style={{ fontSize: 10, color: 'var(--at-success)' }}>✓ Resuelta</span>}
-        </div>
-      </div>
+  const texto = normalizarNombre(busqueda)
+  const lista = filas
+    .filter(f =>
+      (filtroEstado === 'todas' || (filtroEstado === 'cerradas' ? f.n.resuelta : !f.n.resuelta)) &&
+      (filtroEstado !== 'vencidas' || f.resumen.vencidos > 0) &&
+      (filtroCategoria === '' || f.n.categoria === filtroCategoria) &&
+      (!texto || normalizarNombre(f.n.titulo).includes(texto) || f.participantes.some(p => normalizarNombre(p.nombre).includes(texto)) || f.puntos.some(p => normalizarNombre(p.titulo).includes(texto))),
     )
-  }
+    .sort((a, b) => {
+      if (a.n.resuelta !== b.n.resuelta) return a.n.resuelta ? 1 : -1
+      if (a.n.fijada !== b.n.fijada) return a.n.fijada ? -1 : 1
+      return b.fecha.localeCompare(a.fecha) || b.n.created_at.localeCompare(a.n.created_at)
+    })
+
+  const seleccionada = selectedId ? notas.find(n => n.id === selectedId) ?? null : null
+
+  function abrirNueva() { setSelectedId(null); setWizard({ abierto: true, nota: null }) }
+  function abrirEdicion(n: NotaAdmin) { setWizard({ abierto: true, nota: n }) }
+
+  const resumenBtn = (activo: boolean, color: string): CSSProperties => ({
+    display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', minWidth: 0,
+    background: activo ? tint(color, 16) : 'var(--at-surface)', border: `1.5px solid ${activo ? color : 'var(--at-line)'}`, color: 'var(--at-ink)', fontFamily: 'inherit',
+  })
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      {/* Lista */}
-      <div style={{ width: 320, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>Notas ({notas.filter(n => !n.resuelta).length} activas)</span>
-            {canCreate && (
-              <button onClick={() => { resetForm(); setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nueva
-              </button>
-            )}
-          </div>
-          <select style={{ ...inp, marginBottom: 6 }} value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaNota | '')}>
-            <option value="">Todas las categorías</option>
-            {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
-          </select>
-          <select style={inp} value={filtroResuelta} onChange={e => setFiltroResuelta(e.target.value as 'pendiente' | 'resuelta' | '')}>
-            <option value="pendiente">Solo pendientes</option>
-            <option value="resuelta">Solo resueltas</option>
-            <option value="">Todas</option>
-          </select>
+    <div style={{ display: 'grid', gap: 14, padding: '4px 0' }}>
+      {/* Encabezado */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--at-ink)' }}>Minutas de reunión</div>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Participantes, puntos abordados y seguimiento de acuerdos y compromisos.</div>
         </div>
-
-        <div style={{ padding: '10px 12px' }}>
-          {fijadas.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 10, color: 'var(--at-warning)', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>📌 Fijadas</div>
-              {fijadas.map(n => <NotaCard key={n.id} n={n} highlight />)}
-            </div>
-          )}
-          {lista.length === 0 && !fijadas.length && (
-            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: 13 }}>Sin notas</div>
-          )}
-          {lista.map(n => <NotaCard key={n.id} n={n} />)}
-        </div>
+        {canCreate && <Button variant="primary" onClick={abrirNueva}>+ Nueva minuta</Button>}
       </div>
 
-      {/* Panel derecho */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {mostrarForm && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>{editando ? 'Editar nota' : 'Nueva nota'}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={lbl}>Título *</label>
-                <input style={inp} placeholder="Resumen de la nota" value={form.titulo} onChange={e => setForm(p => ({ ...p, titulo: e.target.value }))} />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={lbl}>Contenido *</label>
-                <textarea style={{ ...inp, height: 120, resize: 'vertical' }} value={form.contenido} onChange={e => setForm(p => ({ ...p, contenido: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Categoría</label>
-                <select style={inp} value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value as CategoriaNota }))}>
-                  {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Prioridad</label>
-                <select style={inp} value={form.prioridad} onChange={e => setForm(p => ({ ...p, prioridad: e.target.value as PrioridadNota }))}>
-                  {PRIORIDADES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Recordatorio (fecha)</label>
-                <input type="date" style={inp} value={form.fecha_recordatorio} onChange={e => setForm(p => ({ ...p, fecha_recordatorio: e.target.value }))} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 20 }}>
-                <input type="checkbox" id="fijada_check" checked={form.fijada} onChange={e => setForm(p => ({ ...p, fijada: e.target.checked }))} />
-                <label htmlFor="fijada_check" style={{ fontSize: 13, cursor: 'pointer' }}>📌 Fijar nota</label>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Crear nota'}`}
-              </button>
-              <button onClick={resetForm}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
+      {/* Resumen clicable */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: 8 }}>
+        <button type="button" aria-pressed={filtroEstado === 'abiertas'} onClick={() => setFiltroEstado('abiertas')} style={resumenBtn(filtroEstado === 'abiertas', 'var(--at-info)')}>
+          <span style={{ fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600 }}>Abiertas</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--at-info)' }}>{totales.abiertas}</span>
+        </button>
+        <div style={{ ...resumenBtn(false, 'var(--at-accent)'), cursor: 'default' }}>
+          <span style={{ fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600 }}>Compromisos pendientes</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--at-accent)' }}>{totales.pendientes}</span>
+        </div>
+        <button type="button" aria-pressed={filtroEstado === 'vencidas'} onClick={() => setFiltroEstado('vencidas')} style={resumenBtn(filtroEstado === 'vencidas', 'var(--at-danger)')}>
+          <span style={{ fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600 }}>Compromisos vencidos</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: totales.vencidos > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{totales.vencidos}</span>
+        </button>
+        <button type="button" aria-pressed={filtroEstado === 'cerradas'} onClick={() => setFiltroEstado('cerradas')} style={resumenBtn(filtroEstado === 'cerradas', 'var(--at-success)')}>
+          <span style={{ fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600 }}>Cerradas</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--at-success)' }}>{totales.cerradas}</span>
+        </button>
+      </div>
 
-        {!mostrarForm && selected && (() => {
-          const cat = CATEGORIAS.find(c => c.value === selected.categoria)
-          const prio = PRIORIDADES.find(p => p.value === selected.prioridad)
-          const dias = diasHastaRecordatorio(selected.fecha_recordatorio)
-          return (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: cat && tint(cat.color, 12), color: cat?.color }}>{cat?.icon} {cat?.label}</span>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: prio?.bg, color: prio?.color }}>{prio?.label}</span>
-                    {selected.fijada && <span style={{ fontSize: 11, color: 'var(--at-warning)' }}>📌 Fijada</span>}
-                    {selected.resuelta && <span style={{ fontSize: 11, color: 'var(--at-success)' }}>✓ Resuelta</span>}
-                  </div>
-                  <div style={{ fontWeight: 700, fontSize: 18 }}>{selected.titulo}</div>
-                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
-                    {selected.autor && <span>{selected.autor} · </span>}
-                    {new Date(selected.created_at).toLocaleDateString('es-ES')}
-                  </div>
+      {/* Filtros */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <FilterChips ariaLabel="Estado de la minuta" value={filtroEstado} onChange={setFiltroEstado} options={[
+          { value: 'abiertas', label: 'Abiertas', count: totales.abiertas, color: 'var(--at-info)' },
+          { value: 'vencidas', label: 'Con vencidos', count: totales.conVencidos, color: 'var(--at-danger)' },
+          { value: 'cerradas', label: 'Cerradas', count: totales.cerradas, color: 'var(--at-success)' },
+          { value: 'todas', label: 'Todas', count: filas.length },
+        ]} />
+        <select aria-label="Categoría" style={{ ...inp, width: 'auto', minWidth: 170 }} value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaNota | '')}>
+          <option value="">Todas las categorías</option>
+          {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+        </select>
+        <input type="search" aria-label="Buscar minuta" placeholder="Buscar por título, participante o punto…" style={{ ...inp, flex: 1, minWidth: 200 }}
+          value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+      </div>
+
+      {/* Lista */}
+      {lista.length === 0 ? (
+        <EmptyState
+          icon="🗒️"
+          title={filas.length === 0 ? 'Aún no hay minutas' : 'Ninguna minuta coincide'}
+          description={filas.length === 0
+            ? 'Registra la primera reunión: quiénes participaron, qué se abordó y qué se acordó.'
+            : 'Cambia el filtro o la búsqueda para ver otras minutas.'}
+          action={canCreate && filas.length === 0 ? <Button variant="primary" onClick={abrirNueva}>+ Nueva minuta</Button> : undefined}
+          compact
+        />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
+          {lista.map(({ n, participantes, puntos, gestor, resumen, fecha }) => {
+            const cat = categoriaInfo(n.categoria)
+            const prio = prioridadInfo(n.prioridad)
+            const diasSeg = !n.resuelta ? diasHastaFechaCalendario(n.fecha_recordatorio) : null
+            return (
+              <button key={n.id} type="button" onClick={() => setSelectedId(n.id)}
+                style={{
+                  textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--at-ink)', display: 'flex', flexDirection: 'column', gap: 8, padding: 14, borderRadius: 14,
+                  background: n.fijada && !n.resuelta ? 'var(--at-warning-tint)' : 'var(--at-surface)',
+                  border: `1px solid ${n.fijada && !n.resuelta ? 'var(--at-warning-border)' : 'var(--at-line)'}`,
+                  opacity: n.resuelta ? 0.8 : 1, boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: tint(cat.color, 14), color: cat.color }}>{cat.icon} {cat.label}</span>
+                  {prio.value !== 'normal' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: prio.bg, color: prio.color }}>{prio.label}</span>}
+                  {n.fijada && !n.resuelta && <span title="Fijada" aria-label="Fijada" style={{ fontSize: 12 }}>📌</span>}
+                  {n.resuelta && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--at-success-tint)', color: 'var(--at-success-strong)' }}>✓ Cerrada</span>}
+                  <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>📅 {formatFechaCalendario(fecha, { day: 'numeric', month: 'short', year: 'numeric' }) || '—'}</span>
                 </div>
-                {canEdit && !selected.resuelta && (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => iniciarEdicion(selected)}
-                      style={{ padding: '6px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                      ✏️ Editar
-                    </button>
-                    <button onClick={() => toggleFijada(selected)}
-                      style={{ padding: '6px 12px', background: selected.fijada ? 'var(--at-warning-tint)' : 'var(--at-chip)', color: selected.fijada ? 'var(--at-warning)' : 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                      {selected.fijada ? '📌 Desfijar' : '📌 Fijar'}
-                    </button>
+                <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>{n.titulo}</div>
+                {gestor && <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>★ Gestiona <span style={{ color: 'var(--at-ink-2)', fontWeight: 600 }}>{gestor.nombre}</span></div>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  {participantes.length > 0 ? <AvataresApilados participantes={participantes} /> : <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Sin participantes</span>}
+                  <span style={{ fontSize: 12, color: 'var(--at-ink-2)' }}>
+                    {puntos.length} punto{puntos.length === 1 ? '' : 's'}{resumen.acuerdos > 0 ? ` · ${resumen.acuerdos} acuerdo${resumen.acuerdos === 1 ? '' : 's'}` : ''}
+                  </span>
+                </div>
+                {resumen.total > 0 && (
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    <BarraAvance cumplidos={resumen.cumplidos} total={resumen.total} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--at-ink-3)' }}>
+                      <span>{resumen.cumplidos}/{resumen.total} compromisos cumplidos</span>
+                      {resumen.vencidos > 0 && !n.resuelta && <span style={{ color: 'var(--at-danger)', fontWeight: 700 }}>⚠ {resumen.vencidos} vencido{resumen.vencidos === 1 ? '' : 's'}</span>}
+                    </div>
                   </div>
                 )}
-              </div>
-
-              {dias !== null && (
-                <div style={{ background: dias < 0 ? 'var(--at-danger-tint)' : dias === 0 ? 'var(--at-warning-tint)' : 'var(--at-accent-tint)', border: `1px solid ${dias < 0 ? 'var(--at-danger-border)' : dias === 0 ? 'var(--at-warning-border)' : 'var(--at-accent-soft)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>⏰</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: dias < 0 ? 'var(--at-danger)' : dias === 0 ? 'var(--at-warning)' : 'var(--at-accent)' }}>
-                      {dias < 0 ? `Recordatorio vencido hace ${Math.abs(dias)} días` : dias === 0 ? 'Recordatorio: hoy' : `Recordatorio en ${dias} días`}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{selected.fecha_recordatorio}</div>
+                {diasSeg !== null && (
+                  <div style={{ fontSize: 11, fontWeight: 600, color: diasSeg < 0 ? 'var(--at-danger)' : diasSeg === 0 ? 'var(--at-warning-strong)' : 'var(--at-ink-3)' }}>
+                    ⏰ Seguimiento {plazoCompromiso(diasSeg).replace('vence', '').replace('venció', 'fue').trim()}
                   </div>
-                </div>
-              )}
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
-              <div style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '16px 20px', fontSize: 14, lineHeight: 1.7, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', marginBottom: 16 }}>
-                {selected.contenido}
-              </div>
+      {seleccionada && !wizard.abierto && (
+        <MinutaDetalle nota={seleccionada} canEdit={canEdit} canDelete={canDelete}
+          onClose={() => setSelectedId(null)} onEditar={() => abrirEdicion(seleccionada)} onRefresh={onRefresh} />
+      )}
 
-              {(canEdit || canDelete) && !selected.resuelta && (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {canEdit && (
-                    <button onClick={() => resolver(selected)}
-                      style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                      ✓ Resolver
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button onClick={() => eliminar(selected)}
-                      style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                      🗑 Eliminar
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })()}
-
-        {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
-            Selecciona una nota o crea una nueva
-          </div>
-        )}
-      </div>
+      {wizard.abierto && (
+        <MinutaWizard nota={wizard.nota} proyectoId={proyectoId} companyId={companyId} autorNombre={autorNombre}
+          personal={personal} cargos={cargos} unidades={unidades} contratos={contratos} contratosProveedores={contratosProveedores}
+          onClose={() => setWizard({ abierto: false, nota: null })}
+          onGuardado={() => { setWizard({ abierto: false, nota: null }); onRefresh() }} />
+      )}
     </div>
   )
 }

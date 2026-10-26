@@ -12713,10 +12713,13 @@ export type Database = {
           contenido: string
           created_at: string
           fecha_recordatorio: string | null
+          fecha_reunion: string | null
           fijada: boolean
           id: string
+          participantes: Json
           prioridad: string
           project_id: string
+          puntos: Json
           resuelta: boolean
           titulo: string
         }
@@ -12724,13 +12727,16 @@ export type Database = {
           autor?: string | null
           categoria?: string
           company_id: string
-          contenido: string
+          contenido?: string
           created_at?: string
           fecha_recordatorio?: string | null
+          fecha_reunion?: string | null
           fijada?: boolean
           id?: string
+          participantes?: Json
           prioridad?: string
           project_id: string
+          puntos?: Json
           resuelta?: boolean
           titulo: string
         }
@@ -12741,10 +12747,13 @@ export type Database = {
           contenido?: string
           created_at?: string
           fecha_recordatorio?: string | null
+          fecha_reunion?: string | null
           fijada?: boolean
           id?: string
+          participantes?: Json
           prioridad?: string
           project_id?: string
+          puntos?: Json
           resuelta?: boolean
           titulo?: string
         }
