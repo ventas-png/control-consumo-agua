@@ -722,8 +722,11 @@ export const TAB_REGISTRY: TabDef[] = [
     <ProgramaActividadesTab actividades={ctx.programaActividades} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('programa_actividades')} canEdit={ctx.canEdit('programa_actividades')} onRefresh={ctx.onRefresh} /> },
   { id: 'reg_autoridades', label: 'Autoridades', icon: '🏛️', render: (ctx) =>
     <RegistroAutoridadesTab registros={ctx.registroAutoridades} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('reg_autoridades')} canEdit={ctx.canEdit('reg_autoridades')} onRefresh={ctx.onRefresh} /> },
-  { id: 'notas_admin', label: 'Notas Admin', icon: '🗒️', render: (ctx) =>
-    <NotasAdminTab notas={ctx.notasAdmin} proyectoId={ctx.proyectoId} companyId={ctx.cid} autorNombre={ctx.currentUser.name ?? ''} canCreate={ctx.canCreate('notas_admin')} canEdit={ctx.canEdit('notas_admin')} canDelete={ctx.canDelete('notas_admin')} onRefresh={ctx.onRefresh} /> },
+  // Minutas de reunión: el id (y el permiso) sigue siendo notas_admin.
+  { id: 'notas_admin', label: 'Minutas', icon: '🗒️', render: (ctx) =>
+    <NotasAdminTab notas={ctx.notasAdmin} proyectoId={ctx.proyectoId} companyId={ctx.cid} autorNombre={ctx.currentUser.name ?? ''}
+      personal={ctx.personal} cargos={ctx.cargosPersonal} unidades={ctx.unidadesProyecto} contratos={ctx.contratos} contratosProveedores={ctx.contratosProveedores}
+      canCreate={ctx.canCreate('notas_admin')} canEdit={ctx.canEdit('notas_admin')} canDelete={ctx.canDelete('notas_admin')} onRefresh={ctx.onRefresh} /> },
   { id: 'control_piscina', label: 'Piscina', icon: '🏊', render: (ctx) =>
     <ControlPiscinaTab registros={ctx.controlPiscina} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('control_piscina')} canEdit={ctx.canEdit('control_piscina')} onRefresh={ctx.onRefresh} /> },
   { id: 'jardineria', label: 'Jardinería', icon: '🌿', render: (ctx) =>
