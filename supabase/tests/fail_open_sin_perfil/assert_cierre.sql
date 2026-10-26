@@ -65,6 +65,21 @@ INSERT INTO fos.fugas (firma, actor, que) VALUES
   ('banco_desconciliar_movimiento(uuid)',                          'SINAPP', 'ESCRITURA: pasa la guarda para desconciliar un movimiento de D'),
   ('banco_ajuste_conciliacion(uuid,text)',                         'SINAPP', 'ESCRITURA: ajusta un movimiento bancario de D');
 
+-- Las firmas de arriba son las MEDIDAS sobre la cadena anterior a 20261029000000.
+-- Una migración POSTERIOR puede reemplazar una de ellas (p. ej. 20261108000000
+-- dio a portal_reservar_amenidad un décimo argumento, p_equipos, y retiró la
+-- firma de nueve): en la base con las posteriores la fuga sigue existiendo, pero
+-- bajo su firma actual. Se resuelve SÓLO cuando la firma medida ya no está en la
+-- matriz y la función tiene UNA sola firma vigente con el mismo nombre; en
+-- cualquier otro caso se deja como está y el bucle de abajo lo denuncia.
+UPDATE fos.fugas f
+   SET firma = s.firma
+  FROM (SELECT DISTINCT firma FROM fos.resultados) s
+ WHERE NOT EXISTS (SELECT 1 FROM fos.resultados x WHERE x.firma = f.firma)
+   AND split_part(s.firma, '(', 1) = split_part(f.firma, '(', 1)
+   AND (SELECT count(DISTINCT r.firma) FROM fos.resultados r
+         WHERE split_part(r.firma, '(', 1) = split_part(f.firma, '(', 1)) = 1;
+
 DO $$
 DECLARE f record; v_fuera text; v_actor text; v_n int := 0;
 BEGIN

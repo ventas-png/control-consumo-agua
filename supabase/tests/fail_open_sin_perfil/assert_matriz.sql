@@ -14,9 +14,14 @@
 --    no estar «antes» son las que trajo una migración POSTERIOR a la serie (fos.posteriores:
 --    run.sh la llena comparando el inventario antes y después de aplicarlas); la matriz las
 --    ejecuta igual y las secciones 2 y 3 las juzgan frente a las sesiones sin perfil.
+--    Y las únicas que pueden estar «antes» y no «después» son las que una posterior
+--    REEMPLAZÓ por otra firma del mismo nombre (20261108000000 dio a
+--    portal_reservar_amenidad un décimo argumento y retiró la de nueve): la sucesora
+--    tiene que figurar en fos.posteriores; una firma que desaparece sin sucesora rompe.
 CREATE TABLE IF NOT EXISTS fos.posteriores (firma text PRIMARY KEY);
 DO $$
 DECLARE v_antes int; v_desp int; v_inv int; v_post int; v_ajenas int; v_lista text;
+        v_reemplazadas int; v_huerfanas int; v_lista_h text;
 BEGIN
   SELECT count(DISTINCT firma) INTO v_antes FROM fos.antes;
   SELECT count(DISTINCT firma) INTO v_desp  FROM fos.resultados;
@@ -25,14 +30,24 @@ BEGIN
     FROM (SELECT DISTINCT firma FROM fos.resultados EXCEPT SELECT firma FROM fos.antes) x;
   SELECT count(*), string_agg(firma, ', ') INTO v_ajenas, v_lista
     FROM (SELECT DISTINCT firma FROM fos.resultados EXCEPT SELECT firma FROM fos.antes EXCEPT SELECT firma FROM fos.posteriores) x;
-  IF v_desp < 200 OR v_inv <> v_desp OR v_antes + v_post <> v_desp OR v_ajenas > 0 THEN
-    RAISE EXCEPTION 'inventario: % funciones antes, % después (% nuevas de migraciones posteriores), % en el catálogo; nuevas sin justificar: %',
-      v_antes, v_desp, v_post, v_inv, COALESCE(v_lista, '—');
+  -- Firmas de «antes» que ya no están: con sucesora del mismo nombre entre las posteriores
+  -- (reemplazadas) o sin ella (huérfanas: alguien quitó una función y nadie lo justifica).
+  SELECT count(*) FILTER (WHERE con_sucesora), count(*) FILTER (WHERE NOT con_sucesora),
+         string_agg(firma, ', ') FILTER (WHERE NOT con_sucesora)
+    INTO v_reemplazadas, v_huerfanas, v_lista_h
+    FROM (
+      SELECT x.firma,
+             EXISTS (SELECT 1 FROM fos.posteriores p WHERE split_part(p.firma, '(', 1) = split_part(x.firma, '(', 1)) AS con_sucesora
+        FROM (SELECT DISTINCT firma FROM fos.antes EXCEPT SELECT firma FROM fos.resultados) x
+    ) y;
+  IF v_desp < 200 OR v_inv <> v_desp OR v_antes - v_reemplazadas + v_post <> v_desp OR v_ajenas > 0 OR v_huerfanas > 0 THEN
+    RAISE EXCEPTION 'inventario: % funciones antes, % después (% nuevas de migraciones posteriores, % reemplazadas por ellas), % en el catálogo; nuevas sin justificar: %; desaparecidas sin sucesora: %',
+      v_antes, v_desp, v_post, v_reemplazadas, v_inv, COALESCE(v_lista, '—'), COALESCE(v_lista_h, '—');
   END IF;
   IF v_post = 0 THEN
     RAISE NOTICE '✓ la matriz cubre las % funciones SECURITY DEFINER ejecutables por authenticated, antes y después', v_desp;
   ELSE
-    RAISE NOTICE '✓ la matriz cubre las % funciones SECURITY DEFINER ejecutables por authenticated (% nuevas de migraciones posteriores a la serie, ejecutadas y juzgadas igual)', v_desp, v_post;
+    RAISE NOTICE '✓ la matriz cubre las % funciones SECURITY DEFINER ejecutables por authenticated (% nuevas de migraciones posteriores a la serie, ejecutadas y juzgadas igual; % firma(s) reemplazada(s) por ellas)', v_desp, v_post, v_reemplazadas;
   END IF;
 END $$;
 
