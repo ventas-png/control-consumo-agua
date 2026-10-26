@@ -677,7 +677,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'tarifas', label: 'Tarifas', icon: '💰', render: (ctx) =>
     <TarifasTab tarifas={ctx.tarifas} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('tarifas')} canEdit={ctx.canEdit('tarifas')} canDelete={ctx.canDelete('tarifas')} onRefresh={ctx.onRefresh} /> },
   { id: 'incidentes', label: 'Incidentes', icon: '🚨', render: (ctx) =>
-    <IncidentesTab incidentes={ctx.incidentes} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('incidentes')} canEdit={ctx.canEdit('incidentes')} canDelete={ctx.canDelete('incidentes')} onRefresh={ctx.onRefresh} /> },
+    <IncidentesTab incidentes={ctx.incidentes} proyectoId={ctx.proyectoId} companyId={ctx.cid} autorNombre={ctx.currentUser.name ?? ''} canCreate={ctx.canCreate('incidentes')} canEdit={ctx.canEdit('incidentes')} canDelete={ctx.canDelete('incidentes')} onRefresh={ctx.onRefresh} /> },
   { id: 'checklist_areas', label: 'Checklist', icon: '🗒️', render: (ctx) =>
     <ChecklistAreasTab checklists={ctx.checklistAreas} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('checklist_areas')} canEdit={ctx.canEdit('checklist_areas')} canDelete={ctx.canDelete('checklist_areas')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'prog_limpieza', label: 'Limpieza', icon: '🧹', render: (ctx) =>

@@ -71,14 +71,14 @@ describe('IncidentesTab — ventanas', () => {
       canCreate canEdit canDelete onRefresh={onRefresh} />)
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('button', { name: '→ Marcar Resuelto' })).toBeTruthy()
-    expect(within(dialog).getByText('Investigando')).toBeTruthy()
+    expect(within(dialog).getByRole('listitem', { current: 'step' }).textContent).toBe('Investigando')
   })
 
   it('registrar un incidente se hace en ventana y guardar llama a la mutación', async () => {
     const onRefresh = vi.fn()
     renderTab({ onRefresh })
-    fireEvent.click(screen.getByRole('button', { name: '🚨 Registrar' }))
-    const dialog = screen.getByRole('dialog', { name: 'Registrar incidente' })
+    fireEvent.click(screen.getByRole('button', { name: '🚨 Registrar incidente' }))
+    const dialog = screen.getByRole('dialog', { name: '🚨 Registrar incidente' })
     expect(dialog.classList.contains('at-modal--fs-mobile')).toBe(true)
 
     fireEvent.change(within(dialog).getByLabelText('Descripción *'), { target: { value: 'Puerta forzada en bodega' } })
@@ -97,7 +97,7 @@ describe('IncidentesTab — ventanas', () => {
     fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '✏️ Editar' }))
 
-    const form = screen.getByRole('dialog', { name: 'Editar incidente' })
+    const form = screen.getByRole('dialog', { name: '✏️ Editar incidente' })
     expect((within(form).getByLabelText('Área') as HTMLInputElement).value).toBe('Parqueo 3')
     fireEvent.change(within(form).getByLabelText('Seguimiento'), { target: { value: 'Denuncia presentada.' } })
     fireEvent.click(within(form).getByRole('button', { name: 'Guardar' }))
@@ -110,7 +110,7 @@ describe('IncidentesTab — ventanas', () => {
 
   it('sin permiso de edición no hay editar ni avance de estado; sin crear no hay registrar', () => {
     renderTab({ canCreate: false, canEdit: false })
-    expect(screen.queryByRole('button', { name: '🚨 Registrar' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '🚨 Registrar incidente' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).queryByRole('button', { name: /Editar/ })).toBeNull()
@@ -119,7 +119,7 @@ describe('IncidentesTab — ventanas', () => {
 
   it('los filtros siguen filtrando la lista', () => {
     renderTab({ incidentes: [incidente(), incidente({ id: 'i2', descripcion: 'Caída en escaleras', tipo: 'accidente', area: 'Torre B' })] })
-    fireEvent.change(screen.getByLabelText('Buscar por área'), { target: { value: 'torre' } })
+    fireEvent.change(screen.getByLabelText('Buscar incidentes'), { target: { value: 'torre' } })
     expect(screen.queryByRole('button', { name: /Grafiti/ })).toBeNull()
     expect(screen.getByRole('button', { name: /Caída en escaleras/ })).toBeTruthy()
   })
@@ -155,5 +155,130 @@ describe('IncidentesTab — ventanas', () => {
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
     expect(onRefresh).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+})
+
+// Más amigable: resumen con lo abierto y su antigüedad, filtros por estado con
+// su cuenta, búsqueda en todo el texto, la línea de avance del incidente y
+// notas de seguimiento con fecha y autor sin pasar por «Editar».
+describe('IncidentesTab — resumen, filtros y seguimiento', () => {
+  const lista = [
+    incidente({ id: 'i1', fecha: '2026-10-10', hora: '08:00', estado: 'reportado', descripcion: 'Puerta de bodega forzada', tipo: 'robo', area: 'Bodega', reportado_por: 'Carlos Ruiz', involucrados: null, seguimiento: null }),
+    incidente({ id: 'i2', fecha: '2026-10-25', hora: '21:15', estado: 'investigando', descripcion: 'Grafiti en el muro del parqueo' }),
+    incidente({ id: 'i3', fecha: '2026-09-30', hora: '10:00', estado: 'cerrado', descripcion: 'Caída en escaleras', tipo: 'accidente', area: 'Torre B', involucrados: 'Apto 4C' }),
+  ]
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 26, 10, 30, 0)) // 26 oct 2026, 10:30
+  })
+  afterEach(() => vi.useRealTimers())
+
+  const titulos = () => screen.getAllByRole('button', { name: /Puerta de bodega|Grafiti en el muro|Caída en escaleras/ })
+    .map(b => (b.textContent ?? '').match(/Puerta de bodega|Grafiti en el muro|Caída en escaleras/)![0])
+
+  it('el resumen cuenta lo abierto, su antigüedad y lo del mes; «Abiertos» filtra', () => {
+    renderTab({ incidentes: lista })
+    expect(screen.getByRole('button', { name: 'Abiertos: 2' })).toBeTruthy()
+    expect(screen.getByText(/Más antiguo abierto$/).nextElementSibling!.textContent).toBe('16 días')
+    expect(screen.getByText(/Este mes$/).nextElementSibling!.textContent).toBe('2')
+
+    // Lo más reciente arriba.
+    expect(titulos()).toEqual(['Grafiti en el muro', 'Puerta de bodega', 'Caída en escaleras'])
+    fireEvent.click(screen.getByRole('button', { name: 'Abiertos: 2' }))
+    expect(titulos()).toEqual(['Grafiti en el muro', 'Puerta de bodega'])
+    expect(screen.getByRole('button', { name: 'Abiertos (2)' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('los estados filtran con su cuenta; la búsqueda mira también quién reportó y los involucrados', () => {
+    renderTab({ incidentes: lista })
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrado (1)' }))
+    expect(titulos()).toEqual(['Caída en escaleras'])
+    fireEvent.click(screen.getByRole('button', { name: 'Todos (3)' }))
+
+    fireEvent.change(screen.getByLabelText('Buscar incidentes'), { target: { value: 'carlos' } })
+    expect(titulos()).toEqual(['Puerta de bodega'])
+    fireEvent.change(screen.getByLabelText('Buscar incidentes'), { target: { value: '4c' } })
+    expect(titulos()).toEqual(['Caída en escaleras'])
+  })
+
+  it('cada incidente abierto dice cuánto lleva; uno cerrado no', () => {
+    renderTab({ incidentes: lista })
+    const tarjeta = (t: RegExp) => screen.getByRole('button', { name: t }).textContent
+    expect(tarjeta(/Puerta de bodega/)).toContain('abierto hace 16 días')
+    expect(tarjeta(/Grafiti en el muro/)).toContain('abierto hace 1 día')
+    expect(tarjeta(/Caída en escaleras/)).not.toContain('abierto')
+  })
+
+  it('el detalle muestra el avance y agrega notas de seguimiento con fecha y autor', async () => {
+    const onRefresh = vi.fn()
+    renderTab({ incidentes: lista, onRefresh, autorNombre: 'Ana López' })
+    fireEvent.click(screen.getByRole('button', { name: /Puerta de bodega/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('listitem', { current: 'step' }).textContent).toBe('Reportado')
+    expect(within(dialog).getByText('Sin notas todavía.')).toBeTruthy()
+
+    const agregar = within(dialog).getByRole('button', { name: '+ Agregar nota' }) as HTMLButtonElement
+    expect(agregar.disabled).toBe(true) // sin texto no hay nota
+    fireEvent.change(within(dialog).getByLabelText('Agregar nota de seguimiento'), { target: { value: 'Se revisaron las cámaras.' } })
+
+    // Si falla, la nota se queda escrita.
+    mocks.updateCondominioRow.mockResolvedValueOnce({ error: { message: 'Sin conexión' } } as never)
+    fireEvent.click(agregar)
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error', text: 'Sin conexión' })))
+    expect((within(dialog).getByLabelText('Agregar nota de seguimiento') as HTMLTextAreaElement).value).toBe('Se revisaron las cámaras.')
+    expect(onRefresh).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '+ Agregar nota' }))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    expect(mocks.updateCondominioRow).toHaveBeenLastCalledWith('incidentes_seguridad', 'i1', {
+      seguimiento: '[2026-10-26 10:30 · Ana López] Se revisaron las cámaras.',
+    })
+    expect((within(dialog).getByLabelText('Agregar nota de seguimiento') as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('una nota nueva va debajo de las anteriores, sin borrarlas', async () => {
+    renderTab({ incidentes: lista, autorNombre: 'Ana López' })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    fireEvent.change(screen.getByLabelText('Agregar nota de seguimiento'), { target: { value: 'Denuncia presentada.' } })
+    fireEvent.click(screen.getByRole('button', { name: '+ Agregar nota' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', 'i2', {
+      seguimiento: 'Se revisan las cámaras.\n[2026-10-26 10:30 · Ana López] Denuncia presentada.',
+    }))
+  })
+
+  it('avanzar de estado no se repite con un segundo toque', async () => {
+    renderTab({ incidentes: lista })
+    fireEvent.click(screen.getByRole('button', { name: /Puerta de bodega/ }))
+    let resolver!: (v: { error: null }) => void
+    mocks.updateCondominioRow.mockReturnValueOnce(new Promise(r => { resolver = r }) as never)
+    const avanzar = within(screen.getByRole('dialog')).getByRole('button', { name: '→ Iniciar Investigación' })
+    fireEvent.click(avanzar)
+    fireEvent.click(avanzar)
+    expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1)
+    resolver({ error: null })
+  })
+
+  it('sin permiso de editar no hay notas; el pie ofrece Cerrar', () => {
+    renderTab({ incidentes: lista, canEdit: false, canDelete: false })
+    fireEvent.click(screen.getByRole('button', { name: /Puerta de bodega/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByLabelText('Agregar nota de seguimiento')).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('registrar propone la fecha y la hora de ahora, y sin fecha avisa', async () => {
+    renderTab({ incidentes: lista })
+    fireEvent.click(screen.getByRole('button', { name: '🚨 Registrar incidente' }))
+    const dialog = screen.getByRole('dialog', { name: '🚨 Registrar incidente' })
+    expect((within(dialog).getByLabelText('Fecha *') as HTMLInputElement).value).toBe('2026-10-26')
+    expect((within(dialog).getByLabelText('Hora') as HTMLInputElement).value).toBe('10:30')
+
+    fireEvent.change(within(dialog).getByLabelText('Descripción *'), { target: { value: 'Alarma activada' } })
+    fireEvent.change(within(dialog).getByLabelText('Fecha *'), { target: { value: '' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Indica la fecha del incidente.' })))
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
   })
 })
