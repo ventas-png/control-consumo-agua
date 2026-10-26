@@ -4,7 +4,7 @@ import { fetchPortalPaymentConfig, fetchPortalRecargoTarjeta } from '../../../do
 import type { RecargoTarjetaRow } from '../../../lib/businessPagos'
 import type {
   Unidad, CuotaCondominio, TicketMantenimiento,
-  Amenidad, ReservaAmenidad, BloqueoAmenidad, Visitante, VisitaFrecuente, AnuncioComunidad, MensajePortal,
+  Amenidad, ReservaAmenidad, BloqueoAmenidad, PrestamoEquipo, Visitante, VisitaFrecuente, AnuncioComunidad, MensajePortal,
 } from '../../../types'
 import { PortalMiCuentaTab }   from './PortalMiCuentaTab'
 import { PortalMisTicketsTab } from './PortalMisTicketsTab'
@@ -20,6 +20,8 @@ interface Props {
   amenidades: Amenidad[]
   reservas:   ReservaAmenidad[]
   bloqueosAmenidades: BloqueoAmenidad[]
+  /** Préstamos de equipo del proyecto; la vista previa filtra por la unidad elegida. */
+  prestamos?: PrestamoEquipo[]
   visitantes: Visitante[]
   /** Pre-autorizaciones del proyecto; la vista previa filtra por la unidad elegida. */
   visitasFrecuentes?: VisitaFrecuente[]
@@ -46,7 +48,7 @@ const SUB_TABS: { id: PortalTab; label: string; icon: string }[] = [
 ]
 
 export function PortalResidenteTab({
-  unidades, cuotas, tickets, amenidades, reservas, bloqueosAmenidades, visitantes, visitasFrecuentes = [], anuncios,
+  unidades, cuotas, tickets, amenidades, reservas, bloqueosAmenidades, prestamos = [], visitantes, visitasFrecuentes = [], anuncios,
   proyectoId, companyId, moneda, canEdit, autorNombre, autorUserId, onRefresh,
 }: Props) {
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
@@ -182,6 +184,7 @@ export function PortalResidenteTab({
                 amenidades={amenidades}
                 reservas={reservas}
                 bloqueos={bloqueosAmenidades}
+                prestamos={prestamos.filter(p => p.unidad_id === selectedUnidadId)}
                 unidadId={selectedUnidadId}
                 moneda={moneda}
                 onRefresh={onRefresh}

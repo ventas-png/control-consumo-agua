@@ -264,6 +264,9 @@ export async function fetchCondominiosRondasData(pid: string, cid: string) {
     // propios, así que acota como el resto del módulo.
     db.from('puntos_verificacion').select('*, areas_condominio(nombre, icono)').eq('project_id', pid).eq('company_id', cid).order('orden').order('nombre'),
     db.from('amenidades_bloqueos').select('*, amenidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
+    // Equipo del inventario que se presta con cada amenidad (20261108000000):
+    // lo configura el tab de Amenidades y lo consulta el detalle de la reserva.
+    db.from('amenidad_inventario').select('*').eq('project_id', pid).eq('company_id', cid),
   ])
 }
 

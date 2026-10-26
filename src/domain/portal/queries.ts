@@ -240,6 +240,8 @@ export interface CondominiosPortalData {
   cuotasData: unknown[] | null
   reservasData: unknown[] | null
   bloqueosData: unknown[] | null
+  /** Préstamos de equipo de las unidades del residente: los pedidos con una reserva y los sueltos. */
+  prestamosData: unknown[] | null
   ticketsData: unknown[] | null
   anunciosData: unknown[] | null
   visitantesData: unknown[] | null
@@ -271,7 +273,7 @@ export async function fetchCondominiosPortalData(
   const haceDosAnos = dateLocalISO(new Date(Date.now() - 730 * 24 * 60 * 60 * 1000))
 
   const [
-    projRes, amenidadesRes, cuotasRes, reservasRes, bloqueosRes, ticketsRes,
+    projRes, amenidadesRes, cuotasRes, reservasRes, bloqueosRes, prestamosRes, ticketsRes,
     anunciosRes, visitantesRes, visitasFrecuentesRes, mensajesRes, solicitudesRentaRes, paquetesRes,
     correspondenciaRes, comunicadosRes, pestanasRes,
   ] = await Promise.all([
@@ -284,6 +286,10 @@ export async function fetchCondominiosPortalData(
       .limit(500),
     db.from('reservas_amenidades').select('*').in('unidad_id', unidadIds).gte('fecha', today).order('fecha'),
     db.from('amenidades_bloqueos').select('*').in('project_id', projectIds),
+    // Equipo pedido con las reservas (20261108000000) y préstamos sueltos de
+    // la unidad: el residente ve qué se le entregó, qué devolvió y qué debe por
+    // lo que faltó. La RLS ya le concedía las filas de su unidad (20260713030000).
+    db.from('prestamos_equipo').select('*').in('unidad_id', unidadIds).order('fecha_prestamo', { ascending: false }).limit(200),
     db.from('tickets_mantenimiento').select('*').in('unidad_id', unidadIds)
       .is('deleted_at', null)
       .gte('created_at', noventaDias)
@@ -332,6 +338,7 @@ export async function fetchCondominiosPortalData(
     cuotasData: cuotasRes.data,
     reservasData: reservasRes.data,
     bloqueosData: bloqueosRes.data,
+    prestamosData: prestamosRes.data,
     ticketsData: ticketsRes.data,
     anunciosData: anunciosRes.data,
     visitantesData: visitantesRes.data,

@@ -24,7 +24,7 @@ import { CondominioContextBar } from './CondominioContextBar'
 import type {
   UserSession, Proyecto, Unidad,
   OrdenCompra, Proforma,
-  CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento, AnuncioComunidad,
+  CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, BloqueoAmenidad, AmenidadInventario, TicketMantenimiento, AnuncioComunidad,
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
   AreaCondominio, RutaRonda, PuntoControlRuta, PuntoVerificacion, VisitaControl,
@@ -167,6 +167,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [amenidades, setAmenidades] = useState<Amenidad[]>([])
   const [reservas, setReservas] = useState<ReservaAmenidad[]>([])
   const [bloqueosAmenidades, setBloqueosAmenidades] = useState<BloqueoAmenidad[]>([])
+  const [amenidadInventario, setAmenidadInventario] = useState<AmenidadInventario[]>([])
   const [tickets, setTickets] = useState<TicketMantenimiento[]>([])
   const [anuncios, setAnuncios] = useState<AnuncioComunidad[]>([])
   // Fase 2
@@ -453,7 +454,8 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     if (runSeqRef.current !== run) return // una carga más nueva ya corre
 
     // Fase 57 — Rutas de ronda (separate to avoid giant Promise.all size limit)
-    const [areasRes, rutasRes, puntosControlRes, puntosVerifRes, bloqueosAmenRes] = await fetchCondominiosRondasData(pid, cid)
+    const [areasRes, rutasRes, puntosControlRes, puntosVerifRes, bloqueosAmenRes, amenidadInvRes] = await fetchCondominiosRondasData(pid, cid)
+    setAmenidadInventario((amenidadInvRes.data ?? []) as AmenidadInventario[])
     setBloqueosAmenidades(
       (bloqueosAmenRes.data ?? []).map((b: Record<string, unknown>) => ({
         ...b,
@@ -752,7 +754,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     onRefresh: cargarDatos, irATab: setActiveTab,
     proyectoId: selectedProyectoId, proyectoActual, proyectosActivos,
     unidadesProyecto, cid, uid, currentUser, moneda,
-    cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, tickets, anuncios,
+    cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, amenidadInventario, tickets, anuncios,
     parqueos, mascotas, paquetes, infracciones, rondas, novedades, areas, rutas,
     puntosControl, puntosVerificacion, visitasControl, plantillasCargo, bloquesTurno, tareasBloque,
     revisionesTarea, contratos, asambleas, contratosProveedores, objetos, agenda,
@@ -787,7 +789,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     cargarDatos, setActiveTab,
     selectedProyectoId, proyectoActual, proyectosActivos,
     unidadesProyecto, cid, uid, currentUser, moneda,
-    cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, tickets, anuncios,
+    cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, amenidadInventario, tickets, anuncios,
     parqueos, mascotas, paquetes, infracciones, rondas, novedades, areas, rutas,
     puntosControl, puntosVerificacion, visitasControl, plantillasCargo, bloquesTurno, tareasBloque,
     revisionesTarea, contratos, asambleas, contratosProveedores, objetos, agenda,

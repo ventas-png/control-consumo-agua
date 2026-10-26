@@ -465,13 +465,19 @@ export interface MiembroJunta {
   unidad_nombre?: string
 }
 
-export type EstadoPrestamo = 'prestado' | 'devuelto' | 'dañado' | 'perdido'
+/**
+ * Ciclo de un préstamo (20261108000000): 'solicitado' = pedido con la reserva
+ * y aún no entregado · 'prestado' = en circulación · 'devuelto' / 'dañado' /
+ * 'perdido' = cerrado al recibir · 'cancelado' = no se entregó.
+ */
+export type EstadoPrestamo = 'solicitado' | 'prestado' | 'devuelto' | 'dañado' | 'perdido' | 'cancelado'
 export interface PrestamoEquipo {
   id: string
   company_id: string
   project_id: string
   unidad_id?: string | null
   equipo_nombre: string
+  /** Cantidad ENTREGADA (la pedida mientras sigue 'solicitado'). Es la que descuenta disponibilidad. */
   cantidad: number
   fecha_prestamo: string
   hora_prestamo?: string | null
@@ -483,6 +489,20 @@ export interface PrestamoEquipo {
   observaciones?: string | null
   entregado_por?: string | null
   recibido_por?: string | null
+  /** Fila del inventario de la que sale el equipo; NULL = préstamo libre (texto). */
+  inventario_id?: string | null
+  /** Reserva de amenidad que lo pidió; NULL = préstamo suelto. */
+  reserva_id?: string | null
+  /** Lo que pidió el residente al reservar (`cantidad` puede quedar por debajo al entregar). */
+  cantidad_solicitada?: number | null
+  cantidad_devuelta?: number | null
+  /** Costo unitario del inventario congelado al prestar: lo que cuesta reponer cada faltante. */
+  costo_reposicion_unitario?: number | null
+  /** Lo que debe la unidad por faltantes o daños al recibir. */
+  monto_reposicion?: number | null
+  /** Cuota 'amenidad' que cobró la reposición, si se generó. */
+  cuota_reposicion_id?: string | null
+  observaciones_devolucion?: string | null
   created_at: string
   unidad_nombre?: string
 }

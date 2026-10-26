@@ -4,9 +4,10 @@ import { pillStyle, RESERVA_CAL_COLORS } from './ui'
 import { ImageUploader } from '../../../shared/ImageUploader'
 import { EmptyState } from './comunes'
 import { formatFechaCalendario } from '../../../../lib/format'
+import { SelectorEquiposAmenidad } from './SelectorEquiposAmenidad'
 
 export function VistaAmenidades({ ctx }: { ctx: AmenidadesCtx }) {
-  const { amenidades, reservas, moneda, canCreate, canEdit, canDelete, showAmenidadForm, setShowAmenidadForm, saving, amenidadFotoUrl, setAmenidadFotoUrl, amenidadForm, setAmenidadForm, editingAmenidad, setEditingAmenidad, editAmenidadFotoUrl, setEditAmenidadFotoUrl, editAmenidadForm, setEditAmenidadForm, savingEdit, hoy, amenidadFotoUrls, guardarAmenidad, guardarEdicion, toggleAmenidad, eliminarAmenidad, abrirEdicion } = ctx
+  const { amenidades, reservas, moneda, inventario, prestamos, amenidadInventario, canCreate, canEdit, canDelete, showAmenidadForm, setShowAmenidadForm, saving, amenidadFotoUrl, setAmenidadFotoUrl, amenidadForm, setAmenidadForm, editingAmenidad, setEditingAmenidad, editAmenidadFotoUrl, setEditAmenidadFotoUrl, editAmenidadForm, setEditAmenidadForm, savingEdit, hoy, amenidadFotoUrls, guardarAmenidad, guardarEdicion, toggleAmenidad, eliminarAmenidad, abrirEdicion } = ctx
   return (
         <>
           {showAmenidadForm && (
@@ -106,6 +107,9 @@ export function VistaAmenidades({ ctx }: { ctx: AmenidadesCtx }) {
                         style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: 'var(--at-surface-2)' }} />
                     </div>
                   </div>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <SelectorEquiposAmenidad inventario={inventario} prestamos={prestamos} value={amenidadForm.equipos} onChange={equipos => setAmenidadForm(f => ({ ...f, equipos }))} />
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <ImageUploader value={amenidadFotoUrl} onChange={setAmenidadFotoUrl} folder="amenidades" label="Foto de la amenidad" />
@@ -219,6 +223,9 @@ export function VistaAmenidades({ ctx }: { ctx: AmenidadesCtx }) {
                   </div>
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
+                  <SelectorEquiposAmenidad inventario={inventario} prestamos={prestamos} value={editAmenidadForm.equipos} onChange={equipos => setEditAmenidadForm(f => ({ ...f, equipos }))} />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
                   <ImageUploader value={editAmenidadFotoUrl} onChange={setEditAmenidadFotoUrl} folder="amenidades" label="Foto de la amenidad" />
                 </div>
               </div>
@@ -305,6 +312,10 @@ export function VistaAmenidades({ ctx }: { ctx: AmenidadesCtx }) {
                       )}
                       {a.requiere_aprobacion && <span style={pillStyle('var(--at-warning-tint)', 'var(--at-warning-border)', 'var(--at-warning-strong)')}>👤 Aprobación</span>}
                       {a.reglamento && <span style={pillStyle('var(--at-accent-tint-2)', 'var(--at-accent-soft-2)', 'var(--at-accent-dark)')}>📜 Reglamento</span>}
+                      {(() => {
+                        const n = amenidadInventario.filter(l => l.amenidad_id === a.id).length
+                        return n > 0 ? <span style={pillStyle('var(--at-success-tint)', 'var(--at-success-border)', 'var(--at-success-strong)')}>🪑 {n} equipo{n === 1 ? '' : 's'}</span> : null
+                      })()}
                     </div>
                     {/* Stats footer */}
                     <div style={{ marginTop: 'auto', paddingTop: 10, borderTop: '1px dashed var(--at-line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>

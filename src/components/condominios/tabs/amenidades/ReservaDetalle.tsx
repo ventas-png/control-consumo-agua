@@ -9,9 +9,11 @@ import { CheckoutForm } from './comunes'
 import { ModalPortal } from '../../../shared/ModalPortal'
 import { formatFechaCalendario } from '../../../../lib/format'
 import { tint } from '../../../shared/statusTone'
+import { EquiposReserva } from './EquiposReserva'
+import { prestamosDeReserva, resumenEquiposReserva } from '../../../../lib/prestamosEquipo'
 
 export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
-  const { amenidades, moneda, canEdit, onRefresh, reservaDetalle, setReservaDetalle, registrarCheckin, registrarCheckout, actualizarEstadoDeposito, retenerDeposito, aprobarReserva, rechazarReserva } = ctx
+  const { amenidades, moneda, canEdit, onRefresh, reservaDetalle, prestamos, amenidadInventario, setReservaDetalle, registrarCheckin, registrarCheckout, actualizarEstadoDeposito, retenerDeposito, aprobarReserva, rechazarReserva } = ctx
   if (!reservaDetalle) return null
         const r = reservaDetalle
         const amen = amenidades.find(a => a.id === r.amenidad_id)
@@ -63,6 +65,33 @@ export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
             </>
           ),
         })
+        // Equipo pedido con la reserva (20261108000000): entrega al check-in,
+        // recepción al check-out. Sólo aparece si se pidió algo o si la
+        // amenidad presta equipo (para poder agregarlo).
+        {
+          const equiposR = prestamosDeReserva(r.id, prestamos)
+          const prestaEquipo = amenidadInventario.some(l => l.amenidad_id === r.amenidad_id)
+          if (equiposR.length > 0 || (prestaEquipo && r.estado !== 'cancelada')) {
+            const res = resumenEquiposReserva(equiposR)
+            const hay = equiposR.length > 0
+            steps.push({
+              id: 'equipo',
+              label: !hay ? 'Equipo' : res.pendienteEntrega ? 'Equipo por entregar' : res.pendienteRecepcion ? 'Equipo por recibir' : 'Equipo recibido',
+              done: hay && !res.pendienteEntrega && !res.pendienteRecepcion,
+              current: res.pendienteEntrega || res.pendienteRecepcion,
+              meta: !hay
+                ? 'Sin equipo solicitado'
+                : [
+                    res.solicitados > 0 ? `${res.solicitados} por entregar` : null,
+                    res.prestados > 0 ? `${res.prestados} en préstamo` : null,
+                    res.cerrados > 0 ? `${res.cerrados} recibido${res.cerrados === 1 ? '' : 's'}` : null,
+                    res.cancelados > 0 ? `${res.cancelados} sin entregar` : null,
+                    res.reposicion > 0 ? `reposición ${moneda} ${res.reposicion.toFixed(2)}` : null,
+                  ].filter(Boolean).join(' · '),
+              render: <EquiposReserva ctx={ctx} reserva={r} />,
+            })
+          }
+        }
         // Check-out
         steps.push({
           id: 'checkout', label: 'Check-out', done: !!r.checkout_at,

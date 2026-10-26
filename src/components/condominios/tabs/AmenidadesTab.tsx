@@ -10,15 +10,29 @@ import {
   deleteCondominioRow,
 } from '../../../domain/condominios/tabMutations'
 import { solicitarAjuste, cancelarReservaConTarifa, avisoCancelacionReserva } from '../../../domain/contabilidad/ajustes'
-import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
+import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad, ItemInventario, PrestamoEquipo, AmenidadInventario, SolicitudEquipoReserva } from '../../../types'
 import { useSignedUrls } from '../../../lib/storageUrls'
 import { formatPhoneForWa } from '../../../lib/validation'
+import {
+  solicitarEquiposReserva as solicitarEquiposReservaRpc,
+  entregarPrestamos,
+  recibirPrestamos,
+  type EntregaPrestamo,
+  type RecepcionPrestamo,
+  type ResultadoRecepcion,
+} from '../../../domain/condominios/prestamosEquipo'
 
 interface Props {
   amenidades: Amenidad[]
   reservas: ReservaAmenidad[]
   bloqueos: BloqueoAmenidad[]
   unidades: Unidad[]
+  /** Inventario del condominio: de aquí se eligen los equipos que se prestan con cada amenidad (20261108000000). */
+  inventario?: ItemInventario[]
+  /** Préstamos de equipo del proyecto; los pedidos con una reserva cuelgan de `reserva_id`. */
+  prestamos?: PrestamoEquipo[]
+  /** Enlaces amenidad ↔ inventario. */
+  amenidadInventario?: AmenidadInventario[]
   proyectoId: string
   companyId: string
   userId: string
@@ -44,7 +58,7 @@ import {
   MOTIVO_LABEL,
   btnHero,
 } from './amenidades/ui'
-import type { AmenidadesCtx } from './amenidades/ctx'
+import type { AmenidadesCtx, AmenidadFormState, ReservaFormState } from './amenidades/ctx'
 import { VistaAmenidades } from './amenidades/VistaAmenidades'
 import { VistaReservas } from './amenidades/VistaReservas'
 import { VistaCalendario } from './amenidades/VistaCalendario'
@@ -52,15 +66,15 @@ import { VistaBloqueos } from './amenidades/VistaBloqueos'
 import { ReservaDetalle } from './amenidades/ReservaDetalle'
 import { VistaRecordatorios } from './amenidades/VistaRecordatorios'
 
-export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
+export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, inventario = [], prestamos = [], amenidadInventario = [], proyectoId, companyId, userId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [vista, setVista] = useState<Vista>('amenidades')
   const [showAmenidadForm, setShowAmenidadForm] = useState(false)
   const [showReservaForm, setShowReservaForm] = useState(false)
   const [showBloqueoForm, setShowBloqueoForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [amenidadFotoUrl, setAmenidadFotoUrl] = useState<string | null>(null)
-  const [amenidadForm, setAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '' })
-  const [reservaForm, setReservaForm] = useState({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad' as 'cargar_unidad' | 'pagar_momento', tarifa_pagada: false })
+  const [amenidadForm, setAmenidadForm] = useState<AmenidadFormState>({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '', equipos: {} })
+  const [reservaForm, setReservaForm] = useState<ReservaFormState>({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad', tarifa_pagada: false, equipos: {} })
   const [bloqueoForm, setBloqueoForm] = useState({ amenidad_id: '', fecha_inicio: '', fecha_fin: '', dia_completo: true, hora_inicio: '', hora_fin: '', motivo: 'mantenimiento' as MotivoBloqueoAmenidad, notas: '' })
   const [semana, setSemana] = useState<Date>(() => lunesDeSemana(new Date()))
   const [selectedReserva, setSelectedReserva] = useState<ReservaAmenidad | null>(null)
@@ -71,7 +85,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   // Edición de amenidad existente
   const [editingAmenidad, setEditingAmenidad] = useState<Amenidad | null>(null)
   const [editAmenidadFotoUrl, setEditAmenidadFotoUrl] = useState<string | null>(null)
-  const [editAmenidadForm, setEditAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '' })
+  const [editAmenidadForm, setEditAmenidadForm] = useState<AmenidadFormState>({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '', equipos: {} })
   const [savingEdit, setSavingEdit] = useState(false)
 
   const hoy = hoyLocalISO()
@@ -91,7 +105,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     if (!amenidadForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre.' }); return }
     if (amenidadForm.requiere_tarifa && !amenidadForm.tarifa_uso) { notify({ variant: 'error', title: 'Error', text: 'Indique el monto de la tarifa por uso.' }); return }
     setSaving(true)
-    const { error } = await createCondominioRow('amenidades', {
+    const { data: creada, error } = await createCondominioRowReturning('amenidades', {
       company_id: companyId, project_id: proyectoId,
       nombre: amenidadForm.nombre.trim(),
       descripcion: amenidadForm.descripcion.trim() || null,
@@ -114,7 +128,12 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setAmenidadForm({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '' })
+    const amenidadId = (creada?.id as string | undefined) ?? null
+    if (amenidadId && Object.keys(amenidadForm.equipos).length > 0) {
+      const errEq = await sincronizarEquiposAmenidad(amenidadId, amenidadForm.equipos, [])
+      if (errEq) notify({ variant: 'warning', title: 'Amenidad guardada, pero el equipo no se enlazó', text: errEq })
+    }
+    setAmenidadForm({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '', equipos: {} })
     setAmenidadFotoUrl(null)
     setShowAmenidadForm(false)
     onRefresh()
@@ -141,8 +160,45 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       minutos_preparacion_posterior: a.minutos_preparacion_posterior != null ? String(a.minutos_preparacion_posterior) : '',
       requiere_aprobacion: a.requiere_aprobacion ?? false,
       reglamento: a.reglamento ?? '',
+      equipos: Object.fromEntries(
+        amenidadInventario
+          .filter(l => l.amenidad_id === a.id)
+          .map(l => [l.inventario_id, l.cantidad_max_por_reserva != null ? String(l.cantidad_max_por_reserva) : '']),
+      ),
     })
     setShowAmenidadForm(false)
+  }
+
+  /**
+   * Deja los enlaces amenidad ↔ inventario como dice el formulario: crea los
+   * nuevos, actualiza el tope de los que cambiaron y borra los que se quitaron.
+   * Devuelve el primer error, o null.
+   */
+  async function sincronizarEquiposAmenidad(
+    amenidadId: string,
+    equipos: Record<string, string>,
+    existentes: AmenidadInventario[],
+  ): Promise<string | null> {
+    const tope = (v: string) => (v.trim() ? Math.max(1, Math.floor(Number(v))) || null : null)
+    const nuevos = Object.entries(equipos).filter(([id]) => !existentes.some(l => l.inventario_id === id))
+    const quitados = existentes.filter(l => !(l.inventario_id in equipos))
+    const cambiados = existentes
+      .filter(l => l.inventario_id in equipos && (l.cantidad_max_por_reserva ?? null) !== tope(equipos[l.inventario_id]))
+    if (nuevos.length > 0) {
+      const { error } = await createCondominioRow('amenidad_inventario', nuevos.map(([inventario_id, max]) => ({
+        company_id: companyId, project_id: proyectoId, amenidad_id: amenidadId, inventario_id, cantidad_max_por_reserva: tope(max),
+      })))
+      if (error) return error.message
+    }
+    for (const l of cambiados) {
+      const { error } = await updateCondominioRow('amenidad_inventario', l.id, { cantidad_max_por_reserva: tope(equipos[l.inventario_id]) })
+      if (error) return error.message
+    }
+    for (const l of quitados) {
+      const { error } = await deleteCondominioRow('amenidad_inventario', l.id)
+      if (error) return error.message
+    }
+    return null
   }
 
   async function guardarEdicion() {
@@ -172,6 +228,10 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     })
     setSavingEdit(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    const errEq = await sincronizarEquiposAmenidad(
+      editingAmenidad.id, editAmenidadForm.equipos, amenidadInventario.filter(l => l.amenidad_id === editingAmenidad.id),
+    )
+    if (errEq) notify({ variant: 'warning', title: 'Cambios guardados, pero el equipo no se actualizó', text: errEq })
     setEditingAmenidad(null)
     onRefresh()
   }
@@ -268,7 +328,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
     const tarifaPagada = aplicaTarifa && metodoPago === 'pagar_momento' ? reservaForm.tarifa_pagada : false
 
-    const { error } = await createCondominioRow('reservas_amenidades', {
+    const { data: reservaCreada, error } = await createCondominioRowReturning('reservas_amenidades', {
       company_id: companyId,
       amenidad_id: reservaForm.amenidad_id,
       unidad_id: reservaForm.unidad_id,
@@ -290,7 +350,19 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       if (cuotaId) await compensarCuotaSinReserva(cuotaId, error.message)
       notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
-    setReservaForm({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad', tarifa_pagada: false })
+    // Equipo pedido con la reserva: nace como préstamo 'solicitado' por RPC
+    // (valida enlace, tope y disponibilidad en la base). Si falla, la reserva
+    // ya existe y se avisa para agregarlo desde el detalle.
+    const equiposPedidos: SolicitudEquipoReserva[] = Object.entries(reservaForm.equipos)
+      .filter(([, n]) => n > 0)
+      .map(([inventario_id, cantidad]) => ({ inventario_id, cantidad }))
+    const reservaId = (reservaCreada?.id as string | undefined) ?? null
+    let avisoEquipo: string | null = null
+    if (reservaId && equiposPedidos.length > 0) {
+      const { error: errEq } = await solicitarEquiposReservaRpc(reservaId, equiposPedidos)
+      if (errEq) avisoEquipo = errEq.message
+    }
+    setReservaForm({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad', tarifa_pagada: false, equipos: {} })
     setShowReservaForm(false)
     const msg = requiereAprob
       ? 'Reserva enviada como pendiente. Apruébala desde la lista.'
@@ -302,7 +374,39 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
             : `Reserva confirmada. Cobrar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
         : 'Reserva confirmada'
     notify({ variant: 'success', title: msg, duration: 2400 })
+    if (avisoEquipo) notify({ variant: 'warning', title: 'La reserva se guardó, pero el equipo no se pudo solicitar', text: avisoEquipo })
     onRefresh()
+  }
+
+  // ── Equipo de la reserva (20261108000000) ──────────────────────────────────
+  async function solicitarEquiposReserva(reservaId: string, equipos: SolicitudEquipoReserva[]): Promise<boolean> {
+    const { data, error } = await solicitarEquiposReservaRpc(reservaId, equipos)
+    if (error) { notify({ variant: 'error', title: 'No se pudo solicitar el equipo', text: error.message }); return false }
+    notify({ variant: 'success', title: `Equipo solicitado (${data?.equipos_solicitados ?? equipos.length})`, duration: 1800 })
+    onRefresh()
+    return true
+  }
+
+  async function entregarEquipos(entregas: EntregaPrestamo[], entregadoPor: string, observaciones: string): Promise<boolean> {
+    const { data, error } = await entregarPrestamos(entregas, entregadoPor || null, observaciones || null)
+    if (error) { notify({ variant: 'error', title: 'No se registró la entrega', text: error.message }); return false }
+    const partes = [`${data?.entregados ?? 0} entregado(s)`]
+    if (data?.cancelados) partes.push(`${data.cancelados} sin entregar`)
+    notify({ variant: 'success', title: 'Entrega registrada', text: partes.join(' · '), duration: 2200 })
+    onRefresh()
+    return true
+  }
+
+  async function recibirEquipos(recepciones: RecepcionPrestamo[], recibidoPor: string, generarCargo: boolean): Promise<ResultadoRecepcion | null> {
+    const { data, error } = await recibirPrestamos(recepciones, recibidoPor || null, generarCargo)
+    if (error) { notify({ variant: 'error', title: 'No se registró la recepción', text: error.message }); return null }
+    const monto = Number(data?.monto_reposicion ?? 0)
+    const texto = monto > 0
+      ? `Reposición ${moneda} ${monto.toFixed(2)}${data?.cuota_id ? ' · se generó el cargo a la unidad' : ' · sin cargo (puedes retenerlo del depósito)'}`
+      : 'Todo el equipo volvió completo.'
+    notify({ variant: 'success', title: `Recepción registrada (${data?.recibidos ?? recepciones.length})`, text: texto, duration: 2800 })
+    onRefresh()
+    return data
   }
 
   // E7 (20261018000000): cancelar o rechazar la reserva y ANULAR su tarifa van
@@ -621,11 +725,12 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   const ctx: AmenidadesCtx = {
-    amenidades, reservas, bloqueos, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, canDelete, onRefresh,
+    amenidades, reservas, bloqueos, unidades, inventario, prestamos, amenidadInventario, proyectoId, companyId, userId, moneda, canCreate, canEdit, canDelete, onRefresh,
     showAmenidadForm, setShowAmenidadForm, showReservaForm, setShowReservaForm, showBloqueoForm, setShowBloqueoForm, saving, amenidadFotoUrl, setAmenidadFotoUrl, amenidadForm, setAmenidadForm, reservaForm, setReservaForm, bloqueoForm,
     setBloqueoForm, semana, setSemana, selectedReserva, setSelectedReserva, reservaDetalle, setReservaDetalle, editingAmenidad, setEditingAmenidad, editAmenidadFotoUrl, setEditAmenidadFotoUrl, editAmenidadForm, setEditAmenidadForm, savingEdit,
     hoy, amenidadesActivas, dias, amenidadFotoUrls,
     abrirReservaDesdeCalendario, abrirEdicion, guardarAmenidad, guardarEdicion, toggleAmenidad, eliminarAmenidad, guardarReserva, cancelarReserva, marcarNoShow, marcarTarifaPagada, guardarBloqueo, enviarRecordatorio, registrarCheckin, registrarCheckout, actualizarEstadoDeposito, retenerDeposito, aprobarReserva, rechazarReserva, eliminarBloqueo,
+    solicitarEquiposReserva, entregarEquipos, recibirEquipos,
   }
 
   return (

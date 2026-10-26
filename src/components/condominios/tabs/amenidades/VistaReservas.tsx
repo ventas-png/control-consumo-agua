@@ -3,9 +3,11 @@ import type { AmenidadesCtx } from './ctx'
 import { esFinDeSemana, tarifaAplicable } from '../../../../lib/amenidadesReglas'
 import { chipStyle, btnAction } from './ui'
 import { EmptyState } from './comunes'
+import { SelectorEquiposReserva } from './SelectorEquiposReserva'
+import { prestamosDeReserva, resumenEquiposReserva } from '../../../../lib/prestamosEquipo'
 
 export function VistaReservas({ ctx }: { ctx: AmenidadesCtx }) {
-  const { amenidades, reservas, unidades, moneda, canCreate, canEdit, showReservaForm, setShowReservaForm, saving, reservaForm, setReservaForm, reservaDetalle, setReservaDetalle, hoy, amenidadesActivas, guardarReserva, cancelarReserva, marcarNoShow, marcarTarifaPagada, aprobarReserva, rechazarReserva } = ctx
+  const { amenidades, reservas, unidades, moneda, inventario, prestamos, amenidadInventario, canCreate, canEdit, showReservaForm, setShowReservaForm, saving, reservaForm, setReservaForm, reservaDetalle, setReservaDetalle, hoy, amenidadesActivas, guardarReserva, cancelarReserva, marcarNoShow, marcarTarifaPagada, aprobarReserva, rechazarReserva } = ctx
   return (
         <>
           {showReservaForm && (
@@ -48,6 +50,19 @@ export function VistaReservas({ ctx }: { ctx: AmenidadesCtx }) {
                   <input type="time" value={reservaForm.hora_fin} onChange={e => setReservaForm(f => ({ ...f, hora_fin: e.target.value }))}
                     style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
                 </div>
+                {(() => {
+                  const am = amenidades.find(a => a.id === reservaForm.amenidad_id)
+                  const links = am ? amenidadInventario.filter(l => l.amenidad_id === am.id) : []
+                  if (!am || links.length === 0) return null
+                  return (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <SelectorEquiposReserva
+                        links={links} inventario={inventario} prestamos={prestamos} fecha={reservaForm.fecha} moneda={moneda}
+                        value={reservaForm.equipos} onChange={equipos => setReservaForm(f => ({ ...f, equipos }))}
+                      />
+                    </div>
+                  )
+                })()}
                 {(() => {
                   const am = amenidades.find(a => a.id === reservaForm.amenidad_id)
                   if (!am?.requiere_tarifa) return null
@@ -134,6 +149,14 @@ export function VistaReservas({ ctx }: { ctx: AmenidadesCtx }) {
                           {r.metodo_pago_tarifa === 'cargar_unidad' ? ' · unidad' : (r.tarifa_pagada ? ' · pagado' : ' · pendiente')}
                         </span>
                       )}
+                      {(() => {
+                        const eq = prestamosDeReserva(r.id, prestamos)
+                        if (eq.length === 0) return null
+                        const res = resumenEquiposReserva(eq)
+                        const tono = res.pendienteEntrega ? 'pendiente' : res.pendienteRecepcion ? 'cobro_pendiente' : res.reposicion > 0 ? 'no_show' : 'pagado'
+                        const detalle = res.pendienteEntrega ? ' · por entregar' : res.pendienteRecepcion ? ' · por recibir' : res.reposicion > 0 ? ` · reposición ${moneda} ${res.reposicion.toFixed(2)}` : ''
+                        return <span style={chipStyle(tono)}>🪑 {eq.length} equipo{eq.length === 1 ? '' : 's'}{detalle}</span>
+                      })()}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
                       🏠 {r.unidad_nombre} · 📅 {r.fecha} · ⏰ {r.hora_inicio}–{r.hora_fin}

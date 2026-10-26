@@ -5,12 +5,17 @@
 import type { Dispatch, SetStateAction } from 'react'
 import type {
   Amenidad,
+  AmenidadInventario,
   BloqueoAmenidad,
   EstadoDepositoReserva,
+  ItemInventario,
   MotivoBloqueoAmenidad,
+  PrestamoEquipo,
   ReservaAmenidad,
+  SolicitudEquipoReserva,
   Unidad,
 } from '../../../../types'
+import type { EntregaPrestamo, RecepcionPrestamo, ResultadoRecepcion } from '../../../../domain/condominios/prestamosEquipo'
 
 export interface AmenidadFormState {
   nombre: string
@@ -30,6 +35,8 @@ export interface AmenidadFormState {
   minutos_preparacion_posterior: string
   requiere_aprobacion: boolean
   reglamento: string
+  /** Equipo del inventario que se presta con la amenidad: inventario_id → tope por reserva ('' = sin tope). */
+  equipos: Record<string, string>
 }
 
 export interface ReservaFormState {
@@ -42,6 +49,8 @@ export interface ReservaFormState {
   notas: string
   metodo_pago_tarifa: 'cargar_unidad' | 'pagar_momento'
   tarifa_pagada: boolean
+  /** Equipo que se pide con la reserva: inventario_id → cantidad. */
+  equipos: Record<string, number>
 }
 
 export interface BloqueoFormState {
@@ -61,6 +70,12 @@ export interface AmenidadesCtx {
   reservas: ReservaAmenidad[]
   bloqueos: BloqueoAmenidad[]
   unidades: Unidad[]
+  /** Inventario del condominio: de aquí se eligen los equipos que se prestan con cada amenidad. */
+  inventario: ItemInventario[]
+  /** Préstamos de equipo del proyecto (los pedidos con una reserva cuelgan de `reserva_id`). */
+  prestamos: PrestamoEquipo[]
+  /** Enlaces amenidad ↔ inventario (20261108000000). */
+  amenidadInventario: AmenidadInventario[]
   proyectoId: string
   companyId: string
   userId: string
@@ -127,4 +142,11 @@ export interface AmenidadesCtx {
   aprobarReserva: (r: ReservaAmenidad) => Promise<void>
   rechazarReserva: (r: ReservaAmenidad) => Promise<void>
   eliminarBloqueo: (id: string) => Promise<void>
+  // ── Equipo de la reserva (20261108000000) ──
+  /** Agrega equipo enlazado a la amenidad a una reserva ya creada. Devuelve true si se registró. */
+  solicitarEquiposReserva: (reservaId: string, equipos: SolicitudEquipoReserva[]) => Promise<boolean>
+  /** Registra la entrega de préstamos 'solicitado'. Devuelve true si se registró. */
+  entregarEquipos: (entregas: EntregaPrestamo[], entregadoPor: string, observaciones: string) => Promise<boolean>
+  /** Registra la recepción de préstamos 'prestado' (y el cargo por reposición si se pide). */
+  recibirEquipos: (recepciones: RecepcionPrestamo[], recibidoPor: string, generarCargo: boolean) => Promise<ResultadoRecepcion | null>
 }
