@@ -20,6 +20,8 @@ interface SuministroRow {
   proveedor?: string | null
   proveedor_id?: string | null
   costo_unitario?: number | null
+  rendimiento?: number | null
+  rendimiento_unidad?: string | null
   notas?: string | null
 }
 
@@ -33,6 +35,8 @@ const COLUMNS: ImportColumn[] = [
   { key: 'stock_actual',   width: 14, exampleValues: [20, 5, 12] },
   { key: 'stock_minimo',   width: 14, exampleValues: [5, 1, 4] },
   { key: 'costo_unitario', width: 16, exampleValues: [35.50, 80, 22.75] },
+  { key: 'rendimiento',    width: 14, exampleValues: [40, '', 20] },
+  { key: 'rendimiento_unidad', width: 18, exampleValues: ['aplicaciones', '', 'limpiezas'] },
   { key: 'ubicacion',      width: 22, exampleValues: ['Cuarto de limpieza', 'Bodega general', 'Cuarto de máquinas'] },
   { key: 'proveedor',      width: 20, exampleValues: ['', '', ''] },
   { key: 'notas',          width: 28, exampleValues: ['Diluir 1:10', '', 'Manejar con guantes'] },
@@ -100,6 +104,17 @@ export function makeValidateRow(proveedoresValidos: ProveedorImportable[]) {
     if (isNaN(costo_unitario) || costo_unitario < 0) errors.push('costo_unitario debe ser un número ≥ 0')
   }
 
+  // rendimiento → opcional: cuántos usos da UNA unidad_medida (> 0). La unidad
+  // del rendimiento sólo viaja si hay rendimiento; sola no significa nada.
+  let rendimiento: number | undefined
+  const rawRend = String(row['rendimiento'] ?? '').trim()
+  if (rawRend) {
+    rendimiento = Number(rawRend)
+    if (isNaN(rendimiento) || rendimiento <= 0) errors.push('rendimiento debe ser un número > 0 (usos por unidad de medida)')
+  }
+  const rendimiento_unidad = sanitizeInput(String(row['rendimiento_unidad'] ?? '').trim()) || undefined
+  if (rendimiento_unidad && !rawRend) errors.push('rendimiento_unidad necesita un rendimiento')
+
   // proveedor → opcional, pero si viene debe ser un proveedor autorizado.
   let proveedor: ProveedorImportable | undefined
   const rawProveedor = sanitizeInput(String(row['proveedor'] ?? '').trim())
@@ -122,6 +137,8 @@ export function makeValidateRow(proveedoresValidos: ProveedorImportable[]) {
       stock_actual,
       stock_minimo,
       costo_unitario: costo_unitario ?? undefined,
+      rendimiento: rendimiento ?? undefined,
+      rendimiento_unidad: rendimiento != null ? rendimiento_unidad : undefined,
       ubicacion:  sanitizeInput(String(row['ubicacion'] ?? '').trim()) || undefined,
       proveedor:  proveedor?.nombre,
       proveedor_id: proveedor?.id,

@@ -21252,6 +21252,8 @@ export type Database = {
           project_id: string
           proveedor: string | null
           proveedor_id: string | null
+          rendimiento: number | null
+          rendimiento_unidad: string | null
           stock_actual: number
           stock_minimo: number
           ubicacion: string | null
@@ -21270,6 +21272,8 @@ export type Database = {
           project_id: string
           proveedor?: string | null
           proveedor_id?: string | null
+          rendimiento?: number | null
+          rendimiento_unidad?: string | null
           stock_actual?: number
           stock_minimo?: number
           ubicacion?: string | null
@@ -21288,6 +21292,8 @@ export type Database = {
           project_id?: string
           proveedor?: string | null
           proveedor_id?: string | null
+          rendimiento?: number | null
+          rendimiento_unidad?: string | null
           stock_actual?: number
           stock_minimo?: number
           ubicacion?: string | null
