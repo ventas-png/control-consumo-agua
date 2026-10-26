@@ -566,6 +566,9 @@ export interface ControlSistemaIncendio {
   fecha: string
   tipo_sistema: TipoSistemaIncendio
   identificador: string
+  /** Área del catálogo (areas_condominio). null = histórico sin vincular (solo texto en `ubicacion`). */
+  area_id?: string | null
+  /** Snapshot del nombre del área al registrar; en lo histórico, el texto libre capturado. */
   ubicacion: string
   tipo_inspeccion: TipoInspeccionIncendio
   resultado: ResultadoInspeccionIncendio

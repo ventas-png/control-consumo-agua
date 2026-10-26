@@ -7002,6 +7002,7 @@ export type Database = {
       }
       control_sistema_incendio: {
         Row: {
+          area_id: string | null
           company_id: string
           costo: number | null
           creado_por: string | null
@@ -7022,6 +7023,7 @@ export type Database = {
           ubicacion: string
         }
         Insert: {
+          area_id?: string | null
           company_id: string
           costo?: number | null
           creado_por?: string | null
@@ -7042,6 +7044,7 @@ export type Database = {
           ubicacion: string
         }
         Update: {
+          area_id?: string | null
           company_id?: string
           costo?: number | null
           creado_por?: string | null
@@ -7089,6 +7092,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incendio_area_tenant_fk"
+            columns: ["area_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
           },
         ]
       }

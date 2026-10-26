@@ -11,15 +11,21 @@ import { useAsignacionesQuery } from '../../../domain/proveedores/queries'
 import type { ProveedorCatalogo } from '../../../types/proveedores'
 import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
 import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
-import { ControlSistemaIncendio, TipoSistemaIncendio, TipoInspeccionIncendio, ResultadoInspeccionIncendio } from '../../../types'
+import { nombreAreaDe, normalizarNombreArea } from '../../../domain/condominios/areas'
+import { AreaCondominio, ControlSistemaIncendio, TipoSistemaIncendio, TipoInspeccionIncendio, ResultadoInspeccionIncendio } from '../../../types'
 
 interface Props {
   registros: ControlSistemaIncendio[]
+  /** Catálogo compartido: la ubicación del equipo se ELIGE de aquí (tab Áreas), no se escribe. */
+  areas: AreaCondominio[]
   proyectoId: string
   companyId: string
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Visibilidad del tab Áreas: decide si se ofrece el atajo para configurarlas. */
+  puedeConfigurarAreas: boolean
+  onIrATab: (tabId: 'areas_config') => void
   onRefresh: () => void
 }
 
@@ -65,7 +71,7 @@ function ResultadoBadge({ resultado }: { resultado: ResultadoInspeccionIncendio 
   return <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: res?.bg, color: res?.color, whiteSpace: 'nowrap' }}>{res?.icon} {res?.label ?? resultado}</span>
 }
 
-export default function ControlSistemaIncendioTab({ registros, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function ControlSistemaIncendioTab({ registros, areas, proyectoId, companyId, moneda, canCreate, canEdit, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
   const [detalleId, setDetalleId] = useState<string | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -75,7 +81,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
   const [form, setForm] = useState({
     fecha: hoyLocalISO(),
     tipo_sistema: 'extintor' as TipoSistemaIncendio,
-    identificador: '', ubicacion: '',
+    identificador: '', area_id: '',
     tipo_inspeccion: 'revision_visual' as TipoInspeccionIncendio,
     resultado: 'aprobado' as ResultadoInspeccionIncendio,
     fecha_vencimiento: '', proveedor_id: '', empresa_servicio: '', tecnico: '',
@@ -113,14 +119,32 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
 
   const identificadores = [...new Set(registros.map(r => r.identificador.trim()))].sort()
 
-  // Al escribir un equipo ya registrado se proponen su tipo y su ubicación,
-  // si la ubicación aún está vacía.
+  // La ubicación es un área del catálogo (tab Áreas). Solo las activas se
+  // ofrecen al registrar; las inactivas siguen nombrando lo ya registrado.
+  const areasActivas = [...areas]
+    .filter(a => a.activo)
+    .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
+  const ubicacionDe = (r: ControlSistemaIncendio) => nombreAreaDe(r.area_id, areas, r.ubicacion)
+
+  /**
+   * Área activa donde quedó el equipo en su inspección anterior. Lo histórico
+   * sin vincular se reconoce por su texto si coincide con UNA sola área.
+   */
+  function areaDelEquipo(previo: ControlSistemaIncendio): string {
+    if (previo.area_id) return areasActivas.some(a => a.id === previo.area_id) ? previo.area_id : ''
+    const norm = normalizarNombreArea(previo.ubicacion)
+    const coinciden = norm ? areasActivas.filter(a => normalizarNombreArea(a.nombre) === norm) : []
+    return coinciden.length === 1 ? coinciden[0].id : ''
+  }
+
+  // Al escribir un equipo ya registrado se proponen su tipo y su área, si el
+  // área aún no se eligió.
   function elegirIdentificador(valor: string) {
     const previo = registros.filter(r => r.identificador.trim() === valor.trim()).sort(masReciente)[0]
     setForm(p => ({
       ...p,
       identificador: valor,
-      ...(previo && !p.ubicacion.trim() ? { ubicacion: previo.ubicacion, tipo_sistema: previo.tipo_sistema } : {}),
+      ...(previo && !p.area_id ? { area_id: areaDelEquipo(previo), tipo_sistema: previo.tipo_sistema } : {}),
     }))
   }
 
@@ -141,14 +165,16 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
 
   async function guardar() {
     if (saving) return
-    if (!form.identificador.trim() || !form.ubicacion.trim()) {
-      notify({ variant: 'warning', title: 'Faltan datos', text: 'Identificador y ubicación son obligatorios' }); return
+    const area = areas.find(a => a.id === form.area_id)
+    if (!form.identificador.trim() || !area) {
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Identificador y ubicación (área) son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await createCondominioRow('control_sistema_incendio', {
       company_id: companyId, project_id: proyectoId,
       fecha: form.fecha, tipo_sistema: form.tipo_sistema,
-      identificador: form.identificador.trim(), ubicacion: form.ubicacion.trim(),
+      // `ubicacion` es el snapshot del nombre del área al registrar.
+      identificador: form.identificador.trim(), area_id: area.id, ubicacion: area.nombre.trim(),
       tipo_inspeccion: form.tipo_inspeccion, resultado: form.resultado,
       fecha_vencimiento: form.fecha_vencimiento || null,
       proveedor_id: form.proveedor_id || null,
@@ -160,7 +186,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm(p => ({ ...p, identificador: '', ubicacion: '', fecha_vencimiento: '', costo: '', proxima_inspeccion: '', observaciones: '' }))
+    setForm(p => ({ ...p, identificador: '', area_id: '', fecha_vencimiento: '', costo: '', proxima_inspeccion: '', observaciones: '' }))
     setMostrarForm(false)
     onRefresh()
   }
@@ -187,14 +213,14 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
             {vencidos.map(r => (
               <li key={r.id}>
                 <button type="button" className="cond-barra-fila" style={filaAviso} onClick={() => setDetalleId(r.id)}>
-                  ⚠ <strong>{r.identificador}</strong> · {r.ubicacion} — <span style={{ color: 'var(--at-danger)', fontWeight: 600 }}>vencido ({r.fecha_vencimiento})</span>
+                  ⚠ <strong>{r.identificador}</strong> · {ubicacionDe(r)} — <span style={{ color: 'var(--at-danger)', fontWeight: 600 }}>vencido ({r.fecha_vencimiento})</span>
                 </button>
               </li>
             ))}
             {proximosVencer.map(r => (
               <li key={r.id}>
                 <button type="button" className="cond-barra-fila" style={filaAviso} onClick={() => setDetalleId(r.id)}>
-                  ⏰ <strong>{r.identificador}</strong> · {r.ubicacion} — vence pronto ({r.fecha_vencimiento})
+                  ⏰ <strong>{r.identificador}</strong> · {ubicacionDe(r)} — vence pronto ({r.fecha_vencimiento})
                 </button>
               </li>
             ))}
@@ -275,7 +301,23 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
             </div>
             <div>
               <label htmlFor="incendio-ubicacion" style={lbl}>Ubicación *</label>
-              <input id="incendio-ubicacion" style={inp} placeholder="Lobby, Piso 3…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
+              <select id="incendio-ubicacion" style={inp} value={form.area_id} onChange={e => setForm(p => ({ ...p, area_id: e.target.value }))}>
+                <option value="">— Selecciona un área —</option>
+                {areasActivas.map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
+              </select>
+              {areasActivas.length === 0 && (
+                <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 4 }}>
+                  Sin áreas activas.{' '}
+                  {puedeConfigurarAreas
+                    ? (
+                      <button type="button" onClick={() => onIrATab('areas_config')}
+                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--at-accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}>
+                        Crearlas en el tab Áreas
+                      </button>
+                    )
+                    : 'Se dan de alta en el tab Áreas.'}
+                </div>
+              )}
             </div>
             <div>
               <label htmlFor="incendio-fecha" style={lbl}>Fecha de inspección</label>
@@ -332,7 +374,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
             title={`${tipo?.icon ?? '🧯'} ${detalle.identificador}`}
             subtitle={
               <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span>{tipo?.label ?? detalle.tipo_sistema} · 📍 {detalle.ubicacion}</span>
+                <span>{tipo?.label ?? detalle.tipo_sistema} · 📍 {ubicacionDe(detalle)}</span>
                 <ResultadoBadge resultado={detalle.resultado} />
               </span>
             }
@@ -377,7 +419,8 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
           { key: 'identificador', header: 'Equipo', sortable: true,
             render: (r) => <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{tipoDe(r.tipo_sistema)?.icon} {r.identificador}</span> },
           { key: 'ubicacion', header: 'Ubicación', sortable: true,
-            render: (r) => <span style={{ color: 'var(--at-ink-2)' }}>{r.ubicacion}</span> },
+            accessor: (r) => ubicacionDe(r),
+            render: (r) => <span style={{ color: 'var(--at-ink-2)' }}>{ubicacionDe(r)}</span> },
           { key: 'fecha', header: 'Fecha', sortable: true,
             accessor: (r) => `${r.fecha} ${r.created_at ?? ''}`,
             render: (r) => <span style={{ whiteSpace: 'nowrap' }}>{r.fecha}</span> },

@@ -735,7 +735,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'generador', label: 'Generador', icon: '⚡', render: (ctx) =>
     <ControlGeneradorTab registros={ctx.controlGenerador} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('generador')} canEdit={ctx.canEdit('generador')} onRefresh={ctx.onRefresh} /> },
   { id: 'incendio', label: 'Contra incendio', icon: '🧯', render: (ctx) =>
-    <ControlSistemaIncendioTab registros={ctx.controlIncendio} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('incendio')} canEdit={ctx.canEdit('incendio')} onRefresh={ctx.onRefresh} /> },
+    <ControlSistemaIncendioTab registros={ctx.controlIncendio} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('incendio')} canEdit={ctx.canEdit('incendio')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'camaras', label: 'Cámaras', icon: '📷', render: (ctx) =>
     <ControlCamarasTab camaras={ctx.camarasSeguridad} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('camaras')} canEdit={ctx.canEdit('camaras')} onRefresh={ctx.onRefresh} /> },
   { id: 'gas', label: 'Medidores gas', icon: '🔥', render: (ctx) =>
