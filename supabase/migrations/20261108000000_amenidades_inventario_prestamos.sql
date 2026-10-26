@@ -198,10 +198,13 @@ ALTER TABLE public.prestamos_equipo
   ADD  CONSTRAINT prestamos_equipo_devuelta_check
     CHECK (cantidad_devuelta IS NULL OR (cantidad_devuelta >= 0 AND cantidad_devuelta <= cantidad));
 
-CREATE INDEX IF NOT EXISTS idx_prestamos_reserva
-  ON public.prestamos_equipo(reserva_id) WHERE reserva_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_prestamos_inventario_estado
-  ON public.prestamos_equipo(inventario_id, estado) WHERE inventario_id IS NOT NULL;
+-- SIN ÍNDICES NUEVOS sobre prestamos_equipo a propósito: sus índices ya
+-- difieren entre producción y el repositorio (`tabla:prestamos_equipo/indices`
+-- en scripts/schema-drift/drift-conocido.json, #826) y el auditor de tres
+-- vías no puede decidir un cambio sobre un grupo con drift declarado. Los
+-- índices por reserva_id e inventario_id van con la migración que haga
+-- converger ese grupo; la tabla es chica y las búsquedas por equipo o por
+-- reserva no lo resienten mientras tanto.
 
 COMMENT ON COLUMN public.prestamos_equipo.estado IS
   'solicitado = pedido con la reserva, aún no entregado · prestado = en circulación · devuelto / dañado / perdido = cerrado al recibir · cancelado = no se entregó';
