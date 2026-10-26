@@ -377,6 +377,16 @@
       ]
     },
     {
+      "nombre": "portal_equipos_amenidad",
+      "dominio": "reservas",
+      "porQue": "leer el catálogo de equipo y la disponibilidad de una amenidad de otro tenant",
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
+    },
+    {
       "nombre": "portal_registrar_familiar",
       "dominio": "familiares",
       "porQue": "alta de acceso familiar en unidad ajena",

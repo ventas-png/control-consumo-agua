@@ -1,7 +1,8 @@
 import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import type { ItemInventario, CategoriaInventario, EstadoInventario } from '../../../types'
+import type { ItemInventario, CategoriaInventario, EstadoInventario, PrestamoEquipo } from '../../../types'
+import { enCirculacion } from '../../../lib/prestamosEquipo'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
@@ -9,6 +10,8 @@ import { ImportInventarioModal } from '../ImportInventarioModal'
 
 interface Props {
   inventario: ItemInventario[]
+  /** Préstamos del proyecto: lo que está en circulación se muestra junto a cada equipo (20261108000000). */
+  prestamos?: PrestamoEquipo[]
   proyectoId: string
   companyId: string
   moneda: string
@@ -52,7 +55,7 @@ const blank = (): Partial<ItemInventario> => ({
   proveedor: '', fecha_adquisicion: '', fecha_vencimiento: '', notas: '',
 })
 
-export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
+export function InventarioTab({ inventario, prestamos = [], proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const { t } = useTranslation()
   const hoy = hoyLocalISO()
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaInventario | 'todos'>('todos')
@@ -292,6 +295,10 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
                     <span style={{ fontWeight: 700, color: 'var(--at-ink)', fontSize: '14px' }}>{i.nombre}</span>
                   </div>
                   {i.ubicacion && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>📍 {i.ubicacion}</div>}
+                  {(() => {
+                    const fuera = enCirculacion(i.id, prestamos)
+                    return fuera > 0 ? <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>🔁 {fuera} en préstamo</div> : null
+                  })()}
                   {venceProx && <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>{t('condominios.inventario.vence_label', { fecha: i.fecha_vencimiento ?? '' })}</div>}
                 </div>
               )

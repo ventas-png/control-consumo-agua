@@ -141,6 +141,42 @@ export interface Amenidad {
   created_at: string
 }
 
+/**
+ * Equipo del inventario que se presta con una amenidad (20261108000000):
+ * `amenidades` ↔ `inventario_condominio`. El residente elige de aquí al
+ * reservar; `cantidad_max_por_reserva` NULL = hasta lo que haya disponible.
+ */
+export interface AmenidadInventario {
+  id: string
+  company_id: string
+  project_id: string
+  amenidad_id: string
+  inventario_id: string
+  cantidad_max_por_reserva?: number | null
+  notas?: string | null
+  creado_por?: string | null
+  created_at: string
+}
+
+/** Fila que devuelve `portal_equipos_amenidad`: catálogo de una amenidad con lo que queda para una fecha. */
+export interface EquipoAmenidadDisponible {
+  inventario_id: string
+  nombre: string
+  categoria: string
+  descripcion?: string | null
+  unidad_medida: string
+  costo_reposicion?: number | null
+  cantidad_max_por_reserva?: number | null
+  notas?: string | null
+  disponible: number
+}
+
+/** Lo que se pide de un equipo al reservar (entrada de `p_equipos`). */
+export interface SolicitudEquipoReserva {
+  inventario_id: string
+  cantidad: number
+}
+
 export type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
 export type MetodoPagoTarifa = 'cargar_unidad' | 'pagar_momento'
 export type EstadoDepositoReserva = 'no_aplica' | 'pendiente' | 'cobrado' | 'devuelto' | 'retenido'

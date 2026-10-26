@@ -10,7 +10,7 @@ import { EditModal } from '../shared/EditModal'
 import { NotificationBell } from '../layout/NotificationBell'
 import type {
   UserSession, Unidad, CuotaCondominio, Amenidad,
-  ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento,
+  ReservaAmenidad, BloqueoAmenidad, PrestamoEquipo, TicketMantenimiento,
   AnuncioComunidad, Visitante, VisitaFrecuente, MensajePortal, SolicitudRentaUnidad, PaqueteRecibido, PiezaRecepcion,
   ComunicadoCondominio,
 } from '../../types'
@@ -112,6 +112,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [amenidades, setAmenidades]               = useState<Amenidad[]>([])
   const [reservas, setReservas]                   = useState<ReservaAmenidad[]>([])
   const [bloqueos, setBloqueos]                   = useState<BloqueoAmenidad[]>([])
+  const [prestamos, setPrestamos]                 = useState<PrestamoEquipo[]>([])
   const [tickets, setTickets]                     = useState<TicketMantenimiento[]>([])
   const [anuncios, setAnuncios]                   = useState<AnuncioComunidad[]>([])
   const [visitantes, setVisitantes]               = useState<Visitante[]>([])
@@ -153,7 +154,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       // Batch 2: all condominios data in parallel (los caps de tiempo viven en la
       // capa domain; el portal muestra actividad reciente, el admin tiene su loader).
       const {
-        projData, amenidadesData, cuotasData, reservasData, bloqueosData,
+        projData, amenidadesData, cuotasData, reservasData, bloqueosData, prestamosData,
         ticketsData, anunciosData, visitantesData, visitasFrecuentesData, mensajesData,
         solicitudesRentaData, paquetesData, correspondenciaData, comunicadosData,
         pestanasData,
@@ -172,6 +173,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       setCuotas((cuotasData as CuotaCondominio[]) ?? [])
       setReservas((reservasData as ReservaAmenidad[]) ?? [])
       setBloqueos((bloqueosData as BloqueoAmenidad[]) ?? [])
+      setPrestamos((prestamosData as PrestamoEquipo[]) ?? [])
       setTickets((ticketsData as TicketMantenimiento[]) ?? [])
       setAnuncios((anunciosData as AnuncioComunidad[]) ?? [])
       setVisitantes((visitantesData as Visitante[]) ?? [])
@@ -591,6 +593,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                   amenidades={amenidadesP}
                   reservas={misReservas}
                   bloqueos={bloqueosP}
+                  prestamos={prestamos.filter(p => p.unidad_id === selectedUnidadId)}
                   unidadId={selectedUnidadId}
                   moneda={moneda}
                   onRefresh={cargarDatos}

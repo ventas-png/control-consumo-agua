@@ -212,7 +212,7 @@ esquema y verificada por `src/test/rls/__tests__/esquemaFixtures.test.ts`:
 
 | Garantía | Cuántas | Qué demuestra |
 |---|---|---|
-| `tenant` | 11 | La RPC es ejecutable por `authenticated` y compara `get_my_company_id()` con la empresa del recurso. A es `company_owner`, así que pasa rol y permisos: **el rechazo sólo puede venir de la pertenencia**. Aislamiento demostrado |
+| `tenant` | 12 | La RPC es ejecutable por `authenticated` y compara `get_my_company_id()` con la empresa del recurso. A es `company_owner`, así que pasa rol y permisos: **el rechazo sólo puede venir de la pertenencia**. Aislamiento demostrado |
 | `rol` | 8 | El guard exige ser cliente del portal (`current_user_role()` o `mis_unidades_propietario_ids()`) y los usuarios fixture son staff: rechaza **antes** de mirar la pertenencia. Demuestra que el guard existe y que la RPC no es anon-ejecutable. **No es aislamiento** |
 | `privilegio` | 4 | `REVOKE EXECUTE FROM PUBLIC` + `GRANT` sólo a `service_role`: ningún usuario del navegador puede invocarla, que es lo que se cerró en #378/#380. **Tampoco es aislamiento** |
 
@@ -220,8 +220,9 @@ Las ocho de garantía `rol` son las `portal_*` del self-service del propietario.
 Para subirlas a `tenant` harían falta usuarios fixture con rol `cliente` y fila
 en `unidad_residentes`, lo que exige dos credenciales más allá de las quince
 `RLS_*` que define este PR. Queda declarado como limitación, no como cobertura.
-Las de reservas (`portal_reservar_amenidad`, `portal_cancelar_reserva`) sí llegan
-a `tenant` porque aceptan al staff del tenant y comparan `company_id`.
+Las de reservas (`portal_reservar_amenidad`, `portal_cancelar_reserva` y el
+catálogo de equipo `portal_equipos_amenidad`, 20261108000000) sí llegan a
+`tenant` porque aceptan al staff del tenant y comparan `company_id`.
 
 ### Los payloads negativos respetan los CHECK del esquema
 

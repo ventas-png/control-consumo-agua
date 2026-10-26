@@ -489,6 +489,64 @@ export type Database = {
           },
         ]
       }
+      amenidad_inventario: {
+        Row: {
+          amenidad_id: string
+          cantidad_max_por_reserva: number | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          id: string
+          inventario_id: string
+          notas: string | null
+          project_id: string
+        }
+        Insert: {
+          amenidad_id: string
+          cantidad_max_por_reserva?: number | null
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          inventario_id: string
+          notas?: string | null
+          project_id: string
+        }
+        Update: {
+          amenidad_id?: string
+          cantidad_max_por_reserva?: number | null
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          inventario_id?: string
+          notas?: string | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amenidad_inventario_amenidad_id_fkey"
+            columns: ["amenidad_id"]
+            isOneToOne: false
+            referencedRelation: "amenidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenidad_inventario_recurso_fk"
+            columns: ["inventario_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "inventario_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "amenidad_inventario_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       amenidades: {
         Row: {
           activo: boolean
@@ -16033,6 +16091,14 @@ export type Database = {
           project_id: string
           recibido_por: string | null
           unidad_id: string | null
+          inventario_id: string | null
+          reserva_id: string | null
+          cantidad_solicitada: number | null
+          cantidad_devuelta: number | null
+          costo_reposicion_unitario: number | null
+          monto_reposicion: number | null
+          cuota_reposicion_id: string | null
+          observaciones_devolucion: string | null
         }
         Insert: {
           cantidad?: number
@@ -16053,6 +16119,14 @@ export type Database = {
           project_id: string
           recibido_por?: string | null
           unidad_id?: string | null
+          inventario_id?: string | null
+          reserva_id?: string | null
+          cantidad_solicitada?: number | null
+          cantidad_devuelta?: number | null
+          costo_reposicion_unitario?: number | null
+          monto_reposicion?: number | null
+          cuota_reposicion_id?: string | null
+          observaciones_devolucion?: string | null
         }
         Update: {
           cantidad?: number
@@ -16073,8 +16147,37 @@ export type Database = {
           project_id?: string
           recibido_por?: string | null
           unidad_id?: string | null
+          inventario_id?: string | null
+          reserva_id?: string | null
+          cantidad_solicitada?: number | null
+          cantidad_devuelta?: number | null
+          costo_reposicion_unitario?: number | null
+          monto_reposicion?: number | null
+          cuota_reposicion_id?: string | null
+          observaciones_devolucion?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "prestamos_equipo_inventario_id_fkey"
+            columns: ["inventario_id"]
+            isOneToOne: false
+            referencedRelation: "inventario_condominio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prestamos_equipo_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "reservas_amenidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prestamos_equipo_cuota_reposicion_id_fkey"
+            columns: ["cuota_reposicion_id"]
+            isOneToOne: false
+            referencedRelation: "cuotas_condominio"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "prestamos_equipo_company_id_fkey"
             columns: ["company_id"]
@@ -26305,6 +26408,7 @@ export type Database = {
       portal_reservar_amenidad: {
         Args: {
           p_amenidad_id: string
+          p_equipos?: Json
           p_fecha: string
           p_hora_fin: string
           p_hora_inicio: string
@@ -26314,6 +26418,30 @@ export type Database = {
           p_reglamento_aceptado?: boolean
           p_unidad_id: string
         }
+        Returns: Json
+      }
+      portal_equipos_amenidad: {
+        Args: { p_amenidad_id: string; p_fecha?: string }
+        Returns: Json
+      }
+      reserva_equipos_solicitar: {
+        Args: { p_equipos: Json; p_reserva_id: string }
+        Returns: Json
+      }
+      reserva_equipos_registrar_solicitud: {
+        Args: { p_equipos: Json; p_reserva_id: string }
+        Returns: number
+      }
+      prestamo_equipo_disponible: {
+        Args: { p_excluir_id?: string; p_fecha: string; p_inventario_id: string }
+        Returns: number
+      }
+      prestamos_equipo_entregar: {
+        Args: { p_entregado_por?: string; p_entregas: Json; p_observaciones?: string }
+        Returns: Json
+      }
+      prestamos_equipo_recibir: {
+        Args: { p_generar_cargo?: boolean; p_recepciones: Json; p_recibido_por?: string }
         Returns: Json
       }
       portal_reservar_solicitud_renta: {

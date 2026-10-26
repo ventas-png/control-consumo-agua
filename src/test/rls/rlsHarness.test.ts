@@ -387,6 +387,9 @@ const PORTAL_RESERVAS_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
     }),
   },
   { name: 'portal_cancelar_reserva', args: (b) => ({ p_reserva_id: b.reservaId }) },
+  // Catálogo de equipo con disponibilidad (20261108000000): es de LECTURA pero
+  // rechaza con RAISE la amenidad de otro tenant, no devuelve vacío.
+  { name: 'portal_equipos_amenidad', args: (b) => ({ p_amenidad_id: b.amenidadId, p_fecha: '2099-01-01' }) },
 ]
 
 // RPCs de accesos familiares (20260825000000): mismo contrato, unidad real de B.

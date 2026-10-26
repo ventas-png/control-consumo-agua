@@ -1,11 +1,12 @@
 import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
-import { useId, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
-import { reservarAmenidad, cancelarReservaAmenidad } from '../../../domain/portal/reservas'
+import { reservarAmenidad, cancelarReservaAmenidad, equiposDeAmenidad } from '../../../domain/portal/reservas'
 import { useSignedUrls } from '../../../lib/storageUrls'
-import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
+import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa, PrestamoEquipo, EquipoAmenidadDisponible } from '../../../types'
 import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana, addMinutosToTime } from '../../../lib/amenidadesReglas'
+import { ESTADO_PRESTAMO_LABEL, faltantes, prestamosDeReserva } from '../../../lib/prestamosEquipo'
 import { tint } from '../../shared/statusTone'
 
 // Card de amenidad con background-image signed-URL. La URL viene firmada
@@ -43,9 +44,51 @@ interface Props {
   amenidades: Amenidad[]
   reservas: ReservaAmenidad[]
   bloqueos: BloqueoAmenidad[]
+  /** Préstamos de equipo de la unidad: los pedidos con cada reserva y los sueltos (20261108000000). */
+  prestamos?: PrestamoEquipo[]
   unidadId: string
   moneda: string
   onRefresh: () => void
+}
+
+const PRESTAMO_TONO: Record<PrestamoEquipo['estado'], string> = {
+  solicitado: 'var(--at-primary-hover)',
+  prestado: 'var(--at-warning-strong)',
+  devuelto: 'var(--at-success)',
+  dañado: 'var(--at-danger-strong)',
+  perdido: 'var(--at-danger-strong)',
+  cancelado: 'var(--at-ink-3)',
+}
+
+/** Línea de un préstamo tal como la lee el residente: qué pidió, qué le entregaron, qué devolvió y qué debe. */
+function describirPrestamo(p: PrestamoEquipo, moneda: string): string {
+  switch (p.estado) {
+    case 'solicitado': return 'pendiente de entrega'
+    case 'prestado': return `entregado${p.fecha_prestamo ? ` el ${p.fecha_prestamo}` : ''}`
+    case 'cancelado': return 'no se entregó'
+    default: {
+      const falt = faltantes(p)
+      const partes = [ESTADO_PRESTAMO_LABEL[p.estado].toLowerCase()]
+      if (falt > 0) partes.push(`faltan ${falt}`)
+      if (p.monto_reposicion != null && Number(p.monto_reposicion) > 0) partes.push(`reposición ${moneda} ${Number(p.monto_reposicion).toFixed(2)}${p.cuota_reposicion_id ? ' cargada a tu cuenta' : ''}`)
+      return partes.join(' · ')
+    }
+  }
+}
+
+function ListaPrestamos({ prestamos, moneda }: { prestamos: PrestamoEquipo[]; moneda: string }) {
+  if (prestamos.length === 0) return null
+  return (
+    <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {prestamos.map(p => (
+        <div key={p.id} style={{ fontSize: 11.5, color: 'var(--at-ink-2)' }}>
+          🪑 <strong>{p.equipo_nombre}</strong> ×{p.cantidad}
+          {p.cantidad_solicitada != null && p.cantidad_solicitada !== p.cantidad && <span style={{ color: 'var(--at-ink-3)' }}> (pediste {p.cantidad_solicitada})</span>}
+          <span style={{ color: PRESTAMO_TONO[p.estado], fontWeight: 700 }}> · {describirPrestamo(p, moneda)}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 const MOTIVO_LABEL: Record<BloqueoAmenidad['motivo'], string> = {
@@ -64,15 +107,48 @@ const ESTADO_RES: Record<EstadoReserva, { label: string; bg: string; color: stri
   cancelada:  { label: 'Cancelada',  bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
-function blankForm(): { amenidad_id: string; fecha: string; hora_inicio: string; hora_fin: string; num_invitados: number; notas: string; metodo_pago_tarifa: MetodoPagoTarifa; reglamento_aceptado: boolean } {
-  return { amenidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: 0, notas: '', metodo_pago_tarifa: 'cargar_unidad', reglamento_aceptado: false }
+interface FormReserva {
+  amenidad_id: string
+  fecha: string
+  hora_inicio: string
+  hora_fin: string
+  num_invitados: number
+  notas: string
+  metodo_pago_tarifa: MetodoPagoTarifa
+  reglamento_aceptado: boolean
+  /** Equipo que se pide con la reserva: inventario_id → cantidad. */
+  equipos: Record<string, number>
 }
 
-export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, moneda, onRefresh }: Props) {
+function blankForm(): FormReserva {
+  return { amenidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: 0, notas: '', metodo_pago_tarifa: 'cargar_unidad', reglamento_aceptado: false, equipos: {} }
+}
+
+export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = [], unidadId, moneda, onRefresh }: Props) {
   const [showForm, setShowForm]   = useState(false)
   const [saving, setSaving]       = useState(false)
-  const [form, setForm]           = useState(blankForm())
+  const [form, setForm]           = useState<FormReserva>(blankForm())
   const [vistaFutura, setVistaFutura] = useState(true)
+  // Catálogo de equipo de la amenidad elegida con lo disponible para la fecha.
+  // Viene por RPC: el residente sólo ve sus propios préstamos, así que no
+  // podría calcular cuánto queda.
+  const [catalogo, setCatalogo] = useState<EquipoAmenidadDisponible[]>([])
+  const [cargandoCatalogo, setCargandoCatalogo] = useState(false)
+
+  useEffect(() => {
+    if (!showForm || !form.amenidad_id) { setCatalogo([]); return }
+    let cancelado = false
+    setCargandoCatalogo(true)
+    void equiposDeAmenidad(form.amenidad_id, form.fecha || undefined).then(({ data, error }) => {
+      if (cancelado) return
+      setCargandoCatalogo(false)
+      setCatalogo(error ? [] : data)
+    })
+    return () => { cancelado = true }
+  }, [showForm, form.amenidad_id, form.fecha])
+
+  const equiposPedidos = Object.values(form.equipos).filter(n => n > 0).length
+  const prestamosSueltos = prestamos.filter(p => !p.reserva_id && (p.estado === 'prestado' || p.estado === 'solicitado'))
 
   // ids estables para asociar cada <label htmlFor> con su control. Sin la
   // asociación, un lector de pantalla anuncia "cuadro combinado, en blanco" y dos
@@ -175,6 +251,9 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, mo
       notas: form.notas.trim() || undefined,
       metodoPago: aplicaTarifa ? form.metodo_pago_tarifa : null,
       reglamentoAceptado: form.reglamento_aceptado,
+      // El equipo viaja con la reserva: si no alcanza, el servidor rechaza todo
+      // y el mensaje dice qué faltó.
+      equipos: Object.entries(form.equipos).filter(([, n]) => n > 0).map(([inventario_id, cantidad]) => ({ inventario_id, cantidad })),
     })
     setSaving(false)
     if (error || !data) {
@@ -190,7 +269,8 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, mo
           ? `Reserva confirmada. Se cargó ${moneda} ${montoSrv.toFixed(2)} a tu cuenta.`
           : `Reserva confirmada. Pagar ${moneda} ${montoSrv.toFixed(2)} en sitio.`
         : '¡Reserva confirmada!'
-    notify({ variant: 'success', title: titulo, duration: 2600 })
+    const nEquipos = Number(data.equipos_solicitados ?? 0)
+    notify({ variant: 'success', title: titulo, text: nEquipos > 0 ? `Equipo solicitado: ${nEquipos}. La administración te lo entregará al llegar.` : undefined, duration: 2600 })
     descartarForm(); onRefresh()
   }
 
@@ -234,7 +314,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, mo
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14, marginBottom: 22 }}>
         {amenidadesActivas.map((a, idx) => (
           <AmenidadHeroButton key={a.id} signedFotoUrl={signedFotoUrls[idx] ?? null}
-            onClick={() => { setForm(f => ({ ...f, amenidad_id: a.id })); setShowForm(true) }}>
+            onClick={() => { setForm(f => ({ ...f, amenidad_id: a.id, equipos: f.amenidad_id === a.id ? f.equipos : {} })); setShowForm(true) }}>
               {/* Icono fallback si no hay foto */}
               {!a.foto_url && (
                 <div style={{ position: 'absolute', top: 16, right: 16, fontSize: 36, opacity: 0.55 }}>🏖</div>
@@ -314,7 +394,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, mo
               <label htmlFor={ids.amenidad} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
               {/* autoFocus: mete el foco DENTRO del diálogo al abrirlo, que es lo que
                   activa el focus trap de EditModal (su handler vive en el div del modal). */}
-              <select autoFocus id={ids.amenidad} value={form.amenidad_id} onChange={e => setForm(f => ({ ...f, amenidad_id: e.target.value }))}
+              <select autoFocus id={ids.amenidad} value={form.amenidad_id} onChange={e => setForm(f => ({ ...f, amenidad_id: e.target.value, equipos: {} }))}
                 style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }}>
                 <option value="">Seleccionar...</option>
                 {amenidadesActivas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
@@ -407,8 +487,78 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, mo
               <input type="text" id={ids.notas} value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones adicionales..."
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
+            {/* Equipo que se presta con la amenidad (20261108000000): el residente
+                indica cuánto quiere que se le entregue; la cantidad se limita al
+                tope por reserva y a lo disponible para la fecha. */}
+            {amenidadSel && (cargandoCatalogo || catalogo.length > 0) && (
+              <div style={{ gridColumn: '1 / -1', background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--at-ink)' }}>🪑 ¿Qué equipo necesitas que te entreguen?</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)' }}>
+                    {cargandoCatalogo ? 'Consultando disponibilidad…' : form.fecha ? `Disponible para el ${form.fecha}` : 'Elige la fecha para ver cuánto hay disponible'}
+                  </div>
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)', marginBottom: 8, lineHeight: 1.45 }}>
+                  Se te entrega al llegar y se recibe al terminar. Lo que falte o se dañe se cobra al costo de reposición indicado.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {catalogo.map(eq => {
+                    const tope = eq.cantidad_max_por_reserva != null ? Math.min(eq.cantidad_max_por_reserva, eq.disponible) : eq.disponible
+                    const agotado = form.fecha !== '' && tope <= 0
+                    const inputId = `${uid}-eq-${eq.inventario_id}`
+                    return (
+                      <div key={eq.inventario_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, opacity: agotado ? 0.65 : 1 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <label htmlFor={inputId} style={{ fontSize: 13, fontWeight: 700, color: 'var(--at-ink)', cursor: 'pointer' }}>{eq.nombre}</label>
+                          <div style={{ fontSize: 11, color: agotado ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
+                            {!form.fecha ? 'Disponibilidad según la fecha' : agotado ? 'Sin disponibilidad para esa fecha' : `${eq.disponible} disponible${eq.disponible === 1 ? '' : 's'}`}
+                            {eq.cantidad_max_por_reserva != null && ` · máx. ${eq.cantidad_max_por_reserva} por reserva`}
+                            {eq.costo_reposicion != null && ` · reposición ${moneda} ${Number(eq.costo_reposicion).toFixed(2)} c/u`}
+                          </div>
+                          {eq.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', fontStyle: 'italic' }}>{eq.notas}</div>}
+                        </div>
+                        <input
+                          id={inputId}
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={Math.max(0, tope)}
+                          value={form.equipos[eq.inventario_id] ?? ''}
+                          placeholder="0"
+                          disabled={!form.fecha || tope <= 0}
+                          onChange={e => {
+                            const n = Math.max(0, Math.min(tope, parseInt(e.target.value) || 0))
+                            setForm(f => {
+                              const equipos = { ...f.equipos }
+                              if (n > 0) equipos[eq.inventario_id] = n
+                              else delete equipos[eq.inventario_id]
+                              return { ...f, equipos }
+                            })
+                          }}
+                          aria-label={`Cantidad de ${eq.nombre}`}
+                          style={{ width: 78, padding: '8px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 16, background: 'var(--at-surface-2)', textAlign: 'right' }}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+                {equiposPedidos > 0 && (
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-primary-hover)', marginTop: 8 }}>
+                    {equiposPedidos} equipo{equiposPedidos === 1 ? '' : 's'} pedido{equiposPedidos === 1 ? '' : 's'} con esta reserva
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </EditModal>
+      )}
+
+      {/* Equipo prestado a la unidad sin reserva de por medio */}
+      {prestamosSueltos.length > 0 && (
+        <div style={{ background: 'var(--at-warning-tint)', border: '1.5px solid var(--at-warning-border)', borderRadius: 12, padding: '10px 14px', marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--at-warning-strong)' }}>🪑 Equipo prestado a tu unidad</div>
+          <ListaPrestamos prestamos={prestamosSueltos} moneda={moneda} />
+        </div>
       )}
 
       {/* Mis reservas */}
@@ -459,6 +609,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, mo
                   {r.rechazada_motivo && (
                     <div style={{ fontSize: 11.5, color: 'var(--at-danger-strong)', marginTop: 3, fontStyle: 'italic', background: 'var(--at-danger-tint)', padding: '3px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
                   )}
+                  <ListaPrestamos prestamos={prestamosDeReserva(r.id, prestamos)} moneda={moneda} />
                 </div>
                 <span style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: ec.bg, color: ec.color, flexShrink: 0, border: `1px solid ${tint(ec.color, 20)}` }}>{ec.label}</span>
                 {vistaFutura && r.estado !== 'cancelada' && (

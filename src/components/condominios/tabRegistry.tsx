@@ -12,7 +12,7 @@ import type { ContratoProveedorCatalogo } from '../../types/proveedores'
 import type {
   UserSession, Proyecto, Unidad,
   OrdenCompra, Proforma,
-  CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento, AnuncioComunidad,
+  CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, BloqueoAmenidad, AmenidadInventario, TicketMantenimiento, AnuncioComunidad,
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
   AreaCondominio, RutaRonda, PuntoControlRuta, PuntoVerificacion, VisitaControl,
@@ -141,6 +141,8 @@ export interface CondominiosTabContext {
   amenidades: Amenidad[]
   reservas: ReservaAmenidad[]
   bloqueosAmenidades: BloqueoAmenidad[]
+  /** Equipo del inventario que se presta con cada amenidad (20261108000000). */
+  amenidadInventario: AmenidadInventario[]
   tickets: TicketMantenimiento[]
   anuncios: AnuncioComunidad[]
   parqueos: ParqueoCondominio[]
@@ -495,7 +497,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'visitantes', label: 'Visitantes', icon: '🚪', render: (ctx) =>
     <VisitantesTab visitantes={ctx.visitantes} unidades={ctx.unidadesProyecto} reservasSTR={ctx.reservasSTR} solicitudesMudanza={ctx.solicitudesMudanza} visitasFrecuentes={ctx.visitasFrecuentes} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('visitantes')} onRefresh={ctx.onRefresh} /> },
   { id: 'amenidades', label: 'Amenidades', icon: '🏊', render: (ctx) =>
-    <AmenidadesTab amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueos={ctx.bloqueosAmenidades} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} moneda={ctx.moneda} canCreate={ctx.canCreate('amenidades')} canEdit={ctx.canEdit('amenidades')} canDelete={ctx.canDelete('amenidades')} onRefresh={ctx.onRefresh} /> },
+    <AmenidadesTab amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueos={ctx.bloqueosAmenidades} unidades={ctx.unidadesProyecto} inventario={ctx.inventario} prestamos={ctx.prestamos} amenidadInventario={ctx.amenidadInventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} moneda={ctx.moneda} canCreate={ctx.canCreate('amenidades')} canEdit={ctx.canEdit('amenidades')} canDelete={ctx.canDelete('amenidades')} onRefresh={ctx.onRefresh} /> },
   { id: 'mantenimiento', label: 'Mantenimiento', icon: '🔧', render: (ctx) =>
     <MantenimientoTab tickets={ctx.tickets} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} autorNombre={ctx.currentUser.name ?? ''} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('mantenimiento')} canEdit={ctx.canEdit('mantenimiento')} canDelete={ctx.canDelete('mantenimiento')} onRefresh={ctx.onRefresh} /> },
   { id: 'comunidad', label: 'Comunidad', icon: '📢', render: (ctx) =>
@@ -539,7 +541,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'cumpleanos', label: 'Cumpleaños', icon: '🎂', render: (ctx) =>
     <CumpleanosTab personal={ctx.personal} cargos={ctx.cargosPersonal} clientesBirthday={ctx.clientesBirthday} proyectoNombre={ctx.proyectoActual?.nombre} /> },
   { id: 'inventario', label: 'Inventario', icon: '🗃️', render: (ctx) =>
-    <InventarioTab inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('inventario')} canEdit={ctx.canEdit('inventario')} canDelete={ctx.canDelete('inventario')} onRefresh={ctx.onRefresh} /> },
+    <InventarioTab inventario={ctx.inventario} prestamos={ctx.prestamos} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('inventario')} canEdit={ctx.canEdit('inventario')} canDelete={ctx.canDelete('inventario')} onRefresh={ctx.onRefresh} /> },
   // Etiqueta "Seguros": el id/tab gestiona pólizas de SEGURO; el nombre "Pólizas"
   // ahora pertenece a los asientos del módulo Contabilidad (partida doble).
   { id: 'polizas', label: 'Seguros', icon: '🛡️', render: (ctx) =>
@@ -611,7 +613,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'junta', label: 'Junta Directiva', icon: '👑', render: (ctx) =>
     <JuntaTab junta={ctx.junta} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('junta')} canEdit={ctx.canEdit('junta')} canDelete={ctx.canDelete('junta')} onRefresh={ctx.onRefresh} /> },
   { id: 'prestamos', label: 'Préstamo Equip.', icon: '🪑', render: (ctx) =>
-    <PrestamoEquiposTab prestamos={ctx.prestamos} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('prestamos')} canEdit={ctx.canEdit('prestamos')} canDelete={ctx.canDelete('prestamos')} onRefresh={ctx.onRefresh} /> },
+    <PrestamoEquiposTab prestamos={ctx.prestamos} unidades={ctx.unidadesProyecto} inventario={ctx.inventario} reservas={ctx.reservas} moneda={ctx.moneda} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('prestamos')} canEdit={ctx.canEdit('prestamos')} canDelete={ctx.canDelete('prestamos')} onRefresh={ctx.onRefresh} /> },
   { id: 'comunicados', label: 'Comunicados', icon: '✉️', render: (ctx) =>
     <ComunicadosTab comunicados={ctx.comunicados} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('comunicados')} canDelete={ctx.canDelete('comunicados')} onRefresh={ctx.onRefresh} /> },
   { id: 'comunicacion_condominios', label: 'Conversaciones', icon: '💬', render: (ctx) =>
@@ -631,7 +633,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'mant_preventivo', label: 'Mant. Prev.', icon: '🔩', render: (ctx) =>
     <MantenimientoPrevTab planes={ctx.planesMantenimiento} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('mant_preventivo')} canEdit={ctx.canEdit('mant_preventivo')} onRefresh={ctx.onRefresh} /> },
   { id: 'portal', label: 'Portal Resid.', icon: '👤', render: (ctx) =>
-    <PortalResidenteTab unidades={ctx.unidadesProyecto} cuotas={ctx.cuotas} tickets={ctx.tickets} amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueosAmenidades={ctx.bloqueosAmenidades} visitantes={ctx.visitantes} visitasFrecuentes={ctx.visitasFrecuentes} anuncios={ctx.anuncios} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canEdit={ctx.canEdit('portal')} autorNombre={ctx.currentUser.name ?? ''} autorUserId={ctx.uid} onRefresh={ctx.onRefresh} /> },
+    <PortalResidenteTab unidades={ctx.unidadesProyecto} cuotas={ctx.cuotas} tickets={ctx.tickets} amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueosAmenidades={ctx.bloqueosAmenidades} prestamos={ctx.prestamos} visitantes={ctx.visitantes} visitasFrecuentes={ctx.visitasFrecuentes} anuncios={ctx.anuncios} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canEdit={ctx.canEdit('portal')} autorNombre={ctx.currentUser.name ?? ''} autorUserId={ctx.uid} onRefresh={ctx.onRefresh} /> },
   // Qué pestañas ve el residente en su portal (projects.portal_tabs_ocultos,
   // 20261106000000). Sin clave RBAC en el catálogo a propósito: la escritura
   // pasa por projects_update (propietario/administrador de la empresa), así que

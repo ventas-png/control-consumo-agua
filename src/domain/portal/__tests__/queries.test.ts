@@ -91,19 +91,29 @@ describe('fetchPortalFotoIds', () => {
 })
 
 describe('fetchCondominiosPortalData', () => {
-  it('mapea los 15 datasets en orden', async () => {
+  it('mapea los 16 datasets en orden', async () => {
     h.state.results = [
       { data: ['proj'] }, { data: ['amen'] }, { data: ['cuota'] }, { data: ['reserva'] },
-      { data: ['bloqueo'] }, { data: ['ticket'] }, { data: ['anuncio'] }, { data: ['visita'] },
+      { data: ['bloqueo'] }, { data: ['prestamo'] }, { data: ['ticket'] }, { data: ['anuncio'] }, { data: ['visita'] },
       { data: ['frecuente'] }, { data: ['mensaje'] }, { data: ['solicitud'] }, { data: ['paquete'] },
       { data: ['correspondencia'] }, { data: ['comunicado'] }, { data: ['pestanas'] },
     ]
     expect(await fetchCondominiosPortalData(['p1'], ['u1'])).toEqual({
       projData: ['proj'], amenidadesData: ['amen'], cuotasData: ['cuota'], reservasData: ['reserva'],
-      bloqueosData: ['bloqueo'], ticketsData: ['ticket'], anunciosData: ['anuncio'], visitantesData: ['visita'],
+      bloqueosData: ['bloqueo'], prestamosData: ['prestamo'], ticketsData: ['ticket'], anunciosData: ['anuncio'], visitantesData: ['visita'],
       visitasFrecuentesData: ['frecuente'], mensajesData: ['mensaje'], solicitudesRentaData: ['solicitud'], paquetesData: ['paquete'],
       correspondenciaData: ['correspondencia'], comunicadosData: ['comunicado'], pestanasData: ['pestanas'],
     })
+  })
+
+  it('pide los préstamos de equipo acotados a las unidades del residente', async () => {
+    // El equipo pedido con una reserva (20261108000000) y el prestado suelto
+    // se leen por unidad: la RLS ya se los concede, y el portal muestra qué se
+    // entregó, qué volvió y qué debe por lo que faltó.
+    h.state.results = Array.from({ length: 16 }, () => ({ data: [] }))
+    await fetchCondominiosPortalData(['p1'], ['u1'])
+    expect(h.state.calls).toContainEqual(['prestamos_equipo', 'in', ['unidad_id', ['u1']]])
+    expect(h.state.calls.some(([t, m]) => t === 'prestamos_equipo' && m === 'eq')).toBe(false)
   })
 
   it('lee las pestañas apagadas en una consulta APARTE de la moneda y la empresa', async () => {
@@ -111,7 +121,7 @@ describe('fetchCondominiosPortalData', () => {
     // consulta falla sola: la fila de moneda/empresa tiene que seguir llegando.
     h.state.results = [
       { data: [{ id: 'p1', company_id: 'c1', moneda_condominios: 'Q', moneda: 'Q' }] },
-      ...Array.from({ length: 13 }, () => ({ data: [] })),
+      ...Array.from({ length: 14 }, () => ({ data: [] })),
       { data: null, error: { message: 'column projects.portal_tabs_ocultos does not exist', code: '42703' } },
     ]
     const r = await fetchCondominiosPortalData(['p1'], ['u1'])
@@ -126,7 +136,7 @@ describe('fetchCondominiosPortalData', () => {
   it('separa paquetería de correspondencia por clase, no por tabla', async () => {
     // Las dos salen de `paquetes_recibidos` desde 20260829000600: sin el filtro
     // por clase, "Mis paquetes" mostraría también las cartas del residente.
-    h.state.results = Array.from({ length: 15 }, () => ({ data: [] }))
+    h.state.results = Array.from({ length: 16 }, () => ({ data: [] }))
     await fetchCondominiosPortalData(['p1'], ['u1'])
     const clases = h.state.calls
       .filter(([tabla, metodo, args]) =>
@@ -136,7 +146,7 @@ describe('fetchCondominiosPortalData', () => {
   })
 
   it('pide los comunicados acotados a las unidades del residente', async () => {
-    h.state.results = Array.from({ length: 15 }, () => ({ data: [] }))
+    h.state.results = Array.from({ length: 16 }, () => ({ data: [] }))
     await fetchCondominiosPortalData(['p1'], ['u1'])
     // El filtro es por unidad, NO por proyecto: los comunicados de audiencia
     // amplia llegan al residente vía "Publicar en portal" → anuncios_comunidad,
