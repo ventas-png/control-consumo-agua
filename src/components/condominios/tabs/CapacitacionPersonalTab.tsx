@@ -1,11 +1,15 @@
 import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
-import { useState, type CSSProperties} from 'react'
+import { useMemo, useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { etiquetaCargo } from '../../../domain/condominios/rrhhCatalogos'
 import { notify, confirm } from '../../shared/Dialog'
-import { CapacitacionPersonal, EstadoCapacitacion } from '../../../types'
+import { CapacitacionPersonal, EstadoCapacitacion, PersonalCondominio, CargoCatalogo } from '../../../types'
 
 interface Props {
   capacitaciones: CapacitacionPersonal[]
+  /** Expediente del condominio: el empleado se elige de aquí, sólo los activos. */
+  personal: PersonalCondominio[]
+  cargos?: CargoCatalogo[]
   proyectoId: string
   companyId: string
   moneda: string
@@ -24,18 +28,35 @@ const ESTADO_CFG: Record<EstadoCapacitacion, { label: string; bg: string; color:
 }
 
 const BLANK = {
-  nombre_empleado: '', cargo: '', curso: '', proveedor: '',
+  personal_id: '', nombre_empleado: '', cargo: '', curso: '', proveedor: '',
   fecha_inicio: hoyLocalISO(),
   fecha_fin: '', fecha_vencimiento_cert: '',
   costo: '', estado: 'completado' as EstadoCapacitacion, notas: '',
 }
 
-export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
+export default function CapacitacionPersonalTab({ capacitaciones, personal, cargos = [], proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoCapacitacion | ''>('')
   const [busqueda, setBusqueda] = useState('')
   const [form, setForm] = useState(BLANK)
+
+  // Mismo criterio que Tareas por turno y Presencia: fuera sólo el inactivo
+  // (vacaciones o incapacidad siguen en planilla y pueden capacitarse).
+  const personalActivo = useMemo(
+    () => personal.filter(p => p.estado !== 'inactivo').sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [personal],
+  )
+
+  function elegirEmpleado(id: string) {
+    const p = personalActivo.find(x => x.id === id)
+    setForm(f => ({
+      ...f,
+      personal_id: p?.id ?? '',
+      nombre_empleado: p?.nombre ?? '',
+      cargo: p?.cargo ? etiquetaCargo(p.cargo, cargos) : '',
+    }))
+  }
 
   const lista = capacitaciones.filter(c =>
     (!filtroEstado || c.estado === filtroEstado) &&
@@ -53,12 +74,13 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
   const totalCosto = capacitaciones.reduce((s, c) => s + (c.costo ?? 0), 0)
 
   async function guardar() {
-    if (!form.nombre_empleado.trim() || !form.curso.trim() || !form.fecha_inicio) {
+    if (!form.personal_id || !form.curso.trim() || !form.fecha_inicio) {
       notify({ variant: 'warning', title: 'Error', text: 'Empleado, curso y fecha de inicio son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await createCondominioRow('capacitacion_personal_cond', {
       company_id: companyId, project_id: proyectoId,
+      personal_id: form.personal_id,
       nombre_empleado: form.nombre_empleado.trim(),
       cargo: form.cargo.trim() || null,
       curso: form.curso.trim(),
@@ -139,8 +161,13 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Registrar capacitación</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
-              <label style={lbl}>Empleado *</label>
-              <input style={inp} value={form.nombre_empleado} onChange={e => setForm(p => ({ ...p, nombre_empleado: e.target.value }))} placeholder="Nombre completo" />
+              <label style={lbl} htmlFor="cap-empleado">Empleado *</label>
+              <select id="cap-empleado" style={inp} value={form.personal_id} onChange={e => elegirEmpleado(e.target.value)}>
+                <option value="">{personalActivo.length ? 'Elegí un empleado…' : 'Sin empleados activos — agregalos en Personal'}</option>
+                {personalActivo.map(p => (
+                  <option key={p.id} value={p.id}>{p.nombre}{p.cargo ? ` — ${etiquetaCargo(p.cargo, cargos)}` : ''}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label style={lbl}>Cargo</label>

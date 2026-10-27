@@ -784,7 +784,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'vencimientos_criticos', label: 'Vencimientos', icon: '⏳', render: (ctx) =>
     <VencimientosCriticosTab vencimientosExtra={ctx.vencimientosExtra} polizas={ctx.polizas} contratosProveedores={ctx.contratosProveedores} inspecciones={ctx.inspecciones} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('vencimientos_criticos')} canEdit={ctx.canEdit('vencimientos_criticos')} onRefresh={ctx.onRefresh} /> },
   { id: 'capacitacion_personal', label: 'Capacitación', icon: '🎓', render: (ctx) =>
-    <CapacitacionPersonalTab capacitaciones={ctx.capacitaciones} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('capacitacion_personal')} canEdit={ctx.canEdit('capacitacion_personal')} canDelete={ctx.canDelete('capacitacion_personal')} onRefresh={ctx.onRefresh} /> },
+    <CapacitacionPersonalTab capacitaciones={ctx.capacitaciones} personal={ctx.personal} cargos={ctx.cargosPersonal} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('capacitacion_personal')} canEdit={ctx.canEdit('capacitacion_personal')} canDelete={ctx.canDelete('capacitacion_personal')} onRefresh={ctx.onRefresh} /> },
   { id: 'proyectos_cond', label: 'Proyectos', icon: '🏗️', render: (ctx) =>
     <ProyectosCondominioTab proyectos={ctx.proyectosCond} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proyectos_cond')} canEdit={ctx.canEdit('proyectos_cond')} canDelete={ctx.canDelete('proyectos_cond')} onRefresh={ctx.onRefresh} /> },
   { id: 'metricas_servicio', label: 'Métricas servicio', icon: '📊', render: (ctx) =>
