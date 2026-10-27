@@ -1,19 +1,24 @@
 // Detalle de una minuta en ventana: participantes, puntos con sus acuerdos y
-// compromisos (que se marcan cumplidos desde aquí), avance y acciones
-// (editar, fijar, cerrar/reabrir, imprimir, eliminar).
+// compromisos (que se marcan cumplidos desde aquí), fotos y documentos, avance
+// y acciones (editar, fijar, cerrar/reabrir, imprimir, eliminar).
 import { useEffect, useState, type CSSProperties } from 'react'
 import { EditModal } from '../../../shared/EditModal'
+import { ImageGallery } from '../../../shared/ImageGallery'
+import { ListaAdjuntos } from '../../../shared/FileUploader'
 import { Button } from '../../../shared/Button'
 import { confirm, notify } from '../../../shared/Dialog'
-import { deleteCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
+import { deleteCondominioRowAfectando, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
+import { removeMedia } from '../../../../domain/shared/storage'
+import { BUCKET_MEDIA } from '../../../../domain/shared/buckets'
 import {
-  TIPO_ACUERDO_INFO, fechaDeMinuta, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, puntosDe, resumenCompromisos, situacionCompromiso,
+  TIPO_ACUERDO_INFO, documentosDe, fechaDeMinuta, fotosDe, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, plazoSeguimiento, puntosDe, resumenCompromisos, situacionCompromiso,
 } from '../../../../domain/condominios/minutas'
 import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../../lib/format'
 import type { AcuerdoMinuta, NotaAdmin } from '../../../../types'
 import { tint } from '../../../shared/statusTone'
 import { BarraAvance, ParticipanteCard, categoriaInfo, prioridadInfo } from './comun'
 import { imprimirMinuta } from './imprimirMinuta'
+import './minutas.css'
 
 interface Props {
   nota: NotaAdmin
@@ -31,6 +36,8 @@ const tituloBloque: CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var
 export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onRefresh }: Props) {
   const participantes = participantesDe(nota)
   const gestor = gestorDe(participantes)
+  const fotos = fotosDe(nota)
+  const documentos = documentosDe(nota)
   // Copia local de los puntos: marcar un compromiso se ve al instante y la
   // sección recarga detrás; cuando llega la fila fresca, se vuelve a tomar.
   const [puntos, setPuntos] = useState(() => puntosDe(nota))
@@ -76,8 +83,12 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
     if (!canDelete) return
     const res = await confirm({ title: 'Eliminar minuta', text: `¿Eliminar «${nota.titulo}»? No se puede deshacer.`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    const { error } = await deleteCondominioRow('notas_admin', nota.id)
+    // Afectando: si la política de filas no la borra, los archivos no se tocan.
+    const { error } = await deleteCondominioRowAfectando('notas_admin', nota.id)
     if (error) { notify({ variant: 'error', title: 'No se pudo eliminar', text: error.message }); return }
+    // Ninguna otra fila apunta a estas rutas; si el borrado falla, sólo quedan huérfanas.
+    const archivos = [...fotos, ...documentos]
+    if (archivos.length > 0) void removeMedia(BUCKET_MEDIA, archivos)
     onClose()
     onRefresh()
   }
@@ -95,22 +106,23 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
       size="lg"
       fullScreenOnMobile
       onClose={onClose}
-      footer={<>
-        {canDelete && <Button variant="outline-danger" size="sm" onClick={() => void eliminar()}>🗑 Eliminar</Button>}
-        <span style={{ flex: 1 }} />
-        <Button variant="secondary" size="sm" onClick={() => imprimirMinuta(nota)}>🖨 Imprimir</Button>
-        {canEdit && !nota.resuelta && (
-          <Button variant="secondary" size="sm" onClick={() => void cambiar({ fijada: !nota.fijada }, 'fijar')} loading={ocupado === 'fijar'}>
-            {nota.fijada ? '📌 Desfijar' : '📌 Fijar'}
-          </Button>
-        )}
-        {canEdit && (nota.resuelta
-          ? <Button variant="secondary" size="sm" onClick={() => void cambiar({ resuelta: false }, 'reabrir', 'Minuta reabierta')} loading={ocupado === 'reabrir'}>↺ Reabrir</Button>
-          : <Button variant="success" size="sm" onClick={() => void cerrarMinuta()} loading={ocupado === 'cerrar'}>✓ Cerrar minuta</Button>)}
-        {editable && <Button variant="primary" size="sm" onClick={onEditar}>✏️ Editar</Button>}
-      </>}
+      footer={
+        <div className="minuta-acciones minuta-acciones--detalle">
+          {canDelete && <Button className="minuta-eliminar" variant="outline-danger" size="sm" onClick={() => void eliminar()}>🗑 Eliminar</Button>}
+          <Button variant="secondary" size="sm" onClick={() => imprimirMinuta(nota)}>🖨 Imprimir</Button>
+          {canEdit && !nota.resuelta && (
+            <Button variant="secondary" size="sm" onClick={() => void cambiar({ fijada: !nota.fijada }, 'fijar')} loading={ocupado === 'fijar'}>
+              {nota.fijada ? '📌 Desfijar' : '📌 Fijar'}
+            </Button>
+          )}
+          {canEdit && (nota.resuelta
+            ? <Button variant="secondary" size="sm" onClick={() => void cambiar({ resuelta: false }, 'reabrir', 'Minuta reabierta')} loading={ocupado === 'reabrir'}>↺ Reabrir</Button>
+            : <Button variant="success" size="sm" onClick={() => void cerrarMinuta()} loading={ocupado === 'cerrar'}>✓ Cerrar minuta</Button>)}
+          {editable && <Button variant="primary" size="sm" onClick={onEditar}>✏️ Editar</Button>}
+        </div>
+      }
     >
-      <div style={{ display: 'grid', gap: 14 }}>
+      <div className="minuta-detalle-cuerpo" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={chip(tint(cat.color, 14), cat.color)}>{cat.icon} {cat.label}</span>
           {prio.value !== 'normal' && <span style={chip(prio.bg, prio.color)}>Prioridad {prio.label.toLowerCase()}</span>}
@@ -124,7 +136,7 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
             border: `1px solid ${diasSeguimiento < 0 ? 'var(--at-danger-border)' : diasSeguimiento === 0 ? 'var(--at-warning-border)' : 'var(--at-info-border)'}` }}>
             <span aria-hidden="true" style={{ fontSize: 18 }}>⏰</span>
             <div style={{ fontSize: 13 }}>
-              <strong>Próximo seguimiento</strong> {formatFechaCalendario(nota.fecha_recordatorio)} · {plazoCompromiso(diasSeguimiento).replace('vence', 'es').replace('venció', 'fue')}
+              <strong>Próximo seguimiento</strong> {formatFechaCalendario(nota.fecha_recordatorio)} · {plazoSeguimiento(diasSeguimiento)}
             </div>
           </div>
         )}
@@ -133,6 +145,20 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
           <div style={bloque}>
             <h3 style={tituloBloque}>Objetivo</h3>
             <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>{nota.contenido}</div>
+          </div>
+        )}
+
+        {fotos.length > 0 && (
+          <div style={bloque} className="minuta-galeria">
+            <h3 style={tituloBloque}>Fotos ({fotos.length})</h3>
+            <ImageGallery urls={fotos} maxVisible={6} />
+          </div>
+        )}
+
+        {documentos.length > 0 && (
+          <div style={bloque} className="minuta-documentos">
+            <h3 style={tituloBloque}>Documentos ({documentos.length})</h3>
+            <ListaAdjuntos paths={documentos} />
           </div>
         )}
 
@@ -175,9 +201,11 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
                           <li key={a.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '8px 10px', borderRadius: 8,
                             background: a.cumplido ? 'var(--at-success-tint)' : 'var(--at-surface-2)', borderLeft: `3px solid ${esCompromiso ? (a.cumplido ? 'var(--at-success)' : situacion === 'vencido' ? 'var(--at-danger)' : 'var(--at-accent)') : 'var(--at-primary-mint)'}` }}>
                             {esCompromiso && (
-                              <input type="checkbox" checked={a.cumplido} disabled={!canEdit || nota.resuelta || ocupado !== null}
-                                aria-label={`${a.cumplido ? 'Desmarcar' : 'Marcar'} cumplido: ${a.texto}`}
-                                onChange={e => void marcar(a, e.target.checked)} style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }} />
+                              <label className="minuta-check-hit" style={{ marginTop: -2 }}>
+                                <input type="checkbox" className="minuta-check" checked={a.cumplido} disabled={!canEdit || nota.resuelta || ocupado !== null}
+                                  aria-label={`${a.cumplido ? 'Desmarcar' : 'Marcar'} cumplido: ${a.texto}`}
+                                  onChange={e => void marcar(a, e.target.checked)} />
+                              </label>
                             )}
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 14, color: 'var(--at-ink)', textDecoration: a.cumplido ? 'line-through' : 'none', opacity: a.cumplido ? 0.75 : 1 }}>

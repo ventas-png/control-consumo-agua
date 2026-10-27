@@ -12725,9 +12725,11 @@ export type Database = {
           company_id: string
           contenido: string
           created_at: string
+          documentos: string[]
           fecha_recordatorio: string | null
           fecha_reunion: string | null
           fijada: boolean
+          fotos: string[]
           id: string
           participantes: Json
           prioridad: string
@@ -12742,9 +12744,11 @@ export type Database = {
           company_id: string
           contenido?: string
           created_at?: string
+          documentos?: string[]
           fecha_recordatorio?: string | null
           fecha_reunion?: string | null
           fijada?: boolean
+          fotos?: string[]
           id?: string
           participantes?: Json
           prioridad?: string
@@ -12759,9 +12763,11 @@ export type Database = {
           company_id?: string
           contenido?: string
           created_at?: string
+          documentos?: string[]
           fecha_recordatorio?: string | null
           fecha_reunion?: string | null
           fijada?: boolean
+          fotos?: string[]
           id?: string
           participantes?: Json
           prioridad?: string

@@ -5,23 +5,28 @@
 //                      y quién la gestiona (quien la abre queda de gestor).
 //   2 · Puntos         los puntos a abordar, numerados, con detalle opcional.
 //   3 · Acuerdos       por cada punto, lo acordado y los compromisos (quién y
-//                      para cuándo); cierre: categoría, prioridad, próximo
-//                      seguimiento y fijar.
+//                      para cuándo); fotos y documentos de la reunión; cierre:
+//                      categoría, prioridad, próximo seguimiento y fijar.
 //
 // Las listas salen de lo que la sección ya carga (personal, unidades,
 // contratos) y de dos lecturas propias: residentes de unidad (con rol) y el
 // catálogo compartido de proveedores. Todo lo que no es pantalla —validar cada
-// paso, depurar y armar candidatos— vive en domain/condominios/minutas.
+// paso, depurar y armar candidatos— vive en domain/condominios/minutas. El
+// reacomodo para el teléfono está en minutas.css.
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { EditModal } from '../../../shared/EditModal'
 import { Button } from '../../../shared/Button'
 import { FilterChips } from '../../../shared/FilterChips'
+import { MultiImageUploader } from '../../../shared/ImageUploader'
+import { MultiFileUploader } from '../../../shared/FileUploader'
 import { notify } from '../../../shared/Dialog'
-import { createCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
+import { createCondominioRow, updateCondominioRowAfectando } from '../../../../domain/condominios/tabMutations'
 import { useProveedoresQuery } from '../../../../domain/cxp/queries'
+import { removeMedia } from '../../../../domain/shared/storage'
+import { BUCKET_MEDIA } from '../../../../domain/shared/buckets'
 import {
-  PASOS_MINUTA, TIPOS_PARTICIPANTE, TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO,
-  borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
+  MAX_DOCUMENTOS_MINUTA, MAX_FOTOS_MINUTA, PASOS_MINUTA, TIPOS_PARTICIPANTE, TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO,
+  archivosPorBorrar, documentosDe, fotosDe, mismasRutas, borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
   fetchResidentesProyecto, filtrarCandidatos, nuevoIdMinuta, participanteDesdeCandidato, quitarParticipante, validarPasoMinuta, yaParticipa,
   type BorradorMinuta, type CandidatoParticipante, type PasoMinuta, type ResidenteProyecto,
 } from '../../../../domain/condominios/minutas'
@@ -32,6 +37,7 @@ import type {
 } from '../../../../types'
 import type { ProveedorCatalogo } from '../../../../types/proveedores'
 import { Avatar, CATEGORIAS, PRIORIDADES, ParticipanteCard, btnIcono, inp, lbl } from './comun'
+import './minutas.css'
 
 interface Props {
   /** null = nueva minuta. */
@@ -51,15 +57,62 @@ interface Props {
 
 const MAX_CANDIDATOS = 30
 
-const tarjeta: CSSProperties = { border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, background: 'var(--at-surface)' }
+const tarjeta: CSSProperties = { border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, background: 'var(--at-surface)', minWidth: 0 }
 const seccionTitulo: CSSProperties = { fontSize: 13, fontWeight: 700, color: 'var(--at-ink)', margin: '0 0 8px' }
 const ayuda: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', margin: '0 0 10px', lineHeight: 1.5 }
+const numeroPunto: CSSProperties = {
+  width: 28, height: 28, borderRadius: '50%', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', fontWeight: 800, fontSize: 13,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+}
 
 export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, personal, cargos, unidades, contratos, contratosProveedores, onClose, onGuardado }: Props) {
   const uid = useId()
   const [borrador, setBorrador] = useState<BorradorMinuta>(() => borradorDesde(nota, autorNombre, hoyLocalISO()))
   const [paso, setPaso] = useState<PasoMinuta>(1)
   const [saving, setSaving] = useState(false)
+
+  // ── Fotos y documentos: qué se borra del bucket ──
+  // Los uploaders no borran nada al quitar (borrarAlQuitar={false}); todo se
+  // decide al desmontar el asistente, que es el único momento en que se sabe
+  // qué quedó guardado. Desmontar cubre guardar, cancelar, Esc, el fondo y el
+  // «Atrás» del sistema (que cambia de pestaña sin pasar por cerrar()).
+  const [originales] = useState(() => ({ fotos: fotosDe(nota), documentos: documentosDe(nota) }))
+  /** Subidas en curso por campo: cuenta, no booleano, para que la primera que termina no habilite Guardar. */
+  const [subiendo, setSubiendo] = useState({ fotos: 0, documentos: 0 })
+  const subiendoAlgo = subiendo.fotos > 0 || subiendo.documentos > 0
+  /** Toda ruta que pasó por las listas en esta edición, también las que después se quitaron. */
+  const vistasRef = useRef(new Set<string>())
+  /** Lo que quedó en la fila; null mientras no se guarde. */
+  const guardadoRef = useRef<string[] | null>(null)
+  const borradasRef = useRef(new Set<string>())
+  const montadoRef = useRef(false)
+  /** Con el INSERT/UPDATE en vuelo no se sabe qué queda: la limpieza espera su resultado. */
+  const guardandoRef = useRef(false)
+  const limpiarArchivos = () => {
+    const fuera = archivosPorBorrar([...originales.fotos, ...originales.documentos], vistasRef.current, guardadoRef.current)
+      .filter(r => !borradasRef.current.has(r))
+    fuera.forEach(r => borradasRef.current.add(r))
+    // Si el borrado falla sólo queda un archivo huérfano, nunca una minuta rota.
+    if (fuera.length > 0) void removeMedia(BUCKET_MEDIA, fuera)
+  }
+  const limpiarRef = useRef(limpiarArchivos)
+  limpiarRef.current = limpiarArchivos
+  useEffect(() => {
+    montadoRef.current = true
+    return () => { montadoRef.current = false; if (!guardandoRef.current) limpiarRef.current() }
+  }, [])
+  function cambiarArchivos(campo: 'fotos' | 'documentos', rutas: string[]) {
+    rutas.forEach(r => vistasRef.current.add(r))
+    // Una subida que terminó con el asistente ya cerrado: nadie la va a guardar.
+    if (!montadoRef.current) { limpiarRef.current(); return }
+    set({ [campo]: rutas })
+  }
+  const marcarSubida = (campo: 'fotos' | 'documentos') => (v: boolean) => setSubiendo(s => ({ ...s, [campo]: Math.max(0, s[campo] + (v ? 1 : -1)) }))
+  /** Cambiar de paso desmonta el uploader a mitad de la subida: se espera a que termine. */
+  function esperarSubida(): boolean {
+    if (subiendoAlgo) notify({ variant: 'info', title: 'Subiendo archivos', text: 'Espera a que terminen de subir para cambiar de paso.' })
+    return subiendoAlgo
+  }
 
   // Paso 1: de qué lista se agrega y qué se busca.
   const [tipoLista, setTipoLista] = useState<TipoParticipanteMinuta>('empleado')
@@ -137,6 +190,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
   // ── Navegación ──
   /** Para llegar a `destino` deben estar completos los pasos anteriores. */
   function irA(destino: PasoMinuta) {
+    if (destino !== paso && esperarSubida()) return
     for (const p of PASOS_MINUTA) {
       if (p.n >= destino) break
       const falta = validarPasoMinuta(borrador, p.n)
@@ -147,12 +201,15 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
 
   async function guardar() {
     if (saving) return
+    if (subiendoAlgo) { notify({ variant: 'info', title: 'Subiendo archivos', text: 'Espera a que terminen de subir para guardar la minuta.' }); return }
     for (const p of PASOS_MINUTA) {
       const falta = validarPasoMinuta(borrador, p.n)
       if (falta) { setPaso(p.n); notify({ variant: 'warning', title: `Paso ${p.n} · ${p.label}`, text: falta }); return }
     }
     const { participantes, puntos } = depurarBorrador(borrador)
-    const campos = {
+    const fotos = fotosDe({ fotos: borrador.fotos })
+    const documentos = documentosDe({ documentos: borrador.documentos })
+    const campos: Record<string, unknown> = {
       titulo: borrador.titulo.trim(),
       contenido: borrador.contenido.trim(),
       categoria: borrador.categoria,
@@ -163,74 +220,96 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       participantes,
       puntos,
     }
+    // Al editar, las listas de archivos sólo viajan si cambiaron: una pestaña
+    // abierta desde antes que sólo corrige el título no revive en la fila un
+    // archivo que otra sesión ya quitó y borró.
+    if (!nota || !mismasRutas(fotos, originales.fotos)) campos.fotos = fotos
+    if (!nota || !mismasRutas(documentos, originales.documentos)) campos.documentos = documentos
     setSaving(true)
+    guardandoRef.current = true
+    // Afectando: si la política de filas no deja tocar la fila, el UPDATE vuelve
+    // «bien» con cero filas, y borrar las quitadas rompería la minuta guardada.
     const { error } = nota
-      ? await updateCondominioRow('notas_admin', nota.id, campos)
+      ? await updateCondominioRowAfectando('notas_admin', nota.id, campos)
       : await createCondominioRow('notas_admin', { company_id: companyId, project_id: proyectoId, autor: autorNombre || null, ...campos })
+    guardandoRef.current = false
+    if (!error) guardadoRef.current = [...fotos, ...documentos]
+    // Si el «Atrás» del sistema desmontó el asistente durante el guardado, la
+    // limpieza que se saltó se hace ahora, con lo que de verdad quedó en la fila.
+    if (!montadoRef.current) limpiarRef.current()
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'No se pudo guardar la minuta', text: error.message }); return }
     notify({ variant: 'success', title: nota ? 'Minuta actualizada' : 'Minuta guardada' })
     onGuardado()
   }
 
-  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
-  const cerrar = () => { if (!saving) onClose() }
+  // No se cierra a mitad del guardado (escondería el error) ni de una subida
+  // (el archivo llegaría sin asistente que lo guarde).
+  const cerrar = () => {
+    if (saving) return
+    if (subiendoAlgo) { notify({ variant: 'info', title: 'Subiendo archivos', text: 'Espera a que terminen de subir para cerrar.' }); return }
+    onClose()
+  }
   const pasoInfo = PASOS_MINUTA.find(p => p.n === paso)!
 
   return (
     <EditModal
       title={nota ? '✏️ Editar minuta' : '📝 Nueva minuta'}
-      subtitle={`Paso ${paso} de ${PASOS_MINUTA.length} · ${pasoInfo.titulo}`}
+      subtitle={<span aria-live="polite">{`Paso ${paso} de ${PASOS_MINUTA.length} · ${pasoInfo.titulo}`}</span>}
       size="lg"
       fullScreenOnMobile
       onClose={cerrar}
-      closeOnBackdropClick={!saving}
-      closeOnEscape={!saving}
-      footer={<>
-        <Button variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
-        <span style={{ flex: 1 }} />
-        {paso > 1 && <Button variant="secondary" onClick={() => setPaso((paso - 1) as PasoMinuta)} disabled={saving}>← Anterior</Button>}
-        {paso < 3 && <Button variant="primary" onClick={() => irA((paso + 1) as PasoMinuta)} disabled={saving}>Siguiente →</Button>}
-        {(paso === 3 || nota) && (
-          <Button variant={paso === 3 ? 'success' : 'outline-primary'} onClick={() => void guardar()} loading={saving} loadingText="Guardando…">
-            {nota ? 'Guardar cambios' : '✅ Guardar minuta'}
-          </Button>
-        )}
-      </>}
+      closeOnBackdropClick={!saving && !subiendoAlgo}
+      closeOnEscape={!saving && !subiendoAlgo}
+      footer={
+        <div className="minuta-acciones">
+          {/* Durante una subida los botones avisan en vez de deshabilitarse: un
+              botón `disabled` sale del orden de Tab y, si es el último, el foco
+              se escapa de la ventana. */}
+          <Button className="minuta-cancelar" variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
+          {paso > 1 && <Button className="minuta-anterior" variant="secondary" onClick={() => { if (!esperarSubida()) setPaso((paso - 1) as PasoMinuta) }} disabled={saving}>← Anterior</Button>}
+          {paso < 3 && <Button className="minuta-avanzar" variant="primary" onClick={() => irA((paso + 1) as PasoMinuta)} disabled={saving}>Siguiente →</Button>}
+          {(paso === 3 || nota) && (
+            <Button className="minuta-avanzar" variant={paso === 3 ? 'success' : 'outline-primary'} onClick={() => void guardar()} loading={saving} loadingText="Guardando…"
+              aria-disabled={subiendoAlgo || undefined} style={subiendoAlgo ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
+              {subiendoAlgo ? 'Subiendo archivos…' : nota ? 'Guardar cambios' : '✅ Guardar minuta'}
+            </Button>
+          )}
+        </div>
+      }
     >
-      {/* Indicador de pasos */}
-      <div role="tablist" aria-label="Pasos de la minuta" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
+      {/* Indicador de pasos: en el teléfono, tres columnas; en escritorio, en línea. */}
+      <div role="tablist" aria-label="Pasos de la minuta" className="minuta-pasos">
         {PASOS_MINUTA.map((p, i) => {
           const activo = paso === p.n
           const hecho = p.n < paso
           return (
-            <div key={p.n} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button type="button" role="tab" aria-selected={activo} aria-label={`Paso ${p.n} · ${p.label}`} onClick={() => irA(p.n)}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, border: 'none', background: 'none', cursor: 'pointer', padding: '6px 4px', minHeight: 40 }}>
-                <span aria-hidden="true" style={{ width: 26, height: 26, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800,
+            <div key={p.n} className="minuta-paso">
+              <button type="button" role="tab" aria-selected={activo} aria-controls={activo ? `${uid}-panel` : undefined} aria-label={`Paso ${p.n} · ${p.label}`} onClick={() => irA(p.n)} className="minuta-paso-btn">
+                <span aria-hidden="true" style={{ width: 26, height: 26, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800,
                   background: hecho ? 'var(--at-success)' : activo ? 'var(--at-primary)' : 'var(--at-chip)',
                   color: hecho || activo ? 'var(--at-on-status)' : 'var(--at-ink-3)' }}>{hecho ? '✓' : p.n}</span>
-                <span style={{ fontSize: 13, fontWeight: activo ? 700 : 500, color: activo ? 'var(--at-ink)' : 'var(--at-ink-3)' }}>{p.label}</span>
+                <span className="minuta-paso-label" style={{ fontWeight: activo ? 700 : 500, color: activo ? 'var(--at-ink)' : 'var(--at-ink-3)' }}>{p.label}</span>
               </button>
-              {i < PASOS_MINUTA.length - 1 && <div aria-hidden="true" style={{ width: 22, height: 2, background: hecho ? 'var(--at-success)' : 'var(--at-line)', borderRadius: 1 }} />}
+              {i < PASOS_MINUTA.length - 1 && <span aria-hidden="true" className={hecho ? 'minuta-conector minuta-conector--hecho' : 'minuta-conector'} />}
             </div>
           )
         })}
       </div>
 
       {paso === 1 && (
-        <div role="tabpanel" aria-label="Paso 1 · Participantes" style={{ display: 'grid', gap: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
-            <div style={{ gridColumn: '1 / -1' }}>
+        <div role="tabpanel" id={`${uid}-panel`} aria-label="Paso 1 · Participantes" className="minuta-panel" style={{ gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12, minWidth: 0 }}>
+            <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
               <label htmlFor={`${uid}-titulo`} style={lbl}>Título de la minuta *</label>
               <input id={`${uid}-titulo`} style={inp} placeholder="Ej. Reunión con el guardia del turno nocturno" value={borrador.titulo}
                 onChange={e => set({ titulo: e.target.value })} autoFocus />
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <label htmlFor={`${uid}-fecha`} style={lbl}>Fecha de la reunión *</label>
               <input id={`${uid}-fecha`} type="date" style={inp} value={borrador.fecha_reunion} onChange={e => set({ fecha_reunion: e.target.value })} />
             </div>
-            <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
               <label htmlFor={`${uid}-objetivo`} style={lbl}>Objetivo de la reunión (opcional)</label>
               <textarea id={`${uid}-objetivo`} style={{ ...inp, minHeight: 64, resize: 'vertical' }} placeholder="Para qué se reunieron"
                 value={borrador.contenido} onChange={e => set({ contenido: e.target.value })} />
@@ -241,27 +320,27 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
             <h3 style={seccionTitulo}>Participantes ({borrador.participantes.length})</h3>
             <p style={ayuda}>Quien gestiona la minuta es responsable de darle seguimiento. Puedes cambiarlo con «Hacer gestor».</p>
             {borrador.participantes.length === 0 && <p style={{ ...ayuda, fontStyle: 'italic' }}>Aún no hay participantes: agrégalos abajo.</p>}
-            <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
               {borrador.participantes.map(p => (
-                <ParticipanteCard key={p.id} p={p} acciones={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                    {!p.gestiona && (
-                      <button type="button" onClick={() => set({ participantes: designarGestor(borrador.participantes, p.id) })}
-                        style={{ ...btnIcono, fontSize: 12, fontWeight: 600, color: 'var(--at-primary)', padding: '0 8px' }}>Hacer gestor</button>
-                    )}
-                    <button type="button" aria-label={`Quitar a ${p.nombre}`} title="Quitar" onClick={() => set({ participantes: quitarParticipante(borrador.participantes, p.id) })} style={btnIcono}>✕</button>
-                  </div>
-                } />
+                <ParticipanteCard key={p.id} p={p} acciones={<>
+                  {!p.gestiona && (
+                    <button type="button" className="minuta-icono" onClick={() => set({ participantes: designarGestor(borrador.participantes, p.id) })}
+                      style={{ ...btnIcono, fontSize: 12, fontWeight: 600, color: 'var(--at-primary)', padding: '0 8px', whiteSpace: 'nowrap' }}>Hacer gestor</button>
+                  )}
+                  <button type="button" className="minuta-icono" aria-label={`Quitar a ${p.nombre}`} title="Quitar" onClick={() => { enfocarRef.current = tipoLista === 'otro' ? `${uid}-otro-nombre` : `${uid}-buscar`; set({ participantes: quitarParticipante(borrador.participantes, p.id) }) }} style={btnIcono}>✕</button>
+                </>} />
               ))}
             </div>
           </div>
 
           <div style={tarjeta}>
             <h3 style={seccionTitulo}>Agregar participante</h3>
-            <FilterChips ariaLabel="Tipo de participante" value={tipoLista} onChange={t => { setTipoLista(t); setBusqueda('') }}
-              options={TIPOS_PARTICIPANTE.map(t => ({ value: t, label: TIPO_PARTICIPANTE_INFO[t].label, icon: TIPO_PARTICIPANTE_INFO[t].icon, count: t === 'otro' ? undefined : candidatos[t].length }))} />
+            <div className="minuta-chips">
+              <FilterChips ariaLabel="Tipo de participante" value={tipoLista} onChange={t => { setTipoLista(t); setBusqueda('') }}
+                options={TIPOS_PARTICIPANTE.map(t => ({ value: t, label: TIPO_PARTICIPANTE_INFO[t].label, icon: TIPO_PARTICIPANTE_INFO[t].icon, count: t === 'otro' ? undefined : candidatos[t].length }))} />
+            </div>
             {tipoLista !== 'otro' ? (
-              <div style={{ marginTop: 10 }}>
+              <div style={{ marginTop: 10, minWidth: 0 }}>
                 <label htmlFor={`${uid}-buscar`} style={lbl}>Buscar {TIPO_PARTICIPANTE_INFO[tipoLista].plural.toLowerCase()}</label>
                 <input id={`${uid}-buscar`} type="search" style={inp} placeholder="Nombre, cargo, unidad…" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
                 <div role="list" aria-label={TIPO_PARTICIPANTE_INFO[tipoLista].plural} style={{ marginTop: 8, maxHeight: 260, overflowY: 'auto', display: 'grid', gap: 4 }}>
@@ -274,13 +353,13 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
                   {visibles.slice(0, MAX_CANDIDATOS).map(c => {
                     const agregado = yaParticipa(borrador.participantes, c)
                     return (
-                      <div key={c.clave} role="listitem" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 8, background: agregado ? 'var(--at-success-tint)' : 'transparent' }}>
+                      <div key={c.clave} role="listitem" className="minuta-cand" style={{ background: agregado ? 'var(--at-success-tint)' : 'transparent' }}>
                         <Avatar nombre={c.nombre} tipo={c.tipo} size={28} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--at-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nombre}</div>
-                          {c.detalle && <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{c.detalle}</div>}
+                        <div className="minuta-cand-texto">
+                          <div className="minuta-cand-nombre">{c.nombre}</div>
+                          {c.detalle && <div style={{ fontSize: 12, color: 'var(--at-ink-3)', overflowWrap: 'anywhere' }}>{c.detalle}</div>}
                         </div>
-                        <Button size="sm" variant={agregado ? 'ghost' : 'outline-primary'} disabled={agregado} aria-label={agregado ? `${c.nombre} ya está en la minuta` : `Agregar a ${c.nombre}`}
+                        <Button size="sm" className="minuta-touch" variant={agregado ? 'ghost' : 'outline-primary'} disabled={agregado} aria-label={agregado ? `${c.nombre} ya está en la minuta` : `Agregar a ${c.nombre}`}
                           onClick={() => agregarCandidato(c)}>{agregado ? '✓ Agregado' : '+ Agregar'}</Button>
                       </div>
                     )
@@ -289,18 +368,18 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
                 </div>
               </div>
             ) : (
-              <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 10, alignItems: 'end' }}>
-                <div>
+              <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 10, alignItems: 'end', minWidth: 0 }}>
+                <div style={{ minWidth: 0 }}>
                   <label htmlFor={`${uid}-otro-nombre`} style={lbl}>Nombre *</label>
                   <input id={`${uid}-otro-nombre`} style={inp} placeholder="Ej. Lic. Rodríguez" value={otro.nombre}
                     onChange={e => setOtro(o => ({ ...o, nombre: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarOtro() } }} />
                 </div>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <label htmlFor={`${uid}-otro-detalle`} style={lbl}>Detalle</label>
                   <input id={`${uid}-otro-detalle`} style={inp} placeholder="Ej. Abogado externo" value={otro.detalle}
                     onChange={e => setOtro(o => ({ ...o, detalle: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarOtro() } }} />
                 </div>
-                <Button variant="outline-primary" onClick={agregarOtro}>+ Agregar</Button>
+                <Button className="minuta-touch" variant="outline-primary" onClick={agregarOtro}>+ Agregar</Button>
               </div>
             )}
           </div>
@@ -308,69 +387,73 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       )}
 
       {paso === 2 && (
-        <div role="tabpanel" aria-label="Paso 2 · Puntos" style={{ display: 'grid', gap: 12 }}>
+        <div role="tabpanel" id={`${uid}-panel`} aria-label="Paso 2 · Puntos" className="minuta-panel" style={{ gap: 12 }}>
           <p style={ayuda}>Anota cada tema que se trató o se va a tratar con {borrador.participantes.filter(p => !p.gestiona).map(p => p.nombre).join(', ') || 'los participantes'}. En el siguiente paso registras lo acordado en cada uno.</p>
           {borrador.puntos.length === 0 && (
             <div style={{ ...tarjeta, textAlign: 'center', padding: 24, color: 'var(--at-ink-3)', fontSize: 14 }}>Todavía no hay puntos.</div>
           )}
           {borrador.puntos.map((p, i) => (
-            <div key={p.id} style={{ ...tarjeta, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', fontWeight: 800, fontSize: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 6 }}>{i + 1}</span>
-              <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 8 }}>
+            <div key={p.id} style={tarjeta} className="minuta-punto">
+              <span aria-hidden="true" style={{ ...numeroPunto, marginTop: 6 }}>{i + 1}</span>
+              <div className="minuta-punto-campos">
                 <input id={`${uid}-punto-${p.id}`} aria-label={`Punto ${i + 1}`} style={{ ...inp, fontWeight: 600 }} placeholder="Punto a abordar" value={p.titulo}
                   onChange={e => patchPunto(p.id, { titulo: e.target.value })}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarPunto() } }} />
                 <textarea aria-label={`Detalle del punto ${i + 1}`} style={{ ...inp, minHeight: 48, fontSize: 13, resize: 'vertical' }} placeholder="Contexto o detalle (opcional)"
                   value={p.descripcion ?? ''} onChange={e => patchPunto(p.id, { descripcion: e.target.value })} />
               </div>
-              <button type="button" aria-label={`Quitar punto ${i + 1}`} title="Quitar punto" style={btnIcono} onClick={() => set({ puntos: borrador.puntos.filter(x => x.id !== p.id) })}>✕</button>
+              <button type="button" className="minuta-icono" aria-label={`Quitar punto ${i + 1}`} title="Quitar punto" style={btnIcono} onClick={() => {
+                const previo = borrador.puntos[i - 1]
+                enfocarRef.current = previo ? `${uid}-punto-${previo.id}` : `${uid}-agregar-punto`
+                set({ puntos: borrador.puntos.filter(x => x.id !== p.id) })
+              }}>✕</button>
             </div>
           ))}
-          <div><Button variant="outline-primary" onClick={agregarPunto}>+ Agregar punto</Button></div>
+          <div><Button id={`${uid}-agregar-punto`} className="minuta-touch" variant="outline-primary" onClick={agregarPunto}>+ Agregar punto</Button></div>
         </div>
       )}
 
       {paso === 3 && (
-        <div role="tabpanel" aria-label="Paso 3 · Acuerdos" style={{ display: 'grid', gap: 14 }}>
+        <div role="tabpanel" id={`${uid}-panel`} aria-label="Paso 3 · Acuerdos" className="minuta-panel" style={{ gap: 14 }}>
           <p style={ayuda}>Un <strong>acuerdo</strong> es lo que se decidió; un <strong>compromiso</strong> lo asume alguien y tiene fecha límite para darle seguimiento.</p>
           {borrador.puntos.filter(p => p.titulo.trim()).map((p, i) => (
             <div key={p.id} style={tarjeta}>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 8 }}>
-                <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', fontWeight: 800, fontSize: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)' }}>{p.titulo}</div>
-                  {p.descripcion?.trim() && <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>{p.descripcion}</div>}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 8, minWidth: 0 }}>
+                <span aria-hidden="true" style={{ ...numeroPunto }}>{i + 1}</span>
+                <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>{p.titulo}</div>
+                  {p.descripcion?.trim() && <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2, overflowWrap: 'anywhere' }}>{p.descripcion}</div>}
                 </div>
               </div>
-              <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
                 {p.acuerdos.length === 0 && <p style={{ ...ayuda, margin: 0, fontStyle: 'italic' }}>Sin acuerdos ni compromisos en este punto.</p>}
                 {p.acuerdos.map(a => (
-                  <div key={a.id} style={{ display: 'grid', gap: 8, padding: 10, borderRadius: 10, background: 'var(--at-surface-2)', border: '1px solid var(--at-line)' }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <div role="group" aria-label="Tipo" style={{ display: 'inline-flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--at-line-strong)' }}>
+                  <div key={a.id} className="minuta-acuerdo">
+                    <div className="minuta-acuerdo-fila">
+                      <div role="group" aria-label="Tipo" className="minuta-acu-tipo" style={{ display: 'inline-flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--at-line-strong)' }}>
                         {(['acuerdo', 'compromiso'] as const).map(t => (
                           <button key={t} type="button" aria-pressed={a.tipo === t} onClick={() => patchAcuerdo(p.id, a.id, { tipo: t })}
-                            style={{ border: 'none', cursor: 'pointer', padding: '6px 10px', fontSize: 12, fontWeight: 700, minHeight: 36,
+                            className="minuta-tipo-btn" style={{ border: 'none', cursor: 'pointer', padding: '6px 10px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
                               background: a.tipo === t ? 'var(--at-primary)' : 'var(--at-surface)', color: a.tipo === t ? 'var(--at-on-status)' : 'var(--at-ink-2)' }}>
                             {TIPO_ACUERDO_INFO[t].icon} {TIPO_ACUERDO_INFO[t].label}
                           </button>
                         ))}
                       </div>
-                      <input id={`${uid}-acuerdo-${a.id}`} aria-label={a.tipo === 'compromiso' ? 'Compromiso' : 'Acuerdo'} style={{ ...inp, flex: 1, minWidth: 180 }}
+                      <input id={`${uid}-acuerdo-${a.id}`} aria-label={`${a.tipo === 'compromiso' ? 'Compromiso' : 'Acuerdo'} del punto ${i + 1}`} className="minuta-acu-texto" style={inp}
                         placeholder={a.tipo === 'compromiso' ? 'Qué se compromete a hacer' : 'Qué se acordó'} value={a.texto}
                         onChange={e => patchAcuerdo(p.id, a.id, { texto: e.target.value })} />
-                      <button type="button" aria-label="Quitar acuerdo" title="Quitar" style={btnIcono} onClick={() => quitarAcuerdo(p.id, a.id)}>✕</button>
+                      <button type="button" className="minuta-acu-quitar minuta-icono" aria-label={`Quitar acuerdo del punto ${i + 1}`} title="Quitar" style={btnIcono} onClick={() => quitarAcuerdo(p.id, a.id)}>✕</button>
                     </div>
                     {a.tipo === 'compromiso' && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 8 }}>
-                        <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 8, minWidth: 0 }}>
+                        <div style={{ minWidth: 0 }}>
                           <label htmlFor={`${uid}-resp-${a.id}`} style={lbl}>Responsable</label>
                           <select id={`${uid}-resp-${a.id}`} style={inp} value={a.responsable_id ?? ''} onChange={e => patchAcuerdo(p.id, a.id, { responsable_id: e.target.value || null })}>
                             <option value="">Sin asignar</option>
                             {borrador.participantes.map(x => <option key={x.id} value={x.id}>{x.nombre}{x.detalle ? ` · ${x.detalle}` : ''}</option>)}
                           </select>
                         </div>
-                        <div>
+                        <div style={{ minWidth: 0 }}>
                           <label htmlFor={`${uid}-limite-${a.id}`} style={lbl}>Fecha límite</label>
                           <input id={`${uid}-limite-${a.id}`} type="date" style={inp} value={a.fecha_limite ?? ''} onChange={e => patchAcuerdo(p.id, a.id, { fecha_limite: e.target.value || null })} />
                         </div>
@@ -380,32 +463,45 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <Button size="sm" variant="outline-primary" onClick={() => agregarAcuerdo(p.id, 'acuerdo')} aria-label={`Agregar acuerdo al punto ${i + 1}`}>🤝 + Acuerdo</Button>
-                <Button size="sm" variant="outline-primary" onClick={() => agregarAcuerdo(p.id, 'compromiso')} aria-label={`Agregar compromiso al punto ${i + 1}`}>📌 + Compromiso</Button>
+                <Button size="sm" className="minuta-touch" variant="outline-primary" onClick={() => agregarAcuerdo(p.id, 'acuerdo')} aria-label={`Agregar acuerdo al punto ${i + 1}`}>🤝 + Acuerdo</Button>
+                <Button size="sm" className="minuta-touch" variant="outline-primary" onClick={() => agregarAcuerdo(p.id, 'compromiso')} aria-label={`Agregar compromiso al punto ${i + 1}`}>📌 + Compromiso</Button>
               </div>
             </div>
           ))}
 
+          <div style={tarjeta} className="minuta-fotos">
+            <h3 style={seccionTitulo}>Fotos y documentos</h3>
+            <p style={ayuda}>La hoja de asistencia, el pizarrón con los acuerdos, la cotización o el contrato que se revisó. Hasta {MAX_FOTOS_MINUTA} fotos y {MAX_DOCUMENTOS_MINUTA} documentos.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
+              <MultiImageUploader values={borrador.fotos} onChange={fotos => cambiarArchivos('fotos', fotos)} folder="minutas" label="Fotos"
+                maxFiles={MAX_FOTOS_MINUTA} borrarAlQuitar={false} onSubiendo={marcarSubida('fotos')} />
+              <div className="minuta-documentos">
+                <MultiFileUploader values={borrador.documentos} onChange={docs => cambiarArchivos('documentos', docs)} folder="minutas" label="Documentos"
+                  maxFiles={MAX_DOCUMENTOS_MINUTA} borrarAlQuitar={false} onSubiendo={marcarSubida('documentos')} />
+              </div>
+            </div>
+          </div>
+
           <div style={tarjeta}>
             <h3 style={seccionTitulo}>Cierre y seguimiento</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 10, alignItems: 'end' }}>
-              <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 10, alignItems: 'end', minWidth: 0 }}>
+              <div style={{ minWidth: 0 }}>
                 <label htmlFor={`${uid}-categoria`} style={lbl}>Categoría</label>
                 <select id={`${uid}-categoria`} style={inp} value={borrador.categoria} onChange={e => set({ categoria: e.target.value as CategoriaNota })}>
                   {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
                 </select>
               </div>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <label htmlFor={`${uid}-prioridad`} style={lbl}>Prioridad</label>
                 <select id={`${uid}-prioridad`} style={inp} value={borrador.prioridad} onChange={e => set({ prioridad: e.target.value as PrioridadNota })}>
                   {PRIORIDADES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
               </div>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <label htmlFor={`${uid}-seguimiento`} style={lbl}>Próximo seguimiento</label>
                 <input id={`${uid}-seguimiento`} type="date" style={inp} value={borrador.fecha_recordatorio} onChange={e => set({ fecha_recordatorio: e.target.value })} />
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', minHeight: 40 }}>
+              <label className="minuta-fijar" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
                 <input type="checkbox" checked={borrador.fijada} onChange={e => set({ fijada: e.target.checked })} /> 📌 Fijar arriba
               </label>
             </div>

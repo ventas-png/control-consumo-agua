@@ -222,7 +222,7 @@ export function EditModal({
           }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>
               {title}
             </h2>
             {subtitle && (
