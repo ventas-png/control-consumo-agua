@@ -3,11 +3,12 @@
 // (editar, fijar, cerrar/reabrir, imprimir, eliminar).
 import { useEffect, useState, type CSSProperties } from 'react'
 import { EditModal } from '../../../shared/EditModal'
+import { ImageGallery } from '../../../shared/ImageGallery'
 import { Button } from '../../../shared/Button'
 import { confirm, notify } from '../../../shared/Dialog'
 import { deleteCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
 import {
-  TIPO_ACUERDO_INFO, fechaDeMinuta, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, plazoSeguimiento, puntosDe, resumenCompromisos, situacionCompromiso,
+  TIPO_ACUERDO_INFO, fechaDeMinuta, fotosDe, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, plazoSeguimiento, puntosDe, resumenCompromisos, situacionCompromiso,
 } from '../../../../domain/condominios/minutas'
 import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../../lib/format'
 import type { AcuerdoMinuta, NotaAdmin } from '../../../../types'
@@ -32,6 +33,7 @@ const tituloBloque: CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var
 export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onRefresh }: Props) {
   const participantes = participantesDe(nota)
   const gestor = gestorDe(participantes)
+  const fotos = fotosDe(nota)
   // Copia local de los puntos: marcar un compromiso se ve al instante y la
   // sección recarga detrás; cuando llega la fila fresca, se vuelve a tomar.
   const [puntos, setPuntos] = useState(() => puntosDe(nota))
@@ -135,6 +137,13 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
           <div style={bloque}>
             <h3 style={tituloBloque}>Objetivo</h3>
             <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>{nota.contenido}</div>
+          </div>
+        )}
+
+        {fotos.length > 0 && (
+          <div style={bloque} className="minuta-galeria">
+            <h3 style={tituloBloque}>Fotos ({fotos.length})</h3>
+            <ImageGallery urls={fotos} maxVisible={6} />
           </div>
         )}
 

@@ -115,6 +115,34 @@ export function puntosDe(nota: Pick<NotaAdmin, 'puntos'> | null | undefined): Pu
   return out
 }
 
+// ── Fotos (20261112000000) ───────────────────────────────────────────────────
+
+/** Fotos por minuta: lo mismo que el CHECK de la base y que ofrece el uploader. */
+export const MAX_FOTOS_MINUTA = 10
+
+/** Rutas de las fotos: sin vacíos ni repetidas, y nunca más de las que admite la base. */
+export function fotosDe(nota: Pick<NotaAdmin, 'fotos'> | null | undefined): string[] {
+  const lista = nota?.fotos
+  if (!Array.isArray(lista)) return []
+  const vistas = new Set<string>()
+  for (const f of lista as unknown[]) {
+    if (typeof f !== 'string') continue
+    const ruta = f.trim()
+    if (ruta) vistas.add(ruta)
+  }
+  return [...vistas].slice(0, MAX_FOTOS_MINUTA)
+}
+
+/**
+ * Las rutas de `antes` que ya no están en `despues`. Al guardar, son las fotos
+ * que se quitaron de la minuta (se borran del bucket recién entonces); al
+ * cancelar, con los argumentos al revés, las que se subieron y no se guardaron.
+ */
+export function fotosQuitadas(antes: readonly string[], despues: readonly string[]): string[] {
+  const quedan = new Set(despues)
+  return antes.filter(f => !quedan.has(f))
+}
+
 export function gestorDe(participantes: readonly ParticipanteMinuta[]): ParticipanteMinuta | null {
   return participantes.find(p => p.gestiona) ?? null
 }
@@ -205,6 +233,7 @@ export interface BorradorMinuta {
   fijada: boolean
   participantes: ParticipanteMinuta[]
   puntos: PuntoMinuta[]
+  fotos: string[]
 }
 
 /**
@@ -218,6 +247,7 @@ export function borradorDesde(nota: NotaAdmin | null, gestorNombre: string, hoy:
       titulo: '', fecha_reunion: hoy, contenido: '', categoria: 'reunion', prioridad: 'normal', fecha_recordatorio: '', fijada: false,
       participantes: nombre ? [{ id: nuevoIdMinuta(), tipo: 'otro', ref_id: null, nombre, detalle: 'Administración', gestiona: true }] : [],
       puntos: [],
+      fotos: [],
     }
   }
   return {
@@ -230,6 +260,7 @@ export function borradorDesde(nota: NotaAdmin | null, gestorNombre: string, hoy:
     fijada: nota.fijada,
     participantes: participantesDe(nota),
     puntos: puntosDe(nota),
+    fotos: fotosDe(nota),
   }
 }
 

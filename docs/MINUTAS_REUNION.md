@@ -31,6 +31,9 @@ fila con la fecha de la reunión y dos columnas JSON.
      (responsable entre los participantes y fecha límite). Cierre: categoría,
      prioridad, próximo seguimiento y fijar.
 
+  En el paso 3 también se adjuntan **fotos de la reunión** (hasta 10): hoja
+  de asistencia, pizarrón, lo revisado en sitio.
+
   Cada paso valida lo suyo antes de avanzar (título, fecha, al menos un
   participante y un gestor; al menos un punto; fechas válidas). La lógica está
   en `src/domain/condominios/minutas.ts`.
@@ -66,3 +69,17 @@ fila con la fecha de la reunión y dos columnas JSON.
   entradas sin nombre o sin título y completa ids que falten.
 - Las notas anteriores a la migración conservan su `contenido` (ahora
   «objetivo») y toman como fecha de reunión el día en que se escribieron.
+
+## Fotos (20261112000000)
+
+- `notas_admin.fotos text[] NOT NULL DEFAULT '{}'`, con CHECK de máximo 10.
+  Guarda rutas del bucket privado `condominios-media`
+  (`<project_id>/minutas/<archivo>.jpg`), no URLs firmadas: `SecureImage` las
+  firma al mostrarlas, igual que en contra incendio.
+- Ciclo de vida de los archivos:
+  - Al **guardar**, las fotos que salieron de la minuta se borran del bucket.
+  - Al **cancelar**, se borran las subidas en esa edición que no se guardaron.
+  - Al **editar**, quitar una foto ya guardada no borra el archivo hasta
+    guardar (`MultiImageUploader` recibe esas rutas en `conservar`).
+- El detalle las muestra en galería; la tarjeta de la lista indica cuántas hay;
+  la versión impresa sólo dice cuántas hay adjuntas.

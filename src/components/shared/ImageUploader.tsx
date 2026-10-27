@@ -142,9 +142,16 @@ interface MultiProps {
    * es por pieza/unidad (20260831000000).
    */
   bucket?: string
+  /**
+   * Rutas que, al quitarse de la lista, NO se borran del bucket. Para editar un
+   * registro ya guardado: la foto guardada sólo debe borrarse cuando el registro
+   * se guarde sin ella (si se cancela, sigue referenciada). Por defecto, quitar
+   * borra el archivo al instante, como hasta ahora.
+   */
+  conservar?: readonly string[]
 }
 
-export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', maxFiles = 10, maxSizeMB = 5, capture = false, bucket = BUCKET_MEDIA }: MultiProps) {
+export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', maxFiles = 10, maxSizeMB = 5, capture = false, bucket = BUCKET_MEDIA, conservar }: MultiProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -186,7 +193,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
 
   async function handleRemove(url: string) {
     const path = url.startsWith('http') ? url.match(/condominios-media\/(.+)$/)?.[1] : url
-    if (path) await removeMedia(bucket, [path])
+    if (path && !conservar?.includes(url)) await removeMedia(bucket, [path])
     onChange(values.filter(u => u !== url))
   }
 
@@ -219,6 +226,9 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1.5px solid var(--at-line)', display: 'block' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <button
+              type="button"
+              className="at-foto-quitar"
+              aria-label="Quitar foto"
               onClick={() => handleRemove(url)}
               style={{ position: 'absolute', top: -7, right: -7, zIndex: 1, width: 20, height: 20, borderRadius: '50%', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               ×

@@ -198,6 +198,19 @@
   .minuta-acciones .minuta-cancelar { display: none !important; }
 }
 
+/* Fotos: en el teléfono la ✕ de cada miniatura crece a 32 px (el uploader la
+   trae de 20 px en su estilo inline, por eso !important; más grande taparía
+   la miniatura de ~80 px). */
+@media (max-width: 559px) {
+  .minuta-fotos .at-foto-quitar {
+    width: 32px !important;
+    height: 32px !important;
+    top: -8px !important;
+    right: -6px !important;
+    font-size: 15px !important;
+  }
+}
+
 /* Objetivos táctiles: en el teléfono 44 px; en escritorio, los de antes.
    Van en clases y no en el inline, porque el inline ganaría al CSS. */
 .minuta-touch { min-height: 44px; }

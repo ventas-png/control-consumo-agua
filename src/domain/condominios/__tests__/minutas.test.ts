@@ -6,8 +6,8 @@ vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { 
 
 const {
   borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
-  fechaDeMinuta, filtrarCandidatos, iniciales, marcarCumplido, participanteDesdeCandidato, participantesDe, plazoCompromiso, plazoSeguimiento,
-  puntosDe, quitarParticipante, resumenCompromisos, situacionCompromiso, validarPasoMinuta, yaParticipa,
+  fechaDeMinuta, filtrarCandidatos, fotosDe, fotosQuitadas, iniciales, marcarCumplido, participanteDesdeCandidato, participantesDe, plazoCompromiso, plazoSeguimiento,
+  puntosDe, MAX_FOTOS_MINUTA, quitarParticipante, resumenCompromisos, situacionCompromiso, validarPasoMinuta, yaParticipa,
 } = await import('../minutas')
 
 const HOY = new Date(2026, 9, 26, 15, 0) // 26 oct 2026, 3 de la tarde (local)
@@ -111,6 +111,30 @@ describe('plazoSeguimiento', () => {
     expect(plazoSeguimiento(0)).toBe('hoy')
     expect(plazoSeguimiento(1)).toBe('en 1 día')
     expect(plazoSeguimiento(4)).toBe('en 4 días')
+  })
+})
+
+describe('fotos de la minuta', () => {
+  it('fotosDe limpia lo que llega de la base: sin vacíos, sin repetidas y con tope', () => {
+    expect(fotosDe(nota({}))).toEqual([])
+    expect(fotosDe({ fotos: null })).toEqual([])
+    expect(fotosDe({ fotos: 'p/minutas/a.jpg' as never })).toEqual([])
+    expect(fotosDe({ fotos: ['p/minutas/a.jpg', ' ', 'p/minutas/a.jpg', 7, ' p/minutas/b.jpg '] as never })).toEqual(['p/minutas/a.jpg', 'p/minutas/b.jpg'])
+    const muchas = Array.from({ length: 14 }, (_, i) => `p/minutas/${i}.jpg`)
+    expect(fotosDe({ fotos: muchas })).toHaveLength(MAX_FOTOS_MINUTA)
+  })
+
+  it('fotosQuitadas: al guardar, las que salieron; al cancelar, las recién subidas', () => {
+    const guardadas = ['p/minutas/a.jpg', 'p/minutas/b.jpg']
+    const borrador = ['p/minutas/b.jpg', 'p/minutas/c.jpg']
+    expect(fotosQuitadas(guardadas, borrador)).toEqual(['p/minutas/a.jpg'])
+    expect(fotosQuitadas(borrador, guardadas)).toEqual(['p/minutas/c.jpg'])
+    expect(fotosQuitadas([], borrador)).toEqual([])
+  })
+
+  it('el borrador de una minuta nueva no trae fotos; editar trae las guardadas', () => {
+    expect(borradorDesde(null, 'Admin', '2026-10-26').fotos).toEqual([])
+    expect(borradorDesde(nota({ fotos: ['p/minutas/a.jpg'] }), 'Admin', '2026-10-26').fotos).toEqual(['p/minutas/a.jpg'])
   })
 })
 

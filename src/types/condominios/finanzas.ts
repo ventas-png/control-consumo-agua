@@ -282,6 +282,8 @@ export interface NotaAdmin {
   /** Opcionales: una fila anterior a la migración (o una prueba) puede no traerlos. */
   participantes?: ParticipanteMinuta[] | null
   puntos?: PuntoMinuta[] | null
+  /** Rutas en condominios-media (<project_id>/minutas/...), máximo 10 (20261112000000). */
+  fotos?: string[] | null
   created_at: string
 }
 

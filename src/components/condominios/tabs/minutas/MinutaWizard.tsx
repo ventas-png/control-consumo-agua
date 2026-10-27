@@ -17,11 +17,14 @@ import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 
 import { EditModal } from '../../../shared/EditModal'
 import { Button } from '../../../shared/Button'
 import { FilterChips } from '../../../shared/FilterChips'
+import { MultiImageUploader } from '../../../shared/ImageUploader'
 import { notify } from '../../../shared/Dialog'
 import { createCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
 import { useProveedoresQuery } from '../../../../domain/cxp/queries'
+import { removeMedia } from '../../../../domain/shared/storage'
+import { BUCKET_MEDIA } from '../../../../domain/shared/buckets'
 import {
-  PASOS_MINUTA, TIPOS_PARTICIPANTE, TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO,
+  MAX_FOTOS_MINUTA, PASOS_MINUTA, TIPOS_PARTICIPANTE, TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO, fotosDe, fotosQuitadas,
   borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
   fetchResidentesProyecto, filtrarCandidatos, nuevoIdMinuta, participanteDesdeCandidato, quitarParticipante, validarPasoMinuta, yaParticipa,
   type BorradorMinuta, type CandidatoParticipante, type PasoMinuta, type ResidenteProyecto,
@@ -168,6 +171,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       fecha_reunion: borrador.fecha_reunion,
       participantes,
       puntos,
+      fotos: fotosDe({ fotos: borrador.fotos }),
     }
     setSaving(true)
     const { error } = nota
@@ -175,12 +179,22 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       : await createCondominioRow('notas_admin', { company_id: companyId, project_id: proyectoId, autor: autorNombre || null, ...campos })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'No se pudo guardar la minuta', text: error.message }); return }
+    // Las fotos que salieron de la minuta se borran del bucket recién ahora que
+    // quedó guardada sin ellas. Si el borrado falla, sólo queda un archivo huérfano.
+    const quitadas = fotosQuitadas(fotosDe(nota), campos.fotos)
+    if (quitadas.length > 0) void removeMedia(BUCKET_MEDIA, quitadas)
     notify({ variant: 'success', title: nota ? 'Minuta actualizada' : 'Minuta guardada' })
     onGuardado()
   }
 
-  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
-  const cerrar = () => { if (!saving) onClose() }
+  // No se cierra a mitad del guardado: cerrar ahí escondería el error. Al
+  // cancelar se borran las fotos subidas en esta edición que no se guardaron.
+  const cerrar = () => {
+    if (saving) return
+    const sinGuardar = fotosQuitadas(borrador.fotos, fotosDe(nota))
+    if (sinGuardar.length > 0) void removeMedia(BUCKET_MEDIA, sinGuardar)
+    onClose()
+  }
   const pasoInfo = PASOS_MINUTA.find(p => p.n === paso)!
 
   return (
@@ -395,6 +409,14 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
               </div>
             </div>
           ))}
+
+          <div style={tarjeta} className="minuta-fotos">
+            <h3 style={seccionTitulo}>Fotos de la reunión</h3>
+            <p style={ayuda}>La hoja de asistencia, el pizarrón con los acuerdos o lo que se revisó en sitio. Hasta {MAX_FOTOS_MINUTA}.</p>
+            {/* Al editar, quitar una foto guardada no la borra del bucket hasta guardar. */}
+            <MultiImageUploader values={borrador.fotos} onChange={fotos => set({ fotos })} folder="minutas" label="Fotos"
+              maxFiles={MAX_FOTOS_MINUTA} conservar={fotosDe(nota)} />
+          </div>
 
           <div style={tarjeta}>
             <h3 style={seccionTitulo}>Cierre y seguimiento</h3>

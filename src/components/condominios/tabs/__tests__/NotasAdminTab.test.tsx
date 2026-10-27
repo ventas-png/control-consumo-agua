@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   deleteCondominioRow: vi.fn(async (..._args: unknown[]) => ({ error: null as { message: string } | null })),
   notify: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
+  removeMedia: vi.fn(async (_bucket: string, _paths: string[]) => ({ error: null as string | null })),
+  conservar: [] as (readonly string[] | undefined)[],
   fetchResidentesProyecto: vi.fn(async (_projectId: string) => [
     { id: 'r1', unidad_id: 'u2', cliente_id: 'c1', tipo: 'propietario', nombre: 'María Pérez', unidad_nombre: 'Casa 2' },
   ]),
@@ -27,6 +29,23 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
 }))
 vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: mocks.confirm }))
 vi.mock('../../../../domain/cxp/queries', () => ({ useProveedoresQuery: mocks.useProveedoresQuery }))
+vi.mock('../../../../domain/shared/storage', () => ({ removeMedia: mocks.removeMedia }))
+// El uploader real sube al bucket; aquí sólo importa qué lista devuelve.
+vi.mock('../../../shared/ImageUploader', () => ({
+  MultiImageUploader: (p: { values: string[]; onChange: (v: string[]) => void; conservar?: readonly string[] }) => {
+    mocks.conservar.push(p.conservar)
+    return (
+      <div>
+        <span data-testid="fotos-borrador">{p.values.join('|')}</span>
+        <button type="button" onClick={() => p.onChange([...p.values, 'p1/minutas/nueva.jpg'])}>Simular subida</button>
+        <button type="button" onClick={() => p.onChange(p.values.slice(1))}>Simular quitar primera</button>
+      </div>
+    )
+  },
+}))
+vi.mock('../../../shared/ImageGallery', () => ({
+  ImageGallery: ({ urls }: { urls: string[] }) => <div data-testid="galeria">{urls.join('|')}</div>,
+}))
 vi.mock('../../../../domain/condominios/minutas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../domain/condominios/minutas')>()),
   fetchResidentesProyecto: mocks.fetchResidentesProyecto,
@@ -81,6 +100,7 @@ const dialogo = () => screen.getByRole('dialog')
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.conservar.length = 0
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 26, 12, 0, 0)) // 26 oct 2026
   mocks.createCondominioRow.mockResolvedValue({ error: null })
@@ -335,5 +355,86 @@ describe('Minutas — detalle', () => {
     expect(html).toContain('Responsable: Carlos Guardia')
     expect(print).toHaveBeenCalled()
     open.mockRestore()
+  })
+})
+
+describe('Minutas — fotos', () => {
+  /** Llega al paso 3 de una minuta nueva con un punto (el mínimo para guardar). */
+  function nuevaHastaPaso3() {
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva minuta' }))
+    const d = dialogo()
+    fireEvent.change(within(d).getByLabelText('Título de la minuta *'), { target: { value: 'Con fotos' } })
+    fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
+    fireEvent.click(within(d).getByRole('button', { name: '+ Agregar punto' }))
+    fireEvent.change(within(d).getByLabelText('Punto 1'), { target: { value: 'Revisión en sitio' } })
+    fireEvent.click(within(d).getByRole('tab', { name: 'Paso 3 · Acuerdos' }))
+    return d
+  }
+
+  it('las fotos subidas en el paso 3 se guardan con la minuta', async () => {
+    render(<NotasAdminTab {...props()} />)
+    const d = nuevaHastaPaso3()
+    expect(within(d).getByText('Fotos de la reunión')).toBeTruthy()
+    fireEvent.click(within(d).getByRole('button', { name: 'Simular subida' }))
+    expect(within(d).getByTestId('fotos-borrador').textContent).toBe('p1/minutas/nueva.jpg')
+    fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    const [, payload] = mocks.createCondominioRow.mock.calls[0] as [string, Record<string, unknown>]
+    expect(payload.fotos).toEqual(['p1/minutas/nueva.jpg'])
+    // Una minuta nueva no tiene fotos guardadas que conservar ni que borrar.
+    expect(mocks.removeMedia).not.toHaveBeenCalled()
+  })
+
+  it('cancelar borra del bucket las fotos subidas que no se guardaron', () => {
+    render(<NotasAdminTab {...props()} />)
+    const d = nuevaHastaPaso3()
+    fireEvent.click(within(d).getByRole('button', { name: 'Simular subida' }))
+    fireEvent.click(within(d).getByRole('button', { name: 'Cancelar' }))
+    expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/nueva.jpg'])
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('al editar, una foto guardada que se quita sólo se borra al guardar', async () => {
+    const conFotos = { ...abierta, fotos: ['p1/minutas/a.jpg', 'p1/minutas/b.jpg'] }
+    render(<NotasAdminTab {...props({ notas: [conFotos] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '✏️ Editar' }))
+    const w = screen.getByRole('dialog', { name: '✏️ Editar minuta' })
+    fireEvent.click(within(w).getByRole('tab', { name: 'Paso 3 · Acuerdos' }))
+    // El uploader recibe las guardadas para no borrarlas al quitarlas.
+    expect(mocks.conservar.at(-1)).toEqual(['p1/minutas/a.jpg', 'p1/minutas/b.jpg'])
+    fireEvent.click(within(w).getByRole('button', { name: 'Simular quitar primera' }))
+    expect(mocks.removeMedia).not.toHaveBeenCalled()
+    fireEvent.click(within(w).getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('notas_admin', 'n1', expect.objectContaining({ fotos: ['p1/minutas/b.jpg'] })))
+    await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/a.jpg']))
+  })
+
+  it('al editar y cancelar, la foto guardada que se quitó no se borra', () => {
+    const conFotos = { ...abierta, fotos: ['p1/minutas/a.jpg'] }
+    render(<NotasAdminTab {...props({ notas: [conFotos] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '✏️ Editar' }))
+    const w = screen.getByRole('dialog', { name: '✏️ Editar minuta' })
+    fireEvent.click(within(w).getByRole('tab', { name: 'Paso 3 · Acuerdos' }))
+    fireEvent.click(within(w).getByRole('button', { name: 'Simular quitar primera' }))
+    fireEvent.click(within(w).getByRole('button', { name: 'Cancelar' }))
+    expect(mocks.removeMedia).not.toHaveBeenCalled()
+  })
+
+  it('el detalle muestra la galería y la tarjeta cuenta las fotos', () => {
+    const conFotos = { ...abierta, fotos: ['p1/minutas/a.jpg', 'p1/minutas/b.jpg'] }
+    render(<NotasAdminTab {...props({ notas: [conFotos] })} />)
+    expect(screen.getByText('Reunión con el guardia').closest('button')!.textContent).toContain('📷 2')
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    const d = screen.getByRole('dialog', { name: 'Reunión con el guardia' })
+    expect(within(d).getByText('Fotos (2)')).toBeTruthy()
+    expect(within(d).getByTestId('galeria').textContent).toBe('p1/minutas/a.jpg|p1/minutas/b.jpg')
+  })
+
+  it('sin fotos no hay sección de fotos en el detalle', () => {
+    render(<NotasAdminTab {...props()} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    expect(within(screen.getByRole('dialog')).queryByText(/^Fotos \(/)).toBeNull()
   })
 })
