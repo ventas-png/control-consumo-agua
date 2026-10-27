@@ -11649,6 +11649,7 @@ export type Database = {
           id: string
           incidentes: Json
           novedades: string
+          personal_id: string | null
           project_id: string
           responsable: string
           turno: string
@@ -11665,6 +11666,7 @@ export type Database = {
           id?: string
           incidentes?: Json
           novedades: string
+          personal_id?: string | null
           project_id: string
           responsable: string
           turno?: string
@@ -11681,6 +11683,7 @@ export type Database = {
           id?: string
           incidentes?: Json
           novedades?: string
+          personal_id?: string | null
           project_id?: string
           responsable?: string
           turno?: string
@@ -11713,6 +11716,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "libro_novedades_personal_fk"
+            columns: ["personal_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
           },
         ]
       }
