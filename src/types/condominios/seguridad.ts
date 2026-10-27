@@ -566,6 +566,9 @@ export interface ControlSistemaIncendio {
   fecha: string
   tipo_sistema: TipoSistemaIncendio
   identificador: string
+  /** Área del catálogo (areas_condominio). null = histórico sin vincular (solo texto en `ubicacion`). */
+  area_id?: string | null
+  /** Snapshot del nombre del área al registrar; en lo histórico, el texto libre capturado. */
   ubicacion: string
   tipo_inspeccion: TipoInspeccionIncendio
   resultado: ResultadoInspeccionIncendio
@@ -577,6 +580,8 @@ export interface ControlSistemaIncendio {
   costo?: number | null
   proxima_inspeccion?: string | null
   observaciones?: string | null
+  /** Rutas en condominios-media (`<project_id>/incendio/…`); SecureImage las firma al mostrarlas. */
+  fotos?: string[] | null
   created_at: string
 }
 
