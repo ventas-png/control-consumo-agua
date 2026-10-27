@@ -687,6 +687,9 @@ export interface LibroNovedad {
   project_id: string
   fecha: string
   turno: TurnoNovedad
+  /** Empleado responsable (personal_condominio). NULL en entradas legadas de texto libre. */
+  personal_id?: string | null
+  /** Snapshot del nombre del responsable al registrar. */
   responsable: string
   hora_inicio?: string | null
   hora_fin?: string | null

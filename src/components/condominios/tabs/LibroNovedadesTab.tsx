@@ -1,15 +1,21 @@
 import { hoyLocalISO } from '../../../lib/format'
-import { useState, type CSSProperties} from 'react'
+import { useMemo, useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import type { LibroNovedad } from '../../../types'
+import { etiquetaCargo } from '../../../domain/condominios/rrhhCatalogos'
+import type { LibroNovedad, PersonalCondominio, CargoCatalogo } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { printHtml, raw, escapeHtml } from '../../../lib/printHtml'
 
 interface Props {
   novedades: LibroNovedad[]
+  /** Expediente del condominio: el responsable se elige de aquí, sólo los activos. */
+  personal: PersonalCondominio[]
+  cargos?: CargoCatalogo[]
+  /** Usuario que registra: si tiene ficha de empleado, se propone como responsable. */
+  userId?: string
   proyectoId: string
   companyId: string
   canCreate: boolean
@@ -25,7 +31,7 @@ const BLANK_INCIDENTE: Incidente = { hora: '', descripcion: '', tipo: 'observaci
 
 const BLANK = {
   fecha: hoyLocalISO(),
-  turno: 'mañana', responsable: '', hora_inicio: '', hora_fin: '',
+  turno: 'mañana', personal_id: '', responsable: '', hora_inicio: '', hora_fin: '',
   novedades: '', incidentes: [] as Incidente[], firmado: false,
 }
 
@@ -36,7 +42,7 @@ const TURNO_COLORS: Record<string, { bg: string; color: string; icon: string }> 
 }
 const TIPO_INCIDENTE = ['observacion', 'incidente', 'emergencia', 'visita', 'reparacion', 'otro']
 
-export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
+export function LibroNovedadesTab({ novedades, personal, cargos = [], userId, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
@@ -45,6 +51,25 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
 
   function setF<K extends keyof typeof form>(k: K, v: typeof form[K]) { setForm(p => ({ ...p, [k]: v })) }
 
+  // Mismo criterio que Capacitación y Tareas por turno: fuera sólo el inactivo.
+  const personalActivo = useMemo(
+    () => personal.filter(p => p.estado !== 'inactivo').sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [personal],
+  )
+
+  function elegirResponsable(id: string) {
+    const p = personalActivo.find(x => x.id === id)
+    setForm(f => ({ ...f, personal_id: p?.id ?? '', responsable: p?.nombre ?? '' }))
+  }
+
+  function abrirForm() {
+    // Quien registra suele ser quien hizo el turno: si su usuario tiene ficha
+    // de empleado se propone, sin pisar lo que ya se había elegido.
+    const propio = userId ? personalActivo.find(p => p.user_id === userId) : undefined
+    if (!form.personal_id && propio) elegirResponsable(propio.id)
+    setShowForm(true)
+  }
+
   function addIncidente() { setForm(f => ({ ...f, incidentes: [...f.incidentes, { ...BLANK_INCIDENTE }] })) }
   function removeIncidente(i: number) { setForm(f => ({ ...f, incidentes: f.incidentes.filter((_, j) => j !== i) })) }
   function setIncidente(i: number, field: keyof Incidente, val: string) {
@@ -52,12 +77,13 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   }
 
   async function handleSave() {
-    if (!form.responsable.trim() || !form.novedades.trim())
+    if (!form.personal_id || !form.novedades.trim())
       return notify({ variant: 'warning', title: 'Requerido', text: 'Responsable y novedades son obligatorios.' })
     setSaving(true)
     const { error } = await createCondominioRow('libro_novedades', {
       company_id: companyId, project_id: proyectoId,
-      fecha: form.fecha, turno: form.turno, responsable: form.responsable.trim(),
+      fecha: form.fecha, turno: form.turno,
+      personal_id: form.personal_id, responsable: form.responsable.trim(),
       hora_inicio: form.hora_inicio || null, hora_fin: form.hora_fin || null,
       novedades: form.novedades.trim(),
       incidentes: form.incidentes.filter(i => i.descripcion.trim()),
@@ -124,7 +150,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
         </div>
         {/* Sigue montado con la ventana abierta: al cerrarla, el foco vuelve aquí. */}
         {canCreate && (
-          <button onClick={() => setShowForm(true)}
+          <button onClick={abrirForm}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nueva entrada
           </button>
@@ -161,7 +187,12 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
             </div>
             <div>
               <label htmlFor="lib-responsable" style={labelStyle}>Responsable *</label>
-              <input id="lib-responsable" style={inputStyle} value={form.responsable} onChange={e => setF('responsable', e.target.value)} placeholder="Nombre del encargado" autoFocus />
+              <select id="lib-responsable" style={inputStyle} value={form.personal_id} onChange={e => elegirResponsable(e.target.value)} autoFocus>
+                <option value="">{personalActivo.length ? 'Elegí un empleado…' : 'Sin empleados activos — agregalos en Personal'}</option>
+                {personalActivo.map(p => (
+                  <option key={p.id} value={p.id}>{p.nombre}{p.cargo ? ` — ${etiquetaCargo(p.cargo, cargos)}` : ''}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label htmlFor="lib-hora-inicio" style={labelStyle}>Hora inicio</label>

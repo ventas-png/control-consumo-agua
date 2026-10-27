@@ -643,7 +643,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'correspondencia', label: 'Correspondencia', icon: '📬', render: (ctx) =>
     <CorrespondenciaCondTab correspondencia={ctx.correspondencia} paquetes={ctx.paquetes} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('correspondencia')} canEdit={ctx.canEdit('correspondencia')} puedeVerPaqueteria={ctx.canView('paqueteria')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'libro_novedades', label: 'Libro Novedades', icon: '📖', render: (ctx) =>
-    <LibroNovedadesTab novedades={ctx.libroNovedades} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('libro_novedades')} canEdit={ctx.canEdit('libro_novedades')} canDelete={ctx.canDelete('libro_novedades')} onRefresh={ctx.onRefresh} /> },
+    <LibroNovedadesTab novedades={ctx.libroNovedades} personal={ctx.personal} cargos={ctx.cargosPersonal} userId={ctx.uid} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('libro_novedades')} canEdit={ctx.canEdit('libro_novedades')} canDelete={ctx.canDelete('libro_novedades')} onRefresh={ctx.onRefresh} /> },
   { id: 'acuerdos', label: 'Acuerdos', icon: '✅', render: (ctx) =>
     <SeguimientoAcuerdosTab acuerdos={ctx.acuerdos} actas={ctx.actas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('acuerdos')} canEdit={ctx.canEdit('acuerdos')} canDelete={ctx.canDelete('acuerdos')} onRefresh={ctx.onRefresh} /> },
   { id: 'dashboard_ejecutivo', label: 'Dashboard Ejec.', icon: '📈', render: (ctx) =>
