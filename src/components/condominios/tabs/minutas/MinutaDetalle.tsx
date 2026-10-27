@@ -112,7 +112,7 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
         </div>
       }
     >
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, minWidth: 0 }}>
+      <div className="minuta-detalle-cuerpo" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={chip(tint(cat.color, 14), cat.color)}>{cat.icon} {cat.label}</span>
           {prio.value !== 'normal' && <span style={chip(prio.bg, prio.color)}>Prioridad {prio.label.toLowerCase()}</span>}
@@ -177,9 +177,11 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
                           <li key={a.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '8px 10px', borderRadius: 8,
                             background: a.cumplido ? 'var(--at-success-tint)' : 'var(--at-surface-2)', borderLeft: `3px solid ${esCompromiso ? (a.cumplido ? 'var(--at-success)' : situacion === 'vencido' ? 'var(--at-danger)' : 'var(--at-accent)') : 'var(--at-primary-mint)'}` }}>
                             {esCompromiso && (
-                              <input type="checkbox" checked={a.cumplido} disabled={!canEdit || nota.resuelta || ocupado !== null}
-                                aria-label={`${a.cumplido ? 'Desmarcar' : 'Marcar'} cumplido: ${a.texto}`}
-                                onChange={e => void marcar(a, e.target.checked)} style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }} />
+                              <label className="minuta-check-hit" style={{ marginTop: -2 }}>
+                                <input type="checkbox" className="minuta-check" checked={a.cumplido} disabled={!canEdit || nota.resuelta || ocupado !== null}
+                                  aria-label={`${a.cumplido ? 'Desmarcar' : 'Marcar'} cumplido: ${a.texto}`}
+                                  onChange={e => void marcar(a, e.target.checked)} />
+                              </label>
                             )}
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 14, color: 'var(--at-ink)', textDecoration: a.cumplido ? 'line-through' : 'none', opacity: a.cumplido ? 0.75 : 1 }}>

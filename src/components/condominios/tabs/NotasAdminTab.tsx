@@ -95,7 +95,7 @@ export default function NotasAdminTab({
   })
 
   return (
-    <div style={{ display: 'grid', gap: 14, padding: '4px 0' }}>
+    <div className="minuta-lista-cuerpo" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, padding: '4px 0', minWidth: 0 }}>
       {/* Encabezado */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>

@@ -186,7 +186,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
   return (
     <EditModal
       title={nota ? '✏️ Editar minuta' : '📝 Nueva minuta'}
-      subtitle={`Paso ${paso} de ${PASOS_MINUTA.length} · ${pasoInfo.titulo}`}
+      subtitle={<span aria-live="polite">{`Paso ${paso} de ${PASOS_MINUTA.length} · ${pasoInfo.titulo}`}</span>}
       size="lg"
       fullScreenOnMobile
       onClose={cerrar}
@@ -212,7 +212,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
           const hecho = p.n < paso
           return (
             <div key={p.n} className="minuta-paso">
-              <button type="button" role="tab" aria-selected={activo} aria-label={`Paso ${p.n} · ${p.label}`} onClick={() => irA(p.n)} className="minuta-paso-btn">
+              <button type="button" role="tab" aria-selected={activo} aria-controls={activo ? `${uid}-panel` : undefined} aria-label={`Paso ${p.n} · ${p.label}`} onClick={() => irA(p.n)} className="minuta-paso-btn">
                 <span aria-hidden="true" style={{ width: 26, height: 26, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800,
                   background: hecho ? 'var(--at-success)' : activo ? 'var(--at-primary)' : 'var(--at-chip)',
                   color: hecho || activo ? 'var(--at-on-status)' : 'var(--at-ink-3)' }}>{hecho ? '✓' : p.n}</span>
@@ -225,7 +225,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       </div>
 
       {paso === 1 && (
-        <div role="tabpanel" aria-label="Paso 1 · Participantes" className="minuta-panel" style={{ gap: 16 }}>
+        <div role="tabpanel" id={`${uid}-panel`} aria-label="Paso 1 · Participantes" className="minuta-panel" style={{ gap: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12, minWidth: 0 }}>
             <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
               <label htmlFor={`${uid}-titulo`} style={lbl}>Título de la minuta *</label>
@@ -254,7 +254,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
                     <button type="button" className="minuta-icono" onClick={() => set({ participantes: designarGestor(borrador.participantes, p.id) })}
                       style={{ ...btnIcono, fontSize: 12, fontWeight: 600, color: 'var(--at-primary)', padding: '0 8px', whiteSpace: 'nowrap' }}>Hacer gestor</button>
                   )}
-                  <button type="button" className="minuta-icono" aria-label={`Quitar a ${p.nombre}`} title="Quitar" onClick={() => set({ participantes: quitarParticipante(borrador.participantes, p.id) })} style={btnIcono}>✕</button>
+                  <button type="button" className="minuta-icono" aria-label={`Quitar a ${p.nombre}`} title="Quitar" onClick={() => { enfocarRef.current = tipoLista === 'otro' ? `${uid}-otro-nombre` : `${uid}-buscar`; set({ participantes: quitarParticipante(borrador.participantes, p.id) }) }} style={btnIcono}>✕</button>
                 </>} />
               ))}
             </div>
@@ -314,7 +314,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       )}
 
       {paso === 2 && (
-        <div role="tabpanel" aria-label="Paso 2 · Puntos" className="minuta-panel" style={{ gap: 12 }}>
+        <div role="tabpanel" id={`${uid}-panel`} aria-label="Paso 2 · Puntos" className="minuta-panel" style={{ gap: 12 }}>
           <p style={ayuda}>Anota cada tema que se trató o se va a tratar con {borrador.participantes.filter(p => !p.gestiona).map(p => p.nombre).join(', ') || 'los participantes'}. En el siguiente paso registras lo acordado en cada uno.</p>
           {borrador.puntos.length === 0 && (
             <div style={{ ...tarjeta, textAlign: 'center', padding: 24, color: 'var(--at-ink-3)', fontSize: 14 }}>Todavía no hay puntos.</div>
@@ -329,15 +329,19 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
                 <textarea aria-label={`Detalle del punto ${i + 1}`} style={{ ...inp, minHeight: 48, fontSize: 13, resize: 'vertical' }} placeholder="Contexto o detalle (opcional)"
                   value={p.descripcion ?? ''} onChange={e => patchPunto(p.id, { descripcion: e.target.value })} />
               </div>
-              <button type="button" className="minuta-icono" aria-label={`Quitar punto ${i + 1}`} title="Quitar punto" style={btnIcono} onClick={() => set({ puntos: borrador.puntos.filter(x => x.id !== p.id) })}>✕</button>
+              <button type="button" className="minuta-icono" aria-label={`Quitar punto ${i + 1}`} title="Quitar punto" style={btnIcono} onClick={() => {
+                const previo = borrador.puntos[i - 1]
+                enfocarRef.current = previo ? `${uid}-punto-${previo.id}` : `${uid}-agregar-punto`
+                set({ puntos: borrador.puntos.filter(x => x.id !== p.id) })
+              }}>✕</button>
             </div>
           ))}
-          <div><Button className="minuta-touch" variant="outline-primary" onClick={agregarPunto}>+ Agregar punto</Button></div>
+          <div><Button id={`${uid}-agregar-punto`} className="minuta-touch" variant="outline-primary" onClick={agregarPunto}>+ Agregar punto</Button></div>
         </div>
       )}
 
       {paso === 3 && (
-        <div role="tabpanel" aria-label="Paso 3 · Acuerdos" className="minuta-panel" style={{ gap: 14 }}>
+        <div role="tabpanel" id={`${uid}-panel`} aria-label="Paso 3 · Acuerdos" className="minuta-panel" style={{ gap: 14 }}>
           <p style={ayuda}>Un <strong>acuerdo</strong> es lo que se decidió; un <strong>compromiso</strong> lo asume alguien y tiene fecha límite para darle seguimiento.</p>
           {borrador.puntos.filter(p => p.titulo.trim()).map((p, i) => (
             <div key={p.id} style={tarjeta}>
@@ -362,10 +366,10 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
                           </button>
                         ))}
                       </div>
-                      <input id={`${uid}-acuerdo-${a.id}`} aria-label={a.tipo === 'compromiso' ? 'Compromiso' : 'Acuerdo'} className="minuta-acu-texto" style={inp}
+                      <input id={`${uid}-acuerdo-${a.id}`} aria-label={`${a.tipo === 'compromiso' ? 'Compromiso' : 'Acuerdo'} del punto ${i + 1}`} className="minuta-acu-texto" style={inp}
                         placeholder={a.tipo === 'compromiso' ? 'Qué se compromete a hacer' : 'Qué se acordó'} value={a.texto}
                         onChange={e => patchAcuerdo(p.id, a.id, { texto: e.target.value })} />
-                      <button type="button" className="minuta-acu-quitar minuta-icono" aria-label="Quitar acuerdo" title="Quitar" style={btnIcono} onClick={() => quitarAcuerdo(p.id, a.id)}>✕</button>
+                      <button type="button" className="minuta-acu-quitar minuta-icono" aria-label={`Quitar acuerdo del punto ${i + 1}`} title="Quitar" style={btnIcono} onClick={() => quitarAcuerdo(p.id, a.id)}>✕</button>
                     </div>
                     {a.tipo === 'compromiso' && (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 8, minWidth: 0 }}>
@@ -411,7 +415,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
                 <label htmlFor={`${uid}-seguimiento`} style={lbl}>Próximo seguimiento</label>
                 <input id={`${uid}-seguimiento`} type="date" style={inp} value={borrador.fecha_recordatorio} onChange={e => set({ fecha_recordatorio: e.target.value })} />
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+              <label className="minuta-fijar" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
                 <input type="checkbox" checked={borrador.fijada} onChange={e => set({ fijada: e.target.checked })} /> 📌 Fijar arriba
               </label>
             </div>

@@ -200,9 +200,9 @@ describe('Minutas — nueva en tres pasos', () => {
     expect(within(d).getByText(/Paso 3 de 3/)).toBeTruthy()
     expect(within(d).getByText('Rondas nocturnas')).toBeTruthy()
     fireEvent.click(within(d).getByRole('button', { name: 'Agregar acuerdo al punto 1' }))
-    fireEvent.change(within(d).getByLabelText('Acuerdo'), { target: { value: 'Se mantiene el horario' } })
+    fireEvent.change(within(d).getByLabelText('Acuerdo del punto 1'), { target: { value: 'Se mantiene el horario' } })
     fireEvent.click(within(d).getByRole('button', { name: 'Agregar compromiso al punto 1' }))
-    fireEvent.change(within(d).getByLabelText('Compromiso'), { target: { value: 'Registrar cada ronda' } })
+    fireEvent.change(within(d).getByLabelText('Compromiso del punto 1'), { target: { value: 'Registrar cada ronda' } })
     const responsable = within(d).getByLabelText('Responsable') as HTMLSelectElement
     const opcionCarlos = Array.from(responsable.options).find(o => o.textContent?.startsWith('Carlos Guardia'))!
     fireEvent.change(responsable, { target: { value: opcionCarlos.value } })
@@ -315,7 +315,7 @@ describe('Minutas — detalle', () => {
     expect((within(w).getByLabelText('Fecha de la reunión *') as HTMLInputElement).value).toBe('2026-10-22')
     expect(within(w).getByText('Participantes (2)')).toBeTruthy()
     fireEvent.click(within(w).getByRole('tab', { name: 'Paso 3 · Acuerdos' }))
-    expect(within(w).getAllByLabelText('Compromiso', { selector: 'input' }).map(i => (i as HTMLInputElement).value)).toEqual(['Registrar cada ronda', 'Comprar linterna'])
+    expect(within(w).getAllByLabelText(/^Compromiso del punto/, { selector: 'input' }).map(i => (i as HTMLInputElement).value)).toEqual(['Registrar cada ronda', 'Comprar linterna'])
     expect((within(w).getByLabelText('Próximo seguimiento') as HTMLInputElement).value).toBe('2026-10-30')
     fireEvent.click(within(w).getByRole('button', { name: 'Guardar cambios' }))
     await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenLastCalledWith('notas_admin', 'n1', expect.objectContaining({ titulo: 'Reunión con el guardia', fecha_reunion: '2026-10-22' })))

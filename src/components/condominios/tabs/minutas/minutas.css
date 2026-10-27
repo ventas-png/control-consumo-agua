@@ -3,6 +3,12 @@
  * cambia con el ancho. Móvil primero (menos de 560 px): una columna, objetivos
  * táctiles de 44 px y nada que se salga del panel. */
 
+/* Palabras sin espacios (un título o un nombre muy largos) se parten en vez de
+   ensanchar la ventana. Se hereda a todo el texto de la ventana. */
+.minuta-detalle-cuerpo,
+.minuta-lista-cuerpo,
+.minuta-panel { overflow-wrap: anywhere; }
+
 /* ── Indicador de pasos ───────────────────────────────────────────────────── */
 /* En el teléfono: tres columnas iguales, número arriba y nombre debajo. */
 .minuta-pasos {
@@ -120,13 +126,17 @@
   min-width: 0;
 }
 .minuta-cand-texto { flex: 1 1 0; min-width: 0; }
+/* Nombre del candidato: en el teléfono hasta dos líneas (dos personas con el
+   mismo inicio se distinguen); en escritorio, una línea con puntos suspensivos. */
 .minuta-cand-nombre {
   font-size: 14px;
   font-weight: 600;
   color: var(--at-ink);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 /* ── Pie de la ventana ────────────────────────────────────────────────────── */
@@ -144,12 +154,8 @@
   white-space: nowrap;
 }
 /* Teléfono: el paso principal ocupa su mitad; «Cancelar» baja a una fila propia. */
-/* «Cancelar» sale del pie en el teléfono: la ✕ del encabezado hace lo mismo y
-   así el orden de tabulación coincide con el visual. El inline del Button
-   fija display, por eso lleva !important. */
-.minuta-acciones .minuta-cancelar {
-  display: none !important;
-}
+/* Pie del detalle en el teléfono: «Eliminar» ocupa la primera fila a lo ancho.
+   Sin reordenar: el orden de Tab y de lectura es el mismo que el visual. */
 
 /* Pie del detalle: en el teléfono, dos columnas y «Eliminar» a lo ancho. */
 .minuta-acciones--detalle {
@@ -163,7 +169,6 @@
 }
 .minuta-acciones--detalle .minuta-eliminar {
   grid-column: 1 / -1;
-  order: 9;
 }
 
 /* Objetivos táctiles en el teléfono. */
@@ -171,6 +176,27 @@
    propia) y el selector Acuerdo/Compromiso: 44 px en el teléfono. */
 .minuta-chips button { min-height: 44px; }
 .minuta-tipo-btn { min-height: 44px; }
+
+/* Casilla de «cumplido»: área de toque de 44 px en el teléfono. */
+.minuta-check-hit {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.minuta-check { width: 22px; height: 22px; cursor: pointer; }
+/* «Fijar arriba» con la misma área de toque. */
+.minuta-fijar { min-height: 44px; }
+
+/* «Cancelar» sale del pie en el teléfono: la ✕ del encabezado hace lo mismo y
+   el orden de Tab queda igual al visual. Sólo en el teléfono: en escritorio
+   el botón se ve. */
+@media (max-width: 559px) {
+  .minuta-acciones .minuta-cancelar { display: none !important; }
+}
 
 /* Objetivos táctiles: en el teléfono 44 px; en escritorio, los de antes.
    Van en clases y no en el inline, porque el inline ganaría al CSS. */
@@ -227,8 +253,12 @@
     order: 0;
     margin-right: auto;
   }
+  .minuta-cand-nombre { display: block; white-space: nowrap; -webkit-line-clamp: unset; }
   .minuta-chips button { min-height: 0; }
   .minuta-tipo-btn { min-height: 36px; }
+  .minuta-check-hit { min-width: 0; min-height: 0; }
+  .minuta-check { width: 18px; height: 18px; }
+  .minuta-fijar { min-height: 0; }
   .minuta-touch { min-height: 0; }
   .minuta-icono { min-width: 36px; min-height: 36px; }
 }
