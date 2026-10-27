@@ -35,7 +35,7 @@ export const lbl: CSSProperties = {
 /** Botón de icono (quitar, cerrar) con área táctil suficiente. */
 export const btnIcono: CSSProperties = {
   border: 'none', background: 'transparent', color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: 16, lineHeight: 1,
-  minWidth: 36, minHeight: 36, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 }
 
 export const TIPO_COLOR: Record<TipoParticipanteMinuta, { bg: string; fg: string }> = {

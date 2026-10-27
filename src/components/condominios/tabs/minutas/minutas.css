@@ -31,7 +31,6 @@
   border: none;
   background: none;
   cursor: pointer;
-  font-family: inherit;
 }
 .minuta-paso-label {
   max-width: 100%;
@@ -145,9 +144,11 @@
   white-space: nowrap;
 }
 /* Teléfono: el paso principal ocupa su mitad; «Cancelar» baja a una fila propia. */
+/* «Cancelar» sale del pie en el teléfono: la ✕ del encabezado hace lo mismo y
+   así el orden de tabulación coincide con el visual. El inline del Button
+   fija display, por eso lleva !important. */
 .minuta-acciones .minuta-cancelar {
-  order: 9;
-  flex: 1 1 100%;
+  display: none !important;
 }
 
 /* Pie del detalle: en el teléfono, dos columnas y «Eliminar» a lo ancho. */
@@ -166,13 +167,20 @@
 }
 
 /* Objetivos táctiles en el teléfono. */
+/* Chips de tipo de participante (FilterChips, componente compartido sin clase
+   propia) y el selector Acuerdo/Compromiso: 44 px en el teléfono. */
+.minuta-chips button { min-height: 44px; }
+.minuta-tipo-btn { min-height: 44px; }
+
+/* Objetivos táctiles: en el teléfono 44 px; en escritorio, los de antes.
+   Van en clases y no en el inline, porque el inline ganaría al CSS. */
 .minuta-touch { min-height: 44px; }
 .minuta-icono { min-width: 44px; min-height: 44px; }
 
 /* ── Escritorio y tabletas (560 px en adelante) ───────────────────────────── */
 @media (min-width: 560px) {
-  .minuta-pasos { gap: 8px; margin-bottom: 18px; }
-  .minuta-paso { flex: 0 0 auto; }
+  .minuta-pasos { gap: 6px; margin-bottom: 18px; }
+  .minuta-paso { flex: 0 0 auto; gap: 6px; }
   .minuta-paso-btn {
     flex: 0 0 auto;
     flex-direction: row;
@@ -205,7 +213,6 @@
     min-height: 0;
   }
   .minuta-acciones .minuta-cancelar {
-    order: -1;
     flex: 0 0 auto;
     margin-right: auto;
   }
@@ -220,6 +227,8 @@
     order: 0;
     margin-right: auto;
   }
+  .minuta-chips button { min-height: 0; }
+  .minuta-tipo-btn { min-height: 36px; }
   .minuta-touch { min-height: 0; }
   .minuta-icono { min-width: 36px; min-height: 36px; }
 }

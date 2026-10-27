@@ -194,6 +194,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       closeOnEscape={!saving}
       footer={
         <div className="minuta-acciones">
+          <Button className="minuta-cancelar" variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
           {paso > 1 && <Button className="minuta-anterior" variant="secondary" onClick={() => setPaso((paso - 1) as PasoMinuta)} disabled={saving}>← Anterior</Button>}
           {paso < 3 && <Button className="minuta-avanzar" variant="primary" onClick={() => irA((paso + 1) as PasoMinuta)} disabled={saving}>Siguiente →</Button>}
           {(paso === 3 || nota) && (
@@ -201,7 +202,6 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
               {nota ? 'Guardar cambios' : '✅ Guardar minuta'}
             </Button>
           )}
-          <Button className="minuta-cancelar" variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
         </div>
       }
     >
@@ -225,7 +225,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       </div>
 
       {paso === 1 && (
-        <div role="tabpanel" aria-label="Paso 1 · Participantes" className="minuta-panel">
+        <div role="tabpanel" aria-label="Paso 1 · Participantes" className="minuta-panel" style={{ gap: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12, minWidth: 0 }}>
             <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
               <label htmlFor={`${uid}-titulo`} style={lbl}>Título de la minuta *</label>
@@ -251,7 +251,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
               {borrador.participantes.map(p => (
                 <ParticipanteCard key={p.id} p={p} acciones={<>
                   {!p.gestiona && (
-                    <button type="button" className="minuta-touch" onClick={() => set({ participantes: designarGestor(borrador.participantes, p.id) })}
+                    <button type="button" className="minuta-icono" onClick={() => set({ participantes: designarGestor(borrador.participantes, p.id) })}
                       style={{ ...btnIcono, fontSize: 12, fontWeight: 600, color: 'var(--at-primary)', padding: '0 8px', whiteSpace: 'nowrap' }}>Hacer gestor</button>
                   )}
                   <button type="button" className="minuta-icono" aria-label={`Quitar a ${p.nombre}`} title="Quitar" onClick={() => set({ participantes: quitarParticipante(borrador.participantes, p.id) })} style={btnIcono}>✕</button>
@@ -262,13 +262,15 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
 
           <div style={tarjeta}>
             <h3 style={seccionTitulo}>Agregar participante</h3>
-            <FilterChips ariaLabel="Tipo de participante" value={tipoLista} onChange={t => { setTipoLista(t); setBusqueda('') }}
-              options={TIPOS_PARTICIPANTE.map(t => ({ value: t, label: TIPO_PARTICIPANTE_INFO[t].label, icon: TIPO_PARTICIPANTE_INFO[t].icon, count: t === 'otro' ? undefined : candidatos[t].length }))} />
+            <div className="minuta-chips">
+              <FilterChips ariaLabel="Tipo de participante" value={tipoLista} onChange={t => { setTipoLista(t); setBusqueda('') }}
+                options={TIPOS_PARTICIPANTE.map(t => ({ value: t, label: TIPO_PARTICIPANTE_INFO[t].label, icon: TIPO_PARTICIPANTE_INFO[t].icon, count: t === 'otro' ? undefined : candidatos[t].length }))} />
+            </div>
             {tipoLista !== 'otro' ? (
               <div style={{ marginTop: 10, minWidth: 0 }}>
                 <label htmlFor={`${uid}-buscar`} style={lbl}>Buscar {TIPO_PARTICIPANTE_INFO[tipoLista].plural.toLowerCase()}</label>
                 <input id={`${uid}-buscar`} type="search" style={inp} placeholder="Nombre, cargo, unidad…" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-                <div role="list" aria-label={TIPO_PARTICIPANTE_INFO[tipoLista].plural} style={{ marginTop: 8, maxHeight: 280, overflowY: 'auto', display: 'grid', gap: 4 }}>
+                <div role="list" aria-label={TIPO_PARTICIPANTE_INFO[tipoLista].plural} style={{ marginTop: 8, maxHeight: 260, overflowY: 'auto', display: 'grid', gap: 4 }}>
                   {cargandoLista && <p style={ayuda}>Cargando {TIPO_PARTICIPANTE_INFO[tipoLista].plural.toLowerCase()}…</p>}
                   {!cargandoLista && visibles.length === 0 && (
                     <p style={{ ...ayuda, fontStyle: 'italic' }}>
@@ -312,7 +314,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       )}
 
       {paso === 2 && (
-        <div role="tabpanel" aria-label="Paso 2 · Puntos" className="minuta-panel">
+        <div role="tabpanel" aria-label="Paso 2 · Puntos" className="minuta-panel" style={{ gap: 12 }}>
           <p style={ayuda}>Anota cada tema que se trató o se va a tratar con {borrador.participantes.filter(p => !p.gestiona).map(p => p.nombre).join(', ') || 'los participantes'}. En el siguiente paso registras lo acordado en cada uno.</p>
           {borrador.puntos.length === 0 && (
             <div style={{ ...tarjeta, textAlign: 'center', padding: 24, color: 'var(--at-ink-3)', fontSize: 14 }}>Todavía no hay puntos.</div>
@@ -335,11 +337,11 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       )}
 
       {paso === 3 && (
-        <div role="tabpanel" aria-label="Paso 3 · Acuerdos" className="minuta-panel">
+        <div role="tabpanel" aria-label="Paso 3 · Acuerdos" className="minuta-panel" style={{ gap: 14 }}>
           <p style={ayuda}>Un <strong>acuerdo</strong> es lo que se decidió; un <strong>compromiso</strong> lo asume alguien y tiene fecha límite para darle seguimiento.</p>
           {borrador.puntos.filter(p => p.titulo.trim()).map((p, i) => (
             <div key={p.id} style={tarjeta}>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10, minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 8, minWidth: 0 }}>
                 <span aria-hidden="true" style={{ ...numeroPunto }}>{i + 1}</span>
                 <div style={{ flex: '1 1 0', minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>{p.titulo}</div>
@@ -354,7 +356,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
                       <div role="group" aria-label="Tipo" className="minuta-acu-tipo" style={{ display: 'inline-flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--at-line-strong)' }}>
                         {(['acuerdo', 'compromiso'] as const).map(t => (
                           <button key={t} type="button" aria-pressed={a.tipo === t} onClick={() => patchAcuerdo(p.id, a.id, { tipo: t })}
-                            style={{ border: 'none', cursor: 'pointer', padding: '6px 10px', fontSize: 12, fontWeight: 700, minHeight: 36, whiteSpace: 'nowrap', fontFamily: 'inherit',
+                            className="minuta-tipo-btn" style={{ border: 'none', cursor: 'pointer', padding: '6px 10px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
                               background: a.tipo === t ? 'var(--at-primary)' : 'var(--at-surface)', color: a.tipo === t ? 'var(--at-on-status)' : 'var(--at-ink-2)' }}>
                             {TIPO_ACUERDO_INFO[t].icon} {TIPO_ACUERDO_INFO[t].label}
                           </button>
@@ -409,8 +411,8 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
                 <label htmlFor={`${uid}-seguimiento`} style={lbl}>Próximo seguimiento</label>
                 <input id={`${uid}-seguimiento`} type="date" style={inp} value={borrador.fecha_recordatorio} onChange={e => set({ fecha_recordatorio: e.target.value })} />
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
-                <input type="checkbox" checked={borrador.fijada} onChange={e => set({ fijada: e.target.checked })} style={{ width: 18, height: 18 }} /> 📌 Fijar arriba
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+                <input type="checkbox" checked={borrador.fijada} onChange={e => set({ fijada: e.target.checked })} /> 📌 Fijar arriba
               </label>
             </div>
           </div>
