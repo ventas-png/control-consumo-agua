@@ -10,7 +10,7 @@ import { EmptyState } from '../../shared/EmptyState'
 import { FilterChips } from '../../shared/FilterChips'
 import { tint } from '../../shared/statusTone'
 import {
-  fechaDeMinuta, fotosDe, gestorDe, participantesDe, plazoSeguimiento, puntosDe, resumenCompromisos,
+  documentosDe, fechaDeMinuta, fotosDe, gestorDe, participantesDe, plazoSeguimiento, puntosDe, resumenCompromisos,
 } from '../../../domain/condominios/minutas'
 import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../lib/format'
 import { normalizarNombre } from '../../../domain/proveedores/identidad'
@@ -58,7 +58,7 @@ export default function NotasAdminTab({
   const filas = useMemo(() => notas.map(n => {
     const participantes = participantesDe(n)
     const puntos = puntosDe(n)
-    return { n, participantes, puntos, gestor: gestorDe(participantes), resumen: resumenCompromisos(puntos), fecha: fechaDeMinuta(n), fotos: fotosDe(n).length }
+    return { n, participantes, puntos, gestor: gestorDe(participantes), resumen: resumenCompromisos(puntos), fecha: fechaDeMinuta(n), fotos: fotosDe(n).length, documentos: documentosDe(n).length }
   }), [notas])
 
   const abiertas = filas.filter(f => !f.n.resuelta)
@@ -154,7 +154,7 @@ export default function NotasAdminTab({
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
-          {lista.map(({ n, participantes, puntos, gestor, resumen, fecha, fotos }) => {
+          {lista.map(({ n, participantes, puntos, gestor, resumen, fecha, fotos, documentos }) => {
             const cat = categoriaInfo(n.categoria)
             const prio = prioridadInfo(n.prioridad)
             const diasSeg = !n.resuelta ? diasHastaFechaCalendario(n.fecha_recordatorio) : null
@@ -178,7 +178,7 @@ export default function NotasAdminTab({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   {participantes.length > 0 ? <AvataresApilados participantes={participantes} /> : <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Sin participantes</span>}
                   <span style={{ fontSize: 12, color: 'var(--at-ink-2)' }}>
-                    {puntos.length} punto{puntos.length === 1 ? '' : 's'}{resumen.acuerdos > 0 ? ` · ${resumen.acuerdos} acuerdo${resumen.acuerdos === 1 ? '' : 's'}` : ''}{fotos > 0 ? ` · 📷 ${fotos}` : ''}
+                    {puntos.length} punto{puntos.length === 1 ? '' : 's'}{resumen.acuerdos > 0 ? ` · ${resumen.acuerdos} acuerdo${resumen.acuerdos === 1 ? '' : 's'}` : ''}{fotos > 0 ? ` · 📷 ${fotos}` : ''}{documentos > 0 ? ` · 📎 ${documentos}` : ''}
                   </span>
                 </div>
                 {resumen.total > 0 && (

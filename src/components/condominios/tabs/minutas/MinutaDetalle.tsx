@@ -1,14 +1,17 @@
 // Detalle de una minuta en ventana: participantes, puntos con sus acuerdos y
-// compromisos (que se marcan cumplidos desde aquí), avance y acciones
-// (editar, fijar, cerrar/reabrir, imprimir, eliminar).
+// compromisos (que se marcan cumplidos desde aquí), fotos y documentos, avance
+// y acciones (editar, fijar, cerrar/reabrir, imprimir, eliminar).
 import { useEffect, useState, type CSSProperties } from 'react'
 import { EditModal } from '../../../shared/EditModal'
 import { ImageGallery } from '../../../shared/ImageGallery'
+import { ListaAdjuntos } from '../../../shared/FileUploader'
 import { Button } from '../../../shared/Button'
 import { confirm, notify } from '../../../shared/Dialog'
-import { deleteCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
+import { deleteCondominioRowAfectando, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
+import { removeMedia } from '../../../../domain/shared/storage'
+import { BUCKET_MEDIA } from '../../../../domain/shared/buckets'
 import {
-  TIPO_ACUERDO_INFO, fechaDeMinuta, fotosDe, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, plazoSeguimiento, puntosDe, resumenCompromisos, situacionCompromiso,
+  TIPO_ACUERDO_INFO, documentosDe, fechaDeMinuta, fotosDe, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, plazoSeguimiento, puntosDe, resumenCompromisos, situacionCompromiso,
 } from '../../../../domain/condominios/minutas'
 import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../../lib/format'
 import type { AcuerdoMinuta, NotaAdmin } from '../../../../types'
@@ -34,6 +37,7 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
   const participantes = participantesDe(nota)
   const gestor = gestorDe(participantes)
   const fotos = fotosDe(nota)
+  const documentos = documentosDe(nota)
   // Copia local de los puntos: marcar un compromiso se ve al instante y la
   // sección recarga detrás; cuando llega la fila fresca, se vuelve a tomar.
   const [puntos, setPuntos] = useState(() => puntosDe(nota))
@@ -79,8 +83,12 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
     if (!canDelete) return
     const res = await confirm({ title: 'Eliminar minuta', text: `¿Eliminar «${nota.titulo}»? No se puede deshacer.`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    const { error } = await deleteCondominioRow('notas_admin', nota.id)
+    // Afectando: si la política de filas no la borra, los archivos no se tocan.
+    const { error } = await deleteCondominioRowAfectando('notas_admin', nota.id)
     if (error) { notify({ variant: 'error', title: 'No se pudo eliminar', text: error.message }); return }
+    // Ninguna otra fila apunta a estas rutas; si el borrado falla, sólo quedan huérfanas.
+    const archivos = [...fotos, ...documentos]
+    if (archivos.length > 0) void removeMedia(BUCKET_MEDIA, archivos)
     onClose()
     onRefresh()
   }
@@ -144,6 +152,13 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
           <div style={bloque} className="minuta-galeria">
             <h3 style={tituloBloque}>Fotos ({fotos.length})</h3>
             <ImageGallery urls={fotos} maxVisible={6} />
+          </div>
+        )}
+
+        {documentos.length > 0 && (
+          <div style={bloque} className="minuta-documentos">
+            <h3 style={tituloBloque}>Documentos ({documentos.length})</h3>
+            <ListaAdjuntos paths={documentos} />
           </div>
         )}
 

@@ -284,6 +284,8 @@ export interface NotaAdmin {
   puntos?: PuntoMinuta[] | null
   /** Rutas en condominios-media (<project_id>/minutas/...), máximo 10 (20261112000000). */
   fotos?: string[] | null
+  /** Documentos adjuntos, mismo bucket y carpeta; máximo 10 (20261112000100). */
+  documentos?: string[] | null
   created_at: string
 }
 

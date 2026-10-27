@@ -209,6 +209,13 @@
     right: -6px !important;
     font-size: 15px !important;
   }
+  /* Documentos: la ✕ de cada archivo y cada enlace del detalle, a 44 px. */
+  .minuta-documentos .at-adjunto-quitar {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    font-size: 15px !important;
+  }
+  .minuta-documentos a { min-height: 44px; }
 }
 
 /* Objetivos táctiles: en el teléfono 44 px; en escritorio, los de antes.

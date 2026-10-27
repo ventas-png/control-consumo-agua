@@ -2,7 +2,8 @@
 // nueva + printHtml, que escapa todo lo que viene de la base).
 import { printHtml, raw } from '../../../../lib/printHtml'
 import { formatFechaCalendario } from '../../../../lib/format'
-import { TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO, fechaDeMinuta, fotosDe, participantesDe, puntosDe } from '../../../../domain/condominios/minutas'
+import { TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO, documentosDe, fechaDeMinuta, fotosDe, participantesDe, puntosDe } from '../../../../domain/condominios/minutas'
+import { nombreDeArchivo } from '../../../shared/FileUploader'
 import type { NotaAdmin } from '../../../../types'
 import { categoriaInfo, prioridadInfo } from './comun'
 
@@ -39,6 +40,7 @@ export function htmlMinuta(nota: NotaAdmin): string {
   <h2>Puntos abordados</h2>${cuerpo ? raw(cuerpo) : raw('<p class="desc">Sin puntos registrados.</p>')}
   ${nota.fecha_recordatorio ? raw(printHtml`<p><strong>Próximo seguimiento:</strong> ${formatFechaCalendario(nota.fecha_recordatorio)}</p>`) : ''}
   ${fotosDe(nota).length > 0 ? raw(printHtml`<p><strong>Fotos adjuntas:</strong> ${fotosDe(nota).length} (se consultan en la minuta)</p>`) : ''}
+  ${documentosDe(nota).length > 0 ? raw(printHtml`<p><strong>Documentos adjuntos:</strong> ${documentosDe(nota).map(nombreDeArchivo).join(', ')}</p>`) : ''}
   <div class="pie">Prioridad: ${prioridadInfo(nota.prioridad).label}${nota.autor ? ` · Registró: ${nota.autor}` : ''}</div>
   </body></html>`
 }

@@ -5,8 +5,8 @@
 //                      y quién la gestiona (quien la abre queda de gestor).
 //   2 · Puntos         los puntos a abordar, numerados, con detalle opcional.
 //   3 · Acuerdos       por cada punto, lo acordado y los compromisos (quién y
-//                      para cuándo); cierre: categoría, prioridad, próximo
-//                      seguimiento y fijar.
+//                      para cuándo); fotos y documentos de la reunión; cierre:
+//                      categoría, prioridad, próximo seguimiento y fijar.
 //
 // Las listas salen de lo que la sección ya carga (personal, unidades,
 // contratos) y de dos lecturas propias: residentes de unidad (con rol) y el
@@ -18,14 +18,15 @@ import { EditModal } from '../../../shared/EditModal'
 import { Button } from '../../../shared/Button'
 import { FilterChips } from '../../../shared/FilterChips'
 import { MultiImageUploader } from '../../../shared/ImageUploader'
+import { MultiFileUploader } from '../../../shared/FileUploader'
 import { notify } from '../../../shared/Dialog'
-import { createCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
+import { createCondominioRow, updateCondominioRowAfectando } from '../../../../domain/condominios/tabMutations'
 import { useProveedoresQuery } from '../../../../domain/cxp/queries'
 import { removeMedia } from '../../../../domain/shared/storage'
 import { BUCKET_MEDIA } from '../../../../domain/shared/buckets'
 import {
-  MAX_FOTOS_MINUTA, PASOS_MINUTA, TIPOS_PARTICIPANTE, TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO, fotosDe, fotosQuitadas,
-  borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
+  MAX_DOCUMENTOS_MINUTA, MAX_FOTOS_MINUTA, PASOS_MINUTA, TIPOS_PARTICIPANTE, TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO,
+  archivosPorBorrar, documentosDe, fotosDe, mismasRutas, borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
   fetchResidentesProyecto, filtrarCandidatos, nuevoIdMinuta, participanteDesdeCandidato, quitarParticipante, validarPasoMinuta, yaParticipa,
   type BorradorMinuta, type CandidatoParticipante, type PasoMinuta, type ResidenteProyecto,
 } from '../../../../domain/condominios/minutas'
@@ -69,6 +70,41 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
   const [borrador, setBorrador] = useState<BorradorMinuta>(() => borradorDesde(nota, autorNombre, hoyLocalISO()))
   const [paso, setPaso] = useState<PasoMinuta>(1)
   const [saving, setSaving] = useState(false)
+
+  // ── Fotos y documentos: qué se borra del bucket ──
+  // Los uploaders no borran nada al quitar (borrarAlQuitar={false}); todo se
+  // decide al desmontar el asistente, que es el único momento en que se sabe
+  // qué quedó guardado. Desmontar cubre guardar, cancelar, Esc, el fondo y el
+  // «Atrás» del sistema (que cambia de pestaña sin pasar por cerrar()).
+  const [originales] = useState(() => ({ fotos: fotosDe(nota), documentos: documentosDe(nota) }))
+  const [subiendo, setSubiendo] = useState({ fotos: false, documentos: false })
+  const subiendoAlgo = subiendo.fotos || subiendo.documentos
+  /** Toda ruta que pasó por las listas en esta edición, también las que después se quitaron. */
+  const vistasRef = useRef(new Set<string>())
+  /** Lo que quedó en la fila; null mientras no se guarde. */
+  const guardadoRef = useRef<string[] | null>(null)
+  const borradasRef = useRef(new Set<string>())
+  const montadoRef = useRef(false)
+  const limpiarArchivos = () => {
+    const fuera = archivosPorBorrar([...originales.fotos, ...originales.documentos], vistasRef.current, guardadoRef.current)
+      .filter(r => !borradasRef.current.has(r))
+    fuera.forEach(r => borradasRef.current.add(r))
+    // Si el borrado falla sólo queda un archivo huérfano, nunca una minuta rota.
+    if (fuera.length > 0) void removeMedia(BUCKET_MEDIA, fuera)
+  }
+  const limpiarRef = useRef(limpiarArchivos)
+  limpiarRef.current = limpiarArchivos
+  useEffect(() => {
+    montadoRef.current = true
+    return () => { montadoRef.current = false; limpiarRef.current() }
+  }, [])
+  function cambiarArchivos(campo: 'fotos' | 'documentos', rutas: string[]) {
+    rutas.forEach(r => vistasRef.current.add(r))
+    // Una subida que terminó con el asistente ya cerrado: nadie la va a guardar.
+    if (!montadoRef.current) { limpiarRef.current(); return }
+    set({ [campo]: rutas })
+  }
+  const marcarSubida = (campo: 'fotos' | 'documentos') => (v: boolean) => setSubiendo(s => ({ ...s, [campo]: v }))
 
   // Paso 1: de qué lista se agrega y qué se busca.
   const [tipoLista, setTipoLista] = useState<TipoParticipanteMinuta>('empleado')
@@ -156,12 +192,15 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
 
   async function guardar() {
     if (saving) return
+    if (subiendoAlgo) { notify({ variant: 'info', title: 'Subiendo archivos', text: 'Espera a que terminen de subir para guardar la minuta.' }); return }
     for (const p of PASOS_MINUTA) {
       const falta = validarPasoMinuta(borrador, p.n)
       if (falta) { setPaso(p.n); notify({ variant: 'warning', title: `Paso ${p.n} · ${p.label}`, text: falta }); return }
     }
     const { participantes, puntos } = depurarBorrador(borrador)
-    const campos = {
+    const fotos = fotosDe({ fotos: borrador.fotos })
+    const documentos = documentosDe({ documentos: borrador.documentos })
+    const campos: Record<string, unknown> = {
       titulo: borrador.titulo.trim(),
       contenido: borrador.contenido.trim(),
       categoria: borrador.categoria,
@@ -171,28 +210,30 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       fecha_reunion: borrador.fecha_reunion,
       participantes,
       puntos,
-      fotos: fotosDe({ fotos: borrador.fotos }),
     }
+    // Al editar, las listas de archivos sólo viajan si cambiaron: una pestaña
+    // abierta desde antes que sólo corrige el título no revive en la fila un
+    // archivo que otra sesión ya quitó y borró.
+    if (!nota || !mismasRutas(fotos, originales.fotos)) campos.fotos = fotos
+    if (!nota || !mismasRutas(documentos, originales.documentos)) campos.documentos = documentos
     setSaving(true)
+    // Afectando: si la política de filas no deja tocar la fila, el UPDATE vuelve
+    // «bien» con cero filas, y borrar las quitadas rompería la minuta guardada.
     const { error } = nota
-      ? await updateCondominioRow('notas_admin', nota.id, campos)
+      ? await updateCondominioRowAfectando('notas_admin', nota.id, campos)
       : await createCondominioRow('notas_admin', { company_id: companyId, project_id: proyectoId, autor: autorNombre || null, ...campos })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'No se pudo guardar la minuta', text: error.message }); return }
-    // Las fotos que salieron de la minuta se borran del bucket recién ahora que
-    // quedó guardada sin ellas. Si el borrado falla, sólo queda un archivo huérfano.
-    const quitadas = fotosQuitadas(fotosDe(nota), campos.fotos)
-    if (quitadas.length > 0) void removeMedia(BUCKET_MEDIA, quitadas)
+    guardadoRef.current = [...fotos, ...documentos]
     notify({ variant: 'success', title: nota ? 'Minuta actualizada' : 'Minuta guardada' })
     onGuardado()
   }
 
-  // No se cierra a mitad del guardado: cerrar ahí escondería el error. Al
-  // cancelar se borran las fotos subidas en esta edición que no se guardaron.
+  // No se cierra a mitad del guardado (escondería el error) ni de una subida
+  // (el archivo llegaría sin asistente que lo guarde).
   const cerrar = () => {
     if (saving) return
-    const sinGuardar = fotosQuitadas(borrador.fotos, fotosDe(nota))
-    if (sinGuardar.length > 0) void removeMedia(BUCKET_MEDIA, sinGuardar)
+    if (subiendoAlgo) { notify({ variant: 'info', title: 'Subiendo archivos', text: 'Espera a que terminen de subir para cerrar.' }); return }
     onClose()
   }
   const pasoInfo = PASOS_MINUTA.find(p => p.n === paso)!
@@ -204,16 +245,16 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       size="lg"
       fullScreenOnMobile
       onClose={cerrar}
-      closeOnBackdropClick={!saving}
-      closeOnEscape={!saving}
+      closeOnBackdropClick={!saving && !subiendoAlgo}
+      closeOnEscape={!saving && !subiendoAlgo}
       footer={
         <div className="minuta-acciones">
-          <Button className="minuta-cancelar" variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
+          <Button className="minuta-cancelar" variant="secondary" onClick={cerrar} disabled={saving || subiendoAlgo}>Cancelar</Button>
           {paso > 1 && <Button className="minuta-anterior" variant="secondary" onClick={() => setPaso((paso - 1) as PasoMinuta)} disabled={saving}>← Anterior</Button>}
           {paso < 3 && <Button className="minuta-avanzar" variant="primary" onClick={() => irA((paso + 1) as PasoMinuta)} disabled={saving}>Siguiente →</Button>}
           {(paso === 3 || nota) && (
-            <Button className="minuta-avanzar" variant={paso === 3 ? 'success' : 'outline-primary'} onClick={() => void guardar()} loading={saving} loadingText="Guardando…">
-              {nota ? 'Guardar cambios' : '✅ Guardar minuta'}
+            <Button className="minuta-avanzar" variant={paso === 3 ? 'success' : 'outline-primary'} onClick={() => void guardar()} loading={saving} loadingText="Guardando…" disabled={subiendoAlgo}>
+              {subiendoAlgo ? 'Subiendo archivos…' : nota ? 'Guardar cambios' : '✅ Guardar minuta'}
             </Button>
           )}
         </div>
@@ -411,11 +452,16 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
           ))}
 
           <div style={tarjeta} className="minuta-fotos">
-            <h3 style={seccionTitulo}>Fotos de la reunión</h3>
-            <p style={ayuda}>La hoja de asistencia, el pizarrón con los acuerdos o lo que se revisó en sitio. Hasta {MAX_FOTOS_MINUTA}.</p>
-            {/* Al editar, quitar una foto guardada no la borra del bucket hasta guardar. */}
-            <MultiImageUploader values={borrador.fotos} onChange={fotos => set({ fotos })} folder="minutas" label="Fotos"
-              maxFiles={MAX_FOTOS_MINUTA} conservar={fotosDe(nota)} />
+            <h3 style={seccionTitulo}>Fotos y documentos</h3>
+            <p style={ayuda}>La hoja de asistencia, el pizarrón con los acuerdos, la cotización o el contrato que se revisó. Hasta {MAX_FOTOS_MINUTA} fotos y {MAX_DOCUMENTOS_MINUTA} documentos.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
+              <MultiImageUploader values={borrador.fotos} onChange={fotos => cambiarArchivos('fotos', fotos)} folder="minutas" label="Fotos"
+                maxFiles={MAX_FOTOS_MINUTA} borrarAlQuitar={false} onSubiendo={marcarSubida('fotos')} />
+              <div className="minuta-documentos">
+                <MultiFileUploader values={borrador.documentos} onChange={docs => cambiarArchivos('documentos', docs)} folder="minutas" label="Documentos"
+                  maxFiles={MAX_DOCUMENTOS_MINUTA} borrarAlQuitar={false} onSubiendo={marcarSubida('documentos')} />
+              </div>
+            </div>
           </div>
 
           <div style={tarjeta}>

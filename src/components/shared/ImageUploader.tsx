@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent} from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from 'react'
 import { isNative } from '../../lib/platform'
 import { uploadCondominiosMedia, removeCondominiosMedia, uploadMedia, removeMedia } from '../../domain/shared/storage'
 import { BUCKET_MEDIA } from '../../domain/shared/buckets'
@@ -143,26 +143,43 @@ interface MultiProps {
    */
   bucket?: string
   /**
-   * Rutas que, al quitarse de la lista, NO se borran del bucket. Para editar un
-   * registro ya guardado: la foto guardada sólo debe borrarse cuando el registro
-   * se guarde sin ella (si se cancela, sigue referenciada). Por defecto, quitar
-   * borra el archivo al instante, como hasta ahora.
+   * Por defecto, quitar una foto la borra del bucket al instante. Con `false`
+   * sólo la saca de la lista y el que llama decide al guardar o cancelar (las
+   * minutas: una fila guardada nunca debe apuntar a un archivo ya borrado).
    */
-  conservar?: readonly string[]
+  borrarAlQuitar?: boolean
+  /** Avisa cuándo empieza y termina una subida, para no guardar ni cerrar a mitad. */
+  onSubiendo?: (subiendo: boolean) => void
 }
 
-export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', maxFiles = 10, maxSizeMB = 5, capture = false, bucket = BUCKET_MEDIA, conservar }: MultiProps) {
+export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', maxFiles = 10, maxSizeMB = 5, capture = false, bucket = BUCKET_MEDIA, borrarAlQuitar = true, onSubiendo }: MultiProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const projectId = useMediaScope()
+  // La lista vigente, no la del render en que empezó la subida o se tocó la ✕:
+  // con dos acciones seguidas, la segunda pisaba a la primera con una lista vieja.
+  const valuesRef = useRef(values)
+  valuesRef.current = values
+  const gridRef = useRef<HTMLDivElement>(null)
+  const enfocarRef = useRef<number | null>(null)
+  useEffect(() => {
+    const i = enfocarRef.current
+    if (i === null || !gridRef.current) return
+    enfocarRef.current = null
+    // Tras quitar con el teclado, el foco va a la ✕ que ocupó su lugar (o a la
+    // anterior, o a «agregar»), no a <body>.
+    const quitar = gridRef.current.querySelectorAll<HTMLElement>('.at-foto-quitar')
+    const destino = quitar[Math.min(i, quitar.length - 1)] ?? gridRef.current.querySelector<HTMLElement>('.at-foto-agregar')
+    destino?.focus()
+  }, [values])
 
   async function handleFiles(files: FileList) {
     setError(null)
     // infra:I14 — scope uploads by project_id (see ImageUploader.handleFile).
     if (!projectId) { setError('No se pudo determinar el proyecto. Recargá la página e intentá de nuevo.'); return }
-    const toUpload = Array.from(files).slice(0, maxFiles - values.length)
+    const toUpload = Array.from(files).slice(0, maxFiles - valuesRef.current.length)
     if (toUpload.length === 0) { setError(`Máximo ${maxFiles} fotos`); return }
     for (const file of toUpload) {
       if (file.size > maxSizeMB * 1024 * 1024) { setError(`Máximo ${maxSizeMB} MB por archivo`); return }
@@ -170,6 +187,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
       if (!magicCheck.ok) { setError(magicCheck.reason); return }
     }
     setUploading(true)
+    onSubiendo?.(true)
     try {
       const newUrls: string[] = []
       for (const file of toUpload) {
@@ -183,23 +201,29 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
         // S6 phase 2: persist the bare path; SecureImage signs at render time.
         newUrls.push(path)
       }
-      if (newUrls.length > 0) onChange([...values, ...newUrls])
+      if (newUrls.length > 0) onChange([...valuesRef.current, ...newUrls])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al subir')
     } finally {
       setUploading(false)
+      onSubiendo?.(false)
     }
   }
 
-  async function handleRemove(url: string) {
+  async function handleRemove(url: string, conFoco: boolean) {
+    const lista = valuesRef.current
+    if (conFoco) enfocarRef.current = Math.max(0, lista.indexOf(url))
+    // Primero sale de la lista y después se borra: al revés, un «Guardar» en el
+    // medio guardaba la ruta de un archivo que se borraba un instante después.
+    onChange(lista.filter(u => u !== url))
     const path = url.startsWith('http') ? url.match(/condominios-media\/(.+)$/)?.[1] : url
-    if (path && !conservar?.includes(url)) await removeMedia(bucket, [path])
-    onChange(values.filter(u => u !== url))
+    if (path && borrarAlQuitar) await removeMedia(bucket, [path])
   }
 
   // Nativo: una foto por toque desde la cámara/galería del sistema, envuelta en un
   // FileList para reusar handleFiles sin duplicar validación/subida.
   async function openPicker() {
+    if (uploading) return
     if (!isNative()) { inputRef.current?.click(); return }
     const { takeNativePhoto } = await import('../../lib/nativeCamera')
     const file = await takeNativePhoto(capture)
@@ -219,17 +243,17 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
       <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: 6 }}>
         {label} <span style={{ fontWeight: 400, color: 'var(--at-ink-3)' }}>({values.length}/{maxFiles})</span>
       </label>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 8 }}>
-        {values.map(url => (
+      <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 8 }}>
+        {values.map((url, i) => (
           <div key={url} style={{ position: 'relative', paddingBottom: '75%' }}>
-            <SecureImage src={url} bucket={bucket} alt=""
+            <SecureImage src={url} bucket={bucket} alt={`Foto ${i + 1}`}
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1.5px solid var(--at-line)', display: 'block' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <button
               type="button"
               className="at-foto-quitar"
-              aria-label="Quitar foto"
-              onClick={() => handleRemove(url)}
+              aria-label={`Quitar foto ${i + 1} de ${values.length}`}
+              onClick={e => void handleRemove(url, e.currentTarget === document.activeElement)}
               style={{ position: 'absolute', top: -7, right: -7, zIndex: 1, width: 20, height: 20, borderRadius: '50%', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               ×
             </button>
@@ -237,11 +261,17 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
         ))}
         {values.length < maxFiles && (
           <div
+            role="button"
+            tabIndex={0}
+            className="at-foto-agregar"
+            aria-label={`Agregar ${label.toLowerCase()} (${values.length} de ${maxFiles})`}
+            aria-disabled={uploading || undefined}
             onDrop={onDrop}
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
             onClick={openPicker}
-            style={{ paddingBottom: '75%', position: 'relative', border: `2px dashed ${dragOver ? 'var(--at-primary)' : 'var(--at-line-strong)'}`, borderRadius: 8, cursor: 'pointer', background: dragOver ? 'var(--at-primary-tint)' : 'var(--at-surface-2)' }}>
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openPicker() } }}
+            style={{ paddingBottom: '75%', position: 'relative', border: `2px dashed ${dragOver ? 'var(--at-primary)' : 'var(--at-line-strong)'}`, borderRadius: 8, cursor: uploading ? 'default' : 'pointer', background: dragOver ? 'var(--at-primary-tint)' : 'var(--at-surface-2)' }}>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               {uploading
                 ? <span style={{ fontSize: 10, color: 'var(--at-primary)' }}>…</span>
@@ -253,11 +283,15 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
           </div>
         )}
       </div>
+      {/* El «…» de la casilla no le dice nada a un lector de pantalla. */}
+      <span role="status" style={srOnly}>{uploading ? 'Subiendo foto…' : ''}</span>
       <input ref={inputRef} type="file" style={{ display: 'none' }}
         accept={capture ? 'image/*;capture=camera' : 'image/*'}
         {...(capture ? { capture: 'environment' } : { multiple: true })}
         onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = '' }} />
-      {error && <div style={{ fontSize: 11, color: 'var(--at-danger)', marginTop: 4 }}>{error}</div>}
+      {error && <div role="alert" style={{ fontSize: 11, color: 'var(--at-danger)', marginTop: 4 }}>{error}</div>}
     </div>
   )
 }
+
+const srOnly: CSSProperties = { position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }

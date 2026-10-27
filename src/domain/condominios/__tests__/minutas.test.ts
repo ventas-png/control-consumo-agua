@@ -5,8 +5,8 @@ import type { ProveedorCatalogo } from '../../../types/proveedores'
 vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
 
 const {
-  borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
-  fechaDeMinuta, filtrarCandidatos, fotosDe, fotosQuitadas, iniciales, marcarCumplido, participanteDesdeCandidato, participantesDe, plazoCompromiso, plazoSeguimiento,
+  archivosPorBorrar, borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
+  documentosDe, fechaDeMinuta, filtrarCandidatos, fotosDe, iniciales, mismasRutas, rutasQuitadas, MAX_DOCUMENTOS_MINUTA, marcarCumplido, participanteDesdeCandidato, participantesDe, plazoCompromiso, plazoSeguimiento,
   puntosDe, MAX_FOTOS_MINUTA, quitarParticipante, resumenCompromisos, situacionCompromiso, validarPasoMinuta, yaParticipa,
 } = await import('../minutas')
 
@@ -114,27 +114,57 @@ describe('plazoSeguimiento', () => {
   })
 })
 
-describe('fotos de la minuta', () => {
-  it('fotosDe limpia lo que llega de la base: sin vacíos, sin repetidas y con tope', () => {
+describe('fotos y documentos de la minuta', () => {
+  it('fotosDe y documentosDe limpian lo que llega de la base: sin vacíos, sin repetidas y con tope', () => {
     expect(fotosDe(nota({}))).toEqual([])
     expect(fotosDe({ fotos: null })).toEqual([])
     expect(fotosDe({ fotos: 'p/minutas/a.jpg' as never })).toEqual([])
     expect(fotosDe({ fotos: ['p/minutas/a.jpg', ' ', 'p/minutas/a.jpg', 7, ' p/minutas/b.jpg '] as never })).toEqual(['p/minutas/a.jpg', 'p/minutas/b.jpg'])
     const muchas = Array.from({ length: 14 }, (_, i) => `p/minutas/${i}.jpg`)
     expect(fotosDe({ fotos: muchas })).toHaveLength(MAX_FOTOS_MINUTA)
+    expect(documentosDe(nota({}))).toEqual([])
+    expect(documentosDe({ documentos: ['p/minutas/acta.pdf', 'p/minutas/acta.pdf', ''] })).toEqual(['p/minutas/acta.pdf'])
+    expect(documentosDe({ documentos: muchas })).toHaveLength(MAX_DOCUMENTOS_MINUTA)
   })
 
-  it('fotosQuitadas: al guardar, las que salieron; al cancelar, las recién subidas', () => {
-    const guardadas = ['p/minutas/a.jpg', 'p/minutas/b.jpg']
-    const borrador = ['p/minutas/b.jpg', 'p/minutas/c.jpg']
-    expect(fotosQuitadas(guardadas, borrador)).toEqual(['p/minutas/a.jpg'])
-    expect(fotosQuitadas(borrador, guardadas)).toEqual(['p/minutas/c.jpg'])
-    expect(fotosQuitadas([], borrador)).toEqual([])
+  it('rutasQuitadas y mismasRutas', () => {
+    expect(rutasQuitadas(['a', 'b'], ['b', 'c'])).toEqual(['a'])
+    expect(rutasQuitadas([], ['b'])).toEqual([])
+    expect(mismasRutas(['a', 'b'], ['a', 'b'])).toBe(true)
+    expect(mismasRutas(['a', 'b'], ['b', 'a'])).toBe(false)
+    expect(mismasRutas(['a'], ['a', 'b'])).toBe(false)
   })
 
-  it('el borrador de una minuta nueva no trae fotos; editar trae las guardadas', () => {
-    expect(borradorDesde(null, 'Admin', '2026-10-26').fotos).toEqual([])
-    expect(borradorDesde(nota({ fotos: ['p/minutas/a.jpg'] }), 'Admin', '2026-10-26').fotos).toEqual(['p/minutas/a.jpg'])
+  describe('archivosPorBorrar — una minuta nunca apunta a un archivo borrado', () => {
+    const originales = ['s1.jpg', 's2.pdf']
+
+    it('sin guardar: sólo lo subido en esta edición, aunque ya se haya quitado de la lista', () => {
+      const vistas = ['s1.jpg', 's2.pdf', 'n1.jpg', 'n2.pdf']
+      expect(archivosPorBorrar(originales, vistas, null)).toEqual(['n1.jpg', 'n2.pdf'])
+      // Quitar una guardada y cancelar no la borra: la fila sigue apuntando a ella.
+      expect(archivosPorBorrar(originales, ['s2.pdf'], null)).toEqual([])
+    })
+
+    it('guardada: lo que estuvo antes o en esta edición y ya no está en la fila', () => {
+      const vistas = ['s1.jpg', 's2.pdf', 'n1.jpg', 'n2.pdf']
+      expect(archivosPorBorrar(originales, vistas, ['s2.pdf', 'n1.jpg'])).toEqual(['s1.jpg', 'n2.pdf'])
+      expect(archivosPorBorrar(originales, vistas, [...vistas])).toEqual([])
+    })
+
+    it('una minuta nueva que se guarda sin nada de lo subido lo borra todo; sin subir nada, nada', () => {
+      expect(archivosPorBorrar([], ['n1.jpg'], [])).toEqual(['n1.jpg'])
+      expect(archivosPorBorrar([], [], null)).toEqual([])
+      expect(archivosPorBorrar(originales, [], originales)).toEqual([])
+    })
+  })
+
+  it('el borrador de una minuta nueva no trae archivos; editar trae los guardados', () => {
+    const nueva = borradorDesde(null, 'Admin', '2026-10-26')
+    expect(nueva.fotos).toEqual([])
+    expect(nueva.documentos).toEqual([])
+    const editar = borradorDesde(nota({ fotos: ['p/minutas/a.jpg'], documentos: ['p/minutas/acta.pdf'] }), 'Admin', '2026-10-26')
+    expect(editar.fotos).toEqual(['p/minutas/a.jpg'])
+    expect(editar.documentos).toEqual(['p/minutas/acta.pdf'])
   })
 })
 

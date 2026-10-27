@@ -12725,6 +12725,7 @@ export type Database = {
           company_id: string
           contenido: string
           created_at: string
+          documentos: string[]
           fecha_recordatorio: string | null
           fecha_reunion: string | null
           fijada: boolean
@@ -12743,6 +12744,7 @@ export type Database = {
           company_id: string
           contenido?: string
           created_at?: string
+          documentos?: string[]
           fecha_recordatorio?: string | null
           fecha_reunion?: string | null
           fijada?: boolean
@@ -12761,6 +12763,7 @@ export type Database = {
           company_id?: string
           contenido?: string
           created_at?: string
+          documentos?: string[]
           fecha_recordatorio?: string | null
           fecha_reunion?: string | null
           fijada?: boolean

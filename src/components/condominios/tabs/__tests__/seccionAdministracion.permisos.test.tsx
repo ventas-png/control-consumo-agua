@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
   deleteCondominioRow: vi.fn(async () => ({ error: null })),
+  deleteCondominioRowAfectando: vi.fn(async () => ({ error: null })),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   notify: vi.fn(),
 }))
@@ -24,6 +25,7 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
+  deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
   marcarCuotasMorosas: vi.fn(async () => ({ error: null })),
 }))
 vi.mock('../../../../lib/storageUrls', () => ({ useSignedUrl: () => null, useSignedUrls: () => ({}) }))
@@ -107,7 +109,8 @@ eliminarExigeSuPermiso('Notas', p => {
   render(<NotasAdminTab {...base} autorNombre="Admin" canCreate {...p}
     notas={[fila({ id: 'no1', titulo: 'Llamar al proveedor', contenido: 'Pendiente', categoria: 'general', prioridad: 'media', fijada: false, resuelta: false })]} />)
   fireEvent.click(screen.getByText('Llamar al proveedor'))
-}, /Eliminar$/, borrar, 'notas_admin', 'no1')
+  // La minuta exige que la fila se haya borrado antes de borrar sus archivos.
+}, /Eliminar$/, mocks.deleteCondominioRowAfectando, 'notas_admin', 'no1')
 
 eliminarExigeSuPermiso('Documentos', p => render(
   <DocumentosTab {...base} userId="u1" canCreate {...p}

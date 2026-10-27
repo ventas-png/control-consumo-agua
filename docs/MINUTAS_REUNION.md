@@ -31,8 +31,9 @@ fila con la fecha de la reunión y dos columnas JSON.
      (responsable entre los participantes y fecha límite). Cierre: categoría,
      prioridad, próximo seguimiento y fijar.
 
-  En el paso 3 también se adjuntan **fotos de la reunión** (hasta 10): hoja
-  de asistencia, pizarrón, lo revisado en sitio.
+  En el paso 3 también se adjuntan **fotos** (hasta 10: hoja de asistencia,
+  pizarrón, lo revisado en sitio) y **documentos** (hasta 10: PDF, Word o
+  Excel, como la cotización o el contrato que se revisó).
 
   Cada paso valida lo suyo antes de avanzar (título, fecha, al menos un
   participante y un gestor; al menos un punto; fechas válidas). La lógica está
@@ -70,16 +71,34 @@ fila con la fecha de la reunión y dos columnas JSON.
 - Las notas anteriores a la migración conservan su `contenido` (ahora
   «objetivo») y toman como fecha de reunión el día en que se escribieron.
 
-## Fotos (20261112000000)
+## Fotos y documentos (20261112000000 · 20261112000100)
 
-- `notas_admin.fotos text[] NOT NULL DEFAULT '{}'`, con CHECK de máximo 10.
-  Guarda rutas del bucket privado `condominios-media`
-  (`<project_id>/minutas/<archivo>.jpg`), no URLs firmadas: `SecureImage` las
-  firma al mostrarlas, igual que en contra incendio.
-- Ciclo de vida de los archivos:
-  - Al **guardar**, las fotos que salieron de la minuta se borran del bucket.
-  - Al **cancelar**, se borran las subidas en esa edición que no se guardaron.
-  - Al **editar**, quitar una foto ya guardada no borra el archivo hasta
-    guardar (`MultiImageUploader` recibe esas rutas en `conservar`).
-- El detalle las muestra en galería; la tarjeta de la lista indica cuántas hay;
-  la versión impresa sólo dice cuántas hay adjuntas.
+- `notas_admin.fotos text[]` y `notas_admin.documentos text[]`, ambas
+  `NOT NULL DEFAULT '{}'` con CHECK de máximo 10. Guardan rutas del bucket
+  privado `condominios-media` (`<project_id>/minutas/<archivo>`), no URLs
+  firmadas: `SecureImage` y `SecureFileLink` las firman al mostrarlas. El bucket
+  acepta PDF, Word, Excel y PowerPoint hasta 10 MB.
+- Ciclo de vida de los archivos. La regla: **una minuta nunca apunta a un
+  archivo borrado**. Los uploaders no borran nada al quitar
+  (`borrarAlQuitar={false}`); el asistente lleva la cuenta de toda ruta que pasó
+  por las listas en esa edición y decide al desmontarse
+  (`archivosPorBorrar`):
+  - **Guardada**: se borra lo que estuvo (antes o en esta edición) y ya no está
+    en la fila. Al editar se usa `updateCondominioRowAfectando`: si la política
+    de filas no deja tocar la fila, no se borra nada.
+  - **Sin guardar** (Cancelar, Esc, el fondo, o el «Atrás» del sistema, que
+    cambia de pestaña sin pasar por el botón): se borra sólo lo subido en esta
+    edición, aunque ya se hubiera quitado de la lista. Lo guardado sigue
+    referenciado por la fila.
+  - **Subiendo**: mientras haya una subida en curso (`onSubiendo`) no se puede
+    guardar ni cerrar. Si una subida termina con el asistente ya desmontado, el
+    archivo se borra al llegar.
+  - **Eliminar** la minuta borra sus fotos y documentos, sólo si la fila se
+    borró de verdad (`deleteCondominioRowAfectando`).
+  - Al editar, `fotos` y `documentos` sólo viajan en el UPDATE si cambiaron: una
+    pestaña abierta desde antes que sólo corrige el título no revive un archivo
+    que otra sesión ya quitó y borró.
+- El detalle muestra las fotos en galería (miniaturas con nombre, navegables con
+  teclado; Escape cierra sólo la foto) y los documentos como enlaces firmados;
+  la tarjeta de la lista cuenta unas (📷) y otros (📎); la versión impresa dice
+  cuántas fotos hay y nombra los documentos.

@@ -115,14 +115,15 @@ export function puntosDe(nota: Pick<NotaAdmin, 'puntos'> | null | undefined): Pu
   return out
 }
 
-// ── Fotos (20261112000000) ───────────────────────────────────────────────────
+// ── Fotos (20261112000000) y documentos (20261112000100) ────────────────────
 
 /** Fotos por minuta: lo mismo que el CHECK de la base y que ofrece el uploader. */
 export const MAX_FOTOS_MINUTA = 10
+/** Documentos por minuta: lo mismo que el CHECK de la base y que ofrece el uploader. */
+export const MAX_DOCUMENTOS_MINUTA = 10
 
-/** Rutas de las fotos: sin vacíos ni repetidas, y nunca más de las que admite la base. */
-export function fotosDe(nota: Pick<NotaAdmin, 'fotos'> | null | undefined): string[] {
-  const lista = nota?.fotos
+/** Rutas sin vacíos ni repetidas, y nunca más de las que admite la base. */
+function rutasDe(lista: unknown, max: number): string[] {
   if (!Array.isArray(lista)) return []
   const vistas = new Set<string>()
   for (const f of lista as unknown[]) {
@@ -130,17 +131,49 @@ export function fotosDe(nota: Pick<NotaAdmin, 'fotos'> | null | undefined): stri
     const ruta = f.trim()
     if (ruta) vistas.add(ruta)
   }
-  return [...vistas].slice(0, MAX_FOTOS_MINUTA)
+  return [...vistas].slice(0, max)
+}
+
+export function fotosDe(nota: Pick<NotaAdmin, 'fotos'> | null | undefined): string[] {
+  return rutasDe(nota?.fotos, MAX_FOTOS_MINUTA)
+}
+
+export function documentosDe(nota: Pick<NotaAdmin, 'documentos'> | null | undefined): string[] {
+  return rutasDe(nota?.documentos, MAX_DOCUMENTOS_MINUTA)
+}
+
+/** Las rutas de `antes` que ya no están en `despues`. */
+export function rutasQuitadas(antes: readonly string[], despues: readonly string[]): string[] {
+  const quedan = new Set(despues)
+  return antes.filter(f => !quedan.has(f))
+}
+
+/** Mismas rutas en el mismo orden. */
+export function mismasRutas(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((r, i) => r === b[i])
 }
 
 /**
- * Las rutas de `antes` que ya no están en `despues`. Al guardar, son las fotos
- * que se quitaron de la minuta (se borran del bucket recién entonces); al
- * cancelar, con los argumentos al revés, las que se subieron y no se guardaron.
+ * Qué archivos borrar del bucket cuando el asistente se cierra. El uploader no
+ * borra nada al quitar: una minuta nunca debe apuntar a un archivo borrado, y
+ * hasta que se guarda no se sabe cuáles quedan.
+ *
+ *   - `guardadas` — lo que quedó en la fila; `null` si no se guardó (cancelar,
+ *     Esc, «Atrás» del sistema).
+ *   - `originales` — lo que la fila tenía al abrir.
+ *   - `vistas` — toda ruta que pasó por la lista en esta edición, incluidas las
+ *     subidas que después se quitaron.
+ *
+ * Guardada: lo que estuvo (antes o en esta edición) y ya no está. Sin guardar:
+ * sólo lo subido en esta edición; lo original sigue referenciado por la fila.
  */
-export function fotosQuitadas(antes: readonly string[], despues: readonly string[]): string[] {
-  const quedan = new Set(despues)
-  return antes.filter(f => !quedan.has(f))
+export function archivosPorBorrar(originales: readonly string[], vistas: Iterable<string>, guardadas: readonly string[] | null): string[] {
+  const conservar = new Set(guardadas ?? originales)
+  const fuera = new Set<string>()
+  for (const r of [...(guardadas ? originales : []), ...vistas]) {
+    if (!conservar.has(r)) fuera.add(r)
+  }
+  return [...fuera]
 }
 
 export function gestorDe(participantes: readonly ParticipanteMinuta[]): ParticipanteMinuta | null {
@@ -234,6 +267,7 @@ export interface BorradorMinuta {
   participantes: ParticipanteMinuta[]
   puntos: PuntoMinuta[]
   fotos: string[]
+  documentos: string[]
 }
 
 /**
@@ -248,6 +282,7 @@ export function borradorDesde(nota: NotaAdmin | null, gestorNombre: string, hoy:
       participantes: nombre ? [{ id: nuevoIdMinuta(), tipo: 'otro', ref_id: null, nombre, detalle: 'Administración', gestiona: true }] : [],
       puntos: [],
       fotos: [],
+      documentos: [],
     }
   }
   return {
@@ -261,6 +296,7 @@ export function borradorDesde(nota: NotaAdmin | null, gestorNombre: string, hoy:
     participantes: participantesDe(nota),
     puntos: puntosDe(nota),
     fotos: fotosDe(nota),
+    documentos: documentosDe(nota),
   }
 }
 

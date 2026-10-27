@@ -192,16 +192,27 @@ interface MultiProps {
   label?: string
   maxFiles?: number
   accept?: string
+  /**
+   * Por defecto, quitar un archivo lo borra del bucket al instante. Con `false`
+   * sólo lo saca de la lista y el que llama decide al guardar o cancelar (ver
+   * MultiImageUploader).
+   */
+  borrarAlQuitar?: boolean
+  /** Avisa cuándo empieza y termina una subida, para no guardar ni cerrar a mitad. */
+  onSubiendo?: (subiendo: boolean) => void
 }
 
 export function MultiFileUploader({
-  values, onChange, folder, label = 'Adjuntar documentos', maxFiles = 4, accept = ACCEPT,
+  values, onChange, folder, label = 'Adjuntar documentos', maxFiles = 4, accept = ACCEPT, borrarAlQuitar = true, onSubiendo,
 }: MultiProps) {
   const ref = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const projectId = useMediaScope()
+  // La lista vigente, no la del render en que empezó la subida (ver MultiImageUploader).
+  const valuesRef = useRef(values)
+  valuesRef.current = values
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -209,10 +220,11 @@ export function MultiFileUploader({
     // infra:I14 — el path va scopeado por project_id o la policy de storage lo
     // rechaza; fallar acá da un mensaje entendible.
     if (!projectId) { setError('No se pudo determinar el proyecto. Recargue la página e intente de nuevo.'); return }
-    const aSubir = Array.from(files).slice(0, maxFiles - values.length)
+    const aSubir = Array.from(files).slice(0, maxFiles - valuesRef.current.length)
     if (aSubir.length === 0) { setError(`Máximo ${maxFiles} archivos`); return }
 
     setUploading(true)
+    onSubiendo?.(true)
     try {
       const nuevos: string[] = []
       for (const file of aSubir) {
@@ -227,17 +239,21 @@ export function MultiFileUploader({
         if (upErr || !data) { setError(`No se pudo subir "${file.name}".`); break }
         nuevos.push(data.path)
       }
-      if (nuevos.length > 0) onChange([...values, ...nuevos])
+      if (nuevos.length > 0) onChange([...valuesRef.current, ...nuevos])
     } finally {
       setUploading(false)
+      onSubiendo?.(false)
     }
   }
 
   async function quitar(path: string) {
+    // Primero sale de la lista y después se borra (ver MultiImageUploader).
+    onChange(valuesRef.current.filter(p => p !== path))
     const real = path.startsWith('http') ? path.match(/condominios-media\/(.+)$/)?.[1] : path
-    if (real) await removeCondominiosMedia([real])
-    onChange(values.filter(p => p !== path))
+    if (real && borrarAlQuitar) await removeCondominiosMedia([real])
   }
+
+  function abrir() { if (!uploading) ref.current?.click() }
 
   function onDrop(e: DragEvent) {
     e.preventDefault(); setDragging(false)
@@ -258,7 +274,7 @@ export function MultiFileUploader({
               <div key={path} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8 }}>
                 <span style={{ fontSize: 17 }}>{fileIcon(nombre)}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--at-ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</span>
-                <button onClick={() => quitar(path)} aria-label={`Quitar ${nombre}`}
+                <button type="button" className="at-adjunto-quitar" onClick={() => void quitar(path)} aria-label={`Quitar ${nombre}`}
                   style={{ padding: '2px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, color: 'var(--at-danger)', cursor: 'pointer', fontSize: 12 }}>
                   ✕
                 </button>
@@ -270,10 +286,16 @@ export function MultiFileUploader({
 
       {values.length < maxFiles && (
         <div
+          role="button"
+          tabIndex={0}
+          className="at-adjunto-agregar"
+          aria-label={`${label} (${values.length} de ${maxFiles})`}
+          aria-disabled={uploading || undefined}
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
-          onClick={() => !uploading && ref.current?.click()}
+          onClick={abrir}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir() } }}
           style={{
             border: `2px dashed ${dragging ? 'var(--at-primary)' : 'var(--at-line-strong)'}`,
             borderRadius: 8, padding: '12px', textAlign: 'center',
@@ -281,7 +303,7 @@ export function MultiFileUploader({
             background: dragging ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
           }}>
           {uploading ? (
-            <div style={{ fontSize: 12, color: 'var(--at-primary)' }}>Subiendo…</div>
+            <div role="status" style={{ fontSize: 12, color: 'var(--at-primary)' }}>Subiendo…</div>
           ) : (
             <>
               <span style={{ fontSize: 18 }}>📎</span>
@@ -294,7 +316,7 @@ export function MultiFileUploader({
       <input ref={ref} type="file" accept={accept} multiple style={{ display: 'none' }}
         onChange={e => { void handleFiles(e.target.files); e.target.value = '' }} />
 
-      {error && <div style={{ fontSize: 11, color: 'var(--at-danger)', marginTop: 4 }}>{error}</div>}
+      {error && <div role="alert" style={{ fontSize: 11, color: 'var(--at-danger)', marginTop: 4 }}>{error}</div>}
     </div>
   )
 }
