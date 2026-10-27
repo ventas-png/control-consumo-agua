@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type MouseEvent } from 'react'
 import { isNative } from '../../lib/platform'
 import { uploadCondominiosMedia, removeCondominiosMedia, uploadMedia, removeMedia } from '../../domain/shared/storage'
 import { BUCKET_MEDIA } from '../../domain/shared/buckets'
@@ -162,33 +162,39 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
   // con dos acciones seguidas, la segunda pisaba a la primera con una lista vieja.
   const valuesRef = useRef(values)
   valuesRef.current = values
+  // Una subida a la vez: soltar otra encima pisaba la lista y apagaba
+  // `onSubiendo` antes de tiempo. Ref, no estado: el render todavía no se enteró.
+  const subiendoRef = useRef(false)
   const gridRef = useRef<HTMLDivElement>(null)
   const enfocarRef = useRef<number | null>(null)
+  const ultimoQuitarRef = useRef(-Infinity)
   useEffect(() => {
     const i = enfocarRef.current
     if (i === null || !gridRef.current) return
     enfocarRef.current = null
-    // Tras quitar con el teclado, el foco va a la ✕ que ocupó su lugar (o a la
-    // anterior, o a «agregar»), no a <body>.
+    // Tras quitar con el teclado (o llenar el cupo desde «agregar»), el foco va
+    // a la ✕ que ocupó su lugar, a la anterior o a «agregar»; nunca a <body>.
     const quitar = gridRef.current.querySelectorAll<HTMLElement>('.at-foto-quitar')
     const destino = quitar[Math.min(i, quitar.length - 1)] ?? gridRef.current.querySelector<HTMLElement>('.at-foto-agregar')
     destino?.focus()
   }, [values])
 
   async function handleFiles(files: FileList) {
+    if (subiendoRef.current) { setError('Espera a que termine la subida en curso.'); return }
     setError(null)
     // infra:I14 — scope uploads by project_id (see ImageUploader.handleFile).
     if (!projectId) { setError('No se pudo determinar el proyecto. Recargá la página e intentá de nuevo.'); return }
     const toUpload = Array.from(files).slice(0, maxFiles - valuesRef.current.length)
     if (toUpload.length === 0) { setError(`Máximo ${maxFiles} fotos`); return }
-    for (const file of toUpload) {
-      if (file.size > maxSizeMB * 1024 * 1024) { setError(`Máximo ${maxSizeMB} MB por archivo`); return }
-      const magicCheck = await validateFileMagic(file, 'image')
-      if (!magicCheck.ok) { setError(magicCheck.reason); return }
-    }
+    subiendoRef.current = true
     setUploading(true)
     onSubiendo?.(true)
     try {
+      for (const file of toUpload) {
+        if (file.size > maxSizeMB * 1024 * 1024) { setError(`Máximo ${maxSizeMB} MB por archivo`); return }
+        const magicCheck = await validateFileMagic(file, 'image')
+        if (!magicCheck.ok) { setError(magicCheck.reason); return }
+      }
       const newUrls: string[] = []
       for (const file of toUpload) {
         const blob = await compressImage(file)
@@ -201,18 +207,29 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
         // S6 phase 2: persist the bare path; SecureImage signs at render time.
         newUrls.push(path)
       }
-      if (newUrls.length > 0) onChange([...valuesRef.current, ...newUrls])
+      if (newUrls.length > 0) {
+        const lista = [...valuesRef.current, ...newUrls]
+        // Con el cupo lleno «agregar» desaparece: si tenía el foco, pasa a la última ✕.
+        if (lista.length >= maxFiles && gridRef.current?.querySelector('.at-foto-agregar') === document.activeElement) enfocarRef.current = lista.length - 1
+        onChange(lista)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al subir')
     } finally {
+      subiendoRef.current = false
       setUploading(false)
       onSubiendo?.(false)
     }
   }
 
-  async function handleRemove(url: string, conFoco: boolean) {
+  async function handleRemove(url: string, e: MouseEvent<HTMLButtonElement>) {
+    // El segundo clic de un doble clic (o doble toque) cae sobre la ✕ de la foto
+    // que acaba de ocupar el lugar, y la borraba también. Sólo con puntero: con
+    // el teclado (detail 0) se quitan seguidas a propósito.
+    if (e.detail > 0 && e.timeStamp - ultimoQuitarRef.current < 500) return
+    ultimoQuitarRef.current = e.timeStamp
     const lista = valuesRef.current
-    if (conFoco) enfocarRef.current = Math.max(0, lista.indexOf(url))
+    if (e.currentTarget === document.activeElement) enfocarRef.current = Math.max(0, lista.indexOf(url))
     // Primero sale de la lista y después se borra: al revés, un «Guardar» en el
     // medio guardaba la ruta de un archivo que se borraba un instante después.
     onChange(lista.filter(u => u !== url))
@@ -223,7 +240,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
   // Nativo: una foto por toque desde la cámara/galería del sistema, envuelta en un
   // FileList para reusar handleFiles sin duplicar validación/subida.
   async function openPicker() {
-    if (uploading) return
+    if (subiendoRef.current) return
     if (!isNative()) { inputRef.current?.click(); return }
     const { takeNativePhoto } = await import('../../lib/nativeCamera')
     const file = await takeNativePhoto(capture)
@@ -253,7 +270,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
               type="button"
               className="at-foto-quitar"
               aria-label={`Quitar foto ${i + 1} de ${values.length}`}
-              onClick={e => void handleRemove(url, e.currentTarget === document.activeElement)}
+              onClick={e => void handleRemove(url, e)}
               style={{ position: 'absolute', top: -7, right: -7, zIndex: 1, width: 20, height: 20, borderRadius: '50%', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               ×
             </button>
@@ -264,7 +281,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
             role="button"
             tabIndex={0}
             className="at-foto-agregar"
-            aria-label={`Agregar ${label.toLowerCase()} (${values.length} de ${maxFiles})`}
+            aria-label={`${label}: agregar${capture ? ' con la cámara' : ''} (${values.length} de ${maxFiles})`}
             aria-disabled={uploading || undefined}
             onDrop={onDrop}
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}

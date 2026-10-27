@@ -30,6 +30,16 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'ArrowLeft') prev()
     else if (e.key === 'ArrowRight') next()
+    else if (e.key === 'Tab') {
+      // El foco no sale de la foto: afuera sólo hay controles tapados por el
+      // fondo, y desde ellos Escape cerraría el modal que contiene la galería.
+      const botones = [...(dialogRef.current?.querySelectorAll<HTMLElement>('button') ?? [])]
+      e.preventDefault()
+      e.stopPropagation()
+      if (botones.length === 0) return
+      const i = botones.indexOf(document.activeElement as HTMLElement)
+      botones[e.shiftKey ? (i <= 0 ? botones.length - 1 : i - 1) : (i + 1) % botones.length].focus()
+    }
     else if (e.key === 'Escape') {
       // Escape cierra sólo la foto: el modal que contiene la galería escucha
       // Escape en `document` e ignora los eventos ya atendidos.
@@ -46,7 +56,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
           <button key={url} type="button" className="at-galeria-miniatura"
             aria-label={`Ver foto ${i + 1} de ${urls.length}${i === maxVisible - 1 && extra > 0 ? ` (y ${extra} más)` : ''}`}
             onClick={e => { origenRef.current = e.currentTarget; setLightbox(i) }}
-            style={{ position: 'relative', cursor: 'zoom-in', flexShrink: 0, padding: 0, border: 'none', background: 'none', borderRadius: 7, display: 'block' }}>
+            style={{ position: 'relative', cursor: 'zoom-in', flexShrink: 0, padding: 0, border: 'none', background: 'none', borderRadius: 7, display: 'block', minWidth: 64, minHeight: 48 }}>
             <SecureImage
               src={url}
               alt=""

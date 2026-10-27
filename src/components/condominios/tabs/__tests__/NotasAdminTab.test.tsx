@@ -4,7 +4,7 @@
 // acuerdos/compromisos por punto—; el detalle marca compromisos cumplidos,
 // cierra la minuta y abre la edición con lo guardado.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, within, waitFor, act } from '@testing-library/react'
 import type { ContratoArrendamiento, ContratoProveedor, NotaAdmin, PersonalCondominio, Unidad } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
@@ -460,21 +460,78 @@ describe('Minutas — fotos y documentos', () => {
     expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/tarde.jpg'])
   })
 
-  it('mientras sube no se guarda ni se cierra; al terminar, sí', async () => {
+  it('mientras sube no se guarda, no se cierra ni se cambia de paso; los botones avisan sin salir del orden de Tab', async () => {
     render(<NotasAdminTab {...props()} />)
     const d = nuevaHastaPaso3()
+    // Dos subidas: que termine una no basta.
     fireEvent.click(within(d).getByRole('button', { name: 'Simular inicio de subida' }))
+    fireEvent.click(within(d).getByRole('button', { name: 'Simular inicio de subida' }))
+    fireEvent.click(within(d).getByRole('button', { name: 'Simular fin de subida' }))
     const guardar = within(d).getByRole('button', { name: 'Subiendo archivos…' }) as HTMLButtonElement
-    expect(guardar.disabled).toBe(true)
-    expect((within(d).getByRole('button', { name: 'Cancelar' }) as HTMLButtonElement).disabled).toBe(true)
+    // aria-disabled y no `disabled`: un botón deshabilitado sale del orden de Tab y el foco se escapa.
+    expect(guardar.disabled).toBe(false)
+    expect(guardar.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(guardar)
+    fireEvent.click(within(d).getByRole('button', { name: 'Cancelar' }))
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(within(d).getByRole('button', { name: 'Cerrar modal' }))
+    fireEvent.click(within(d).getByRole('button', { name: '← Anterior' }))
+    fireEvent.click(within(d).getByRole('tab', { name: 'Paso 1 · Participantes' }))
     expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(within(d).getByRole('tab', { name: 'Paso 3 · Acuerdos' }).getAttribute('aria-selected')).toBe('true')
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
     expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ title: 'Subiendo archivos' }))
+
     fireEvent.click(within(d).getByRole('button', { name: 'Simular subida' }))
     fireEvent.click(within(d).getByRole('button', { name: 'Simular fin de subida' }))
     fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+  })
+
+  describe('si el asistente se desmonta mientras guarda («Atrás» del sistema)', () => {
+    function guardadoPendiente(mock: typeof mocks.createCondominioRow) {
+      let resolver!: (v: { error: { message: string } | null }) => void
+      mock.mockImplementationOnce(() => new Promise(r => { resolver = r }))
+      return (v: { error: { message: string } | null }) => resolver(v)
+    }
+
+    it('una minuta nueva guardada conserva sus archivos', async () => {
+      const resolver = guardadoPendiente(mocks.createCondominioRow)
+      const { unmount } = render(<NotasAdminTab {...props()} />)
+      const d = nuevaHastaPaso3()
+      fireEvent.click(within(d).getByRole('button', { name: 'Simular subida' }))
+      fireEvent.click(within(d).getByRole('button', { name: 'Simular subida de documento' }))
+      fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+      await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+      unmount()
+      expect(mocks.removeMedia).not.toHaveBeenCalled()
+      await act(async () => { resolver({ error: null }) })
+      expect(mocks.removeMedia).not.toHaveBeenCalled()
+    })
+
+    it('una edición guardada borra sólo lo quitado; si el guardado falla, borra sólo lo subido', async () => {
+      const resolver = guardadoPendiente(mocks.updateCondominioRowAfectando)
+      const w = editarHastaPaso3({ ...abierta, fotos: ['p1/minutas/a.jpg', 'p1/minutas/b.jpg'] })
+      fireEvent.click(within(w).getByRole('button', { name: 'Simular quitar primera' }))
+      fireEvent.click(within(w).getByRole('button', { name: 'Simular subida' }))
+      fireEvent.click(within(w).getByRole('button', { name: 'Guardar cambios' }))
+      await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledTimes(1))
+      cleanup()
+      expect(mocks.removeMedia).not.toHaveBeenCalled()
+      await act(async () => { resolver({ error: null }) })
+      expect(mocks.removeMedia).toHaveBeenCalledTimes(1)
+      expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/a.jpg'])
+
+      mocks.removeMedia.mockClear()
+      const falla = guardadoPendiente(mocks.updateCondominioRowAfectando)
+      const w2 = editarHastaPaso3({ ...abierta, fotos: ['p1/minutas/a.jpg'] })
+      fireEvent.click(within(w2).getByRole('button', { name: 'Simular subida' }))
+      fireEvent.click(within(w2).getByRole('button', { name: 'Guardar cambios' }))
+      await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledTimes(2))
+      cleanup()
+      await act(async () => { falla({ error: { message: 'sin conexión' } }) })
+      expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/nueva.jpg'])
+    })
   })
 
   it('al editar, lo guardado que se quita sólo se borra al guardar, y sólo viaja la lista que cambió', async () => {

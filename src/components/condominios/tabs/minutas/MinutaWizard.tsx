@@ -77,14 +77,17 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
   // qué quedó guardado. Desmontar cubre guardar, cancelar, Esc, el fondo y el
   // «Atrás» del sistema (que cambia de pestaña sin pasar por cerrar()).
   const [originales] = useState(() => ({ fotos: fotosDe(nota), documentos: documentosDe(nota) }))
-  const [subiendo, setSubiendo] = useState({ fotos: false, documentos: false })
-  const subiendoAlgo = subiendo.fotos || subiendo.documentos
+  /** Subidas en curso por campo: cuenta, no booleano, para que la primera que termina no habilite Guardar. */
+  const [subiendo, setSubiendo] = useState({ fotos: 0, documentos: 0 })
+  const subiendoAlgo = subiendo.fotos > 0 || subiendo.documentos > 0
   /** Toda ruta que pasó por las listas en esta edición, también las que después se quitaron. */
   const vistasRef = useRef(new Set<string>())
   /** Lo que quedó en la fila; null mientras no se guarde. */
   const guardadoRef = useRef<string[] | null>(null)
   const borradasRef = useRef(new Set<string>())
   const montadoRef = useRef(false)
+  /** Con el INSERT/UPDATE en vuelo no se sabe qué queda: la limpieza espera su resultado. */
+  const guardandoRef = useRef(false)
   const limpiarArchivos = () => {
     const fuera = archivosPorBorrar([...originales.fotos, ...originales.documentos], vistasRef.current, guardadoRef.current)
       .filter(r => !borradasRef.current.has(r))
@@ -96,7 +99,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
   limpiarRef.current = limpiarArchivos
   useEffect(() => {
     montadoRef.current = true
-    return () => { montadoRef.current = false; limpiarRef.current() }
+    return () => { montadoRef.current = false; if (!guardandoRef.current) limpiarRef.current() }
   }, [])
   function cambiarArchivos(campo: 'fotos' | 'documentos', rutas: string[]) {
     rutas.forEach(r => vistasRef.current.add(r))
@@ -104,7 +107,12 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
     if (!montadoRef.current) { limpiarRef.current(); return }
     set({ [campo]: rutas })
   }
-  const marcarSubida = (campo: 'fotos' | 'documentos') => (v: boolean) => setSubiendo(s => ({ ...s, [campo]: v }))
+  const marcarSubida = (campo: 'fotos' | 'documentos') => (v: boolean) => setSubiendo(s => ({ ...s, [campo]: Math.max(0, s[campo] + (v ? 1 : -1)) }))
+  /** Cambiar de paso desmonta el uploader a mitad de la subida: se espera a que termine. */
+  function esperarSubida(): boolean {
+    if (subiendoAlgo) notify({ variant: 'info', title: 'Subiendo archivos', text: 'Espera a que terminen de subir para cambiar de paso.' })
+    return subiendoAlgo
+  }
 
   // Paso 1: de qué lista se agrega y qué se busca.
   const [tipoLista, setTipoLista] = useState<TipoParticipanteMinuta>('empleado')
@@ -182,6 +190,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
   // ── Navegación ──
   /** Para llegar a `destino` deben estar completos los pasos anteriores. */
   function irA(destino: PasoMinuta) {
+    if (destino !== paso && esperarSubida()) return
     for (const p of PASOS_MINUTA) {
       if (p.n >= destino) break
       const falta = validarPasoMinuta(borrador, p.n)
@@ -217,14 +226,19 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
     if (!nota || !mismasRutas(fotos, originales.fotos)) campos.fotos = fotos
     if (!nota || !mismasRutas(documentos, originales.documentos)) campos.documentos = documentos
     setSaving(true)
+    guardandoRef.current = true
     // Afectando: si la política de filas no deja tocar la fila, el UPDATE vuelve
     // «bien» con cero filas, y borrar las quitadas rompería la minuta guardada.
     const { error } = nota
       ? await updateCondominioRowAfectando('notas_admin', nota.id, campos)
       : await createCondominioRow('notas_admin', { company_id: companyId, project_id: proyectoId, autor: autorNombre || null, ...campos })
+    guardandoRef.current = false
+    if (!error) guardadoRef.current = [...fotos, ...documentos]
+    // Si el «Atrás» del sistema desmontó el asistente durante el guardado, la
+    // limpieza que se saltó se hace ahora, con lo que de verdad quedó en la fila.
+    if (!montadoRef.current) limpiarRef.current()
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'No se pudo guardar la minuta', text: error.message }); return }
-    guardadoRef.current = [...fotos, ...documentos]
     notify({ variant: 'success', title: nota ? 'Minuta actualizada' : 'Minuta guardada' })
     onGuardado()
   }
@@ -249,11 +263,15 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       closeOnEscape={!saving && !subiendoAlgo}
       footer={
         <div className="minuta-acciones">
-          <Button className="minuta-cancelar" variant="secondary" onClick={cerrar} disabled={saving || subiendoAlgo}>Cancelar</Button>
-          {paso > 1 && <Button className="minuta-anterior" variant="secondary" onClick={() => setPaso((paso - 1) as PasoMinuta)} disabled={saving}>← Anterior</Button>}
+          {/* Durante una subida los botones avisan en vez de deshabilitarse: un
+              botón `disabled` sale del orden de Tab y, si es el último, el foco
+              se escapa de la ventana. */}
+          <Button className="minuta-cancelar" variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
+          {paso > 1 && <Button className="minuta-anterior" variant="secondary" onClick={() => { if (!esperarSubida()) setPaso((paso - 1) as PasoMinuta) }} disabled={saving}>← Anterior</Button>}
           {paso < 3 && <Button className="minuta-avanzar" variant="primary" onClick={() => irA((paso + 1) as PasoMinuta)} disabled={saving}>Siguiente →</Button>}
           {(paso === 3 || nota) && (
-            <Button className="minuta-avanzar" variant={paso === 3 ? 'success' : 'outline-primary'} onClick={() => void guardar()} loading={saving} loadingText="Guardando…" disabled={subiendoAlgo}>
+            <Button className="minuta-avanzar" variant={paso === 3 ? 'success' : 'outline-primary'} onClick={() => void guardar()} loading={saving} loadingText="Guardando…"
+              aria-disabled={subiendoAlgo || undefined} style={subiendoAlgo ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
               {subiendoAlgo ? 'Subiendo archivos…' : nota ? 'Guardar cambios' : '✅ Guardar minuta'}
             </Button>
           )}

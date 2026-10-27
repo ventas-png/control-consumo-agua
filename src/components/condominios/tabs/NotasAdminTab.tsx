@@ -207,7 +207,8 @@ export default function NotasAdminTab({
       )}
 
       {wizard.abierto && (
-        <MinutaWizard nota={wizard.nota} proyectoId={proyectoId} companyId={companyId} autorNombre={autorNombre}
+        // key: otra minuta (o una nueva) es otro asistente, con su propio estado y sus propios archivos.
+        <MinutaWizard key={wizard.nota?.id ?? 'nueva'} nota={wizard.nota} proyectoId={proyectoId} companyId={companyId} autorNombre={autorNombre}
           personal={personal} cargos={cargos} unidades={unidades} contratos={contratos} contratosProveedores={contratosProveedores}
           onClose={() => setWizard({ abierto: false, nota: null })}
           onGuardado={() => { setWizard({ abierto: false, nota: null }); onRefresh() }} />

@@ -28,13 +28,13 @@ vi.mock('../../../lib/fileValidation', () => ({
 }))
 vi.mock('../../../lib/imageCompress', () => ({ compressImage: vi.fn(async (f: File) => f) }))
 vi.mock('../../../lib/platform', () => ({ isNative: () => false }))
-vi.mock('../../../lib/storageUrls', () => ({ useSignedUrl: () => null }))
+vi.mock('../../../lib/storageUrls', () => ({ useSignedUrl: (v: string | null) => (v && !v.includes('sin-firma') ? `https://firmada/${v}` : null) }))
 vi.mock('../MediaScopeContext', () => ({ useMediaScope: () => 'p1' }))
 vi.mock('../SecureImage', () => ({ SecureImage: ({ alt }: { alt: string }) => <img alt={alt} /> }))
 vi.mock('../SecureFileLink', () => ({ SecureFileLink: ({ children }: { children: React.ReactNode }) => <a href="#x">{children}</a> }))
 
 const { MultiImageUploader } = await import('../ImageUploader')
-const { MultiFileUploader } = await import('../FileUploader')
+const { MultiFileUploader, ListaAdjuntos } = await import('../FileUploader')
 const { ImageGallery } = await import('../ImageGallery')
 
 /** Una promesa que el test resuelve cuando quiere: simula la latencia de Storage. */
@@ -112,13 +112,56 @@ describe('MultiImageUploader', () => {
 
   it('la casilla de agregar es un botón con nombre que se abre con Enter o Espacio', () => {
     const { container } = render(<ConEstado tipo="foto" inicial={['p1/minutas/a.jpg']} />)
-    const agregar = screen.getByRole('button', { name: 'Agregar fotos (1 de 10)' })
+    const agregar = screen.getByRole('button', { name: 'Fotos: agregar (1 de 10)' })
     expect(agregar.tabIndex).toBe(0)
     const click = vi.spyOn(container.querySelector('input[type=file]') as HTMLInputElement, 'click')
     fireEvent.keyDown(agregar, { key: 'Enter' })
     fireEvent.keyDown(agregar, { key: ' ' })
     expect(click).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('img', { name: 'Foto 1' })).toBeTruthy()
+  })
+
+  it('un doble clic (o doble toque) en la ✕ quita una sola foto; dos quitas con teclado, dos', () => {
+    const espia = vi.fn()
+    render(<ConEstado tipo="foto" inicial={['p1/minutas/a.jpg', 'p1/minutas/b.jpg', 'p1/minutas/c.jpg']} espia={espia} />)
+    // El segundo clic cae sobre la ✕ de la foto que ocupó el lugar.
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar foto 1 de 3' }), { detail: 1 })
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar foto 1 de 2' }), { detail: 2 })
+    // Un doble toque que el navegador no cuenta como doble clic (detail 1) tampoco.
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar foto 1 de 2' }), { detail: 1 })
+    expect(espia).toHaveBeenCalledTimes(1)
+    expect(espia).toHaveBeenLastCalledWith(['p1/minutas/b.jpg', 'p1/minutas/c.jpg'])
+    expect(mocks.removeMedia).toHaveBeenCalledTimes(1)
+    // Teclado (detail 0): cada Enter es deliberado.
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar foto 1 de 2' }), { detail: 0 })
+    expect(espia).toHaveBeenLastCalledWith(['p1/minutas/c.jpg'])
+  })
+
+  it('una subida a la vez: lo que se suelta mientras sube se rechaza con aviso', async () => {
+    const subida = diferida<{ error: null }>()
+    mocks.uploadMedia.mockReturnValueOnce(subida.promesa)
+    const onSubiendo = vi.fn()
+    const espia = vi.fn()
+    const { container } = render(<ConEstado tipo="foto" inicial={[]} onSubiendo={onSubiendo} espia={espia} />)
+    const input = container.querySelector('input[type=file]') as HTMLInputElement
+    elegir(input, [archivo('lenta.jpg')])
+    await act(async () => {})
+    elegir(input, [archivo('rapida.jpg')])
+    await act(async () => {})
+    expect(screen.getByRole('alert').textContent).toBe('Espera a que termine la subida en curso.')
+    await act(async () => { subida.resolver({ error: null }) })
+    expect(mocks.uploadMedia).toHaveBeenCalledTimes(1)
+    expect(espia).toHaveBeenLastCalledWith(['p1/minutas/lenta.jpg'])
+    expect(onSubiendo.mock.calls).toEqual([[true], [false]])
+  })
+
+  it('si «agregar» tenía el foco y la foto llena el cupo, el foco pasa a la última ✕', async () => {
+    const nueve = Array.from({ length: 9 }, (_, i) => `p1/minutas/${i}.jpg`)
+    const { container } = render(<ConEstado tipo="foto" inicial={nueve} />)
+    screen.getByRole('button', { name: 'Fotos: agregar (9 de 10)' }).focus()
+    elegir(container.querySelector('input[type=file]')!, [archivo('decima.jpg')])
+    await act(async () => {})
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Quitar foto 10 de 10' }))
   })
 
   it('quitar con el foco en la ✕ pasa el foco a la siguiente, no a <body>', () => {
@@ -129,7 +172,7 @@ describe('MultiImageUploader', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Quitar foto 1 de 1' }))
     const ultima = screen.getByRole('button', { name: 'Quitar foto 1 de 1' })
     fireEvent.click(ultima)
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Agregar fotos (0 de 10)' }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Fotos: agregar (0 de 10)' }))
   })
 })
 
@@ -157,13 +200,36 @@ describe('MultiFileUploader', () => {
 
     const input = container.querySelector('input[type=file]') as HTMLInputElement
     const click = vi.spyOn(input, 'click')
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Adjuntar documentos (0 de 4)' }), { key: 'Enter' })
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Adjuntar documentos: agregar (0 de 4). PDF, Word o Excel, máximo 10 MB' }), { key: 'Enter' })
     expect(click).toHaveBeenCalledTimes(1)
 
     elegir(input, [archivo('contrato.pdf', 'application/pdf')])
     await act(async () => {})
     expect(onSubiendo.mock.calls).toEqual([[true], [false]])
     expect(espia).toHaveBeenLastCalledWith(['p1/minutas/contrato.pdf'])
+  })
+})
+
+describe('MultiFileUploader — doble clic, foco y lista de lectura', () => {
+  it('un doble clic en la ✕ quita un solo documento; con teclado el foco pasa al siguiente', () => {
+    const espia = vi.fn()
+    render(<ConEstado tipo="doc" inicial={['p1/minutas/a.pdf', 'p1/minutas/b.pdf', 'p1/minutas/c.pdf']} borrarAlQuitar={false} espia={espia} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar a.pdf' }), { detail: 1 })
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar b.pdf' }), { detail: 2 })
+    expect(espia).toHaveBeenCalledTimes(1)
+    const b = screen.getByRole('button', { name: 'Quitar b.pdf' })
+    b.focus()
+    fireEvent.click(b, { detail: 0 })
+    expect(espia).toHaveBeenLastCalledWith(['p1/minutas/c.pdf'])
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Quitar c.pdf' }))
+  })
+
+  it('ListaAdjuntos muestra el nombre de inmediato y activa el enlace cuando llega la firma', () => {
+    render(<ListaAdjuntos paths={['p1/minutas/acta.pdf', 'p1/minutas/sin-firma.pdf']} />)
+    expect(screen.getByRole('link', { name: /acta\.pdf/ }).getAttribute('href')).toBe('https://firmada/p1/minutas/acta.pdf')
+    // Sin URL todavía: la fila está (no salta el contenido) pero no es un enlace.
+    expect(screen.getByText('sin-firma.pdf')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /sin-firma/ })).toBeNull()
   })
 })
 
@@ -189,6 +255,14 @@ describe('ImageGallery', () => {
     expect(screen.getByRole('button', { name: 'Cerrar foto' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Foto siguiente' }))
     expect(screen.getByRole('dialog', { name: 'Foto 3 de 3' })).toBeTruthy()
+    // Tab y Shift+Tab ciclan dentro de la foto: nunca salen a controles tapados.
+    const cerrar = screen.getByRole('button', { name: 'Cerrar foto' })
+    const siguiente = screen.getByRole('button', { name: 'Foto siguiente' })
+    siguiente.focus()
+    fireEvent.keyDown(siguiente, { key: 'Tab' })
+    expect(document.activeElement).toBe(cerrar)
+    fireEvent.keyDown(cerrar, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(siguiente)
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(delModal).not.toHaveBeenCalled()
