@@ -3,9 +3,11 @@
 // detalle van en ventana (pantalla completa en el teléfono). Los vencimientos
 // y los problemas se cuentan por equipo con su inspección más reciente: un
 // extintor ya recargado deja de salir «vencido» por su registro viejo.
+// La ubicación se elige del catálogo de áreas (tab Áreas); lo histórico sin
+// vincular se sigue mostrando con su texto. La inspección lleva imágenes.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react'
-import type { ControlSistemaIncendio } from '../../../../types'
+import type { AreaCondominio, ControlSistemaIncendio } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async (..._args: unknown[]) => ({ error: null as { message: string } | null })),
@@ -34,6 +36,15 @@ vi.mock('../../../../domain/proveedores/queries', () => ({
   useAsignacionesQuery: () => ({ data: [], isLoading: false }),
   useOperacionesLegadoQuery: () => ({ data: mocks.legado, isLoading: false }),
 }))
+// Subir y firmar imágenes es del storage; aquí basta con qué rutas viajan.
+vi.mock('../../../shared/ImageUploader', () => ({
+  MultiImageUploader: ({ values, onChange, label }: { values: string[]; onChange: (v: string[]) => void; label: string }) => (
+    <button type="button" onClick={() => onChange([...values, `p1/incendio/foto-${values.length + 1}.jpg`])}>{`${label}: agregar (${values.length})`}</button>
+  ),
+}))
+vi.mock('../../../shared/ImageGallery', () => ({
+  ImageGallery: ({ urls }: { urls: string[] }) => <ul aria-label="Galería">{urls.map(u => <li key={u}>{u}</li>)}</ul>,
+}))
 vi.mock('../../../../domain/proveedores/mutations', () => ({
   useVincularOperacionMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
@@ -50,6 +61,17 @@ function inspeccion(over: Partial<ControlSistemaIncendio>): ControlSistemaIncend
   }
 }
 
+function area(over: Partial<AreaCondominio> & Pick<AreaCondominio, 'id' | 'nombre'>): AreaCondominio {
+  return { company_id: 'co1', project_id: 'p1', icono: '📍', orden: 0, activo: true, created_at: '2026-01-01T00:00:00Z', ...over }
+}
+
+const areas = [
+  area({ id: 'ar-lobby', nombre: 'Lobby', icono: '🚪' }),
+  area({ id: 'ar-sot1', nombre: 'Sótano 1', icono: '🚗' }),
+  area({ id: 'ar-n3', nombre: 'Nivel 3' }),
+  area({ id: 'ar-terraza', nombre: 'Terraza', activo: false }),
+]
+
 const registros = [
   // EXT-001: vencido en 2025, recargado en 2026 → ya no está vencido.
   inspeccion({ id: 'a1', fecha: '2025-01-10', tipo_inspeccion: 'recarga', fecha_vencimiento: '2025-12-31', created_at: '2025-01-10T10:00:00Z' }),
@@ -58,14 +80,18 @@ const registros = [
   // EXT-002: sigue vencido.
   inspeccion({ id: 'b1', identificador: 'EXT-002', ubicacion: 'Sótano 1', fecha: '2025-03-01', fecha_vencimiento: '2025-09-01', created_at: '2025-03-01T10:00:00Z' }),
   // ALM-05: estuvo fuera de servicio y ya se reparó.
-  inspeccion({ id: 'c1', tipo_sistema: 'alarma', identificador: 'ALM-05', ubicacion: 'Piso 3', fecha: '2026-09-01', resultado: 'fuera_servicio',
+  // ALM-05 está vinculada al área; su snapshot es de antes de renombrarla.
+  inspeccion({ id: 'c1', tipo_sistema: 'alarma', identificador: 'ALM-05', area_id: 'ar-n3', ubicacion: 'Piso 3', fecha: '2026-09-01', resultado: 'fuera_servicio',
     observaciones: 'Sirena sin sonido.', created_at: '2026-09-01T10:00:00Z' }),
-  inspeccion({ id: 'c2', tipo_sistema: 'alarma', identificador: 'ALM-05', ubicacion: 'Piso 3', fecha: '2026-10-02', tipo_inspeccion: 'prueba_funcional',
-    created_at: '2026-10-02T10:00:00Z' }),
+  inspeccion({ id: 'c2', tipo_sistema: 'alarma', identificador: 'ALM-05', area_id: 'ar-n3', ubicacion: 'Piso 3', fecha: '2026-10-02', tipo_inspeccion: 'prueba_funcional',
+    fotos: ['p1/incendio/sirena.jpg', 'p1/incendio/panel.jpg'], created_at: '2026-10-02T10:00:00Z' }),
 ]
 
 function props(over: Partial<Parameters<typeof ControlSistemaIncendioTab>[0]> = {}): Parameters<typeof ControlSistemaIncendioTab>[0] {
-  return { registros, proyectoId: 'p1', companyId: 'co1', moneda: 'Q', canCreate: true, canEdit: true, onRefresh: vi.fn(), ...over }
+  return {
+    registros, areas, proyectoId: 'p1', companyId: 'co1', moneda: 'Q', canCreate: true, canEdit: true,
+    puedeConfigurarAreas: true, onIrATab: vi.fn(), onRefresh: vi.fn(), ...over,
+  }
 }
 
 function esperar() {
@@ -81,7 +107,7 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Contra incendio — nueva inspección en ventana', () => {
-  it('abre a pantalla completa, propone tipo y ubicación de un equipo ya registrado y registra', async () => {
+  it('abre a pantalla completa, propone tipo y área de un equipo ya registrado y registra', async () => {
     const onRefresh = vi.fn()
     render(<ControlSistemaIncendioTab {...props({ onRefresh })} />)
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -91,7 +117,7 @@ describe('Contra incendio — nueva inspección en ventana', () => {
     expect(ventana.classList.contains('at-modal--fs-mobile')).toBe(true)
 
     fireEvent.change(screen.getByLabelText('Identificador *'), { target: { value: 'ALM-05' } })
-    expect((screen.getByLabelText('Ubicación *') as HTMLInputElement).value).toBe('Piso 3')
+    expect((screen.getByLabelText('Ubicación *') as HTMLSelectElement).value).toBe('ar-n3')
     expect((screen.getByLabelText('Tipo de sistema') as HTMLSelectElement).value).toBe('alarma')
 
     const guardado = esperar()
@@ -99,7 +125,7 @@ describe('Contra incendio — nueva inspección en ventana', () => {
     fireEvent.click(within(ventana).getByRole('button', { name: /Registrar/ }))
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     expect(mocks.createCondominioRow).toHaveBeenCalledWith('control_sistema_incendio', expect.objectContaining({
-      company_id: 'co1', project_id: 'p1', identificador: 'ALM-05', ubicacion: 'Piso 3', tipo_sistema: 'alarma',
+      company_id: 'co1', project_id: 'p1', identificador: 'ALM-05', area_id: 'ar-n3', ubicacion: 'Nivel 3', tipo_sistema: 'alarma',
     }))
 
     // Mientras guarda, ni Escape ni la X la cierran.
@@ -112,27 +138,78 @@ describe('Contra incendio — nueva inspección en ventana', () => {
     expect(onRefresh).toHaveBeenCalled()
   })
 
-  it('la ubicación escrita a mano no se pisa al elegir un equipo', () => {
+  it('la ubicación se elige entre las áreas activas del catálogo', () => {
     render(<ControlSistemaIncendioTab {...props()} />)
     fireEvent.click(screen.getByRole('button', { name: '+ Nueva inspección' }))
-    fireEvent.change(screen.getByLabelText('Ubicación *'), { target: { value: 'Terraza' } })
-    fireEvent.change(screen.getByLabelText('Identificador *'), { target: { value: 'EXT-001' } })
-    expect((screen.getByLabelText('Ubicación *') as HTMLInputElement).value).toBe('Terraza')
+    const ubicacion = screen.getByLabelText('Ubicación *') as HTMLSelectElement
+    expect(ubicacion.tagName).toBe('SELECT')
+    expect(Array.from(ubicacion.options).map(o => o.textContent)).toEqual(
+      ['— Selecciona un área —', '🚪 Lobby', '📍 Nivel 3', '🚗 Sótano 1'])
   })
 
-  it('sin identificador avisa; si falla el guardado, la ventana conserva lo escrito', async () => {
+  it('el área elegida a mano no se pisa al elegir un equipo', () => {
+    render(<ControlSistemaIncendioTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva inspección' }))
+    fireEvent.change(screen.getByLabelText('Ubicación *'), { target: { value: 'ar-sot1' } })
+    fireEvent.change(screen.getByLabelText('Identificador *'), { target: { value: 'ALM-05' } })
+    expect((screen.getByLabelText('Ubicación *') as HTMLSelectElement).value).toBe('ar-sot1')
+  })
+
+  it('un equipo histórico sin vincular propone el área cuyo nombre coincide', () => {
+    render(<ControlSistemaIncendioTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva inspección' }))
+    // EXT-001 se registró con el texto «Lobby», antes del catálogo.
+    fireEvent.change(screen.getByLabelText('Identificador *'), { target: { value: 'EXT-001' } })
+    expect((screen.getByLabelText('Ubicación *') as HTMLSelectElement).value).toBe('ar-lobby')
+  })
+
+  it('sin áreas activas lleva al tab Áreas (o dice dónde se crean)', () => {
+    const onIrATab = vi.fn()
+    const { unmount } = render(<ControlSistemaIncendioTab {...props({ areas: [], onIrATab })} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva inspección' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Crearlas en el tab Áreas' }))
+    expect(onIrATab).toHaveBeenCalledWith('areas_config')
+    unmount()
+
+    render(<ControlSistemaIncendioTab {...props({ areas: [], puedeConfigurarAreas: false })} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva inspección' }))
+    expect(screen.queryByRole('button', { name: 'Crearlas en el tab Áreas' })).toBeNull()
+    expect(screen.getByText(/Se dan de alta en el tab Áreas\./)).toBeTruthy()
+  })
+
+  it('sin identificador o sin área avisa; si falla el guardado, la ventana conserva lo escrito', async () => {
     render(<ControlSistemaIncendioTab {...props()} />)
     fireEvent.click(screen.getByRole('button', { name: '+ Nueva inspección' }))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Registrar/ }))
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'warning' })))
     expect(mocks.createCondominioRow).not.toHaveBeenCalled()
 
-    mocks.createCondominioRow.mockResolvedValueOnce({ error: { message: 'Sin conexión' } })
+    // Un equipo nuevo no trae área: hay que elegirla.
     fireEvent.change(screen.getByLabelText('Identificador *'), { target: { value: 'GAB-01' } })
-    fireEvent.change(screen.getByLabelText('Ubicación *'), { target: { value: 'Piso 2' } })
+    mocks.notify.mockClear()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Registrar/ }))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'warning' })))
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+
+    mocks.createCondominioRow.mockResolvedValueOnce({ error: { message: 'Sin conexión' } })
+    fireEvent.change(screen.getByLabelText('Ubicación *'), { target: { value: 'ar-lobby' } })
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Registrar/ }))
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error', text: 'Sin conexión' })))
     expect((screen.getByLabelText('Identificador *') as HTMLInputElement).value).toBe('GAB-01')
+    expect((screen.getByLabelText('Ubicación *') as HTMLSelectElement).value).toBe('ar-lobby')
+  })
+
+  it('las imágenes agregadas viajan con la inspección', async () => {
+    render(<ControlSistemaIncendioTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva inspección' }))
+    fireEvent.change(screen.getByLabelText('Identificador *'), { target: { value: 'EXT-009' } })
+    fireEvent.change(screen.getByLabelText('Ubicación *'), { target: { value: 'ar-lobby' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Imágenes: agregar (0)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Imágenes: agregar (1)' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Registrar/ }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('control_sistema_incendio', expect.objectContaining({
+      identificador: 'EXT-009', fotos: ['p1/incendio/foto-1.jpg', 'p1/incendio/foto-2.jpg'],
+    })))
   })
 
   it('sin permiso de crear no hay botón', () => {
@@ -185,6 +262,14 @@ describe('Contra incendio — estado por equipo, lista y detalle', () => {
     expect(within(viejo).getByText('2025-12-31')).toBeTruthy()
   })
 
+  it('lo vinculado muestra el nombre vigente del área; lo histórico, su texto', () => {
+    const { container } = render(<ControlSistemaIncendioTab {...props()} />)
+    const ubicaciones = Array.from(container.querySelectorAll('tbody td[data-label="Ubicación"]')).map(td => td.textContent)
+    // ALM-05 guardó «Piso 3», pero el área ahora se llama «Nivel 3».
+    expect(new Set(ubicaciones)).toEqual(new Set(['Lobby', 'Sótano 1', 'Nivel 3']))
+    expect(ubicaciones).not.toContain('Piso 3')
+  })
+
   it('tocar la fila abre el detalle con las observaciones', () => {
     const { container } = render(<ControlSistemaIncendioTab {...props()} />)
     const fila = within(container.querySelector('tbody')!).getAllByText('ALM-05', { exact: false })
@@ -192,5 +277,18 @@ describe('Contra incendio — estado por equipo, lista y detalle', () => {
       .find(tr => tr.textContent?.includes('2026-09-01'))!
     fireEvent.click(fila)
     expect(within(screen.getByRole('dialog', { name: '🔔 ALM-05' })).getByText('Sirena sin sonido.')).toBeTruthy()
+  })
+
+  it('el detalle muestra las imágenes de la inspección', () => {
+    render(<ControlSistemaIncendioTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver inspección de ALM-05 del 2026-10-02' }))
+    const detalle = screen.getByRole('dialog', { name: '🔔 ALM-05' })
+    expect(within(detalle).getByText('Imágenes (2)')).toBeTruthy()
+    expect(within(within(detalle).getByRole('list', { name: 'Galería' })).getAllByRole('listitem').map(li => li.textContent))
+      .toEqual(['p1/incendio/sirena.jpg', 'p1/incendio/panel.jpg'])
+
+    // Sin imágenes no hay sección.
+    fireEvent.click(within(detalle).getByRole('button', { name: /^2026-09-01 · Revisión visual/ }))
+    expect(within(screen.getByRole('dialog', { name: '🔔 ALM-05' })).queryByText(/^Imágenes/)).toBeNull()
   })
 })

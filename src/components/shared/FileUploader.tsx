@@ -1,8 +1,7 @@
-import { useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type MouseEvent } from 'react'
 import { uploadCondominiosMedia, removeCondominiosMedia } from '../../domain/shared/storage'
 import { validateFileMagic, buildUploadPath, resolveUploadContentType } from '../../lib/fileValidation'
 import { useSignedUrl } from '../../lib/storageUrls'
-import { SecureFileLink } from './SecureFileLink'
 import { useMediaScope } from './MediaScopeContext'
 
 const ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp'
@@ -192,27 +191,54 @@ interface MultiProps {
   label?: string
   maxFiles?: number
   accept?: string
+  /**
+   * Por defecto, quitar un archivo lo borra del bucket al instante. Con `false`
+   * sólo lo saca de la lista y el que llama decide al guardar o cancelar (ver
+   * MultiImageUploader).
+   */
+  borrarAlQuitar?: boolean
+  /** Avisa cuándo empieza y termina una subida, para no guardar ni cerrar a mitad. */
+  onSubiendo?: (subiendo: boolean) => void
 }
 
 export function MultiFileUploader({
-  values, onChange, folder, label = 'Adjuntar documentos', maxFiles = 4, accept = ACCEPT,
+  values, onChange, folder, label = 'Adjuntar documentos', maxFiles = 4, accept = ACCEPT, borrarAlQuitar = true, onSubiendo,
 }: MultiProps) {
   const ref = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const projectId = useMediaScope()
+  // La lista vigente, no la del render en que empezó la subida; una subida a la
+  // vez; y un doble clic en la ✕ no quita también el siguiente (ver MultiImageUploader).
+  const valuesRef = useRef(values)
+  valuesRef.current = values
+  const subiendoRef = useRef(false)
+  const ultimoQuitarRef = useRef(-Infinity)
+  const cajaRef = useRef<HTMLDivElement>(null)
+  const enfocarRef = useRef<number | null>(null)
+  useEffect(() => {
+    const i = enfocarRef.current
+    if (i === null || !cajaRef.current) return
+    enfocarRef.current = null
+    const quitar = cajaRef.current.querySelectorAll<HTMLElement>('.at-adjunto-quitar')
+    const destino = quitar[Math.min(i, quitar.length - 1)] ?? cajaRef.current.querySelector<HTMLElement>('.at-adjunto-agregar')
+    destino?.focus()
+  }, [values])
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
+    if (subiendoRef.current) { setError('Espera a que termine la subida en curso.'); return }
     setError(null)
     // infra:I14 — el path va scopeado por project_id o la policy de storage lo
     // rechaza; fallar acá da un mensaje entendible.
     if (!projectId) { setError('No se pudo determinar el proyecto. Recargue la página e intente de nuevo.'); return }
-    const aSubir = Array.from(files).slice(0, maxFiles - values.length)
+    const aSubir = Array.from(files).slice(0, maxFiles - valuesRef.current.length)
     if (aSubir.length === 0) { setError(`Máximo ${maxFiles} archivos`); return }
 
+    subiendoRef.current = true
     setUploading(true)
+    onSubiendo?.(true)
     try {
       const nuevos: string[] = []
       for (const file of aSubir) {
@@ -227,17 +253,31 @@ export function MultiFileUploader({
         if (upErr || !data) { setError(`No se pudo subir "${file.name}".`); break }
         nuevos.push(data.path)
       }
-      if (nuevos.length > 0) onChange([...values, ...nuevos])
+      if (nuevos.length > 0) {
+        const lista = [...valuesRef.current, ...nuevos]
+        // Con el cupo lleno «agregar» desaparece: si tenía el foco, pasa a la última ✕.
+        if (lista.length >= maxFiles && cajaRef.current?.querySelector('.at-adjunto-agregar') === document.activeElement) enfocarRef.current = lista.length - 1
+        onChange(lista)
+      }
     } finally {
+      subiendoRef.current = false
       setUploading(false)
+      onSubiendo?.(false)
     }
   }
 
-  async function quitar(path: string) {
+  async function quitar(path: string, e: MouseEvent<HTMLButtonElement>) {
+    if (e.detail > 0 && e.timeStamp - ultimoQuitarRef.current < 500) return
+    ultimoQuitarRef.current = e.timeStamp
+    const lista = valuesRef.current
+    if (e.currentTarget === document.activeElement) enfocarRef.current = Math.max(0, lista.indexOf(path))
+    // Primero sale de la lista y después se borra (ver MultiImageUploader).
+    onChange(lista.filter(p => p !== path))
     const real = path.startsWith('http') ? path.match(/condominios-media\/(.+)$/)?.[1] : path
-    if (real) await removeCondominiosMedia([real])
-    onChange(values.filter(p => p !== path))
+    if (real && borrarAlQuitar) await removeCondominiosMedia([real])
   }
+
+  function abrir() { if (!subiendoRef.current) ref.current?.click() }
 
   function onDrop(e: DragEvent) {
     e.preventDefault(); setDragging(false)
@@ -245,7 +285,7 @@ export function MultiFileUploader({
   }
 
   return (
-    <div>
+    <div ref={cajaRef}>
       <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: 6 }}>
         {label} <span style={{ fontWeight: 400, color: 'var(--at-ink-3)' }}>({values.length}/{maxFiles})</span>
       </label>
@@ -257,8 +297,8 @@ export function MultiFileUploader({
             return (
               <div key={path} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8 }}>
                 <span style={{ fontSize: 17 }}>{fileIcon(nombre)}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--at-ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</span>
-                <button onClick={() => quitar(path)} aria-label={`Quitar ${nombre}`}
+                <span className="at-adjunto-nombre" title={nombre} style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--at-ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</span>
+                <button type="button" className="at-adjunto-quitar" onClick={e => void quitar(path, e)} aria-label={`Quitar ${nombre}`}
                   style={{ padding: '2px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, color: 'var(--at-danger)', cursor: 'pointer', fontSize: 12 }}>
                   ✕
                 </button>
@@ -270,10 +310,16 @@ export function MultiFileUploader({
 
       {values.length < maxFiles && (
         <div
+          role="button"
+          tabIndex={0}
+          className="at-adjunto-agregar"
+          aria-label={`${label}: agregar (${values.length} de ${maxFiles}). PDF, Word o Excel, máximo 10 MB`}
+          aria-disabled={uploading || undefined}
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
-          onClick={() => !uploading && ref.current?.click()}
+          onClick={abrir}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir() } }}
           style={{
             border: `2px dashed ${dragging ? 'var(--at-primary)' : 'var(--at-line-strong)'}`,
             borderRadius: 8, padding: '12px', textAlign: 'center',
@@ -281,7 +327,7 @@ export function MultiFileUploader({
             background: dragging ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
           }}>
           {uploading ? (
-            <div style={{ fontSize: 12, color: 'var(--at-primary)' }}>Subiendo…</div>
+            <div role="status" style={{ fontSize: 12, color: 'var(--at-primary)' }}>Subiendo…</div>
           ) : (
             <>
               <span style={{ fontSize: 18 }}>📎</span>
@@ -294,7 +340,7 @@ export function MultiFileUploader({
       <input ref={ref} type="file" accept={accept} multiple style={{ display: 'none' }}
         onChange={e => { void handleFiles(e.target.files); e.target.value = '' }} />
 
-      {error && <div style={{ fontSize: 11, color: 'var(--at-danger)', marginTop: 4 }}>{error}</div>}
+      {error && <div role="alert" style={{ fontSize: 11, color: 'var(--at-danger)', marginTop: 4 }}>{error}</div>}
     </div>
   )
 }
@@ -309,17 +355,27 @@ export function ListaAdjuntos({ paths }: { paths: string[] }) {
   if (!paths || paths.length === 0) return null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      {paths.map(path => {
-        const nombre = nombreDeArchivo(path)
-        return (
-          <SecureFileLink key={path} src={path}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8, textDecoration: 'none', color: 'var(--at-ink-2)' }}>
-            <span style={{ fontSize: 16 }}>{fileIcon(nombre)}</span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</span>
-            <span style={{ fontSize: 11, color: 'var(--at-primary)', fontWeight: 700, flexShrink: 0 }}>Abrir</span>
-          </SecureFileLink>
-        )
-      })}
+      {paths.map(path => <FilaAdjunto key={path} path={path} />)}
     </div>
   )
+}
+
+const filaAdjunto: CSSProperties = { display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8, textDecoration: 'none', color: 'var(--at-ink-2)' }
+
+/**
+ * Una fila: el nombre se ve de inmediato (no necesita la URL) y el enlace se
+ * activa cuando llega la firma. Antes la fila no existía hasta firmar: la lista
+ * aparecía vacía y cada enlace que llegaba empujaba lo de abajo.
+ */
+function FilaAdjunto({ path }: { path: string }) {
+  const url = useSignedUrl(path, 'condominios-media')
+  const nombre = nombreDeArchivo(path)
+  const contenido = <>
+    <span style={{ fontSize: 16 }}>{fileIcon(nombre)}</span>
+    <span className="at-adjunto-nombre" title={nombre} style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</span>
+    <span style={{ fontSize: 11, color: url ? 'var(--at-primary)' : 'var(--at-ink-3)', fontWeight: 700, flexShrink: 0 }}>{url ? 'Abrir' : '…'}</span>
+  </>
+  return url
+    ? <a className="at-adjunto-fila" href={url} target="_blank" rel="noreferrer" style={filaAdjunto}>{contenido}</a>
+    : <span className="at-adjunto-fila" aria-disabled="true" style={filaAdjunto}>{contenido}</span>
 }
