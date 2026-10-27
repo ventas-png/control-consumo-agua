@@ -1,0 +1,225 @@
+/* Minutas de reunión: el reacomodo de las ventanas al teléfono.
+ * Los estilos inline no pueden expresar media queries, así que aquí vive lo que
+ * cambia con el ancho. Móvil primero (menos de 560 px): una columna, objetivos
+ * táctiles de 44 px y nada que se salga del panel. */
+
+/* ── Indicador de pasos ───────────────────────────────────────────────────── */
+/* En el teléfono: tres columnas iguales, número arriba y nombre debajo. */
+.minuta-pasos {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-bottom: 18px;
+  min-width: 0;
+}
+.minuta-paso {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.minuta-paso-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.minuta-paso-label {
+  max-width: 100%;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.minuta-conector { display: none; }
+
+/* ── Ventana: contenido ───────────────────────────────────────────────────── */
+/* Columna de un solo ancho: ninguna pista puede crecer más que el panel. */
+.minuta-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+.minuta-punto {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.minuta-punto-campos {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+/* Acuerdo: el tipo y la ✕ en la primera fila; el texto ocupa la segunda. */
+.minuta-acuerdo {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--at-surface-2);
+  border: 1px solid var(--at-line);
+  min-width: 0;
+}
+.minuta-acuerdo-fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "tipo quitar"
+    "texto texto";
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.minuta-acu-tipo { grid-area: tipo; justify-self: start; }
+.minuta-acu-texto { grid-area: texto; min-width: 0; }
+.minuta-acu-quitar { grid-area: quitar; }
+
+/* Participante: el cuerpo y las acciones; en el teléfono las acciones bajan
+   a su propia línea, alineadas a la derecha. */
+.minuta-part {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--at-surface-2);
+  min-width: 0;
+}
+.minuta-part-cuerpo {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.minuta-part-acc {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Candidatos a participante: fila con avatar, nombre y botón de agregar. */
+.minuta-cand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  min-width: 0;
+}
+.minuta-cand-texto { flex: 1 1 0; min-width: 0; }
+.minuta-cand-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--at-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Pie de la ventana ────────────────────────────────────────────────────── */
+.minuta-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.minuta-acciones > button {
+  flex: 1 1 0;
+  min-height: 44px;
+  white-space: nowrap;
+}
+/* Teléfono: el paso principal ocupa su mitad; «Cancelar» baja a una fila propia. */
+.minuta-acciones .minuta-cancelar {
+  order: 9;
+  flex: 1 1 100%;
+}
+
+/* Pie del detalle: en el teléfono, dos columnas y «Eliminar» a lo ancho. */
+.minuta-acciones--detalle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.minuta-acciones--detalle > button {
+  flex: none;
+  min-width: 0;
+}
+.minuta-acciones--detalle .minuta-eliminar {
+  grid-column: 1 / -1;
+  order: 9;
+}
+
+/* Objetivos táctiles en el teléfono. */
+.minuta-touch { min-height: 44px; }
+.minuta-icono { min-width: 44px; min-height: 44px; }
+
+/* ── Escritorio y tabletas (560 px en adelante) ───────────────────────────── */
+@media (min-width: 560px) {
+  .minuta-pasos { gap: 8px; margin-bottom: 18px; }
+  .minuta-paso { flex: 0 0 auto; }
+  .minuta-paso-btn {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 7px;
+    min-height: 40px;
+    padding: 6px 4px;
+  }
+  .minuta-paso-label { font-size: 13px; overflow: visible; }
+  .minuta-conector {
+    display: block;
+    width: 22px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--at-line);
+    flex: 0 0 auto;
+  }
+  .minuta-conector--hecho { background: var(--at-success); }
+
+  .minuta-acuerdo-fila {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "tipo texto quitar";
+  }
+
+  .minuta-acciones {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+  .minuta-acciones > button {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+  .minuta-acciones .minuta-cancelar {
+    order: -1;
+    flex: 0 0 auto;
+    margin-right: auto;
+  }
+
+  .minuta-acciones--detalle {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .minuta-acciones--detalle .minuta-eliminar {
+    order: 0;
+    margin-right: auto;
+  }
+  .minuta-touch { min-height: 0; }
+  .minuta-icono { min-width: 36px; min-height: 36px; }
+}

@@ -145,6 +145,13 @@ export function plazoCompromiso(dias: number): string {
   return `vence en ${dias} día${dias === 1 ? '' : 's'}`
 }
 
+/** Próximo seguimiento de la minuta: «en 3 días», «hoy», «vencido hace 2 días». Días de calendario locales. */
+export function plazoSeguimiento(dias: number): string {
+  if (dias < 0) return `vencido hace ${-dias} día${dias === -1 ? '' : 's'}`
+  if (dias === 0) return 'hoy'
+  return `en ${dias} día${dias === 1 ? '' : 's'}`
+}
+
 export interface ResumenCompromisos {
   /** Compromisos (no cuenta los acuerdos). */
   total: number

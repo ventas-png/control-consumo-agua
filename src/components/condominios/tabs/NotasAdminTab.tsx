@@ -10,7 +10,7 @@ import { EmptyState } from '../../shared/EmptyState'
 import { FilterChips } from '../../shared/FilterChips'
 import { tint } from '../../shared/statusTone'
 import {
-  fechaDeMinuta, gestorDe, participantesDe, plazoCompromiso, puntosDe, resumenCompromisos,
+  fechaDeMinuta, gestorDe, participantesDe, plazoSeguimiento, puntosDe, resumenCompromisos,
 } from '../../../domain/condominios/minutas'
 import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../lib/format'
 import { normalizarNombre } from '../../../domain/proveedores/identidad'
@@ -18,6 +18,7 @@ import type { CargoCatalogo, CategoriaNota, ContratoArrendamiento, ContratoProve
 import { AvataresApilados, BarraAvance, CATEGORIAS, categoriaInfo, inp, prioridadInfo } from './minutas/comun'
 import { MinutaDetalle } from './minutas/MinutaDetalle'
 import { MinutaWizard } from './minutas/MinutaWizard'
+import './minutas/minutas.css'
 
 interface Props {
   notas: NotaAdmin[]
@@ -191,7 +192,7 @@ export default function NotasAdminTab({
                 )}
                 {diasSeg !== null && (
                   <div style={{ fontSize: 11, fontWeight: 600, color: diasSeg < 0 ? 'var(--at-danger)' : diasSeg === 0 ? 'var(--at-warning-strong)' : 'var(--at-ink-3)' }}>
-                    ⏰ Seguimiento {plazoCompromiso(diasSeg).replace('vence', '').replace('venció', 'fue').trim()}
+                    ⏰ Seguimiento {plazoSeguimiento(diasSeg)}
                   </div>
                 )}
               </button>

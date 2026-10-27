@@ -7,13 +7,14 @@ import { Button } from '../../../shared/Button'
 import { confirm, notify } from '../../../shared/Dialog'
 import { deleteCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
 import {
-  TIPO_ACUERDO_INFO, fechaDeMinuta, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, puntosDe, resumenCompromisos, situacionCompromiso,
+  TIPO_ACUERDO_INFO, fechaDeMinuta, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, plazoSeguimiento, puntosDe, resumenCompromisos, situacionCompromiso,
 } from '../../../../domain/condominios/minutas'
 import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../../lib/format'
 import type { AcuerdoMinuta, NotaAdmin } from '../../../../types'
 import { tint } from '../../../shared/statusTone'
 import { BarraAvance, ParticipanteCard, categoriaInfo, prioridadInfo } from './comun'
 import { imprimirMinuta } from './imprimirMinuta'
+import './minutas.css'
 
 interface Props {
   nota: NotaAdmin
@@ -95,22 +96,23 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
       size="lg"
       fullScreenOnMobile
       onClose={onClose}
-      footer={<>
-        {canDelete && <Button variant="outline-danger" size="sm" onClick={() => void eliminar()}>🗑 Eliminar</Button>}
-        <span style={{ flex: 1 }} />
-        <Button variant="secondary" size="sm" onClick={() => imprimirMinuta(nota)}>🖨 Imprimir</Button>
-        {canEdit && !nota.resuelta && (
-          <Button variant="secondary" size="sm" onClick={() => void cambiar({ fijada: !nota.fijada }, 'fijar')} loading={ocupado === 'fijar'}>
-            {nota.fijada ? '📌 Desfijar' : '📌 Fijar'}
-          </Button>
-        )}
-        {canEdit && (nota.resuelta
-          ? <Button variant="secondary" size="sm" onClick={() => void cambiar({ resuelta: false }, 'reabrir', 'Minuta reabierta')} loading={ocupado === 'reabrir'}>↺ Reabrir</Button>
-          : <Button variant="success" size="sm" onClick={() => void cerrarMinuta()} loading={ocupado === 'cerrar'}>✓ Cerrar minuta</Button>)}
-        {editable && <Button variant="primary" size="sm" onClick={onEditar}>✏️ Editar</Button>}
-      </>}
+      footer={
+        <div className="minuta-acciones minuta-acciones--detalle">
+          {canDelete && <Button className="minuta-eliminar" variant="outline-danger" size="sm" onClick={() => void eliminar()}>🗑 Eliminar</Button>}
+          <Button variant="secondary" size="sm" onClick={() => imprimirMinuta(nota)}>🖨 Imprimir</Button>
+          {canEdit && !nota.resuelta && (
+            <Button variant="secondary" size="sm" onClick={() => void cambiar({ fijada: !nota.fijada }, 'fijar')} loading={ocupado === 'fijar'}>
+              {nota.fijada ? '📌 Desfijar' : '📌 Fijar'}
+            </Button>
+          )}
+          {canEdit && (nota.resuelta
+            ? <Button variant="secondary" size="sm" onClick={() => void cambiar({ resuelta: false }, 'reabrir', 'Minuta reabierta')} loading={ocupado === 'reabrir'}>↺ Reabrir</Button>
+            : <Button variant="success" size="sm" onClick={() => void cerrarMinuta()} loading={ocupado === 'cerrar'}>✓ Cerrar minuta</Button>)}
+          {editable && <Button variant="primary" size="sm" onClick={onEditar}>✏️ Editar</Button>}
+        </div>
+      }
     >
-      <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={chip(tint(cat.color, 14), cat.color)}>{cat.icon} {cat.label}</span>
           {prio.value !== 'normal' && <span style={chip(prio.bg, prio.color)}>Prioridad {prio.label.toLowerCase()}</span>}
@@ -124,7 +126,7 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
             border: `1px solid ${diasSeguimiento < 0 ? 'var(--at-danger-border)' : diasSeguimiento === 0 ? 'var(--at-warning-border)' : 'var(--at-info-border)'}` }}>
             <span aria-hidden="true" style={{ fontSize: 18 }}>⏰</span>
             <div style={{ fontSize: 13 }}>
-              <strong>Próximo seguimiento</strong> {formatFechaCalendario(nota.fecha_recordatorio)} · {plazoCompromiso(diasSeguimiento).replace('vence', 'es').replace('venció', 'fue')}
+              <strong>Próximo seguimiento</strong> {formatFechaCalendario(nota.fecha_recordatorio)} · {plazoSeguimiento(diasSeguimiento)}
             </div>
           </div>
         )}

@@ -6,7 +6,7 @@ vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { 
 
 const {
   borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
-  fechaDeMinuta, filtrarCandidatos, iniciales, marcarCumplido, participanteDesdeCandidato, participantesDe, plazoCompromiso,
+  fechaDeMinuta, filtrarCandidatos, iniciales, marcarCumplido, participanteDesdeCandidato, participantesDe, plazoCompromiso, plazoSeguimiento,
   puntosDe, quitarParticipante, resumenCompromisos, situacionCompromiso, validarPasoMinuta, yaParticipa,
 } = await import('../minutas')
 
@@ -101,6 +101,16 @@ describe('compromisos — situación y resumen', () => {
     expect(plazoCompromiso(0)).toBe('vence hoy')
     expect(plazoCompromiso(1)).toBe('vence en 1 día')
     expect(plazoCompromiso(5)).toBe('vence en 5 días')
+  })
+})
+
+describe('plazoSeguimiento', () => {
+  it('en palabras, para el próximo seguimiento de la minuta', () => {
+    expect(plazoSeguimiento(-2)).toBe('vencido hace 2 días')
+    expect(plazoSeguimiento(-1)).toBe('vencido hace 1 día')
+    expect(plazoSeguimiento(0)).toBe('hoy')
+    expect(plazoSeguimiento(1)).toBe('en 1 día')
+    expect(plazoSeguimiento(4)).toBe('en 4 días')
   })
 })
 

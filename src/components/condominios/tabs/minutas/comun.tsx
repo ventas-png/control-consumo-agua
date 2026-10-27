@@ -24,8 +24,9 @@ export const PRIORIDADES: { value: PrioridadNota; label: string; color: string; 
 export const categoriaInfo = (v: string | null | undefined) => CATEGORIAS.find(c => c.value === v) ?? CATEGORIAS[4]
 export const prioridadInfo = (v: string | null | undefined) => PRIORIDADES.find(p => p.value === v) ?? PRIORIDADES[0]
 
+/** Campo a todo el ancho de su columna. `minWidth: 0` impide que el ancho intrínseco del control ensanche la cuadrícula. */
 export const inp: CSSProperties = {
-  width: '100%', padding: '9px 11px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14,
+  width: '100%', minWidth: 0, maxWidth: '100%', padding: '9px 11px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14,
   background: 'var(--at-surface)', color: 'var(--at-ink)', boxSizing: 'border-box', fontFamily: 'inherit', minHeight: 40,
 }
 export const lbl: CSSProperties = {
@@ -87,19 +88,19 @@ export function ChipTipo({ tipo }: { tipo: TipoParticipanteMinuta }) {
 /** Tarjeta de participante: avatar, nombre, detalle, tipo y la marca de quien gestiona. */
 export function ParticipanteCard({ p, acciones }: { p: ParticipanteMinuta; acciones?: ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'var(--at-surface-2)', border: `1px solid ${p.gestiona ? 'var(--at-primary-mint)' : 'var(--at-line)'}` }}>
+    <div className="minuta-part" style={{ border: `1px solid ${p.gestiona ? 'var(--at-primary-mint)' : 'var(--at-line)'}` }}>
       <Avatar nombre={p.nombre} tipo={p.tipo} size={34} />
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="minuta-part-cuerpo">
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--at-ink)' }}>{p.nombre}</span>
-          {p.gestiona && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: 'var(--at-primary)', color: '#fff' }}>★ Gestiona</span>}
+          <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>{p.nombre}</span>
+          {p.gestiona && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: 'var(--at-primary)', color: '#fff', whiteSpace: 'nowrap' }}>★ Gestiona</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
           <ChipTipo tipo={p.tipo} />
-          {p.detalle && <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{p.detalle}</span>}
+          {p.detalle && <span style={{ fontSize: 12, color: 'var(--at-ink-3)', overflowWrap: 'anywhere' }}>{p.detalle}</span>}
         </div>
       </div>
-      {acciones}
+      {acciones && <div className="minuta-part-acc">{acciones}</div>}
     </div>
   )
 }
