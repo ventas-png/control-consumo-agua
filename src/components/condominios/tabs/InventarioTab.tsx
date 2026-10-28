@@ -1,7 +1,8 @@
 import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import type { ItemInventario, CategoriaInventario, EstadoInventario, PrestamoEquipo } from '../../../types'
+import type { AreaCondominio, ItemInventario, CategoriaInventario, EstadoInventario, PrestamoEquipo } from '../../../types'
+import { areaUnicaPorNombre, nombreAreaDe } from '../../../domain/condominios/areas'
 import { enCirculacion } from '../../../lib/prestamosEquipo'
 import { notify, confirm } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
@@ -14,6 +15,8 @@ interface Props {
   inventario: ItemInventario[]
   /** Préstamos del proyecto: lo que está en circulación se muestra junto a cada equipo (20261108000000). */
   prestamos?: PrestamoEquipo[]
+  /** Catálogo compartido: la ubicación del item se ELIGE de aquí (tab Áreas), no se escribe. */
+  areas: AreaCondominio[]
   proyectoId: string
   companyId: string
   moneda: string
@@ -21,6 +24,9 @@ interface Props {
   canEdit: boolean
   /** Eliminar tiene su propio permiso (condominios.tab.inventario.delete): editar no basta. */
   canDelete: boolean
+  /** Visibilidad del tab Áreas: decide si se ofrece el atajo para configurarlas. */
+  puedeConfigurarAreas: boolean
+  onIrATab: (tabId: 'areas_config') => void
   onRefresh: () => void
 }
 
@@ -52,12 +58,12 @@ const ESTADO_LABEL_KEY: Record<EstadoInventario, TranslationKey> = {
 
 const blank = (): Partial<ItemInventario> => ({
   nombre: '', categoria: 'herramienta', descripcion: '', numero_serie: '',
-  ubicacion: '', estado: 'disponible', cantidad: 1, cantidad_minima: 0,
+  area_id: '', ubicacion: '', estado: 'disponible', cantidad: 1, cantidad_minima: 0,
   unidad_medida: 'unidad', costo_unitario: undefined,
   proveedor: '', fecha_adquisicion: '', fecha_vencimiento: '', notas: '',
 })
 
-export function InventarioTab({ inventario, prestamos = [], proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
+export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
   const { t } = useTranslation()
   const hoy = hoyLocalISO()
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaInventario | 'todos'>('todos')
@@ -82,10 +88,26 @@ export function InventarioTab({ inventario, prestamos = [], proyectoId, companyI
     .filter(i => i.estado !== 'dado_de_baja')
     .reduce((s, i) => s + (i.costo_unitario ?? 0) * i.cantidad, 0)
 
+  // La ubicación es un área del catálogo (tab Áreas). Solo las activas se
+  // ofrecen al capturar; las inactivas siguen nombrando lo ya registrado.
+  const areasActivas = [...areas]
+    .filter(a => a.activo)
+    .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
+  const ubicacionDe = (i: ItemInventario) => nombreAreaDe(i.area_id, areas, i.ubicacion ?? '')
+
+  // Texto libre de un item anterior al catálogo que nadie ha vinculado: se
+  // conserva mientras no se elija un área.
+  const editando = editId ? inventario.find(i => i.id === editId) : undefined
+  const ubicacionLegada = editando && !editando.area_id ? (editando.ubicacion ?? '').trim() : ''
+  // El área guardada puede estar inactiva: se sigue ofreciendo para no perderla.
+  const areaFueraDeLista = form.area_id && !areasActivas.some(a => a.id === form.area_id) ? form.area_id : null
+
   function startEdit(i: ItemInventario) {
     setForm({
       nombre: i.nombre, categoria: i.categoria, descripcion: i.descripcion ?? '',
       numero_serie: i.numero_serie ?? '', ubicacion: i.ubicacion ?? '',
+      // Lo legado se propone vinculado si su texto coincide con UNA sola área.
+      area_id: i.area_id ?? areaUnicaPorNombre(i.ubicacion, areasActivas)?.id ?? '',
       estado: i.estado, cantidad: i.cantidad, cantidad_minima: i.cantidad_minima,
       unidad_medida: i.unidad_medida, costo_unitario: i.costo_unitario ?? undefined,
       proveedor: i.proveedor ?? '', fecha_adquisicion: i.fecha_adquisicion ?? '',
@@ -108,11 +130,16 @@ export function InventarioTab({ inventario, prestamos = [], proyectoId, companyI
     if (saving) return
     if (!form.nombre?.trim()) return notify({ variant: 'warning', title: t('condominios.comun.required'), text: t('condominios.inventario.err_nombre') })
     setSaving(true)
+    const area = form.area_id ? areas.find(a => a.id === form.area_id) : undefined
     const payload = {
       company_id: companyId, project_id: proyectoId,
       nombre: form.nombre!.trim(), categoria: form.categoria ?? 'herramienta',
       descripcion: form.descripcion || null, numero_serie: form.numero_serie || null,
-      ubicacion: form.ubicacion || null, estado: form.estado ?? 'disponible',
+      // `ubicacion` es el snapshot del nombre del área al guardar. Sin área solo
+      // sobrevive el texto de un item legado que nadie ha vinculado.
+      area_id: form.area_id || null,
+      ubicacion: area ? area.nombre.trim() : form.area_id ? (form.ubicacion || null) : (ubicacionLegada || null),
+      estado: form.estado ?? 'disponible',
       cantidad: form.cantidad ?? 1, cantidad_minima: form.cantidad_minima ?? 0,
       unidad_medida: form.unidad_medida ?? 'unidad',
       costo_unitario: form.costo_unitario ?? null,
@@ -241,7 +268,31 @@ export function InventarioTab({ inventario, prestamos = [], proyectoId, companyI
             </div>
             <div>
               <label htmlFor="inv-ubicacion" style={labelStyle}>{t('condominios.inventario.ubicacion')}</label>
-              <input id="inv-ubicacion" style={inputStyle} value={form.ubicacion ?? ''} onChange={e => setForm(f => ({ ...f, ubicacion: e.target.value }))} placeholder={t('condominios.inventario.ubicacion_placeholder')} />
+              <select id="inv-ubicacion" style={inputStyle} value={form.area_id ?? ''} onChange={e => setForm(f => ({ ...f, area_id: e.target.value }))}>
+                <option value="">{t('condominios.inventario.ubicacion_sin_area')}</option>
+                {areasActivas.map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
+                {areaFueraDeLista && (
+                  <option value={areaFueraDeLista}>{t('condominios.inventario.ubicacion_inactiva', { nombre: nombreAreaDe(areaFueraDeLista, areas, form.ubicacion ?? '') })}</option>
+                )}
+              </select>
+              {!form.area_id && ubicacionLegada && (
+                <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', marginTop: '4px' }}>
+                  {t('condominios.inventario.ubicacion_legada', { texto: ubicacionLegada })}
+                </div>
+              )}
+              {areasActivas.length === 0 && (
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
+                  {t('condominios.inventario.sin_areas')}{' '}
+                  {puedeConfigurarAreas
+                    ? (
+                      <button type="button" onClick={() => onIrATab('areas_config')}
+                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--at-accent)', fontWeight: 600, fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}>
+                        {t('condominios.inventario.crear_areas')}
+                      </button>
+                    )
+                    : t('condominios.inventario.areas_en_tab')}
+                </div>
+              )}
             </div>
             <div>
               <label htmlFor="inv-serie" style={labelStyle}>{t('condominios.inventario.numero_serie')}</label>
@@ -275,7 +326,7 @@ export function InventarioTab({ inventario, prestamos = [], proyectoId, companyI
         mobileCardLayout
         defaultSort={{ key: 'nombre', direction: 'asc' }}
         searchPlaceholder={t('condominios.inventario.search_placeholder')}
-        searchableKeys={['nombre', i => i.ubicacion ?? '', i => i.numero_serie ?? '']}
+        searchableKeys={['nombre', ubicacionDe, i => i.numero_serie ?? '']}
         rowStyle={i => (i.cantidad <= i.cantidad_minima && i.estado !== 'dado_de_baja') ? { background: 'var(--at-danger-tint)' } : {}}
         filters={[
           {
@@ -312,7 +363,7 @@ export function InventarioTab({ inventario, prestamos = [], proyectoId, companyI
                     <span style={{ fontSize: '16px' }}>{CATEGORIA_ICON[i.categoria]}</span>
                     <span style={{ fontWeight: 700, color: 'var(--at-ink)', fontSize: '14px' }}>{i.nombre}</span>
                   </div>
-                  {i.ubicacion && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>📍 {i.ubicacion}</div>}
+                  {ubicacionDe(i) && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>📍 {ubicacionDe(i)}</div>}
                   {(() => {
                     const fuera = enCirculacion(i.id, prestamos)
                     return fuera > 0 ? <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>🔁 {fuera} en préstamo</div> : null
@@ -373,6 +424,7 @@ export function InventarioTab({ inventario, prestamos = [], proyectoId, companyI
 
       {showImportModal && (
         <ImportInventarioModal
+          areas={areasActivas}
           proyectoId={proyectoId}
           companyId={companyId}
           onClose={() => setShowImportModal(false)}

@@ -541,7 +541,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'cumpleanos', label: 'Cumpleaños', icon: '🎂', render: (ctx) =>
     <CumpleanosTab personal={ctx.personal} cargos={ctx.cargosPersonal} clientesBirthday={ctx.clientesBirthday} proyectoNombre={ctx.proyectoActual?.nombre} /> },
   { id: 'inventario', label: 'Inventario', icon: '🗃️', render: (ctx) =>
-    <InventarioTab inventario={ctx.inventario} prestamos={ctx.prestamos} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('inventario')} canEdit={ctx.canEdit('inventario')} canDelete={ctx.canDelete('inventario')} onRefresh={ctx.onRefresh} /> },
+    <InventarioTab inventario={ctx.inventario} prestamos={ctx.prestamos} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('inventario')} canEdit={ctx.canEdit('inventario')} canDelete={ctx.canDelete('inventario')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   // Etiqueta "Seguros": el id/tab gestiona pólizas de SEGURO; el nombre "Pólizas"
   // ahora pertenece a los asientos del módulo Contabilidad (partida doble).
   { id: 'polizas', label: 'Seguros', icon: '🛡️', render: (ctx) =>

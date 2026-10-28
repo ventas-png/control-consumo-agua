@@ -53,7 +53,7 @@ beforeEach(() => {
 afterEach(cleanup)
 
 eliminarExigeSuPermiso('Inventario', p => conI18n(
-  <InventarioTab {...base} moneda="Q" canCreate {...p}
+  <InventarioTab {...base} moneda="Q" areas={[]} puedeConfigurarAreas={false} onIrATab={() => {}} canCreate {...p}
     inventario={[fila({ id: 'iv1', nombre: 'Escalera', categoria: 'herramienta', estado: 'disponible', cantidad: 1, cantidad_minima: 0, unidad_medida: 'unidad' })]} />,
 ), /^(Eliminar|Delete)$/, borrar, 'inventario_condominio', 'iv1')
 
