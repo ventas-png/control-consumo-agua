@@ -734,6 +734,9 @@ export interface ItemInventario {
   categoria: CategoriaInventario
   descripcion?: string | null
   numero_serie?: string | null
+  /** Área del catálogo (areas_condominio). null = sin área, o legado sin vincular (solo texto en `ubicacion`). */
+  area_id?: string | null
+  /** Snapshot del nombre del área al guardar; en lo legado, el texto libre capturado. */
   ubicacion?: string | null
   estado: EstadoInventario
   cantidad: number

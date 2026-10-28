@@ -46,3 +46,18 @@ export function nombreAreaDe(
   if (!areaId) return fallback
   return areas.find(a => a.id === areaId)?.nombre ?? fallback
 }
+
+/**
+ * El área cuyo nombre normalizado coincide con `texto`, solo si es UNA: el
+ * mismo criterio que los backfills (20261111000000, 20261114000000). Con dos
+ * candidatas no se adivina —atar al área equivocada es peor que no atar—.
+ */
+export function areaUnicaPorNombre(
+  texto: string | null | undefined,
+  areas: AreaCondominio[],
+): AreaCondominio | null {
+  const norm = normalizarNombreArea(texto)
+  if (!norm) return null
+  const coinciden = areas.filter(a => normalizarNombreArea(a.nombre) === norm)
+  return coinciden.length === 1 ? coinciden[0] : null
+}

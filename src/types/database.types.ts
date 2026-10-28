@@ -11168,6 +11168,7 @@ export type Database = {
       }
       inventario_condominio: {
         Row: {
+          area_id: string | null
           cantidad: number
           cantidad_minima: number
           categoria: string
@@ -11190,6 +11191,7 @@ export type Database = {
           unidad_medida: string
         }
         Insert: {
+          area_id?: string | null
           cantidad?: number
           cantidad_minima?: number
           categoria?: string
@@ -11212,6 +11214,7 @@ export type Database = {
           unidad_medida?: string
         }
         Update: {
+          area_id?: string | null
           cantidad?: number
           cantidad_minima?: number
           categoria?: string
@@ -11234,6 +11237,13 @@ export type Database = {
           unidad_medida?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "inventario_area_tenant_fk"
+            columns: ["area_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
           {
             foreignKeyName: "inventario_condominio_company_id_fkey"
             columns: ["company_id"]
