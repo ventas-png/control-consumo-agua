@@ -4,6 +4,8 @@ import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '.
 import type { ItemInventario, CategoriaInventario, EstadoInventario, PrestamoEquipo } from '../../../types'
 import { enCirculacion } from '../../../lib/prestamosEquipo'
 import { notify, confirm } from '../../shared/Dialog'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
 import { ImportInventarioModal } from '../ImportInventarioModal'
@@ -93,9 +95,17 @@ export function InventarioTab({ inventario, prestamos = [], proyectoId, companyI
     setShowForm(true)
   }
 
-  function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
+  function abrirNuevo() {
+    // Una edición cancelada no se cuela en el item nuevo.
+    if (editId) { setEditId(null); setForm(blank()) }
+    setShowForm(true)
+  }
+
+  // Cancelar cierra sin borrar lo escrito; no se cierra a mitad del guardado.
+  function cerrarForm() { if (!saving) setShowForm(false) }
 
   async function handleSave() {
+    if (saving) return
     if (!form.nombre?.trim()) return notify({ variant: 'warning', title: t('condominios.comun.required'), text: t('condominios.inventario.err_nombre') })
     setSaving(true)
     const payload = {
@@ -115,7 +125,7 @@ export function InventarioTab({ inventario, prestamos = [], proyectoId, companyI
       ? await updateCondominioRow('inventario_condominio', editId, payload)
       : await createCondominioRow('inventario_condominio', payload)
     if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); setSaving(false); return }
-    setSaving(false); cancelForm(); onRefresh()
+    setSaving(false); setShowForm(false); setEditId(null); setForm(blank()); onRefresh()
   }
 
   async function handleDelete(id: string) {
@@ -164,89 +174,97 @@ export function InventarioTab({ inventario, prestamos = [], proyectoId, companyI
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>{t('condominios.inventario.title')}</h2>
           {valorTotal > 0 && <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{t('condominios.inventario.valor_activo')} <strong style={{ color: 'var(--at-primary)' }}>{moneda} {valorTotal.toFixed(2)}</strong></span>}
         </div>
-        {canCreate && !showForm && (
+        {canCreate && (
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => setShowImportModal(true)} style={{ padding: '8px 14px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {t('condominios.inventario.import_button')}
             </button>
-            <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={abrirNuevo} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {t('condominios.inventario.new_button')}
             </button>
           </div>
         )}
       </div>
 
-      {/* Form */}
+      {/* Nuevo / editar en ventana: antes se desplegaba encima de la lista y
+          había que hacer scroll para ver la tabla o el formulario. */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>{editId ? t('condominios.inventario.form_title_edit') : t('condominios.inventario.form_title_new')}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
+        <EditModal
+          title={editId ? t('condominios.inventario.form_title_edit') : t('condominios.inventario.form_title_new')}
+          maxWidth="760px"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <Button variant="secondary" onClick={cerrarForm} disabled={saving}>{t('condominios.comun.cancel')}</Button>
+            <Button type="submit" form="inventario-form" loading={saving} loadingText={t('condominios.comun.saving')}>
+              {editId ? t('condominios.comun.update') : t('condominios.comun.add')}
+            </Button>
+          </>}
+        >
+          <form id="inventario-form" onSubmit={e => { e.preventDefault(); void handleSave() }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: '12px', alignItems: 'start' }}>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.nombre')}</label>
-              <input style={inputStyle} value={form.nombre ?? ''} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder={t('condominios.inventario.nombre_placeholder')} />
+              <label htmlFor="inv-nombre" style={labelStyle}>{t('condominios.inventario.nombre')}</label>
+              <input id="inv-nombre" style={inputStyle} value={form.nombre ?? ''} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder={t('condominios.inventario.nombre_placeholder')} autoFocus />
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.categoria')}</label>
-              <select style={inputStyle} value={form.categoria ?? 'herramienta'} onChange={e => setForm(f => ({ ...f, categoria: e.target.value as CategoriaInventario }))}>
+              <label htmlFor="inv-categoria" style={labelStyle}>{t('condominios.inventario.categoria')}</label>
+              <select id="inv-categoria" style={inputStyle} value={form.categoria ?? 'herramienta'} onChange={e => setForm(f => ({ ...f, categoria: e.target.value as CategoriaInventario }))}>
                 {CATEGORIAS.map(c => <option key={c} value={c}>{CATEGORIA_ICON[c]} {t(CATEGORIA_LABEL_KEY[c])}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.comun.status')}</label>
-              <select style={inputStyle} value={form.estado ?? 'disponible'} onChange={e => setForm(f => ({ ...f, estado: e.target.value as EstadoInventario }))}>
+              <label htmlFor="inv-estado" style={labelStyle}>{t('condominios.comun.status')}</label>
+              <select id="inv-estado" style={inputStyle} value={form.estado ?? 'disponible'} onChange={e => setForm(f => ({ ...f, estado: e.target.value as EstadoInventario }))}>
                 {(Object.keys(ESTADO_LABEL_KEY) as EstadoInventario[]).map(k => <option key={k} value={k}>{t(ESTADO_LABEL_KEY[k])}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.cantidad')}</label>
-              <input style={inputStyle} type="number" min="0" value={form.cantidad ?? 1} onChange={e => setForm(f => ({ ...f, cantidad: Number(e.target.value) }))} />
+              <label htmlFor="inv-cantidad" style={labelStyle}>{t('condominios.inventario.cantidad')}</label>
+              <input id="inv-cantidad" style={inputStyle} type="number" inputMode="numeric" min="0" value={form.cantidad ?? 1} onChange={e => setForm(f => ({ ...f, cantidad: Number(e.target.value) }))} />
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.stock_minimo')}</label>
-              <input style={inputStyle} type="number" min="0" value={form.cantidad_minima ?? 0} onChange={e => setForm(f => ({ ...f, cantidad_minima: Number(e.target.value) }))} />
+              <label htmlFor="inv-stock-minimo" style={labelStyle}>{t('condominios.inventario.stock_minimo')}</label>
+              <input id="inv-stock-minimo" style={inputStyle} type="number" inputMode="numeric" min="0" value={form.cantidad_minima ?? 0} onChange={e => setForm(f => ({ ...f, cantidad_minima: Number(e.target.value) }))} />
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.unidad_medida')}</label>
-              <select style={inputStyle} value={form.unidad_medida ?? 'unidad'} onChange={e => setForm(f => ({ ...f, unidad_medida: e.target.value }))}>
+              <label htmlFor="inv-unidad" style={labelStyle}>{t('condominios.inventario.unidad_medida')}</label>
+              <select id="inv-unidad" style={inputStyle} value={form.unidad_medida ?? 'unidad'} onChange={e => setForm(f => ({ ...f, unidad_medida: e.target.value }))}>
                 {['unidad', 'kg', 'litro', 'metro', 'caja'].map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.costo_unitario', { moneda })}</label>
-              <input style={inputStyle} type="number" min="0" step="0.01" value={form.costo_unitario ?? ''} onChange={e => setForm(f => ({ ...f, costo_unitario: e.target.value ? Number(e.target.value) : undefined }))} placeholder="0.00" />
+              <label htmlFor="inv-costo" style={labelStyle}>{t('condominios.inventario.costo_unitario', { moneda })}</label>
+              <input id="inv-costo" style={inputStyle} type="number" inputMode="decimal" min="0" step="0.01" value={form.costo_unitario ?? ''} onChange={e => setForm(f => ({ ...f, costo_unitario: e.target.value ? Number(e.target.value) : undefined }))} placeholder="0.00" />
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.ubicacion')}</label>
-              <input style={inputStyle} value={form.ubicacion ?? ''} onChange={e => setForm(f => ({ ...f, ubicacion: e.target.value }))} placeholder={t('condominios.inventario.ubicacion_placeholder')} />
+              <label htmlFor="inv-ubicacion" style={labelStyle}>{t('condominios.inventario.ubicacion')}</label>
+              <input id="inv-ubicacion" style={inputStyle} value={form.ubicacion ?? ''} onChange={e => setForm(f => ({ ...f, ubicacion: e.target.value }))} placeholder={t('condominios.inventario.ubicacion_placeholder')} />
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.numero_serie')}</label>
-              <input style={inputStyle} value={form.numero_serie ?? ''} onChange={e => setForm(f => ({ ...f, numero_serie: e.target.value }))} />
+              <label htmlFor="inv-serie" style={labelStyle}>{t('condominios.inventario.numero_serie')}</label>
+              <input id="inv-serie" style={inputStyle} value={form.numero_serie ?? ''} onChange={e => setForm(f => ({ ...f, numero_serie: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.proveedor')}</label>
-              <input style={inputStyle} value={form.proveedor ?? ''} onChange={e => setForm(f => ({ ...f, proveedor: e.target.value }))} />
+              <label htmlFor="inv-proveedor" style={labelStyle}>{t('condominios.inventario.proveedor')}</label>
+              <input id="inv-proveedor" style={inputStyle} value={form.proveedor ?? ''} onChange={e => setForm(f => ({ ...f, proveedor: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.fecha_adquisicion')}</label>
-              <input style={inputStyle} type="date" value={form.fecha_adquisicion ?? ''} onChange={e => setForm(f => ({ ...f, fecha_adquisicion: e.target.value }))} />
+              <label htmlFor="inv-adquisicion" style={labelStyle}>{t('condominios.inventario.fecha_adquisicion')}</label>
+              <input id="inv-adquisicion" style={inputStyle} type="date" value={form.fecha_adquisicion ?? ''} onChange={e => setForm(f => ({ ...f, fecha_adquisicion: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>{t('condominios.inventario.fecha_vencimiento')}</label>
-              <input style={inputStyle} type="date" value={form.fecha_vencimiento ?? ''} onChange={e => setForm(f => ({ ...f, fecha_vencimiento: e.target.value }))} />
+              <label htmlFor="inv-vencimiento" style={labelStyle}>{t('condominios.inventario.fecha_vencimiento')}</label>
+              <input id="inv-vencimiento" style={inputStyle} type="date" value={form.fecha_vencimiento ?? ''} onChange={e => setForm(f => ({ ...f, fecha_vencimiento: e.target.value }))} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>{t('condominios.inventario.descripcion')}</label>
-              <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '56px' }} value={form.descripcion ?? ''} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} />
+              <label htmlFor="inv-descripcion" style={labelStyle}>{t('condominios.inventario.descripcion')}</label>
+              <textarea id="inv-descripcion" style={{ ...inputStyle, resize: 'vertical', minHeight: '56px' }} value={form.descripcion ?? ''} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} />
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>{t('condominios.comun.cancel')}</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
-              {saving ? t('condominios.comun.saving') : editId ? t('condominios.comun.update') : t('condominios.comun.add')}
-            </button>
-          </div>
-        </div>
+          </form>
+        </EditModal>
       )}
 
       {/* List — cond:B2: migrado a <DataTable> shared */}
