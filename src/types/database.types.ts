@@ -10818,6 +10818,7 @@ export type Database = {
       incidentes_seguridad: {
         Row: {
           area: string | null
+          area_id: string | null
           company_id: string
           creado_por: string | null
           created_at: string
@@ -10834,6 +10835,7 @@ export type Database = {
         }
         Insert: {
           area?: string | null
+          area_id?: string | null
           company_id: string
           creado_por?: string | null
           created_at?: string
@@ -10850,6 +10852,7 @@ export type Database = {
         }
         Update: {
           area?: string | null
+          area_id?: string | null
           company_id?: string
           creado_por?: string | null
           created_at?: string
@@ -10865,6 +10868,13 @@ export type Database = {
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "incidentes_area_tenant_fk"
+            columns: ["area_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
           {
             foreignKeyName: "incidentes_seguridad_company_id_fkey"
             columns: ["company_id"]

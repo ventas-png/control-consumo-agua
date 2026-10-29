@@ -1,5 +1,6 @@
 import { datetimeLocalISO, diasEntreFechasCalendario } from '../../lib/format'
-import type { IncidenteSeguridad } from '../../types'
+import { etiquetaCargo } from './rrhhCatalogos'
+import type { CargoCatalogo, IncidenteSeguridad, PersonalCondominio } from '../../types'
 
 // ============================================================================
 // Incidentes de seguridad: seguimiento y antigüedad.
@@ -41,3 +42,19 @@ export function agregarSeguimiento(actual: string | null | undefined, nota: stri
 /** Más reciente primero: por fecha, hora y, si coinciden, hora de captura. */
 export const masRecientePrimero = (a: IncidenteSeguridad, b: IncidenteSeguridad) =>
   b.fecha.localeCompare(a.fecha) || (b.hora ?? '').localeCompare(a.hora ?? '') || (b.created_at ?? '').localeCompare(a.created_at ?? '')
+
+/**
+ * «Reportado por» propuesto al registrar: el usuario que lo registra. Si su
+ * cuenta está vinculada a una ficha de empleado activa del condominio
+ * (personal_condominio.user_id), con su cargo: «Ana López — Guardia».
+ */
+export function reportanteDe(
+  userId: string | null | undefined,
+  nombreUsuario: string | null | undefined,
+  personal: readonly PersonalCondominio[],
+  cargos: readonly CargoCatalogo[] = [],
+): string {
+  const ficha = userId ? personal.find(p => p.user_id === userId && p.estado !== 'inactivo') : undefined
+  if (ficha) return ficha.cargo ? `${ficha.nombre} — ${etiquetaCargo(ficha.cargo, cargos)}` : ficha.nombre
+  return (nombreUsuario ?? '').trim()
+}

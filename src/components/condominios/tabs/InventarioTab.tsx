@@ -2,7 +2,7 @@ import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AreaCondominio, ItemInventario, CategoriaInventario, EstadoInventario, PrestamoEquipo } from '../../../types'
-import { areaUnicaPorNombre, nombreAreaDe } from '../../../domain/condominios/areas'
+import { areaUnicaPorNombre, nombreAreaDe, vinculoArea } from '../../../domain/condominios/areas'
 import { enCirculacion } from '../../../lib/prestamosEquipo'
 import { notify, confirm } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
@@ -130,15 +130,13 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
     if (saving) return
     if (!form.nombre?.trim()) return notify({ variant: 'warning', title: t('condominios.comun.required'), text: t('condominios.inventario.err_nombre') })
     setSaving(true)
-    const area = form.area_id ? areas.find(a => a.id === form.area_id) : undefined
+    // `ubicacion` es el snapshot del nombre del área al guardar.
+    const area = vinculoArea(form.area_id, areas, editando && { area_id: editando.area_id, texto: editando.ubicacion })
     const payload = {
       company_id: companyId, project_id: proyectoId,
       nombre: form.nombre!.trim(), categoria: form.categoria ?? 'herramienta',
       descripcion: form.descripcion || null, numero_serie: form.numero_serie || null,
-      // `ubicacion` es el snapshot del nombre del área al guardar. Sin área solo
-      // sobrevive el texto de un item legado que nadie ha vinculado.
-      area_id: form.area_id || null,
-      ubicacion: area ? area.nombre.trim() : form.area_id ? (form.ubicacion || null) : (ubicacionLegada || null),
+      area_id: area.area_id, ubicacion: area.nombre,
       estado: form.estado ?? 'disponible',
       cantidad: form.cantidad ?? 1, cantidad_minima: form.cantidad_minima ?? 0,
       unidad_medida: form.unidad_medida ?? 'unidad',

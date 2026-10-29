@@ -4,13 +4,21 @@ import { EmptyState } from '../../shared/EmptyState'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
 import { createCondominioRow, deleteCondominioRowAfectando, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import { estaAbierto, diasAbierto, agregarSeguimiento, masRecientePrimero } from '../../../domain/condominios/incidentes'
-import type { IncidenteSeguridad } from '../../../types'
+import { estaAbierto, diasAbierto, agregarSeguimiento, masRecientePrimero, reportanteDe } from '../../../domain/condominios/incidentes'
+import { areaUnicaPorNombre, nombreAreaDe, vinculoArea } from '../../../domain/condominios/areas'
+import type { AreaCondominio, CargoCatalogo, IncidenteSeguridad, PersonalCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   incidentes: IncidenteSeguridad[]
+  /** Catálogo compartido: el área del incidente se ELIGE de aquí (tab Áreas), no se escribe. */
+  areas: AreaCondominio[]
+  /** Expediente del condominio: si el usuario tiene ficha, «Reportado por» lleva su cargo. */
+  personal: PersonalCondominio[]
+  cargos?: CargoCatalogo[]
+  /** Usuario que registra: se propone como «Reportado por». */
+  userId?: string
   proyectoId: string
   companyId: string
   proyectoNombre?: string
@@ -21,6 +29,9 @@ interface Props {
   /** Eliminar tiene su propio permiso (condominios.tab.<tab>.delete): ver o
    *  editar no basta. */
   canDelete: boolean
+  /** Visibilidad del tab Áreas: decide si se ofrece el atajo para configurarlas. */
+  puedeConfigurarAreas: boolean
+  onIrATab: (tabId: 'areas_config') => void
   onRefresh: () => void
 }
 
@@ -59,7 +70,7 @@ const blank = (): Record<string, string> => {
   const ahora = datetimeLocalISO()
   return {
     fecha: hoyLocalISO(), hora: ahora.slice(11, 16),
-    tipo: 'otro', descripcion: '', area: '',
+    tipo: 'otro', descripcion: '', area_id: '', area: '',
     reportado_por: '', estado: 'reportado', involucrados: '', seguimiento: '',
   }
 }
@@ -104,7 +115,7 @@ function LineaEstados({ estado }: { estado: string }) {
   )
 }
 
-export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombre = 'Condominio', autorNombre, canCreate, canEdit, canDelete, onRefresh }: Props) {
+export function IncidentesTab({ incidentes, areas, personal, cargos = [], userId, proyectoId, companyId, proyectoNombre = 'Condominio', autorNombre, canCreate, canEdit, canDelete, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
   // Por id y no la fila: tras editar o avanzar de estado, `incidentes` llega
   // refrescado y la ventana muestra el dato nuevo (la copia quedaba vieja).
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -121,11 +132,33 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
 
   const setF = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
-  const openNew = () => { setForm(blank()); setEditId(null); setShowForm(true); setSelectedId(null) }
+  // El área es del catálogo (tab Áreas). Solo las activas se ofrecen al
+  // registrar; las inactivas siguen nombrando lo ya registrado.
+  const areasActivas = [...areas]
+    .filter(a => a.activo)
+    .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
+  const areaDe = (i: IncidenteSeguridad) => nombreAreaDe(i.area_id, areas, i.area ?? '')
+
+  // Texto libre de un incidente anterior al catálogo que nadie ha vinculado: se
+  // conserva mientras no se elija un área.
+  const editando = editId ? incidentes.find(i => i.id === editId) : undefined
+  const areaLegada = editando && !editando.area_id ? (editando.area ?? '').trim() : ''
+  // El área guardada puede estar inactiva: se sigue ofreciendo para no perderla.
+  const areaFueraDeLista = form.area_id && !areasActivas.some(a => a.id === form.area_id) ? form.area_id : null
+
+  // Quien registra es quien reporta, salvo que lo cambie: se propone su nombre
+  // (con su cargo si su usuario tiene ficha de empleado).
+  const reportantePropio = reportanteDe(userId, autorNombre, personal, cargos)
+  const openNew = () => {
+    setForm({ ...blank(), reportado_por: reportantePropio })
+    setEditId(null); setShowForm(true); setSelectedId(null)
+  }
   const openEdit = (i: IncidenteSeguridad) => {
     setForm({
       fecha: i.fecha, hora: i.hora ?? '',
       tipo: i.tipo, descripcion: i.descripcion, area: i.area ?? '',
+      // Lo legado se propone vinculado si su texto coincide con UNA sola área.
+      area_id: i.area_id ?? areaUnicaPorNombre(i.area, areasActivas)?.id ?? '',
       reportado_por: i.reportado_por ?? '', estado: i.estado,
       involucrados: i.involucrados ?? '', seguimiento: i.seguimiento ?? '',
     })
@@ -138,11 +171,13 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
     // La fecha es obligatoria en la base: antes, al borrarla, el error llegaba de la base.
     if (!form.fecha) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Indica la fecha del incidente.' })
     setSaving(true)
+    // `area` es el snapshot del nombre del área al guardar.
+    const area = vinculoArea(form.area_id, areas, editando && { area_id: editando.area_id, texto: editando.area })
     const payload = {
       company_id: companyId, project_id: proyectoId,
       fecha: form.fecha, hora: form.hora || null,
       tipo: form.tipo, descripcion: form.descripcion.trim(),
-      area: form.area.trim() || null, reportado_por: form.reportado_por.trim() || null,
+      area_id: area.area_id, area: area.nombre, reportado_por: form.reportado_por.trim() || null,
       estado: form.estado, involucrados: form.involucrados.trim() || null,
       seguimiento: form.seguimiento.trim() || null,
     }
@@ -201,7 +236,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
   const filtered = incidentes.filter(i =>
     (!filterTipo || i.tipo === filterTipo) &&
     pasaEstado(i, filterEstado) &&
-    (!q || [i.descripcion, i.area, i.reportado_por, i.involucrados].some(t => (t ?? '').toLowerCase().includes(q)))
+    (!q || [i.descripcion, areaDe(i), i.reportado_por, i.involucrados].some(t => (t ?? '').toLowerCase().includes(q)))
   ).sort(masRecientePrimero)
 
   function exportarPDF() {
@@ -209,7 +244,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
       titulo: 'Registro de Incidentes de Seguridad',
       proyectoNombre,
       headers: ['Fecha', 'Hora', 'Tipo', 'Área', 'Descripción', 'Reportado por', 'Estado'],
-      rows: filtered.map(i => [i.fecha, i.hora ?? '—', tipoDe(i.tipo).label, i.area ?? '—', i.descripcion, i.reportado_por ?? '—', estadoDe(i.estado).label]),
+      rows: filtered.map(i => [i.fecha, i.hora ?? '—', tipoDe(i.tipo).label, areaDe(i) || '—', i.descripcion, i.reportado_por ?? '—', estadoDe(i.estado).label]),
       filename: `incidentes-${hoyLocalISO()}`,
       landscape: true,
     })
@@ -219,7 +254,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
     exportarExcel(`incidentes-${hoyLocalISO()}`, [{
       name: 'Incidentes',
       headers: ['Fecha', 'Hora', 'Tipo', 'Área', 'Descripción', 'Reportado por', 'Estado', 'Involucrados', 'Seguimiento'],
-      rows: filtered.map(i => [i.fecha, i.hora ?? '', tipoDe(i.tipo).label, i.area ?? '', i.descripcion, i.reportado_por ?? '', estadoDe(i.estado).label, i.involucrados ?? '', i.seguimiento ?? '']),
+      rows: filtered.map(i => [i.fecha, i.hora ?? '', tipoDe(i.tipo).label, areaDe(i), i.descripcion, i.reportado_por ?? '', estadoDe(i.estado).label, i.involucrados ?? '', i.seguimiento ?? '']),
     }])
   }
 
@@ -308,7 +343,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
                       <span style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--at-ink)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>{i.descripcion}</span>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '3px' }}>
-                      {i.fecha}{i.hora ? ` ${i.hora.slice(0, 5)}` : ''}{i.area ? ` · ${i.area}` : ''}{i.reportado_por ? ` · ${i.reportado_por}` : ''}
+                      {i.fecha}{i.hora ? ` ${i.hora.slice(0, 5)}` : ''}{areaDe(i) ? ` · ${areaDe(i)}` : ''}{i.reportado_por ? ` · ${i.reportado_por}` : ''}
                     </div>
                     {dias !== null && (
                       <div style={{ fontSize: '11.5px', fontWeight: 600, marginTop: '2px', color: dias > DIAS_ALERTA ? 'var(--at-danger)' : 'var(--at-warning-strong)' }}>⏳ {haceDias(dias)}</div>
@@ -360,7 +395,31 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
             </div>
             <div>
               <label htmlFor="inc-area" style={labelStyle}>Área</label>
-              <input id="inc-area" style={inputStyle} value={form.area} onChange={e => setF('area', e.target.value)} placeholder="Ej. Lobby, Parqueo 3" />
+              <select id="inc-area" style={inputStyle} value={form.area_id} onChange={e => setF('area_id', e.target.value)}>
+                <option value="">— Sin área —</option>
+                {areasActivas.map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
+                {areaFueraDeLista && (
+                  <option value={areaFueraDeLista}>{nombreAreaDe(areaFueraDeLista, areas, form.area)} (inactiva)</option>
+                )}
+              </select>
+              {!form.area_id && areaLegada && (
+                <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', marginTop: '4px' }}>
+                  Antes: «{areaLegada}», sin vincular a un área. Se conserva hasta que elijas una.
+                </div>
+              )}
+              {areasActivas.length === 0 && (
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
+                  Sin áreas activas.{' '}
+                  {puedeConfigurarAreas
+                    ? (
+                      <button type="button" onClick={() => onIrATab('areas_config')}
+                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--at-accent)', fontWeight: 600, fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}>
+                        Crearlas en el tab Áreas
+                      </button>
+                    )
+                    : 'Se dan de alta en el tab Áreas.'}
+                </div>
+              )}
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label htmlFor="inc-descripcion" style={labelStyle}>Descripción *</label>
@@ -369,6 +428,9 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
             <div>
               <label htmlFor="inc-reportado-por" style={labelStyle}>Reportado por</label>
               <input id="inc-reportado-por" style={inputStyle} value={form.reportado_por} onChange={e => setF('reportado_por', e.target.value)} placeholder="Nombre o cargo" />
+              {!editId && form.reportado_por && form.reportado_por === reportantePropio && (
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px' }}>Con tu usuario. Cámbialo si lo reportó otra persona.</div>
+              )}
             </div>
             <div>
               <label htmlFor="inc-estado" style={labelStyle}>Estado</label>
@@ -399,7 +461,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
             subtitle={<span style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={pill(ts.bg, ts.color)}>{ts.label}</span>
               <span style={pill(es.bg, es.color)}>{es.label}</span>
-              <span>{selected.fecha}{selected.hora ? ` a las ${selected.hora.slice(0, 5)}` : ''}{selected.area ? ` · ${selected.area}` : ''}</span>
+              <span>{selected.fecha}{selected.hora ? ` a las ${selected.hora.slice(0, 5)}` : ''}{areaDe(selected) ? ` · ${areaDe(selected)}` : ''}</span>
             </span>}
             maxWidth="640px"
             fullScreenOnMobile
