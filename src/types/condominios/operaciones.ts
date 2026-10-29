@@ -1228,6 +1228,75 @@ export interface VencimientoExtra {
   created_at: string
 }
 
+export type TipoLlamadaAtencion = 'llamada_atencion' | 'amonestacion' | 'suspension' | 'otra'
+export type EstadoLlamadaAtencion = 'pendiente' | 'acusada' | 'anulada'
+/** usuario = firmó desde su cuenta; presencial = firmó en el dispositivo de quien registra. */
+export type ModoAcuseLlamada = 'usuario' | 'presencial'
+/**
+ * Llamada de atención, amonestación o suspensión a un empleado
+ * (llamadas_atencion_personal, 20261115000000). Inmutable tras emitirse: sólo
+ * cambian el estado, el acuse y la anulación, y sólo por las RPCs.
+ */
+export interface LlamadaAtencionPersonal {
+  id: string
+  company_id: string
+  project_id: string
+  /** NULL sólo si la ficha se dio de baja después; empleado_nombre conserva a quién se entregó. */
+  personal_id?: string | null
+  empleado_nombre: string
+  empleado_cargo?: string | null
+  tipo: TipoLlamadaAtencion
+  fecha_hechos: string
+  motivo: string
+  descripcion: string
+  fundamento?: string | null
+  dias_suspension?: number | null
+  estado: EstadoLlamadaAtencion
+  emitido_por?: string | null
+  emitido_por_nombre: string
+  emitido_en: string
+  /** Firma manuscrita del emisor en el bucket rrhh-llamadas-atencion. */
+  firma_emisor_path: string
+  notificado_en?: string | null
+  acuse_en?: string | null
+  acuse_por?: string | null
+  acuse_nombre?: string | null
+  acuse_modo?: ModoAcuseLlamada | null
+  firma_acuse_path?: string | null
+  anulada_en?: string | null
+  anulada_por?: string | null
+  motivo_anulacion?: string | null
+  creado_por?: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Fila de rrhh_llamadas_mias(): la carta vista por el empleado, con su condominio. */
+export interface LlamadaAtencionMia {
+  id: string
+  project_id: string
+  proyecto_nombre?: string | null
+  personal_id?: string | null
+  empleado_nombre: string
+  empleado_cargo?: string | null
+  tipo: TipoLlamadaAtencion
+  fecha_hechos: string
+  motivo: string
+  descripcion: string
+  fundamento?: string | null
+  dias_suspension?: number | null
+  estado: EstadoLlamadaAtencion
+  emitido_por_nombre: string
+  emitido_en: string
+  firma_emisor_path: string
+  acuse_en?: string | null
+  acuse_nombre?: string | null
+  acuse_modo?: ModoAcuseLlamada | null
+  firma_acuse_path?: string | null
+  anulada_en?: string | null
+  motivo_anulacion?: string | null
+}
+
 export type EstadoCapacitacion = 'planificado' | 'en_progreso' | 'completado' | 'vencido'
 export interface CapacitacionPersonal {
   id: string

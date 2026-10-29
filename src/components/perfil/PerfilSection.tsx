@@ -28,6 +28,7 @@ import { getDisplayRoleLabel, getDisplayRoleColor } from '../../lib/permissions'
 import { PreferenciasRegionales } from './PreferenciasRegionales'
 import { SesionesActivas } from './SesionesActivas'
 import { LegalYPrivacidad } from './LegalYPrivacidad'
+import { MisLlamadasAtencion } from './MisLlamadasAtencion'
 import { tint } from '../shared/statusTone'
 
 interface Props {
@@ -552,6 +553,10 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+        {/* Llamadas de atención dirigidas a esta cuenta (sólo si las hay): va
+            arriba porque es lo que la notificación de la campana trae a leer. */}
+        <MisLlamadasAtencion />
 
         {/* Card 1 — Nombre */}
         <Card title="Datos personales">

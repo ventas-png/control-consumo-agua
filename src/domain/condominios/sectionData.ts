@@ -329,6 +329,17 @@ export async function fetchCondominiosRrhhCatalogosData(pid: string, cid: string
 }
 
 /**
+ * Llamadas de atención y sanciones al personal (20261115000000). Batch aparte
+ * por el mismo motivo que los catálogos: si un entorno aún no tiene la
+ * migración, la lista queda vacía y el tab avisa, sin tumbar el panel.
+ */
+export async function fetchCondominiosLlamadasAtencionData(pid: string, cid: string) {
+  return db.from('llamadas_atencion_personal').select('*')
+    .eq('project_id', pid).eq('company_id', cid)
+    .order('emitido_en', { ascending: false }).limit(500)
+}
+
+/**
  * Lo que el calendario de turnos necesita de UN RANGO de fechas: los bloques
  * materializados y los días quitados a mano.
  *

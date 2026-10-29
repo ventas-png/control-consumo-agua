@@ -11746,6 +11746,124 @@ export type Database = {
           },
         ]
       }
+      llamadas_atencion_personal: {
+        Row: {
+          acuse_en: string | null
+          acuse_modo: string | null
+          acuse_nombre: string | null
+          acuse_por: string | null
+          anulada_en: string | null
+          anulada_por: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          descripcion: string
+          dias_suspension: number | null
+          emitido_en: string
+          emitido_por: string | null
+          emitido_por_nombre: string
+          empleado_cargo: string | null
+          empleado_nombre: string
+          estado: string
+          fecha_hechos: string
+          firma_acuse_path: string | null
+          firma_emisor_path: string
+          fundamento: string | null
+          id: string
+          motivo: string
+          motivo_anulacion: string | null
+          notificado_en: string | null
+          personal_id: string | null
+          project_id: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          acuse_en?: string | null
+          acuse_modo?: string | null
+          acuse_nombre?: string | null
+          acuse_por?: string | null
+          anulada_en?: string | null
+          anulada_por?: string | null
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion: string
+          dias_suspension?: number | null
+          emitido_en?: string
+          emitido_por?: string | null
+          emitido_por_nombre?: string
+          empleado_cargo?: string | null
+          empleado_nombre?: string
+          estado?: string
+          fecha_hechos?: string
+          firma_acuse_path?: string | null
+          firma_emisor_path: string
+          fundamento?: string | null
+          id?: string
+          motivo: string
+          motivo_anulacion?: string | null
+          notificado_en?: string | null
+          personal_id?: string | null
+          project_id: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          acuse_en?: string | null
+          acuse_modo?: string | null
+          acuse_nombre?: string | null
+          acuse_por?: string | null
+          anulada_en?: string | null
+          anulada_por?: string | null
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion?: string
+          dias_suspension?: number | null
+          emitido_en?: string
+          emitido_por?: string | null
+          emitido_por_nombre?: string
+          empleado_cargo?: string | null
+          empleado_nombre?: string
+          estado?: string
+          fecha_hechos?: string
+          firma_acuse_path?: string | null
+          firma_emisor_path?: string
+          fundamento?: string | null
+          id?: string
+          motivo?: string
+          motivo_anulacion?: string | null
+          notificado_en?: string | null
+          personal_id?: string | null
+          project_id?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llamadas_atencion_personal_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "llamadas_atencion_personal_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "llamadas_atencion_personal_fk"
+            columns: ["personal_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+        ]
+      }
       llaves_condominio: {
         Row: {
           cantidad: number
@@ -26995,6 +27113,102 @@ export type Database = {
       rrhh_cargo_valido: {
         Args: { p_codigo: string; p_project: string; p_solo_activos?: boolean }
         Returns: boolean
+      }
+      rrhh_llamada_acusar: {
+        Args: { p_firma_path: string; p_id: string; p_nombre: string }
+        Returns: {
+          acuse_en: string | null
+          acuse_modo: string | null
+          acuse_nombre: string | null
+          acuse_por: string | null
+          anulada_en: string | null
+          anulada_por: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          descripcion: string
+          dias_suspension: number | null
+          emitido_en: string
+          emitido_por: string | null
+          emitido_por_nombre: string
+          empleado_cargo: string | null
+          empleado_nombre: string
+          estado: string
+          fecha_hechos: string
+          firma_acuse_path: string | null
+          firma_emisor_path: string
+          fundamento: string | null
+          id: string
+          motivo: string
+          motivo_anulacion: string | null
+          notificado_en: string | null
+          personal_id: string | null
+          project_id: string
+          tipo: string
+          updated_at: string
+        }
+      }
+      rrhh_llamada_anular: {
+        Args: { p_id: string; p_motivo: string }
+        Returns: {
+          acuse_en: string | null
+          acuse_modo: string | null
+          acuse_nombre: string | null
+          acuse_por: string | null
+          anulada_en: string | null
+          anulada_por: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          descripcion: string
+          dias_suspension: number | null
+          emitido_en: string
+          emitido_por: string | null
+          emitido_por_nombre: string
+          empleado_cargo: string | null
+          empleado_nombre: string
+          estado: string
+          fecha_hechos: string
+          firma_acuse_path: string | null
+          firma_emisor_path: string
+          fundamento: string | null
+          id: string
+          motivo: string
+          motivo_anulacion: string | null
+          notificado_en: string | null
+          personal_id: string | null
+          project_id: string
+          tipo: string
+          updated_at: string
+        }
+      }
+      rrhh_llamada_es_mia: { Args: { p_llamada: string }; Returns: boolean }
+      rrhh_llamadas_mias: {
+        Args: never
+        Returns: {
+          acuse_en: string
+          acuse_modo: string
+          acuse_nombre: string
+          anulada_en: string
+          descripcion: string
+          dias_suspension: number
+          emitido_en: string
+          emitido_por_nombre: string
+          empleado_cargo: string
+          empleado_nombre: string
+          estado: string
+          fecha_hechos: string
+          firma_acuse_path: string
+          firma_emisor_path: string
+          fundamento: string
+          id: string
+          motivo: string
+          motivo_anulacion: string
+          personal_id: string
+          project_id: string
+          proyecto_nombre: string
+          tipo: string
+        }[]
       }
       rrhh_turno_en_uso: {
         Args: { p_codigo: string; p_project: string }
