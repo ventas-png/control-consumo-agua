@@ -731,7 +731,7 @@ export const TAB_REGISTRY: TabDef[] = [
       personal={ctx.personal} cargos={ctx.cargosPersonal} unidades={ctx.unidadesProyecto} contratos={ctx.contratos} contratosProveedores={ctx.contratosProveedores}
       canCreate={ctx.canCreate('notas_admin')} canEdit={ctx.canEdit('notas_admin')} canDelete={ctx.canDelete('notas_admin')} onRefresh={ctx.onRefresh} /> },
   { id: 'control_piscina', label: 'Piscina', icon: '🏊', render: (ctx) =>
-    <ControlPiscinaTab registros={ctx.controlPiscina} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('control_piscina')} canEdit={ctx.canEdit('control_piscina')} onRefresh={ctx.onRefresh} /> },
+    <ControlPiscinaTab registros={ctx.controlPiscina} areas={ctx.areas} personal={ctx.personal} cargos={ctx.cargosPersonal} userId={ctx.uid} autorNombre={ctx.currentUser.name ?? ''} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('control_piscina')} canEdit={ctx.canEdit('control_piscina')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'jardineria', label: 'Jardinería', icon: '🌿', render: (ctx) =>
     <MantenimientoJardineriaTab registros={ctx.mantenimientoJardineria} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('jardineria')} canEdit={ctx.canEdit('jardineria')} onRefresh={ctx.onRefresh} /> },
   { id: 'elevadores', label: 'Elevadores', icon: '🛗', render: (ctx) =>
