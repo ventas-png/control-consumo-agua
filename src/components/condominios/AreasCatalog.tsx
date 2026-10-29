@@ -106,7 +106,7 @@ export function AreasCatalog({ areas, proyectoId, companyId, canCreate, canEdit,
   async function handleDelete(a: AreaCondominio) {
     const r = await confirm({
       title: '¿Eliminar área?',
-      text: `${a.nombre} — solo se puede eliminar si ninguna ruta, plantilla, tarea, programación, inspección o item del inventario la usa. Si está en uso, desactívala.`,
+      text: `${a.nombre} — solo se puede eliminar si ninguna ruta, plantilla, tarea, programación, inspección, item del inventario o incidente la usa. Si está en uso, desactívala.`,
       icon: 'warning', variant: 'danger', confirmText: 'Eliminar',
     })
     if (!r.isConfirmed) return
@@ -115,7 +115,7 @@ export function AreasCatalog({ areas, proyectoId, companyId, canCreate, canEdit,
       notify({
         variant: 'error', title: 'El área está en uso',
         text: error.code === '23503'
-          ? 'Tiene rutas, plantillas, tareas, programaciones, inspecciones o items del inventario vinculados. Desactívala en su lugar: los registros históricos la siguen mostrando.'
+          ? 'Tiene rutas, plantillas, tareas, programaciones, inspecciones, items del inventario o incidentes vinculados. Desactívala en su lugar: los registros históricos la siguen mostrando.'
           : error.message,
       })
       return

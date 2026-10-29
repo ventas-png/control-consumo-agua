@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { agregarSeguimiento, diasAbierto, estaAbierto, masRecientePrimero } from '../incidentes'
-import type { IncidenteSeguridad } from '../../../types'
+import { agregarSeguimiento, diasAbierto, estaAbierto, masRecientePrimero, reportanteDe } from '../incidentes'
+import type { IncidenteSeguridad, PersonalCondominio } from '../../../types'
 
 const HOY = new Date(2026, 9, 26, 22, 0) // 26 oct, 10 de la noche (local)
 
@@ -45,5 +45,24 @@ describe('masRecientePrimero', () => {
     const lista = [inc('a', '2026-10-20', '08:00'), inc('b', '2026-10-21', null), inc('c', '2026-10-20', '22:00'),
       inc('d', '2026-10-20', '22:00', '2026-10-20T23:00:00Z')]
     expect(lista.sort(masRecientePrimero).map(i => i.id)).toEqual(['b', 'd', 'c', 'a'])
+  })
+})
+
+describe('reportanteDe — «Reportado por» propuesto con el usuario que registra', () => {
+  const ficha = (o: Partial<PersonalCondominio>) => ({
+    id: 'pe1', company_id: 'co1', project_id: 'p1', nombre: 'Ana López', cargo: 'guardia', turno: 'nocturno',
+    estado: 'activo', created_at: '2026-01-01T00:00:00Z', user_id: 'u-ana', ...o,
+  }) as PersonalCondominio
+
+  it('con ficha activa: nombre y cargo (del catálogo del condominio si lo renombró)', () => {
+    expect(reportanteDe('u-ana', 'ana@x.com', [ficha({})])).toBe('Ana López — Guardia')
+    expect(reportanteDe('u-ana', 'ana@x.com', [ficha({})], [{ id: 'c1', company_id: 'co1', project_id: 'p1', codigo: 'guardia', nombre: 'Agente de seguridad', icono: '💂', orden: 1, activo: true, created_at: '', updated_at: '' }]))
+      .toBe('Ana López — Agente de seguridad')
+  })
+
+  it('sin ficha, o con la ficha inactiva, el nombre del usuario', () => {
+    expect(reportanteDe('u-admin', ' Prestadora ', [ficha({})])).toBe('Prestadora')
+    expect(reportanteDe('u-ana', 'Ana', [ficha({ estado: 'inactivo' })])).toBe('Ana')
+    expect(reportanteDe(undefined, undefined, [ficha({})])).toBe('')
   })
 })
