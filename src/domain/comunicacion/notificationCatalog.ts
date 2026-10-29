@@ -77,6 +77,7 @@ const PREFIX_TO_GROUP: ReadonlyArray<[string, NotificationGroup]> = [
   ['cuota_', 'cobros'],
   ['recibo_', 'cobros'],
   ['housekeeping_', 'housekeeping'],
+  ['rrhh_', 'operacion'],
 ]
 
 /** Grupo al que pertenece un `tipo`. Nunca lanza: lo desconocido es 'otros'. */
