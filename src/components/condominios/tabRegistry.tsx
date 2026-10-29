@@ -46,7 +46,7 @@ import type {
   RecargoMora, ConvenioCuotaCond, HistorialSaldoUnidad, NotificacionEnviada,
   ReglaMoraConfig, CampanaCobro, CierreAnual,
   CobranzaJudicial, ReciboDigital, InformeMensual, SugerenciaCondominio,
-  VencimientoExtra, CapacitacionPersonal, ProyectoCondominio,
+  VencimientoExtra, CapacitacionPersonal, LlamadaAtencionPersonal, ProyectoCondominio,
   ArticuloManual,
   AutomatizacionCond,
   PlantillaMensajeCond,
@@ -105,7 +105,7 @@ export type CondominioTab =
   | 'desempeno_personal' | 'reporte_consolidado' | 'comunicacion_condominios'
   | 'benchmarking'
   | 'turnos' | 'ausencias' | 'horas_extra'
-  | 'areas_config' | 'rrhh_config'
+  | 'areas_config' | 'rrhh_config' | 'llamadas_atencion'
   | 'portal_config'
 
 // ── Contexto pasado a cada `render(ctx)` ─────────────────────────────────────
@@ -277,6 +277,8 @@ export interface CondominiosTabContext {
   sugerencias: SugerenciaCondominio[]
   vencimientosExtra: VencimientoExtra[]
   capacitaciones: CapacitacionPersonal[]
+  /** Llamadas de atención y sanciones del condominio (20261115000000). */
+  llamadasAtencion: LlamadaAtencionPersonal[]
   proyectosCond: ProyectoCondominio[]
   articulosManual: ArticuloManual[]
   automatizaciones: AutomatizacionCond[]
@@ -435,6 +437,7 @@ const InformeMensualTab = lazy(() => import('./tabs/InformeMensualTab'))
 const BuzonSugerenciasTab = lazy(() => import('./tabs/BuzonSugerenciasTab'))
 const VencimientosCriticosTab = lazy(() => import('./tabs/VencimientosCriticosTab'))
 const CapacitacionPersonalTab = lazy(() => import('./tabs/CapacitacionPersonalTab'))
+const LlamadasAtencionTab = lazy(() => import('./tabs/LlamadasAtencionTab'))
 const ProyectosCondominioTab = lazy(() => import('./tabs/ProyectosCondominioTab'))
 const MetricasServicioTab = lazy(() => import('./tabs/MetricasServicioTab'))
 const AnalisisCarteraTab = lazy(() => import('./tabs/AnalisisCarteraTab'))
@@ -785,6 +788,8 @@ export const TAB_REGISTRY: TabDef[] = [
     <VencimientosCriticosTab vencimientosExtra={ctx.vencimientosExtra} polizas={ctx.polizas} contratosProveedores={ctx.contratosProveedores} inspecciones={ctx.inspecciones} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('vencimientos_criticos')} canEdit={ctx.canEdit('vencimientos_criticos')} onRefresh={ctx.onRefresh} /> },
   { id: 'capacitacion_personal', label: 'Capacitación', icon: '🎓', render: (ctx) =>
     <CapacitacionPersonalTab capacitaciones={ctx.capacitaciones} personal={ctx.personal} cargos={ctx.cargosPersonal} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('capacitacion_personal')} canEdit={ctx.canEdit('capacitacion_personal')} canDelete={ctx.canDelete('capacitacion_personal')} onRefresh={ctx.onRefresh} /> },
+  { id: 'llamadas_atencion', label: 'Llamadas de atención', icon: '⚠️', render: (ctx) =>
+    <LlamadasAtencionTab llamadas={ctx.llamadasAtencion} personal={ctx.personal} cargos={ctx.cargosPersonal} proyectoId={ctx.proyectoId} companyId={ctx.cid} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('llamadas_atencion')} canEdit={ctx.canEdit('llamadas_atencion')} canChangeStatus={ctx.canChangeStatus('llamadas_atencion')} canDelete={ctx.canDelete('llamadas_atencion')} onRefresh={ctx.onRefresh} /> },
   { id: 'proyectos_cond', label: 'Proyectos', icon: '🏗️', render: (ctx) =>
     <ProyectosCondominioTab proyectos={ctx.proyectosCond} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proyectos_cond')} canEdit={ctx.canEdit('proyectos_cond')} canDelete={ctx.canDelete('proyectos_cond')} onRefresh={ctx.onRefresh} /> },
   { id: 'metricas_servicio', label: 'Métricas servicio', icon: '📊', render: (ctx) =>
