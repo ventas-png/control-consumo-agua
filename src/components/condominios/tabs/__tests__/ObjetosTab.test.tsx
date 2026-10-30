@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   uploadCondominiosMedia: vi.fn(async (..._args: unknown[]) => ({ data: null, error: null as string | null })),
   notify: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
+  generarComprobanteEntregaPdf: vi.fn(async (..._args: unknown[]) => new Blob(['%PDF-'], { type: 'application/pdf' })),
+  compartirOdescargarPdf: vi.fn(async (..._args: unknown[]) => false),
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
@@ -43,6 +45,9 @@ vi.mock('../../../shared/SignaturePad', () => ({
     <button type="button" disabled={saving} onClick={() => onSave(new File(['x'], 'firma.png', { type: 'image/png' }))}>{saveLabel}</button>
   ),
 }))
+
+vi.mock('../objetosPerdidos/comprobanteEntregaPdf', () => ({ generarComprobanteEntregaPdf: mocks.generarComprobanteEntregaPdf }))
+vi.mock('../housekeepingPdf', () => ({ compartirOdescargarPdf: mocks.compartirOdescargarPdf }))
 
 const { I18nProvider } = await import('../../../../lib/i18n')
 const { ObjetosTab } = await import('../ObjetosTab')
@@ -75,7 +80,7 @@ function objeto(o: Partial<ObjetoPerdido> = {}): ObjetoPerdido {
 }
 
 const base = {
-  objetos: [objeto()], areas: AREAS, personal: [ANA, LUIS, BAJA], proyectoId: 'p1', companyId: 'co1', userId: 'u1',
+  objetos: [objeto()], areas: AREAS, personal: [ANA, LUIS, BAJA], proyectoId: 'p1', proyectoNombre: 'Condominio 21B+', companyId: 'co1', userId: 'u1',
   canCreate: true, canEdit: true, canDelete: true, puedeConfigurarAreas: true, onIrATab: vi.fn(), onRefresh: vi.fn(),
 }
 
@@ -218,7 +223,9 @@ describe('ObjetosTab — entrega al propietario con firma', () => {
       estado: 'reclamado', reclamado_por: 'Pedro Ramírez', entrega_documento: '1234 56789 0101',
       fecha_reclamo: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), firma_entrega_path: path,
     })
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // Al terminar se abre el detalle del objeto (con su comprobante cuando llegue la fila entregada).
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Entregar al propietario' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Llaves con llavero rojo' })).toBeTruthy()
     expect(onRefresh).toHaveBeenCalled()
   })
 
@@ -253,6 +260,39 @@ describe('ObjetosTab — entrega al propietario con firma', () => {
     expect(within(dialog).getByRole('img', { name: 'Firma de recibido' })).toBeTruthy()
     expect(within(dialog).queryByRole('button', { name: '✍ Entregar' })).toBeNull()
     expect(within(dialog).queryByRole('button', { name: 'Editar' })).toBeNull()
+  })
+
+  it('una entrega firmada descarga su comprobante PDF desde el detalle y desde la lista', async () => {
+    const entregado = objeto({
+      estado: 'reclamado', reclamado_por: 'Pedro Ramírez', fecha_reclamo: '2026-10-30',
+      firma_entrega_path: 'p1/objetos-perdidos/firmas/1-a-firma.png', entregado_en: '2026-10-30T16:05:00Z', entregado_por_nombre: 'Admin Uno',
+    })
+    renderTab({ objetos: [entregado], canEdit: false })
+    fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'reclamado' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver Llaves con llavero rojo' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '📄 Comprobante PDF' }))
+
+    await waitFor(() => expect(mocks.compartirOdescargarPdf).toHaveBeenCalledTimes(1))
+    expect(mocks.generarComprobanteEntregaPdf).toHaveBeenCalledWith({
+      objeto: entregado, lugar: 'Piscina', almacen: 'Recepción · Gaveta 2', proyectoNombre: 'Condominio 21B+',
+    })
+    expect(mocks.compartirOdescargarPdf).toHaveBeenCalledWith(expect.any(Blob), 'Entrega-Llaves_con_llavero_rojo-2026-10-30.pdf')
+    expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ title: 'PDF descargado' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobante de entrega de Llaves con llavero rojo' }))
+    await waitFor(() => expect(mocks.compartirOdescargarPdf).toHaveBeenCalledTimes(2))
+  })
+
+  it('si el PDF falla se avisa; una entrega legada sin firma no ofrece comprobante', async () => {
+    mocks.generarComprobanteEntregaPdf.mockRejectedValueOnce(new Error('Sin memoria'))
+    const firmado = objeto({ id: 'o2', descripcion: 'Cartera', estado: 'reclamado', reclamado_por: 'Pedro Ramírez', firma_entrega_path: 'p1/objetos-perdidos/firmas/x.png' })
+    const legado = objeto({ id: 'o3', descripcion: 'Sombrilla', estado: 'reclamado', reclamado_por: 'Vecino', firma_entrega_path: null })
+    renderTab({ objetos: [firmado, legado] })
+    fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'reclamado' } })
+    expect(screen.queryByRole('button', { name: 'Comprobante de entrega de Sombrilla' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobante de entrega de Cartera' }))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error', title: 'No se generó el comprobante', text: 'Sin memoria' })))
+    expect(mocks.compartirOdescargarPdf).not.toHaveBeenCalled()
   })
 
   it('sin permiso de edición no se ofrece entregar', () => {

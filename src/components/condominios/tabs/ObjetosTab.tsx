@@ -4,9 +4,11 @@ import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '.
 import { nombreAreaDe } from '../../../domain/condominios/areas'
 import {
   CARPETA_FOTOS_OBJETO, MAX_FOTOS_OBJETO, entregarObjeto, etiquetaEmpleado, fichaDeUsuario, formDesdeObjeto, fotosDe,
-  hallazgoDe, nombreReceptorValido, payloadObjeto, personalElegible, validarFormObjeto,
+  hallazgoDe, nombrePdfEntrega, nombreReceptorValido, payloadObjeto, personalElegible, tieneComprobante, validarFormObjeto,
   type ErrorFormObjeto, type FormObjeto,
 } from '../../../domain/condominios/objetosPerdidos'
+import { generarComprobanteEntregaPdf } from './objetosPerdidos/comprobanteEntregaPdf'
+import { compartirOdescargarPdf } from './housekeepingPdf'
 import type { AreaCondominio, CargoCatalogo, ObjetoPerdido, EstadoObjeto, PersonalCondominio, TipoHallazgoObjeto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -26,6 +28,8 @@ interface Props {
   personal?: PersonalCondominio[]
   cargos?: CargoCatalogo[]
   proyectoId: string
+  /** Encabeza el comprobante PDF de la entrega. */
+  proyectoNombre?: string | null
   companyId: string
   /** Usuario que registra: si tiene ficha de empleado, se propone como quien lo encontró y custodio. */
   userId: string
@@ -72,7 +76,7 @@ const accionStyle = (bg: string, color: string): CSSProperties => ({
 })
 
 export function ObjetosTab({
-  objetos, areas = [], personal = [], cargos = [], proyectoId, companyId, userId,
+  objetos, areas = [], personal = [], cargos = [], proyectoId, proyectoNombre, companyId, userId,
   canCreate, canEdit, canDelete, puedeConfigurarAreas = false, onIrATab, onRefresh,
 }: Props) {
   const { t } = useTranslation()
@@ -87,6 +91,7 @@ export function ObjetosTab({
   const [recibe, setRecibe] = useState('')
   const [documento, setDocumento] = useState('')
   const [entregando, setEntregando] = useState(false)
+  const [generandoPdf, setGenerandoPdf] = useState<string | null>(null)
 
   const filtered = objetos.filter(o => filtroEstado === 'todos' || o.estado === filtroEstado)
 
@@ -193,9 +198,25 @@ export function ObjetosTab({
       if (error) { notify({ variant: 'error', title: t('condominios.objetos.entrega_error'), text: error }); return }
       notify({ variant: 'success', title: t('condominios.objetos.entrega_ok'), text: t('condominios.objetos.entrega_ok_text', { nombre: recibe.trim() }), duration: 2500 })
       setEntregaId(null)
+      // El detalle muestra la entrega recién firmada y su comprobante a un toque.
+      setDetalleId(objeto.id)
       onRefresh()
     } finally {
       setEntregando(false)
+    }
+  }
+
+  async function descargarComprobante(o: ObjetoPerdido) {
+    if (generandoPdf) return
+    setGenerandoPdf(o.id)
+    try {
+      const blob = await generarComprobanteEntregaPdf({ objeto: o, lugar: lugarDe(o), almacen: almacenDe(o), proyectoNombre })
+      const compartido = await compartirOdescargarPdf(blob, nombrePdfEntrega(o))
+      if (!compartido) notify({ variant: 'info', title: t('condominios.objetos.pdf_descargado'), text: t('condominios.objetos.pdf_descargado_text'), duration: 2000 })
+    } catch (e) {
+      notify({ variant: 'error', title: t('condominios.objetos.pdf_error'), text: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setGenerandoPdf(null)
     }
   }
 
@@ -374,6 +395,12 @@ export function ObjetosTab({
               {canEdit && detalle.estado === 'en_custodia' && (
                 <Button variant="success" onClick={() => abrirEntrega(detalle)}>{t('condominios.objetos.accion_entregar')}</Button>
               )}
+              {tieneComprobante(detalle) && (
+                <Button variant="secondary" onClick={() => void descargarComprobante(detalle)} loading={generandoPdf === detalle.id}
+                  disabled={!!generandoPdf} loadingText={t('condominios.objetos.comprobante_generando')}>
+                  {t('condominios.objetos.comprobante')}
+                </Button>
+              )}
               {puedeEditar(detalle) && (
                 <Button variant="secondary" onClick={() => { setDetalleId(null); abrirEdicion(detalle) }}>{t('condominios.comun.edit')}</Button>
               )}
@@ -521,6 +548,12 @@ export function ObjetosTab({
                       {t('condominios.objetos.accion_descartar')}
                     </button>
                   </>
+                )}
+                {tieneComprobante(o) && (
+                  <button type="button" onClick={() => void descargarComprobante(o)} disabled={!!generandoPdf}
+                    aria-label={t('condominios.objetos.comprobante_aria', { objeto: o.descripcion })} style={accionStyle('var(--at-chip)', 'var(--at-ink-2)')}>
+                    {generandoPdf === o.id ? t('condominios.objetos.comprobante_generando') : '📄 PDF'}
+                  </button>
                 )}
                 {puedeEditar(o) && <button type="button" onClick={() => abrirEdicion(o)} aria-label={t('condominios.comun.edit')} style={{ ...accionStyle('var(--at-chip)', 'var(--at-ink-2)'), fontWeight: 400 }}>✏️</button>}
                 {canDelete && <button type="button" onClick={() => void handleDelete(o.id)} aria-label={t('condominios.comun.delete')} style={{ ...accionStyle('var(--at-danger-tint)', 'var(--at-danger)'), fontWeight: 400 }}>🗑️</button>}

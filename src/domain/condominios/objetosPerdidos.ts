@@ -121,6 +121,14 @@ export function fotosDe(o: ObjetoPerdido): string[] {
   return o.foto_url && !fotos.includes(o.foto_url) ? [o.foto_url, ...fotos] : fotos
 }
 
+/** El comprobante PDF existe para las entregas firmadas (las legadas no tienen firma que mostrar). */
+export const tieneComprobante = (o: ObjetoPerdido) => o.estado === 'reclamado' && !!o.firma_entrega_path
+
+/** «Entrega-Llaves_con_llavero_rojo-2026-10-30.pdf»: sin acentos ni signos. */
+export const nombrePdfEntrega = (o: Pick<ObjetoPerdido, 'descripcion' | 'fecha_reclamo' | 'entregado_en'>) =>
+  `Entrega-${o.descripcion.trim().slice(0, 40)}-${o.fecha_reclamo ?? o.entregado_en?.slice(0, 10) ?? ''}.pdf`
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.-]+/g, '_')
+
 /** Nombre de quien recibe: sin espacios sobrantes y al menos nombre y apellido. */
 export function nombreReceptorValido(nombre: string): boolean {
   return nombre.trim().split(/\s+/).filter(p => p.length >= 2).length >= 2
