@@ -1118,6 +1118,8 @@ export interface GestionCobranza {
 
 export type TurbiededadPiscina = 'cristalina' | 'ligeramente_turbia' | 'turbia'
 export type EstadoPiscina = 'abierta' | 'cerrada_mantenimiento' | 'cerrada_quimica' | 'cerrada_incidente'
+/** El mismo registro de calidad de agua sirve para la piscina y el jacuzzi (20261117000000). */
+export type TipoCuerpoAgua = 'piscina' | 'jacuzzi'
 
 export interface ControlPiscina {
   id: string
@@ -1125,15 +1127,31 @@ export interface ControlPiscina {
   project_id: string
   fecha: string
   hora?: string | null
+  /** Nombre del cuerpo de agua («Principal», «Infantil»), no del área. */
   piscina: string
+  tipo: TipoCuerpoAgua
+  /** Área del catálogo donde está (areas_condominio). NULL en registros legados. */
+  area_id?: string | null
   ph?: number | null
+  /** Cloro LIBRE (ppm). */
   cloro?: number | null
+  cloro_total?: number | null
+  bromo?: number | null
+  dureza_total?: number | null
+  acido_cianurico?: number | null
+  alcalinidad_total?: number | null
+  cobre?: number | null
+  sal?: number | null
   temperatura?: number | null
   turbiedad: TurbiededadPiscina
   estado: EstadoPiscina
   num_usuarios?: number | null
   registrado_por?: string | null
   observaciones?: string | null
+  /** Rutas en condominios-media (<project_id>/piscina/...): muestra (≤2), tira con resultado (≤2), área (≤4). */
+  fotos_muestra?: string[] | null
+  fotos_resultado?: string[] | null
+  fotos_area?: string[] | null
   created_at: string
 }
 

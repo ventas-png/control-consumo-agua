@@ -6827,12 +6827,22 @@ export type Database = {
       }
       control_piscina: {
         Row: {
+          acido_cianurico: number | null
+          alcalinidad_total: number | null
+          area_id: string | null
+          bromo: number | null
           cloro: number | null
+          cloro_total: number | null
+          cobre: number | null
           company_id: string
           creado_por: string | null
           created_at: string
+          dureza_total: number | null
           estado: string
           fecha: string
+          fotos_area: string[]
+          fotos_muestra: string[]
+          fotos_resultado: string[]
           hora: string | null
           id: string
           num_usuarios: number | null
@@ -6841,16 +6851,28 @@ export type Database = {
           piscina: string
           project_id: string
           registrado_por: string | null
+          sal: number | null
           temperatura: number | null
+          tipo: string
           turbiedad: string
         }
         Insert: {
+          acido_cianurico?: number | null
+          alcalinidad_total?: number | null
+          area_id?: string | null
+          bromo?: number | null
           cloro?: number | null
+          cloro_total?: number | null
+          cobre?: number | null
           company_id: string
           creado_por?: string | null
           created_at?: string
+          dureza_total?: number | null
           estado?: string
           fecha?: string
+          fotos_area?: string[]
+          fotos_muestra?: string[]
+          fotos_resultado?: string[]
           hora?: string | null
           id?: string
           num_usuarios?: number | null
@@ -6859,16 +6881,28 @@ export type Database = {
           piscina?: string
           project_id: string
           registrado_por?: string | null
+          sal?: number | null
           temperatura?: number | null
+          tipo?: string
           turbiedad?: string
         }
         Update: {
+          acido_cianurico?: number | null
+          alcalinidad_total?: number | null
+          area_id?: string | null
+          bromo?: number | null
           cloro?: number | null
+          cloro_total?: number | null
+          cobre?: number | null
           company_id?: string
           creado_por?: string | null
           created_at?: string
+          dureza_total?: number | null
           estado?: string
           fecha?: string
+          fotos_area?: string[]
+          fotos_muestra?: string[]
+          fotos_resultado?: string[]
           hora?: string | null
           id?: string
           num_usuarios?: number | null
@@ -6877,7 +6911,9 @@ export type Database = {
           piscina?: string
           project_id?: string
           registrado_por?: string | null
+          sal?: number | null
           temperatura?: number | null
+          tipo?: string
           turbiedad?: string
         }
         Relationships: [
@@ -6908,6 +6944,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "piscina_area_tenant_fk"
+            columns: ["area_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
           },
         ]
       }
