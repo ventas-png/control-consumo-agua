@@ -21487,6 +21487,7 @@ export type Database = {
           costo_unitario: number | null
           creado_por: string | null
           created_at: string
+          foto_url: string | null
           id: string
           nombre: string
           notas: string | null
@@ -21507,6 +21508,7 @@ export type Database = {
           costo_unitario?: number | null
           creado_por?: string | null
           created_at?: string
+          foto_url?: string | null
           id?: string
           nombre: string
           notas?: string | null
@@ -21527,6 +21529,7 @@ export type Database = {
           costo_unitario?: number | null
           creado_por?: string | null
           created_at?: string
+          foto_url?: string | null
           id?: string
           nombre?: string
           notas?: string | null

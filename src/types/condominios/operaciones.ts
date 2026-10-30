@@ -1037,6 +1037,8 @@ export interface SuministroCondominio {
   rendimiento?: number | null
   /** En qué se mide el rendimiento: aplicaciones, limpiezas, m², días… */
   rendimiento_unidad?: string | null
+  /** Ruta de la foto del insumo en `condominios-media`; SecureImage la firma al mostrarla. */
+  foto_url?: string | null
   notas?: string | null
   activo: boolean
   created_at: string

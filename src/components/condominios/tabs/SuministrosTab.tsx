@@ -12,6 +12,9 @@ import type { ProveedorCatalogo } from '../../../types/proveedores'
 import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
 import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
 import { tint } from '../../shared/statusTone'
+import { SecureImage } from '../../shared/SecureImage'
+import { removeCondominiosMedia } from '../../../domain/shared/storage'
+import { FotoSuministroModal } from './suministros/FotoSuministroModal'
 import {
   UNIDADES_RENDIMIENTO, consumoObservado, describirRendimiento, fmtRendimiento, rendimientoSuministro,
 } from '../../../lib/suministros'
@@ -60,12 +63,13 @@ interface FormSuministro {
   costo_unitario: string
   rendimiento: string
   rendimiento_unidad: string
+  foto_url: string
   notas: string
 }
 
 const FORM_VACIO: FormSuministro = {
   nombre: '', categoria: 'limpieza', unidad_medida: 'unidad', stock_actual: '0', stock_minimo: '0',
-  ubicacion: '', proveedor_id: '', proveedor: '', costo_unitario: '', rendimiento: '', rendimiento_unidad: '', notas: '',
+  ubicacion: '', proveedor_id: '', proveedor: '', costo_unitario: '', rendimiento: '', rendimiento_unidad: '', foto_url: '', notas: '',
 }
 
 /** La ficha tal como la edita la persona (el stock no: lo mueven los movimientos). */
@@ -77,6 +81,7 @@ function formDesde(s: SuministroCondominio): FormSuministro {
     costo_unitario: s.costo_unitario != null ? String(s.costo_unitario) : '',
     rendimiento: s.rendimiento != null ? String(s.rendimiento) : '',
     rendimiento_unidad: s.rendimiento_unidad ?? '',
+    foto_url: s.foto_url ?? '',
     notas: s.notas ?? '',
   }
 }
@@ -92,6 +97,8 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   const [filtro, setFiltro] = useState<CategoriaSupministro | ''>('')
   const [soloAlertas, setSoloAlertas] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  /** Qué ventana de foto está abierta: la de la ficha (guarda ya) o la del formulario (guarda con la ficha). */
+  const [fotoAbierta, setFotoAbierta] = useState<'detalle' | 'form' | null>(null)
 
   const [form, setForm] = useState<FormSuministro>(FORM_VACIO)
 
@@ -119,7 +126,50 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
     .filter(p => proveedorHabilitadoEn(p, asignaciones, proyectoId, hoyLocalISO()))
     .map(p => ({ id: p.id, nombre: p.nombre }))
 
+  /** La foto que la fila en edición tiene guardada (en «nuevo» no hay fila). */
+  const fotoGuardada = vista === 'editar' ? selected?.foto_url ?? null : null
+
+  /**
+   * Una foto subida en el formulario que no llegó a guardarse no la referencia
+   * ninguna fila: al salir sin guardar se borra del bucket. La guardada no se
+   * toca: la fila todavía apunta a ella.
+   */
+  function descartarFotoPendiente() {
+    if (vista !== 'nuevo' && vista !== 'editar') return
+    if (form.foto_url && form.foto_url !== fotoGuardada) void removeCondominiosMedia([form.foto_url])
+  }
+
+  function seleccionar(id: string) {
+    descartarFotoPendiente()
+    setSelectedId(id)
+    setVista('lista')
+  }
+
+  function cancelarFormulario() {
+    descartarFotoPendiente()
+    setForm(FORM_VACIO)
+    setVista('lista')
+  }
+
+  /** La foto elegida en la ventana viaja con la ficha; la pendiente que reemplaza ya no sirve. */
+  function elegirFotoForm(foto: string | null) {
+    if (form.foto_url && form.foto_url !== foto && form.foto_url !== fotoGuardada) void removeCondominiosMedia([form.foto_url])
+    setForm(p => ({ ...p, foto_url: foto ?? '' }))
+  }
+
+  /** Desde la ficha la foto se guarda en el acto, sin pasar por el formulario. */
+  async function guardarFoto(s: SuministroCondominio, foto: string | null): Promise<boolean> {
+    const { error } = await updateCondominioRow('suministros_condominio', s.id, { foto_url: foto })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
+    // La fila ya no apunta a la anterior: ahora sí se puede borrar.
+    if (s.foto_url && s.foto_url !== foto) void removeCondominiosMedia([s.foto_url])
+    notify({ variant: 'success', title: foto ? 'Foto guardada' : 'Foto quitada', text: s.nombre })
+    onRefresh()
+    return true
+  }
+
   function abrirNuevo() {
+    descartarFotoPendiente()
     setForm(FORM_VACIO)
     setSelectedId(null)
     setVista('nuevo')
@@ -156,6 +206,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
         costo_unitario: form.costo_unitario ? parseFloat(form.costo_unitario) : null,
         rendimiento,
         rendimiento_unidad: rendimiento != null ? (form.rendimiento_unidad.trim() || null) : null,
+        foto_url: form.foto_url || null,
         notas: form.notas.trim() || null,
       },
     }
@@ -174,6 +225,8 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
         })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    // Se reemplazó o se quitó la foto: la fila ya no apunta a la anterior.
+    if (fotoGuardada && fotoGuardada !== r.ficha.foto_url) void removeCondominiosMedia([fotoGuardada])
     if (vista === 'editar') notify({ variant: 'success', title: 'Suministro actualizado', text: r.ficha.nombre as string })
     setForm(FORM_VACIO)
     setVista('lista')
@@ -265,8 +318,8 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
           const r = rendimientoSuministro(s)
           return (
             <div key={s.id} role="button" tabIndex={0} aria-label={s.nombre}
-              onClick={() => { setSelectedId(s.id); setVista('lista') }}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(s.id); setVista('lista') } }}
+              onClick={() => seleccionar(s.id)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); seleccionar(s.id) } }}
               style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', opacity: s.activo ? 1 : 0.5, borderLeft: alerta ? '3px solid var(--at-warning)' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {s.nombre}</span>
@@ -362,6 +415,22 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
                 </div>
               </div>
               <div style={{ gridColumn: 'span 3' }}>
+                <div style={lbl}>Foto</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {form.foto_url && (
+                    <SecureImage src={form.foto_url} alt={`Foto de ${form.nombre || 'el insumo'}`}
+                      style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--at-line)', display: 'block' }} />
+                  )}
+                  <button type="button" onClick={() => setFotoAbierta('form')}
+                    style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                    📷 {form.foto_url ? 'Cambiar foto' : 'Agregar foto'}
+                  </button>
+                  {(form.foto_url || null) !== fotoGuardada && (
+                    <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Se guarda con la ficha</span>
+                  )}
+                </div>
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
                 <label style={lbl} htmlFor="sum-f-notas">Notas</label>
                 <input id="sum-f-notas" style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
               </div>
@@ -371,7 +440,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
                 style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : editando ? '✅ Guardar cambios' : '✅ Guardar'}
               </button>
-              <button onClick={() => { setForm(FORM_VACIO); setVista('lista') }}
+              <button onClick={cancelarFormulario}
                 style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
@@ -431,25 +500,37 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
         {vista === 'lista' && selected && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 20 }}>
-                  {CATEGORIAS.find(c => c.value === selected.categoria)?.icon} {selected.nombre}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>
-                  {selected.ubicacion && <span>{selected.ubicacion} · </span>}
-                  {selected.proveedor && <span>Proveedor: {selected.proveedor}{!selected.proveedor_id && ' (sin vincular al catálogo)'}</span>}
-                </div>
-                {rendimiento && (
-                  <div style={{ fontSize: 13, color: 'var(--at-ink-2)', marginTop: 4 }}>
-                    📐 {describirRendimiento(selected)}
-                    {rendimiento.costoPorUso != null && <span> · {fmtMoneda(rendimiento.costoPorUso)} por {rendimiento.unidad === 'usos' ? 'uso' : rendimiento.unidad}</span>}
-                  </div>
+              <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                {(selected.foto_url || canEdit) && (
+                  <button type="button" onClick={() => setFotoAbierta('detalle')}
+                    aria-label={selected.foto_url ? `Ver foto de ${selected.nombre}` : `Agregar foto de ${selected.nombre}`}
+                    title={selected.foto_url ? 'Ver foto' : 'Agregar foto'}
+                    style={{ width: 76, height: 76, flexShrink: 0, padding: 0, overflow: 'hidden', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', border: selected.foto_url ? '1px solid var(--at-line)' : '2px dashed var(--at-line-strong)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                    {selected.foto_url
+                      ? <SecureImage src={selected.foto_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      : <><span aria-hidden="true" style={{ fontSize: 22 }}>📷</span><span style={{ fontSize: 10 }}>Agregar foto</span></>}
+                  </button>
                 )}
-                {!rendimiento && canEdit && (
-                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
-                    📐 Sin rendimiento declarado: edita la ficha para indicar cuántos usos da 1 {selected.unidad_medida}.
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 20 }}>
+                    {CATEGORIAS.find(c => c.value === selected.categoria)?.icon} {selected.nombre}
                   </div>
-                )}
+                  <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>
+                    {selected.ubicacion && <span>{selected.ubicacion} · </span>}
+                    {selected.proveedor && <span>Proveedor: {selected.proveedor}{!selected.proveedor_id && ' (sin vincular al catálogo)'}</span>}
+                  </div>
+                  {rendimiento && (
+                    <div style={{ fontSize: 13, color: 'var(--at-ink-2)', marginTop: 4 }}>
+                      📐 {describirRendimiento(selected)}
+                      {rendimiento.costoPorUso != null && <span> · {fmtMoneda(rendimiento.costoPorUso)} por {rendimiento.unidad === 'usos' ? 'uso' : rendimiento.unidad}</span>}
+                    </div>
+                  )}
+                  {!rendimiento && canEdit && (
+                    <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
+                      📐 Sin rendimiento declarado: edita la ficha para indicar cuántos usos da 1 {selected.unidad_medida}.
+                    </div>
+                  )}
+                </div>
               </div>
               {canEdit && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -546,6 +627,15 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
       </div>
 
       <OperacionesLegadoPanel companyId={companyId} tabla="suministros_condominio" projectId={proyectoId} canEdit={canEdit} />
+
+      {fotoAbierta === 'detalle' && selected && (
+        <FotoSuministroModal nombre={selected.nombre} valor={selected.foto_url ?? null} editable={canEdit}
+          onGuardar={foto => guardarFoto(selected, foto)} onClose={() => setFotoAbierta(null)} />
+      )}
+      {fotoAbierta === 'form' && (
+        <FotoSuministroModal nombre={form.nombre.trim() || 'Nuevo suministro'} valor={form.foto_url || null} editable
+          accion="Usar esta foto" onGuardar={foto => { elegirFotoForm(foto); return true }} onClose={() => setFotoAbierta(null)} />
+      )}
 
       {showImportModal && (
         <ImportSuministrosModal
