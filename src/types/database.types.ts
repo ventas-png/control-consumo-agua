@@ -13417,13 +13417,28 @@ export type Database = {
       }
       objetos_perdidos: {
         Row: {
+          almacenamiento_detalle: string | null
+          area_almacenamiento_id: string | null
+          area_encontrado_id: string | null
           company_id: string
           created_at: string
+          custodio_nombre: string | null
+          custodio_personal_id: string | null
           descripcion: string
+          encontrado_por_contacto: string | null
+          encontrado_por_nombre: string | null
+          encontrado_por_personal_id: string | null
+          encontrado_por_tipo: string | null
+          entrega_documento: string | null
+          entregado_en: string | null
+          entregado_por: string | null
+          entregado_por_nombre: string | null
           estado: string
           fecha_encontrado: string
           fecha_reclamo: string | null
+          firma_entrega_path: string | null
           foto_url: string | null
+          fotos: string[]
           id: string
           lugar_encontrado: string | null
           notas: string | null
@@ -13432,13 +13447,28 @@ export type Database = {
           registrado_por: string | null
         }
         Insert: {
+          almacenamiento_detalle?: string | null
+          area_almacenamiento_id?: string | null
+          area_encontrado_id?: string | null
           company_id: string
           created_at?: string
+          custodio_nombre?: string | null
+          custodio_personal_id?: string | null
           descripcion: string
+          encontrado_por_contacto?: string | null
+          encontrado_por_nombre?: string | null
+          encontrado_por_personal_id?: string | null
+          encontrado_por_tipo?: string | null
+          entrega_documento?: string | null
+          entregado_en?: string | null
+          entregado_por?: string | null
+          entregado_por_nombre?: string | null
           estado?: string
           fecha_encontrado?: string
           fecha_reclamo?: string | null
+          firma_entrega_path?: string | null
           foto_url?: string | null
+          fotos?: string[]
           id?: string
           lugar_encontrado?: string | null
           notas?: string | null
@@ -13447,13 +13477,28 @@ export type Database = {
           registrado_por?: string | null
         }
         Update: {
+          almacenamiento_detalle?: string | null
+          area_almacenamiento_id?: string | null
+          area_encontrado_id?: string | null
           company_id?: string
           created_at?: string
+          custodio_nombre?: string | null
+          custodio_personal_id?: string | null
           descripcion?: string
+          encontrado_por_contacto?: string | null
+          encontrado_por_nombre?: string | null
+          encontrado_por_personal_id?: string | null
+          encontrado_por_tipo?: string | null
+          entrega_documento?: string | null
+          entregado_en?: string | null
+          entregado_por?: string | null
+          entregado_por_nombre?: string | null
           estado?: string
           fecha_encontrado?: string
           fecha_reclamo?: string | null
+          firma_entrega_path?: string | null
           foto_url?: string | null
+          fotos?: string[]
           id?: string
           lugar_encontrado?: string | null
           notas?: string | null
@@ -13462,6 +13507,34 @@ export type Database = {
           registrado_por?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "objetos_area_almacenamiento_tenant_fk"
+            columns: ["area_almacenamiento_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "objetos_area_encontrado_tenant_fk"
+            columns: ["area_encontrado_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "objetos_custodio_personal_fk"
+            columns: ["custodio_personal_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "objetos_encontrado_por_personal_fk"
+            columns: ["encontrado_por_personal_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
           {
             foreignKeyName: "objetos_perdidos_company_id_fkey"
             columns: ["company_id"]
