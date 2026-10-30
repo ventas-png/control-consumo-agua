@@ -166,6 +166,8 @@ export interface EquipoAmenidadDisponible {
   descripcion?: string | null
   unidad_medida: string
   costo_reposicion?: number | null
+  /** Renta por unidad; NULL cuando el equipo se presta sin costo. */
+  costo_renta_unidad?: number | null
   cantidad_max_por_reserva?: number | null
   notas?: string | null
   disponible: number

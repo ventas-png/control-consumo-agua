@@ -6,7 +6,7 @@ import { reservarAmenidad, cancelarReservaAmenidad, equiposDeAmenidad } from '..
 import { useSignedUrls } from '../../../lib/storageUrls'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa, PrestamoEquipo, EquipoAmenidadDisponible } from '../../../types'
 import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana, addMinutosToTime } from '../../../lib/amenidadesReglas'
-import { ESTADO_PRESTAMO_LABEL, faltantes, prestamosDeReserva } from '../../../lib/prestamosEquipo'
+import { ESTADO_PRESTAMO_LABEL, faltantes, prestamosDeReserva, rentaDeReserva, rentaEquipoSolicitado, totalCobroReserva } from '../../../lib/prestamosEquipo'
 import { tint } from '../../shared/statusTone'
 
 // Card de amenidad con background-image signed-URL. La URL viene firmada
@@ -62,16 +62,18 @@ const PRESTAMO_TONO: Record<PrestamoEquipo['estado'], string> = {
 
 /** Línea de un préstamo tal como la lee el residente: qué pidió, qué le entregaron, qué devolvió y qué debe. */
 function describirPrestamo(p: PrestamoEquipo, moneda: string): string {
+  // La renta (20261118000000) acompaña a toda línea viva: el residente ve cuánto le suma a la reserva.
+  const renta = p.estado !== 'cancelado' && p.monto_renta != null && Number(p.monto_renta) > 0 ? ` · renta ${moneda} ${Number(p.monto_renta).toFixed(2)}` : ''
   switch (p.estado) {
-    case 'solicitado': return 'pendiente de entrega'
-    case 'prestado': return `entregado${p.fecha_prestamo ? ` el ${p.fecha_prestamo}` : ''}`
+    case 'solicitado': return `pendiente de entrega${renta}`
+    case 'prestado': return `entregado${p.fecha_prestamo ? ` el ${p.fecha_prestamo}` : ''}${renta}`
     case 'cancelado': return 'no se entregó'
     default: {
       const falt = faltantes(p)
       const partes = [ESTADO_PRESTAMO_LABEL[p.estado].toLowerCase()]
       if (falt > 0) partes.push(`faltan ${falt}`)
       if (p.monto_reposicion != null && Number(p.monto_reposicion) > 0) partes.push(`reposición ${moneda} ${Number(p.monto_reposicion).toFixed(2)}${p.cuota_reposicion_id ? ' cargada a tu cuenta' : ''}`)
-      return partes.join(' · ')
+      return partes.join(' · ') + renta
     }
   }
 }
@@ -148,6 +150,9 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
   }, [showForm, form.amenidad_id, form.fecha])
 
   const equiposPedidos = Object.values(form.equipos).filter(n => n > 0).length
+  // Renta del equipo pedido (20261118000000): el servidor la calcula y la suma
+  // a la tarifa; aquí se muestra antes de confirmar con la renta del catálogo.
+  const rentaPedida = rentaEquipoSolicitado(form.equipos, catalogo)
   const prestamosSueltos = prestamos.filter(p => !p.reserva_id && (p.estado === 'prestado' || p.estado === 'solicitado'))
 
   // ids estables para asociar cada <label htmlFor> con su control. Sin la
@@ -235,6 +240,8 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
     // monto real lo calcula y sella el servidor (RPC 20260822030000).
     const tarifaCalc = amenidadSel ? tarifaAplicable(amenidadSel, form.fecha) : 0
     const aplicaTarifa = !!(amenidadSel?.requiere_tarifa && tarifaCalc > 0)
+    // Con renta de equipo también hay que decir cómo se paga, aunque la amenidad no tenga tarifa.
+    const aplicaCobro = aplicaTarifa || rentaPedida > 0
 
     setSaving(true)
     // Todo lo anterior es pre-chequeo UX (mensajes inmediatos); el RPC re-valida
@@ -249,7 +256,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
       horaFin: form.hora_fin,
       numInvitados: form.num_invitados,
       notas: form.notas.trim() || undefined,
-      metodoPago: aplicaTarifa ? form.metodo_pago_tarifa : null,
+      metodoPago: aplicaCobro ? form.metodo_pago_tarifa : null,
       reglamentoAceptado: form.reglamento_aceptado,
       // El equipo viaja con la reserva: si no alcanza, el servidor rechaza todo
       // y el mensaje dice qué faltó.
@@ -260,17 +267,22 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
       notify({ variant: 'error', title: 'No se pudo reservar', text: error ?? 'Error desconocido. Intenta de nuevo.' })
       return
     }
-    // El toast usa el monto DEVUELTO por el servidor — es el que realmente se cargó.
-    const montoSrv = data.monto_tarifa != null ? Number(data.monto_tarifa) : null
+    // El toast usa el monto DEVUELTO por el servidor — es el que realmente se
+    // cargó: tarifa + renta del equipo (monto_total_cobro, 20261118000000).
+    const montoSrv = data.monto_total_cobro != null ? Number(data.monto_total_cobro) : Number(data.monto_tarifa ?? 0)
+    const rentaSrv = Number(data.monto_renta_equipo ?? 0)
     const titulo = data.estado === 'pendiente'
       ? 'Solicitud enviada. La administración debe aprobarla.'
-      : montoSrv != null
+      : montoSrv > 0
         ? data.metodo_pago_tarifa === 'cargar_unidad'
           ? `Reserva confirmada. Se cargó ${moneda} ${montoSrv.toFixed(2)} a tu cuenta.`
           : `Reserva confirmada. Pagar ${moneda} ${montoSrv.toFixed(2)} en sitio.`
         : '¡Reserva confirmada!'
     const nEquipos = Number(data.equipos_solicitados ?? 0)
-    notify({ variant: 'success', title: titulo, text: nEquipos > 0 ? `Equipo solicitado: ${nEquipos}. La administración te lo entregará al llegar.` : undefined, duration: 2600 })
+    const textoEquipo = nEquipos > 0
+      ? `Equipo solicitado: ${nEquipos}${rentaSrv > 0 ? ` (renta ${moneda} ${rentaSrv.toFixed(2)} incluida)` : ''}. La administración te lo entregará al llegar.`
+      : undefined
+    notify({ variant: 'success', title: titulo, text: textoEquipo, duration: 2600 })
     descartarForm(); onRefresh()
   }
 
@@ -417,16 +429,20 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
                 )
               })()}
             </div>
-            {amenidadSel?.requiere_tarifa && (() => {
-              const tarifa = tarifaAplicable(amenidadSel, form.fecha)
-              if (tarifa <= 0) return null
+            {amenidadSel && (() => {
+              const tarifa = amenidadSel.requiere_tarifa ? tarifaAplicable(amenidadSel, form.fecha) : 0
+              // Tarifa + renta del equipo pedido: un solo cobro, un solo método de pago.
+              const total = Math.round((tarifa + rentaPedida) * 100) / 100
+              if (total <= 0) return null
               const finde = form.fecha && esFinDeSemana(form.fecha) && amenidadSel.tarifa_uso_finde != null
               return (
               <div style={{ gridColumn: '1 / -1', background: 'var(--at-primary-tint)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--at-primary-hover)', marginBottom: 8 }}>
-                  🎟 Tarifa por uso: {moneda} {tarifa.toFixed(2)} {finde && <span style={{ fontSize: 11, fontWeight: 600 }}>(fin de semana)</span>}
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--at-primary-hover)', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {tarifa > 0 && <span>🎟 Tarifa por uso: {moneda} {tarifa.toFixed(2)} {finde && <span style={{ fontSize: 11, fontWeight: 600 }}>(fin de semana)</span>}</span>}
+                  {rentaPedida > 0 && <span>🪑 Renta del equipo pedido: {moneda} {rentaPedida.toFixed(2)}</span>}
+                  {tarifa > 0 && rentaPedida > 0 && <span style={{ borderTop: '1px dashed var(--at-primary-soft-2)', paddingTop: 4, marginTop: 2 }}>Total: {moneda} {total.toFixed(2)}</span>}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginBottom: 8 }}>¿Cómo deseas pagar la tarifa?</div>
+                <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginBottom: 8 }}>¿Cómo deseas pagar{tarifa > 0 && rentaPedida > 0 ? '' : tarifa > 0 ? ' la tarifa' : ' la renta del equipo'}?</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
                     <input type="radio" name="metodo_pago" checked={form.metodo_pago_tarifa === 'cargar_unidad'}
@@ -499,7 +515,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
                   </div>
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)', marginBottom: 8, lineHeight: 1.45 }}>
-                  Se te entrega al llegar y se recibe al terminar. Lo que falte o se dañe se cobra al costo de reposición indicado.
+                  Se te entrega al llegar y se recibe al terminar. Lo que falte o se dañe se cobra al costo de reposición indicado; el equipo con renta suma su precio por unidad al cobro de la reserva.
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {catalogo.map(eq => {
@@ -514,6 +530,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
                             {!form.fecha ? 'Disponibilidad según la fecha' : agotado ? 'Sin disponibilidad para esa fecha' : `${eq.disponible} disponible${eq.disponible === 1 ? '' : 's'}`}
                             {eq.cantidad_max_por_reserva != null && ` · máx. ${eq.cantidad_max_por_reserva} por reserva`}
                             {eq.costo_reposicion != null && ` · reposición ${moneda} ${Number(eq.costo_reposicion).toFixed(2)} c/u`}
+                            {eq.costo_renta_unidad != null && Number(eq.costo_renta_unidad) > 0 && <strong style={{ color: 'var(--at-primary-hover)' }}>{` · renta ${moneda} ${Number(eq.costo_renta_unidad).toFixed(2)} c/u`}</strong>}
                           </div>
                           {eq.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', fontStyle: 'italic' }}>{eq.notas}</div>}
                         </div>
@@ -543,8 +560,9 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
                   })}
                 </div>
                 {equiposPedidos > 0 && (
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-primary-hover)', marginTop: 8 }}>
-                    {equiposPedidos} equipo{equiposPedidos === 1 ? '' : 's'} pedido{equiposPedidos === 1 ? '' : 's'} con esta reserva
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-primary-hover)', marginTop: 8, display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                    <span>{equiposPedidos} equipo{equiposPedidos === 1 ? '' : 's'} pedido{equiposPedidos === 1 ? '' : 's'} con esta reserva</span>
+                    {rentaPedida > 0 && <span>Renta de equipo: {moneda} {rentaPedida.toFixed(2)}</span>}
                   </div>
                 )}
               </div>
@@ -599,9 +617,10 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
                     {formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—')} · {r.hora_inicio} – {r.hora_fin}
                     {r.num_invitados > 0 && ` · ${r.num_invitados} invitado${r.num_invitados > 1 ? 's' : ''}`}
                   </div>
-                  {r.monto_tarifa != null && r.monto_tarifa > 0 && (
+                  {totalCobroReserva(r, prestamos) > 0 && (
                     <div style={{ fontSize: 11.5, marginTop: 3, fontWeight: 700, color: r.metodo_pago_tarifa === 'cargar_unidad' ? 'var(--at-primary-hover)' : (r.tarifa_pagada ? 'var(--at-success)' : 'var(--at-warning-strong)') }}>
-                      🎟 {moneda} {Number(r.monto_tarifa).toFixed(2)}
+                      🎟 {moneda} {totalCobroReserva(r, prestamos).toFixed(2)}
+                      {rentaDeReserva(r.id, prestamos) > 0 && ` · incluye renta de equipo ${moneda} ${rentaDeReserva(r.id, prestamos).toFixed(2)}`}
                       {r.metodo_pago_tarifa === 'cargar_unidad' && ' · cargado a tu unidad'}
                       {r.metodo_pago_tarifa === 'pagar_momento' && (r.tarifa_pagada ? ' · pagado' : ' · pagar en sitio')}
                     </div>

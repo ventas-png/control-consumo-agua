@@ -60,6 +60,7 @@ const blank = (): Partial<ItemInventario> => ({
   nombre: '', categoria: 'herramienta', descripcion: '', numero_serie: '',
   area_id: '', ubicacion: '', estado: 'disponible', cantidad: 1, cantidad_minima: 0,
   unidad_medida: 'unidad', costo_unitario: undefined,
+  prestable_con_costo: false, costo_renta_unidad: undefined,
   proveedor: '', fecha_adquisicion: '', fecha_vencimiento: '', notas: '',
 })
 
@@ -110,6 +111,7 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
       area_id: i.area_id ?? areaUnicaPorNombre(i.ubicacion, areasActivas)?.id ?? '',
       estado: i.estado, cantidad: i.cantidad, cantidad_minima: i.cantidad_minima,
       unidad_medida: i.unidad_medida, costo_unitario: i.costo_unitario ?? undefined,
+      prestable_con_costo: i.prestable_con_costo ?? false, costo_renta_unidad: i.costo_renta_unidad ?? undefined,
       proveedor: i.proveedor ?? '', fecha_adquisicion: i.fecha_adquisicion ?? '',
       fecha_vencimiento: i.fecha_vencimiento ?? '', notas: i.notas ?? '',
     })
@@ -129,6 +131,11 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
   async function handleSave() {
     if (saving) return
     if (!form.nombre?.trim()) return notify({ variant: 'warning', title: t('condominios.comun.required'), text: t('condominios.inventario.err_nombre') })
+    // El toggle «se presta a un costo» exige la renta por unidad (la base también lo impone).
+    const rentaUnidad = form.costo_renta_unidad != null && Number(form.costo_renta_unidad) > 0 ? Number(form.costo_renta_unidad) : null
+    if (form.prestable_con_costo && rentaUnidad == null) {
+      return notify({ variant: 'warning', title: t('condominios.comun.required'), text: t('condominios.inventario.err_renta') })
+    }
     setSaving(true)
     // `ubicacion` es el snapshot del nombre del área al guardar.
     const area = vinculoArea(form.area_id, areas, editando && { area_id: editando.area_id, texto: editando.ubicacion })
@@ -141,6 +148,9 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
       cantidad: form.cantidad ?? 1, cantidad_minima: form.cantidad_minima ?? 0,
       unidad_medida: form.unidad_medida ?? 'unidad',
       costo_unitario: form.costo_unitario ?? null,
+      // Apagado, la renta no se guarda: lo que se cobra es lo que el toggle dice.
+      prestable_con_costo: !!form.prestable_con_costo,
+      costo_renta_unidad: form.prestable_con_costo ? rentaUnidad : null,
       proveedor: form.proveedor || null,
       fecha_adquisicion: form.fecha_adquisicion || null,
       fecha_vencimiento: form.fecha_vencimiento || null,
@@ -264,6 +274,28 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
               <label htmlFor="inv-costo" style={labelStyle}>{t('condominios.inventario.costo_unitario', { moneda })}</label>
               <input id="inv-costo" style={inputStyle} type="number" inputMode="decimal" min="0" step="0.01" value={form.costo_unitario ?? ''} onChange={e => setForm(f => ({ ...f, costo_unitario: e.target.value ? Number(e.target.value) : undefined }))} placeholder="0.00" />
             </div>
+            {/* Se presta a un costo (20261118000000): el toggle encendido pide la renta
+                por unidad; esa renta se suma a la reserva por cada unidad que el
+                residente pida que se le tenga lista. */}
+            <div style={{ gridColumn: '1 / -1', background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <label htmlFor="inv-prestable" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)' }}>
+                  <input id="inv-prestable" type="checkbox" role="switch" aria-checked={!!form.prestable_con_costo} checked={!!form.prestable_con_costo}
+                    onChange={e => setForm(f => ({ ...f, prestable_con_costo: e.target.checked, costo_renta_unidad: e.target.checked ? f.costo_renta_unidad : undefined }))}
+                    style={{ width: 18, height: 18, accentColor: 'var(--at-primary)' }} />
+                  💲 {t('condominios.inventario.prestable_con_costo')}
+                </label>
+                {form.prestable_con_costo && (
+                  <div style={{ flex: '1 1 220px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label htmlFor="inv-renta" style={{ ...labelStyle, marginBottom: 0, whiteSpace: 'nowrap' }}>{t('condominios.inventario.renta_unidad', { moneda })}</label>
+                    <input id="inv-renta" style={{ ...inputStyle, maxWidth: 180 }} type="number" inputMode="decimal" min="0" step="0.01" autoFocus
+                      value={form.costo_renta_unidad ?? ''} onChange={e => setForm(f => ({ ...f, costo_renta_unidad: e.target.value ? Number(e.target.value) : undefined }))}
+                      placeholder={t('condominios.inventario.renta_unidad_placeholder')} />
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px' }}>{t('condominios.inventario.prestable_con_costo_hint')}</div>
+            </div>
             <div>
               <label htmlFor="inv-ubicacion" style={labelStyle}>{t('condominios.inventario.ubicacion')}</label>
               <select id="inv-ubicacion" style={inputStyle} value={form.area_id ?? ''} onChange={e => setForm(f => ({ ...f, area_id: e.target.value }))}>
@@ -362,6 +394,11 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
                     <span style={{ fontWeight: 700, color: 'var(--at-ink)', fontSize: '14px' }}>{i.nombre}</span>
                   </div>
                   {ubicacionDe(i) && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>📍 {ubicacionDe(i)}</div>}
+                  {i.prestable_con_costo && i.costo_renta_unidad != null && (
+                    <div style={{ fontSize: '11px', color: 'var(--at-primary-hover)', fontWeight: 600 }}>
+                      💲 {t('condominios.inventario.renta_chip', { moneda, monto: Number(i.costo_renta_unidad).toFixed(2) })}
+                    </div>
+                  )}
                   {(() => {
                     const fuera = enCirculacion(i.id, prestamos)
                     return fuera > 0 ? <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>🔁 {fuera} en préstamo</div> : null

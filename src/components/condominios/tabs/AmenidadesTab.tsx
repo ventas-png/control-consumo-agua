@@ -21,6 +21,7 @@ import {
   type RecepcionPrestamo,
   type ResultadoRecepcion,
 } from '../../../domain/condominios/prestamosEquipo'
+import { rentaDeReserva, rentaEquipoSolicitado, totalCobroReserva } from '../../../lib/prestamosEquipo'
 
 interface Props {
   amenidades: Amenidad[]
@@ -301,32 +302,37 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, invent
     const tarifaCalc = amen ? tarifaAplicable(amen, reservaForm.fecha) : 0
     const aplicaTarifa = !!(amen?.requiere_tarifa && tarifaCalc > 0)
     const montoTarifa = aplicaTarifa ? tarifaCalc : null
-    const metodoPago = aplicaTarifa ? reservaForm.metodo_pago_tarifa : null
+    // Renta del equipo pedido (20261118000000): adicional a la tarifa, en el
+    // mismo cobro. Espejo de lo que la base congela por línea.
+    const rentaCalc = rentaEquipoSolicitado(reservaForm.equipos, inventario)
+    const totalCobro = Math.round(((montoTarifa ?? 0) + rentaCalc) * 100) / 100
+    const aplicaCobro = totalCobro > 0
+    const metodoPago = aplicaCobro ? reservaForm.metodo_pago_tarifa : null
     const requiereAprob = !!amen?.requiere_aprobacion
     const estadoInicial: 'confirmada' | 'pendiente' = requiereAprob ? 'pendiente' : 'confirmada'
 
     setSaving(true)
     let cuotaId: string | null = null
     // Solo generar cuota si la reserva queda confirmada de inmediato
-    if (!requiereAprob && aplicaTarifa && metodoPago === 'cargar_unidad') {
+    if (!requiereAprob && aplicaCobro && metodoPago === 'cargar_unidad') {
       const periodo = reservaForm.fecha.slice(0, 7)
       const { data: cuotaData, error: cuotaErr } = await createCondominioRowReturning('cuotas_condominio', {
           company_id: companyId,
           project_id: proyectoId,
           unidad_id: reservaForm.unidad_id,
           concepto: 'amenidad',
-          monto: montoTarifa,
+          monto: totalCobro,
           periodo,
           fecha_vencimiento: reservaForm.fecha,
           estado: 'pendiente',
-          notas: `Reserva ${amen!.nombre} ${reservaForm.fecha} ${reservaForm.hora_inicio}-${reservaForm.hora_fin}`,
+          notas: `Reserva ${amen!.nombre} ${reservaForm.fecha} ${reservaForm.hora_inicio}-${reservaForm.hora_fin}${rentaCalc > 0 ? ` · incluye renta de equipo ${rentaCalc.toFixed(2)}` : ''}`,
           created_by: userId,
       })
       if (cuotaErr) { setSaving(false); notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
       cuotaId = (cuotaData?.id as string | undefined) ?? null
     }
 
-    const tarifaPagada = aplicaTarifa && metodoPago === 'pagar_momento' ? reservaForm.tarifa_pagada : false
+    const tarifaPagada = aplicaCobro && metodoPago === 'pagar_momento' ? reservaForm.tarifa_pagada : false
 
     const { data: reservaCreada, error } = await createCondominioRowReturning('reservas_amenidades', {
       company_id: companyId,
@@ -364,25 +370,39 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, invent
     }
     setReservaForm({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad', tarifa_pagada: false, equipos: {} })
     setShowReservaForm(false)
+    const desglose = rentaCalc > 0 && montoTarifa != null
+      ? ` (tarifa ${montoTarifa.toFixed(2)} + renta de equipo ${rentaCalc.toFixed(2)})`
+      : rentaCalc > 0 ? ' (renta de equipo)' : ''
     const msg = requiereAprob
       ? 'Reserva enviada como pendiente. Apruébala desde la lista.'
-      : aplicaTarifa
+      : aplicaCobro
         ? metodoPago === 'cargar_unidad'
-          ? `Reserva confirmada. Se cargó ${moneda} ${montoTarifa!.toFixed(2)} a la unidad.`
+          ? `Reserva confirmada. Se cargó ${moneda} ${totalCobro.toFixed(2)} a la unidad${desglose}.`
           : tarifaPagada
             ? `Reserva confirmada. Pago en sitio registrado.`
-            : `Reserva confirmada. Cobrar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
+            : `Reserva confirmada. Cobrar ${moneda} ${totalCobro.toFixed(2)} en sitio${desglose}.`
         : 'Reserva confirmada'
     notify({ variant: 'success', title: msg, duration: 2400 })
-    if (avisoEquipo) notify({ variant: 'warning', title: 'La reserva se guardó, pero el equipo no se pudo solicitar', text: avisoEquipo })
+    if (avisoEquipo) {
+      notify({
+        variant: 'warning', title: 'La reserva se guardó, pero el equipo no se pudo solicitar',
+        text: rentaCalc > 0 && cuotaId
+          ? `${avisoEquipo} El cargo generado incluye ${moneda} ${rentaCalc.toFixed(2)} de renta de equipo: agrégalo desde el detalle de la reserva o solicita el ajuste del cargo.`
+          : avisoEquipo,
+      })
+    }
     onRefresh()
   }
 
   // ── Equipo de la reserva (20261108000000) ──────────────────────────────────
-  async function solicitarEquiposReserva(reservaId: string, equipos: SolicitudEquipoReserva[]): Promise<boolean> {
-    const { data, error } = await solicitarEquiposReservaRpc(reservaId, equipos)
+  async function solicitarEquiposReserva(reservaId: string, equipos: SolicitudEquipoReserva[], generarCargo = false): Promise<boolean> {
+    const { data, error } = await solicitarEquiposReservaRpc(reservaId, equipos, generarCargo)
     if (error) { notify({ variant: 'error', title: 'No se pudo solicitar el equipo', text: error.message }); return false }
-    notify({ variant: 'success', title: `Equipo solicitado (${data?.equipos_solicitados ?? equipos.length})`, duration: 1800 })
+    const renta = Number(data?.monto_renta ?? 0)
+    const texto = renta > 0
+      ? `Renta ${moneda} ${renta.toFixed(2)}${data?.cuota_id ? ' · se generó el cargo a la unidad' : ' · se cobra en sitio con la reserva'}`
+      : undefined
+    notify({ variant: 'success', title: `Equipo solicitado (${data?.equipos_solicitados ?? equipos.length})`, text: texto, duration: 2200 })
     onRefresh()
     return true
   }
@@ -493,8 +513,9 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, invent
 
   function buildMensajeRecordatorio(r: ReservaAmenidad, unidad: Unidad | undefined): string {
     const fechaStr = formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—')
-    const tarifa = r.monto_tarifa && r.monto_tarifa > 0 && r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada
-      ? `\n\n💰 Recuerda traer ${moneda} ${Number(r.monto_tarifa).toFixed(2)} para la tarifa de uso.`
+    const cobro = totalCobroReserva(r, prestamos)
+    const tarifa = cobro > 0 && r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada
+      ? `\n\n💰 Recuerda traer ${moneda} ${cobro.toFixed(2)} para la tarifa de uso${rentaDeReserva(r.id, prestamos) > 0 ? ' y la renta del equipo' : ''}.`
       : ''
     const nombreSaludo = unidad?.propietario_nombre ? `Hola ${unidad.propietario_nombre.split(' ')[0]}, ` : 'Hola, '
     return `${nombreSaludo}te recordamos tu reserva de *${r.amenidad_nombre}* el ${fechaStr} de ${r.hora_inicio} a ${r.hora_fin}.${tarifa}\n\nNos vemos pronto. 🏖`
@@ -661,19 +682,21 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, invent
     }
     const amen = amenidades.find(a => a.id === r.amenidad_id)
     let cuotaId: string | null = r.cuota_id ?? null
-    // Generar cargo si tiene tarifa con cargar_unidad y aún no existe
-    if (!cuotaId && r.monto_tarifa && r.monto_tarifa > 0 && r.metodo_pago_tarifa === 'cargar_unidad') {
+    // Generar cargo (tarifa + renta del equipo) si se cobra a la unidad y aún no existe
+    const cobro = totalCobroReserva(r, prestamos)
+    const renta = rentaDeReserva(r.id, prestamos)
+    if (!cuotaId && cobro > 0 && r.metodo_pago_tarifa === 'cargar_unidad') {
       const periodo = r.fecha.slice(0, 7)
       const { data: cuotaData, error: cuotaErr } = await createCondominioRowReturning('cuotas_condominio', {
           company_id: companyId,
           project_id: proyectoId,
           unidad_id: r.unidad_id,
           concepto: 'amenidad',
-          monto: r.monto_tarifa,
+          monto: cobro,
           periodo,
           fecha_vencimiento: r.fecha,
           estado: 'pendiente',
-          notas: `Reserva ${amen?.nombre || 'amenidad'} ${r.fecha} ${r.hora_inicio}-${r.hora_fin}`,
+          notas: `Reserva ${amen?.nombre || 'amenidad'} ${r.fecha} ${r.hora_inicio}-${r.hora_fin}${renta > 0 ? ` · incluye renta de equipo ${renta.toFixed(2)}` : ''}`,
           created_by: userId,
       })
       if (cuotaErr) { notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
@@ -770,8 +793,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, invent
         const cobrosPendientes = reservas.filter(r => r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada && r.estado === 'confirmada' && r.fecha >= hoy).length
         const mes = hoy.slice(0, 7)
         const tarifasMes = reservas
-          .filter(r => r.estado === 'confirmada' && r.fecha.startsWith(mes) && r.monto_tarifa)
-          .reduce((s, r) => s + Number(r.monto_tarifa || 0), 0)
+          .filter(r => r.estado === 'confirmada' && r.fecha.startsWith(mes))
+          .reduce((s, r) => s + totalCobroReserva(r, prestamos), 0)
         const kpis = [
           { label: 'Amenidades activas', value: amenidadesActivas.length, accent: 'var(--at-primary)', icon: '🏊' },
           { label: 'Reservas hoy', value: hoyReservas, accent: 'var(--at-accent-2)', icon: '📅' },

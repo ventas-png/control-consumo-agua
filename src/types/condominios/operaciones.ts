@@ -743,6 +743,10 @@ export interface ItemInventario {
   cantidad_minima: number
   unidad_medida: string
   costo_unitario?: number | null
+  /** true = se presta a un costo: cada unidad pedida con una reserva suma `costo_renta_unidad` al cobro (20261118000000). */
+  prestable_con_costo?: boolean
+  /** Renta por unidad prestada. Obligatoria (> 0) cuando `prestable_con_costo`. */
+  costo_renta_unidad?: number | null
   proveedor?: string | null
   fecha_adquisicion?: string | null
   fecha_vencimiento?: string | null

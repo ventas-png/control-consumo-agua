@@ -26,8 +26,13 @@ export interface ReservarAmenidadInput {
   equipos?: SolicitudEquipoReserva[]
 }
 
-/** La reserva creada, más cuántas líneas de equipo quedaron solicitadas. */
-export type ReservaCreada = ReservaAmenidad & { equipos_solicitados?: number }
+/**
+ * La reserva creada, más cuántas líneas de equipo quedaron solicitadas, la
+ * renta de ese equipo y el total cobrado (tarifa + renta, 20261118000000).
+ * `monto_renta_equipo` y `monto_total_cobro` los CALCULA el servidor; no son
+ * columnas de la reserva.
+ */
+export type ReservaCreada = ReservaAmenidad & { equipos_solicitados?: number; monto_renta_equipo?: number | null; monto_total_cobro?: number }
 
 /**
  * Reserva una amenidad de una unidad propia. El RPC valida reglas, bloqueos y

@@ -8,8 +8,13 @@ import {
   prestamoAbierto,
   prestamoCerrado,
   prestamosDeReserva,
+  rentaDeLineas,
+  rentaDeReserva,
+  rentaEquipoSolicitado,
+  rentaUnitaria,
   resumenEquiposReserva,
   topePorReserva,
+  totalCobroReserva,
 } from '../prestamosEquipo'
 import type { ItemInventario, PrestamoEquipo } from '../../types'
 
@@ -104,8 +109,17 @@ describe('resumenEquiposReserva', () => {
     ])
     expect(r).toEqual({
       total: 6, solicitados: 1, prestados: 1, cerrados: 3, cancelados: 1,
-      reposicion: 339.5, reposicionSinCargo: 99.5, pendienteEntrega: true, pendienteRecepcion: true,
+      reposicion: 339.5, reposicionSinCargo: 99.5, renta: 0, pendienteEntrega: true, pendienteRecepcion: true,
     })
+  })
+
+  it('suma la renta de las líneas vivas; la cancelada no cuenta', () => {
+    const r = resumenEquiposReserva([
+      prestamo({ id: '1', estado: 'solicitado', monto_renta: 50 }),
+      prestamo({ id: '2', estado: 'devuelto', monto_renta: 12.25 }),
+      prestamo({ id: '3', estado: 'cancelado', monto_renta: 99 }),
+    ])
+    expect(r.renta).toBe(62.25)
   })
 
   it('sin préstamos no hay nada pendiente', () => {
@@ -113,6 +127,53 @@ describe('resumenEquiposReserva', () => {
     expect(r.total).toBe(0)
     expect(r.pendienteEntrega).toBe(false)
     expect(r.pendienteRecepcion).toBe(false)
+  })
+})
+
+describe('renta del equipo (20261118000000)', () => {
+  it('sólo renta lo marcado «se presta a un costo» con un monto mayor que cero', () => {
+    expect(rentaUnitaria(item({ prestable_con_costo: true, costo_renta_unidad: 5 }))).toBe(5)
+    expect(rentaUnitaria(item({ prestable_con_costo: false, costo_renta_unidad: 5 }))).toBeNull()
+    expect(rentaUnitaria(item({ prestable_con_costo: true, costo_renta_unidad: 0 }))).toBeNull()
+    expect(rentaUnitaria(item({ prestable_con_costo: true, costo_renta_unidad: null }))).toBeNull()
+    // El catálogo del portal no trae el toggle: el servidor manda null cuando no se cobra.
+    expect(rentaUnitaria({ costo_renta_unidad: 7.5 })).toBe(7.5)
+    expect(rentaUnitaria({ costo_renta_unidad: null })).toBeNull()
+  })
+
+  it('la renta de lo pedido es Σ cantidad × renta unitaria, con dos decimales', () => {
+    const inventario = [
+      item({ id: 'sillas', prestable_con_costo: true, costo_renta_unidad: 5 }),
+      item({ id: 'mesas', prestable_con_costo: false, costo_renta_unidad: null }),
+      item({ id: 'carpa', prestable_con_costo: true, costo_renta_unidad: 33.333 }),
+    ]
+    expect(rentaEquipoSolicitado({ sillas: 10, mesas: 2 }, inventario)).toBe(50)
+    expect(rentaEquipoSolicitado({ sillas: 10, carpa: 3 }, inventario)).toBe(150)
+    expect(rentaEquipoSolicitado({ sillas: 0, desconocido: 4 }, inventario)).toBe(0)
+    expect(rentaEquipoSolicitado({}, inventario)).toBe(0)
+    // Con el catálogo del portal (inventario_id en vez de id).
+    expect(rentaEquipoSolicitado({ sillas: 4 }, [{ inventario_id: 'sillas', costo_renta_unidad: 5 }])).toBe(20)
+  })
+
+  it('la renta de las líneas y el total a cobrar de la reserva', () => {
+    expect(rentaDeLineas([
+      prestamo({ estado: 'solicitado', monto_renta: 50 }),
+      prestamo({ estado: 'prestado', monto_renta: 20 }),
+      prestamo({ estado: 'cancelado', monto_renta: 99 }),
+      prestamo({ estado: 'devuelto', monto_renta: null }),
+    ])).toBe(70)
+    const lineas = [
+      prestamo({ id: 'a', reserva_id: 'r1', estado: 'solicitado', monto_renta: 50 }),
+      prestamo({ id: 'b', reserva_id: 'r1', estado: 'cancelado', monto_renta: 99 }),
+      prestamo({ id: 'c', reserva_id: 'r2', estado: 'prestado', monto_renta: 20 }),
+    ]
+    expect(rentaDeReserva('r1', lineas)).toBe(50)
+    expect(rentaDeReserva('r2', lineas)).toBe(20)
+    expect(rentaDeReserva('r3', lineas)).toBe(0)
+    expect(totalCobroReserva({ id: 'r1', monto_tarifa: 100 }, lineas)).toBe(150)
+    expect(totalCobroReserva({ id: 'r2', monto_tarifa: null }, lineas)).toBe(20)
+    expect(totalCobroReserva({ id: 'r3', monto_tarifa: 100 }, lineas)).toBe(100)
+    expect(totalCobroReserva({ id: 'r3', monto_tarifa: null }, [])).toBe(0)
   })
 })
 
