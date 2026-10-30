@@ -28,21 +28,29 @@ export interface RecepcionPrestamo {
 }
 
 export interface ResultadoEntrega { entregados: number; cancelados: number }
+/** Lo que devuelve reserva_equipos_solicitar: cuántas líneas, la renta de lo agregado y la cuota si se pidió cargarla. */
+export interface ResultadoSolicitud { equipos_solicitados: number; monto_renta?: number; cuota_id?: string | null }
 export interface ResultadoRecepcion { recibidos: number; monto_reposicion: number; cuota_id: string | null }
 
 /** Los arreglos de objetos viajan como Json de PostgREST. */
 const comoJson = (v: unknown) => v as Json
 
-/** La administración agrega equipo a una reserva pendiente o confirmada (sin check-out). */
+/**
+ * La administración agrega equipo a una reserva pendiente o confirmada (sin
+ * check-out). Con `generarCargo`, la renta de lo agregado se cobra en UNA
+ * cuota 'amenidad' a la unidad (20261118000000).
+ */
 export async function solicitarEquiposReserva(
   reservaId: string,
   equipos: SolicitudEquipoReserva[],
-): Promise<{ data: { equipos_solicitados: number } | null; error: RowError }> {
+  generarCargo = false,
+): Promise<{ data: ResultadoSolicitud | null; error: RowError }> {
   const { data, error } = await db.rpc('reserva_equipos_solicitar', {
     p_reserva_id: reservaId,
     p_equipos: comoJson(equipos),
+    p_generar_cargo: generarCargo,
   })
-  return { data: (data as { equipos_solicitados: number } | null) ?? null, error }
+  return { data: (data as ResultadoSolicitud | null) ?? null, error }
 }
 
 /** Entrega préstamos 'solicitado': quedan 'prestado' con fecha, hora y quién entregó. */

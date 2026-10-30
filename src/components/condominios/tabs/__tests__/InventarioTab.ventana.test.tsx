@@ -219,3 +219,45 @@ describe('InventarioTab — ubicación elegida del catálogo de áreas', () => {
     expect(within(screen.getByRole('dialog')).queryByRole('button', { name: 'Crearlas en el tab Áreas' })).toBeNull()
   })
 })
+
+describe('InventarioTab — se permite prestar a un costo (20261118000000)', () => {
+  const interruptor = () => within(screen.getByRole('dialog')).getByRole('switch', { name: /Se permite prestar a un costo/ }) as HTMLInputElement
+
+  it('el toggle encendido pide la renta por unidad; sin ella avisa y no guarda', async () => {
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: '+ Agregar Item' }))
+    expect(interruptor().checked).toBe(false)
+    expect(within(screen.getByRole('dialog')).queryByLabelText('Renta por unidad (Q) *')).toBeNull()
+
+    fireEvent.click(interruptor())
+    expect(interruptor().checked).toBe(true)
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Nombre *'), { target: { value: 'Sillas plegables' } })
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Agregar' }))
+    expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'warning', text: expect.stringContaining('Indica la renta por unidad') }))
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Renta por unidad (Q) *'), { target: { value: '12.5' } })
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Agregar' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    expect(mocks.createCondominioRow.mock.calls[0][1]).toMatchObject({ nombre: 'Sillas plegables', prestable_con_costo: true, costo_renta_unidad: 12.5 })
+  })
+
+  it('apagar el toggle borra la renta y guarda prestable_con_costo=false con renta nula', async () => {
+    renderTab({ inventario: [item({ id: 'iv9', nombre: 'Carpa', prestable_con_costo: true, costo_renta_unidad: 80 })] })
+    expect(screen.getByText(/Renta Q 80\.00 c\/u/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    expect(interruptor().checked).toBe(true)
+    expect((within(screen.getByRole('dialog')).getByLabelText('Renta por unidad (Q) *') as HTMLInputElement).value).toBe('80')
+
+    fireEvent.click(interruptor())
+    expect(within(screen.getByRole('dialog')).queryByLabelText('Renta por unidad (Q) *')).toBeNull()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Actualizar' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1))
+    expect(mocks.updateCondominioRow.mock.calls[0][2]).toMatchObject({ prestable_con_costo: false, costo_renta_unidad: null })
+  })
+
+  it('un item sin toggle no muestra renta en la lista', () => {
+    renderTab()
+    expect(screen.queryByText(/Renta Q/)).toBeNull()
+  })
+})

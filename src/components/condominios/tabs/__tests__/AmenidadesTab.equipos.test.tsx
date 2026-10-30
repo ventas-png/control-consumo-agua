@@ -128,7 +128,8 @@ describe('AmenidadesTab — equipo del inventario', () => {
     fireEvent.change(input, { target: { value: '35' } })
     expect(input.value).toBe('20')
     fireEvent.click(screen.getByRole('button', { name: 'Solicitar equipo' }))
-    await waitFor(() => expect(mocks.solicitarEquiposReserva).toHaveBeenCalledWith('r1', [{ inventario_id: 'inv1', cantidad: 20 }]))
+    // Sin renta no hay cargo que generar: el tercer argumento va en false.
+    await waitFor(() => expect(mocks.solicitarEquiposReserva).toHaveBeenCalledWith('r1', [{ inventario_id: 'inv1', cantidad: 20 }], false))
   })
 
   it('la recepción manda devueltos, estado y reposición, y ofrece cargar a la unidad sólo si falta algo', async () => {

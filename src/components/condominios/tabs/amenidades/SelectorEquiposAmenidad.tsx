@@ -3,7 +3,7 @@
 // inventario_id → tope ('' = sin tope); lo que no está en el mapa no se presta.
 import { useId, useState } from 'react'
 import type { CategoriaInventario, ItemInventario, PrestamoEquipo } from '../../../../types'
-import { enCirculacion } from '../../../../lib/prestamosEquipo'
+import { enCirculacion, rentaUnitaria } from '../../../../lib/prestamosEquipo'
 
 export const CATEGORIA_INVENTARIO_ICON: Record<CategoriaInventario, string> = {
   herramienta: '🔨', equipo: '⚙️', material: '📦', mobiliario: '🪑', vehiculo: '🚗', otro: '📋',
@@ -39,7 +39,7 @@ export function SelectorEquiposAmenidad({ inventario, prestamos, value, onChange
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-ink-2)' }}>🪑 Equipo que el residente puede solicitar</div>
           <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)', lineHeight: 1.45 }}>
-            Al reservar, el residente elige de esta lista qué se le entrega; la entrega y la devolución quedan registradas en Préstamo de equipos y lo que falte se cobra al costo del inventario.
+            Al reservar, el residente elige de esta lista qué se le entrega; la entrega y la devolución quedan registradas en Préstamo de equipos y lo que falte se cobra al costo del inventario. Lo marcado en Inventario como «se presta a un costo» suma su renta por unidad al cobro de la reserva.
           </div>
         </div>
         {seleccionados > 0 && (
@@ -88,6 +88,7 @@ export function SelectorEquiposAmenidad({ inventario, prestamos, value, onChange
                       {fuera > 0 && ` · ${fuera} en préstamo`}
                       {i.estado === 'en_reparacion' && ' · en reparación (no se presta hasta que vuelva)'}
                       {i.costo_unitario != null && ` · reposición ${Number(i.costo_unitario).toFixed(2)} c/u`}
+                      {rentaUnitaria(i) != null && <strong style={{ color: 'var(--at-primary-hover)' }}>{` · se renta a ${rentaUnitaria(i)!.toFixed(2)} c/u`}</strong>}
                     </div>
                   </div>
                   {on && (

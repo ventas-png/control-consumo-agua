@@ -269,6 +269,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, inventario = [], reser
                   <div style={{ fontSize: 11, color: (disponible ?? 0) > 0 ? 'var(--at-ink-3)' : 'var(--at-danger)', marginTop: 3 }}>
                     {Math.max(0, disponible ?? 0)} de {itemSel.cantidad} disponible(s) para el {form.fecha_prestamo}
                     {itemSel.costo_unitario != null && ` · reposición ${moneda} ${Number(itemSel.costo_unitario).toFixed(2)} c/u`}
+                    {itemSel.prestable_con_costo && itemSel.costo_renta_unidad != null && <strong style={{ color: 'var(--at-primary-hover)' }}>{` · renta ${moneda} ${Number(itemSel.costo_renta_unidad).toFixed(2)} c/u`}</strong>}
                   </div>
                 )}
               </div>
@@ -357,6 +358,11 @@ export function PrestamoEquiposTab({ prestamos, unidades, inventario = [], reser
                     </div>
                   )}
                   {!res && p.reserva_id && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 500 }}>📅 Pedido con una reserva</div>}
+                  {p.estado !== 'cancelado' && p.monto_renta != null && Number(p.monto_renta) > 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--at-primary-hover)', fontWeight: 600 }} title={p.cuota_renta_id ? 'Renta cargada a la unidad' : 'Renta sin cargo propio'}>
+                      💲 Renta {moneda} {Number(p.monto_renta).toFixed(2)}{p.cuota_renta_id ? ' ✓' : ''}
+                    </div>
+                  )}
                   {p.observaciones && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 400 }}>{p.observaciones}</div>}
                   {p.observaciones_devolucion && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 400 }}>↩ {p.observaciones_devolucion}</div>}
                 </div>

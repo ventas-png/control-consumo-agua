@@ -502,6 +502,12 @@ export interface PrestamoEquipo {
   monto_reposicion?: number | null
   /** Cuota 'amenidad' que cobró la reposición, si se generó. */
   cuota_reposicion_id?: string | null
+  /** Renta por unidad congelada al pedir (inventario.costo_renta_unidad si se presta a un costo). NULL = sin costo. */
+  costo_renta_unitario?: number | null
+  /** Renta de la línea: cantidad SOLICITADA × costo_renta_unitario. Entregar menos no la cambia. */
+  monto_renta?: number | null
+  /** Cuota 'amenidad' que cobró la renta: la de la reserva (portal, cargo a la unidad) o la generada aparte al agregar equipo. */
+  cuota_renta_id?: string | null
   observaciones_devolucion?: string | null
   created_at: string
   unidad_nombre?: string

@@ -11227,6 +11227,8 @@ export type Database = {
           categoria: string
           company_id: string
           costo_unitario: number | null
+          costo_renta_unidad: number | null
+          prestable_con_costo: boolean
           creado_por: string | null
           created_at: string
           descripcion: string | null
@@ -11250,6 +11252,8 @@ export type Database = {
           categoria?: string
           company_id: string
           costo_unitario?: number | null
+          costo_renta_unidad?: number | null
+          prestable_con_costo?: boolean
           creado_por?: string | null
           created_at?: string
           descripcion?: string | null
@@ -11273,6 +11277,8 @@ export type Database = {
           categoria?: string
           company_id?: string
           costo_unitario?: number | null
+          costo_renta_unidad?: number | null
+          prestable_con_costo?: boolean
           creado_por?: string | null
           created_at?: string
           descripcion?: string | null
@@ -16317,6 +16323,9 @@ export type Database = {
           costo_reposicion_unitario: number | null
           monto_reposicion: number | null
           cuota_reposicion_id: string | null
+          costo_renta_unitario: number | null
+          monto_renta: number | null
+          cuota_renta_id: string | null
           observaciones_devolucion: string | null
         }
         Insert: {
@@ -16345,6 +16354,9 @@ export type Database = {
           costo_reposicion_unitario?: number | null
           monto_reposicion?: number | null
           cuota_reposicion_id?: string | null
+          costo_renta_unitario?: number | null
+          monto_renta?: number | null
+          cuota_renta_id?: string | null
           observaciones_devolucion?: string | null
         }
         Update: {
@@ -16373,9 +16385,19 @@ export type Database = {
           costo_reposicion_unitario?: number | null
           monto_reposicion?: number | null
           cuota_reposicion_id?: string | null
+          costo_renta_unitario?: number | null
+          monto_renta?: number | null
+          cuota_renta_id?: string | null
           observaciones_devolucion?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "prestamos_equipo_cuota_renta_id_fkey"
+            columns: ["cuota_renta_id"]
+            isOneToOne: false
+            referencedRelation: "cuotas_condominio"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "prestamos_equipo_inventario_id_fkey"
             columns: ["inventario_id"]
@@ -26650,8 +26672,12 @@ export type Database = {
         Returns: Json
       }
       reserva_equipos_solicitar: {
-        Args: { p_equipos: Json; p_reserva_id: string }
+        Args: { p_equipos: Json; p_reserva_id: string; p_generar_cargo?: boolean }
         Returns: Json
+      }
+      reserva_equipos_renta: {
+        Args: { p_amenidad_id: string; p_equipos: Json }
+        Returns: number
       }
       reserva_equipos_registrar_solicitud: {
         Args: { p_equipos: Json; p_reserva_id: string }
