@@ -538,7 +538,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'proveedores', label: 'Contratos', icon: '🤝', render: (ctx) =>
     <ContratosProveedorTab contratos={ctx.contratosProveedores as ContratoProveedorCatalogo[]} proyectoId={ctx.proyectoId} proyectoNombre={ctx.proyectoActual?.nombre} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('proveedores')} canEdit={ctx.canEdit('proveedores')} canDelete={ctx.canDelete('proveedores')} onRefresh={ctx.onRefresh} /> },
   { id: 'objetos', label: 'Obj. Perdidos', icon: '🔍', render: (ctx) =>
-    <ObjetosTab objetos={ctx.objetos} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('objetos')} canEdit={ctx.canEdit('objetos')} canDelete={ctx.canDelete('objetos')} onRefresh={ctx.onRefresh} /> },
+    <ObjetosTab objetos={ctx.objetos} areas={ctx.areas} personal={ctx.personal} cargos={ctx.cargosPersonal} proyectoId={ctx.proyectoId} proyectoNombre={ctx.proyectoActual?.nombre} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('objetos')} canEdit={ctx.canEdit('objetos')} canDelete={ctx.canDelete('objetos')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'agenda', label: 'Agenda', icon: '📅', render: (ctx) =>
     <AgendaTab agenda={ctx.agenda} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('agenda')} canEdit={ctx.canEdit('agenda')} canDelete={ctx.canDelete('agenda')} onRefresh={ctx.onRefresh} /> },
   { id: 'cumpleanos', label: 'Cumpleaños', icon: '🎂', render: (ctx) =>
