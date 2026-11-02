@@ -158,7 +158,7 @@ describe('cuentaBancariaFormSchema', () => {
   it('normaliza moneda a mayúsculas y exige cuenta contable', () => {
     const r = cuentaBancariaFormSchema.parse({
       nombre: 'BI USD', banco: 'Banco Industrial', numero_mascara: '4321',
-      moneda: 'usd', cuenta_contable_id: '11111111-1111-1111-1111-111111111111', notas: null,
+      moneda: 'usd', cuenta_contable_id: '11111111-1111-4111-8111-111111111111', notas: null,
     })
     expect(r.moneda).toBe('USD')
     expect(cuentaBancariaFormSchema.safeParse({

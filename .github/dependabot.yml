@@ -55,13 +55,6 @@ updates:
       # Levantar este ignore cuando typescript-eslint amplíe ese rango.
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
-      # zod@4 cambia la API de errores (`.issues`, formato de `invalid_format`)
-      # y los schemas de dominio dependen de ella. Ojo: el build de Vercel NO
-      # corre `tsc` ni los tests, así que este PR sale VERDE en Vercel mientras
-      # CI está en rojo — mergearlo desplegaría validaciones rotas. Levantar
-      # este ignore junto con la migración de los schemas a la API v4.
-      - dependency-name: zod
-        update-types: ["version-update:semver-major"]
       # @types/node no es una dependencia cualquiera: su major ES la versión de
       # Node que describe. `engines` de este repo fija `node: 22.x` (y los
       # workflows y Vercel corren 22), así que @types/node@26 describiría APIs

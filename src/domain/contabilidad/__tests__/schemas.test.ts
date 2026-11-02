@@ -10,8 +10,8 @@ import {
   totalesLineas,
 } from '../schemas'
 
-const lineaDebe = { cuenta_id: '11111111-1111-1111-1111-111111111111', debe: 100, haber: 0 }
-const lineaHaber = { cuenta_id: '22222222-2222-2222-2222-222222222222', debe: 0, haber: 100 }
+const lineaDebe = { cuenta_id: '11111111-1111-4111-8111-111111111111', debe: 100, haber: 0 }
+const lineaHaber = { cuenta_id: '22222222-2222-4222-8222-222222222222', debe: 0, haber: 100 }
 
 describe('asientoLineaFormSchema', () => {
   it('acepta una línea con monto en un solo lado', () => {

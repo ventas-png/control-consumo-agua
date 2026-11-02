@@ -10,7 +10,7 @@ import {
 } from '../schemas'
 
 const facturaBase = {
-  proveedor_id: '11111111-1111-1111-1111-111111111111',
+  proveedor_id: '11111111-1111-4111-8111-111111111111',
   project_id: null,
   numero_factura: 'F-001',
   fecha_emision: '2026-06-10',
@@ -45,7 +45,7 @@ describe('facturaProveedorFormSchema', () => {
 
 describe('ordenPagoFormSchema', () => {
   const ordenBase = {
-    factura_id: '22222222-2222-2222-2222-222222222222',
+    factura_id: '22222222-2222-4222-8222-222222222222',
     monto: 200,
     metodo_pago: 'transferencia' as const,
     fecha_pago: null,
