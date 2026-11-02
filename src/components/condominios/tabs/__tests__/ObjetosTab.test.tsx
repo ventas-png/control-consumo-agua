@@ -1,4 +1,4 @@
-// Objetos perdidos (20261119000000): el registro se hace en ventana; el área
+// Objetos perdidos (20261119000001): el registro se hace en ventana; el área
 // donde se encontró y la de almacenamiento se eligen del catálogo; quién lo
 // encontró es un empleado (se propone el del usuario) o un tercero con nombre;
 // el custodio se elige del personal; y la entrega al propietario pide el
