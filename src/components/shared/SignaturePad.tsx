@@ -6,11 +6,13 @@ interface Props {
   saving?: boolean
   saveLabel?: string
   height?: number
+  /** Deshabilita «Guardar firma» aunque haya trazo (p. ej. falta aceptar una declaración). */
+  bloquearGuardar?: boolean
 }
 
 // Captura de firma manuscrita sobre un <canvas> (pointer events: mouse, touch y
 // lápiz). Exporta un PNG con fondo blanco. Sin dependencias externas.
-export function SignaturePad({ onSave, onCancel, saving = false, saveLabel = 'Guardar firma', height = 200 }: Props) {
+export function SignaturePad({ onSave, onCancel, saving = false, saveLabel = 'Guardar firma', height = 200, bloquearGuardar = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
   const last = useRef<{ x: number; y: number } | null>(null)
@@ -79,7 +81,7 @@ export function SignaturePad({ onSave, onCancel, saving = false, saveLabel = 'Gu
 
   function save() {
     const canvas = canvasRef.current
-    if (!canvas || !hasDrawn || saving) return
+    if (!canvas || !hasDrawn || saving || bloquearGuardar) return
     canvas.toBlob(blob => {
       if (blob) onSave(new File([blob], 'firma.png', { type: 'image/png' }))
     }, 'image/png')
@@ -109,8 +111,8 @@ export function SignaturePad({ onSave, onCancel, saving = false, saveLabel = 'Gu
         Firme con el dedo o el mouse dentro del recuadro.
       </div>
       <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-        <button type="button" onClick={save} disabled={!hasDrawn || saving}
-          style={{ ...btn, border: 'none', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', opacity: !hasDrawn || saving ? 0.6 : 1 }}>
+        <button type="button" onClick={save} disabled={!hasDrawn || saving || bloquearGuardar}
+          style={{ ...btn, border: 'none', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', opacity: !hasDrawn || saving || bloquearGuardar ? 0.6 : 1 }}>
           {saving ? 'Guardando…' : saveLabel}
         </button>
         <button type="button" onClick={clear} disabled={saving}

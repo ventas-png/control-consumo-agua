@@ -2,10 +2,11 @@ import { describe, it, expect, vi } from 'vitest'
 import type { ContratoArrendamiento, ContratoProveedor, NotaAdmin, PersonalCondominio, PuntoMinuta, Unidad } from '../../../types'
 import type { ProveedorCatalogo } from '../../../types/proveedores'
 
-vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
+const dbMock = vi.hoisted(() => ({ from: vi.fn((_tabla: string): unknown => ({})) }))
+vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: dbMock }))
 
 const {
-  archivosPorBorrar, borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
+  archivosPorBorrar, borradorDesde, conFirma, estadoFirma, firmasDe, firmasDeParticipantes, registrarFirmaMinuta, resumenFirmas, sinFirma, versionAcuerdos, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
   documentosDe, fechaDeMinuta, filtrarCandidatos, fotosDe, iniciales, mismasRutas, rutasQuitadas, MAX_DOCUMENTOS_MINUTA, marcarCumplido, participanteDesdeCandidato, participantesDe, plazoCompromiso, plazoSeguimiento,
   puntosDe, MAX_FOTOS_MINUTA, quitarParticipante, resumenCompromisos, situacionCompromiso, validarPasoMinuta, yaParticipa,
 } = await import('../minutas')
@@ -325,5 +326,93 @@ describe('candidatos a participante', () => {
     expect(iniciales('María José Pérez')).toBe('MP')
     expect(iniciales('Prestadora')).toBe('PR')
     expect(iniciales('   ')).toBe('?')
+  })
+})
+
+describe('firmas de la minuta', () => {
+  const participantes = [
+    { id: 'pa', tipo: 'otro' as const, ref_id: null, nombre: 'Admin', detalle: null, gestiona: true },
+    { id: 'pb', tipo: 'empleado' as const, ref_id: 'e1', nombre: 'Carlos Guardia', detalle: 'Guardia', gestiona: false },
+  ]
+  const puntos: PuntoMinuta[] = [
+    { id: 'q1', titulo: 'Rondas', descripcion: 'Nocturnas', acuerdos: [
+      { id: 'a1', tipo: 'acuerdo', texto: 'Se mantiene el horario', cumplido: false },
+      { id: 'c1', tipo: 'compromiso', texto: 'Registrar cada ronda', responsable_id: 'pb', fecha_limite: '2026-11-05', cumplido: false },
+    ] },
+  ]
+  const firma = (o: Partial<{ participante_id: string; path: string; version: string }> = {}) => ({
+    participante_id: 'pa', nombre: 'Admin', path: 'p1/minutas-firmas/a.png', firmado_at: '2026-11-02T15:00:00.000Z', version: 'v', ...o,
+  })
+
+  it('firmasDe: una por participante (gana la última), sin entradas sin ruta o sin participante', () => {
+    expect(firmasDe(nota({}))).toEqual([])
+    expect(firmasDe({ firmas: 'x' as never })).toEqual([])
+    const lista = [firma(), { participante_id: 'pb' }, { path: 'p1/x.png' }, 7, firma({ path: 'p1/minutas-firmas/b.png' })]
+    expect(firmasDe({ firmas: lista as never })).toEqual([firma({ path: 'p1/minutas-firmas/b.png' })])
+  })
+
+  it('versionAcuerdos: la misma para lo que se guarda y lo que se lee; cambia con lo acordado, no con «cumplido»', () => {
+    const b = { ...borradorDesde(null, '', '2026-11-02'), titulo: 'X', participantes, puntos: [{ ...puntos[0], titulo: '  Rondas ', acuerdos: [...puntos[0].acuerdos, { id: 'v', tipo: 'acuerdo' as const, texto: '  ', cumplido: false }] }] }
+    const guardado = depurarBorrador(b)
+    const v = versionAcuerdos(guardado.puntos, guardado.participantes)
+    // Ida y vuelta por la base.
+    expect(versionAcuerdos(puntosDe({ puntos: guardado.puntos }), participantesDe({ participantes: guardado.participantes }))).toBe(v)
+    expect(versionAcuerdos(puntos, participantes)).toBe(v)
+    // Marcar un compromiso cumplido no la cambia.
+    expect(versionAcuerdos(marcarCumplido(puntos, 'c1', true, '2026-11-03T10:00:00Z'), participantes)).toBe(v)
+    // Cambiar un texto, el responsable o la fecha, sí.
+    const con = (patch: object) => versionAcuerdos([{ ...puntos[0], acuerdos: [puntos[0].acuerdos[0], { ...puntos[0].acuerdos[1], ...patch }] }], participantes)
+    expect(con({ texto: 'Registrar cada ronda en la bitácora' })).not.toBe(v)
+    expect(con({ responsable_id: 'pa' })).not.toBe(v)
+    expect(con({ fecha_limite: '2026-11-06' })).not.toBe(v)
+    expect(versionAcuerdos([...puntos, { id: 'q2', titulo: 'Llaves', acuerdos: [] }], participantes)).not.toBe(v)
+  })
+
+  it('estado, resumen y edición de la lista de firmas', () => {
+    const v = versionAcuerdos(puntos, participantes)
+    const vigente = firma({ version: v })
+    const anterior = firma({ participante_id: 'pb', path: 'p1/minutas-firmas/b.png', version: 'vieja' })
+    const deUnQuitado = firma({ participante_id: 'px', path: 'p1/minutas-firmas/x.png', version: v })
+    expect(estadoFirma(vigente, v)).toBe('vigente')
+    expect(estadoFirma(anterior, v)).toBe('anterior')
+    expect(resumenFirmas(participantes, [vigente, anterior, deUnQuitado], v)).toEqual({ total: 2, vigentes: 1, anteriores: 1, pendientes: 1 })
+    expect(firmasDeParticipantes([vigente, deUnQuitado], participantes)).toEqual([vigente])
+    const nueva = firma({ path: 'p1/minutas-firmas/a2.png', version: v })
+    expect(conFirma([vigente, anterior], nueva)).toEqual([anterior, nueva])
+    expect(sinFirma([vigente, anterior], 'pa')).toEqual([anterior])
+  })
+
+  it('el paso 4 no exige firmas; el borrador trae las guardadas', () => {
+    const b = borradorDesde(nota({ participantes, puntos, firmas: [firma()] }), 'Admin', '2026-11-02')
+    expect(b.firmas).toEqual([firma()])
+    expect(validarPasoMinuta(b, 4)).toBeNull()
+    expect(borradorDesde(null, 'Admin', '2026-11-02').firmas).toEqual([])
+  })
+
+  describe('registrarFirmaMinuta', () => {
+    function base(fila: unknown, afectadas: unknown[] = [{ id: 'n1' }]) {
+      const updates: unknown[] = []
+      dbMock.from.mockImplementation(() => ({
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: fila, error: null }) }) }),
+        update: (patch: unknown) => { updates.push(patch); return { eq: () => ({ select: async () => ({ data: afectadas, error: null }) }) } },
+      }))
+      return updates
+    }
+
+    it('relee las firmas de la fila y agrega la nueva sin pisar las de otros; devuelve la que reemplazó', async () => {
+      const deOtro = firma({ participante_id: 'pb', path: 'p1/minutas-firmas/b.png' })
+      const vieja = firma({ path: 'p1/minutas-firmas/a-vieja.png' })
+      const updates = base({ firmas: [deOtro, vieja] })
+      const nueva = firma({ path: 'p1/minutas-firmas/a-nueva.png' })
+      expect(await registrarFirmaMinuta('n1', nueva)).toEqual({ error: null, reemplazada: 'p1/minutas-firmas/a-vieja.png' })
+      expect(updates).toEqual([{ firmas: [deOtro, nueva] }])
+    })
+
+    it('sin fila o sin filas afectadas es un error (no se reporta como firmado)', async () => {
+      base(null)
+      expect((await registrarFirmaMinuta('n1', firma())).error).toMatch(/ya no existe/)
+      base({ firmas: [] }, [])
+      expect((await registrarFirmaMinuta('n1', firma())).error).toMatch(/no tienes permiso/)
+    })
   })
 })

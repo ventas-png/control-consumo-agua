@@ -108,6 +108,59 @@
   flex: 1 1 200px;
   min-width: 0;
 }
+
+/* ── Firmas ───────────────────────────────────────────────────────────────── */
+/* Fila de firma: avatar, nombre y estado; la firma y los botones bajan a su
+   propia línea en el teléfono. */
+.minuta-firma {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--at-surface-2);
+  min-width: 0;
+}
+.minuta-firma-cuerpo { flex: 1 1 180px; min-width: 0; }
+.minuta-firma-acc { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+/* Avisos: firmas que quedaron de una versión anterior. */
+.minuta-aviso {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--at-warning-tint);
+  border: 1px solid var(--at-warning-border);
+  color: var(--at-warning-strong);
+}
+/* Declaración de aceptación: toda la fila es el área de toque. */
+.minuta-acepta {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--at-line);
+  border-radius: 10px;
+  background: var(--at-surface-2);
+  font-size: 14px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.minuta-acepta .minuta-check { flex-shrink: 0; margin-top: 1px; }
+.minuta-firma-resumen {
+  border: 1px solid var(--at-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.minuta-firma-resumen > summary {
+  min-height: 24px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--at-primary);
+}
 .minuta-part-acc {
   margin-left: auto;
   display: flex;
@@ -216,6 +269,8 @@
     font-size: 15px !important;
   }
   .minuta-documentos .at-adjunto-fila { min-height: 44px; box-sizing: border-box; }
+  /* Botones del recuadro de firma (SignaturePad compartido, 35 px). */
+  .minuta-firma-pad button { min-height: 44px; }
   /* Dos líneas para el nombre: «acta-…-firmada.pdf» y «acta-…-borrador.pdf»
      cortadas en una línea se ven iguales (como los nombres de candidatos). */
   .minuta-documentos .at-adjunto-nombre {
