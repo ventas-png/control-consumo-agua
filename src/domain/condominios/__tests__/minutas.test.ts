@@ -6,7 +6,7 @@ const dbMock = vi.hoisted(() => ({ from: vi.fn((_tabla: string): unknown => ({})
 vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: dbMock }))
 
 const {
-  archivosPorBorrar, borradorDesde, conFirma, estadoFirma, firmasDe, firmasDeParticipantes, registrarFirmaMinuta, resumenFirmas, sinFirma, versionAcuerdos, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
+  archivosPorBorrar, borradorDesde, conFirma, estadoFirma, firmasDe, firmasDeParticipantes, fusionarFirmas, leerFirmasMinuta, registrarFirmaMinuta, rutasDelProyecto, resumenFirmas, sinFirma, versionAcuerdos, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
   documentosDe, fechaDeMinuta, filtrarCandidatos, fotosDe, iniciales, mismasRutas, rutasQuitadas, MAX_DOCUMENTOS_MINUTA, marcarCumplido, participanteDesdeCandidato, participantesDe, plazoCompromiso, plazoSeguimiento,
   puntosDe, MAX_FOTOS_MINUTA, quitarParticipante, resumenCompromisos, situacionCompromiso, validarPasoMinuta, yaParticipa,
 } = await import('../minutas')
@@ -389,6 +389,33 @@ describe('firmas de la minuta', () => {
     expect(borradorDesde(null, 'Admin', '2026-11-02').firmas).toEqual([])
   })
 
+  describe('fusionarFirmas — guardar el asistente no pisa lo que se firmó desde el detalle', () => {
+    const pa = firma({ participante_id: 'pa', path: 'p1/minutas-firmas/pa.png' })
+    const pb = firma({ participante_id: 'pb', path: 'p1/minutas-firmas/pb.png' })
+
+    it('conserva la firma que otro registró mientras tanto y aplica la que esta edición cambió', () => {
+      const pa2 = firma({ participante_id: 'pa', path: 'p1/minutas-firmas/pa2.png' })
+      // Al abrir: [pa]. En la fila ahora: [pa, pb]. Esta edición volvió a firmar pa.
+      expect(fusionarFirmas([pa, pb], [pa], [pa2])).toEqual([pb, pa2])
+    })
+
+    it('no revive una firma que el detalle reemplazó si esta edición no la tocó', () => {
+      const paDetalle = firma({ participante_id: 'pa', path: 'p1/minutas-firmas/pa-detalle.png' })
+      const pbNueva = firma({ participante_id: 'pb', path: 'p1/minutas-firmas/pb.png' })
+      // Al abrir: [pa]. El detalle reemplazó pa. Esta edición sólo agregó pb.
+      expect(fusionarFirmas([paDetalle], [pa], [pa, pbNueva])).toEqual([paDetalle, pbNueva])
+    })
+
+    it('una baja de esta edición se aplica; sin cambios, queda lo que tiene la fila', () => {
+      expect(fusionarFirmas([pa, pb], [pa, pb], [pb])).toEqual([pb])
+      expect(fusionarFirmas([pa, pb], [pa], [pa])).toEqual([pa, pb])
+    })
+  })
+
+  it('rutasDelProyecto: sólo las de la carpeta del proyecto', () => {
+    expect(rutasDelProyecto(['p1/minutas-firmas/a.png', 'p2/minutas-firmas/b.png', 'p10/x.png', 'p1x/y.png'], 'p1')).toEqual(['p1/minutas-firmas/a.png'])
+  })
+
   describe('registrarFirmaMinuta', () => {
     function base(fila: unknown, afectadas: unknown[] = [{ id: 'n1' }]) {
       const updates: unknown[] = []
@@ -406,6 +433,13 @@ describe('firmas de la minuta', () => {
       const nueva = firma({ path: 'p1/minutas-firmas/a-nueva.png' })
       expect(await registrarFirmaMinuta('n1', nueva)).toEqual({ error: null, reemplazada: 'p1/minutas-firmas/a-vieja.png' })
       expect(updates).toEqual([{ firmas: [deOtro, nueva] }])
+    })
+
+    it('leerFirmasMinuta: las firmas normalizadas de la fila, o null si no se pudo leer', async () => {
+      base({ firmas: [firma(), { participante_id: 'x' }] })
+      expect(await leerFirmasMinuta('n1')).toEqual([firma()])
+      base(null)
+      expect(await leerFirmasMinuta('n1')).toBeNull()
     })
 
     it('sin fila o sin filas afectadas es un error (no se reporta como firmado)', async () => {

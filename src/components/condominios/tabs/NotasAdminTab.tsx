@@ -179,7 +179,7 @@ export default function NotasAdminTab({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   {participantes.length > 0 ? <AvataresApilados participantes={participantes} /> : <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Sin participantes</span>}
                   <span style={{ fontSize: 12, color: 'var(--at-ink-2)' }}>
-                    {puntos.length} punto{puntos.length === 1 ? '' : 's'}{resumen.acuerdos > 0 ? ` · ${resumen.acuerdos} acuerdo${resumen.acuerdos === 1 ? '' : 's'}` : ''}{fotos > 0 ? ` · 📷 ${fotos}` : ''}{documentos > 0 ? ` · 📎 ${documentos}` : ''}{firmas.vigentes > 0 ? ` · ✍ ${firmas.vigentes}/${firmas.total}` : ''}
+                    {puntos.length} punto{puntos.length === 1 ? '' : 's'}{resumen.acuerdos > 0 ? ` · ${resumen.acuerdos} acuerdo${resumen.acuerdos === 1 ? '' : 's'}` : ''}{fotos > 0 ? ` · 📷 ${fotos}` : ''}{documentos > 0 ? ` · 📎 ${documentos}` : ''}{firmas.vigentes > 0 ? ` · ✍ ${firmas.vigentes} de ${firmas.total} firmas` : ''}
                   </span>
                 </div>
                 {resumen.total > 0 && (

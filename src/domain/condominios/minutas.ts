@@ -253,6 +253,28 @@ export function sinFirma(firmas: readonly FirmaMinuta[], participanteId: string)
   return firmas.filter(f => f.participante_id !== participanteId)
 }
 
+/**
+ * Las firmas que se guardan al editar: las que la fila tiene AHORA, con lo que
+ * esta edición cambió aplicado encima, participante por participante (altas,
+ * reemplazos y bajas). Sin esto, guardar el asistente escribía la lista que se
+ * cargó al abrirlo y borraba una firma registrada desde el detalle mientras
+ * tanto —o volvía a citar una imagen que el detalle ya había reemplazado—.
+ */
+export function fusionarFirmas(actuales: readonly FirmaMinuta[], originales: readonly FirmaMinuta[], editadas: readonly FirmaMinuta[]): FirmaMinuta[] {
+  const ruta = (l: readonly FirmaMinuta[], id: string) => l.find(f => f.participante_id === id)?.path
+  const tocadas = new Set([...originales, ...editadas].map(f => f.participante_id).filter(id => ruta(originales, id) !== ruta(editadas, id)))
+  return [...actuales.filter(f => !tocadas.has(f.participante_id)), ...editadas.filter(f => tocadas.has(f.participante_id))]
+}
+
+/**
+ * Sólo las rutas de la carpeta del proyecto de la minuta. Lo que llega de la
+ * fila se borra del bucket; una ruta manipulada no debe arrastrar archivos de
+ * otro proyecto que quien borra sí puede tocar.
+ */
+export function rutasDelProyecto(rutas: readonly string[], projectId: string): string[] {
+  return rutas.filter(r => r.startsWith(`${projectId}/`))
+}
+
 export interface ResumenFirmas {
   /** Participantes que deben firmar. */
   total: number
@@ -613,6 +635,13 @@ function porNombre(a: { nombre: string }, b: { nombre: string }): number {
 }
 
 // ── Acceso a datos ───────────────────────────────────────────────────────────
+
+/** Las firmas que la fila tiene ahora; null si no se pudo leer (el que llama sigue con lo que tiene). */
+export async function leerFirmasMinuta(notaId: string): Promise<FirmaMinuta[] | null> {
+  const { data, error } = await db.from('notas_admin').select('firmas').eq('id', notaId).maybeSingle()
+  if (error || !data) return null
+  return firmasDe({ firmas: data.firmas as unknown as FirmaMinuta[] })
+}
 
 /**
  * Registra (o reemplaza) la firma de un participante en una minuta ya

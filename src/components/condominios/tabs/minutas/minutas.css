@@ -271,6 +271,8 @@
   .minuta-documentos .at-adjunto-fila { min-height: 44px; box-sizing: border-box; }
   /* Botones del recuadro de firma (SignaturePad compartido, 35 px). */
   .minuta-firma-pad button { min-height: 44px; }
+  /* «Ver los acuerdos…»: toda la fila del desplegable es el área de toque. */
+  .minuta-firma-resumen > summary { min-height: 44px; padding: 10px 0; box-sizing: border-box; }
   /* Dos líneas para el nombre: «acta-…-firmada.pdf» y «acta-…-borrador.pdf»
      cortadas en una línea se ven iguales (como los nombres de candidatos). */
   .minuta-documentos .at-adjunto-nombre {

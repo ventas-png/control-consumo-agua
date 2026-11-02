@@ -130,11 +130,22 @@ fila con la fecha de la reunión y dos columnas JSON.
   acto (`registrarFirmaMinuta`, que relee las firmas de la fila para no pisar
   la de otro dispositivo y exige que el UPDATE cambie la fila). Una minuta
   cerrada no ofrece firmar.
+- **Editar no pisa firmas ajenas.** Si el asistente cambió las firmas, al
+  guardar relee las de la fila y aplica encima sólo lo que esta edición cambió,
+  participante por participante (`fusionarFirmas`): una firma registrada desde
+  el detalle mientras el asistente estaba abierto se conserva, y una imagen que
+  el detalle ya reemplazó no vuelve a citarse.
+- **Límite conocido.** Dos firmas registradas desde el detalle en dos
+  dispositivos dentro de la misma ida y vuelta de red pueden pisarse (lectura y
+  escritura no son atómicas). La pérdida se ve: esa persona vuelve a figurar
+  como pendiente.
 - **Archivos.** Las imágenes siguen el ciclo de vida de fotos y documentos: una
   firma subida y no guardada se borra al cerrar el asistente; la de un
   participante que se quitó, o la reemplazada al volver a firmar, se borra al
   guardar; eliminar la minuta borra sus firmas; si el registro desde el detalle
-  falla, la imagen recién subida se borra.
+  falla, la imagen recién subida se borra. Sólo se borran rutas de la carpeta
+  del proyecto de la minuta (`rutasDelProyecto`), también para fotos y
+  documentos: una ruta manipulada en la fila no arrastra archivos ajenos.
 - El detalle muestra «Firmas (vigentes de total)» con la imagen y la hora de
   cada una; la tarjeta de la lista cuenta «✍ n/m»; cerrar la minuta avisa de
   las firmas pendientes; la impresión trae una sección de firmas con la imagen

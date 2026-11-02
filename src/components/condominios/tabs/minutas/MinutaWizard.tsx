@@ -29,7 +29,8 @@ import { removeMedia, uploadCondominiosMedia } from '../../../../domain/shared/s
 import { BUCKET_MEDIA } from '../../../../domain/shared/buckets'
 import {
   MAX_DOCUMENTOS_MINUTA, MAX_FOTOS_MINUTA, PASOS_MINUTA, TIPOS_PARTICIPANTE, TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO,
-  archivosPorBorrar, conFirma, documentosDe, firmasDe, firmasDeParticipantes, fotosDe, mismasRutas, resumenFirmas, sinFirma, versionAcuerdos, borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
+  archivosPorBorrar, conFirma, documentosDe, firmasDe, firmasDeParticipantes, fotosDe, fusionarFirmas, leerFirmasMinuta, mismasRutas, resumenFirmas, rutasDelProyecto,
+  sinFirma, versionAcuerdos, borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
   fetchResidentesProyecto, filtrarCandidatos, nuevoIdMinuta, participanteDesdeCandidato, quitarParticipante, validarPasoMinuta, yaParticipa,
   type BorradorMinuta, type CandidatoParticipante, type PasoMinuta, type ResidenteProyecto,
 } from '../../../../domain/condominios/minutas'
@@ -94,7 +95,8 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
   /** Con el INSERT/UPDATE en vuelo no se sabe qué queda: la limpieza espera su resultado. */
   const guardandoRef = useRef(false)
   const limpiarArchivos = () => {
-    const fuera = archivosPorBorrar([...originales.fotos, ...originales.documentos, ...originales.firmas.map(f => f.path)], vistasRef.current, guardadoRef.current)
+    // Sólo de la carpeta del proyecto: una ruta que llegó de la fila no arrastra archivos ajenos.
+    const fuera = rutasDelProyecto(archivosPorBorrar([...originales.fotos, ...originales.documentos, ...originales.firmas.map(f => f.path)], vistasRef.current, guardadoRef.current), proyectoId)
       .filter(r => !borradasRef.current.has(r))
     fuera.forEach(r => borradasRef.current.add(r))
     // Si el borrado falla sólo queda un archivo huérfano, nunca una minuta rota.
@@ -215,7 +217,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
     const fotos = fotosDe({ fotos: borrador.fotos })
     const documentos = documentosDe({ documentos: borrador.documentos })
     // La firma de alguien que se quitó de la minuta no se guarda (y su imagen se borra).
-    const firmas = firmasDeParticipantes(borrador.firmas, participantes)
+    let firmas = firmasDeParticipantes(borrador.firmas, participantes)
     const campos: Record<string, unknown> = {
       titulo: borrador.titulo.trim(),
       contenido: borrador.contenido.trim(),
@@ -232,9 +234,17 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
     // archivo que otra sesión ya quitó y borró.
     if (!nota || !mismasRutas(fotos, originales.fotos)) campos.fotos = fotos
     if (!nota || !mismasRutas(documentos, originales.documentos)) campos.documentos = documentos
-    if (!nota || JSON.stringify(firmas) !== JSON.stringify(originales.firmas)) campos.firmas = firmas
+    const firmasCambiaron = !nota || JSON.stringify(firmas) !== JSON.stringify(originales.firmas)
     setSaving(true)
     guardandoRef.current = true
+    if (nota && firmasCambiaron) {
+      // Mientras el asistente estaba abierto alguien pudo firmar desde el
+      // detalle: se parte de las firmas de la fila y se aplica sólo lo que
+      // esta edición cambió.
+      const actuales = await leerFirmasMinuta(nota.id)
+      if (actuales) firmas = firmasDeParticipantes(fusionarFirmas(actuales, originales.firmas, firmas), participantes)
+    }
+    if (firmasCambiaron) campos.firmas = firmas
     // Afectando: si la política de filas no deja tocar la fila, el UPDATE vuelve
     // «bien» con cero filas, y borrar las quitadas rompería la minuta guardada.
     const { error } = nota
@@ -267,9 +277,12 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
   const resumen = resumenFirmas(depurado.participantes, borrador.firmas, version)
   const [firmando, setFirmando] = useState<ParticipanteMinuta | null>(null)
   const [guardandoFirma, setGuardandoFirma] = useState(false)
+  // Ref y no estado: dos toques seguidos en «Firmar y aceptar» llegan con el mismo render.
+  const firmandoRef = useRef(false)
   async function firmar(archivo: File) {
     const p = firmando
-    if (!p || guardandoFirma) return
+    if (!p || firmandoRef.current) return
+    firmandoRef.current = true
     setGuardandoFirma(true)
     marcarSubida('firmas')(true)
     try {
@@ -283,6 +296,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       setBorrador(b => ({ ...b, firmas: conFirma(b.firmas, firma) }))
       setFirmando(null)
     } finally {
+      firmandoRef.current = false
       setGuardandoFirma(false)
       marcarSubida('firmas')(false)
     }
@@ -306,7 +320,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
           {paso > 1 && <Button className="minuta-anterior" variant="secondary" onClick={() => { if (!esperarSubida()) setPaso((paso - 1) as PasoMinuta) }} disabled={saving}>← Anterior</Button>}
           {paso < 4 && <Button className="minuta-avanzar" variant="primary" onClick={() => irA((paso + 1) as PasoMinuta)} disabled={saving}>Siguiente →</Button>}
           {(paso === 4 || nota) && (
-            <Button className="minuta-avanzar" variant={paso === 3 ? 'success' : 'outline-primary'} onClick={() => void guardar()} loading={saving} loadingText="Guardando…"
+            <Button className="minuta-avanzar" variant={paso === PASOS_MINUTA.length ? 'success' : 'outline-primary'} onClick={() => void guardar()} loading={saving} loadingText="Guardando…"
               aria-disabled={subiendoAlgo || undefined} style={subiendoAlgo ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
               {subiendoAlgo ? 'Subiendo archivos…' : nota ? 'Guardar cambios' : '✅ Guardar minuta'}
             </Button>
@@ -570,13 +584,13 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
                 const vigente = firma?.version === version
                 return (
                   <FilaFirma key={p.id} p={p} firma={firma} version={version} acciones={<>
-                    <Button size="sm" className="minuta-touch" variant={vigente ? 'secondary' : 'primary'} onClick={() => setFirmando(p)}
-                      aria-label={`${firma ? 'Volver a firmar' : 'Firmar'}: ${p.nombre}`}>
+                    <Button id={`${uid}-firmar-${p.id}`} size="sm" className="minuta-touch" variant={vigente ? 'secondary' : 'primary'} onClick={() => setFirmando(p)}
+                      aria-label={`${firma ? (vigente ? 'Volver a firmar' : 'Firmar de nuevo') : 'Firmar'}: ${p.nombre}`}>
                       {firma ? (vigente ? 'Volver a firmar' : '✍ Firmar de nuevo') : '✍ Firmar'}
                     </Button>
                     {firma && (
                       <button type="button" className="minuta-icono" style={btnIcono} title="Quitar firma" aria-label={`Quitar la firma de ${p.nombre}`}
-                        onClick={() => set({ firmas: sinFirma(borrador.firmas, p.id) })}>✕</button>
+                        onClick={() => { enfocarRef.current = `${uid}-firmar-${p.id}`; set({ firmas: sinFirma(borrador.firmas, p.id) }) }}>✕</button>
                     )}
                   </>} />
                 )

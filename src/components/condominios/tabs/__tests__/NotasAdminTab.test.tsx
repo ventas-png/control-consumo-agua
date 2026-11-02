@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   uploadCondominiosMedia: vi.fn(async (path: string, _file: File, _o?: unknown) => ({ data: { path } as { path: string } | null, error: null as string | null })),
   downloadMedia: vi.fn(async (_bucket: string, _path: string) => null as Blob | null),
   registrarFirmaMinuta: vi.fn(async (_id: string, _firma: unknown) => ({ error: null as string | null, reemplazada: null as string | null })),
+  leerFirmasMinuta: vi.fn(async (_id: string) => null as unknown[] | null),
   borrarAlQuitar: [] as (boolean | undefined)[],
   /** Últimas props de cada uploader: para simular una subida que termina tarde. */
   uploader: {} as Record<'fotos' | 'documentos', { values: string[]; onChange: (v: string[]) => void }>,
@@ -81,6 +82,7 @@ vi.mock('../../../../domain/condominios/minutas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../domain/condominios/minutas')>()),
   fetchResidentesProyecto: mocks.fetchResidentesProyecto,
   registrarFirmaMinuta: mocks.registrarFirmaMinuta,
+  leerFirmasMinuta: mocks.leerFirmasMinuta,
 }))
 // El recuadro real dibuja en un <canvas>; aquí basta con que entregue un PNG,
 // y respete el bloqueo mientras no se acepte la declaración.
@@ -161,6 +163,7 @@ beforeEach(() => {
   mocks.updateCondominioRowAfectando.mockResolvedValue({ error: null })
   mocks.deleteCondominioRowAfectando.mockResolvedValue({ error: null })
   mocks.registrarFirmaMinuta.mockResolvedValue({ error: null, reemplazada: null })
+  mocks.leerFirmasMinuta.mockResolvedValue(null)
   mocks.downloadMedia.mockResolvedValue(null)
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
 })
@@ -764,7 +767,7 @@ describe('Minutas — firmas', () => {
     const onRefresh = vi.fn()
     const conFirma = { ...abierta, firmas: [firmaDe(abierta, 'pa')] }
     render(<NotasAdminTab {...props({ notas: [conFirma], onRefresh })} />)
-    expect(screen.getByText('Reunión con el guardia').closest('button')!.textContent).toContain('✍ 1/2')
+    expect(screen.getByText('Reunión con el guardia').closest('button')!.textContent).toContain('✍ 1 de 2 firmas')
     fireEvent.click(screen.getByText('Reunión con el guardia'))
     const d = screen.getByRole('dialog', { name: 'Reunión con el guardia' })
     expect(within(d).getByText('Firmas (1 de 2)')).toBeTruthy()
@@ -787,7 +790,8 @@ describe('Minutas — firmas', () => {
     expect(within(dialogo()).getByText(/Firmó una versión anterior/)).toBeTruthy()
 
     mocks.registrarFirmaMinuta.mockResolvedValueOnce({ error: 'sin permiso', reemplazada: null })
-    fireEvent.click(screen.getByRole('button', { name: 'Firmar: Carlos Guardia' }))
+    // El nombre accesible dice lo mismo que el botón: «Firmar de nuevo».
+    fireEvent.click(screen.getByRole('button', { name: 'Firmar de nuevo: Carlos Guardia' }))
     let m = screen.getByRole('dialog', { name: '✍ Firma de Carlos Guardia' })
     fireEvent.click(within(m).getByLabelText(/acepto los acuerdos/i))
     fireEvent.click(within(m).getByRole('button', { name: 'Simular firma' }))
@@ -819,6 +823,65 @@ describe('Minutas — firmas', () => {
     fireEvent.click(screen.getByText('Reunión con jardinería'))
     expect(within(dialogo()).getByText('Firmas (0 de 1)')).toBeTruthy()
     expect(within(dialogo()).queryByRole('button', { name: /^Firmar:/ })).toBeNull()
+  })
+
+  it('al editar, guardar conserva la firma que otro registró desde el detalle mientras el asistente estaba abierto', async () => {
+    const original = firmaDe(abierta, 'pa', 'p1/minutas-firmas/pa-vieja.png')
+    const deOtroDispositivo = firmaDe(abierta, 'pb', 'p1/minutas-firmas/pb-detalle.png')
+    // Al abrir sólo estaba la de Admin; cuando se guarda, la fila ya tiene también la de Carlos.
+    mocks.leerFirmasMinuta.mockResolvedValue([original, deOtroDispositivo])
+    render(<NotasAdminTab {...props({ notas: [{ ...abierta, firmas: [original] }] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(dialogo()).getByRole('button', { name: '✏️ Editar' }))
+    const w = screen.getByRole('dialog', { name: '✏️ Editar minuta' })
+    fireEvent.click(within(w).getByRole('tab', { name: 'Paso 4 · Firmas' }))
+    // Admin vuelve a firmar en el asistente.
+    fireEvent.click(within(w).getByRole('button', { name: 'Volver a firmar: Admin' }))
+    const m = screen.getByRole('dialog', { name: '✍ Firma de Admin' })
+    fireEvent.click(within(m).getByLabelText(/acepto los acuerdos/i))
+    fireEvent.click(within(m).getByRole('button', { name: 'Simular firma' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '✍ Firma de Admin' })).toBeNull())
+    const nueva = mocks.uploadCondominiosMedia.mock.calls[0][0]
+    fireEvent.click(within(w).getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledTimes(1))
+    expect(mocks.leerFirmasMinuta).toHaveBeenCalledWith('n1')
+    const patch = mocks.updateCondominioRowAfectando.mock.calls[0][2] as { firmas: { participante_id: string; path: string }[] }
+    expect(patch.firmas.map(f => [f.participante_id, f.path])).toEqual([['pb', 'p1/minutas-firmas/pb-detalle.png'], ['pa', nueva]])
+    // Se borra sólo la que esta edición reemplazó; la del otro dispositivo, no.
+    await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas-firmas/pa-vieja.png']))
+    expect(mocks.removeMedia.mock.calls.flatMap(c => c[1] as string[])).not.toContain('p1/minutas-firmas/pb-detalle.png')
+  })
+
+  it('en el paso 4, quitar una firma deja el foco en el botón «Firmar» de esa fila', () => {
+    render(<NotasAdminTab {...props({ notas: [{ ...abierta, firmas: [firmaDe(abierta, 'pa')] }] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(dialogo()).getByRole('button', { name: '✏️ Editar' }))
+    const w = screen.getByRole('dialog', { name: '✏️ Editar minuta' })
+    fireEvent.click(within(w).getByRole('tab', { name: 'Paso 4 · Firmas' }))
+    fireEvent.click(within(w).getByRole('button', { name: 'Quitar la firma de Admin' }))
+    expect(document.activeElement).toBe(within(w).getByRole('button', { name: 'Firmar: Admin' }))
+  })
+
+  it('en el detalle, dos toques seguidos en «Firmar y aceptar» suben una sola firma; luego el foco va al título de Firmas', async () => {
+    render(<NotasAdminTab {...props()} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(screen.getByRole('button', { name: 'Firmar: Carlos Guardia' }))
+    const m = screen.getByRole('dialog', { name: '✍ Firma de Carlos Guardia' })
+    fireEvent.click(within(m).getByLabelText(/acepto los acuerdos/i))
+    const firmarBtn = within(m).getByRole('button', { name: 'Simular firma' })
+    fireEvent.click(firmarBtn)
+    fireEvent.click(firmarBtn)
+    await waitFor(() => expect(mocks.registrarFirmaMinuta).toHaveBeenCalledTimes(1))
+    expect(mocks.uploadCondominiosMedia).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(document.activeElement?.textContent).toMatch(/^Firmas \(0 de 2\)/))
+  })
+
+  it('eliminar no borra rutas de fuera de la carpeta del proyecto aunque la fila las cite', async () => {
+    const ajena = { ...firmaDe(abierta, 'pb'), path: 'otro-proyecto/minutas-firmas/x.png' }
+    render(<NotasAdminTab {...props({ notas: [{ ...abierta, fotos: ['otro-proyecto/minutas/f.jpg', 'p1/minutas/a.jpg'], firmas: [firmaDe(abierta, 'pa'), ajena] }] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(dialogo()).getByRole('button', { name: '🗑 Eliminar' }))
+    await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/a.jpg', 'p1/minutas-firmas/pa.png']))
   })
 
   it('la impresión trae la sección de firmas: la imagen de quien firmó y la línea de quien falta', async () => {
