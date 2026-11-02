@@ -1,21 +1,30 @@
-// Flujo por pasos de un servicio de housekeeping (sustituye a HousekeepingEvidencias).
+// Flujo guiado de un servicio de housekeeping: un MENÚ con tres botones grandes y una
+// pantalla por cada uno. Sustituye al indicador numerado «1 · Ingreso — 2 · Resultado»,
+// que el personal de limpieza no entendía.
 //
-//   Paso 1 · Ingreso   estado en que se encontró la unidad + fotos; «Inconvenientes
-//                      encontrados» aparte, con su texto y sus fotos; Guardar.
-//   Paso 2 · Resultado cómo quedó + fotos; «Guardar y dar por finalizado» mueve el
-//                      servicio a completado (la base sella completado_en y las horas
-//                      dedicadas salen de iniciado_en → completado_en) y pregunta si
-//                      notificar el informe: correo a dueño/administradores (RPC
-//                      hk_notificar_informe), WhatsApp (PDF compartido desde el
-//                      dispositivo o enlace wa.me) y/o un destinatario tecleado.
+//   Menú                      tras «Iniciar servicio» (o desde la tarjeta): muestra qué hay
+//                             registrado en cada parte y ofrece:
+//   · Estado al ingresar      cómo se encontró la unidad + fotos `ingreso`.
+//   · Reportar inconvenientes daños, faltantes o averías + fotos `inconvenientes`.
+//   · Resultado del servicio  cómo quedó + fotos `cierre`; «Guardar y dar por finalizado»
+//                             mueve el servicio a completado: la base sella completado_en
+//                             (la hora REAL de finalización) y las horas dedicadas salen de
+//                             iniciado_en → completado_en. Después pregunta si notificar el
+//                             informe: correo a dueño/administradores (RPC hk_notificar_informe),
+//                             WhatsApp (PDF compartido desde el dispositivo o enlace wa.me)
+//                             y/o un destinatario tecleado.
+//
+// Cada pantalla tiene «Guardar y regresar»: guarda los textos y vuelve al menú (las fotos se
+// suben al momento). Cerrar la ventana (✕, «Cerrar», Escape o el fondo) guarda antes lo que
+// haya escrito sin guardar: nada de lo digitado se pierde.
 //
 // Las fotos se depuran a los 90 días; los textos no (ver docs/PURGA_FOTOS_SCHEDULE.md).
-// Un servicio completado o cancelado se abre en solo lectura, con el PDF y la opción de
-// volver a notificar el informe.
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+// Un servicio completado o cancelado se abre en solo lectura (mismo menú), con el PDF y la
+// opción de volver a notificar el informe.
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ModalPortal } from '../../shared/ModalPortal'
 import { SecureImage } from '../../shared/SecureImage'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { useUsuariosMap } from '../../../domain/usuarios/queries'
 import { updateCondominioRow, updateCondominioRowAfectando } from '../../../domain/condominios/tabMutations'
@@ -24,7 +33,8 @@ import {
   MAX_FOTOS_POR_FASE, cupoDisponible, eliminarFotoServicio, listarFotosServicio, subirFotoServicio,
 } from '../../../domain/condominios/housekeepingEvidencias'
 import {
-  clasificarDestinatario, construirEnlaceWhatsApp, horasDedicadas, mensajeErrorFlujo, resumenTextoInforme,
+  clasificarDestinatario, construirEnlaceWhatsApp, fechaHoraReal, horaReal, horasDedicadas, mensajeErrorFlujo, resumenParte,
+  resumenTextoInforme,
 } from '../../../domain/condominios/housekeepingFlujo'
 import { notificarInformeHousekeeping } from '../../../domain/condominios/housekeepingReservas'
 import { compartirOdescargarPdf, generarInformeHousekeepingPdf } from './housekeepingPdf'
@@ -33,7 +43,9 @@ import { ResponsableLinea } from './ResponsableSelector'
 import { HousekeepingFaseFotos } from './HousekeepingFaseFotos'
 import type { FaseFotoHousekeeping, FotoHousekeeping, ServicioHousekeeping } from '../../../types'
 
-export type PasoHK = 1 | 2
+/** Pantalla del flujo guiado: el menú o una de sus tres partes. */
+export type VistaHK = 'menu' | 'ingreso' | 'inconvenientes' | 'resultado'
+type ParteHK = Exclude<VistaHK, 'menu'>
 
 interface Props {
   servicio: ServicioHousekeeping
@@ -46,28 +58,42 @@ interface Props {
   /** Nombre del responsable ya resuelto (para el texto de WhatsApp). */
   responsableNombre?: string
   canEdit: boolean
-  pasoInicial?: PasoHK
+  vistaInicial?: VistaHK
   onClose: () => void
   onRefresh: () => void
 }
 
-const area: CSSProperties = { width: '100%', minHeight: 80, padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 13, color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }
-const btn: CSSProperties = { padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1.5px solid var(--at-line)', background: 'var(--at-surface)', color: 'var(--at-ink)' }
-const btnPrimario: CSSProperties = { ...btn, background: 'var(--at-primary)', color: 'white', border: 'none' }
+/** Las tres partes del menú, en el orden en que se hacen. */
+const PARTES: { vista: ParteHK; fase: FaseFotoHousekeeping; icon: string; titulo: string; vacio: string }[] = [
+  { vista: 'ingreso',        fase: 'ingreso',        icon: '📝', titulo: 'Evidenciar estado al ingresar', vacio: 'Sin registrar' },
+  { vista: 'inconvenientes', fase: 'inconvenientes', icon: '⚠️', titulo: 'Reportar inconvenientes',       vacio: 'Sin inconvenientes reportados' },
+  { vista: 'resultado',      fase: 'cierre',         icon: '🏁', titulo: 'Resultado del servicio',        vacio: 'Sin registrar' },
+]
 
-export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, estadoLabel, responsableEstado, responsableNombre, canEdit, pasoInicial = 1, onClose, onRefresh }: Props) {
+const area: CSSProperties = { width: '100%', minHeight: 96, padding: '10px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }
+const btn: CSSProperties = { padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1.5px solid var(--at-line)', background: 'var(--at-surface)', color: 'var(--at-ink)', minHeight: 40 }
+const btnPrimario: CSSProperties = { ...btn, background: 'var(--at-primary)', color: 'white', border: 'none' }
+const btnFinalizar: CSSProperties = { ...btnPrimario, background: 'var(--at-success)' }
+// Botón grande del menú: todo el ancho, texto a la izquierda, alto cómodo para el dedo.
+const btnParte: CSSProperties = { display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left', padding: '14px 16px', minHeight: 72, border: '1.5px solid var(--at-line)', borderRadius: 12, background: 'var(--at-surface-2)', color: 'var(--at-ink)', cursor: 'pointer', fontFamily: 'inherit' }
+const notaStyle: CSSProperties = { fontSize: 11, color: 'var(--at-ink-3)', margin: '14px 0 0' }
+
+export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, estadoLabel, responsableEstado, responsableNombre, canEdit, vistaInicial = 'menu', onClose, onRefresh }: Props) {
   const { mapa } = useUsuariosMap()
-  const [paso, setPaso] = useState<PasoHK>(pasoInicial)
+  const [vista, setVista] = useState<VistaHK>(vistaInicial)
   const [fotos, setFotos] = useState<FotoHousekeeping[]>([])
   const [hallazgos, setHallazgos] = useState(servicio.hallazgos_ingreso ?? '')
   const [inconvenientes, setInconvenientes] = useState(servicio.inconvenientes ?? '')
   const [cierre, setCierre] = useState(servicio.observaciones_cierre ?? '')
-  const [mostrarInconvenientes, setMostrarInconvenientes] = useState(!!servicio.inconvenientes)
   const [guardando, setGuardando] = useState(false)
   const [finalizando, setFinalizando] = useState(false)
   const [subiendo, setSubiendo] = useState<FaseFotoHousekeeping | null>(null)
   const [generando, setGenerando] = useState(false)
   const [visor, setVisor] = useState<string | null>(null)
+  // Lo último que se guardó (o lo que traía el servicio): contra esto se decide si hay
+  // cambios pendientes, sin esperar a que el padre recargue.
+  const guardado = useRef({ hallazgos: servicio.hallazgos_ingreso ?? '', inconvenientes: servicio.inconvenientes ?? '', cierre: servicio.observaciones_cierre ?? '' })
+  const cerrando = useRef(false)
 
   // Un servicio completado o cancelado no se edita desde aquí (reabrir es cosa de dueño/admin
   // desde la tarjeta); se mira, se comparte y se vuelve a notificar.
@@ -78,33 +104,56 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
   const cargar = useCallback(async () => {
     const { data, error } = await listarFotosServicio(servicio.id)
     if (error) notify({ variant: 'error', title: 'No se pudieron cargar las fotos', text: error })
-    else {
-      setFotos(data)
-      if (data.some(f => f.fase === 'inconvenientes')) setMostrarInconvenientes(true)
-    }
+    else setFotos(data)
   }, [servicio.id])
   useEffect(() => { void cargar() }, [cargar])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { if (visor) setVisor(null); else onClose() } }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, visor])
-
   const nombre = (id?: string | null) => (id ? (mapa.get(id)?.full_name?.trim() || `Usuario ${id.slice(0, 8)}`) : undefined)
-  const sucio = hallazgos !== (servicio.hallazgos_ingreso ?? '') || inconvenientes !== (servicio.inconvenientes ?? '') || cierre !== (servicio.observaciones_cierre ?? '')
+  const sucio = hallazgos.trim() !== guardado.current.hallazgos.trim()
+    || inconvenientes.trim() !== guardado.current.inconvenientes.trim()
+    || cierre.trim() !== guardado.current.cierre.trim()
 
   async function guardarTexto(): Promise<boolean> {
-    if (!sucio) return true
+    if (!editable || !sucio) return true
     setGuardando(true)
     const { error } = await updateCondominioRow('servicios_housekeeping', servicio.id, {
       hallazgos_ingreso: hallazgos.trim() || null, inconvenientes: inconvenientes.trim() || null, observaciones_cierre: cierre.trim() || null,
     })
     setGuardando(false)
     if (error) { notify({ variant: 'error', title: 'Error al guardar', text: error.message }); return false }
+    guardado.current = { hallazgos, inconvenientes, cierre }
     onRefresh()
     return true
   }
+
+  /** «Guardar y regresar»: guarda los textos y vuelve al menú (en solo lectura, solo vuelve). */
+  async function volverAlMenu() {
+    if (await guardarTexto()) setVista('menu')
+  }
+
+  /**
+   * Cerrar la ventana guarda primero lo escrito sin guardar. Si no se pudo guardar, se
+   * pregunta antes de perderlo.
+   */
+  async function cerrar() {
+    if (cerrando.current) return
+    cerrando.current = true
+    try {
+      if (!(await guardarTexto())) {
+        const r = await confirm({ title: 'No se guardaron las observaciones', text: '¿Cerrar de todos modos? Se perderá lo escrito sin guardar.', icon: 'warning', variant: 'danger', confirmText: 'Cerrar sin guardar', cancelText: 'Seguir editando' })
+        if (!r.isConfirmed) return
+      }
+      onClose()
+    } finally { cerrando.current = false }
+  }
+  const cerrarRef = useRef(cerrar)
+  cerrarRef.current = cerrar
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { if (visor) setVisor(null); else void cerrarRef.current() } }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [visor])
 
   async function agregar(fase: FaseFotoHousekeeping, files: File[]) {
     const actuales = fotos.filter(f => f.fase === fase).length
@@ -144,7 +193,7 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
   async function compartir() {
     setGenerando(true)
     try {
-      if (editable && !(await guardarTexto())) return
+      if (!(await guardarTexto())) return
       const compartido = await compartirOdescargarPdf(await generarPdf(servicioActual()), nombrePdf(servicio))
       if (!compartido) notify({ variant: 'info', title: 'PDF descargado', text: 'Adjúntalo en WhatsApp desde tus descargas.' })
     } catch (e) {
@@ -157,9 +206,10 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
    * completado_en si ya se recargó; si no, se asume «ahora» para el texto de WhatsApp).
    */
   async function preguntarNotificar(s: ServicioHousekeeping) {
+    const completadoEn = s.completado_en ?? new Date().toISOString()
     const r = await openPromptDialog({
       title: '¿Notificar el informe?',
-      description: `Servicio finalizado. Horas dedicadas: ${horasDedicadas({ iniciado_en: s.iniciado_en, completado_en: s.completado_en ?? new Date().toISOString() })}. El correo lleva el resumen (sin fotos) y solo sale si la empresa tiene Gmail conectado; el PDF con fotos se comparte desde este dispositivo.`,
+      description: `Servicio finalizado a las ${horaReal(completadoEn)} (hora de finalización registrada). Horas dedicadas: ${horasDedicadas({ iniciado_en: s.iniciado_en, completado_en: completadoEn })}. El correo lleva el resumen (sin fotos) y solo sale si la empresa tiene Gmail conectado; el PDF con fotos se comparte desde este dispositivo.`,
       fields: [
         { name: 'correo', label: 'Correo a dueño y administradores del proyecto', control: 'checkbox', initialValue: 'true' },
         { name: 'whatsapp', label: 'WhatsApp (compartir el PDF desde este dispositivo)', control: 'checkbox', initialValue: '' },
@@ -202,6 +252,7 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
     }
   }
 
+  /** «Guardar y dar por finalizado»: textos → completado (la base sella la hora de fin). */
   async function finalizar() {
     if (!enProceso) return
     setFinalizando(true)
@@ -217,13 +268,20 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
     } finally { setFinalizando(false) }
   }
 
-  const fecha = (iso?: string | null) => iso ? new Date(iso).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' }) : null
-  const pasos: { n: PasoHK; label: string }[] = [{ n: 1, label: '1 · Ingreso' }, { n: 2, label: '2 · Resultado' }]
-  const hecho = (n: PasoHK) => (n === 1 && (paso === 2 || cerrado)) || (n === 2 && servicio.estado === 'completado')
+  const textoDe: Record<ParteHK, string> = { ingreso: hallazgos, inconvenientes, resultado: cierre }
+  const nFotos = (fase: FaseFotoHousekeeping) => fotos.filter(f => f.fase === fase).length
+  const parteActual = PARTES.find(p => p.vista === vista) ?? null
+  const ocupado = guardando || finalizando || subiendo !== null
+
+  const botonVolver = (estilo: CSSProperties) => (
+    <button type="button" onClick={() => void volverAlMenu()} disabled={ocupado} style={{ ...estilo, opacity: ocupado ? 0.6 : 1 }}>
+      {guardando ? 'Guardando…' : editable ? '💾 Guardar y regresar' : '← Regresar'}
+    </button>
+  )
 
   return (
     <ModalPortal>
-      <div role="dialog" aria-modal="true" aria-label="Servicio de housekeeping" onClick={onClose}
+      <div role="dialog" aria-modal="true" aria-label="Servicio de housekeeping" onClick={() => void cerrar()}
         style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: 16 }}>
         <div onClick={e => e.stopPropagation()}
           style={{ background: 'var(--at-surface)', borderRadius: 12, padding: 20, width: '100%', maxWidth: 760, margin: 'auto' }}>
@@ -234,47 +292,71 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
                 {servicio.unidad_nombre ?? 'Sin unidad específica'} · {servicio.fecha}{servicio.hora_inicio ? ` · ingreso tentativo ${servicio.hora_inicio.slice(0, 5)}` : ''} · {estadoLabel}<br />
                 <ResponsableLinea estado={responsableEstado} />
                 {servicio.reserva_str_resumen && <>🔖 Reserva {servicio.reserva_str_resumen.codigo_confirmacion ?? ''} · {servicio.reserva_str_resumen.huesped_nombre ?? ''} ({servicio.reserva_str_resumen.fecha_entrada ?? '?'} → {servicio.reserva_str_resumen.fecha_salida ?? '?'})<br /></>}
-                {servicio.iniciado_por && <>Iniciado por <b>{nombre(servicio.iniciado_por)}</b> ({fecha(servicio.iniciado_en)})<br /></>}
-                {servicio.completado_por && <>Completado por <b>{nombre(servicio.completado_por)}</b> ({fecha(servicio.completado_en)}) · ⏱ {horasDedicadas(servicio)}</>}
+                {servicio.iniciado_por && <>▶️ Inició <b>{nombre(servicio.iniciado_por)}</b> · {fechaHoraReal(servicio.iniciado_en) ?? '—'}<br /></>}
+                {servicio.completado_por && <>✅ Finalizó <b>{nombre(servicio.completado_por)}</b> · {fechaHoraReal(servicio.completado_en) ?? '—'} · ⏱ {horasDedicadas(servicio)}</>}
               </div>
             </div>
-            <button type="button" onClick={onClose} aria-label="Cerrar" style={{ ...btn, alignSelf: 'flex-start' }}>✕</button>
+            <button type="button" onClick={() => void cerrar()} aria-label="Cerrar" style={{ ...btn, alignSelf: 'flex-start' }}>✕</button>
           </div>
 
-          {/* Indicador de pasos */}
-          <div role="tablist" aria-label="Pasos" style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0 4px' }}>
-            {pasos.map((p, i) => {
-              const activo = paso === p.n
-              return (
-                <div key={p.n} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button type="button" role="tab" aria-selected={activo} aria-label={p.label} onClick={() => setPaso(p.n)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
-                    <span style={{ width: 24, height: 24, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
-                      background: hecho(p.n) ? 'var(--at-success)' : activo ? 'var(--at-primary)' : 'var(--at-chip)',
-                      color: hecho(p.n) || activo ? 'white' : 'var(--at-ink-3)' }}>{hecho(p.n) ? '✓' : p.n}</span>
-                    <span style={{ fontSize: 12, fontWeight: activo ? 700 : 500, color: activo ? 'var(--at-ink)' : 'var(--at-ink-3)' }}>{p.label}</span>
-                  </button>
-                  {i < pasos.length - 1 && <div style={{ width: 24, height: 1, background: 'var(--at-line)' }} />}
-                </div>
-              )
-            })}
-          </div>
+          {vista === 'menu' && (
+            <nav aria-label="Partes del servicio" style={{ marginTop: 12 }}>
+              <h4 style={{ margin: '0 0 10px', fontSize: 13 }}>{editable ? '¿Qué deseas registrar?' : 'Evidencia del servicio'}</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {PARTES.map(p => {
+                  const resumen = resumenParte(textoDe[p.vista], nFotos(p.fase))
+                  const descripcion = p.vista === 'ingreso' ? 'Cómo encontraste la unidad y fotos al ingresar'
+                    : p.vista === 'inconvenientes' ? 'Daños, faltantes o averías que hay que reportar, con sus fotos'
+                    : editable && enProceso ? 'Cómo quedó la unidad, fotos al terminar y dar por finalizado' : 'Cómo quedó la unidad y fotos al terminar'
+                  return (
+                    <button key={p.vista} type="button" onClick={() => setVista(p.vista)} aria-label={p.titulo} style={btnParte}>
+                      <span aria-hidden="true" style={{ fontSize: 26, lineHeight: 1 }}>{p.icon}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 15, fontWeight: 700 }}>{p.titulo}</span>
+                        <span style={{ display: 'block', fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>{descripcion}</span>
+                        <span style={{ display: 'block', fontSize: 12, fontWeight: 600, marginTop: 4, color: resumen ? 'var(--at-success-strong)' : 'var(--at-ink-3)' }}>
+                          {resumen ? `✓ ${resumen}` : p.vacio}
+                        </span>
+                      </span>
+                      <span aria-hidden="true" style={{ fontSize: 22, color: 'var(--at-ink-3)' }}>›</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {editable && enProceso && (
+                <p style={{ ...notaStyle, fontSize: 12 }}>Para dar por finalizado el servicio entra a <b>Resultado del servicio</b>: ahí se registra la hora de finalización.</p>
+              )}
+              {editable && servicio.estado === 'pendiente' && (
+                <p style={{ ...notaStyle, fontSize: 12 }}>Para finalizar, primero «Iniciar servicio» desde la tarjeta.</p>
+              )}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14, flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => void cerrar()} disabled={ocupado} style={{ ...btn, opacity: ocupado ? 0.6 : 1 }}>
+                  {guardando ? 'Guardando…' : 'Cerrar'}
+                </button>
+              </div>
+            </nav>
+          )}
 
-          {paso === 1 && (
-            <div role="tabpanel" aria-label="Paso 1 · Ingreso">
-              <h4 style={{ margin: '14px 0 4px', fontSize: 13 }}>Estado en que se encontró la unidad</h4>
-              <textarea style={area} value={hallazgos} readOnly={!editable} onChange={e => setHallazgos(e.target.value)} aria-label="Estado al ingresar"
-                placeholder="Ej.: vaso roto en cocina, mancha en sofá, aire acondicionado sin control…" />
-              <HousekeepingFaseFotos titulo="Fotos al ingresar" ayuda="de 15 a 20 recomendadas" fase="ingreso" fotos={fotos} canEdit={editable}
-                subiendo={subiendo} onAgregar={agregar} onEliminar={eliminar} onVer={setVisor} />
+          {parteActual && (
+            <section aria-label={parteActual.titulo} style={{ marginTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => void volverAlMenu()} disabled={ocupado} aria-label="Regresar al menú" style={{ ...btn, padding: '6px 10px', minHeight: 32, fontSize: 12 }}>← Regresar</button>
+                <h4 style={{ margin: 0, fontSize: 14 }}>{parteActual.icon} {parteActual.titulo}</h4>
+              </div>
 
-              {!mostrarInconvenientes ? (
-                (editable || !!inconvenientes) && (
-                  <button type="button" onClick={() => setMostrarInconvenientes(true)} style={{ ...btn, marginTop: 14, color: 'var(--at-warning-strong)' }}>⚠️ Inconvenientes encontrados</button>
-                )
-              ) : (
+              {vista === 'ingreso' && (
+                <>
+                  <h5 style={{ margin: '14px 0 4px', fontSize: 13, fontWeight: 600 }}>Estado en que se encontró la unidad</h5>
+                  <textarea style={area} value={hallazgos} readOnly={!editable} onChange={e => setHallazgos(e.target.value)} aria-label="Estado al ingresar"
+                    placeholder="Ej.: vaso roto en cocina, mancha en sofá, aire acondicionado sin control…" />
+                  <HousekeepingFaseFotos titulo="Fotos al ingresar" ayuda="de 15 a 20 recomendadas" fase="ingreso" fotos={fotos} canEdit={editable}
+                    subiendo={subiendo} onAgregar={agregar} onEliminar={eliminar} onVer={setVisor} />
+                </>
+              )}
+
+              {vista === 'inconvenientes' && (
                 <div style={{ marginTop: 14, padding: 12, border: '1.5px solid var(--at-warning-border, var(--at-line))', borderRadius: 10, background: 'var(--at-warning-tint)' }}>
-                  <h4 style={{ margin: '0 0 4px', fontSize: 13 }}>⚠️ Inconvenientes encontrados</h4>
+                  <h5 style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600 }}>Inconvenientes encontrados</h5>
                   <textarea style={area} value={inconvenientes} readOnly={!editable} onChange={e => setInconvenientes(e.target.value)} aria-label="Inconvenientes encontrados"
                     placeholder="Daños, faltantes, averías o situaciones que hay que reportar…" />
                   <HousekeepingFaseFotos titulo="Fotos de los inconvenientes" ayuda="las que hagan falta" fase="inconvenientes" fotos={fotos} canEdit={editable}
@@ -282,57 +364,47 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14, flexWrap: 'wrap' }}>
-                {editable && (
-                  <button type="button" onClick={guardarTexto} disabled={guardando || !sucio} style={{ ...btnPrimario, opacity: guardando || !sucio ? 0.6 : 1 }}>
-                    {guardando ? 'Guardando…' : 'Guardar'}
-                  </button>
-                )}
-                {editable && enProceso && (
-                  <button type="button" onClick={async () => { if (await guardarTexto()) setPaso(2) }} style={btn}>🏁 Finalizar limpieza →</button>
-                )}
-              </div>
-            </div>
-          )}
+              {vista === 'resultado' && (
+                <>
+                  <h5 style={{ margin: '14px 0 4px', fontSize: 13, fontWeight: 600 }}>Cómo quedó la unidad</h5>
+                  <textarea style={area} value={cierre} readOnly={!editable} onChange={e => setCierre(e.target.value)} aria-label="Cómo quedó la unidad"
+                    placeholder="Cómo quedó la unidad, pendientes, faltantes…" />
+                  <HousekeepingFaseFotos titulo="Fotos al terminar" ayuda="de 15 a 20 recomendadas" fase="cierre" fotos={fotos} canEdit={editable}
+                    subiendo={subiendo} onAgregar={agregar} onEliminar={eliminar} onVer={setVisor} />
+                  {editable && enProceso && (
+                    <p style={{ ...notaStyle, fontSize: 12 }}>Al dar por finalizado se registra la hora de finalización y se calculan las horas dedicadas.</p>
+                  )}
+                  {editable && servicio.estado === 'pendiente' && (
+                    <p style={{ ...notaStyle, fontSize: 12 }}>Para finalizar, primero «Iniciar servicio» desde la tarjeta.</p>
+                  )}
+                </>
+              )}
 
-          {paso === 2 && (
-            <div role="tabpanel" aria-label="Paso 2 · Resultado">
-              <h4 style={{ margin: '14px 0 4px', fontSize: 13 }}>Resultado de la limpieza</h4>
-              <textarea style={area} value={cierre} readOnly={!editable} onChange={e => setCierre(e.target.value)} aria-label="Resultado de la limpieza"
-                placeholder="Cómo quedó la unidad, pendientes, faltantes…" />
-              <HousekeepingFaseFotos titulo="Fotos al terminar" ayuda="de 15 a 20 recomendadas" fase="cierre" fotos={fotos} canEdit={editable}
-                subiendo={subiendo} onAgregar={agregar} onEliminar={eliminar} onVer={setVisor} />
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14, flexWrap: 'wrap' }}>
-                <button type="button" onClick={() => setPaso(1)} style={btn}>← Ingreso</button>
-                {editable && (
-                  <button type="button" onClick={guardarTexto} disabled={guardando || !sucio} style={{ ...btn, opacity: guardando || !sucio ? 0.6 : 1 }}>
-                    {guardando ? 'Guardando…' : 'Guardar'}
-                  </button>
-                )}
-                {editable && enProceso && (
-                  <button type="button" onClick={finalizar} disabled={finalizando || subiendo !== null} style={{ ...btnPrimario, background: 'var(--at-success)', opacity: finalizando ? 0.7 : 1 }}>
+                {botonVolver(vista === 'resultado' && editable && enProceso ? btn : btnPrimario)}
+                {vista === 'resultado' && editable && enProceso && (
+                  <button type="button" onClick={finalizar} disabled={ocupado} style={{ ...btnFinalizar, opacity: ocupado ? 0.7 : 1 }}>
                     {finalizando ? 'Finalizando…' : '✅ Guardar y dar por finalizado'}
                   </button>
                 )}
-                {editable && servicio.estado === 'pendiente' && (
-                  <span style={{ fontSize: 11, color: 'var(--at-ink-3)', alignSelf: 'center' }}>Para finalizar, primero «Iniciar servicio» desde la tarjeta.</span>
-                )}
               </div>
-            </div>
+            </section>
           )}
 
-          <p style={{ fontSize: 11, color: 'var(--at-ink-3)', margin: '14px 0 0' }}>
+          <p style={notaStyle}>
             Las fotos se eliminan automáticamente a los 90 días para no saturar el servidor; las observaciones y quién realizó el servicio se conservan.
-            {servicio.informe_enviado_en && <> · 📨 Informe enviado por correo el {fecha(servicio.informe_enviado_en)}.</>}
+            {servicio.informe_enviado_en && <> · 📨 Informe enviado por correo el {fechaHoraReal(servicio.informe_enviado_en)}.</>}
           </p>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10, flexWrap: 'wrap' }}>
-            <button type="button" style={btn} onClick={compartir} disabled={generando}>
-              {generando ? 'Generando PDF…' : '📄 PDF / WhatsApp'}
-            </button>
-            {canEdit && servicio.estado === 'completado' && (
-              <button type="button" style={btn} onClick={() => void preguntarNotificar(servicio)} disabled={generando}>📨 Notificar informe</button>
-            )}
-          </div>
+          {vista === 'menu' && (
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10, flexWrap: 'wrap' }}>
+              <button type="button" style={btn} onClick={compartir} disabled={generando}>
+                {generando ? 'Generando PDF…' : '📄 PDF / WhatsApp'}
+              </button>
+              {canEdit && servicio.estado === 'completado' && (
+                <button type="button" style={btn} onClick={() => void preguntarNotificar(servicio)} disabled={generando}>📨 Notificar informe</button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

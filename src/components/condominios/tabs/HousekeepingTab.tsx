@@ -1,15 +1,17 @@
-// Pestaña de housekeeping: agenda por fecha, alta/edición en ventana emergente y flujo por
-// pasos de cada servicio (Iniciar servicio → evidencia de ingreso → Finalizar limpieza →
-// informe). El estado lo mueven los botones de la tarjeta, nunca un selector: la base
-// (trg_hk_estado_transicion) rechaza cualquier otro salto.
+// Pestaña de housekeeping: agenda por fecha, alta/edición en ventana emergente y flujo guiado
+// de cada servicio (Iniciar servicio → menú con «Evidenciar estado al ingresar», «Reportar
+// inconvenientes» y «Resultado del servicio» → dar por finalizado → informe). El estado lo
+// mueven los botones de la tarjeta y el flujo, nunca un selector: la base
+// (trg_hk_estado_transicion) rechaza cualquier otro salto y sella las horas reales de inicio
+// y de fin (iniciado_en / completado_en), que la tarjeta muestra.
 import { hoyLocalISO } from '../../../lib/format'
 import { useEffect, useRef, useState } from 'react'
 import { updateCondominioRowAfectando } from '../../../domain/condominios/tabMutations'
 import type { ServicioHousekeeping, EstadoHousekeeping, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { eliminarServicioConEvidencias } from '../../../domain/condominios/housekeepingEvidencias'
-import { etiquetaReserva, horasDedicadas, mensajeErrorFlujo } from '../../../domain/condominios/housekeepingFlujo'
-import { HousekeepingServicioPasos, type PasoHK } from './HousekeepingServicioPasos'
+import { etiquetaReserva, horaReal, horasDedicadas, mensajeErrorFlujo } from '../../../domain/condominios/housekeepingFlujo'
+import { HousekeepingServicioPasos, type VistaHK } from './HousekeepingServicioPasos'
 import { HousekeepingServicioModal, TIPO_CONFIG } from './HousekeepingServicioModal'
 import { UsuarioChip } from '../../shared/UsuarioChip'
 import type { AppUser } from '../../../domain/usuarios/queries'
@@ -39,7 +41,7 @@ const ESTADO_CONFIG: Record<EstadoHousekeeping, { label: string; color: string; 
 export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoHousekeeping | 'todos'>('todos')
   const [modal, setModal] = useState<{ abierto: boolean; servicio: ServicioHousekeeping | null }>({ abierto: false, servicio: null })
-  const [pasos, setPasos] = useState<{ id: string; paso: PasoHK } | null>(null)
+  const [pasos, setPasos] = useState<{ id: string; vista: VistaHK } | null>(null)
   const [iniciando, setIniciando] = useState<string | null>(null)
   const servicioPasos = pasos ? servicios.find(s => s.id === pasos.id) ?? null : null
 
@@ -95,9 +97,9 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
     onRefresh()
   }
 
-  /** «Iniciar servicio»: sella la hora de inicio real (la base) y abre el paso 1. */
+  /** «Iniciar servicio»: sella la hora de inicio real (la base) y abre el menú del flujo guiado. */
   async function iniciar(s: ServicioHousekeeping) {
-    const r = await confirm({ title: 'Iniciar servicio', text: `Se registrará la hora de inicio ahora y podrás documentar el estado en que encontraste ${s.unidad_nombre ? `la unidad ${s.unidad_nombre}` : 'la unidad'}.`, confirmText: 'Iniciar' })
+    const r = await confirm({ title: 'Iniciar servicio', text: `Se registrará la hora de inicio ahora y podrás documentar el estado en que encontraste ${s.unidad_nombre ? `la unidad ${s.unidad_nombre}` : 'la unidad'}, reportar inconvenientes y registrar el resultado.`, confirmText: 'Iniciar' })
     if (!r.isConfirmed) return
     setIniciando(s.id)
     const { error } = await updateCondominioRowAfectando('servicios_housekeeping', s.id, { estado: 'en_proceso' })
@@ -106,7 +108,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
       return notify({ variant: 'error', title: 'No se inició el servicio', text: error.code === 'SIN_FILAS' ? 'El servicio ya no existe o no tienes acceso.' : mensajeErrorFlujo(error.message) })
     }
     onRefresh()
-    setPasos({ id: s.id, paso: 1 })
+    setPasos({ id: s.id, vista: 'menu' })
   }
 
   const btnChip = (extra: React.CSSProperties = {}): React.CSSProperties => ({ flex: 1, padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', ...extra })
@@ -194,8 +196,11 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
                         <ResponsableLinea estado={estadoResponsable(s, elegibles)} />
                         {(s.hora_inicio || s.hora_fin) && <div>🕐 Ingreso tentativo {s.hora_inicio?.slice(0, 5) ?? '?'}{s.hora_fin ? ` — fin ${s.hora_fin.slice(0, 5)}` : ''}</div>}
                         {s.costo && <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>💰 {moneda} {s.costo.toFixed(2)}</div>}
-                        {s.completado_por && <div>✅ Completó: <UsuarioChip userId={s.completado_por} /> · ⏱ {horasDedicadas(s)}</div>}
-                        {!s.completado_por && s.iniciado_por && <div>▶️ Inició: <UsuarioChip userId={s.iniciado_por} /></div>}
+                        {s.completado_por && <div>✅ Completó: <UsuarioChip userId={s.completado_por} /></div>}
+                        {s.completado_por && (
+                          <div title="Horas reales de inicio y de finalización">🕒 {s.iniciado_en ? `Inició ${horaReal(s.iniciado_en)} · ` : ''}Finalizó {horaReal(s.completado_en) ?? '—'} · ⏱ {horasDedicadas(s)}</div>
+                        )}
+                        {!s.completado_por && s.iniciado_por && <div>▶️ Inició: <UsuarioChip userId={s.iniciado_por} />{s.iniciado_en && <> · {horaReal(s.iniciado_en)}</>}</div>}
                         {s.informe_enviado_en && <div>📨 Informe enviado</div>}
                       </div>
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -206,12 +211,12 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
                         )}
                         {s.estado === 'en_proceso' && (
                           <>
-                            <button onClick={() => setPasos({ id: s.id, paso: 1 })} style={btnChip()}>📝 Evidencia de ingreso</button>
-                            {canEdit && <button onClick={() => setPasos({ id: s.id, paso: 2 })} style={btnChip({ background: 'var(--at-success-tint)', color: 'var(--at-success-strong)' })}>🏁 Finalizar limpieza</button>}
+                            <button onClick={() => setPasos({ id: s.id, vista: 'menu' })} style={btnChip()}>📝 Continuar servicio</button>
+                            {canEdit && <button onClick={() => setPasos({ id: s.id, vista: 'resultado' })} style={btnChip({ background: 'var(--at-success-tint)', color: 'var(--at-success-strong)' })}>🏁 Finalizar limpieza</button>}
                           </>
                         )}
                         {(cerrado || (s.estado === 'pendiente' && !canEdit)) && (
-                          <button onClick={() => setPasos({ id: s.id, paso: 1 })} style={btnChip()}>📋 Ver evidencia</button>
+                          <button onClick={() => setPasos({ id: s.id, vista: 'menu' })} style={btnChip()}>📋 Ver evidencia</button>
                         )}
                       </div>
                       {canEdit && (
@@ -230,11 +235,11 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, us
       )}
       {servicioPasos && pasos && (
         <HousekeepingServicioPasos
-          key={`${servicioPasos.id}-${pasos.paso}`}
+          key={`${servicioPasos.id}-${pasos.vista}`}
           servicio={servicioPasos} projectId={proyectoId} companyId={companyId}
           tipoLabel={TIPO_CONFIG[servicioPasos.tipo].label} estadoLabel={ESTADO_CONFIG[servicioPasos.estado].label}
           responsableEstado={estadoResponsable(servicioPasos, elegibles)} responsableNombre={nombreResponsable(servicioPasos)}
-          canEdit={canEdit} pasoInicial={pasos.paso} onClose={() => setPasos(null)} onRefresh={onRefresh} />
+          canEdit={canEdit} vistaInicial={pasos.vista} onClose={() => setPasos(null)} onRefresh={onRefresh} />
       )}
     </div>
   )

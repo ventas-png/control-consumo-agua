@@ -80,6 +80,40 @@ export function horasDedicadas(s: Pick<ServicioHousekeeping, 'iniciado_en' | 'co
   return formatearDuracion(minutosDedicados(s.iniciado_en, s.completado_en))
 }
 
+/**
+ * Hora REAL de un sello (iniciado_en / completado_en) como «15:54», en la hora local del
+ * dispositivo y en formato de 24 h (igual que el ingreso tentativo de la tarjeta). `null`
+ * si no hay sello o no es una fecha.
+ */
+export function horaReal(iso: string | null | undefined): string | null {
+  const d = fechaValida(iso)
+  return d ? d.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : null
+}
+
+/** «30/10/26, 15:54»: fecha y hora real de un sello para cabeceras e informes. */
+export function fechaHoraReal(iso: string | null | undefined): string | null {
+  const d = fechaValida(iso)
+  return d ? d.toLocaleString('es-GT', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : null
+}
+
+function fechaValida(iso: string | null | undefined): Date | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  return Number.isFinite(d.getTime()) ? d : null
+}
+
+/**
+ * Qué hay registrado en una parte del servicio (ingreso, inconvenientes o resultado), para
+ * el menú del flujo guiado: «Con observaciones · 3 fotos», «1 foto», «Con observaciones»
+ * o `null` si no hay nada todavía.
+ */
+export function resumenParte(texto: string | null | undefined, nFotos: number): string | null {
+  const partes: string[] = []
+  if (texto?.trim()) partes.push('Con observaciones')
+  if (nFotos > 0) partes.push(`${nFotos} ${nFotos === 1 ? 'foto' : 'fotos'}`)
+  return partes.length ? partes.join(' · ') : null
+}
+
 /** «HM-001 · Ana Pérez · 08/11 → 12/11» para la tarjeta y el selector. */
 export function etiquetaReserva(r: Pick<ReservaSTRResumen, 'codigo_confirmacion' | 'huesped_nombre' | 'fecha_entrada' | 'fecha_salida'>
   | Pick<ReservaSTRVinculable, 'codigo_confirmacion' | 'huesped_nombre' | 'fecha_entrada' | 'fecha_salida'>): string {

@@ -119,23 +119,36 @@ Variables: `{{servicio_tipo}} {{unidad}} {{fecha}} {{hora}} {{asignado_por}} {{r
   (`HK_TRANSICION_INVALIDA`, `HK_RESERVA_*`, `HK_RESPONSABLE_NO_ELEGIBLE`) se traducen (`mensajeErrorFlujo`,
   `mensajeErrorResponsable`).
 - **Tarjeta** (`HousekeepingTab`): reserva (`🔖 código · huésped · entrada → salida`), «🕐 Ingreso tentativo»,
-  «⏱ horas dedicadas» cuando está completado, «📨 Informe enviado». Botones por estado: `pendiente` →
+  «▶️ Inició: quién · HH:MM» mientras está en proceso y, al completarse, «✅ Completó: quién» más
+  «🕒 Inició HH:MM · Finalizó HH:MM · ⏱ horas dedicadas» (horas REALES `iniciado_en` / `completado_en`, que sella la
+  base; `horaReal`, 24 h, hora local del dispositivo), «📨 Informe enviado». Botones por estado: `pendiente` →
   **«▶️ Iniciar servicio»** (confirmación → `estado = en_proceso` exigiendo una fila; `SIN_FILAS` se explica → abre
-  el paso 1); `en_proceso` → **«📝 Evidencia de ingreso»** (paso 1) y **«🏁 Finalizar limpieza»** (paso 2);
-  `completado | cancelado` → **«📋 Ver evidencia»** (solo lectura). ✏️ y 🗑️ se mantienen.
-- **Flujo por pasos** (`HousekeepingServicioPasos`, con `HousekeepingFaseFotos` tres veces):
-  - Paso 1 · Ingreso: «Estado en que se encontró la unidad» + fotos `ingreso`; botón **«⚠️ Inconvenientes
-    encontrados»** que despliega su texto + fotos `inconvenientes` (se abre solo si ya hay texto o fotos);
-    **Guardar** (solo textos) y «🏁 Finalizar limpieza →» (en proceso).
-  - Paso 2 · Resultado: «Resultado de la limpieza» + fotos `cierre`; **«✅ Guardar y dar por finalizado»**: guarda
-    los textos → `estado = completado` exigiendo una fila (la base sella `completado_en`) → recarga → diálogo
-    **«¿Notificar el informe?»** (`openPromptDialog`): ☑ correo a dueño y administradores del proyecto (por defecto),
-    ☐ WhatsApp (compartir el PDF desde este dispositivo), «Otro destinatario (correo o teléfono)». Correo →
-    `hk_notificar_informe` (aviso con los destinatarios; recuerda que sale solo con Gmail). WhatsApp o teléfono →
-    PDF por Web Share; si el dispositivo no comparte archivos, se descarga y se abre `wa.me` (teléfono tecleado o
-    el del huésped de la reserva) con el texto de `resumenTextoInforme`. «Ahora no» = no notificar; se puede
-    repetir desde «📋 Ver evidencia» → **«📨 Notificar informe»**.
-  - Completado o cancelado: solo lectura (sin Guardar/Finalizar ni subir fotos), PDF y notificar.
+  el **menú** del flujo guiado); `en_proceso` → **«📝 Continuar servicio»** (menú) y **«🏁 Finalizar limpieza»**
+  (abre directamente «Resultado del servicio»); `completado | cancelado` → **«📋 Ver evidencia»** (menú en solo
+  lectura). ✏️ y 🗑️ se mantienen.
+- **Flujo guiado** (`HousekeepingServicioPasos`, con `HousekeepingFaseFotos` tres veces). Sustituye al indicador
+  numerado «1 · Ingreso — 2 · Resultado», que el personal no entendía, por un **menú con tres botones grandes**;
+  cada uno dice qué hay registrado (`resumenParte`: «✓ Con observaciones · 3 fotos» o «Sin registrar») y abre su
+  pantalla:
+  - **📝 Evidenciar estado al ingresar**: «Estado en que se encontró la unidad» + fotos `ingreso`.
+  - **⚠️ Reportar inconvenientes**: texto + fotos `inconvenientes` (ya no está plegado dentro del ingreso).
+  - **🏁 Resultado del servicio**: «Cómo quedó la unidad» + fotos `cierre`; en proceso, además
+    **«✅ Guardar y dar por finalizado»**: guarda los textos → `estado = completado` exigiendo una fila (la base
+    sella `completado_en`, la hora real de finalización) → recarga → diálogo **«¿Notificar el informe?»**
+    (`openPromptDialog`), que empieza con «Servicio finalizado a las HH:MM (hora de finalización registrada)» y las
+    horas dedicadas: ☑ correo a dueño y administradores del proyecto (por defecto), ☐ WhatsApp (compartir el PDF
+    desde este dispositivo), «Otro destinatario (correo o teléfono)». Correo → `hk_notificar_informe` (aviso con
+    los destinatarios; recuerda que sale solo con Gmail). WhatsApp o teléfono → PDF por Web Share; si el
+    dispositivo no comparte archivos, se descarga y se abre `wa.me` (teléfono tecleado o el del huésped de la
+    reserva) con el texto de `resumenTextoInforme`. «Ahora no» = no notificar; se puede repetir desde
+    «📋 Ver evidencia» → **«📨 Notificar informe»**.
+  - Cada pantalla tiene **«💾 Guardar y regresar»** (y «← Regresar» arriba, que también guarda): manda los tres
+    textos en un solo PATCH (solo si cambiaron) y vuelve al menú; las fotos se suben al momento. **Cerrar** la
+    ventana (✕, «Cerrar», Escape o el fondo) guarda antes lo escrito sin guardar; si no se pudo guardar, pregunta
+    «¿Cerrar de todos modos?». Nada de lo digitado se pierde.
+  - La cabecera muestra «▶️ Inició quién · dd/mm/aa, HH:MM» y «✅ Finalizó quién · dd/mm/aa, HH:MM · ⏱ horas»
+    (`fechaHoraReal`).
+  - Completado o cancelado: el mismo menú en solo lectura (sin Guardar/Finalizar ni subir fotos), PDF y notificar.
 - **PDF** (`housekeepingPdf.ts`): hora tentativa y fin estimado, inicio y fin reales, **horas dedicadas**, línea
   de la reserva vinculada (del resumen), tres bloques fotográficos (ingreso, inconvenientes, resultado).
 
