@@ -31,6 +31,8 @@ import {
 
 const TABS_RRHH = [
   'personal', 'capacitacion_personal',
+  // Llamadas de atención y sanciones con acuse firmado (20261115000000).
+  'llamadas_atencion',
   'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
   'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza',
   'desempeno_personal', 'actividad_equipo',

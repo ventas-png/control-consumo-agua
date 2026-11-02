@@ -78,7 +78,7 @@ export const SECTIONS: SectionDef[] = [
   // pegado al de "quién administra los documentos del condominio".
   { id: 'recursos_humanos', label: 'Recursos Humanos', tabs: [
     // Expediente y formación
-    'personal', 'capacitacion_personal',
+    'personal', 'capacitacion_personal', 'llamadas_atencion',
     // La jornada: quién cubre qué, cuándo, y quién falta
     'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
     // El trabajo que se les asigna, y quien lo revisa

@@ -172,16 +172,42 @@ export interface ContratoProveedor {
   created_at: string
 }
 
+/** Quién encontró el objeto: un empleado del expediente o un tercero (20261119000000). */
+export type TipoHallazgoObjeto = 'personal' | 'tercero'
+
 export interface ObjetoPerdido {
   id: string
   company_id: string
   project_id: string
   descripcion: string
+  /** Snapshot del nombre del área donde se encontró; en lo legado, el texto escrito a mano. */
   lugar_encontrado?: string | null
+  /** Área del catálogo donde se encontró (FK compuesta, ON DELETE RESTRICT). */
+  area_encontrado_id?: string | null
   fecha_encontrado: string
   estado: EstadoObjeto
+  /** NULL en lo legado. */
+  encontrado_por_tipo?: TipoHallazgoObjeto | null
+  encontrado_por_personal_id?: string | null
+  /** Snapshot: el nombre del empleado (lo pone el servidor) o el del tercero. */
+  encontrado_por_nombre?: string | null
+  encontrado_por_contacto?: string | null
+  /** Rutas en condominios-media (<project_id>/objetos-perdidos/...). Máximo 6. */
+  fotos?: string[] | null
+  custodio_personal_id?: string | null
+  custodio_nombre?: string | null
+  area_almacenamiento_id?: string | null
+  almacenamiento_detalle?: string | null
+  /** Nombre de quien recibe el objeto en la entrega. */
   reclamado_por?: string | null
   fecha_reclamo?: string | null
+  entrega_documento?: string | null
+  firma_entrega_path?: string | null
+  /** Sello de servidor de la entrega: hora, usuario y su nombre. */
+  entregado_en?: string | null
+  entregado_por?: string | null
+  entregado_por_nombre?: string | null
+  /** Legado: una sola foto. Las nuevas van en `fotos`. */
   foto_url?: string | null
   registrado_por?: string | null
   notas?: string | null

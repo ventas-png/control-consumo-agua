@@ -81,7 +81,7 @@ eliminarExigeSuPermiso('Plantillas de mensaje', p => render(
 ), /^Eliminar Aviso general$/, borrar, 'plantillas_mensaje_cond', 'pm1')
 
 eliminarExigeSuPermiso('Libro de novedades', p => render(
-  <LibroNovedadesTab {...base} canCreate {...p}
+  <LibroNovedadesTab {...base} personal={[]} canCreate {...p}
     novedades={[fila({ id: 'ln1', fecha: '2026-10-01', turno: 'mañana', responsable: 'Pedro', novedades: 'Sin novedad', incidentes: [], firmado: false })]} />,
 ), /^Eliminar entrada del 2026-10-01/, borrar, 'libro_novedades', 'ln1')
 

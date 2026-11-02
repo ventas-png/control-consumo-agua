@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react'
-import type { IncidenteSeguridad } from '../../../../types'
+import type { AreaCondominio, IncidenteSeguridad, PersonalCondominio } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
@@ -32,12 +32,30 @@ function incidente(over: Partial<IncidenteSeguridad> = {}): IncidenteSeguridad {
   }
 }
 
-function renderTab(props: Partial<Parameters<typeof IncidentesTab>[0]> = {}) {
-  return render(
-    <IncidentesTab incidentes={[incidente()]} proyectoId="p1" companyId="co1"
-      canCreate canEdit canDelete onRefresh={() => {}} {...props} />,
-  )
+const area = (o: Partial<AreaCondominio>): AreaCondominio => ({
+  id: 'a?', company_id: 'co1', project_id: 'p1', nombre: '?', icono: '📍', orden: 0, activo: true,
+  created_at: '2026-01-01T00:00:00Z', ...o,
+})
+const PARQUEO = area({ id: 'a-parqueo', nombre: 'Parqueo 3', icono: '🚗', orden: 1 })
+const BODEGA = area({ id: 'a-bodega', nombre: 'Bodega', icono: '📦', orden: 2 })
+const GARITA_VIEJA = area({ id: 'a-garita', nombre: 'Garita vieja', activo: false })
+const AREAS = [PARQUEO, BODEGA, GARITA_VIEJA]
+
+const empleado = (o: Partial<PersonalCondominio>) => ({
+  id: 'pe?', company_id: 'co1', project_id: 'p1', nombre: '?', cargo: 'guardia', turno: 'nocturno', estado: 'activo',
+  created_at: '2026-01-01T00:00:00Z', ...o,
+}) as PersonalCondominio
+
+const base = {
+  incidentes: [incidente()], areas: AREAS, personal: [] as PersonalCondominio[], proyectoId: 'p1', companyId: 'co1',
+  canCreate: true, canEdit: true, canDelete: true, puedeConfigurarAreas: true, onIrATab: () => {}, onRefresh: () => {},
 }
+
+function renderTab(props: Partial<Parameters<typeof IncidentesTab>[0]> = {}) {
+  return render(<IncidentesTab {...base} {...props} />)
+}
+
+const areaSelect = () => within(screen.getByRole('dialog')).getByLabelText('Área') as HTMLSelectElement
 
 beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
 afterEach(cleanup)
@@ -67,8 +85,7 @@ describe('IncidentesTab — ventanas', () => {
     expect(onRefresh).toHaveBeenCalled()
 
     // Llega la lista refrescada: la ventana lee la fila vigente, no una copia.
-    rerender(<IncidentesTab incidentes={[incidente({ estado: 'investigando' })]} proyectoId="p1" companyId="co1"
-      canCreate canEdit canDelete onRefresh={onRefresh} />)
+    rerender(<IncidentesTab {...base} incidentes={[incidente({ estado: 'investigando' })]} onRefresh={onRefresh} />)
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('button', { name: '→ Marcar Resuelto' })).toBeTruthy()
     expect(within(dialog).getByRole('listitem', { current: 'step' }).textContent).toBe('Investigando')
@@ -82,11 +99,11 @@ describe('IncidentesTab — ventanas', () => {
     expect(dialog.classList.contains('at-modal--fs-mobile')).toBe(true)
 
     fireEvent.change(within(dialog).getByLabelText('Descripción *'), { target: { value: 'Puerta forzada en bodega' } })
-    fireEvent.change(within(dialog).getByLabelText('Área'), { target: { value: 'Bodega' } })
+    fireEvent.change(within(dialog).getByLabelText('Área'), { target: { value: 'a-bodega' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
 
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', expect.objectContaining({
-      descripcion: 'Puerta forzada en bodega', area: 'Bodega', company_id: 'co1', project_id: 'p1',
+      descripcion: 'Puerta forzada en bodega', area_id: 'a-bodega', area: 'Bodega', company_id: 'co1', project_id: 'p1',
     })))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(onRefresh).toHaveBeenCalled()
@@ -98,12 +115,15 @@ describe('IncidentesTab — ventanas', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '✏️ Editar' }))
 
     const form = screen.getByRole('dialog', { name: '✏️ Editar incidente' })
-    expect((within(form).getByLabelText('Área') as HTMLInputElement).value).toBe('Parqueo 3')
+    // Legado «Parqueo 3» sin vincular: coincide con UNA área y se propone vinculado.
+    expect((within(form).getByLabelText('Área') as HTMLSelectElement).value).toBe('a-parqueo')
     fireEvent.change(within(form).getByLabelText('Seguimiento'), { target: { value: 'Denuncia presentada.' } })
     fireEvent.click(within(form).getByRole('button', { name: 'Guardar' }))
 
     await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', 'i1', expect.objectContaining({
-      seguimiento: 'Denuncia presentada.',
+      seguimiento: 'Denuncia presentada.', area_id: 'a-parqueo', area: 'Parqueo 3',
+      // Editar no cambia quién lo reportó.
+      reportado_por: 'Guardia nocturno',
     })))
     await waitFor(() => expect(screen.getByRole('dialog', { name: /Grafiti en el muro/ })).toBeTruthy())
   })
@@ -280,5 +300,80 @@ describe('IncidentesTab — resumen, filtros y seguimiento', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Indica la fecha del incidente.' })))
     expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+  })
+})
+
+describe('IncidentesTab — área del catálogo y quién reporta', () => {
+  it('el área se elige de las áreas activas, en su orden', () => {
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: '🚨 Registrar incidente' }))
+    expect(Array.from(areaSelect().options).map(o => o.textContent)).toEqual(['— Sin área —', '🚗 Parqueo 3', '📦 Bodega'])
+  })
+
+  it('«Reportado por» se propone con el usuario y el cargo de su ficha; se puede cambiar', async () => {
+    renderTab({
+      userId: 'u-ana', autorNombre: 'ana@condominio.com',
+      personal: [empleado({ id: 'pe1', nombre: 'Ana López', cargo: 'guardia', user_id: 'u-ana' }), empleado({ id: 'pe2', nombre: 'Otro', user_id: 'u-otro' })],
+    })
+    fireEvent.click(screen.getByRole('button', { name: '🚨 Registrar incidente' }))
+    const dialog = screen.getByRole('dialog', { name: '🚨 Registrar incidente' })
+    const reportado = within(dialog).getByLabelText('Reportado por') as HTMLInputElement
+    expect(reportado.value).toBe('Ana López — Guardia')
+    expect(within(dialog).getByText('Con tu usuario. Cámbialo si lo reportó otra persona.')).toBeTruthy()
+
+    fireEvent.change(within(dialog).getByLabelText('Descripción *'), { target: { value: 'Ruido en el parqueo' } })
+    fireEvent.change(reportado, { target: { value: 'Residente apto 4C' } })
+    expect(within(dialog).queryByText('Con tu usuario. Cámbialo si lo reportó otra persona.')).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', expect.objectContaining({
+      reportado_por: 'Residente apto 4C', area_id: null, area: null,
+    })))
+  })
+
+  it('sin ficha de empleado se propone el nombre del usuario', () => {
+    renderTab({ userId: 'u-admin', autorNombre: 'Prestadora de Servicios', personal: [empleado({ nombre: 'Ana López', user_id: 'u-ana' })] })
+    fireEvent.click(screen.getByRole('button', { name: '🚨 Registrar incidente' }))
+    expect((within(screen.getByRole('dialog')).getByLabelText('Reportado por') as HTMLInputElement).value).toBe('Prestadora de Servicios')
+  })
+
+  it('la lista y el detalle muestran el nombre vigente del área', () => {
+    renderTab({ incidentes: [incidente({ area_id: 'a-bodega', area: 'Bodega (nombre viejo)' })] })
+    expect(screen.getByRole('button', { name: /Grafiti en el muro/ }).textContent).toContain('· Bodega ·')
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    expect(within(screen.getByRole('dialog')).getByText(/a las 23:40 · Bodega$/)).toBeTruthy()
+  })
+
+  it('un incidente legado sin coincidencia conserva su texto hasta que se elija un área', async () => {
+    renderTab({ incidentes: [incidente({ area_id: null, area: 'Junto a la piscina' })] })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '✏️ Editar' }))
+    expect(areaSelect().value).toBe('')
+    expect(within(screen.getByRole('dialog')).getByText(/Antes: «Junto a la piscina», sin vincular a un área/)).toBeTruthy()
+
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', 'i1', expect.objectContaining({
+      area_id: null, area: 'Junto a la piscina',
+    })))
+  })
+
+  it('un incidente en un área ya inactiva la conserva al editar', async () => {
+    renderTab({ incidentes: [incidente({ area_id: 'a-garita', area: 'Garita vieja' })] })
+    fireEvent.click(screen.getByRole('button', { name: /Grafiti en el muro/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '✏️ Editar' }))
+    expect(areaSelect().value).toBe('a-garita')
+    expect(Array.from(areaSelect().options).map(o => o.textContent)).toContain('Garita vieja (inactiva)')
+
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('incidentes_seguridad', 'i1', expect.objectContaining({
+      area_id: 'a-garita', area: 'Garita vieja',
+    })))
+  })
+
+  it('sin áreas activas lleva al tab Áreas', () => {
+    const onIrATab = vi.fn()
+    renderTab({ areas: [GARITA_VIEJA], onIrATab })
+    fireEvent.click(screen.getByRole('button', { name: '🚨 Registrar incidente' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Crearlas en el tab Áreas' }))
+    expect(onIrATab).toHaveBeenCalledWith('areas_config')
   })
 })

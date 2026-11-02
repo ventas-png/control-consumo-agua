@@ -143,8 +143,8 @@ export interface AmenidadesCtx {
   rechazarReserva: (r: ReservaAmenidad) => Promise<void>
   eliminarBloqueo: (id: string) => Promise<void>
   // ── Equipo de la reserva (20261108000000) ──
-  /** Agrega equipo enlazado a la amenidad a una reserva ya creada. Devuelve true si se registró. */
-  solicitarEquiposReserva: (reservaId: string, equipos: SolicitudEquipoReserva[]) => Promise<boolean>
+  /** Agrega equipo enlazado a la amenidad a una reserva ya creada; con `generarCargo` cobra la renta en una cuota. Devuelve true si se registró. */
+  solicitarEquiposReserva: (reservaId: string, equipos: SolicitudEquipoReserva[], generarCargo?: boolean) => Promise<boolean>
   /** Registra la entrega de préstamos 'solicitado'. Devuelve true si se registró. */
   entregarEquipos: (entregas: EntregaPrestamo[], entregadoPor: string, observaciones: string) => Promise<boolean>
   /** Registra la recepción de préstamos 'prestado' (y el cargo por reposición si se pide). */

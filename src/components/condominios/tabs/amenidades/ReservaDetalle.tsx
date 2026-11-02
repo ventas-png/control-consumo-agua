@@ -10,7 +10,7 @@ import { ModalPortal } from '../../../shared/ModalPortal'
 import { formatFechaCalendario } from '../../../../lib/format'
 import { tint } from '../../../shared/statusTone'
 import { EquiposReserva } from './EquiposReserva'
-import { prestamosDeReserva, resumenEquiposReserva } from '../../../../lib/prestamosEquipo'
+import { prestamosDeReserva, rentaDeReserva, resumenEquiposReserva, totalCobroReserva } from '../../../../lib/prestamosEquipo'
 
 export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
   const { amenidades, moneda, canEdit, onRefresh, reservaDetalle, prestamos, amenidadInventario, setReservaDetalle, registrarCheckin, registrarCheckout, actualizarEstadoDeposito, retenerDeposito, aprobarReserva, rechazarReserva } = ctx
@@ -208,15 +208,21 @@ export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
                   })}
                 </div>
 
-                {/* Datos extra: tarifa y notas */}
-                {(r.monto_tarifa || r.notas) && (
+                {/* Datos extra: tarifa, renta del equipo y notas */}
+                {(totalCobroReserva(r, prestamos) > 0 || r.notas) && (
                   <div style={{ marginTop: 18, padding: 14, background: 'var(--at-surface-2)', borderRadius: 12 }}>
-                    {r.monto_tarifa != null && r.monto_tarifa > 0 && (
-                      <div style={{ fontSize: 12.5, color: 'var(--at-ink-2)', marginBottom: r.notas ? 6 : 0 }}>
-                        🎟 <strong>Tarifa:</strong> {moneda} {Number(r.monto_tarifa).toFixed(2)} ·
-                        {r.metodo_pago_tarifa === 'cargar_unidad' ? ' cargado a unidad' : (r.tarifa_pagada ? ' pagado en sitio' : ' por cobrar en sitio')}
-                      </div>
-                    )}
+                    {totalCobroReserva(r, prestamos) > 0 && (() => {
+                      const tarifa = Number(r.monto_tarifa ?? 0)
+                      const renta = rentaDeReserva(r.id, prestamos)
+                      const estadoPago = r.metodo_pago_tarifa === 'cargar_unidad' ? 'cargado a unidad' : (r.tarifa_pagada ? 'pagado en sitio' : 'por cobrar en sitio')
+                      return (
+                        <div style={{ fontSize: 12.5, color: 'var(--at-ink-2)', marginBottom: r.notas ? 6 : 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {tarifa > 0 && <span>🎟 <strong>Tarifa:</strong> {moneda} {tarifa.toFixed(2)}</span>}
+                          {renta > 0 && <span>🪑 <strong>Renta de equipo:</strong> {moneda} {renta.toFixed(2)}</span>}
+                          <span><strong>{tarifa > 0 && renta > 0 ? 'Total: ' : ''}</strong>{tarifa > 0 && renta > 0 ? `${moneda} ${totalCobroReserva(r, prestamos).toFixed(2)} · ` : ''}{estadoPago}</span>
+                        </div>
+                      )
+                    })()}
                     {r.notas && <div style={{ fontSize: 12.5, color: 'var(--at-ink-2)' }}>📝 {r.notas}</div>}
                   </div>
                 )}

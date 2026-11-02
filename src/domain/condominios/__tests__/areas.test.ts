@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { areaDuplicada, nombreAreaDe, normalizarNombreArea } from '../areas'
+import { areaDuplicada, areaUnicaPorNombre, nombreAreaDe, normalizarNombreArea, vinculoArea } from '../areas'
 import type { AreaCondominio } from '../../../types'
 
 function area(over: Partial<AreaCondominio> = {}): AreaCondominio {
@@ -64,5 +64,38 @@ describe('nombreAreaDe', () => {
 
   it('vínculo a un área que no vino en el catálogo cargado degrada al snapshot', () => {
     expect(nombreAreaDe('fantasma', catalogo, 'texto histórico')).toBe('texto histórico')
+  })
+})
+
+describe('areaUnicaPorNombre — vincular texto libre solo si hay UNA coincidencia', () => {
+  const areas = [area({ id: 'a1', nombre: 'Área social' }), area({ id: 'a2', nombre: 'Azotea' })]
+
+  it('encuentra el área con el mismo nombre normalizado', () => {
+    expect(areaUnicaPorNombre('area  SOCIAL', areas)?.id).toBe('a1')
+  })
+
+  it('sin texto, sin coincidencia o con dos candidatas devuelve null', () => {
+    expect(areaUnicaPorNombre('', areas)).toBeNull()
+    expect(areaUnicaPorNombre(null, areas)).toBeNull()
+    expect(areaUnicaPorNombre('Azotea Planta baja', areas)).toBeNull()
+    expect(areaUnicaPorNombre('Azotea', [...areas, area({ id: 'a3', nombre: 'AZOTEA' })])).toBeNull()
+  })
+})
+
+describe('vinculoArea — id del área y snapshot de su nombre', () => {
+  const areas = [area({ id: 'a1', nombre: ' Área social ' })]
+
+  it('con área elegida guarda su id y su nombre vigente', () => {
+    expect(vinculoArea('a1', areas)).toEqual({ area_id: 'a1', nombre: 'Área social' })
+  })
+
+  it('un área fuera del catálogo cargado conserva el snapshot que ya tenía', () => {
+    expect(vinculoArea('a9', areas, { area_id: 'a9', texto: 'Garita' })).toEqual({ area_id: 'a9', nombre: 'Garita' })
+  })
+
+  it('sin área: el texto legado sin vincular se conserva; un área quitada deja ambos vacíos', () => {
+    expect(vinculoArea('', areas)).toEqual({ area_id: null, nombre: null })
+    expect(vinculoArea('', areas, { area_id: null, texto: 'Junto a la piscina' })).toEqual({ area_id: null, nombre: 'Junto a la piscina' })
+    expect(vinculoArea('', areas, { area_id: 'a1', texto: 'Área social' })).toEqual({ area_id: null, nombre: null })
   })
 })

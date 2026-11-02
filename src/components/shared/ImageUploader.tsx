@@ -18,9 +18,17 @@ interface SingleProps {
   label?: string
   maxSizeMB?: number
   capture?: boolean
+  /**
+   * Por defecto, quitar la foto la borra del bucket al instante. Con `false`
+   * sólo la saca del valor y el que llama decide al guardar o cancelar (una
+   * fila guardada nunca debe apuntar a un archivo ya borrado).
+   */
+  borrarAlQuitar?: boolean
+  /** Avisa cuándo empieza y termina una subida, para no guardar ni cerrar a mitad. */
+  onSubiendo?: (subiendo: boolean) => void
 }
 
-export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSizeMB = 5, capture = false }: SingleProps) {
+export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSizeMB = 5, capture = false, borrarAlQuitar = true, onSubiendo }: SingleProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,6 +47,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
     const magicCheck = await validateFileMagic(file, 'image')
     if (!magicCheck.ok) { setError(magicCheck.reason); return }
     setUploading(true)
+    onSubiendo?.(true)
     try {
       const blob = await compressImage(file)
       // We always re-encode to JPEG via canvas (compressImage), so forcing
@@ -48,7 +57,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
       if (upErr) { setError(upErr); return }
       // S6 phase 2: persist the bare path; SecureImage signs at render time.
       // Delete previous photo only if it was uploaded in this same session.
-      if (value && sessionUploadsRef.current.has(value)) {
+      if (value && borrarAlQuitar && sessionUploadsRef.current.has(value)) {
         const prevPath = value.startsWith('http') ? value.match(/condominios-media\/(.+)$/)?.[1] : value
         if (prevPath) await removeCondominiosMedia([prevPath])
       }
@@ -58,6 +67,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
       setError(e instanceof Error ? e.message : 'Error al subir')
     } finally {
       setUploading(false)
+      onSubiendo?.(false)
     }
   }
 
@@ -79,9 +89,9 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
   async function handleRemove() {
     if (!value) return
     const path = value.startsWith('http') ? value.match(/condominios-media\/(.+)$/)?.[1] : value
-    if (path) await removeCondominiosMedia([path])
     sessionUploadsRef.current.delete(value)
     onChange(null)
+    if (path && borrarAlQuitar) await removeCondominiosMedia([path])
   }
 
   return (
@@ -93,6 +103,8 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10, border: '2px solid var(--at-line)', display: 'block' }}
             onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           <button
+            type="button"
+            aria-label="Quitar foto"
             onClick={handleRemove}
             style={{ position: 'absolute', top: -8, right: -8, zIndex: 1, width: 24, height: 24, borderRadius: '50%', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
             ×

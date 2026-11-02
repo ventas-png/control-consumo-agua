@@ -1,5 +1,6 @@
-import type { CategoriaInventario, EstadoInventario } from '../../types'
+import type { AreaCondominio, CategoriaInventario, EstadoInventario } from '../../types'
 import { createInventarioItems } from '../../domain/condominios/mutations'
+import { areaUnicaPorNombre } from '../../domain/condominios/areas'
 import { sanitizeInput } from '../../lib/validation'
 import { ImportModal, type ImportColumn, type RowValidationResult } from '../shared'
 
@@ -158,13 +159,15 @@ function validateRow(row: Record<string, unknown>): RowValidationResult<Inventar
 }
 
 interface Props {
+  /** Áreas activas: la columna `ubicacion` se vincula a la que tenga ese nombre. */
+  areas: AreaCondominio[]
   proyectoId: string
   companyId: string
   onClose: () => void
   onImportado: () => void
 }
 
-export function ImportInventarioModal({ proyectoId, companyId, onClose, onImportado }: Props) {
+export function ImportInventarioModal({ areas, proyectoId, companyId, onClose, onImportado }: Props) {
   return (
     <ImportModal<InventarioRow>
       entityLabel="item"
@@ -174,11 +177,18 @@ export function ImportInventarioModal({ proyectoId, companyId, onClose, onImport
       columns={COLUMNS}
       validateRow={validateRow}
       onInsertBatch={async (batch) => {
-        const payload = batch.map(i => ({
-          ...i,
-          project_id: proyectoId,
-          company_id: companyId,
-        }))
+        const payload = batch.map(i => {
+          // Mismo criterio que el backfill (20261114000000): solo se vincula si
+          // el texto coincide con UNA área; si no, queda como texto sin vincular.
+          const area = areaUnicaPorNombre(i.ubicacion, areas)
+          return {
+            ...i,
+            area_id: area?.id ?? null,
+            ubicacion: area ? area.nombre.trim() : i.ubicacion,
+            project_id: proyectoId,
+            company_id: companyId,
+          }
+        })
         const { error } = await createInventarioItems(payload)
         return error
           ? { ok: 0, error }

@@ -12,6 +12,7 @@ import {
   faltantes,
   montoReposicionSugerido,
   prestamosDeReserva,
+  rentaEquipoSolicitado,
   resumenEquiposReserva,
 } from '../../../../lib/prestamosEquipo'
 import { btnAction } from './ui'
@@ -44,6 +45,9 @@ export function EquiposReserva({ ctx, reserva }: { ctx: AmenidadesCtx; reserva: 
   const [recepcion, setRecepcion] = useState<Record<string, LineaRecepcion>>({})
   const [recibidoPor, setRecibidoPor] = useState('')
   const [generarCargo, setGenerarCargo] = useState(false)
+  // Renta de lo que se agrega (20261118000000): se propone cargarla a la
+  // unidad cuando la reserva ya se cobra así.
+  const [cargarRenta, setCargarRenta] = useState(true)
 
   const lista = prestamosDeReserva(reserva.id, prestamos)
   const resumen = resumenEquiposReserva(lista)
@@ -51,6 +55,7 @@ export function EquiposReserva({ ctx, reserva }: { ctx: AmenidadesCtx; reserva: 
   const solicitados = lista.filter(p => p.estado === 'solicitado')
   const prestados = lista.filter(p => p.estado === 'prestado')
   const puedeAgregar = canEdit && links.length > 0 && (reserva.estado === 'pendiente' || reserva.estado === 'confirmada') && !reserva.checkout_at
+  const rentaAgregar = rentaEquipoSolicitado(agregar, inventario)
 
   function abrirEntrega() {
     setEntrega(Object.fromEntries(solicitados.map(p => [p.id, String(p.cantidad)])))
@@ -88,7 +93,7 @@ export function EquiposReserva({ ctx, reserva }: { ctx: AmenidadesCtx; reserva: 
     const equipos = Object.entries(agregar).filter(([, n]) => n > 0).map(([inventario_id, cantidad]) => ({ inventario_id, cantidad }))
     if (equipos.length === 0) return
     setSaving(true)
-    const ok = await solicitarEquiposReserva(reserva.id, equipos)
+    const ok = await solicitarEquiposReserva(reserva.id, equipos, rentaAgregar > 0 && cargarRenta)
     setSaving(false)
     if (ok) { setAgregar({}); setModo('ver') }
   }
@@ -138,6 +143,9 @@ export function EquiposReserva({ ctx, reserva }: { ctx: AmenidadesCtx; reserva: 
                     {p.estado === 'prestado' && `Entregado ${p.fecha_prestamo}${p.hora_prestamo ? ` ${p.hora_prestamo.slice(0, 5)}` : ''}${p.entregado_por ? ` por ${p.entregado_por}` : ''}`}
                     {p.estado === 'solicitado' && 'Pendiente de entrega'}
                     {p.estado === 'cancelado' && 'No se entregó'}
+                    {p.estado !== 'cancelado' && p.monto_renta != null && Number(p.monto_renta) > 0 && (
+                      <strong style={{ color: 'var(--at-primary-hover)' }}> · renta {moneda} {Number(p.monto_renta).toFixed(2)}{p.cuota_renta_id ? ' (cargo generado)' : ''}</strong>
+                    )}
                     {(p.estado === 'devuelto' || p.estado === 'dañado' || p.estado === 'perdido') && (
                       <>
                         Devuelto {p.cantidad_devuelta ?? p.cantidad} de {p.cantidad}
@@ -156,6 +164,11 @@ export function EquiposReserva({ ctx, reserva }: { ctx: AmenidadesCtx; reserva: 
               </div>
             )
           })}
+          {resumen.renta > 0 && (
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-primary-hover)', padding: '4px 2px' }}>
+              Renta de equipo: {moneda} {resumen.renta.toFixed(2)} <span style={{ fontWeight: 500, color: 'var(--at-ink-3)' }}>· adicional a la tarifa de la reserva</span>
+            </div>
+          )}
           {resumen.reposicion > 0 && (
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-danger-strong)', padding: '4px 2px' }}>
               Reposición total: {moneda} {resumen.reposicion.toFixed(2)}
@@ -188,6 +201,12 @@ export function EquiposReserva({ ctx, reserva }: { ctx: AmenidadesCtx; reserva: 
             links={links} inventario={inventario} prestamos={prestamos} fecha={reserva.fecha} moneda={moneda}
             value={agregar} onChange={setAgregar} titulo="🪑 Agregar equipo a la reserva"
           />
+          {rentaAgregar > 0 && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, color: 'var(--at-ink-2)', cursor: 'pointer', fontWeight: 600 }}>
+              <input type="checkbox" checked={cargarRenta} onChange={e => setCargarRenta(e.target.checked)} />
+              Generar un cargo a la unidad por la renta ({moneda} {rentaAgregar.toFixed(2)}); si no, se cobra en sitio con la reserva
+            </label>
+          )}
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
             <button onClick={confirmarAgregar} disabled={saving || Object.keys(agregar).length === 0} style={btnAction('var(--at-primary-soft)', 'var(--at-accent-2)', 'var(--at-primary-hover)')}>
               {saving ? 'Guardando…' : 'Solicitar equipo'}

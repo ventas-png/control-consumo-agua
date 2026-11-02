@@ -5,7 +5,7 @@
 // disponibilidad por RPC porque sólo ve sus propios préstamos.
 import { useId } from 'react'
 import type { AmenidadInventario, ItemInventario, PrestamoEquipo } from '../../../../types'
-import { disponibilidadEquipo, topePorReserva } from '../../../../lib/prestamosEquipo'
+import { disponibilidadEquipo, rentaEquipoSolicitado, rentaUnitaria, topePorReserva } from '../../../../lib/prestamosEquipo'
 import { CATEGORIA_INVENTARIO_ICON } from './SelectorEquiposAmenidad'
 
 interface Props {
@@ -38,6 +38,8 @@ export function SelectorEquiposReserva({ links, inventario, prestamos, fecha, mo
   }
 
   const pedidos = Object.values(value).filter(n => n > 0).length
+  // Renta de lo pedido (20261118000000): se suma a la tarifa de la reserva.
+  const renta = rentaEquipoSolicitado(value, inventario)
 
   return (
     <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: 10, padding: '12px 14px' }}>
@@ -65,6 +67,7 @@ export function SelectorEquiposReserva({ links, inventario, prestamos, fecha, mo
                     : `${Math.max(0, disponible)} disponible${disponible === 1 ? '' : 's'}`}
                   {link.cantidad_max_por_reserva != null && ` · máx. ${link.cantidad_max_por_reserva} por reserva`}
                   {item.costo_unitario != null && ` · reposición ${moneda} ${Number(item.costo_unitario).toFixed(2)} c/u`}
+                  {rentaUnitaria(item) != null && <strong style={{ color: 'var(--at-primary-hover)' }}>{` · renta ${moneda} ${rentaUnitaria(item)!.toFixed(2)} c/u`}</strong>}
                 </div>
                 {link.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', fontStyle: 'italic' }}>{link.notas}</div>}
               </div>
@@ -84,6 +87,12 @@ export function SelectorEquiposReserva({ links, inventario, prestamos, fecha, mo
           )
         })}
       </div>
+      {renta > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, fontWeight: 700, color: 'var(--at-primary-hover)' }}>
+          <span>🪑 Renta de equipo (adicional a la reserva)</span>
+          <span>{moneda} {renta.toFixed(2)}</span>
+        </div>
+      )}
     </div>
   )
 }

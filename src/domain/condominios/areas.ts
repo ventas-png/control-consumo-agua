@@ -46,3 +46,38 @@ export function nombreAreaDe(
   if (!areaId) return fallback
   return areas.find(a => a.id === areaId)?.nombre ?? fallback
 }
+
+/**
+ * El área cuyo nombre normalizado coincide con `texto`, solo si es UNA: el
+ * mismo criterio que los backfills (20261111000000, 20261114000000). Con dos
+ * candidatas no se adivina —atar al área equivocada es peor que no atar—.
+ */
+export function areaUnicaPorNombre(
+  texto: string | null | undefined,
+  areas: AreaCondominio[],
+): AreaCondominio | null {
+  const norm = normalizarNombreArea(texto)
+  if (!norm) return null
+  const coinciden = areas.filter(a => normalizarNombreArea(a.nombre) === norm)
+  return coinciden.length === 1 ? coinciden[0] : null
+}
+
+/**
+ * Lo que se guarda al elegir área en un formulario: el id y el SNAPSHOT de su
+ * nombre. `areaId` vacío = «Sin área». `previo` es el registro que se edita:
+ *  - Si su área no está en el catálogo cargado, se conserva el snapshot que ya
+ *    tenía (no se borra un nombre por no haber podido leer el catálogo).
+ *  - Sin área elegida, solo sobrevive el texto de un registro legado que nadie
+ *    ha vinculado; quitar un área vinculada deja ambos en null.
+ */
+export function vinculoArea(
+  areaId: string | null | undefined,
+  areas: AreaCondominio[],
+  previo?: { area_id?: string | null; texto?: string | null },
+): { area_id: string | null; nombre: string | null } {
+  if (areaId) {
+    const area = areas.find(a => a.id === areaId)
+    return { area_id: areaId, nombre: area ? area.nombre.trim() : (previo?.texto?.trim() || null) }
+  }
+  return { area_id: null, nombre: previo && !previo.area_id ? (previo.texto?.trim() || null) : null }
+}

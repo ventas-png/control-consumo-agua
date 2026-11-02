@@ -142,6 +142,9 @@ export interface IncidenteSeguridad {
   hora?: string | null
   tipo: TipoIncidente
   descripcion: string
+  /** Área del catálogo (areas_condominio). null = sin área, o legado sin vincular (solo texto en `area`). */
+  area_id?: string | null
+  /** Snapshot del nombre del área al guardar; en lo legado, el texto libre capturado. */
   area?: string | null
   reportado_por?: string | null
   estado: EstadoIncidente

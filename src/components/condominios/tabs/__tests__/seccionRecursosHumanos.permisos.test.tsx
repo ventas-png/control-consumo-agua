@@ -30,7 +30,7 @@ beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
 afterEach(cleanup)
 
 eliminarExigeSuPermiso('Capacitación', p => render(
-  <CapacitacionPersonalTab proyectoId="p1" companyId="co1" moneda="Q" canCreate {...p} onRefresh={() => {}}
+  <CapacitacionPersonalTab proyectoId="p1" companyId="co1" moneda="Q" canCreate {...p} onRefresh={() => {}} personal={[]}
     capacitaciones={[{
       id: 'ca1', company_id: 'co1', project_id: 'p1', nombre_empleado: 'Lucía Conserje', curso: 'Primeros auxilios',
       estado: 'planificado', created_at: '2026-10-10T00:00:00Z',

@@ -148,7 +148,7 @@ const sinComunicacion = (tabs: string[]) => tabs.filter(t => !COMUNICACION_SET.h
 // es el recorrido de vigilancia y su catálogo de puntos de verificación, que se
 // arma y se ejecuta desde el mismo sitio que las rondas y sus novedades.
 const RECURSOS_HUMANOS_TABS = [
-  'personal', 'capacitacion_personal',
+  'personal', 'capacitacion_personal', 'llamadas_atencion',
   'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
   'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza',
   'desempeno_personal', 'actividad_equipo',
@@ -192,7 +192,7 @@ export const CONDOMINIOS_TAB_ACCESS: Record<CondominiosRole, Set<string> | null>
     ...TODAS_INSTALACIONES,
     // Administración: técnica
     'documentos', 'bitacora_acciones', 'vencimientos_criticos', 'polizas',
-    'inspecciones', 'automatizaciones', 'personal', 'rrhh_config', 'capacitacion_personal',
+    'inspecciones', 'automatizaciones', 'personal', 'rrhh_config', 'capacitacion_personal', 'llamadas_atencion',
     'comunicacion_condominios',
   ]),
 

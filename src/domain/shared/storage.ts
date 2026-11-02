@@ -29,6 +29,12 @@ export async function uploadMedia(
   return { data: data ? { path: data.path } : null, error: error?.message ?? null }
 }
 
+/** Descarga un archivo de un bucket (para incrustarlo en un PDF). null si no está o falla. */
+export async function downloadMedia(bucket: string, path: string): Promise<Blob | null> {
+  const { data, error } = await supabase.storage.from(bucket).download(path)
+  return error ? null : data
+}
+
 /** Elimina archivos de un bucket por path. */
 export async function removeMedia(bucket: string, paths: string[]): Promise<{ error: string | null }> {
   const { error } = await supabase.storage.from(bucket).remove(paths)

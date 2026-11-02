@@ -734,12 +734,19 @@ export interface ItemInventario {
   categoria: CategoriaInventario
   descripcion?: string | null
   numero_serie?: string | null
+  /** Área del catálogo (areas_condominio). null = sin área, o legado sin vincular (solo texto en `ubicacion`). */
+  area_id?: string | null
+  /** Snapshot del nombre del área al guardar; en lo legado, el texto libre capturado. */
   ubicacion?: string | null
   estado: EstadoInventario
   cantidad: number
   cantidad_minima: number
   unidad_medida: string
   costo_unitario?: number | null
+  /** true = se presta a un costo: cada unidad pedida con una reserva suma `costo_renta_unidad` al cobro (20261118000000). */
+  prestable_con_costo?: boolean
+  /** Renta por unidad prestada. Obligatoria (> 0) cuando `prestable_con_costo`. */
+  costo_renta_unidad?: number | null
   proveedor?: string | null
   fecha_adquisicion?: string | null
   fecha_vencimiento?: string | null
@@ -1030,6 +1037,8 @@ export interface SuministroCondominio {
   rendimiento?: number | null
   /** En qué se mide el rendimiento: aplicaciones, limpiezas, m², días… */
   rendimiento_unidad?: string | null
+  /** Ruta de la foto del insumo en `condominios-media`; SecureImage la firma al mostrarla. */
+  foto_url?: string | null
   notas?: string | null
   activo: boolean
   created_at: string
@@ -1115,6 +1124,8 @@ export interface GestionCobranza {
 
 export type TurbiededadPiscina = 'cristalina' | 'ligeramente_turbia' | 'turbia'
 export type EstadoPiscina = 'abierta' | 'cerrada_mantenimiento' | 'cerrada_quimica' | 'cerrada_incidente'
+/** El mismo registro de calidad de agua sirve para la piscina y el jacuzzi (20261117000000). */
+export type TipoCuerpoAgua = 'piscina' | 'jacuzzi'
 
 export interface ControlPiscina {
   id: string
@@ -1122,15 +1133,31 @@ export interface ControlPiscina {
   project_id: string
   fecha: string
   hora?: string | null
+  /** Nombre del cuerpo de agua («Principal», «Infantil»), no del área. */
   piscina: string
+  tipo: TipoCuerpoAgua
+  /** Área del catálogo donde está (areas_condominio). NULL en registros legados. */
+  area_id?: string | null
   ph?: number | null
+  /** Cloro LIBRE (ppm). */
   cloro?: number | null
+  cloro_total?: number | null
+  bromo?: number | null
+  dureza_total?: number | null
+  acido_cianurico?: number | null
+  alcalinidad_total?: number | null
+  cobre?: number | null
+  sal?: number | null
   temperatura?: number | null
   turbiedad: TurbiededadPiscina
   estado: EstadoPiscina
   num_usuarios?: number | null
   registrado_por?: string | null
   observaciones?: string | null
+  /** Rutas en condominios-media (<project_id>/piscina/...): muestra (≤2), tira con resultado (≤2), área (≤4). */
+  fotos_muestra?: string[] | null
+  fotos_resultado?: string[] | null
+  fotos_area?: string[] | null
   created_at: string
 }
 
@@ -1223,6 +1250,75 @@ export interface VencimientoExtra {
   renovado: boolean
   notas?: string | null
   created_at: string
+}
+
+export type TipoLlamadaAtencion = 'llamada_atencion' | 'amonestacion' | 'suspension' | 'otra'
+export type EstadoLlamadaAtencion = 'pendiente' | 'acusada' | 'anulada'
+/** usuario = firmó desde su cuenta; presencial = firmó en el dispositivo de quien registra. */
+export type ModoAcuseLlamada = 'usuario' | 'presencial'
+/**
+ * Llamada de atención, amonestación o suspensión a un empleado
+ * (llamadas_atencion_personal, 20261115000000). Inmutable tras emitirse: sólo
+ * cambian el estado, el acuse y la anulación, y sólo por las RPCs.
+ */
+export interface LlamadaAtencionPersonal {
+  id: string
+  company_id: string
+  project_id: string
+  /** NULL sólo si la ficha se dio de baja después; empleado_nombre conserva a quién se entregó. */
+  personal_id?: string | null
+  empleado_nombre: string
+  empleado_cargo?: string | null
+  tipo: TipoLlamadaAtencion
+  fecha_hechos: string
+  motivo: string
+  descripcion: string
+  fundamento?: string | null
+  dias_suspension?: number | null
+  estado: EstadoLlamadaAtencion
+  emitido_por?: string | null
+  emitido_por_nombre: string
+  emitido_en: string
+  /** Firma manuscrita del emisor en el bucket rrhh-llamadas-atencion. */
+  firma_emisor_path: string
+  notificado_en?: string | null
+  acuse_en?: string | null
+  acuse_por?: string | null
+  acuse_nombre?: string | null
+  acuse_modo?: ModoAcuseLlamada | null
+  firma_acuse_path?: string | null
+  anulada_en?: string | null
+  anulada_por?: string | null
+  motivo_anulacion?: string | null
+  creado_por?: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Fila de rrhh_llamadas_mias(): la carta vista por el empleado, con su condominio. */
+export interface LlamadaAtencionMia {
+  id: string
+  project_id: string
+  proyecto_nombre?: string | null
+  personal_id?: string | null
+  empleado_nombre: string
+  empleado_cargo?: string | null
+  tipo: TipoLlamadaAtencion
+  fecha_hechos: string
+  motivo: string
+  descripcion: string
+  fundamento?: string | null
+  dias_suspension?: number | null
+  estado: EstadoLlamadaAtencion
+  emitido_por_nombre: string
+  emitido_en: string
+  firma_emisor_path: string
+  acuse_en?: string | null
+  acuse_nombre?: string | null
+  acuse_modo?: ModoAcuseLlamada | null
+  firma_acuse_path?: string | null
+  anulada_en?: string | null
+  motivo_anulacion?: string | null
 }
 
 export type EstadoCapacitacion = 'planificado' | 'en_progreso' | 'completado' | 'vencido'

@@ -8,6 +8,7 @@ import {
   fetchTareasBloqueData,
   fetchCondominiosTurnosData,
   fetchCondominiosRrhhCatalogosData,
+  fetchCondominiosLlamadasAtencionData,
 } from '../../domain/condominios/sectionData'
 import { track } from '../../lib/analytics'
 import { canViewCondominiosTabByPermission, canActInCondominiosTab } from '../../lib/permissions'
@@ -58,7 +59,7 @@ import type {
   RecargoMora, ConvenioCuotaCond, HistorialSaldoUnidad, NotificacionEnviada,
   ReglaMoraConfig, CampanaCobro, CierreAnual,
   CobranzaJudicial, ReciboDigital, InformeMensual, SugerenciaCondominio,
-  VencimientoExtra, CapacitacionPersonal, ProyectoCondominio,
+  VencimientoExtra, CapacitacionPersonal, LlamadaAtencionPersonal, ProyectoCondominio,
   ArticuloManual,
   AutomatizacionCond,
   PlantillaMensajeCond,
@@ -286,6 +287,8 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   // Catálogos de cargos y tipos de turno del condominio (20261031000300)
   const [cargosPersonal, setCargosPersonal] = useState<CargoCatalogo[]>([])
   const [tiposTurno, setTiposTurno] = useState<TipoTurnoCatalogo[]>([])
+  // Llamadas de atención y sanciones (20261115000000)
+  const [llamadasAtencion, setLlamadasAtencion] = useState<LlamadaAtencionPersonal[]>([])
   // Fase 21
   const [suministros, setSuministros] = useState<SuministroCondominio[]>([])
   const [movimientosSuministro, setMovimientosSuministro] = useState<MovimientoSuministro[]>([])
@@ -538,6 +541,10 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     setCargosPersonal((cargosRes.data ?? []) as CargoCatalogo[])
     setTiposTurno((tiposTurnoRes.data ?? []) as TipoTurnoCatalogo[])
 
+    // Llamadas de atención (20261115000000): batch aparte, mismo motivo.
+    const llamadasRes = await fetchCondominiosLlamadasAtencionData(pid, cid)
+    setLlamadasAtencion((llamadasRes.data ?? []) as LlamadaAtencionPersonal[])
+
     // Control de asignación de turnos (20260820000000 / 000100). Aparte del
     // Promise.all grande por el mismo motivo que las rutas de limpieza: las
     // tablas son nuevas y, si un entorno todavía no tiene la migración
@@ -772,7 +779,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
     plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal, excepcionesTurno,
-    cargosPersonal, tiposTurno,
+    cargosPersonal, tiposTurno, llamadasAtencion,
     tareasCond, cobranzas, certificados, visitasFrecuentes, reglamento,
     controlPlagas, cargosAdicionales, programaActividades, registroAutoridades,
     notasAdmin, controlPiscina, mantenimientoJardineria, incidenciasElevador,
@@ -807,7 +814,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
     plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal, excepcionesTurno,
-    cargosPersonal, tiposTurno,
+    cargosPersonal, tiposTurno, llamadasAtencion,
     tareasCond, cobranzas, certificados, visitasFrecuentes, reglamento,
     controlPlagas, cargosAdicionales, programaActividades, registroAutoridades,
     notasAdmin, controlPiscina, mantenimientoJardineria, incidenciasElevador,

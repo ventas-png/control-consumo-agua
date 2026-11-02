@@ -6827,12 +6827,22 @@ export type Database = {
       }
       control_piscina: {
         Row: {
+          acido_cianurico: number | null
+          alcalinidad_total: number | null
+          area_id: string | null
+          bromo: number | null
           cloro: number | null
+          cloro_total: number | null
+          cobre: number | null
           company_id: string
           creado_por: string | null
           created_at: string
+          dureza_total: number | null
           estado: string
           fecha: string
+          fotos_area: string[]
+          fotos_muestra: string[]
+          fotos_resultado: string[]
           hora: string | null
           id: string
           num_usuarios: number | null
@@ -6841,16 +6851,28 @@ export type Database = {
           piscina: string
           project_id: string
           registrado_por: string | null
+          sal: number | null
           temperatura: number | null
+          tipo: string
           turbiedad: string
         }
         Insert: {
+          acido_cianurico?: number | null
+          alcalinidad_total?: number | null
+          area_id?: string | null
+          bromo?: number | null
           cloro?: number | null
+          cloro_total?: number | null
+          cobre?: number | null
           company_id: string
           creado_por?: string | null
           created_at?: string
+          dureza_total?: number | null
           estado?: string
           fecha?: string
+          fotos_area?: string[]
+          fotos_muestra?: string[]
+          fotos_resultado?: string[]
           hora?: string | null
           id?: string
           num_usuarios?: number | null
@@ -6859,16 +6881,28 @@ export type Database = {
           piscina?: string
           project_id: string
           registrado_por?: string | null
+          sal?: number | null
           temperatura?: number | null
+          tipo?: string
           turbiedad?: string
         }
         Update: {
+          acido_cianurico?: number | null
+          alcalinidad_total?: number | null
+          area_id?: string | null
+          bromo?: number | null
           cloro?: number | null
+          cloro_total?: number | null
+          cobre?: number | null
           company_id?: string
           creado_por?: string | null
           created_at?: string
+          dureza_total?: number | null
           estado?: string
           fecha?: string
+          fotos_area?: string[]
+          fotos_muestra?: string[]
+          fotos_resultado?: string[]
           hora?: string | null
           id?: string
           num_usuarios?: number | null
@@ -6877,7 +6911,9 @@ export type Database = {
           piscina?: string
           project_id?: string
           registrado_por?: string | null
+          sal?: number | null
           temperatura?: number | null
+          tipo?: string
           turbiedad?: string
         }
         Relationships: [
@@ -6908,6 +6944,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "piscina_area_tenant_fk"
+            columns: ["area_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
           },
         ]
       }
@@ -10818,6 +10861,7 @@ export type Database = {
       incidentes_seguridad: {
         Row: {
           area: string | null
+          area_id: string | null
           company_id: string
           creado_por: string | null
           created_at: string
@@ -10834,6 +10878,7 @@ export type Database = {
         }
         Insert: {
           area?: string | null
+          area_id?: string | null
           company_id: string
           creado_por?: string | null
           created_at?: string
@@ -10850,6 +10895,7 @@ export type Database = {
         }
         Update: {
           area?: string | null
+          area_id?: string | null
           company_id?: string
           creado_por?: string | null
           created_at?: string
@@ -10865,6 +10911,13 @@ export type Database = {
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "incidentes_area_tenant_fk"
+            columns: ["area_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
           {
             foreignKeyName: "incidentes_seguridad_company_id_fkey"
             columns: ["company_id"]
@@ -11168,11 +11221,14 @@ export type Database = {
       }
       inventario_condominio: {
         Row: {
+          area_id: string | null
           cantidad: number
           cantidad_minima: number
           categoria: string
           company_id: string
           costo_unitario: number | null
+          costo_renta_unidad: number | null
+          prestable_con_costo: boolean
           creado_por: string | null
           created_at: string
           descripcion: string | null
@@ -11190,11 +11246,14 @@ export type Database = {
           unidad_medida: string
         }
         Insert: {
+          area_id?: string | null
           cantidad?: number
           cantidad_minima?: number
           categoria?: string
           company_id: string
           costo_unitario?: number | null
+          costo_renta_unidad?: number | null
+          prestable_con_costo?: boolean
           creado_por?: string | null
           created_at?: string
           descripcion?: string | null
@@ -11212,11 +11271,14 @@ export type Database = {
           unidad_medida?: string
         }
         Update: {
+          area_id?: string | null
           cantidad?: number
           cantidad_minima?: number
           categoria?: string
           company_id?: string
           costo_unitario?: number | null
+          costo_renta_unidad?: number | null
+          prestable_con_costo?: boolean
           creado_por?: string | null
           created_at?: string
           descripcion?: string | null
@@ -11234,6 +11296,13 @@ export type Database = {
           unidad_medida?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "inventario_area_tenant_fk"
+            columns: ["area_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
           {
             foreignKeyName: "inventario_condominio_company_id_fkey"
             columns: ["company_id"]
@@ -11649,6 +11718,7 @@ export type Database = {
           id: string
           incidentes: Json
           novedades: string
+          personal_id: string | null
           project_id: string
           responsable: string
           turno: string
@@ -11665,6 +11735,7 @@ export type Database = {
           id?: string
           incidentes?: Json
           novedades: string
+          personal_id?: string | null
           project_id: string
           responsable: string
           turno?: string
@@ -11681,6 +11752,7 @@ export type Database = {
           id?: string
           incidentes?: Json
           novedades?: string
+          personal_id?: string | null
           project_id?: string
           responsable?: string
           turno?: string
@@ -11713,6 +11785,131 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "libro_novedades_personal_fk"
+            columns: ["personal_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+        ]
+      }
+      llamadas_atencion_personal: {
+        Row: {
+          acuse_en: string | null
+          acuse_modo: string | null
+          acuse_nombre: string | null
+          acuse_por: string | null
+          anulada_en: string | null
+          anulada_por: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          descripcion: string
+          dias_suspension: number | null
+          emitido_en: string
+          emitido_por: string | null
+          emitido_por_nombre: string
+          empleado_cargo: string | null
+          empleado_nombre: string
+          estado: string
+          fecha_hechos: string
+          firma_acuse_path: string | null
+          firma_emisor_path: string
+          fundamento: string | null
+          id: string
+          motivo: string
+          motivo_anulacion: string | null
+          notificado_en: string | null
+          personal_id: string | null
+          project_id: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          acuse_en?: string | null
+          acuse_modo?: string | null
+          acuse_nombre?: string | null
+          acuse_por?: string | null
+          anulada_en?: string | null
+          anulada_por?: string | null
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion: string
+          dias_suspension?: number | null
+          emitido_en?: string
+          emitido_por?: string | null
+          emitido_por_nombre?: string
+          empleado_cargo?: string | null
+          empleado_nombre?: string
+          estado?: string
+          fecha_hechos?: string
+          firma_acuse_path?: string | null
+          firma_emisor_path: string
+          fundamento?: string | null
+          id?: string
+          motivo: string
+          motivo_anulacion?: string | null
+          notificado_en?: string | null
+          personal_id?: string | null
+          project_id: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          acuse_en?: string | null
+          acuse_modo?: string | null
+          acuse_nombre?: string | null
+          acuse_por?: string | null
+          anulada_en?: string | null
+          anulada_por?: string | null
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion?: string
+          dias_suspension?: number | null
+          emitido_en?: string
+          emitido_por?: string | null
+          emitido_por_nombre?: string
+          empleado_cargo?: string | null
+          empleado_nombre?: string
+          estado?: string
+          fecha_hechos?: string
+          firma_acuse_path?: string | null
+          firma_emisor_path?: string
+          fundamento?: string | null
+          id?: string
+          motivo?: string
+          motivo_anulacion?: string | null
+          notificado_en?: string | null
+          personal_id?: string | null
+          project_id?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llamadas_atencion_personal_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "llamadas_atencion_personal_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "llamadas_atencion_personal_fk"
+            columns: ["personal_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
           },
         ]
       }
@@ -13220,13 +13417,28 @@ export type Database = {
       }
       objetos_perdidos: {
         Row: {
+          almacenamiento_detalle: string | null
+          area_almacenamiento_id: string | null
+          area_encontrado_id: string | null
           company_id: string
           created_at: string
+          custodio_nombre: string | null
+          custodio_personal_id: string | null
           descripcion: string
+          encontrado_por_contacto: string | null
+          encontrado_por_nombre: string | null
+          encontrado_por_personal_id: string | null
+          encontrado_por_tipo: string | null
+          entrega_documento: string | null
+          entregado_en: string | null
+          entregado_por: string | null
+          entregado_por_nombre: string | null
           estado: string
           fecha_encontrado: string
           fecha_reclamo: string | null
+          firma_entrega_path: string | null
           foto_url: string | null
+          fotos: string[]
           id: string
           lugar_encontrado: string | null
           notas: string | null
@@ -13235,13 +13447,28 @@ export type Database = {
           registrado_por: string | null
         }
         Insert: {
+          almacenamiento_detalle?: string | null
+          area_almacenamiento_id?: string | null
+          area_encontrado_id?: string | null
           company_id: string
           created_at?: string
+          custodio_nombre?: string | null
+          custodio_personal_id?: string | null
           descripcion: string
+          encontrado_por_contacto?: string | null
+          encontrado_por_nombre?: string | null
+          encontrado_por_personal_id?: string | null
+          encontrado_por_tipo?: string | null
+          entrega_documento?: string | null
+          entregado_en?: string | null
+          entregado_por?: string | null
+          entregado_por_nombre?: string | null
           estado?: string
           fecha_encontrado?: string
           fecha_reclamo?: string | null
+          firma_entrega_path?: string | null
           foto_url?: string | null
+          fotos?: string[]
           id?: string
           lugar_encontrado?: string | null
           notas?: string | null
@@ -13250,13 +13477,28 @@ export type Database = {
           registrado_por?: string | null
         }
         Update: {
+          almacenamiento_detalle?: string | null
+          area_almacenamiento_id?: string | null
+          area_encontrado_id?: string | null
           company_id?: string
           created_at?: string
+          custodio_nombre?: string | null
+          custodio_personal_id?: string | null
           descripcion?: string
+          encontrado_por_contacto?: string | null
+          encontrado_por_nombre?: string | null
+          encontrado_por_personal_id?: string | null
+          encontrado_por_tipo?: string | null
+          entrega_documento?: string | null
+          entregado_en?: string | null
+          entregado_por?: string | null
+          entregado_por_nombre?: string | null
           estado?: string
           fecha_encontrado?: string
           fecha_reclamo?: string | null
+          firma_entrega_path?: string | null
           foto_url?: string | null
+          fotos?: string[]
           id?: string
           lugar_encontrado?: string | null
           notas?: string | null
@@ -13265,6 +13507,34 @@ export type Database = {
           registrado_por?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "objetos_area_almacenamiento_tenant_fk"
+            columns: ["area_almacenamiento_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "objetos_area_encontrado_tenant_fk"
+            columns: ["area_encontrado_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "objetos_custodio_personal_fk"
+            columns: ["custodio_personal_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "objetos_encontrado_por_personal_fk"
+            columns: ["encontrado_por_personal_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
           {
             foreignKeyName: "objetos_perdidos_company_id_fkey"
             columns: ["company_id"]
@@ -16126,6 +16396,9 @@ export type Database = {
           costo_reposicion_unitario: number | null
           monto_reposicion: number | null
           cuota_reposicion_id: string | null
+          costo_renta_unitario: number | null
+          monto_renta: number | null
+          cuota_renta_id: string | null
           observaciones_devolucion: string | null
         }
         Insert: {
@@ -16154,6 +16427,9 @@ export type Database = {
           costo_reposicion_unitario?: number | null
           monto_reposicion?: number | null
           cuota_reposicion_id?: string | null
+          costo_renta_unitario?: number | null
+          monto_renta?: number | null
+          cuota_renta_id?: string | null
           observaciones_devolucion?: string | null
         }
         Update: {
@@ -16182,9 +16458,19 @@ export type Database = {
           costo_reposicion_unitario?: number | null
           monto_reposicion?: number | null
           cuota_reposicion_id?: string | null
+          costo_renta_unitario?: number | null
+          monto_renta?: number | null
+          cuota_renta_id?: string | null
           observaciones_devolucion?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "prestamos_equipo_cuota_renta_id_fkey"
+            columns: ["cuota_renta_id"]
+            isOneToOne: false
+            referencedRelation: "cuotas_condominio"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "prestamos_equipo_inventario_id_fkey"
             columns: ["inventario_id"]
@@ -21274,6 +21560,7 @@ export type Database = {
           costo_unitario: number | null
           creado_por: string | null
           created_at: string
+          foto_url: string | null
           id: string
           nombre: string
           notas: string | null
@@ -21294,6 +21581,7 @@ export type Database = {
           costo_unitario?: number | null
           creado_por?: string | null
           created_at?: string
+          foto_url?: string | null
           id?: string
           nombre: string
           notas?: string | null
@@ -21314,6 +21602,7 @@ export type Database = {
           costo_unitario?: number | null
           creado_por?: string | null
           created_at?: string
+          foto_url?: string | null
           id?: string
           nombre?: string
           notas?: string | null
@@ -26459,8 +26748,12 @@ export type Database = {
         Returns: Json
       }
       reserva_equipos_solicitar: {
-        Args: { p_equipos: Json; p_reserva_id: string }
+        Args: { p_equipos: Json; p_reserva_id: string; p_generar_cargo?: boolean }
         Returns: Json
+      }
+      reserva_equipos_renta: {
+        Args: { p_amenidad_id: string; p_equipos: Json }
+        Returns: number
       }
       reserva_equipos_registrar_solicitud: {
         Args: { p_equipos: Json; p_reserva_id: string }
@@ -26965,6 +27258,102 @@ export type Database = {
       rrhh_cargo_valido: {
         Args: { p_codigo: string; p_project: string; p_solo_activos?: boolean }
         Returns: boolean
+      }
+      rrhh_llamada_acusar: {
+        Args: { p_firma_path: string; p_id: string; p_nombre: string }
+        Returns: {
+          acuse_en: string | null
+          acuse_modo: string | null
+          acuse_nombre: string | null
+          acuse_por: string | null
+          anulada_en: string | null
+          anulada_por: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          descripcion: string
+          dias_suspension: number | null
+          emitido_en: string
+          emitido_por: string | null
+          emitido_por_nombre: string
+          empleado_cargo: string | null
+          empleado_nombre: string
+          estado: string
+          fecha_hechos: string
+          firma_acuse_path: string | null
+          firma_emisor_path: string
+          fundamento: string | null
+          id: string
+          motivo: string
+          motivo_anulacion: string | null
+          notificado_en: string | null
+          personal_id: string | null
+          project_id: string
+          tipo: string
+          updated_at: string
+        }
+      }
+      rrhh_llamada_anular: {
+        Args: { p_id: string; p_motivo: string }
+        Returns: {
+          acuse_en: string | null
+          acuse_modo: string | null
+          acuse_nombre: string | null
+          acuse_por: string | null
+          anulada_en: string | null
+          anulada_por: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          descripcion: string
+          dias_suspension: number | null
+          emitido_en: string
+          emitido_por: string | null
+          emitido_por_nombre: string
+          empleado_cargo: string | null
+          empleado_nombre: string
+          estado: string
+          fecha_hechos: string
+          firma_acuse_path: string | null
+          firma_emisor_path: string
+          fundamento: string | null
+          id: string
+          motivo: string
+          motivo_anulacion: string | null
+          notificado_en: string | null
+          personal_id: string | null
+          project_id: string
+          tipo: string
+          updated_at: string
+        }
+      }
+      rrhh_llamada_es_mia: { Args: { p_llamada: string }; Returns: boolean }
+      rrhh_llamadas_mias: {
+        Args: never
+        Returns: {
+          acuse_en: string
+          acuse_modo: string
+          acuse_nombre: string
+          anulada_en: string
+          descripcion: string
+          dias_suspension: number
+          emitido_en: string
+          emitido_por_nombre: string
+          empleado_cargo: string
+          empleado_nombre: string
+          estado: string
+          fecha_hechos: string
+          firma_acuse_path: string
+          firma_emisor_path: string
+          fundamento: string
+          id: string
+          motivo: string
+          motivo_anulacion: string
+          personal_id: string
+          project_id: string
+          proyecto_nombre: string
+          tipo: string
+        }[]
       }
       rrhh_turno_en_uso: {
         Args: { p_codigo: string; p_project: string }

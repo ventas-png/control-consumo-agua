@@ -62,3 +62,11 @@ export const BUCKET_HOUSEKEEPING = 'housekeeping-evidencias'
  * registró, el propietario de la unidad y el staff con el permiso del tab.
  */
 export const BUCKET_PADRON_DOCS = 'padron-docs'
+
+/**
+ * Firmas de las llamadas de atención y sanciones al personal (la del emisor y
+ * la de recibido). Bucket PRIVADO (20261115000000). Ruta
+ * `<project_id>/<llamada_id>/<archivo>`: lee el empleado dueño de la carta y
+ * quien ve el tab; sube quien emite o registra el acuse; nadie sustituye.
+ */
+export const BUCKET_RRHH_LLAMADAS = 'rrhh-llamadas-atencion'
