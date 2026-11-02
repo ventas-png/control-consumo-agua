@@ -49,12 +49,54 @@ agregar overrides sin documentarlos aquí.
 | --- | --- | --- | --- |
 | `exceljs → uuid ^11.1.1` | uuid <11.1.1: falta el bounds-check del `buf` en v3/v5/v6 (advisory de npm audit). exceljs@4.4.0 declara `uuid ^8.3.2` y no hay release del padre con uuid parcheado; el «fix» que propone `npm audit` DEGRADA exceljs a 3.4.0, que no es aceptable. | exceljs consume únicamente `v4()` por `require` CJS (`lib/xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js`); uuid 11 conserva el build CJS y el named export (13+ es ESM-only: NO subir el override a 13 sin verificar). La costura se ejecuta de verdad en `src/lib/__tests__/xlsx.test.ts` (round-trip con formato condicional dataBar → uuidv4 real). | exceljs publique una versión con `uuid >=11.1.1`. |
 
-Estado al 2026-08-28 (Node 22, tras actualizar dompurify a 3.4.14 —
-GHSA-55q2-fjhq-7xh7— y refrescar brace-expansion/fast-uri/nanoid en rango):
-`npm audit` y `npm audit --omit=dev` reportan **0 vulnerabilidades**, sin
-advisories residuales. Regresión del sanitizador en
-`src/lib/__tests__/validation.test.ts` (piso de versión + vectores mXSS +
-forma IN_PLACE del advisory).
+### Estado de `npm audit` al 2026-11-02
+
+Medición sobre `main` (Node 22, `npm ci` limpio). El estado anterior, del
+2026-08-28, daba **0 vulnerabilidades**. Desde entonces se publicaron
+advisories nuevos contra versiones que ya estaban en el lockfile, y la
+medición dio **38 (3 low, 30 moderate, 5 high)** con `npm audit` y **11 (9
+moderate, 2 high)** con `--omit=dev`.
+
+`npm audit fix` **sin** `--force` refrescó solo el lockfile, dentro de los
+rangos declarados (`package.json` no cambia):
+
+| Paquete | Antes → después | Advisories que cierra |
+| --- | --- | --- |
+| `@xmldom/xmldom` (plist de @capacitor/cli) | 0.9.10 → 0.9.12 | 13 GHSA (inyección con `requireWellFormed`, ReDoS, tiempo/memoria cuadráticos), p. ej. GHSA-6mj3-qw4j-hgrw y GHSA-93r5-fhx6-vmg9 |
+| `brace-expansion` (eslint, glob, workbox, archiver) | 1.1.18 → 1.1.21; 2.1.4 → 2.1.7; 5.0.9 → 5.0.12 | GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p (DoS) |
+| `browserslist` | 4.28.6 → 4.29.5 | GHSA-c83g-rgw3-j3cx, GHSA-73wf-gq98-2v4g |
+| `fast-uri` (ajv de workbox-build) | 3.1.6 → 3.1.9 | 7 GHSA, p. ej. GHSA-qw65-cvwx-89v3 y GHSA-58mr-gqgx-xq4g |
+| `baseline-browser-mapping` | 2.10.43 → 2.11.35 | GHSA-w5vr-8v7q-w6rv |
+| `serialize-javascript` (terser de workbox-build) | 7.0.7 → 7.1.4 | GHSA-m5mm-p8h7-m29v |
+| `fflate` (anidado en posthog-js) | 0.4.8 → 0.4.9 | GHSA-px8p-9vwx-vf98 |
+
+Además subieron, por arrastre: eslint 10.13.0 → 10.14.0,
+`@eslint-community/eslint-utils` 4.9.1 → 4.10.1, minimatch de workbox-build
+10.2.5 → 10.2.6, caniuse-lite, electron-to-chromium, node-releases y
+update-browserslist-db. Verificación: `npm ci`, `npm run type-check`,
+`npm run lint`, `npx vitest run` y `npm run build`, todos en verde.
+
+**Resultado: `npm audit` da 31 (2 low, 28 moderate, 1 high) y
+`npm audit --omit=dev` da 9 (8 moderate, 1 high).** Los 31 avisos salen de
+cuatro advisories raíz. Los demás nombres del reporte (eslint,
+typescript-eslint, exceljs, archiver, vite-plugin-pwa, @sentry/vite-plugin,
+@storybook/react-vite, @capacitor/cli, etc.) aparecen solo porque dependen de
+esos cuatro. Ninguno tiene arreglo en rango y ninguno amerita un override:
+
+| Advisory raíz | Versión instalada / parcheada | ¿Llega al bundle? | Por qué queda | Revisar cuando |
+| --- | --- | --- | --- | --- |
+| **zod** — GHSA-mrhx-c7xc-m3w5 (high; agotamiento de memoria al validar un arreglo enorme, porque los límites `.max()`/`.length()` se aplicaban después de recorrer cada elemento) | 3.25.76 (última 3.x) / 4.6.6. El fix solo toca el código v4; no hay backport a 3.x. | **Sí**: zod es dependencia de producción (`src/domain/*/schemas.ts`, `src/lib/validatedInsert.ts`). | Solo se explota si un atacante manda el arreglo. Aquí zod corre únicamente en el navegador, sobre el payload que el propio usuario armó en su formulario, antes de enviarlo a Supabase. Ninguna Edge Function ni RPC usa zod: `supabase/functions/*/validate.ts` es lógica pura sin dependencias, y la validación de servidor vive en SQL. El peor caso es que el usuario cuelgue su propia pestaña. La salida es el salto a zod 4, que `.github/dependabot.yml` ya tiene en `ignore` hasta migrar los schemas a la API v4. `npm audit fix --force` instalaría zod 4.6.7 sin migrar nada. | Se migren los schemas a zod ≥ 4.6.6 (PR propio). |
+| **minimatch** — GHSA-g3hv-75wg-m249 (moderate; DoS por amplificación de globparts) | 3.1.5, 5.1.9, 10.2.5 y 10.2.6 / solo 11.0.1 (publicada el 2026-10-27), sin backport | **No**. Vite resuelve exceljs a su build de navegador (`dist/exceljs.min.js`), que no incluye archiver. Verificado: `dist/` no contiene minimatch, glob, readdir-glob ni archiver-utils. | Exige que un atacante controle el **patrón** glob. Aquí los patrones son configuración del repo (`eslint.config.js`, `globPatterns` de workbox en `vite.config.ts`) y archiver no recibe patrones (exceljs solo hace `Archiver('zip')` en `lib/stream/xlsx/workbook-writer.js`). `npm audit --omit=dev` cuenta 8 avisos por la rama exceljs → archiver → glob/readdir-glob, pero esa rama solo corre en Node (tests). Ningún padre declara todavía `^11`. Un override a 11 metería un major recién publicado debajo de ramas que hoy usan 3.x, 5.x y 10.x (eslint, typescript-eslint, workbox, archiver), sin evidencia de compatibilidad de ninguno de los padres. Las propuestas de `--force` son degradaciones: eslint 4.0.0, typescript-eslint 8.14.0, exceljs 4.1.1, vite-plugin-pwa 1.1.0. | eslint, typescript-eslint, glob y workbox-build declaren minimatch ≥ 11.0.1. Entonces basta `npm audit fix` en rango. |
+| **glob** — GHSA-3g3m-2fjr-6pw4 (moderate; un recorrido sigue después de cancelarse con `AbortSignal`) | 13.0.6 (rimraf de @capacitor/cli, @sentry/bundler-plugins, docgen de Storybook) y 11.1.0 (workbox-build) / 14.0.2 | **No** (solo build, tooling y CLI) | Solo importa si el llamador usa un `AbortSignal` como presupuesto del recorrido, y ningún consumidor pasa `signal`. Revisados: `@sentry/bundler-plugins/build/*/core/glob.js`, `globSync` en `@joshwooding/vite-plugin-react-docgen-typescript`, `workbox-build/build/lib/get-file-details.js` y el `index.js` de rimraf. La propuesta de `--force` degrada @sentry/vite-plugin a 5.3.0, @storybook/react-vite a 8.5.3 y @capacitor/cli a 4.8.2. | Los padres adopten glob ≥ 14.0.2. |
+| **deepmerge** — GHSA-gcqx-w48m-w2h4 (low; prototype poisoning en `mergeObject`) | 4.3.1 / **ninguna**: 4.3.1 es la última y no hay versión parcheada | **No**: lo usa `@rollup/plugin-node-resolve`, que workbox-build ejecuta al generar el service worker | Su único uso es `deepMerge({}, defaults)` sobre las constantes del propio plugin (`dist/cjs/index.js`), sin entrada externa. El «fix» de `--force` **degrada** vite-plugin-pwa a 1.1.0, el mismo patrón que exceljs → 3.4.0. No es aceptable. | deepmerge publique un parche, o plugin-node-resolve o workbox dejen de usarlo. |
+
+`npm audit fix --force` sigue sin ser opción: todas sus propuestas son
+degradaciones de major o, en el caso de zod, un salto de major sin migrar el
+código.
+
+La regresión de dompurify (GHSA-55q2-fjhq-7xh7, actualizado a 3.4.14 el
+2026-08-28) sigue cubierta en `src/lib/__tests__/validation.test.ts`, con el
+piso de versión, los vectores mXSS y la forma IN_PLACE del advisory.
 
 ## Configuración del repositorio (checklist del owner)
 
