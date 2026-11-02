@@ -1,22 +1,26 @@
 // Detalle de una minuta en ventana: participantes, puntos con sus acuerdos y
-// compromisos (que se marcan cumplidos desde aquí), fotos y documentos, avance
-// y acciones (editar, fijar, cerrar/reabrir, imprimir, eliminar).
-import { useEffect, useState, type CSSProperties } from 'react'
+// compromisos (que se marcan cumplidos desde aquí), fotos y documentos, las
+// firmas (firma aquí quien no firmó al guardarla), avance y acciones (editar,
+// fijar, cerrar/reabrir, imprimir, eliminar).
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { EditModal } from '../../../shared/EditModal'
 import { ImageGallery } from '../../../shared/ImageGallery'
 import { ListaAdjuntos } from '../../../shared/FileUploader'
 import { Button } from '../../../shared/Button'
 import { confirm, notify } from '../../../shared/Dialog'
 import { deleteCondominioRowAfectando, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
-import { removeMedia } from '../../../../domain/shared/storage'
+import { removeMedia, uploadCondominiosMedia } from '../../../../domain/shared/storage'
 import { BUCKET_MEDIA } from '../../../../domain/shared/buckets'
 import {
-  TIPO_ACUERDO_INFO, documentosDe, fechaDeMinuta, fotosDe, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, plazoSeguimiento, puntosDe, resumenCompromisos, situacionCompromiso,
+  TIPO_ACUERDO_INFO, documentosDe, estadoFirma, fechaDeMinuta, firmasDe, fotosDe, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, plazoSeguimiento, puntosDe,
+  registrarFirmaMinuta, resumenCompromisos, resumenFirmas, rutasDelProyecto, situacionCompromiso, versionAcuerdos,
 } from '../../../../domain/condominios/minutas'
+import { buildUploadPath } from '../../../../lib/fileValidation'
 import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../../lib/format'
-import type { AcuerdoMinuta, NotaAdmin } from '../../../../types'
+import type { AcuerdoMinuta, NotaAdmin, ParticipanteMinuta } from '../../../../types'
 import { tint } from '../../../shared/statusTone'
-import { BarraAvance, ParticipanteCard, categoriaInfo, prioridadInfo } from './comun'
+import { BarraAvance, FilaFirma, ParticipanteCard, categoriaInfo, prioridadInfo } from './comun'
+import { FirmarMinutaModal } from './FirmarMinutaModal'
 import { imprimirMinuta } from './imprimirMinuta'
 import './minutas.css'
 
@@ -38,6 +42,7 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
   const gestor = gestorDe(participantes)
   const fotos = fotosDe(nota)
   const documentos = documentosDe(nota)
+  const firmas = firmasDe(nota)
   // Copia local de los puntos: marcar un compromiso se ve al instante y la
   // sección recarga detrás; cuando llega la fila fresca, se vuelve a tomar.
   const [puntos, setPuntos] = useState(() => puntosDe(nota))
@@ -48,6 +53,23 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
   const prio = prioridadInfo(nota.prioridad)
   const resumen = resumenCompromisos(puntos)
   const diasSeguimiento = diasHastaFechaCalendario(nota.fecha_recordatorio)
+  // Marcar un compromiso cumplido no cambia la huella: sólo cuenta lo acordado.
+  const version = versionAcuerdos(puntos, participantes)
+  const resumenF = resumenFirmas(participantes, firmas, version)
+  const [firmando, setFirmando] = useState<ParticipanteMinuta | null>(null)
+  const [guardandoFirma, setGuardandoFirma] = useState(false)
+  // Ref y no estado: dos toques seguidos en «Firmar y aceptar» llegan con el mismo render.
+  const firmandoRef = useRef(false)
+  const tituloFirmasRef = useRef<HTMLHeadingElement>(null)
+  // Tras firmar, el botón «Firmar» de esa fila desaparece con la recarga: el
+  // foco va al título de la sección y no cae a <body>. En un efecto, para que
+  // corra después de que la ventana de firma devuelva el foco a su disparador.
+  const enfocarFirmasRef = useRef(false)
+  useEffect(() => {
+    if (firmando || !enfocarFirmasRef.current) return
+    enfocarFirmasRef.current = false
+    tituloFirmasRef.current?.focus()
+  }, [firmando])
   const nombreDe = (id: string | null | undefined) => participantes.find(p => p.id === id)?.nombre ?? null
 
   async function cambiar(campos: Record<string, unknown>, clave: string, exito?: string) {
@@ -70,9 +92,13 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
 
   async function cerrarMinuta() {
     const pendientes = resumen.total - resumen.cumplidos
+    const faltan = [
+      pendientes > 0 && `${pendientes} compromiso${pendientes === 1 ? '' : 's'} sin cumplir`,
+      resumenF.pendientes > 0 && `${resumenF.pendientes} firma${resumenF.pendientes === 1 ? '' : 's'} pendiente${resumenF.pendientes === 1 ? '' : 's'}`,
+    ].filter(Boolean)
     const res = await confirm({
       title: 'Cerrar minuta',
-      text: pendientes > 0 ? `Quedan ${pendientes} compromiso${pendientes === 1 ? '' : 's'} sin cumplir. ¿Cerrar de todos modos?` : '¿Dar la minuta por cerrada?',
+      text: faltan.length > 0 ? `Quedan ${faltan.join(' y ')}. ¿Cerrar de todos modos?` : '¿Dar la minuta por cerrada?',
       icon: 'question', confirmText: 'Cerrar minuta',
     })
     if (!res.isConfirmed) return
@@ -87,10 +113,35 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
     const { error } = await deleteCondominioRowAfectando('notas_admin', nota.id)
     if (error) { notify({ variant: 'error', title: 'No se pudo eliminar', text: error.message }); return }
     // Ninguna otra fila apunta a estas rutas; si el borrado falla, sólo quedan huérfanas.
-    const archivos = [...fotos, ...documentos]
+    const archivos = rutasDelProyecto([...fotos, ...documentos, ...firmas.map(f => f.path)], nota.project_id)
     if (archivos.length > 0) void removeMedia(BUCKET_MEDIA, archivos)
     onClose()
     onRefresh()
+  }
+
+  /** Firma de quien no firmó al guardar (o firmó una versión anterior). Se guarda en el acto. */
+  async function firmar(archivo: File) {
+    const p = firmando
+    if (!p || firmandoRef.current) return
+    firmandoRef.current = true
+    setGuardandoFirma(true)
+    try {
+      const path = buildUploadPath(`${nota.project_id}/minutas-firmas`, 'firma.png', 'png')
+      const { error: upErr } = await uploadCondominiosMedia(path, archivo, { contentType: 'image/png', upsert: false })
+      if (upErr) { notify({ variant: 'error', title: 'No se pudo guardar la firma', text: upErr }); return }
+      const { error, reemplazada } = await registrarFirmaMinuta(nota.id, { participante_id: p.id, nombre: p.nombre.trim(), path, firmado_at: new Date().toISOString(), version })
+      // Sin fila que la cite, la imagen recién subida sobra; la que reemplazó, también.
+      if (error) { void removeMedia(BUCKET_MEDIA, [path]); notify({ variant: 'error', title: 'No se pudo guardar la firma', text: error }); return }
+      const vieja = reemplazada ? rutasDelProyecto([reemplazada], nota.project_id) : []
+      if (vieja.length > 0) void removeMedia(BUCKET_MEDIA, vieja)
+      notify({ variant: 'success', title: `Firma de ${p.nombre} registrada` })
+      enfocarFirmasRef.current = true
+      setFirmando(null)
+      onRefresh()
+    } finally {
+      firmandoRef.current = false
+      setGuardandoFirma(false)
+    }
   }
 
   const editable = canEdit && !nota.resuelta
@@ -109,7 +160,7 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
       footer={
         <div className="minuta-acciones minuta-acciones--detalle">
           {canDelete && <Button className="minuta-eliminar" variant="outline-danger" size="sm" onClick={() => void eliminar()}>🗑 Eliminar</Button>}
-          <Button variant="secondary" size="sm" onClick={() => imprimirMinuta(nota)}>🖨 Imprimir</Button>
+          <Button variant="secondary" size="sm" onClick={() => void imprimirMinuta(nota)}>🖨 Imprimir</Button>
           {canEdit && !nota.resuelta && (
             <Button variant="secondary" size="sm" onClick={() => void cambiar({ fijada: !nota.fijada }, 'fijar')} loading={ocupado === 'fijar'}>
               {nota.fijada ? '📌 Desfijar' : '📌 Fijar'}
@@ -233,7 +284,34 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
             ))}
           </ol>
         </div>
+
+        {participantes.length > 0 && (
+          <div style={bloque} className="minuta-firmas">
+            <h3 ref={tituloFirmasRef} tabIndex={-1} style={{ ...tituloBloque, outline: 'none' }}>Firmas ({resumenF.vigentes} de {resumenF.total})</h3>
+            <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--at-ink-3)' }}>
+              Con su firma, cada participante acepta los acuerdos y compromisos de esta minuta.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
+              {participantes.map(p => {
+                const firma = firmas.find(f => f.participante_id === p.id)
+                const puedeFirmar = editable && (!firma || estadoFirma(firma, version) === 'anterior')
+                return (
+                  <FilaFirma key={p.id} p={p} firma={firma} version={version} acciones={puedeFirmar ? (
+                    <Button size="sm" className="minuta-touch" variant="primary" onClick={() => setFirmando(p)} aria-label={`${firma ? 'Firmar de nuevo' : 'Firmar'}: ${p.nombre}`}>
+                      {firma ? '✍ Firmar de nuevo' : '✍ Firmar'}
+                    </Button>
+                  ) : undefined} />
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
+
+      {firmando && (
+        <FirmarMinutaModal participante={firmando} tituloMinuta={nota.titulo} puntos={puntos} participantes={participantes}
+          guardando={guardandoFirma} onFirmar={archivo => void firmar(archivo)} onClose={() => setFirmando(null)} />
+      )}
     </EditModal>
   )
 }

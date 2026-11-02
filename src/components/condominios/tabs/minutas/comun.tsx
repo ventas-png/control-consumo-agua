@@ -1,9 +1,12 @@
 // Piezas compartidas por la lista, el detalle y el asistente de minutas:
-// catálogos de categoría/prioridad, estilos de formulario y el avatar con
-// iniciales que identifica a cada participante por su tipo.
+// catálogos de categoría/prioridad, estilos de formulario, el avatar con
+// iniciales que identifica a cada participante por su tipo, el resumen de lo
+// acordado y la fila de firma de cada participante.
 import type { CSSProperties, ReactNode } from 'react'
-import type { CategoriaNota, ParticipanteMinuta, PrioridadNota, TipoParticipanteMinuta } from '../../../../types'
-import { TIPO_PARTICIPANTE_INFO, iniciales } from '../../../../domain/condominios/minutas'
+import type { CategoriaNota, FirmaMinuta, ParticipanteMinuta, PrioridadNota, PuntoMinuta, TipoParticipanteMinuta } from '../../../../types'
+import { TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO, estadoFirma, iniciales } from '../../../../domain/condominios/minutas'
+import { formatDateTime, formatFechaCalendario } from '../../../../lib/format'
+import { SecureImage } from '../../../shared/SecureImage'
 
 export const CATEGORIAS: { value: CategoriaNota; label: string; icon: string; color: string }[] = [
   { value: 'reunion',      label: 'Reunión',      icon: '👥', color: 'var(--at-success)' },
@@ -113,6 +116,73 @@ export function BarraAvance({ cumplidos, total, alto = 6 }: { cumplidos: number;
     <div role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={cumplidos} aria-label={`${cumplidos} de ${total} compromisos cumplidos`}
       style={{ height: alto, borderRadius: 999, background: 'var(--at-chip)', overflow: 'hidden' }}>
       <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? 'var(--at-success)' : 'var(--at-primary-mint-2)', transition: 'width .18s ease' }} />
+    </div>
+  )
+}
+
+/**
+ * Lo que se firma: cada punto con sus acuerdos y compromisos (responsable y
+ * fecha límite). Sólo lectura; lo ve quien firma antes de firmar.
+ */
+export function ResumenAcuerdos({ puntos, participantes }: { puntos: readonly PuntoMinuta[]; participantes: readonly ParticipanteMinuta[] }) {
+  const nombre = (id: string | null | undefined) => participantes.find(p => p.id === id)?.nombre ?? null
+  const conTitulo = puntos.filter(p => p.titulo.trim())
+  if (conTitulo.length === 0) return <p style={{ margin: 0, fontSize: 13, color: 'var(--at-ink-3)', fontStyle: 'italic' }}>Sin puntos registrados.</p>
+  return (
+    <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 10 }}>
+      {conTitulo.map((p, i) => {
+        const acuerdos = p.acuerdos.filter(a => a.texto.trim())
+        return (
+          <li key={p.id} style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>{i + 1}. {p.titulo}</div>
+            {acuerdos.length === 0
+              ? <div style={{ fontSize: 12.5, color: 'var(--at-ink-3)', fontStyle: 'italic', marginTop: 2 }}>Sin acuerdos ni compromisos.</div>
+              : <ul style={{ margin: '4px 0 0', paddingLeft: 18, display: 'grid', gap: 3 }}>
+                  {acuerdos.map(a => {
+                    const resp = a.tipo === 'compromiso' ? nombre(a.responsable_id) : null
+                    return (
+                      <li key={a.id} style={{ fontSize: 13, color: 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>
+                        <strong>{TIPO_ACUERDO_INFO[a.tipo].label}:</strong> {a.texto.trim()}
+                        {a.tipo === 'compromiso' && (resp || a.fecha_limite) && (
+                          <span style={{ color: 'var(--at-ink-3)' }}>
+                            {' '}({[resp && `responsable: ${resp}`, a.fecha_limite && `para el ${formatFechaCalendario(a.fecha_limite)}`].filter(Boolean).join(', ')})
+                          </span>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+/**
+ * Un participante y su firma: la imagen, cuándo firmó y si firmó lo que la
+ * minuta dice hoy o una versión anterior de los acuerdos.
+ */
+export function FilaFirma({ p, firma, version, acciones }: { p: ParticipanteMinuta; firma: FirmaMinuta | undefined; version: string; acciones?: ReactNode }) {
+  const anterior = firma ? estadoFirma(firma, version) === 'anterior' : false
+  const borde = !firma ? 'var(--at-line)' : anterior ? 'var(--at-warning-border)' : 'var(--at-success-border)'
+  return (
+    <div className="minuta-firma" style={{ border: `1px solid ${borde}` }}>
+      <Avatar nombre={p.nombre} tipo={p.tipo} size={34} />
+      <div className="minuta-firma-cuerpo">
+        <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>{p.nombre}</div>
+        {p.detalle && <div style={{ fontSize: 12, color: 'var(--at-ink-3)', overflowWrap: 'anywhere' }}>{p.detalle}</div>}
+        <div role="status" style={{ fontSize: 12, fontWeight: 600, marginTop: 3, color: !firma ? 'var(--at-ink-3)' : anterior ? 'var(--at-warning-strong)' : 'var(--at-success-strong)' }}>
+          {!firma ? 'Pendiente de firma'
+            : anterior ? `⚠ Firmó una versión anterior de los acuerdos${firma.firmado_at ? ` (${formatDateTime(firma.firmado_at)})` : ''}`
+            : `✍ Firmó${firma.firmado_at ? ` · ${formatDateTime(firma.firmado_at)}` : ''}`}
+        </div>
+      </div>
+      {firma && (
+        <SecureImage src={firma.path} alt={`Firma de ${p.nombre}`} className="minuta-firma-img"
+          style={{ height: 48, width: 'auto', maxWidth: 120, objectFit: 'contain', background: '#fff', border: '1px solid var(--at-line)', borderRadius: 6, opacity: anterior ? 0.6 : 1 }} />
+      )}
+      {acciones && <div className="minuta-firma-acc">{acciones}</div>}
     </div>
   )
 }

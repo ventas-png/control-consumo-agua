@@ -30,6 +30,9 @@ fila con la fecha de la reunión y dos columnas JSON.
   3. **Acuerdos** — por cada punto, *acuerdos* (lo decidido) y *compromisos*
      (responsable entre los participantes y fecha límite). Cierre: categoría,
      prioridad, próximo seguimiento y fijar.
+  4. **Firmas** — cada participante firma que acepta los acuerdos y
+     compromisos: ve lo que firma, marca la declaración de aceptación y firma
+     en el recuadro. Es opcional: quien no esté firma después desde el detalle.
 
   En el paso 3 también se adjuntan **fotos** (hasta 10: hoja de asistencia,
   pizarrón, lo revisado en sitio) y **documentos** (hasta 10: PDF, Word o
@@ -102,3 +105,48 @@ fila con la fecha de la reunión y dos columnas JSON.
   teclado; Escape cierra sólo la foto) y los documentos como enlaces firmados;
   la tarjeta de la lista cuenta unas (📷) y otros (📎); la versión impresa dice
   cuántas fotos hay y nombra los documentos.
+
+## Firmas (20261120000000)
+
+- `notas_admin.firmas jsonb NOT NULL DEFAULT '[]'` (CHECK de lista), una
+  entrada por participante que firmó:
+
+  ```jsonc
+  { "participante_id": "<participantes[].id>", "nombre": "Carlos Guardia",
+    "path": "<project_id>/minutas-firmas/<archivo>.png",
+    "firmado_at": "2026-11-02T15:04:05.000Z", "version": "<huella>" }
+  ```
+
+  La firma es un PNG (el `SignaturePad` compartido) en el bucket privado
+  `condominios-media`; la fila guarda la ruta, no una URL firmada.
+- **Qué se firma.** `version` es `versionAcuerdos(puntos, participantes)`: una
+  huella de los puntos con sus acuerdos y compromisos (texto, responsable y
+  fecha límite). Marcar un compromiso cumplido no la cambia. Si alguien edita
+  lo acordado después, las firmas existentes se muestran como «firmó una versión
+  anterior de los acuerdos» —no se borran ni se dan por vigentes— y el detalle
+  vuelve a ofrecer firmar. El paso 3 avisa cuando la minuta ya tiene firmas.
+- **Dónde se firma.** En el paso 4 del asistente (la firma se guarda con la
+  minuta) o en el detalle, para quien falte: ahí se sube y se registra en el
+  acto (`registrarFirmaMinuta`, que relee las firmas de la fila para no pisar
+  la de otro dispositivo y exige que el UPDATE cambie la fila). Una minuta
+  cerrada no ofrece firmar.
+- **Editar no pisa firmas ajenas.** Si el asistente cambió las firmas, al
+  guardar relee las de la fila y aplica encima sólo lo que esta edición cambió,
+  participante por participante (`fusionarFirmas`): una firma registrada desde
+  el detalle mientras el asistente estaba abierto se conserva, y una imagen que
+  el detalle ya reemplazó no vuelve a citarse.
+- **Límite conocido.** Dos firmas registradas desde el detalle en dos
+  dispositivos dentro de la misma ida y vuelta de red pueden pisarse (lectura y
+  escritura no son atómicas). La pérdida se ve: esa persona vuelve a figurar
+  como pendiente.
+- **Archivos.** Las imágenes siguen el ciclo de vida de fotos y documentos: una
+  firma subida y no guardada se borra al cerrar el asistente; la de un
+  participante que se quitó, o la reemplazada al volver a firmar, se borra al
+  guardar; eliminar la minuta borra sus firmas; si el registro desde el detalle
+  falla, la imagen recién subida se borra. Sólo se borran rutas de la carpeta
+  del proyecto de la minuta (`rutasDelProyecto`), también para fotos y
+  documentos: una ruta manipulada en la fila no arrastra archivos ajenos.
+- El detalle muestra «Firmas (vigentes de total)» con la imagen y la hora de
+  cada una; la tarjeta de la lista cuenta «✍ n/m»; cerrar la minuta avisa de
+  las firmas pendientes; la impresión trae una sección de firmas con la imagen
+  de quien firmó (bajada del bucket e incrustada) y la línea de quien falta.

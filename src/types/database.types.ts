@@ -12926,6 +12926,7 @@ export type Database = {
           fecha_recordatorio: string | null
           fecha_reunion: string | null
           fijada: boolean
+          firmas: Json
           fotos: string[]
           id: string
           participantes: Json
@@ -12945,6 +12946,7 @@ export type Database = {
           fecha_recordatorio?: string | null
           fecha_reunion?: string | null
           fijada?: boolean
+          firmas?: Json
           fotos?: string[]
           id?: string
           participantes?: Json
@@ -12964,6 +12966,7 @@ export type Database = {
           fecha_recordatorio?: string | null
           fecha_reunion?: string | null
           fijada?: boolean
+          firmas?: Json
           fotos?: string[]
           id?: string
           participantes?: Json

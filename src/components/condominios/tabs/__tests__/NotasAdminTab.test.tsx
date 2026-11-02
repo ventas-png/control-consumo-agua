@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
   notify: vi.fn(),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   removeMedia: vi.fn(async (_bucket: string, _paths: string[]) => ({ error: null as string | null })),
+  uploadCondominiosMedia: vi.fn(async (path: string, _file: File, _o?: unknown) => ({ data: { path } as { path: string } | null, error: null as string | null })),
+  downloadMedia: vi.fn(async (_bucket: string, _path: string) => null as Blob | null),
+  registrarFirmaMinuta: vi.fn(async (_id: string, _firma: unknown) => ({ error: null as string | null, reemplazada: null as string | null })),
+  leerFirmasMinuta: vi.fn(async (_id: string) => null as unknown[] | null),
   borrarAlQuitar: [] as (boolean | undefined)[],
   /** Últimas props de cada uploader: para simular una subida que termina tarde. */
   uploader: {} as Record<'fotos' | 'documentos', { values: string[]; onChange: (v: string[]) => void }>,
@@ -33,7 +37,11 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
 }))
 vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: mocks.confirm }))
 vi.mock('../../../../domain/cxp/queries', () => ({ useProveedoresQuery: mocks.useProveedoresQuery }))
-vi.mock('../../../../domain/shared/storage', () => ({ removeMedia: mocks.removeMedia }))
+vi.mock('../../../../domain/shared/storage', () => ({
+  removeMedia: mocks.removeMedia,
+  uploadCondominiosMedia: mocks.uploadCondominiosMedia,
+  downloadMedia: mocks.downloadMedia,
+}))
 // Los uploaders reales suben al bucket; aquí sólo importa qué lista devuelven
 // y cuándo avisan que están subiendo.
 type PropsUploader = { values: string[]; onChange: (v: string[]) => void; borrarAlQuitar?: boolean; onSubiendo?: (v: boolean) => void }
@@ -73,9 +81,20 @@ vi.mock('../../../shared/ImageGallery', () => ({
 vi.mock('../../../../domain/condominios/minutas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../domain/condominios/minutas')>()),
   fetchResidentesProyecto: mocks.fetchResidentesProyecto,
+  registrarFirmaMinuta: mocks.registrarFirmaMinuta,
+  leerFirmasMinuta: mocks.leerFirmasMinuta,
 }))
+// El recuadro real dibuja en un <canvas>; aquí basta con que entregue un PNG,
+// y respete el bloqueo mientras no se acepte la declaración.
+vi.mock('../../../shared/SignaturePad', () => ({
+  SignaturePad: (p: { onSave: (f: File) => void; bloquearGuardar?: boolean; saving?: boolean }) => (
+    <button type="button" disabled={p.bloquearGuardar || p.saving} onClick={() => p.onSave(new File(['png'], 'firma.png', { type: 'image/png' }))}>Simular firma</button>
+  ),
+}))
+vi.mock('../../../shared/SecureImage', () => ({ SecureImage: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} data-src={src} /> }))
 
 const { default: NotasAdminTab } = await import('../NotasAdminTab')
+const { versionAcuerdos, participantesDe, puntosDe } = await import('../../../../domain/condominios/minutas')
 
 const personal = [
   { id: 'e1', nombre: 'Carlos Guardia', cargo: 'guardia', estado: 'activo' },
@@ -121,6 +140,18 @@ function props(over: Partial<Parameters<typeof NotasAdminTab>[0]> = {}): Paramet
 }
 
 const dialogo = () => screen.getByRole('dialog')
+/** window.open simulado: la impresión escribe un aviso, baja las firmas y luego escribe la minuta. */
+function ventanaDeImpresion() {
+  const write = vi.fn(); const print = vi.fn()
+  const ventana = { closed: false, document: { write, open: vi.fn(), close: vi.fn() }, print }
+  const open = vi.spyOn(window, 'open').mockReturnValue(ventana as unknown as Window)
+  return { ventana, write, print, open }
+}
+/** Una minuta nueva se guarda en el paso 4 (Firmas, que es opcional). */
+function guardarNueva(d: HTMLElement) {
+  fireEvent.click(within(d).getByRole('tab', { name: 'Paso 4 · Firmas' }))
+  fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -131,6 +162,9 @@ beforeEach(() => {
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
   mocks.updateCondominioRowAfectando.mockResolvedValue({ error: null })
   mocks.deleteCondominioRowAfectando.mockResolvedValue({ error: null })
+  mocks.registrarFirmaMinuta.mockResolvedValue({ error: null, reemplazada: null })
+  mocks.leerFirmasMinuta.mockResolvedValue(null)
+  mocks.downloadMedia.mockResolvedValue(null)
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
 })
 afterEach(() => { cleanup(); vi.useRealTimers() })
@@ -180,7 +214,7 @@ describe('Minutas — nueva en tres pasos', () => {
     render(<NotasAdminTab {...props({ onRefresh })} />)
     fireEvent.click(screen.getByRole('button', { name: '+ Nueva minuta' }))
     const d = dialogo()
-    expect(within(d).getByText(/Paso 1 de 3/)).toBeTruthy()
+    expect(within(d).getByText(/Paso 1 de 4/)).toBeTruthy()
 
     // Quien la crea ya está como gestor
     expect(within(d).getByText('Admin')).toBeTruthy()
@@ -189,7 +223,7 @@ describe('Minutas — nueva en tres pasos', () => {
     // Sin título no se avanza
     fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
     expect(mocks.notify).toHaveBeenLastCalledWith(expect.objectContaining({ variant: 'warning', text: expect.stringMatching(/título/) }))
-    expect(within(d).getByText(/Paso 1 de 3/)).toBeTruthy()
+    expect(within(d).getByText(/Paso 1 de 4/)).toBeTruthy()
 
     fireEvent.change(within(d).getByLabelText('Título de la minuta *'), { target: { value: 'Turno nocturno' } })
     expect((within(d).getByLabelText('Fecha de la reunión *') as HTMLInputElement).value).toBe('2026-10-26')
@@ -230,7 +264,7 @@ describe('Minutas — nueva en tres pasos', () => {
 
     // Paso 2: puntos
     fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
-    expect(within(d).getByText(/Paso 2 de 3/)).toBeTruthy()
+    expect(within(d).getByText(/Paso 2 de 4/)).toBeTruthy()
     fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
     expect(mocks.notify).toHaveBeenLastCalledWith(expect.objectContaining({ variant: 'warning', text: expect.stringMatching(/punto/) }))
     fireEvent.click(within(d).getByRole('button', { name: '+ Agregar punto' }))
@@ -243,7 +277,7 @@ describe('Minutas — nueva en tres pasos', () => {
 
     // Paso 3: acuerdos y compromisos por punto
     fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
-    expect(within(d).getByText(/Paso 3 de 3/)).toBeTruthy()
+    expect(within(d).getByText(/Paso 3 de 4/)).toBeTruthy()
     expect(within(d).getByText('Rondas nocturnas')).toBeTruthy()
     fireEvent.click(within(d).getByRole('button', { name: 'Agregar acuerdo al punto 1' }))
     fireEvent.change(within(d).getByLabelText('Acuerdo del punto 1'), { target: { value: 'Se mantiene el horario' } })
@@ -256,7 +290,7 @@ describe('Minutas — nueva en tres pasos', () => {
     fireEvent.change(within(d).getByLabelText('Próximo seguimiento'), { target: { value: '2026-11-03' } })
     fireEvent.change(within(d).getByLabelText('Prioridad'), { target: { value: 'alta' } })
 
-    fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+    guardarNueva(d)
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     const [tabla, payload] = mocks.createCondominioRow.mock.calls[0] as [string, Record<string, unknown>]
     expect(tabla).toBe('notas_admin')
@@ -292,7 +326,7 @@ describe('Minutas — nueva en tres pasos', () => {
     fireEvent.change(within(d).getByLabelText('Punto 1'), { target: { value: 'Tema' } })
     // Saltar al paso 3 desde el indicador
     fireEvent.click(within(d).getByRole('tab', { name: 'Paso 3 · Acuerdos' }))
-    fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+    guardarNueva(d)
     await waitFor(() => expect(mocks.notify).toHaveBeenLastCalledWith(expect.objectContaining({ variant: 'error', text: 'sin permiso' })))
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
@@ -367,14 +401,15 @@ describe('Minutas — detalle', () => {
     await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenLastCalledWith('notas_admin', 'n1', expect.objectContaining({ titulo: 'Reunión con el guardia', fecha_reunion: '2026-10-22' })))
   })
 
-  it('imprimir abre la versión imprimible con participantes y compromisos', () => {
-    const write = vi.fn(); const print = vi.fn()
-    const open = vi.spyOn(window, 'open').mockReturnValue({ document: { write, close: vi.fn() }, print } as unknown as Window)
+  it('imprimir abre la versión imprimible con participantes y compromisos', async () => {
+    const { ventana, write, print, open } = ventanaDeImpresion()
     render(<NotasAdminTab {...props()} />)
     fireEvent.click(screen.getByText('Reunión con el guardia'))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '🖨 Imprimir' }))
     expect(open).toHaveBeenCalled()
-    const html = write.mock.calls[0][0] as string
+    await waitFor(() => expect(print).toHaveBeenCalled())
+    void ventana
+    const html = write.mock.calls.at(-1)![0] as string
     expect(html).toContain('Reunión con el guardia')
     expect(html).toContain('Carlos Guardia')
     expect(html).toContain('Registrar cada ronda')
@@ -416,7 +451,7 @@ describe('Minutas — fotos y documentos', () => {
     fireEvent.click(within(d).getByRole('button', { name: 'Simular subida de documento' }))
     expect(within(d).getByTestId('fotos-borrador').textContent).toBe('p1/minutas/nueva.jpg')
     expect(within(d).getByTestId('documentos-borrador').textContent).toBe(DOC)
-    fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+    guardarNueva(d)
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     const [, payload] = mocks.createCondominioRow.mock.calls[0] as [string, Record<string, unknown>]
     expect(payload.fotos).toEqual(['p1/minutas/nueva.jpg'])
@@ -431,7 +466,7 @@ describe('Minutas — fotos y documentos', () => {
     fireEvent.click(within(d).getByRole('button', { name: 'Simular subida' }))
     fireEvent.click(within(d).getByRole('button', { name: 'Simular quitar primera' }))
     fireEvent.click(within(d).getByRole('button', { name: 'Simular subida de documento' }))
-    fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+    guardarNueva(d)
     await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/nueva.jpg']))
     const [, payload] = mocks.createCondominioRow.mock.calls[0] as [string, Record<string, unknown>]
     expect(payload.fotos).toEqual([])
@@ -467,11 +502,8 @@ describe('Minutas — fotos y documentos', () => {
     fireEvent.click(within(d).getByRole('button', { name: 'Simular inicio de subida' }))
     fireEvent.click(within(d).getByRole('button', { name: 'Simular inicio de subida' }))
     fireEvent.click(within(d).getByRole('button', { name: 'Simular fin de subida' }))
-    const guardar = within(d).getByRole('button', { name: 'Subiendo archivos…' }) as HTMLButtonElement
-    // aria-disabled y no `disabled`: un botón deshabilitado sale del orden de Tab y el foco se escapa.
-    expect(guardar.disabled).toBe(false)
-    expect(guardar.getAttribute('aria-disabled')).toBe('true')
-    fireEvent.click(guardar)
+    fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
+    fireEvent.click(within(d).getByRole('tab', { name: 'Paso 4 · Firmas' }))
     fireEvent.click(within(d).getByRole('button', { name: 'Cancelar' }))
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(within(d).getByRole('button', { name: 'Cerrar modal' }))
@@ -484,8 +516,20 @@ describe('Minutas — fotos y documentos', () => {
 
     fireEvent.click(within(d).getByRole('button', { name: 'Simular subida' }))
     fireEvent.click(within(d).getByRole('button', { name: 'Simular fin de subida' }))
-    fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+    guardarNueva(d)
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+  })
+
+  it('al editar, «Guardar cambios» avisa durante la subida sin salir del orden de Tab', () => {
+    const w = editarHastaPaso3({ ...abierta })
+    fireEvent.click(within(w).getByRole('button', { name: 'Simular inicio de subida' }))
+    const guardar = within(w).getByRole('button', { name: 'Subiendo archivos…' }) as HTMLButtonElement
+    // aria-disabled y no `disabled`: un botón deshabilitado sale del orden de Tab y el foco se escapa.
+    expect(guardar.disabled).toBe(false)
+    expect(guardar.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(guardar)
+    expect(mocks.updateCondominioRowAfectando).not.toHaveBeenCalled()
+    expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ title: 'Subiendo archivos' }))
   })
 
   describe('si el asistente se desmonta mientras guarda («Atrás» del sistema)', () => {
@@ -501,7 +545,7 @@ describe('Minutas — fotos y documentos', () => {
       const d = nuevaHastaPaso3()
       fireEvent.click(within(d).getByRole('button', { name: 'Simular subida' }))
       fireEvent.click(within(d).getByRole('button', { name: 'Simular subida de documento' }))
-      fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+      guardarNueva(d)
       await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
       unmount()
       expect(mocks.removeMedia).not.toHaveBeenCalled()
@@ -578,7 +622,7 @@ describe('Minutas — fotos y documentos', () => {
     expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', [DOC])
   })
 
-  it('el detalle muestra fotos y documentos, la tarjeta los cuenta y la impresión nombra los documentos', () => {
+  it('el detalle muestra fotos y documentos, la tarjeta los cuenta y la impresión nombra los documentos', async () => {
     const conArchivos = { ...abierta, fotos: ['p1/minutas/a.jpg', 'p1/minutas/b.jpg'], documentos: [DOC, 'p1/minutas/cotizacion.xlsx'] }
     render(<NotasAdminTab {...props({ notas: [conArchivos] })} />)
     const tarjeta = screen.getByText('Reunión con el guardia').closest('button')!
@@ -591,10 +635,10 @@ describe('Minutas — fotos y documentos', () => {
     expect(within(d).getByText('Documentos (2)')).toBeTruthy()
     expect(within(d).getByTestId('adjuntos').textContent).toBe(`${DOC}|p1/minutas/cotizacion.xlsx`)
 
-    const write = vi.fn()
-    const open = vi.spyOn(window, 'open').mockReturnValue({ document: { write, close: vi.fn() }, print: vi.fn() } as unknown as Window)
+    const { write, print, open } = ventanaDeImpresion()
     fireEvent.click(within(d).getByRole('button', { name: '🖨 Imprimir' }))
-    expect(write.mock.calls[0][0]).toContain('Documentos adjuntos:</strong> acta.pdf, cotizacion.xlsx')
+    await waitFor(() => expect(print).toHaveBeenCalled())
+    expect(write.mock.calls.at(-1)![0]).toContain('Documentos adjuntos:</strong> acta.pdf, cotizacion.xlsx')
     open.mockRestore()
   })
 
@@ -618,5 +662,239 @@ describe('Minutas — fotos y documentos', () => {
     await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/a.jpg', DOC]))
     expect(mocks.deleteCondominioRowAfectando).toHaveBeenLastCalledWith('notas_admin', 'n1')
     unmount()
+  })
+})
+
+describe('Minutas — firmas', () => {
+  const FIRMA = /^p1\/minutas-firmas\//
+  /** La firma vigente de `quien` sobre la versión actual de `n`. */
+  const firmaDe = (n: NotaAdmin, quien: string, path = `p1/minutas-firmas/${quien}.png`) => ({
+    participante_id: quien, nombre: participantesDe(n).find(p => p.id === quien)!.nombre, path,
+    firmado_at: '2026-10-22T18:00:00.000Z', version: versionAcuerdos(puntosDe(n), participantesDe(n)),
+  })
+  function nuevaHastaFirmas() {
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva minuta' }))
+    const d = dialogo()
+    fireEvent.change(within(d).getByLabelText('Título de la minuta *'), { target: { value: 'Entrega de unidad' } })
+    fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
+    fireEvent.click(within(d).getByRole('button', { name: '+ Agregar punto' }))
+    fireEvent.change(within(d).getByLabelText('Punto 1'), { target: { value: 'Entrega de accesos' } })
+    fireEvent.click(within(d).getByRole('tab', { name: 'Paso 3 · Acuerdos' }))
+    fireEvent.click(within(d).getByRole('button', { name: 'Agregar acuerdo al punto 1' }))
+    fireEvent.change(within(d).getByLabelText('Acuerdo del punto 1'), { target: { value: 'Todo funciona' } })
+    fireEvent.click(within(d).getByRole('tab', { name: 'Paso 4 · Firmas' }))
+    return d
+  }
+  async function firmarComo(nombre: string) {
+    fireEvent.click(screen.getByRole('button', { name: `Firmar: ${nombre}` }))
+    const m = screen.getByRole('dialog', { name: `✍ Firma de ${nombre}` })
+    // Sin aceptar la declaración no se puede firmar.
+    expect((within(m).getByRole('button', { name: 'Simular firma' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(within(m).getByLabelText(new RegExp(`acepto los acuerdos y compromisos`, 'i')))
+    fireEvent.click(within(m).getByRole('button', { name: 'Simular firma' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: `✍ Firma de ${nombre}` })).toBeNull())
+  }
+
+  it('el paso 4 muestra lo que se firma; quien firma acepta la declaración y la firma se guarda con la versión de los acuerdos', async () => {
+    render(<NotasAdminTab {...props()} />)
+    const d = nuevaHastaFirmas()
+    expect(within(d).getByText(/Paso 4 de 4/)).toBeTruthy()
+    expect(within(d).getByText('Lo que se firma')).toBeTruthy()
+    expect(within(d).getByText('Todo funciona')).toBeTruthy()
+    expect(within(d).getByText('Firmas (0 de 1)')).toBeTruthy()
+    expect(within(d).getByText('Pendiente de firma')).toBeTruthy()
+
+    await firmarComo('Admin')
+    const path = mocks.uploadCondominiosMedia.mock.calls[0][0]
+    expect(path).toMatch(FIRMA)
+    expect(within(d).getByText('Firmas (1 de 1)')).toBeTruthy()
+    expect(within(d).getByText(/^✍ Firmó/)).toBeTruthy()
+    expect(within(d).getByRole('img', { name: 'Firma de Admin' }).getAttribute('data-src')).toBe(path)
+
+    fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    const payload = mocks.createCondominioRow.mock.calls[0][1] as { firmas: { participante_id: string; nombre: string; path: string; version: string; firmado_at: string }[]; puntos: never; participantes: never }
+    expect(payload.firmas).toHaveLength(1)
+    expect(payload.firmas[0]).toMatchObject({ nombre: 'Admin', path })
+    expect(payload.firmas[0].firmado_at).toMatch(/^2026-10-26T/)
+    // La versión firmada es la de lo que se guardó.
+    expect(payload.firmas[0].version).toBe(versionAcuerdos(puntosDe({ puntos: payload.puntos }), participantesDe({ participantes: payload.participantes })))
+    expect(mocks.removeMedia).not.toHaveBeenCalled()
+  })
+
+  it('cancelar borra la firma subida; volver a firmar deja sólo la última', async () => {
+    render(<NotasAdminTab {...props()} />)
+    nuevaHastaFirmas()
+    await firmarComo('Admin')
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a firmar: Admin' }))
+    const m = screen.getByRole('dialog', { name: '✍ Firma de Admin' })
+    fireEvent.click(within(m).getByLabelText(/acepto los acuerdos/i))
+    fireEvent.click(within(m).getByRole('button', { name: 'Simular firma' }))
+    await waitFor(() => expect(mocks.uploadCondominiosMedia).toHaveBeenCalledTimes(2))
+    const subidas = mocks.uploadCondominiosMedia.mock.calls.map(c => c[0] as string)
+    fireEvent.click(within(screen.getByRole('dialog', { name: '📝 Nueva minuta' })).getByRole('button', { name: 'Cancelar' }))
+    expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', subidas)
+  })
+
+  it('al editar: cambiar un acuerdo firmado deja la firma como de una versión anterior, y quitar al participante descarta su firma', async () => {
+    const conFirmas = { ...abierta, firmas: [firmaDe(abierta, 'pa'), firmaDe(abierta, 'pb')] }
+    render(<NotasAdminTab {...props({ notas: [conFirmas] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '✏️ Editar' }))
+    const w = screen.getByRole('dialog', { name: '✏️ Editar minuta' })
+    fireEvent.click(within(w).getByRole('tab', { name: 'Paso 4 · Firmas' }))
+    expect(within(w).getByText('Firmas (2 de 2)')).toBeTruthy()
+
+    fireEvent.click(within(w).getByRole('tab', { name: 'Paso 3 · Acuerdos' }))
+    expect(within(w).getByRole('note').textContent).toMatch(/ya tiene firmas/)
+    fireEvent.change(within(w).getAllByLabelText(/^Compromiso del punto/, { selector: 'input' })[0], { target: { value: 'Registrar cada ronda en la bitácora' } })
+    fireEvent.click(within(w).getByRole('tab', { name: 'Paso 4 · Firmas' }))
+    expect(within(w).getByText('Firmas (0 de 2)')).toBeTruthy()
+    expect(within(w).getAllByText(/Firmó una versión anterior/)).toHaveLength(2)
+    expect(within(w).getByText(/2 firmas son de una versión anterior de los acuerdos/)).toBeTruthy()
+
+    // Quitar a Carlos: su firma no se guarda y su imagen se borra al guardar.
+    fireEvent.click(within(w).getByRole('tab', { name: 'Paso 1 · Participantes' }))
+    fireEvent.click(within(w).getByRole('button', { name: 'Quitar a Carlos Guardia' }))
+    fireEvent.click(within(w).getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledTimes(1))
+    const patch = mocks.updateCondominioRowAfectando.mock.calls[0][2] as { firmas: { participante_id: string }[] }
+    expect(patch.firmas.map(f => f.participante_id)).toEqual(['pa'])
+    await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas-firmas/pb.png']))
+  })
+
+  it('el detalle muestra las firmas, firma quien falta y lo guarda en el acto; la tarjeta las cuenta', async () => {
+    const onRefresh = vi.fn()
+    const conFirma = { ...abierta, firmas: [firmaDe(abierta, 'pa')] }
+    render(<NotasAdminTab {...props({ notas: [conFirma], onRefresh })} />)
+    expect(screen.getByText('Reunión con el guardia').closest('button')!.textContent).toContain('✍ 1 de 2 firmas')
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    const d = screen.getByRole('dialog', { name: 'Reunión con el guardia' })
+    expect(within(d).getByText('Firmas (1 de 2)')).toBeTruthy()
+    // Admin ya firmó: no se le ofrece firmar. Carlos sí.
+    expect(within(d).queryByRole('button', { name: 'Firmar: Admin' })).toBeNull()
+    await firmarComo('Carlos Guardia')
+    await waitFor(() => expect(mocks.registrarFirmaMinuta).toHaveBeenCalledTimes(1))
+    const [id, firma] = mocks.registrarFirmaMinuta.mock.calls[0] as [string, { participante_id: string; path: string; version: string }]
+    expect(id).toBe('n1')
+    expect(firma).toMatchObject({ participante_id: 'pb', nombre: 'Carlos Guardia', version: versionAcuerdos(puntosDe(abierta), participantesDe(abierta)) })
+    expect(firma.path).toMatch(FIRMA)
+    expect(onRefresh).toHaveBeenCalled()
+    expect(mocks.removeMedia).not.toHaveBeenCalled()
+  })
+
+  it('en el detalle, si la firma no se pudo guardar, la imagen subida se borra; si reemplazó otra, la vieja también', async () => {
+    const anterior = { ...firmaDe(abierta, 'pb'), version: 'otra-version' }
+    render(<NotasAdminTab {...props({ notas: [{ ...abierta, firmas: [anterior] }] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    expect(within(dialogo()).getByText(/Firmó una versión anterior/)).toBeTruthy()
+
+    mocks.registrarFirmaMinuta.mockResolvedValueOnce({ error: 'sin permiso', reemplazada: null })
+    // El nombre accesible dice lo mismo que el botón: «Firmar de nuevo».
+    fireEvent.click(screen.getByRole('button', { name: 'Firmar de nuevo: Carlos Guardia' }))
+    let m = screen.getByRole('dialog', { name: '✍ Firma de Carlos Guardia' })
+    fireEvent.click(within(m).getByLabelText(/acepto los acuerdos/i))
+    fireEvent.click(within(m).getByRole('button', { name: 'Simular firma' }))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error', title: 'No se pudo guardar la firma' })))
+    const subida = mocks.uploadCondominiosMedia.mock.calls[0][0] as string
+    expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', [subida])
+    // La ventana sigue abierta para reintentar.
+    m = screen.getByRole('dialog', { name: '✍ Firma de Carlos Guardia' })
+
+    mocks.removeMedia.mockClear()
+    mocks.registrarFirmaMinuta.mockResolvedValueOnce({ error: null, reemplazada: anterior.path })
+    fireEvent.click(within(m).getByRole('button', { name: 'Simular firma' }))
+    await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', [anterior.path]))
+  })
+
+  it('una minuta cerrada no ofrece firmar; cerrar avisa de las firmas pendientes; eliminar borra las firmas', async () => {
+    render(<NotasAdminTab {...props({ notas: [{ ...abierta, firmas: [firmaDe(abierta, 'pa')] }, { ...cerrada }] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(dialogo()).getByRole('button', { name: '✓ Cerrar minuta' }))
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
+    expect((mocks.confirm.mock.calls[0] as unknown as [{ text: string }])[0].text).toMatch(/1 firma pendiente/)
+
+    fireEvent.click(within(dialogo()).getByRole('button', { name: '🗑 Eliminar' }))
+    await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas-firmas/pa.png']))
+    cleanup()
+
+    render(<NotasAdminTab {...props({ notas: [{ ...cerrada, firmas: [] }] })} />)
+    fireEvent.click(screen.getByRole('radio', { name: /Cerradas/ }))
+    fireEvent.click(screen.getByText('Reunión con jardinería'))
+    expect(within(dialogo()).getByText('Firmas (0 de 1)')).toBeTruthy()
+    expect(within(dialogo()).queryByRole('button', { name: /^Firmar:/ })).toBeNull()
+  })
+
+  it('al editar, guardar conserva la firma que otro registró desde el detalle mientras el asistente estaba abierto', async () => {
+    const original = firmaDe(abierta, 'pa', 'p1/minutas-firmas/pa-vieja.png')
+    const deOtroDispositivo = firmaDe(abierta, 'pb', 'p1/minutas-firmas/pb-detalle.png')
+    // Al abrir sólo estaba la de Admin; cuando se guarda, la fila ya tiene también la de Carlos.
+    mocks.leerFirmasMinuta.mockResolvedValue([original, deOtroDispositivo])
+    render(<NotasAdminTab {...props({ notas: [{ ...abierta, firmas: [original] }] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(dialogo()).getByRole('button', { name: '✏️ Editar' }))
+    const w = screen.getByRole('dialog', { name: '✏️ Editar minuta' })
+    fireEvent.click(within(w).getByRole('tab', { name: 'Paso 4 · Firmas' }))
+    // Admin vuelve a firmar en el asistente.
+    fireEvent.click(within(w).getByRole('button', { name: 'Volver a firmar: Admin' }))
+    const m = screen.getByRole('dialog', { name: '✍ Firma de Admin' })
+    fireEvent.click(within(m).getByLabelText(/acepto los acuerdos/i))
+    fireEvent.click(within(m).getByRole('button', { name: 'Simular firma' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '✍ Firma de Admin' })).toBeNull())
+    const nueva = mocks.uploadCondominiosMedia.mock.calls[0][0]
+    fireEvent.click(within(w).getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledTimes(1))
+    expect(mocks.leerFirmasMinuta).toHaveBeenCalledWith('n1')
+    const patch = mocks.updateCondominioRowAfectando.mock.calls[0][2] as { firmas: { participante_id: string; path: string }[] }
+    expect(patch.firmas.map(f => [f.participante_id, f.path])).toEqual([['pb', 'p1/minutas-firmas/pb-detalle.png'], ['pa', nueva]])
+    // Se borra sólo la que esta edición reemplazó; la del otro dispositivo, no.
+    await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas-firmas/pa-vieja.png']))
+    expect(mocks.removeMedia.mock.calls.flatMap(c => c[1] as string[])).not.toContain('p1/minutas-firmas/pb-detalle.png')
+  })
+
+  it('en el paso 4, quitar una firma deja el foco en el botón «Firmar» de esa fila', () => {
+    render(<NotasAdminTab {...props({ notas: [{ ...abierta, firmas: [firmaDe(abierta, 'pa')] }] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(dialogo()).getByRole('button', { name: '✏️ Editar' }))
+    const w = screen.getByRole('dialog', { name: '✏️ Editar minuta' })
+    fireEvent.click(within(w).getByRole('tab', { name: 'Paso 4 · Firmas' }))
+    fireEvent.click(within(w).getByRole('button', { name: 'Quitar la firma de Admin' }))
+    expect(document.activeElement).toBe(within(w).getByRole('button', { name: 'Firmar: Admin' }))
+  })
+
+  it('en el detalle, dos toques seguidos en «Firmar y aceptar» suben una sola firma; luego el foco va al título de Firmas', async () => {
+    render(<NotasAdminTab {...props()} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(screen.getByRole('button', { name: 'Firmar: Carlos Guardia' }))
+    const m = screen.getByRole('dialog', { name: '✍ Firma de Carlos Guardia' })
+    fireEvent.click(within(m).getByLabelText(/acepto los acuerdos/i))
+    const firmarBtn = within(m).getByRole('button', { name: 'Simular firma' })
+    fireEvent.click(firmarBtn)
+    fireEvent.click(firmarBtn)
+    await waitFor(() => expect(mocks.registrarFirmaMinuta).toHaveBeenCalledTimes(1))
+    expect(mocks.uploadCondominiosMedia).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(document.activeElement?.textContent).toMatch(/^Firmas \(0 de 2\)/))
+  })
+
+  it('eliminar no borra rutas de fuera de la carpeta del proyecto aunque la fila las cite', async () => {
+    const ajena = { ...firmaDe(abierta, 'pb'), path: 'otro-proyecto/minutas-firmas/x.png' }
+    render(<NotasAdminTab {...props({ notas: [{ ...abierta, fotos: ['otro-proyecto/minutas/f.jpg', 'p1/minutas/a.jpg'], firmas: [firmaDe(abierta, 'pa'), ajena] }] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(dialogo()).getByRole('button', { name: '🗑 Eliminar' }))
+    await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/a.jpg', 'p1/minutas-firmas/pa.png']))
+  })
+
+  it('la impresión trae la sección de firmas: la imagen de quien firmó y la línea de quien falta', async () => {
+    mocks.downloadMedia.mockResolvedValue(new Blob(['png'], { type: 'image/png' }))
+    const { write, print } = ventanaDeImpresion()
+    render(<NotasAdminTab {...props({ notas: [{ ...abierta, firmas: [firmaDe(abierta, 'pa')] }] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    fireEvent.click(within(dialogo()).getByRole('button', { name: '🖨 Imprimir' }))
+    await waitFor(() => expect(print).toHaveBeenCalled())
+    expect(mocks.downloadMedia).toHaveBeenCalledWith('condominios-media', 'p1/minutas-firmas/pa.png')
+    const html = write.mock.calls.at(-1)![0] as string
+    expect(html).toContain('<h2>Firmas</h2>')
+    expect(html).toMatch(/<img src="data:image\/png;base64,[A-Za-z0-9+/=]+" alt="">/)
+    expect(html).toContain('Firma pendiente')
   })
 })

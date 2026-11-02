@@ -266,6 +266,22 @@ export interface PuntoMinuta {
   acuerdos: AcuerdoMinuta[]
 }
 
+/**
+ * Firma de un participante sobre los acuerdos y compromisos de la minuta
+ * (20261120000000). `version` es la huella de puntos y acuerdos al firmar: si
+ * cambian después, la firma queda como de una versión anterior.
+ */
+export interface FirmaMinuta {
+  /** `ParticipanteMinuta.id` de quien firmó. */
+  participante_id: string
+  /** Nombre tal como estaba al firmar. */
+  nombre: string
+  /** PNG en condominios-media (<project_id>/minutas-firmas/...). */
+  path: string
+  firmado_at: string
+  version: string
+}
+
 export interface NotaAdmin {
   id: string
   company_id: string
@@ -289,6 +305,8 @@ export interface NotaAdmin {
   fotos?: string[] | null
   /** Documentos adjuntos, mismo bucket y carpeta; máximo 10 (20261112000100). */
   documentos?: string[] | null
+  /** Firmas de los participantes (20261120000000). */
+  firmas?: FirmaMinuta[] | null
   created_at: string
 }
 

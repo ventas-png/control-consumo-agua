@@ -12,10 +12,11 @@ import { reportDegradedQuery } from '../queryFetch'
 import { diasHastaFechaCalendario, diaLocalDeInstante, esFechaCalendario } from '../../lib/format'
 import { normalizarNombre } from '../proveedores/identidad'
 import type {
-  AcuerdoMinuta, CategoriaNota, ContratoArrendamiento, ContratoProveedor, NotaAdmin, ParticipanteMinuta,
+  AcuerdoMinuta, CategoriaNota, ContratoArrendamiento, ContratoProveedor, FirmaMinuta, NotaAdmin, ParticipanteMinuta,
   PersonalCondominio, PrioridadNota, PuntoMinuta, TipoAcuerdoMinuta, TipoParticipanteMinuta, TipoResidente, Unidad,
 } from '../../types'
 import type { ProveedorCatalogo } from '../../types/proveedores'
+import type { Json } from '../../types/database.types'
 
 // ── Catálogos de etiquetas ───────────────────────────────────────────────────
 
@@ -176,6 +177,121 @@ export function archivosPorBorrar(originales: readonly string[], vistas: Iterabl
   return [...fuera]
 }
 
+// ── Firmas (20261120000000) ──────────────────────────────────────────────────
+
+/** Una firma por participante (si llegan dos, gana la última), sin entradas sin ruta o sin participante. */
+export function firmasDe(nota: Pick<NotaAdmin, 'firmas'> | null | undefined): FirmaMinuta[] {
+  const lista = nota?.firmas
+  if (!Array.isArray(lista)) return []
+  const porParticipante = new Map<string, FirmaMinuta>()
+  for (const f of lista as unknown[]) {
+    if (!f || typeof f !== 'object') continue
+    const o = f as Record<string, unknown>
+    const participante_id = texto(o.participante_id)
+    const path = texto(o.path)
+    if (!participante_id || !path) continue
+    porParticipante.set(participante_id, { participante_id, nombre: texto(o.nombre), path, firmado_at: texto(o.firmado_at), version: texto(o.version) })
+  }
+  return [...porParticipante.values()]
+}
+
+/**
+ * Huella de lo que se firma: los puntos con sus acuerdos y compromisos (texto,
+ * responsable y fecha límite). No entra el estado «cumplido»: marcar el
+ * seguimiento no cambia lo acordado. Si la huella cambia, las firmas que ya
+ * había son de una versión anterior. Detecta cambios; no es criptográfica.
+ *
+ * Recibe lo que se guarda (depurarBorrador) o lo que se leyó (puntosDe): las
+ * dos formas dan la misma huella para el mismo contenido.
+ */
+export function versionAcuerdos(puntos: readonly PuntoMinuta[], participantes: readonly ParticipanteMinuta[]): string {
+  const nombre = new Map(participantes.map(p => [p.id, p.nombre.trim()]))
+  const canon = puntos
+    .filter(p => p.titulo.trim())
+    .map(p => [
+      p.titulo.trim(),
+      (p.descripcion ?? '').trim(),
+      p.acuerdos
+        .filter(a => a.texto.trim())
+        .map(a => a.tipo === 'compromiso'
+          ? [a.tipo, a.texto.trim(), nombre.get(a.responsable_id ?? '') ?? '', a.fecha_limite ?? '']
+          : [a.tipo, a.texto.trim()]),
+    ])
+  return cyrb53(JSON.stringify(canon))
+}
+
+/** Hash de 53 bits (cyrb53), en hexadecimal. */
+function cyrb53(str: string): string {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i)
+    h1 = Math.imul(h1 ^ ch, 2654435761)
+    h2 = Math.imul(h2 ^ ch, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16)
+}
+
+/** «vigente» si firmó lo que la minuta dice hoy; «anterior» si los acuerdos cambiaron después. */
+export function estadoFirma(f: Pick<FirmaMinuta, 'version'>, version: string): 'vigente' | 'anterior' {
+  return f.version === version ? 'vigente' : 'anterior'
+}
+
+/** Sólo las firmas de quienes siguen en la minuta: la de alguien que se quitó no se guarda. */
+export function firmasDeParticipantes(firmas: readonly FirmaMinuta[], participantes: readonly ParticipanteMinuta[]): FirmaMinuta[] {
+  const ids = new Set(participantes.map(p => p.id))
+  return firmas.filter(f => ids.has(f.participante_id))
+}
+
+/** Reemplaza (o agrega) la firma de ese participante. */
+export function conFirma(firmas: readonly FirmaMinuta[], nueva: FirmaMinuta): FirmaMinuta[] {
+  return [...firmas.filter(f => f.participante_id !== nueva.participante_id), nueva]
+}
+
+export function sinFirma(firmas: readonly FirmaMinuta[], participanteId: string): FirmaMinuta[] {
+  return firmas.filter(f => f.participante_id !== participanteId)
+}
+
+/**
+ * Las firmas que se guardan al editar: las que la fila tiene AHORA, con lo que
+ * esta edición cambió aplicado encima, participante por participante (altas,
+ * reemplazos y bajas). Sin esto, guardar el asistente escribía la lista que se
+ * cargó al abrirlo y borraba una firma registrada desde el detalle mientras
+ * tanto —o volvía a citar una imagen que el detalle ya había reemplazado—.
+ */
+export function fusionarFirmas(actuales: readonly FirmaMinuta[], originales: readonly FirmaMinuta[], editadas: readonly FirmaMinuta[]): FirmaMinuta[] {
+  const ruta = (l: readonly FirmaMinuta[], id: string) => l.find(f => f.participante_id === id)?.path
+  const tocadas = new Set([...originales, ...editadas].map(f => f.participante_id).filter(id => ruta(originales, id) !== ruta(editadas, id)))
+  return [...actuales.filter(f => !tocadas.has(f.participante_id)), ...editadas.filter(f => tocadas.has(f.participante_id))]
+}
+
+/**
+ * Sólo las rutas de la carpeta del proyecto de la minuta. Lo que llega de la
+ * fila se borra del bucket; una ruta manipulada no debe arrastrar archivos de
+ * otro proyecto que quien borra sí puede tocar.
+ */
+export function rutasDelProyecto(rutas: readonly string[], projectId: string): string[] {
+  return rutas.filter(r => r.startsWith(`${projectId}/`))
+}
+
+export interface ResumenFirmas {
+  /** Participantes que deben firmar. */
+  total: number
+  /** Firmaron lo que la minuta dice hoy. */
+  vigentes: number
+  /** Firmaron una versión anterior de los acuerdos. */
+  anteriores: number
+  /** Sin firma vigente (no firmaron o firmaron una versión anterior). */
+  pendientes: number
+}
+
+export function resumenFirmas(participantes: readonly ParticipanteMinuta[], firmas: readonly FirmaMinuta[], version: string): ResumenFirmas {
+  const propias = firmasDeParticipantes(firmas, participantes)
+  const vigentes = propias.filter(f => estadoFirma(f, version) === 'vigente').length
+  return { total: participantes.length, vigentes, anteriores: propias.length - vigentes, pendientes: participantes.length - vigentes }
+}
+
 export function gestorDe(participantes: readonly ParticipanteMinuta[]): ParticipanteMinuta | null {
   return participantes.find(p => p.gestiona) ?? null
 }
@@ -247,12 +363,13 @@ export function marcarCumplido(puntos: readonly PuntoMinuta[], acuerdoId: string
 
 // ── Borrador del asistente ───────────────────────────────────────────────────
 
-export type PasoMinuta = 1 | 2 | 3
+export type PasoMinuta = 1 | 2 | 3 | 4
 
 export const PASOS_MINUTA: { n: PasoMinuta; label: string; titulo: string }[] = [
   { n: 1, label: 'Participantes', titulo: '¿Quiénes participan?' },
   { n: 2, label: 'Puntos',        titulo: '¿Qué puntos se abordan?' },
   { n: 3, label: 'Acuerdos',      titulo: '¿Qué se acordó en cada punto?' },
+  { n: 4, label: 'Firmas',        titulo: '¿Quiénes firman los acuerdos?' },
 ]
 
 export interface BorradorMinuta {
@@ -268,6 +385,7 @@ export interface BorradorMinuta {
   puntos: PuntoMinuta[]
   fotos: string[]
   documentos: string[]
+  firmas: FirmaMinuta[]
 }
 
 /**
@@ -283,6 +401,7 @@ export function borradorDesde(nota: NotaAdmin | null, gestorNombre: string, hoy:
       puntos: [],
       fotos: [],
       documentos: [],
+      firmas: [],
     }
   }
   return {
@@ -297,6 +416,7 @@ export function borradorDesde(nota: NotaAdmin | null, gestorNombre: string, hoy:
     puntos: puntosDe(nota),
     fotos: fotosDe(nota),
     documentos: documentosDe(nota),
+    firmas: firmasDe(nota),
   }
 }
 
@@ -313,14 +433,18 @@ export function validarPasoMinuta(b: BorradorMinuta, paso: PasoMinuta): string |
     if (!b.puntos.some(p => p.titulo.trim())) return 'Anota al menos un punto a abordar.'
     return null
   }
-  for (const p of b.puntos) {
-    for (const a of p.acuerdos) {
-      if (a.tipo === 'compromiso' && a.texto.trim() && a.fecha_limite && !esFechaCalendario(a.fecha_limite)) {
-        return `La fecha límite de un compromiso de «${p.titulo}» no es válida.`
+  if (paso === 3) {
+    for (const p of b.puntos) {
+      for (const a of p.acuerdos) {
+        if (a.tipo === 'compromiso' && a.texto.trim() && a.fecha_limite && !esFechaCalendario(a.fecha_limite)) {
+          return `La fecha límite de un compromiso de «${p.titulo}» no es válida.`
+        }
       }
     }
+    if (b.fecha_recordatorio && !esFechaCalendario(b.fecha_recordatorio)) return 'La fecha del próximo seguimiento no es válida.'
+    return null
   }
-  if (b.fecha_recordatorio && !esFechaCalendario(b.fecha_recordatorio)) return 'La fecha del próximo seguimiento no es válida.'
+  // Paso 4: firmar es opcional; quien no firme ahora puede hacerlo desde el detalle.
   return null
 }
 
@@ -511,6 +635,34 @@ function porNombre(a: { nombre: string }, b: { nombre: string }): number {
 }
 
 // ── Acceso a datos ───────────────────────────────────────────────────────────
+
+/** Las firmas que la fila tiene ahora; null si no se pudo leer (el que llama sigue con lo que tiene). */
+export async function leerFirmasMinuta(notaId: string): Promise<FirmaMinuta[] | null> {
+  const { data, error } = await db.from('notas_admin').select('firmas').eq('id', notaId).maybeSingle()
+  if (error || !data) return null
+  return firmasDe({ firmas: data.firmas as unknown as FirmaMinuta[] })
+}
+
+/**
+ * Registra (o reemplaza) la firma de un participante en una minuta ya
+ * guardada, desde el detalle. Relee las firmas de la fila justo antes para no
+ * pisar la de otro que firmó en otro dispositivo, y exige que el UPDATE haya
+ * cambiado la fila. Devuelve la ruta de la firma reemplazada, para borrarla.
+ */
+export async function registrarFirmaMinuta(notaId: string, firma: FirmaMinuta): Promise<{ error: string | null; reemplazada: string | null }> {
+  const { data, error } = await db.from('notas_admin').select('firmas').eq('id', notaId).maybeSingle()
+  if (error) return { error: error.message, reemplazada: null }
+  if (!data) return { error: 'La minuta ya no existe o no tienes acceso a ella.', reemplazada: null }
+  const actuales = firmasDe({ firmas: data.firmas as unknown as FirmaMinuta[] })
+  const reemplazada = actuales.find(f => f.participante_id === firma.participante_id)?.path ?? null
+  const { data: filas, error: upErr } = await db.from('notas_admin')
+    .update({ firmas: conFirma(actuales, firma) as unknown as Json })
+    .eq('id', notaId)
+    .select('id')
+  if (upErr) return { error: upErr.message, reemplazada: null }
+  if (!filas || filas.length === 0) return { error: 'No se pudo guardar la firma: no tienes permiso para editar esta minuta.', reemplazada: null }
+  return { error: null, reemplazada: reemplazada !== firma.path ? reemplazada : null }
+}
 
 /** Residentes activos de las unidades del proyecto, con su nombre y unidad. Degrada a `[]`. */
 export async function fetchResidentesProyecto(projectId: string): Promise<ResidenteProyecto[]> {
