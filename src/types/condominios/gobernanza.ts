@@ -172,7 +172,7 @@ export interface ContratoProveedor {
   created_at: string
 }
 
-/** Quién encontró el objeto: un empleado del expediente o un tercero (20261119000000). */
+/** Quién encontró el objeto: un empleado del expediente o un tercero (20261119000001). */
 export type TipoHallazgoObjeto = 'personal' | 'tercero'
 
 export interface ObjetoPerdido {

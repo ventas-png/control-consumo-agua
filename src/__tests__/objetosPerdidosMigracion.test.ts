@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-// Guards de FORMA de 20261119000000 (objetos perdidos: área del catálogo,
+// Guards de FORMA de 20261119000001 (objetos perdidos: área del catálogo,
 // quién lo encontró, fotos, custodia y entrega con firma). La conducta —los
 // snapshots desde la ficha, el personal o el área de otro condominio, la
 // entrega sin receptor, sin firma, con firma ajena o no subida, el sello de
@@ -10,11 +10,11 @@ import { resolve } from 'node:path'
 // verificó ejecutando la migración contra el esquema reconstruido (ver el PR).
 // Aquí quedan los filos que un test de conducta no ve.
 
-const MIG = resolve('supabase/migrations/20261119000000_objetos_perdidos_custodia_entrega.sql')
+const MIG = resolve('supabase/migrations/20261119000001_objetos_perdidos_custodia_entrega.sql')
 const soloCodigo = (sql: string) => sql.replace(/--[^\n]*/g, '')
 const sql = soloCodigo(readFileSync(MIG, 'utf8'))
 
-describe('20261119000000 — forma de la migración', () => {
+describe('20261119000001 — forma de la migración', () => {
   it('ningún LIKE ejecutable usa un guion bajo sin escapar', () => {
     const infractores: string[] = []
     for (const m of sql.matchAll(/LIKE\s+'([^']*)'/g)) {

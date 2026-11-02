@@ -1,4 +1,4 @@
-// domain/condominios/objetosPerdidos.ts — Objetos perdidos (20261119000000):
+// domain/condominios/objetosPerdidos.ts — Objetos perdidos (20261119000001):
 // dónde y quién lo encontró, custodia y entrega al propietario con firma.
 //
 // Los nombres del personal (quién lo encontró, custodio) los pone el trigger
