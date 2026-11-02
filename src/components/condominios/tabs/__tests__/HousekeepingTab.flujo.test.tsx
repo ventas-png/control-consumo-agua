@@ -1,6 +1,7 @@
-// Tarjetas del flujo por pasos: los botones dependen del estado; «Iniciar servicio» pide
-// confirmación, exige una fila afectada (pendiente → en_proceso) y abre el paso 1; la tarjeta
-// muestra la reserva, el ingreso tentativo, las horas dedicadas y el informe enviado.
+// Tarjetas del flujo guiado: los botones dependen del estado; «Iniciar servicio» pide
+// confirmación, exige una fila afectada (pendiente → en_proceso) y abre el menú; la tarjeta
+// muestra la reserva, el ingreso tentativo, las horas reales de inicio y fin, las horas
+// dedicadas y el informe enviado.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import type { ServicioHousekeeping, Unidad } from '../../../../types'
@@ -25,9 +26,9 @@ vi.mock('../../../../domain/condominios/housekeepingResponsable', async (importO
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
 vi.mock('../../../shared/UsuarioChip', () => ({ UsuarioChip: ({ userId }: { userId: string }) => <span>chip:{userId}</span> }))
 vi.mock('../HousekeepingServicioPasos', () => ({
-  HousekeepingServicioPasos: (p: { servicio: { id: string }; pasoInicial: number; canEdit: boolean }) => {
-    mocks.pasos(p.servicio.id, p.pasoInicial, p.canEdit)
-    return <div data-testid="pasos">pasos:{p.servicio.id}:{p.pasoInicial}</div>
+  HousekeepingServicioPasos: (p: { servicio: { id: string }; vistaInicial: string; canEdit: boolean }) => {
+    mocks.pasos(p.servicio.id, p.vistaInicial, p.canEdit)
+    return <div data-testid="pasos">pasos:{p.servicio.id}:{p.vistaInicial}</div>
   },
 }))
 
@@ -47,25 +48,25 @@ beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()); mocks.updat
 afterEach(() => cleanup())
 
 describe('HousekeepingTab — flujo por pasos', () => {
-  it('pendiente: «Iniciar servicio» (sin selector de estado); en proceso: evidencia y finalizar; cerrado: ver evidencia', () => {
+  it('pendiente: «Iniciar servicio» (sin selector de estado); en proceso: continuar y finalizar; cerrado: ver evidencia', () => {
     renderTab({ servicios: [servicio({ id: 'p' }), servicio({ id: 'e', estado: 'en_proceso' }), servicio({ id: 'c', estado: 'completado' }), servicio({ id: 'x', estado: 'cancelado' })] })
     expect(within(tarjeta('p')).getByText('▶️ Iniciar servicio')).toBeTruthy()
     expect(within(tarjeta('p')).queryByText(/Finalizar/)).toBeNull()
-    expect(within(tarjeta('e')).getByText('📝 Evidencia de ingreso')).toBeTruthy()
+    expect(within(tarjeta('e')).getByText('📝 Continuar servicio')).toBeTruthy()
     expect(within(tarjeta('e')).getByText('🏁 Finalizar limpieza')).toBeTruthy()
     expect(within(tarjeta('c')).getByText('📋 Ver evidencia')).toBeTruthy()
     expect(within(tarjeta('x')).getByText('📋 Ver evidencia')).toBeTruthy()
     expect(screen.queryByRole('combobox')).toBeNull()
   })
 
-  it('«Iniciar servicio» confirma, exige una fila afectada al pasar a en_proceso, recarga y abre el paso 1', async () => {
+  it('«Iniciar servicio» confirma, exige una fila afectada al pasar a en_proceso, recarga y abre el menú del flujo guiado', async () => {
     const { onRefresh } = renderTab({ servicios: [servicio()] })
     fireEvent.click(screen.getByText('▶️ Iniciar servicio'))
     await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledWith('servicios_housekeeping', 's1', { estado: 'en_proceso' }))
-    expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Iniciar servicio' }))
+    expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Iniciar servicio', text: expect.stringMatching(/reportar inconvenientes y registrar el resultado/) }))
     expect(onRefresh).toHaveBeenCalled()
     expect(await screen.findByTestId('pasos')).toBeTruthy()
-    expect(mocks.pasos).toHaveBeenCalledWith('s1', 1, true)
+    expect(mocks.pasos).toHaveBeenCalledWith('s1', 'menu', true)
   })
 
   it('si no se confirma, no toca nada', async () => {
@@ -88,13 +89,22 @@ describe('HousekeepingTab — flujo por pasos', () => {
     await waitFor(() => expect(mocks.notify).toHaveBeenLastCalledWith(expect.objectContaining({ text: expect.stringMatching(/Iniciar servicio/) })))
   })
 
-  it('«Finalizar limpieza» abre el paso 2 y «Evidencia de ingreso» el paso 1', async () => {
-    renderTab({ servicios: [servicio({ estado: 'en_proceso' })] })
+  it('«Finalizar limpieza» abre directamente «Resultado del servicio»; «Continuar servicio» y «Ver evidencia» abren el menú', async () => {
+    renderTab({ servicios: [servicio({ id: 'e', estado: 'en_proceso' }), servicio({ id: 'c', estado: 'completado' })] })
     fireEvent.click(screen.getByText('🏁 Finalizar limpieza'))
-    expect(await screen.findByText('pasos:s1:2')).toBeTruthy()
+    expect(await screen.findByText('pasos:e:resultado')).toBeTruthy()
+    fireEvent.click(screen.getByText('📝 Continuar servicio'))
+    expect(await screen.findByText('pasos:e:menu')).toBeTruthy()
+    fireEvent.click(screen.getByText('📋 Ver evidencia'))
+    expect(await screen.findByText('pasos:c:menu')).toBeTruthy()
   })
 
-  it('la tarjeta muestra reserva, ingreso tentativo, horas dedicadas e informe enviado', () => {
+  it('en proceso: la tarjeta muestra quién inició y a qué hora real', () => {
+    renderTab({ servicios: [servicio({ estado: 'en_proceso', iniciado_por: 'u2', iniciado_en: '2026-10-15T15:07:00Z' })] })
+    expect(within(tarjeta('s1')).getByText(/▶️ Inició:/).textContent).toMatch(/chip:u2 · \d{2}:07$/)
+  })
+
+  it('la tarjeta muestra reserva, ingreso tentativo, horas reales de inicio y fin, horas dedicadas e informe enviado', () => {
     renderTab({ servicios: [servicio({
       estado: 'completado', hora_inicio: '09:00:00', hora_fin: '11:00:00', completado_por: 'u2',
       iniciado_en: '2026-10-15T15:00:00Z', completado_en: '2026-10-15T17:30:00Z', informe_enviado_en: '2026-10-15T18:00:00Z',
@@ -103,7 +113,8 @@ describe('HousekeepingTab — flujo por pasos', () => {
     const t = tarjeta('s1')
     expect(within(t).getByText(/🔖 HM-001 · Ana Pérez · 08\/11 → 12\/11/)).toBeTruthy()
     expect(within(t).getByText(/🕐 Ingreso tentativo 09:00 — fin 11:00/)).toBeTruthy()
-    expect(within(t).getByText(/⏱ 2 h 30 min/)).toBeTruthy()
+    expect(within(t).getByText(/✅ Completó:/).textContent).toMatch(/chip:u2/)
+    expect(within(t).getByText(/🕒 Inició/).textContent).toMatch(/^🕒 Inició \d{2}:00 · Finalizó \d{2}:30 · ⏱ 2 h 30 min$/)
     expect(within(t).getByText('📨 Informe enviado')).toBeTruthy()
   })
 

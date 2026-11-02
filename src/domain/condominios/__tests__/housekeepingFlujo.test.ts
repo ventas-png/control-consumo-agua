@@ -2,9 +2,9 @@
 // funciones solo tienen que coincidir con ella.
 import { describe, it, expect } from 'vitest'
 import {
-  clasificarDestinatario, construirEnlaceWhatsApp, esAdminDeTransiciones, etiquetaReserva, filtrarReservas,
-  formatearDuracion, horasDedicadas, mensajeErrorFlujo, minutosDedicados, reservasDeUnidad, resumenTextoInforme, sugerirReservas,
-  transicionPermitida,
+  clasificarDestinatario, construirEnlaceWhatsApp, esAdminDeTransiciones, etiquetaReserva, fechaHoraReal, filtrarReservas,
+  formatearDuracion, horaReal, horasDedicadas, mensajeErrorFlujo, minutosDedicados, reservasDeUnidad, resumenParte, resumenTextoInforme,
+  sugerirReservas, transicionPermitida,
 } from '../housekeepingFlujo'
 import type { ReservaSTRVinculable } from '../../../types'
 
@@ -68,6 +68,32 @@ describe('horas dedicadas', () => {
   it('horasDedicadas lee los sellos del servicio', () => {
     expect(horasDedicadas({ iniciado_en: '2026-11-10T15:00:00Z', completado_en: '2026-11-10T15:45:00Z' })).toBe('45 min')
     expect(horasDedicadas({ iniciado_en: null, completado_en: '2026-11-10T15:45:00Z' })).toBe('—')
+  })
+})
+
+describe('hora real de los sellos (hora local del dispositivo, 24 h)', () => {
+  it('horaReal: «HH:MM» de un sello; los minutos son los del instante, sin importar la zona', () => {
+    const h = horaReal('2026-11-10T15:07:00Z')
+    expect(h).toMatch(/^\d{2}:\d{2}$/)
+    expect(h!.endsWith(':07')).toBe(true)
+    expect(horaReal('2026-11-10T00:30:00Z')).toMatch(/^\d{2}:30$/)   // nunca «24:30» (hourCycle h23)
+  })
+  it('fechaHoraReal: «dd/mm/aa, HH:MM»', () => {
+    expect(fechaHoraReal('2026-11-10T15:07:00Z')).toMatch(/^\d{2}\/\d{2}\/\d{2}, \d{2}:\d{2}$/)
+  })
+  it('sin sello o con basura devuelven null', () => {
+    expect(horaReal(null)).toBeNull(); expect(horaReal(undefined)).toBeNull(); expect(horaReal('no-es-fecha')).toBeNull()
+    expect(fechaHoraReal(null)).toBeNull(); expect(fechaHoraReal('')).toBeNull()
+  })
+})
+
+describe('resumenParte (menú del flujo guiado)', () => {
+  it('describe texto y fotos; nada → null', () => {
+    expect(resumenParte('Polvo en repisas', 3)).toBe('Con observaciones · 3 fotos')
+    expect(resumenParte('', 1)).toBe('1 foto')
+    expect(resumenParte('Grifo roto', 0)).toBe('Con observaciones')
+    expect(resumenParte('   ', 0)).toBeNull()
+    expect(resumenParte(null, 0)).toBeNull()
   })
 })
 
