@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 
 // Guards ESTÁTICOS del endurecimiento del alta (20260907000900 +
@@ -18,16 +18,31 @@ import { resolve, join } from 'node:path'
 //   2. La lista de permisos y la forma envuelta (#799) tienen que sobrevivir
 //      al endurecimiento: cerrar la puerta de atrás no puede cerrar la de
 //      adelante.
-//   3. El drift guard vigila la EXPRESIÓN desde la versión correcta.
+//   3. Toda re-declaración posterior (hoy 20261104000700, #991: crear exige
+//      la ACCIÓN del tab) conserva ese contrato, primero.
+//   4. El drift guard vigila la EXPRESIÓN desde la ÚLTIMA migración que
+//      declara la policy. Si una migración nueva la re-declara y el guard no
+//      se actualiza en el mismo PR, el apply deja a producción con la forma
+//      nueva y el guard da un rojo falso — lo que pasó tras #991. Esto lo
+//      convierte en un rojo ANTES del merge.
 
 const RAIZ = resolve('.')
 const MIGRATIONS_DIR = join(RAIZ, 'supabase/migrations')
 const MIG_CONTRATO = '20260907001100_endurecer_alta_y_consumo_tareas.sql'
-const VERSION_CONTRATO = MIG_CONTRATO.split('_')[0]
 const SANDBOX_DIR = join(RAIZ, 'supabase/tests/insert_solo_pendiente')
 
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
 const soloCodigo = (sql: string) => sql.replace(/--[^\n]*/g, '')
+
+// Toda migración que declara (o altera) la policy, en orden de versión. La
+// última es la forma que producción tiene una vez aplicada la serie.
+const RE_DECLARA = /(?:CREATE|ALTER) POLICY\s+"?tareas_bloque_insert"?\s+ON\s+public\.tareas_bloque\b/i
+const DECLARACIONES = readdirSync(MIGRATIONS_DIR)
+  .filter((f) => f.endsWith('.sql'))
+  .sort()
+  .filter((f) => RE_DECLARA.test(soloCodigo(readFileSync(join(MIGRATIONS_DIR, f), 'utf8'))))
+const MIG_VIGENTE = DECLARACIONES[DECLARACIONES.length - 1]
+const VERSION_VIGENTE = MIG_VIGENTE.split('_')[0]
 
 const sqlContrato = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_CONTRATO), 'utf8'))
 const guardProduccion = readFileSync(
@@ -35,13 +50,16 @@ const guardProduccion = readFileSync(
   'utf8',
 )
 
-const politica = (() => {
-  const m = sqlContrato.match(
-    /CREATE POLICY "tareas_bloque_insert" ON public\.tareas_bloque([\s\S]*?);/i,
+/** El cuerpo del CREATE POLICY tareas_bloque_insert (comillado o no) de un SQL. */
+const cuerpoPolicy = (sql: string) => {
+  const m = sql.match(
+    /CREATE POLICY\s+"?tareas_bloque_insert"?\s+ON public\.tareas_bloque([\s\S]*?);/i,
   )
   expect(m, 'la migración no re-declara tareas_bloque_insert').not.toBeNull()
   return m![1]
-})()
+}
+
+const politica = cuerpoPolicy(sqlContrato)
 
 describe('20260907001100 · la tarea nace pendiente y sin sellos — para TODOS', () => {
   it('es una policy de INSERT para authenticated, con WITH CHECK', () => {
@@ -91,6 +109,31 @@ describe('20260907001100 · la tarea nace pendiente y sin sellos — para TODOS'
   })
 })
 
+describe('la declaración VIGENTE conserva el contrato del alta', () => {
+  // Hoy es 20261104000700 (#991): cambió el permiso —crear exige
+  // condominios_puede_actuar('tareas_personal', 'create'), ver el tab ya no
+  // basta— y tenía que dejar el contrato intacto. Cualquier re-declaración
+  // futura pasa por aquí también: la última es la que manda en producción.
+  const vigente = cuerpoPolicy(soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_VIGENTE), 'utf8')))
+
+  it('la serie conocida termina en 20261104000700, o en una posterior', () => {
+    expect(DECLARACIONES).toContain(MIG_CONTRATO)
+    expect(DECLARACIONES).toContain('20261104000700_rls_acciones_recursos_humanos.sql')
+    expect(VERSION_VIGENTE >= '20261104000700').toBe(true)
+  })
+
+  it('es de INSERT para authenticated, con el contrato completo y PRIMERO', () => {
+    expect(vigente).toMatch(/FOR INSERT TO authenticated/i)
+    expect(vigente).toMatch(/estado = 'pendiente'/)
+    for (const col of ['completada_en', 'completado_por', 'anulada_en',
+                       'anulada_por', 'motivo_anulacion', 'motivo_sin_evidencia']) {
+      expect(vigente, `${MIG_VIGENTE} perdió ${col} IS NULL`).toMatch(new RegExp(`${col} IS NULL`))
+    }
+    expect(vigente.indexOf("estado = 'pendiente'"))
+      .toBeLessThan(vigente.indexOf('is_super_admin'))
+  })
+})
+
 describe('drift guard · la expresión de la policy se vigila desde la versión correcta', () => {
   const bloqueEntrada = (() => {
     const desde = guardProduccion.indexOf("policy: 'tareas_bloque_insert'")
@@ -109,10 +152,15 @@ describe('drift guard · la expresión de la policy se vigila desde la versión 
     expect(bloqueEntrada!).toContain('(motivo_sin_evidencia IS NULL)')
   })
 
-  it('el gate desdeVersion apunta al archivo que existe en el repo', () => {
+  it('desdeVersion es la ÚLTIMA migración que declara la policy', () => {
+    // Si falla en un PR que re-declara tareas_bloque_insert: llevar
+    // desdeVersion y withCheck de POLICIES_CRITICAS a esa versión (withCheck
+    // es la salida de pg_get_expr; run.sh de insert_solo_pendiente la coteja
+    // contra un servidor real).
     const m = bloqueEntrada!.match(/desdeVersion:\s*'(\d+)'/)
     expect(m).not.toBeNull()
-    expect(m![1]).toBe(VERSION_CONTRATO)
+    expect(m![1], `POLICIES_CRITICAS vigila ${m![1]} pero la última declaración es ${MIG_VIGENTE}`)
+      .toBe(VERSION_VIGENTE)
   })
 
   it('el literal del guard también pone el contrato PRIMERO', () => {
@@ -127,7 +175,8 @@ describe('el sandbox del alta existe y corre en CI', () => {
   it('los archivos del sandbox están completos', () => {
     for (const f of ['run.sh', 'pre.sql', 'seed.sql', 'pre_assert.sql',
                      'pre_assert_superadmin.sql',
-                     'assert.sql', 'reassert.sql', 'postdeploy.sql']) {
+                     'assert.sql', 'reassert.sql', 'assert_acciones.sql',
+                     'postdeploy.sql']) {
       expect(existsSync(join(SANDBOX_DIR, f)), `falta ${f}`).toBe(true)
     }
   })
@@ -143,6 +192,14 @@ describe('el sandbox del alta existe y corre en CI', () => {
       join(SANDBOX_DIR, 'pre_assert_superadmin.sql'), 'utf8'))
     expect(pre).toMatch(/'completada'/)
     expect(pre).toMatch(/la vulnerabilidad ya no se reproduce/i)
+  })
+
+  it('el run.sh aplica la policy de la migración VIGENTE, no una copia', () => {
+    // El literal del guard se coteja contra el servidor con la policy que
+    // declara la última migración, extraída de ella tal cual. Si una nueva
+    // re-declaración llega, el harness tiene que apuntar a ella también.
+    const run = readFileSync(join(SANDBOX_DIR, 'run.sh'), 'utf8')
+    expect(run).toContain(`supabase/migrations/${MIG_VIGENTE}`)
   })
 
   it('coverage.yml cablea el run.sh (el harness que no corre no protege)', () => {
