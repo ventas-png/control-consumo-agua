@@ -30,7 +30,7 @@ describe('totalFila', () => {
 
 describe('partidaSchema', () => {
   it('valida formato de periodo YYYY-MM', () => {
-    const base = { cuenta_id: '11111111-1111-1111-1111-111111111111', monto: 10 }
+    const base = { cuenta_id: '11111111-1111-4111-8111-111111111111', monto: 10 }
     expect(partidaSchema.safeParse({ ...base, periodo: '2026-06' }).success).toBe(true)
     expect(partidaSchema.safeParse({ ...base, periodo: '2026-13' }).success).toBe(false)
     expect(partidaSchema.safeParse({ ...base, periodo: '202606' }).success).toBe(false)
@@ -38,7 +38,7 @@ describe('partidaSchema', () => {
 
   it('rechaza montos negativos', () => {
     expect(partidaSchema.safeParse({
-      cuenta_id: '11111111-1111-1111-1111-111111111111', periodo: '2026-06', monto: -1,
+      cuenta_id: '11111111-1111-4111-8111-111111111111', periodo: '2026-06', monto: -1,
     }).success).toBe(false)
   })
 })

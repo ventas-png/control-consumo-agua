@@ -192,6 +192,34 @@ describe('validatedInsertMany', () => {
     expect(error).toBeNull()
     expect(mock.insertFn).toHaveBeenCalledWith([])
   })
+
+  // zod 4 conserva en `.passthrough()` las llaves no declaradas que valen
+  // `undefined`, y zod 3 las omitía. En un lote, postgrest-js lista en
+  // `?columns=` las llaves de todas las filas, y una columna listada que la fila
+  // no trae se inserta como NULL en vez de tomar su DEFAULT. Es lo que manda
+  // ImportContadoresModal con las celdas vacías (medida, material…).
+  it('con .passthrough(), no lista columnas no declaradas que vienen undefined (como zod 3)', async () => {
+    const mock = makeMockClient()
+    const conApodo = schema.extend({ apodo: z.string().optional() }).passthrough()
+    const { error } = await validatedInsertMany(
+      'contadores',
+      conApodo,
+      [
+        { nombre: 'Juan', edad: 30, medida: undefined, material: 'PVC', apodo: undefined },
+        { nombre: 'Ana', edad: 25, medida: undefined },
+      ],
+      { client: mock.client },
+    )
+    expect(error).toBeNull()
+    const filas = mock.insertFn.mock.calls[0][0] as Record<string, unknown>[]
+    // Lo mismo que calcula postgrest-js para `?columns=`.
+    const columnas = [...new Set(filas.flatMap((f) => Object.keys(f)))]
+    expect(columnas).not.toContain('medida')
+    expect(columnas).toContain('material')
+    // Una llave DECLARADA se queda aunque venga undefined: así era en zod 3.
+    expect(Object.keys(filas[0])).toEqual(['nombre', 'edad', 'apodo', 'material'])
+    expect(Object.keys(filas[1])).toEqual(['nombre', 'edad'])
+  })
 })
 
 describe('validatedUpdate', () => {
@@ -221,6 +249,49 @@ describe('validatedUpdate', () => {
     )
     expect(isValidationError(error)).toBe(true)
     expect(mock.updateFn).not.toHaveBeenCalled()
+  })
+})
+
+// GHSA-mrhx-c7xc-m3w5 (high): en zod < 4.6.6, `.max()` y `.length()` de un
+// arreglo se aplicaban DESPUÉS de validar cada elemento, así que un arreglo
+// enorme se recorría completo antes de rechazarse (agotamiento de memoria). El
+// fix existe solo en el código v4, no hay backport a 3.x. Ver SECURITY.md.
+describe('zod · regresión del advisory GHSA-mrhx-c7xc-m3w5', () => {
+  it('la versión instalada quedó fuera del rango afectado (< 4.6.6)', () => {
+    const { major, minor, patch } = z.core.version
+    const fueraDelRango = major > 4 || (major === 4 && (minor > 6 || (minor === 6 && patch >= 6)))
+    expect(fueraDelRango,
+      `zod@${major}.${minor}.${patch} está dentro del rango vulnerable de GHSA-mrhx-c7xc-m3w5`,
+    ).toBe(true)
+  })
+
+  it('un arreglo que excede .max() se rechaza sin validar sus elementos', () => {
+    let validados = 0
+    const elemento = z.number().refine(() => { validados++; return true })
+    const enorme = Array.from({ length: 100_000 }, () => 1)
+    for (const tope of [z.array(elemento).max(10), z.array(elemento).length(10)]) {
+      const r = tope.safeParse(enorme)
+      expect(r.success).toBe(false)
+      if (!r.success) expect(r.error.issues[0].code).toBe('too_big')
+    }
+    // Con zod 3.25.76 esto da 200 000: recorría el arreglo entero dos veces.
+    expect(validados).toBe(0)
+  })
+
+  // zod 4 valida el UUID según RFC 9562: el nibble de versión (1-8) y el de
+  // variante (8-b). '11111111-1111-1111-1111-111111111111' pasaba con zod 3 y
+  // ya no pasa. Las filas reales (gen_random_uuid, auth.users) son v4 y no
+  // cambian. Los fixtures de prueba deben ser UUIDs reales.
+  it('z.string().uuid() exige un UUID RFC 9562 (no solo la forma 8-4-4-4-12)', () => {
+    const uuid = z.string().uuid()
+    expect(uuid.safeParse(crypto.randomUUID()).success).toBe(true)
+    expect(uuid.safeParse('11111111-1111-4111-8111-111111111111').success).toBe(true)
+    expect(uuid.safeParse('11111111-1111-1111-1111-111111111111').success).toBe(false)
+    // Los IDs fijos de los roles del sistema (src/lib/systemRoleIds.ts)
+    // tampoco son RFC. Hoy ningún schema valida un role_id; si alguno llega
+    // a hacerlo, tendrá que usar z.guid().
+    expect(uuid.safeParse('00000000-0000-0000-0000-000000000001').success).toBe(false)
+    expect(z.guid().safeParse('00000000-0000-0000-0000-000000000001').success).toBe(true)
   })
 })
 

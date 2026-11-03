@@ -19,12 +19,12 @@ vi.mock('../../../lib/supabase', () => {
 import { crearFacturaProveedor } from '../mutations'
 import { facturaProveedorFormSchema, facturaRenglonSchema, totalesFactura, type FacturaCrearInput } from '../schemas'
 
-const ORDEN = '0d100000-0000-0000-0000-0000000000c1'
-const LINEA_A = '0d110000-0000-0000-0000-0000000000c1'
-const LINEA_B = '0d110000-0000-0000-0000-0000000000c2'
+const ORDEN = '0d100000-0000-4000-8000-0000000000c1'
+const LINEA_A = '0d110000-0000-4000-8000-0000000000c1'
+const LINEA_B = '0d110000-0000-4000-8000-0000000000c2'
 const base = facturaProveedorFormSchema.parse({
-  proveedor_id: '0d120000-0000-0000-0000-0000000000c1',
-  project_id: '0d130000-0000-0000-0000-0000000000c1',
+  proveedor_id: '0d120000-0000-4000-8000-0000000000c1',
+  project_id: '0d130000-0000-4000-8000-0000000000c1',
   numero_factura: 'F-1',
   fecha_emision: '2026-10-02',
   fecha_vencimiento: null,

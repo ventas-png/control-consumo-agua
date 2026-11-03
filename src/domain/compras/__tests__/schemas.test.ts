@@ -13,7 +13,7 @@ import {
 } from '../schemas'
 import { proveedorHabilitado } from '../../../types/compras'
 
-const UUID = '11111111-1111-1111-1111-111111111111'
+const UUID = '11111111-1111-4111-8111-111111111111'
 
 const lineaBase = {
   descripcion: 'Cloro granular 45kg',

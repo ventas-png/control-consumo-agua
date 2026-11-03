@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { z } from 'zod'
 import {
   cuotaInputSchema,
   visitanteInputSchema,
@@ -143,7 +144,7 @@ describe('visitanteInputSchema', () => {
   // de tocar la DB y el botón "Pre-autorizar visita" parecía no hacer nada.
   it('acepta valido_hasta como fecha de <input type="date">', () => {
     const r = visitanteInputSchema.safeParse({ ...base, valido_hasta: '2026-07-28' })
-    expect(r.success ? 'OK' : JSON.stringify(r.error.flatten().fieldErrors)).toBe('OK')
+    expect(r.success ? 'OK' : JSON.stringify(z.flattenError(r.error).fieldErrors)).toBe('OK')
   })
 
   it('acepta valido_hasta como timestamp (columna timestamptz leída de vuelta)', () => {
@@ -162,6 +163,21 @@ describe('visitanteInputSchema', () => {
     expect(visitanteInputSchema.safeParse({ ...base, valido_hasta: 'mañana' }).success).toBe(false)
   })
 
+  // zod 4: si las dos opciones de texto (fecha y timestamp) fallan, la unión ya
+  // no hereda el mensaje de la primera, como en zod 3, sino un genérico «Invalid
+  // input». El mensaje lo fija ahora el schema y es el que ve el usuario.
+  it('el rechazo de valido_hasta conserva el mensaje en español', () => {
+    for (const valido_hasta of ['28/07/2026', 'mañana', '']) {
+      const r = visitanteInputSchema.safeParse({ ...base, valido_hasta })
+      expect(r.success).toBe(false)
+      if (!r.success) {
+        expect(r.error.issues).toHaveLength(1)
+        expect(r.error.issues[0].path).toEqual(['valido_hasta'])
+        expect(r.error.issues[0].message).toBe('Fecha debe ser YYYY-MM-DD')
+      }
+    }
+  })
+
   // El payload exacto que arma PortalVisitantesTab.preAutorizar() para el caso
   // reportado: menor de edad, foto de vehículo y autorización con fecha.
   it('acepta el payload completo del portal del residente', () => {
@@ -178,7 +194,7 @@ describe('visitanteInputSchema', () => {
       es_menor: true,
       fecha_nacimiento: '2015-07-14',
     })
-    expect(r.success ? 'OK' : JSON.stringify(r.error.flatten().fieldErrors)).toBe('OK')
+    expect(r.success ? 'OK' : JSON.stringify(z.flattenError(r.error).fieldErrors)).toBe('OK')
   })
 
   it('acepta timestamp en formato Postgres "YYYY-MM-DD HH:MM:SS"', () => {

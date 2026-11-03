@@ -144,13 +144,13 @@ export interface ParseSuccess<T> {
 }
 export type ParseResult<T> = ParseSuccess<T> | ParseFailure
 
-export function safeValidate<T extends z.ZodTypeAny>(
+export function safeValidate<T extends z.ZodType>(
   schema: T,
   input: unknown,
 ): ParseResult<z.infer<T>> {
   const result = schema.safeParse(input)
   if (result.success) return { ok: true, data: result.data }
-  const flat = result.error.flatten()
+  const flat = z.flattenError(result.error)
   return {
     ok: false,
     fieldErrors: flat.fieldErrors as Record<string, string[]>,

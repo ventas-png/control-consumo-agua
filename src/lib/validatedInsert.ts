@@ -84,7 +84,7 @@ export interface ValidatedInsertResult<T = unknown> {
 
 // Construye un ValidationError a partir de una ZodError.
 function buildValidationError(zodError: z.ZodError): ValidationError {
-  const flat = zodError.flatten()
+  const flat = z.flattenError(zodError)
   const fieldErrors = flat.fieldErrors as Record<string, string[]>
   const formErrors = flat.formErrors
   // Mensaje de "primera línea" para callers legacy: priorizamos errores de
@@ -109,7 +109,7 @@ function buildValidationError(zodError: z.ZodError): ValidationError {
 // Si la validación pasa, hace `supabase.from(table).insert(<validated>)`
 // (opcionalmente con `.select()` si `returning: true`) y propaga el
 // `PostgrestError` o `data` resultante.
-export async function validatedInsert<TSchema extends z.ZodTypeAny>(
+export async function validatedInsert<TSchema extends z.ZodType>(
   table: string,
   schema: TSchema,
   payload: unknown,
@@ -131,11 +131,35 @@ export async function validatedInsert<TSchema extends z.ZodTypeAny>(
   }
 }
 
+// En un lote, postgrest-js arma `?columns=` con las llaves de TODAS las filas,
+// y la columna listada que una fila no trae en el JSON se inserta como NULL,
+// no con su DEFAULT. Una llave con valor `undefined` cuenta como listada pero
+// `JSON.stringify` la quita del cuerpo.
+//
+// Con `.passthrough()`, zod 3 omitía las llaves NO declaradas en el schema
+// cuyo valor era `undefined`; zod 4 las conserva. Los importadores mandan así
+// las celdas vacías (p. ej. `medida` o `periodicidad_lectura_dias` en
+// ImportContadoresModal). Aquí se quitan para conservar el comportamiento de
+// zod 3. Las llaves declaradas no se tocan, porque con ellas ambas versiones
+// se comportan igual. En el insert de una sola fila no hace falta: sin
+// `columns`, la llave ausente toma su DEFAULT.
+function omitirExtrasIndefinidos(schema: z.ZodType, filas: unknown[]): unknown[] {
+  if (!(schema instanceof z.ZodObject)) return filas
+  const declaradas = new Set(Object.keys(schema.shape))
+  return filas.map((fila) =>
+    fila !== null && typeof fila === 'object'
+      ? Object.fromEntries(
+          Object.entries(fila).filter(([k, v]) => v !== undefined || declaradas.has(k)),
+        )
+      : fila,
+  )
+}
+
 // Variante para batch insert: valida CADA item del array contra el schema.
 // Si cualquier item falla, retorna error sin tocar la DB (atómico). El
 // `fieldErrors` de un fallo incluye el índice del item entre brackets,
 // e.g. `{ "0.nombre": ["..."] }` para identificar la fila problemática.
-export async function validatedInsertMany<TSchema extends z.ZodTypeAny>(
+export async function validatedInsertMany<TSchema extends z.ZodType>(
   table: string,
   schema: TSchema,
   payloads: unknown[],
@@ -147,7 +171,7 @@ export async function validatedInsertMany<TSchema extends z.ZodTypeAny>(
     return { data: null, error: buildValidationError(parsed.error) }
   }
   const client = options.client ?? defaultClient
-  const query = (client.from(table) as any).insert(parsed.data)
+  const query = (client.from(table) as any).insert(omitirExtrasIndefinidos(schema, parsed.data))
   const result = options.returning ? await query.select() : await query
   return {
     data: (result.data ?? null) as z.infer<TSchema>[] | null,
@@ -163,7 +187,7 @@ export interface ValidatedUpdateOptions extends ValidatedInsertOptions {
   match: Record<string, string | number | boolean | null>
 }
 
-export async function validatedUpdate<TSchema extends z.ZodTypeAny>(
+export async function validatedUpdate<TSchema extends z.ZodType>(
   table: string,
   schema: TSchema,
   payload: unknown,

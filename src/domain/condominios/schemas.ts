@@ -38,7 +38,12 @@ const optionalIsoTimestamp = z.union([isoTimestamp, z.null()]).optional()
 // pero que en DB son timestamptz: Postgres coacciona la fecha a medianoche.
 // Aceptar SOLO timestamp rechazaba el payload de los formularios y el insert
 // nunca salía del navegador. Ver `valido_hasta` en visitanteInputSchema.
-const optionalYmdOrIsoTimestamp = z.union([ymd, isoTimestamp, z.null()]).optional()
+// El mensaje va explícito porque, con dos formatos que fallan a la vez, zod 4
+// no hereda el de la primera opción (como hacía zod 3): devolvería «Invalid
+// input».
+const optionalYmdOrIsoTimestamp = z
+  .union([ymd, isoTimestamp, z.null()], { error: 'Fecha debe ser YYYY-MM-DD' })
+  .optional()
 
 // ── CuotaCondominio ─────────────────────────────────────────────────────────
 const conceptoCuota = z.enum(['mantenimiento', 'extraordinaria', 'CAM', 'amenidad', 'otro'])
@@ -74,7 +79,7 @@ export const cuotaInputSchema = z
     // global a nivel proyecto sin unidad específica.
     if (data.concepto !== 'CAM' && (!data.unidad_id || data.unidad_id === null)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['unidad_id'],
         message: `unidad_id es obligatorio para cuotas de tipo '${data.concepto}'`,
       })
@@ -120,7 +125,7 @@ export const visitanteInputSchema = z
       const salida = Date.parse(data.hora_salida)
       if (Number.isFinite(entrada) && Number.isFinite(salida) && salida < entrada) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['hora_salida'],
           message: 'hora_salida no puede ser anterior a hora_entrada',
         })
@@ -129,7 +134,7 @@ export const visitanteInputSchema = z
     // Regla: si `es_menor === true`, fecha_nacimiento es obligatoria.
     if (data.es_menor === true && !data.fecha_nacimiento) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['fecha_nacimiento'],
         message: 'fecha_nacimiento obligatoria para menores de edad',
       })
@@ -169,7 +174,7 @@ export const amenidadInputSchema = z
     // Regla: si requiere depósito, monto_deposito debe ser > 0.
     if (data.requiere_deposito && (!data.monto_deposito || data.monto_deposito <= 0)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['monto_deposito'],
         message: 'monto_deposito debe ser > 0 cuando requiere_deposito es true',
       })
@@ -177,7 +182,7 @@ export const amenidadInputSchema = z
     // Regla: si requiere tarifa, tarifa_uso debe ser > 0.
     if (data.requiere_tarifa && (!data.tarifa_uso || data.tarifa_uso <= 0)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['tarifa_uso'],
         message: 'tarifa_uso debe ser > 0 cuando requiere_tarifa es true',
       })
@@ -190,7 +195,7 @@ export const amenidadInputSchema = z
       const minutosFin = hf * 60 + mf
       if (minutosFin <= minutosInicio) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['horario_fin'],
           message: 'horario_fin debe ser posterior a horario_inicio',
         })
@@ -240,23 +245,23 @@ export const visitaFrecuenteInputSchema = z
     const desde = data.vigente_desde ?? fechaLocalYMD(new Date())
     if (data.vigente_hasta < desde) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['vigente_hasta'],
         message: 'La vigencia no puede terminar antes de empezar',
       })
     } else if (!vigenciaValida(desde, data.vigente_hasta)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['vigente_hasta'],
         message: `La vigencia no puede superar ${VIGENCIA_MAXIMA_MESES} meses (hasta ${vigenciaMaxima(desde)})`,
       })
     }
     // Una autorización aprobada lleva sello de quién la aprobó; una pendiente no.
     if (data.estado === 'aprobada' && !data.autorizado_por) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['autorizado_por'], message: 'Una autorización aprobada requiere quién la aprobó' })
+      ctx.addIssue({ code: 'custom', path: ['autorizado_por'], message: 'Una autorización aprobada requiere quién la aprobó' })
     }
     if (data.estado === 'pendiente' && (data.autorizado_por || data.autorizado_en)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['estado'], message: 'Una solicitud pendiente no lleva sello de aprobación' })
+      ctx.addIssue({ code: 'custom', path: ['estado'], message: 'Una solicitud pendiente no lleva sello de aprobación' })
     }
   })
 
