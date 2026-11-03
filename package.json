@@ -50,7 +50,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.9",
     "leaflet": "^1.9.4",
-    "posthog-js": "^1.443.0",
+    "posthog-js": "^1.444.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
