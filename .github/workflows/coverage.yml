@@ -373,8 +373,11 @@ jobs:
       # actor ni sello de excepción. Este sandbox reproduce primero el alta
       # pre-cerrada (NEGATIVA), prueba el rechazo POR FAMILIA de permisos y
       # como admin, que el cierre por UPDATE sigue exigiendo evidencia, que el
-      # histórico no se re-valida, y coteja el literal de POLICIES_CRITICAS
-      # contra el pg_get_expr de un servidor real.
+      # histórico no se re-valida, aplica la policy VIGENTE de 20261104000700
+      # (crear exige la acción del tab, el contrato intacto), y coteja el
+      # literal de POLICIES_CRITICAS contra el pg_get_expr de un servidor real
+      # — y que el guard da rojo con las formas sin contrato o con el permiso
+      # viejo.
       - name: Alta de tareas — la tarea nace pendiente, sin sellos
         env:
           PGBIN: ${{ steps.pg.outputs.bin }}

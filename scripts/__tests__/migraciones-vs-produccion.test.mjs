@@ -355,12 +355,14 @@ describe('compararConstraints · el homónimo incompatible', () => {
 
 // ── Policies críticas: la expresión se exige, no el nombre ───────────────────
 //
-// El caso que fija estas pruebas es tareas_bloque_insert (20260907001100): el
-// WITH CHECK obliga a que la tarea NAZCA pendiente y sin sellos PARA TODOS —
-// super_admin incluido. Re-declararla con el mismo nombre pero sin ese
-// contrato (la forma de #803), o con el bypass por rol delante (la forma de
-// 20260907000900), reabre el alta pre-cerrada — y un guard por nombre lo
-// daría por bueno.
+// El caso que fija estas pruebas es tareas_bloque_insert. Su CONTRATO viene de
+// 20260907000900 + 20260907001100: la tarea NACE pendiente y sin sellos PARA
+// TODOS, super_admin incluido. Su forma VIGENTE es la de 20261104000700 (#991),
+// que cambió sólo el permiso —crear exige la ACCIÓN del tab, no verlo— y dejó
+// el contrato idéntico y primero. Re-declararla con el mismo nombre pero sin
+// ese contrato (la forma de #803, o la de #991 sin las cláusulas), o con el
+// bypass por rol delante (la forma de 20260907000900), reabre el alta
+// pre-cerrada — y un guard por nombre lo daría por bueno.
 
 const WC_CANONICO = POLICIES_CRITICAS[0].withCheck
 const WC_803 =
@@ -369,6 +371,28 @@ const WC_803 =
 // super_admin de nacer pendiente. Es exactamente lo que 001100 vino a cerrar.
 const WC_900 =
   "(( SELECT is_super_admin() AS is_super_admin) OR ((estado = 'pendiente'::text) AND (completada_en IS NULL) AND (completado_por IS NULL) AND (anulada_en IS NULL) AND (anulada_por IS NULL) AND (motivo_anulacion IS NULL) AND (motivo_sin_evidencia IS NULL) AND (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id)) AND ( SELECT (user_has_permission('condominios.tab.tareas_personal'::text) OR user_has_permission('condominios.tab.turnos'::text) OR user_has_permission('condominios.tab.prog_limpieza'::text))))))))"
+// La forma de 20260907001100: contrato primero, pero bastaba VER uno de tres
+// tabs para crear. Fue la vigente hasta 20261104000700; volver a ella es drift.
+const WC_001100 =
+  "((estado = 'pendiente'::text) AND (completada_en IS NULL) AND (completado_por IS NULL) AND (anulada_en IS NULL) AND (anulada_por IS NULL) AND (motivo_anulacion IS NULL) AND (motivo_sin_evidencia IS NULL) AND (( SELECT is_super_admin() AS is_super_admin) OR (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id)) AND ( SELECT (user_has_permission('condominios.tab.tareas_personal'::text) OR user_has_permission('condominios.tab.turnos'::text) OR user_has_permission('condominios.tab.prog_limpieza'::text))))))))"
+// El permiso de 20261104000700, tal como lo imprime pg_get_expr.
+const PERMISO_ACCION =
+  "( SELECT (( SELECT condominios_puede_actuar('tareas_personal'::text, 'create'::text) AS condominios_puede_actuar) OR ( SELECT condominios_puede_actuar('tareas_personal'::text, 'create'::text) AS condominios_puede_actuar) OR ( SELECT condominios_puede_actuar('tareas_personal'::text, 'create'::text) AS condominios_puede_actuar)))"
+// El permiso NUEVO, pero SIN el contrato del alta: la regresión que importa.
+// Nombre, comando, empresa y acción en su sitio — y la tarea puede nacer
+// cerrada. Un guard que mirara el permiso y no el contrato lo daría por bueno.
+const WC_ACCION_SIN_CONTRATO =
+  `(( SELECT is_super_admin() AS is_super_admin) OR (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id)) AND ${PERMISO_ACCION}))))`
+
+const CLAUSULAS_CONTRATO = [
+  "(estado = 'pendiente'::text)",
+  '(completada_en IS NULL)',
+  '(completado_por IS NULL)',
+  '(anulada_en IS NULL)',
+  '(anulada_por IS NULL)',
+  '(motivo_anulacion IS NULL)',
+  '(motivo_sin_evidencia IS NULL)',
+]
 
 function policyProd(with_check, extra = {}) {
   return {
@@ -381,15 +405,15 @@ function policyProd(with_check, extra = {}) {
   }
 }
 
-const REGISTRADA_LA_POLICY = new Set(['20260907001100'])
+const REGISTRADA_LA_POLICY = new Set(['20260907001100', '20261104000700'])
 
 describe('compararPolicies · el WITH CHECK del alta', () => {
-  it('declara tareas_bloque_insert como crítica desde 20260907001100, con su contrato', () => {
+  it('declara tareas_bloque_insert como crítica desde 20261104000700, con su contrato', () => {
     const e = POLICIES_CRITICAS.find((p) => p.policy === 'tareas_bloque_insert')
     expect(e).toBeDefined()
     expect(e.tabla).toBe('tareas_bloque')
     expect(e.cmd).toBe('INSERT')
-    expect(e.desdeVersion).toBe('20260907001100')
+    expect(e.desdeVersion).toBe('20261104000700')
     // El contrato del alta, cláusula por cláusula.
     expect(e.withCheck).toContain("estado = 'pendiente'")
     for (const col of ['completada_en', 'completado_por', 'anulada_en', 'anulada_por',
@@ -399,6 +423,19 @@ describe('compararPolicies · el WITH CHECK del alta', () => {
     // Y el contrato va PRIMERO: is_super_admin vive DENTRO, no delante.
     expect(e.withCheck.indexOf("estado = 'pendiente'"))
       .toBeLessThan(e.withCheck.indexOf('is_super_admin'))
+    // El permiso es la ACCIÓN de crear (20261104000700), no ver el tab.
+    expect(e.withCheck).toContain(PERMISO_ACCION)
+    expect(e.withCheck).not.toContain('user_has_permission')
+  })
+
+  it('el literal vigente es el contrato de 001100 con SÓLO el permiso cambiado', () => {
+    // #991 sustituyó los átomos de permiso y nada más: si el literal difiriera
+    // de la forma de 001100 en otra cosa que el permiso, el contrato se habría
+    // tocado por el camino.
+    const permiso001100 =
+      "( SELECT (user_has_permission('condominios.tab.tareas_personal'::text) OR user_has_permission('condominios.tab.turnos'::text) OR user_has_permission('condominios.tab.prog_limpieza'::text)))"
+    expect(WC_001100).toContain(permiso001100)
+    expect(WC_CANONICO).toBe(WC_001100.replace(permiso001100, PERMISO_ACCION))
   })
 
   it('la query de policies trae las tablas que POLICIES_CRITICAS vigila', () => {
@@ -430,6 +467,39 @@ describe('compararPolicies · el WITH CHECK del alta', () => {
     expect(hallazgos[0]).toContain('WITH CHECK')
   })
 
+  it('FALLA con el permiso nuevo pero SIN el contrato del alta', () => {
+    // La regresión que el guard existe para ver: alguien re-declara la policy
+    // con la acción de crear —la forma «correcta» de #991— y pierde por el
+    // camino el «nace pendiente y sin sellos».
+    const hallazgos = compararPolicies({
+      registradas: REGISTRADA_LA_POLICY,
+      policiesProd: [policyProd(WC_ACCION_SIN_CONTRATO)],
+    })
+    expect(hallazgos).toHaveLength(1)
+    expect(hallazgos[0]).toContain('WITH CHECK')
+    expect(hallazgos[0]).toContain('20261104000700')
+  })
+
+  it('FALLA si se cae UNA sola cláusula del contrato', () => {
+    for (const clausula of CLAUSULAS_CONTRATO) {
+      expect(WC_CANONICO, `el literal ya no contiene ${clausula}`).toContain(`${clausula} AND `)
+      const sinUna = WC_CANONICO.replace(`${clausula} AND `, '')
+      expect(
+        compararPolicies({ registradas: REGISTRADA_LA_POLICY, policiesProd: [policyProd(sinUna)] }),
+        `sin ${clausula} el guard dio verde`,
+      ).toHaveLength(1)
+    }
+  })
+
+  it('FALLA si producción vuelve a la forma de 001100 (ver el tab bastaba para crear)', () => {
+    const hallazgos = compararPolicies({
+      registradas: REGISTRADA_LA_POLICY,
+      policiesProd: [policyProd(WC_001100)],
+    })
+    expect(hallazgos).toHaveLength(1)
+    expect(hallazgos[0]).toContain('WITH CHECK')
+  })
+
   it('pasa con la expresión canónica (los saltos de línea de pg_get_expr no cuentan)', () => {
     expect(
       compararPolicies({
@@ -451,13 +521,14 @@ describe('compararPolicies · el WITH CHECK del alta', () => {
     ).toContain('debía cubrir INSERT')
   })
 
-  it('no exige nada mientras 20260907001100 NO esté registrada', () => {
-    // Con solo 20260907000900 registrada, producción legítimamente tiene la
-    // forma vieja: exigir la nueva daría un rojo falso pre-apply.
+  it('no exige nada mientras 20261104000700 NO esté registrada', () => {
+    // Con 20260907001100 registrada y 20261104000700 todavía pendiente,
+    // producción legítimamente tiene la forma de 001100: exigir la nueva daría
+    // un rojo falso pre-apply.
     expect(
       compararPolicies({
-        registradas: new Set(['20260907000900']),
-        policiesProd: [policyProd(WC_900)],
+        registradas: new Set(['20260907000900', '20260907001100']),
+        policiesProd: [policyProd(WC_001100)],
       }),
     ).toEqual([])
   })

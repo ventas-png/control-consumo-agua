@@ -51,7 +51,10 @@
 // (pg_get_expr del WITH CHECK), no solo una policy con ese nombre. La lección
 // es tareas_bloque_insert (20260907000900): la tarea nace 'pendiente' y sin
 // sellos — re-declarar la policy sin ese contrato reabriría el alta
-// pre-cerrada con todos los nombres en su sitio.
+// pre-cerrada con todos los nombres en su sitio. El literal sigue a la ÚLTIMA
+// migración que la declara (hoy 20261104000700); una re-declaración nueva
+// tiene que actualizarlo en el mismo PR — insertSoloPendiente.test.ts lo
+// exige antes del merge, no después del apply.
 //
 // SOLO LECTURA: cinco consultas de catálogo. Jamás muta datos ni esquema.
 //
@@ -196,18 +199,36 @@ export function normalizarDef(def) {
 // normalizar espacios; run.sh de insert_solo_pendiente la coteja contra un
 // servidor real en cada corrida de CI. Mismo acotamiento que columnas y
 // constraints: solo se exige cuando `desdeVersion` ya está registrada.
+//
+// `desdeVersion` es la ÚLTIMA migración que re-declara la policy: la
+// comparación es exacta, así que el literal es el de ESA versión y ninguna
+// otra. Cuando una migración vuelve a declararla, este literal se actualiza en
+// el mismo PR (insertSoloPendiente.test.ts lo exige) — si no, el apply deja a
+// producción con la forma nueva y esto da un rojo falso, que fue lo que pasó
+// con #991.
 export const POLICIES_CRITICAS = [
   {
     tabla: 'tareas_bloque',
     policy: 'tareas_bloque_insert',
     cmd: 'INSERT',
-    // 20260907001100 puso el CONTRATO PRIMERO: super_admin quedó DENTRO del
-    // «nace pendiente y sin sellos» (antes el OR lo eximía). Si producción
-    // volviera a la forma de 20260907000900 —bypass por rol delante— la
-    // expresión ya no coincide y esto da rojo.
-    desdeVersion: '20260907001100',
+    // El CONTRATO del alta, que esto vigila, viene de 20260907000900 y
+    // 20260907001100: la tarea nace 'pendiente', con cierre, actor,
+    // anulación, motivo y sello de excepción en NULL — y va PRIMERO, con el
+    // super_admin DENTRO (la forma de 000900 lo eximía con el OR delante).
+    //
+    // 20261104000700 (#991, «escribir exige la ACCIÓN del tab, también en la
+    // base») re-declaró la policy y cambió SOLO los átomos de permiso: donde
+    // bastaba VER tareas_personal, turnos o prog_limpieza, ahora hace falta
+    // condominios_puede_actuar('tareas_personal', 'create'). El generador
+    // sustituye cada átomo por la acción, por eso aparece tres veces. El
+    // contrato quedó idéntico y primero.
+    //
+    // Da rojo si producción pierde una cláusula del contrato, si el bypass por
+    // rol vuelve delante (forma de 000900), y también si vuelve la forma de
+    // 001100: ver un tab no autoriza a crear tareas en él.
+    desdeVersion: '20261104000700',
     withCheck:
-      "((estado = 'pendiente'::text) AND (completada_en IS NULL) AND (completado_por IS NULL) AND (anulada_en IS NULL) AND (anulada_por IS NULL) AND (motivo_anulacion IS NULL) AND (motivo_sin_evidencia IS NULL) AND (( SELECT is_super_admin() AS is_super_admin) OR (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id)) AND ( SELECT (user_has_permission('condominios.tab.tareas_personal'::text) OR user_has_permission('condominios.tab.turnos'::text) OR user_has_permission('condominios.tab.prog_limpieza'::text))))))))",
+      "((estado = 'pendiente'::text) AND (completada_en IS NULL) AND (completado_por IS NULL) AND (anulada_en IS NULL) AND (anulada_por IS NULL) AND (motivo_anulacion IS NULL) AND (motivo_sin_evidencia IS NULL) AND (( SELECT is_super_admin() AS is_super_admin) OR (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id)) AND ( SELECT (( SELECT condominios_puede_actuar('tareas_personal'::text, 'create'::text) AS condominios_puede_actuar) OR ( SELECT condominios_puede_actuar('tareas_personal'::text, 'create'::text) AS condominios_puede_actuar) OR ( SELECT condominios_puede_actuar('tareas_personal'::text, 'create'::text) AS condominios_puede_actuar))))))))",
   },
 ]
 
@@ -534,6 +555,9 @@ async function main() {
     console.log('   Re-declarar una policy sin su contrato reabre el bypass con el nombre en')
     console.log('   verde (la clase de tareas_bloque_insert: la tarea debe NACER pendiente).')
     console.log('   Reponer la expresión con una migración forward-only, patrón 20260907000900.')
+    console.log('   Si una migración ya registrada la re-declaró A PROPÓSITO y conserva el')
+    console.log('   contrato, lo desactualizado es POLICIES_CRITICAS: llevar su desdeVersion y')
+    console.log('   su withCheck a esa versión (y cotejarlos con run.sh de insert_solo_pendiente).')
     console.log('')
   }
   if (r.tablasFaltantes.length + r.columnasFaltantes.length > 0) {
