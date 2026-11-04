@@ -15,7 +15,7 @@ preconfigurados (permisos y deep link incluidos). No hace falta `cap add`.
 | Objetivo | Necesitas |
 | --- | --- |
 | Compilar Android | Android Studio + JDK 21 + Android SDK 36 |
-| Compilar iOS | **Mac** con Xcode 16+ (los plugins se resuelven con Swift Package Manager; **no** hace falta CocoaPods) |
+| Compilar iOS | **Mac** con Xcode 26+ (desde el 28-abr-2026 App Store Connect exige el SDK de iOS 26; los plugins se resuelven con Swift Package Manager; **no** hace falta CocoaPods) |
 | Publicar iOS | Apple Developer Program — **US$99/año** |
 | Publicar Android | Google Play Console — **US$25 pago único** |
 | Push | Proyecto Firebase (FCM) + clave APNs en Apple Developer |
@@ -111,12 +111,22 @@ Sin `FCM_SERVICE_ACCOUNT`, `send-push` responde `{ status: 'not_configured' }` y
 no rompe nada.
 
 ### Paso 7 — Publicar
+El paso a paso completo (cuentas, llave de firma, AAB, archivo de Xcode,
+TestFlight, fichas, declaración de datos y problemas frecuentes) está en
+**`docs/PUBLICACION_TIENDAS.md`**. Resumen:
+
 - Sube `versionCode`/`versionName` (Android) y `MARKETING_VERSION`/
   `CURRENT_PROJECT_VERSION` (iOS): hoy están en el valor inicial (1 / 1.0).
-- **Play**: genera un **AAB** firmado (Play App Signing) y completa *Data safety*.
-- **App Store**: archiva en Xcode → App Store Connect y completa las etiquetas de
-  privacidad (cámara y ubicación).
-- Política de privacidad: reutiliza la página legal existente (`LegalPage`).
+- **Play**: `./gradlew bundleRelease` firma el **AAB** con el
+  `android/keystore.properties` (no versionado) y se sube con Play App Signing;
+  completar *Data safety*.
+- **App Store**: archiva en Xcode → App Store Connect y completa *App Privacy*
+  (cámara y ubicación).
+- Política de privacidad: `https://administratodo.com/politica-privacidad`
+  (`LegalPage`, ya pre-renderizada).
+- **Bloqueantes de revisión que aún no están en el código**: eliminación de
+  cuenta desde la app (Apple 5.1.1 v / Play *Account deletion*) y *Sign in with
+  Apple* o esconder el botón de Google en iOS (Apple 4.8). Detalle en la guía.
 
 ---
 
