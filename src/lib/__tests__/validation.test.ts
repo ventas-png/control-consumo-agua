@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import DOMPurify from 'dompurify'
 import {
   sanitizeInput,
@@ -7,6 +7,9 @@ import {
   validatePhoneNumber,
   formatPhoneForWa,
   validatePasswordStrength,
+  isPasswordPwned,
+  PWNED_PASSWORD_MESSAGE,
+  PWNED_PASSWORDS_RANGE_URL,
   validateNumber,
 } from '../validation'
 
@@ -184,6 +187,138 @@ describe('validatePasswordStrength', () => {
   it('falla sin número', () => {
     expect(validatePasswordStrength('NoNumbers').valid).toBe(false)
     expect(validatePasswordStrength('NoNumbers').message).toContain('numero')
+  })
+})
+
+describe('isPasswordPwned (HaveIBeenPwned, k-anonimato)', () => {
+  // SHA-1('password') = 5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8 → prefijo 5BAA6,
+  // sufijo 1E4C9B93F3F0682250B6CF8331B7EE68FD8. Vector público y estable.
+  const PREFIX = '5BAA6'
+  const SUFFIX = '1E4C9B93F3F0682250B6CF8331B7EE68FD8'
+
+  function respuesta(body: string, status = 200) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => body,
+    } as unknown as Response
+  }
+
+  /** Cuerpo con el formato real de la API: `SUFIJO:CONTADOR` separados por CRLF. */
+  function cuerpo(lineas: string[]): string {
+    return lineas.join('\r\n')
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('devuelve true cuando el sufijo del SHA-1 aparece en el rango', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      respuesta(cuerpo(['0018A45C4D1DEF81644B54AB7F969B88D65:3', `${SUFFIX}:3861493`, '011053FD0102E94D6AE2F8B83D76FAF94F6:1'])),
+    )
+    await expect(isPasswordPwned('password', { fetchImpl })).resolves.toBe(true)
+  })
+
+  it('solo viaja el prefijo de 5 hex: ni la contraseña ni el hash completo salen', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(respuesta(''))
+    await isPasswordPwned('password', { fetchImpl })
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe(`${PWNED_PASSWORDS_RANGE_URL}${PREFIX}`)
+    // Lo único variable de la URL son 5 hex: nunca el hash completo (40).
+    const path = url.slice(PWNED_PASSWORDS_RANGE_URL.length)
+    expect(path).toMatch(/^[0-9A-F]{5}$/)
+    expect(url.toUpperCase()).not.toContain(SUFFIX)
+    // Petición "simple" (sin cabeceras extra → sin preflight) y sin credenciales.
+    expect(init.method).toBe('GET')
+    expect(init.credentials).toBe('omit')
+    expect(init.headers).toBeUndefined()
+  })
+
+  it('devuelve false cuando el sufijo no está en el rango', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      respuesta(cuerpo(['0018A45C4D1DEF81644B54AB7F969B88D65:3', '011053FD0102E94D6AE2F8B83D76FAF94F6:1'])),
+    )
+    await expect(isPasswordPwned('password', { fetchImpl })).resolves.toBe(false)
+  })
+
+  it('compara el sufijo sin distinguir mayúsculas y tolera LF o espacios', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(respuesta(`abc:1\n ${SUFFIX.toLowerCase()} : 7 \n`))
+    await expect(isPasswordPwned('password', { fetchImpl })).resolves.toBe(true)
+  })
+
+  it('ignora entradas de relleno (contador 0) aunque coincida el sufijo', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(respuesta(cuerpo([`${SUFFIX}:0`])))
+    await expect(isPasswordPwned('password', { fetchImpl })).resolves.toBe(false)
+  })
+
+  it('contraseña vacía: false sin llamar a la API', async () => {
+    const fetchImpl = vi.fn()
+    await expect(isPasswordPwned('', { fetchImpl })).resolves.toBe(false)
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  // ── Fail-open: ningún fallo del tercero debe bloquear el formulario ──────
+  it('no bloquea si fetch rechaza (sin red / CSP / CORS)', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    await expect(isPasswordPwned('password', { fetchImpl })).resolves.toBe(false)
+  })
+
+  it('no bloquea ante una respuesta no-OK (5xx / 429)', async () => {
+    for (const status of [429, 500, 503]) {
+      const fetchImpl = vi.fn().mockResolvedValue(respuesta(`${SUFFIX}:10`, status))
+      await expect(isPasswordPwned('password', { fetchImpl }), `status ${status}`).resolves.toBe(false)
+    }
+  })
+
+  it('no bloquea si el cuerpo no se puede leer', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true, status: 200, text: async () => { throw new Error('body stream broken') },
+    } as unknown as Response)
+    await expect(isPasswordPwned('password', { fetchImpl })).resolves.toBe(false)
+  })
+
+  it('no bloquea si la API no responde dentro del timeout (aborta la petición)', async () => {
+    // fetch que nunca resuelve por sí solo: solo termina cuando se aborta la
+    // señal. Timers reales: el digest SHA-1 resuelve fuera del event loop
+    // simulado y con fake timers el setTimeout del abort nunca llegaría a
+    // registrarse antes de avanzar el reloj.
+    const fetchImpl = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    }))
+    await expect(
+      isPasswordPwned('password', { fetchImpl: fetchImpl as unknown as typeof fetch, timeoutMs: 20 }),
+    ).resolves.toBe(false)
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
+    expect(init.signal?.aborted).toBe(true)
+  })
+
+  it('no bloquea si el navegador no tiene crypto.subtle', async () => {
+    vi.stubGlobal('crypto', {})
+    const fetchImpl = vi.fn()
+    await expect(isPasswordPwned('password', { fetchImpl })).resolves.toBe(false)
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('no bloquea si no hay fetch disponible', async () => {
+    vi.stubGlobal('fetch', undefined)
+    await expect(isPasswordPwned('password')).resolves.toBe(false)
+  })
+
+  it('usa globalThis.fetch por defecto', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(respuesta(cuerpo([`${SUFFIX}:1`])))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(isPasswordPwned('password')).resolves.toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('el mensaje coincide con el que devuelve la edge function para reasons: ["pwned"]', () => {
+    // Mismo texto que classifyAuthCreateError (create-cliente-account/logic.ts):
+    // el usuario ve lo mismo antes de enviar que si el servidor lo rechaza.
+    expect(PWNED_PASSWORD_MESSAGE).toBe(
+      'La contraseña es demasiado común o apareció en filtraciones de datos conocidas. Elija una contraseña distinta, que no use en otros sitios.',
+    )
   })
 })
 

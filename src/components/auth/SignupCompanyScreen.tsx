@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { signupCompany } from '../../domain/auth/account'
-import { validatePasswordStrength } from '../../lib/validation'
+import { isPasswordPwned, PWNED_PASSWORD_MESSAGE, validatePasswordStrength } from '../../lib/validation'
 import { MONEDAS_ISO } from '../../lib/monedas'
 import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { BrandLogo } from '../shared/BrandLogo'
@@ -64,10 +64,20 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
     return null
   }
 
-  function nextStep() {
+  async function nextStep() {
     setError('')
     const e = validateStep1()
     if (e) { setError(e); return }
+    // La contraseña se fija en el paso 1 y no cambia en el 2, así que la
+    // comprobación contra HaveIBeenPwned (k-anonimato) va aquí: el usuario
+    // sigue en el campo y puede corregirla antes de llegar al envío. Si la
+    // API no responde, no bloquea: decide el servidor (signup-company).
+    setLoading(true)
+    try {
+      if (await isPasswordPwned(password)) { setError(PWNED_PASSWORD_MESSAGE); return }
+    } finally {
+      setLoading(false)
+    }
     setStep(2)
   }
 
@@ -194,8 +204,8 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
               />
             </label>
             {error && <div className="signup-error" role="alert">⚠️ {error}</div>}
-            <button className="signup-btn-primary" onClick={nextStep} type="button">
-              Siguiente →
+            <button className="signup-btn-primary" onClick={() => void nextStep()} type="button" disabled={loading}>
+              {loading ? 'Verificando…' : 'Siguiente →'}
             </button>
           </>
         )}

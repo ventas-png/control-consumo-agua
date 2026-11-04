@@ -24,6 +24,7 @@ import {
   fetchMonthlyTotalBreakdown,
 } from '../../domain/facturacion/billing'
 import { logSecurityEvent } from '../../lib/security'
+import { isPasswordPwned, PWNED_PASSWORD_MESSAGE } from '../../lib/validation'
 import { getDisplayRoleLabel, getDisplayRoleColor } from '../../lib/permissions'
 import { PreferenciasRegionales } from './PreferenciasRegionales'
 import { SesionesActivas } from './SesionesActivas'
@@ -184,6 +185,15 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     if (pwNew.length < 8) { setPwFb({ type: 'error', msg: 'La nueva contraseña debe tener al menos 8 caracteres' }); return }
     if (pwNew !== pwConfirm) { setPwFb({ type: 'error', msg: 'La nueva contraseña y la confirmación no coinciden' }); return }
     setPwLoading(true)
+    // Contraseña filtrada (HaveIBeenPwned, k-anonimato): Auth la rechazaría
+    // igual en updateUser con un error genérico. Va ANTES de verificar la
+    // contraseña actual para no gastar un intento de login en vano. Si la API
+    // no responde, no bloquea: decide el servidor.
+    if (await isPasswordPwned(pwNew)) {
+      setPwFb({ type: 'error', msg: PWNED_PASSWORD_MESSAGE })
+      setPwLoading(false)
+      return
+    }
     // Verify current password
     const { error: signInErr } = await signInWithPassword(currentUser.email, pwCurrent)
     if (signInErr) {
