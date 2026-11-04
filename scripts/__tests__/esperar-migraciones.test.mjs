@@ -292,7 +292,11 @@ describe('deploy-functions.yml respeta el orden', () => {
 
   it('el paso de la compuerta va ANTES que cualquier deploy-fn.sh', () => {
     const iPuerta = LINEAS_FN.findIndex((l) => l.includes('node scripts/esperar-migraciones.mjs'))
-    const iDeploy = LINEAS_FN.findIndex((l) => l.includes('deploy-fn.sh'))
+    // Lo que tiene que ir detrás de la compuerta es la INVOCACIÓN del script
+    // (`run: bash .github/scripts/deploy-fn.sh …`), no cualquier mención: desde
+    // 2026-11-04 el nombre aparece también arriba, en `on.push.paths`, para
+    // que un cambio en el script dispare el despliegue, y eso no es un deploy.
+    const iDeploy = LINEAS_FN.findIndex((l) => l.includes('bash .github/scripts/deploy-fn.sh'))
     expect(iPuerta).toBeGreaterThanOrEqual(0)
     expect(iDeploy).toBeGreaterThan(iPuerta)
   })
