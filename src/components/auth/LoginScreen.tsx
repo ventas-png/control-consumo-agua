@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { detectSsoForEmail, signInWithSso, type SsoEmailDetection } from '../../lib/sso'
+import { mostrarLoginConGoogle } from '../../lib/loginProviders'
 
 interface Props {
   onLogin: (email: string, password: string) => Promise<string | null>
@@ -66,6 +67,9 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
 
   const ssoAvailable = !!sso?.available
   const hidePassword = !!sso?.enforced && !ssoFailed
+  // Guideline 4.8 de App Review (Login Services): la app de iOS no ofrece
+  // Google mientras no exista Sign in with Apple. Ver src/lib/loginProviders.ts.
+  const conGoogle = mostrarLoginConGoogle()
 
   function getLoginStatusText(seconds: number): string {
     if (seconds >= 15) return 'Iniciando sistema, espere...'
@@ -247,7 +251,9 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               Inicia sesión para acceder al sistema
             </p>
 
-            {/* Google button */}
+            {/* Google button + divisor: solo donde se ofrece Google (en iOS no, guideline 4.8) */}
+            {conGoogle && (
+            <>
             <button
               className="login-btn-google"
               onClick={handleGoogle}
@@ -285,6 +291,8 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               <span style={{ fontSize: '13px', color: 'var(--at-ink-3)', fontWeight: 500 }}>o con tu correo</span>
               <div style={{ flex: 1, height: '1px', background: 'var(--at-line)' }} />
             </div>
+            </>
+            )}
 
             {/* Email input */}
             <div style={{ position: 'relative', marginBottom: '12px' }}>

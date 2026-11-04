@@ -7,6 +7,19 @@ vi.mock('../../../lib/supabase', () => ({
   warmUpSupabase: vi.fn(),
 }))
 
+// Plataforma simulada vía @capacitor/core (el camino real: platform.ts →
+// loginProviders.ts). Por defecto web; los tests de la app nativa la cambian.
+const capacitor = vi.hoisted(() => ({
+  isNativePlatform: vi.fn(() => false),
+  getPlatform: vi.fn(() => 'web'),
+}))
+vi.mock('@capacitor/core', () => ({ Capacitor: capacitor }))
+
+function simularPlataforma(plataforma: 'web' | 'android' | 'ios') {
+  capacitor.isNativePlatform.mockReturnValue(plataforma !== 'web')
+  capacitor.getPlatform.mockReturnValue(plataforma)
+}
+
 import { LandingPage } from '../LandingPage'
 import { checkA11y } from '../../../test/a11y'
 
@@ -15,6 +28,7 @@ beforeEach(() => {
   // El test "switches copy to English" persiste lang=en en la URL — limpiar
   // para que los siguientes tests vuelvan al español por defecto.
   window.history.replaceState({}, '', '/')
+  simularPlataforma('web')
 })
 
 function setup(opts: { mfaChallenge?: { email: string } | null; initialAuthError?: string | null } = {}) {
@@ -67,6 +81,34 @@ describe('LandingPage', () => {
   it('invokes the Google handler', async () => {
     const { onLoginWithGoogle } = setup()
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar con Google' }))
+    await waitFor(() => expect(onLoginWithGoogle).toHaveBeenCalledTimes(1))
+  })
+
+  // Guideline 4.8 de App Review (Login Services): sin Sign in with Apple, la
+  // app de iOS no puede ofrecer Google. Este modal es el login que ve la app.
+  it('en la app de iOS el modal no ofrece Google ni el separador, y el correo sigue funcionando', async () => {
+    simularPlataforma('ios')
+    const { onLogin, onLoginWithGoogle, container } = setup()
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    expect(screen.getByText('Bienvenido de vuelta')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Continuar con Google' })).toBeNull()
+    expect(screen.queryByText('o con tu correo')).toBeNull()
+
+    fireEvent.change(screen.getByPlaceholderText('nombre@empresa.com'), { target: { value: 'admin@empresa.com' } })
+    fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 's3cret' } })
+    fireEvent.click(document.querySelector('.login-fields button[type="submit"]') as HTMLButtonElement)
+    await waitFor(() => expect(onLogin).toHaveBeenCalledWith('admin@empresa.com', 's3cret'))
+    expect(onLoginWithGoogle).not.toHaveBeenCalled()
+    await checkA11y(container)
+  })
+
+  // Google Play no tiene esa regla: Android se comporta igual que la web.
+  it('en la app de Android el modal sigue ofreciendo Google', async () => {
+    simularPlataforma('android')
+    const { onLoginWithGoogle } = setup()
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    expect(screen.getByText('o con tu correo')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Continuar con Google' }))
     await waitFor(() => expect(onLoginWithGoogle).toHaveBeenCalledTimes(1))
   })
