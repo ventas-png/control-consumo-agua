@@ -12,6 +12,7 @@ import type { ProveedorCatalogo } from '../../../types/proveedores'
 import { ProveedorSelector } from '../../proveedores/ProveedorSelector'
 import { OperacionesLegadoPanel } from '../../proveedores/OperacionesLegadoPanel'
 import { tint } from '../../shared/statusTone'
+import { EditModal } from '../../shared/EditModal'
 import { SecureImage } from '../../shared/SecureImage'
 import { removeCondominiosMedia } from '../../../domain/shared/storage'
 import { FotoSuministroModal } from './suministros/FotoSuministroModal'
@@ -67,6 +68,14 @@ interface FormSuministro {
   notas: string
 }
 
+/** Un movimiento en blanco. Función y no constante: la fecha es la de hoy al abrir, no la de cargar el módulo. */
+function movFormVacio() {
+  return {
+    tipo: 'salida' as TipoMovimientoSum, cantidad: '', motivo: '',
+    area_destino: '', realizado_por: '', fecha: hoyLocalISO(), notas: '',
+  }
+}
+
 const FORM_VACIO: FormSuministro = {
   nombre: '', categoria: 'limpieza', unidad_medida: 'unidad', stock_actual: '0', stock_minimo: '0',
   ubicacion: '', proveedor_id: '', proveedor: '', costo_unitario: '', rendimiento: '', rendimiento_unidad: '', foto_url: '', notas: '',
@@ -102,10 +111,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
 
   const [form, setForm] = useState<FormSuministro>(FORM_VACIO)
 
-  const [movForm, setMovForm] = useState({
-    tipo: 'salida' as TipoMovimientoSum, cantidad: '', motivo: '',
-    area_destino: '', realizado_por: '', fecha: hoyLocalISO(), notas: '',
-  })
+  const [movForm, setMovForm] = useState(movFormVacio)
 
   const lista = suministros.filter(s =>
     (filtro === '' || s.categoria === filtro) &&
@@ -171,8 +177,13 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   function abrirNuevo() {
     descartarFotoPendiente()
     setForm(FORM_VACIO)
-    setSelectedId(null)
     setVista('nuevo')
+  }
+
+  /** Cerrar la ventana de movimiento descarta lo tecleado: al reabrir no aparece a medias. */
+  function cerrarMovimiento() {
+    setMovForm(movFormVacio())
+    setVista('lista')
   }
 
   function abrirEdicion(s: SuministroCondominio) {
@@ -259,7 +270,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
     // La BD además ignora los UPDATE directos a `stock_actual`, así que
     // reponerlos aquí no serviría de nada más que para contar doble.
 
-    setMovForm({ tipo: 'salida', cantidad: '', motivo: '', area_destino: '', realizado_por: '', fecha: hoyLocalISO(), notas: '' })
+    setMovForm(movFormVacio())
     setVista('lista')
     onRefresh()
   }
@@ -271,6 +282,8 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
+  const btnSecundario: CSSProperties = { padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }
+  const btnPrimario: CSSProperties = { padding: '8px 20px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }
   const editando = vista === 'editar'
   const fmtMoneda = (n: number) => `${moneda} ${n.toFixed(2)}`
 
@@ -340,164 +353,11 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
         })}
       </div>
 
-      {/* Panel derecho */}
+      {/* Panel derecho: la ficha seleccionada. Los formularios (nuevo, editar,
+          movimiento) ya no se pintan aquí: abren en ventana emergente, más
+          abajo, así la ficha sigue a la vista mientras se llena el formulario. */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {/* Formulario nuevo / editar */}
-        {(vista === 'nuevo' || (editando && selected)) && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>{editando ? `Editar suministro` : 'Nuevo suministro'}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={lbl} htmlFor="sum-f-nombre">Nombre *</label>
-                <input id="sum-f-nombre" style={inp} placeholder="Detergente multiusos…" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl} htmlFor="sum-f-categoria">Categoría</label>
-                <select id="sum-f-categoria" style={inp} value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value as CategoriaSupministro }))}>
-                  {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl} htmlFor="sum-f-unidad">Unidad de medida</label>
-                <select id="sum-f-unidad" style={inp} value={form.unidad_medida} onChange={e => setForm(p => ({ ...p, unidad_medida: e.target.value as UnidadMedidaSum }))}>
-                  {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-              </div>
-              <div>
-                <label id="sum-f-stock-lbl" style={lbl} htmlFor={editando ? undefined : 'sum-f-stock'}>Stock actual</label>
-                {editando && selected ? (
-                  // Lo mueven los movimientos: un UPDATE directo al stock lo
-                  // ignora la BD. Para corregirlo se registra un «ajuste».
-                  <div aria-labelledby="sum-f-stock-lbl" style={{ ...inp, background: 'var(--at-surface-2)', color: 'var(--at-ink-2)' }}>
-                    {selected.stock_actual} {selected.unidad_medida}
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>Se cambia con un movimiento de ajuste</div>
-                  </div>
-                ) : (
-                  <input id="sum-f-stock" type="number" style={inp} value={form.stock_actual} onChange={e => setForm(p => ({ ...p, stock_actual: e.target.value }))} />
-                )}
-              </div>
-              <div>
-                <label style={lbl} htmlFor="sum-f-minimo">Stock mínimo</label>
-                <input id="sum-f-minimo" type="number" style={inp} value={form.stock_minimo} onChange={e => setForm(p => ({ ...p, stock_minimo: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl} htmlFor="sum-f-ubicacion">Ubicación</label>
-                <input id="sum-f-ubicacion" style={inp} placeholder="Cuarto de limpieza…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
-              </div>
-              <div>
-                <ProveedorSelector
-                  proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
-                  value={form.proveedor_id || null} soloHabilitados label="Proveedor"
-                  onChange={(id, pr) => setForm(p => ({ ...p, proveedor_id: id ?? '', proveedor: pr?.nombre ?? '' }))}
-                />
-              </div>
-              <div>
-                <label style={lbl} htmlFor="sum-f-costo">Costo unitario ({moneda})</label>
-                <input id="sum-f-costo" type="number" style={inp} value={form.costo_unitario} onChange={e => setForm(p => ({ ...p, costo_unitario: e.target.value }))} />
-              </div>
-              <div style={{ gridColumn: 'span 3', background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>📐 Rendimiento</div>
-                <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 8 }}>
-                  Cuántos usos da 1 {form.unidad_medida}: por ejemplo, 1 litro rinde 40 aplicaciones. Con eso el stock se lee en usos y el costo en costo por uso.
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={lbl} htmlFor="sum-f-rendimiento">Rendimiento por {form.unidad_medida}</label>
-                    <input id="sum-f-rendimiento" type="number" min="0" step="any" style={inp} placeholder="40" value={form.rendimiento} onChange={e => setForm(p => ({ ...p, rendimiento: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label style={lbl} htmlFor="sum-f-rendimiento-unidad">Se mide en</label>
-                    <input id="sum-f-rendimiento-unidad" list="sum-f-rendimiento-unidades" style={inp} placeholder="aplicaciones, limpiezas, m², días…" value={form.rendimiento_unidad} onChange={e => setForm(p => ({ ...p, rendimiento_unidad: e.target.value }))} />
-                    <datalist id="sum-f-rendimiento-unidades">
-                      {UNIDADES_RENDIMIENTO.map(u => <option key={u} value={u} />)}
-                    </datalist>
-                  </div>
-                </div>
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <div style={lbl}>Foto</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {form.foto_url && (
-                    <SecureImage src={form.foto_url} alt={`Foto de ${form.nombre || 'el insumo'}`}
-                      style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--at-line)', display: 'block' }} />
-                  )}
-                  <button type="button" onClick={() => setFotoAbierta('form')}
-                    style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                    📷 {form.foto_url ? 'Cambiar foto' : 'Agregar foto'}
-                  </button>
-                  {(form.foto_url || null) !== fotoGuardada && (
-                    <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Se guarda con la ficha</span>
-                  )}
-                </div>
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl} htmlFor="sum-f-notas">Notas</label>
-                <input id="sum-f-notas" style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : editando ? '✅ Guardar cambios' : '✅ Guardar'}
-              </button>
-              <button onClick={cancelarFormulario}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Formulario movimiento */}
-        {vista === 'movimiento' && selected && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Registrar movimiento</div>
-            <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginBottom: 16 }}>
-              {selected.nombre} — Stock actual: <strong>{selected.stock_actual} {selected.unidad_medida}</strong>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={lbl}>Tipo *</label>
-                <select style={inp} value={movForm.tipo} onChange={e => setMovForm(p => ({ ...p, tipo: e.target.value as TipoMovimientoSum }))}>
-                  {TIPOS_MOV.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Cantidad *{movForm.tipo === 'ajuste' ? ' (nuevo stock)' : ''}</label>
-                <input type="number" style={inp} value={movForm.cantidad} onChange={e => setMovForm(p => ({ ...p, cantidad: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Fecha</label>
-                <input type="date" style={inp} value={movForm.fecha} onChange={e => setMovForm(p => ({ ...p, fecha: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Motivo</label>
-                <input style={inp} placeholder="Consumo semanal…" value={movForm.motivo} onChange={e => setMovForm(p => ({ ...p, motivo: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Área destino</label>
-                <input style={inp} placeholder="Lobby, piscina…" value={movForm.area_destino} onChange={e => setMovForm(p => ({ ...p, area_destino: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Realizado por</label>
-                <input style={inp} value={movForm.realizado_por} onChange={e => setMovForm(p => ({ ...p, realizado_por: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={registrarMovimiento} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : '✅ Registrar'}
-              </button>
-              <button onClick={() => setVista('lista')}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Detalle */}
-        {vista === 'lista' && selected && (
+        {selected ? (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
@@ -617,9 +477,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
               ] satisfies DataTableColumn<MovimientoSuministro>[]}
             />
           </div>
-        )}
-
-        {vista === 'lista' && !selected && (
+        ) : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
             Selecciona un suministro o crea uno nuevo
           </div>
@@ -627,6 +485,171 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
       </div>
 
       <OperacionesLegadoPanel companyId={companyId} tabla="suministros_condominio" projectId={proyectoId} canEdit={canEdit} />
+
+      {/* Ventana: nuevo / editar. Va ANTES de la ventana de foto en el árbol:
+          la foto se abre desde aquí y debe quedar encima (EditModal apila por
+          orden de montaje y Escape sólo cierra la de arriba). */}
+      {(vista === 'nuevo' || (editando && selected)) && (
+        <EditModal
+          title={editando ? 'Editar suministro' : 'Nuevo suministro'}
+          subtitle={editando && selected ? selected.nombre : undefined}
+          size="lg"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cancelarFormulario}
+          footer={<>
+            <button type="button" onClick={cancelarFormulario} disabled={saving} style={btnSecundario}>
+              Cancelar
+            </button>
+            <button type="button" onClick={() => void guardar()} disabled={saving}
+              style={{ ...btnPrimario, background: 'var(--at-success)', color: 'var(--at-on-status)' }}>
+              {saving ? 'Guardando…' : editando ? '✅ Guardar cambios' : '✅ Guardar'}
+            </button>
+          </>}
+        >
+          <div className="sum-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={lbl} htmlFor="sum-f-nombre">Nombre *</label>
+              <input id="sum-f-nombre" style={inp} placeholder="Detergente multiusos…" value={form.nombre} autoFocus onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="sum-f-categoria">Categoría</label>
+              <select id="sum-f-categoria" style={inp} value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value as CategoriaSupministro }))}>
+                {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl} htmlFor="sum-f-unidad">Unidad de medida</label>
+              <select id="sum-f-unidad" style={inp} value={form.unidad_medida} onChange={e => setForm(p => ({ ...p, unidad_medida: e.target.value as UnidadMedidaSum }))}>
+                {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div>
+              <label id="sum-f-stock-lbl" style={lbl} htmlFor={editando ? undefined : 'sum-f-stock'}>Stock actual</label>
+              {editando && selected ? (
+                // Lo mueven los movimientos: un UPDATE directo al stock lo
+                // ignora la BD. Para corregirlo se registra un «ajuste».
+                <div aria-labelledby="sum-f-stock-lbl" style={{ ...inp, background: 'var(--at-surface-2)', color: 'var(--at-ink-2)' }}>
+                  {selected.stock_actual} {selected.unidad_medida}
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>Se cambia con un movimiento de ajuste</div>
+                </div>
+              ) : (
+                <input id="sum-f-stock" type="number" style={inp} value={form.stock_actual} onChange={e => setForm(p => ({ ...p, stock_actual: e.target.value }))} />
+              )}
+            </div>
+            <div>
+              <label style={lbl} htmlFor="sum-f-minimo">Stock mínimo</label>
+              <input id="sum-f-minimo" type="number" style={inp} value={form.stock_minimo} onChange={e => setForm(p => ({ ...p, stock_minimo: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="sum-f-ubicacion">Ubicación</label>
+              <input id="sum-f-ubicacion" style={inp} placeholder="Cuarto de limpieza…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
+            </div>
+            <div>
+              <ProveedorSelector
+                proveedores={catalogo as ProveedorCatalogo[]} asignaciones={asignaciones} projectId={proyectoId}
+                value={form.proveedor_id || null} soloHabilitados label="Proveedor"
+                onChange={(id, pr) => setForm(p => ({ ...p, proveedor_id: id ?? '', proveedor: pr?.nombre ?? '' }))}
+              />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="sum-f-costo">Costo unitario ({moneda})</label>
+              <input id="sum-f-costo" type="number" style={inp} value={form.costo_unitario} onChange={e => setForm(p => ({ ...p, costo_unitario: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: 'span 3', background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>📐 Rendimiento</div>
+              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 8 }}>
+                Cuántos usos da 1 {form.unidad_medida}: por ejemplo, 1 litro rinde 40 aplicaciones. Con eso el stock se lee en usos y el costo en costo por uso.
+              </div>
+              <div className="sum-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={lbl} htmlFor="sum-f-rendimiento">Rendimiento por {form.unidad_medida}</label>
+                  <input id="sum-f-rendimiento" type="number" min="0" step="any" style={inp} placeholder="40" value={form.rendimiento} onChange={e => setForm(p => ({ ...p, rendimiento: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={lbl} htmlFor="sum-f-rendimiento-unidad">Se mide en</label>
+                  <input id="sum-f-rendimiento-unidad" list="sum-f-rendimiento-unidades" style={inp} placeholder="aplicaciones, limpiezas, m², días…" value={form.rendimiento_unidad} onChange={e => setForm(p => ({ ...p, rendimiento_unidad: e.target.value }))} />
+                  <datalist id="sum-f-rendimiento-unidades">
+                    {UNIDADES_RENDIMIENTO.map(u => <option key={u} value={u} />)}
+                  </datalist>
+                </div>
+              </div>
+            </div>
+            <div style={{ gridColumn: 'span 3' }}>
+              <div style={lbl}>Foto</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {form.foto_url && (
+                  <SecureImage src={form.foto_url} alt={`Foto de ${form.nombre || 'el insumo'}`}
+                    style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--at-line)', display: 'block' }} />
+                )}
+                <button type="button" onClick={() => setFotoAbierta('form')}
+                  style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                  📷 {form.foto_url ? 'Cambiar foto' : 'Agregar foto'}
+                </button>
+                {(form.foto_url || null) !== fotoGuardada && (
+                  <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Se guarda con la ficha</span>
+                )}
+              </div>
+            </div>
+            <div style={{ gridColumn: 'span 3' }}>
+              <label style={lbl} htmlFor="sum-f-notas">Notas</label>
+              <input id="sum-f-notas" style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
+            </div>
+          </div>
+        </EditModal>
+      )}
+
+      {/* Ventana: movimiento de stock */}
+      {vista === 'movimiento' && selected && (
+        <EditModal
+          title="Registrar movimiento"
+          subtitle={<>{selected.nombre} — Stock actual: <strong>{selected.stock_actual} {selected.unidad_medida}</strong></>}
+          size="md"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarMovimiento}
+          footer={<>
+            <button type="button" onClick={cerrarMovimiento} disabled={saving} style={btnSecundario}>
+              Cancelar
+            </button>
+            <button type="button" onClick={() => void registrarMovimiento()} disabled={saving}
+              style={{ ...btnPrimario, background: 'var(--at-accent)', color: 'white' }}>
+              {saving ? 'Guardando…' : '✅ Registrar'}
+            </button>
+          </>}
+        >
+          <div className="sum-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={lbl} htmlFor="sum-m-tipo">Tipo *</label>
+              <select id="sum-m-tipo" style={inp} value={movForm.tipo} onChange={e => setMovForm(p => ({ ...p, tipo: e.target.value as TipoMovimientoSum }))}>
+                {TIPOS_MOV.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl} htmlFor="sum-m-cantidad">Cantidad *{movForm.tipo === 'ajuste' ? ' (nuevo stock)' : ''}</label>
+              <input id="sum-m-cantidad" type="number" style={inp} value={movForm.cantidad} autoFocus onChange={e => setMovForm(p => ({ ...p, cantidad: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="sum-m-fecha">Fecha</label>
+              <input id="sum-m-fecha" type="date" style={inp} value={movForm.fecha} onChange={e => setMovForm(p => ({ ...p, fecha: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="sum-m-motivo">Motivo</label>
+              <input id="sum-m-motivo" style={inp} placeholder="Consumo semanal…" value={movForm.motivo} onChange={e => setMovForm(p => ({ ...p, motivo: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="sum-m-area">Área destino</label>
+              <input id="sum-m-area" style={inp} placeholder="Lobby, piscina…" value={movForm.area_destino} onChange={e => setMovForm(p => ({ ...p, area_destino: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="sum-m-por">Realizado por</label>
+              <input id="sum-m-por" style={inp} value={movForm.realizado_por} onChange={e => setMovForm(p => ({ ...p, realizado_por: e.target.value }))} />
+            </div>
+          </div>
+        </EditModal>
+      )}
 
       {fotoAbierta === 'detalle' && selected && (
         <FotoSuministroModal nombre={selected.nombre} valor={selected.foto_url ?? null} editable={canEdit}
