@@ -1,5 +1,7 @@
-// Vista extraída de CustomerPortal (refactor P1 #3): JSX idéntico al original.
+// Vista extraída de CustomerPortal (refactor P1 #3): JSX idéntico al original, más la tarjeta
+// «Eliminar mi cuenta» que exigen las tiendas (App Store 5.1.1 v / Google Play «Account deletion»).
 import type { PortalCtx } from './ctx'
+import { EliminarCuenta } from '../../perfil/EliminarCuenta'
 
 export function PerfilTab({ ctx }: { ctx: PortalCtx }) {
   const { currentUser, contactoEdit, setContactoEdit, savingContacto, contactoMsg, guardarContacto } = ctx
@@ -101,6 +103,10 @@ export function PerfilTab({ ctx }: { ctx: PortalCtx }) {
                   )}
                 </button>
               </div>
+            </div>
+
+            <div style={{ marginTop: '16px' }}>
+              <EliminarCuenta currentUser={currentUser} variant="seccion" />
             </div>
           </div>
   )

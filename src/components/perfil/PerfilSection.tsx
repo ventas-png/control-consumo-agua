@@ -30,6 +30,7 @@ import { PreferenciasRegionales } from './PreferenciasRegionales'
 import { SesionesActivas } from './SesionesActivas'
 import { LegalYPrivacidad } from './LegalYPrivacidad'
 import { MisLlamadasAtencion } from './MisLlamadasAtencion'
+import { EliminarCuenta } from './EliminarCuenta'
 import { tint } from '../shared/statusTone'
 
 interface Props {
@@ -1003,6 +1004,12 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
             )}
           </Card>
         )}
+
+        {/* Card — Eliminar mi cuenta (App Store 5.1.1 v / Google Play «Account
+            deletion»): la persona borra su propia cuenta en dos pasos. */}
+        <Card title="Eliminar mi cuenta" id="eliminar-cuenta-section">
+          <EliminarCuenta currentUser={currentUser} />
+        </Card>
 
       </div>
     </div>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- AdministraTodo · sitemap. Solo las páginas públicas indexables: la suite legal
-     (RGPD/CCPA + APIs de Google). La app SaaS y el landing no se indexan (ver robots.txt),
+     (RGPD/CCPA + APIs de Google) y la página de eliminación de cuenta (App Store / Google Play). La app SaaS y el landing no se indexan (ver robots.txt),
      por eso no se listan aquí — así cada URL del sitemap es rastreable y no genera avisos
      de "bloqueado por robots.txt". Cada página declara su alternativa en inglés (hreflang). -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -29,6 +29,15 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://administratodo.com/acuerdo-dpa-cookies?lang=en" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://administratodo.com/acuerdo-dpa-cookies" />
     <lastmod>2026-06-04</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://administratodo.com/eliminar-cuenta</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://administratodo.com/eliminar-cuenta" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://administratodo.com/eliminar-cuenta?lang=en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://administratodo.com/eliminar-cuenta" />
+    <lastmod>2026-11-04</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>

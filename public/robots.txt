@@ -12,6 +12,7 @@ Allow: /sitemap.xml
 Allow: /politica-privacidad
 Allow: /terminos-servicio
 Allow: /acuerdo-dpa-cookies
+Allow: /eliminar-cuenta
 Disallow: /auth
 Disallow: /admin
 Disallow: /empresa

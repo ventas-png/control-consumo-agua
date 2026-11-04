@@ -22,6 +22,7 @@ import type { CompanyInfo, ProjectInfo, ClienteContacto } from './customer/ctx'
 import { DashboardTab } from './customer/DashboardTab'
 import { ServiciosTab } from './customer/ServiciosTab'
 import { PerfilTab } from './customer/PerfilTab'
+import { EliminarCuenta } from '../perfil/EliminarCuenta'
 import { CustomerPaymentsTab } from './CustomerPaymentsTab'
 import { CustomerComunicacion } from './CustomerComunicacion'
 import { BrandLogo } from '../shared/BrandLogo'
@@ -422,6 +423,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           >
             Cerrar sesión
           </button>
+          {/* App Store 5.1.1 v / Google Play «Account deletion»: también sin servicios se puede borrar la cuenta. */}
+          <div style={{ marginTop: '18px' }}>
+            <EliminarCuenta currentUser={currentUser} variant="enlace" />
+          </div>
         </div>
       </div>
     )
