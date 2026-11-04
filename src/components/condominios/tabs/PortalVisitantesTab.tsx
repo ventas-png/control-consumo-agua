@@ -192,7 +192,7 @@ export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], diasAv
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div className="portal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={labelBase}>Nombre completo *</label>
                 <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
@@ -255,7 +255,10 @@ export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], diasAv
               </div>
 
               <div style={{ gridColumn: '1 / -1' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+                {/* auto-fill y no 3 columnas fijas: en el teléfono tres casillas de
+                  * ~84px no dejaban leer "Foto del DPI / Documento"; con 130px de
+                  * mínimo caben dos por fila y la tercera baja. */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 130px), 1fr))', gap: '14px' }}>
                   <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" capture />
                   {!form.es_menor && (
                     <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" capture />
@@ -374,7 +377,7 @@ export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], diasAv
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
               <button onClick={preAutorizar} disabled={saving}
                 style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Autorizando...' : `✅ Pre-autorizar visita${acompanantes.length > 0 ? ` (+${acompanantes.length})` : ''}`}

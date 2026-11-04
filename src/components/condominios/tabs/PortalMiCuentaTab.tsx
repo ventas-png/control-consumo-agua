@@ -167,7 +167,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, recargoRows, c
           onClick={e => e.target === e.currentTarget && !procesando && setPagando(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
         >
-          <div style={{ background: 'var(--at-surface)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+          <div style={{ background: 'var(--at-surface)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
             <h2 style={{ margin: '0 0 4px', fontSize: 19, fontWeight: 800, color: 'var(--at-ink)' }}>Pagar cuota</h2>
             <p style={{ margin: '0 0 18px', fontSize: 13.5, color: 'var(--at-ink-2)' }}>
               {pagando.concepto.replace(/_/g, ' ')} — {pagando.periodo}

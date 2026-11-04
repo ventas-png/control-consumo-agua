@@ -58,6 +58,16 @@ function destinoPortalCliente(setTab: (t: PortalTab) => void) {
 
 export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [tab, setTab] = useState<PortalTab>('dashboard')
+  // La tira de pestañas desliza en horizontal en el teléfono y la pestaña
+  // recién elegida puede quedar medio fuera (se tocaba "Mi Perfil" asomando
+  // por el borde y la tira no la seguía). Misma receta que <TabStrip>:
+  // `block: 'nearest'` para no mover el scroll vertical de la página y `?.()`
+  // porque jsdom no implementa scrollIntoView.
+  const tabStripRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    tabStripRef.current?.querySelector('.portal-tab.active')
+      ?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
+  }, [tab])
   const [loading, setLoading] = useState(true)
   const [companies, setCompanies] = useState<CompanyInfo[]>([])
   const [companyActivoMap, setCompanyActivoMap] = useState<Record<string, boolean>>({})
@@ -480,7 +490,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             dos líneas ("Mis / Servicios") y, aun así, la fila ensanchaba el
             documento y TODO el portal se podía arrastrar de lado. Aquí no hay
             red de seguridad de `.app-main`, que solo cubre el panel de admin. */}
-        <div className="tab-strip-scrollable" style={{
+        <div ref={tabStripRef} className="tab-strip-scrollable" style={{
           maxWidth: '900px', margin: '0 auto',
           padding: '0 24px',
           display: 'flex', gap: '4px', overflowX: 'auto',
@@ -515,7 +525,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '28px 24px' }}>
+      <div className="portal-main" style={{ maxWidth: '900px', margin: '0 auto', padding: '28px 24px' }}>
 
         {/* ── TAB: DASHBOARD ── */}
         {tab === 'dashboard' && <DashboardTab ctx={ctx} />}

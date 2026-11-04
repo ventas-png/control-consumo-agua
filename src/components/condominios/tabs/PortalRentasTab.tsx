@@ -422,7 +422,7 @@ function SolicitudForm({ unidadId, borrador, onSolicitudChange, prevRechazada, p
             Con estos datos la administración evalúa la solicitud y, al aprobarla, genera el contrato de tu unidad.
           </div>
 
-          <div style={rowStyle}>
+          <div className="portal-form-grid" style={rowStyle}>
             <div style={{ gridColumn: '1/-1' }}>
               <label style={labelStyle}>Nombre del arrendatario *</label>
               <input style={fieldStyle} aria-label="Nombre del arrendatario *" value={datos.arrendatario_nombre} onChange={e => setDato('arrendatario_nombre', e.target.value)} placeholder="Nombre completo" />
@@ -1129,7 +1129,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                       color: i.tiene_cuenta ? 'var(--at-success)' : 'var(--at-warning-strong)',
                     }}>{i.tiene_cuenta ? '✓ Con cuenta' : 'Cuenta pendiente'}</span>
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '2px', overflowWrap: 'anywhere' }}>
                     {i.cliente_email && <>✉️ {i.cliente_email}</>}{i.cliente_email && i.cliente_telefono && '  ·  '}{i.cliente_telefono && <>📞 {i.cliente_telefono}</>}
                   </div>
                   {!i.tiene_cuenta && (
@@ -1160,10 +1160,10 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
             return (
               <div key={c.id} style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'var(--at-surface)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)', marginBottom: '4px' }}>👤 {c.arrendatario_nombre}</div>
                     {c.arrendatario_telefono && <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)' }}>📞 {c.arrendatario_telefono}</div>}
-                    {c.arrendatario_email && <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)' }}>✉️ {c.arrendatario_email}</div>}
+                    {c.arrendatario_email && <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>✉️ {c.arrendatario_email}</div>}
                     <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)', marginTop: '4px' }}>
                       📅 {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' (indefinido)'}{'  '}|{'  '}💰 Renta: {c.monto_renta.toLocaleString()} · Día {c.dia_pago}
                     </div>
@@ -1188,7 +1188,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>{editCA ? 'Editar contrato' : 'Nuevo contrato de arrendamiento'}</h3>
                   <button onClick={() => setShowCA(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--at-ink-3)' }}>✕</button>
                 </div>
-                <div style={rowStyle}>
+                <div className="portal-form-grid" style={rowStyle}>
                   <div style={{ gridColumn: '1/-1' }}>
                     <label style={labelStyle}>Nombre del arrendatario *</label>
                     <input style={fieldStyle} value={formCA.arrendatario_nombre ?? ''} onChange={e => setFormCA(p => ({ ...p, arrendatario_nombre: e.target.value }))} placeholder="Nombre completo" />
@@ -1260,7 +1260,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                 <p style={{ margin: '0 0 18px', fontSize: '12.5px', color: 'var(--at-ink-3)', lineHeight: 1.5 }}>
                   Con estos datos tu inquilino creará su cuenta en la app (validando DPI/CUI + fecha de nacimiento + email) y verá <strong>solo esta unidad</strong>. Verifícalos con su documento.
                 </p>
-                <div style={rowStyle}>
+                <div className="portal-form-grid" style={rowStyle}>
                   <div style={{ gridColumn: '1/-1' }}>
                     <label style={labelStyle}>Nombre completo *</label>
                     <input style={fieldStyle} value={formInq.nombre} onChange={e => setFormInq(p => ({ ...p, nombre: e.target.value }))} placeholder="Como aparece en su documento" />
@@ -1358,7 +1358,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>{editSTR ? 'Editar reserva STR' : 'Nueva reserva STR'}</h3>
                   <button onClick={resetSTRForm} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--at-ink-3)' }}>✕</button>
                 </div>
-                <div style={rowStyle}>
+                <div className="portal-form-grid" style={rowStyle}>
                   <div style={{ gridColumn: '1/-1' }}>
                     <label style={labelStyle}>Nombre del huésped *</label>
                     <input style={fieldStyle} value={formSTR.huesped_nombre ?? ''} onChange={e => setFormSTR(p => ({ ...p, huesped_nombre: e.target.value }))} placeholder="Nombre completo" />

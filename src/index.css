@@ -362,10 +362,9 @@ button:focus:not(:focus-visible) {
  * desaparece al llegar al final del scroll.
  *
  * Activacion solo en ≤640px (mismo breakpoint que table-scroll). El caller
- * solo agrega className="tab-strip-scrollable" — no requiere wrapper extra
- * ni cambios de layout. El position:relative se aplica automaticamente. */
+ * solo agrega className="tab-strip-scrollable" a su contenedor flex — no
+ * requiere wrapper extra ni cambios de layout. */
 .tab-strip-scrollable {
-  position: relative;
   /* Touch scroll suave en iOS para el momentum */
   -webkit-overflow-scrolling: touch;
   /* Snap tabs al borde izquierdo para que el usuario aterrize en un tab
@@ -375,13 +374,22 @@ button:focus:not(:focus-visible) {
 .tab-strip-scrollable > * {
   scroll-snap-align: start;
 }
+/* El indicador es `position: sticky` y NO `absolute`, a propósito. La tira
+ * es a la vez el contenedor posicionado y el contenedor con scroll, y un
+ * `absolute; right: 0` se ancla al borde derecho de la caja SIN desplazar:
+ * al deslizar la tira, el degradado viajaba con el contenido y aparecía en
+ * medio de la fila, tapando una pestaña ("Mis Pagos" en el portal de Agua)
+ * mientras la pestaña activa quedaba fuera de la vista sin ningún aviso.
+ * `sticky; right: 0` se pega al borde derecho del scrollport, que es lo que
+ * se quería. Como la tira es flex, el pseudo-elemento es un ítem más: el
+ * `margin-left` negativo anula su anchura para que no sume espacio al final. */
 .tab-strip-scrollable::after {
   content: '';
-  position: absolute;
-  top: 0;
+  position: sticky;
   right: 0;
-  bottom: 0;
-  width: 28px;
+  flex: 0 0 28px;
+  margin-left: -28px;
+  align-self: stretch;
   background: linear-gradient(to left,
     color-mix(in srgb, var(--at-surface) 90%, transparent),
     transparent);
@@ -392,6 +400,19 @@ button:focus:not(:focus-visible) {
   .tab-strip-scrollable::after {
     display: block;
   }
+  /* Donde hay animaciones guiadas por scroll (Chrome 115+, Safari 26+), el
+   * degradado se apaga al llegar al final de la tira: ya no hay nada más que
+   * anunciar. En navegadores sin soporte queda siempre visible, como antes. */
+  @supports (animation-timeline: scroll()) {
+    .tab-strip-scrollable::after {
+      animation: tab-strip-fade-out linear both;
+      animation-timeline: scroll(nearest inline);
+    }
+  }
+}
+@keyframes tab-strip-fade-out {
+  0%, 85% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 @media (max-width: 640px) {
@@ -696,6 +717,21 @@ button:focus:not(:focus-visible) {
     padding-top: 16px !important;
   }
 
+  /* ── Portal: menos aire lateral en el teléfono ─────────────────────────
+   *
+   * El contenido del portal lleva 24px de margen lateral y, en Condominios,
+   * la tarjeta de cada pestaña suma otros 24px: en un teléfono de 360px
+   * quedaban 264px para el formulario, y 229px dentro de cualquier tarjeta
+   * interior. Con 12px + 16px quedan 304px. `!important` porque los
+   * paddings van inline en los dos portales. */
+  .portal-main {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .portal-tab-card {
+    padding: 16px !important;
+  }
+
   /* ── Anti-autozoom de iOS: el font-size manda y va con !important ────────
    *
    * Safari amplía la página al enfocar un campo cuyo font-size computado sea
@@ -716,6 +752,19 @@ button:focus:not(:focus-visible) {
   textarea,
   select {
     font-size: 16px !important;
+  }
+}
+
+/* ─── Portal: formularios de dos columnas → una en el teléfono ────────────
+ *
+ * Los formularios del residente (contrato de arrendamiento, visita
+ * pre-autorizada, mudanza) van en rejillas `1fr 1fr` inline. En un teléfono,
+ * dentro de la ventana modal, cada columna medía ~130px: etiquetas partidas
+ * en dos líneas y campos de fecha en los que no cabe la fecha. Una sola
+ * columna por debajo de 480px; de ahí en adelante se respeta el inline. */
+@media (max-width: 480px) {
+  .portal-form-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 }
 
@@ -911,6 +960,52 @@ button:focus:not(:focus-visible) {
 ::placeholder {
   color: #64748b;
   opacity: 1;
+}
+
+/* ─── Campos de fecha y hora: el mismo ancho que el resto de campos ───────
+ *
+ * Los formularios dan a TODOS sus campos `width: 100%` + `box-sizing:
+ * border-box`, y aun así en el iPhone los <input type="date"> y <input
+ * type="time"> sobresalían del formulario exactamente el padding más el
+ * borde (unos 27px): se veía en el contrato de arrendamiento, la visita
+ * pre-autorizada, la visita frecuente, la mascota y la reserva del portal
+ * del residente. No es un estilo del proyecto: WebKit en iOS dibuja esos
+ * campos con el tema `menulist-button` y, al ajustar el estilo, les impone
+ * `box-sizing: content-box` por encima de lo que declare la hoja o el
+ * atributo `style`. 100% + padding = desborde. Con `appearance: none` el
+ * tema no interviene y el `border-box` del autor vuelve a mandar. El
+ * selector de fecha nativo se sigue abriendo igual al tocar el campo.
+ *
+ * `min-width: 0` cubre Android: en una rejilla `1fr 1fr` de 360px el ancho
+ * mínimo intrínseco del campo de fecha de Chrome ensanchaba la columna y
+ * empujaba la rejilla fuera de la pantalla. Un ítem de grid/flex no encoge
+ * por debajo de su contenido salvo que se le permita explícitamente.
+ *
+ * Fuera de toda media query a propósito: el iPad también es WebKit y supera
+ * los 767px. En escritorio no cambia nada visible: los 307 campos de fecha
+ * de la app llevan su estilo (borde, fondo) en línea o por clase, no del
+ * tema del navegador. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"] {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+/* iOS pinta el valor en un pseudo-elemento propio: centrado, con 24px de
+ * margen derecho reservados para un botón que con `appearance: none` ya no
+ * se dibuja y, cuando el campo está vacío, sin altura alguna (el campo se
+ * aplastaba hasta el padding). Alineado al inicio como cualquier otro campo
+ * y con la altura de una línea de texto. Chrome, Firefox y Safari de
+ * escritorio no tienen este pseudo-elemento: la regla no les afecta. */
+input::-webkit-date-and-time-value {
+  text-align: start;
+  min-height: 1.2em;
+  margin: 0;
 }
 
 /* ─── Reduced Motion (a11y) ───────────────────────────────────────────────

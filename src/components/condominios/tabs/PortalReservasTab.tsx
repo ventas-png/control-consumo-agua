@@ -606,12 +606,17 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
             const amenidad = amenidades.find(a => a.id === r.amenidad_id)
             const accent = r.estado === 'confirmada' ? 'var(--at-success)' : r.estado === 'pendiente' ? 'var(--at-warning-strong)' : 'var(--at-ink-3)'
             return (
-              <div key={r.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: '14px 16px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease' }}
+              <div key={r.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: '14px 16px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease' }}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 16px -8px rgba(15,23,42,0.18)' }}
                 onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}>
                 <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: accent }} />
                 <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,var(--at-primary-soft),#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📅</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Base de 180px y no `flex: 1` (base 0): con base 0 el texto no
+                  * reclama sitio, el estado y «Cancelar» (ambos sin encoger) se
+                  * quedaban en la misma línea y en un teléfono el texto se
+                  * aplastaba a 0px con el botón recortado. Con base 180px, si no
+                  * caben todos, el estado y el botón pasan a la línea siguiente. */}
+                <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--at-ink)' }}>{amenidad?.nombre ?? 'Amenidad'}</div>
                   <div style={{ fontSize: 12.5, color: 'var(--at-ink-3)', marginTop: 2, textTransform: 'capitalize' }}>
                     {formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—')} · {r.hora_inicio} – {r.hora_fin}
