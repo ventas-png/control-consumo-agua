@@ -124,9 +124,10 @@ TestFlight, fichas, declaración de datos y problemas frecuentes) está en
   (cámara y ubicación).
 - Política de privacidad: `https://administratodo.com/politica-privacidad`
   (`LegalPage`, ya pre-renderizada).
-- **Bloqueantes de revisión que aún no están en el código**: eliminación de
-  cuenta desde la app (Apple 5.1.1 v / Play *Account deletion*) y *Sign in with
-  Apple* o esconder el botón de Google en iOS (Apple 4.8). Detalle en la guía.
+- **Bloqueante de revisión que aún no está en el código**: eliminación de
+  cuenta desde la app (Apple 5.1.1 v / Play *Account deletion*). El de Apple 4.8
+  (login social sin *Sign in with Apple*) ya está cubierto para la v1: la app de
+  iOS no muestra el botón de Google (paso 4 y sección 5). Detalle en la guía.
 
 ---
 
