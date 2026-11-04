@@ -8,14 +8,21 @@
 
 import type { ReactElement } from 'react'
 import type { Lang } from '../landing/i18n'
+import { RUTA_PUBLICA_ELIMINAR_CUENTA } from '../../lib/routes'
 
-export type LegalDocType = 'privacy' | 'tos' | 'dpa'
+/**
+ * Documentos públicos sessionless. Los tres legales (RGPD/CCPA) y, desde la publicación en las tiendas, la página de eliminación de cuenta
+ * que exigen Google Play («Account deletion»: una URL web para pedir el borrado sin la app) y Apple (5.1.1 v). No confundir con el
+ * LegalDocType de domain/legal/queries.ts, que es el catálogo de ACEPTACIÓN en la BD: la página de eliminación no se acepta, sólo se lee.
+ */
+export type LegalDocType = 'privacy' | 'tos' | 'dpa' | 'account_deletion'
 
 /** Rutas públicas canónicas de cada documento (footer, click-wrap, sitemap, enlaces cruzados). */
 export const LEGAL_PATHS: Record<LegalDocType, string> = {
   privacy: '/politica-privacidad',
   tos: '/terminos-servicio',
   dpa: '/acuerdo-dpa-cookies',
+  account_deletion: RUTA_PUBLICA_ELIMINAR_CUENTA,
 }
 
 /** Enlace interno preservando el idioma (los enlaces EN llevan ?lang=en). */
@@ -53,6 +60,13 @@ export const LEGAL_META: Record<Lang, Record<LegalDocType, LegalDocMeta>> = {
         'Anexo de Procesamiento de Datos (DPA) y Política de Cookies de administratodo.com: roles de responsable y encargado del tratamiento, subprocesadores, medidas de seguridad y gestión de cookies conforme al RGPD.',
       updated: 'Última actualización: 7 de agosto de 2026',
     },
+    account_deletion: {
+      title: 'Eliminación de cuenta',
+      metaTitle: 'Eliminar tu cuenta | AdministraTodo',
+      metaDescription:
+        'Cómo eliminar tu cuenta de AdministraTodo desde la app o pedirlo por correo sin instalarla, y qué datos se borran y cuáles se conservan por obligación legal.',
+      updated: 'Última actualización: 4 de noviembre de 2026',
+    },
   },
   en: {
     privacy: {
@@ -75,6 +89,13 @@ export const LEGAL_META: Record<Lang, Record<LegalDocType, LegalDocMeta>> = {
       metaDescription:
         'administratodo.com Data Processing Addendum (DPA) and Cookie Policy: controller/processor roles, sub-processors, security measures and cookie management under the GDPR.',
       updated: 'Last updated: August 7, 2026',
+    },
+    account_deletion: {
+      title: 'Account deletion',
+      metaTitle: 'Delete your account | AdministraTodo',
+      metaDescription:
+        'How to delete your AdministraTodo account from the app or request it by email without installing it, and which data is deleted or retained by legal obligation.',
+      updated: 'Last updated: November 4, 2026',
     },
   },
 }
@@ -692,7 +713,189 @@ function DpaBodyEn(): ReactElement {
   )
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ELIMINACIÓN DE CUENTA (App Store 5.1.1 v · Google Play «Account deletion»)
+// ════════════════════════════════════════════════════════════════════════════
+// Página pública para pedir el borrado SIN la app (Google la exige en Data safety) y guía de la opción dentro de la app. Lo que dice sobre
+// qué se borra y qué se conserva es lo que hace supabase/functions/delete-own-account (ver su validate.ts y docs/ELIMINACION_CUENTA.md):
+// si cambia la función, cambia este texto.
+
+const SOPORTE = 'soporte@administratodo.com'
+const MAILTO_ELIMINAR_ES = `mailto:${SOPORTE}?subject=${encodeURIComponent('Eliminación de cuenta')}`
+const MAILTO_ELIMINAR_EN = `mailto:${SOPORTE}?subject=${encodeURIComponent('Account deletion')}`
+
+function AccountDeletionBodyEs(): ReactElement {
+  return (
+    <>
+      <p>
+        Si tienes una cuenta en AdministraTodo —como propietario o miembro del equipo de una empresa, o como residente o cliente en el
+        portal— puedes eliminarla en cualquier momento. Esta página explica cómo hacerlo desde la app, cómo pedirlo sin la app y qué datos
+        se borran y cuáles se conservan.
+      </p>
+
+      <h2>1. Eliminar la cuenta desde la app o la web</h2>
+      <p>Es la vía más rápida: la eliminación es inmediata.</p>
+      <ol>
+        <li>Inicia sesión en la app (iOS o Android) o en <a href="https://administratodo.com">administratodo.com</a>.</li>
+        <li>
+          <strong>Panel de empresa:</strong> abre <strong>Mi perfil</strong> en el menú y baja hasta la sección{' '}
+          <strong>Eliminar mi cuenta</strong>. <strong>Portal de residentes y clientes:</strong> abre la pestaña <strong>Mi Perfil</strong>{' '}
+          o usa el enlace <strong>Eliminar mi cuenta</strong> al pie del portal.
+        </li>
+        <li>
+          Pulsa <strong>Eliminar mi cuenta</strong>, lee el aviso y confirma con tu contraseña actual (las cuentas que entran con Google no
+          la tienen) y la palabra <strong>ELIMINAR</strong>.
+        </li>
+      </ol>
+      <p>
+        Al terminar se cierra tu sesión en ese dispositivo y la cuenta deja de existir; en los demás dispositivos la sesión caduca sola en
+        menos de una hora.
+      </p>
+
+      <h2>2. Pedir la eliminación sin la app</h2>
+      <p>
+        Si ya no tienes la app instalada o no puedes iniciar sesión, escríbenos a{' '}
+        <a href={MAILTO_ELIMINAR_ES}>{SOPORTE}</a> con el asunto «Eliminación de cuenta»,{' '}
+        <strong>desde el correo con el que te registraste</strong>, e indica tu nombre completo. Si escribes desde otro correo te pediremos
+        una verificación adicional antes de actuar: nunca borramos una cuenta sin confirmar que la solicitud viene de su titular.
+      </p>
+      <p>
+        Confirmaremos la recepción en un máximo de <strong>5 días hábiles</strong> y completaremos la eliminación en un plazo máximo de{' '}
+        <strong>30 días</strong> desde la verificación, avisándote por correo cuando esté hecha.
+      </p>
+
+      <h2>3. Qué se elimina</h2>
+      <ul>
+        <li>Tu acceso (correo y contraseña, o la vinculación con Google) y todas tus sesiones activas.</li>
+        <li>Tu perfil de usuario: nombre, rol, preferencias regionales y de notificaciones.</li>
+        <li>Tus notificaciones dentro de la app.</li>
+        <li>Los roles y permisos que tenías asignados.</li>
+      </ul>
+
+      <h2>4. Qué se conserva y por qué</h2>
+      <ul>
+        <li>
+          <strong>Registros de la empresa en los que participaste.</strong> Lecturas de medidores, pagos, cuotas, tickets, pólizas contables
+          y documentos firmados son registros de la empresa (administradora, condominio u operadora de agua) y deben conservarse por
+          obligaciones contables y fiscales. Se mantienen <strong>desvinculados de tu usuario</strong>: el dato «quién lo registró» queda
+          vacío. Los documentos que llevan una firma o un nombre impreso (actas, acuses, cartas) se conservan tal cual, por su naturaleza.
+        </li>
+        <li>
+          <strong>Tu expediente como residente o cliente.</strong> Los datos que tu administradora o empresa de agua tiene sobre tu unidad
+          o servicio (nombre, contacto, lecturas, pagos) pertenecen a esa empresa, que es la responsable del tratamiento. Eliminar tu cuenta
+          del portal no los borra: puedes solicitar su supresión directamente a esa empresa, conforme a nuestra{' '}
+          <a href={LEGAL_PATHS.privacy}>Política de Privacidad</a>.
+        </li>
+        <li>
+          <strong>Evidencia legal y de seguridad.</strong> La aceptación de los documentos legales y un registro mínimo de la eliminación
+          (fecha y dirección IP) se conservan sin tu nombre como prueba de cumplimiento.
+        </li>
+      </ul>
+
+      <h2>5. Si eres el único propietario de una empresa</h2>
+      <p>
+        Si tu cuenta es la única propietaria de una empresa y no hay más usuarios activos en ella, al eliminarla la empresa queda{' '}
+        <strong>suspendida</strong>: nadie puede entrar, la suscripción de pago (si la hay) se cancela y, transcurrido el periodo de gracia
+        previsto en los <a href={LEGAL_PATHS.tos}>Términos de Servicio</a>, sus datos se eliminan definitivamente. Si la empresa tiene otros
+        usuarios activos, la app te pedirá primero desactivarlos o eliminarlos, o bien escribir a soporte para transferir la propiedad a
+        otra persona.
+      </p>
+
+      <h2>6. Contacto</h2>
+      <p>
+        Para cualquier duda sobre este proceso o sobre tus derechos de acceso, rectificación, portabilidad y supresión:{' '}
+        <a href={`mailto:${SOPORTE}`}>{SOPORTE}</a>.
+      </p>
+    </>
+  )
+}
+
+function AccountDeletionBodyEn(): ReactElement {
+  return (
+    <>
+      <p>
+        If you have an AdministraTodo account —as the owner or a team member of a company, or as a resident or customer in the portal— you
+        can delete it at any time. This page explains how to do it from the app, how to request it without the app, and which data is
+        deleted and which is retained.
+      </p>
+
+      <h2>1. Delete the account from the app or the web</h2>
+      <p>This is the fastest way: deletion is immediate.</p>
+      <ol>
+        <li>Sign in to the app (iOS or Android) or at <a href="https://administratodo.com">administratodo.com</a>.</li>
+        <li>
+          <strong>Company panel:</strong> open <strong>My profile</strong> in the menu and scroll down to the{' '}
+          <strong>Delete my account</strong> section. <strong>Resident and customer portal:</strong> open the <strong>My Profile</strong>{' '}
+          tab or use the <strong>Delete my account</strong> link at the bottom of the portal.
+        </li>
+        <li>
+          Tap <strong>Delete my account</strong>, read the notice and confirm with your current password (accounts that sign in with Google
+          do not have one) and the word <strong>ELIMINAR</strong>.
+        </li>
+      </ol>
+      <p>
+        When it finishes, you are signed out on that device and the account no longer exists; on other devices the session expires on its
+        own within an hour.
+      </p>
+
+      <h2>2. Request deletion without the app</h2>
+      <p>
+        If you no longer have the app installed or cannot sign in, email us at <a href={MAILTO_ELIMINAR_EN}>{SOPORTE}</a> with the subject
+        "Account deletion", <strong>from the email address you registered with</strong>, and include your full name. If you write from a
+        different address we will ask for additional verification before acting: we never delete an account without confirming that the
+        request comes from its holder.
+      </p>
+      <p>
+        We will acknowledge receipt within <strong>5 business days</strong> and complete the deletion within <strong>30 days</strong> of
+        verification, emailing you when it is done.
+      </p>
+
+      <h2>3. What is deleted</h2>
+      <ul>
+        <li>Your login (email and password, or the Google link) and all your active sessions.</li>
+        <li>Your user profile: name, role, regional and notification preferences.</li>
+        <li>Your in-app notifications.</li>
+        <li>The roles and permissions assigned to you.</li>
+      </ul>
+
+      <h2>4. What is retained and why</h2>
+      <ul>
+        <li>
+          <strong>Company records you took part in.</strong> Meter readings, payments, dues, tickets, accounting entries and signed documents
+          are records of the company (property manager, condominium or water operator) and must be kept under accounting and tax
+          obligations. They are kept <strong>unlinked from your user</strong>: the "recorded by" field is left empty. Documents that carry a
+          signature or a printed name (minutes, acknowledgements, letters) are kept as they are, by their nature.
+        </li>
+        <li>
+          <strong>Your file as a resident or customer.</strong> The data your property manager or water company holds about your unit or
+          service (name, contact details, readings, payments) belongs to that company, which is the data controller. Deleting your portal
+          account does not delete it: you can request its erasure directly from that company, in line with our{' '}
+          <a href={legalHref('privacy', 'en')}>Privacy Policy</a>.
+        </li>
+        <li>
+          <strong>Legal and security evidence.</strong> Your acceptance of the legal documents and a minimal record of the deletion (date and
+          IP address) are kept without your name as proof of compliance.
+        </li>
+      </ul>
+
+      <h2>5. If you are the sole owner of a company</h2>
+      <p>
+        If your account is the only owner of a company and there are no other active users in it, deleting it leaves the company{' '}
+        <strong>suspended</strong>: nobody can sign in, the paid subscription (if any) is cancelled and, after the grace period set out in the{' '}
+        <a href={legalHref('tos', 'en')}>Terms of Service</a>, its data is permanently deleted. If the company has other active users, the app
+        will first ask you to deactivate or remove them, or to write to support to transfer ownership to someone else.
+      </p>
+
+      <h2>6. Contact</h2>
+      <p>
+        For any question about this process or about your rights of access, rectification, portability and erasure:{' '}
+        <a href={`mailto:${SOPORTE}`}>{SOPORTE}</a>.
+      </p>
+    </>
+  )
+}
+
 export const LEGAL_BODIES: Record<Lang, Record<LegalDocType, () => ReactElement>> = {
-  es: { privacy: PrivacyBodyEs, tos: TosBodyEs, dpa: DpaBodyEs },
-  en: { privacy: PrivacyBodyEn, tos: TosBodyEn, dpa: DpaBodyEn },
+  es: { privacy: PrivacyBodyEs, tos: TosBodyEs, dpa: DpaBodyEs, account_deletion: AccountDeletionBodyEs },
+  en: { privacy: PrivacyBodyEn, tos: TosBodyEn, dpa: DpaBodyEn, account_deletion: AccountDeletionBodyEn },
 }

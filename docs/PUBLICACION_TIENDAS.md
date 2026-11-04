@@ -29,16 +29,23 @@ Identidad fija de la app (no cambiarla una vez publicada):
 - Build nativo (`npm run mobile:build`) que desactiva service worker y SRI.
 - Firma de release en Android lista para leer un `android/keystore.properties`
   que **no se versiona** (sección 5.1).
+- **Eliminación de cuenta por el propio usuario** (Apple 5.1.1 v, Google Play
+  *Account deletion*): opción **Eliminar mi cuenta** en *Mi perfil* (panel de
+  empresa) y en los portales de residentes y clientes, con confirmación en dos
+  pasos (contraseña + palabra `ELIMINAR`), servida por la edge function
+  `delete-own-account`; y la URL pública para pedirlo sin la app,
+  `https://administratodo.com/eliminar-cuenta` (pre-renderizada, ES/EN). Reglas,
+  retención y procedimiento de soporte en `docs/ELIMINACION_CUENTA.md`.
 
 **Falta y es bloqueante para la revisión** (decidir antes de subir nada):
 
-1. **Eliminación de cuenta desde la app.** La app permite registrarse
-   (`RegisterScreen`), así que Apple (guideline 5.1.1 v) y Google Play
-   (política *Account deletion*) exigen que el usuario pueda **borrar su propia
-   cuenta** desde dentro de la app, y Google pide además una **URL web** para
-   pedir el borrado. Hoy solo existe `delete-user`, que es para que un
-   administrador elimine a otros usuarios. Sin esto Apple rechaza la app en la
-   primera revisión.
+1. ~~**Eliminación de cuenta desde la app.**~~ **Resuelto** (ver arriba). Queda
+   sólo declararlo en las consolas: la URL en Play Console (sección 5.3) y
+   «el usuario puede solicitar el borrado» en las dos declaraciones de datos
+   (sección 8). Para el revisor de Apple, el camino es *Mi perfil → Eliminar mi
+   cuenta* con la cuenta de prueba (es un único propietario: al borrarla la
+   empresa de prueba queda suspendida, así que hay que recrearla o usar otra
+   cuenta de prueba para la siguiente revisión).
 2. **«Iniciar sesión con Apple» o esconder Google en iOS.** La guideline 4.8
    de Apple (*Login Services*) obliga a ofrecer también *Sign in with Apple*
    (o equivalente) cuando hay login social de terceros. **Resuelto para la v1**
@@ -249,9 +256,11 @@ adb install -r app/build/outputs/apk/release/app-release.apk
    - *Funciones financieras*: si el cobro en línea al residente (Stripe) está
      activo en producción, declararlo en «Otras funciones financieras»; si no,
      «Mi app no ofrece funciones financieras». Google puede pedir documentación.
-   - *Eliminación de cuenta*: URL de una página web donde pedir el borrado
-     (bloqueante #1 de la sección 0) y confirmar que también se puede desde la
-     app.
+   - *Eliminación de cuenta*: URL `https://administratodo.com/eliminar-cuenta`
+     (página pública con instrucciones y correo de soporte) y marcar que también
+     se puede desde la app (*Mi perfil → Eliminar mi cuenta*). Google acepta
+     ambas vías; la página explica además qué datos se borran y cuáles se
+     conservan, que es lo que la política pide declarar.
 3. **Ficha de Play Store** (*Presencia en la tienda → Ficha principal*):
    - Nombre (30 caracteres), descripción breve (80), descripción completa (4000).
    - Icono 512×512 PNG, **gráfico de funciones** 1024×500 (obligatorio).
@@ -378,7 +387,9 @@ En App Store Connect → la app → versión `2.0.0`:
   **usuario y contraseña de la cuenta de prueba** (la misma que en Play).
   Notas para el revisor, en inglés: qué hace la app, que la cámara se usa para
   fotografiar medidores de agua y el GPS para geolocalizar la lectura, y cómo
-  llegar a una pantalla que use cada permiso. Un teléfono de contacto.
+  llegar a una pantalla que use cada permiso. Indicar también dónde está la
+  eliminación de cuenta (*Profile → Delete my account*) y la URL pública
+  `https://administratodo.com/eliminar-cuenta`. Un teléfono de contacto.
 - *Versión*: seleccionar el build subido desde TestFlight.
 - *Lanzamiento*: «Manual» para controlar el día, o «Automático».
 - **Enviar para revisión**. Primera revisión: 1–3 días laborables; las
@@ -426,9 +437,16 @@ Rellenar las dos con la misma verdad. Inventario según el código actual:
 | Datos de residentes y proveedores que captura el usuario (nombres, teléfonos, direcciones) | Sí | Funcionalidad | No | Información personal → Nombre, Dirección, Teléfono | Contact Info, User Content |
 
 Marcar en ambas: **se cifra en tránsito** (sí), **el usuario puede solicitar el
-borrado** (sí, cuando exista el flujo del bloqueante #1), **no se usa para
-publicidad ni tracking** (Apple: *Data not used for tracking*; no hay ATT que
-pedir).
+borrado** (sí: desde la app en *Mi perfil → Eliminar mi cuenta* y sin la app en
+`https://administratodo.com/eliminar-cuenta`), **no se usa para publicidad ni
+tracking** (Apple: *Data not used for tracking*; no hay ATT que pedir).
+
+| Declaración | Valor |
+| --- | --- |
+| Play *Data safety* → *Eliminación de cuenta* → URL | `https://administratodo.com/eliminar-cuenta` |
+| Play *Data safety* → «¿Los usuarios pueden solicitar que se eliminen sus datos?» | Sí (desde la app y desde la URL) |
+| Apple *App Privacy* / notas de revisión | Borrado dentro de la app (*Profile → Delete my account*) y la misma URL |
+| Qué se borra y qué se conserva (si lo preguntan) | `docs/ELIMINACION_CUENTA.md` y la propia página pública |
 
 ---
 
@@ -464,7 +482,7 @@ pedir).
 | Xcode: «No signing certificate» / «No profiles for com.administratodo.app» | Team sin seleccionar o App ID no creado. Sección 6.1 y 6.2. |
 | App Store Connect: «ITMS-90xxx Missing Purpose String» | Falta una clave `NS*UsageDescription` para un permiso que un plugin declara. Las cuatro actuales cubren cámara, galería (lectura y escritura) y ubicación. |
 | App Store Connect: «Invalid App Icon: transparency / alpha channel» | El `icon-only.png` de `resources/` tiene alfa. Exportar en RGB sin transparencia y regenerar. |
-| Rechazo Apple 5.1.1(v) *Account deletion* | Bloqueante #1 de la sección 0. |
+| Rechazo Apple 5.1.1(v) *Account deletion* | Ya existe (*Mi perfil → Eliminar mi cuenta* y `/eliminar-cuenta`). Si lo rechazan, comprobar que la cuenta de prueba llega a *Mi perfil* y que `delete-own-account` está desplegada (`deploy-functions.yml`) y en `ALLOWED_ORIGINS` el origen de la app. |
 | Rechazo Apple 4.8 *Login services* | No debería ocurrir: la app de iOS no muestra login social (bloqueante #2 de la sección 0). Si aparece, comprobar en el binario que `mostrarLoginConGoogle()` devuelve `false` en iOS y que nadie añadió otro login social sin *Sign in with Apple*. |
 | Rechazo Apple 2.1 *App completeness*: «no pudimos iniciar sesión» | Credenciales de prueba caducadas o con 2FA. Mantener la cuenta demo viva y sin SSO/2FA. |
 | Rechazo Apple 4.2 *Minimum functionality*: «es solo un sitio web empaquetado» | Resaltar en las notas de revisión las capacidades nativas: cámara para medidores, GPS, sesión persistente, (push). Las capturas deben mostrar esas pantallas. |

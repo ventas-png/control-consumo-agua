@@ -7,6 +7,8 @@
 import { reportDegradedQuery } from '../queryFetch'
 import { extractFunctionError } from '../functionError'
 import { supabase } from '../../lib/supabase'
+import { clearSession } from '../../lib/authSession'
+import { queryClient } from '../queryClient'
 
 /** Respuesta común de las Edge Functions de cuenta. */
 export interface AccountFnResult {
@@ -161,4 +163,53 @@ export async function updateAppUserName(
     .update({ full_name: fullName })
     .eq('id', userId)
   return { error: error?.message ?? null }
+}
+
+// ── Eliminación de la propia cuenta (App Store 5.1.1 v / Google Play «Account deletion») ─────────────────────────────────────────────────
+// Edge `delete-own-account`: el objetivo es siempre quien llama (su JWT). La UI primero PREVISUALIZA (dry_run) para avisar de las
+// consecuencias —p. ej. «eres el único propietario: la empresa quedará suspendida»— y recibir los 409 del servidor ANTES de pedir la
+// contraseña, y después confirma con la palabra exacta. Los mensajes del servidor se extraen del cuerpo `{ error }` (functionError.ts): el
+// 409 del único propietario con equipo explica qué hacer y es justo lo que la persona tiene que leer.
+
+/** Palabra que el servidor exige en `confirm` (CONFIRM_WORD de supabase/functions/delete-own-account/validate.ts). */
+export const DELETE_OWN_ACCOUNT_CONFIRM_WORD = 'ELIMINAR'
+
+export interface DeleteOwnAccountPreview {
+  /** `true` cuando la persona es el único propietario de su empresa y ésta quedará suspendida junto con su cuenta. */
+  suspendeEmpresa: boolean
+}
+
+/** Evalúa las compuertas del borrado propio SIN borrar nada. Devuelve `{ data, error }`; el error trae el mensaje real del servidor. */
+export async function previewDeleteOwnAccount(): Promise<{ data: DeleteOwnAccountPreview | null; error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('delete-own-account', { body: { dry_run: true } })
+  if (error) return { data: null, error: await extractFunctionError(error) }
+  const body = (data as { suspende_empresa?: boolean } | null) ?? null
+  return { data: { suspendeEmpresa: body?.suspende_empresa === true }, error: null }
+}
+
+/** Elimina definitivamente la cuenta de la sesión actual. `confirmacion` debe ser la palabra exacta; el servidor la vuelve a comprobar. */
+export async function deleteOwnAccount(confirmacion: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.functions.invoke('delete-own-account', { body: { confirm: confirmacion } })
+  return { error: error ? await extractFunctionError(error) : null }
+}
+
+/**
+ * Tras un borrado con éxito la identidad ya no existe en auth, así que el signOut remoto puede responder 401/403: se ignora. Lo que importa
+ * es limpiar TODO rastro local (misma lista que el logout de useAuth: sesión guardada, caché de React Query y Cache Storage del SW) y
+ * recargar en el inicio, para que el shell arranque sin estado. `redirigir` se inyecta para poder probarlo sin navegar.
+ */
+export async function signOutAfterOwnAccountDeleted(
+  redirigir: (url: string) => void = (url) => window.location.replace(url),
+): Promise<void> {
+  try {
+    await supabase.auth.signOut({ scope: 'local' })
+  } catch {
+    // la identidad ya no existe; el rastro local se limpia igual
+  }
+  clearSession()
+  queryClient.clear()
+  if (typeof caches !== 'undefined') {
+    await Promise.all(['supabase-rest', 'supabase-storage'].map((n) => caches.delete(n).catch(() => false)))
+  }
+  redirigir('/')
 }

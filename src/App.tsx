@@ -10,7 +10,8 @@ import { SetupWizard } from './components/onboarding/SetupWizard'
 import { BrandingApplier } from './components/branding/BrandingApplier'
 import { Toaster } from 'sonner'
 import type { AppSection, Ruta } from './types'
-import { sectionToPath, pathToSection } from './lib/routes'
+import { sectionToPath, pathToSection, RUTA_PUBLICA_ELIMINAR_CUENTA } from './lib/routes'
+import type { LegalDocType } from './components/legal/content'
 import { sectionForPath, type SectionKey } from './components/condominios/sections'
 import { fetchOpenConversationsCount } from './domain/comunicacion/conversations'
 import { useAuth } from './hooks/useAuth'
@@ -49,15 +50,19 @@ const LazyShowcase = lazy(() =>
   import('./components/dev/ComponentShowcase').then(m => ({ default: m.ComponentShowcase })),
 )
 
-/** Rutas públicas que se resuelven ANTES del router y del gate de auth. */
-const LEGAL_ROUTES: Record<string, 'privacy' | 'tos' | 'dpa'> = {
+/**
+ * Rutas públicas que se resuelven ANTES del router y del gate de auth: la suite legal y la página de eliminación de cuenta que exigen las
+ * tiendas (App Store 5.1.1 v, Google Play «Account deletion»: una URL para pedir el borrado SIN la app).
+ */
+const LEGAL_ROUTES: Record<string, LegalDocType> = {
   '/politica-privacidad': 'privacy',
   '/terminos-servicio': 'tos',
   '/acuerdo-dpa-cookies': 'dpa',
+  [RUTA_PUBLICA_ELIMINAR_CUENTA]: 'account_deletion',
 }
 
 /**
- * Raíz de la app. SOLO resuelve las tres rutas públicas sessionless y, si no
+ * Raíz de la app. SOLO resuelve las rutas públicas sessionless y, si no
  * aplica ninguna, delega en `<AppShell/>`.
  *
  * POR QUÉ ESTÁ PARTIDO EN DOS (auditoría 2026-07-28, PR-33)
@@ -97,8 +102,8 @@ export default function App() {
       )
     }
 
-    // Suite legal pública (RGPD/CCPA + verificación de APIs de Google): páginas
-    // 100% públicas e indexables, también sessionless.
+    // Suite legal pública (RGPD/CCPA + verificación de APIs de Google) y la
+    // página de eliminación de cuenta: 100% públicas e indexables, también sessionless.
     const legalDoc = LEGAL_ROUTES[pathname]
     if (legalDoc) {
       const legalLang = new URLSearchParams(search).get('lang') === 'en' ? 'en' : 'es'
