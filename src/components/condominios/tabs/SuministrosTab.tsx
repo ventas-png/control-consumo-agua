@@ -508,7 +508,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             </button>
           </>}
         >
-          <div className="sum-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div className="at-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
               <label style={lbl} htmlFor="sum-f-nombre">Nombre *</label>
               <input id="sum-f-nombre" style={inp} placeholder="Detergente multiusos…" value={form.nombre} autoFocus onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
@@ -562,7 +562,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
               <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 8 }}>
                 Cuántos usos da 1 {form.unidad_medida}: por ejemplo, 1 litro rinde 40 aplicaciones. Con eso el stock se lee en usos y el costo en costo por uso.
               </div>
-              <div className="sum-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="at-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={lbl} htmlFor="sum-f-rendimiento">Rendimiento por {form.unidad_medida}</label>
                   <input id="sum-f-rendimiento" type="number" min="0" step="any" style={inp} placeholder="40" value={form.rendimiento} onChange={e => setForm(p => ({ ...p, rendimiento: e.target.value }))} />
@@ -620,7 +620,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             </button>
           </>}
         >
-          <div className="sum-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div className="at-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div>
               <label style={lbl} htmlFor="sum-m-tipo">Tipo *</label>
               <select id="sum-m-tipo" style={inp} value={movForm.tipo} onChange={e => setMovForm(p => ({ ...p, tipo: e.target.value as TipoMovimientoSum }))}>

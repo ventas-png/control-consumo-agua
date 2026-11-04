@@ -768,18 +768,18 @@ button:focus:not(:focus-visible) {
   }
 }
 
-/* ─── Suministros: ficha y movimiento en ventana emergente ────────────────
+/* ─── Formularios de ficha en ventana emergente (Suministros, Equipos) ────
  *
- * Los dos formularios (SuministrosTab.tsx) van en rejillas inline de tres
- * columnas con campos que abarcan dos o tres (`gridColumn: span`). En el
- * teléfono la ventana es una hoja a pantalla completa (`fullScreenOnMobile`)
- * y tres columnas de ~110px no sirven: una sola columna y cada campo en su
- * fila. `!important` porque tanto las columnas como los `span` van inline. */
+ * Esos formularios van en rejillas inline de tres columnas con campos que
+ * abarcan dos o tres (`gridColumn: span`). En el teléfono la ventana es una
+ * hoja a pantalla completa (`fullScreenOnMobile`) y tres columnas de ~110px
+ * no sirven: una sola columna y cada campo en su fila. `!important` porque
+ * tanto las columnas como los `span` van inline. */
 @media (max-width: 767px) {
-  .sum-form-grid {
+  .at-form-grid {
     grid-template-columns: minmax(0, 1fr) !important;
   }
-  .sum-form-grid > * {
+  .at-form-grid > * {
     grid-column: auto !important;
   }
 }
