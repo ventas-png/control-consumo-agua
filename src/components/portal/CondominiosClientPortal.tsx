@@ -19,6 +19,7 @@ import { PortalMiCuentaTab }   from '../condominios/tabs/PortalMiCuentaTab'
 import { PortalCargosSaldoFavor } from './PortalCargosSaldoFavor'
 import { PortalMisTicketsTab } from '../condominios/tabs/PortalMisTicketsTab'
 import { PortalMiUnidadTab }   from '../condominios/tabs/PortalMiUnidadTab'
+import { EliminarCuenta } from '../perfil/EliminarCuenta'
 import { PortalVisitantesTab } from '../condominios/tabs/PortalVisitantesTab'
 import { PortalAnunciosTab }   from '../condominios/tabs/PortalAnunciosTab'
 import { PortalRentasTab }     from '../condominios/tabs/PortalRentasTab'
@@ -355,6 +356,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               fontSize: '14px', fontWeight: 600, cursor: 'pointer',
             }}
           >Cerrar sesión</button>
+          {/* App Store 5.1.1 v / Google Play «Account deletion»: también sin unidades se puede borrar la cuenta. */}
+          <div style={{ marginTop: '18px' }}>
+            <EliminarCuenta currentUser={currentUser} variant="enlace" />
+          </div>
         </div>
       </div>
     )
@@ -733,6 +738,17 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
             )}
           </div>
         )}
+
+        {/* Pie del portal: eliminación de la propia cuenta (App Store 5.1.1 v / Google Play «Account deletion»).
+            El portal de condominios no tiene pestaña de perfil, así que el enlace vive aquí, visible en todas las pestañas. */}
+        <footer style={{
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px',
+          padding: '18px 4px 8px', fontSize: '12.5px', color: 'var(--at-ink-3)',
+        }}>
+          <span>Sesión: {currentUser.email}</span>
+          <span aria-hidden="true">·</span>
+          <EliminarCuenta currentUser={currentUser} variant="enlace" />
+        </footer>
       </div>
 
       {popupOpen && (paquetesPendientes.length > 0 || retirosNuevos.length > 0) && (

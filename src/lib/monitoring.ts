@@ -40,6 +40,7 @@ export function initMonitoring(): void {
         'stripe',
         'create-user',
         'delete-user',
+        'delete-own-account',
         'create-payment-intent',
       ]
       const name = samplingContext.name ?? ''

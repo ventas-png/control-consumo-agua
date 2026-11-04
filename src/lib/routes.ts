@@ -60,3 +60,10 @@ export function pathToSection(pathname: string): AppSection | null {
   }
   return best
 }
+
+/**
+ * Ruta pública (sessionless, pre-renderizada) para pedir la eliminación de la cuenta SIN la app. La exigen Google Play (Data safety →
+ * «Account deletion», una URL web) y Apple (5.1.1 v). La resuelve App.tsx junto a las rutas legales; el contenido vive en
+ * components/legal/content.tsx. La pantalla «Eliminar mi cuenta» (components/perfil/EliminarCuenta.tsx) enlaza aquí.
+ */
+export const RUTA_PUBLICA_ELIMINAR_CUENTA = '/eliminar-cuenta'

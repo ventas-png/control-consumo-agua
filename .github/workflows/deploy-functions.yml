@@ -209,6 +209,9 @@ jobs:
       - name: Deploy delete-user (JWT requerido — el código valida rol admin del caller)
         run: bash .github/scripts/deploy-fn.sh delete-user
 
+      - name: Deploy delete-own-account (JWT requerido — la persona elimina su propia cuenta)
+        run: bash .github/scripts/deploy-fn.sh delete-own-account
+
       - name: Deploy save-payment-config
         run: bash .github/scripts/deploy-fn.sh save-payment-config
 

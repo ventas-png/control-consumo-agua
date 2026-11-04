@@ -55,6 +55,8 @@ const AUTENTICA_ANTES = [
   'create-charge',
   'confirm-charge',
   'whatsapp-save-credentials',
+  // requireUser (JWT) antes del límite por user.id; el daño lo acota el propio JWT: sólo puede borrarse a sí mismo.
+  'delete-own-account',
 ] as const
 
 /**
