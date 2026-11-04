@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from './icons'
 import type { Copy, Lang } from './i18n'
+import { mostrarLoginConGoogle } from '../../lib/loginProviders'
 
 interface NavProps {
   t: Copy
@@ -100,6 +101,10 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onFor
   }, [open, onClose])
 
   if (!open) return null
+
+  // Guideline 4.8 de App Review (Login Services): la app de iOS no ofrece
+  // Google mientras no exista Sign in with Apple. Ver src/lib/loginProviders.ts.
+  const conGoogle = mostrarLoginConGoogle()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -202,12 +207,16 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onFor
                   <p>{t.login.sub}</p>
                 </header>
 
-                <button className="btn-google" onClick={handleGoogle} disabled={googleLoading || loading} type="button">
-                  <Icon.google />
-                  <span>{googleLoading ? t.login.google_loading : t.login.google}</span>
-                </button>
+                {conGoogle && (
+                  <>
+                    <button className="btn-google" onClick={handleGoogle} disabled={googleLoading || loading} type="button">
+                      <Icon.google />
+                      <span>{googleLoading ? t.login.google_loading : t.login.google}</span>
+                    </button>
 
-                <div className="login-or"><span>{t.login.or}</span></div>
+                    <div className="login-or"><span>{t.login.or}</span></div>
+                  </>
+                )}
 
                 <form className="login-fields" onSubmit={handleSubmit}>
                   <label className="field">

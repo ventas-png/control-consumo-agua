@@ -75,6 +75,12 @@ Supabase reenvía al scheme de la app.
 > link vuelve con `?code=` y se canjea con `exchangeCodeForSession`. La web sigue
 > en flujo implícito a propósito — ver el comentario en `src/lib/supabase.ts`.
 
+> **En la app de iOS el botón de Google no se muestra** (guideline 4.8 de App
+> Review; el porqué y lo que falta para Sign in with Apple están en la sección
+> 5). Este paso sigue haciendo falta: Android sí usa el login con Google, y la
+> recuperación de contraseña desde la app usa el mismo deep link en las dos
+> plataformas.
+
 ### Paso 5 — Iconos y splash
 Hoy son los del template de Capacitor. Con tu marca:
 ```bash
@@ -118,9 +124,12 @@ TestFlight, fichas, declaración de datos y problemas frecuentes) está en
   (cámara y ubicación).
 - Política de privacidad: `https://administratodo.com/politica-privacidad`
   (`LegalPage`, ya pre-renderizada).
-- **Bloqueantes de revisión que aún no están en el código**: eliminación de
-  cuenta desde la app (Apple 5.1.1 v / Play *Account deletion*) y *Sign in with
-  Apple* o esconder el botón de Google en iOS (Apple 4.8). Detalle en la guía.
+- **Bloqueantes de revisión ya cubiertos en el código**: eliminación de cuenta
+  desde la app (Apple 5.1.1 v / Play *Account deletion*: *Mi perfil → Eliminar
+  mi cuenta* y `/eliminar-cuenta`) y Apple 4.8 (login social sin *Sign in with
+  Apple*: la app de iOS no muestra el botón de Google, paso 4 y sección 5). Lo
+  que queda es externo: iconos de marca y las declaraciones en las consolas.
+  Detalle en la guía.
 
 ---
 
@@ -152,12 +161,15 @@ futura. La plantilla de Capacitor 8 aún no lo trae (su código Swift no mencion
 - `AppDelegate.swift` pierde `window` y los callbacks que UIKit ya no llama en una
   app con escenas; conserva `configurationForConnecting`.
 
-**Al tocar cualquiera de esos tres archivos, probar en dispositivo el login con
-Google**: es el único consumidor real del deep link (`src/lib/nativeAuth.ts`), y
-si el puente se rompe, el OAuth se queda colgado en el navegador sin volver a la
-app. Probar los dos casos, que van por caminos distintos: con la app **abierta**
-en segundo plano (`scene(_:openURLContexts:)`) y con la app **cerrada del todo**
-(`connectionOptions` en `willConnectTo`).
+**Al tocar cualquiera de esos tres archivos, probar en dispositivo el deep
+link**. En iOS el login con Google no se muestra (guideline 4.8, sección 5), así
+que el consumidor real del deep link (`src/lib/nativeAuth.ts`) es la
+**recuperación de contraseña desde la app** (sección 5): pedirla, abrir el enlace
+del correo en el mismo iPhone y comprobar que aparece el formulario de nueva
+contraseña. Si el puente se rompe, el enlace se queda en el navegador sin volver
+a la app. Probar los dos casos, que van por caminos distintos: con la app
+**abierta** en segundo plano (`scene(_:openURLContexts:)`) y con la app
+**cerrada del todo** (`connectionOptions` en `willConnectTo`).
 
 Cuando Capacitor adopte escenas upstream, conviene volver a su plantilla y borrar
 esta adaptación.
@@ -249,6 +261,36 @@ elección tiene dos trampas detrás:
   **Limitación:** hay que abrir el correo en el mismo teléfono que pidió el
   restablecimiento; desde otro dispositivo no hay verifier. Quien necesite
   cambiarla en otro equipo puede hacerlo desde la web.
+- **Sin login con Google en la app de iOS (guideline 4.8 de App Review, *Login
+  Services*)**: una app que ofrece iniciar sesión con un tercero tiene que
+  ofrecer también una opción equivalente que limite los datos a nombre y correo
+  y permita ocultar el correo — en la práctica, *Sign in with Apple* —, y sin
+  ella App Review rechaza el binario. Para la v1 se tomó la salida rápida:
+  `mostrarLoginConGoogle()` (`src/lib/loginProviders.ts`) devuelve `false`
+  cuando `isNative() && getPlatform() === 'ios'`, y el `LoginModal` de la
+  landing (`src/components/landing/Nav.tsx`, el login que ve la app) y
+  `LoginScreen` omiten el botón de Google **y** el separador «o con tu correo».
+  Sin login social, la regla no aplica. La web (Safari en un iPhone es `'web'`
+  para Capacitor) y Android no cambian: Google Play no tiene esta regla.
+  Impacto: en la app de iOS se entra con correo y contraseña (o SSO); quien solo
+  usaba Google sigue teniendo la web.
+  **Pendiente — Sign in with Apple**, que permitiría volver a ofrecer Google en
+  iOS:
+  1. Apple Developer: capability *Sign in with Apple* en el App ID
+     `com.administratodo.app`, un Services ID y una clave `.p8`.
+  2. Supabase → Authentication → Providers → Apple con esos datos.
+  3. Nativo: `@capacitor-community/apple-sign-in` y pasar el `identityToken` a
+     `supabase.auth.signInWithIdToken({ provider: 'apple', token, nonce })`.
+     Web: `signInWithOAuth({ provider: 'apple' })`, como hoy con Google.
+  4. Botón con el diseño oficial de Apple (negro, «Continuar con Apple») en iOS
+     y web; Apple no lo exige en Android.
+  5. Apple entrega el nombre **solo la primera vez**: guardarlo en el perfil en
+     ese primer login (reutilizar `complete-oauth-onboarding`, que ya crea el
+     perfil tras Google), y revisar que un correo privado
+     `@privaterelay.appleid.com` pueda completar el alta en
+     `OAuthOnboardingScreen`.
+  6. Al terminar: `mostrarLoginConGoogle()` vuelve a `true` en iOS y el
+     bloqueante #2 de `docs/PUBLICACION_TIENDAS.md` pasa a resuelto.
 - **Token de push por dispositivo**: se registra con la función
   `register_device_token` (SECURITY DEFINER) en vez de un `upsert`. Si el usuario
   A cierra sesión y B entra en el mismo teléfono, el token es el mismo: el upsert
