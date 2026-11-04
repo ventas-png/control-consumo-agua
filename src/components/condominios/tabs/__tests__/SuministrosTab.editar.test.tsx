@@ -256,14 +256,56 @@ describe('carga masiva — columnas rendimiento', () => {
   })
 })
 
+describe('SuministrosTab — los formularios abren en ventana emergente', () => {
+  it('+ Nuevo abre un diálogo y la ficha seleccionada sigue a la vista detrás', () => {
+    renderTab()
+    abrirDetalle()
+    fireEvent.click(screen.getByRole('button', { name: '+ Nuevo' }))
+    const ventana = screen.getByRole('dialog', { name: 'Nuevo suministro' })
+    expect((within(ventana).getByLabelText('Nombre *') as HTMLInputElement).value).toBe('')
+    // La ficha no se fue: sigue debajo de la ventana (el KPI sólo existe en el detalle).
+    expect(screen.getByText('Usos disponibles (aplicaciones)')).toBeTruthy()
+    fireEvent.click(within(ventana).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByText('Usos disponibles (aplicaciones)')).toBeTruthy()
+  })
+
+  it('Editar abre un diálogo con el insumo de subtítulo; Escape lo cierra sin guardar', () => {
+    renderTab()
+    abrirDetalle()
+    fireEvent.click(screen.getByRole('button', { name: /Editar/ }))
+    const ventana = screen.getByRole('dialog', { name: 'Editar suministro' })
+    expect(within(ventana).getByText('Alcohol Etílico al 70%')).toBeTruthy()
+    fireEvent.change(within(ventana).getByLabelText('Nombre *'), { target: { value: 'Otro' } })
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
+  })
+
+  it('+ Movimiento abre un diálogo con el stock de subtítulo y cancelar descarta lo tecleado', () => {
+    renderTab()
+    abrirDetalle()
+    fireEvent.click(screen.getByRole('button', { name: '+ Movimiento' }))
+    let ventana = screen.getByRole('dialog', { name: 'Registrar movimiento' })
+    expect(ventana.textContent).toMatch(/Stock actual: 1 litro/)
+    fireEvent.change(within(ventana).getByLabelText(/Cantidad/), { target: { value: '3' } })
+    fireEvent.click(within(ventana).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Movimiento' }))
+    ventana = screen.getByRole('dialog', { name: 'Registrar movimiento' })
+    expect((within(ventana).getByLabelText(/Cantidad/) as HTMLInputElement).value).toBe('')
+  })
+})
+
 describe('SuministrosTab — lo que ya existía sigue igual', () => {
   it('registrar un movimiento inserta sólo el movimiento (el stock lo recalcula la BD)', async () => {
     renderTab()
     abrirDetalle()
     fireEvent.click(screen.getByRole('button', { name: '+ Movimiento' }))
-    const form = screen.getByText('Registrar movimiento').parentElement as HTMLElement
-    const inputs = within(form).getAllByRole('spinbutton')
-    fireEvent.change(inputs[0], { target: { value: '0.5' } })
+    const ventana = screen.getByRole('dialog', { name: 'Registrar movimiento' })
+    fireEvent.change(within(ventana).getByLabelText(/Cantidad/), { target: { value: '0.5' } })
     fireEvent.click(screen.getByRole('button', { name: /Registrar/ }))
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('movimientos_suministro', expect.objectContaining({ suministro_id: 's1', tipo: 'salida', cantidad: 0.5 })))
     expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
