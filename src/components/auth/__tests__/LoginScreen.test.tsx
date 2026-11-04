@@ -28,22 +28,32 @@ function simularPlataforma(plataforma: 'web' | 'android' | 'ios') {
 function montar() {
   const onLogin = vi.fn(async () => null)
   const onLoginWithGoogle = vi.fn(async () => null)
+  const onLoginWithApple = vi.fn(async () => null)
   render(
     <LoginScreen
       onLogin={onLogin}
       onLoginWithGoogle={onLoginWithGoogle}
+      onLoginWithApple={onLoginWithApple}
       onForgotPassword={vi.fn()}
       onRegister={vi.fn()}
     />,
   )
-  return { onLogin, onLoginWithGoogle }
+  return { onLogin, onLoginWithGoogle, onLoginWithApple }
 }
 
 const botonGoogle = () => screen.queryByRole('button', { name: 'Continuar con Google' })
+const botonApple = () => screen.queryByRole('button', { name: 'Continuar con Apple' })
 const separador = () => screen.queryByText('o con tu correo')
 
-beforeEach(() => simularPlataforma('web'))
-afterEach(() => cleanup())
+beforeEach(() => {
+  simularPlataforma('web')
+  // Sign in with Apple apagado por defecto; los tests de Apple lo encienden.
+  vi.stubEnv('VITE_APPLE_SIGN_IN', '')
+})
+afterEach(() => {
+  cleanup()
+  vi.unstubAllEnvs()
+})
 
 describe('LoginScreen · login con Google por plataforma', () => {
   it('web: muestra el botón de Google y el separador, y el botón llama al handler', async () => {
@@ -67,7 +77,52 @@ describe('LoginScreen · login con Google por plataforma', () => {
     simularPlataforma('ios')
     montar()
     expect(botonGoogle()).toBeNull()
+    expect(botonApple()).toBeNull()
     expect(separador()).toBeNull()
+  })
+
+  it('web sin VITE_APPLE_SIGN_IN: no hay botón de Apple', () => {
+    montar()
+    expect(botonApple()).toBeNull()
+    expect(botonGoogle()).toBeTruthy()
+  })
+
+  describe('con Sign in with Apple configurado', () => {
+    beforeEach(() => vi.stubEnv('VITE_APPLE_SIGN_IN', 'true'))
+
+    it('web: Apple (negro, encima de Google) y Google; Apple llama a su handler', async () => {
+      const { onLoginWithApple, onLoginWithGoogle } = montar()
+      const apple = botonApple()!
+      const google = botonGoogle()!
+      expect(apple.compareDocumentPosition(google) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(apple.style.background).toBe('rgb(0, 0, 0)')
+      expect(separador()).toBeTruthy()
+      fireEvent.click(apple)
+      await waitFor(() => expect(onLoginWithApple).toHaveBeenCalledTimes(1))
+      expect(onLoginWithGoogle).not.toHaveBeenCalled()
+    })
+
+    it('app de iOS: Apple y Google juntos (la 4.8 queda cumplida)', () => {
+      simularPlataforma('ios')
+      montar()
+      expect(botonApple()).toBeTruthy()
+      expect(botonGoogle()).toBeTruthy()
+      expect(separador()).toBeTruthy()
+    })
+
+    it('app de Android: solo Google', () => {
+      simularPlataforma('android')
+      montar()
+      expect(botonApple()).toBeNull()
+      expect(botonGoogle()).toBeTruthy()
+    })
+
+    it('el error del login con Apple se muestra con el aviso', async () => {
+      const { onLoginWithApple } = montar()
+      onLoginWithApple.mockResolvedValueOnce('Error al iniciar sesión con Apple' as unknown as null)
+      fireEvent.click(botonApple()!)
+      await waitFor(() => expect(screen.getByText(/Error al iniciar sesión con Apple/)).toBeTruthy())
+    })
   })
 
   it('app de iOS: el login con correo y contraseña sigue intacto', async () => {

@@ -1,34 +1,63 @@
 import { useState } from 'react'
-import { completeOAuthOnboarding, signOut } from '../../domain/auth/account'
+import { completeOAuthOnboarding, signOut, type CompleteOAuthOnboardingPayload } from '../../domain/auth/account'
+import { esCorreoPrivadoDeApple } from '../../domain/auth/appleRelay'
+import { validateEmail } from '../../lib/validation'
 import { BrandLogo } from '../shared/BrandLogo'
 
 interface Props {
-  googleUser: { id: string; email: string; full_name: string }
+  oauthUser: { id: string; email: string; full_name: string; provider: 'google' | 'apple' | 'oauth' }
   onSuccess: () => void
   onCancel: () => void
 }
 
-export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel }: Props) {
+const NOMBRE_PROVEEDOR: Record<Props['oauthUser']['provider'], string> = {
+  google: 'Google',
+  apple: 'Apple',
+  oauth: 'tu proveedor',
+}
+
+export default function OAuthOnboardingScreen({ oauthUser, onSuccess, onCancel }: Props) {
   const [cuiDui, setCuiDui] = useState('')
   const [fechaNacimiento, setFechaNacimiento] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Sign in with Apple: el nombre llega solo en la primera autorización y, con
+  // «Ocultar mi correo», el JWT trae un alias @privaterelay.appleid.com que no
+  // casa con el padrón. En esos dos casos se piden aquí; la edge function solo
+  // los usa en esos casos (nunca pisan lo que el proveedor sí verificó).
+  const pideNombre = !oauthUser.full_name.trim()
+  const correoPrivado = esCorreoPrivadoDeApple(oauthUser.email)
+  const [fullName, setFullName] = useState('')
+  const [emailCliente, setEmailCliente] = useState('')
+  const proveedor = NOMBRE_PROVEEDOR[oauthUser.provider]
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
-    if (!cuiDui.trim() || !fechaNacimiento) {
+    if (
+      !cuiDui.trim() || !fechaNacimiento ||
+      (pideNombre && !fullName.trim()) ||
+      (correoPrivado && !emailCliente.trim())
+    ) {
       setError('Por favor complete todos los campos.')
       return
     }
+    if (correoPrivado && !validateEmail(emailCliente.trim())) {
+      setError('El correo registrado no tiene un formato válido.')
+      return
+    }
+
+    const payload: CompleteOAuthOnboardingPayload = {
+      cui_dui: cuiDui.trim(),
+      fecha_nacimiento: fechaNacimiento,
+    }
+    if (pideNombre) payload.full_name = fullName.trim()
+    if (correoPrivado) payload.email_cliente = emailCliente.trim().toLowerCase()
 
     setLoading(true)
     try {
-      const { data, error: fnError } = await completeOAuthOnboarding({
-        cui_dui: cuiDui.trim(),
-        fecha_nacimiento: fechaNacimiento,
-      })
+      const { data, error: fnError } = await completeOAuthOnboarding(payload)
 
       if (fnError) {
         setError('Error de conexión. Intente nuevamente.')
@@ -88,11 +117,11 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
             Completa tu registro
           </h1>
           <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
-            Confirma tu identidad para vincular tu cuenta de Google
+            Confirma tu identidad para vincular tu cuenta de {proveedor}
           </p>
         </div>
 
-        {/* Google account info */}
+        {/* Cuenta del proveedor (Google / Apple) */}
         <div style={{
           background: 'var(--at-success-tint)', border: '1.5px solid var(--at-success-border)',
           borderRadius: '12px', padding: '12px 14px', marginBottom: '20px',
@@ -101,14 +130,56 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
           <span style={{ fontSize: '20px' }}>✅</span>
           <div>
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-success-strong)' }}>
-              {googleUser.full_name}
+              {oauthUser.full_name.trim() || `Cuenta de ${proveedor}`}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--at-success)' }}>{googleUser.email}</div>
+            <div style={{ fontSize: '12px', color: 'var(--at-success)' }}>{oauthUser.email}</div>
           </div>
         </div>
+        {correoPrivado && (
+          <p style={{ margin: '-10px 0 16px', fontSize: '12px', color: 'var(--at-ink-3)', lineHeight: 1.5 }}>
+            Apple ocultó tu correo real tras un alias. Escribe abajo el correo que tu
+            empresa tiene registrado para poder encontrarte en el padrón.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
+            {pideNombre && (
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '5px' }}>
+                  Nombre completo *
+                </label>
+                <input
+                  className="oauth-input"
+                  type="text"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  placeholder="Nombre y apellidos"
+                  autoComplete="name"
+                  disabled={loading}
+                  style={inputStyle}
+                />
+              </div>
+            )}
+
+            {correoPrivado && (
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '5px' }}>
+                  Correo registrado con tu empresa *
+                </label>
+                <input
+                  className="oauth-input"
+                  type="email"
+                  value={emailCliente}
+                  onChange={e => setEmailCliente(e.target.value)}
+                  placeholder="nombre@correo.com"
+                  autoComplete="email"
+                  disabled={loading}
+                  style={inputStyle}
+                />
+              </div>
+            )}
+
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '5px' }}>
                 DPI / CUI *

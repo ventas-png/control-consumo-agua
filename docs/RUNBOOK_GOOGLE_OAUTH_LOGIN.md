@@ -111,3 +111,18 @@ select c.puede_crear_cuenta,
   from public.clientes c
  where c.cui_dui = '<DPI sin espacios>';
 ```
+
+## Login con Apple: el *Secret Key* del proveedor caduca cada 6 meses
+
+**Síntoma:** «Continuar con Apple» (web y app de iOS) vuelve a la landing con el
+mismo error de callback que arriba (`Unable to exchange external code` /
+`invalid_client`), mientras Google sigue funcionando. Apple limita el *client
+secret* (un JWT firmado con la clave `.p8`) a **6 meses** de vigencia, así que
+esto pasa solo, sin que nadie toque nada.
+
+**Corrección:** generar un JWT nuevo con el `.p8`, el Team ID y el Key ID (la guía
+de Supabase para el proveedor Apple trae el generador), pegarlo en **Supabase →
+Authentication → Providers → Apple → Secret Key** y anotar la nueva fecha de
+caducidad en el calendario del equipo. No hay que tocar código ni recompilar la
+app. Si además se rotó la clave en Apple Developer → *Keys*, descargar el nuevo
+`.p8` y actualizar el Key ID. Configuración completa: `MOBILE.md`, paso 4.

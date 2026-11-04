@@ -1,7 +1,7 @@
 // Bootstrap de sesión y flujo OAuth (P1 #5, extraído de useAuth sin cambios
 // de comportamiento): restauración de la sesión almacenada al montar, manejo
-// del redirect OAuth (incluido el onboarding de usuarios Google sin perfil),
-// el evento PASSWORD_RECOVERY y el cierre del onboarding.
+// del redirect OAuth (incluido el onboarding de usuarios Google/Apple sin
+// perfil), el evento PASSWORD_RECOVERY y el cierre del onboarding.
 import { useState, useEffect, useCallback } from 'react'
 import type { UserSession } from '../../types'
 import { supabase, getOAuthCallbackError } from '../../lib/supabase'
@@ -10,12 +10,39 @@ import { getStoredSession, storeSession } from '../../lib/authSession'
 import { buildSessionFromSupabase, refreshSessionFromSupabase, appUserProfileExists } from '../../domain/auth/session'
 import { describeOAuthCallbackError } from '../../domain/auth/oauthCallbackError'
 
-export interface PendingOAuthUser { id: string; email: string; full_name: string }
+export type OAuthProvider = 'google' | 'apple' | 'oauth'
+
+export interface PendingOAuthUser {
+  id: string
+  email: string
+  /** Vacío cuando el proveedor no entregó nombre (Apple solo lo manda la primera vez). */
+  full_name: string
+  provider: OAuthProvider
+}
+
+type OAuthUser = {
+  id: string
+  email?: string | null
+  user_metadata?: Record<string, unknown>
+  app_metadata?: Record<string, unknown>
+}
+
+/** Proveedor con el que entró el usuario, según GoTrue (`app_metadata.provider`). */
+export function oauthProviderOf(user: Pick<OAuthUser, 'app_metadata'>): OAuthProvider {
+  const p = user.app_metadata?.provider
+  return p === 'google' || p === 'apple' ? p : 'oauth'
+}
+
+/** Nombre que trae la metadata del proveedor; '' si no trae ninguno. */
+export function oauthFullNameOf(user: Pick<OAuthUser, 'user_metadata'>): string {
+  const meta = user.user_metadata
+  const name = (meta?.full_name as string | undefined) ?? (meta?.name as string | undefined) ?? ''
+  return typeof name === 'string' ? name.trim() : ''
+}
 
 async function applyOAuthSession(
-  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> },
+  user: OAuthUser,
   expiresAt: number | undefined,
-  provider: string,
   setCurrentUser: (s: UserSession) => void,
   setNeedsOnboarding: (v: boolean) => void,
   setPendingOAuthUser: (v: PendingOAuthUser | null) => void,
@@ -23,17 +50,15 @@ async function applyOAuthSession(
   setOauthError: (msg: string) => void,
 ): Promise<void> {
   if (getStoredSession()) return
+  const provider = oauthProviderOf(user)
   try {
     // Check if an app_users profile already exists for this auth user
     const profileExists = await appUserProfileExists(user.id)
 
     if (!profileExists) {
-      // New OAuth user without app_users — needs onboarding to link to a cliente record
-      const fullName: string =
-        (user.user_metadata?.full_name as string | undefined) ??
-        (user.user_metadata?.name as string | undefined) ??
-        user.email ?? ''
-      setPendingOAuthUser({ id: user.id, email: user.email ?? '', full_name: fullName })
+      // New OAuth user without app_users — needs onboarding to link to a cliente
+      // record. Sin nombre en la metadata, el onboarding lo pide.
+      setPendingOAuthUser({ id: user.id, email: user.email ?? '', full_name: oauthFullNameOf(user), provider })
       setNeedsOnboarding(true)
       setLoadingDone()
       return
@@ -44,8 +69,8 @@ async function applyOAuthSession(
     setCurrentUser(sessionData)
     await logSecurityEvent('login_success', { email: user.email, provider }, user.id)
   } catch (e) {
-    // Google ya autenticó al usuario: si aquí no se pudo armar la sesión de la
-    // app, dejarlo mudo lo devuelve a la landing sin pista alguna. Se muestra
+    // El proveedor ya autenticó al usuario: si aquí no se pudo armar la sesión
+    // de la app, dejarlo mudo lo devuelve a la landing sin pista alguna. Se muestra
     // el motivo; para cuenta/empresa desactivada además se cierra la media
     // sesión de Supabase para que un reload no reintente en silencio.
     const msg = e instanceof Error ? e.message : ''
@@ -105,14 +130,14 @@ export function useOAuthSession(setCurrentUser: (s: UserSession) => void) {
       return
     }
 
-    // Check for active Supabase session (e.g. after Google OAuth redirect)
+    // Check for active Supabase session (e.g. after a Google/Apple OAuth redirect)
     // Timeout prevents infinite "Cargando..." if Supabase is unreachable
     const timeoutId = setTimeout(() => setLoading(false), 8000)
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(timeoutId)
       if (session?.user) {
-        await applyOAuthSession(session.user, session.expires_at, 'google', setCurrentUser, setNeedsOnboarding, setPendingOAuthUser, () => setLoading(false), setOauthError)
+        await applyOAuthSession(session.user, session.expires_at, setCurrentUser, setNeedsOnboarding, setPendingOAuthUser, () => setLoading(false), setOauthError)
       }
       setLoading(false)
     }).catch(() => {
@@ -126,7 +151,7 @@ export function useOAuthSession(setCurrentUser: (s: UserSession) => void) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        await applyOAuthSession(session.user, session.expires_at, 'oauth', setCurrentUser, setNeedsOnboarding, setPendingOAuthUser, () => setLoading(false), setOauthError)
+        await applyOAuthSession(session.user, session.expires_at, setCurrentUser, setNeedsOnboarding, setPendingOAuthUser, () => setLoading(false), setOauthError)
       }
       if (event === 'PASSWORD_RECOVERY') {
         // Supabase has processed the recovery token — show the reset form
@@ -146,7 +171,7 @@ export function useOAuthSession(setCurrentUser: (s: UserSession) => void) {
       setCurrentUser(session)
       setNeedsOnboarding(false)
       setPendingOAuthUser(null)
-      await logSecurityEvent('login_success', { email: user.email, provider: 'google_oauth_onboarding' }, user.id)
+      await logSecurityEvent('login_success', { email: user.email, provider: `${oauthProviderOf(user)}_oauth_onboarding` }, user.id)
     } catch {
       // ignore — user will remain in onboarding state
     }

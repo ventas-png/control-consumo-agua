@@ -77,10 +77,14 @@ export async function signupCompany(
 export interface CompleteOAuthOnboardingPayload {
   cui_dui: string
   fecha_nacimiento: string
+  /** Solo cuando el proveedor no entregó nombre (Apple lo manda una sola vez). */
+  full_name?: string
+  /** Solo cuando Apple ocultó el correo (@privaterelay.appleid.com): el registrado en la empresa. */
+  email_cliente?: string
 }
 
 /**
- * Completa el onboarding de un usuario que entró por OAuth (Google): valida
+ * Completa el onboarding de un usuario que entró por OAuth (Google o Apple): valida
  * identidad y vincula el `cliente`. Devuelve `{ data, error }`.
  */
 export async function completeOAuthOnboarding(

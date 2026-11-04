@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 
 // LandingPage dispara el warm-up de Supabase al montar; el módulo real exige
@@ -29,11 +29,15 @@ beforeEach(() => {
   // para que los siguientes tests vuelvan al español por defecto.
   window.history.replaceState({}, '', '/')
   simularPlataforma('web')
+  // Sign in with Apple apagado por defecto; los tests de Apple lo encienden.
+  vi.stubEnv('VITE_APPLE_SIGN_IN', '')
 })
+afterEach(() => vi.unstubAllEnvs())
 
 function setup(opts: { mfaChallenge?: { email: string } | null; initialAuthError?: string | null } = {}) {
   const onLogin = vi.fn(async () => null)
   const onLoginWithGoogle = vi.fn(async () => null)
+  const onLoginWithApple = vi.fn(async () => null)
   const onForgotPassword = vi.fn()
   const onRegister = vi.fn()
   const onSignupCompany = vi.fn()
@@ -43,6 +47,7 @@ function setup(opts: { mfaChallenge?: { email: string } | null; initialAuthError
     <LandingPage
       onLogin={onLogin}
       onLoginWithGoogle={onLoginWithGoogle}
+      onLoginWithApple={onLoginWithApple}
       onForgotPassword={onForgotPassword}
       onRegister={onRegister}
       onSignupCompany={onSignupCompany}
@@ -52,7 +57,7 @@ function setup(opts: { mfaChallenge?: { email: string } | null; initialAuthError
       initialAuthError={opts.initialAuthError ?? null}
     />,
   )
-  return { onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, onVerifyMfa, onCancelMfa, ...utils }
+  return { onLogin, onLoginWithGoogle, onLoginWithApple, onForgotPassword, onRegister, onSignupCompany, onVerifyMfa, onCancelMfa, ...utils }
 }
 
 describe('LandingPage', () => {
@@ -111,6 +116,56 @@ describe('LandingPage', () => {
     expect(screen.getByText('o con tu correo')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Continuar con Google' }))
     await waitFor(() => expect(onLoginWithGoogle).toHaveBeenCalledTimes(1))
+  })
+
+  describe('Sign in with Apple (VITE_APPLE_SIGN_IN=true)', () => {
+    beforeEach(() => vi.stubEnv('VITE_APPLE_SIGN_IN', 'true'))
+
+    it('sin la variable no hay botón de Apple en la web', () => {
+      vi.stubEnv('VITE_APPLE_SIGN_IN', '')
+      setup()
+      fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+      expect(screen.queryByRole('button', { name: 'Continuar con Apple' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Continuar con Google' })).toBeTruthy()
+    })
+
+    it('web: muestra Apple encima de Google, el botón llama a su handler y pasa axe', async () => {
+      const { onLoginWithApple, onLoginWithGoogle, container } = setup()
+      fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+      const apple = screen.getByRole('button', { name: 'Continuar con Apple' })
+      const google = screen.getByRole('button', { name: 'Continuar con Google' })
+      expect(apple.compareDocumentPosition(google) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(apple.className).toBe('btn-apple')
+      fireEvent.click(apple)
+      await waitFor(() => expect(onLoginWithApple).toHaveBeenCalledTimes(1))
+      expect(onLoginWithGoogle).not.toHaveBeenCalled()
+      await checkA11y(container)
+    })
+
+    it('app de iOS: con Apple presente vuelve Google (la 4.8 queda cumplida)', () => {
+      simularPlataforma('ios')
+      setup()
+      fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+      expect(screen.getByRole('button', { name: 'Continuar con Apple' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Continuar con Google' })).toBeTruthy()
+      expect(screen.getByText('o con tu correo')).toBeTruthy()
+    })
+
+    it('app de Android: Google sí, Apple no', () => {
+      simularPlataforma('android')
+      setup()
+      fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+      expect(screen.queryByRole('button', { name: 'Continuar con Apple' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Continuar con Google' })).toBeTruthy()
+    })
+
+    it('el error del login con Apple se muestra en el modal', async () => {
+      const { onLoginWithApple } = setup()
+      onLoginWithApple.mockResolvedValueOnce('Error al iniciar sesión con Apple' as unknown as null)
+      fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Continuar con Apple' }))
+      await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Error al iniciar sesión con Apple'))
+    })
   })
 
   it('auto-opens the login modal showing the OAuth callback error', async () => {

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { detectSsoForEmail, signInWithSso, type SsoEmailDetection } from '../../lib/sso'
-import { mostrarLoginConGoogle } from '../../lib/loginProviders'
+import { mostrarLoginConApple, mostrarLoginConGoogle } from '../../lib/loginProviders'
 
 interface Props {
   onLogin: (email: string, password: string) => Promise<string | null>
   onLoginWithGoogle: () => Promise<string | null>
+  onLoginWithApple: () => Promise<string | null>
   onForgotPassword: () => void
   onRegister: () => void
 }
@@ -27,13 +28,14 @@ const FEATURES = [
   },
 ]
 
-export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRegister }: Props) {
+export function LoginScreen({ onLogin, onLoginWithGoogle, onLoginWithApple, onForgotPassword, onRegister }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [appleLoading, setAppleLoading] = useState(false)
   const [shake, setShake] = useState(false)
   const [loadingSeconds, setLoadingSeconds] = useState(0)
   // ── SSO/SAML enterprise (plat:P10) ──
@@ -67,9 +69,10 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
 
   const ssoAvailable = !!sso?.available
   const hidePassword = !!sso?.enforced && !ssoFailed
-  // Guideline 4.8 de App Review (Login Services): la app de iOS no ofrece
-  // Google mientras no exista Sign in with Apple. Ver src/lib/loginProviders.ts.
+  // Login social por plataforma (guideline 4.8 de App Review: la app de iOS
+  // solo ofrece Google si también ofrece Apple). Ver src/lib/loginProviders.ts.
   const conGoogle = mostrarLoginConGoogle()
+  const conApple = mostrarLoginConApple()
 
   function getLoginStatusText(seconds: number): string {
     if (seconds >= 15) return 'Iniciando sistema, espere...'
@@ -98,6 +101,17 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
       setTimeout(() => setShake(false), 500)
     }
     setGoogleLoading(false)
+  }
+
+  async function handleApple() {
+    setAppleLoading(true)
+    const err = await onLoginWithApple()
+    if (err) {
+      setError(err)
+      setShake(true)
+      setTimeout(() => setShake(false), 500)
+    }
+    setAppleLoading(false)
   }
 
   async function handleSso() {
@@ -251,13 +265,43 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               Inicia sesión para acceder al sistema
             </p>
 
-            {/* Google button + divisor: solo donde se ofrece Google (en iOS no, guideline 4.8) */}
+            {/* Login social: Apple (web e iOS, con proveedor configurado) y Google
+                (en la app de iOS solo junto a Apple, guideline 4.8). Apple va con su
+                diseño oficial: negro, logo y texto blancos. */}
+            {conApple && (
+            <button
+              className="login-btn-apple"
+              onClick={handleApple}
+              disabled={appleLoading || googleLoading || loading}
+              style={{
+                width: '100%', padding: '13px', fontSize: '15px', fontWeight: 600,
+                background: '#000', color: '#fff',
+                border: '1.5px solid #000', borderRadius: '14px',
+                cursor: 'pointer', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', gap: '10px',
+                transition: 'all 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
+                marginBottom: conGoogle ? '12px' : '22px',
+              }}
+            >
+              {appleLoading ? (
+                <span style={{
+                  width: 20, height: 20, borderRadius: '50%',
+                  border: '2.5px solid rgba(255,255,255,0.35)', borderTopColor: '#fff',
+                  display: 'inline-block', animation: 'spin 0.7s linear infinite',
+                }} />
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" />
+                </svg>
+              )}
+              {appleLoading ? 'Conectando...' : 'Continuar con Apple'}
+            </button>
+            )}
             {conGoogle && (
-            <>
             <button
               className="login-btn-google"
               onClick={handleGoogle}
-              disabled={googleLoading || loading}
+              disabled={googleLoading || appleLoading || loading}
               style={{
                 width: '100%', padding: '13px', fontSize: '15px', fontWeight: 600,
                 background: 'var(--at-surface)', color: 'var(--at-ink-2)',
@@ -284,14 +328,15 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               )}
               {googleLoading ? 'Conectando...' : 'Continuar con Google'}
             </button>
+            )}
 
             {/* Divider */}
+            {(conApple || conGoogle) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
               <div style={{ flex: 1, height: '1px', background: 'var(--at-line)' }} />
               <span style={{ fontSize: '13px', color: 'var(--at-ink-3)', fontWeight: 500 }}>o con tu correo</span>
               <div style={{ flex: 1, height: '1px', background: 'var(--at-line)' }} />
             </div>
-            </>
             )}
 
             {/* Email input */}
@@ -321,7 +366,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             {ssoAvailable && (
               <button
                 onClick={handleSso}
-                disabled={ssoLoading || loading || googleLoading}
+                disabled={ssoLoading || loading || googleLoading || appleLoading}
                 style={{
                   width: '100%', padding: '13px', fontSize: '15px', fontWeight: 700,
                   background: 'var(--at-primary)', color: 'white',
@@ -395,7 +440,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             <button
               className="login-btn-main"
               onClick={handleLogin}
-              disabled={loading || googleLoading}
+              disabled={loading || googleLoading || appleLoading}
               style={{
                 width: '100%', padding: '14px', fontSize: '16px', fontWeight: 700,
                 background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 50%, var(--at-accent-2) 100%)',

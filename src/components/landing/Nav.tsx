@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from './icons'
 import type { Copy, Lang } from './i18n'
-import { mostrarLoginConGoogle } from '../../lib/loginProviders'
+import { mostrarLoginConApple, mostrarLoginConGoogle } from '../../lib/loginProviders'
 
 interface NavProps {
   t: Copy
@@ -55,6 +55,7 @@ interface LoginModalProps {
   t: Copy
   onLogin: (email: string, password: string) => Promise<string | null>
   onLoginWithGoogle: () => Promise<string | null>
+  onLoginWithApple: () => Promise<string | null>
   onForgotPassword: () => void
   onRegister: () => void
   // Crear empresa nueva (admin self-service, F2.10). Distinto de onRegister
@@ -72,7 +73,7 @@ interface LoginModalProps {
   initialError?: string
 }
 
-export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa, initialError }: LoginModalProps) {
+export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onLoginWithApple, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa, initialError }: LoginModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -86,6 +87,7 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onFor
   }, [initialError])
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [appleLoading, setAppleLoading] = useState(false)
   const [mfaCode, setMfaCode] = useState('')
   const [mfaLoading, setMfaLoading] = useState(false)
 
@@ -102,13 +104,16 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onFor
 
   if (!open) return null
 
-  // Guideline 4.8 de App Review (Login Services): la app de iOS no ofrece
-  // Google mientras no exista Sign in with Apple. Ver src/lib/loginProviders.ts.
+  // Login social por plataforma (guideline 4.8 de App Review: la app de iOS
+  // solo ofrece Google si también ofrece Apple). Ver src/lib/loginProviders.ts.
   const conGoogle = mostrarLoginConGoogle()
+  const conApple = mostrarLoginConApple()
+  const conSocial = conGoogle || conApple
+  const socialLoading = googleLoading || appleLoading
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (loading || googleLoading) return
+    if (loading || socialLoading) return
     setError('')
     setLoading(true)
     const err = await onLogin(email, password)
@@ -117,12 +122,21 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onFor
   }
 
   async function handleGoogle() {
-    if (loading || googleLoading) return
+    if (loading || socialLoading) return
     setError('')
     setGoogleLoading(true)
     const err = await onLoginWithGoogle()
     if (err) setError(err)
     setGoogleLoading(false)
+  }
+
+  async function handleApple() {
+    if (loading || socialLoading) return
+    setError('')
+    setAppleLoading(true)
+    const err = await onLoginWithApple()
+    if (err) setError(err)
+    setAppleLoading(false)
   }
 
   async function handleVerifyMfa(e: React.FormEvent) {
@@ -207,16 +221,19 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onFor
                   <p>{t.login.sub}</p>
                 </header>
 
-                {conGoogle && (
-                  <>
-                    <button className="btn-google" onClick={handleGoogle} disabled={googleLoading || loading} type="button">
-                      <Icon.google />
-                      <span>{googleLoading ? t.login.google_loading : t.login.google}</span>
-                    </button>
-
-                    <div className="login-or"><span>{t.login.or}</span></div>
-                  </>
+                {conApple && (
+                  <button className="btn-apple" onClick={handleApple} disabled={socialLoading || loading} type="button">
+                    <Icon.apple />
+                    <span>{appleLoading ? t.login.apple_loading : t.login.apple}</span>
+                  </button>
                 )}
+                {conGoogle && (
+                  <button className="btn-google" onClick={handleGoogle} disabled={socialLoading || loading} type="button">
+                    <Icon.google />
+                    <span>{googleLoading ? t.login.google_loading : t.login.google}</span>
+                  </button>
+                )}
+                {conSocial && <div className="login-or"><span>{t.login.or}</span></div>}
 
                 <form className="login-fields" onSubmit={handleSubmit}>
                   <label className="field">
@@ -247,7 +264,7 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onFor
                     </label>
                     <button type="button" className="link-quiet" onClick={() => { onClose(); onForgotPassword() }}>{t.login.forgot}</button>
                   </div>
-                  <button type="submit" className="btn-primary btn-block" disabled={loading || googleLoading}>
+                  <button type="submit" className="btn-primary btn-block" disabled={loading || socialLoading}>
                     {loading ? t.login.submitting : t.login.submit}
                   </button>
                 </form>

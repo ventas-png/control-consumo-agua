@@ -8,8 +8,11 @@ import { describe, it, expect } from 'vitest'
 import {
   IDENTITY_ERROR,
   buildClienteProfileRow,
+  chooseFullName,
   isIdentityMatch,
+  isPrivateRelayEmail,
   resolveFullName,
+  resolveLookupEmail,
 } from '../logic.ts'
 
 describe('complete-oauth-onboarding/resolveFullName', () => {
@@ -26,6 +29,49 @@ describe('complete-oauth-onboarding/resolveFullName', () => {
 
   it('una cadena vacía en full_name NO cae al fallback (?? solo salta null/undefined)', () => {
     expect(resolveFullName({ full_name: '', name: 'Ana' }, 'ana@g.com')).toBe('')
+  })
+})
+
+// Sign in with Apple: el nombre llega solo en la primera autorización (GoTrue lo
+// guarda en full_name) y, con «Ocultar mi correo», el JWT trae un alias
+// @privaterelay.appleid.com que nunca casa con el padrón.
+describe('complete-oauth-onboarding/chooseFullName', () => {
+  it('la metadata del proveedor manda aunque el formulario traiga otro nombre', () => {
+    expect(chooseFullName({ full_name: 'Ana García' }, 'ana@g.com', 'Otro Nombre')).toBe('Ana García')
+  })
+
+  it('sin nombre en la metadata, usa el declarado (recortado y acotado)', () => {
+    expect(chooseFullName({}, 'ana@g.com', '  Ana García  ')).toBe('Ana García')
+    expect(chooseFullName(null, 'x@privaterelay.appleid.com', 'A'.repeat(200))).toHaveLength(120)
+  })
+
+  it('sin metadata ni declarado, conserva el comportamiento previo (email o vacío)', () => {
+    expect(chooseFullName({}, 'ana@g.com', undefined)).toBe('ana@g.com')
+    expect(chooseFullName({}, 'ana@g.com', '   ')).toBe('ana@g.com')
+    expect(chooseFullName({ full_name: '' }, 'ana@g.com', null)).toBe('')
+  })
+})
+
+describe('complete-oauth-onboarding/isPrivateRelayEmail · resolveLookupEmail', () => {
+  it('detecta el alias de Apple sin importar mayúsculas ni espacios', () => {
+    expect(isPrivateRelayEmail('abc123@privaterelay.appleid.com')).toBe(true)
+    expect(isPrivateRelayEmail('  ABC@PrivateRelay.AppleID.com ')).toBe(true)
+    expect(isPrivateRelayEmail('ana@gmail.com')).toBe(false)
+    expect(isPrivateRelayEmail('ana@privaterelay.appleid.com.evil.io')).toBe(false)
+    expect(isPrivateRelayEmail(null)).toBe(false)
+  })
+
+  it('con un correo normal en el JWT, el declarado se IGNORA (no se puede suplantar el padrón)', () => {
+    expect(resolveLookupEmail('ana@gmail.com', 'otra@empresa.com')).toBe('ana@gmail.com')
+  })
+
+  it('con alias de Apple, busca por el correo declarado (normalizado)', () => {
+    expect(resolveLookupEmail('abc@privaterelay.appleid.com', '  Ana@Empresa.com ')).toBe('ana@empresa.com')
+  })
+
+  it('con alias de Apple y declarado inválido o ausente, cae al alias (→ IDENTITY_ERROR río abajo)', () => {
+    expect(resolveLookupEmail('abc@privaterelay.appleid.com', 'no-es-correo')).toBe('abc@privaterelay.appleid.com')
+    expect(resolveLookupEmail('abc@privaterelay.appleid.com', undefined)).toBe('abc@privaterelay.appleid.com')
   })
 })
 

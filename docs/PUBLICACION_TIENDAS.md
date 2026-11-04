@@ -48,16 +48,15 @@ Identidad fija de la app (no cambiarla una vez publicada):
    cuenta de prueba para la siguiente revisión).
 2. **«Iniciar sesión con Apple» o esconder Google en iOS.** La guideline 4.8
    de Apple (*Login Services*) obliga a ofrecer también *Sign in with Apple*
-   (o equivalente) cuando hay login social de terceros. **Resuelto para la v1**
-   con la salida rápida: la app de iOS no muestra «Continuar con Google» ni su
-   separador (`mostrarLoginConGoogle()` en `src/lib/loginProviders.ts`; la
-   condición está en el `LoginModal` de `src/components/landing/Nav.tsx`, que
-   es el login que ve la app, y en `LoginScreen.tsx`), así que la regla no
-   aplica. La web y Android no cambian; Android no tiene esta regla.
-   **Pendiente:** *Sign in with Apple* (proveedor `apple` de Supabase Auth +
-   `@capacitor-community/apple-sign-in`), que permitiría volver a ofrecer
-   Google en iOS; los pasos están en `MOBILE.md` §5. Si se añade cualquier
-   login social a la app de iOS antes de eso, el bloqueante vuelve.
+   cuando hay login social de terceros. **Resuelto en el código**: la app
+   ofrece «Continuar con Apple» junto a Google en iOS y en la web, por el mismo
+   camino de Supabase que Google (`src/lib/loginProviders.ts` decide qué botones
+   salen; `LoginModal` en `src/components/landing/Nav.tsx` y `LoginScreen` los
+   pintan). **Falta configurar** (`MOBILE.md`, paso 4): *Sign in with Apple* en
+   el App ID, un Services ID, una clave `.p8`, el proveedor Apple en Supabase y
+   compilar con `VITE_APPLE_SIGN_IN=true`. Mientras no esté, el binario cumple
+   igual: sin la variable la app de iOS no muestra ningún login social (ni
+   Google). Android no tiene esta regla y no muestra Apple.
 3. **Iconos y splash de marca.** Los actuales son los del template de
    Capacitor (sección 3). Apple rechaza iconos placeholder.
 
@@ -297,8 +296,9 @@ adb install -r app/build/outputs/apk/release/app-release.apk
    - Description: `AdministraTodo`.
    - Bundle ID: *Explicit* → `com.administratodo.app`.
    - Capabilities: ninguna obligatoria para la v1. *Push Notifications* solo si
-     se activa push ahora. *Sign in with Apple* solo cuando se implemente la
-     parte pendiente del bloqueante #2 (hoy la app de iOS no tiene login social).
+     se activa push ahora. *Sign in with Apple*: activarla en este App ID, que
+     es el principal del Services ID del login (`MOBILE.md`, paso 4); no cambia
+     el binario ni hace falta añadirla en Xcode (el flujo va por el navegador).
 2. No hace falta crear certificados ni perfiles a mano: Xcode lo hace con
    *Automatically manage signing*.
 
@@ -363,10 +363,10 @@ En Xcode:
   **revisión beta** (1–2 días). Útil para los administradores de condominios
   antes del lanzamiento.
 
-Hacer en TestFlight la prueba de humo de la sección 7, sobre todo la
-recuperación de contraseña desde la app en los dos arranques (app en segundo
-plano y app cerrada del todo): en iOS el login con Google no se muestra
-(bloqueante #2), así que el enlace del correo es el único consumidor real del
+Hacer en TestFlight la prueba de humo de la sección 7, sobre todo el deep link
+en los dos arranques (app en segundo plano y app cerrada del todo): con
+`VITE_APPLE_SIGN_IN=true`, el login con Apple y con Google; sin la variable, la
+recuperación de contraseña desde la app, que es entonces el único consumidor del
 deep link (ver `MOBILE.md` §3).
 
 ### 6.6 Ficha de la App Store y envío a revisión
@@ -405,9 +405,10 @@ En App Store Connect → la app → versión `2.0.0`:
 2. Login con correo y contraseña; cerrar la app del todo y reabrir: sigue la
    sesión.
 3. Deep link en los dos arranques (app abierta y app cerrada del todo): en
-   Android, login con Google; en iOS, donde Google no se muestra (bloqueante
-   #2), recuperación de contraseña desde la app abriendo el enlace del correo
-   en el mismo iPhone.
+   Android, login con Google; en iOS, login con Apple y con Google si el build
+   lleva `VITE_APPLE_SIGN_IN=true` (bloqueante #2), o recuperación de
+   contraseña desde la app abriendo el enlace del correo en el mismo iPhone si
+   no la lleva.
 4. Registrar una lectura con foto de cámara y con foto de galería: aparecen
    los diálogos de permiso con los textos en español.
 5. Una lectura con GPS: aparece el permiso de ubicación «mientras se usa».
@@ -483,6 +484,7 @@ tracking** (Apple: *Data not used for tracking*; no hay ATT que pedir).
 | App Store Connect: «ITMS-90xxx Missing Purpose String» | Falta una clave `NS*UsageDescription` para un permiso que un plugin declara. Las cuatro actuales cubren cámara, galería (lectura y escritura) y ubicación. |
 | App Store Connect: «Invalid App Icon: transparency / alpha channel» | El `icon-only.png` de `resources/` tiene alfa. Exportar en RGB sin transparencia y regenerar. |
 | Rechazo Apple 5.1.1(v) *Account deletion* | Ya existe (*Mi perfil → Eliminar mi cuenta* y `/eliminar-cuenta`). Si lo rechazan, comprobar que la cuenta de prueba llega a *Mi perfil* y que `delete-own-account` está desplegada (`deploy-functions.yml`) y en `ALLOWED_ORIGINS` el origen de la app. |
-| Rechazo Apple 4.8 *Login services* | No debería ocurrir: la app de iOS no muestra login social (bloqueante #2 de la sección 0). Si aparece, comprobar en el binario que `mostrarLoginConGoogle()` devuelve `false` en iOS y que nadie añadió otro login social sin *Sign in with Apple*. |
+| Rechazo Apple 4.8 *Login services* | No debería ocurrir: con `VITE_APPLE_SIGN_IN=true` la app ofrece *Sign in with Apple* junto a Google, y sin la variable no muestra login social (bloqueante #2 de la sección 0). Si aparece, comprobar en el binario qué botones salen (`src/lib/loginProviders.ts`) y que nadie añadió otro login social sin Apple al lado. |
+| «Continuar con Apple» vuelve con error de callback y Google funciona | El *Secret Key* del proveedor Apple en Supabase caducó (Apple lo limita a 6 meses). Renovarlo: `docs/RUNBOOK_GOOGLE_OAUTH_LOGIN.md`. |
 | Rechazo Apple 2.1 *App completeness*: «no pudimos iniciar sesión» | Credenciales de prueba caducadas o con 2FA. Mantener la cuenta demo viva y sin SSO/2FA. |
 | Rechazo Apple 4.2 *Minimum functionality*: «es solo un sitio web empaquetado» | Resaltar en las notas de revisión las capacidades nativas: cámara para medidores, GPS, sesión persistente, (push). Las capturas deben mostrar esas pantallas. |

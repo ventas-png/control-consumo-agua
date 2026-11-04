@@ -2,7 +2,7 @@
 // mezcladas aquí ahora son hooks enfocados que comparten el estado de sesión:
 //   - hooks/auth/useOAuthSession      — bootstrap/restauración + flujo OAuth/onboarding
 //   - hooks/auth/useSessionMaintenance — refresh de token, realtime RBAC, expiración
-//   - hooks/auth/useCredentialsLogin   — login email/contraseña + step-up MFA + Google
+//   - hooks/auth/useCredentialsLogin   — login email/contraseña + step-up MFA + Google/Apple
 // useAuth conserva la API pública intacta (App.tsx es su único consumidor) y
 // las acciones que tocan la sesión completa (logout, updateProfile).
 import { useState, useCallback, useEffect } from 'react'
@@ -24,7 +24,7 @@ export function useAuth() {
   const { loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError } =
     useOAuthSession(setCurrentUser)
   useSessionMaintenance(currentUser, setCurrentUser)
-  const { login, loginWithGoogle, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } =
+  const { login, loginWithGoogle, loginWithApple, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } =
     useCredentialsLogin(setCurrentUser)
 
   // Push nativas: registrar el dispositivo cuando hay sesión activa. No-op en web
@@ -87,5 +87,5 @@ export function useAuth() {
     return null
   }, [currentUser])
 
-  return { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge }
+  return { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError, login, loginWithGoogle, loginWithApple, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge }
 }
