@@ -158,7 +158,10 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
               alignItems: 'flex-start',
             }}>
               <span style={{ flexShrink: 0, fontSize: '14px' }}>ℹ️</span>
-              <span>Sus datos deben coincidir con los registrados en el sistema. Solo clientes autorizados pueden crear cuenta.</span>
+              <span>
+                Sus datos deben coincidir con los registrados en el sistema. Solo clientes autorizados pueden crear cuenta.
+                {' '}Si ya creó su cuenta o ingresó con Google, no necesita registrarse de nuevo: vuelva al inicio de sesión.
+              </span>
             </div>
 
             {/* Form fields */}

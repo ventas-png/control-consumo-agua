@@ -67,3 +67,40 @@ deja el otro con `invalid_client`.
   podrá completarlo: ese flujo es solo para residentes. Para personal de una
   empresa, crear el usuario desde Empresa → Usuarios (o invitación) con el
   mismo correo ANTES de que entre con Google.
+- **«No se encontró un cliente…» con los datos correctos** (formulario «Crear
+  cuenta de cliente»): casi siempre el residente **ya tiene cuenta** — por
+  ejemplo entró con «Continuar con Google» y completó el onboarding minutos
+  antes. `create-cliente-account` responde el MISMO error genérico cuando no
+  encuentra al cliente y cuando ya tiene cuenta (anti-enumeración), así que el
+  texto cubre ambos casos y dice cómo entrar. Para confirmarlo: en Clientes la
+  columna **Cuenta** muestra «Cuenta activa», y en los logs de la función hay un
+  `warn` «el cliente ya tiene cuenta de portal» con el `cliente_id`. El
+  residente debe iniciar sesión (Google o «¿Olvidaste tu contraseña?»), no
+  registrarse otra vez.
+- **Contraseña rechazada por Auth** (`weak_password`, `reasons: ["pwned"]`):
+  el proyecto tiene activa la protección contra contraseñas filtradas
+  (Dashboard → Authentication → Settings → Passwords), y Auth rechaza con 422
+  cualquier contraseña que aparezca en HaveIBeenPwned aunque cumpla la
+  validación del formulario (8+ caracteres, mayúscula, minúscula, número).
+  Antes el residente veía «No se pudo crear la cuenta. Intente nuevamente.» y
+  reintentar con la misma contraseña fallaba siempre; ahora el mensaje dice que
+  la contraseña es común o está filtrada y que elija otra. En los logs de la
+  función queda `warn` «Auth create rejected password: weak_password».
+- **Cliente «Habilitado» sin CUI/DUI, fecha de nacimiento o correo**: nunca va
+  a poder registrarse (el alta verifica los tres 3-de-3). El formulario de
+  Clientes ya no permite guardar la cuenta habilitada sin esos tres datos; para
+  los que quedaron así de antes, completar los datos o deshabilitar la cuenta.
+
+Diagnóstico rápido de un residente por DPI (SQL Editor; devuelve solo
+booleanos, sin PII):
+
+```sql
+select c.puede_crear_cuenta,
+       c.fecha_nacimiento is not null as tiene_fecha,
+       c.email is not null            as tiene_email,
+       exists (select 1 from public.app_users au where au.cliente_id = c.id) as tiene_cuenta,
+       (select u.raw_app_meta_data->>'provider' from public.app_users au
+          join auth.users u on u.id = au.id where au.cliente_id = c.id limit 1) as proveedor_login
+  from public.clientes c
+ where c.cui_dui = '<DPI sin espacios>';
+```
