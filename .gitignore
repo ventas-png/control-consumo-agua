@@ -49,3 +49,12 @@ condominios-media-manifest-*.json
 # Estado de cookies del bypass E2E de Vercel (lo escribe e2e/bypass.setup.ts;
 # contiene la cookie de sesión del Preview — jamás se versiona ni se sube)
 e2e/.estado/
+
+# Firma de la app móvil (docs/PUBLICACION_TIENDAS.md §5.1 y §6.1). Las llaves
+# de subida a Play y el material de firma de Apple jamás se versionan.
+android/keystore.properties
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision

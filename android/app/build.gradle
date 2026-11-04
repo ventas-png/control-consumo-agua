@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+// Firma de release para Google Play. Lee `android/keystore.properties` (NO se
+// versiona: está en el .gitignore de la raíz, junto con *.jks y *.keystore) con
+// storeFile / storePassword / keyAlias / keyPassword. Si el archivo no existe,
+// el build type `release` queda sin firma y solo los builds debug funcionan,
+// así que un clon recién hecho o el CI no se rompen. Cómo generar la llave y
+// el archivo: docs/PUBLICACION_TIENDAS.md §5.1.
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace = "com.administratodo.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,10 +28,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            release {
+                // storeFile relativo a android/ (o absoluto). Ver §5.1 de la guía.
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
