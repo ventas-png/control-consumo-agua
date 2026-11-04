@@ -69,10 +69,14 @@ function renderTab(props: Partial<Parameters<typeof SuministrosTab>[0]> = {}) {
 const abrirDetalle = () => fireEvent.click(screen.getByRole('button', { name: 'Alcohol Etílico al 70%' }))
 const ventana = () => screen.getByRole('dialog', { name: 'Foto del insumo' })
 const enVentana = (nombre: string | RegExp) => fireEvent.click(within(ventana()).getByRole('button', { name: nombre }))
-/** Confirma la ventana del formulario; cierra tras la promesa de `onGuardar`. */
+/**
+ * Confirma la ventana de foto abierta desde el formulario; cierra tras la
+ * promesa de `onGuardar`. Se espera a que desaparezca ESA ventana: el
+ * formulario de la ficha también es un diálogo y sigue abierto debajo.
+ */
 async function usarFoto() {
   enVentana(/Usar esta foto/)
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Foto del insumo' })).toBeNull())
 }
 const borradas = () => (mocks.removeCondominiosMedia.mock.calls as unknown as [string[]][]).flatMap(c => c[0])
 
