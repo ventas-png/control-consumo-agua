@@ -15,8 +15,18 @@
 #   .github/scripts/deploy-fn.sh signup-company --no-verify-jwt
 #
 # Requiere en el entorno:
-#   SUPABASE_PROJECT_ID    (se pasa como --project-ref)
+#   SUPABASE_PROJECT_ID    (se pasa como --remote=<ref>)
 #   SUPABASE_ACCESS_TOKEN  (lo consume el CLI de Supabase)
+#
+# CLI 3.x: el workflow instala `version: latest`, que el 2026-11-04 resolvió a
+# 3.0.0. Esa versión cambió dos cosas que rompían ESTE script en silencio:
+#   · todo cambio en un proyecto hosted pide confirmación interactiva; sin TTY
+#     el CLI imprime «Confirmation required … Nothing was changed. Re-run with
+#     --yes to confirm» y sale con error. Los 4 reintentos de abajo fallaban
+#     igual (run 41748297330) y ninguna función se desplegó.
+#   · `--project-ref` queda deprecado («will be removed in v4»); el destino se
+#     pasa con `--remote=<ref>`.
+# Por eso `--remote` y `--yes` van fijos aquí y no en cada step del workflow.
 #
 # NOTA: usamos `set -uo pipefail` (SIN `-e`) a propósito: un deploy fallido NO
 # debe abortar el script; el bucle de reintentos maneja el código de salida.
@@ -34,7 +44,7 @@ attempts="${DEPLOY_FN_ATTEMPTS:-4}"
 
 for i in $(seq 1 "$attempts"); do
   echo "::group::Deploy ${fn} (intento ${i}/${attempts})"
-  if supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_ID" "$@"; then
+  if supabase functions deploy "$fn" --remote="$SUPABASE_PROJECT_ID" --yes "$@"; then
     echo "::endgroup::"
     echo "✓ ${fn} desplegada (intento ${i})"
     exit 0
