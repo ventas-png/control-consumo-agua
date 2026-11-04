@@ -112,7 +112,10 @@ export function PortalTransparenciaTab({ proyectoId, moneda }: Props) {
     : 0
 
   return (
-    <div style={{ padding: '20px 24px' }}>
+    // Sin padding propio: la tarjeta de la pestaña en CondominiosClientPortal
+    // ya pone el suyo, y sumar otros 24px por lado dejaba ~216px de ancho útil
+    // en un teléfono. Las demás pestañas del portal tampoco lo llevan.
+    <div>
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700, color: 'var(--at-ink)' }}>
           📊 Transparencia financiera
@@ -123,7 +126,7 @@ export function PortalTransparenciaTab({ proyectoId, moneda }: Props) {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))', gap: '12px', marginBottom: '24px' }}>
         <StatTile
           label="💰 Saldo fondo reserva"
           value={`${moneda} ${kpis.saldoFondo.toLocaleString('es', { minimumFractionDigits: 2 })}`}

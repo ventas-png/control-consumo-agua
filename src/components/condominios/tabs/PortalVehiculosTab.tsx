@@ -40,7 +40,7 @@ const fieldStyle: React.CSSProperties = {
   boxSizing: 'border-box', background: 'var(--at-surface)',
 }
 const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '4px', display: 'block' }
-const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }
+const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '12px' }
 
 const BLANK = { placa: '', tipo: 'auto' as TipoVehiculo, marca: '', modelo: '', color: '', anio: '', notas: '' }
 

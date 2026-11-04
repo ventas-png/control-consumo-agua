@@ -136,7 +136,9 @@ export function CustomerPaymentsTab({ registros, currentUser, companyId, moneda,
           boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
         }}>
           <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '6px', fontWeight: 500 }}>Total por Pagar</div>
-          <div style={{ fontSize: '24px', fontWeight: 800, whiteSpace: 'nowrap' }}>{moneda} {totalPendiente.toFixed(2)}</div>
+          {/* Dos tarjetas por fila en el teléfono dejan ~115px de contenido: a 24px
+            * fijos y sin partir, "Q 1250.00" se salía de la tarjeta. */}
+          <div style={{ fontSize: 'clamp(18px, 6.5vw, 24px)', fontWeight: 800, overflowWrap: 'anywhere' }}>{moneda} {totalPendiente.toFixed(2)}</div>
         </div>
 
         <div style={{

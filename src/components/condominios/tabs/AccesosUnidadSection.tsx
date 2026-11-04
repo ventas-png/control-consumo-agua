@@ -127,7 +127,7 @@ export function AccesosUnidadSection({ unidadId }: { unidadId: string }) {
           style={{
             padding: '8px 16px', background: cupoLleno ? 'var(--at-chip)' : 'var(--at-accent-hover)',
             color: cupoLleno ? 'var(--at-ink-3)' : 'white', border: 'none', borderRadius: '8px',
-            fontSize: '13px', fontWeight: 600, cursor: cupoLleno ? 'not-allowed' : 'pointer', flexShrink: 0,
+            fontSize: '13px', fontWeight: 600, cursor: cupoLleno ? 'not-allowed' : 'pointer', maxWidth: '100%',
           }}
         >
           {enRenta ? '+ Agregar familiar del inquilino' : '+ Dar acceso a mi familia'} ({familiaresNucleo.length}/{MAX_POR_NUCLEO})
@@ -152,7 +152,7 @@ export function AccesosUnidadSection({ unidadId }: { unidadId: string }) {
                   color: a.tiene_cuenta ? 'var(--at-success)' : 'var(--at-warning-strong)',
                 }}>{a.tiene_cuenta ? '✓ Con cuenta' : 'Cuenta pendiente'}</span>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '2px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '2px', overflowWrap: 'anywhere' }}>
                 {a.cliente_email && <>✉️ {a.cliente_email}</>}{a.cliente_email && a.cliente_telefono && '  ·  '}{a.cliente_telefono && <>📞 {a.cliente_telefono}</>}
               </div>
             </div>

@@ -40,7 +40,7 @@ const fieldStyle: React.CSSProperties = {
   boxSizing: 'border-box', background: 'var(--at-surface)',
 }
 const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '4px', display: 'block' }
-const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }
+const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '12px', marginBottom: '12px' }
 const seccionStyle: React.CSSProperties = {
   border: '1.5px solid var(--at-line)', borderRadius: '12px',
   padding: '16px', marginBottom: '18px', background: 'var(--at-surface-2)',

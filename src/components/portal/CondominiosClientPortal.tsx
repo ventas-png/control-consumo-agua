@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { fetchCondominiosPortalData, fetchPortalUnidadesResidente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta, marcarAnunciosLeidos } from '../../domain/portal/queries'
 import { PORTAL_TABS, tabsVisiblesPortal, normalizarTabsOcultos, type PortalTab } from '../../lib/portalTabs'
 import { DIAS_AVISO_RENOVACION_DEFAULT, estaVencida, necesitaRenovacion, normalizarDiasAviso, tieneRenovacionSolicitada } from '../../lib/visitasFrecuentes'
@@ -100,6 +100,15 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
   const [loading, setLoading]                     = useState(true)
   const [tab, setTab]                             = useState<PortalTab>('mi_unidad')
+  // La pestaña activa se trae a la vista dentro de la tira (que desliza en
+  // horizontal en el teléfono). Misma receta que <TabStrip> y el portal de
+  // Agua: `block: 'nearest'` no mueve el scroll vertical; `?.()` porque jsdom
+  // no implementa scrollIntoView.
+  const tabStripRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    tabStripRef.current?.querySelector('.condo-tab.active')
+      ?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
+  }, [tab])
   const [unidades, setUnidades]                   = useState<UnidadPortal[]>([])
   const [selectedUnidadId, setSelectedUnidadId]   = useState('')
   const [resolvedCompanyId, setResolvedCompanyId] = useState(currentUser.company_id ?? '')
@@ -490,7 +499,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         </div>
 
         {/* Tab navigation */}
-        <div className="tab-strip-scrollable" style={{ maxWidth: '960px', margin: '0 auto', padding: '0 24px', display: 'flex', gap: '4px', overflowX: 'auto' }}>
+        <div ref={tabStripRef} className="tab-strip-scrollable" style={{ maxWidth: '960px', margin: '0 auto', padding: '0 24px', display: 'flex', gap: '4px', overflowX: 'auto' }}>
           {pestanasListas && tabsVisibles.map(t => (
             <button
               key={t.id}
@@ -511,7 +520,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       </div>
 
       {/* Main content */}
-      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 24px' }}>
+      <div className="portal-main" style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 24px' }}>
 
         {/* KPI Cards — tarjeta compacta: valor arriba y el icono junto a la
          * etiqueta en una sola línea abajo. Antes el icono iba en su propio
@@ -570,7 +579,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
             <span style={{ fontSize: '14px', color: 'var(--at-ink-3)', fontWeight: 500 }}>Cargando información…</span>
           </div>
         ) : !unidad ? null : (
-          <div style={{ background: 'var(--at-surface)', borderRadius: '20px', padding: '24px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
+          <div className="portal-tab-card" style={{ background: 'var(--at-surface)', borderRadius: '20px', padding: '24px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
             {tab === 'mi_unidad' && (
               <PortalMiUnidadTab
                 unidad={unidad}

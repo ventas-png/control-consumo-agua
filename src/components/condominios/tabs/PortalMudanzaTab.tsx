@@ -202,7 +202,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div className="portal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
               <div>
                 <label style={labelStyle}>Fecha propuesta *</label>
                 <input style={fieldStyle} type="date" value={form.fecha_solicitada} onChange={e => setForm(p => ({ ...p, fecha_solicitada: e.target.value }))} />
