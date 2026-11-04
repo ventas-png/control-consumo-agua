@@ -268,6 +268,7 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
     const rfc = sanitizeInput(form.rfc).trim()
     const nombre_fiscal = sanitizeInput(form.nombre_fiscal).trim()
     const uso_cfdi = sanitizeInput(form.uso_cfdi).trim()
+    const cui_dui = sanitizeInput(form.cui_dui)
 
     const errors: string[] = []
     if (!nombre || nombre.length < 2) errors.push('Nombre debe tener al menos 2 caracteres')
@@ -278,6 +279,14 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
     // Formato del identificador tributario del receptor (NIT GT / RFC MX). Helper
     // puro que reusa los validadores de businessFiscal.ts; opcional salvo formato.
     errors.push(...validarReceptorFiscal(regimenFiscal, { nit, rfc }))
+    // El alta self-service del portal (create-cliente-account) verifica
+    // CUI/DUI + fecha de nacimiento + correo 3-de-3 contra ESTA fila.
+    // Habilitarla sin alguno de los tres deja al cliente con un «no se
+    // encontró un cliente» que no puede resolver desde su lado — y a soporte
+    // con un ticket de «el registro falla con los datos correctos».
+    if (form.puede_crear_cuenta && (!cui_dui || !form.fecha_nacimiento || !email)) {
+      errors.push('Para habilitar la cuenta del portal el cliente necesita CUI/DUI, fecha de nacimiento y correo electrónico: el registro verifica los tres')
+    }
 
     if (errors.length > 0) {
       notify({ variant: 'error', title: 'Error de validación', text: errors.join('<br>') })
@@ -295,7 +304,7 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
       whatsapp: whatsapp || null,
       puede_crear_cuenta: form.puede_crear_cuenta,
       nacionalidad: sanitizeInput(form.nacionalidad) || null,
-      cui_dui: sanitizeInput(form.cui_dui) || null,
+      cui_dui: cui_dui || null,
       fecha_nacimiento: form.fecha_nacimiento || null,
       numero_facturacion: sanitizeInput(form.numero_facturacion) || null,
       // serv:S11 — datos fiscales del receptor. nombre_fiscal aplica a ambos

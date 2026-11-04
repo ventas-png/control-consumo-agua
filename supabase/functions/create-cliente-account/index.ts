@@ -1,9 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
-
-// Generic identity error — same message for "not found" and "already verified" to prevent enumeration
-const IDENTITY_ERROR = 'No se encontró un cliente con los datos proporcionados. Verifique su DPI/CUI, fecha de nacimiento y correo electrónico.'
+// Lógica pura (error genérico anti-enumeración —el mismo para «no encontrado»
+// y «ya tiene cuenta», por eso su texto cubre ambos—, match 3-de-3 y
+// clasificación del error de createUser) extraída a ./logic.ts para testearla
+// en vitest.
+import {
+  IDENTITY_ERROR,
+  classifyAuthCreateError,
+  isIdentityMatch,
+  type OnboardingLookup,
+} from './logic.ts'
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
@@ -96,13 +103,13 @@ Deno.serve(async (req) => {
       return err('Error al verificar su identidad. Intente nuevamente.')
     }
 
-    const result = lookupResult as { match_count: number; cliente_id: string | null }
+    const result = lookupResult as OnboardingLookup
 
-    if (result.match_count < 3 || !result.cliente_id) {
+    if (!isIdentityMatch(result)) {
       return err(IDENTITY_ERROR)
     }
 
-    const clienteId = result.cliente_id
+    const clienteId = result.cliente_id as string
 
     // Step 2: Verify that the client has permission to create an account
     const { data: clienteRecord, error: clienteError } = await adminClient
@@ -127,6 +134,12 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (existingUser) {
+      // Misma respuesta que «no encontrado» (anti-enumeración; el texto de
+      // IDENTITY_ERROR ya cubre este caso y dice cómo entrar). Queda rastro
+      // server-side —sin PII— para que soporte pueda distinguirlo en los logs
+      // de la función: el cliente ya tiene cuenta (p.ej. entró con Google) y
+      // debe iniciar sesión, no registrarse de nuevo.
+      console.warn('create-cliente-account: el cliente ya tiene cuenta de portal', { cliente_id: clienteId })
       return err(IDENTITY_ERROR)
     }
 
@@ -144,7 +157,8 @@ Deno.serve(async (req) => {
     let createdFreshAuthUser = false
 
     if (createError || !newAuthUser?.user) {
-      const isDuplicate = createError?.message?.toLowerCase().includes('already') ?? false
+      const clasificacion = classifyAuthCreateError(createError)
+      const isDuplicate = clasificacion.kind === 'duplicate'
 
       // Login huérfano: existe en Auth pero SIN perfil app_users (p.ej. un
       // perfil eliminado sin borrar el login, o un alta anterior que quedó a
@@ -173,8 +187,17 @@ Deno.serve(async (req) => {
               email_confirm: true,
               user_metadata: { full_name },
             })
-            if (adoptError) console.error('Orphan auth user adopt error:', adoptError)
-            else {
+            if (adoptError) {
+              // Misma clasificación que createUser: si Auth rechazó la nueva
+              // contraseña (weak_password) hay que decirlo; de lo contrario el
+              // usuario vería «ya está registrado» y no sabría qué cambiar.
+              const adoptClass = classifyAuthCreateError(adoptError)
+              if (adoptClass.kind === 'weak_password') {
+                console.warn('Orphan adopt rejected password:', adoptError.code ?? adoptError.name)
+                return err(adoptClass.message)
+              }
+              console.error('Orphan auth user adopt error:', adoptError)
+            } else {
               adoptedId = existingId
               // PR-19: esta rama SOBRESCRIBE la contraseña de un auth user que
               // ya existía. Está acotada a huérfanos (sin fila en `app_users`,
@@ -202,11 +225,17 @@ Deno.serve(async (req) => {
       }
 
       if (!adoptedId) {
-        console.error('Auth create error:', createError)
-        const message = isDuplicate
-          ? 'El correo electrónico ya está registrado.'
-          : 'No se pudo crear la cuenta. Intente nuevamente.'
-        return err(message)
+        if (clasificacion.kind === 'weak_password') {
+          // Auth rechazó la contraseña (protección contra contraseñas filtradas
+          // o política del proyecto, HTTP 422). No es un fallo del sistema:
+          // warn sin stack, y al usuario se le dice qué cambiar. Antes caía en
+          // «No se pudo crear la cuenta. Intente nuevamente.», que invitaba a
+          // reintentar con la misma contraseña para siempre.
+          console.warn('Auth create rejected password:', createError?.code ?? createError?.name)
+        } else {
+          console.error('Auth create error:', createError)
+        }
+        return err(clasificacion.message)
       }
       newUserId = adoptedId
     } else {
