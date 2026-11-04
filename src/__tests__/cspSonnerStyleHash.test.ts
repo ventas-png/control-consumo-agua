@@ -91,6 +91,16 @@ describe('CSP · postura de seguridad (prod y previews)', () => {
     expect(csp).not.toContain('emailjs.com')
   })
 
+  // Comprobación de contraseñas filtradas en el navegador (isPasswordPwned,
+  // src/lib/validation.ts): consulta por rango con k-anonimato. Si falta en
+  // connect-src el navegador bloquea la llamada y el check queda silenciosamente
+  // inútil (fail-open), así que lo fijamos aquí para prod Y previews.
+  it.each(variants)('[%s] connect-src permite la API de rango de HaveIBeenPwned', (_n, csp) => {
+    expect(directive(csp, 'connect-src')).toContain('https://api.pwnedpasswords.com')
+    // Solo connect-src: no hace falta (ni conviene) en script-src/img-src.
+    expect(directive(csp, 'script-src')).not.toContain('pwnedpasswords.com')
+  })
+
   it('prod NO usa wildcard *.supabase.co: Supabase pineado al ref del proyecto', () => {
     expect(prod).not.toContain('*.supabase.co')
     const connect = directive(prod, 'connect-src')

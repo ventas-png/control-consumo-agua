@@ -86,6 +86,13 @@ deja el otro con `invalid_client`.
   reintentar con la misma contraseña fallaba siempre; ahora el mensaje dice que
   la contraseña es común o está filtrada y que elija otra. En los logs de la
   función queda `warn` «Auth create rejected password: weak_password».
+  Además, el formulario consulta HaveIBeenPwned ANTES de enviar
+  (`isPasswordPwned` en `src/lib/validation.ts`, API de rango con
+  k-anonimato: solo viaja el prefijo de 5 hex del SHA-1) y muestra el mismo
+  mensaje sin llamar a la función. Si esa API no responde, no bloquea: decide
+  el servidor. Requiere `https://api.pwnedpasswords.com` en el `connect-src`
+  de la CSP (vercel.json); si falta, el navegador bloquea la llamada y el
+  check queda silenciosamente inútil (hay un test que lo fija).
 - **Cliente «Habilitado» sin CUI/DUI, fecha de nacimiento o correo**: nunca va
   a poder registrarse (el alta verifica los tres 3-de-3). El formulario de
   Clientes ya no permite guardar la cuenta habilitada sin esos tres datos; para

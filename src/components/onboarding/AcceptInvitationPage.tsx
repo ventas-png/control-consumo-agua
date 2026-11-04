@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { previewInvitation } from '../../domain/onboarding/queries'
 import { acceptInvitation, signInWithPassword } from '../../domain/onboarding/mutations'
-import { validatePasswordStrength } from '../../lib/validation'
+import { isPasswordPwned, PWNED_PASSWORD_MESSAGE, validatePasswordStrength } from '../../lib/validation'
 import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { BrandLogo } from '../shared/BrandLogo'
 
@@ -86,6 +86,10 @@ export function AcceptInvitationPage() {
 
     setSubmitting(true)
     try {
+      // Contraseña filtrada (HaveIBeenPwned, k-anonimato): Auth la rechazaría
+      // igual en accept-invitation. Si la API no responde, no bloquea: decide el servidor.
+      if (await isPasswordPwned(password)) { setError(PWNED_PASSWORD_MESSAGE); return }
+
       const { data: result, error: fnErr } = await acceptInvitation(token, password, fullName.trim() || undefined)
       if (fnErr || !result || result.error || !result.success) {
         setError(result?.error ?? fnErr ?? 'No se pudo aceptar la invitación.')

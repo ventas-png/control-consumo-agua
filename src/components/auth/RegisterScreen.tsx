@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent} from 'react'
 import { createClienteAccount } from '../../domain/auth/account'
-import { validatePasswordStrength } from '../../lib/validation'
+import { isPasswordPwned, PWNED_PASSWORD_MESSAGE, validatePasswordStrength } from '../../lib/validation'
 import { BrandLogo } from '../shared/BrandLogo'
 
 interface Props {
@@ -54,6 +54,15 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
 
     setLoading(true)
     try {
+      // Contraseña filtrada (HaveIBeenPwned, k-anonimato): Auth la rechazaría
+      // igual en la edge function; avisar antes ahorra el viaje y deja al
+      // usuario corregirla aquí. Si la API no responde, no bloquea: decide el
+      // servidor.
+      if (await isPasswordPwned(password)) {
+        setError(PWNED_PASSWORD_MESSAGE)
+        return
+      }
+
       const { data, error: fnError } = await createClienteAccount({
         full_name: fullName.trim(),
         email: email.trim().toLowerCase(),

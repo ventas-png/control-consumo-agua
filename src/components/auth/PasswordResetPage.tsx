@@ -2,7 +2,7 @@ import { useState, useEffect, type CSSProperties} from 'react'
 import { notify } from '../shared/Dialog'
 import { hasActiveSession, updatePassword, signOutGlobal } from '../../domain/auth/account'
 import { logSecurityEvent } from '../../lib/security'
-import { validatePasswordStrength } from '../../lib/validation'
+import { isPasswordPwned, PWNED_PASSWORD_MESSAGE, validatePasswordStrength } from '../../lib/validation'
 
 interface Props {
   onBack: () => void
@@ -39,6 +39,13 @@ export function PasswordResetPage({ onBack }: Props) {
 
     setLoading(true)
     try {
+      // Contraseña filtrada (HaveIBeenPwned, k-anonimato): Auth la rechazaría
+      // igual en updateUser. Si la API no responde, no bloquea: decide el servidor.
+      if (await isPasswordPwned(newPassword)) {
+        setNewPassError(PWNED_PASSWORD_MESSAGE)
+        return
+      }
+
       const { error } = await updatePassword(newPassword)
 
       if (error) {

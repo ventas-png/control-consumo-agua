@@ -55,6 +55,105 @@ export function validatePasswordStrength(password: string): { valid: boolean; me
   return { valid: true, message: '' }
 }
 
+// ── Contraseñas filtradas (HaveIBeenPwned) ───────────────────────────────────
+//
+// Supabase Auth tiene activa la protección contra contraseñas filtradas: rechaza
+// con `weak_password` / `reasons: ["pwned"]` cualquier contraseña que aparezca
+// en HaveIBeenPwned aunque cumpla `validatePasswordStrength`. La edge function
+// ya traduce ese rechazo a un mensaje claro, pero el usuario solo lo veía
+// DESPUÉS de enviar. Esta comprobación corre en el navegador antes de llamar al
+// backend, con el mismo texto, para que corrija la contraseña en el formulario.
+//
+// Privacidad (k-anonimato): se calcula el SHA-1 de la contraseña en el
+// navegador y a la API solo viaja el PREFIJO de 5 hex. La API devuelve todos los
+// sufijos con ese prefijo (~500-800) y la comparación se hace localmente. Ni la
+// contraseña ni su hash completo salen del dispositivo.
+//
+// Fail-open A PROPÓSITO: si la API no responde (sin red, caída, CSP, timeout,
+// navegador sin crypto.subtle) la función devuelve `false` y el servidor —que
+// hace la misma comprobación— decide. Nunca debe impedir un registro legítimo
+// por un fallo de un tercero.
+
+/** Mismo texto que `classifyAuthCreateError` en la edge function create-cliente-account. */
+export const PWNED_PASSWORD_MESSAGE =
+  'La contraseña es demasiado común o apareció en filtraciones de datos conocidas. Elija una contraseña distinta, que no use en otros sitios.'
+
+/** Endpoint de rango (k-anonimato). Debe estar permitido en `connect-src` de la CSP (vercel.json). */
+export const PWNED_PASSWORDS_RANGE_URL = 'https://api.pwnedpasswords.com/range/'
+
+/** Tiempo máximo de espera por la API antes de dejar que decida el servidor. */
+export const PWNED_CHECK_TIMEOUT_MS = 5000
+
+export interface PwnedCheckOptions {
+  /** Inyectable en tests; por defecto `globalThis.fetch`. */
+  fetchImpl?: typeof fetch
+  /** Por defecto `PWNED_CHECK_TIMEOUT_MS`. */
+  timeoutMs?: number
+}
+
+async function sha1Hex(text: string): Promise<string | null> {
+  const subtle = globalThis.crypto?.subtle
+  if (!subtle) return null
+  const digest = new Uint8Array(await subtle.digest('SHA-1', new TextEncoder().encode(text)))
+  return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase()
+}
+
+/**
+ * ¿Aparece la contraseña en filtraciones conocidas (HaveIBeenPwned)?
+ *
+ * Devuelve `true` SOLO cuando la API confirma que la contraseña está filtrada.
+ * Devuelve `false` tanto si no aparece como si la comprobación no pudo
+ * hacerse (ver fail-open arriba): en ese caso la decisión queda en el servidor.
+ */
+export async function isPasswordPwned(password: string, opts: PwnedCheckOptions = {}): Promise<boolean> {
+  if (!password) return false
+  const fetchImpl = opts.fetchImpl ?? globalThis.fetch
+  if (typeof fetchImpl !== 'function') return false
+
+  let hash: string | null
+  try {
+    hash = await sha1Hex(password)
+  } catch {
+    return false
+  }
+  if (!hash) return false
+
+  const prefix = hash.slice(0, 5)
+  const suffix = hash.slice(5)
+
+  const controller = typeof AbortController === 'function' ? new AbortController() : null
+  const timer = controller
+    ? setTimeout(() => controller.abort(), opts.timeoutMs ?? PWNED_CHECK_TIMEOUT_MS)
+    : null
+  try {
+    const res = await fetchImpl(`${PWNED_PASSWORDS_RANGE_URL}${prefix}`, {
+      method: 'GET',
+      signal: controller?.signal,
+      // Sin cookies ni credenciales: la petición no identifica al usuario.
+      credentials: 'omit',
+    })
+    if (!res.ok) return false
+    const body = await res.text()
+    // Formato: una línea por sufijo, `SUFIJO:CONTADOR` (hex en mayúsculas,
+    // separadas por CRLF). Un contador de 0 es relleno (padding) y se ignora.
+    // No se pide `Add-Padding`: es una cabecera no simple y obligaría a un
+    // preflight CORS; la petición GET sin cabeceras extra no lo necesita.
+    for (const line of body.split(/\r?\n/)) {
+      const sep = line.indexOf(':')
+      const lineSuffix = (sep === -1 ? line : line.slice(0, sep)).trim().toUpperCase()
+      if (lineSuffix !== suffix) continue
+      const count = sep === -1 ? 1 : parseInt(line.slice(sep + 1), 10)
+      return Number.isNaN(count) || count > 0
+    }
+    return false
+  } catch {
+    // Red caída, timeout (AbortError), CSP, respuesta ilegible: decide el servidor.
+    return false
+  } finally {
+    if (timer !== null) clearTimeout(timer)
+  }
+}
+
 export function validateNumber(
   input: number | string,
   min = 0,
