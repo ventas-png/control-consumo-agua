@@ -287,32 +287,131 @@ export function estilosMarcaOscuro(primaryColor: string | null | undefined): Rec
 /** Color de acento del tema por defecto (= --at-accent en src/index.css). */
 export const DEFAULT_ACCENT_COLOR = '#B96A3F'
 
-/** CSS vars de acento que el branding sobreescribe. */
-export const ACCENT_CSS_VARS = ['--at-accent', '--at-accent-hover'] as const
+export interface VariablesAccent {
+  /** --at-accent: acento de marca (botones secundarios, destacados). */
+  accent: string
+  /** --at-accent-hover */
+  hover: string
+  /** --at-accent-dark / -darker: texto de acento sobre sus fondos claros. */
+  dark: string
+  darker: string
+  /** --at-accent-light: tono medio-claro (fondos, texto, bordes). */
+  light: string
+  /** --at-accent-soft / -soft-2: bordes de acento. */
+  soft: string
+  soft2: string
+  /** --at-accent-tint / -tint-2: fondos de acento (~160 usos). */
+  tint: string
+  tint2: string
+}
 
 /**
- * Mapa de CSS vars de ACENTO para un color custom, o null si no hay (restablecer).
- * Sobreescribe las 2 vars de acento dominantes; las variantes finas
- * (-soft/-tint/-light/…) quedan en sus defaults (follow-up: derivar la paleta).
+ * Menor factor de `oscurecer` ≥ `desde` con el que el color cumple `cumple`
+ * (1 = negro si nada antes lo cumple).
  */
-export function estilosAccent(accentColor: string | null | undefined): Record<string, string> | null {
-  const color = normalizarColorHex(accentColor)
-  if (!color) return null
+function factorOscurecerHasta(hex: string, desde: number, cumple: (c: string) => boolean): number {
+  if (cumple(oscurecer(hex, desde))) return desde
+  let lo = desde, hi = 1
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2
+    if (cumple(oscurecer(hex, mid))) hi = mid
+    else lo = mid
+  }
+  return hi
+}
+
+/**
+ * Deriva la paleta de ACENTO del tema CLARO. Proporciones sacadas de la paleta
+ * por defecto de src/index.css (con #B96A3F da valores casi iguales):
+ * - hover / dark / darker: 18 / 32 / 49% más oscuro. dark y darker se usan como
+ *   texto sobre los tints: se oscurecen más si hace falta para ≥ 4.5:1.
+ * - light: mismo tono, +11% de luminosidad.
+ * - soft / soft-2 / tint / tint-2: mezcla con blanco 65 / 78 / 85 / 90%.
+ */
+export function derivarVariablesAccent(accent: string | null | undefined): VariablesAccent {
+  const base = normalizarColorHex(accent) ?? (normalizarColorHex(DEFAULT_ACCENT_COLOR) as string)
+  const tint = mezclarBlanco(base, 0.85)
+  const tint2 = mezclarBlanco(base, 0.9)
+  const legible = (c: string) => contraste(c, tint) >= LIGHT_MIN_CONTRASTE
+  const fDark = factorOscurecerHasta(base, 0.32, legible)
   return {
-    '--at-accent': color,
-    '--at-accent-hover': oscurecer(color, 0.18),
+    accent: base,
+    hover: oscurecer(base, 0.18),
+    dark: oscurecer(base, fDark),
+    darker: oscurecer(base, Math.max(0.49, Math.min(1, fDark + 0.17))),
+    light: enLuminosidad(base, luminosidadHsl(base) + 0.11),
+    soft: mezclarBlanco(base, 0.65),
+    soft2: mezclarBlanco(base, 0.78),
+    tint,
+    tint2,
   }
 }
 
-/** Acento para el tema OSCURO: aclarado hasta leerse sobre fondos oscuros; hover aclara. */
+/**
+ * Paleta de ACENTO del tema OSCURO (equivalente a los overrides dark de index.css):
+ * - accent: aclarado hasta leerse sobre fondos oscuros; hover y light aclaran.
+ * - dark = accent (como en index.css); darker algo más oscuro pero ≥ 4.5:1 sobre
+ *   los tints oscuros (se usan como texto).
+ * - tint / tint-2 / soft / soft-2: superficies oscuras con el MISMO tono del acento
+ *   (luminosidad HSL 9 / 11 / 14 / 18%, saturación atenuada). A diferencia del
+ *   primario no se mezclan con --at-bg: su tinte verdoso volvería oliva los tonos
+ *   cálidos (los de index.css son marrones).
+ */
+export function derivarVariablesAccentOscuro(accent: string | null | undefined): VariablesAccent {
+  const base = normalizarColorHex(accent) ?? (normalizarColorHex(DEFAULT_ACCENT_COLOR) as string)
+  const a = aclararParaTemaOscuro(base)
+  const superficie = (l: number) => enLuminosidad(a, l, 0.65)
+  const tint = superficie(0.092)
+  const tint2 = superficie(0.11)
+  const soft = superficie(0.137)
+  const legible = (c: string) => [tint, tint2, soft].every((f) => contraste(c, f) >= DARK_MIN_CONTRASTE)
+  return {
+    accent: a,
+    hover: mezclarBlanco(a, 0.18),
+    dark: aclararHasta(a, legible),
+    darker: aclararHasta(oscurecer(a, 0.1), legible),
+    light: mezclarBlanco(a, 0.26),
+    soft,
+    soft2: superficie(0.176),
+    tint,
+    tint2,
+  }
+}
+
+/** CSS vars de acento que el branding sobreescribe (en orden). */
+export const ACCENT_CSS_VARS = [
+  '--at-accent', '--at-accent-hover', '--at-accent-dark', '--at-accent-darker', '--at-accent-light',
+  '--at-accent-soft', '--at-accent-soft-2', '--at-accent-tint', '--at-accent-tint-2',
+] as const
+
+function varsAccent(v: VariablesAccent): Record<(typeof ACCENT_CSS_VARS)[number], string> {
+  return {
+    '--at-accent': v.accent,
+    '--at-accent-hover': v.hover,
+    '--at-accent-dark': v.dark,
+    '--at-accent-darker': v.darker,
+    '--at-accent-light': v.light,
+    '--at-accent-soft': v.soft,
+    '--at-accent-soft-2': v.soft2,
+    '--at-accent-tint': v.tint,
+    '--at-accent-tint-2': v.tint2,
+  }
+}
+
+/**
+ * Mapa de CSS vars de ACENTO (tema claro) para un color custom, o null si no hay
+ * (restablecer). `--at-accent-2` (verde salvia) NO es un tono del acento: queda
+ * en su default.
+ */
+export function estilosAccent(accentColor: string | null | undefined): Record<string, string> | null {
+  const color = normalizarColorHex(accentColor)
+  return color ? varsAccent(derivarVariablesAccent(color)) : null
+}
+
+/** Igual que `estilosAccent` pero con los valores del tema OSCURO. */
 export function estilosAccentOscuro(accentColor: string | null | undefined): Record<string, string> | null {
   const color = normalizarColorHex(accentColor)
-  if (!color) return null
-  const a = aclararParaTemaOscuro(color)
-  return {
-    '--at-accent': a,
-    '--at-accent-hover': mezclarBlanco(a, 0.18),
-  }
+  return color ? varsAccent(derivarVariablesAccentOscuro(color)) : null
 }
 
 /** id del <style> que BrandingApplier inyecta en <head>. */

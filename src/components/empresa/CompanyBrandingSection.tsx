@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useBrandingQuery } from '../../domain/branding/queries'
 import { useGuardarBrandingMutation } from '../../domain/branding/mutations'
 import {
-  derivarVariablesMarca, derivarVariablesMarcaOscuro, aclararParaTemaOscuro, normalizarColorHex, esColorHex,
+  derivarVariablesMarca, derivarVariablesMarcaOscuro, derivarVariablesAccentOscuro, normalizarColorHex, esColorHex,
   DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_SURFACE,
 } from '../../lib/branding'
 
@@ -94,7 +94,7 @@ export function CompanyBrandingSection({ companyId, canEdit }: Props) {
             <PreviewFila etiqueta="Claro" fondo="#FFFFFF" tinta="#3E5A4C" borde="#E1DDD0"
               primary={vars.primary} soft={vars.soft} softInk={vars.hover} accent={accentHex} />
             <PreviewFila etiqueta="Oscuro" fondo={DARK_SURFACE} tinta="#B7C4BB" borde="#28352D"
-              primary={varsOscuro.primary} soft={varsOscuro.soft} softInk={varsOscuro.primary} accent={aclararParaTemaOscuro(accentHex)} />
+              primary={varsOscuro.primary} soft={varsOscuro.soft} softInk={varsOscuro.primary} accent={derivarVariablesAccentOscuro(accentHex).accent} />
           </div>
         </div>
       </div>

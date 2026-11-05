@@ -5,7 +5,8 @@ import {
   derivarVariablesMarca, derivarVariablesMarcaOscuro, estilosMarca, estilosMarcaOscuro,
   estilosAccent, estilosAccentOscuro, hojaEstilosMarca,
   DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_BG, DARK_SURFACE, DARK_MIN_CONTRASTE,
-  LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS,
+  LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS,
+  derivarVariablesAccent, derivarVariablesAccentOscuro,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -94,11 +95,18 @@ describe('estilosAccent', () => {
     expect(estilosAccent(null)).toBeNull()
     expect(estilosAccent('nope')).toBeNull()
   })
-  it('color válido → --at-accent + --at-accent-hover', () => {
+  it('color válido → las 9 CSS vars de acento', () => {
     const m = estilosAccent('#B96A3F')
     expect(m).not.toBeNull()
     expect(m!['--at-accent']).toBe('#b96a3f')
-    expect(Object.keys(m!)).toEqual(['--at-accent', '--at-accent-hover'])
+    expect(Object.keys(m!)).toEqual([
+      '--at-accent', '--at-accent-hover', '--at-accent-dark', '--at-accent-darker', '--at-accent-light',
+      '--at-accent-soft', '--at-accent-soft-2', '--at-accent-tint', '--at-accent-tint-2',
+    ])
+    expect(Object.keys(m!)).toEqual([...ACCENT_CSS_VARS])
+  })
+  it('--at-accent-2 (verde salvia) no es un tono del acento: no se toca', () => {
+    expect(Object.keys(estilosAccent('#B96A3F')!)).not.toContain('--at-accent-2')
   })
 })
 
@@ -158,6 +166,87 @@ describe('derivarVariablesMarca — tonos derivados (tema claro)', () => {
       // la marca ya no llega: no se empeora
       expect(v.primary2).toBe(v.primary)
     }
+  })
+})
+
+// ─── Tonos de ACENTO (dark / darker / light / soft / soft-2 / tint / tint-2) ─
+describe('derivarVariablesAccent — tonos derivados (tema claro)', () => {
+  it('con el acento por defecto reproduce (casi) la paleta clara de src/index.css', () => {
+    const v = derivarVariablesAccent(DEFAULT_ACCENT_COLOR)
+    const indexCss = {
+      hover: '#9C5733', dark: '#7E461F', darker: '#5E3417', light: '#CE8A63',
+      soft: '#E6CDBB', soft2: '#EFE0D5', tint: '#F4EBE3', tint2: '#FAF1EA',
+    }
+    for (const [k, hex] of Object.entries(indexCss)) {
+      expect(distanciaRgb(v[k as keyof typeof v], hex), k).toBeLessThan(16)
+    }
+  })
+
+  it('sigue al acento y conserva su tono (azul petróleo → azul > rojo)', () => {
+    const def = derivarVariablesAccent(DEFAULT_ACCENT_COLOR)
+    const v = derivarVariablesAccent('#0e7490')
+    for (const k of ['dark', 'darker', 'light', 'soft', 'soft2', 'tint', 'tint2'] as const) {
+      expect(v[k], k).not.toBe(def[k])
+      expect(parseInt(v[k].slice(5, 7), 16), k).toBeGreaterThan(parseInt(v[k].slice(1, 3), 16))
+    }
+  })
+
+  it.each(MUESTRAS.filter((c) => c !== '#ffffff'))('%s → orden de fondos: tint-2 > tint > soft-2 > soft', (c) => {
+    const v = derivarVariablesAccent(c)
+    expect(L(v.tint2)).toBeGreaterThan(L(v.tint))
+    expect(L(v.tint)).toBeGreaterThan(L(v.soft2))
+    expect(L(v.soft2)).toBeGreaterThan(L(v.soft))
+  })
+
+  it.each(MUESTRAS)('%s → dark / darker (texto) se leen sobre los tints y darker ≤ dark', (c) => {
+    const v = derivarVariablesAccent(c)
+    for (const t of [v.dark, v.darker]) {
+      expect(contraste(t, v.tint)).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+      expect(contraste(t, v.tint2)).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+    }
+    expect(L(v.darker)).toBeLessThanOrEqual(L(v.dark))
+  })
+})
+
+describe('derivarVariablesAccentOscuro — tonos derivados (tema oscuro)', () => {
+  it('con el acento por defecto queda cerca de la paleta dark de src/index.css (marrones, no oliva)', () => {
+    const d = derivarVariablesAccentOscuro(DEFAULT_ACCENT_COLOR)
+    const indexCss = {
+      accent: '#C8865C', hover: '#D49A72', dark: '#C8865C', darker: '#B5764A', light: '#D9A580',
+      soft: '#2E2018', soft2: '#3A2A20', tint: '#1F1610', tint2: '#261A12',
+    }
+    for (const [k, hex] of Object.entries(indexCss)) {
+      expect(distanciaRgb(d[k as keyof typeof d], hex), k).toBeLessThan(20)
+    }
+    // superficies cálidas: rojo > verde > azul
+    for (const k of ['soft', 'soft2', 'tint', 'tint2'] as const) {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(d[k].slice(i, i + 2), 16))
+      expect(r, k).toBeGreaterThan(g)
+      expect(g, k).toBeGreaterThan(b)
+    }
+  })
+
+  it.each(MUESTRAS)('%s → tint / tint-2 / soft / soft-2 son superficies OSCURAS, en orden', (c) => {
+    const d = derivarVariablesAccentOscuro(c)
+    for (const f of [d.tint, d.tint2, d.soft]) expect(L(f)).toBeLessThan(0.06)
+    expect(L(d.soft2)).toBeLessThan(0.1)
+    for (const f of [d.tint, d.tint2, d.soft, d.soft2]) expect(contraste('#ECEFE8', f)).toBeGreaterThanOrEqual(DARK_MIN_CONTRASTE)
+    expect(L(d.tint)).toBeLessThan(L(d.tint2))
+    expect(L(d.tint2)).toBeLessThan(L(d.soft))
+    expect(L(d.soft)).toBeLessThan(L(d.soft2))
+  })
+
+  it.each(MUESTRAS)('%s → dark / darker (texto) se leen sobre tint / tint-2 / soft oscuros', (c) => {
+    const d = derivarVariablesAccentOscuro(c)
+    for (const t of [d.dark, d.darker]) {
+      for (const f of [d.tint, d.tint2, d.soft]) expect(contraste(t, f)).toBeGreaterThanOrEqual(DARK_MIN_CONTRASTE)
+    }
+  })
+
+  it.each(MUESTRAS.filter((c) => c !== '#ffffff'))('%s → hover y light son más claros que el acento (dark aclara)', (c) => {
+    const d = derivarVariablesAccentOscuro(c)
+    expect(L(d.hover)).toBeGreaterThan(L(d.accent))
+    expect(L(d.light)).toBeGreaterThan(L(d.hover))
   })
 })
 
@@ -315,6 +404,18 @@ describe('hojaEstilosMarca', () => {
     }
     // Sin acento custom no se tocan las vars de acento.
     expect(css).not.toContain('--at-accent')
+  })
+
+  it('con acento custom, el bloque OSCURO lleva las 9 vars de acento oscuras', () => {
+    const css = hojaEstilosMarca(null, '#0e7490')!
+    const dark = estilosAccentOscuro('#0e7490')!
+    const claro = estilosAccent('#0e7490')!
+    const lineas = css.split('\n').slice(1)
+    expect(lineas).toHaveLength(2)
+    for (const l of lineas) {
+      for (const k of ACCENT_CSS_VARS) expect(l).toContain(`${k}: ${dark[k]};`)
+      for (const k of ['--at-accent-soft', '--at-accent-soft-2', '--at-accent-tint', '--at-accent-tint-2']) expect(l).not.toContain(claro[k])
+    }
   })
 
   it('solo acento → sólo vars de acento', () => {
