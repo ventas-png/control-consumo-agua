@@ -123,7 +123,7 @@ export default function App() {
  * este componente solo se monta cuando ninguna ruta pública aplicó.
  */
 function AppShell() {
-  const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
+  const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError, login, loginWithGoogle, loginWithApple, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const { canViewModule, canCreate, canEdit, canChangeStatus, canApprove, canDelete } = usePermissions(currentUser)
 
   // agua:A1 — navegación basada en URL (react-router-dom v6). El sidebar/topbar
@@ -314,12 +314,12 @@ function AppShell() {
     )
   }
 
-  // Google OAuth user without app_users profile — needs to complete onboarding
+  // OAuth user (Google / Apple) without app_users profile — needs to complete onboarding
   if (needsOnboarding && pendingOAuthUser) {
     return (
       <Suspense fallback={<AuthSplash />}>
         <OAuthOnboardingScreen
-          googleUser={pendingOAuthUser}
+          oauthUser={pendingOAuthUser}
           onSuccess={completeOnboarding}
           onCancel={() => window.location.replace(window.location.pathname)}
         />
@@ -384,6 +384,7 @@ function AppShell() {
         <LandingPage
           onLogin={login}
           onLoginWithGoogle={loginWithGoogle}
+          onLoginWithApple={loginWithApple}
           onForgotPassword={() => setShowPasswordReset(true)}
           onRegister={() => setShowRegister(true)}
           onSignupCompany={() => setShowSignupCompany(true)}

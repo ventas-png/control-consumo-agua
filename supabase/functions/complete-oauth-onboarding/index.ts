@@ -8,8 +8,9 @@ import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 import {
   IDENTITY_ERROR,
   buildClienteProfileRow,
+  chooseFullName,
   isIdentityMatch,
-  resolveFullName,
+  resolveLookupEmail,
   type OnboardingLookup,
 } from './logic.ts'
 
@@ -59,19 +60,29 @@ Deno.serve(async (req) => {
     // Email comes from the verified JWT — cannot be tampered by the client
     const email = oauthUser.email
     if (!email) {
-      return err('La cuenta de Google no tiene un correo electrónico asociado.')
+      return err('La cuenta no tiene un correo electrónico asociado.')
     }
 
-    // Full name from Google metadata
-    const fullName: string = resolveFullName(oauthUser.user_metadata, email)
-
-    // Step 2: Parse and validate body
-    const body = await req.json() as { cui_dui?: string; fecha_nacimiento?: string }
+    // Step 2: Parse and validate body. `full_name` y `email_cliente` solo se
+    // usan cuando el proveedor no entregó nombre o Apple ocultó el correo
+    // (ver chooseFullName / resolveLookupEmail): nunca pisan lo verificado.
+    const body = await req.json() as {
+      cui_dui?: string
+      fecha_nacimiento?: string
+      full_name?: string
+      email_cliente?: string
+    }
     const { cui_dui, fecha_nacimiento } = body
 
     if (!cui_dui || !fecha_nacimiento) {
       return err('DPI/CUI y fecha de nacimiento son requeridos.')
     }
+
+    // Full name: metadata del proveedor (Google / Apple en la primera
+    // autorización) o, si no trae, el declarado en el formulario.
+    const fullName: string = chooseFullName(oauthUser.user_metadata, email, body.full_name)
+    // Correo del padrón: el del JWT, salvo alias privado de Apple.
+    const lookupEmail = resolveLookupEmail(email, body.email_cliente)
 
     // Step 3: Verify no app_users record already exists for this auth user
     // (idempotency guard — prevents double-registration on retry)
@@ -87,10 +98,10 @@ Deno.serve(async (req) => {
     }
 
     // Step 4: Look up cliente using the same RPC as the email/password flow
-    // Email from JWT + DPI + birthdate must all match (3-of-3)
+    // Email (JWT, o el declarado si Apple lo ocultó) + DPI + birthdate must all match (3-of-3)
     const { data: lookupResult, error: lookupError } = await adminClient.rpc(
       'buscar_cliente_para_onboarding',
-      { p_cui_dui: cui_dui, p_fecha_nac: fecha_nacimiento, p_email: email }
+      { p_cui_dui: cui_dui, p_fecha_nac: fecha_nacimiento, p_email: lookupEmail }
     )
 
     if (lookupError) {

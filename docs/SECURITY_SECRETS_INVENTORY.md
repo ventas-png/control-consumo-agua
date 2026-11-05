@@ -48,6 +48,7 @@ lleva `VITE_`** (lección histórica: EmailJS, ver `SECURITY_FIX_SUMMARY.md`).
 | `VITE_COUNTRY_CODE` | Público (config) | App | Código país por defecto (502 GT). |
 | `VITE_APP_URL` | Público (config) | App / OAuth redirect | URL pública del sitio. |
 | `VITE_GOOGLE_CLIENT_ID` | Público por diseño | OAuth Gmail (inicio) | Client **ID** OAuth (el *secret* va en Edge, no aquí). |
+| `VITE_APPLE_SIGN_IN` | Público (config) | `src/lib/loginProviders` (cliente) | Interruptor (`true`/`1`) de Sign in with Apple en web y app de iOS. El *Secret Key* del proveedor NO va aquí: vive en Supabase → Authentication → Providers → Apple y **caduca cada 6 meses** (`docs/RUNBOOK_GOOGLE_OAUTH_LOGIN.md`). |
 | `VITE_SENTRY_DSN` | Público por diseño | `src/lib` Sentry | El DSN es público; permite ingestar eventos, no leerlos. Si se omite, Sentry queda desactivado. |
 | `VITE_APP_ENV` | Público (config) | Sentry/PostHog tags | `production` / `preview` / `staging`. En Vercel se sugiere `=$VERCEL_ENV`. |
 | `VITE_APP_VERSION` | Público (config) | Sentry release | Opcional. |

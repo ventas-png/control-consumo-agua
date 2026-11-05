@@ -11,6 +11,7 @@ import { measureSLO, reportSLOError } from '../../lib/slo'
 import { storeSession } from '../../lib/authSession'
 import { recordLoginFailure, clearLoginFailures, getLoginLockoutMessage } from '../../lib/loginRateLimit'
 import { isNative } from '../../lib/platform'
+import type { ProveedorSocial } from '../../lib/nativeAuth'
 import { buildSessionFromSupabase } from '../../domain/auth/session'
 import { connectivityLoginMessage } from '../../domain/auth/loginErrors'
 import { waitForLateSession } from '../../domain/auth/lateSession'
@@ -215,25 +216,27 @@ export function useCredentialsLogin(setCurrentUser: (s: UserSession) => void) {
     try { await supabase.auth.signOut() } catch { /* ignore */ }
   }, [])
 
-  const loginWithGoogle = useCallback(async (): Promise<string | null> => {
-    // En la app nativa el redirect web no sirve: el WebView no puede recibir el
-    // callback de Google. Se usa el navegador del sistema + deep link y el canje
-    // PKCE lo hace el listener de appUrlOpen (ver src/lib/nativeAuth.ts).
-    if (isNative()) {
-      const { nativeGoogleLogin } = await import('../../lib/nativeAuth')
-      return nativeGoogleLogin()
-    }
+  // Login social (Google / Apple). En la app nativa el redirect web no sirve: el
+  // WebView no puede recibir el callback del proveedor. Se usa el navegador del
+  // sistema + deep link y el canje PKCE lo hace el listener de appUrlOpen (ver
+  // src/lib/nativeAuth.ts). En web, Supabase redirige y vuelve con la sesión.
+  const loginWithProvider = useCallback(async (provider: ProveedorSocial): Promise<string | null> => {
+    const { nativeSocialLogin, errorLoginSocial } = await import('../../lib/nativeAuth')
+    if (isNative()) return nativeSocialLogin(provider)
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider,
         options: { redirectTo: window.location.origin },
       })
-      if (error) return 'Error al iniciar sesión con Google'
+      if (error) return errorLoginSocial(provider)
       return null
     } catch {
-      return 'Error al iniciar sesión con Google'
+      return errorLoginSocial(provider)
     }
   }, [])
 
-  return { login, loginWithGoogle, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge }
+  const loginWithGoogle = useCallback(() => loginWithProvider('google'), [loginWithProvider])
+  const loginWithApple = useCallback(() => loginWithProvider('apple'), [loginWithProvider])
+
+  return { login, loginWithGoogle, loginWithApple, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge }
 }

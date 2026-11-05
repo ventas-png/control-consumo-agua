@@ -11,6 +11,7 @@ import './landing.css'
 interface LandingPageProps {
   onLogin: (email: string, password: string) => Promise<string | null>
   onLoginWithGoogle: () => Promise<string | null>
+  onLoginWithApple: () => Promise<string | null>
   onForgotPassword: () => void
   onRegister: () => void
   onSignupCompany: () => void
@@ -28,7 +29,7 @@ function initialLang(): Lang {
   return urlLang === 'en' ? 'en' : 'es'
 }
 
-export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa, initialAuthError }: LandingPageProps) {
+export function LandingPage({ onLogin, onLoginWithGoogle, onLoginWithApple, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa, initialAuthError }: LandingPageProps) {
   const [loginOpen, setLoginOpen] = useState(false)
   const [lang, setLang] = useState<Lang>(initialLang)
 
@@ -90,6 +91,7 @@ export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         t={t}
         onLogin={onLogin}
         onLoginWithGoogle={onLoginWithGoogle}
+        onLoginWithApple={onLoginWithApple}
         onForgotPassword={onForgotPassword}
         onRegister={onRegister}
         onSignupCompany={onSignupCompany}

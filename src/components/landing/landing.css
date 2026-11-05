@@ -94,7 +94,7 @@
 }
 
 /* ─── Buttons ─── */
-.btn-primary, .btn-ghost, .btn-ghost-light, .btn-quiet, .btn-google {
+.btn-primary, .btn-ghost, .btn-ghost-light, .btn-quiet, .btn-google, .btn-apple {
   appearance: none;
   border: 0;
   font-family: inherit;
@@ -152,6 +152,15 @@
   font-weight: 500;
 }
 .btn-google:hover { background: var(--c-chip); }
+/* Sign in with Apple: diseño oficial (negro, logo y texto blancos), misma altura que Google. */
+.btn-apple {
+  background: #000;
+  color: #fff;
+  border: 1px solid #000;
+  height: 44px;
+  font-weight: 500;
+}
+.btn-apple:hover { background: #1a1a1a; }
 .link-quiet { color: var(--c-primary); font-size: 13px; }
 .link-quiet:hover { text-decoration: underline; }
 .link-bold {
