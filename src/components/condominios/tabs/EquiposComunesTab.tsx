@@ -1,9 +1,10 @@
 import { hoyLocalISO } from '../../../lib/format'
-import { useState, type CSSProperties} from 'react'
+import { useMemo, useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { tint } from '../../shared/statusTone'
 import { openPromptDialog } from '../../shared/PromptDialog'
+import { EditModal } from '../../shared/EditModal'
 import { EquipoComun, CategoriaEquipo, EstadoEquipo } from '../../../types'
 
 interface Props {
@@ -47,28 +48,52 @@ function alertaManto(equipo: EquipoComun): 'vencido' | 'proximo' | 'ok' | 'sin_f
   return 'ok'
 }
 
+interface FormEquipo {
+  nombre: string
+  categoria: CategoriaEquipo
+  marca: string
+  modelo: string
+  serial: string
+  ubicacion: string
+  fecha_compra: string
+  valor_compra: string
+  vida_util_anios: string
+  estado: EstadoEquipo
+  ultimo_mantenimiento: string
+  proximo_mantenimiento: string
+  notas: string
+}
+
+const FORM_VACIO: FormEquipo = {
+  nombre: '', categoria: 'otro', marca: '', modelo: '', serial: '', ubicacion: '', fecha_compra: '', valor_compra: '',
+  vida_util_anios: '', estado: 'operativo', ultimo_mantenimiento: '', proximo_mantenimiento: '', notas: '',
+}
+
+/** La ficha tal como la edita la persona. */
+function formDesde(e: EquipoComun): FormEquipo {
+  return {
+    nombre: e.nombre, categoria: e.categoria,
+    marca: e.marca ?? '', modelo: e.modelo ?? '', serial: e.serial ?? '', ubicacion: e.ubicacion ?? '',
+    fecha_compra: e.fecha_compra ?? '',
+    valor_compra: e.valor_compra != null ? String(e.valor_compra) : '',
+    vida_util_anios: e.vida_util_anios != null ? String(e.vida_util_anios) : '',
+    estado: e.estado,
+    ultimo_mantenimiento: e.ultimo_mantenimiento ?? '', proximo_mantenimiento: e.proximo_mantenimiento ?? '',
+    notas: e.notas ?? '',
+  }
+}
+
 export default function EquiposComunesTab({ equipos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
-  const [selected, setSelected] = useState<EquipoComun | null>(null)
-  const [mostrarForm, setMostrarForm] = useState(false)
+  // Se guarda el id y no la fila: cuando `equipos` vuelve a cargar tras editar,
+  // cambiar el estado o registrar un mantenimiento, el detalle muestra la ficha
+  // nueva y no una copia vieja de la que se pulsó.
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selected = useMemo(() => equipos.find(e => e.id === selectedId) ?? null, [equipos, selectedId])
+  const [vista, setVista] = useState<'lista' | 'nuevo' | 'editar'>('lista')
   const [saving, setSaving] = useState(false)
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaEquipo | ''>('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoEquipo | ''>('')
-
-  const [form, setForm] = useState({
-    nombre: '',
-    categoria: 'otro' as CategoriaEquipo,
-    marca: '',
-    modelo: '',
-    serial: '',
-    ubicacion: '',
-    fecha_compra: '',
-    valor_compra: '',
-    vida_util_anios: '',
-    estado: 'operativo' as EstadoEquipo,
-    ultimo_mantenimiento: '',
-    proximo_mantenimiento: '',
-    notas: '',
-  })
+  const [form, setForm] = useState<FormEquipo>(FORM_VACIO)
 
   const lista = equipos.filter(e =>
     (filtroCategoria === '' || e.categoria === filtroCategoria) &&
@@ -77,34 +102,63 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
 
   const alertas = equipos.filter(e => ['vencido', 'proximo'].includes(alertaManto(e)))
 
-  async function guardar() {
-    if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre del equipo obligatorio' }); return }
-    setSaving(true)
-    const payload: Record<string, unknown> = {
-      company_id: companyId, project_id: proyectoId,
-      nombre: form.nombre.trim(), categoria: form.categoria,
-      marca: form.marca.trim() || null, modelo: form.modelo.trim() || null,
-      serial: form.serial.trim() || null, ubicacion: form.ubicacion.trim() || null,
-      fecha_compra: form.fecha_compra || null,
-      valor_compra: form.valor_compra ? parseFloat(form.valor_compra) : null,
-      vida_util_anios: form.vida_util_anios ? parseInt(form.vida_util_anios) : null,
-      estado: form.estado,
-      ultimo_mantenimiento: form.ultimo_mantenimiento || null,
-      proximo_mantenimiento: form.proximo_mantenimiento || null,
-      notas: form.notas.trim() || null,
+  function seleccionar(id: string) {
+    setSelectedId(id)
+    setVista('lista')
+  }
+
+  function abrirNuevo() {
+    setForm(FORM_VACIO)
+    setVista('nuevo')
+  }
+
+  function abrirEdicion(e: EquipoComun) {
+    setForm(formDesde(e))
+    setVista('editar')
+  }
+
+  function cancelarFormulario() {
+    setForm(FORM_VACIO)
+    setVista('lista')
+  }
+
+  /** Lo que la persona puede cambiar de la ficha; el tenant lo añade sólo el alta. */
+  function fichaDesdeForm(): { ficha: Record<string, unknown> } | { error: string } {
+    if (!form.nombre.trim()) return { error: 'Nombre del equipo obligatorio' }
+    return {
+      ficha: {
+        nombre: form.nombre.trim(), categoria: form.categoria,
+        marca: form.marca.trim() || null, modelo: form.modelo.trim() || null,
+        serial: form.serial.trim() || null, ubicacion: form.ubicacion.trim() || null,
+        fecha_compra: form.fecha_compra || null,
+        valor_compra: form.valor_compra ? parseFloat(form.valor_compra) : null,
+        vida_util_anios: form.vida_util_anios ? parseInt(form.vida_util_anios) : null,
+        estado: form.estado,
+        ultimo_mantenimiento: form.ultimo_mantenimiento || null,
+        proximo_mantenimiento: form.proximo_mantenimiento || null,
+        notas: form.notas.trim() || null,
+      },
     }
-    const { error } = await createCondominioRow('equipos_comunes', payload)
+  }
+
+  async function guardar() {
+    const r = fichaDesdeForm()
+    if ('error' in r) { notify({ variant: 'warning', title: 'Faltan datos', text: r.error }); return }
+    setSaving(true)
+    const { error } = vista === 'editar' && selected
+      ? await updateCondominioRow('equipos_comunes', selected.id, r.ficha)
+      : await createCondominioRow('equipos_comunes', { company_id: companyId, project_id: proyectoId, ...r.ficha })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    resetForm()
-    setMostrarForm(false)
+    if (vista === 'editar') notify({ variant: 'success', title: 'Equipo actualizado', text: r.ficha.nombre as string })
+    setForm(FORM_VACIO)
+    setVista('lista')
     onRefresh()
   }
 
   async function actualizarEstado(equipo: EquipoComun, estado: EstadoEquipo) {
     const { error } = await updateCondominioRow('equipos_comunes', equipo.id, { estado })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    if (selected?.id === equipo.id) setSelected(prev => prev ? { ...prev, estado } : null)
     onRefresh()
   }
 
@@ -127,18 +181,14 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
       estado: 'operativo' as EstadoEquipo,
     })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    if (selected?.id === equipo.id) {
-      setSelected(prev => prev ? { ...prev, ultimo_mantenimiento: hoyLocalISO(), proximo_mantenimiento: proxima || undefined, estado: 'operativo' } : null)
-    }
     onRefresh()
-  }
-
-  function resetForm() {
-    setForm({ nombre: '', categoria: 'otro', marca: '', modelo: '', serial: '', ubicacion: '', fecha_compra: '', valor_compra: '', vida_util_anios: '', estado: 'operativo', ultimo_mantenimiento: '', proximo_mantenimiento: '', notas: '' })
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
+  const btnSecundario: CSSProperties = { padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }
+  const btnPrimario: CSSProperties = { padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }
+  const editando = vista === 'editar'
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
@@ -148,7 +198,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Equipos ({lista.length})</span>
             {canCreate && (
-              <button onClick={() => { setMostrarForm(true); setSelected(null) }}
+              <button onClick={abrirNuevo}
                 style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
@@ -179,7 +229,9 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
           const alerta = alertaManto(e)
           const dias = diasParaManto(e.proximo_mantenimiento)
           return (
-            <div key={e.id} onClick={() => { setSelected(e); setMostrarForm(false) }}
+            <div key={e.id} role="button" tabIndex={0} aria-label={e.nombre}
+              onClick={() => seleccionar(e.id)}
+              onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); seleccionar(e.id) } }}
               style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === e.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: alerta === 'vencido' ? '3px solid var(--at-danger)' : alerta === 'proximo' ? '3px solid var(--at-warning)' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {e.nombre}</span>
@@ -199,90 +251,18 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
         })}
       </div>
 
-      {/* Panel derecho */}
+      {/* Panel derecho: la ficha seleccionada. El formulario (nuevo / editar) no
+          se pinta aquí: abre en ventana emergente, más abajo, así la ficha sigue
+          a la vista mientras se llena. */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {mostrarForm && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Nuevo equipo</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={lbl}>Nombre *</label>
-                <input style={inp} placeholder="Bomba de agua principal" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Categoría</label>
-                <select style={inp} value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value as CategoriaEquipo }))}>
-                  {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Marca</label>
-                <input style={inp} value={form.marca} onChange={e => setForm(p => ({ ...p, marca: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Modelo</label>
-                <input style={inp} value={form.modelo} onChange={e => setForm(p => ({ ...p, modelo: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Serial</label>
-                <input style={inp} value={form.serial} onChange={e => setForm(p => ({ ...p, serial: e.target.value }))} />
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Ubicación</label>
-                <input style={inp} placeholder="Cuarto de máquinas, Piso 1…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Fecha de compra</label>
-                <input type="date" style={inp} value={form.fecha_compra} onChange={e => setForm(p => ({ ...p, fecha_compra: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Valor compra ({moneda})</label>
-                <input type="number" style={inp} value={form.valor_compra} onChange={e => setForm(p => ({ ...p, valor_compra: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Vida útil (años)</label>
-                <input type="number" style={inp} value={form.vida_util_anios} onChange={e => setForm(p => ({ ...p, vida_util_anios: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Estado</label>
-                <select style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoEquipo }))}>
-                  {ESTADOS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Último mantenimiento</label>
-                <input type="date" style={inp} value={form.ultimo_mantenimiento} onChange={e => setForm(p => ({ ...p, ultimo_mantenimiento: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Próximo mantenimiento</label>
-                <input type="date" style={inp} value={form.proximo_mantenimiento} onChange={e => setForm(p => ({ ...p, proximo_mantenimiento: e.target.value }))} />
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Notas</label>
-                <textarea style={{ ...inp, height: 60, resize: 'vertical' }} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : '✅ Guardar equipo'}
-              </button>
-              <button onClick={() => { setMostrarForm(false); resetForm() }}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!mostrarForm && selected && (() => {
+        {selected ? (() => {
           const cat = CATEGORIAS.find(c => c.value === selected.categoria)
           const est = ESTADOS.find(s => s.value === selected.estado)
           const alerta = alertaManto(selected)
           const dias = diasParaManto(selected.proximo_mantenimiento)
           return (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 20 }}>{cat?.icon} {selected.nombre}</div>
                   <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>
@@ -290,7 +270,15 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
                     {selected.ubicacion && <span>{selected.ubicacion}</span>}
                   </div>
                 </div>
-                <span style={{ padding: '4px 12px', borderRadius: 12, background: est && tint(est.color, 12), color: est?.color, fontWeight: 600, fontSize: 13 }}>{est?.label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ padding: '4px 12px', borderRadius: 12, background: est && tint(est.color, 12), color: est?.color, fontWeight: 600, fontSize: 13 }}>{est?.label}</span>
+                  {canEdit && (
+                    <button onClick={() => abrirEdicion(selected)}
+                      style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                      ✏️ Editar
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Alerta mantenimiento */}
@@ -343,14 +331,92 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
               )}
             </div>
           )
-        })()}
-
-        {!mostrarForm && !selected && (
+        })() : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
             Selecciona un equipo o registra uno nuevo
           </div>
         )}
       </div>
+
+      {/* Ventana: nuevo / editar */}
+      {(vista === 'nuevo' || (editando && selected)) && (
+        <EditModal
+          title={editando ? 'Editar equipo' : 'Nuevo equipo'}
+          subtitle={editando && selected ? selected.nombre : undefined}
+          size="lg"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cancelarFormulario}
+          footer={<>
+            <button type="button" onClick={cancelarFormulario} disabled={saving} style={btnSecundario}>
+              Cancelar
+            </button>
+            <button type="button" onClick={() => void guardar()} disabled={saving} style={btnPrimario}>
+              {saving ? 'Guardando…' : editando ? '✅ Guardar cambios' : '✅ Guardar equipo'}
+            </button>
+          </>}
+        >
+          <div className="at-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={lbl} htmlFor="eq-f-nombre">Nombre *</label>
+              <input id="eq-f-nombre" style={inp} placeholder="Bomba de agua principal" value={form.nombre} autoFocus onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-categoria">Categoría</label>
+              <select id="eq-f-categoria" style={inp} value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value as CategoriaEquipo }))}>
+                {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-marca">Marca</label>
+              <input id="eq-f-marca" style={inp} value={form.marca} onChange={e => setForm(p => ({ ...p, marca: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-modelo">Modelo</label>
+              <input id="eq-f-modelo" style={inp} value={form.modelo} onChange={e => setForm(p => ({ ...p, modelo: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-serial">Serial</label>
+              <input id="eq-f-serial" style={inp} value={form.serial} onChange={e => setForm(p => ({ ...p, serial: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: 'span 3' }}>
+              <label style={lbl} htmlFor="eq-f-ubicacion">Ubicación</label>
+              <input id="eq-f-ubicacion" style={inp} placeholder="Cuarto de máquinas, Piso 1…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-fecha-compra">Fecha de compra</label>
+              <input id="eq-f-fecha-compra" type="date" style={inp} value={form.fecha_compra} onChange={e => setForm(p => ({ ...p, fecha_compra: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-valor">Valor compra ({moneda})</label>
+              <input id="eq-f-valor" type="number" style={inp} value={form.valor_compra} onChange={e => setForm(p => ({ ...p, valor_compra: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-vida">Vida útil (años)</label>
+              <input id="eq-f-vida" type="number" style={inp} value={form.vida_util_anios} onChange={e => setForm(p => ({ ...p, vida_util_anios: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-estado">Estado</label>
+              <select id="eq-f-estado" style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoEquipo }))}>
+                {ESTADOS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-ultimo">Último mantenimiento</label>
+              <input id="eq-f-ultimo" type="date" style={inp} value={form.ultimo_mantenimiento} onChange={e => setForm(p => ({ ...p, ultimo_mantenimiento: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-proximo">Próximo mantenimiento</label>
+              <input id="eq-f-proximo" type="date" style={inp} value={form.proximo_mantenimiento} onChange={e => setForm(p => ({ ...p, proximo_mantenimiento: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: 'span 3' }}>
+              <label style={lbl} htmlFor="eq-f-notas">Notas</label>
+              <textarea id="eq-f-notas" style={{ ...inp, height: 60, resize: 'vertical' }} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
+            </div>
+          </div>
+        </EditModal>
+      )}
     </div>
   )
 }
