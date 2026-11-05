@@ -13,6 +13,7 @@ import { openPromptDialog } from '../../shared/PromptDialog'
 import { formatHoras } from '../../../domain/condominios/turnos'
 import { notify } from '../../shared/Dialog'
 import MarcajeTurno from './presencia/MarcajeTurno'
+import './presencia/presencia.css'
 import { SecureImage } from '../../shared/SecureImage'
 import { BUCKET_PRESENCIA } from '../../../domain/shared/buckets'
 import {
@@ -36,12 +37,16 @@ interface Props {
   onRefresh: () => void
 }
 
-const ESTADOS_PRESENCIA: { value: EstadoPresencia; label: string; color: string; bg: string }[] = [
-  { value: 'presente', label: 'Presente', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
-  { value: 'ausente', label: 'Ausente', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
-  { value: 'tardanza', label: 'Tardanza', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
-  { value: 'permiso', label: 'Permiso', color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
-  { value: 'vacaciones', label: 'Vacaciones', color: 'var(--at-primary-2)', bg: 'var(--at-primary-soft)' },
+// Vacaciones va en `info` y no en `--at-primary-soft`: el branding de la
+// empresa reescribe ese token en línea sobre :root con un tono CLARO (mezcla
+// 82 % blanco), que gana también en modo oscuro — en el teléfono la ficha de
+// Vacaciones salía casi blanca en medio de una pantalla oscura.
+const ESTADOS_PRESENCIA: { value: EstadoPresencia; label: string; color: string; bg: string; border: string }[] = [
+  { value: 'presente', label: 'Presente', color: 'var(--at-success)', bg: 'var(--at-success-tint)', border: 'var(--at-success-border)' },
+  { value: 'ausente', label: 'Ausente', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', border: 'var(--at-danger-border)' },
+  { value: 'tardanza', label: 'Tardanza', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', border: 'var(--at-warning-border)' },
+  { value: 'permiso', label: 'Permiso', color: 'var(--at-accent)', bg: 'var(--at-accent-tint)', border: 'var(--at-accent-soft)' },
+  { value: 'vacaciones', label: 'Vacaciones', color: 'var(--at-info)', bg: 'var(--at-info-tint)', border: 'var(--at-info-border)' },
 ]
 
 /**
@@ -422,7 +427,19 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
+  // Fondo y tinta explícitos: sin ellos iOS pinta los campos de fecha en azul
+  // de sistema y los <select> con el gris nativo, ajenos al tema.
+  const campo: CSSProperties = {
+    padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 8, fontSize: 13,
+    background: 'var(--at-surface)', color: 'var(--at-ink)', fontFamily: 'inherit',
+  }
+  const inp: CSSProperties = { ...campo, width: '100%' }
+  const btnCabecera: CSSProperties = {
+    padding: '9px 16px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+  }
+  const btnFila: CSSProperties = {
+    background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)',
+  }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   if (modo === 'resolviendo') {
@@ -503,48 +520,57 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
   }
 
   return (
-    <div style={{ padding: 16 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 14, color: 'var(--at-ink-2)' }}>Fecha:</span>
-          <input type="date" value={fechaFiltro} onChange={e => setFechaFiltro(e.target.value)}
-            style={{ ...inp, width: 'auto', padding: '6px 10px' }} />
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-        {miFicha && (
-          <button onClick={() => setModo('marcar')}
-            style={{ padding: '8px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-            🟢 Marcar mi turno
-          </button>
-        )}
-        {canEdit && tiposPausa.length > 0 && (
-          <button onClick={() => setConfigPausas(v => !v)}
-            title="Qué pausas descuentan de las horas que se pagan"
-            style={{ padding: '8px 16px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-            {configPausas ? '✕ Cerrar' : '⏸️ Pausas'}
-          </button>
-        )}
-        {canCreate && (
-          <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-            {mostrarForm ? '✕ Cancelar' : '+ Registrar persona'}
-          </button>
-        )}
+    <div className="presencia-consulta">
+      {/* Cabecera: la fecha en su renglón y las acciones repartidas en el de
+          abajo en el teléfono; lado a lado en pantallas anchas. */}
+      <div className="presencia-cabecera">
+        <label className="presencia-fecha">
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--at-ink-2)' }}>Fecha</span>
+          <input type="date" value={fechaFiltro} onChange={e => setFechaFiltro(e.target.value)} style={campo} />
+        </label>
+        <div className="presencia-cabecera-acciones">
+          {miFicha && (
+            <button onClick={() => setModo('marcar')}
+              style={{ ...btnCabecera, background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none' }}>
+              🟢 Marcar mi turno
+            </button>
+          )}
+          {canEdit && tiposPausa.length > 0 && (
+            <button onClick={() => setConfigPausas(v => !v)}
+              title="Qué pausas descuentan de las horas que se pagan"
+              aria-expanded={configPausas}
+              style={{ ...btnCabecera, background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)' }}>
+              {configPausas ? '✕ Cerrar' : '⏸️ Pausas'}
+            </button>
+          )}
+          {canCreate && (
+            <button onClick={() => setMostrarForm(!mostrarForm)}
+              aria-expanded={mostrarForm}
+              style={{ ...btnCabecera, background: 'var(--at-accent)', color: 'white', border: 'none' }}>
+              {mostrarForm ? '✕ Cancelar' : '+ Registrar persona'}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* KPIs */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-        {ESTADOS_PRESENCIA.map(s => (
-          <div key={s.value} style={{ background: s.bg, borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 80 }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{contadores[s.value] || 0}</div>
-            <div style={{ fontSize: 11, color: s.color }}>{s.label}</div>
-          </div>
-        ))}
-        <div style={{ background: 'var(--at-chip)', borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 80 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-ink-2)' }}>{vigentesDia.length}</div>
-          <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Total</div>
+      {/* Contadores. El que está en cero se apaga a gris: de un vistazo se ve
+          lo que SÍ pasó en el día, en vez de seis colores compitiendo. */}
+      <div className="presencia-kpis">
+        {ESTADOS_PRESENCIA.map(s => {
+          const n = contadores[s.value] || 0
+          const tono = n > 0
+            ? { background: s.bg, border: `1px solid ${s.border}`, color: s.color }
+            : { background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', color: 'var(--at-ink-3)' }
+          return (
+            <div key={s.value} className="presencia-kpi" style={{ background: tono.background, border: tono.border }}>
+              <div className="presencia-kpi-valor" style={{ color: tono.color }}>{n}</div>
+              <div className="presencia-kpi-label" style={{ color: tono.color }}>{s.label}</div>
+            </div>
+          )
+        })}
+        <div className="presencia-kpi" style={{ background: 'var(--at-chip)', border: '1px solid var(--at-line)' }}>
+          <div className="presencia-kpi-valor" style={{ color: 'var(--at-ink)' }}>{vigentesDia.length}</div>
+          <div className="presencia-kpi-label" style={{ color: 'var(--at-ink-3)' }}>Total</div>
         </div>
       </div>
 
@@ -568,7 +594,7 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
           <div style={{ display: 'grid', gap: 6 }}>
             {tiposPausa.map(t => (
               <div key={t.codigo} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
+                display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10,
                 background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, padding: '8px 12px',
               }}>
                 <div>
@@ -597,7 +623,7 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
       {mostrarForm && (
         <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Registrar asistencia</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div className="presencia-form-grid">
             <div>
               <label style={lbl} htmlFor="presencia-empleado">Empleado *</label>
               {activos.length > 0 ? (
@@ -655,7 +681,7 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
             <input style={inp} placeholder="Opcional" value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '10px 20px', minHeight: 44, background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
             {saving ? 'Guardando…' : '✅ Guardar'}
           </button>
         </div>
@@ -687,14 +713,18 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
       {sinCubrir.length > 0 && (
         <div style={{
           background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)',
-          borderRadius: 8, padding: '10px 14px', marginBottom: 8, fontSize: 12,
+          borderRadius: 12, padding: '12px 14px', marginBottom: 12, fontSize: 13,
         }}>
           <strong style={{ color: 'var(--at-warning)' }}>Turnos planificados sin marcaje</strong>
-          <div style={{ marginTop: 4, color: 'var(--at-ink-2)' }}>
+          <div style={{ marginTop: 6, color: 'var(--at-ink-2)', display: 'grid', gap: 4, overflowWrap: 'anywhere' }}>
             {sinCubrir.map(d => (
               <div key={`${d.personal_id}-${d.fecha}`}>
                 {d.nombre}
-                {d.turno_inicio && d.turno_fin && ` · ${d.turno_inicio.slice(0, 5)}–${d.turno_fin.slice(0, 5)}`}
+                {d.turno_inicio && d.turno_fin && (
+                  <span style={{ whiteSpace: 'nowrap', color: 'var(--at-ink-3)', fontVariantNumeric: 'tabular-nums' }}>
+                    {` · ${d.turno_inicio.slice(0, 5)}–${d.turno_fin.slice(0, 5)}`}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -707,9 +737,8 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
           Sin registros para {fechaFiltro}
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: 8 }}>
+        <div style={{ display: 'grid', gap: 10 }}>
           {registrosDia.map(r => {
-            const est = ESTADOS_PRESENCIA.find(s => s.value === r.estado)
             const susPausas = pausasDe.get(r.id) ?? []
             // El desglose vive en el dominio y es gemelo de lo que hace
             // `calcular_horas_personal` en SQL, incluido tratar `fin <= inicio`
@@ -717,84 +746,88 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
             // lo que produjo el bug de las 24 horas (#839).
             const { estadia, descanso, laborales } = desglose(r.hora_entrada, r.hora_salida, susPausas)
             const hayDescuento = estadia !== null && laborales !== null && laborales < estadia
+            const hayDatos = Boolean(r.hora_entrada || r.hora_salida || estadia !== null || descanso > 0)
+            const anulada = Boolean(r.anulado_en)
             return (
-              <div key={r.id} style={{
-                background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8,
-                padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              <div key={r.id} className="presencia-fila" style={{
+                background: 'var(--at-surface)', border: '1px solid var(--at-line)',
                 // Anulada: se ve, pero se ve APAGADA. No se esconde — es
                 // evidencia, y esconderla sería la mitad de borrarla.
-                opacity: r.anulado_en ? 0.6 : 1,
+                opacity: anulada ? 0.6 : 1,
               }}>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <span style={{ padding: '3px 10px', borderRadius: 10, background: est?.bg, color: est?.color, fontSize: 12, fontWeight: 600 }}>{est?.label}</span>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{r.nombre}</div>
-                    <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
-                      {r.cargo && <span>{r.cargo} · </span>}
+                <div className="presencia-fila-info">
+                  <div className="presencia-fila-cabeza">
+                    <div className="presencia-fila-quien">
+                      <div className="presencia-fila-nombre">{r.nombre}</div>
+                      {r.cargo && <div className="presencia-fila-cargo" style={{ color: 'var(--at-ink-3)' }}>{r.cargo}</div>}
+                    </div>
+                    {/* Sobre una fila anulada no se actúa: ya no cuenta, y
+                        dejar el selector vivo invitaría a «arreglarla». */}
+                    <EstadoFila
+                      registro={r}
+                      editable={canEdit && !anulada}
+                      onCambiar={estado => void actualizarEstado(r.id, estado)}
+                    />
+                  </div>
+                  {hayDatos && (
+                    <div className="presencia-fila-datos" style={{ color: 'var(--at-ink-3)' }}>
                       {r.hora_entrada && <span>Entrada: {r.hora_entrada}</span>}
-                      {r.hora_salida && <span> · Salida: {r.hora_salida}</span>}
+                      {r.hora_salida && <span>Salida: {r.hora_salida}</span>}
                       {/* Estadía y laborales se muestran SEPARADAS solo cuando
                           difieren. Con cero pausas que descuenten son el mismo
                           número, y enseñarlo dos veces solo enseña ruido. */}
                       {estadia !== null && (
                         hayDescuento ? (
                           <>
-                            <span style={{ color: 'var(--at-ink-3)' }}> · Estadía: {formatHoras(estadia)}</span>
-                            <span style={{ color: 'var(--at-accent)', fontWeight: 600 }}> · Laborales: {formatHoras(laborales)}</span>
+                            <span>Estadía: {formatHoras(estadia)}</span>
+                            <span style={{ color: 'var(--at-accent)', fontWeight: 700 }}>Laborales: {formatHoras(laborales)}</span>
                           </>
                         ) : (
-                          <span style={{ color: 'var(--at-accent)' }}> · {formatHoras(estadia)}</span>
+                          <span style={{ color: 'var(--at-accent)', fontWeight: 700 }}>Horas: {formatHoras(estadia)}</span>
                         )
                       )}
-                      {descanso > 0 && (
-                        <span style={{ color: 'var(--at-ink-3)' }}> · Descanso: {formatHoras(descanso)}</span>
-                      )}
+                      {descanso > 0 && <span>Descanso: {formatHoras(descanso)}</span>}
                     </div>
-                    {r.observaciones && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.observaciones}</div>}
-                    <EvidenciaMarcaje registro={r} />
-                    <HuellaCorreccion registro={r} />
-                    <Pausas
-                      pausas={susPausas}
-                      canEdit={canEdit && !r.anulado_en}
-                      canDelete={canDelete && !r.anulado_en}
-                      onAjustar={ajustar}
-                      onAnular={quitarPausa}
-                    />
-                    {!r.anulado_en && <ContraLaJornada dia={balanceDe.get(r.id) ?? null} />}
-                  </div>
+                  )}
+                  {r.observaciones && (
+                    <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginTop: 6, fontStyle: 'italic' }}>{r.observaciones}</div>
+                  )}
+                  <EvidenciaMarcaje registro={r} />
+                  <HuellaCorreccion registro={r} />
+                  <Pausas
+                    pausas={susPausas}
+                    canEdit={canEdit && !anulada}
+                    canDelete={canDelete && !anulada}
+                    onAjustar={ajustar}
+                    onAnular={quitarPausa}
+                  />
+                  {!anulada && <ContraLaJornada dia={balanceDe.get(r.id) ?? null} />}
                 </div>
-                {/* Sobre una fila anulada no se actúa: ya no cuenta, y dejar los
-                    controles vivos invitaría a «arreglarla» editándola. */}
-                {!r.anulado_en && (
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                {/* Los controles van a la derecha mientras quepan; en el
+                    teléfono bajan a su propio renglón (presencia.css) en vez
+                    de quedar fuera de la pantalla, que es como se veían. */}
+                {!anulada && (canEdit || canDelete) && (
+                  <div className="presencia-fila-acciones">
                     {canEdit && !r.hora_salida && r.estado === 'presente' && (
-                      <button onClick={() => registrarSalida(r.id)}
-                        style={{ padding: '5px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                      <button onClick={() => registrarSalida(r.id)} className="presencia-accion-principal"
+                        style={{ background: 'var(--at-warning)', color: 'var(--at-on-status)', border: '1px solid var(--at-warning)' }}>
                         Registrar salida
                       </button>
                     )}
                     {canEdit && (
-                      <select value={r.estado} onChange={e => actualizarEstado(r.id, e.target.value as EstadoPresencia)}
-                        style={{ padding: '4px 8px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
-                        {ESTADOS_PRESENCIA.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                      </select>
-                    )}
-                    {canEdit && (
-                      <button onClick={() => void corregir(r)}
-                        style={{ padding: '5px 10px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                      <button onClick={() => void corregir(r)} style={btnFila}>
                         ✏️ Corregir
                       </button>
                     )}
                     {canEdit && r.hora_entrada && (
                       <button onClick={() => void agregar(r)}
                         title="Para la pausa que la persona no marcó"
-                        style={{ padding: '5px 10px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                        style={btnFila}>
                         ⏸️ Pausa
                       </button>
                     )}
                     {canDelete && (
-                      <button onClick={() => void anular(r)}
-                        style={{ padding: '5px 10px', background: 'var(--at-surface-2)', color: 'var(--at-danger)', border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                      <button onClick={() => void anular(r)} style={{ ...btnFila, color: 'var(--at-danger)' }}>
                         Anular
                       </button>
                     )}
@@ -806,6 +839,49 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * El estado del día, arriba a la derecha de la tarjeta.
+ *
+ * Con permiso de edición la pastilla ES el selector: antes la tarjeta decía
+ * «Presente» dos veces —la etiqueta a la izquierda y el <select> a la
+ * derecha—, y en el teléfono el segundo era justo lo que se salía de la
+ * pantalla. Sin permiso, o con la fila anulada, es una etiqueta y nada más.
+ */
+function EstadoFila({ registro, editable, onCambiar }: {
+  registro: PresenciaPersonal
+  editable: boolean
+  onCambiar: (estado: EstadoPresencia) => void
+}) {
+  const est = ESTADOS_PRESENCIA.find(s => s.value === registro.estado)
+  const tono: CSSProperties = {
+    background: est?.bg ?? 'var(--at-chip)',
+    color: est?.color ?? 'var(--at-ink-2)',
+    border: `1px solid ${est?.border ?? 'var(--at-line)'}`,
+  }
+  if (!editable) {
+    return (
+      <span className="presencia-estado" style={{
+        ...tono, borderRadius: 999, padding: '3px 12px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+      }}>
+        {est?.label ?? registro.estado}
+      </span>
+    )
+  }
+  return (
+    <span className="presencia-estado">
+      <select
+        value={registro.estado}
+        onChange={e => onCambiar(e.target.value as EstadoPresencia)}
+        aria-label={`Estado de ${registro.nombre}`}
+        style={tono}
+      >
+        {ESTADOS_PRESENCIA.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+      </select>
+      <span aria-hidden="true" className="presencia-estado-flecha" style={{ color: tono.color }}>▾</span>
+    </span>
   )
 }
 
@@ -829,7 +905,7 @@ function ContraLaJornada({ dia }: { dia: BalanceDia | null }) {
   const enEspera = !dia.tiene_vara || dia.hallazgos.includes('jornada_abierta')
   return (
     <div style={{
-      fontSize: 11, marginTop: 4,
+      fontSize: 12, marginTop: 8, lineHeight: 1.45,
       color: enEspera ? 'var(--at-ink-3)' : 'var(--at-warning)',
     }}>
       {enEspera ? '⏳' : '⚠️'} Contra la jornada: {frases.join(' · ')}
@@ -860,14 +936,13 @@ function Pausas({ pausas, canEdit, canDelete, onAjustar, onAnular }: {
 }) {
   if (pausas.length === 0) return null
   return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
       {pausas.map(p => {
         const anulada = Boolean(p.anulado_en)
         const abierta = p.minutos === null && !anulada
         return (
-          <span key={p.id} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5,
-            padding: '2px 7px', borderRadius: 8, opacity: anulada ? 0.55 : 1,
+          <span key={p.id} className="presencia-pausa" style={{
+            opacity: anulada ? 0.55 : 1,
             background: anulada ? 'var(--at-chip)' : p.descuenta ? 'var(--at-warning-tint)' : 'var(--at-chip)',
             color: anulada ? 'var(--at-ink-3)' : p.descuenta ? 'var(--at-warning)' : 'var(--at-ink-2)',
             textDecoration: anulada ? 'line-through' : undefined,
@@ -878,12 +953,10 @@ function Pausas({ pausas, canEdit, canDelete, onAjustar, onAnular }: {
             {p.origen === 'manual' && <span title="La agregó quien administra: se sabe cuánto duró, no a qué hora fue">· agregada</span>}
             {p.cerrada_al_salir && <span title="Quedó abierta y la cerró el marcaje de salida" style={{ color: 'var(--at-danger)' }}>· sin cerrar</span>}
             {canEdit && !anulada && !abierta && (
-              <button onClick={() => onAjustar(p)} aria-label={`Ajustar ${p.etiqueta}`}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 10.5, color: 'inherit' }}>✏️</button>
+              <button onClick={() => onAjustar(p)} aria-label={`Ajustar ${p.etiqueta}`}>✏️</button>
             )}
             {canDelete && !anulada && (
-              <button onClick={() => onAnular(p)} aria-label={`Anular ${p.etiqueta}`}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 10.5, color: 'inherit' }}>✕</button>
+              <button onClick={() => onAnular(p)} aria-label={`Anular ${p.etiqueta}`}>✕</button>
             )}
           </span>
         )
@@ -904,8 +977,13 @@ function EvidenciaMarcaje({ registro }: { registro: PresenciaPersonal }) {
   if (registro.origen !== 'autoservicio') return null
   const gps = registro.gps_entrada ?? registro.gps_salida
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 8, background: 'var(--at-primary-soft)', color: 'var(--at-primary-2)' }}>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+      {/* Neutra y no en --at-primary-soft: el branding lo reescribe en claro
+          también en modo oscuro (ver ESTADOS_PRESENCIA). */}
+      <span style={{
+        fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999,
+        background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)',
+      }}>
         Marcado por la persona
       </span>
       {[registro.foto_entrada, registro.foto_salida].filter(Boolean).map(path => (
@@ -914,11 +992,12 @@ function EvidenciaMarcaje({ registro }: { registro: PresenciaPersonal }) {
           src={path}
           bucket={BUCKET_PRESENCIA}
           alt="Foto del marcaje"
-          style={{ width: 34, height: 34, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--at-line)' }}
+          className="presencia-foto"
+          style={{ border: '1px solid var(--at-line)', background: 'var(--at-surface-2)' }}
         />
       ))}
       {gps && (
-        <span style={{ fontSize: 10.5, color: 'var(--at-ink-3)' }}>
+        <span style={{ fontSize: 11.5, color: 'var(--at-ink-3)', fontVariantNumeric: 'tabular-nums' }}>
           📍 {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
           {gps.exactitud_m ? ` (±${Math.round(gps.exactitud_m)} m)` : ''}
         </span>
