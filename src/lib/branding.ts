@@ -276,13 +276,124 @@ export function derivarVariablesMarcaOscuro(primary: string | null | undefined):
 }
 
 /** CSS vars de tema que el branding sobreescribe (en orden). */
-export const BRAND_CSS_VARS = [
+const TONOS_MARCA_VARS = [
   '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
   '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
   '--at-surface-tint',
 ] as const
 
-function varsMarca(v: VariablesMarca): Record<(typeof BRAND_CSS_VARS)[number], string> {
+/** Tokens de estado que también siguen a la marca (ver derivarEstados). */
+export const ESTADO_CSS_VARS = [
+  '--at-success', '--at-success-tint', '--at-success-border', '--at-success-strong',
+  '--at-info', '--at-info-tint', '--at-info-border', '--at-info-strong',
+] as const
+
+/** CSS vars de tema que el branding sobreescribe (en orden): tonos de marca + estados. */
+export const BRAND_CSS_VARS = [...TONOS_MARCA_VARS, ...ESTADO_CSS_VARS] as const
+
+// ─── Estados success / info ─────────────────────────────────────────────────
+// info toma el TONO de la marca (avisos neutros en color de marca). success
+// conserva el tono verde por defecto (142°) para que siempre se lea como éxito
+// (~1600 usos: pagado, activo, guardado…), pero su saturación y luminosidad de
+// partida se ajustan a las de la marca: una marca viva da un verde vivo, una
+// apagada uno apagado. Con el color por defecto, success reproduce el de
+// index.css. Mismos mínimos de contraste que src/test/__tests__/contrast.test.ts:
+// strong sobre tint ≥ 4.5, blanco sobre strong ≥ 4.5 y blanco sobre la base ≥ 3
+// (AA-large); en dark, la base y strong ≥ 4.5 sobre la superficie y su tint.
+
+/** HSL del success por defecto (#16a34a) y de la marca por defecto (#1B3B36). */
+const SUCCESS_TONO = 142 / 360
+const SUCCESS_SAT = 0.76
+const SUCCESS_LUM = 0.36
+const MARCA_SAT = 0.37
+const MARCA_LUM = 0.17
+/** HSL del info por defecto (#2563eb): para marcas grises / negras, que no tienen tono. */
+const INFO_TONO = 221 / 360
+const INFO_SAT = 0.83
+/** Por debajo de esta saturación HSL la marca se trata como gris (sin tono que heredar). */
+const SAT_GRIS = 0.08
+/**
+ * Tonos (grados) de los estados con significado propio: danger (#ef4444), warning
+ * (#d97706) y success. Si el tono de la marca cae a menos de ESTADO_DISTANCIA_MIN de
+ * alguno, info usaría un color que se confunde con ese estado (marca roja → «Aviso»
+ * igual que «Vencido»), así que vuelve al azul por defecto.
+ */
+const TONOS_ESTADO = [0, 32, 142]
+const ESTADO_DISTANCIA_MIN = 30
+const distanciaTono = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b))
+/** Mínimos de contraste (WCAG) de los estados, como en contrast.test.ts. */
+const AA = 4.5
+const AA_GRANDE = 3
+
+/** Baja la luminosidad HSL (mismo tono y saturación) lo MÍNIMO para cumplir `cumple`. */
+function oscurecerHslHasta(hex: string, cumple: (c: string) => boolean): string {
+  if (cumple(hex)) return hex
+  const [h, s, l0] = rgbAHsl(parseRgb(hex))
+  let lo = 0, hi = l0 // lo cumple (negro), hi no
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2
+    if (cumple(hslAHex([h, s, mid]))) lo = mid
+    else hi = mid
+  }
+  return hslAHex([h, s, lo])
+}
+
+const acotar = (x: number, min: number, max: number) => Math.max(min, Math.min(max, x))
+
+interface PaletaEstado { base: string; tint: string; border: string; strong: string }
+
+/**
+ * Paleta de un estado (base / tint / border / strong) para claro y oscuro a partir
+ * de un tono, una saturación y una luminosidad de partida. Las proporciones salen
+ * de las paletas de estado de index.css (tint 86% / border 72% blanco en claro;
+ * en dark, superficies con el mismo tono al 12 / 20% de luminosidad).
+ */
+function paletaEstado(h: number, s: number, l: number): { claro: PaletaEstado; oscuro: PaletaEstado } {
+  const blanco = '#ffffff'
+  const base = oscurecerHslHasta(hslAHex([h, s, l]), (c) => contraste(blanco, c) >= AA_GRANDE)
+  const tint = mezclarBlanco(base, 0.86)
+  const strong = oscurecerHslHasta(oscurecer(base, 0.2), (c) => contraste(c, tint) >= AA && contraste(blanco, c) >= AA)
+
+  // Dark: base clara y saturada como los *-400 de index.css; superficies del mismo tono.
+  const tintOsc = enLuminosidad(base, 0.12, 0.55)
+  const baseOsc = aclararHasta(enLuminosidad(base, 0.6), (c) => contraste(c, DARK_SURFACE) >= AA && contraste(c, tintOsc) >= AA)
+  const strongOsc = aclararHasta(enLuminosidad(baseOsc, 0.76), (c) => contraste(c, tintOsc) >= AA)
+  return {
+    claro: { base, tint, border: mezclarBlanco(base, 0.72), strong },
+    oscuro: { base: baseOsc, tint: enLuminosidad(baseOsc, 0.12, 0.55), border: enLuminosidad(baseOsc, 0.2, 0.55), strong: strongOsc },
+  }
+}
+
+/**
+ * success / info derivados del color de marca, para claro y oscuro (claves de
+ * ESTADO_CSS_VARS). success: tono verde fijo; saturación = la por defecto escalada
+ * por la saturación de la marca (acotada a 0.4–0.85) y luminosidad de partida que
+ * sigue la de la marca (acotada a 0.3–0.45). info: el tono de la marca, con su
+ * saturación acotada a 0.45–0.9 para que se lea como aviso. Vuelve al azul por
+ * defecto si la marca es gris o negra (sin tono: HSL daría 0° = rojo, que se leería
+ * como error) o si su tono choca con danger / warning / success (TONOS_ESTADO); en
+ * ese caso conserva la saturación ajustada a la marca.
+ */
+export function derivarEstados(primary: string | null | undefined): { claro: Record<string, string>; oscuro: Record<string, string> } {
+  const base = normalizarColorHex(primary) ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
+  const [h, s, l] = rgbAHsl(parseRgb(base))
+  const success = paletaEstado(
+    SUCCESS_TONO,
+    acotar((SUCCESS_SAT * s) / MARCA_SAT, 0.4, 0.85),
+    acotar(SUCCESS_LUM + (l - MARCA_LUM) * 0.3, 0.3, 0.45),
+  )
+  const choca = TONOS_ESTADO.some((t) => distanciaTono(h * 360, t) < ESTADO_DISTANCIA_MIN)
+  const info = s < SAT_GRIS
+    ? paletaEstado(INFO_TONO, INFO_SAT, 0.53)
+    : paletaEstado(choca ? INFO_TONO : h, acotar(s, 0.45, 0.9), choca ? 0.53 : 0.5)
+  const vars = (sc: PaletaEstado, inf: PaletaEstado): Record<string, string> => ({
+    '--at-success': sc.base, '--at-success-tint': sc.tint, '--at-success-border': sc.border, '--at-success-strong': sc.strong,
+    '--at-info': inf.base, '--at-info-tint': inf.tint, '--at-info-border': inf.border, '--at-info-strong': inf.strong,
+  })
+  return { claro: vars(success.claro, info.claro), oscuro: vars(success.oscuro, info.oscuro) }
+}
+
+function varsMarca(v: VariablesMarca): Record<(typeof TONOS_MARCA_VARS)[number], string> {
   return {
     '--at-primary': v.primary,
     '--at-primary-hover': v.hover,
@@ -304,13 +415,13 @@ function varsMarca(v: VariablesMarca): Record<(typeof BRAND_CSS_VARS)[number], s
  */
 export function estilosMarca(primaryColor: string | null | undefined): Record<string, string> | null {
   const color = normalizarColorHex(primaryColor)
-  return color ? varsMarca(derivarVariablesMarca(color)) : null
+  return color ? { ...varsMarca(derivarVariablesMarca(color)), ...derivarEstados(color).claro } : null
 }
 
 /** Igual que `estilosMarca` pero con los valores del tema OSCURO; null si no hay color custom. */
 export function estilosMarcaOscuro(primaryColor: string | null | undefined): Record<string, string> | null {
   const color = normalizarColorHex(primaryColor)
-  return color ? varsMarca(derivarVariablesMarcaOscuro(color)) : null
+  return color ? { ...varsMarca(derivarVariablesMarcaOscuro(color)), ...derivarEstados(color).oscuro } : null
 }
 
 /** Color de acento del tema por defecto (= --at-accent en src/index.css). */
