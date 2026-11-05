@@ -104,7 +104,9 @@ describe('SuministrosTab — foto desde la ficha', () => {
     expect(mocks.removeCondominiosMedia).not.toHaveBeenCalled()
     expect(mocks.onRefresh).toHaveBeenCalled()
     expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success', title: 'Foto guardada' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // Se cierra la ventana de foto; la ficha sigue abierta debajo.
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Foto del insumo' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: /Alcohol Etílico al 70%/ })).toBeTruthy()
   })
 
   it('al reemplazarla, la anterior se borra después de actualizar la fila, y lo subido y descartado en la ventana también', async () => {
@@ -145,7 +147,7 @@ describe('SuministrosTab — foto desde la ficha', () => {
     enVentana('Subir foto')
     enVentana('Cancelar')
 
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Foto del insumo' })).toBeNull()
     expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
     expect(borradas()).toEqual(['p1/suministros/nueva-1.jpg'])
   })
@@ -172,7 +174,7 @@ describe('SuministrosTab — foto desde la ficha', () => {
     expect(within(ventana()).getByRole('img', { name: 'Foto de Alcohol Etílico al 70%' }).getAttribute('src')).toBe(FOTO)
     expect(within(ventana()).queryByRole('button', { name: /Guardar foto|Quitar foto|Subir foto/ })).toBeNull()
     enVentana('Cerrar')
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Foto del insumo' })).toBeNull()
     unmount()
 
     renderTab({ canEdit: false })
@@ -220,7 +222,12 @@ describe('SuministrosTab — foto en el formulario', () => {
     fireEvent.click(screen.getByRole('button', { name: /Editar/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     fireEvent.click(screen.getByRole('button', { name: /Editar/ }))
+    // Escape cierra el formulario; otro Escape, la ficha. Luego se abre otro insumo.
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Escoba' }))
+    expect(screen.getByRole('dialog', { name: /Escoba/ })).toBeTruthy()
     expect(mocks.removeCondominiosMedia).not.toHaveBeenCalled()
   })
 

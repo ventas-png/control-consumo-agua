@@ -784,6 +784,16 @@ button:focus:not(:focus-visible) {
   }
 }
 
+/* Pie de la ficha en ventana (Suministros): Desactivar, Cerrar, Editar y
+ * + Movimiento no caben en una fila de teléfono. En vez de dejar el último
+ * huérfano a la derecha, los botones se reparten el ancho de su fila y la
+ * acción principal, que cae sola a la segunda, ocupa toda la fila. */
+@media (max-width: 767px) {
+  .at-ficha-acciones > button {
+    flex: 1 1 auto;
+  }
+}
+
 /* ─── EditModal `fullScreenOnMobile`: hoja a pantalla completa ────────────
  *
  * Un chat en un modal centrado al 95vw × 90vh desperdicia los bordes y deja
