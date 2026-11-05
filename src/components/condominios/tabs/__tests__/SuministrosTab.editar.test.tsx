@@ -257,20 +257,18 @@ describe('carga masiva — columnas rendimiento', () => {
 })
 
 describe('SuministrosTab — los formularios abren en ventana emergente', () => {
-  it('+ Nuevo abre un diálogo y la ficha seleccionada sigue a la vista detrás', () => {
+  it('+ Nuevo abre un diálogo desde la lista, sin pasar por una ficha', () => {
     renderTab()
-    abrirDetalle()
+    expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '+ Nuevo' }))
     const ventana = screen.getByRole('dialog', { name: 'Nuevo suministro' })
     expect((within(ventana).getByLabelText('Nombre *') as HTMLInputElement).value).toBe('')
-    // La ficha no se fue: sigue debajo de la ventana (el KPI sólo existe en el detalle).
-    expect(screen.getByText('Usos disponibles (aplicaciones)')).toBeTruthy()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
     fireEvent.click(within(ventana).getByRole('button', { name: 'Cancelar' }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByText('Usos disponibles (aplicaciones)')).toBeTruthy()
   })
 
-  it('Editar abre un diálogo con el insumo de subtítulo; Escape lo cierra sin guardar', () => {
+  it('Editar abre un diálogo con el insumo de subtítulo; Escape lo cierra sin guardar y la ficha sigue abierta', () => {
     renderTab()
     abrirDetalle()
     fireEvent.click(screen.getByRole('button', { name: /Editar/ }))
@@ -278,7 +276,8 @@ describe('SuministrosTab — los formularios abren en ventana emergente', () => 
     expect(within(ventana).getByText('Alcohol Etílico al 70%')).toBeTruthy()
     fireEvent.change(within(ventana).getByLabelText('Nombre *'), { target: { value: 'Otro' } })
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Editar suministro' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: /Alcohol Etílico al 70%/ })).toBeTruthy()
     expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
   })
 
@@ -290,7 +289,7 @@ describe('SuministrosTab — los formularios abren en ventana emergente', () => 
     expect(ventana.textContent).toMatch(/Stock actual: 1 litro/)
     fireEvent.change(within(ventana).getByLabelText(/Cantidad/), { target: { value: '3' } })
     fireEvent.click(within(ventana).getByRole('button', { name: 'Cancelar' }))
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Registrar movimiento' })).toBeNull()
     expect(mocks.createCondominioRow).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: '+ Movimiento' }))

@@ -105,11 +105,12 @@ async function botonesDe(page, concepto) {
   const titulo = page.getByText(concepto, { exact: true }).first()
   if ((await titulo.count()) === 0) return null
   await titulo.click()
-  await page.waitForTimeout(600)
-  // la tarjeta = el ancestro más cercano que contiene su botón «Seguimiento» (los botones de acción viven ahí)
-  const tarjeta = titulo.locator('xpath=ancestor::div[.//button[contains(normalize-space(.), "Seguimiento")]][1]')
-  const textos = (await tarjeta.locator('button').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
-  await titulo.click().catch(() => {})
+  // la ficha de la orden abre en ventana (su nombre accesible es el concepto): los botones de acción viven ahí
+  const ficha = page.getByRole('dialog', { name: concepto })
+  await ficha.waitFor({ timeout: 5000 })
+  await page.waitForTimeout(300)
+  const textos = (await ficha.locator('button').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+  await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
   return [...new Set(textos.map(ETIQUETA).filter(Boolean))].sort()
 }

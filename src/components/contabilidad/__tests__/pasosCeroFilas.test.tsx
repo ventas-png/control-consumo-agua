@@ -490,6 +490,8 @@ describe('Contratos de proveedor › cambiar el estado: cero filas NO es éxito'
       <ContratosProveedorTab contratos={[contrato] as never} proyectoId="p1" companyId="c1" moneda="GTQ" canCreate canEdit canDelete onRefresh={onRefresh} />,
       { permisos: VER_Y_EDITAR, queryClient: qc },
     )
+    // La ficha abre en ventana al pulsar la tarjeta; Suspender vive ahí.
+    fireEvent.click(screen.getByRole('button', { name: /Ferretería/ }))
     fireEvent.click(screen.getByText('Suspender'))
     return { onRefresh, invalidar }
   }

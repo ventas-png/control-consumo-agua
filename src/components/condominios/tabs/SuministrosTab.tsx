@@ -151,6 +151,20 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
     setVista('lista')
   }
 
+  /**
+   * Cerrar la ventana de la ficha. Los formularios (editar, movimiento) y la
+   * foto cuelgan de la ficha, así que se cierran con ella y lo tecleado se
+   * descarta; una foto subida y no guardada se borra del bucket.
+   */
+  function cerrarDetalle() {
+    descartarFotoPendiente()
+    setForm(FORM_VACIO)
+    setMovForm(movFormVacio())
+    setFotoAbierta(null)
+    setVista('lista')
+    setSelectedId(null)
+  }
+
   function cancelarFormulario() {
     descartarFotoPendiente()
     setForm(FORM_VACIO)
@@ -288,207 +302,221 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   const fmtMoneda = (n: number) => `${moneda} ${n.toFixed(2)}`
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>Suministros</span>
-            {canCreate && (
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => setShowImportModal(true)} title="Carga masiva desde Excel/CSV"
-                  style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                  ⬆ Masiva
-                </button>
-                <button onClick={abrirNuevo}
-                  style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                  + Nuevo
-                </button>
-              </div>
-            )}
+    <div style={{ height: '100%', overflowY: 'auto' }}>
+      {/* Cabecera: filtros y altas. La ficha ya no vive en un panel al lado:
+          abre en ventana emergente (más abajo), así la lista ocupa todo el
+          ancho —en el teléfono antes compartían 300px + lo que sobrara—. */}
+      <div style={{ padding: '12px 16px 10px', borderBottom: '1px solid var(--at-line)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 12px' }}>
+        <span style={{ fontWeight: 600, fontSize: 14, marginRight: 'auto' }}>Suministros</span>
+        <select style={{ ...inp, width: 'auto', minWidth: 180 }} value={filtro} aria-label="Categoría" onChange={e => setFiltro(e.target.value as CategoriaSupministro | '')}>
+          <option value="">Todas las categorías</option>
+          {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+        </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={soloAlertas} onChange={e => setSoloAlertas(e.target.checked)} />
+          Solo alertas de stock ({alertas.length})
+        </label>
+        {canCreate && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => setShowImportModal(true)} title="Carga masiva desde Excel/CSV"
+              style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              ⬆ Masiva
+            </button>
+            <button onClick={abrirNuevo}
+              style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+              + Nuevo
+            </button>
           </div>
-          <select style={{ ...inp, marginBottom: 6 }} value={filtro} onChange={e => setFiltro(e.target.value as CategoriaSupministro | '')}>
-            <option value="">Todas las categorías</option>
-            {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
-          </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-            <input type="checkbox" checked={soloAlertas} onChange={e => setSoloAlertas(e.target.checked)} />
-            Solo alertas de stock ({alertas.length})
-          </label>
+        )}
+      </div>
+
+      {alertas.length > 0 && !soloAlertas && (
+        <div style={{ padding: '6px 16px', background: 'var(--at-warning-tint)', borderBottom: '1px solid var(--at-warning-border)', fontSize: 12, color: 'var(--at-warning-strong)' }}>
+          ⚠️ {alertas.length} suministros bajo mínimo
         </div>
+      )}
 
-        {alertas.length > 0 && !soloAlertas && (
-          <div style={{ padding: '6px 12px', background: 'var(--at-warning-tint)', borderBottom: '1px solid var(--at-warning-border)', fontSize: 12, color: 'var(--at-warning-strong)' }}>
-            ⚠️ {alertas.length} suministros bajo mínimo
-          </div>
-        )}
+      {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin suministros</div>}
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin suministros</div>}
-
-        {lista.map(s => {
-          const cat = CATEGORIAS.find(c => c.value === s.categoria)
-          const alerta = s.stock_actual <= s.stock_minimo
-          const r = rendimientoSuministro(s)
-          return (
-            <div key={s.id} role="button" tabIndex={0} aria-label={s.nombre}
-              onClick={() => seleccionar(s.id)}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); seleccionar(s.id) } }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', opacity: s.activo ? 1 : 0.5, borderLeft: alerta ? '3px solid var(--at-warning)' : '3px solid transparent' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {s.nombre}</span>
-                <span style={{ fontWeight: 700, fontSize: 14, color: alerta ? 'var(--at-danger)' : 'var(--at-success)' }}>
-                  {s.stock_actual} {s.unidad_medida}
-                </span>
-              </div>
-              {alerta && <div style={{ fontSize: 11, color: 'var(--at-warning)' }}>⚠️ Mínimo: {s.stock_minimo}</div>}
-              {(s.ubicacion || r) && (
-                <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>
-                  {s.ubicacion}
-                  {s.ubicacion && r && ' · '}
-                  {r && `≈ ${fmtRendimiento(r.usosDisponibles)} ${r.unidad}`}
+      {/* Tarjetas: una por insumo, en rejilla que se adapta al ancho (una
+          columna en el teléfono). Pulsar una abre la ficha en ventana. */}
+      {lista.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10, padding: 16 }}>
+          {lista.map(s => {
+            const cat = CATEGORIAS.find(c => c.value === s.categoria)
+            const alerta = s.stock_actual <= s.stock_minimo
+            const r = rendimientoSuministro(s)
+            return (
+              <div key={s.id} role="button" tabIndex={0} aria-label={s.nombre}
+                onClick={() => seleccionar(s.id)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); seleccionar(s.id) } }}
+                style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface)', opacity: s.activo ? 1 : 0.5, border: '1px solid var(--at-line)', borderLeft: alerta ? '4px solid var(--at-warning)' : '4px solid var(--at-line)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {s.nombre}</span>
+                  <span style={{ fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', color: alerta ? 'var(--at-danger)' : 'var(--at-success)' }}>
+                    {s.stock_actual} {s.unidad_medida}
+                  </span>
                 </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Panel derecho: la ficha seleccionada. Los formularios (nuevo, editar,
-          movimiento) ya no se pintan aquí: abren en ventana emergente, más
-          abajo, así la ficha sigue a la vista mientras se llena el formulario. */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {selected ? (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                {(selected.foto_url || canEdit) && (
-                  <button type="button" onClick={() => setFotoAbierta('detalle')}
-                    aria-label={selected.foto_url ? `Ver foto de ${selected.nombre}` : `Agregar foto de ${selected.nombre}`}
-                    title={selected.foto_url ? 'Ver foto' : 'Agregar foto'}
-                    style={{ width: 76, height: 76, flexShrink: 0, padding: 0, overflow: 'hidden', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', border: selected.foto_url ? '1px solid var(--at-line)' : '2px dashed var(--at-line-strong)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                    {selected.foto_url
-                      ? <SecureImage src={selected.foto_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                      : <><span aria-hidden="true" style={{ fontSize: 22 }}>📷</span><span style={{ fontSize: 10 }}>Agregar foto</span></>}
-                  </button>
+                {alerta && <div style={{ fontSize: 11, color: 'var(--at-warning)' }}>⚠️ Mínimo: {s.stock_minimo}</div>}
+                {(s.ubicacion || r) && (
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>
+                    {s.ubicacion}
+                    {s.ubicacion && r && ' · '}
+                    {r && `≈ ${fmtRendimiento(r.usosDisponibles)} ${r.unidad}`}
+                  </div>
                 )}
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 20 }}>
-                    {CATEGORIAS.find(c => c.value === selected.categoria)?.icon} {selected.nombre}
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>
-                    {selected.ubicacion && <span>{selected.ubicacion} · </span>}
-                    {selected.proveedor && <span>Proveedor: {selected.proveedor}{!selected.proveedor_id && ' (sin vincular al catálogo)'}</span>}
-                  </div>
-                  {rendimiento && (
-                    <div style={{ fontSize: 13, color: 'var(--at-ink-2)', marginTop: 4 }}>
-                      📐 {describirRendimiento(selected)}
-                      {rendimiento.costoPorUso != null && <span> · {fmtMoneda(rendimiento.costoPorUso)} por {rendimiento.unidad === 'usos' ? 'uso' : rendimiento.unidad}</span>}
-                    </div>
-                  )}
-                  {!rendimiento && canEdit && (
-                    <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
-                      📐 Sin rendimiento declarado: edita la ficha para indicar cuántos usos da 1 {selected.unidad_medida}.
-                    </div>
-                  )}
-                </div>
+                {!s.activo && <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Inactivo</div>}
               </div>
-              {canEdit && (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button onClick={() => abrirEdicion(selected)}
-                    style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                    ✏️ Editar
-                  </button>
-                  <button onClick={() => setVista('movimiento')}
-                    style={{ padding: '7px 14px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                    + Movimiento
-                  </button>
-                  <button onClick={() => toggleActivo(selected)}
-                    style={{ padding: '7px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                    {selected.activo ? 'Desactivar' : 'Activar'}
-                  </button>
-                </div>
-              )}
-            </div>
+            )
+          })}
+        </div>
+      )}
 
-            {/* Stock KPI */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
-              {[
-                { label: `Stock actual (${selected.unidad_medida})`, value: String(selected.stock_actual), color: selected.stock_actual <= selected.stock_minimo ? 'var(--at-danger)' : 'var(--at-success)' },
-                { label: `Stock mínimo (${selected.unidad_medida})`, value: String(selected.stock_minimo), color: 'var(--at-ink-3)' },
-                { label: `Costo unitario (${moneda})`, value: selected.costo_unitario?.toFixed(2) ?? '—', color: 'var(--at-accent)' },
-                ...(rendimiento ? [
-                  { label: `Usos disponibles (${rendimiento.unidad})`, value: fmtRendimiento(rendimiento.usosDisponibles), color: rendimiento.usosDisponibles <= rendimiento.usosMinimo ? 'var(--at-danger)' : 'var(--at-success)' },
-                  { label: `Costo por ${rendimiento.unidad === 'usos' ? 'uso' : rendimiento.unidad} (${moneda})`, value: rendimiento.costoPorUso != null ? fmtRendimiento(rendimiento.costoPorUso, 4) : '—', color: 'var(--at-accent)' },
-                ] : []),
-              ].map(k => (
-                <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: k.color }}>{k.value}</div>
-                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{k.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {selected.stock_actual <= selected.stock_minimo && (
-              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--at-warning-strong)' }}>
-                ⚠️ Stock bajo mínimo — requiere reposición
-              </div>
-            )}
-
-            {/* Consumo observado: lo que de verdad salió, no lo declarado */}
-            {consumo && (
-              <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginBottom: 16 }}>
-                {consumo.movimientos === 0
-                  ? `Sin salidas en los últimos ${consumo.dias} días.`
-                  : <>
-                      Salidas en los últimos {consumo.dias} días: <strong>{fmtRendimiento(consumo.salidas)} {selected.unidad_medida}</strong> ({consumo.movimientos} {consumo.movimientos === 1 ? 'movimiento' : 'movimientos'})
-                      {' · '}≈ {fmtRendimiento(consumo.porDia, 2)} {selected.unidad_medida} por día
-                      {consumo.diasCobertura != null && <> · a ese ritmo el stock alcanza ≈ <strong>{consumo.diasCobertura} {consumo.diasCobertura === 1 ? 'día' : 'días'}</strong></>}
-                    </>}
-              </div>
-            )}
-
-            {/* Historial movimientos — F3.9: migrado a <DataTable> shared */}
-            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Últimos movimientos</div>
-            <DataTable<MovimientoSuministro>
-              data={movsDelSelected.slice(0, 30)}
-              rowKey="id"
-              pageSize={30}
-              defaultSort={{ key: 'fecha', direction: 'desc' }}
-              emptyState={{ icon: '📋', title: 'Sin movimientos registrados' }}
-              columns={[
-                { key: 'fecha', header: 'Fecha', sortable: true,
-                  render: (m) => m.fecha },
-                { key: 'tipo', header: 'Tipo', sortable: true,
-                  render: (m) => {
-                    const tipo = TIPOS_MOV.find(t => t.value === m.tipo)
-                    return <span style={{ padding: '2px 8px', borderRadius: 8, background: tint(tipo?.color ?? 'var(--at-ink-3)', 12), color: tipo?.color, fontSize: 11 }}>{tipo?.label}</span>
-                  } },
-                { key: 'cantidad', header: 'Cantidad', align: 'right', sortable: true,
-                  render: (m) => <span style={{ fontWeight: 600 }}>{m.cantidad} {selected.unidad_medida}</span> },
-                { key: 'motivo', header: 'Motivo', hideOnMobile: true,
-                  accessor: (m) => m.motivo ?? '',
-                  render: (m) => m.motivo || '—' },
-                { key: 'area_destino', header: 'Área', hideOnMobile: true,
-                  accessor: (m) => m.area_destino ?? '',
-                  render: (m) => m.area_destino || '—' },
-                { key: 'realizado_por', header: 'Por', hideOnMobile: true,
-                  accessor: (m) => m.realizado_por ?? '',
-                  render: (m) => m.realizado_por || '—' },
-              ] satisfies DataTableColumn<MovimientoSuministro>[]}
-            />
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
-            Selecciona un suministro o crea uno nuevo
-          </div>
-        )}
+      <div style={{ padding: '0 16px 16px' }}>
+        <OperacionesLegadoPanel companyId={companyId} tabla="suministros_condominio" projectId={proyectoId} canEdit={canEdit} />
       </div>
 
-      <OperacionesLegadoPanel companyId={companyId} tabla="suministros_condominio" projectId={proyectoId} canEdit={canEdit} />
+      {/* Ventana: la ficha del insumo. Va ANTES de las ventanas de formulario y
+          de foto en el árbol: se abren desde aquí y deben quedar encima
+          (EditModal apila por orden de montaje y Escape sólo cierra la de
+          arriba). En el teléfono ocupa toda la pantalla. */}
+      {selected && (
+        <EditModal
+          title={`${CATEGORIAS.find(c => c.value === selected.categoria)?.icon ?? ''} ${selected.nombre}`.trim()}
+          subtitle={(selected.ubicacion || selected.proveedor || !selected.activo) ? (
+            <span style={{ display: 'inline-flex', gap: '2px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {selected.ubicacion && <span>📍 {selected.ubicacion}</span>}
+              {selected.proveedor && <span>Proveedor: {selected.proveedor}{!selected.proveedor_id && ' (sin vincular al catálogo)'}</span>}
+              {!selected.activo && <span style={{ padding: '1px 8px', borderRadius: 8, background: 'var(--at-chip)', color: 'var(--at-ink-2)', fontSize: 11 }}>Inactivo</span>}
+            </span>
+          ) : undefined}
+          size="lg"
+          fullScreenOnMobile
+          onClose={cerrarDetalle}
+          footer={
+            <div className="at-ficha-acciones" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+              {canEdit && (
+                <button type="button" onClick={() => toggleActivo(selected)}
+                  style={{ ...btnSecundario, marginRight: 'auto', border: '1px solid var(--at-line)', fontSize: 12 }}>
+                  {selected.activo ? 'Desactivar' : 'Activar'}
+                </button>
+              )}
+              <button type="button" onClick={cerrarDetalle} style={btnSecundario}>Cerrar</button>
+              {canEdit && (<>
+                <button type="button" onClick={() => abrirEdicion(selected)}
+                  style={{ ...btnPrimario, background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)' }}>
+                  ✏️ Editar
+                </button>
+                <button type="button" onClick={() => setVista('movimiento')}
+                  style={{ ...btnPrimario, background: 'var(--at-accent)', color: 'white' }}>
+                  + Movimiento
+                </button>
+              </>)}
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 16 }}>
+            {(selected.foto_url || canEdit) && (
+              <button type="button" onClick={() => setFotoAbierta('detalle')}
+                aria-label={selected.foto_url ? `Ver foto de ${selected.nombre}` : `Agregar foto de ${selected.nombre}`}
+                title={selected.foto_url ? 'Ver foto' : 'Agregar foto'}
+                style={{ width: 76, height: 76, flexShrink: 0, padding: 0, overflow: 'hidden', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', border: selected.foto_url ? '1px solid var(--at-line)' : '2px dashed var(--at-line-strong)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                {selected.foto_url
+                  ? <SecureImage src={selected.foto_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  : <><span aria-hidden="true" style={{ fontSize: 22 }}>📷</span><span style={{ fontSize: 10 }}>Agregar foto</span></>}
+              </button>
+            )}
+            <div style={{ minWidth: 0 }}>
+              {rendimiento && (
+                <div style={{ fontSize: 13, color: 'var(--at-ink-2)' }}>
+                  📐 {describirRendimiento(selected)}
+                  {rendimiento.costoPorUso != null && <span> · {fmtMoneda(rendimiento.costoPorUso)} por {rendimiento.unidad === 'usos' ? 'uso' : rendimiento.unidad}</span>}
+                </div>
+              )}
+              {!rendimiento && canEdit && (
+                <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
+                  📐 Sin rendimiento declarado: edita la ficha para indicar cuántos usos da 1 {selected.unidad_medida}.
+                </div>
+              )}
+              {selected.notas && (
+                <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4, whiteSpace: 'pre-wrap' }}>{selected.notas}</div>
+              )}
+            </div>
+          </div>
 
-      {/* Ventana: nuevo / editar. Va ANTES de la ventana de foto en el árbol:
-          la foto se abre desde aquí y debe quedar encima (EditModal apila por
-          orden de montaje y Escape sólo cierra la de arriba). */}
+          {/* Stock KPI */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
+            {[
+              { label: `Stock actual (${selected.unidad_medida})`, value: String(selected.stock_actual), color: selected.stock_actual <= selected.stock_minimo ? 'var(--at-danger)' : 'var(--at-success)' },
+              { label: `Stock mínimo (${selected.unidad_medida})`, value: String(selected.stock_minimo), color: 'var(--at-ink-3)' },
+              { label: `Costo unitario (${moneda})`, value: selected.costo_unitario?.toFixed(2) ?? '—', color: 'var(--at-accent)' },
+              ...(rendimiento ? [
+                { label: `Usos disponibles (${rendimiento.unidad})`, value: fmtRendimiento(rendimiento.usosDisponibles), color: rendimiento.usosDisponibles <= rendimiento.usosMinimo ? 'var(--at-danger)' : 'var(--at-success)' },
+                { label: `Costo por ${rendimiento.unidad === 'usos' ? 'uso' : rendimiento.unidad} (${moneda})`, value: rendimiento.costoPorUso != null ? fmtRendimiento(rendimiento.costoPorUso, 4) : '—', color: 'var(--at-accent)' },
+              ] : []),
+            ].map(k => (
+              <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: k.color }}>{k.value}</div>
+                <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {selected.stock_actual <= selected.stock_minimo && (
+            <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--at-warning-strong)' }}>
+              ⚠️ Stock bajo mínimo — requiere reposición
+            </div>
+          )}
+
+          {/* Consumo observado: lo que de verdad salió, no lo declarado */}
+          {consumo && (
+            <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginBottom: 16 }}>
+              {consumo.movimientos === 0
+                ? `Sin salidas en los últimos ${consumo.dias} días.`
+                : <>
+                    Salidas en los últimos {consumo.dias} días: <strong>{fmtRendimiento(consumo.salidas)} {selected.unidad_medida}</strong> ({consumo.movimientos} {consumo.movimientos === 1 ? 'movimiento' : 'movimientos'})
+                    {' · '}≈ {fmtRendimiento(consumo.porDia, 2)} {selected.unidad_medida} por día
+                    {consumo.diasCobertura != null && <> · a ese ritmo el stock alcanza ≈ <strong>{consumo.diasCobertura} {consumo.diasCobertura === 1 ? 'día' : 'días'}</strong></>}
+                  </>}
+            </div>
+          )}
+
+          {/* Historial movimientos — F3.9: migrado a <DataTable> shared */}
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Últimos movimientos</div>
+          <DataTable<MovimientoSuministro>
+            data={movsDelSelected.slice(0, 30)}
+            rowKey="id"
+            pageSize={30}
+            defaultSort={{ key: 'fecha', direction: 'desc' }}
+            emptyState={{ icon: '📋', title: 'Sin movimientos registrados' }}
+            columns={[
+              { key: 'fecha', header: 'Fecha', sortable: true,
+                render: (m) => m.fecha },
+              { key: 'tipo', header: 'Tipo', sortable: true,
+                render: (m) => {
+                  const tipo = TIPOS_MOV.find(t => t.value === m.tipo)
+                  return <span style={{ padding: '2px 8px', borderRadius: 8, background: tint(tipo?.color ?? 'var(--at-ink-3)', 12), color: tipo?.color, fontSize: 11 }}>{tipo?.label}</span>
+                } },
+              { key: 'cantidad', header: 'Cantidad', align: 'right', sortable: true,
+                render: (m) => <span style={{ fontWeight: 600 }}>{m.cantidad} {selected.unidad_medida}</span> },
+              { key: 'motivo', header: 'Motivo', hideOnMobile: true,
+                accessor: (m) => m.motivo ?? '',
+                render: (m) => m.motivo || '—' },
+              { key: 'area_destino', header: 'Área', hideOnMobile: true,
+                accessor: (m) => m.area_destino ?? '',
+                render: (m) => m.area_destino || '—' },
+              { key: 'realizado_por', header: 'Por', hideOnMobile: true,
+                accessor: (m) => m.realizado_por ?? '',
+                render: (m) => m.realizado_por || '—' },
+            ] satisfies DataTableColumn<MovimientoSuministro>[]}
+          />
+        </EditModal>
+      )}
+
+      {/* Ventana: nuevo / editar. Va DESPUÉS de la ficha (queda encima de
+          ella) y ANTES de la ventana de foto: la foto se abre desde aquí y
+          debe quedar encima (EditModal apila por orden de montaje y Escape
+          sólo cierra la de arriba). */}
       {(vista === 'nuevo' || (editando && selected)) && (
         <EditModal
           title={editando ? 'Editar suministro' : 'Nuevo suministro'}

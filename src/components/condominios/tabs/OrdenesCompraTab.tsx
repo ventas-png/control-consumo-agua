@@ -21,6 +21,7 @@ import { ContratoSelector } from '../../proveedores/ContratoSelector'
 import { ContratoSeguimientoModal } from '../../proveedores/ContratoSeguimientoModal'
 import { usePermisosProveedor } from '../../proveedores/permisos'
 import { tint } from '../../shared/statusTone'
+import { EditModal } from '../../shared/EditModal'
 
 interface Props {
   ordenes: OrdenCompra[]
@@ -73,7 +74,10 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
-  const [expandida, setExpandida] = useState<string | null>(null)
+  // La ficha abre en ventana al pulsar la tarjeta. Se guarda el id y no la fila:
+  // tras aprobar, emitir o editar, la ficha muestra la orden recargada.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalle = detalleId ? ordenes.find(o => o.id === detalleId) ?? null : null
   // Renglones de la orden NUEVA (opcionales aquí: también se cargan después con «Importar renglones»). La clave de
   // idempotencia es por apertura del formulario: un doble clic o un reintento devuelven la MISMA orden.
   const [lineas, setLineas] = useState<LineaForm[]>([])
@@ -226,8 +230,20 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRowAfectando('ordenes_compra', orden.id)
     if (error) { notify({ variant: 'error', title: 'No se pudo', text: error.message }); return }
+    setDetalleId(null)
     onRefresh()
   }
+
+  // Cancelar cierra sin borrar lo escrito; no se cierra a mitad del guardado.
+  function cerrarForm() { if (!saving) { setShowForm(false); setEditId(null) } }
+
+  function abrirEdicion(orden: OrdenCompra) {
+    setEditId(orden.id)
+    setForm({ proveedor_id: orden.proveedor_id ?? '', proveedor_nombre: orden.proveedor_nombre, contrato_id: orden.contrato_id ?? '', concepto: orden.concepto, descripcion: orden.descripcion ?? '', monto_estimado: String(orden.monto_estimado ?? ''), fecha_entrega_esperada: orden.fecha_entrega_esperada ?? '', notas: orden.notas ?? '' })
+    setShowForm(true)
+  }
+
+  const fmtMonto = (n: number) => `${moneda} ${n.toLocaleString('es', { minimumFractionDigits: 2 })}`
 
   const botonVista = (v: 'ordenes' | 'seguimiento', texto: string) => (
     <button onClick={() => setVistaOc(v)} aria-pressed={vistaOc === v}
@@ -284,13 +300,188 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
         )}
       </div>
 
-      {/* Formulario */}
+      {importarEn && (
+        <ImportarLineasOrdenModal
+          orden={{ id: importarEn.id, numero: importarEn.numero ?? null, concepto: importarEn.concepto }}
+          monedaBase={moneda}
+          onClose={() => { setImportarEn(null); onRefresh() }}
+        />
+      )}
+
+      {seguirContrato && <ContratoSeguimientoModal contratoId={seguirContrato} onClose={() => setSeguirContrato(null)} />}
+      {seguirDe && <SeguimientoOrdenModal ordenId={seguirDe} monedaBase={moneda} onClose={() => setSeguirDe(null)} />}
+
+      {/* Lista: una tarjeta por orden. Pulsarla abre la ficha en ventana
+          (antes se desplegaba dentro de la tarjeta, en acordeón). */}
+      {filtradas.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🛒</div>
+          No hay órdenes de compra{filtroEstado ? ` en estado "${ESTADO_CFG[filtroEstado].label}"` : ''}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtradas.map((orden) => {
+            const cfg = ESTADO_CFG[orden.estado]
+            return (
+              <div key={orden.id} role="button" tabIndex={0} aria-label={orden.concepto}
+                onClick={() => setDetalleId(orden.id)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetalleId(orden.id) } }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: 'pointer', background: 'var(--at-surface)', border: `1px solid ${tint(cfg.color, 20)}`, borderRadius: 10, borderLeft: `4px solid ${cfg.color}` }}>
+                {/* El número REAL de la orden (el mismo en Contabilidad y en el seguimiento), no un contador por posición en la lista. */}
+                <div style={{ minWidth: 76, fontSize: 10, color: 'var(--at-ink-3)', fontWeight: 600, flexShrink: 0 }}>{orden.numero ?? 'Sin número'}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-ink)' }}>{orden.concepto}</div>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{orden.proveedor_nombre}</div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  {montoDe(orden) > 0 && (
+                    <div style={{ fontWeight: 700, fontSize: 13, color: cfg.color }}>{fmtMonto(montoDe(orden))}</div>
+                  )}
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', background: cfg.bg, color: cfg.color, borderRadius: 6 }}>{cfg.label}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Ficha en ventana (pantalla completa en el teléfono): datos y acciones
+          de la orden. Los pasos del ciclo (aprobar, emitir) y Editar van en el
+          pie; devolver, cancelar, eliminar e importar renglones, en el cuerpo. */}
+      {detalle && (() => {
+        const orden = detalle
+        const cfg = ESTADO_CFG[orden.estado]
+        const siguiente = cfg.next
+        const datos: { label: string; value: string; color?: string }[] = [
+          { label: orden.monto_estimado ? 'Monto estimado' : 'Total de los renglones', value: montoDe(orden) > 0 ? fmtMonto(montoDe(orden)) : '—', color: cfg.color },
+          { label: 'Monto real', value: orden.monto_real ? fmtMonto(orden.monto_real) : '—' },
+          { label: 'Entrega esperada', value: orden.fecha_entrega_esperada || '—' },
+          { label: 'Recibido', value: orden.estado === 'recibida' ? '✓ Sí' : orden.estado === 'recibida_parcial' ? 'Parcial' : '—', color: orden.estado === 'recibida' ? 'var(--at-success)' : undefined },
+          ...((orden.revision ?? 0) > 0 ? [{ label: 'Revisión', value: String(orden.revision) }] : []),
+        ]
+        const puedeDevolver = canEdit && permisos.puedeAprobarOrdenCompra && orden.estado === 'aprobada'
+        const puedeCancelar = canEdit && permisos.puedeCambiarEstadoPaso && (orden.estado === 'borrador' || orden.estado === 'aprobada')
+        const puedeBorrar = canEdit && orden.estado === 'borrador' && sePuedeEliminar(orden)
+        const puedeImportar = canCreate && orden.estado === 'borrador'
+        return (
+          <EditModal
+            title={orden.concepto}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '2px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', background: cfg.bg, color: cfg.color, borderRadius: 6 }}>{cfg.label}</span>
+                <span>{orden.numero ?? 'Sin número'}</span>
+                <span>· {orden.proveedor_nombre}</span>
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+                <button type="button" onClick={() => setDetalleId(null)}
+                  style={{ padding: '8px 14px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+                  Cerrar
+                </button>
+                <button type="button" onClick={() => setSeguirDe(orden.id)}
+                  style={{ padding: '8px 14px', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 13, background: 'var(--at-surface)' }}>
+                  Seguimiento
+                </button>
+                {canEdit && orden.estado === 'borrador' && (
+                  <button type="button" onClick={() => abrirEdicion(orden)}
+                    style={{ padding: '8px 14px', border: '1px solid var(--at-line-strong)', borderRadius: 7, cursor: 'pointer', fontSize: 13, background: 'var(--at-surface)', color: 'var(--at-ink)' }}>
+                    ✏️ Editar
+                  </button>
+                )}
+                {canEdit && siguiente && puedeAvanzar(siguiente) && (
+                  <button type="button" onClick={() => avanzarEstado(orden)}
+                    style={{ padding: '8px 16px', background: ESTADO_CFG[siguiente].bg, color: ESTADO_CFG[siguiente].color, border: `1px solid ${tint(ESTADO_CFG[siguiente].color, 40)}`, borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                    → {cfg.nextLabel}
+                  </button>
+                )}
+              </div>
+            }
+          >
+            {orden.contrato_id && (
+              <div data-testid={`orden-contrato-${orden.id}`} style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: 'var(--at-ink-2)' }}>
+                🤝 Amparada en un contrato{' '}
+                <button type="button" onClick={() => setSeguirContrato(orden.contrato_id ?? null)}
+                  style={{ border: 'none', background: 'none', color: 'var(--at-primary)', cursor: 'pointer', fontSize: 12, padding: 0, textDecoration: 'underline' }}>
+                  ver seguimiento del contrato
+                </button>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
+              {datos.map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: d.color ?? 'var(--at-ink)', overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+            {(orden.descripcion || orden.notas) && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 14, fontSize: 13, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>
+                {orden.descripcion && <div>{orden.descripcion}</div>}
+                {orden.notas && <div style={{ marginTop: orden.descripcion ? 6 : 0 }}>📝 {orden.notas}</div>}
+              </div>
+            )}
+            {(puedeImportar || puedeDevolver || puedeCancelar || puedeBorrar) && (
+              <div style={{ paddingTop: 12, borderTop: '1px solid var(--at-line)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Otras acciones</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {puedeImportar && (
+                    <button type="button" onClick={() => setImportarEn(orden)}
+                      style={{ padding: '6px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 12, background: 'var(--at-surface)' }}>
+                      Importar renglones
+                    </button>
+                  )}
+                  {puedeDevolver && (
+                    <button type="button" onClick={() => devolverABorrador(orden)}
+                      style={{ padding: '6px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 12, background: 'var(--at-surface-2)' }}>
+                      Devolver a borrador
+                    </button>
+                  )}
+                  {puedeCancelar && (
+                    <button type="button" onClick={() => cancelar(orden)}
+                      style={{ padding: '6px 12px', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 12, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>
+                      Cancelar OC
+                    </button>
+                  )}
+                  {puedeBorrar && (
+                    <button type="button" onClick={() => eliminar(orden)}
+                      style={{ padding: '6px 12px', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 12, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>
+                      🗑 Eliminar
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
+
+      {/* Formulario en ventana (antes se desplegaba entre los KPIs y la lista).
+          Va DESPUÉS de la ficha en el árbol porque Editar lo abre desde ella;
+          como se monta después, queda encima (EditModal apila por montaje). */}
       {showForm && (
-        <div style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 12, padding: 16, marginBottom: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: 'var(--at-primary-hover)' }}>
-            {editId ? 'Editar orden' : 'Nueva orden de compra'}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <EditModal
+          title={editId ? 'Editar orden' : 'Nueva orden de compra'}
+          size="lg"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <button type="button" onClick={cerrarForm} disabled={saving}
+              style={{ padding: '8px 14px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+              Cancelar
+            </button>
+            <button type="button" onClick={guardar} disabled={saving}
+              style={{ padding: '8px 18px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Guardando…' : 'Guardar como borrador'}
+            </button>
+          </>}
+        >
+          <div className="at-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
               {/* El proveedor se elige del CATÁLOGO COMPARTIDO por su id (nunca texto
                   libre) y solo aparecen los habilitados HOY en este proyecto: el
@@ -327,7 +518,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
               placeholder="Descripción breve de la compra"
               style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div className="at-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Fecha entrega esperada</label>
               <input type="date" value={form.fecha_entrega_esperada} onChange={e => setForm(f => ({ ...f, fecha_entrega_esperada: e.target.value }))}
@@ -341,7 +532,7 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
             </div>
           </div>
           {!editId && (
-            <div style={{ marginBottom: 10 }}>
+            <div>
               <LineasOrdenEditor
                 lineas={lineas} onChange={setLineas} projectId={proyectoId} proveedorId={form.proveedor_id || null}
                 monedaBase={moneda} insumos={insumos} cargandoInsumos={cargandoInsumos} minimo={0} titulo="Renglones (opcional)"
@@ -351,126 +542,9 @@ export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moned
               </p>
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={guardar} disabled={saving}
-              style={{ padding: '8px 18px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Guardando…' : 'Guardar como borrador'}
-            </button>
-            <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '8px 14px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
-      {importarEn && (
-        <ImportarLineasOrdenModal
-          orden={{ id: importarEn.id, numero: importarEn.numero ?? null, concepto: importarEn.concepto }}
-          monedaBase={moneda}
-          onClose={() => { setImportarEn(null); onRefresh() }}
-        />
-      )}
-
-      {seguirContrato && <ContratoSeguimientoModal contratoId={seguirContrato} onClose={() => setSeguirContrato(null)} />}
-      {seguirDe && <SeguimientoOrdenModal ordenId={seguirDe} monedaBase={moneda} onClose={() => setSeguirDe(null)} />}
-
-      {/* Lista */}
-      {filtradas.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0' }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🛒</div>
-          No hay órdenes de compra{filtroEstado ? ` en estado "${ESTADO_CFG[filtroEstado].label}"` : ''}
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtradas.map((orden) => {
-            const cfg = ESTADO_CFG[orden.estado]
-            const isOpen = expandida === orden.id
-            return (
-              <div key={orden.id} style={{ background: 'var(--at-surface)', border: `1px solid ${tint(cfg.color, 20)}`, borderRadius: 10, borderLeft: `4px solid ${cfg.color}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: 'pointer' }}
-                  onClick={() => setExpandida(isOpen ? null : orden.id)}>
-                  {/* El número REAL de la orden (el mismo en Contabilidad y en el seguimiento), no un contador por posición en la lista. */}
-                  <div style={{ minWidth: 76, fontSize: 10, color: 'var(--at-ink-3)', fontWeight: 600, flexShrink: 0 }}>{orden.numero ?? 'Sin número'}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-ink)' }}>{orden.concepto}</div>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{orden.proveedor_nombre}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {montoDe(orden) > 0 && (
-                      <div style={{ fontWeight: 700, fontSize: 13, color: cfg.color }}>{moneda} {montoDe(orden).toLocaleString('es', { minimumFractionDigits: 2 })}</div>
-                    )}
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', background: cfg.bg, color: cfg.color, borderRadius: 6 }}>{cfg.label}</span>
-                  </div>
-                  <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>{isOpen ? '▲' : '▼'}</span>
-                </div>
-
-                {isOpen && (
-                  <div style={{ padding: '0 14px 14px', borderTop: '1px solid var(--at-chip)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, margin: '10px 0', fontSize: 11, color: 'var(--at-ink-3)' }}>
-                      {orden.fecha_entrega_esperada && <div>Entrega esperada: <strong>{orden.fecha_entrega_esperada}</strong></div>}
-                      {orden.contrato_id && (
-                        <div data-testid={`orden-contrato-${orden.id}`}>
-                          Amparada en un contrato{' '}
-                          <button type="button" onClick={() => setSeguirContrato(orden.contrato_id ?? null)}
-                            style={{ border: 'none', background: 'none', color: 'var(--at-primary)', cursor: 'pointer', fontSize: 11, padding: 0, textDecoration: 'underline' }}>
-                            ver seguimiento del contrato
-                          </button>
-                        </div>
-                      )}
-                      {orden.estado === 'recibida' && <div>Recibido: <strong style={{ color: 'var(--at-success)' }}>✓</strong></div>}
-                      {orden.monto_real && <div>Monto real: <strong style={{ color: 'var(--at-ink)' }}>{moneda} {orden.monto_real.toFixed(2)}</strong></div>}
-                    </div>
-                    {orden.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 10 }}>📝 {orden.notas}</div>}
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <button onClick={() => setSeguirDe(orden.id)}
-                        style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
-                        Seguimiento
-                      </button>
-                      {canCreate && orden.estado === 'borrador' && (
-                        <button onClick={() => setImportarEn(orden)}
-                          style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface)' }}>
-                          Importar renglones
-                        </button>
-                      )}
-                      {canEdit && permisos.puedeAprobarOrdenCompra && orden.estado === 'aprobada' && (
-                        <button onClick={() => devolverABorrador(orden)}
-                          style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
-                          Devolver a borrador
-                        </button>
-                      )}
-                      {canEdit && cfg.next && puedeAvanzar(cfg.next) && (
-                        <button onClick={() => avanzarEstado(orden)}
-                          style={{ padding: '5px 12px', background: ESTADO_CFG[cfg.next!].bg, color: ESTADO_CFG[cfg.next!].color, border: `1px solid ${tint(ESTADO_CFG[cfg.next!].color, 40)}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-                          → {cfg.nextLabel}
-                        </button>
-                      )}
-                      {canEdit && orden.estado === 'borrador' && (
-                        <button onClick={() => { setEditId(orden.id); setForm({ proveedor_id: orden.proveedor_id ?? '', proveedor_nombre: orden.proveedor_nombre, contrato_id: orden.contrato_id ?? '', concepto: orden.concepto, descripcion: orden.descripcion ?? '', monto_estimado: String(orden.monto_estimado ?? ''), fecha_entrega_esperada: orden.fecha_entrega_esperada ?? '', notas: orden.notas ?? '' }); setShowForm(true) }}
-                          style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
-                          ✏️ Editar
-                        </button>
-                      )}
-                      {canEdit && permisos.puedeCambiarEstadoPaso && (orden.estado === 'borrador' || orden.estado === 'aprobada') && (
-                        <button onClick={() => cancelar(orden)}
-                          style={{ padding: '5px 12px', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>
-                          Cancelar OC
-                        </button>
-                      )}
-                      {canEdit && orden.estado === 'borrador' && sePuedeEliminar(orden) && (
-                        <button onClick={() => eliminar(orden)}
-                          style={{ padding: '5px 12px', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>
-                          🗑 Eliminar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }
