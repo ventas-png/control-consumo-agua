@@ -473,6 +473,35 @@ function declaraciones(...mapas: (Record<string, string> | null)[]): string {
     .join(' ')
 }
 
+/** index.css: --at-border-organic = color-mix(in srgb, var(--at-primary) 16%, transparent). */
+const BORDE_ORGANICO_MEZCLA = 0.16
+/** Navegadores SIN color-mix (Safari/iOS < 16.2, Chrome < 111). */
+const SIN_COLOR_MIX = '@supports not (color: color-mix(in srgb, red 50%, blue))'
+
+/**
+ * Respaldo SÓLIDO de --at-border-organic para navegadores sin color-mix, o null
+ * sin color de marca custom:
+ * - claro: el primario al 16% sobre --at-bg, la misma receta del #D0D2CB de
+ *   index.css.
+ * - oscuro: el primario oscuro al 16% sobre la superficie oscura, que es lo que
+ *   el color-mix translúcido pinta sobre una tarjeta. Sobre --at-bg, más oscuro,
+ *   el borde casi no se distinguiría de la tarjeta.
+ *
+ * Va dentro de `@supports not (…)` y NO como doble declaración (hex y luego
+ * color-mix, como en index.css): una custom property acepta cualquier valor, así
+ * que el navegador viejo se queda con el color-mix y el borde que la usa se
+ * anula (sin borde). Los navegadores modernos ignoran el bloque y conservan el
+ * color-mix translúcido de index.css, que ya sigue a --at-primary.
+ */
+export function respaldoBordeOrganico(primaryColor: string | null | undefined): { claro: string; oscuro: string } | null {
+  const color = normalizarColorHex(primaryColor)
+  if (!color) return null
+  return {
+    claro: mezclar(color, LIGHT_BG, BORDE_ORGANICO_MEZCLA),
+    oscuro: mezclar(derivarVariablesMarcaOscuro(color).primary, DARK_SURFACE, BORDE_ORGANICO_MEZCLA),
+  }
+}
+
 /**
  * Hoja de estilos con los colores de marca para AMBOS temas, o null si no hay
  * ningún color custom (el caller quita la hoja → defaults de src/index.css).
@@ -481,7 +510,9 @@ function declaraciones(...mapas: (Record<string, string> | null)[]): string {
  * salvo [data-theme="light"], y [data-theme="dark"] manual) con `:root:root`
  * para tener MÁS especificidad que los de la hoja base: ganan sin depender del
  * orden de inserción y, a diferencia de un style inline en <html>, el bloque
- * dark sigue ganando al claro cuando el tema es oscuro.
+ * dark sigue ganando al claro cuando el tema es oscuro. Con color de marca, una
+ * última línea añade el respaldo sólido de --at-border-organic (ver
+ * respaldoBordeOrganico) sólo para navegadores sin color-mix.
  */
 export function hojaEstilosMarca(
   primaryColor: string | null | undefined,
@@ -490,9 +521,19 @@ export function hojaEstilosMarca(
   const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor))
   const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor))
   if (!claro) return null
-  return [
+  const lineas = [
     `:root:root { ${claro} }`,
     `@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) { ${oscuro} } }`,
     `:root:root[data-theme="dark"] { ${oscuro} }`,
-  ].join('\n')
+  ]
+  const borde = respaldoBordeOrganico(primaryColor)
+  if (borde) {
+    const c = `--at-border-organic: ${borde.claro};`, o = `--at-border-organic: ${borde.oscuro};`
+    lineas.push(
+      `${SIN_COLOR_MIX} { :root:root { ${c} } ` +
+        `@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) { ${o} } } ` +
+        `:root:root[data-theme="dark"] { ${o} } }`,
+    )
+  }
+  return lineas.join('\n')
 }

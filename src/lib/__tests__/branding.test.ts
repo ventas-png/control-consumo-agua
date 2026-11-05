@@ -6,7 +6,7 @@ import {
   estilosAccent, estilosAccentOscuro, hojaEstilosMarca,
   DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_BG, DARK_SURFACE, DARK_MIN_CONTRASTE,
   LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
-  derivarVariablesAccent, derivarVariablesAccentOscuro,
+  derivarVariablesAccent, derivarVariablesAccentOscuro, respaldoBordeOrganico,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -519,6 +519,53 @@ describe('hojaEstilosMarca', () => {
     const css = hojaEstilosMarca(null, '#00ff00')!
     expect(css).toContain('--at-accent: #00ff00;')
     expect(css).not.toContain('--at-primary')
+  })
+})
+
+// ─── Respaldo de --at-border-organic para navegadores sin color-mix ──────────
+// index.css define --at-border-organic como color-mix(--at-primary 16%,
+// transparent), que ya sigue a la marca. Sin color-mix (Safari/iOS < 16.2,
+// Chrome < 111) hace falta un hex sólido, dentro de @supports not (…): una doble
+// declaración en una custom property no hace de respaldo.
+describe('respaldoBordeOrganico / bloque @supports not (color-mix)', () => {
+  it('sin color de marca → null', () => {
+    expect(respaldoBordeOrganico(null)).toBeNull()
+    expect(respaldoBordeOrganico('rojo')).toBeNull()
+  })
+
+  it('con el color por defecto reproduce el #D0D2CB de index.css (misma receta: 16% sobre --at-bg)', () => {
+    expect(distanciaRgb(respaldoBordeOrganico(DEFAULT_BRAND_COLOR)!.claro, '#D0D2CB')).toBeLessThan(3)
+  })
+
+  it.each(MUESTRAS)('%s → claro y oscuro son bordes visibles sobre su tarjeta', (c) => {
+    const r = respaldoBordeOrganico(c)!
+    // (Con marca blanca el color-mix moderno sobre blanco ya es invisible; el respaldo da algo más.)
+    expect(contraste(r.claro, '#ffffff')).toBeGreaterThan(1.1)
+    expect(contraste(r.oscuro, DARK_SURFACE)).toBeGreaterThan(1.1)
+    expect(L(r.oscuro)).toBeLessThan(L(r.claro))
+  })
+
+  it('el oscuro es lo que el color-mix translúcido pinta sobre una tarjeta oscura', () => {
+    const pd = derivarVariablesMarcaOscuro('#7c3aed').primary
+    expect(respaldoBordeOrganico('#7c3aed')!.oscuro).toBe(mezclar(pd, DARK_SURFACE, 0.16))
+  })
+
+  it('la hoja con marca añade el bloque sólo para navegadores sin color-mix, con ambos temas', () => {
+    const css = hojaEstilosMarca('#7c3aed', null)!
+    const lineas = css.split('\n')
+    const r = respaldoBordeOrganico('#7c3aed')!
+    expect(lineas).toHaveLength(4)
+    const bloque = lineas[3]
+    expect(bloque.startsWith('@supports not (color: color-mix(in srgb, red 50%, blue)) {')).toBe(true)
+    expect(bloque).toContain(`:root:root { --at-border-organic: ${r.claro}; }`)
+    expect(bloque).toContain(`@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) { --at-border-organic: ${r.oscuro}; } }`)
+    expect(bloque).toContain(`:root:root[data-theme="dark"] { --at-border-organic: ${r.oscuro}; }`)
+    // Fuera del bloque NO se toca: los navegadores modernos conservan el color-mix de index.css.
+    for (const l of lineas.slice(0, 3)) expect(l).not.toContain('--at-border-organic')
+  })
+
+  it('sólo acento custom → sin bloque (el borde depende del primario, que queda en su default)', () => {
+    expect(hojaEstilosMarca(null, '#0e7490')).not.toContain('@supports')
   })
 })
 
