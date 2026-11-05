@@ -10,7 +10,7 @@ import {
   LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
   derivarVariablesAccent, derivarVariablesAccentOscuro, respaldosSinColorMix,
   derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO, DATOS_CSS_VARS, DATA_NEGATIVE_DEFECTO, NAV_INK,
-  navAccentDesdeMarca, NAV_BG,
+  navAccentDesdeMarca, NAV_BG, navGrisesDesdeMarca, NAV_GRISES,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -82,14 +82,14 @@ describe('estilosMarca', () => {
     expect(estilosMarca(undefined)).toBeNull()
     expect(estilosMarca('rojo')).toBeNull()
   })
-  it('color válido → mapa con las 30 CSS vars de marca (tonos + nav + estados + datos)', () => {
+  it('color válido → mapa con las 33 CSS vars de marca (tonos + nav + estados + datos)', () => {
     const m = estilosMarca('#1B3B36')
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
     expect(Object.keys(m!)).toEqual([
       '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
       '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
-      '--at-surface-tint', '--at-nav-bg', '--at-nav-ink',
+      '--at-surface-tint', '--at-nav-bg', '--at-nav-ink', '--at-nav-ink-2', '--at-nav-ink-3', '--at-nav-ink-4',
       '--at-success', '--at-success-tint', '--at-success-border', '--at-success-strong',
       '--at-warning', '--at-warning-tint', '--at-warning-border', '--at-warning-strong',
       '--at-danger', '--at-danger-tint', '--at-danger-border', '--at-danger-strong',
@@ -880,6 +880,63 @@ describe('--at-nav-ink desde la marca', () => {
 
   it('marca gris → blanco roto neutro', () => {
     expect(croma(derivarVariablesMarca('#808080').navInk)).toBe(0)
+  })
+})
+
+// --at-nav-ink-2 / -3 / -4: los grises del rail (texto bajo el puntero, ítems
+// inactivos, iconos y encabezados de grupo), teñidos del tono de la marca.
+describe('--at-nav-ink-2 / -3 / -4 (grises del rail) desde la marca', () => {
+  const GRISES = ['ink2', 'ink3', 'ink4'] as const
+
+  it('index.css los define con los valores de siempre y el Sidebar ya no tiene los grises fijos', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    expect(css).toMatch(new RegExp(`--at-nav-ink-2:\\s*${NAV_GRISES.ink2};`))
+    expect(css).toMatch(new RegExp(`--at-nav-ink-3:\\s*${NAV_GRISES.ink3};`))
+    expect(css).toMatch(new RegExp(`--at-nav-ink-4:\\s*${NAV_GRISES.ink4};`))
+    const sidebar = readFileSync(resolve(process.cwd(), 'src/components/layout/Sidebar.tsx'), 'utf8')
+    for (const g of Object.values(NAV_GRISES)) expect(sidebar.toUpperCase()).not.toContain(g.toUpperCase())
+    for (const v of ['--at-nav-ink-2', '--at-nav-ink-3', '--at-nav-ink-4']) expect(sidebar).toContain(`var(${v})`)
+  })
+
+  it('con la marca por defecto quedan prácticamente iguales a los de index.css', () => {
+    const g = navGrisesDesdeMarca(DEFAULT_BRAND_COLOR)
+    for (const k of GRISES) expect(distanciaRgb(g[k], NAV_GRISES[k]), k).toBeLessThan(10)
+  })
+
+  it.each(MUESTRAS)('%s → iguales en ambos temas, legibles y con la jerarquía de siempre', (c) => {
+    const claro = derivarVariablesMarca(c), oscuro = derivarVariablesMarcaOscuro(c)
+    const g = navGrisesDesdeMarca(c)
+    expect([claro.navInk2, claro.navInk3, claro.navInk4]).toEqual([g.ink2, g.ink3, g.ink4])
+    expect([oscuro.navInk2, oscuro.navInk3, oscuro.navInk4]).toEqual([g.ink2, g.ink3, g.ink4])
+    const k = (x: string) => contraste(x, claro.navBg)
+    // Del más legible al más apagado: --at-nav-ink > -2 > -3 > -4, y todos son texto.
+    expect(k(claro.navInk)).toBeGreaterThan(k(g.ink2))
+    expect(k(g.ink2)).toBeGreaterThan(k(g.ink3))
+    expect(k(g.ink3)).toBeGreaterThan(k(g.ink4))
+    expect(k(g.ink4)).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+    // Tan legibles como los por defecto, en proporción a lo que se lee --at-nav-ink.
+    const escala = Math.min(1, k(claro.navInk) / contraste(NAV_INK, NAV_BG))
+    for (const x of GRISES) expect(k(g[x]), x).toBeGreaterThanOrEqual(contraste(NAV_GRISES[x], NAV_BG) * escala - 0.01)
+  })
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → se tiñen del tono de la marca', (c) => {
+    const g = navGrisesDesdeMarca(c)
+    for (const x of ['ink3', 'ink4'] as const) expect(distTono(tono(g[x]), tono(c)), `${x} ${g[x]}`).toBeLessThan(12)
+    for (const x of GRISES) expect(croma(g[x]), x).toBeLessThan(70)
+  })
+
+  it('marca gris → grises neutros', () => {
+    const g = navGrisesDesdeMarca('#808080')
+    for (const x of GRISES) expect(croma(g[x]), x).toBe(0)
+  })
+
+  it('la hoja los lleva en los tres selectores, con el mismo valor', () => {
+    const g = navGrisesDesdeMarca('#7c3aed')
+    for (const l of hojaEstilosMarca('#7c3aed', null)!.split('\n').slice(0, 3)) {
+      expect(l).toContain(`--at-nav-ink-2: ${g.ink2};`)
+      expect(l).toContain(`--at-nav-ink-3: ${g.ink3};`)
+      expect(l).toContain(`--at-nav-ink-4: ${g.ink4};`)
+    }
   })
 })
 

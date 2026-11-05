@@ -428,7 +428,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
             : isHovered
             ? 'rgba(255,255,255,0.05)'
             : 'transparent',
-          color: isActive ? 'white' : isHovered ? '#DCE6E0' : '#B4C5BB',
+          color: isActive ? 'white' : isHovered ? 'var(--at-nav-ink-2)' : 'var(--at-nav-ink-3)',
           fontWeight: isActive ? 600 : 400,
           fontSize: '13.5px',
           letterSpacing: isActive ? '-0.1px' : '0',
@@ -449,7 +449,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
               : isHovered
               ? 'rgba(255,255,255,0.07)'
               : 'transparent',
-            color: isActive ? 'white' : isHovered ? '#B4C5BB' : '#8FA398',
+            color: isActive ? 'white' : isHovered ? 'var(--at-nav-ink-3)' : 'var(--at-nav-ink-4)',
             transition: 'all 0.14s ease',
           }}
         >
@@ -510,7 +510,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
             : isHovered
             ? 'rgba(255,255,255,0.05)'
             : 'transparent',
-          color: isActive ? 'white' : isHovered ? '#DCE6E0' : '#B4C5BB',
+          color: isActive ? 'white' : isHovered ? 'var(--at-nav-ink-2)' : 'var(--at-nav-ink-3)',
           fontWeight: isActive ? 600 : 400,
           fontSize: '13.5px',
           letterSpacing: isActive ? '-0.1px' : '0',
@@ -531,7 +531,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
               : isHovered
               ? 'rgba(255,255,255,0.07)'
               : 'transparent',
-            color: isActive ? 'white' : isHovered ? '#B4C5BB' : '#8FA398',
+            color: isActive ? 'white' : isHovered ? 'var(--at-nav-ink-3)' : 'var(--at-nav-ink-4)',
             transition: 'all 0.14s ease',
           }}
           aria-hidden="true"
@@ -584,7 +584,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
             <div style={{ color: 'var(--at-nav-ink)', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
               AdministraTodo
             </div>
-            <div style={{ color: '#8FA398', fontSize: '11px', marginTop: '2px', letterSpacing: '0.02em' }}>
+            <div style={{ color: 'var(--at-nav-ink-4)', fontSize: '11px', marginTop: '2px', letterSpacing: '0.02em' }}>
               Agua + Condominios
             </div>
           </div>
@@ -628,7 +628,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
-                  color: isHG ? '#8FA398' : '#8FA398',
+                  color: isHG ? 'var(--at-nav-ink-4)' : 'var(--at-nav-ink-4)',
                   fontSize: '11px',
                   fontWeight: 700,
                   letterSpacing: '0.1em',
@@ -726,7 +726,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
           </div>
           <div style={{ overflow: 'hidden', flex: 1 }}>
             <div style={{
-              color: '#DCE6E0',
+              color: 'var(--at-nav-ink-2)',
               fontWeight: 600,
               fontSize: '13px',
               whiteSpace: 'nowrap',
@@ -736,11 +736,11 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
             }}>
               {currentUser.name}
             </div>
-            <div style={{ color: '#8FA398', fontSize: '11px', marginTop: '1px' }}>
+            <div style={{ color: 'var(--at-nav-ink-4)', fontSize: '11px', marginTop: '1px' }}>
               {getDisplayRoleLabel(currentUser)}
             </div>
           </div>
-          <svg width="13" height="13" fill="none" stroke="#8FA398" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ flexShrink: 0, color: 'var(--at-nav-ink-4)' }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
@@ -760,7 +760,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
             borderRadius: '8px',
             cursor: 'pointer',
             background: hoveredLogout ? 'rgba(239,68,68,0.1)' : 'transparent',
-            color: hoveredLogout ? 'var(--at-danger)' : '#B4C5BB',
+            color: hoveredLogout ? 'var(--at-danger)' : 'var(--at-nav-ink-3)',
             fontSize: '13px',
             fontWeight: 500,
             transition: 'all 0.14s ease',

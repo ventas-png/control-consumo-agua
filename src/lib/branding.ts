@@ -175,6 +175,12 @@ export interface VariablesMarca {
   navBg: string
   /** --at-nav-ink: texto sobre --at-nav-bg (Sidebar, encabezados de SuperAdmin). */
   navInk: string
+  /** --at-nav-ink-2: texto de un ítem del rail bajo el puntero y nombre del usuario. */
+  navInk2: string
+  /** --at-nav-ink-3: texto de los ítems inactivos, icono bajo el puntero, «Salir». */
+  navInk3: string
+  /** --at-nav-ink-4: iconos inactivos, encabezados de grupo y subtítulos del rail. */
+  navInk4: string
 }
 
 /** Fondo del tema claro (= --at-bg en src/index.css). */
@@ -206,6 +212,41 @@ export function navInkDesdeMarca(hex: string): string {
 
 /** --at-nav-bg por defecto (index.css). */
 export const NAV_BG = '#102622'
+
+/**
+ * Grises del rail por defecto (index.css: --at-nav-ink-2 / -3 / -4), del más claro al
+ * más apagado: texto bajo el puntero, texto de los ítems inactivos y sus iconos /
+ * encabezados de grupo. Son grises verdosos (HSL ~145°, saturación 0.10–0.17).
+ */
+export const NAV_GRISES = { ink2: '#DCE6E0', ink3: '#B4C5BB', ink4: '#8FA398' } as const
+
+/**
+ * Grises del rail (--at-nav-ink-2 / -3 / -4) desde la marca. Cada uno toma
+ * el TONO de la marca, conserva la luminosidad HSL del por defecto y escala su
+ * saturación por la de la marca, acotada a 0.3 para que sigan siendo grises (marcas
+ * grises → grises neutros). Se aclaran si hace falta para leerse sobre el fondo del
+ * rail de la misma marca como el por defecto sobre #102622 (≈ 12.4 / 8.8 / 5.9:1),
+ * escalado por lo que se lee --at-nav-ink de esa marca respecto del por defecto (así
+ * ninguno supera a --at-nav-ink y se conserva la jerarquía) y nunca por debajo de
+ * 4.5:1 (también son texto).
+ */
+export function navGrisesDesdeMarca(hex: string): { ink2: string; ink3: string; ink4: string } {
+  const [h, s] = rgbAHsl(parseRgb(hex))
+  const fondo = navBgDesdeMarca(hex)
+  const escala = Math.min(1, contraste(navInkDesdeMarca(hex), fondo) / contraste(NAV_INK, NAV_BG))
+  const gris = (def: string) => {
+    const [, sDef, lDef] = rgbAHsl(parseRgb(def))
+    const sat = s < SAT_GRIS ? 0 : Math.min((sDef * s) / MARCA_SAT, 0.3)
+    const minimo = Math.max(AA, contraste(def, NAV_BG) * escala)
+    return aclararHasta(hslAHex([h, sat, lDef]), (c) => contraste(c, fondo) >= minimo)
+  }
+  return { ink2: gris(NAV_GRISES.ink2), ink3: gris(NAV_GRISES.ink3), ink4: gris(NAV_GRISES.ink4) }
+}
+
+function grisesNav(hex: string): Pick<VariablesMarca, 'navInk2' | 'navInk3' | 'navInk4'> {
+  const g = navGrisesDesdeMarca(hex)
+  return { navInk2: g.ink2, navInk3: g.ink3, navInk4: g.ink4 }
+}
 
 /**
  * Ítem activo del rail: el punto (--at-nav-accent), su halo (--at-nav-accent-glow) y el
@@ -302,6 +343,7 @@ export function derivarVariablesMarca(primary: string | null | undefined): Varia
     surfaceTint: mezclar(base, LIGHT_BG, SURFACE_TINT_MEZCLA_CLARO),
     navBg: navBgDesdeMarca(base),
     navInk: navInkDesdeMarca(base),
+    ...grisesNav(base),
   }
 }
 
@@ -336,6 +378,7 @@ export function derivarVariablesMarcaOscuro(primary: string | null | undefined):
     // El rail es oscuro en ambos temas: mismos valores que en claro.
     navBg: navBgDesdeMarca(base),
     navInk: navInkDesdeMarca(base),
+    ...grisesNav(base),
   }
 }
 
@@ -343,7 +386,8 @@ export function derivarVariablesMarcaOscuro(primary: string | null | undefined):
 const TONOS_MARCA_VARS = [
   '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
   '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
-  '--at-surface-tint', '--at-nav-bg', '--at-nav-ink',
+  '--at-surface-tint', '--at-nav-bg', '--at-nav-ink', '--at-nav-ink-2', '--at-nav-ink-3',
+  '--at-nav-ink-4',
 ] as const
 
 /** Tokens de estado que también siguen a la marca (ver derivarEstados). */
@@ -549,6 +593,9 @@ function varsMarca(v: VariablesMarca): Record<(typeof TONOS_MARCA_VARS)[number],
     '--at-surface-tint': v.surfaceTint,
     '--at-nav-bg': v.navBg,
     '--at-nav-ink': v.navInk,
+    '--at-nav-ink-2': v.navInk2,
+    '--at-nav-ink-3': v.navInk3,
+    '--at-nav-ink-4': v.navInk4,
   }
 }
 
