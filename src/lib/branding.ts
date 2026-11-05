@@ -290,8 +290,11 @@ export const ESTADO_CSS_VARS = [
   '--at-info', '--at-info-tint', '--at-info-border', '--at-info-strong',
 ] as const
 
-/** CSS vars de tema que el branding sobreescribe (en orden): tonos de marca + estados. */
-export const BRAND_CSS_VARS = [...TONOS_MARCA_VARS, ...ESTADO_CSS_VARS] as const
+/** Tokens de datos que siguen a la marca: el color de las variaciones negativas (KPIs). */
+export const DATOS_CSS_VARS = ['--at-data-negative'] as const
+
+/** CSS vars de tema que el branding sobreescribe (en orden): tonos de marca + estados + datos. */
+export const BRAND_CSS_VARS = [...TONOS_MARCA_VARS, ...ESTADO_CSS_VARS, ...DATOS_CSS_VARS] as const
 
 // ─── Estados success / warning / danger / info ──────────────────────────────
 // success, warning y danger tienen significado propio (~1600 / ~1400 / ~1800 usos:
@@ -329,6 +332,11 @@ export const PALETAS_ESTADO_DEFECTO: Record<Estado, { claro: PaletaEstado; oscur
     oscuro: { base: '#60a5fa', tint: '#0f1f33', border: '#1e3a5f', strong: '#93c5fd' },
   },
 }
+/**
+ * --at-data-negative por defecto (index.css: claro / dark): el rojo de las variaciones
+ * negativas de los KPIs (StatTile). Es texto sobre las tarjetas.
+ */
+export const DATA_NEGATIVE_DEFECTO = { claro: '#B23A3A', oscuro: '#E8736B' } as const
 /** HSL de la marca por defecto (#1B3B36): referencia para escalar saturación / luminosidad. */
 const MARCA_SAT = 0.37
 const MARCA_LUM = 0.17
@@ -415,6 +423,9 @@ function paletaEstado(def: { claro: PaletaEstado; oscuro: PaletaEstado }, giro: 
  *   marca, salvo que la marca sea gris o negra (sin tono: HSL daría 0° = rojo) o que
  *   su tono choque con danger / warning / success (TONOS_ESTADO): entonces queda azul.
  * Con la marca por defecto las cuatro paletas salen idénticas a index.css.
+ * Incluye también --at-data-negative (DATOS_CSS_VARS): conserva su rojo como danger,
+ * con la misma saturación / luminosidad ajustadas, y se lee como texto sobre las
+ * tarjetas (≥ 4.5:1, o lo que ya da el valor por defecto si es menos).
  */
 export function derivarEstados(primary: string | null | undefined): { claro: Record<string, string>; oscuro: Record<string, string> } {
   const marca = normalizarColorHex(primary) ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
@@ -435,6 +446,12 @@ export function derivarEstados(primary: string | null | undefined): { claro: Rec
       })
     }
   }
+  // --at-data-negative: rojo como danger; texto sobre las tarjetas (blanco / superficie dark).
+  const dn = DATA_NEGATIVE_DEFECTO
+  vars.claro['--at-data-negative'] = oscurecerHslHasta(transformar(dn.claro, 0, k, dl), (x) =>
+    contraste(x, '#ffffff') >= Math.min(AA, contraste(dn.claro, '#ffffff')))
+  vars.oscuro['--at-data-negative'] = aclararHasta(transformar(dn.oscuro, 0, k, dl), (x) =>
+    contraste(x, DARK_SURFACE) >= Math.min(AA, contraste(dn.oscuro, DARK_SURFACE)))
   return vars
 }
 

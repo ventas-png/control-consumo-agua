@@ -9,7 +9,7 @@ import {
   DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_BG, DARK_SURFACE, DARK_MIN_CONTRASTE,
   LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
   derivarVariablesAccent, derivarVariablesAccentOscuro, respaldosSinColorMix,
-  derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO,
+  derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO, DATOS_CSS_VARS, DATA_NEGATIVE_DEFECTO,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -81,7 +81,7 @@ describe('estilosMarca', () => {
     expect(estilosMarca(undefined)).toBeNull()
     expect(estilosMarca('rojo')).toBeNull()
   })
-  it('color válido → mapa con las 26 CSS vars de marca (tonos + estados)', () => {
+  it('color válido → mapa con las 27 CSS vars de marca (tonos + estados + datos)', () => {
     const m = estilosMarca('#1B3B36')
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
@@ -93,6 +93,7 @@ describe('estilosMarca', () => {
       '--at-warning', '--at-warning-tint', '--at-warning-border', '--at-warning-strong',
       '--at-danger', '--at-danger-tint', '--at-danger-border', '--at-danger-strong',
       '--at-info', '--at-info-tint', '--at-info-border', '--at-info-strong',
+      '--at-data-negative',
     ])
     expect(Object.keys(m!)).toEqual([...BRAND_CSS_VARS])
   })
@@ -641,10 +642,11 @@ describe('derivarEstados — success / warning / danger / info desde la marca', 
     }
   })
 
-  it('da las 16 vars de estado en claro y en oscuro', () => {
+  it('da las 16 vars de estado + --at-data-negative, en claro y en oscuro', () => {
     const e = derivarEstados('#7c3aed')
-    expect(Object.keys(e.claro).sort()).toEqual([...ESTADO_CSS_VARS].sort())
-    expect(Object.keys(e.oscuro).sort()).toEqual([...ESTADO_CSS_VARS].sort())
+    const esperadas = [...ESTADO_CSS_VARS, ...DATOS_CSS_VARS].sort()
+    expect(Object.keys(e.claro).sort()).toEqual(esperadas)
+    expect(Object.keys(e.oscuro).sort()).toEqual(esperadas)
   })
 
   it('con el color por defecto, las cuatro paletas salen idénticas a las de index.css', () => {
@@ -735,6 +737,43 @@ describe('derivarEstados — success / warning / danger / info desde la marca', 
       expect(manual).toContain(`${k}: ${e.oscuro[k]};`)
     }
     expect(hojaEstilosMarca(null, '#0e7490')).not.toContain('--at-danger')
+  })
+})
+
+// --at-data-negative: el rojo de las variaciones negativas de los KPIs (StatTile).
+describe('--at-data-negative desde la marca', () => {
+  it('el valor por defecto es el de src/index.css (claro y dark)', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    const raiz = css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {')))
+    const darkManual = css.slice(css.indexOf('[data-theme="dark"] {'), css.indexOf('}', css.indexOf('[data-theme="dark"] {')))
+    const v = (b: string) => /--at-data-negative:\s*(#[0-9a-fA-F]{6})/.exec(b)?.[1]
+    expect(v(raiz)).toBe(DATA_NEGATIVE_DEFECTO.claro)
+    expect(v(darkManual)).toBe(DATA_NEGATIVE_DEFECTO.oscuro)
+  })
+
+  it('con la marca por defecto sale igual que en index.css', () => {
+    const d = derivarEstados(DEFAULT_BRAND_COLOR)
+    expect(distanciaRgb(d.claro['--at-data-negative'], DATA_NEGATIVE_DEFECTO.claro)).toBeLessThanOrEqual(2)
+    expect(distanciaRgb(d.oscuro['--at-data-negative'], DATA_NEGATIVE_DEFECTO.oscuro)).toBeLessThanOrEqual(2)
+  })
+
+  it.each(MUESTRAS)('%s → sigue siendo rojo y se lee como texto sobre las tarjetas en ambos temas', (c) => {
+    const d = derivarEstados(c)
+    for (const t of TEMAS) {
+      expect(distTono(tono(d[t]['--at-data-negative']), tono(DATA_NEGATIVE_DEFECTO[t])), `${t} ${d[t]['--at-data-negative']}`).toBeLessThan(6)
+    }
+    expect(contraste(d.claro['--at-data-negative'], '#ffffff')).toBeGreaterThanOrEqual(4.5)
+    expect(contraste(d.oscuro['--at-data-negative'], DARK_SURFACE)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('la saturación sigue a la de la marca y la hoja lo lleva en claro y oscuro', () => {
+    expect(croma(derivarEstados('#5f6b66').claro['--at-data-negative'])).toBeLessThan(croma(derivarEstados('#7c3aed').claro['--at-data-negative']))
+    const css = hojaEstilosMarca('#7c3aed', null)!
+    const [claro, auto, manual] = css.split('\n')
+    const e = derivarEstados('#7c3aed')
+    expect(claro).toContain(`--at-data-negative: ${e.claro['--at-data-negative']};`)
+    expect(auto).toContain(`--at-data-negative: ${e.oscuro['--at-data-negative']};`)
+    expect(manual).toContain(`--at-data-negative: ${e.oscuro['--at-data-negative']};`)
   })
 })
 
