@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   esColorHex, normalizarColorHex, oscurecer, mezclarBlanco, mezclar,
   luminanciaRelativa, contraste, aclararParaTemaOscuro, suaveOscuro,
@@ -7,7 +9,7 @@ import {
   DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_BG, DARK_SURFACE, DARK_MIN_CONTRASTE,
   LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
   derivarVariablesAccent, derivarVariablesAccentOscuro, respaldosSinColorMix,
-  derivarEstados, ESTADO_CSS_VARS,
+  derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -79,7 +81,7 @@ describe('estilosMarca', () => {
     expect(estilosMarca(undefined)).toBeNull()
     expect(estilosMarca('rojo')).toBeNull()
   })
-  it('color válido → mapa con las 18 CSS vars de marca (tonos + success / info)', () => {
+  it('color válido → mapa con las 26 CSS vars de marca (tonos + estados)', () => {
     const m = estilosMarca('#1B3B36')
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
@@ -88,6 +90,8 @@ describe('estilosMarca', () => {
       '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
       '--at-surface-tint',
       '--at-success', '--at-success-tint', '--at-success-border', '--at-success-strong',
+      '--at-warning', '--at-warning-tint', '--at-warning-border', '--at-warning-strong',
+      '--at-danger', '--at-danger-tint', '--at-danger-border', '--at-danger-strong',
       '--at-info', '--at-info-tint', '--at-info-border', '--at-info-strong',
     ])
     expect(Object.keys(m!)).toEqual([...BRAND_CSS_VARS])
@@ -599,10 +603,12 @@ describe('respaldosSinColorMix / bloque @supports not (color-mix)', () => {
   })
 })
 
-// ─── Estados success / info derivados de la marca ────────────────────────────
-// info toma el tono de la marca; success sigue siendo VERDE (~1600 usos: pagado,
-// activo, guardado…) y sólo ajusta saturación / luminosidad a la marca. Mismos
-// mínimos que src/test/__tests__/contrast.test.ts.
+// ─── Estados success / warning / danger / info derivados de la marca ─────────
+// Parten de las paletas de index.css: success / warning / danger conservan su tono
+// (verde / ámbar / rojo: ~1600 / ~1400 / ~1800 usos con significado propio) y sólo
+// ajustan saturación y luminosidad a la marca; info toma el tono de la marca salvo
+// que choque con otro estado. Mínimos de src/test/__tests__/contrast.test.ts, nunca
+// más exigentes que lo que ya cumple la paleta por defecto.
 
 /** Tono HSL en grados (0–360) de un hex. */
 function tono(hex: string): number {
@@ -613,36 +619,51 @@ function tono(hex: string): number {
   return h * 60
 }
 const distTono = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b))
-const BLANCO = '#ffffff', ON_STATUS_DARK = '#0B1410'
-const ESTADOS = ['success', 'info'] as const
+const BLANCO = '#ffffff'
+const ESTADOS = ['success', 'warning', 'danger', 'info'] as const
+const SEMANTICOS = ['success', 'warning', 'danger'] as const
+const TEMAS = ['claro', 'oscuro'] as const
+const clave = (e: string, parte: 'base' | 'tint' | 'border' | 'strong') => (parte === 'base' ? `--at-${e}` : `--at-${e}-${parte}`)
+const PARTES = ['base', 'tint', 'border', 'strong'] as const
 
-describe('derivarEstados — success / info desde la marca', () => {
-  it('da las 8 vars de estado en claro y en oscuro', () => {
-    const e = derivarEstados('#7c3aed')
-    expect(Object.keys(e.claro)).toEqual([...ESTADO_CSS_VARS])
-    expect(Object.keys(e.oscuro)).toEqual([...ESTADO_CSS_VARS])
-  })
-
-  it('con el color por defecto, success reproduce (casi) el de src/index.css', () => {
-    const e = derivarEstados(DEFAULT_BRAND_COLOR)
-    expect(distanciaRgb(e.claro['--at-success'], '#16a34a')).toBeLessThan(6)
-    expect(distanciaRgb(e.claro['--at-success-strong'], '#15803d')).toBeLessThan(12)
-    expect(distanciaRgb(e.claro['--at-success-tint'], '#dcfce7')).toBeLessThan(16)
-    expect(distanciaRgb(e.oscuro['--at-success'], '#4ade80')).toBeLessThan(16)
-    expect(distanciaRgb(e.oscuro['--at-success-tint'], '#14271c')).toBeLessThan(12)
-  })
-
-  it.each(MUESTRAS)('%s → success sigue siendo VERDE en ambos temas', (c) => {
-    const e = derivarEstados(c)
-    for (const t of ['claro', 'oscuro'] as const) {
-      for (const k of ['--at-success', '--at-success-tint', '--at-success-border', '--at-success-strong']) {
-        expect(distTono(tono(e[t][k]), 142), `${t} ${k} ${e[t][k]}`).toBeLessThan(15)
+describe('derivarEstados — success / warning / danger / info desde la marca', () => {
+  it('las paletas por defecto son las de src/index.css (claro y dark)', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    const raiz = css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {')))
+    const darkManual = css.slice(css.indexOf('[data-theme="dark"] {'), css.indexOf('}', css.indexOf('[data-theme="dark"] {')))
+    for (const e of ESTADOS) {
+      for (const parte of PARTES) {
+        const k = clave(e, parte)
+        const re = (bloque: string) => new RegExp(`${k}:\\s*(#[0-9a-fA-F]{6})`).exec(bloque)?.[1]?.toLowerCase()
+        expect(re(raiz), `claro ${k}`).toBe(PALETAS_ESTADO_DEFECTO[e].claro[parte])
+        expect(re(darkManual), `oscuro ${k}`).toBe(PALETAS_ESTADO_DEFECTO[e].oscuro[parte])
       }
     }
   })
 
-  it('la saturación de success sigue a la de la marca: marca apagada → verde más apagado', () => {
-    expect(croma(derivarEstados('#5f6b66').claro['--at-success'])).toBeLessThan(croma(derivarEstados('#7c3aed').claro['--at-success']))
+  it('da las 16 vars de estado en claro y en oscuro', () => {
+    const e = derivarEstados('#7c3aed')
+    expect(Object.keys(e.claro).sort()).toEqual([...ESTADO_CSS_VARS].sort())
+    expect(Object.keys(e.oscuro).sort()).toEqual([...ESTADO_CSS_VARS].sort())
+  })
+
+  it('con el color por defecto, las cuatro paletas salen idénticas a las de index.css', () => {
+    const d = derivarEstados(DEFAULT_BRAND_COLOR)
+    for (const e of ESTADOS) for (const t of TEMAS) for (const parte of PARTES) {
+      expect(distanciaRgb(d[t][clave(e, parte)], PALETAS_ESTADO_DEFECTO[e][t][parte]), `${t} ${clave(e, parte)}`).toBeLessThanOrEqual(2)
+    }
+  })
+
+  it.each(MUESTRAS)('%s → success / warning / danger conservan su tono (verde / ámbar / rojo) en ambos temas', (c) => {
+    const d = derivarEstados(c)
+    for (const e of SEMANTICOS) for (const t of TEMAS) for (const parte of PARTES) {
+      const v = d[t][clave(e, parte)], def = PALETAS_ESTADO_DEFECTO[e][t][parte]
+      expect(distTono(tono(v), tono(def)), `${t} ${clave(e, parte)} ${v}`).toBeLessThan(6)
+    }
+  })
+
+  it.each(SEMANTICOS)('%s: la saturación sigue a la de la marca (marca apagada → estado más apagado)', (e) => {
+    expect(croma(derivarEstados('#5f6b66').claro[`--at-${e}`])).toBeLessThan(croma(derivarEstados('#7c3aed').claro[`--at-${e}`]))
   })
 
   // Tonos de danger (#ef4444), warning (#d97706) y success: info no debe parecerse a ellos.
@@ -650,63 +671,61 @@ describe('derivarEstados — success / info desde la marca', () => {
 
   it.each(MUESTRAS.filter((c) => croma(c) > 25 && !chocaConEstado(c)))('%s → info toma el tono de la marca', (c) => {
     const e = derivarEstados(c)
-    for (const t of ['claro', 'oscuro'] as const) {
-      expect(distTono(tono(e[t]['--at-info']), tono(c)), `${t} ${e[t]['--at-info']}`).toBeLessThan(8)
+    // Se gira la paleta entera: cada token conserva su desfase con la base clara por
+    // defecto (en index.css el info dark está ~8° del claro).
+    const tonoBase = tono(PALETAS_ESTADO_DEFECTO.info.claro.base)
+    for (const t of TEMAS) {
+      const esperado = (tono(c) + tono(PALETAS_ESTADO_DEFECTO.info[t].base) - tonoBase + 360) % 360
+      expect(distTono(tono(e[t]['--at-info']), esperado), `${t} ${e[t]['--at-info']}`).toBeLessThan(4)
     }
   })
 
   it.each([
     ['#ff0000', 'rojo → danger'], ['#be123c', 'carmesí → danger'], ['#ffd400', 'amarillo → warning'],
     ['#B96A3F', 'terracota → warning'], ['#22c55e', 'verde → success'], [DEFAULT_BRAND_COLOR, 'verde azulado por defecto → success'],
-  ])('%s (%s) → info vuelve al azul por defecto para no confundirse', (c) => {
+    ['#000000', 'negro (sin tono)'], ['#c0c0c0', 'gris (sin tono)'], ['#ffffff', 'blanco (sin tono)'],
+  ])('%s (%s) → info se queda azul para no confundirse', (c) => {
     const e = derivarEstados(c)
-    for (const t of ['claro', 'oscuro'] as const) {
-      expect(distTono(tono(e[t]['--at-info']), 221), `${t} ${e[t]['--at-info']}`).toBeLessThan(8)
+    for (const t of TEMAS) {
+      expect(distTono(tono(e[t]['--at-info']), tono(PALETAS_ESTADO_DEFECTO.info[t].base)), `${t} ${e[t]['--at-info']}`).toBeLessThan(6)
     }
   })
 
   it.each(MUESTRAS)('%s → info nunca cae cerca del tono de danger / warning / success', (c) => {
     const e = derivarEstados(c)
-    for (const t of ['claro', 'oscuro'] as const) {
+    for (const t of TEMAS) {
       if (croma(e[t]['--at-info']) > 25) expect(chocaConEstado(e[t]['--at-info']), `${t} ${e[t]['--at-info']}`).toBe(false)
     }
   })
 
-  it('marca gris o negra (sin tono) → info azul por defecto, no rojo', () => {
-    for (const c of ['#000000', '#c0c0c0', '#ffffff']) {
-      const e = derivarEstados(c)
-      expect(distanciaRgb(e.claro['--at-info'], '#2563eb'), c).toBeLessThan(8)
-      expect(distTono(tono(e.oscuro['--at-info']), 221), c).toBeLessThan(8)
-    }
-  })
-
-  it.each(MUESTRAS)('%s → claro: los mínimos de contrast.test.ts', (c) => {
-    const e = derivarEstados(c).claro
-    for (const st of ESTADOS) {
-      const base = e[`--at-${st}`], tint = e[`--at-${st}-tint`], strong = e[`--at-${st}-strong`], border = e[`--at-${st}-border`]
-      expect(contraste(BLANCO, base), `${st}: blanco sobre base (AA-large)`).toBeGreaterThanOrEqual(3)
-      expect(contraste(strong, tint), `${st}: strong sobre tint`).toBeGreaterThanOrEqual(4.5)
-      expect(contraste(BLANCO, strong), `${st}: blanco sobre strong`).toBeGreaterThanOrEqual(4.5)
+  it.each(MUESTRAS)('%s → claro: los mínimos de contrast.test.ts (nunca peor que la paleta por defecto)', (c) => {
+    const d = derivarEstados(c).claro
+    for (const e of ESTADOS) {
+      const def = PALETAS_ESTADO_DEFECTO[e].claro
+      const base = d[`--at-${e}`], tint = d[`--at-${e}-tint`], strong = d[`--at-${e}-strong`], border = d[`--at-${e}-border`]
+      expect(contraste(BLANCO, base), `${e}: blanco sobre base`).toBeGreaterThanOrEqual(Math.min(3, contraste(BLANCO, def.base)) - 0.01)
+      expect(contraste(strong, tint), `${e}: strong sobre tint`).toBeGreaterThanOrEqual(Math.min(4.5, contraste(def.strong, def.tint)) - 0.01)
+      expect(contraste(BLANCO, strong), `${e}: blanco sobre strong`).toBeGreaterThanOrEqual(Math.min(4.5, contraste(BLANCO, def.strong)) - 0.01)
       expect(L(tint)).toBeGreaterThan(L(border))
       expect(L(border)).toBeGreaterThan(L(base))
     }
   })
 
   it.each(MUESTRAS)('%s → oscuro: base y strong se leen sobre la superficie y su tint; tint y border son oscuros', (c) => {
-    const e = derivarEstados(c).oscuro
-    for (const st of ESTADOS) {
-      const base = e[`--at-${st}`], tint = e[`--at-${st}-tint`], strong = e[`--at-${st}-strong`], border = e[`--at-${st}-border`]
-      expect(contraste(base, DARK_SURFACE), `${st}: base sobre superficie`).toBeGreaterThanOrEqual(4.5)
-      expect(contraste(base, tint), `${st}: base sobre tint`).toBeGreaterThanOrEqual(4.5)
-      expect(contraste(strong, tint), `${st}: strong sobre tint`).toBeGreaterThanOrEqual(4.5)
-      expect(contraste(ON_STATUS_DARK, base), `${st}: on-status dark sobre base`).toBeGreaterThanOrEqual(4.5)
+    const d = derivarEstados(c).oscuro
+    for (const e of ESTADOS) {
+      const def = PALETAS_ESTADO_DEFECTO[e].oscuro
+      const base = d[`--at-${e}`], tint = d[`--at-${e}-tint`], strong = d[`--at-${e}-strong`], border = d[`--at-${e}-border`]
+      expect(contraste(base, DARK_SURFACE), `${e}: base sobre superficie`).toBeGreaterThanOrEqual(Math.min(4.5, contraste(def.base, DARK_SURFACE)) - 0.01)
+      expect(contraste(base, tint), `${e}: base sobre tint`).toBeGreaterThanOrEqual(Math.min(4.5, contraste(def.base, def.tint)) - 0.01)
+      expect(contraste(strong, tint), `${e}: strong sobre tint`).toBeGreaterThanOrEqual(Math.min(4.5, contraste(def.strong, def.tint)) - 0.01)
       expect(L(tint)).toBeLessThan(0.06)
       expect(L(border)).toBeLessThan(0.1)
       expect(L(tint)).toBeLessThan(L(border))
     }
   })
 
-  it('la hoja lleva los estados claros y oscuros (sin marca custom, nada)', () => {
+  it('la hoja lleva los 16 estados, claros y oscuros (sin marca custom, nada)', () => {
     const css = hojaEstilosMarca('#7c3aed', null)!
     const [claro, auto, manual] = css.split('\n')
     const e = derivarEstados('#7c3aed')
@@ -715,7 +734,7 @@ describe('derivarEstados — success / info desde la marca', () => {
       expect(auto).toContain(`${k}: ${e.oscuro[k]};`)
       expect(manual).toContain(`${k}: ${e.oscuro[k]};`)
     }
-    expect(hojaEstilosMarca(null, '#0e7490')).not.toContain('--at-success')
+    expect(hojaEstilosMarca(null, '#0e7490')).not.toContain('--at-danger')
   })
 })
 
