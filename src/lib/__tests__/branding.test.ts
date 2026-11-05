@@ -81,7 +81,7 @@ describe('estilosMarca', () => {
     expect(estilosMarca(undefined)).toBeNull()
     expect(estilosMarca('rojo')).toBeNull()
   })
-  it('color válido → mapa con las 27 CSS vars de marca (tonos + estados + datos)', () => {
+  it('color válido → mapa con las 28 CSS vars de marca (tonos + estados + datos)', () => {
     const m = estilosMarca('#1B3B36')
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
@@ -93,7 +93,7 @@ describe('estilosMarca', () => {
       '--at-warning', '--at-warning-tint', '--at-warning-border', '--at-warning-strong',
       '--at-danger', '--at-danger-tint', '--at-danger-border', '--at-danger-strong',
       '--at-info', '--at-info-tint', '--at-info-border', '--at-info-strong',
-      '--at-data-negative',
+      '--at-data-positive', '--at-data-negative',
     ])
     expect(Object.keys(m!)).toEqual([...BRAND_CSS_VARS])
   })
@@ -642,7 +642,7 @@ describe('derivarEstados — success / warning / danger / info desde la marca', 
     }
   })
 
-  it('da las 16 vars de estado + --at-data-negative, en claro y en oscuro', () => {
+  it('da las 16 vars de estado + las 2 de datos, en claro y en oscuro', () => {
     const e = derivarEstados('#7c3aed')
     const esperadas = [...ESTADO_CSS_VARS, ...DATOS_CSS_VARS].sort()
     expect(Object.keys(e.claro).sort()).toEqual(esperadas)
@@ -774,6 +774,49 @@ describe('--at-data-negative desde la marca', () => {
     expect(claro).toContain(`--at-data-negative: ${e.claro['--at-data-negative']};`)
     expect(auto).toContain(`--at-data-negative: ${e.oscuro['--at-data-negative']};`)
     expect(manual).toContain(`--at-data-negative: ${e.oscuro['--at-data-negative']};`)
+  })
+})
+
+// --at-data-positive: el primario (como var(--at-primary) en index.css), salvo que se
+// confunda con el rojo de las variaciones negativas o no se lea como texto: entonces,
+// el verde de success de la marca.
+describe('--at-data-positive desde la marca', () => {
+  const FONDO = { claro: '#ffffff', oscuro: DARK_SURFACE } as const
+  const primario = (c: string) => ({ claro: estilosMarca(c)!['--at-primary'], oscuro: estilosMarcaOscuro(c)!['--at-primary'] })
+
+  it.each([DEFAULT_BRAND_COLOR, '#7c3aed', '#0033cc', '#0e7490', '#14213d'])('%s → es el primario de la marca en ambos temas', (c) => {
+    const d = derivarEstados(c), p = primario(c)
+    for (const t of TEMAS) expect(d[t]['--at-data-positive'], t).toBe(p[t])
+  })
+
+  it.each(['#ff0000', '#be123c'])('%s (rojo) → verde de success en ambos temas, para no confundirse con la variación negativa', (c) => {
+    const d = derivarEstados(c)
+    expect(d.claro['--at-data-positive']).toBe(d.claro['--at-success-strong'])
+    expect(d.oscuro['--at-data-positive']).toBe(d.oscuro['--at-success'])
+  })
+
+  it('amarillo: ilegible sobre blanco → verde en claro; legible en dark → sigue siendo el primario', () => {
+    const d = derivarEstados('#ffd400')
+    expect(d.claro['--at-data-positive']).toBe(d.claro['--at-success-strong'])
+    expect(d.oscuro['--at-data-positive']).toBe(primario('#ffd400').oscuro)
+  })
+
+  it.each(MUESTRAS)('%s → siempre se lee como texto y nunca se parece a --at-data-negative', (c) => {
+    const d = derivarEstados(c)
+    for (const t of TEMAS) {
+      const pos = d[t]['--at-data-positive'], neg = d[t]['--at-data-negative']
+      expect(contraste(pos, FONDO[t]), `${t} ${pos}`).toBeGreaterThanOrEqual(4.5)
+      if (croma(pos) > 25) expect(distTono(tono(pos), tono(neg)), `${t} ${pos} vs ${neg}`).toBeGreaterThanOrEqual(30)
+    }
+  })
+
+  it('la hoja lo lleva en claro y oscuro', () => {
+    const css = hojaEstilosMarca('#ff0000', null)!
+    const [claro, auto, manual] = css.split('\n')
+    const e = derivarEstados('#ff0000')
+    expect(claro).toContain(`--at-data-positive: ${e.claro['--at-data-positive']};`)
+    expect(auto).toContain(`--at-data-positive: ${e.oscuro['--at-data-positive']};`)
+    expect(manual).toContain(`--at-data-positive: ${e.oscuro['--at-data-positive']};`)
   })
 })
 
