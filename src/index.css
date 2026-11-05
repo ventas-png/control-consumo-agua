@@ -366,6 +366,15 @@ button:focus:not(:focus-visible) {
   pointer-events: none;
   display: none;
 }
+/* Sin color-mix (Safari/iOS < 16.2, Chrome < 111) el degradado de arriba se
+ * anula entero: como el valor lleva var(), se acepta al leer la hoja y se
+ * invalida al calcularlo, así que un `background` anterior no serviría de
+ * respaldo. Este bloque da el mismo degradado desde --at-surface sólido. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  .table-scroll-wrapper::after {
+    background: linear-gradient(to left, var(--at-surface), transparent);
+  }
+}
 
 /* Sticky first column: en mobile (donde la tabla scrollea horizontal) la
  * primera columna se queda pegada al borde izquierdo. Conserva el contexto
@@ -421,6 +430,12 @@ button:focus:not(:focus-visible) {
     transparent);
   pointer-events: none;
   display: none;
+}
+/* Respaldo sin color-mix: ver .table-scroll-wrapper::after. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  .tab-strip-scrollable::after {
+    background: linear-gradient(to left, var(--at-surface), transparent);
+  }
 }
 @media (max-width: 640px) {
   .tab-strip-scrollable::after {

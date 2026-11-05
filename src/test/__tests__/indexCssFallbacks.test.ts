@@ -14,7 +14,24 @@ const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
 
 const SUPPORTS_NOT = '@supports not (color: color-mix(in srgb, red 50%, blue))'
 
-/** Cuerpo del bloque @supports not (…) con llaves balanceadas. */
+/** Todos los bloques @supports not (color-mix) con llaves balanceadas: posición y cuerpo. */
+function bloquesRespaldo(): { inicio: number; cuerpo: string; completo: string }[] {
+  const out: { inicio: number; cuerpo: string; completo: string }[] = []
+  for (let i = css.indexOf(SUPPORTS_NOT); i !== -1; i = css.indexOf(SUPPORTS_NOT, i + 1)) {
+    const abre = css.indexOf('{', i)
+    let depth = 0
+    for (let j = abre; j < css.length; j++) {
+      if (css[j] === '{') depth++
+      else if (css[j] === '}' && --depth === 0) {
+        out.push({ inicio: i, cuerpo: css.slice(abre + 1, j), completo: css.slice(i, j + 1) })
+        break
+      }
+    }
+  }
+  return out
+}
+
+/** Cuerpo del bloque @supports not (…) con llaves balanceadas (el primero: el de los tokens). */
 function bloqueRespaldo(): string {
   const i = css.indexOf(SUPPORTS_NOT)
   expect(i, 'falta el bloque @supports not (color-mix)').toBeGreaterThan(-1)
@@ -94,6 +111,29 @@ describe('src/index.css — respaldos sin color-mix', () => {
       const enDark = ['--at-surface', '--at-surface-2'].includes(k)
       if (!enDark) expect(vars(bloque, ':root'), k).toHaveProperty(k)
       expect(bloque.match(new RegExp(`${k}\\s*:`, 'g'))?.length ?? 0, k).toBeGreaterThanOrEqual(enDark ? 1 : 3)
+    }
+  })
+
+  it('toda propiedad normal con color-mix y var() tiene su respaldo @supports not DESPUÉS (un valor anterior no sirve)', () => {
+    // Un valor con var() se acepta al leer la hoja y se invalida al calcularlo, así que la
+    // declaración anterior ya se descartó: la doble declaración tampoco sirve aquí.
+    const bloques = bloquesRespaldo()
+    let principal = css
+    for (const b of bloques) principal = principal.replace(b.completo, ' '.repeat(b.completo.length))
+    const casos: { selector: string; prop: string; pos: number }[] = []
+    for (const m of principal.matchAll(/([^{};]+)\{([^{}]*)\}/g)) {
+      // Sólo propiedades normales (las custom --x se cubren arriba).
+      for (const d of m[2].matchAll(/(?:^|;)\s*([a-z][a-z-]*)\s*:([^;]*)/g)) {
+        if (d[2].includes('color-mix(') && d[2].includes('var(')) casos.push({ selector: m[1].trim(), prop: d[1], pos: m.index! })
+      }
+    }
+    expect(casos.map((c) => c.selector)).toEqual(['.table-scroll-wrapper::after', '.tab-strip-scrollable::after'])
+    for (const c of casos) {
+      const esc = c.selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const respaldo = bloques.find((b) => b.inicio > c.pos && new RegExp(`${esc}\\s*\\{[^}]*${c.prop}\\s*:`).test(b.cuerpo))
+      expect(respaldo, `${c.selector} { ${c.prop} } sin respaldo`).toBeDefined()
+      expect(respaldo!.cuerpo).not.toContain('color-mix(')
+      expect(respaldo!.cuerpo).toContain('var(--at-surface)')
     }
   })
 
