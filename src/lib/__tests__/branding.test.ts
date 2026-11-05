@@ -5,7 +5,7 @@ import {
   derivarVariablesMarca, derivarVariablesMarcaOscuro, estilosMarca, estilosMarcaOscuro,
   estilosAccent, estilosAccentOscuro, hojaEstilosMarca,
   DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_BG, DARK_SURFACE, DARK_MIN_CONTRASTE,
-  LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS,
+  LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
   derivarVariablesAccent, derivarVariablesAccentOscuro,
 } from '../branding'
 
@@ -78,13 +78,13 @@ describe('estilosMarca', () => {
     expect(estilosMarca(undefined)).toBeNull()
     expect(estilosMarca('rojo')).toBeNull()
   })
-  it('color válido → mapa con las 8 CSS vars de marca', () => {
+  it('color válido → mapa con las 9 CSS vars de marca (incluida --at-chip)', () => {
     const m = estilosMarca('#1B3B36')
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
     expect(Object.keys(m!)).toEqual([
       '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
-      '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2',
+      '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
     ])
     expect(Object.keys(m!)).toEqual([...BRAND_CSS_VARS])
   })
@@ -163,6 +163,38 @@ describe('derivarVariablesMarca — tonos derivados (tema claro)', () => {
       // la marca ya no llega: no se empeora
       expect(v.primary2).toBe(v.primary)
     }
+  })
+})
+
+// --at-chip: superficie neutra (botones secundarios, pestañas, divisores…) con
+// texto --at-ink-2. Por defecto #EAE6D8 / dark #1E2A23.
+describe('--at-chip — superficie neutra teñida de marca', () => {
+  const INK2 = '#3E5A4C', INK2_DARK = '#B7C4BB'
+
+  it('con el color por defecto queda cerca de los de src/index.css', () => {
+    expect(distanciaRgb(derivarVariablesMarca(DEFAULT_BRAND_COLOR).chip, '#EAE6D8')).toBeLessThan(10)
+    expect(distanciaRgb(derivarVariablesMarcaOscuro(DEFAULT_BRAND_COLOR).chip, '#1E2A23')).toBeLessThan(12)
+  })
+
+  it('sigue a la marca: morado → chip con más azul que verde', () => {
+    const c = derivarVariablesMarca('#7c3aed').chip
+    expect(c).not.toBe(derivarVariablesMarca(DEFAULT_BRAND_COLOR).chip)
+    expect(parseInt(c.slice(5, 7), 16)).toBeGreaterThan(parseInt(c.slice(3, 5), 16))
+  })
+
+  it.each(MUESTRAS)('%s → claro: neutro y claro, se distingue del blanco como el de siempre, y --at-ink-2 se lee', (c) => {
+    const chip = derivarVariablesMarca(c).chip
+    expect(contraste(chip, LIGHT_BG)).toBeLessThan(1.15)
+    expect(contraste(chip, '#ffffff')).toBeGreaterThan(1.1)
+    expect(contraste(chip, '#ffffff')).toBeLessThan(1.45)
+    expect(contraste(INK2, chip)).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+  })
+
+  it.each(MUESTRAS)('%s → oscuro: superficie oscura y --at-ink-2 dark se lee', (c) => {
+    const chip = derivarVariablesMarcaOscuro(c).chip
+    expect(L(chip)).toBeLessThan(0.06)
+    expect(contraste(INK2_DARK, chip)).toBeGreaterThanOrEqual(DARK_MIN_CONTRASTE)
+    expect(chip).not.toBe(derivarVariablesMarca(c).chip)
   })
 })
 

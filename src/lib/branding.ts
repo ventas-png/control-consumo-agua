@@ -164,7 +164,16 @@ export interface VariablesMarca {
   mint: string
   /** --at-primary-mint-2: tono medio (barras de progreso). */
   mint2: string
+  /** --at-chip: superficie NEUTRA (~640 usos: botones secundarios, pestañas
+   *  inactivas, inputs deshabilitados, avatares, divisores) con texto --at-ink-2. */
+  chip: string
 }
+
+/** Fondo del tema claro (= --at-bg en src/index.css). */
+export const LIGHT_BG = '#F2EFE7'
+/** Proporción de marca en --at-chip (resto = fondo de página), claro / oscuro. */
+const CHIP_MEZCLA_CLARO = 0.06
+const CHIP_MEZCLA_OSCURO = 0.16
 
 /** Mismo tono; luminosidad HSL `l` (0..1) y saturación × `factorSat`. */
 function enLuminosidad(hex: string, l: number, factorSat = 1): string {
@@ -205,6 +214,8 @@ export const LIGHT_MIN_CONTRASTE = 4.5
  *   tint (se usa como texto; si la marca ya está por debajo, queda igual).
  * - mint / mint-2: mismo tono, luminosidad fija 69 / 60% y saturación atenuada,
  *   para que sigan siendo tonos medios aunque la marca sea muy oscura o muy clara.
+ * - chip: 6% de la marca sobre el fondo de página (como --at-surface-tint en
+ *   index.css): sigue siendo neutro, apenas teñido de marca.
  */
 export function derivarVariablesMarca(primary: string | null | undefined): VariablesMarca {
   const base = normalizarColorHex(primary) ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
@@ -218,6 +229,7 @@ export function derivarVariablesMarca(primary: string | null | undefined): Varia
     soft2: mezclarBlanco(base, 0.74),
     mint: enLuminosidad(base, 0.69, 0.72),
     mint2: enLuminosidad(base, 0.6, 0.68),
+    chip: mezclar(base, LIGHT_BG, CHIP_MEZCLA_CLARO),
   }
 }
 
@@ -231,6 +243,7 @@ export function derivarVariablesMarca(primary: string | null | undefined): Varia
  * - primary-2: el primary oscuro con 25% menos saturación (más apagado, como en
  *   index.css), aclarado de nuevo si hace falta para leerse (se usa como texto).
  * - mint = hover y mint-2 = primary-2, igual que en el dark de index.css.
+ * - chip: el primario oscuro 16% sobre el fondo oscuro (entre tint y soft).
  */
 export function derivarVariablesMarcaOscuro(primary: string | null | undefined): VariablesMarca {
   const base = normalizarColorHex(primary) ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
@@ -246,13 +259,14 @@ export function derivarVariablesMarcaOscuro(primary: string | null | undefined):
     soft2: mezclar(p, DARK_BG, 0.3),
     mint: hover,
     mint2: primary2,
+    chip: mezclar(p, DARK_BG, CHIP_MEZCLA_OSCURO),
   }
 }
 
 /** CSS vars de tema que el branding sobreescribe (en orden). */
 export const BRAND_CSS_VARS = [
   '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
-  '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2',
+  '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
 ] as const
 
 function varsMarca(v: VariablesMarca): Record<(typeof BRAND_CSS_VARS)[number], string> {
@@ -265,6 +279,7 @@ function varsMarca(v: VariablesMarca): Record<(typeof BRAND_CSS_VARS)[number], s
     '--at-primary-soft-2': v.soft2,
     '--at-primary-mint': v.mint,
     '--at-primary-mint-2': v.mint2,
+    '--at-chip': v.chip,
   }
 }
 
