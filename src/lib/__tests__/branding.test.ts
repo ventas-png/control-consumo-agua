@@ -78,13 +78,14 @@ describe('estilosMarca', () => {
     expect(estilosMarca(undefined)).toBeNull()
     expect(estilosMarca('rojo')).toBeNull()
   })
-  it('color válido → mapa con las 9 CSS vars de marca (incluida --at-chip)', () => {
+  it('color válido → mapa con las 10 CSS vars de marca (incluidas --at-chip y --at-surface-tint)', () => {
     const m = estilosMarca('#1B3B36')
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
     expect(Object.keys(m!)).toEqual([
       '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
       '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
+      '--at-surface-tint',
     ])
     expect(Object.keys(m!)).toEqual([...BRAND_CSS_VARS])
   })
@@ -195,6 +196,35 @@ describe('--at-chip — superficie neutra teñida de marca', () => {
     expect(L(chip)).toBeLessThan(0.06)
     expect(contraste(INK2_DARK, chip)).toBeGreaterThanOrEqual(DARK_MIN_CONTRASTE)
     expect(chip).not.toBe(derivarVariablesMarca(c).chip)
+  })
+})
+
+// --at-surface-tint (y --at-table-header-bg, el encabezado fijo de DataTable).
+// index.css: color-mix(--at-accent-2 8%, --at-bg) → #E6E6DD / dark #141F1A.
+describe('--at-surface-tint — superficie apenas teñida de marca', () => {
+  const INK2 = '#3E5A4C', INK2_DARK = '#B7C4BB'
+
+  it('con el color por defecto queda casi igual al color-mix de src/index.css', () => {
+    expect(distanciaRgb(derivarVariablesMarca(DEFAULT_BRAND_COLOR).surfaceTint, mezclar('#577B69', LIGHT_BG, 0.08))).toBeLessThan(6)
+    expect(distanciaRgb(derivarVariablesMarcaOscuro(DEFAULT_BRAND_COLOR).surfaceTint, mezclar('#79A18E', DARK_BG, 0.08))).toBeLessThan(8)
+  })
+
+  it('sigue a la marca: morado → más azul que verde', () => {
+    const t = derivarVariablesMarca('#7c3aed').surfaceTint
+    expect(parseInt(t.slice(5, 7), 16)).toBeGreaterThan(parseInt(t.slice(3, 5), 16))
+  })
+
+  it.each(MUESTRAS)('%s → claro: casi el fondo de página, distinguible del blanco de las filas, --at-ink-2 se lee', (c) => {
+    const t = derivarVariablesMarca(c).surfaceTint
+    expect(contraste(t, LIGHT_BG)).toBeLessThan(1.12)
+    expect(contraste(t, '#ffffff')).toBeGreaterThan(1.1)
+    expect(contraste(INK2, t)).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+  })
+
+  it.each(MUESTRAS)('%s → oscuro: superficie oscura y --at-ink-2 dark se lee', (c) => {
+    const t = derivarVariablesMarcaOscuro(c).surfaceTint
+    expect(L(t)).toBeLessThan(0.05)
+    expect(contraste(INK2_DARK, t)).toBeGreaterThanOrEqual(DARK_MIN_CONTRASTE)
   })
 })
 

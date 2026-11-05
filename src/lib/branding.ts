@@ -167,6 +167,9 @@ export interface VariablesMarca {
   /** --at-chip: superficie NEUTRA (~640 usos: botones secundarios, pestañas
    *  inactivas, inputs deshabilitados, avatares, divisores) con texto --at-ink-2. */
   chip: string
+  /** --at-surface-tint: superficie apenas teñida (también --at-table-header-bg,
+   *  el encabezado fijo de DataTable: debe ser opaco). */
+  surfaceTint: string
 }
 
 /** Fondo del tema claro (= --at-bg en src/index.css). */
@@ -174,6 +177,13 @@ export const LIGHT_BG = '#F2EFE7'
 /** Proporción de marca en --at-chip (resto = fondo de página), claro / oscuro. */
 const CHIP_MEZCLA_CLARO = 0.06
 const CHIP_MEZCLA_OSCURO = 0.16
+/**
+ * Proporción de marca en --at-surface-tint (resto = fondo de página). index.css
+ * lo define como color-mix(--at-accent-2 8%, --at-bg); con estas proporciones
+ * y el color por defecto da casi lo mismo (#E6E6DD / #141F1A).
+ */
+const SURFACE_TINT_MEZCLA_CLARO = 0.05
+const SURFACE_TINT_MEZCLA_OSCURO = 0.075
 
 /** Mismo tono; luminosidad HSL `l` (0..1) y saturación × `factorSat`. */
 function enLuminosidad(hex: string, l: number, factorSat = 1): string {
@@ -214,8 +224,8 @@ export const LIGHT_MIN_CONTRASTE = 4.5
  *   tint (se usa como texto; si la marca ya está por debajo, queda igual).
  * - mint / mint-2: mismo tono, luminosidad fija 69 / 60% y saturación atenuada,
  *   para que sigan siendo tonos medios aunque la marca sea muy oscura o muy clara.
- * - chip: 6% de la marca sobre el fondo de página (como --at-surface-tint en
- *   index.css): sigue siendo neutro, apenas teñido de marca.
+ * - chip / surface-tint: 6 / 5% de la marca sobre el fondo de página (como
+ *   index.css arma --at-surface-tint): siguen siendo neutros, apenas teñidos.
  */
 export function derivarVariablesMarca(primary: string | null | undefined): VariablesMarca {
   const base = normalizarColorHex(primary) ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
@@ -230,6 +240,7 @@ export function derivarVariablesMarca(primary: string | null | undefined): Varia
     mint: enLuminosidad(base, 0.69, 0.72),
     mint2: enLuminosidad(base, 0.6, 0.68),
     chip: mezclar(base, LIGHT_BG, CHIP_MEZCLA_CLARO),
+    surfaceTint: mezclar(base, LIGHT_BG, SURFACE_TINT_MEZCLA_CLARO),
   }
 }
 
@@ -243,7 +254,7 @@ export function derivarVariablesMarca(primary: string | null | undefined): Varia
  * - primary-2: el primary oscuro con 25% menos saturación (más apagado, como en
  *   index.css), aclarado de nuevo si hace falta para leerse (se usa como texto).
  * - mint = hover y mint-2 = primary-2, igual que en el dark de index.css.
- * - chip: el primario oscuro 16% sobre el fondo oscuro (entre tint y soft).
+ * - chip / surface-tint: el primario oscuro 16 / 7.5% sobre el fondo oscuro.
  */
 export function derivarVariablesMarcaOscuro(primary: string | null | undefined): VariablesMarca {
   const base = normalizarColorHex(primary) ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
@@ -260,6 +271,7 @@ export function derivarVariablesMarcaOscuro(primary: string | null | undefined):
     mint: hover,
     mint2: primary2,
     chip: mezclar(p, DARK_BG, CHIP_MEZCLA_OSCURO),
+    surfaceTint: mezclar(p, DARK_BG, SURFACE_TINT_MEZCLA_OSCURO),
   }
 }
 
@@ -267,6 +279,7 @@ export function derivarVariablesMarcaOscuro(primary: string | null | undefined):
 export const BRAND_CSS_VARS = [
   '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
   '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
+  '--at-surface-tint',
 ] as const
 
 function varsMarca(v: VariablesMarca): Record<(typeof BRAND_CSS_VARS)[number], string> {
@@ -280,6 +293,7 @@ function varsMarca(v: VariablesMarca): Record<(typeof BRAND_CSS_VARS)[number], s
     '--at-primary-mint': v.mint,
     '--at-primary-mint-2': v.mint2,
     '--at-chip': v.chip,
+    '--at-surface-tint': v.surfaceTint,
   }
 }
 
@@ -435,8 +449,8 @@ function varsAccent(v: VariablesAccent): Record<(typeof ACCENT_CSS_VARS)[number]
 
 /**
  * Mapa de CSS vars de ACENTO (tema claro) para un color custom, o null si no hay
- * (restablecer). Incluye --at-accent-2, que index.css también usa para teñir
- * --at-surface-tint (encabezados de tabla).
+ * (restablecer). Incluye --at-accent-2; index.css tiñe con él --at-surface-tint
+ * sólo mientras no haya color de MARCA custom (con marca, estilosMarca lo fija).
  */
 export function estilosAccent(accentColor: string | null | undefined): Record<string, string> | null {
   const color = normalizarColorHex(accentColor)
