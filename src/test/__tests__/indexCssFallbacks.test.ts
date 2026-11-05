@@ -45,14 +45,19 @@ describe('src/index.css — respaldos sin color-mix', () => {
 
   it('los tokens arreglados siguen usando color-mix en los navegadores modernos', () => {
     expect(css).toMatch(/--at-border-organic:\s*color-mix\(in srgb, var\(--at-primary\) 16%, transparent\)/)
+    expect(css).toMatch(/--at-table-row-border:\s*color-mix\(in srgb, var\(--at-primary\) 12%, transparent\)/)
+    expect(css).toMatch(/--at-table-row-hover:\s*color-mix\(in srgb, var\(--at-primary\) 6%, transparent\)/)
     expect(css).toMatch(/--at-surface-tint:\s*color-mix\(in srgb, var\(--at-accent-2\) 8%, var\(--at-bg\)\)/)
     expect(css).toMatch(/--at-surface:\s*color-mix\(in oklch, var\(--at-bg\) 95%, var\(--at-primary\)\)/)
   })
 
-  it('claro: el bloque da los hex de siempre en :root', () => {
+  it('claro: el bloque da los hex de siempre en :root, y las filas el primario sobre --at-surface', () => {
     expect(vars(bloqueRespaldo(), ':root')).toEqual({
       '--at-border-organic': '#d0d2cb',
       '--at-surface-tint': '#e9ebe2',
+      // Lo que el color-mix translúcido pinta sobre la fila (--at-surface #FFFFFF).
+      '--at-table-row-border': mezclar('#1B3B36', '#FFFFFF', 0.12),
+      '--at-table-row-hover': mezclar('#1B3B36', '#FFFFFF', 0.06),
     })
   })
 
@@ -71,7 +76,24 @@ describe('src/index.css — respaldos sin color-mix', () => {
       // tinte 8% de --at-accent-2 dark sobre --at-bg.
       expect(v['--at-border-organic']).toBe(mezclar('#5E9D8A', '#11201A', 0.16))
       expect(v['--at-surface-tint']).toBe(mezclar('#79A18E', '#0B1410', 0.08))
-      for (const k of ['--at-border-organic', '--at-surface-tint']) expect(luminanciaRelativa(v[k]), k).toBeLessThan(0.06)
+      expect(v['--at-table-row-border']).toBe(mezclar('#5E9D8A', '#11201A', 0.12))
+      expect(v['--at-table-row-hover']).toBe(mezclar('#5E9D8A', '#11201A', 0.06))
+      for (const k of ['--at-border-organic', '--at-surface-tint', '--at-table-row-border', '--at-table-row-hover']) {
+        expect(luminanciaRelativa(v[k]), k).toBeLessThan(0.06)
+      }
+    }
+  })
+
+  it('todo token definido con color-mix tiene respaldo en el bloque (claro y ambos dark)', () => {
+    const bloque = bloqueRespaldo()
+    const fuera = css.replace(bloque, '')
+    const conColorMix = [...new Set([...fuera.matchAll(/(--[\w-]+)\s*:\s*color-mix\(/g)].map((m) => m[1]))]
+    expect(conColorMix.length).toBeGreaterThan(0)
+    for (const k of conColorMix) {
+      // --at-surface / -2 sólo usan color-mix en el dark automático; el resto en :root.
+      const enDark = ['--at-surface', '--at-surface-2'].includes(k)
+      if (!enDark) expect(vars(bloque, ':root'), k).toHaveProperty(k)
+      expect(bloque.match(new RegExp(`${k}\\s*:`, 'g'))?.length ?? 0, k).toBeGreaterThanOrEqual(enDark ? 1 : 3)
     }
   })
 

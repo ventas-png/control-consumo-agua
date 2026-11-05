@@ -6,7 +6,7 @@ import {
   estilosAccent, estilosAccentOscuro, hojaEstilosMarca,
   DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_BG, DARK_SURFACE, DARK_MIN_CONTRASTE,
   LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
-  derivarVariablesAccent, derivarVariablesAccentOscuro, respaldoBordeOrganico,
+  derivarVariablesAccent, derivarVariablesAccentOscuro, respaldosSinColorMix,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -522,50 +522,76 @@ describe('hojaEstilosMarca', () => {
   })
 })
 
-// ─── Respaldo de --at-border-organic para navegadores sin color-mix ──────────
-// index.css define --at-border-organic como color-mix(--at-primary 16%,
-// transparent), que ya sigue a la marca. Sin color-mix (Safari/iOS < 16.2,
-// Chrome < 111) hace falta un hex sólido, dentro de @supports not (…): una doble
-// declaración en una custom property no hace de respaldo.
-describe('respaldoBordeOrganico / bloque @supports not (color-mix)', () => {
+// ─── Respaldos para navegadores sin color-mix ───────────────────────────────
+// index.css deriva de --at-primary con color-mix translúcido --at-border-organic
+// (16%), --at-table-row-border (12%) y --at-table-row-hover (6%), que ya siguen a
+// la marca. Sin color-mix (Safari/iOS < 16.2, Chrome < 111) hace falta un hex
+// sólido, dentro de @supports not (…): una doble declaración en una custom
+// property no hace de respaldo.
+const TOKENS_COLOR_MIX = ['--at-border-organic', '--at-table-row-border', '--at-table-row-hover'] as const
+
+describe('respaldosSinColorMix / bloque @supports not (color-mix)', () => {
   it('sin color de marca → null', () => {
-    expect(respaldoBordeOrganico(null)).toBeNull()
-    expect(respaldoBordeOrganico('rojo')).toBeNull()
+    expect(respaldosSinColorMix(null)).toBeNull()
+    expect(respaldosSinColorMix('rojo')).toBeNull()
   })
 
-  it('con el color por defecto reproduce el #D0D2CB de index.css (misma receta: 16% sobre --at-bg)', () => {
-    expect(distanciaRgb(respaldoBordeOrganico(DEFAULT_BRAND_COLOR)!.claro, '#D0D2CB')).toBeLessThan(3)
+  it('cubre los tres tokens con color-mix sobre --at-primary, en ambos temas', () => {
+    const r = respaldosSinColorMix('#7c3aed')!
+    expect(Object.keys(r.claro)).toEqual([...TOKENS_COLOR_MIX])
+    expect(Object.keys(r.oscuro)).toEqual([...TOKENS_COLOR_MIX])
   })
 
-  it.each(MUESTRAS)('%s → claro y oscuro son bordes visibles sobre su tarjeta', (c) => {
-    const r = respaldoBordeOrganico(c)!
-    // (Con marca blanca el color-mix moderno sobre blanco ya es invisible; el respaldo da algo más.)
-    expect(contraste(r.claro, '#ffffff')).toBeGreaterThan(1.1)
-    expect(contraste(r.oscuro, DARK_SURFACE)).toBeGreaterThan(1.1)
-    expect(L(r.oscuro)).toBeLessThan(L(r.claro))
+  it('con el color por defecto reproduce los respaldos de src/index.css', () => {
+    const r = respaldosSinColorMix(DEFAULT_BRAND_COLOR)!
+    // #D0D2CB es el respaldo histórico del borde (16% sobre --at-bg).
+    expect(distanciaRgb(r.claro['--at-border-organic'], '#D0D2CB')).toBeLessThan(3)
+    expect(r.claro['--at-table-row-border']).toBe('#e4e7e7')
+    expect(r.claro['--at-table-row-hover']).toBe('#f1f3f3')
   })
 
-  it('el oscuro es lo que el color-mix translúcido pinta sobre una tarjeta oscura', () => {
+  it('es lo que el color-mix translúcido pinta: filas sobre --at-surface, borde orgánico sobre la tarjeta oscura', () => {
+    const r = respaldosSinColorMix('#7c3aed')!
     const pd = derivarVariablesMarcaOscuro('#7c3aed').primary
-    expect(respaldoBordeOrganico('#7c3aed')!.oscuro).toBe(mezclar(pd, DARK_SURFACE, 0.16))
+    expect(r.claro['--at-table-row-border']).toBe(mezclar('#7c3aed', '#ffffff', 0.12))
+    expect(r.claro['--at-table-row-hover']).toBe(mezclar('#7c3aed', '#ffffff', 0.06))
+    expect(r.oscuro['--at-border-organic']).toBe(mezclar(pd, DARK_SURFACE, 0.16))
+    expect(r.oscuro['--at-table-row-border']).toBe(mezclar(pd, DARK_SURFACE, 0.12))
+    expect(r.oscuro['--at-table-row-hover']).toBe(mezclar(pd, DARK_SURFACE, 0.06))
   })
 
-  it('la hoja con marca añade el bloque sólo para navegadores sin color-mix, con ambos temas', () => {
+  it.each(MUESTRAS)('%s → bordes visibles sobre su superficie y hover más suave que el borde de fila', (c) => {
+    const r = respaldosSinColorMix(c)!
+    // (Con marca blanca el color-mix moderno sobre blanco ya es invisible; el respaldo del
+    // borde orgánico, sobre --at-bg, da algo más.)
+    expect(contraste(r.claro['--at-border-organic'], '#ffffff')).toBeGreaterThan(1.1)
+    for (const [tema, sup] of [['claro', '#ffffff'], ['oscuro', DARK_SURFACE]] as const) {
+      const v = r[tema]
+      if (c !== '#ffffff' || tema === 'oscuro') {
+        expect(contraste(v['--at-table-row-border'], sup), `${tema} borde fila`).toBeGreaterThan(1.03)
+      }
+      expect(contraste(v['--at-table-row-hover'], sup), `${tema} hover`).toBeLessThanOrEqual(contraste(v['--at-table-row-border'], sup))
+    }
+    expect(contraste(r.oscuro['--at-border-organic'], DARK_SURFACE)).toBeGreaterThan(1.1)
+    for (const k of TOKENS_COLOR_MIX) expect(L(r.oscuro[k]), k).toBeLessThan(L(r.claro[k]))
+  })
+
+  it('la hoja con marca añade el bloque sólo para navegadores sin color-mix, con los tres tokens y ambos temas', () => {
     const css = hojaEstilosMarca('#7c3aed', null)!
     const lineas = css.split('\n')
-    const r = respaldoBordeOrganico('#7c3aed')!
+    const r = respaldosSinColorMix('#7c3aed')!
+    const decl = (m: Record<string, string>) => TOKENS_COLOR_MIX.map((k) => `${k}: ${m[k]};`).join(' ')
     expect(lineas).toHaveLength(4)
     const bloque = lineas[3]
     expect(bloque.startsWith('@supports not (color: color-mix(in srgb, red 50%, blue)) {')).toBe(true)
-    expect(bloque).toContain(`:root:root { --at-border-organic: ${r.claro}; }`)
-    expect(bloque).toContain(`@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) { --at-border-organic: ${r.oscuro}; } }`)
-    expect(bloque).toContain(`:root:root[data-theme="dark"] { --at-border-organic: ${r.oscuro}; }`)
-    // Fuera del bloque NO se toca: los navegadores modernos conservan el color-mix de index.css.
-    for (const l of lineas.slice(0, 3)) expect(l).not.toContain('--at-border-organic')
+    expect(bloque).toContain(`:root:root { ${decl(r.claro)} }`)
+    expect(bloque).toContain(`@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) { ${decl(r.oscuro)} } }`)
+    expect(bloque).toContain(`:root:root[data-theme="dark"] { ${decl(r.oscuro)} }`)
+    // Fuera del bloque NO se tocan: los navegadores modernos conservan el color-mix de index.css.
+    for (const l of lineas.slice(0, 3)) for (const k of TOKENS_COLOR_MIX) expect(l).not.toContain(k)
   })
 
-  it('sólo acento custom → sin bloque (el borde depende del primario, que queda en su default)', () => {
+  it('sólo acento custom → sin bloque (los tres dependen del primario, que queda en su default)', () => {
     expect(hojaEstilosMarca(null, '#0e7490')).not.toContain('@supports')
   })
 })
-

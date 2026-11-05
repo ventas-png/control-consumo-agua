@@ -147,21 +147,25 @@
    declaración (hex y luego color-mix): una custom property acepta cualquier
    valor, así que el navegador viejo se quedaría con el color-mix y la propiedad
    que la usa se anularía (sin borde, fondo transparente). Los modernos ignoran
-   el bloque. Los valores dark son lo que el color-mix da con la paleta dark (el
-   borde, sobre --at-surface). Con color de marca custom, la hoja de branding
+   el bloque. Los valores son lo que el color-mix pinta con cada paleta: los
+   bordes y el hover de fila, el primario sobre --at-surface (donde van las
+   tarjetas y filas). Con color de marca custom, la hoja de branding
    (src/lib/branding.ts) pone los suyos. */
 @supports not (color: color-mix(in srgb, red 50%, blue)) {
   :root {
     --at-border-organic: #D0D2CB; --at-surface-tint: #E9EBE2;
+    --at-table-row-border: #E4E7E7; --at-table-row-hover: #F1F3F3;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --at-surface: #11201A; --at-surface-2: #172821;
       --at-border-organic: #1D342C; --at-surface-tint: #141F1A;
+      --at-table-row-border: #1A2F27; --at-table-row-hover: #162821;
     }
   }
   [data-theme="dark"] {
     --at-border-organic: #1D342C; --at-surface-tint: #141F1A;
+    --at-table-row-border: #1A2F27; --at-table-row-hover: #162821;
   }
 }
 

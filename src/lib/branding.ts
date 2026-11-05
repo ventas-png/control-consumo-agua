@@ -473,32 +473,47 @@ function declaraciones(...mapas: (Record<string, string> | null)[]): string {
     .join(' ')
 }
 
-/** index.css: --at-border-organic = color-mix(in srgb, var(--at-primary) 16%, transparent). */
-const BORDE_ORGANICO_MEZCLA = 0.16
+/** Proporciones de los color-mix de index.css sobre --at-primary. */
+const BORDE_ORGANICO_MEZCLA = 0.16 // --at-border-organic: color-mix(--at-primary 16%, transparent)
+const FILA_BORDE_MEZCLA = 0.12 //     --at-table-row-border: color-mix(--at-primary 12%, transparent)
+const FILA_HOVER_MEZCLA = 0.06 //     --at-table-row-hover:  color-mix(--at-primary 6%, transparent)
 /** Navegadores SIN color-mix (Safari/iOS < 16.2, Chrome < 111). */
 const SIN_COLOR_MIX = '@supports not (color: color-mix(in srgb, red 50%, blue))'
+/** Superficie del tema claro (= --at-surface en src/index.css), donde van las filas de tabla. */
+const LIGHT_SURFACE = '#FFFFFF'
 
 /**
- * Respaldo SÓLIDO de --at-border-organic para navegadores sin color-mix, o null
- * sin color de marca custom:
- * - claro: el primario al 16% sobre --at-bg, la misma receta del #D0D2CB de
- *   index.css.
- * - oscuro: el primario oscuro al 16% sobre la superficie oscura, que es lo que
- *   el color-mix translúcido pinta sobre una tarjeta. Sobre --at-bg, más oscuro,
- *   el borde casi no se distinguiría de la tarjeta.
+ * Respaldos SÓLIDOS, para navegadores sin color-mix, de los tokens que index.css
+ * deriva de --at-primary con color-mix translúcido. null sin color de marca custom.
+ * - --at-border-organic: claro, el primario al 16% sobre --at-bg (la receta del
+ *   #D0D2CB de index.css); oscuro, el primario oscuro al 16% sobre la superficie
+ *   oscura, que es lo que el color-mix pinta sobre una tarjeta.
+ * - --at-table-row-border / --at-table-row-hover: el primario (claro / oscuro) al
+ *   12 / 6% sobre --at-surface, el fondo de las filas de DataTable.
  *
- * Va dentro de `@supports not (…)` y NO como doble declaración (hex y luego
- * color-mix, como en index.css): una custom property acepta cualquier valor, así
- * que el navegador viejo se queda con el color-mix y el borde que la usa se
- * anula (sin borde). Los navegadores modernos ignoran el bloque y conservan el
- * color-mix translúcido de index.css, que ya sigue a --at-primary.
+ * Van dentro de `@supports not (…)` y NO como doble declaración (hex y luego
+ * color-mix): una custom property acepta cualquier valor, así que el navegador
+ * viejo se queda con el color-mix y la propiedad que la usa se anula. Los
+ * navegadores modernos ignoran el bloque y conservan el color-mix de index.css,
+ * que ya sigue a --at-primary.
  */
-export function respaldoBordeOrganico(primaryColor: string | null | undefined): { claro: string; oscuro: string } | null {
+export function respaldosSinColorMix(
+  primaryColor: string | null | undefined,
+): { claro: Record<string, string>; oscuro: Record<string, string> } | null {
   const color = normalizarColorHex(primaryColor)
   if (!color) return null
+  const pd = derivarVariablesMarcaOscuro(color).primary
   return {
-    claro: mezclar(color, LIGHT_BG, BORDE_ORGANICO_MEZCLA),
-    oscuro: mezclar(derivarVariablesMarcaOscuro(color).primary, DARK_SURFACE, BORDE_ORGANICO_MEZCLA),
+    claro: {
+      '--at-border-organic': mezclar(color, LIGHT_BG, BORDE_ORGANICO_MEZCLA),
+      '--at-table-row-border': mezclar(color, LIGHT_SURFACE, FILA_BORDE_MEZCLA),
+      '--at-table-row-hover': mezclar(color, LIGHT_SURFACE, FILA_HOVER_MEZCLA),
+    },
+    oscuro: {
+      '--at-border-organic': mezclar(pd, DARK_SURFACE, BORDE_ORGANICO_MEZCLA),
+      '--at-table-row-border': mezclar(pd, DARK_SURFACE, FILA_BORDE_MEZCLA),
+      '--at-table-row-hover': mezclar(pd, DARK_SURFACE, FILA_HOVER_MEZCLA),
+    },
   }
 }
 
@@ -511,8 +526,8 @@ export function respaldoBordeOrganico(primaryColor: string | null | undefined): 
  * para tener MÁS especificidad que los de la hoja base: ganan sin depender del
  * orden de inserción y, a diferencia de un style inline en <html>, el bloque
  * dark sigue ganando al claro cuando el tema es oscuro. Con color de marca, una
- * última línea añade el respaldo sólido de --at-border-organic (ver
- * respaldoBordeOrganico) sólo para navegadores sin color-mix.
+ * última línea añade los respaldos sólidos de los tokens con color-mix (ver
+ * respaldosSinColorMix) sólo para navegadores sin color-mix.
  */
 export function hojaEstilosMarca(
   primaryColor: string | null | undefined,
@@ -526,9 +541,9 @@ export function hojaEstilosMarca(
     `@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) { ${oscuro} } }`,
     `:root:root[data-theme="dark"] { ${oscuro} }`,
   ]
-  const borde = respaldoBordeOrganico(primaryColor)
-  if (borde) {
-    const c = `--at-border-organic: ${borde.claro};`, o = `--at-border-organic: ${borde.oscuro};`
+  const respaldos = respaldosSinColorMix(primaryColor)
+  if (respaldos) {
+    const c = declaraciones(respaldos.claro), o = declaraciones(respaldos.oscuro)
     lineas.push(
       `${SIN_COLOR_MIX} { :root:root { ${c} } ` +
         `@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) { ${o} } } ` +
