@@ -7,6 +7,7 @@ import { disponibilidadEquipo, faltantes, prestamoCerrado } from '../../../lib/p
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { EditModal } from '../../shared/EditModal'
 
 interface Props {
   prestamos: PrestamoEquipo[]
@@ -55,6 +56,10 @@ export function PrestamoEquiposTab({ prestamos, unidades, inventario = [], reser
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoPrestamo | 'all'>('all')
+  // La ficha abre en ventana al pulsar la fila. Se guarda el id y no la fila:
+  // tras entregar o recibir, la ficha muestra el préstamo recargado.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalle = detalleId ? prestamos.find(p => p.id === detalleId) ?? null : null
 
   function setF<K extends keyof typeof form>(k: K, v: typeof form[K]) {
     setForm(prev => ({ ...prev, [k]: v }))
@@ -196,8 +201,12 @@ export function PrestamoEquiposTab({ prestamos, unidades, inventario = [], reser
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('prestamos_equipo', id)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    setDetalleId(null)
     onRefresh()
   }
+
+  // Cancelar cierra sin borrar lo escrito; no se cierra a mitad del guardado.
+  function cerrarForm() { if (!saving) setShowForm(false) }
 
   function reservaDe(p: PrestamoEquipo): ReservaAmenidad | undefined {
     return p.reserva_id ? reservas.find(r => r.id === p.reserva_id) : undefined
@@ -214,7 +223,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, inventario = [], reser
           <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>El equipo que los residentes piden al reservar una amenidad aparece aquí como «Solicitado» hasta que se entrega.</span>
         </div>
         {canCreate && (
-          <button onClick={() => setShowForm(v => !v)}
+          <button onClick={() => setShowForm(true)}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Registrar Préstamo
           </button>
@@ -238,11 +247,27 @@ export function PrestamoEquiposTab({ prestamos, unidades, inventario = [], reser
         ))}
       </div>
 
-      {/* Form */}
+      {/* Formulario en ventana (antes se desplegaba entre los KPIs y la lista). */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nuevo préstamo</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: '10px' }}>
+        <EditModal
+          title="Nuevo préstamo"
+          size="lg"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <button type="button" onClick={cerrarForm} disabled={saving}
+              style={{ padding: '8px 14px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
+              Cancelar
+            </button>
+            <button type="button" onClick={handleSave} disabled={saving}
+              style={{ padding: '8px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+          </>}
+        >
+          <div className="at-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: '10px' }}>
             <div>
               <label style={labelStyle} htmlFor="prestamo-unidad">Unidad *</label>
               <select id="prestamo-unidad" style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
@@ -311,17 +336,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, inventario = [], reser
               <input id="prestamo-obs" style={inputStyle} value={form.observaciones} onChange={e => setF('observaciones', e.target.value)} placeholder="Estado del equipo, condiciones, etc." />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Filter */}
@@ -342,7 +357,9 @@ export function PrestamoEquiposTab({ prestamos, unidades, inventario = [], reser
         data={filtered}
         rowKey="id"
         pageSize={50}
+        mobileCardLayout
         defaultSort={{ key: 'fecha_prestamo', direction: 'desc' }}
+        onRowClick={p => setDetalleId(p.id)}
         emptyState={{ icon: '📋', title: 'No hay préstamos registrados' }}
         columns={[
           { key: 'equipo_nombre', header: 'Equipo', sortable: true,
@@ -406,29 +423,125 @@ export function PrestamoEquiposTab({ prestamos, unidades, inventario = [], reser
               const es = ESTADO_STYLE[p.estado] ?? ESTADO_STYLE.prestado
               return <span style={{ background: es.bg, color: es.color, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{es.label}</span>
             } },
+          // En la fila queda sólo la acción del día a día (Entregar / Recibir);
+          // eliminar vive en la ficha, que abre al pulsar la fila.
           { key: 'actions', header: '', align: 'right',
-            render: (p) => (canEdit || canDelete) ? (
+            render: (p) => canEdit && (p.estado === 'solicitado' || p.estado === 'prestado') ? (
               <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                {canEdit && p.estado === 'solicitado' && (
+                {p.estado === 'solicitado' ? (
                   <button onClick={(e) => { e.stopPropagation(); entregar(p) }}
                     style={{ padding: '3px 8px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                     📦 Entregar
                   </button>
-                )}
-                {canEdit && p.estado === 'prestado' && (
+                ) : (
                   <button onClick={(e) => { e.stopPropagation(); recibir(p) }}
                     style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                     ✓ Recibir
                   </button>
                 )}
-                {canDelete && (
-                  <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} aria-label="Eliminar préstamo"
-                    style={{ padding: '3px 7px', background: 'var(--at-chip)', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer', color: 'var(--at-ink-3)' }}>🗑️</button>
-                )}
               </div>
             ) : null },
         ] satisfies DataTableColumn<PrestamoEquipo>[]}
       />
+
+      {/* Ficha en ventana (pantalla completa en el teléfono): todos los datos del
+          préstamo y sus acciones. Los diálogos de entregar y recibir (Radix) se
+          abren encima. */}
+      {detalle && (() => {
+        const p = detalle
+        const es = ESTADO_STYLE[p.estado] ?? ESTADO_STYLE.prestado
+        const res = reservaDe(p)
+        const cerrado = prestamoCerrado(p)
+        const falt = faltantes(p)
+        const reposicion = p.monto_reposicion != null && Number(p.monto_reposicion) > 0 ? Number(p.monto_reposicion) : 0
+        const datos: { label: string; value: string; color?: string }[] = [
+          { label: 'Unidad', value: p.unidad_nombre ?? '—' },
+          cerrado
+            ? { label: 'Devuelto / entregado', value: `${p.cantidad_devuelta ?? p.cantidad} / ${p.cantidad}`, color: falt > 0 ? 'var(--at-danger)' : undefined }
+            : { label: 'Cantidad', value: String(p.cantidad) },
+          ...(p.cantidad_solicitada != null && p.cantidad_solicitada !== p.cantidad ? [{ label: 'Pedido', value: String(p.cantidad_solicitada) }] : []),
+          ...(falt > 0 ? [{ label: 'Faltantes', value: String(falt), color: 'var(--at-danger)' }] : []),
+          { label: 'Fecha de préstamo', value: `${p.fecha_prestamo}${p.hora_prestamo ? ` ${p.hora_prestamo.slice(0, 5)}` : ''}` },
+          { label: 'Fecha de devolución', value: p.fecha_devolucion ? `${p.fecha_devolucion}${p.hora_devolucion ? ` ${p.hora_devolucion.slice(0, 5)}` : ''}` : '—' },
+          { label: 'Depósito', value: p.deposito ? `${moneda} ${p.deposito.toFixed(2)} · ${p.deposito_pagado ? 'pagado' : 'pendiente'}` : '—', color: p.deposito ? (p.deposito_pagado ? 'var(--at-success)' : 'var(--at-warning)') : undefined },
+          ...(p.estado !== 'cancelado' && p.monto_renta != null && Number(p.monto_renta) > 0
+            ? [{ label: 'Renta', value: `${moneda} ${Number(p.monto_renta).toFixed(2)}${p.cuota_renta_id ? ' · cargada a la unidad' : ''}`, color: 'var(--at-primary-hover)' }] : []),
+          ...(p.costo_reposicion_unitario != null ? [{ label: 'Reposición por unidad', value: `${moneda} ${Number(p.costo_reposicion_unitario).toFixed(2)}` }] : []),
+          { label: 'Reposición', value: reposicion > 0 ? `${moneda} ${reposicion.toFixed(2)}${p.cuota_reposicion_id ? ' · cargo generado a la unidad' : ' · sin cargo a la unidad'}` : '—', color: reposicion > 0 ? 'var(--at-danger-strong)' : undefined },
+          { label: 'Entregado por', value: p.entregado_por || '—' },
+          { label: 'Recibido por', value: p.recibido_por || '—' },
+        ]
+        return (
+          <EditModal
+            title={p.equipo_nombre}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '2px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ background: es.bg, color: es.color, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{es.label}</span>
+                {p.unidad_nombre && <span>🏠 {p.unidad_nombre}</span>}
+                {!p.inventario_id && <span>(sin inventario)</span>}
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+                <button type="button" onClick={() => setDetalleId(null)}
+                  style={{ padding: '8px 14px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: 7, fontSize: 13, cursor: 'pointer', color: 'var(--at-ink-2)' }}>
+                  Cerrar
+                </button>
+                {canDelete && (
+                  <button type="button" onClick={() => handleDelete(p.id)} aria-label="Eliminar préstamo"
+                    style={{ padding: '8px 14px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 7, fontSize: 13, cursor: 'pointer', color: 'var(--at-danger)' }}>
+                    🗑️ Eliminar
+                  </button>
+                )}
+                {canEdit && p.estado === 'solicitado' && (
+                  <button type="button" onClick={() => entregar(p)}
+                    style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                    📦 Entregar
+                  </button>
+                )}
+                {canEdit && p.estado === 'prestado' && (
+                  <button type="button" onClick={() => recibir(p)}
+                    style={{ padding: '8px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                    ✓ Recibir
+                  </button>
+                )}
+              </div>
+            }
+          >
+            {res && (
+              <div style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: 'var(--at-primary-hover)', fontWeight: 600 }}>
+                📅 Reserva {res.amenidad_nombre ?? 'amenidad'} · {res.fecha} {res.hora_inicio}–{res.hora_fin}
+              </div>
+            )}
+            {!res && p.reserva_id && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: 'var(--at-ink-3)' }}>📅 Pedido con una reserva</div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10, marginBottom: (p.observaciones || p.observaciones_devolucion) ? 14 : 0 }}>
+              {datos.map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: d.color ?? 'var(--at-ink)', overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+            {p.observaciones && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 13, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
+                {p.observaciones}
+              </div>
+            )}
+            {p.observaciones_devolucion && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>↩ Observaciones de la devolución</div>
+                {p.observaciones_devolucion}
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }
