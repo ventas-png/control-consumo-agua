@@ -38,6 +38,13 @@
   --at-on-status: #ffffff;
   /* Nav rail oscuro — fijo en ambos temas (sólo en :root, sin override dark) */
   --at-nav-bg: #102622; --at-nav-ink: #ECEFE8;
+  /* Grises del rail: texto bajo el puntero, texto de ítems inactivos e iconos /
+     encabezados de grupo. Con color de marca custom los fija la hoja de branding. */
+  --at-nav-ink-2: #DCE6E0; --at-nav-ink-3: #B4C5BB; --at-nav-ink-4: #8FA398;
+  /* Ítem activo del rail: punto, su halo y el fondo del icono. Por defecto el
+     acento; con color de marca custom los fija la hoja de branding (src/lib/branding.ts). */
+  --at-nav-accent: var(--at-accent); --at-nav-accent-glow: rgba(185, 106, 63, 0.7);
+  --at-nav-accent-soft: rgba(185, 106, 63, 0.3);
   --at-font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --at-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 

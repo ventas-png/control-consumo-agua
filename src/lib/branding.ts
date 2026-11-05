@@ -170,6 +170,17 @@ export interface VariablesMarca {
   /** --at-surface-tint: superficie apenas teñida (también --at-table-header-bg,
    *  el encabezado fijo de DataTable: debe ser opaco). */
   surfaceTint: string
+  /** --at-nav-bg: fondo del rail de navegación, OSCURO en ambos temas (lleva texto
+   *  --at-nav-ink claro y overlays blancos translúcidos). */
+  navBg: string
+  /** --at-nav-ink: texto sobre --at-nav-bg (Sidebar, encabezados de SuperAdmin). */
+  navInk: string
+  /** --at-nav-ink-2: texto de un ítem del rail bajo el puntero y nombre del usuario. */
+  navInk2: string
+  /** --at-nav-ink-3: texto de los ítems inactivos, icono bajo el puntero, «Salir». */
+  navInk3: string
+  /** --at-nav-ink-4: iconos inactivos, encabezados de grupo y subtítulos del rail. */
+  navInk4: string
 }
 
 /** Fondo del tema claro (= --at-bg en src/index.css). */
@@ -184,6 +195,95 @@ const CHIP_MEZCLA_OSCURO = 0.16
  */
 const SURFACE_TINT_MEZCLA_CLARO = 0.05
 const SURFACE_TINT_MEZCLA_OSCURO = 0.075
+/** Texto del rail de navegación por defecto (= --at-nav-ink en index.css, fijo en ambos temas). */
+export const NAV_INK = '#ECEFE8'
+
+/**
+ * --at-nav-ink (index.css: #ECEFE8) desde la marca: un blanco roto teñido del TONO de
+ * la marca, con la luminosidad del por defecto (HSL 92.4%) y su saturación (0.18)
+ * escalada por la de la marca, acotada a 0.3 para que siga siendo casi blanco. Marcas
+ * grises → blanco roto neutro.
+ */
+export function navInkDesdeMarca(hex: string): string {
+  const [h, s] = rgbAHsl(parseRgb(hex))
+  const sat = s < SAT_GRIS ? 0 : Math.min((0.18 * s) / MARCA_SAT, 0.3)
+  return hslAHex([h, sat, 0.924])
+}
+
+/** --at-nav-bg por defecto (index.css). */
+export const NAV_BG = '#102622'
+
+/**
+ * Grises del rail por defecto (index.css: --at-nav-ink-2 / -3 / -4), del más claro al
+ * más apagado: texto bajo el puntero, texto de los ítems inactivos y sus iconos /
+ * encabezados de grupo. Son grises verdosos (HSL ~145°, saturación 0.10–0.17).
+ */
+export const NAV_GRISES = { ink2: '#DCE6E0', ink3: '#B4C5BB', ink4: '#8FA398' } as const
+
+/**
+ * Grises del rail (--at-nav-ink-2 / -3 / -4) desde la marca. Cada uno toma
+ * el TONO de la marca, conserva la luminosidad HSL del por defecto y escala su
+ * saturación por la de la marca, acotada a 0.3 para que sigan siendo grises (marcas
+ * grises → grises neutros). Se aclaran si hace falta para leerse sobre el fondo del
+ * rail de la misma marca como el por defecto sobre #102622 (≈ 12.4 / 8.8 / 5.9:1),
+ * escalado por lo que se lee --at-nav-ink de esa marca respecto del por defecto (así
+ * ninguno supera a --at-nav-ink y se conserva la jerarquía) y nunca por debajo de
+ * 4.5:1 (también son texto).
+ */
+export function navGrisesDesdeMarca(hex: string): { ink2: string; ink3: string; ink4: string } {
+  const [h, s] = rgbAHsl(parseRgb(hex))
+  const fondo = navBgDesdeMarca(hex)
+  const escala = Math.min(1, contraste(navInkDesdeMarca(hex), fondo) / contraste(NAV_INK, NAV_BG))
+  const gris = (def: string) => {
+    const [, sDef, lDef] = rgbAHsl(parseRgb(def))
+    const sat = s < SAT_GRIS ? 0 : Math.min((sDef * s) / MARCA_SAT, 0.3)
+    const minimo = Math.max(AA, contraste(def, NAV_BG) * escala)
+    return aclararHasta(hslAHex([h, sat, lDef]), (c) => contraste(c, fondo) >= minimo)
+  }
+  return { ink2: gris(NAV_GRISES.ink2), ink3: gris(NAV_GRISES.ink3), ink4: gris(NAV_GRISES.ink4) }
+}
+
+function grisesNav(hex: string): Pick<VariablesMarca, 'navInk2' | 'navInk3' | 'navInk4'> {
+  const g = navGrisesDesdeMarca(hex)
+  return { navInk2: g.ink2, navInk3: g.ink3, navInk4: g.ink4 }
+}
+
+/**
+ * Ítem activo del rail: el punto (--at-nav-accent), su halo (--at-nav-accent-glow) y el
+ * fondo del icono (--at-nav-accent-soft), o null sin colores custom (index.css:
+ * var(--at-accent) y el terracota al 70 / 30%). Toma el acento custom si lo hay y, si
+ * no, el primario de la marca. Se aclara si hace falta para destacar sobre el fondo
+ * del rail (el derivado de la marca, o el por defecto) al menos tanto como el punto
+ * terracota por defecto sobre #102622 (≈ 3.7:1; nunca menos de 3:1, el mínimo WCAG
+ * para componentes de UI). Halo y fondo son el mismo color al 70 / 30%. Igual en
+ * ambos temas.
+ */
+export function navAccentDesdeMarca(
+  primaryColor: string | null | undefined,
+  accentColor: string | null | undefined,
+): { color: string; glow: string; soft: string } | null {
+  const primario = normalizarColorHex(primaryColor), acento = normalizarColorHex(accentColor)
+  const fuente = acento ?? primario
+  if (!fuente) return null
+  const fondo = primario ? navBgDesdeMarca(primario) : NAV_BG
+  const minimo = Math.max(3, contraste(DEFAULT_ACCENT_COLOR, NAV_BG))
+  const color = aclararHasta(fuente, (c) => contraste(c, fondo) >= minimo)
+  const [r, g, b] = parseRgb(color)
+  return { color, glow: `rgba(${r}, ${g}, ${b}, 0.7)`, soft: `rgba(${r}, ${g}, ${b}, 0.3)` }
+}
+
+/**
+ * --at-nav-bg (index.css: #102622, fijo en ambos temas) desde la marca: su tono, su
+ * saturación × 1.1 (acotada a 0.85) y luminosidad HSL 10.6%, como el #102622 respecto
+ * de #1B3B36. Marcas grises → casi negro neutro. Se oscurece si hace falta para que
+ * --at-nav-ink (el derivado de la misma marca) se lea ≥ 7:1 (AAA).
+ */
+export function navBgDesdeMarca(hex: string): string {
+  const [h, s] = rgbAHsl(parseRgb(hex))
+  const ink = navInkDesdeMarca(hex)
+  const base = hslAHex([h, Math.min(s * 1.1, 0.85), 0.106])
+  return oscurecer(base, factorOscurecerHasta(base, 0, (c) => contraste(ink, c) >= 7))
+}
 
 /** Mismo tono; luminosidad HSL `l` (0..1) y saturación × `factorSat`. */
 function enLuminosidad(hex: string, l: number, factorSat = 1): string {
@@ -241,6 +341,9 @@ export function derivarVariablesMarca(primary: string | null | undefined): Varia
     mint2: enLuminosidad(base, 0.6, 0.68),
     chip: mezclar(base, LIGHT_BG, CHIP_MEZCLA_CLARO),
     surfaceTint: mezclar(base, LIGHT_BG, SURFACE_TINT_MEZCLA_CLARO),
+    navBg: navBgDesdeMarca(base),
+    navInk: navInkDesdeMarca(base),
+    ...grisesNav(base),
   }
 }
 
@@ -272,17 +375,211 @@ export function derivarVariablesMarcaOscuro(primary: string | null | undefined):
     mint2: primary2,
     chip: mezclar(p, DARK_BG, CHIP_MEZCLA_OSCURO),
     surfaceTint: mezclar(p, DARK_BG, SURFACE_TINT_MEZCLA_OSCURO),
+    // El rail es oscuro en ambos temas: mismos valores que en claro.
+    navBg: navBgDesdeMarca(base),
+    navInk: navInkDesdeMarca(base),
+    ...grisesNav(base),
   }
 }
 
 /** CSS vars de tema que el branding sobreescribe (en orden). */
-export const BRAND_CSS_VARS = [
+const TONOS_MARCA_VARS = [
   '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
   '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
-  '--at-surface-tint',
+  '--at-surface-tint', '--at-nav-bg', '--at-nav-ink', '--at-nav-ink-2', '--at-nav-ink-3',
+  '--at-nav-ink-4',
 ] as const
 
-function varsMarca(v: VariablesMarca): Record<(typeof BRAND_CSS_VARS)[number], string> {
+/** Tokens de estado que también siguen a la marca (ver derivarEstados). */
+export const ESTADO_CSS_VARS = [
+  '--at-success', '--at-success-tint', '--at-success-border', '--at-success-strong',
+  '--at-warning', '--at-warning-tint', '--at-warning-border', '--at-warning-strong',
+  '--at-danger', '--at-danger-tint', '--at-danger-border', '--at-danger-strong',
+  '--at-info', '--at-info-tint', '--at-info-border', '--at-info-strong',
+] as const
+
+/** Tokens de datos que siguen a la marca: el color de las variaciones positivas / negativas (KPIs). */
+export const DATOS_CSS_VARS = ['--at-data-positive', '--at-data-negative'] as const
+
+/** CSS vars de tema que el branding sobreescribe (en orden): tonos de marca + estados + datos. */
+export const BRAND_CSS_VARS = [...TONOS_MARCA_VARS, ...ESTADO_CSS_VARS, ...DATOS_CSS_VARS] as const
+
+// ─── Estados success / warning / danger / info ──────────────────────────────
+// success, warning y danger tienen significado propio (~1600 / ~1400 / ~1800 usos:
+// pagado, pendiente, vencido…), así que conservan su TONO por defecto (verde,
+// ámbar, rojo) y sólo ajustan a la marca la saturación y la luminosidad de partida:
+// una marca viva da estados vivos, una apagada estados apagados. Con el color por
+// defecto reproducen los de index.css. info, en cambio, toma el tono de la marca
+// (avisos neutros en color de marca), salvo que choque con alguno de los otros.
+// Mismos mínimos de contraste que src/test/__tests__/contrast.test.ts: strong sobre
+// tint ≥ 4.5, blanco sobre strong ≥ 4.5 y blanco sobre la base ≥ 3 (AA-large); en
+// dark, la base y strong ≥ 4.5 sobre la superficie y su tint.
+
+interface PaletaEstado { base: string; tint: string; border: string; strong: string }
+type Estado = 'success' | 'warning' | 'danger' | 'info'
+
+/**
+ * Paletas de estado por defecto: los valores de src/index.css (claro en :root, dark
+ * en los bloques dark). Un test comprueba que sigan iguales a los de index.css.
+ */
+export const PALETAS_ESTADO_DEFECTO: Record<Estado, { claro: PaletaEstado; oscuro: PaletaEstado }> = {
+  success: {
+    claro: { base: '#16a34a', tint: '#dcfce7', border: '#bbf7d0', strong: '#15803d' },
+    oscuro: { base: '#4ade80', tint: '#14271c', border: '#1f3a2a', strong: '#86efac' },
+  },
+  warning: {
+    claro: { base: '#d97706', tint: '#fef3c7', border: '#fde68a', strong: '#92400e' },
+    oscuro: { base: '#fbbf24', tint: '#2a2008', border: '#3a2e0f', strong: '#fcd34d' },
+  },
+  danger: {
+    claro: { base: '#ef4444', tint: '#fef2f2', border: '#fecaca', strong: '#dc2626' },
+    oscuro: { base: '#f87171', tint: '#2a1414', border: '#3a1f1f', strong: '#fca5a5' },
+  },
+  info: {
+    claro: { base: '#2563eb', tint: '#dbeafe', border: '#bfdbfe', strong: '#1d4ed8' },
+    oscuro: { base: '#60a5fa', tint: '#0f1f33', border: '#1e3a5f', strong: '#93c5fd' },
+  },
+}
+/**
+ * --at-data-negative por defecto (index.css: claro / dark): el rojo de las variaciones
+ * negativas de los KPIs (StatTile). Es texto sobre las tarjetas.
+ */
+export const DATA_NEGATIVE_DEFECTO = { claro: '#B23A3A', oscuro: '#E8736B' } as const
+/** HSL de la marca por defecto (#1B3B36): referencia para escalar saturación / luminosidad. */
+const MARCA_SAT = 0.37
+const MARCA_LUM = 0.17
+/** Por debajo de esta saturación HSL la marca se trata como gris (sin tono que heredar). */
+const SAT_GRIS = 0.08
+/**
+ * Tonos (grados) de los estados con significado propio: danger (#ef4444), warning
+ * (#d97706) y success. Si el tono de la marca cae a menos de ESTADO_DISTANCIA_MIN de
+ * alguno, info usaría un color que se confunde con ese estado (marca roja → «Aviso»
+ * igual que «Vencido»), así que vuelve al azul por defecto.
+ */
+const TONOS_ESTADO = [0, 32, 142]
+const ESTADO_DISTANCIA_MIN = 30
+const distanciaTono = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b))
+/** Mínimos de contraste (WCAG) de los estados, como en contrast.test.ts. */
+const AA = 4.5
+const AA_GRANDE = 3
+
+/** Baja la luminosidad HSL (mismo tono y saturación) lo MÍNIMO para cumplir `cumple`. */
+function oscurecerHslHasta(hex: string, cumple: (c: string) => boolean): string {
+  if (cumple(hex)) return hex
+  const [h, s, l0] = rgbAHsl(parseRgb(hex))
+  let lo = 0, hi = l0 // lo cumple (negro), hi no
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2
+    if (cumple(hslAHex([h, s, mid]))) lo = mid
+    else hi = mid
+  }
+  return hslAHex([h, s, lo])
+}
+
+const acotar = (x: number, min: number, max: number) => Math.max(min, Math.min(max, x))
+
+/**
+ * Transforma un color de una paleta por defecto: tono girado `giro` (0–1), saturación
+ * × `k` (acotada entre la mitad de la original y máx(original, 0.85)) y luminosidad
+ * + `dl`. paletaEstado sólo mueve la luminosidad de base y strong, y a tint / border
+ * (superficies) sólo les baja la saturación (k ≤ 1): una marca viva aviva el texto y
+ * los rellenos, no los fondos.
+ */
+function transformar(hex: string, giro: number, k: number, dl: number): string {
+  const [h, s, l] = rgbAHsl(parseRgb(hex))
+  return hslAHex([(h + giro + 1) % 1, acotar(s * k, s * 0.5, Math.max(s, 0.85)), acotar(l + dl, 0, 1)])
+}
+
+/**
+ * Paleta de un estado ajustada a la marca, a partir de la de index.css. Después se
+ * imponen los mínimos de contraste de contrast.test.ts, cada uno nunca más exigente
+ * que lo que ya cumple la paleta por defecto (así, con la marca por defecto, la
+ * paleta sale idéntica a index.css). Claro: blanco sobre base ≥ 3; strong sobre tint
+ * ≥ 4.5; blanco sobre strong ≥ 4.5. Dark: base ≥ 4.5 sobre la superficie y su tint;
+ * strong ≥ 4.5 sobre su tint.
+ */
+function paletaEstado(def: { claro: PaletaEstado; oscuro: PaletaEstado }, giro: number, k: number, dl: number): { claro: PaletaEstado; oscuro: PaletaEstado } {
+  const blanco = '#ffffff'
+  const min = (regla: number, a: string, b: string) => Math.min(regla, contraste(a, b))
+  const c = def.claro, o = def.oscuro
+  // lum = true: base / strong (texto, rellenos). false: tint / border (superficies).
+  const t = (hex: string, lum = false) => transformar(hex, giro, lum ? k : Math.min(k, 1), lum ? dl : 0)
+
+  const tint = t(c.tint)
+  const base = oscurecerHslHasta(t(c.base, true), (x) => contraste(blanco, x) >= min(AA_GRANDE, blanco, c.base))
+  const strong = oscurecerHslHasta(t(c.strong, true), (x) =>
+    contraste(x, tint) >= min(AA, c.strong, c.tint) && contraste(blanco, x) >= min(AA, blanco, c.strong))
+
+  const tintO = t(o.tint)
+  const baseO = aclararHasta(t(o.base, true), (x) =>
+    contraste(x, DARK_SURFACE) >= min(AA, o.base, DARK_SURFACE) && contraste(x, tintO) >= min(AA, o.base, o.tint))
+  const strongO = aclararHasta(t(o.strong, true), (x) => contraste(x, tintO) >= min(AA, o.strong, o.tint))
+  return {
+    claro: { base, tint, border: t(c.border), strong },
+    oscuro: { base: baseO, tint: tintO, border: t(o.border), strong: strongO },
+  }
+}
+
+/**
+ * success / warning / danger / info derivados del color de marca, para claro y
+ * oscuro (claves de ESTADO_CSS_VARS), a partir de las paletas de index.css:
+ * - saturación × (saturación de la marca / la de la marca por defecto): una marca
+ *   viva da estados vivos, una apagada (o gris) estados apagados;
+ * - luminosidad de base y strong + 30% de lo que se aparta la de la marca (acotado
+ *   a −0.06 / +0.09);
+ * - tono: success / warning / danger conservan el suyo. info se gira al tono de la
+ *   marca, salvo que la marca sea gris o negra (sin tono: HSL daría 0° = rojo) o que
+ *   su tono choque con danger / warning / success (TONOS_ESTADO): entonces queda azul.
+ * Con la marca por defecto las cuatro paletas salen idénticas a index.css.
+ * Incluye también los tokens de datos de los KPIs (DATOS_CSS_VARS, texto sobre las
+ * tarjetas):
+ * - --at-data-negative conserva su rojo como danger, con la misma saturación /
+ *   luminosidad ajustadas, y se lee ≥ 4.5:1 (o lo que ya da el valor por defecto).
+ * - --at-data-positive es el primario de la marca, como en index.css
+ *   (var(--at-primary)), salvo que su tono esté a menos de 30° del rojo (se
+ *   confundiría con la variación negativa) o que no se lea como texto (< 4.5:1): en
+ *   ese tema pasa al verde de success de la marca (strong en claro, base en dark).
+ */
+export function derivarEstados(primary: string | null | undefined): { claro: Record<string, string>; oscuro: Record<string, string> } {
+  const marca = normalizarColorHex(primary) ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
+  const [h, s, l] = rgbAHsl(parseRgb(marca))
+  const k = s / MARCA_SAT
+  const dl = acotar((l - MARCA_LUM) * 0.3, -0.06, 0.09)
+  const choca = s < SAT_GRIS || TONOS_ESTADO.some((t) => distanciaTono(h * 360, t) < ESTADO_DISTANCIA_MIN)
+  const tonoInfo = rgbAHsl(parseRgb(PALETAS_ESTADO_DEFECTO.info.claro.base))[0]
+  const vars = {} as { claro: Record<string, string>; oscuro: Record<string, string> }
+  vars.claro = {}; vars.oscuro = {}
+  for (const e of ['success', 'warning', 'danger', 'info'] as const) {
+    const giro = e === 'info' && !choca ? h - tonoInfo : 0
+    const p = paletaEstado(PALETAS_ESTADO_DEFECTO[e], giro, k, dl)
+    for (const tema of ['claro', 'oscuro'] as const) {
+      Object.assign(vars[tema], {
+        [`--at-${e}`]: p[tema].base, [`--at-${e}-tint`]: p[tema].tint,
+        [`--at-${e}-border`]: p[tema].border, [`--at-${e}-strong`]: p[tema].strong,
+      })
+    }
+  }
+  // --at-data-positive: el primario, salvo choque con el rojo o ilegible → verde de success.
+  const fondoTexto = { claro: '#ffffff', oscuro: DARK_SURFACE } as const
+  const primario = { claro: marca, oscuro: derivarVariablesMarcaOscuro(marca).primary }
+  const chocaConRojo = s >= SAT_GRIS && distanciaTono(h * 360, 0) < ESTADO_DISTANCIA_MIN
+  for (const tema of ['claro', 'oscuro'] as const) {
+    const legible = contraste(primario[tema], fondoTexto[tema]) >= AA
+    vars[tema]['--at-data-positive'] = !chocaConRojo && legible
+      ? primario[tema]
+      : vars[tema][tema === 'claro' ? '--at-success-strong' : '--at-success']
+  }
+
+  // --at-data-negative: rojo como danger; texto sobre las tarjetas (blanco / superficie dark).
+  const dn = DATA_NEGATIVE_DEFECTO
+  vars.claro['--at-data-negative'] = oscurecerHslHasta(transformar(dn.claro, 0, k, dl), (x) =>
+    contraste(x, '#ffffff') >= Math.min(AA, contraste(dn.claro, '#ffffff')))
+  vars.oscuro['--at-data-negative'] = aclararHasta(transformar(dn.oscuro, 0, k, dl), (x) =>
+    contraste(x, DARK_SURFACE) >= Math.min(AA, contraste(dn.oscuro, DARK_SURFACE)))
+  return vars
+}
+
+function varsMarca(v: VariablesMarca): Record<(typeof TONOS_MARCA_VARS)[number], string> {
   return {
     '--at-primary': v.primary,
     '--at-primary-hover': v.hover,
@@ -294,6 +591,11 @@ function varsMarca(v: VariablesMarca): Record<(typeof BRAND_CSS_VARS)[number], s
     '--at-primary-mint-2': v.mint2,
     '--at-chip': v.chip,
     '--at-surface-tint': v.surfaceTint,
+    '--at-nav-bg': v.navBg,
+    '--at-nav-ink': v.navInk,
+    '--at-nav-ink-2': v.navInk2,
+    '--at-nav-ink-3': v.navInk3,
+    '--at-nav-ink-4': v.navInk4,
   }
 }
 
@@ -304,13 +606,13 @@ function varsMarca(v: VariablesMarca): Record<(typeof BRAND_CSS_VARS)[number], s
  */
 export function estilosMarca(primaryColor: string | null | undefined): Record<string, string> | null {
   const color = normalizarColorHex(primaryColor)
-  return color ? varsMarca(derivarVariablesMarca(color)) : null
+  return color ? { ...varsMarca(derivarVariablesMarca(color)), ...derivarEstados(color).claro } : null
 }
 
 /** Igual que `estilosMarca` pero con los valores del tema OSCURO; null si no hay color custom. */
 export function estilosMarcaOscuro(primaryColor: string | null | undefined): Record<string, string> | null {
   const color = normalizarColorHex(primaryColor)
-  return color ? varsMarca(derivarVariablesMarcaOscuro(color)) : null
+  return color ? { ...varsMarca(derivarVariablesMarcaOscuro(color)), ...derivarEstados(color).oscuro } : null
 }
 
 /** Color de acento del tema por defecto (= --at-accent en src/index.css). */
@@ -533,8 +835,13 @@ export function hojaEstilosMarca(
   primaryColor: string | null | undefined,
   accentColor: string | null | undefined,
 ): string | null {
-  const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor))
-  const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor))
+  // Marcador del rail: depende de ambos colores; el rail es igual en ambos temas.
+  const marcador = navAccentDesdeMarca(primaryColor, accentColor)
+  const nav = marcador
+    ? { '--at-nav-accent': marcador.color, '--at-nav-accent-glow': marcador.glow, '--at-nav-accent-soft': marcador.soft }
+    : null
+  const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor), nav)
+  const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor), nav)
   if (!claro) return null
   const lineas = [
     `:root:root { ${claro} }`,

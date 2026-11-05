@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   esColorHex, normalizarColorHex, oscurecer, mezclarBlanco, mezclar,
   luminanciaRelativa, contraste, aclararParaTemaOscuro, suaveOscuro,
@@ -7,6 +9,8 @@ import {
   DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_BG, DARK_SURFACE, DARK_MIN_CONTRASTE,
   LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
   derivarVariablesAccent, derivarVariablesAccentOscuro, respaldosSinColorMix,
+  derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO, DATOS_CSS_VARS, DATA_NEGATIVE_DEFECTO, NAV_INK,
+  navAccentDesdeMarca, NAV_BG, navGrisesDesdeMarca, NAV_GRISES,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -78,14 +82,19 @@ describe('estilosMarca', () => {
     expect(estilosMarca(undefined)).toBeNull()
     expect(estilosMarca('rojo')).toBeNull()
   })
-  it('color válido → mapa con las 10 CSS vars de marca (incluidas --at-chip y --at-surface-tint)', () => {
+  it('color válido → mapa con las 33 CSS vars de marca (tonos + nav + estados + datos)', () => {
     const m = estilosMarca('#1B3B36')
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
     expect(Object.keys(m!)).toEqual([
       '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
       '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
-      '--at-surface-tint',
+      '--at-surface-tint', '--at-nav-bg', '--at-nav-ink', '--at-nav-ink-2', '--at-nav-ink-3', '--at-nav-ink-4',
+      '--at-success', '--at-success-tint', '--at-success-border', '--at-success-strong',
+      '--at-warning', '--at-warning-tint', '--at-warning-border', '--at-warning-strong',
+      '--at-danger', '--at-danger-tint', '--at-danger-border', '--at-danger-strong',
+      '--at-info', '--at-info-tint', '--at-info-border', '--at-info-strong',
+      '--at-data-positive', '--at-data-negative',
     ])
     expect(Object.keys(m!)).toEqual([...BRAND_CSS_VARS])
   })
@@ -595,3 +604,390 @@ describe('respaldosSinColorMix / bloque @supports not (color-mix)', () => {
     expect(hojaEstilosMarca(null, '#0e7490')).not.toContain('@supports')
   })
 })
+
+// ─── Estados success / warning / danger / info derivados de la marca ─────────
+// Parten de las paletas de index.css: success / warning / danger conservan su tono
+// (verde / ámbar / rojo: ~1600 / ~1400 / ~1800 usos con significado propio) y sólo
+// ajustan saturación y luminosidad a la marca; info toma el tono de la marca salvo
+// que choque con otro estado. Mínimos de src/test/__tests__/contrast.test.ts, nunca
+// más exigentes que lo que ya cumple la paleta por defecto.
+
+/** Tono HSL en grados (0–360) de un hex. */
+function tono(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(normalizarColorHex(hex)!.slice(i, i + 2), 16) / 255)
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+  if (d === 0) return 0
+  const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return h * 60
+}
+const distTono = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b))
+const BLANCO = '#ffffff'
+const ESTADOS = ['success', 'warning', 'danger', 'info'] as const
+const SEMANTICOS = ['success', 'warning', 'danger'] as const
+const TEMAS = ['claro', 'oscuro'] as const
+const clave = (e: string, parte: 'base' | 'tint' | 'border' | 'strong') => (parte === 'base' ? `--at-${e}` : `--at-${e}-${parte}`)
+const PARTES = ['base', 'tint', 'border', 'strong'] as const
+
+describe('derivarEstados — success / warning / danger / info desde la marca', () => {
+  it('las paletas por defecto son las de src/index.css (claro y dark)', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    const raiz = css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {')))
+    const darkManual = css.slice(css.indexOf('[data-theme="dark"] {'), css.indexOf('}', css.indexOf('[data-theme="dark"] {')))
+    for (const e of ESTADOS) {
+      for (const parte of PARTES) {
+        const k = clave(e, parte)
+        const re = (bloque: string) => new RegExp(`${k}:\\s*(#[0-9a-fA-F]{6})`).exec(bloque)?.[1]?.toLowerCase()
+        expect(re(raiz), `claro ${k}`).toBe(PALETAS_ESTADO_DEFECTO[e].claro[parte])
+        expect(re(darkManual), `oscuro ${k}`).toBe(PALETAS_ESTADO_DEFECTO[e].oscuro[parte])
+      }
+    }
+  })
+
+  it('da las 16 vars de estado + las 2 de datos, en claro y en oscuro', () => {
+    const e = derivarEstados('#7c3aed')
+    const esperadas = [...ESTADO_CSS_VARS, ...DATOS_CSS_VARS].sort()
+    expect(Object.keys(e.claro).sort()).toEqual(esperadas)
+    expect(Object.keys(e.oscuro).sort()).toEqual(esperadas)
+  })
+
+  it('con el color por defecto, las cuatro paletas salen idénticas a las de index.css', () => {
+    const d = derivarEstados(DEFAULT_BRAND_COLOR)
+    for (const e of ESTADOS) for (const t of TEMAS) for (const parte of PARTES) {
+      expect(distanciaRgb(d[t][clave(e, parte)], PALETAS_ESTADO_DEFECTO[e][t][parte]), `${t} ${clave(e, parte)}`).toBeLessThanOrEqual(2)
+    }
+  })
+
+  it.each(MUESTRAS)('%s → success / warning / danger conservan su tono (verde / ámbar / rojo) en ambos temas', (c) => {
+    const d = derivarEstados(c)
+    for (const e of SEMANTICOS) for (const t of TEMAS) for (const parte of PARTES) {
+      const v = d[t][clave(e, parte)], def = PALETAS_ESTADO_DEFECTO[e][t][parte]
+      expect(distTono(tono(v), tono(def)), `${t} ${clave(e, parte)} ${v}`).toBeLessThan(6)
+    }
+  })
+
+  it.each(SEMANTICOS)('%s: la saturación sigue a la de la marca (marca apagada → estado más apagado)', (e) => {
+    expect(croma(derivarEstados('#5f6b66').claro[`--at-${e}`])).toBeLessThan(croma(derivarEstados('#7c3aed').claro[`--at-${e}`]))
+  })
+
+  // Tonos de danger (#ef4444), warning (#d97706) y success: info no debe parecerse a ellos.
+  const chocaConEstado = (c: string) => [0, 32, 142].some((t) => distTono(tono(c), t) < 30)
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25 && !chocaConEstado(c)))('%s → info toma el tono de la marca', (c) => {
+    const e = derivarEstados(c)
+    // Se gira la paleta entera: cada token conserva su desfase con la base clara por
+    // defecto (en index.css el info dark está ~8° del claro).
+    const tonoBase = tono(PALETAS_ESTADO_DEFECTO.info.claro.base)
+    for (const t of TEMAS) {
+      const esperado = (tono(c) + tono(PALETAS_ESTADO_DEFECTO.info[t].base) - tonoBase + 360) % 360
+      expect(distTono(tono(e[t]['--at-info']), esperado), `${t} ${e[t]['--at-info']}`).toBeLessThan(4)
+    }
+  })
+
+  it.each([
+    ['#ff0000', 'rojo → danger'], ['#be123c', 'carmesí → danger'], ['#ffd400', 'amarillo → warning'],
+    ['#B96A3F', 'terracota → warning'], ['#22c55e', 'verde → success'], [DEFAULT_BRAND_COLOR, 'verde azulado por defecto → success'],
+    ['#000000', 'negro (sin tono)'], ['#c0c0c0', 'gris (sin tono)'], ['#ffffff', 'blanco (sin tono)'],
+  ])('%s (%s) → info se queda azul para no confundirse', (c) => {
+    const e = derivarEstados(c)
+    for (const t of TEMAS) {
+      expect(distTono(tono(e[t]['--at-info']), tono(PALETAS_ESTADO_DEFECTO.info[t].base)), `${t} ${e[t]['--at-info']}`).toBeLessThan(6)
+    }
+  })
+
+  it.each(MUESTRAS)('%s → info nunca cae cerca del tono de danger / warning / success', (c) => {
+    const e = derivarEstados(c)
+    for (const t of TEMAS) {
+      if (croma(e[t]['--at-info']) > 25) expect(chocaConEstado(e[t]['--at-info']), `${t} ${e[t]['--at-info']}`).toBe(false)
+    }
+  })
+
+  it.each(MUESTRAS)('%s → claro: los mínimos de contrast.test.ts (nunca peor que la paleta por defecto)', (c) => {
+    const d = derivarEstados(c).claro
+    for (const e of ESTADOS) {
+      const def = PALETAS_ESTADO_DEFECTO[e].claro
+      const base = d[`--at-${e}`], tint = d[`--at-${e}-tint`], strong = d[`--at-${e}-strong`], border = d[`--at-${e}-border`]
+      expect(contraste(BLANCO, base), `${e}: blanco sobre base`).toBeGreaterThanOrEqual(Math.min(3, contraste(BLANCO, def.base)) - 0.01)
+      expect(contraste(strong, tint), `${e}: strong sobre tint`).toBeGreaterThanOrEqual(Math.min(4.5, contraste(def.strong, def.tint)) - 0.01)
+      expect(contraste(BLANCO, strong), `${e}: blanco sobre strong`).toBeGreaterThanOrEqual(Math.min(4.5, contraste(BLANCO, def.strong)) - 0.01)
+      expect(L(tint)).toBeGreaterThan(L(border))
+      expect(L(border)).toBeGreaterThan(L(base))
+    }
+  })
+
+  it.each(MUESTRAS)('%s → oscuro: base y strong se leen sobre la superficie y su tint; tint y border son oscuros', (c) => {
+    const d = derivarEstados(c).oscuro
+    for (const e of ESTADOS) {
+      const def = PALETAS_ESTADO_DEFECTO[e].oscuro
+      const base = d[`--at-${e}`], tint = d[`--at-${e}-tint`], strong = d[`--at-${e}-strong`], border = d[`--at-${e}-border`]
+      expect(contraste(base, DARK_SURFACE), `${e}: base sobre superficie`).toBeGreaterThanOrEqual(Math.min(4.5, contraste(def.base, DARK_SURFACE)) - 0.01)
+      expect(contraste(base, tint), `${e}: base sobre tint`).toBeGreaterThanOrEqual(Math.min(4.5, contraste(def.base, def.tint)) - 0.01)
+      expect(contraste(strong, tint), `${e}: strong sobre tint`).toBeGreaterThanOrEqual(Math.min(4.5, contraste(def.strong, def.tint)) - 0.01)
+      expect(L(tint)).toBeLessThan(0.06)
+      expect(L(border)).toBeLessThan(0.1)
+      expect(L(tint)).toBeLessThan(L(border))
+    }
+  })
+
+  it('la hoja lleva los 16 estados, claros y oscuros (sin marca custom, nada)', () => {
+    const css = hojaEstilosMarca('#7c3aed', null)!
+    const [claro, auto, manual] = css.split('\n')
+    const e = derivarEstados('#7c3aed')
+    for (const k of ESTADO_CSS_VARS) {
+      expect(claro).toContain(`${k}: ${e.claro[k]};`)
+      expect(auto).toContain(`${k}: ${e.oscuro[k]};`)
+      expect(manual).toContain(`${k}: ${e.oscuro[k]};`)
+    }
+    expect(hojaEstilosMarca(null, '#0e7490')).not.toContain('--at-danger')
+  })
+})
+
+// --at-data-negative: el rojo de las variaciones negativas de los KPIs (StatTile).
+describe('--at-data-negative desde la marca', () => {
+  it('el valor por defecto es el de src/index.css (claro y dark)', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    const raiz = css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {')))
+    const darkManual = css.slice(css.indexOf('[data-theme="dark"] {'), css.indexOf('}', css.indexOf('[data-theme="dark"] {')))
+    const v = (b: string) => /--at-data-negative:\s*(#[0-9a-fA-F]{6})/.exec(b)?.[1]
+    expect(v(raiz)).toBe(DATA_NEGATIVE_DEFECTO.claro)
+    expect(v(darkManual)).toBe(DATA_NEGATIVE_DEFECTO.oscuro)
+  })
+
+  it('con la marca por defecto sale igual que en index.css', () => {
+    const d = derivarEstados(DEFAULT_BRAND_COLOR)
+    expect(distanciaRgb(d.claro['--at-data-negative'], DATA_NEGATIVE_DEFECTO.claro)).toBeLessThanOrEqual(2)
+    expect(distanciaRgb(d.oscuro['--at-data-negative'], DATA_NEGATIVE_DEFECTO.oscuro)).toBeLessThanOrEqual(2)
+  })
+
+  it.each(MUESTRAS)('%s → sigue siendo rojo y se lee como texto sobre las tarjetas en ambos temas', (c) => {
+    const d = derivarEstados(c)
+    for (const t of TEMAS) {
+      expect(distTono(tono(d[t]['--at-data-negative']), tono(DATA_NEGATIVE_DEFECTO[t])), `${t} ${d[t]['--at-data-negative']}`).toBeLessThan(6)
+    }
+    expect(contraste(d.claro['--at-data-negative'], '#ffffff')).toBeGreaterThanOrEqual(4.5)
+    expect(contraste(d.oscuro['--at-data-negative'], DARK_SURFACE)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('la saturación sigue a la de la marca y la hoja lo lleva en claro y oscuro', () => {
+    expect(croma(derivarEstados('#5f6b66').claro['--at-data-negative'])).toBeLessThan(croma(derivarEstados('#7c3aed').claro['--at-data-negative']))
+    const css = hojaEstilosMarca('#7c3aed', null)!
+    const [claro, auto, manual] = css.split('\n')
+    const e = derivarEstados('#7c3aed')
+    expect(claro).toContain(`--at-data-negative: ${e.claro['--at-data-negative']};`)
+    expect(auto).toContain(`--at-data-negative: ${e.oscuro['--at-data-negative']};`)
+    expect(manual).toContain(`--at-data-negative: ${e.oscuro['--at-data-negative']};`)
+  })
+})
+
+// --at-data-positive: el primario (como var(--at-primary) en index.css), salvo que se
+// confunda con el rojo de las variaciones negativas o no se lea como texto: entonces,
+// el verde de success de la marca.
+describe('--at-data-positive desde la marca', () => {
+  const FONDO = { claro: '#ffffff', oscuro: DARK_SURFACE } as const
+  const primario = (c: string) => ({ claro: estilosMarca(c)!['--at-primary'], oscuro: estilosMarcaOscuro(c)!['--at-primary'] })
+
+  it.each([DEFAULT_BRAND_COLOR, '#7c3aed', '#0033cc', '#0e7490', '#14213d'])('%s → es el primario de la marca en ambos temas', (c) => {
+    const d = derivarEstados(c), p = primario(c)
+    for (const t of TEMAS) expect(d[t]['--at-data-positive'], t).toBe(p[t])
+  })
+
+  it.each(['#ff0000', '#be123c'])('%s (rojo) → verde de success en ambos temas, para no confundirse con la variación negativa', (c) => {
+    const d = derivarEstados(c)
+    expect(d.claro['--at-data-positive']).toBe(d.claro['--at-success-strong'])
+    expect(d.oscuro['--at-data-positive']).toBe(d.oscuro['--at-success'])
+  })
+
+  it('amarillo: ilegible sobre blanco → verde en claro; legible en dark → sigue siendo el primario', () => {
+    const d = derivarEstados('#ffd400')
+    expect(d.claro['--at-data-positive']).toBe(d.claro['--at-success-strong'])
+    expect(d.oscuro['--at-data-positive']).toBe(primario('#ffd400').oscuro)
+  })
+
+  it.each(MUESTRAS)('%s → siempre se lee como texto y nunca se parece a --at-data-negative', (c) => {
+    const d = derivarEstados(c)
+    for (const t of TEMAS) {
+      const pos = d[t]['--at-data-positive'], neg = d[t]['--at-data-negative']
+      expect(contraste(pos, FONDO[t]), `${t} ${pos}`).toBeGreaterThanOrEqual(4.5)
+      if (croma(pos) > 25) expect(distTono(tono(pos), tono(neg)), `${t} ${pos} vs ${neg}`).toBeGreaterThanOrEqual(30)
+    }
+  })
+
+  it('la hoja lo lleva en claro y oscuro', () => {
+    const css = hojaEstilosMarca('#ff0000', null)!
+    const [claro, auto, manual] = css.split('\n')
+    const e = derivarEstados('#ff0000')
+    expect(claro).toContain(`--at-data-positive: ${e.claro['--at-data-positive']};`)
+    expect(auto).toContain(`--at-data-positive: ${e.oscuro['--at-data-positive']};`)
+    expect(manual).toContain(`--at-data-positive: ${e.oscuro['--at-data-positive']};`)
+  })
+})
+
+// --at-nav-bg: fondo del rail de navegación (#102622), oscuro en ambos temas, con
+// texto --at-nav-ink claro y overlays blancos translúcidos encima.
+describe('--at-nav-bg desde la marca', () => {
+  it('el valor por defecto y --at-nav-ink son los de src/index.css', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    expect(css).toMatch(/--at-nav-bg:\s*#102622;/)
+    expect(css).toMatch(new RegExp(`--at-nav-ink:\\s*${NAV_INK};`))
+  })
+
+  it('con la marca por defecto sale (casi) igual que en index.css', () => {
+    expect(distanciaRgb(derivarVariablesMarca(DEFAULT_BRAND_COLOR).navBg, '#102622')).toBeLessThanOrEqual(2)
+  })
+
+  it.each(MUESTRAS)('%s → oscuro, igual en claro y en oscuro, y su --at-nav-ink se lee ≥ 7:1', (c) => {
+    const claro = derivarVariablesMarca(c), oscuro = derivarVariablesMarcaOscuro(c)
+    expect(oscuro.navBg).toBe(claro.navBg)
+    expect(oscuro.navInk).toBe(claro.navInk)
+    expect(L(claro.navBg)).toBeLessThan(0.03)
+    expect(contraste(claro.navInk, claro.navBg)).toBeGreaterThanOrEqual(7)
+  })
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → toma el tono de la marca', (c) => {
+    const nav = derivarVariablesMarca(c).navBg
+    expect(distTono(tono(nav), tono(c)), nav).toBeLessThan(10)
+  })
+
+  it('marca gris → casi negro neutro', () => {
+    expect(croma(derivarVariablesMarca('#808080').navBg)).toBeLessThan(4)
+  })
+
+  it('la hoja lleva --at-nav-bg y --at-nav-ink en los tres selectores, con el mismo valor', () => {
+    const css = hojaEstilosMarca('#7c3aed', null)!
+    const v = derivarVariablesMarca('#7c3aed')
+    for (const l of css.split('\n').slice(0, 3)) {
+      expect(l).toContain(`--at-nav-bg: ${v.navBg};`)
+      expect(l).toContain(`--at-nav-ink: ${v.navInk};`)
+    }
+  })
+})
+
+// --at-nav-ink: texto sobre --at-nav-bg. Blanco roto teñido del tono de la marca.
+describe('--at-nav-ink desde la marca', () => {
+  it('con la marca por defecto queda prácticamente igual que #ECEFE8 (un blanco roto)', () => {
+    expect(distanciaRgb(derivarVariablesMarca(DEFAULT_BRAND_COLOR).navInk, NAV_INK)).toBeLessThan(10)
+  })
+
+  it.each(MUESTRAS)('%s → sigue siendo casi blanco', (c) => {
+    const ink = derivarVariablesMarca(c).navInk
+    expect(L(ink)).toBeGreaterThan(0.75)
+    expect(croma(ink)).toBeLessThan(40)
+  })
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → se tiñe del tono de la marca', (c) => {
+    const ink = derivarVariablesMarca(c).navInk
+    expect(distTono(tono(ink), tono(c)), ink).toBeLessThan(12)
+  })
+
+  it('marca gris → blanco roto neutro', () => {
+    expect(croma(derivarVariablesMarca('#808080').navInk)).toBe(0)
+  })
+})
+
+// --at-nav-ink-2 / -3 / -4: los grises del rail (texto bajo el puntero, ítems
+// inactivos, iconos y encabezados de grupo), teñidos del tono de la marca.
+describe('--at-nav-ink-2 / -3 / -4 (grises del rail) desde la marca', () => {
+  const GRISES = ['ink2', 'ink3', 'ink4'] as const
+
+  it('index.css los define con los valores de siempre y el Sidebar ya no tiene los grises fijos', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    expect(css).toMatch(new RegExp(`--at-nav-ink-2:\\s*${NAV_GRISES.ink2};`))
+    expect(css).toMatch(new RegExp(`--at-nav-ink-3:\\s*${NAV_GRISES.ink3};`))
+    expect(css).toMatch(new RegExp(`--at-nav-ink-4:\\s*${NAV_GRISES.ink4};`))
+    const sidebar = readFileSync(resolve(process.cwd(), 'src/components/layout/Sidebar.tsx'), 'utf8')
+    for (const g of Object.values(NAV_GRISES)) expect(sidebar.toUpperCase()).not.toContain(g.toUpperCase())
+    for (const v of ['--at-nav-ink-2', '--at-nav-ink-3', '--at-nav-ink-4']) expect(sidebar).toContain(`var(${v})`)
+  })
+
+  it('con la marca por defecto quedan prácticamente iguales a los de index.css', () => {
+    const g = navGrisesDesdeMarca(DEFAULT_BRAND_COLOR)
+    for (const k of GRISES) expect(distanciaRgb(g[k], NAV_GRISES[k]), k).toBeLessThan(10)
+  })
+
+  it.each(MUESTRAS)('%s → iguales en ambos temas, legibles y con la jerarquía de siempre', (c) => {
+    const claro = derivarVariablesMarca(c), oscuro = derivarVariablesMarcaOscuro(c)
+    const g = navGrisesDesdeMarca(c)
+    expect([claro.navInk2, claro.navInk3, claro.navInk4]).toEqual([g.ink2, g.ink3, g.ink4])
+    expect([oscuro.navInk2, oscuro.navInk3, oscuro.navInk4]).toEqual([g.ink2, g.ink3, g.ink4])
+    const k = (x: string) => contraste(x, claro.navBg)
+    // Del más legible al más apagado: --at-nav-ink > -2 > -3 > -4, y todos son texto.
+    expect(k(claro.navInk)).toBeGreaterThan(k(g.ink2))
+    expect(k(g.ink2)).toBeGreaterThan(k(g.ink3))
+    expect(k(g.ink3)).toBeGreaterThan(k(g.ink4))
+    expect(k(g.ink4)).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+    // Tan legibles como los por defecto, en proporción a lo que se lee --at-nav-ink.
+    const escala = Math.min(1, k(claro.navInk) / contraste(NAV_INK, NAV_BG))
+    for (const x of GRISES) expect(k(g[x]), x).toBeGreaterThanOrEqual(contraste(NAV_GRISES[x], NAV_BG) * escala - 0.01)
+  })
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → se tiñen del tono de la marca', (c) => {
+    const g = navGrisesDesdeMarca(c)
+    for (const x of ['ink3', 'ink4'] as const) expect(distTono(tono(g[x]), tono(c)), `${x} ${g[x]}`).toBeLessThan(12)
+    for (const x of GRISES) expect(croma(g[x]), x).toBeLessThan(70)
+  })
+
+  it('marca gris → grises neutros', () => {
+    const g = navGrisesDesdeMarca('#808080')
+    for (const x of GRISES) expect(croma(g[x]), x).toBe(0)
+  })
+
+  it('la hoja los lleva en los tres selectores, con el mismo valor', () => {
+    const g = navGrisesDesdeMarca('#7c3aed')
+    for (const l of hojaEstilosMarca('#7c3aed', null)!.split('\n').slice(0, 3)) {
+      expect(l).toContain(`--at-nav-ink-2: ${g.ink2};`)
+      expect(l).toContain(`--at-nav-ink-3: ${g.ink3};`)
+      expect(l).toContain(`--at-nav-ink-4: ${g.ink4};`)
+    }
+  })
+})
+
+// Marcador del ítem activo del rail (Sidebar): --at-nav-accent + halo.
+describe('--at-nav-accent (marcador del rail) desde la marca', () => {
+  it('index.css lo define con los valores de siempre y el Sidebar ya no tiene el terracota fijo', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    expect(css).toMatch(/--at-nav-accent:\s*var\(--at-accent\);/)
+    expect(css).toMatch(/--at-nav-accent-glow:\s*rgba\(185, 106, 63, 0\.7\);/)
+    expect(css).toMatch(/--at-nav-accent-soft:\s*rgba\(185, 106, 63, 0\.3\);/)
+    expect(css).toMatch(new RegExp(`--at-nav-bg:\\s*${NAV_BG};`))
+    const sidebar = readFileSync(resolve(process.cwd(), 'src/components/layout/Sidebar.tsx'), 'utf8')
+    expect(sidebar.match(/var\(--at-nav-accent\)/g)).toHaveLength(2)
+    expect(sidebar.match(/var\(--at-nav-accent-glow\)/g)).toHaveLength(2)
+    expect(sidebar.match(/var\(--at-nav-accent-soft\)/g)).toHaveLength(2)
+    expect(sidebar).not.toContain('rgba(185,106,63')
+  })
+
+  it('sin colores custom → null (quedan los de index.css)', () => {
+    expect(navAccentDesdeMarca(null, null)).toBeNull()
+    expect(navAccentDesdeMarca('rojo', undefined)).toBeNull()
+  })
+
+  it('prefiere el acento custom; si no hay, usa el primario de la marca', () => {
+    expect(tono(navAccentDesdeMarca('#7c3aed', '#0e7490')!.color)).toBeCloseTo(tono('#0e7490'), -1)
+    expect(distTono(tono(navAccentDesdeMarca('#7c3aed', null)!.color), tono('#7c3aed'))).toBeLessThan(6)
+  })
+
+  it.each(MUESTRAS)('%s → destaca sobre el rail al menos como el punto por defecto; halo y fondo de icono = mismo color al 70 / 30%', (c) => {
+    const minimo = Math.max(3, contraste(DEFAULT_ACCENT_COLOR, NAV_BG))
+    expect(minimo).toBeGreaterThan(3.5)
+    for (const [p, a] of [[c, null], [null, c], [c, '#B96A3F']] as const) {
+      const m = navAccentDesdeMarca(p, a)!
+      const fondo = p ? derivarVariablesMarca(p).navBg : NAV_BG
+      expect(contraste(m.color, fondo), `${p}/${a} ${m.color}`).toBeGreaterThanOrEqual(minimo - 0.01)
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(m.color.slice(i, i + 2), 16))
+      expect(m.glow).toBe(`rgba(${r}, ${g}, ${b}, 0.7)`)
+      expect(m.soft).toBe(`rgba(${r}, ${g}, ${b}, 0.3)`)
+    }
+  })
+
+  it('la hoja lo lleva en los tres selectores (también con sólo acento custom)', () => {
+    for (const [p, a] of [['#7c3aed', null], [null, '#0e7490'], ['#ff0000', '#ffd400']] as const) {
+      const m = navAccentDesdeMarca(p, a)!
+      const lineas = hojaEstilosMarca(p, a)!.split('\n').slice(0, 3)
+      for (const l of lineas) {
+        expect(l).toContain(`--at-nav-accent: ${m.color};`)
+        expect(l).toContain(`--at-nav-accent-glow: ${m.glow};`)
+        expect(l).toContain(`--at-nav-accent-soft: ${m.soft};`)
+      }
+    }
+  })
+})
+
