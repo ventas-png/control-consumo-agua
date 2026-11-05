@@ -2,6 +2,8 @@
    AdministraTodo · estilos de las páginas legales públicas
    Scoped bajo .at-root (mismos tokens --c-* y tipografía Grotesk que el landing)
    para mantener la identidad visual del sitio sin filtrar estilos a la app.
+   Depende de landing.css (tokens --c-*, .container, <Footer>): LegalPage.tsx lo
+   importa explícitamente, porque la página legal es un chunk lazy propio.
 ───────────────────────────────────────────────────────────────────────── */
 
 /* Respaldo sin color-mix (Safari/iOS < 16.2, Chrome < 111): cada regla que usa

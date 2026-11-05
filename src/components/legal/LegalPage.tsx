@@ -12,6 +12,12 @@ import { BrandLogo } from '../shared/BrandLogo'
 import { Footer } from '../landing/Social'
 import { COPY, type Lang } from '../landing/i18n'
 import { LEGAL_META, LEGAL_BODIES, LEGAL_PATHS, legalHref, type LegalDocType } from './content'
+// Los tokens --c-* de `.at-root`, `.container` y los estilos del <Footer> viven en
+// landing.css, y legal.css cuenta con ellos. Se importa aquí también porque esta página
+// es un chunk lazy propio: entrando directo a la URL (sin pasar por el landing) landing.css
+// no se cargaba y la página salía sin contenedor, con la barra superior transparente.
+// Antes que legal.css, para que éste gane a igual especificidad.
+import '../landing/landing.css'
 import './legal.css'
 
 interface Props {
