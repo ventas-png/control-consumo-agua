@@ -9,7 +9,7 @@ import {
   DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_BG, DARK_SURFACE, DARK_MIN_CONTRASTE,
   LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
   derivarVariablesAccent, derivarVariablesAccentOscuro, respaldosSinColorMix,
-  derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO, DATOS_CSS_VARS, DATA_NEGATIVE_DEFECTO,
+  derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO, DATOS_CSS_VARS, DATA_NEGATIVE_DEFECTO, NAV_INK,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -81,14 +81,14 @@ describe('estilosMarca', () => {
     expect(estilosMarca(undefined)).toBeNull()
     expect(estilosMarca('rojo')).toBeNull()
   })
-  it('color válido → mapa con las 28 CSS vars de marca (tonos + estados + datos)', () => {
+  it('color válido → mapa con las 29 CSS vars de marca (tonos + nav + estados + datos)', () => {
     const m = estilosMarca('#1B3B36')
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
     expect(Object.keys(m!)).toEqual([
       '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
       '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
-      '--at-surface-tint',
+      '--at-surface-tint', '--at-nav-bg',
       '--at-success', '--at-success-tint', '--at-success-border', '--at-success-strong',
       '--at-warning', '--at-warning-tint', '--at-warning-border', '--at-warning-strong',
       '--at-danger', '--at-danger-tint', '--at-danger-border', '--at-danger-strong',
@@ -817,6 +817,42 @@ describe('--at-data-positive desde la marca', () => {
     expect(claro).toContain(`--at-data-positive: ${e.claro['--at-data-positive']};`)
     expect(auto).toContain(`--at-data-positive: ${e.oscuro['--at-data-positive']};`)
     expect(manual).toContain(`--at-data-positive: ${e.oscuro['--at-data-positive']};`)
+  })
+})
+
+// --at-nav-bg: fondo del rail de navegación (#102622), oscuro en ambos temas, con
+// texto --at-nav-ink claro y overlays blancos translúcidos encima.
+describe('--at-nav-bg desde la marca', () => {
+  it('el valor por defecto y --at-nav-ink son los de src/index.css', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    expect(css).toMatch(/--at-nav-bg:\s*#102622;/)
+    expect(css).toMatch(new RegExp(`--at-nav-ink:\\s*${NAV_INK};`))
+  })
+
+  it('con la marca por defecto sale (casi) igual que en index.css', () => {
+    expect(distanciaRgb(derivarVariablesMarca(DEFAULT_BRAND_COLOR).navBg, '#102622')).toBeLessThanOrEqual(2)
+  })
+
+  it.each(MUESTRAS)('%s → oscuro, igual en claro y en oscuro, y --at-nav-ink se lee ≥ 7:1', (c) => {
+    const claro = derivarVariablesMarca(c).navBg, oscuro = derivarVariablesMarcaOscuro(c).navBg
+    expect(oscuro).toBe(claro)
+    expect(L(claro)).toBeLessThan(0.03)
+    expect(contraste(NAV_INK, claro)).toBeGreaterThanOrEqual(7)
+  })
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → toma el tono de la marca', (c) => {
+    const nav = derivarVariablesMarca(c).navBg
+    expect(distTono(tono(nav), tono(c)), nav).toBeLessThan(10)
+  })
+
+  it('marca gris → casi negro neutro', () => {
+    expect(croma(derivarVariablesMarca('#808080').navBg)).toBeLessThan(4)
+  })
+
+  it('la hoja lo lleva en los tres selectores, con el mismo valor', () => {
+    const css = hojaEstilosMarca('#7c3aed', null)!
+    const nav = derivarVariablesMarca('#7c3aed').navBg
+    for (const l of css.split('\n').slice(0, 3)) expect(l).toContain(`--at-nav-bg: ${nav};`)
   })
 })
 
