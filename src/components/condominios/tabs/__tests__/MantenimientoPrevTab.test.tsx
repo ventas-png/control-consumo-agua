@@ -61,6 +61,19 @@ describe('MantenimientoPrevTab — ventanas', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('la ficha muestra los datos del plan con su estado y Cerrar la cierra', () => {
+    renderTab({ planes: [{ ...plan, descripcion: 'Revisar sellos y presión' }] })
+    fireEvent.click(screen.getByRole('button', { name: /Bomba de agua/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Bomba de agua' })
+    expect(within(dialog).getByText('Vencido')).toBeTruthy()
+    expect(within(dialog).getByText('Última ejecución').nextSibling?.textContent).toBe('2026-09-01')
+    expect(within(dialog).getByText('Próxima ejecución').nextSibling?.textContent).toBe('2026-10-01')
+    expect(within(dialog).getByText('Responsable').nextSibling?.textContent).toBe('Hidrotec')
+    expect(within(dialog).getByText('Revisar sellos y presión')).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it('el formulario de nuevo plan es una ventana y guarda el plan', async () => {
     const onRefresh = vi.fn()
     renderTab({ onRefresh })

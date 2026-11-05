@@ -2,6 +2,7 @@ import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
+import { EditModal } from '../../shared/EditModal'
 import { ProgramaActividad, CategoriaActividad, EstadoActividad } from '../../../types'
 
 interface Props {
@@ -34,7 +35,10 @@ const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'do
 const DIAS_LABEL: Record<string, string> = { lunes: 'L', martes: 'M', miercoles: 'X', jueves: 'J', viernes: 'V', sabado: 'S', domingo: 'D' }
 
 export default function ProgramaActividadesTab({ actividades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
-  const [selected, setSelected] = useState<ProgramaActividad | null>(null)
+  // La ficha abre en ventana al pulsar la tarjeta. Se guarda el id y no la fila:
+  // tras cambiar el estado o inscribir, la ficha muestra la actividad recargada.
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selected = selectedId ? actividades.find(a => a.id === selectedId) ?? null : null
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaActividad | ''>('')
@@ -95,10 +99,13 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
   }
 
   async function cambiarEstado(a: ProgramaActividad, estado: EstadoActividad) {
-    await updateCondominioRow('programa_actividades', a.id, { estado })
-    if (selected?.id === a.id) setSelected(prev => prev ? { ...prev, estado } : null)
+    const { error } = await updateCondominioRow('programa_actividades', a.id, { estado })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
+
+  // Cancelar cierra sin borrar lo escrito; no se cierra a mitad del guardado.
+  function cerrarForm() { if (!saving) setMostrarForm(false) }
 
   async function registrarInscripcion(a: ProgramaActividad) {
     if (a.cupo_maximo && a.inscritos >= a.cupo_maximo) {
@@ -112,250 +119,261 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>Actividades ({lista.length})</span>
-            {canCreate && (
-              <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nueva
-              </button>
-            )}
-          </div>
-          <select style={{ ...inp, marginBottom: 6 }} value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaActividad | '')}>
-            <option value="">Todas las categorías</option>
-            {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
-          </select>
-          <select style={inp} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoActividad | '')}>
-            <option value="">Todos los estados</option>
-            {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
-          </select>
-        </div>
-
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin actividades</div>}
-
-        {lista.map(a => {
-          const cat = CATEGORIAS.find(c => c.value === a.categoria)
-          const est = ESTADOS.find(e => e.value === a.estado)
-          const disp = disponibilidad(a)
-          return (
-            <div key={a.id} onClick={() => { setSelected(a); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === a.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${cat?.color}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {a.nombre}</span>
-                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.label}</span>
-              </div>
-              {a.instructor && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>👤 {a.instructor}</div>}
-              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
-                {a.fecha_inicio}{a.fecha_fin ? ` → ${a.fecha_fin}` : ''}
-                {a.hora_inicio && <span> · {a.hora_inicio.slice(0, 5)}{a.hora_fin ? `–${a.hora_fin.slice(0, 5)}` : ''}</span>}
-              </div>
-              {disp !== null && (
-                <div style={{ marginTop: 4 }}>
-                  <div style={{ height: 4, background: 'var(--at-line)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.min(disp.pct, 100)}%`, background: disp.pct >= 100 ? 'var(--at-danger)' : disp.pct >= 80 ? 'var(--at-warning)' : 'var(--at-success)', transition: 'width 0.3s' }} />
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 1 }}>{a.inscritos}/{a.cupo_maximo} inscritos</div>
-                </div>
-              )}
-            </div>
-          )
-        })}
+    <div style={{ height: '100%', overflowY: 'auto' }}>
+      {/* Cabecera: filtros y alta. La ficha ya no vive en un panel al lado:
+          abre en ventana emergente (más abajo), así la lista ocupa todo el
+          ancho —en el teléfono antes compartían 300px + lo que sobrara—. */}
+      <div style={{ padding: '12px 16px 10px', borderBottom: '1px solid var(--at-line)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 12px' }}>
+        <span style={{ fontWeight: 600, fontSize: 14, marginRight: 'auto' }}>Actividades ({lista.length})</span>
+        <select style={{ ...inp, width: 'auto', minWidth: 170 }} value={filtroCategoria} aria-label="Categoría" onChange={e => setFiltroCategoria(e.target.value as CategoriaActividad | '')}>
+          <option value="">Todas las categorías</option>
+          {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+        </select>
+        <select style={{ ...inp, width: 'auto', minWidth: 150 }} value={filtroEstado} aria-label="Estado" onChange={e => setFiltroEstado(e.target.value as EstadoActividad | '')}>
+          <option value="">Todos los estados</option>
+          {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+        </select>
+        {canCreate && (
+          <button onClick={() => setMostrarForm(true)}
+            style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+            + Nueva
+          </button>
+        )}
       </div>
 
-      {/* Panel derecho */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {mostrarForm && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Nueva actividad</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={lbl}>Nombre *</label>
-                <input style={inp} placeholder="Clases de natación, Yoga matutino…" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
+      {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin actividades</div>}
+
+      {/* Tarjetas: una por actividad, en rejilla que se adapta al ancho (una
+          columna en el teléfono). Pulsar una abre la ficha en ventana. */}
+      {lista.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10, padding: 16 }}>
+          {lista.map(a => {
+            const cat = CATEGORIAS.find(c => c.value === a.categoria)
+            const est = ESTADOS.find(e => e.value === a.estado)
+            const disp = disponibilidad(a)
+            return (
+              <div key={a.id} role="button" tabIndex={0} aria-label={a.nombre}
+                onClick={() => setSelectedId(a.id)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(a.id) } }}
+                style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderLeft: `4px solid ${cat?.color ?? 'var(--at-line)'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {a.nombre}</span>
+                  <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, whiteSpace: 'nowrap', background: est?.bg, color: est?.color }}>{est?.label}</span>
+                </div>
+                {a.instructor && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>👤 {a.instructor}</div>}
+                <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
+                  {a.fecha_inicio}{a.fecha_fin ? ` → ${a.fecha_fin}` : ''}
+                  {a.hora_inicio && <span> · {a.hora_inicio.slice(0, 5)}{a.hora_fin ? `–${a.hora_fin.slice(0, 5)}` : ''}</span>}
+                </div>
+                {disp !== null && (
+                  <div style={{ marginTop: 4 }}>
+                    <div style={{ height: 4, background: 'var(--at-line)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(disp.pct, 100)}%`, background: disp.pct >= 100 ? 'var(--at-danger)' : disp.pct >= 80 ? 'var(--at-warning)' : 'var(--at-success)', transition: 'width 0.3s' }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 1 }}>{a.inscritos}/{a.cupo_maximo} inscritos</div>
+                  </div>
+                )}
               </div>
-              <div>
-                <label style={lbl}>Categoría</label>
-                <select style={inp} value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value as CategoriaActividad }))}>
-                  {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
-                </select>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Ficha en ventana (pantalla completa en el teléfono): datos, cupo,
+          descripción, notas y las acciones del ciclo en el pie. */}
+      {selected && (() => {
+        const cat = CATEGORIAS.find(c => c.value === selected.categoria)
+        const est = ESTADOS.find(e => e.value === selected.estado)
+        const disp = disponibilidad(selected)
+        const abierta = selected.estado === 'programada' || selected.estado === 'activa'
+        const datos: { label: string; value: string }[] = [
+          { label: 'Período', value: `${selected.fecha_inicio}${selected.fecha_fin ? ` → ${selected.fecha_fin}` : ''}` },
+          { label: 'Horario', value: (selected.hora_inicio || selected.hora_fin) ? `${selected.hora_inicio?.slice(0, 5) || '—'} – ${selected.hora_fin?.slice(0, 5) || '—'}` : '—' },
+          { label: 'Costo', value: selected.costo === 0 ? 'Gratuita' : `${moneda} ${selected.costo.toLocaleString()}` },
+          { label: 'Cupo', value: selected.cupo_maximo ? `${selected.inscritos} / ${selected.cupo_maximo}` : `${selected.inscritos} inscritos · sin límite` },
+        ]
+        return (
+          <EditModal
+            title={`${cat?.icon ?? ''} ${selected.nombre}`.trim()}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '2px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: est?.bg, color: est?.color, fontWeight: 600 }}>{est?.label}</span>
+                <span style={{ color: cat?.color, fontWeight: 700, textTransform: 'uppercase', fontSize: 11 }}>{cat?.label}</span>
+                {selected.instructor && <span>👤 {selected.instructor}</span>}
+                {selected.lugar && <span>📍 {selected.lugar}</span>}
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={() => setSelectedId(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+                <button type="button" onClick={() => setSelectedId(null)}
+                  style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                  Cerrar
+                </button>
+                {canEdit && abierta && (
+                  <button type="button" onClick={() => cambiarEstado(selected, 'cancelada')}
+                    style={{ padding: '8px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                    ✕ Cancelar actividad
+                  </button>
+                )}
+                {canEdit && selected.estado === 'activa' && (
+                  <button type="button" onClick={() => cambiarEstado(selected, 'completada')}
+                    style={{ padding: '8px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                    ✓ Completar
+                  </button>
+                )}
+                {canEdit && selected.estado === 'programada' && (
+                  <button type="button" onClick={() => cambiarEstado(selected, 'activa')}
+                    style={{ padding: '8px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                    ▶ Iniciar
+                  </button>
+                )}
+                {canEdit && selected.estado === 'activa' && (
+                  <button type="button" onClick={() => registrarInscripcion(selected)}
+                    style={{ padding: '8px 16px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                    + Inscribir
+                  </button>
+                )}
               </div>
-              <div>
-                <label style={lbl}>Instructor</label>
-                <input style={inp} value={form.instructor} onChange={e => setForm(p => ({ ...p, instructor: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Lugar</label>
-                <input style={inp} placeholder="Piscina, Gimnasio…" value={form.lugar} onChange={e => setForm(p => ({ ...p, lugar: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Costo ({moneda})</label>
-                <input type="number" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Fecha inicio *</label>
-                <input type="date" style={inp} value={form.fecha_inicio} onChange={e => setForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Fecha fin</label>
-                <input type="date" style={inp} value={form.fecha_fin} onChange={e => setForm(p => ({ ...p, fecha_fin: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Cupo máximo</label>
-                <input type="number" style={inp} placeholder="Sin límite" value={form.cupo_maximo} onChange={e => setForm(p => ({ ...p, cupo_maximo: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Hora inicio</label>
-                <input type="time" style={inp} value={form.hora_inicio} onChange={e => setForm(p => ({ ...p, hora_inicio: e.target.value }))} />
-              </div>
-              <div>
-                <label style={lbl}>Hora fin</label>
-                <input type="time" style={inp} value={form.hora_fin} onChange={e => setForm(p => ({ ...p, hora_fin: e.target.value }))} />
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Descripción</label>
-                <textarea style={{ ...inp, height: 60, resize: 'vertical' }} value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))} />
-              </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Días de la semana</label>
-                <div style={{ display: 'flex', gap: 6 }}>
+            }
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
+              {datos.map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {selected.dias_semana && selected.dias_semana.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Días</div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {DIAS.map(d => (
-                    <button key={d} type="button" onClick={() => toggleDia(d)}
-                      style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: form.dias_semana.includes(d) ? 'var(--at-accent)' : 'var(--at-surface)', color: form.dias_semana.includes(d) ? 'white' : 'var(--at-ink-2)', borderColor: form.dias_semana.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
+                    <span key={d} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, background: selected.dias_semana!.includes(d) ? 'var(--at-accent-tint)' : 'var(--at-chip)', color: selected.dias_semana!.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)', fontWeight: selected.dias_semana!.includes(d) ? 700 : 400 }}>
                       {DIAS_LABEL[d]}
-                    </button>
+                    </span>
                   ))}
                 </div>
               </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Notas</label>
-                <input style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : '✅ Crear actividad'}
-              </button>
-              <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
+            )}
 
-        {!mostrarForm && selected && (() => {
-          const cat = CATEGORIAS.find(c => c.value === selected.categoria)
-          const est = ESTADOS.find(e => e.value === selected.estado)
-          const disp = disponibilidad(selected)
-          return (
+            {disp !== null && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Inscritos</span>
+                  <span style={{ fontSize: 13, color: disp.pct >= 100 ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>{selected.inscritos} / {selected.cupo_maximo}</span>
+                </div>
+                <div style={{ height: 6, background: 'var(--at-line)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+                  <div style={{ height: '100%', width: `${Math.min(disp.pct, 100)}%`, background: disp.pct >= 100 ? 'var(--at-danger)' : disp.pct >= 80 ? 'var(--at-warning)' : 'var(--at-success)' }} />
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{disp.libre > 0 ? `${disp.libre} cupos disponibles` : 'Sin cupos disponibles'}</div>
+              </div>
+            )}
+
+            {selected.descripcion && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '12px 16px', marginBottom: 14, fontSize: 13, color: 'var(--at-ink-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                {selected.descripcion}
+              </div>
+            )}
+
+            {selected.notas && (
+              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--at-warning-strong)' }}>
+                <strong>Nota: </strong>{selected.notas}
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
+
+      {/* Formulario en ventana (antes ocupaba el panel de la ficha). */}
+      {mostrarForm && (
+        <EditModal
+          title="Nueva actividad"
+          size="lg"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <button type="button" onClick={cerrarForm} disabled={saving}
+              style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+              Cancelar
+            </button>
+            <button type="button" onClick={guardar} disabled={saving}
+              style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+              {saving ? 'Guardando…' : '✅ Crear actividad'}
+            </button>
+          </>}
+        >
+        <div className="at-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={lbl}>Nombre *</label>
+              <input style={inp} placeholder="Clases de natación, Yoga matutino…" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
+            </div>
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: cat?.color, fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>{cat?.icon} {cat?.label}</div>
-                  <div style={{ fontWeight: 700, fontSize: 20 }}>{selected.nombre}</div>
-                  {selected.instructor && <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>👤 {selected.instructor}</div>}
-                  {selected.lugar && <div style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>📍 {selected.lugar}</div>}
-                </div>
-                <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, background: est?.bg, color: est?.color, fontWeight: 600 }}>{est?.label}</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
-                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Período</div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.fecha_inicio}{selected.fecha_fin ? ` → ${selected.fecha_fin}` : ''}</div>
-                </div>
-                {(selected.hora_inicio || selected.hora_fin) && (
-                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Horario</div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.hora_inicio?.slice(0, 5) || '—'} – {selected.hora_fin?.slice(0, 5) || '—'}</div>
-                  </div>
-                )}
-                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Costo</div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.costo === 0 ? 'Gratuita' : `${moneda} ${selected.costo.toLocaleString()}`}</div>
-                </div>
-              </div>
-
-              {selected.dias_semana && selected.dias_semana.length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Días</div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {DIAS.map(d => (
-                      <span key={d} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, background: selected.dias_semana!.includes(d) ? 'var(--at-accent-tint)' : 'var(--at-chip)', color: selected.dias_semana!.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)', fontWeight: selected.dias_semana!.includes(d) ? 700 : 400 }}>
-                        {DIAS_LABEL[d]}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {disp !== null && (
-                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>Inscritos</span>
-                    <span style={{ fontSize: 13, color: disp.pct >= 100 ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>{selected.inscritos} / {selected.cupo_maximo}</span>
-                  </div>
-                  <div style={{ height: 6, background: 'var(--at-line)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
-                    <div style={{ height: '100%', width: `${Math.min(disp.pct, 100)}%`, background: disp.pct >= 100 ? 'var(--at-danger)' : disp.pct >= 80 ? 'var(--at-warning)' : 'var(--at-success)' }} />
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{disp.libre > 0 ? `${disp.libre} cupos disponibles` : 'Sin cupos disponibles'}</div>
-                </div>
-              )}
-
-              {selected.descripcion && (
-                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: 'var(--at-ink-2)', lineHeight: 1.6 }}>
-                  {selected.descripcion}
-                </div>
-              )}
-
-              {selected.notas && (
-                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--at-warning-strong)' }}>
-                  <strong>Nota: </strong>{selected.notas}
-                </div>
-              )}
-
-              {canEdit && (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {selected.estado === 'programada' && (
-                    <button onClick={() => cambiarEstado(selected, 'activa')}
-                      style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                      ▶ Iniciar
-                    </button>
-                  )}
-                  {selected.estado === 'activa' && (
-                    <>
-                      <button onClick={() => registrarInscripcion(selected)}
-                        style={{ padding: '6px 14px', background: 'var(--at-accent-tint)', color: 'var(--at-accent)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                        + Inscribir
-                      </button>
-                      <button onClick={() => cambiarEstado(selected, 'completada')}
-                        style={{ padding: '6px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                        ✓ Completar
-                      </button>
-                    </>
-                  )}
-                  {(selected.estado === 'programada' || selected.estado === 'activa') && (
-                    <button onClick={() => cambiarEstado(selected, 'cancelada')}
-                      style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                      ✕ Cancelar
-                    </button>
-                  )}
-                </div>
-              )}
+              <label style={lbl}>Categoría</label>
+              <select style={inp} value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value as CategoriaActividad }))}>
+                {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+              </select>
             </div>
-          )
-        })()}
-
-        {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
-            Selecciona una actividad o crea una nueva
+            <div>
+              <label style={lbl}>Instructor</label>
+              <input style={inp} value={form.instructor} onChange={e => setForm(p => ({ ...p, instructor: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Lugar</label>
+              <input style={inp} placeholder="Piscina, Gimnasio…" value={form.lugar} onChange={e => setForm(p => ({ ...p, lugar: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Costo ({moneda})</label>
+              <input type="number" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Fecha inicio *</label>
+              <input type="date" style={inp} value={form.fecha_inicio} onChange={e => setForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Fecha fin</label>
+              <input type="date" style={inp} value={form.fecha_fin} onChange={e => setForm(p => ({ ...p, fecha_fin: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Cupo máximo</label>
+              <input type="number" style={inp} placeholder="Sin límite" value={form.cupo_maximo} onChange={e => setForm(p => ({ ...p, cupo_maximo: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Hora inicio</label>
+              <input type="time" style={inp} value={form.hora_inicio} onChange={e => setForm(p => ({ ...p, hora_inicio: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Hora fin</label>
+              <input type="time" style={inp} value={form.hora_fin} onChange={e => setForm(p => ({ ...p, hora_fin: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: 'span 3' }}>
+              <label style={lbl}>Descripción</label>
+              <textarea style={{ ...inp, height: 60, resize: 'vertical' }} value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: 'span 3' }}>
+              <label style={lbl}>Días de la semana</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {DIAS.map(d => (
+                  <button key={d} type="button" onClick={() => toggleDia(d)}
+                    style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: form.dias_semana.includes(d) ? 'var(--at-accent)' : 'var(--at-surface)', color: form.dias_semana.includes(d) ? 'white' : 'var(--at-ink-2)', borderColor: form.dias_semana.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
+                    {DIAS_LABEL[d]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ gridColumn: 'span 3' }}>
+              <label style={lbl}>Notas</label>
+              <input style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
+            </div>
           </div>
-        )}
-      </div>
+        </EditModal>
+      )}
     </div>
   )
 }
