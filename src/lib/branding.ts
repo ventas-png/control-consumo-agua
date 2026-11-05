@@ -148,18 +148,76 @@ export function aclararParaTemaOscuro(hex: string): string {
 }
 
 export interface VariablesMarca {
+  /** --at-primary: botones, enlaces, texto de marca. */
   primary: string
+  /** --at-primary-hover */
   hover: string
+  /** --at-primary-soft: fondo suave de marca (tiles, chips). */
   soft: string
+  /** --at-primary-2: variante secundaria (texto, puntos, barras). */
+  primary2: string
+  /** --at-primary-tint: fondo aún más suave que soft (filas, tarjetas, botones). */
+  tint: string
+  /** --at-primary-soft-2: bordes de superficies soft/tint. */
+  soft2: string
+  /** --at-primary-mint: tono medio-claro (bordes, gradientes). */
+  mint: string
+  /** --at-primary-mint-2: tono medio (barras de progreso). */
+  mint2: string
 }
 
-/** Deriva las variables de tema (--at-primary / -hover / -soft) de un color base. */
+/** Mismo tono; luminosidad HSL `l` (0..1) y saturación × `factorSat`. */
+function enLuminosidad(hex: string, l: number, factorSat = 1): string {
+  const [h, s] = rgbAHsl(parseRgb(hex))
+  return hslAHex([h, Math.min(1, s * factorSat), Math.max(0, Math.min(1, l))])
+}
+
+function luminosidadHsl(hex: string): number {
+  return rgbAHsl(parseRgb(hex))[2]
+}
+
+/**
+ * Aclara (HSL, mismo tono y saturación) hasta `deltaMax`, pero sólo mientras siga
+ * cumpliendo `cumple`; si el color ya no lo cumple, lo deja como está.
+ */
+function aclararMientras(hex: string, deltaMax: number, cumple: (c: string) => boolean): string {
+  const l0 = luminosidadHsl(hex)
+  const tope = enLuminosidad(hex, l0 + deltaMax)
+  if (cumple(tope)) return tope
+  if (!cumple(hex)) return hex
+  let lo = 0, hi = deltaMax
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2
+    if (cumple(enLuminosidad(hex, l0 + mid))) lo = mid
+    else hi = mid
+  }
+  return enLuminosidad(hex, l0 + lo)
+}
+
+/** Contraste mínimo (WCAG AA texto) de primary-2 sobre su -tint claro. */
+export const LIGHT_MIN_CONTRASTE = 4.5
+
+/**
+ * Deriva las variables de tema CLARO de un color base. Las proporciones salen de
+ * la paleta por defecto de src/index.css (con #1B3B36 dan valores casi iguales):
+ * - hover: 18% más oscuro; soft / tint / soft-2: mezcla con blanco 82 / 92 / 74%.
+ * - primary-2: mismo tono, hasta +10% de luminosidad, sin bajar de 4.5:1 sobre el
+ *   tint (se usa como texto; si la marca ya está por debajo, queda igual).
+ * - mint / mint-2: mismo tono, luminosidad fija 69 / 60% y saturación atenuada,
+ *   para que sigan siendo tonos medios aunque la marca sea muy oscura o muy clara.
+ */
 export function derivarVariablesMarca(primary: string | null | undefined): VariablesMarca {
   const base = normalizarColorHex(primary) ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
+  const tint = mezclarBlanco(base, 0.92)
   return {
     primary: base,
     hover: oscurecer(base, 0.18),
     soft: mezclarBlanco(base, 0.82),
+    primary2: aclararMientras(base, 0.1, (c) => contraste(c, tint) >= LIGHT_MIN_CONTRASTE),
+    tint,
+    soft2: mezclarBlanco(base, 0.74),
+    mint: enLuminosidad(base, 0.69, 0.72),
+    mint2: enLuminosidad(base, 0.6, 0.68),
   }
 }
 
@@ -167,21 +225,48 @@ export function derivarVariablesMarca(primary: string | null | undefined): Varia
  * Variante para el tema OSCURO (equivalente a los overrides dark de src/index.css):
  * - primary: aclarado hasta leerse sobre fondos oscuros (texto/bordes).
  * - hover: MÁS claro que primary (en dark el hover aclara, no oscurece).
- * - soft: el primario mezclado hacia el FONDO oscuro → superficie oscura teñida
- *   de marca, nunca un tinte casi blanco.
+ * - soft / tint / soft-2: el primario mezclado hacia el FONDO oscuro (20 / 12 /
+ *   30%) → superficies oscuras teñidas de marca, nunca tintes casi blancos. Como
+ *   en index.css, tint es más oscuro que soft y soft-2 (bordes) algo más claro.
+ * - primary-2: el primary oscuro con 25% menos saturación (más apagado, como en
+ *   index.css), aclarado de nuevo si hace falta para leerse (se usa como texto).
+ * - mint = hover y mint-2 = primary-2, igual que en el dark de index.css.
  */
 export function derivarVariablesMarcaOscuro(primary: string | null | undefined): VariablesMarca {
   const base = normalizarColorHex(primary) ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
   const p = aclararParaTemaOscuro(base)
+  const hover = mezclarBlanco(p, 0.2)
+  const primary2 = aclararParaTemaOscuro(enLuminosidad(p, luminosidadHsl(p), 0.75))
   return {
     primary: p,
-    hover: mezclarBlanco(p, 0.2),
+    hover,
     soft: suaveOscuro(p),
+    primary2,
+    tint: mezclar(p, DARK_BG, 0.12),
+    soft2: mezclar(p, DARK_BG, 0.3),
+    mint: hover,
+    mint2: primary2,
   }
 }
 
 /** CSS vars de tema que el branding sobreescribe (en orden). */
-export const BRAND_CSS_VARS = ['--at-primary', '--at-primary-hover', '--at-primary-soft'] as const
+export const BRAND_CSS_VARS = [
+  '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
+  '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2',
+] as const
+
+function varsMarca(v: VariablesMarca): Record<(typeof BRAND_CSS_VARS)[number], string> {
+  return {
+    '--at-primary': v.primary,
+    '--at-primary-hover': v.hover,
+    '--at-primary-soft': v.soft,
+    '--at-primary-2': v.primary2,
+    '--at-primary-tint': v.tint,
+    '--at-primary-soft-2': v.soft2,
+    '--at-primary-mint': v.mint,
+    '--at-primary-mint-2': v.mint2,
+  }
+}
 
 /**
  * Mapa de CSS vars a aplicar para un color de marca, o null si NO hay color
@@ -190,25 +275,13 @@ export const BRAND_CSS_VARS = ['--at-primary', '--at-primary-hover', '--at-prima
  */
 export function estilosMarca(primaryColor: string | null | undefined): Record<string, string> | null {
   const color = normalizarColorHex(primaryColor)
-  if (!color) return null
-  const v = derivarVariablesMarca(color)
-  return {
-    '--at-primary': v.primary,
-    '--at-primary-hover': v.hover,
-    '--at-primary-soft': v.soft,
-  }
+  return color ? varsMarca(derivarVariablesMarca(color)) : null
 }
 
 /** Igual que `estilosMarca` pero con los valores del tema OSCURO; null si no hay color custom. */
 export function estilosMarcaOscuro(primaryColor: string | null | undefined): Record<string, string> | null {
   const color = normalizarColorHex(primaryColor)
-  if (!color) return null
-  const v = derivarVariablesMarcaOscuro(color)
-  return {
-    '--at-primary': v.primary,
-    '--at-primary-hover': v.hover,
-    '--at-primary-soft': v.soft,
-  }
+  return color ? varsMarca(derivarVariablesMarcaOscuro(color)) : null
 }
 
 /** Color de acento del tema por defecto (= --at-accent en src/index.css). */

@@ -5,6 +5,7 @@ import {
   derivarVariablesMarca, derivarVariablesMarcaOscuro, estilosMarca, estilosMarcaOscuro,
   estilosAccent, estilosAccentOscuro, hojaEstilosMarca,
   DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_BG, DARK_SURFACE, DARK_MIN_CONTRASTE,
+  LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -76,11 +77,15 @@ describe('estilosMarca', () => {
     expect(estilosMarca(undefined)).toBeNull()
     expect(estilosMarca('rojo')).toBeNull()
   })
-  it('color válido → mapa con las 3 CSS vars de marca', () => {
+  it('color válido → mapa con las 8 CSS vars de marca', () => {
     const m = estilosMarca('#1B3B36')
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
-    expect(Object.keys(m!)).toEqual(['--at-primary', '--at-primary-hover', '--at-primary-soft'])
+    expect(Object.keys(m!)).toEqual([
+      '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
+      '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2',
+    ])
+    expect(Object.keys(m!)).toEqual([...BRAND_CSS_VARS])
   })
 })
 
@@ -94,6 +99,65 @@ describe('estilosAccent', () => {
     expect(m).not.toBeNull()
     expect(m!['--at-accent']).toBe('#b96a3f')
     expect(Object.keys(m!)).toEqual(['--at-accent', '--at-accent-hover'])
+  })
+})
+
+// ─── Tonos derivados (primary-2 / tint / soft-2 / mint / mint-2) ───────────
+// Antes sólo se derivaban primary/hover/soft; el resto quedaba en el verde por
+// defecto aunque la empresa tuviera otro color de marca.
+
+/** Distancia euclídea en RGB (0..441): ≤ ~16 es casi indistinguible a la vista. */
+function distanciaRgb(a: string, b: string): number {
+  const p = (h: string) => [1, 3, 5].map((i) => parseInt(normalizarColorHex(h)!.slice(i, i + 2), 16))
+  const x = p(a), y = p(b)
+  return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2])
+}
+
+const L = luminanciaRelativa
+
+describe('derivarVariablesMarca — tonos derivados (tema claro)', () => {
+  it('con el color por defecto reproduce (casi) la paleta clara de src/index.css', () => {
+    const v = derivarVariablesMarca(DEFAULT_BRAND_COLOR)
+    const indexCss = { soft: '#D9E2DC', primary2: '#2F5D4F', tint: '#EEF2EC', soft2: '#C2D2CA', mint: '#9CC6B6', mint2: '#7FB29F' }
+    for (const [k, hex] of Object.entries(indexCss)) {
+      expect(distanciaRgb(v[k as keyof typeof v], hex), k).toBeLessThan(16)
+    }
+  })
+
+  it('sigue a la marca: con otro color los tonos cambian', () => {
+    const def = derivarVariablesMarca(DEFAULT_BRAND_COLOR)
+    const v = derivarVariablesMarca('#7c3aed')
+    for (const k of ['primary2', 'tint', 'soft2', 'mint', 'mint2'] as const) expect(v[k]).not.toBe(def[k])
+    // y conservan el tono: morado → azul > verde
+    for (const k of ['primary2', 'tint', 'soft2', 'mint', 'mint2'] as const) {
+      expect(parseInt(v[k].slice(5, 7), 16), k).toBeGreaterThan(parseInt(v[k].slice(3, 5), 16))
+    }
+  })
+
+  it.each(MUESTRAS.filter((c) => c !== '#ffffff'))('%s → orden de fondos: tint > soft > soft-2 (más claro a más oscuro)', (c) => {
+    const v = derivarVariablesMarca(c)
+    expect(L(v.tint)).toBeGreaterThan(L(v.soft))
+    expect(L(v.soft)).toBeGreaterThan(L(v.soft2))
+  })
+
+  it.each(MUESTRAS)('%s → mint / mint-2 son tonos medios (ni casi blancos ni casi negros)', (c) => {
+    const v = derivarVariablesMarca(c)
+    for (const m of [v.mint, v.mint2]) {
+      expect(L(m)).toBeGreaterThan(0.15)
+      expect(L(m)).toBeLessThan(0.7)
+    }
+    expect(L(v.mint)).toBeGreaterThan(L(v.mint2))
+  })
+
+  it.each(MUESTRAS)('%s → primary-2 aclara sin perder legibilidad sobre el tint', (c) => {
+    const v = derivarVariablesMarca(c)
+    expect(L(v.primary2)).toBeGreaterThanOrEqual(L(v.primary))
+    if (contraste(v.primary, v.tint) >= LIGHT_MIN_CONTRASTE) {
+      expect(contraste(v.primary2, v.tint)).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+    } else {
+      // la marca ya no llega: no se empeora
+      expect(v.primary2).toBe(v.primary)
+    }
   })
 })
 
@@ -166,11 +230,35 @@ describe('derivarVariablesMarcaOscuro', () => {
     const d = derivarVariablesMarcaOscuro(c)
     expect(luminanciaRelativa(d.hover)).toBeGreaterThan(luminanciaRelativa(d.primary))
   })
+  it.each(MUESTRAS)('%s → tint y soft-2 también son superficies OSCURAS, en orden tint < soft < soft-2', (c) => {
+    const d = derivarVariablesMarcaOscuro(c)
+    // tint es fondo (como soft); soft-2 es sobre todo borde, algo más claro.
+    expect(L(d.tint)).toBeLessThan(0.06)
+    expect(L(d.soft2)).toBeLessThan(0.12)
+    for (const f of [d.tint, d.soft2]) expect(contraste('#ECEFE8', f)).toBeGreaterThanOrEqual(DARK_MIN_CONTRASTE)
+    expect(L(d.tint)).toBeLessThan(L(d.soft))
+    expect(L(d.soft)).toBeLessThan(L(d.soft2))
+  })
+  it.each(MUESTRAS)('%s → primary-2 (texto) se lee sobre soft y tint oscuros; mint = hover, mint-2 = primary-2', (c) => {
+    const d = derivarVariablesMarcaOscuro(c)
+    expect(contraste(d.primary2, d.soft)).toBeGreaterThanOrEqual(DARK_MIN_CONTRASTE)
+    expect(contraste(d.primary2, d.tint)).toBeGreaterThanOrEqual(DARK_MIN_CONTRASTE)
+    expect(d.mint).toBe(d.hover)
+    expect(d.mint2).toBe(d.primary2)
+  })
+  it('primary-2 oscuro es una variante más apagada, no una copia de primary', () => {
+    const d = derivarVariablesMarcaOscuro(DEFAULT_BRAND_COLOR)
+    expect(d.primary2).not.toBe(d.primary)
+  })
   it('el color por defecto da valores cercanos a los dark de src/index.css', () => {
     const d = derivarVariablesMarcaOscuro(DEFAULT_BRAND_COLOR)
     // index.css dark: --at-primary #5E9D8A, --at-primary-soft #1C2E27
     expect(contraste(d.primary, '#5E9D8A')).toBeLessThan(1.3)
     expect(contraste(d.soft, '#1C2E27')).toBeLessThan(1.15)
+    const indexCss = { soft: '#1C2E27', primary2: '#62927F', tint: '#16241D', soft2: '#2A3D33', mint: '#76B3A1', mint2: '#62927F' }
+    for (const [k, hex] of Object.entries(indexCss)) {
+      expect(distanciaRgb(d[k as keyof typeof d], hex), k).toBeLessThan(32)
+    }
   })
   it('null/inválido → cae al color por defecto', () => {
     expect(derivarVariablesMarcaOscuro(null)).toEqual(derivarVariablesMarcaOscuro(DEFAULT_BRAND_COLOR))
@@ -220,8 +308,10 @@ describe('hojaEstilosMarca', () => {
     expect(auto).toBeDefined()
     expect(manual).toBeDefined()
     for (const l of [auto!, manual!]) {
-      for (const [k, v] of Object.entries(dark)) expect(l).toContain(`${k}: ${v};`)
-      expect(l).not.toContain(estilosMarca('#ff0000')!['--at-primary-soft'])
+      for (const k of BRAND_CSS_VARS) expect(l).toContain(`${k}: ${dark[k]};`)
+      // ningún tinte claro (soft / tint / soft-2) se cuela en el bloque oscuro
+      const claro = estilosMarca('#ff0000')!
+      for (const k of ['--at-primary-soft', '--at-primary-tint', '--at-primary-soft-2']) expect(l).not.toContain(claro[k])
     }
     // Sin acento custom no se tocan las vars de acento.
     expect(css).not.toContain('--at-accent')

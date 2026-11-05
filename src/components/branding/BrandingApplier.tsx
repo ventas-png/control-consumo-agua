@@ -3,8 +3,9 @@ import { useBrandingQuery } from '../../domain/branding/queries'
 import { hojaEstilosMarca, BRANDING_STYLE_ID } from '../../lib/branding'
 
 // plat:P20 — Aplica los colores de marca de la empresa (primario + acento) a TODA
-// la app: inyecta un <style> con las CSS vars --at-primary/-hover/-soft y
-// --at-accent/-hover para el tema CLARO y el OSCURO (selectores que replican los
+// la app: inyecta un <style> con las CSS vars de marca (--at-primary y sus tonos
+// -hover/-soft/-2/-tint/-soft-2/-mint/-mint-2, BRAND_CSS_VARS) y --at-accent/-hover
+// para el tema CLARO y el OSCURO (selectores que replican los
 // de src/index.css). NO se usa style inline en <html>: un inline gana a la
 // cascada y en dark mode dejaba, p. ej., --at-primary-soft casi blanco. Es un
 // efecto puro (no renderiza nada). Sin color custom, quita la hoja y la cascada
