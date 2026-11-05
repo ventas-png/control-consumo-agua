@@ -112,6 +112,9 @@ function contrato(over: Partial<ContratoProveedorCatalogo>): ContratoProveedorCa
   }
 }
 
+/** La ficha del contrato abre en ventana al pulsar su tarjeta; las acciones viven ahí. */
+const abrirFicha = (nombre: string | RegExp = 'PRV-00001 · Aguas del Norte') => fireEvent.click(screen.getByRole('button', { name: nombre }))
+
 beforeEach(() => {
   m.confirm.mockResolvedValue({ isConfirmed: true })
   m.config = []
@@ -159,6 +162,7 @@ describe('ContratosProveedorTab', () => {
 
   it('un borrador se puede activar o eliminar; un activo se suspende pero no se elimina', () => {
     const { rerender } = render(<ContratosProveedorTab {...props} contratos={[contrato({ estado: 'borrador' })]} />)
+    abrirFicha()
     expect(screen.getByText('Activar')).toBeTruthy()
     expect(screen.getByText('Eliminar')).toBeTruthy()
     rerender(<ContratosProveedorTab {...props} contratos={[contrato({ estado: 'activo' })]} />)
@@ -172,6 +176,7 @@ describe('ContratosProveedorTab', () => {
 
   it('no activa un contrato incompleto: dice qué falta y no llama al servidor', async () => {
     render(<ContratosProveedorTab {...props} contratos={[contrato({ estado: 'borrador' })]} />)
+    abrirFicha()
     fireEvent.click(screen.getByText('Activar'))
     await waitFor(() => expect(m.notify).toHaveBeenCalled())
     expect(m.notify.mock.calls[0][0].text).toMatch(/modalidad/)
@@ -182,6 +187,7 @@ describe('ContratosProveedorTab', () => {
     const c = contrato({ estado: 'activo', modalidad: 'recurrente', moneda: 'GTQ', periodicidad: 'mensual', importe_periodico: 100, responsable_id: 'u1' })
     m.prompt.mockResolvedValueOnce(null)
     render(<ContratosProveedorTab {...props} contratos={[c]} />)
+    abrirFicha()
     fireEvent.click(screen.getByText('Suspender'))
     await waitFor(() => expect(m.prompt).toHaveBeenCalled())
     expect(m.cambiarEstado).not.toHaveBeenCalled()
@@ -198,6 +204,7 @@ describe('ContratosProveedorTab', () => {
 
   it('sin permiso de edición no ofrece acciones de escritura', () => {
     render(<ContratosProveedorTab {...props} canCreate={false} canEdit={false} contratos={[contrato({ estado: 'activo' })]} />)
+    abrirFicha()
     expect(screen.queryByText('Suspender')).toBeNull()
     expect(screen.queryByText('+ Nuevo contrato')).toBeNull()
     expect(screen.getByText('Historial')).toBeTruthy()
@@ -205,9 +212,10 @@ describe('ContratosProveedorTab', () => {
 
   // Eliminar un borrador exige condominios.tab.proveedores.delete, lo mismo que la base
   // (supabase/rls-acciones/operaciones.json): editar no basta, y sin editar sí se borra.
-  eliminarExigeSuPermiso('Contratos (borrador)', p => render(
-    <ContratosProveedorTab {...props} {...p} contratos={[contrato({ estado: 'borrador' })]} />,
-  ), /^Eliminar$/, m.eliminar, 'k1')
+  eliminarExigeSuPermiso('Contratos (borrador)', p => {
+    render(<ContratosProveedorTab {...props} {...p} contratos={[contrato({ estado: 'borrador' })]} />)
+    abrirFicha()
+  }, /^Eliminar$/, m.eliminar, 'k1')
 })
 
 describe('ContratosProveedorTab · conectado a las compras', () => {
@@ -219,6 +227,7 @@ describe('ContratosProveedorTab · conectado a las compras', () => {
 
   it('un contrato activo ofrece Seguimiento, Prorrogar, Renovar y (si tiene monto máximo) Ampliar monto; un borrador, ninguno', () => {
     const { rerender } = render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    abrirFicha()
     for (const t of ['Seguimiento', 'Prorrogar', 'Ampliar monto', 'Renovar']) expect(screen.getByText(t)).toBeTruthy()
     rerender(<ContratosProveedorTab {...props} contratos={[activo({ monto_maximo: null })]} />)
     expect(screen.queryByText('Ampliar monto')).toBeNull()          // sin límite total no hay tope que ampliar
@@ -228,6 +237,7 @@ describe('ContratosProveedorTab · conectado a las compras', () => {
 
   it('un contrato cancelado no se renueva; uno terminado sí, y conserva su historial', () => {
     const { rerender } = render(<ContratosProveedorTab {...props} contratos={[activo({ estado: 'cancelado' })]} />)
+    abrirFicha()
     expect(screen.queryByText('Renovar')).toBeNull()
     rerender(<ContratosProveedorTab {...props} contratos={[activo({ estado: 'terminado' })]} />)
     expect(screen.getByText('Renovar')).toBeTruthy()
@@ -235,6 +245,7 @@ describe('ContratosProveedorTab · conectado a las compras', () => {
 
   it('sin permiso de edición no prorroga ni amplía; sin permiso de crear no renueva', () => {
     render(<ContratosProveedorTab {...props} canEdit={false} canCreate={false} contratos={[activo()]} />)
+    abrirFicha()
     expect(screen.queryByText('Prorrogar')).toBeNull()
     expect(screen.queryByText('Ampliar monto')).toBeNull()
     expect(screen.queryByText('Renovar')).toBeNull()
@@ -249,6 +260,7 @@ describe('ContratosProveedorTab · conectado a las compras', () => {
   it('renovar manda inicio, fin y motivo; no toca el contrato original y si se cancela no llama al servidor', async () => {
     m.prompt.mockResolvedValueOnce(null)
     render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    abrirFicha()
     fireEvent.click(screen.getByText('Renovar'))
     await waitFor(() => expect(m.prompt).toHaveBeenCalled())
     expect(m.prompt.mock.calls[0][0].description).toMatch(/NUEVO en borrador/)
@@ -263,6 +275,7 @@ describe('ContratosProveedorTab · conectado a las compras', () => {
   it('prorrogar exige motivo y manda la fecha (vacía = indefinido)', async () => {
     m.prompt.mockResolvedValueOnce({ fecha_fin: '', motivo: ' Adenda 2 ' })
     render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    abrirFicha()
     fireEvent.click(screen.getByText('Prorrogar'))
     await waitFor(() => expect(m.prorrogar).toHaveBeenCalledWith({ contratoId: 'k1', fechaFin: null, motivo: 'Adenda 2' }))
   })
@@ -271,6 +284,7 @@ describe('ContratosProveedorTab · conectado a las compras', () => {
     const datos = { incremento: '500', documento: 'ADENDA-1', motivo: 'Ampliación autorizada por el comité' }
     m.prompt.mockResolvedValue(datos)
     render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    abrirFicha()
     fireEvent.click(screen.getByText('Ampliar monto'))
     await waitFor(() => expect(m.ampliar).toHaveBeenCalledTimes(1))
     fireEvent.click(screen.getByText('Ampliar monto'))
@@ -289,9 +303,49 @@ describe('ContratosProveedorTab · conectado a las compras', () => {
     m.prompt.mockResolvedValueOnce({ incremento: '5', documento: '', motivo: 'Ampliación sin límite que subir' })
     m.ampliar.mockRejectedValueOnce(new Error('CONTRATO_SIN_LIMITE: este contrato no tiene monto máximo'))
     render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    abrirFicha()
     fireEvent.click(screen.getByText('Ampliar monto'))
     await waitFor(() => expect(m.notify).toHaveBeenCalled())
     expect(m.notify.mock.calls[0][0].text).toMatch(/CONTRATO_SIN_LIMITE/)
+  })
+})
+
+describe('ContratosProveedorTab · la ficha abre en ventana', () => {
+  const props = { proyectoId: 'pr1', proyectoNombre: 'Torre Sur', companyId: 'c1', moneda: 'GTQ', canCreate: true, canEdit: true, canDelete: true, onRefresh: vi.fn() }
+  const activo = (over: Partial<ContratoProveedorCatalogo> = {}) => contrato({
+    estado: 'activo', modalidad: 'recurrente', periodicidad: 'mensual', importe_periodico: 250, moneda: 'GTQ', monto_maximo: 1000,
+    fecha_inicio: '2020-01-01', fecha_fin: '2099-12-31', referencia: 'CT-01', alcance: 'Limpieza de cisternas', notas: 'Factura a mes vencido', ...over,
+  })
+  const ficha = () => screen.getByRole('dialog', { name: 'PRV-00001 · Aguas del Norte' })
+
+  it('sin pulsar nada sólo hay tarjetas, sin acciones; la tarjeta abre la ficha con los datos y las acciones', () => {
+    render(<ContratosProveedorTab {...props} contratos={[activo()]} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByText('Suspender')).toBeNull()
+    expect(screen.getByText('Ref. CT-01')).toBeTruthy()
+    abrirFicha()
+    const v = ficha()
+    expect(v.textContent).toContain('Monto máximo (tope)')
+    expect(v.textContent).toContain('2020-01-01 → 2099-12-31')
+    expect(v.textContent).toContain('Limpieza de cisternas')
+    expect(v.textContent).toContain('Factura a mes vencido')
+    for (const t of ['Cerrar', 'Editar', 'Suspender', 'Terminar', 'Cancelar contrato', 'Historial', 'Seguimiento', 'Prorrogar', 'Ampliar monto', 'Renovar']) {
+      expect(within(v).getByText(t)).toBeTruthy()
+    }
+    fireEvent.click(within(v).getByText('Cerrar'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('sin monto máximo la ficha dice «Sin límite total»; sin permisos el pie sólo lleva Cerrar', () => {
+    render(<ContratosProveedorTab {...props} canCreate={false} canEdit={false} canDelete={false} contratos={[activo({ monto_maximo: null })]} />)
+    abrirFicha()
+    const v = ficha()
+    expect(v.textContent).toContain('Sin límite total')
+    expect(within(v).getByText('Cerrar')).toBeTruthy()
+    for (const t of ['Editar', 'Suspender', 'Terminar', 'Cancelar contrato', 'Prorrogar', 'Ampliar monto', 'Renovar', 'Eliminar']) {
+      expect(within(v).queryByText(t)).toBeNull()
+    }
+    expect(within(v).getByText('Historial')).toBeTruthy()
   })
 })
 

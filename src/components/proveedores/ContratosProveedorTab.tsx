@@ -50,7 +50,7 @@ import { openPromptDialog } from '../shared/PromptDialog'
 import { EditModal } from '../shared/EditModal'
 import { SecureFileLink } from '../shared/SecureFileLink'
 import { StatusBadge } from '../shared/StatusBadge'
-import { Campo, input, btnLink, btnPrimario, btnSecundario } from '../contabilidad/ui'
+import { Campo, input, btnLink, btnPeligro, btnPrimario, btnSecundario } from '../contabilidad/ui'
 import { ContextoActivo } from './ContextoActivo'
 import { HistoricosPanel } from './HistoricosPanel'
 import { ProveedorSelector } from './ProveedorSelector'
@@ -131,6 +131,10 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
   const [historialDe, setHistorialDe] = useState<ContratoProveedorCatalogo | null>(null)
   const [verHistoricos, setVerHistoricos] = useState(false)
   const [seguirContrato, setSeguirContrato] = useState<string | null>(null)
+  // La ficha abre en ventana al pulsar la tarjeta. Se guarda el id y no la fila:
+  // tras editar o cambiar el estado, la ficha muestra el contrato recargado.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalle = detalleId ? contratos.find((c) => c.id === detalleId) ?? null : null
   const hoy = hoyLocalISO()
 
   const catalogo = proveedores as ProveedorCatalogo[]
@@ -352,7 +356,7 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
       icon: 'warning', variant: 'danger', confirmText: 'Eliminar',
     })
     if (!r.isConfirmed) return
-    try { await eliminar.mutateAsync(c.id); onRefresh() }
+    try { await eliminar.mutateAsync(c.id); setDetalleId(null); onRefresh() }
     catch (e) { notify({ variant: 'error', title: 'No se pudo eliminar', text: (e as Error).message }) }
   }
 
@@ -409,86 +413,172 @@ export function ContratosProveedorTab({ contratos, proyectoId, proyectoNombre, c
       {filtrados.length === 0 ? (
         <p style={{ fontSize: 13, color: 'var(--at-ink-soft)' }}>No hay contratos con estos filtros.</p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--at-ink-soft)' }}>
-                <th scope="col">Proveedor</th><th scope="col">Servicio</th><th scope="col">Modalidad</th>
-                <th scope="col">Vigencia</th><th scope="col">Estado</th><th scope="col">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.map((c) => {
-                const p = c.proveedor_id ? porId.get(c.proveedor_id) : undefined
-                return (
-                  <tr key={c.id} style={{ borderTop: '1px solid var(--at-line)', verticalAlign: 'top' }}>
-                    <td>
-                      <strong>{p ? etiquetaProveedor(p) : c.proveedor_nombre}</strong>
-                      {!c.proveedor_id && <div style={{ fontSize: 11, color: 'var(--at-warning)' }}>Texto libre · sin vincular al catálogo</div>}
-                      {c.referencia && <div style={{ fontSize: 11, color: 'var(--at-ink-soft)' }}>Ref. {c.referencia}</div>}
-                    </td>
-                    <td>{c.servicio}</td>
-                    <td>
-                      {c.modalidad ? MODALIDAD_LABELS[c.modalidad] : '—'}
-                      {c.periodicidad && <div style={{ fontSize: 11 }}>{PERIODICIDAD_LABELS[c.periodicidad]}</div>}
-                      {c.importe_periodico != null && <div style={{ fontSize: 11 }}>{c.moneda} {c.importe_periodico.toLocaleString('es')}</div>}
-                    </td>
-                    <td>
-                      {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' → sin fin'}
-                      {c.estado === 'activo' && !contratoVigente(c, hoy) && (
-                        <div data-testid={`fuera-de-vigencia-${c.id}`} style={{ fontSize: 11, color: 'var(--at-warning)' }}>
-                          Activo, pero hoy está fuera de sus fechas: no ampara órdenes nuevas.
-                        </div>
-                      )}
-                      {c.renovado_de && <div style={{ fontSize: 11, color: 'var(--at-ink-soft)' }}>Renueva a un contrato anterior</div>}
-                    </td>
-                    <td>
-                      <StatusBadge tone={TONO[c.estado] ?? 'neutral'}>{ESTADO_CONTRATO_LABELS[c.estado] ?? c.estado}</StatusBadge>
-                      {c.motivo_estado && ['suspendido', 'terminado', 'cancelado'].includes(c.estado) && (
-                        <div style={{ fontSize: 11, color: 'var(--at-ink-soft)' }}>{c.motivo_estado}</div>
-                      )}
-                    </td>
-                    <td style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {canEdit && c.estado !== 'terminado' && c.estado !== 'cancelado' && (
-                        <button type="button" style={btnLink} onClick={() => abrirEdicion(c)}>Editar</button>
-                      )}
-                      {canEdit && TRANSICIONES_CONTRATO[c.estado].filter((e) => e !== 'vencido').map((e) => (
-                        <button key={e} type="button" style={btnLink} onClick={() => void cambiar(c, e)}>{ACCION_ETIQUETA[e]}</button>
-                      ))}
-                      <button type="button" style={btnLink} onClick={() => setHistorialDe(c)}>Historial</button>
-                      {c.proveedor_id && c.estado !== 'borrador' && (
-                        <button type="button" style={btnLink} onClick={() => setSeguirContrato(c.id)}>Seguimiento</button>
-                      )}
-                      {canEdit && c.proveedor_id && ['activo', 'suspendido', 'vencido'].includes(c.estado) && (
-                        <button type="button" style={btnLink} onClick={() => void prorrogar(c)}>Prorrogar</button>
-                      )}
-                      {canEdit && c.estado === 'activo' && c.monto_maximo != null && (
-                        <button type="button" style={btnLink} onClick={() => void ampliar(c)}>Ampliar monto</button>
-                      )}
-                      {canCreate && c.proveedor_id && (ESTADOS_RENOVABLES as readonly string[]).includes(c.estado) && (
-                        <button type="button" style={btnLink} onClick={() => void renovar(c)}>Renovar</button>
-                      )}
-                      {c.respaldo_path && (
-                        <SecureFileLink src={c.respaldo_path} bucket={BUCKET_CONTRATOS_RESPALDO} style={{ fontSize: 12 }}>Respaldo</SecureFileLink>
-                      )}
-                      {canEdit && c.estado !== 'terminado' && c.estado !== 'cancelado' && (
-                        <label style={{ ...btnLink, display: 'inline-block' }}>
-                          {c.respaldo_path ? 'Añadir respaldo' : 'Subir respaldo'}
-                          <input type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
-                            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void subirRespaldo(c, f) }} />
-                        </label>
-                      )}
-                      {canDelete && c.estado === 'borrador' && (
-                        <button type="button" style={{ ...btnLink, color: 'var(--at-danger)' }} onClick={() => void borrar(c)}>Eliminar</button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        /* Tarjetas: una por contrato, en rejilla que se adapta al ancho (una
+           columna en el teléfono). Pulsar una abre la ficha en ventana, con
+           todos los datos y las acciones (antes: tabla con una columna de
+           acciones por fila, que en el teléfono salía de la pantalla). */
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+          {filtrados.map((c) => {
+            const p = c.proveedor_id ? porId.get(c.proveedor_id) : undefined
+            const etiqueta = p ? etiquetaProveedor(p) : c.proveedor_nombre
+            return (
+              <div key={c.id} role="button" tabIndex={0} aria-label={etiqueta}
+                onClick={() => setDetalleId(c.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetalleId(c.id) } }}
+                style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface)', border: '1px solid var(--at-line)', fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <strong style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{etiqueta}</strong>
+                  <StatusBadge tone={TONO[c.estado] ?? 'neutral'}>{ESTADO_CONTRATO_LABELS[c.estado] ?? c.estado}</StatusBadge>
+                </div>
+                {!c.proveedor_id && <div style={{ fontSize: 11, color: 'var(--at-warning)' }}>Texto libre · sin vincular al catálogo</div>}
+                {c.referencia && <div style={{ fontSize: 11, color: 'var(--at-ink-soft)' }}>Ref. {c.referencia}</div>}
+                <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginTop: 4 }}>
+                  {c.servicio}
+                  {c.modalidad && ` · ${MODALIDAD_LABELS[c.modalidad]}`}
+                  {c.periodicidad && ` · ${PERIODICIDAD_LABELS[c.periodicidad]}`}
+                  {c.importe_periodico != null && ` · ${c.moneda} ${c.importe_periodico.toLocaleString('es')}`}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--at-ink-soft)', marginTop: 2 }}>
+                  {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' → sin fin'}
+                </div>
+                {c.estado === 'activo' && !contratoVigente(c, hoy) && (
+                  <div data-testid={`fuera-de-vigencia-${c.id}`} style={{ fontSize: 11, color: 'var(--at-warning)', marginTop: 2 }}>
+                    Activo, pero hoy está fuera de sus fechas: no ampara órdenes nuevas.
+                  </div>
+                )}
+                {c.renovado_de && <div style={{ fontSize: 11, color: 'var(--at-ink-soft)', marginTop: 2 }}>Renueva a un contrato anterior</div>}
+                {c.motivo_estado && ['suspendido', 'terminado', 'cancelado'].includes(c.estado) && (
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-soft)', marginTop: 2 }}>{c.motivo_estado}</div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
+
+      {/* Ficha en ventana (pantalla completa en el teléfono). Va ANTES del
+          formulario, el historial y el seguimiento en el árbol: se abren desde
+          aquí y deben quedar encima (EditModal apila por orden de montaje y
+          Escape sólo cierra la de arriba). */}
+      {detalle && (() => {
+        const c = detalle
+        const p = c.proveedor_id ? porId.get(c.proveedor_id) : undefined
+        const etiqueta = p ? etiquetaProveedor(p) : c.proveedor_nombre
+        const transiciones = canEdit ? TRANSICIONES_CONTRATO[c.estado].filter((e) => e !== 'vencido') : []
+        const editable = canEdit && c.estado !== 'terminado' && c.estado !== 'cancelado'
+        const responsable = responsables.find((r) => r.id === c.responsable_id)
+        const contacto = [c.proveedor_contacto, c.proveedor_telefono, c.proveedor_email].filter(Boolean).join(' · ')
+        const datos: { label: string; value: string }[] = [
+          { label: 'Servicio', value: c.servicio },
+          { label: 'Modalidad', value: c.modalidad ? MODALIDAD_LABELS[c.modalidad] : '—' },
+          { label: 'Periodicidad', value: c.periodicidad ? PERIODICIDAD_LABELS[c.periodicidad] : '—' },
+          { label: 'Importe periódico', value: c.importe_periodico != null ? `${c.moneda ?? ''} ${c.importe_periodico.toLocaleString('es')}` : '—' },
+          { label: 'Monto máximo (tope)', value: c.monto_maximo != null ? `${c.moneda ?? ''} ${c.monto_maximo.toLocaleString('es')}` : 'Sin límite total' },
+          { label: 'Vigencia', value: `${c.fecha_inicio}${c.fecha_fin ? ` → ${c.fecha_fin}` : ' → sin fin'}` },
+          { label: 'Referencia', value: c.referencia || '—' },
+          { label: 'Contacto del contrato', value: contacto || '—' },
+          { label: 'Responsable en el proyecto', value: responsable?.full_name ?? (c.responsable_id ? c.responsable_id : '—') },
+        ]
+        const bloques = [
+          { label: 'Alcance del servicio', value: c.alcance },
+          { label: 'Descripción', value: c.descripcion },
+          { label: 'Notas', value: c.notas },
+        ].filter((b) => b.value)
+        return (
+          <EditModal
+            title={etiqueta}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '2px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <StatusBadge tone={TONO[c.estado] ?? 'neutral'}>{ESTADO_CONTRATO_LABELS[c.estado] ?? c.estado}</StatusBadge>
+                {c.referencia && <span>Ref. {c.referencia}</span>}
+                {p?.nit && <span>NIT {p.nit}</span>}
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+                <button type="button" style={btnSecundario} onClick={() => setDetalleId(null)}>Cerrar</button>
+                {editable && <button type="button" style={btnSecundario} onClick={() => abrirEdicion(c)}>Editar</button>}
+                {transiciones.map((e) => (
+                  <button key={e} type="button" style={e === 'activo' ? btnPrimario : e === 'cancelado' ? btnPeligro : btnSecundario}
+                    onClick={() => void cambiar(c, e)}>
+                    {/* «Cancelar contrato» y no «Cancelar»: al lado de Cerrar se leería como cerrar la ventana. */}
+                    {e === 'cancelado' ? 'Cancelar contrato' : ACCION_ETIQUETA[e]}
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            {!c.proveedor_id && (
+              <div role="status" style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--at-warning)', fontSize: 12, marginBottom: 12 }}>
+                Contrato histórico con el proveedor en texto libre, sin vincular al catálogo.
+              </div>
+            )}
+            {c.estado === 'activo' && !contratoVigente(c, hoy) && (
+              <div style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--at-warning)', background: 'var(--at-warning-tint)', fontSize: 12, color: 'var(--at-warning-strong)', marginBottom: 12 }}>
+                ⚠️ Activo, pero hoy está fuera de sus fechas: no ampara órdenes nuevas.
+              </div>
+            )}
+            {c.motivo_estado && ['suspendido', 'terminado', 'cancelado'].includes(c.estado) && (
+              <div style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--at-surface-2)', fontSize: 12, marginBottom: 12 }}>
+                <strong>Motivo del estado:</strong> {c.motivo_estado}
+              </div>
+            )}
+            {c.renovado_de && <div style={{ fontSize: 12, color: 'var(--at-ink-soft)', marginBottom: 12 }}>🔁 Renueva a un contrato anterior; aquel conserva su historial.</div>}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 10, marginBottom: 14 }}>
+              {datos.map((d) => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-soft)' }}>{d.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+            {bloques.map((b) => (
+              <div key={b.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 13, whiteSpace: 'pre-wrap' }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--at-ink-soft)', marginBottom: 4 }}>{b.label}</div>
+                {b.value}
+              </div>
+            ))}
+
+            {/* Historial, seguimiento, documentos y los cambios documentados
+                (prórroga, ampliación, renovación). Eliminar sólo en borrador. */}
+            <div style={{ paddingTop: 12, marginTop: 4, borderTop: '1px solid var(--at-line)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--at-ink-soft)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Más acciones</div>
+              <div style={{ display: 'flex', gap: '8px 14px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button type="button" style={btnLink} onClick={() => setHistorialDe(c)}>Historial</button>
+                {c.proveedor_id && c.estado !== 'borrador' && (
+                  <button type="button" style={btnLink} onClick={() => setSeguirContrato(c.id)}>Seguimiento</button>
+                )}
+                {canEdit && c.proveedor_id && ['activo', 'suspendido', 'vencido'].includes(c.estado) && (
+                  <button type="button" style={btnLink} onClick={() => void prorrogar(c)}>Prorrogar</button>
+                )}
+                {canEdit && c.estado === 'activo' && c.monto_maximo != null && (
+                  <button type="button" style={btnLink} onClick={() => void ampliar(c)}>Ampliar monto</button>
+                )}
+                {canCreate && c.proveedor_id && (ESTADOS_RENOVABLES as readonly string[]).includes(c.estado) && (
+                  <button type="button" style={btnLink} onClick={() => void renovar(c)}>Renovar</button>
+                )}
+                {c.respaldo_path && (
+                  <SecureFileLink src={c.respaldo_path} bucket={BUCKET_CONTRATOS_RESPALDO} style={{ fontSize: 12 }}>Respaldo</SecureFileLink>
+                )}
+                {editable && (
+                  <label style={{ ...btnLink, display: 'inline-block' }}>
+                    {c.respaldo_path ? 'Añadir respaldo' : 'Subir respaldo'}
+                    <input type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void subirRespaldo(c, f) }} />
+                  </label>
+                )}
+                {canDelete && c.estado === 'borrador' && (
+                  <button type="button" style={{ ...btnLink, color: 'var(--at-danger)' }} onClick={() => void borrar(c)}>Eliminar</button>
+                )}
+              </div>
+            </div>
+          </EditModal>
+        )
+      })()}
 
       {form && (
         <FormularioContrato

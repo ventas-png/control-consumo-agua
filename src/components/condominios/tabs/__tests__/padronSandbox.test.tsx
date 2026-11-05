@@ -124,7 +124,7 @@ const ORDEN_DE: Record<string, Record<string, unknown>> = {
   aprobada: { estado: 'aprobada', numero: 'OC-000003', revision: 0 },
 }
 
-/** Los botones de paso que la pantalla ofrece en la tarjeta de la orden, con las mismas etiquetas que el guion. */
+/** Los botones de paso que la pantalla ofrece en la ficha de la orden (abre en ventana), con las mismas etiquetas que el guion. */
 function botonesQueOfrece(perfil: PerfilPadron, clave: string): string[] {
   const exento = ['admin', 'company_owner', 'super_admin', 'superadmin'].includes(perfil.rol)
   const orden = {
@@ -140,10 +140,10 @@ function botonesQueOfrece(perfil: PerfilPadron, clave: string): string[] {
     { permisos: [...perfil.permisos], role: perfil.rol },
   )
   fireEvent.click(screen.getByText(guion.ORDENES[clave]))
-  let tarjeta: HTMLElement | null = screen.getByText(guion.ORDENES[clave])
-  while (tarjeta && ![...tarjeta.querySelectorAll('button')].some((b) => /Seguimiento/.test(b.textContent ?? ''))) tarjeta = tarjeta.parentElement
-  expect(tarjeta, 'no se encontró la tarjeta de la orden expandida').not.toBeNull()
-  const textos = [...tarjeta!.querySelectorAll('button')].map((b) => (b.textContent ?? '').replace(/\s+/g, ' ').trim())
+  // La ficha abre en ventana al pulsar la tarjeta: los botones de paso viven ahí (pie y «Otras acciones»).
+  const ficha = screen.getByRole('dialog', { name: guion.ORDENES[clave] })
+  expect([...ficha.querySelectorAll('button')].some((b) => /Seguimiento/.test(b.textContent ?? '')), 'la ficha de la orden no abrió').toBe(true)
+  const textos = [...ficha.querySelectorAll('button')].map((b) => (b.textContent ?? '').replace(/\s+/g, ' ').trim())
   return [...new Set(textos.map((t) => guion.ETIQUETA(t)).filter((e): e is string => !!e))].sort()
 }
 
