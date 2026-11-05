@@ -455,6 +455,28 @@ describe('corregir y anular desde la lista', () => {
     expect(screen.queryByText(/Anular/)).toBeNull()
   })
 
+  it('el estado de la fila es UNA pastilla: selector con permiso, etiqueta sin él', async () => {
+    // Antes la tarjeta decía «Presente» dos veces —etiqueta y <select>— y en el
+    // teléfono el <select> era justo lo que se salía de la pantalla.
+    const { unmount } = montar([filaDelDia()], [], { canEdit: true })
+    const selector = await screen.findByLabelText('Estado de Marco Sical')
+    fireEvent.change(selector, { target: { value: 'tardanza' } })
+    await waitFor(() => expect(mocks.updateCondominioRow)
+      .toHaveBeenCalledWith('presencia_personal', 'r1', { estado: 'tardanza' }))
+    unmount()
+
+    montar([filaDelDia()], [], { canEdit: false, canDelete: false })
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    expect(screen.queryByLabelText('Estado de Marco Sical')).toBeNull()
+    expect(screen.getByText('Presente', { selector: 'span' })).toBeTruthy()
+  })
+
+  it('una fila anulada no ofrece cambiar su estado', async () => {
+    montar([filaDelDia({ anulado_en: '2026-09-08T12:00:00Z' })], [], { canEdit: true })
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    expect(screen.queryByLabelText('Estado de Marco Sical')).toBeNull()
+  })
+
   it('anular es un permiso APARTE de corregir', async () => {
     // Quien puede corregir no debería poder invalidar una jornada entera.
     montar([filaDelDia()], [], { canEdit: true, canDelete: false })
@@ -692,7 +714,8 @@ describe('las pausas en la lista del día', () => {
     montar([filaDelDia({ hora_entrada: '06:00:00', hora_salida: '14:00:00' })])
     await screen.findByText(/Descanso: 0h 30m/)
     expect(screen.queryByText(/Estadía:/)).toBeNull()
-    expect(screen.getByText(/· 8h/)).toBeTruthy()
+    // Rotulado «Horas»: el número solo, sin etiqueta, no decía qué era.
+    expect(screen.getByText(/Horas: 8h/)).toBeTruthy()
   })
 
   it('la pausa anulada se ve, pero ya no resta', async () => {
