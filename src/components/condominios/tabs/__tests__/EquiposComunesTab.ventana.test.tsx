@@ -84,16 +84,15 @@ describe('EquiposComunesTab — nuevo equipo en ventana emergente', () => {
     expect(ventana('Nuevo equipo')).toBeTruthy()
   })
 
-  it('+ Nuevo no pierde el equipo seleccionado: la ficha sigue detrás y al cancelar', () => {
+  it('+ Nuevo abre desde la lista, sin pasar por una ficha, y Cancelar lo cierra', () => {
     renderTab()
-    abrirDetalle()
+    expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '+ Nuevo' }))
     const v = ventana('Nuevo equipo')
     expect((within(v).getByLabelText('Nombre *') as HTMLInputElement).value).toBe('')
-    expect(screen.getByText('SN-001')).toBeTruthy()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
     fireEvent.click(within(v).getByRole('button', { name: 'Cancelar' }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByText('SN-001')).toBeTruthy()
   })
 
   it('sin permiso de alta no hay botón + Nuevo', () => {
@@ -147,7 +146,9 @@ describe('EquiposComunesTab — editar la ficha en ventana emergente', () => {
     expect(mocks.createCondominioRow).not.toHaveBeenCalled()
     expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success', title: 'Equipo actualizado' }))
     expect(mocks.onRefresh).toHaveBeenCalled()
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // Se cierra el formulario; la ficha sigue abierta debajo.
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Editar equipo' })).toBeNull())
+    expect(ventana('💧 Bomba principal')).toBeTruthy()
   })
 
   it('si la fila no se actualiza, avisa y la ventana sigue abierta', async () => {
@@ -167,12 +168,16 @@ describe('EquiposComunesTab — editar la ficha en ventana emergente', () => {
     fireEvent.click(screen.getByRole('button', { name: /Editar/ }))
     fireEvent.change(within(ventana('Editar equipo')).getByLabelText('Nombre *'), { target: { value: 'Otro' } })
     fireEvent.click(within(ventana('Editar equipo')).getByRole('button', { name: 'Cancelar' }))
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByText('SN-001')).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Editar equipo' })).toBeNull()
+    expect(within(ventana('💧 Bomba principal')).getByText('SN-001')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /Editar/ }))
     // Cancelar descartó lo tecleado: la ventana reabre con la ficha, no con «Otro».
     expect((within(ventana('Editar equipo')).getByLabelText('Nombre *') as HTMLInputElement).value).toBe('Bomba principal')
+    // Escape cierra sólo la ventana de arriba: primero el formulario, luego la ficha.
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Editar equipo' })).toBeNull()
+    expect(ventana('💧 Bomba principal')).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
@@ -213,5 +218,49 @@ describe('EquiposComunesTab — lo que ya existía sigue igual', () => {
     fireEvent.click(screen.getByRole('button', { name: /Registrar mantenimiento/ }))
     await waitFor(() => expect(mocks.openPromptDialog).toHaveBeenCalledTimes(1))
     expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
+  })
+})
+
+describe('EquiposComunesTab — la ficha abre en ventana', () => {
+  it('sin pulsar nada sólo hay lista; la tarjeta abre la ficha a pantalla completa en el teléfono', () => {
+    renderTab()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByText('SN-001')).toBeNull()
+    abrirDetalle()
+    const v = ventana('💧 Bomba principal')
+    expect(v.classList.contains('at-modal--fs-mobile')).toBe(true)
+    expect(within(v).getByText('Operativo')).toBeTruthy()
+    expect(within(v).getByText('Pedrollo CP 200')).toBeTruthy()
+    expect(within(v).getByText('📍 Cuarto de máquinas')).toBeTruthy()
+    expect(within(v).getByText('SN-001')).toBeTruthy()
+    expect(within(v).getByText('10 años')).toBeTruthy()
+    expect(within(v).getByRole('button', { name: 'Cerrar' })).toBeTruthy()
+    expect(within(v).getByRole('button', { name: '✏️ Editar' })).toBeTruthy()
+    expect(within(v).getByRole('button', { name: '🔧 Registrar mantenimiento' })).toBeTruthy()
+    expect(within(v).getByRole('button', { name: '→ En mantenimiento' })).toBeTruthy()
+    expect(within(v).queryByRole('button', { name: '→ Operativo' })).toBeNull()
+  })
+
+  it('Cerrar y Escape cierran la ficha; otra tarjeta abre la suya', () => {
+    renderTab({ equipos: [bomba(), bomba({ id: 'e2', nombre: 'Generador', categoria: 'generador', serial: 'GN-9', estado: 'fuera_servicio' })] })
+    abrirDetalle()
+    fireEvent.click(within(ventana('💧 Bomba principal')).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    abrirDetalle()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Generador' }))
+    const v = ventana('⚡ Generador')
+    expect(within(v).getByText('GN-9')).toBeTruthy()
+    expect(within(v).getByText('Fuera de servicio')).toBeTruthy()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  })
+
+  it('sin permiso de edición el pie sólo lleva Cerrar y no hay cambio de estado', () => {
+    renderTab({ canEdit: false })
+    abrirDetalle()
+    const v = ventana('💧 Bomba principal')
+    expect(within(v).getByRole('button', { name: 'Cerrar' })).toBeTruthy()
+    expect(within(v).queryByRole('button', { name: /Editar|Registrar mantenimiento|→ / })).toBeNull()
   })
 })

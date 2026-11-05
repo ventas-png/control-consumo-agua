@@ -57,7 +57,16 @@ function renderTab(o: { inventario?: ItemInventario[]; areas?: AreaCondominio[];
   )
 }
 
-const ubicacion = () => within(screen.getByRole('dialog')).getByLabelText('Ubicación') as HTMLSelectElement
+/** El formulario (nuevo / editar). La ficha también es un diálogo y puede seguir abierta debajo. */
+const formulario = () => screen.getByRole('dialog', { name: /^(Nuevo|Editar) Item$/ })
+const sinFormulario = () => expect(screen.queryByRole('dialog', { name: /^(Nuevo|Editar) Item$/ })).toBeNull()
+/** Abre la ficha del item pulsando su fila y, desde ella, «Editar». */
+function abrirYEditar(nombre: string) {
+  fireEvent.click(screen.getByText(nombre))
+  const ficha = screen.getByRole('dialog', { name: new RegExp(`${nombre}$`) })
+  fireEvent.click(within(ficha).getByRole('button', { name: 'Editar' }))
+}
+const ubicacion = () => within(formulario()).getByLabelText('Ubicación') as HTMLSelectElement
 const opciones = () => Array.from(ubicacion().options).map(o => o.textContent)
 
 // jsdom dice navigator.language = 'en-US': se fija el español, que es lo que ve el staff.
@@ -84,13 +93,13 @@ describe('InventarioTab — ventana', () => {
     const [tabla, payload] = mocks.createCondominioRow.mock.calls[0]
     expect(tabla).toBe('inventario_condominio')
     expect(payload).toMatchObject({ nombre: 'Escalera', company_id: 'co1', project_id: 'p1' })
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(sinFormulario)
     expect(onRefresh).toHaveBeenCalled()
   })
 
-  it('el lápiz abre «Editar Item» en ventana con los datos del item y actualiza', async () => {
+  it('«Editar» desde la ficha abre «Editar Item» en ventana con los datos del item y actualiza', async () => {
     renderTab()
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    abrirYEditar('Set de cojines exterior')
 
     const dialog = screen.getByRole('dialog', { name: 'Editar Item' })
     expect((within(dialog).getByLabelText('Nombre *') as HTMLInputElement).value).toBe('Set de cojines exterior')
@@ -105,13 +114,15 @@ describe('InventarioTab — ventana', () => {
     expect(tabla).toBe('inventario_condominio')
     expect(id).toBe('iv1')
     expect(payload).toMatchObject({ cantidad: 6, nombre: 'Set de cojines exterior' })
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(sinFormulario)
+    // La ficha sigue abierta debajo.
+    expect(screen.getByRole('dialog', { name: /Set de cojines exterior$/ })).toBeTruthy()
   })
 
   it('sin nombre avisa y no guarda; la ventana sigue abierta', () => {
     renderTab()
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar Item' }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Agregar' }))
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Agregar' }))
 
     expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'warning' }))
     expect(mocks.createCondominioRow).not.toHaveBeenCalled()
@@ -122,7 +133,7 @@ describe('InventarioTab — ventana', () => {
     renderTab()
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar Item' }))
     fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'Taladro' } })
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancelar' }))
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Cancelar' }))
     expect(screen.queryByRole('dialog')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar Item' }))
@@ -130,8 +141,11 @@ describe('InventarioTab — ventana', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    abrirYEditar('Set de cojines exterior')
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Editar Item' })).getByRole('button', { name: 'Cancelar' }))
+    // Escape cierra la ficha, que seguía abierta debajo del formulario.
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar Item' }))
     expect((within(screen.getByRole('dialog', { name: 'Nuevo Item' })).getByLabelText('Nombre *') as HTMLInputElement).value).toBe('')
   })
@@ -145,7 +159,7 @@ describe('InventarioTab — ubicación elegida del catálogo de áreas', () => {
 
     fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'Parrilla' } })
     fireEvent.change(ubicacion(), { target: { value: 'a-social' } })
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Agregar' }))
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Agregar' }))
 
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     expect(mocks.createCondominioRow.mock.calls[0][1]).toMatchObject({ area_id: 'a-social', ubicacion: 'Área social' })
@@ -155,7 +169,7 @@ describe('InventarioTab — ubicación elegida del catálogo de áreas', () => {
     renderTab()
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar Item' }))
     fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'Parrilla' } })
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Agregar' }))
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Agregar' }))
 
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     expect(mocks.createCondominioRow.mock.calls[0][1]).toMatchObject({ area_id: null, ubicacion: null })
@@ -169,39 +183,39 @@ describe('InventarioTab — ubicación elegida del catálogo de áreas', () => {
 
   it('un item legado cuyo texto coincide con UNA área se propone vinculado', async () => {
     renderTab({ inventario: [item({ id: 'iv3', nombre: 'Mesa', area_id: null, ubicacion: 'area SOCIAL' })] })
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    abrirYEditar('Mesa')
     expect(ubicacion().value).toBe('a-social')
 
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Actualizar' }))
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Actualizar' }))
     await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1))
     expect(mocks.updateCondominioRow.mock.calls[0][2]).toMatchObject({ area_id: 'a-social', ubicacion: 'Área social' })
   })
 
   it('un item legado sin coincidencia conserva su texto hasta que se elija un área', async () => {
     renderTab({ inventario: [item({ id: 'iv4', nombre: 'Escalera', area_id: null, ubicacion: 'Azotea Planta baja' })] })
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    abrirYEditar('Escalera')
     expect(ubicacion().value).toBe('')
-    expect(within(screen.getByRole('dialog')).getByText(/Antes: «Azotea Planta baja», sin vincular a un área/)).toBeTruthy()
+    expect(within(formulario()).getByText(/Antes: «Azotea Planta baja», sin vincular a un área/)).toBeTruthy()
 
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Actualizar' }))
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Actualizar' }))
     await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1))
     expect(mocks.updateCondominioRow.mock.calls[0][2]).toMatchObject({ area_id: null, ubicacion: 'Azotea Planta baja' })
   })
 
   it('un item en un área ya inactiva la conserva al editar; «Sin área» la quita del todo', async () => {
     renderTab({ inventario: [item({ id: 'iv5', nombre: 'Carretilla', area_id: 'a-bodega', ubicacion: 'Bodega vieja' })] })
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    abrirYEditar('Carretilla')
     expect(ubicacion().value).toBe('a-bodega')
     expect(opciones()).toContain('Bodega vieja (inactiva)')
 
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Actualizar' }))
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Actualizar' }))
     await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1))
     expect(mocks.updateCondominioRow.mock.calls[0][2]).toMatchObject({ area_id: 'a-bodega', ubicacion: 'Bodega vieja' })
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(sinFormulario)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    abrirYEditar('Carretilla')
     fireEvent.change(ubicacion(), { target: { value: '' } })
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Actualizar' }))
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Actualizar' }))
     await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(2))
     expect(mocks.updateCondominioRow.mock.calls[1][2]).toMatchObject({ area_id: null, ubicacion: null })
   })
@@ -209,35 +223,35 @@ describe('InventarioTab — ubicación elegida del catálogo de áreas', () => {
   it('sin áreas activas lleva al tab Áreas (o dice dónde se crean, sin permiso para verlo)', () => {
     renderTab({ areas: [BODEGA_VIEJA] })
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar Item' }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Crearlas en el tab Áreas' }))
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Crearlas en el tab Áreas' }))
     expect(onIrATab).toHaveBeenCalledWith('areas_config')
     cleanup()
 
     renderTab({ areas: [], puedeConfigurarAreas: false })
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar Item' }))
-    expect(within(screen.getByRole('dialog')).getByText(/Se dan de alta en el tab Áreas\./)).toBeTruthy()
-    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: 'Crearlas en el tab Áreas' })).toBeNull()
+    expect(within(formulario()).getByText(/Se dan de alta en el tab Áreas\./)).toBeTruthy()
+    expect(within(formulario()).queryByRole('button', { name: 'Crearlas en el tab Áreas' })).toBeNull()
   })
 })
 
 describe('InventarioTab — se permite prestar a un costo (20261118000000)', () => {
-  const interruptor = () => within(screen.getByRole('dialog')).getByRole('switch', { name: /Se permite prestar a un costo/ }) as HTMLInputElement
+  const interruptor = () => within(formulario()).getByRole('switch', { name: /Se permite prestar a un costo/ }) as HTMLInputElement
 
   it('el toggle encendido pide la renta por unidad; sin ella avisa y no guarda', async () => {
     renderTab()
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar Item' }))
     expect(interruptor().checked).toBe(false)
-    expect(within(screen.getByRole('dialog')).queryByLabelText('Renta por unidad (Q) *')).toBeNull()
+    expect(within(formulario()).queryByLabelText('Renta por unidad (Q) *')).toBeNull()
 
     fireEvent.click(interruptor())
     expect(interruptor().checked).toBe(true)
-    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Nombre *'), { target: { value: 'Sillas plegables' } })
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Agregar' }))
+    fireEvent.change(within(formulario()).getByLabelText('Nombre *'), { target: { value: 'Sillas plegables' } })
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Agregar' }))
     expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'warning', text: expect.stringContaining('Indica la renta por unidad') }))
     expect(mocks.createCondominioRow).not.toHaveBeenCalled()
 
-    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Renta por unidad (Q) *'), { target: { value: '12.5' } })
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Agregar' }))
+    fireEvent.change(within(formulario()).getByLabelText('Renta por unidad (Q) *'), { target: { value: '12.5' } })
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Agregar' }))
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     expect(mocks.createCondominioRow.mock.calls[0][1]).toMatchObject({ nombre: 'Sillas plegables', prestable_con_costo: true, costo_renta_unidad: 12.5 })
   })
@@ -245,13 +259,13 @@ describe('InventarioTab — se permite prestar a un costo (20261118000000)', () 
   it('apagar el toggle borra la renta y guarda prestable_con_costo=false con renta nula', async () => {
     renderTab({ inventario: [item({ id: 'iv9', nombre: 'Carpa', prestable_con_costo: true, costo_renta_unidad: 80 })] })
     expect(screen.getByText(/Renta Q 80\.00 c\/u/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    abrirYEditar('Carpa')
     expect(interruptor().checked).toBe(true)
-    expect((within(screen.getByRole('dialog')).getByLabelText('Renta por unidad (Q) *') as HTMLInputElement).value).toBe('80')
+    expect((within(formulario()).getByLabelText('Renta por unidad (Q) *') as HTMLInputElement).value).toBe('80')
 
     fireEvent.click(interruptor())
-    expect(within(screen.getByRole('dialog')).queryByLabelText('Renta por unidad (Q) *')).toBeNull()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Actualizar' }))
+    expect(within(formulario()).queryByLabelText('Renta por unidad (Q) *')).toBeNull()
+    fireEvent.click(within(formulario()).getByRole('button', { name: 'Actualizar' }))
     await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1))
     expect(mocks.updateCondominioRow.mock.calls[0][2]).toMatchObject({ prestable_con_costo: false, costo_renta_unidad: null })
   })
@@ -259,5 +273,91 @@ describe('InventarioTab — se permite prestar a un costo (20261118000000)', () 
   it('un item sin toggle no muestra renta en la lista', () => {
     renderTab()
     expect(screen.queryByText(/Renta Q/)).toBeNull()
+  })
+})
+
+describe('InventarioTab — la ficha abre en ventana al pulsar la fila', () => {
+  const ficha = () => screen.getByRole('dialog', { name: /Set de cojines exterior$/ })
+  const pie = () => ficha().querySelector('.at-modal-footer') as HTMLElement
+
+  it('sin pulsar nada no hay ventana; la fila sólo lleva la acción del día a día', () => {
+    renderTab()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Editar' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Eliminar' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Disponible' })).toBeTruthy()
+  })
+
+  it('pulsar la fila abre la ficha (pantalla completa en el teléfono) con todos los datos y las acciones en el pie', () => {
+    renderTab()
+    fireEvent.click(screen.getByText('Set de cojines exterior'))
+    const v = ficha()
+    expect(v.classList.contains('at-modal--fs-mobile')).toBe(true)
+    expect(within(v).getByText('🪑 Set de cojines exterior')).toBeTruthy()
+    expect(within(v).getByText('En Uso')).toBeTruthy()
+    expect(within(v).getByText('📍 Azotea')).toBeTruthy()
+    expect(within(v).getByText('Muebles del Lago')).toBeTruthy()
+    expect(within(v).getByText('Tipo cilindro')).toBeTruthy()
+    expect(within(v).getByText('1632.00')).toBeTruthy()
+    expect(within(v).getByText('Valor total (Q)')).toBeTruthy()
+    expect(within(v).getByText('6528.00')).toBeTruthy()
+    expect(within(v).getByText(/Stock bajo \(mín: 4\)/)).toBeTruthy()
+    expect(within(pie()).getByRole('button', { name: 'Cerrar' })).toBeTruthy()
+    expect(within(pie()).getByRole('button', { name: '→ Disponible' })).toBeTruthy()
+    expect(within(pie()).getByRole('button', { name: 'Editar' })).toBeTruthy()
+    expect(within(pie()).getByRole('button', { name: 'Eliminar' })).toBeTruthy()
+  })
+
+  it('Cerrar y Escape cierran la ficha', () => {
+    renderTab()
+    fireEvent.click(screen.getByText('Set de cojines exterior'))
+    fireEvent.click(within(pie()).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByText('Set de cojines exterior'))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('Editar se apila encima de la ficha y Escape cierra sólo el formulario', () => {
+    renderTab()
+    abrirYEditar('Set de cojines exterior')
+    expect(screen.getAllByRole('dialog')).toHaveLength(2)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    sinFormulario()
+    expect(ficha()).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('cambiar el estado y eliminar desde el pie; eliminar cierra la ficha', async () => {
+    renderTab()
+    fireEvent.click(screen.getByText('Set de cojines exterior'))
+    fireEvent.click(within(pie()).getByRole('button', { name: '→ Disponible' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('inventario_condominio', 'iv1', { estado: 'disponible' }))
+    expect(onRefresh).toHaveBeenCalled()
+
+    fireEvent.click(within(pie()).getByRole('button', { name: 'Eliminar' }))
+    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('inventario_condominio', 'iv1'))
+    expect(mocks.confirm).toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('la acción rápida de la fila no abre la ficha', async () => {
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: 'Disponible' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('inventario_condominio', 'iv1', { estado: 'disponible' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('sin permisos de edición ni borrado el pie sólo lleva Cerrar', () => {
+    render(
+      <I18nProvider>
+        <InventarioTab inventario={[COJINES]} areas={AREAS} proyectoId="p1" companyId="co1" moneda="Q"
+          canCreate={false} canEdit={false} canDelete={false} puedeConfigurarAreas={false} onIrATab={onIrATab} onRefresh={onRefresh} />
+      </I18nProvider>,
+    )
+    fireEvent.click(screen.getByText('Set de cojines exterior'))
+    expect(within(pie()).getByRole('button', { name: 'Cerrar' })).toBeTruthy()
+    expect(within(pie()).queryByRole('button', { name: /Editar|Eliminar|Disponible|En Uso/ })).toBeNull()
   })
 })

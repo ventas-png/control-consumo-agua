@@ -74,6 +74,10 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  // La ficha abre en ventana al pulsar la fila. Se guarda el id y no la fila:
+  // tras editar o cambiar el estado, el detalle muestra la fila recargada.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalle = detalleId ? inventario.find(i => i.id === detalleId) ?? null : null
 
   const stockBajo = inventario.filter(i => i.cantidad <= i.cantidad_minima && i.estado !== 'dado_de_baja')
   const porVencer = inventario.filter(i => i.fecha_vencimiento && i.fecha_vencimiento >= hoy &&
@@ -170,6 +174,7 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('inventario_condominio', id)
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
+    setDetalleId(null)
     onRefresh()
   }
 
@@ -181,6 +186,9 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
 
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
+  const venceProximo = (i: ItemInventario) => !!i.fecha_vencimiento && i.fecha_vencimiento >= hoy &&
+    (diasHastaFechaCalendario(i.fecha_vencimiento) ?? Infinity) < 30
+  const stockEnAlerta = (i: ItemInventario) => i.cantidad <= i.cantidad_minima && i.estado !== 'dado_de_baja'
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -357,7 +365,8 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
         defaultSort={{ key: 'nombre', direction: 'asc' }}
         searchPlaceholder={t('condominios.inventario.search_placeholder')}
         searchableKeys={['nombre', ubicacionDe, i => i.numero_serie ?? '']}
-        rowStyle={i => (i.cantidad <= i.cantidad_minima && i.estado !== 'dado_de_baja') ? { background: 'var(--at-danger-tint)' } : {}}
+        rowStyle={i => stockEnAlerta(i) ? { background: 'var(--at-danger-tint)' } : {}}
+        onRowClick={i => setDetalleId(i.id)}
         filters={[
           {
             key: 'categoria',
@@ -385,8 +394,7 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
           {
             key: 'nombre', header: t('condominios.inventario.col_item'), sortable: true,
             render: i => {
-              const venceProx = i.fecha_vencimiento && i.fecha_vencimiento >= hoy &&
-                (diasHastaFechaCalendario(i.fecha_vencimiento) ?? Infinity) < 30
+              const venceProx = venceProximo(i)
               return (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -420,7 +428,7 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
             key: 'cantidad', header: t('condominios.inventario.col_cantidad'), sortable: true, align: 'right',
             accessor: i => i.cantidad,
             render: i => {
-              const stockAlerta = i.cantidad <= i.cantidad_minima && i.estado !== 'dado_de_baja'
+              const stockAlerta = stockEnAlerta(i)
               return (
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ color: stockAlerta ? 'var(--at-danger)' : 'var(--at-ink)', fontWeight: 700 }}>{i.cantidad}</span>
@@ -436,26 +444,99 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
             render: i => i.costo_unitario != null ? <span style={{ color: 'var(--at-ink-2)', fontSize: '12px' }}>{moneda} {i.costo_unitario.toFixed(2)}</span> : <span style={{ color: 'var(--at-ink-3)' }}>—</span>,
           },
           {
+            // En la fila queda sólo la acción del día a día (En uso / Disponible);
+            // editar y eliminar viven en la ficha, que abre al pulsar la fila.
+            // `stopPropagation`: el botón no debe abrir además la ficha.
             key: 'actions', header: '', align: 'right',
-            render: i => (canEdit || canDelete) ? (
-              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                {canEdit && i.estado === 'disponible' && (
+            render: i => canEdit && (i.estado === 'disponible' || i.estado === 'en_uso') ? (
+              <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                {i.estado === 'disponible' ? (
                   <button onClick={() => handleEstado(i.id, 'en_uso')} style={{ padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                     {t('condominios.inventario.accion_en_uso')}
                   </button>
-                )}
-                {canEdit && i.estado === 'en_uso' && (
+                ) : (
                   <button onClick={() => handleEstado(i.id, 'disponible')} style={{ padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                     {t('condominios.inventario.accion_disponible')}
                   </button>
                 )}
-                {canEdit && <button onClick={() => startEdit(i)} aria-label={t('condominios.comun.edit')} style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                {canDelete && <button onClick={() => handleDelete(i.id)} aria-label={t('condominios.comun.delete')} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>}
               </div>
             ) : null,
           },
         ] satisfies DataTableColumn<ItemInventario>[]}
       />
+
+      {/* Ficha en ventana (pantalla completa en el teléfono): todos los datos
+          del item y sus acciones. Va DESPUÉS del formulario en el árbol para
+          que, al pulsar Editar desde aquí, el formulario quede encima: EditModal
+          apila por orden de montaje y el formulario se monta después. */}
+      {detalle && (() => {
+        const i = detalle
+        const c = ESTADO_COLOR[i.estado]
+        const stockAlerta = stockEnAlerta(i)
+        const fuera = enCirculacion(i.id, prestamos)
+        const datos: { label: string; value: string; color?: string }[] = [
+          { label: t('condominios.inventario.categoria'), value: `${CATEGORIA_ICON[i.categoria]} ${t(CATEGORIA_LABEL_KEY[i.categoria])}` },
+          { label: t('condominios.inventario.cantidad'), value: `${i.cantidad} ${i.unidad_medida}`, color: stockAlerta ? 'var(--at-danger)' : undefined },
+          { label: t('condominios.inventario.stock_minimo'), value: `${i.cantidad_minima} ${i.unidad_medida}` },
+          { label: t('condominios.inventario.costo_unitario', { moneda }), value: i.costo_unitario != null ? i.costo_unitario.toFixed(2) : '—' },
+          { label: t('condominios.inventario.valor_total', { moneda }), value: i.costo_unitario != null ? (i.costo_unitario * i.cantidad).toFixed(2) : '—' },
+          ...(i.prestable_con_costo && i.costo_renta_unidad != null
+            ? [{ label: t('condominios.inventario.renta_unidad_detalle', { moneda }), value: Number(i.costo_renta_unidad).toFixed(2) }] : []),
+          ...(fuera > 0 ? [{ label: t('condominios.inventario.en_prestamo'), value: `🔁 ${fuera}`, color: 'var(--at-warning-strong)' }] : []),
+          { label: t('condominios.inventario.numero_serie'), value: i.numero_serie || '—' },
+          { label: t('condominios.inventario.proveedor'), value: i.proveedor || '—' },
+          { label: t('condominios.inventario.fecha_adquisicion'), value: i.fecha_adquisicion || '—' },
+          { label: t('condominios.inventario.fecha_vencimiento'), value: i.fecha_vencimiento || '—', color: venceProximo(i) ? 'var(--at-warning-strong)' : undefined },
+        ]
+        return (
+          <EditModal
+            title={`${CATEGORIA_ICON[i.categoria]} ${i.nombre}`}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '2px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: c.bg, color: c.color }}>{t(ESTADO_LABEL_KEY[i.estado])}</span>
+                {ubicacionDe(i) && <span>📍 {ubicacionDe(i)}</span>}
+              </span>
+            }
+            maxWidth="720px"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+                <Button variant="secondary" onClick={() => setDetalleId(null)}>{t('condominios.comun.close')}</Button>
+                {canEdit && i.estado === 'disponible' && <Button variant="secondary" onClick={() => void handleEstado(i.id, 'en_uso')}>→ {t('condominios.inventario.accion_en_uso')}</Button>}
+                {canEdit && i.estado === 'en_uso' && <Button variant="secondary" onClick={() => void handleEstado(i.id, 'disponible')}>→ {t('condominios.inventario.accion_disponible')}</Button>}
+                {canDelete && <Button variant="outline-danger" onClick={() => void handleDelete(i.id)} aria-label={t('condominios.comun.delete')}>🗑️ {t('condominios.comun.delete')}</Button>}
+                {canEdit && <Button onClick={() => startEdit(i)} aria-label={t('condominios.comun.edit')}>✏️ {t('condominios.comun.edit')}</Button>}
+              </div>
+            }
+          >
+            {stockAlerta && (
+              <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px', fontWeight: 600, color: 'var(--at-danger-strong)' }}>
+                ⚠️ {t('condominios.inventario.stock_bajo', { min: i.cantidad_minima })}
+              </div>
+            )}
+            {venceProximo(i) && (
+              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px', fontWeight: 600, color: 'var(--at-warning-strong)' }}>
+                📅 {t('condominios.inventario.vence_label', { fecha: i.fecha_vencimiento ?? '' })}
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginBottom: (i.descripcion || i.notas) ? '14px' : 0 }}>
+              {datos.map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '8px 12px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: d.color ?? 'var(--at-ink)', overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+            {(i.descripcion || i.notas) && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>
+                <div style={{ fontWeight: 600, fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>{t('condominios.inventario.descripcion')}</div>
+                {[i.descripcion, i.notas].filter(Boolean).join('\n')}
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
 
       {showImportModal && (
         <ImportInventarioModal

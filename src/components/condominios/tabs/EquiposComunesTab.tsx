@@ -107,6 +107,13 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
     setVista('lista')
   }
 
+  /** Cerrar la ventana de la ficha: el formulario de edición cuelga de ella y se descarta con ella. */
+  function cerrarDetalle() {
+    setForm(FORM_VACIO)
+    setVista('lista')
+    setSelectedId(null)
+  }
+
   function abrirNuevo() {
     setForm(FORM_VACIO)
     setVista('nuevo')
@@ -191,154 +198,164 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
   const editando = vista === 'editar'
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      {/* Lista */}
-      <div style={{ width: 320, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>Equipos ({lista.length})</span>
-            {canCreate && (
-              <button onClick={abrirNuevo}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nuevo
-              </button>
-            )}
-          </div>
-          <select style={{ ...inp, marginBottom: 6 }} value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaEquipo | '')}>
-            <option value="">Todas las categorías</option>
-            {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
-          </select>
-          <select style={inp} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoEquipo | '')}>
-            <option value="">Todos los estados</option>
-            {ESTADOS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </div>
-
-        {/* Alertas */}
-        {alertas.length > 0 && (
-          <div style={{ padding: '8px 12px', background: 'var(--at-warning-tint)', borderBottom: '1px solid var(--at-warning-border)' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-warning-strong)' }}>⚠️ {alertas.length} equipos requieren atención</div>
-          </div>
+    <div style={{ height: '100%', overflowY: 'auto' }}>
+      {/* Cabecera: filtros y alta. La ficha ya no vive en un panel al lado:
+          abre en ventana emergente (más abajo), así la lista ocupa todo el
+          ancho —en el teléfono antes compartían 320px + lo que sobrara—. */}
+      <div style={{ padding: '12px 16px 10px', borderBottom: '1px solid var(--at-line)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 12px' }}>
+        <span style={{ fontWeight: 600, fontSize: 14, marginRight: 'auto' }}>Equipos ({lista.length})</span>
+        <select style={{ ...inp, width: 'auto', minWidth: 170 }} value={filtroCategoria} aria-label="Categoría" onChange={e => setFiltroCategoria(e.target.value as CategoriaEquipo | '')}>
+          <option value="">Todas las categorías</option>
+          {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+        </select>
+        <select style={{ ...inp, width: 'auto', minWidth: 160 }} value={filtroEstado} aria-label="Estado" onChange={e => setFiltroEstado(e.target.value as EstadoEquipo | '')}>
+          <option value="">Todos los estados</option>
+          {ESTADOS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+        {canCreate && (
+          <button onClick={abrirNuevo}
+            style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+            + Nuevo
+          </button>
         )}
-
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin equipos</div>}
-
-        {lista.map(e => {
-          const cat = CATEGORIAS.find(c => c.value === e.categoria)
-          const est = ESTADOS.find(s => s.value === e.estado)
-          const alerta = alertaManto(e)
-          const dias = diasParaManto(e.proximo_mantenimiento)
-          return (
-            <div key={e.id} role="button" tabIndex={0} aria-label={e.nombre}
-              onClick={() => seleccionar(e.id)}
-              onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); seleccionar(e.id) } }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === e.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: alerta === 'vencido' ? '3px solid var(--at-danger)' : alerta === 'proximo' ? '3px solid var(--at-warning)' : '3px solid transparent' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {e.nombre}</span>
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: est && tint(est.color, 12), color: est?.color }}>{est?.label}</span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
-                {e.marca && <span>{e.marca} {e.modelo} · </span>}
-                {e.ubicacion && <span>{e.ubicacion}</span>}
-              </div>
-              {dias !== null && (
-                <div style={{ fontSize: 11, color: alerta === 'vencido' ? 'var(--at-danger)' : alerta === 'proximo' ? 'var(--at-warning)' : 'var(--at-ink-3)', marginTop: 2 }}>
-                  {alerta === 'vencido' ? `⚠️ Manto vencido hace ${Math.abs(dias)} días` : alerta === 'proximo' ? `⏳ Manto en ${dias} días` : `Próx. manto: ${e.proximo_mantenimiento}`}
-                </div>
-              )}
-            </div>
-          )
-        })}
       </div>
 
-      {/* Panel derecho: la ficha seleccionada. El formulario (nuevo / editar) no
-          se pinta aquí: abre en ventana emergente, más abajo, así la ficha sigue
-          a la vista mientras se llena. */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {selected ? (() => {
-          const cat = CATEGORIAS.find(c => c.value === selected.categoria)
-          const est = ESTADOS.find(s => s.value === selected.estado)
-          const alerta = alertaManto(selected)
-          const dias = diasParaManto(selected.proximo_mantenimiento)
-          return (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 20 }}>{cat?.icon} {selected.nombre}</div>
-                  <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>
-                    {selected.marca && <span>{selected.marca} {selected.modelo} · </span>}
-                    {selected.ubicacion && <span>{selected.ubicacion}</span>}
+      {/* Alertas */}
+      {alertas.length > 0 && (
+        <div style={{ padding: '8px 16px', background: 'var(--at-warning-tint)', borderBottom: '1px solid var(--at-warning-border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-warning-strong)' }}>⚠️ {alertas.length} equipos requieren atención</div>
+        </div>
+      )}
+
+      {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin equipos</div>}
+
+      {/* Tarjetas: una por equipo, en rejilla que se adapta al ancho (una
+          columna en el teléfono). Pulsar una abre la ficha en ventana. */}
+      {lista.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10, padding: 16 }}>
+          {lista.map(e => {
+            const cat = CATEGORIAS.find(c => c.value === e.categoria)
+            const est = ESTADOS.find(s => s.value === e.estado)
+            const alerta = alertaManto(e)
+            const dias = diasParaManto(e.proximo_mantenimiento)
+            return (
+              <div key={e.id} role="button" tabIndex={0} aria-label={e.nombre}
+                onClick={() => seleccionar(e.id)}
+                onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); seleccionar(e.id) } }}
+                style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderLeft: alerta === 'vencido' ? '4px solid var(--at-danger)' : alerta === 'proximo' ? '4px solid var(--at-warning)' : '4px solid var(--at-line)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {e.nombre}</span>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap', background: est && tint(est.color, 12), color: est?.color }}>{est?.label}</span>
+                </div>
+                {(e.marca || e.ubicacion) && (
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
+                    {e.marca && <span>{e.marca} {e.modelo}</span>}
+                    {e.marca && e.ubicacion && ' · '}
+                    {e.ubicacion && <span>{e.ubicacion}</span>}
                   </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ padding: '4px 12px', borderRadius: 12, background: est && tint(est.color, 12), color: est?.color, fontWeight: 600, fontSize: 13 }}>{est?.label}</span>
-                  {canEdit && (
-                    <button onClick={() => abrirEdicion(selected)}
-                      style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                      ✏️ Editar
-                    </button>
-                  )}
-                </div>
+                )}
+                {dias !== null && (
+                  <div style={{ fontSize: 11, color: alerta === 'vencido' ? 'var(--at-danger)' : alerta === 'proximo' ? 'var(--at-warning)' : 'var(--at-ink-3)', marginTop: 2 }}>
+                    {alerta === 'vencido' ? `⚠️ Manto vencido hace ${Math.abs(dias)} días` : alerta === 'proximo' ? `⏳ Manto en ${dias} días` : `Próx. manto: ${e.proximo_mantenimiento}`}
+                  </div>
+                )}
               </div>
+            )
+          })}
+        </div>
+      )}
 
-              {/* Alerta mantenimiento */}
-              {alerta !== 'ok' && alerta !== 'sin_fecha' && (
-                <div style={{ background: alerta === 'vencido' ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)', border: `1px solid ${alerta === 'vencido' ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
-                  <div style={{ fontWeight: 600, color: alerta === 'vencido' ? 'var(--at-danger)' : 'var(--at-warning-strong)', fontSize: 13 }}>
-                    {alerta === 'vencido' ? `⚠️ Mantenimiento vencido hace ${Math.abs(dias!)} días` : `⏳ Mantenimiento en ${dias} días (${selected.proximo_mantenimiento})`}
-                  </div>
-                </div>
-              )}
-
-              {/* Datos */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                {[
-                  { label: 'Categoría', value: `${cat?.icon} ${cat?.label}` },
-                  { label: 'Serial', value: selected.serial || '—' },
-                  { label: 'Fecha compra', value: selected.fecha_compra || '—' },
-                  { label: `Valor compra (${moneda})`, value: selected.valor_compra != null ? selected.valor_compra.toLocaleString() : '—' },
-                  { label: 'Vida útil', value: selected.vida_util_anios ? `${selected.vida_util_anios} años` : '—' },
-                  { label: 'Último mantenimiento', value: selected.ultimo_mantenimiento || '—' },
-                  { label: 'Próximo mantenimiento', value: selected.proximo_mantenimiento || '—' },
-                ].map(d => (
-                  <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 6, padding: '8px 12px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{d.label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{d.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {selected.notas && (
-                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 13 }}>
-                  <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Notas</div>
-                  {selected.notas}
-                </div>
-              )}
-
-              {canEdit && (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button onClick={() => registrarMantenimiento(selected)}
-                    style={{ padding: '7px 14px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+      {/* Ventana: la ficha del equipo. Va ANTES de la ventana del formulario
+          en el árbol: se abre desde aquí y debe quedar encima (EditModal
+          apila por orden de montaje y Escape sólo cierra la de arriba). En
+          el teléfono ocupa toda la pantalla. */}
+      {selected && (() => {
+        const cat = CATEGORIAS.find(c => c.value === selected.categoria)
+        const est = ESTADOS.find(s => s.value === selected.estado)
+        const alerta = alertaManto(selected)
+        const dias = diasParaManto(selected.proximo_mantenimiento)
+        return (
+          <EditModal
+            title={`${cat?.icon ?? ''} ${selected.nombre}`.trim()}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '2px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ padding: '2px 10px', borderRadius: 10, background: est && tint(est.color, 12), color: est?.color, fontWeight: 600, fontSize: 12 }}>{est?.label}</span>
+                {selected.marca && <span>{selected.marca} {selected.modelo}</span>}
+                {selected.ubicacion && <span>📍 {selected.ubicacion}</span>}
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={cerrarDetalle}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+                <button type="button" onClick={cerrarDetalle} style={btnSecundario}>Cerrar</button>
+                {canEdit && (<>
+                  <button type="button" onClick={() => abrirEdicion(selected)}
+                    style={{ padding: '8px 16px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                    ✏️ Editar
+                  </button>
+                  <button type="button" onClick={() => registrarMantenimiento(selected)} style={btnPrimario}>
                     🔧 Registrar mantenimiento
                   </button>
+                </>)}
+              </div>
+            }
+          >
+            {/* Alerta mantenimiento */}
+            {alerta !== 'ok' && alerta !== 'sin_fecha' && (
+              <div style={{ background: alerta === 'vencido' ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)', border: `1px solid ${alerta === 'vencido' ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+                <div style={{ fontWeight: 600, color: alerta === 'vencido' ? 'var(--at-danger)' : 'var(--at-warning-strong)', fontSize: 13 }}>
+                  {alerta === 'vencido' ? `⚠️ Mantenimiento vencido hace ${Math.abs(dias!)} días` : `⏳ Mantenimiento en ${dias} días (${selected.proximo_mantenimiento})`}
+                </div>
+              </div>
+            )}
+
+            {/* Datos */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              {[
+                { label: 'Categoría', value: `${cat?.icon} ${cat?.label}` },
+                { label: 'Serial', value: selected.serial || '—' },
+                { label: 'Fecha compra', value: selected.fecha_compra || '—' },
+                { label: `Valor compra (${moneda})`, value: selected.valor_compra != null ? selected.valor_compra.toLocaleString() : '—' },
+                { label: 'Vida útil', value: selected.vida_util_anios ? `${selected.vida_util_anios} años` : '—' },
+                { label: 'Último mantenimiento', value: selected.ultimo_mantenimiento || '—' },
+                { label: 'Próximo mantenimiento', value: selected.proximo_mantenimiento || '—' },
+              ].map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 6, padding: '8px 12px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {selected.notas && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 13, whiteSpace: 'pre-wrap' }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Notas</div>
+                {selected.notas}
+              </div>
+            )}
+
+            {/* Cambio de estado: acciones secundarias, en el cuerpo y no en el
+                pie, que ya lleva Editar y Registrar mantenimiento. */}
+            {canEdit && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Cambiar estado</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {ESTADOS.filter(s => s.value !== selected.estado).map(s => (
-                    <button key={s.value} onClick={() => actualizarEstado(selected, s.value)}
+                    <button key={s.value} type="button" onClick={() => actualizarEstado(selected, s.value)}
                       style={{ padding: '7px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       → {s.label}
                     </button>
                   ))}
                 </div>
-              )}
-            </div>
-          )
-        })() : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
-            Selecciona un equipo o registra uno nuevo
-          </div>
-        )}
-      </div>
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
 
-      {/* Ventana: nuevo / editar */}
+      {/* Ventana: nuevo / editar. Va DESPUÉS de la ficha: queda encima de ella. */}
       {(vista === 'nuevo' || (editando && selected)) && (
         <EditModal
           title={editando ? 'Editar equipo' : 'Nuevo equipo'}

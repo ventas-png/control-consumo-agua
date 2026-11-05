@@ -52,10 +52,14 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-eliminarExigeSuPermiso('Inventario', p => conI18n(
-  <InventarioTab {...base} moneda="Q" areas={[]} puedeConfigurarAreas={false} onIrATab={() => {}} canCreate {...p}
-    inventario={[fila({ id: 'iv1', nombre: 'Escalera', categoria: 'herramienta', estado: 'disponible', cantidad: 1, cantidad_minima: 0, unidad_medida: 'unidad' })]} />,
-), /^(Eliminar|Delete)$/, borrar, 'inventario_condominio', 'iv1')
+eliminarExigeSuPermiso('Inventario', p => {
+  conI18n(
+    <InventarioTab {...base} moneda="Q" areas={[]} puedeConfigurarAreas={false} onIrATab={() => {}} canCreate {...p}
+      inventario={[fila({ id: 'iv1', nombre: 'Escalera', categoria: 'herramienta', estado: 'disponible', cantidad: 1, cantidad_minima: 0, unidad_medida: 'unidad' })]} />,
+  )
+  // Eliminar vive en la ficha, que abre al pulsar la fila.
+  fireEvent.click(screen.getByText('Escalera'))
+}, /^(Eliminar|Delete)$/, borrar, 'inventario_condominio', 'iv1')
 
 eliminarExigeSuPermiso('Préstamos de equipo', p => render(
   <PrestamoEquiposTab {...base} unidades={[]} canCreate {...p}
