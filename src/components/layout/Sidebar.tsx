@@ -445,7 +445,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
             justifyContent: 'center',
             borderRadius: '7px',
             background: isActive
-              ? 'rgba(185,106,63,0.30)'
+              ? 'var(--at-nav-accent-soft)'
               : isHovered
               ? 'rgba(255,255,255,0.07)'
               : 'transparent',
@@ -462,8 +462,8 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
             width: '5px',
             height: '5px',
             borderRadius: '50%',
-            background: 'var(--at-accent)',
-            boxShadow: '0 0 6px rgba(185,106,63,0.7)',
+            background: 'var(--at-nav-accent)',
+            boxShadow: '0 0 6px var(--at-nav-accent-glow)',
             flexShrink: 0,
           }} />
         )}
@@ -527,7 +527,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
             justifyContent: 'center',
             borderRadius: '7px',
             background: isActive
-              ? 'rgba(185,106,63,0.30)'
+              ? 'var(--at-nav-accent-soft)'
               : isHovered
               ? 'rgba(255,255,255,0.07)'
               : 'transparent',
@@ -545,8 +545,8 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
             width: '5px',
             height: '5px',
             borderRadius: '50%',
-            background: 'var(--at-accent)',
-            boxShadow: '0 0 6px rgba(185,106,63,0.7)',
+            background: 'var(--at-nav-accent)',
+            boxShadow: '0 0 6px var(--at-nav-accent-glow)',
             flexShrink: 0,
           }} />
         )}

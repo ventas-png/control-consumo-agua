@@ -10,6 +10,7 @@ import {
   LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
   derivarVariablesAccent, derivarVariablesAccentOscuro, respaldosSinColorMix,
   derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO, DATOS_CSS_VARS, DATA_NEGATIVE_DEFECTO, NAV_INK,
+  navAccentDesdeMarca, NAV_BG,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -879,6 +880,57 @@ describe('--at-nav-ink desde la marca', () => {
 
   it('marca gris → blanco roto neutro', () => {
     expect(croma(derivarVariablesMarca('#808080').navInk)).toBe(0)
+  })
+})
+
+// Marcador del ítem activo del rail (Sidebar): --at-nav-accent + halo.
+describe('--at-nav-accent (marcador del rail) desde la marca', () => {
+  it('index.css lo define con los valores de siempre y el Sidebar ya no tiene el terracota fijo', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    expect(css).toMatch(/--at-nav-accent:\s*var\(--at-accent\);/)
+    expect(css).toMatch(/--at-nav-accent-glow:\s*rgba\(185, 106, 63, 0\.7\);/)
+    expect(css).toMatch(/--at-nav-accent-soft:\s*rgba\(185, 106, 63, 0\.3\);/)
+    expect(css).toMatch(new RegExp(`--at-nav-bg:\\s*${NAV_BG};`))
+    const sidebar = readFileSync(resolve(process.cwd(), 'src/components/layout/Sidebar.tsx'), 'utf8')
+    expect(sidebar.match(/var\(--at-nav-accent\)/g)).toHaveLength(2)
+    expect(sidebar.match(/var\(--at-nav-accent-glow\)/g)).toHaveLength(2)
+    expect(sidebar.match(/var\(--at-nav-accent-soft\)/g)).toHaveLength(2)
+    expect(sidebar).not.toContain('rgba(185,106,63')
+  })
+
+  it('sin colores custom → null (quedan los de index.css)', () => {
+    expect(navAccentDesdeMarca(null, null)).toBeNull()
+    expect(navAccentDesdeMarca('rojo', undefined)).toBeNull()
+  })
+
+  it('prefiere el acento custom; si no hay, usa el primario de la marca', () => {
+    expect(tono(navAccentDesdeMarca('#7c3aed', '#0e7490')!.color)).toBeCloseTo(tono('#0e7490'), -1)
+    expect(distTono(tono(navAccentDesdeMarca('#7c3aed', null)!.color), tono('#7c3aed'))).toBeLessThan(6)
+  })
+
+  it.each(MUESTRAS)('%s → destaca sobre el rail al menos como el punto por defecto; halo y fondo de icono = mismo color al 70 / 30%', (c) => {
+    const minimo = Math.max(3, contraste(DEFAULT_ACCENT_COLOR, NAV_BG))
+    expect(minimo).toBeGreaterThan(3.5)
+    for (const [p, a] of [[c, null], [null, c], [c, '#B96A3F']] as const) {
+      const m = navAccentDesdeMarca(p, a)!
+      const fondo = p ? derivarVariablesMarca(p).navBg : NAV_BG
+      expect(contraste(m.color, fondo), `${p}/${a} ${m.color}`).toBeGreaterThanOrEqual(minimo - 0.01)
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(m.color.slice(i, i + 2), 16))
+      expect(m.glow).toBe(`rgba(${r}, ${g}, ${b}, 0.7)`)
+      expect(m.soft).toBe(`rgba(${r}, ${g}, ${b}, 0.3)`)
+    }
+  })
+
+  it('la hoja lo lleva en los tres selectores (también con sólo acento custom)', () => {
+    for (const [p, a] of [['#7c3aed', null], [null, '#0e7490'], ['#ff0000', '#ffd400']] as const) {
+      const m = navAccentDesdeMarca(p, a)!
+      const lineas = hojaEstilosMarca(p, a)!.split('\n').slice(0, 3)
+      for (const l of lineas) {
+        expect(l).toContain(`--at-nav-accent: ${m.color};`)
+        expect(l).toContain(`--at-nav-accent-glow: ${m.glow};`)
+        expect(l).toContain(`--at-nav-accent-soft: ${m.soft};`)
+      }
+    }
   })
 })
 

@@ -204,6 +204,33 @@ export function navInkDesdeMarca(hex: string): string {
   return hslAHex([h, sat, 0.924])
 }
 
+/** --at-nav-bg por defecto (index.css). */
+export const NAV_BG = '#102622'
+
+/**
+ * Ítem activo del rail: el punto (--at-nav-accent), su halo (--at-nav-accent-glow) y el
+ * fondo del icono (--at-nav-accent-soft), o null sin colores custom (index.css:
+ * var(--at-accent) y el terracota al 70 / 30%). Toma el acento custom si lo hay y, si
+ * no, el primario de la marca. Se aclara si hace falta para destacar sobre el fondo
+ * del rail (el derivado de la marca, o el por defecto) al menos tanto como el punto
+ * terracota por defecto sobre #102622 (≈ 3.7:1; nunca menos de 3:1, el mínimo WCAG
+ * para componentes de UI). Halo y fondo son el mismo color al 70 / 30%. Igual en
+ * ambos temas.
+ */
+export function navAccentDesdeMarca(
+  primaryColor: string | null | undefined,
+  accentColor: string | null | undefined,
+): { color: string; glow: string; soft: string } | null {
+  const primario = normalizarColorHex(primaryColor), acento = normalizarColorHex(accentColor)
+  const fuente = acento ?? primario
+  if (!fuente) return null
+  const fondo = primario ? navBgDesdeMarca(primario) : NAV_BG
+  const minimo = Math.max(3, contraste(DEFAULT_ACCENT_COLOR, NAV_BG))
+  const color = aclararHasta(fuente, (c) => contraste(c, fondo) >= minimo)
+  const [r, g, b] = parseRgb(color)
+  return { color, glow: `rgba(${r}, ${g}, ${b}, 0.7)`, soft: `rgba(${r}, ${g}, ${b}, 0.3)` }
+}
+
 /**
  * --at-nav-bg (index.css: #102622, fijo en ambos temas) desde la marca: su tono, su
  * saturación × 1.1 (acotada a 0.85) y luminosidad HSL 10.6%, como el #102622 respecto
@@ -761,8 +788,13 @@ export function hojaEstilosMarca(
   primaryColor: string | null | undefined,
   accentColor: string | null | undefined,
 ): string | null {
-  const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor))
-  const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor))
+  // Marcador del rail: depende de ambos colores; el rail es igual en ambos temas.
+  const marcador = navAccentDesdeMarca(primaryColor, accentColor)
+  const nav = marcador
+    ? { '--at-nav-accent': marcador.color, '--at-nav-accent-glow': marcador.glow, '--at-nav-accent-soft': marcador.soft }
+    : null
+  const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor), nav)
+  const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor), nav)
   if (!claro) return null
   const lineas = [
     `:root:root { ${claro} }`,
