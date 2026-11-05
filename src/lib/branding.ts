@@ -303,7 +303,18 @@ export interface VariablesAccent {
   /** --at-accent-tint / -tint-2: fondos de acento (~160 usos). */
   tint: string
   tint2: string
+  /** --at-accent-2: acento secundario apagado (texto, rellenos, gráficas, bordes de selección). */
+  accent2: string
 }
+
+/**
+ * --at-accent-2 por defecto es un verde salvia (#577B69 / dark #79A18E): un tono
+ * medio y APAGADO. Con acento custom se deriva con el MISMO tono del acento (para
+ * no inventar un color ajeno a la marca) y el mismo peso que el salvia: la
+ * saturación del acento × 0.35 (salvia ≈ 0.17 vs terracota ≈ 0.49) y luminosidad
+ * HSL 41% (claro) / 55% (oscuro).
+ */
+const ACCENT2_SATURACION = 0.35
 
 /**
  * Menor factor de `oscurecer` ≥ `desde` con el que el color cumple `cumple`
@@ -318,6 +329,11 @@ function factorOscurecerHasta(hex: string, desde: number, cumple: (c: string) =>
     else lo = mid
   }
   return hi
+}
+
+/** Oscurece lo MÍNIMO para cumplir `cumple` (nada si ya lo cumple). */
+function oscurecerHasta(hex: string, cumple: (c: string) => boolean): string {
+  return oscurecer(hex, factorOscurecerHasta(hex, 0, cumple))
 }
 
 /**
@@ -344,6 +360,8 @@ export function derivarVariablesAccent(accent: string | null | undefined): Varia
     soft2: mezclarBlanco(base, 0.78),
     tint,
     tint2,
+    // Texto y relleno con texto blanco: ≥ 4.5:1 contra blanco (se oscurece si hace falta).
+    accent2: oscurecerHasta(enLuminosidad(base, 0.41, ACCENT2_SATURACION), (c) => contraste(c, '#ffffff') >= LIGHT_MIN_CONTRASTE),
   }
 }
 
@@ -375,13 +393,14 @@ export function derivarVariablesAccentOscuro(accent: string | null | undefined):
     soft2: superficie(0.176),
     tint,
     tint2,
+    accent2: aclararParaTemaOscuro(enLuminosidad(a, 0.553, ACCENT2_SATURACION)),
   }
 }
 
 /** CSS vars de acento que el branding sobreescribe (en orden). */
 export const ACCENT_CSS_VARS = [
   '--at-accent', '--at-accent-hover', '--at-accent-dark', '--at-accent-darker', '--at-accent-light',
-  '--at-accent-soft', '--at-accent-soft-2', '--at-accent-tint', '--at-accent-tint-2',
+  '--at-accent-soft', '--at-accent-soft-2', '--at-accent-tint', '--at-accent-tint-2', '--at-accent-2',
 ] as const
 
 function varsAccent(v: VariablesAccent): Record<(typeof ACCENT_CSS_VARS)[number], string> {
@@ -395,13 +414,14 @@ function varsAccent(v: VariablesAccent): Record<(typeof ACCENT_CSS_VARS)[number]
     '--at-accent-soft-2': v.soft2,
     '--at-accent-tint': v.tint,
     '--at-accent-tint-2': v.tint2,
+    '--at-accent-2': v.accent2,
   }
 }
 
 /**
  * Mapa de CSS vars de ACENTO (tema claro) para un color custom, o null si no hay
- * (restablecer). `--at-accent-2` (verde salvia) NO es un tono del acento: queda
- * en su default.
+ * (restablecer). Incluye --at-accent-2, que index.css también usa para teñir
+ * --at-surface-tint (encabezados de tabla).
  */
 export function estilosAccent(accentColor: string | null | undefined): Record<string, string> | null {
   const color = normalizarColorHex(accentColor)

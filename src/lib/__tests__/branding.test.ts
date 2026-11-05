@@ -95,18 +95,15 @@ describe('estilosAccent', () => {
     expect(estilosAccent(null)).toBeNull()
     expect(estilosAccent('nope')).toBeNull()
   })
-  it('color válido → las 9 CSS vars de acento', () => {
+  it('color válido → las 10 CSS vars de acento (incluida --at-accent-2)', () => {
     const m = estilosAccent('#B96A3F')
     expect(m).not.toBeNull()
     expect(m!['--at-accent']).toBe('#b96a3f')
     expect(Object.keys(m!)).toEqual([
       '--at-accent', '--at-accent-hover', '--at-accent-dark', '--at-accent-darker', '--at-accent-light',
-      '--at-accent-soft', '--at-accent-soft-2', '--at-accent-tint', '--at-accent-tint-2',
+      '--at-accent-soft', '--at-accent-soft-2', '--at-accent-tint', '--at-accent-tint-2', '--at-accent-2',
     ])
     expect(Object.keys(m!)).toEqual([...ACCENT_CSS_VARS])
-  })
-  it('--at-accent-2 (verde salvia) no es un tono del acento: no se toca', () => {
-    expect(Object.keys(estilosAccent('#B96A3F')!)).not.toContain('--at-accent-2')
   })
 })
 
@@ -205,6 +202,44 @@ describe('derivarVariablesAccent — tonos derivados (tema claro)', () => {
       expect(contraste(t, v.tint2)).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
     }
     expect(L(v.darker)).toBeLessThanOrEqual(L(v.dark))
+  })
+})
+
+// --at-accent-2: por defecto verde salvia (#577B69 / #79A18E). Con acento custom
+// se deriva con el tono del acento y el mismo peso apagado que el salvia.
+const SALVIA = '#577B69', SALVIA_DARK = '#79A18E'
+/** Diferencia entre el canal máximo y el mínimo: 0 = gris, 255 = saturado puro. */
+const croma = (h: string) => {
+  const ch = [1, 3, 5].map((i) => parseInt(normalizarColorHex(h)!.slice(i, i + 2), 16))
+  return Math.max(...ch) - Math.min(...ch)
+}
+
+describe('--at-accent-2 — acento secundario apagado, derivado del acento', () => {
+  it('sigue el tono del acento: verde → casi el salvia por defecto, azul petróleo → azul apagado', () => {
+    expect(distanciaRgb(derivarVariablesAccent('#22c55e').accent2, SALVIA)).toBeLessThan(16)
+    const azul = derivarVariablesAccent('#0e7490').accent2
+    expect(parseInt(azul.slice(5, 7), 16)).toBeGreaterThan(parseInt(azul.slice(1, 3), 16))
+  })
+
+  // Sólo colores con croma: un gris ya no puede apagarse más.
+  it.each(MUESTRAS.filter((c) => croma(c) > 0))('%s → es apagado (menos croma que el acento) en ambos temas', (c) => {
+    expect(croma(derivarVariablesAccent(c).accent2)).toBeLessThan(croma(derivarVariablesAccent(c).accent))
+    expect(croma(derivarVariablesAccentOscuro(c).accent2)).toBeLessThan(croma(derivarVariablesAccentOscuro(c).accent))
+  })
+
+  it.each(MUESTRAS)('%s → claro: ≥ 4.5:1 contra blanco (texto, y relleno con texto blanco)', (c) => {
+    expect(contraste(derivarVariablesAccent(c).accent2, '#ffffff')).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+  })
+
+  it.each(MUESTRAS)('%s → oscuro: se lee sobre la superficie y los tints oscuros, y es más claro que en el tema claro', (c) => {
+    const d = derivarVariablesAccentOscuro(c)
+    for (const f of [DARK_SURFACE, DARK_BG, d.tint, d.tint2]) expect(contraste(d.accent2, f)).toBeGreaterThanOrEqual(DARK_MIN_CONTRASTE)
+    expect(L(d.accent2)).toBeGreaterThan(L(derivarVariablesAccent(c).accent2))
+  })
+
+  it('mismo peso que el salvia: luminancia parecida en ambos temas', () => {
+    expect(contraste(derivarVariablesAccent(DEFAULT_ACCENT_COLOR).accent2, SALVIA)).toBeLessThan(1.25)
+    expect(contraste(derivarVariablesAccentOscuro(DEFAULT_ACCENT_COLOR).accent2, SALVIA_DARK)).toBeLessThan(1.25)
   })
 })
 
@@ -406,7 +441,7 @@ describe('hojaEstilosMarca', () => {
     expect(css).not.toContain('--at-accent')
   })
 
-  it('con acento custom, el bloque OSCURO lleva las 9 vars de acento oscuras', () => {
+  it('con acento custom, el bloque OSCURO lleva las 10 vars de acento oscuras', () => {
     const css = hojaEstilosMarca(null, '#0e7490')!
     const dark = estilosAccentOscuro('#0e7490')!
     const claro = estilosAccent('#0e7490')!
