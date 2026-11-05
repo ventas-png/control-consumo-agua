@@ -90,11 +90,9 @@
 
   /* ─── Profundidad orgánica (color-mix derivado de marca) ─────────────────
      Bordes/superficies decorativas teñidas de marca en vez de gris plano.
-     Fallback sólido por doble-declaración: si el navegador no soporta
-     color-mix (muy antiguo) usa el hex; los modernos usan el color-mix. */
-  --at-border-organic: #D0D2CB;
+     Sin color-mix (Safari/iOS < 16.2, Chrome < 111) toman el hex sólido del
+     bloque «Respaldo sin color-mix» (más abajo, tras los bloques dark). */
   --at-border-organic: color-mix(in srgb, var(--at-primary) 16%, transparent);
-  --at-surface-tint: #E9EBE2;
   --at-surface-tint: color-mix(in srgb, var(--at-accent-2) 8%, var(--at-bg));
 }
 
@@ -104,7 +102,7 @@
    Los mismos valores se declaran en ambos selectores. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --at-bg: #0B1410; --at-surface: #11201A; --at-surface-2: #172821; --at-surface: color-mix(in oklch, var(--at-bg) 95%, var(--at-primary)); --at-surface-2: color-mix(in oklch, var(--at-bg) 92%, var(--at-primary));
+    --at-bg: #0B1410; --at-surface: color-mix(in oklch, var(--at-bg) 95%, var(--at-primary)); --at-surface-2: color-mix(in oklch, var(--at-bg) 92%, var(--at-primary));
     --at-ink: #ECEFE8; --at-ink-2: #B7C4BB; --at-ink-3: #8B9A91;
     --at-line: #28352D; --at-line-strong: #3A4A40;
     --at-primary: #5E9D8A; --at-primary-hover: #76B3A1; --at-primary-soft: #1C2E27;
@@ -141,6 +139,30 @@
   --at-info: #60a5fa; --at-info-tint: #0f1f33; --at-info-border: #1e3a5f; --at-info-strong: #93c5fd;
   --at-on-status: #0B1410; --at-data-negative: #E8736B;
   color-scheme: dark;
+}
+
+/* ─── Respaldo sin color-mix (Safari/iOS < 16.2, Chrome < 111) ───────────────
+   Hex sólidos para los tokens que arriba se definen con color-mix, en los
+   mismos selectores de tema. Van detrás de @supports not y NO como doble
+   declaración (hex y luego color-mix): una custom property acepta cualquier
+   valor, así que el navegador viejo se quedaría con el color-mix y la propiedad
+   que la usa se anularía (sin borde, fondo transparente). Los modernos ignoran
+   el bloque. Los valores dark son lo que el color-mix da con la paleta dark (el
+   borde, sobre --at-surface). Con color de marca custom, la hoja de branding
+   (src/lib/branding.ts) pone los suyos. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  :root {
+    --at-border-organic: #D0D2CB; --at-surface-tint: #E9EBE2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --at-surface: #11201A; --at-surface-2: #172821;
+      --at-border-organic: #1D342C; --at-surface-tint: #141F1A;
+    }
+  }
+  [data-theme="dark"] {
+    --at-border-organic: #1D342C; --at-surface-tint: #141F1A;
+  }
 }
 
 /* ─── Densidad por contexto (admin / residente) ──────────────────────────────
