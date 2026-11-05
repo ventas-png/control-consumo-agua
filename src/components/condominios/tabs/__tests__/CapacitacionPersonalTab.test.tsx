@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import type { PersonalCondominio } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
@@ -42,6 +42,53 @@ function abrirForm() {
 
 beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
 afterEach(cleanup)
+
+describe('CapacitacionPersonalTab — el formulario abre en ventana emergente', () => {
+  it('+ Nueva capacitación abre un diálogo con el formulario y el foco en el empleado', () => {
+    const sel = abrirForm()
+    const ventana = screen.getByRole('dialog', { name: 'Registrar capacitación' })
+    expect(ventana.contains(sel)).toBe(true)
+    expect(document.activeElement).toBe(sel)
+    // El botón ya no alterna a «Cancelar»: la ventana trae el suyo en el pie.
+    expect(screen.getByRole('button', { name: /Nueva capacitación/ })).toBeTruthy()
+    expect(within(ventana).getByRole('button', { name: 'Cancelar' })).toBeTruthy()
+  })
+
+  it('Cancelar cierra sin guardar y descarta lo tecleado; al reabrir sale en blanco', () => {
+    abrirForm()
+    let ventana = screen.getByRole('dialog', { name: 'Registrar capacitación' })
+    fireEvent.change(within(ventana).getByLabelText(/Curso/), { target: { value: 'Primeros auxilios' } })
+    fireEvent.click(within(ventana).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /Nueva capacitación/ }))
+    ventana = screen.getByRole('dialog', { name: 'Registrar capacitación' })
+    expect((within(ventana).getByLabelText(/Curso/) as HTMLInputElement).value).toBe('')
+  })
+
+  it('Escape cierra la ventana sin guardar', () => {
+    abrirForm()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+  })
+
+  it('al registrar con éxito la ventana se cierra y se refresca la lista', async () => {
+    const onRefresh = vi.fn()
+    render(
+      <CapacitacionPersonalTab capacitaciones={[]} personal={personal}
+        proyectoId="p1" companyId="co1" moneda="Q" canCreate canEdit canDelete onRefresh={onRefresh} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Nueva capacitación/ }))
+    const ventana = screen.getByRole('dialog', { name: 'Registrar capacitación' })
+    fireEvent.change(within(ventana).getByLabelText('Empleado *'), { target: { value: 'e1' } })
+    fireEvent.change(within(ventana).getByLabelText(/Curso/), { target: { value: 'Primeros auxilios' } })
+    fireEvent.click(within(ventana).getByRole('button', { name: /Registrar/ }))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
 
 describe('CapacitacionPersonalTab — empleado del expediente', () => {
   it('ofrece sólo el personal que no está inactivo, por nombre', () => {

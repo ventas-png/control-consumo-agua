@@ -3,6 +3,7 @@ import { useMemo, useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { etiquetaCargo } from '../../../domain/condominios/rrhhCatalogos'
 import { notify, confirm } from '../../shared/Dialog'
+import { EditModal } from '../../shared/EditModal'
 import { CapacitacionPersonal, EstadoCapacitacion, PersonalCondominio, CargoCatalogo } from '../../../types'
 
 interface Props {
@@ -27,11 +28,14 @@ const ESTADO_CFG: Record<EstadoCapacitacion, { label: string; bg: string; color:
   vencido:     { label: 'Vencido',     bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
-const BLANK = {
-  personal_id: '', nombre_empleado: '', cargo: '', curso: '', proveedor: '',
-  fecha_inicio: hoyLocalISO(),
-  fecha_fin: '', fecha_vencimiento_cert: '',
-  costo: '', estado: 'completado' as EstadoCapacitacion, notas: '',
+/** Un formulario en blanco. Función y no constante: la fecha es la de hoy al abrir, no la de cargar el módulo. */
+function formVacio() {
+  return {
+    personal_id: '', nombre_empleado: '', cargo: '', curso: '', proveedor: '',
+    fecha_inicio: hoyLocalISO(),
+    fecha_fin: '', fecha_vencimiento_cert: '',
+    costo: '', estado: 'completado' as EstadoCapacitacion, notas: '',
+  }
 }
 
 export default function CapacitacionPersonalTab({ capacitaciones, personal, cargos = [], proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
@@ -39,7 +43,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, personal, carg
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoCapacitacion | ''>('')
   const [busqueda, setBusqueda] = useState('')
-  const [form, setForm] = useState(BLANK)
+  const [form, setForm] = useState(formVacio)
 
   // Mismo criterio que Tareas por turno y Presencia: fuera sólo el inactivo
   // (vacaciones o incapacidad siguen en planilla y pueden capacitarse).
@@ -73,6 +77,14 @@ export default function CapacitacionPersonalTab({ capacitaciones, personal, carg
 
   const totalCosto = capacitaciones.reduce((s, c) => s + (c.costo ?? 0), 0)
 
+  // La ventana emergente descarta lo escrito al cerrarse (Cancelar, ×, Escape o
+  // clic fuera); mientras guarda no se cierra para no perder el envío en curso.
+  function cerrarForm() {
+    if (saving) return
+    setMostrarForm(false)
+    setForm(formVacio())
+  }
+
   async function guardar() {
     if (!form.personal_id || !form.curso.trim() || !form.fecha_inicio) {
       notify({ variant: 'warning', title: 'Error', text: 'Empleado, curso y fecha de inicio son obligatorios' }); return
@@ -94,7 +106,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, personal, carg
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setMostrarForm(false); setForm(BLANK); onRefresh()
+    cerrarForm(); onRefresh()
   }
 
   async function cambiarEstado(id: string, estado: EstadoCapacitacion) {
@@ -148,21 +160,38 @@ export default function CapacitacionPersonalTab({ capacitaciones, personal, carg
           <span style={{ fontSize: 12, color: 'var(--at-ink-3)', alignSelf: 'center' }}>{lista.length} registros</span>
         </div>
         {canCreate && (
-          <button onClick={() => setMostrarForm(!mostrarForm)}
+          <button onClick={() => setMostrarForm(true)}
             style={{ padding: '8px 16px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-            {mostrarForm ? '✕ Cancelar' : '+ Nueva capacitación'}
+            + Nueva capacitación
           </button>
         )}
       </div>
 
-      {/* Formulario */}
+      {/* Formulario en ventana emergente */}
       {mostrarForm && (
-        <div style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-          <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Registrar capacitación</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <EditModal
+          title="Registrar capacitación"
+          onClose={cerrarForm}
+          size="md"
+          fullScreenOnMobile
+          footer={
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={cerrarForm} disabled={saving}
+                style={{ padding: '8px 16px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', color: 'var(--at-ink)', fontSize: 13 }}>
+                Cancelar
+              </button>
+              <button type="button" onClick={guardar} disabled={saving}
+                style={{ padding: '8px 20px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                {saving ? 'Guardando…' : '✅ Registrar'}
+              </button>
+            </div>
+          }
+        >
+          {/* auto-fit: tres columnas en escritorio, una sola en teléfono sin desbordar el panel. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
             <div>
               <label style={lbl} htmlFor="cap-empleado">Empleado *</label>
-              <select id="cap-empleado" style={inp} value={form.personal_id} onChange={e => elegirEmpleado(e.target.value)}>
+              <select id="cap-empleado" style={inp} value={form.personal_id} autoFocus onChange={e => elegirEmpleado(e.target.value)}>
                 <option value="">{personalActivo.length ? 'Elegí un empleado…' : 'Sin empleados activos — agregalos en Personal'}</option>
                 {personalActivo.map(p => (
                   <option key={p.id} value={p.id}>{p.nombre}{p.cargo ? ` — ${etiquetaCargo(p.cargo, cargos)}` : ''}</option>
@@ -170,49 +199,45 @@ export default function CapacitacionPersonalTab({ capacitaciones, personal, carg
               </select>
             </div>
             <div>
-              <label style={lbl}>Cargo</label>
-              <input style={inp} value={form.cargo} onChange={e => setForm(p => ({ ...p, cargo: e.target.value }))} placeholder="Ej. Guardia, Conserje…" />
+              <label style={lbl} htmlFor="cap-cargo">Cargo</label>
+              <input id="cap-cargo" style={inp} value={form.cargo} onChange={e => setForm(p => ({ ...p, cargo: e.target.value }))} placeholder="Ej. Guardia, Conserje…" />
             </div>
             <div>
-              <label style={lbl}>Estado</label>
-              <select style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoCapacitacion }))}>
+              <label style={lbl} htmlFor="cap-estado">Estado</label>
+              <select id="cap-estado" style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoCapacitacion }))}>
                 {(Object.keys(ESTADO_CFG) as EstadoCapacitacion[]).map(e => <option key={e} value={e}>{ESTADO_CFG[e].label}</option>)}
               </select>
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={lbl}>Curso / capacitación *</label>
-              <input style={inp} value={form.curso} onChange={e => setForm(p => ({ ...p, curso: e.target.value }))} placeholder="Ej. Primeros auxilios, Seguridad industrial…" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={lbl} htmlFor="cap-curso">Curso / capacitación *</label>
+              <input id="cap-curso" style={inp} value={form.curso} onChange={e => setForm(p => ({ ...p, curso: e.target.value }))} placeholder="Ej. Primeros auxilios, Seguridad industrial…" />
             </div>
             <div>
-              <label style={lbl}>Proveedor / institución</label>
-              <input style={inp} value={form.proveedor} onChange={e => setForm(p => ({ ...p, proveedor: e.target.value }))} placeholder="Nombre del proveedor" />
+              <label style={lbl} htmlFor="cap-proveedor">Proveedor / institución</label>
+              <input id="cap-proveedor" style={inp} value={form.proveedor} onChange={e => setForm(p => ({ ...p, proveedor: e.target.value }))} placeholder="Nombre del proveedor" />
             </div>
             <div>
-              <label style={lbl}>Fecha inicio *</label>
-              <input type="date" style={inp} value={form.fecha_inicio} onChange={e => setForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
+              <label style={lbl} htmlFor="cap-fecha-inicio">Fecha inicio *</label>
+              <input id="cap-fecha-inicio" type="date" style={inp} value={form.fecha_inicio} onChange={e => setForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
             </div>
             <div>
-              <label style={lbl}>Fecha fin</label>
-              <input type="date" style={inp} value={form.fecha_fin} onChange={e => setForm(p => ({ ...p, fecha_fin: e.target.value }))} />
+              <label style={lbl} htmlFor="cap-fecha-fin">Fecha fin</label>
+              <input id="cap-fecha-fin" type="date" style={inp} value={form.fecha_fin} onChange={e => setForm(p => ({ ...p, fecha_fin: e.target.value }))} />
             </div>
             <div>
-              <label style={lbl}>Vencimiento certificado</label>
-              <input type="date" style={inp} value={form.fecha_vencimiento_cert} onChange={e => setForm(p => ({ ...p, fecha_vencimiento_cert: e.target.value }))} />
+              <label style={lbl} htmlFor="cap-venc-cert">Vencimiento certificado</label>
+              <input id="cap-venc-cert" type="date" style={inp} value={form.fecha_vencimiento_cert} onChange={e => setForm(p => ({ ...p, fecha_vencimiento_cert: e.target.value }))} />
             </div>
             <div>
-              <label style={lbl}>Costo ({moneda})</label>
-              <input type="number" step="0.01" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
+              <label style={lbl} htmlFor="cap-costo">Costo ({moneda})</label>
+              <input id="cap-costo" type="number" step="0.01" style={inp} value={form.costo} onChange={e => setForm(p => ({ ...p, costo: e.target.value }))} />
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={lbl}>Notas</label>
-              <input style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} placeholder="Opcional" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={lbl} htmlFor="cap-notas">Notas</label>
+              <input id="cap-notas" style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} placeholder="Opcional" />
             </div>
           </div>
-          <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-            {saving ? 'Guardando…' : '✅ Registrar'}
-          </button>
-        </div>
+        </EditModal>
       )}
 
       {/* Lista agrupada por empleado */}
