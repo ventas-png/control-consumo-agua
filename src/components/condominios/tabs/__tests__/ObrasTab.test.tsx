@@ -91,6 +91,22 @@ describe('ObrasTab — ventanas', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
+  it('la tarjeta no lleva editar ni eliminar: viven en la ficha, y Cerrar la cierra', async () => {
+    render(<ObrasTab {...props()} />)
+    expect(screen.queryByRole('button', { name: /^Editar / })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Eliminar / })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Remodelación salón comunal/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Remodelación salón comunal' })
+    const pie = dialog.querySelector('.at-modal-footer') as HTMLElement
+    expect(within(pie).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '🗑️ Eliminar', '✏️ Editar'])
+    fireEvent.click(within(pie).getByRole('button', { name: 'Eliminar Remodelación salón comunal' }))
+    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('obras_mejoras', 'o1'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: /^Remodelación salón comunal/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it('el formulario de nueva obra es una ventana y crea la obra', async () => {
     render(<ObrasTab {...props()} />)
     fireEvent.click(screen.getByRole('button', { name: '+ Nueva Obra' }))
@@ -114,6 +130,6 @@ describe('ObrasTab — ventanas', () => {
     expect(within(dialog).getByText('Constructora Sol')).toBeTruthy()
     expect(within(dialog).queryByLabelText(/Actualizar progreso/)).toBeNull()
     expect(within(dialog).queryByRole('button', { name: '✏️ Editar' })).toBeNull()
-    expect(within(dialog).queryByRole('button', { name: 'Eliminar obra' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: /^Eliminar / })).toBeNull()
   })
 })

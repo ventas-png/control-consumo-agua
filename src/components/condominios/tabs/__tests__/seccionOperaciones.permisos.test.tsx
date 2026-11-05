@@ -90,12 +90,20 @@ eliminarExigeSuPermiso('Proyectos', p => {
   fireEvent.click(screen.getByText('Pintar fachada'))
 }, /^Eliminar Pintar fachada$/, borrar, 'proyectos_condominio', 'pc1')
 
-eliminarExigeSuPermiso('Obras', p => render(
-  <ObrasTab {...base} moneda="Q" canCreate {...p}
-    obras={[fila({ id: 'ob1', titulo: 'Techo del salón', estado: 'en_ejecucion', progreso: 30 })]} />,
-), /^Eliminar Techo del salón$/, borrar, 'obras_mejoras', 'ob1')
+eliminarExigeSuPermiso('Obras', p => {
+  render(
+    <ObrasTab {...base} moneda="Q" canCreate {...p}
+      obras={[fila({ id: 'ob1', titulo: 'Techo del salón', estado: 'en_ejecucion', progreso: 30 })]} />,
+  )
+  // Eliminar vive en la ficha, que abre al pulsar la tarjeta.
+  fireEvent.click(screen.getByRole('button', { name: /Techo del salón/ }))
+}, /^Eliminar Techo del salón$/, borrar, 'obras_mejoras', 'ob1')
 
-eliminarExigeSuPermiso('Bitácora de mantenimiento', p => render(
-  <BitacoraManto {...base} canCreate {...p}
-    registros={[fila({ id: 'bm1', fecha: '2026-10-05', turno: 'mañana', responsable: 'Luis', tareas: [], firmado: false })]} />,
-), /^Eliminar registro del 2026-10-05$/, borrar, 'bitacora_manto', 'bm1')
+eliminarExigeSuPermiso('Bitácora de mantenimiento', p => {
+  render(
+    <BitacoraManto {...base} canCreate {...p}
+      registros={[fila({ id: 'bm1', fecha: '2026-10-05', turno: 'mañana', responsable: 'Luis', tareas: [], firmado: false })]} />,
+  )
+  // Eliminar vive en la ficha, que abre al pulsar la tarjeta.
+  fireEvent.click(screen.getByRole('button', { name: /Luis/ }))
+}, /^Eliminar registro del 2026-10-05$/, borrar, 'bitacora_manto', 'bm1')

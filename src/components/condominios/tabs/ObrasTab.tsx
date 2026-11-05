@@ -215,23 +215,22 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
         ))}
       </div>
 
-      {/* Lista a todo el ancho — cada obra se abre en ventana. Antes el
-          detalle ocupaba media pantalla a la derecha y en el teléfono partía
-          la lista. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {filtered.length === 0 ? (
-          <EmptyState icon="🏗️" title="No hay obras registradas" />
-        ) : filtered.map(o => {
-          const es = ESTADO_STYLE[o.estado]
-          const progreso = o.progreso ?? 0
-          return (
-            <div key={o.id}
-              style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px', paddingRight: '10px' }}>
-              <button type="button" className="cond-row-main" onClick={() => setSelectedId(o.id)}
-                style={{ flex: '1 1 260px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: '12px 4px 12px 14px', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 700, fontSize: '13px' }}>{o.titulo}</span>
-                  <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
+      {/* Tarjetas: una por obra, en rejilla que se adapta al ancho (una columna
+          en el teléfono). Pulsar una abre la ficha en ventana; editar y
+          eliminar viven ahí, no en la tarjeta. */}
+      {filtered.length === 0 ? (
+        <EmptyState icon="🏗️" title="No hay obras registradas" />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px' }}>
+          {filtered.map(o => {
+            const es = ESTADO_STYLE[o.estado]
+            const progreso = o.progreso ?? 0
+            return (
+              <button key={o.id} type="button" onClick={() => setSelectedId(o.id)}
+                style={{ display: 'block', width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderLeft: `4px solid ${es.color}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 700, fontSize: '13px', minWidth: 0, overflowWrap: 'anywhere' }}>{o.titulo}</span>
+                  <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color, whiteSpace: 'nowrap', flexShrink: 0 }}>{es.label}</span>
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '6px', display: 'flex', gap: '4px 10px', flexWrap: 'wrap' }}>
                   {o.area && <span>📍 {o.area}</span>}
@@ -247,22 +246,10 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
                   <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-2)', minWidth: '30px' }}>{progreso}%</span>
                 </div>
               </button>
-              {(canEdit || canDelete) && (
-                <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: 'auto', padding: '8px 0' }}>
-                  {canEdit && (
-                    <button onClick={() => startEdit(o)} aria-label={`Editar ${o.titulo}`}
-                      style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                  )}
-                  {canDelete && (
-                    <button onClick={() => handleDelete(o.id)} aria-label={`Eliminar ${o.titulo}`}
-                      style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Detalle en ventana: a pantalla completa en el teléfono. */}
       {selected && (() => {
@@ -275,19 +262,21 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
               {selected.area && <span>📍 {selected.area}</span>}
               <span>{selected.progreso ?? 0}% de avance</span>
             </span>}
-            maxWidth="640px"
+            size="lg"
             fullScreenOnMobile
             onClose={() => setSelectedId(null)}
-            // Las mismas acciones de la fila: con la ventana abierta la lista
-            // queda detrás y no se alcanzan.
-            footer={(canEdit || canDelete) ? <>
-              {canDelete && <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label="Eliminar obra">🗑️</Button>}
-              {canEdit && <Button variant="secondary" onClick={() => { setSelectedId(null); startEdit(selected) }}>✏️ Editar</Button>}
-            </> : undefined}
+            // Editar y eliminar viven aquí (la tarjeta sólo abre la ficha).
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+                <Button variant="secondary" onClick={() => setSelectedId(null)}>Cerrar</Button>
+                {canDelete && <Button variant="outline-danger" onClick={() => handleDelete(selected.id)} aria-label={`Eliminar ${selected.titulo}`}>🗑️ Eliminar</Button>}
+                {canEdit && <Button onClick={() => { setSelectedId(null); startEdit(selected) }}>✏️ Editar</Button>}
+              </div>
+            }
           >
             {/* Tarjetas que se reacomodan: dentro de la ventana no aplican las
                 reglas de teléfono del panel. */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px', marginBottom: '12px' }}>
               {[
                 { label: 'Estado', value: ESTADO_STYLE[selected.estado]?.label },
                 { label: 'Área', value: selected.area ?? '—' },
