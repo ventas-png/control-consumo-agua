@@ -4,6 +4,15 @@
    authenticated app. Verdant palette + Grotesk type are the baked-in defaults.
 ───────────────────────────────────────────────────────────────────────── */
 
+/* Respaldo sin color-mix (Safari/iOS < 16.2, Chrome < 111): cada regla que usa
+   color-mix va seguida de un `@supports not (color: color-mix(…))` con el mismo
+   selector y un valor equivalente sin color-mix, hecho con tokens del tema
+   (--at-primary-tint, --at-accent-soft, --at-surface-2…) para que siga a
+   claro/oscuro. No sirve declarar antes un valor de respaldo: como el valor
+   lleva var(), se acepta al leer la hoja y se invalida al calcularlo, y el
+   anterior ya está descartado. Va justo detrás de su regla (no al final) para
+   que una regla posterior que la pise siga ganando igual que con color-mix. */
+
 .at-root {
   /* Homologado: los tokens del landing referencian los tokens de la app
      (--at-*, definidos en index.css) como única fuente de verdad. Los valores
@@ -75,6 +84,7 @@
   background: var(--c-primary);
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--c-primary) 18%, transparent);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .eyebrow-dot { box-shadow: 0 0 0 4px var(--at-primary-soft); } }
 .section-h {
   display: flex;
   flex-direction: column;
@@ -184,6 +194,7 @@
   -webkit-backdrop-filter: blur(16px) saturate(160%);
   border-bottom: 1px solid var(--c-line);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .site-nav.scrolled { background: var(--c-bg); } }
 .nav-inner {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -241,6 +252,7 @@
     radial-gradient(40% 40% at 20% 70%, color-mix(in oklab, var(--c-accent) 14%, transparent) 0%, transparent 60%);
   filter: blur(20px);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .hero-mesh { background: radial-gradient(60% 50% at 70% 30%, var(--at-primary-soft) 0%, transparent 60%), radial-gradient(40% 40% at 20% 70%, var(--at-accent-soft) 0%, transparent 60%); } }
 .hero-grid {
   position: absolute;
   inset: 0;
@@ -251,6 +263,7 @@
   mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, #000 35%, transparent 75%);
   opacity: 0.4;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .hero-grid { background-image: linear-gradient(to right, var(--c-line) 1px, transparent 1px), linear-gradient(to bottom, var(--c-line) 1px, transparent 1px); } }
 .hero-inner {
   position: relative;
   z-index: 1;
@@ -317,6 +330,7 @@
   transform-origin: 50% 50%;
   animation: hv-float 10s ease-in-out infinite;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .hv-card { box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 30px 60px -20px rgba(21, 41, 31, 0.3), 0 10px 20px -10px rgba(21, 41, 31, 0.2); } }
 @keyframes hv-float {
   0%, 100% { transform: perspective(1800px) rotateY(-6deg) rotateX(2deg) translateY(0); }
   50% { transform: perspective(1800px) rotateY(-5deg) rotateX(1.5deg) translateY(-6px); }
@@ -330,6 +344,7 @@
   background: color-mix(in oklab, var(--c-bg) 60%, var(--c-surface));
   font-size: 12px;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .hv-bar { background: var(--at-surface-2); } }
 .hv-traffic { display: flex; gap: 6px; }
 .hv-traffic i { width: 10px; height: 10px; border-radius: 50%; background: var(--c-line_strong); }
 .hv-traffic i:nth-child(1) { background: #FF5F57; }
@@ -364,6 +379,7 @@
   display: flex; flex-direction: column; gap: 2px;
   font-size: 12.5px;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .hv-side { background: var(--at-surface-2); } }
 .hv-side-item {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 10px;
@@ -437,6 +453,7 @@
   transform-origin: bottom;
   animation: hv-grow 1.2s cubic-bezier(.2,.7,.2,1) var(--d) backwards;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .hv-bar-fill { background: linear-gradient(180deg, var(--c-primary), var(--at-primary-2)); } }
 @keyframes hv-grow { from { transform: scaleY(0); } }
 .hv-bar-lbl { font-size: 9px; color: var(--c-ink_3); font-family: var(--font-mono); }
 .hv-avg-line {
@@ -464,6 +481,7 @@
   padding: 8px 12px; border-bottom: 1px solid var(--c-line);
   background: color-mix(in oklab, var(--c-bg) 40%, var(--c-surface));
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .hv-list-h { background: var(--at-surface-2); } }
 .hv-row {
   display: grid;
   grid-template-columns: 24px 1fr auto auto;
@@ -509,6 +527,7 @@
   font-size: 12px;
   min-width: 200px;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .hv-callout-card { box-shadow: 0 16px 36px -12px rgba(21, 41, 31, 0.3); } }
 .hv-callout-icon {
   width: 28px; height: 28px; border-radius: 8px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -516,7 +535,9 @@
   background: var(--c-primary_soft);
 }
 .hv-callout-card.tone-ok .hv-callout-icon { background: color-mix(in oklab, #1E8A5B 18%, var(--c-surface)); color: #1E8A5B; }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .hv-callout-card.tone-ok .hv-callout-icon { background: var(--at-success-tint); } }
 .hv-callout-card.tone-accent .hv-callout-icon { background: color-mix(in oklab, var(--c-accent) 22%, var(--c-surface)); color: var(--c-accent); }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .hv-callout-card.tone-accent .hv-callout-icon { background: var(--at-accent-tint); } }
 .hv-callout-text { display: flex; flex-direction: column; }
 .hv-callout-label { font-size: 10.5px; color: var(--c-ink_3); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em; }
 .hv-callout-value { font-weight: 600; font-size: 13px; }
@@ -660,6 +681,7 @@
   box-shadow: 0 30px 60px -24px color-mix(in oklab, var(--c-ink) 25%, transparent);
   display: flex; flex-direction: column; gap: 16px;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .modviz-card { box-shadow: 0 30px 60px -24px rgba(21, 41, 31, 0.25); } }
 .modviz-h { display: flex; justify-content: space-between; align-items: center; }
 .modviz-eyebrow { font-family: var(--font-mono); font-size: 11.5px; color: var(--c-ink_3); text-transform: uppercase; letter-spacing: 0.04em; }
 .modviz-pill {
@@ -677,6 +699,7 @@
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--c-primary) 45%, transparent); }
   50% { box-shadow: 0 0 0 6px color-mix(in oklab, var(--c-primary) 0%, transparent); }
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { @keyframes at-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--at-primary-soft); } 50% { box-shadow: 0 0 0 6px transparent; } } }
 
 /* ─── Water dashboard (history monitor) ─── */
 .water-card { padding: 20px; gap: 14px; }
@@ -733,6 +756,7 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--c-accent) 25%, transparent);
   animation: at-pulse 1.8s ease-in-out infinite;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .water-flag { box-shadow: 0 0 0 3px var(--at-accent-soft); } }
 
 .water-range {
   display: inline-flex;
@@ -776,6 +800,7 @@
 .water-metric.primary {
   background: color-mix(in oklab, var(--c-primary) 6%, var(--c-surface));
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .water-metric.primary { background: var(--at-primary-tint); } }
 .wm-l {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -840,6 +865,7 @@
   padding-bottom: 18px;
   overflow: hidden;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .water-chart-stage { background: linear-gradient(to right, var(--at-surface-2) 0%, var(--at-surface-2) 100%); } }
 .water-svg {
   position: absolute;
   inset: 0 0 18px 0;
@@ -881,10 +907,12 @@
   width: 10px; height: 10px;
   animation: water-pt 0.4s ease var(--d) forwards, water-pt-pulse 1.8s ease-in-out infinite calc(var(--d) + 1s);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .water-pt.anomaly { box-shadow: 0 0 0 1px var(--c-accent), 0 0 0 5px var(--at-accent-soft); } }
 @keyframes water-pt-pulse {
   0%, 100% { box-shadow: 0 0 0 1px var(--c-accent), 0 0 0 5px color-mix(in oklab, var(--c-accent) 25%, transparent); }
   50% { box-shadow: 0 0 0 1px var(--c-accent), 0 0 0 9px color-mix(in oklab, var(--c-accent) 0%, transparent); }
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { @keyframes water-pt-pulse { 0%, 100% { box-shadow: 0 0 0 1px var(--c-accent), 0 0 0 5px var(--at-accent-soft); } 50% { box-shadow: 0 0 0 1px var(--c-accent), 0 0 0 9px transparent; } } }
 
 .water-tip {
   position: absolute;
@@ -903,6 +931,7 @@
   box-shadow: 0 6px 14px -4px color-mix(in oklab, var(--c-ink) 25%, transparent);
   pointer-events: none;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .water-tip { box-shadow: 0 6px 14px -4px rgba(21, 41, 31, 0.25); } }
 .water-tip strong {
   font-family: var(--font-display);
   font-size: 13px;
@@ -920,6 +949,7 @@
   border-color: var(--c-accent);
   background: color-mix(in oklab, var(--c-accent) 8%, var(--c-surface));
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .water-tip.alert { background: var(--at-accent-tint); } }
 .water-tip.alert strong { color: var(--c-accent); }
 
 .water-chart-x {
@@ -954,10 +984,12 @@
   background: color-mix(in oklab, var(--c-accent) 12%, var(--c-bg));
   border: 1px solid color-mix(in oklab, var(--c-accent) 30%, var(--c-line));
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .water-alert { background: var(--at-accent-tint); border: 1px solid var(--at-accent-soft); } }
 .water-alert.ok {
   background: color-mix(in oklab, #1E8A5B 8%, var(--c-bg));
   border-color: color-mix(in oklab, #1E8A5B 20%, var(--c-line));
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .water-alert.ok { background: var(--at-success-tint); border-color: var(--at-success-border); } }
 .water-alert-i {
   width: 28px; height: 28px;
   border-radius: 8px;
@@ -1082,6 +1114,7 @@
   border-bottom: 1px solid var(--c-line);
   background: color-mix(in oklab, var(--c-bg) 50%, var(--c-surface));
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .cc-head { background: var(--at-surface-2); } }
 .cc-corner { border-right: 1px solid var(--c-line); }
 .cc-day-h {
   padding: 8px 6px 8px;
@@ -1109,6 +1142,7 @@
   line-height: 1;
 }
 .cc-day-h.today { background: color-mix(in oklab, var(--c-primary) 8%, var(--c-surface)); }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .cc-day-h.today { background: var(--at-primary-tint); } }
 .cc-day-h.today .cc-day-n { color: var(--c-primary); }
 .cc-day-h.today .cc-day-l { color: var(--c-primary); font-weight: 600; }
 .cc-today-dot {
@@ -1169,8 +1203,10 @@
       color-mix(in oklab, var(--c-line) 60%, transparent) calc(100% / 14 + 0.5px)
     );
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .cc-col { background: repeating-linear-gradient( to bottom, transparent 0, transparent calc(100% / 14 - 0.5px), var(--c-line) calc(100% / 14 - 0.5px), var(--c-line) calc(100% / 14 + 0.5px) ); } }
 .cc-col:last-child { border-right: 0; }
 .cc-col.today-col { background-color: color-mix(in oklab, var(--c-primary) 4%, var(--c-surface)); }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .cc-col.today-col { background-color: var(--at-primary-tint); } }
 
 .cc-evt {
   position: absolute;
@@ -1195,6 +1231,7 @@
   box-shadow: 0 6px 14px -4px color-mix(in oklab, var(--c-ink) 25%, transparent);
   z-index: 2;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .cc-evt:hover { box-shadow: 0 6px 14px -4px rgba(21, 41, 31, 0.25); } }
 @keyframes cc-evt-in {
   from { opacity: 0; transform: translateY(-4px) scaleY(0.6); transform-origin: top; }
 }
@@ -1203,16 +1240,19 @@
   border-left-color: var(--c-primary);
   color: var(--c-primary);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .cc-evt.tone-primary { background: var(--at-primary-tint); } }
 .cc-evt.tone-accent {
   background: color-mix(in oklab, var(--c-accent) 18%, var(--c-surface));
   border-left-color: var(--c-accent);
   color: color-mix(in oklab, var(--c-accent) 70%, var(--c-ink));
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .cc-evt.tone-accent { background: var(--at-accent-tint); color: var(--at-accent-dark); } }
 .cc-evt.tone-neutral {
   background: color-mix(in oklab, var(--c-ink_3) 18%, var(--c-surface));
   border-left-color: var(--c-line_strong);
   color: var(--c-ink_2);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .cc-evt.tone-neutral { background: var(--c-chip); } }
 .cc-evt-time {
   font-family: var(--font-mono);
   font-size: 9.5px;
@@ -1272,6 +1312,7 @@
   border-radius: 4px;
   box-shadow: 0 0 0 1px color-mix(in oklab, #FF5F57 30%, transparent);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .cc-now span { box-shadow: 0 0 0 1px rgba(255, 95, 87, 0.3); } }
 
 .condo-cal-foot {
   display: grid;
@@ -1323,6 +1364,7 @@
   overflow: hidden;
   color: var(--c-surface);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .dv-frame { box-shadow: 0 40px 80px -24px rgba(21, 41, 31, 0.5); } }
 .dv-meta { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: rgba(255,255,255,.6); font-family: var(--font-mono); }
 .dv-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(255,255,255,.1); border-radius: 999px; }
 .dv-dot { width: 6px; height: 6px; border-radius: 50%; background: #FF5F57; animation: at-pulse 1.6s infinite; }
@@ -1340,6 +1382,7 @@
   align-items: center;
   justify-content: center;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .dv-stage { background: repeating-linear-gradient(45deg, rgba(255,255,255,.02) 0 14px, rgba(255,255,255,.04) 14px 28px), var(--c-ink); } }
 .dv-placeholder {
   position: absolute;
   bottom: 12px; left: 12px;
@@ -1384,6 +1427,7 @@
   backdrop-filter: blur(8px);
 }
 .dv-scene-mock svg { color: color-mix(in oklab, var(--c-primary) 40%, white); }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .dv-scene-mock svg { color: var(--at-primary-mint); } }
 .dv-scene-t { font-family: var(--font-display); font-size: 28px; font-weight: 500; letter-spacing: -0.01em; }
 .dv-scene-k { font-size: 13px; color: rgba(255,255,255,.6); font-family: var(--font-mono); }
 .dv-controls {
@@ -1434,6 +1478,7 @@
   border-color: var(--c-line_strong);
   box-shadow: 0 16px 32px -16px color-mix(in oklab, var(--c-ink) 20%, transparent);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .feature-card:hover { box-shadow: 0 16px 32px -16px rgba(21, 41, 31, 0.2); } }
 .feature-icon {
   width: 38px; height: 38px; border-radius: 10px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1473,6 +1518,7 @@
   border-color: var(--c-primary);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--c-primary) 18%, transparent);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .pr-mod.active { box-shadow: 0 0 0 3px var(--at-primary-soft); } }
 .pr-mod-badge {
   position: absolute;
   top: 10px; right: 10px;
@@ -1566,6 +1612,7 @@
   box-shadow: 0 30px 60px -28px color-mix(in oklab, var(--c-ink) 30%, transparent);
   display: flex; flex-direction: column; gap: 18px;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .pricing-card { box-shadow: 0 30px 60px -28px rgba(21, 41, 31, 0.3); } }
 .pc-h { position: relative; display: flex; flex-direction: column; gap: 4px; }
 .pc-eyebrow {
   font-family: var(--font-mono); font-size: 11.5px; color: var(--c-ink_3);
@@ -1683,6 +1730,7 @@
   align-items: center;
   overflow: hidden;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .fc-card { background: linear-gradient(135deg, var(--c-primary), var(--c-primary_hover)); } }
 .fc-deco { position: absolute; inset: 0; pointer-events: none; }
 .fc-deco-1, .fc-deco-2, .fc-deco-3 {
   position: absolute; border-radius: 50%;
@@ -1691,6 +1739,7 @@
 .fc-deco-1 { width: 280px; height: 280px; top: -100px; right: -60px; }
 .fc-deco-2 { width: 180px; height: 180px; bottom: -60px; left: 30%; }
 .fc-deco-3 { width: 100px; height: 100px; top: 40%; left: 10%; background: color-mix(in oklab, var(--c-accent) 50%, transparent); }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .fc-deco-3 { background: var(--at-accent-soft); } }
 .fc-text h2 {
   font-family: var(--font-display);
   font-size: clamp(28px, 3.4vw, 44px);
@@ -1760,6 +1809,7 @@
 .foot-bottom { padding-top: 20px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--c-ink_3); }
 .foot-status { display: inline-flex; align-items: center; gap: 6px; }
 .foot-status i { width: 8px; height: 8px; border-radius: 50%; background: #1E8A5B; box-shadow: 0 0 0 3px color-mix(in oklab, #1E8A5B 25%, transparent); }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .foot-status i { box-shadow: 0 0 0 3px rgba(30, 138, 91, 0.25); } }
 
 /* ─── Login modal ─── */
 .modal-veil {
@@ -1770,6 +1820,7 @@
   padding: 24px;
   animation: modal-fade .25s ease;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .modal-veil { background: rgba(21, 41, 31, 0.65); } }
 @keyframes modal-fade { from { opacity: 0; } }
 .modal-card {
   position: relative;
@@ -1801,12 +1852,14 @@
   position: relative;
   overflow: hidden;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .login-side { background: linear-gradient(135deg, var(--c-primary), var(--c-primary_hover)); } }
 .login-side::before {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background:
     radial-gradient(60% 50% at 80% 10%, rgba(255,255,255,.15) 0%, transparent 60%),
     radial-gradient(40% 40% at 20% 90%, color-mix(in oklab, var(--c-accent) 40%, transparent) 0%, transparent 60%);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .login-side::before { background: radial-gradient(60% 50% at 80% 10%, rgba(255,255,255,.15) 0%, transparent 60%), radial-gradient(40% 40% at 20% 90%, var(--at-accent-soft) 0%, transparent 60%); } }
 .login-side > * { position: relative; z-index: 1; }
 .login-side-mark { color: var(--c-surface); opacity: .9; }
 .login-side-title .kicker {
@@ -1824,6 +1877,7 @@
 .login-side-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; font-size: 13.5px; }
 .login-side-list li { display: flex; gap: 10px; align-items: center; opacity: .9; }
 .login-side-list svg { color: color-mix(in oklab, var(--c-accent) 70%, white); }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .login-side-list svg { color: var(--at-accent-light); } }
 .login-side-foot { font-size: 12px; opacity: .7; margin: 0; }
 
 .login-form { padding: 48px 44px; display: flex; flex-direction: column; gap: 14px; }
@@ -1863,6 +1917,7 @@
   border-color: var(--c-primary);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--c-primary) 18%, transparent);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .field input:focus { box-shadow: 0 0 0 3px var(--at-primary-soft); } }
 .login-row { display: flex; justify-content: space-between; align-items: center; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--c-ink_2); cursor: pointer; }
 .check input { width: 14px; height: 14px; accent-color: var(--c-primary); }
@@ -1942,6 +1997,7 @@
   font-size: 13px;
   font-weight: 500;
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .login-error { background: var(--at-accent-tint); border: 1px solid var(--at-accent-soft); color: var(--at-accent-dark); } }
 
 /* Keep login reachable on mobile; free up nav space by dropping the sales CTA + lang switch */
 @media (max-width: 640px) {

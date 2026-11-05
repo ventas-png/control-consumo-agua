@@ -1,20 +1,17 @@
 import { useEffect } from 'react'
 import { useBrandingQuery } from '../../domain/branding/queries'
-import { estilosMarca, estilosAccent, BRAND_CSS_VARS, ACCENT_CSS_VARS } from '../../lib/branding'
+import { hojaEstilosMarca, BRANDING_STYLE_ID } from '../../lib/branding'
 
 // plat:P20 — Aplica los colores de marca de la empresa (primario + acento) a TODA
-// la app: setea las CSS vars --at-primary/-hover/-soft y --at-accent/-hover en
-// :root. Es un efecto puro (no renderiza nada). Si la empresa no tiene un color
-// custom, RESTABLECE esas vars para que la cascada use los defaults de la hoja de
-// estilos. Se monta una vez en el shell autenticado (App).
-
-function aplicarVars(root: HTMLElement, vars: Record<string, string> | null, names: readonly string[]) {
-  if (!vars) {
-    for (const k of names) root.style.removeProperty(k)
-    return
-  }
-  for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v)
-}
+// la app: inyecta un <style> con las CSS vars de marca (--at-primary y sus tonos
+// -hover/-soft/-2/-tint/-soft-2/-mint/-mint-2, más --at-chip y --at-surface-tint;
+// BRAND_CSS_VARS) y de acento (--at-accent y -hover/-dark/-darker/-light/-soft/
+// -soft-2/-tint/-tint-2, más --at-accent-2; ACCENT_CSS_VARS) para el tema CLARO y
+// el OSCURO (selectores que replican los de src/index.css). NO se usa style
+// inline en <html>: un inline gana a la
+// cascada y en dark mode dejaba, p. ej., --at-primary-soft casi blanco. Es un
+// efecto puro (no renderiza nada). Sin color custom, quita la hoja y la cascada
+// vuelve a los defaults. Se monta una vez en el shell autenticado (App).
 
 export function BrandingApplier({ companyId }: { companyId?: string | null }) {
   const { data: row } = useBrandingQuery(companyId ?? undefined)
@@ -22,9 +19,18 @@ export function BrandingApplier({ companyId }: { companyId?: string | null }) {
   const accentColor = row?.accent_color ?? null
 
   useEffect(() => {
-    const root = document.documentElement
-    aplicarVars(root, estilosMarca(primaryColor), BRAND_CSS_VARS)
-    aplicarVars(root, estilosAccent(accentColor), ACCENT_CSS_VARS)
+    const css = hojaEstilosMarca(primaryColor, accentColor)
+    let el = document.getElementById(BRANDING_STYLE_ID) as HTMLStyleElement | null
+    if (!css) {
+      el?.remove()
+      return
+    }
+    if (!el) {
+      el = document.createElement('style')
+      el.id = BRANDING_STYLE_ID
+      document.head.appendChild(el)
+    }
+    el.textContent = css
   }, [primaryColor, accentColor])
 
   return null

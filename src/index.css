@@ -90,11 +90,9 @@
 
   /* ─── Profundidad orgánica (color-mix derivado de marca) ─────────────────
      Bordes/superficies decorativas teñidas de marca en vez de gris plano.
-     Fallback sólido por doble-declaración: si el navegador no soporta
-     color-mix (muy antiguo) usa el hex; los modernos usan el color-mix. */
-  --at-border-organic: #D0D2CB;
+     Sin color-mix (Safari/iOS < 16.2, Chrome < 111) toman el hex sólido del
+     bloque «Respaldo sin color-mix» (más abajo, tras los bloques dark). */
   --at-border-organic: color-mix(in srgb, var(--at-primary) 16%, transparent);
-  --at-surface-tint: #E9EBE2;
   --at-surface-tint: color-mix(in srgb, var(--at-accent-2) 8%, var(--at-bg));
 }
 
@@ -104,7 +102,7 @@
    Los mismos valores se declaran en ambos selectores. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --at-bg: #0B1410; --at-surface: #11201A; --at-surface-2: #172821; --at-surface: color-mix(in oklch, var(--at-bg) 95%, var(--at-primary)); --at-surface-2: color-mix(in oklch, var(--at-bg) 92%, var(--at-primary));
+    --at-bg: #0B1410; --at-surface: color-mix(in oklch, var(--at-bg) 95%, var(--at-primary)); --at-surface-2: color-mix(in oklch, var(--at-bg) 92%, var(--at-primary));
     --at-ink: #ECEFE8; --at-ink-2: #B7C4BB; --at-ink-3: #8B9A91;
     --at-line: #28352D; --at-line-strong: #3A4A40;
     --at-primary: #5E9D8A; --at-primary-hover: #76B3A1; --at-primary-soft: #1C2E27;
@@ -141,6 +139,34 @@
   --at-info: #60a5fa; --at-info-tint: #0f1f33; --at-info-border: #1e3a5f; --at-info-strong: #93c5fd;
   --at-on-status: #0B1410; --at-data-negative: #E8736B;
   color-scheme: dark;
+}
+
+/* ─── Respaldo sin color-mix (Safari/iOS < 16.2, Chrome < 111) ───────────────
+   Hex sólidos para los tokens que arriba se definen con color-mix, en los
+   mismos selectores de tema. Van detrás de @supports not y NO como doble
+   declaración (hex y luego color-mix): una custom property acepta cualquier
+   valor, así que el navegador viejo se quedaría con el color-mix y la propiedad
+   que la usa se anularía (sin borde, fondo transparente). Los modernos ignoran
+   el bloque. Los valores son lo que el color-mix pinta con cada paleta: los
+   bordes y el hover de fila, el primario sobre --at-surface (donde van las
+   tarjetas y filas). Con color de marca custom, la hoja de branding
+   (src/lib/branding.ts) pone los suyos. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  :root {
+    --at-border-organic: #D0D2CB; --at-surface-tint: #E9EBE2;
+    --at-table-row-border: #E4E7E7; --at-table-row-hover: #F1F3F3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --at-surface: #11201A; --at-surface-2: #172821;
+      --at-border-organic: #1D342C; --at-surface-tint: #141F1A;
+      --at-table-row-border: #1A2F27; --at-table-row-hover: #162821;
+    }
+  }
+  [data-theme="dark"] {
+    --at-border-organic: #1D342C; --at-surface-tint: #141F1A;
+    --at-table-row-border: #1A2F27; --at-table-row-hover: #162821;
+  }
 }
 
 /* ─── Densidad por contexto (admin / residente) ──────────────────────────────
@@ -340,6 +366,15 @@ button:focus:not(:focus-visible) {
   pointer-events: none;
   display: none;
 }
+/* Sin color-mix (Safari/iOS < 16.2, Chrome < 111) el degradado de arriba se
+ * anula entero: como el valor lleva var(), se acepta al leer la hoja y se
+ * invalida al calcularlo, así que un `background` anterior no serviría de
+ * respaldo. Este bloque da el mismo degradado desde --at-surface sólido. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  .table-scroll-wrapper::after {
+    background: linear-gradient(to left, var(--at-surface), transparent);
+  }
+}
 
 /* Sticky first column: en mobile (donde la tabla scrollea horizontal) la
  * primera columna se queda pegada al borde izquierdo. Conserva el contexto
@@ -395,6 +430,12 @@ button:focus:not(:focus-visible) {
     transparent);
   pointer-events: none;
   display: none;
+}
+/* Respaldo sin color-mix: ver .table-scroll-wrapper::after. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  .tab-strip-scrollable::after {
+    background: linear-gradient(to left, var(--at-surface), transparent);
+  }
 }
 @media (max-width: 640px) {
   .tab-strip-scrollable::after {

@@ -1,7 +1,10 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useBrandingQuery } from '../../domain/branding/queries'
 import { useGuardarBrandingMutation } from '../../domain/branding/mutations'
-import { derivarVariablesMarca, normalizarColorHex, esColorHex, DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR } from '../../lib/branding'
+import {
+  derivarVariablesMarca, derivarVariablesMarcaOscuro, derivarVariablesAccentOscuro, normalizarColorHex, esColorHex,
+  DEFAULT_BRAND_COLOR, DEFAULT_ACCENT_COLOR, DARK_SURFACE,
+} from '../../lib/branding'
 
 // plat:P20 — Configuración de marca (white-label) por empresa: color primario y de
 // acento con vista previa en vivo. Solo owner/admin edita (canEdit). Los colores se
@@ -38,6 +41,22 @@ function ColorInput({ id, label, value, onChange, disabled }: {
   )
 }
 
+/** Fila de vista previa con fondo FIJO (no sigue el tema): muestra cómo se ve la
+ *  marca en el tema claro y en el oscuro, sea cual sea el tema actual. */
+function PreviewFila({ etiqueta, fondo, tinta, borde, primary, soft, softInk, accent }: {
+  etiqueta: string; fondo: string; tinta: string; borde: string
+  primary: string; soft: string; softInk: string; accent: string
+}) {
+  return (
+    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '12px 14px', border: `1px solid ${borde}`, borderRadius: '10px', background: fondo, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: '11px', fontWeight: 600, color: tinta, minWidth: '44px' }}>{etiqueta}</span>
+      <button type="button" style={{ background: primary, color: 'white', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: 600, cursor: 'default' }}>Botón</button>
+      <span style={{ background: soft, color: softInk, borderRadius: '8px', padding: '4px 10px', fontSize: '12px', fontWeight: 700 }}>Suave</span>
+      <span style={{ background: accent, color: 'white', borderRadius: '8px', padding: '4px 10px', fontSize: '12px', fontWeight: 700 }}>Acento</span>
+    </div>
+  )
+}
+
 export function CompanyBrandingSection({ companyId, canEdit }: Props) {
   const { data: row, isLoading } = useBrandingQuery(companyId)
   const guardar = useGuardarBrandingMutation()
@@ -51,6 +70,7 @@ export function CompanyBrandingSection({ companyId, canEdit }: Props) {
 
   const validos = esColorHex(color) && esColorHex(accent)
   const vars = derivarVariablesMarca(color)
+  const varsOscuro = derivarVariablesMarcaOscuro(color)
   const accentHex = normalizarColorHex(accent) ?? DEFAULT_ACCENT_COLOR
   const personalizado = !!normalizarColorHex(row?.primary_color) || !!normalizarColorHex(row?.accent_color)
 
@@ -70,10 +90,11 @@ export function CompanyBrandingSection({ companyId, canEdit }: Props) {
 
         <div style={{ flex: 1, minWidth: '220px' }}>
           <label style={labelStyle}>Vista previa</label>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '12px 14px', border: '1px solid var(--at-line)', borderRadius: '10px', background: 'var(--at-surface)', flexWrap: 'wrap' }}>
-            <button type="button" style={{ background: vars.primary, color: 'white', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: 600, cursor: 'default' }}>Botón</button>
-            <span style={{ background: vars.soft, color: vars.hover, borderRadius: '8px', padding: '4px 10px', fontSize: '12px', fontWeight: 700 }}>Suave</span>
-            <span style={{ background: accentHex, color: 'white', borderRadius: '8px', padding: '4px 10px', fontSize: '12px', fontWeight: 700 }}>Acento</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <PreviewFila etiqueta="Claro" fondo="#FFFFFF" tinta="#3E5A4C" borde="#E1DDD0"
+              primary={vars.primary} soft={vars.soft} softInk={vars.hover} accent={accentHex} />
+            <PreviewFila etiqueta="Oscuro" fondo={DARK_SURFACE} tinta="#B7C4BB" borde="#28352D"
+              primary={varsOscuro.primary} soft={varsOscuro.soft} softInk={varsOscuro.primary} accent={derivarVariablesAccentOscuro(accentHex).accent} />
           </div>
         </div>
       </div>
