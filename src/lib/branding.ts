@@ -173,6 +173,8 @@ export interface VariablesMarca {
   /** --at-nav-bg: fondo del rail de navegación, OSCURO en ambos temas (lleva texto
    *  --at-nav-ink claro y overlays blancos translúcidos). */
   navBg: string
+  /** --at-nav-ink: texto sobre --at-nav-bg (Sidebar, encabezados de SuperAdmin). */
+  navInk: string
 }
 
 /** Fondo del tema claro (= --at-bg en src/index.css). */
@@ -187,19 +189,32 @@ const CHIP_MEZCLA_OSCURO = 0.16
  */
 const SURFACE_TINT_MEZCLA_CLARO = 0.05
 const SURFACE_TINT_MEZCLA_OSCURO = 0.075
-/** Texto del rail de navegación (= --at-nav-ink en index.css, fijo en ambos temas). */
+/** Texto del rail de navegación por defecto (= --at-nav-ink en index.css, fijo en ambos temas). */
 export const NAV_INK = '#ECEFE8'
+
+/**
+ * --at-nav-ink (index.css: #ECEFE8) desde la marca: un blanco roto teñido del TONO de
+ * la marca, con la luminosidad del por defecto (HSL 92.4%) y su saturación (0.18)
+ * escalada por la de la marca, acotada a 0.3 para que siga siendo casi blanco. Marcas
+ * grises → blanco roto neutro.
+ */
+export function navInkDesdeMarca(hex: string): string {
+  const [h, s] = rgbAHsl(parseRgb(hex))
+  const sat = s < SAT_GRIS ? 0 : Math.min((0.18 * s) / MARCA_SAT, 0.3)
+  return hslAHex([h, sat, 0.924])
+}
 
 /**
  * --at-nav-bg (index.css: #102622, fijo en ambos temas) desde la marca: su tono, su
  * saturación × 1.1 (acotada a 0.85) y luminosidad HSL 10.6%, como el #102622 respecto
  * de #1B3B36. Marcas grises → casi negro neutro. Se oscurece si hace falta para que
- * --at-nav-ink se lea ≥ 7:1 (AAA).
+ * --at-nav-ink (el derivado de la misma marca) se lea ≥ 7:1 (AAA).
  */
 export function navBgDesdeMarca(hex: string): string {
   const [h, s] = rgbAHsl(parseRgb(hex))
+  const ink = navInkDesdeMarca(hex)
   const base = hslAHex([h, Math.min(s * 1.1, 0.85), 0.106])
-  return oscurecer(base, factorOscurecerHasta(base, 0, (c) => contraste(NAV_INK, c) >= 7))
+  return oscurecer(base, factorOscurecerHasta(base, 0, (c) => contraste(ink, c) >= 7))
 }
 
 /** Mismo tono; luminosidad HSL `l` (0..1) y saturación × `factorSat`. */
@@ -259,6 +274,7 @@ export function derivarVariablesMarca(primary: string | null | undefined): Varia
     chip: mezclar(base, LIGHT_BG, CHIP_MEZCLA_CLARO),
     surfaceTint: mezclar(base, LIGHT_BG, SURFACE_TINT_MEZCLA_CLARO),
     navBg: navBgDesdeMarca(base),
+    navInk: navInkDesdeMarca(base),
   }
 }
 
@@ -290,8 +306,9 @@ export function derivarVariablesMarcaOscuro(primary: string | null | undefined):
     mint2: primary2,
     chip: mezclar(p, DARK_BG, CHIP_MEZCLA_OSCURO),
     surfaceTint: mezclar(p, DARK_BG, SURFACE_TINT_MEZCLA_OSCURO),
-    // El rail es oscuro en ambos temas: mismo valor que en claro.
+    // El rail es oscuro en ambos temas: mismos valores que en claro.
     navBg: navBgDesdeMarca(base),
+    navInk: navInkDesdeMarca(base),
   }
 }
 
@@ -299,7 +316,7 @@ export function derivarVariablesMarcaOscuro(primary: string | null | undefined):
 const TONOS_MARCA_VARS = [
   '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
   '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
-  '--at-surface-tint', '--at-nav-bg',
+  '--at-surface-tint', '--at-nav-bg', '--at-nav-ink',
 ] as const
 
 /** Tokens de estado que también siguen a la marca (ver derivarEstados). */
@@ -504,6 +521,7 @@ function varsMarca(v: VariablesMarca): Record<(typeof TONOS_MARCA_VARS)[number],
     '--at-chip': v.chip,
     '--at-surface-tint': v.surfaceTint,
     '--at-nav-bg': v.navBg,
+    '--at-nav-ink': v.navInk,
   }
 }
 

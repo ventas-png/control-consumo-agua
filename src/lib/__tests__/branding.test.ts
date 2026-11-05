@@ -81,14 +81,14 @@ describe('estilosMarca', () => {
     expect(estilosMarca(undefined)).toBeNull()
     expect(estilosMarca('rojo')).toBeNull()
   })
-  it('color válido → mapa con las 29 CSS vars de marca (tonos + nav + estados + datos)', () => {
+  it('color válido → mapa con las 30 CSS vars de marca (tonos + nav + estados + datos)', () => {
     const m = estilosMarca('#1B3B36')
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
     expect(Object.keys(m!)).toEqual([
       '--at-primary', '--at-primary-hover', '--at-primary-soft', '--at-primary-2',
       '--at-primary-tint', '--at-primary-soft-2', '--at-primary-mint', '--at-primary-mint-2', '--at-chip',
-      '--at-surface-tint', '--at-nav-bg',
+      '--at-surface-tint', '--at-nav-bg', '--at-nav-ink',
       '--at-success', '--at-success-tint', '--at-success-border', '--at-success-strong',
       '--at-warning', '--at-warning-tint', '--at-warning-border', '--at-warning-strong',
       '--at-danger', '--at-danger-tint', '--at-danger-border', '--at-danger-strong',
@@ -833,11 +833,12 @@ describe('--at-nav-bg desde la marca', () => {
     expect(distanciaRgb(derivarVariablesMarca(DEFAULT_BRAND_COLOR).navBg, '#102622')).toBeLessThanOrEqual(2)
   })
 
-  it.each(MUESTRAS)('%s → oscuro, igual en claro y en oscuro, y --at-nav-ink se lee ≥ 7:1', (c) => {
-    const claro = derivarVariablesMarca(c).navBg, oscuro = derivarVariablesMarcaOscuro(c).navBg
-    expect(oscuro).toBe(claro)
-    expect(L(claro)).toBeLessThan(0.03)
-    expect(contraste(NAV_INK, claro)).toBeGreaterThanOrEqual(7)
+  it.each(MUESTRAS)('%s → oscuro, igual en claro y en oscuro, y su --at-nav-ink se lee ≥ 7:1', (c) => {
+    const claro = derivarVariablesMarca(c), oscuro = derivarVariablesMarcaOscuro(c)
+    expect(oscuro.navBg).toBe(claro.navBg)
+    expect(oscuro.navInk).toBe(claro.navInk)
+    expect(L(claro.navBg)).toBeLessThan(0.03)
+    expect(contraste(claro.navInk, claro.navBg)).toBeGreaterThanOrEqual(7)
   })
 
   it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → toma el tono de la marca', (c) => {
@@ -849,10 +850,35 @@ describe('--at-nav-bg desde la marca', () => {
     expect(croma(derivarVariablesMarca('#808080').navBg)).toBeLessThan(4)
   })
 
-  it('la hoja lo lleva en los tres selectores, con el mismo valor', () => {
+  it('la hoja lleva --at-nav-bg y --at-nav-ink en los tres selectores, con el mismo valor', () => {
     const css = hojaEstilosMarca('#7c3aed', null)!
-    const nav = derivarVariablesMarca('#7c3aed').navBg
-    for (const l of css.split('\n').slice(0, 3)) expect(l).toContain(`--at-nav-bg: ${nav};`)
+    const v = derivarVariablesMarca('#7c3aed')
+    for (const l of css.split('\n').slice(0, 3)) {
+      expect(l).toContain(`--at-nav-bg: ${v.navBg};`)
+      expect(l).toContain(`--at-nav-ink: ${v.navInk};`)
+    }
+  })
+})
+
+// --at-nav-ink: texto sobre --at-nav-bg. Blanco roto teñido del tono de la marca.
+describe('--at-nav-ink desde la marca', () => {
+  it('con la marca por defecto queda prácticamente igual que #ECEFE8 (un blanco roto)', () => {
+    expect(distanciaRgb(derivarVariablesMarca(DEFAULT_BRAND_COLOR).navInk, NAV_INK)).toBeLessThan(10)
+  })
+
+  it.each(MUESTRAS)('%s → sigue siendo casi blanco', (c) => {
+    const ink = derivarVariablesMarca(c).navInk
+    expect(L(ink)).toBeGreaterThan(0.75)
+    expect(croma(ink)).toBeLessThan(40)
+  })
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → se tiñe del tono de la marca', (c) => {
+    const ink = derivarVariablesMarca(c).navInk
+    expect(distTono(tono(ink), tono(c)), ink).toBeLessThan(12)
+  })
+
+  it('marca gris → blanco roto neutro', () => {
+    expect(croma(derivarVariablesMarca('#808080').navInk)).toBe(0)
   })
 })
 
