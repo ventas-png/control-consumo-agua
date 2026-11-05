@@ -4,6 +4,16 @@
    para mantener la identidad visual del sitio sin filtrar estilos a la app.
 ───────────────────────────────────────────────────────────────────────── */
 
+/* Respaldo sin color-mix (Safari/iOS < 16.2, Chrome < 111): cada regla que usa
+   color-mix va seguida de un `@supports not (color: color-mix(…))` con el mismo
+   selector y un valor equivalente sin color-mix, hecho con tokens del tema
+   (--at-primary-tint, --at-accent-soft, --at-surface-2…) para que siga a
+   claro/oscuro. No sirve declarar antes un valor de respaldo: como el valor
+   lleva var(), se acepta al leer la hoja y se invalida al calcularlo, y el
+   anterior ya está descartado. Va justo detrás de su regla (no al final) para
+   que una regla posterior que la pise siga ganando igual que con color-mix.
+   Los respaldos usan --at-* (index.css, siempre cargado) en vez de --c-*. */
+
 /* Barra superior simple con la marca y el enlace de regreso. */
 .at-root .legal-topbar {
   position: sticky;
@@ -13,6 +23,7 @@
   backdrop-filter: saturate(180%) blur(10px);
   border-bottom: 1px solid var(--c-line);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .at-root .legal-topbar { background: var(--at-surface); } }
 .at-root .legal-topbar-inner {
   display: flex;
   align-items: center;
@@ -181,6 +192,7 @@
 .at-root .legal-prose tbody tr:nth-child(even) td {
   background: color-mix(in srgb, var(--c-bg) 60%, transparent);
 }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .at-root .legal-prose tbody tr:nth-child(even) td { background: var(--at-bg); } }
 
 @media (max-width: 640px) {
   .at-root .legal-main { padding: 32px 0 56px; }
