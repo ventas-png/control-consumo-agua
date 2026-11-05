@@ -217,13 +217,13 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
       {planes.length === 0 ? (
         <EmptyState icon="📋" title="No hay planes. Crea uno para comenzar" />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px' }}>
           {planes.map(p => {
             const st = getStatus(p)
             const stStyle = STATUS[st]
             return (
               <button key={p.id} type="button" onClick={() => setSelected(p.id)}
-                style={{ display: 'block', width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', cursor: 'pointer', opacity: p.activo ? 1 : 0.6 }}>
+                style={{ display: 'block', width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderLeft: `4px solid ${st === 'ok' || st === 'sin_fecha' ? 'var(--at-line)' : stStyle.color}`, borderRadius: '10px', padding: '12px', cursor: 'pointer', opacity: p.activo ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{p.equipo}</div>
@@ -247,32 +247,66 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
       )}
 
       {/* Detalle e historial en ventana: a pantalla completa en el teléfono. */}
-      {plan && (
+      {plan && (() => {
+        const st = getStatus(plan)
+        const stStyle = STATUS[st]
+        const datos: { label: string; value: string; color?: string }[] = [
+          { label: 'Frecuencia', value: FREQ_LABELS[plan.frecuencia] ?? plan.frecuencia },
+          { label: 'Responsable', value: plan.responsable || '—' },
+          { label: 'Última ejecución', value: plan.ultima_ejecucion || '—' },
+          { label: 'Próxima ejecución', value: plan.proxima_ejecucion || '—', color: st === 'ok' || st === 'sin_fecha' ? undefined : stStyle.color },
+          { label: `Costo estimado (${moneda})`, value: plan.costo_estimado ? plan.costo_estimado.toFixed(2) : '—' },
+          { label: 'Plan', value: plan.activo ? 'Activo' : 'Inactivo', color: plan.activo ? 'var(--at-success)' : 'var(--at-ink-3)' },
+        ]
+        return (
         <EditModal
           title={plan.equipo}
-          subtitle={<>
-            {FREQ_LABELS[plan.frecuencia]}
-            {plan.responsable ? ` · ${plan.responsable}` : ''}
-            {plan.costo_estimado ? ` · Est. ${moneda} ${plan.costo_estimado.toFixed(2)}` : ''}
-          </>}
-          maxWidth="640px"
+          subtitle={
+            <span style={{ display: 'inline-flex', gap: '2px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: stStyle.bg, color: stStyle.color }}>{stStyle.label}</span>
+              <span>
+                {FREQ_LABELS[plan.frecuencia]}
+                {plan.responsable ? ` · ${plan.responsable}` : ''}
+                {plan.costo_estimado ? ` · Est. ${moneda} ${plan.costo_estimado.toFixed(2)}` : ''}
+              </span>
+            </span>
+          }
+          size="lg"
           fullScreenOnMobile
           closeOnBackdropClick={!savingEjec}
           closeOnEscape={!savingEjec}
           onClose={cerrarDetalle}
-          footer={(canEdit || (canCreate && plan.activo)) ? <>
-            {canEdit && (
-              <Button variant={plan.activo ? 'secondary' : 'success'} onClick={() => toggleActivo(plan.id, plan.activo)}>
-                {plan.activo ? 'Desactivar' : 'Activar'}
-              </Button>
-            )}
-            {canCreate && plan.activo && (
-              <Button onClick={() => setShowEjecForm(v => !v)} aria-expanded={showEjecForm}>
-                + Registrar ejecución
-              </Button>
-            )}
-          </> : undefined}
+          footer={
+            <div className="at-ficha-acciones" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+              <Button variant="secondary" onClick={cerrarDetalle} disabled={savingEjec}>Cerrar</Button>
+              {canEdit && (
+                <Button variant={plan.activo ? 'secondary' : 'success'} onClick={() => toggleActivo(plan.id, plan.activo)}>
+                  {plan.activo ? 'Desactivar' : 'Activar'}
+                </Button>
+              )}
+              {canCreate && plan.activo && (
+                <Button onClick={() => setShowEjecForm(v => !v)} aria-expanded={showEjecForm}>
+                  + Registrar ejecución
+                </Button>
+              )}
+            </div>
+          }
         >
+          {/* Datos del plan */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+            {datos.map(d => (
+              <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '8px 12px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{d.label}</div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: d.color ?? 'var(--at-ink)', overflowWrap: 'anywhere' }}>{d.value}</div>
+              </div>
+            ))}
+          </div>
+          {plan.descripcion && (
+            <div style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px', fontSize: '13px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>
+              {plan.descripcion}
+            </div>
+          )}
+
           {/* Execution form */}
           {showEjecForm && (
             <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
@@ -346,7 +380,8 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
             </div>
           )}
         </EditModal>
-      )}
+        )
+      })()}
     </div>
   )
 }

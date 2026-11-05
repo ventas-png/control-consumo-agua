@@ -61,15 +61,23 @@ eliminarExigeSuPermiso('Inventario', p => {
   fireEvent.click(screen.getByText('Escalera'))
 }, /^(Eliminar|Delete)$/, borrar, 'inventario_condominio', 'iv1')
 
-eliminarExigeSuPermiso('Préstamos de equipo', p => render(
-  <PrestamoEquiposTab {...base} unidades={[]} canCreate {...p}
-    prestamos={[fila({ id: 'pe1', equipo_nombre: 'Taladro', cantidad: 1, fecha_prestamo: '2026-10-01', estado: 'prestado', deposito_pagado: false })]} />,
-), /^Eliminar préstamo$/, borrar, 'prestamos_equipo', 'pe1')
+eliminarExigeSuPermiso('Préstamos de equipo', p => {
+  render(
+    <PrestamoEquiposTab {...base} unidades={[]} canCreate {...p}
+      prestamos={[fila({ id: 'pe1', equipo_nombre: 'Taladro', cantidad: 1, fecha_prestamo: '2026-10-01', estado: 'prestado', deposito_pagado: false })]} />,
+  )
+  // Eliminar vive en la ficha, que abre al pulsar la fila.
+  fireEvent.click(screen.getByText('Taladro'))
+}, /^Eliminar préstamo$/, borrar, 'prestamos_equipo', 'pe1')
 
-eliminarExigeSuPermiso('Garantías', p => conI18n(
-  <GarantiasEquipoTab {...base} moneda="Q" canCreate {...p}
-    garantias={[fila({ id: 'ga1', equipo: 'Bomba de agua', estado: 'vigente', fecha_vencimiento: '2099-01-01' })]} />,
-), /^(Eliminar|Delete)$/, borrar, 'garantias_equipo', 'ga1')
+eliminarExigeSuPermiso('Garantías', p => {
+  conI18n(
+    <GarantiasEquipoTab {...base} moneda="Q" canCreate {...p}
+      garantias={[fila({ id: 'ga1', equipo: 'Bomba de agua', estado: 'vigente', fecha_vencimiento: '2099-01-01' })]} />,
+  )
+  // Eliminar vive en la ficha, que abre al pulsar la fila.
+  fireEvent.click(screen.getByText('Bomba de agua'))
+}, /^(Eliminar|Delete)$/, borrar, 'garantias_equipo', 'ga1')
 
 eliminarExigeSuPermiso('Evaluación de proveedores', p => render(
   <EvaluacionProveedorTab {...base} proveedores={[]} canCreate {...p}
@@ -82,12 +90,20 @@ eliminarExigeSuPermiso('Proyectos', p => {
   fireEvent.click(screen.getByText('Pintar fachada'))
 }, /^Eliminar Pintar fachada$/, borrar, 'proyectos_condominio', 'pc1')
 
-eliminarExigeSuPermiso('Obras', p => render(
-  <ObrasTab {...base} moneda="Q" canCreate {...p}
-    obras={[fila({ id: 'ob1', titulo: 'Techo del salón', estado: 'en_ejecucion', progreso: 30 })]} />,
-), /^Eliminar Techo del salón$/, borrar, 'obras_mejoras', 'ob1')
+eliminarExigeSuPermiso('Obras', p => {
+  render(
+    <ObrasTab {...base} moneda="Q" canCreate {...p}
+      obras={[fila({ id: 'ob1', titulo: 'Techo del salón', estado: 'en_ejecucion', progreso: 30 })]} />,
+  )
+  // Eliminar vive en la ficha, que abre al pulsar la tarjeta.
+  fireEvent.click(screen.getByRole('button', { name: /Techo del salón/ }))
+}, /^Eliminar Techo del salón$/, borrar, 'obras_mejoras', 'ob1')
 
-eliminarExigeSuPermiso('Bitácora de mantenimiento', p => render(
-  <BitacoraManto {...base} canCreate {...p}
-    registros={[fila({ id: 'bm1', fecha: '2026-10-05', turno: 'mañana', responsable: 'Luis', tareas: [], firmado: false })]} />,
-), /^Eliminar registro del 2026-10-05$/, borrar, 'bitacora_manto', 'bm1')
+eliminarExigeSuPermiso('Bitácora de mantenimiento', p => {
+  render(
+    <BitacoraManto {...base} canCreate {...p}
+      registros={[fila({ id: 'bm1', fecha: '2026-10-05', turno: 'mañana', responsable: 'Luis', tareas: [], firmado: false })]} />,
+  )
+  // Eliminar vive en la ficha, que abre al pulsar la tarjeta.
+  fireEvent.click(screen.getByRole('button', { name: /Luis/ }))
+}, /^Eliminar registro del 2026-10-05$/, borrar, 'bitacora_manto', 'bm1')

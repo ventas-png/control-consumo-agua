@@ -89,6 +89,25 @@ describe('BitacoraManto — ventanas', () => {
     expect(within(screen.getByRole('dialog')).getByRole('button', { name: '✓ Firmado' })).toBeTruthy()
   })
 
+  it('la tarjeta sólo imprime: editar y eliminar viven en la ficha, y Cerrar la cierra', async () => {
+    render(<BitacoraManto {...props()} />)
+    expect(screen.getByRole('button', { name: 'Imprimir registro del 2026-10-20' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Editar registro del 2026-10-20' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Eliminar registro del 2026-10-20' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Pedro Ruiz/ }))
+    const dialog = screen.getByRole('dialog', { name: '🌅 2026-10-20 — Mañana' })
+    expect(within(dialog).getByText('Tareas completadas').nextSibling?.textContent).toBe('1 / 2')
+    expect(within(dialog).getByText('Sin firmar')).toBeTruthy()
+    const pie = dialog.querySelector('.at-modal-footer') as HTMLElement
+    expect(within(pie).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '🗑️ Eliminar', '🖨️ Imprimir', '✏️ Editar', 'Firmar'])
+    fireEvent.click(within(pie).getByRole('button', { name: 'Eliminar registro del 2026-10-20' }))
+    await waitFor(() => expect(mocks.deleteCondominioRow).toHaveBeenCalledWith('bitacora_manto', 'b1'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: /Pedro Ruiz/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it('el formulario de nuevo registro es una ventana y guarda sus tareas', async () => {
     const onRefresh = vi.fn()
     render(<BitacoraManto {...props({ onRefresh })} />)

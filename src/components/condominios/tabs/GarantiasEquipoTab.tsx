@@ -4,6 +4,7 @@ import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '.
 import type { GarantiaEquipo, EstadoGarantia } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { EditModal } from '../../shared/EditModal'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
 
 interface Props {
@@ -44,6 +45,10 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<'todos' | EstadoGarantia>('todos')
+  // La ficha abre en ventana al pulsar la fila. Se guarda el id y no la fila:
+  // tras editar o reclamar, la ficha muestra la garantía recargada.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalle = detalleId ? garantias.find(g => g.id === detalleId) ?? null : null
 
   function setF<K extends keyof typeof form>(k: K, v: typeof form[K]) { setForm(p => ({ ...p, [k]: v })) }
 
@@ -81,8 +86,12 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
     if (!r.isConfirmed) return
     const { error } = await deleteCondominioRow('garantias_equipo', id)
     if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); return }
+    setDetalleId(null)
     onRefresh()
   }
+
+  // Cancelar cierra sin borrar lo escrito; no se cierra a mitad del guardado.
+  function cerrarForm() { if (!saving) { setShowForm(false); setEditId(null) } }
 
   async function cambiarEstado(id: string, estado: EstadoGarantia) {
     await updateCondominioRow('garantias_equipo', id, { estado })
@@ -109,7 +118,7 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
             {vencidas > 0 ? t('condominios.garantias.subtitle_vencidas', { count: vencidas }) : ''}
           </p>
         </div>
-        {canCreate && !showForm && (
+        {canCreate && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setShowForm(true) }}
             style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             {t('condominios.garantias.new_button')}
@@ -135,11 +144,29 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
         ))}
       </div>
 
-      {/* Form */}
+      {/* Formulario en ventana (antes se desplegaba entre los KPIs y la lista).
+          Editar lo abre desde la ficha y queda encima: EditModal apila por
+          orden de montaje. */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? t('condominios.garantias.form_title_edit') : t('condominios.garantias.form_title_new')}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: '10px' }}>
+        <EditModal
+          title={editId ? t('condominios.garantias.form_title_edit') : t('condominios.garantias.form_title_new')}
+          size="lg"
+          fullScreenOnMobile
+          closeOnBackdropClick={!saving}
+          closeOnEscape={!saving}
+          onClose={cerrarForm}
+          footer={<>
+            <button type="button" onClick={cerrarForm} disabled={saving}
+              style={{ padding: '8px 14px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
+              {t('condominios.comun.cancel')}
+            </button>
+            <button type="button" onClick={handleSave} disabled={saving}
+              style={{ padding: '8px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              {saving ? t('condominios.comun.saving') : t('condominios.comun.save')}
+            </button>
+          </>}
+        >
+          <div className="at-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
               <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>{t('condominios.garantias.equipo')}</label>
               <input style={inputStyle} value={form.equipo} onChange={e => setF('equipo', e.target.value)} placeholder={t('condominios.garantias.equipo_placeholder')} autoFocus />
@@ -184,17 +211,7 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
                 value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder={t('condominios.garantias.notas_placeholder')} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? t('condominios.comun.saving') : t('condominios.comun.save')}
-            </button>
-            <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-              {t('condominios.comun.cancel')}
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* List — cond:B2: migrado a <DataTable> shared */}
@@ -204,6 +221,7 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
         pageSize={50}
         mobileCardLayout
         defaultSort={{ key: 'fecha_vencimiento', direction: 'asc' }}
+        onRowClick={g => setDetalleId(g.id)}
         searchPlaceholder={t('condominios.garantias.search_placeholder')}
         searchableKeys={['equipo', g => g.proveedor ?? '', g => g.numero_serie ?? '']}
         rowStyle={g => {
@@ -280,28 +298,107 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
             render: g => g.monto_compra ? <span style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>{fmt(Number(g.monto_compra), moneda)}</span> : <span style={{ color: 'var(--at-ink-3)' }}>—</span>,
           },
           {
+            // En la fila queda sólo la acción del día a día (Reclamar); editar y
+            // eliminar viven en la ficha, que abre al pulsar la fila.
+            // `stopPropagation`: el botón no debe abrir además la ficha.
             key: 'actions', header: '', align: 'right',
-            render: g => (canEdit || canDelete) ? (
-              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                {canEdit && g.estado === 'vigente' && (
-                  <button onClick={() => cambiarEstado(g.id, 'reclamada')}
-                    style={{ padding: '3px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
-                    {t('condominios.garantias.accion_reclamar')}
-                  </button>
-                )}
-                {canEdit && (
-                  <button onClick={() => startEdit(g)} aria-label={t('condominios.comun.edit')}
-                    style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                )}
-                {canDelete && (
-                  <button onClick={() => handleDelete(g.id)} aria-label={t('condominios.comun.delete')}
-                    style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                )}
+            render: g => canEdit && g.estado === 'vigente' ? (
+              <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button onClick={() => cambiarEstado(g.id, 'reclamada')}
+                  style={{ padding: '3px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                  {t('condominios.garantias.accion_reclamar')}
+                </button>
               </div>
             ) : null,
           },
         ] satisfies DataTableColumn<GarantiaEquipo>[]}
       />
+
+      {/* Ficha en ventana (pantalla completa en el teléfono): todos los datos de
+          la garantía y sus acciones (reclamar, editar, eliminar). */}
+      {detalle && (() => {
+        const g = detalle
+        const c = ESTADO_COLOR[g.estado]
+        const expirada = g.estado === 'vigente' && !!g.fecha_vencimiento && g.fecha_vencimiento < today
+        const expirando = !expirada && g.estado === 'vigente' && !!g.fecha_vencimiento && g.fecha_vencimiento <= addDays(today, 60)
+        const sinAsterisco = (s: string) => s.replace(/\s*\*$/, '')
+        const datos: { label: string; value: string; color?: string }[] = [
+          { label: t('condominios.garantias.area'), value: g.area || '—' },
+          { label: t('condominios.garantias.numero_serie'), value: g.numero_serie || '—' },
+          { label: t('condominios.garantias.proveedor'), value: g.proveedor || '—' },
+          { label: t('condominios.garantias.contacto_soporte'), value: g.contacto_soporte || '—' },
+          { label: t('condominios.garantias.fecha_compra'), value: g.fecha_compra || '—' },
+          { label: t('condominios.garantias.fecha_vencimiento'), value: g.fecha_vencimiento || '—', color: expirada ? 'var(--at-danger)' : expirando ? 'var(--at-warning-strong)' : undefined },
+          { label: sinAsterisco(t('condominios.garantias.monto_compra', { moneda })), value: g.monto_compra ? fmt(Number(g.monto_compra), moneda) : '—' },
+        ]
+        return (
+          <EditModal
+            title={g.equipo}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '2px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: c.bg, color: c.color }}>{t(ESTADO_LABEL_KEY[g.estado])}</span>
+                {expirada && <span style={{ color: 'var(--at-danger)', fontWeight: 700 }}>{t('condominios.garantias.badge_expirada')}</span>}
+                {expirando && <span style={{ color: 'var(--at-warning)', fontWeight: 700 }}>{t('condominios.garantias.badge_por_vencer')}</span>}
+                {g.area && <span>📍 {g.area}</span>}
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+                <button type="button" onClick={() => setDetalleId(null)}
+                  style={{ padding: '8px 14px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-2)' }}>
+                  {t('condominios.comun.close')}
+                </button>
+                {canEdit && g.estado === 'vigente' && (
+                  <button type="button" onClick={() => cambiarEstado(g.id, 'reclamada')}
+                    style={{ padding: '8px 14px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: 'none', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>
+                    {t('condominios.garantias.accion_reclamar')}
+                  </button>
+                )}
+                {canDelete && (
+                  <button type="button" onClick={() => handleDelete(g.id)} aria-label={t('condominios.comun.delete')}
+                    style={{ padding: '8px 14px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-danger)' }}>
+                    🗑️ {t('condominios.comun.delete')}
+                  </button>
+                )}
+                {canEdit && (
+                  <button type="button" onClick={() => startEdit(g)} aria-label={t('condominios.comun.edit')}
+                    style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                    ✏️ {t('condominios.comun.edit')}
+                  </button>
+                )}
+              </div>
+            }
+          >
+            {expirada && (
+              <div style={{ background: 'var(--at-danger-tint)', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px', fontSize: '12px', color: 'var(--at-danger)', fontWeight: 600 }}>
+                {t('condominios.garantias.badge_expirada')} · {g.fecha_vencimiento}
+              </div>
+            )}
+            {expirando && (
+              <div style={{ background: 'var(--at-warning-tint)', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px', fontSize: '12px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
+                {t('condominios.garantias.badge_por_vencer')} · {g.fecha_vencimiento}
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginBottom: g.notas ? '14px' : 0 }}>
+              {datos.map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '8px 12px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: d.color ?? 'var(--at-ink)', overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+            {g.notas && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>
+                <div style={{ fontWeight: 600, fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>{t('condominios.comun.notes')}</div>
+                {g.notas}
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }
