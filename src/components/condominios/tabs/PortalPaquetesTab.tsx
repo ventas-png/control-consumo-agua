@@ -9,6 +9,7 @@ import { MultiImageUploader } from '../../shared/ImageUploader'
 import { useMediaScope } from '../../shared/MediaScopeContext'
 import { SecureImage } from '../../shared/SecureImage'
 import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { SignaturePad } from '../../shared/SignaturePad'
 import type { PaqueteRecibido, TipoPaquete } from '../../../types'
 
@@ -55,6 +56,8 @@ const inputStyle = {
 const labelStyle = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' } as const
 
 const FECHA_CORTA: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }
+/** "2026-11-05T15:30:00Z" → "05 de noviembre de 2026, 15:30" (hora local), para la ficha. */
+const fechaHoraLarga = (iso: string) => new Date(iso).toLocaleString('es', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 function blankSalForm() {
   return { tipo: 'paquete' as TipoPaquete, descripcion: '', autorizado_nombre: '', autorizado_documento: '', autorizado_telefono: '', notas: '' }
@@ -74,6 +77,9 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', vist
   const [salFotos, setSalFotos] = useState<string[]>([])
   const [salSaving, setSalSaving] = useState(false)
   const [verCodigo, setVerCodigo] = useState<PaqueteRecibido | null>(null)
+  // Pieza abierta en la ficha, por id: así la ficha sigue a la fila cuando el padre recarga (p. ej. tras firmar).
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalle = detalleId ? paquetes.find(p => p.id === detalleId) ?? null : null
 
   const recibidos = paquetes.filter(p => (p.direccion ?? 'entrante') === 'entrante')
   const salidas   = paquetes.filter(p => p.direccion === 'saliente_tercero')
@@ -177,48 +183,41 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', vist
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {recibidosOrden.map(p => {
-              const cfg = ESTADO_CONFIG[p.estado]
+              const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente
               const tcfg = TIPO_CONFIG[p.tipo] ?? TIPO_CONFIG.paquete
               const pendiente = p.estado === 'pendiente'
+              const fotos = p.fotos?.length ?? 0
+              const abrir = () => setDetalleId(p.id)
               return (
-                <div key={p.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${pendiente ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                /* La tarjeta sólo resume; la ficha (fotos, firma, notas y Firmar recepción) abre en ventana al tocarla. */
+                <div key={p.id} role="button" tabIndex={0} aria-label={p.descripcion}
+                  onClick={abrir}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir() } }}
+                  style={{ background: 'var(--at-surface)', border: `1.5px solid ${pendiente ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '14px', alignItems: 'flex-start', cursor: 'pointer' }}>
                   {p.fotos && p.fotos.length > 0 ? (
-                    <SecureImage src={p.fotos[0]} alt="" style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '10px', flexShrink: 0, border: '1px solid var(--at-line)' }} />
+                    <SecureImage src={p.fotos[0]} alt="" style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '10px', flexShrink: 0, border: '1px solid var(--at-line)' }} />
                   ) : (
-                    <div style={{ fontSize: '34px', flexShrink: 0, width: '64px', textAlign: 'center' }}>{tcfg.icon}</div>
+                    <div aria-hidden style={{ fontSize: '30px', flexShrink: 0, width: '56px', textAlign: 'center' }}>{tcfg.icon}</div>
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)' }}>{p.descripcion}</span>
+                      <span style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>{p.descripcion}</span>
                       <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', background: 'var(--at-chip)', borderRadius: '20px', padding: '2px 9px' }}>{tcfg.icon} {tcfg.label}</span>
                       <span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                     </div>
-                    <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '5px' }}>
-                      {p.remitente && <span>De: {p.remitente}</span>}
-                      {p.empresa_mensajeria && <span>· {p.empresa_mensajeria}</span>}
-                      {p.num_guia && <span>· #{p.num_guia}</span>}
-                    </div>
-                    <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
-                      Recibido en portería: {new Date(p.hora_recepcion).toLocaleString('es', FECHA_CORTA)}
-                      {p.hora_entrega && ` · Retirado: ${new Date(p.hora_entrega).toLocaleString('es', FECHA_CORTA)}`}
-                    </div>
-                    {p.fotos && p.fotos.length > 1 && (
-                      <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
-                        {p.fotos.slice(1).map((f, i) => (
-                          <SecureImage key={i} src={f} alt="" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
-                        ))}
+                    {(p.remitente || p.empresa_mensajeria || p.num_guia) && (
+                      <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '5px' }}>
+                        {p.remitente && <span>De: {p.remitente}</span>}
+                        {p.empresa_mensajeria && <span>· {p.empresa_mensajeria}</span>}
+                        {p.num_guia && <span>· #{p.num_guia}</span>}
                       </div>
                     )}
-                    {pendiente ? (
-                      <button onClick={() => abrirFirma(p)} style={{ marginTop: '12px', padding: '9px 18px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-                        ✍ Firmar recepción
-                      </button>
-                    ) : p.estado === 'entregado' && (p.entregado_a_nombre || p.firma_path) ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
-                        {p.firma_path && <SecureImage src={p.firma_path} alt="firma" style={{ width: '70px', height: '38px', objectFit: 'contain', background: '#fff', borderRadius: '6px', border: '1px solid var(--at-line)' }} />}
-                        <span style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 600 }}>Firmado{p.entregado_a_nombre ? ` por ${p.entregado_a_nombre}` : ''}</span>
-                      </div>
-                    ) : null}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', alignItems: 'center', fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
+                      <span>Recibido en portería: {new Date(p.hora_recepcion).toLocaleString('es', FECHA_CORTA)}</span>
+                      {p.hora_entrega && <span style={{ color: 'var(--at-success)', fontWeight: 600 }}>✓ Retirado{p.entregado_a_nombre ? ` por ${p.entregado_a_nombre}` : ''}</span>}
+                      {fotos > 0 && <span>📷 {fotos}</span>}
+                      <span aria-hidden style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: 700, color: 'var(--at-primary)' }}>Ver ficha ›</span>
+                    </div>
                   </div>
                 </div>
               )
@@ -233,58 +232,147 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', vist
             const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente
             const tcfg = TIPO_CONFIG[p.tipo] ?? TIPO_CONFIG.paquete
             const esperando = p.estado === 'pendiente'
+            const abrir = () => setDetalleId(p.id)
             return (
-              <div key={p.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${esperando ? 'var(--at-accent-soft, var(--at-line))' : 'var(--at-line)'}`, borderRadius: '14px', overflow: 'hidden' }}>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '14px 16px' }}>
-                  {p.fotos && p.fotos.length > 0 ? (
-                    <SecureImage src={p.fotos[0]} alt="" style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '10px', flexShrink: 0, border: '1px solid var(--at-line)' }} />
-                  ) : (
-                    <span aria-hidden="true" style={{ width: '48px', height: '48px', borderRadius: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', background: cfg.bg }}>{tcfg.icon}</span>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline' }}>
-                      <span style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>{p.descripcion}</span>
-                      <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', flexShrink: 0 }}>{new Date(p.hora_recepcion).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', margin: '5px 0' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 9px', borderRadius: '999px', fontSize: '11.5px', fontWeight: 700, background: cfg.bg, color: cfg.color }}>
-                        <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
-                        {ESTADO_SALIDA_LABEL[p.estado] ?? p.estado}
-                      </span>
-                      <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-3)', background: 'var(--at-chip)', borderRadius: '999px', padding: '2px 9px' }}>{tcfg.icon} {tcfg.label}</span>
-                    </div>
-                    <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)' }}>
-                      Lo recoge: <strong style={{ color: 'var(--at-ink-2)' }}>{p.autorizado_nombre}</strong>{p.autorizado_documento ? ` · ${p.autorizado_documento}` : ''}
-                    </div>
+              /* La tarjeta sólo resume; la ficha (datos de quien recoge, código, fotos) abre en ventana al tocarla. */
+              <div key={p.id} role="button" tabIndex={0} aria-label={p.descripcion}
+                onClick={abrir}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir() } }}
+                style={{ background: 'var(--at-surface)', border: `1.5px solid ${esperando ? 'var(--at-accent-soft, var(--at-line))' : 'var(--at-line)'}`, borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer' }}>
+                {p.fotos && p.fotos.length > 0 ? (
+                  <SecureImage src={p.fotos[0]} alt="" style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '10px', flexShrink: 0, border: '1px solid var(--at-line)' }} />
+                ) : (
+                  <span aria-hidden="true" style={{ width: '48px', height: '48px', borderRadius: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', background: cfg.bg }}>{tcfg.icon}</span>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline' }}>
+                    <span style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>{p.descripcion}</span>
+                    <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', flexShrink: 0 }}>{new Date(p.hora_recepcion).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', margin: '5px 0' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 9px', borderRadius: '999px', fontSize: '11.5px', fontWeight: 700, background: cfg.bg, color: cfg.color }}>
+                      <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
+                      {ESTADO_SALIDA_LABEL[p.estado] ?? p.estado}
+                    </span>
+                    <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-3)', background: 'var(--at-chip)', borderRadius: '999px', padding: '2px 9px' }}>{tcfg.icon} {tcfg.label}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', alignItems: 'center', fontSize: '12.5px', color: 'var(--at-ink-3)' }}>
+                    <span>Lo recoge: <strong style={{ color: 'var(--at-ink-2)' }}>{p.autorizado_nombre}</strong></span>
                     {p.estado === 'entregado' && p.hora_entrega && (
-                      <div style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 600, marginTop: '4px' }}>
-                        ✓ Retirado{p.entregado_a_nombre ? ` por ${p.entregado_a_nombre}` : ''} · {new Date(p.hora_entrega).toLocaleString('es', FECHA_CORTA)}
-                      </div>
+                      <span style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 600 }}>✓ Retirado{p.entregado_a_nombre ? ` por ${p.entregado_a_nombre}` : ''}</span>
                     )}
+                    <span aria-hidden style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: 700, color: 'var(--at-primary)' }}>Ver ficha ›</span>
                   </div>
                 </div>
-                {/* El código se abre en ventana; una barra a lo ancho de la tarjeta no
-                    le roba espacio al texto en el teléfono y es fácil de tocar. */}
-                {esperando && p.codigo_retiro && (
-                  <button
-                    type="button"
-                    className="conv-row"
-                    onClick={() => setVerCodigo(p)}
-                    style={{
-                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                      padding: '11px 16px', borderTop: '1px solid var(--at-line)', borderRight: 'none', borderBottom: 'none', borderLeft: 'none',
-                      background: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)',
-                      fontSize: '13px', fontWeight: 700, cursor: 'pointer', textAlign: 'left',
-                    }}>
-                    <span>📲 Ver código de retiro</span>
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                  </button>
-                )}
               </div>
             )
           })}
         </div>
       )}
+
+      {/* Ficha de la pieza en ventana emergente (pantalla completa en el
+          teléfono): datos, notas, fotos y firma, con la acción en el pie
+          (Firmar recepción o Ver código de retiro). Antes cada tarjeta traía
+          desplegadas las fotos, la firma y el botón. */}
+      {detalle && (() => {
+        const p = detalle
+        const saliente = p.direccion === 'saliente_tercero'
+        const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente
+        const tcfg = TIPO_CONFIG[p.tipo] ?? TIPO_CONFIG.paquete
+        const estadoLabel = saliente ? (ESTADO_SALIDA_LABEL[p.estado] ?? p.estado) : cfg.label
+        const datos: { label: string; value: string; color?: string }[] = [
+          { label: 'Estado', value: estadoLabel, color: cfg.color },
+          { label: 'Tipo', value: `${tcfg.icon} ${tcfg.label}` },
+          { label: saliente ? 'Dejado en recepción' : 'Recibido en portería', value: fechaHoraLarga(p.hora_recepcion) },
+        ]
+        if (p.hora_entrega) datos.push({ label: 'Retirado el', value: `${fechaHoraLarga(p.hora_entrega)}${p.entregado_a_nombre ? ` · por ${p.entregado_a_nombre}` : ''}`, color: 'var(--at-success)' })
+        if (saliente) {
+          datos.push({ label: 'Lo recoge', value: p.autorizado_nombre || '—' })
+          if (p.autorizado_documento) datos.push({ label: 'Documento', value: p.autorizado_documento })
+          if (p.autorizado_telefono) datos.push({ label: 'Teléfono', value: p.autorizado_telefono })
+          if (p.estado === 'pendiente' && p.codigo_retiro) datos.push({ label: 'Código de retiro', value: p.codigo_retiro, color: 'var(--at-accent-hover)' })
+        } else {
+          if (p.remitente) datos.push({ label: 'De', value: p.remitente })
+          if (p.empresa_mensajeria) datos.push({ label: 'Mensajería', value: p.empresa_mensajeria })
+          if (p.num_guia) datos.push({ label: 'Nº de guía', value: p.num_guia })
+          if (p.prioridad && p.prioridad !== 'normal') datos.push({ label: 'Prioridad', value: p.prioridad.charAt(0).toUpperCase() + p.prioridad.slice(1), color: 'var(--at-warning-strong)' })
+        }
+        const seccion = { background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)', marginBottom: 12 } as const
+        return (
+          <EditModal
+            title={p.descripcion}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ padding: '2px 9px', borderRadius: '999px', fontSize: '10.5px', fontWeight: 800, background: cfg.bg, color: cfg.color }}>{estadoLabel}</span>
+                <span style={{ padding: '2px 9px', borderRadius: '999px', fontSize: '10.5px', fontWeight: 800, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>{tcfg.icon} {tcfg.label}</span>
+                <span>📅 {new Date(p.hora_recepcion).toLocaleString('es', FECHA_CORTA)}{saliente ? ` · Lo recoge ${p.autorizado_nombre ?? ''}` : (p.remitente ? ` · De: ${p.remitente}` : '')}</span>
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+                <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
+                {!saliente && p.estado === 'pendiente' && (
+                  <Button variant="primary" onClick={() => abrirFirma(p)}>✍ Firmar recepción</Button>
+                )}
+                {saliente && p.estado === 'pendiente' && p.codigo_retiro && (
+                  <Button variant="primary" onClick={() => setVerCodigo(p)}>📲 Ver código de retiro</Button>
+                )}
+              </div>
+            }
+          >
+            {!saliente && p.estado === 'pendiente' && (
+              <div style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', color: 'var(--at-primary)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12.5 }}>
+                📦 Está en portería esperando que lo retires. Al recibirlo, firma la recepción desde aquí.
+              </div>
+            )}
+            {saliente && p.estado === 'pendiente' && (
+              <div style={{ background: 'var(--at-accent-tint-2)', border: '1px solid var(--at-accent-soft-2)', color: 'var(--at-accent-hover)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12.5 }}>
+                📤 Sigue en recepción esperando a {p.autorizado_nombre}. Te avisaremos cuando lo retire.
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, marginBottom: 12 }}>
+              {datos.map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 7, padding: 8, border: '1px solid var(--at-line)', minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: d.color ?? 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {p.notas && (
+              <div style={seccion}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 4 }}>Notas</div>
+                <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--at-ink-2)', lineHeight: 1.45, overflowWrap: 'anywhere' }}>{p.notas}</p>
+              </div>
+            )}
+
+            {p.fotos && p.fotos.length > 0 && (
+              <div style={seccion}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 6 }}>Fotos</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {p.fotos.map((f, i) => (
+                    <SecureImage key={i} src={f} alt={`Foto ${i + 1} de ${p.descripcion}`} style={{ width: 110, height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--at-line)' }} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {p.estado === 'entregado' && (p.firma_path || p.entregado_a_nombre) && (
+              <div style={{ ...seccion, background: 'var(--at-success-tint)', borderColor: 'var(--at-success-border)', marginBottom: 0 }}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 6 }}>Firma de recepción</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  {p.firma_path && <SecureImage src={p.firma_path} alt="Firma de recepción" style={{ width: 120, height: 60, objectFit: 'contain', background: '#fff', borderRadius: 6, border: '1px solid var(--at-line)' }} />}
+                  <span style={{ fontSize: 13, color: 'var(--at-success)', fontWeight: 600 }}>Firmado{p.entregado_a_nombre ? ` por ${p.entregado_a_nombre}` : ''}{p.hora_entrega ? ` · ${new Date(p.hora_entrega).toLocaleString('es', FECHA_CORTA)}` : ''}</span>
+                </div>
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
 
       {/* Autorizar retiro — ventana emergente: el formulario no empuja la lista
           ni se queda abierto a medias al cambiar de vista. */}
