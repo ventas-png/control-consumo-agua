@@ -1225,16 +1225,19 @@ describe('tarjetas de KPI (from / to) legibles en ambos temas', () => {
         expect(e.to, `${f} to`).not.toMatch(del_tema)
       }
     }
-    // Los hex fijos (sin tema) y los --at-cta* tienen el blanco ≥ 4.5:1 en sus dos extremos… salvo
-    // las tipologías de color propio que ya estaban por debajo (riego, jacuzzi, residuales).
-    const PREVIAS = ['#0E9E6E', '#A87E1E', '#E2620E']
+    // Los hex fijos (tipologías de color propio, sin tema) tienen el blanco ≥ 4.5:1 en sus dos
+    // extremos (riego, jacuzzi y residuales empezaban a 3.4–3.7:1 y se oscurecieron).
+    let fijos = 0
     for (const f of ARCHIVOS) {
       for (const e of entradas(leer(f))) {
         for (const c of [e.from, e.to]) {
-          if (esColorHex(c) && !PREVIAS.includes(c)) expect(contraste('#ffffff', c), `${f} ${c}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+          if (!esColorHex(c)) continue
+          expect(contraste('#ffffff', c), `${f} ${c}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+          fijos++
         }
       }
     }
+    expect(fijos).toBe(14)
   })
 
   it('los de estado escriben con --at-on-status (los estados aclaran en dark y el blanco quedaba a ~1.7:1)', () => {
@@ -1256,5 +1259,7 @@ describe('tarjetas de KPI (from / to) legibles en ambos temas', () => {
     const src = leer(ARCHIVOS[2])
     expect(src).toContain("color: meta?.text ?? meta?.from ?? 'var(--at-ink-3)',")
     for (const t of ['var(--at-primary)', 'var(--at-accent-2)', 'var(--at-accent)']) expect(src).toContain(`text: '${t}'`)
+    // Las tipologías oscurecidas conservan su color de siempre en la tabla.
+    for (const t of ['#0E9E6E', '#A87E1E', '#E2620E']) expect(src).toContain(`text: '${t}'`)
   })
 })
