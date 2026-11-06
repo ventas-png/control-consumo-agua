@@ -301,11 +301,8 @@ export function navCabeceraDesdeMarca(
   const primario = normalizarColorHex(primaryColor), acento = normalizarColorHex(accentColor)
   if (!primario && !acento) return null
   const marca = primario ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
-  const blancoLegible = (c: string) => oscurecerHasta(c, (x) => contraste('#ffffff', x) >= AA)
-  const [h, s] = rgbAHsl(parseRgb(marca))
-  const segundo = acento
-    ? derivarVariablesAccent(acento).accent2
-    : blancoLegible(hslAHex([h, s < SAT_GRIS ? 0 : Math.min(s * SEGUNDO_TONO_SAT, ACCENT2_SATURACION), 0.41]))
+  const s = rgbAHsl(parseRgb(marca))[1]
+  const segundo = segundoTono(marca, acento)
 
   const fondo = primario ? navBgDesdeMarca(primario) : NAV_BG
   const pill = mezclar('#ffffff', fondo, PILL_BLANCO)
@@ -320,6 +317,53 @@ export function navCabeceraDesdeMarca(
     '--at-nav-primary-2': segundo,
     '--at-nav-positive': delta(NAV_DELTA.positivo),
     '--at-nav-negative': delta(NAV_DELTA.negativo),
+  }
+}
+
+/** Oscurece lo mínimo para que el texto blanco se lea ≥ 4.5:1 encima (nada si ya se lee). */
+function blancoLegible(hex: string): string {
+  return oscurecerHasta(hex, (x) => contraste('#ffffff', x) >= AA)
+}
+
+/**
+ * Segundo color de los degradados de marca (tema claro), con texto blanco ≥ 4.5:1: el
+ * --at-accent-2 del acento custom si lo hay; si no, un segundo tono de la propia marca
+ * (su tono, saturación × 0.46 —≤ 0.35— y luminosidad HSL 41%, como #577B69 respecto de
+ * #1B3B36). Así una marca sin acento no acaba en el verde por defecto.
+ */
+function segundoTono(marca: string, acento: string | null): string {
+  if (acento) return derivarVariablesAccent(acento).accent2
+  const [h, s] = rgbAHsl(parseRgb(marca))
+  return blancoLegible(hslAHex([h, s < SAT_GRIS ? 0 : Math.min(s * SEGUNDO_TONO_SAT, ACCENT2_SATURACION), 0.41]))
+}
+
+/** Botones principales por defecto en dark (index.css): #5E9D8A / #79A18E oscurecidos hasta blanco ≥ 4.5:1. */
+export const CTA_OSCURO = { cta: '#4D8071', cta2: '#5E7D6F' } as const
+
+/**
+ * Botones principales con texto blanco (degradado --at-cta → --at-cta-2), o null sin
+ * colores custom (index.css: var(--at-primary) / var(--at-accent-2) en claro y
+ * CTA_OSCURO en dark). Mismo color de partida que las cabeceras de SuperAdmin:
+ * - claro: el primario y el segundo tono (segundoTono), oscurecidos si hace falta para
+ *   que el blanco se lea ≥ 4.5:1 (con una marca amarilla quedaba a 1.4:1);
+ * - oscuro: los mismos colores aclarados para el tema oscuro y luego oscurecidos lo
+ *   justo para que el blanco se lea ≥ 4.5:1: el tono más claro posible, que destaca
+ *   sobre las superficies oscuras (con var(--at-primary) el blanco quedaba a ~3.1:1).
+ */
+export function ctaDesdeMarca(
+  primaryColor: string | null | undefined,
+  accentColor: string | null | undefined,
+): { claro: Record<string, string>; oscuro: Record<string, string> } | null {
+  const primario = normalizarColorHex(primaryColor), acento = normalizarColorHex(accentColor)
+  if (!primario && !acento) return null
+  const marca = primario ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
+  const segundoOscuro = acento ? derivarVariablesAccentOscuro(acento).accent2 : aclararParaTemaOscuro(segundoTono(marca, null))
+  return {
+    claro: { '--at-cta': blancoLegible(marca), '--at-cta-2': segundoTono(marca, acento) },
+    oscuro: {
+      '--at-cta': blancoLegible(aclararParaTemaOscuro(marca)),
+      '--at-cta-2': blancoLegible(segundoOscuro),
+    },
   }
 }
 
@@ -893,8 +937,10 @@ export function hojaEstilosMarca(
     : null
   // Cabeceras de SuperAdmin: también dependen de ambos y son iguales en ambos temas.
   const cabecera = navCabeceraDesdeMarca(primaryColor, accentColor)
-  const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor), nav, cabecera)
-  const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor), nav, cabecera)
+  // Botones principales: también dependen de ambos, pero sí cambian con el tema.
+  const cta = ctaDesdeMarca(primaryColor, accentColor)
+  const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor), nav, cabecera, cta?.claro ?? null)
+  const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor), nav, cabecera, cta?.oscuro ?? null)
   if (!claro) return null
   const lineas = [
     `:root:root { ${claro} }`,

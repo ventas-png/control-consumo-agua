@@ -11,6 +11,7 @@ import {
   derivarVariablesAccent, derivarVariablesAccentOscuro, respaldosSinColorMix,
   derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO, DATOS_CSS_VARS, DATA_NEGATIVE_DEFECTO, NAV_INK,
   navAccentDesdeMarca, NAV_BG, navGrisesDesdeMarca, NAV_GRISES, navCabeceraDesdeMarca, NAV_DELTA,
+  ctaDesdeMarca, CTA_OSCURO,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -1092,6 +1093,78 @@ describe('--at-nav-primary / -2 / -positive / -negative (cabeceras de SuperAdmin
       for (const l of hojaEstilosMarca(p, a)!.split('\n').slice(0, 3)) {
         for (const [k, val] of Object.entries(v)) expect(l).toContain(`${k}: ${val};`)
       }
+    }
+  })
+})
+
+// Botones principales con texto blanco (EmpresasTable, EmpresaDetailDrawer):
+// degradado --at-cta → --at-cta-2, legible en ambos temas y con cualquier marca.
+describe('--at-cta / --at-cta-2 (botones principales) desde la marca', () => {
+  const B = '#ffffff'
+  const css = () => readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+
+  it('index.css: los de siempre en claro y, en los dos bloques dark, hex con el blanco ≥ 4.5:1', () => {
+    const c = css()
+    expect(c).toMatch(/--at-cta:\s*var\(--at-primary\);\s*--at-cta-2:\s*var\(--at-accent-2\);/)
+    // Auto (@media) y manual ([data-theme="dark"]): los dos con los mismos hex.
+    expect(c.match(new RegExp(`--at-cta:\\s*${CTA_OSCURO.cta};\\s*--at-cta-2:\\s*${CTA_OSCURO.cta2};`, 'g'))).toHaveLength(2)
+    for (const x of [...Object.values(CTA_OSCURO), '#1B3B36', '#577B69']) expect(contraste(B, x), x).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+    // En dark destacan sobre las superficies oscuras (antes el blanco quedaba a ~3.1:1).
+    for (const x of Object.values(CTA_OSCURO)) expect(contraste(x, DARK_SURFACE), x).toBeGreaterThanOrEqual(3)
+    expect(contraste(B, '#5E9D8A')).toBeLessThan(LIGHT_MIN_CONTRASTE)
+  })
+
+  it('EmpresasTable y EmpresaDetailDrawer usan el degradado --at-cta', () => {
+    for (const f of ['EmpresasTable.tsx', 'EmpresaDetailDrawer.tsx']) {
+      const src = readFileSync(resolve(process.cwd(), `src/components/superadmin/${f}`), 'utf8')
+      expect(src, f).toContain("'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))'")
+      expect(src, f).not.toContain('linear-gradient(135deg, var(--at-primary), var(--at-accent-2))')
+    }
+  })
+
+  it('sin colores custom → null (quedan los de index.css)', () => {
+    expect(ctaDesdeMarca(null, null)).toBeNull()
+    expect(ctaDesdeMarca('rojo', undefined)).toBeNull()
+  })
+
+  it('con la marca por defecto queda (casi) como index.css', () => {
+    const v = ctaDesdeMarca(DEFAULT_BRAND_COLOR, null)!
+    expect(v.claro['--at-cta']).toBe('#1b3b36')
+    expect(distanciaRgb(v.claro['--at-cta-2'], '#577B69')).toBeLessThan(15)
+    expect(distanciaRgb(v.oscuro['--at-cta'], CTA_OSCURO.cta)).toBeLessThan(25)
+    expect(distanciaRgb(v.oscuro['--at-cta-2'], CTA_OSCURO.cta2)).toBeLessThan(25)
+  })
+
+  it.each(MUESTRAS)('%s → el blanco se lee ≥ 4.5:1 en ambos temas y en dark el botón destaca sobre la superficie', (c) => {
+    for (const [p, a] of [[c, null], [null, c], [c, '#B96A3F']] as const) {
+      const v = ctaDesdeMarca(p, a)!
+      for (const tema of ['claro', 'oscuro'] as const) {
+        for (const k of ['--at-cta', '--at-cta-2']) {
+          expect(contraste(B, v[tema][k]), `${p}/${a} ${tema} ${k} ${v[tema][k]}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+        }
+      }
+      for (const k of ['--at-cta', '--at-cta-2']) expect(contraste(v.oscuro[k], DARK_SURFACE), `${p}/${a} ${k}`).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → siguen el tono de la marca (o el accent-2 del acento)', (c) => {
+    const v = ctaDesdeMarca(c, null)!
+    for (const tema of ['claro', 'oscuro'] as const) {
+      expect(distTono(tono(v[tema]['--at-cta']), tono(c)), `${tema} ${v[tema]['--at-cta']}`).toBeLessThan(10)
+      expect(distTono(tono(v[tema]['--at-cta-2']), tono(c)), `${tema} ${v[tema]['--at-cta-2']}`).toBeLessThan(15)
+    }
+    // Mismo color de partida que las cabeceras de SuperAdmin.
+    const cab = navCabeceraDesdeMarca(c, null)!
+    expect([v.claro['--at-cta'], v.claro['--at-cta-2']]).toEqual([cab['--at-nav-primary'], cab['--at-nav-primary-2']])
+    expect(ctaDesdeMarca(c, '#0e7490')!.claro['--at-cta-2']).toBe(derivarVariablesAccent('#0e7490').accent2)
+  })
+
+  it('la hoja lleva los valores claros en :root y los oscuros en los dos selectores dark', () => {
+    for (const [p, a] of [['#7c3aed', null], [null, '#0e7490'], ['#ffd400', '#7c3aed']] as const) {
+      const v = ctaDesdeMarca(p, a)!
+      const [claro, auto, manual] = hojaEstilosMarca(p, a)!.split('\n')
+      for (const [k, val] of Object.entries(v.claro)) expect(claro).toContain(`${k}: ${val};`)
+      for (const l of [auto, manual]) for (const [k, val] of Object.entries(v.oscuro)) expect(l).toContain(`${k}: ${val};`)
     }
   })
 })
