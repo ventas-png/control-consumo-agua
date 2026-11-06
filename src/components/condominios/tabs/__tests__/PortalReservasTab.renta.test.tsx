@@ -2,7 +2,7 @@
 // por unidad, lo pedido suma la renta al cobro de la reserva —aunque la
 // amenidad no tenga tarifa— y hay que decir cómo se paga.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import type { Amenidad, PrestamoEquipo, ReservaAmenidad } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
@@ -92,7 +92,12 @@ describe('PortalReservasTab — renta del equipo', () => {
     const reserva = como<ReservaAmenidad>({ id: 'r1', amenidad_id: 'am1', unidad_id: 'u1', fecha: '2099-01-05', hora_inicio: '10:00', hora_fin: '12:00', estado: 'confirmada', num_invitados: 0, deposito_pagado: false, tarifa_pagada: false, recordatorio_enviado: false, no_show: false, deposito_estado: 'no_aplica', monto_tarifa: 100, metodo_pago_tarifa: 'cargar_unidad' })
     const prestamo = como<PrestamoEquipo>({ id: 'pe1', unidad_id: 'u1', inventario_id: 'inv1', reserva_id: 'r1', equipo_nombre: 'Sillas', cantidad: 10, cantidad_solicitada: 10, fecha_prestamo: '2099-01-05', estado: 'solicitado', deposito_pagado: false, monto_renta: 50 })
     montar({ reservas: [reserva], prestamos: [prestamo] })
-    expect(screen.getByText(/🎟 Q 150\.00 · incluye renta de equipo Q 50\.00 · cargado a tu unidad/)).toBeTruthy()
-    expect(screen.getByText(/renta Q 50\.00/)).toBeTruthy()
+    // La fila resume el cobro; el desglose (renta incluida y cada línea de equipo) está en la ficha.
+    expect(screen.getByText('🎟 Q 150.00')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Reserva de Salón · 2099-01-05' }))
+    const ficha = screen.getByRole('dialog', { name: 'Salón' })
+    expect(within(ficha).getByText('Q 150.00 · cargado a tu unidad')).toBeTruthy()
+    expect(within(ficha).getByText('Q 50.00')).toBeTruthy()
+    expect(within(ficha).getByText(/renta Q 50\.00/)).toBeTruthy()
   })
 })
