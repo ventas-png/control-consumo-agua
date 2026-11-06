@@ -7,6 +7,9 @@ import { ImageUploader } from '../../shared/ImageUploader'
 import { diaValidez } from '../../../lib/visitantesFiltros'
 import type { Visitante, VisitaFrecuente } from '../../../types'
 import { ModalPortal } from '../../shared/ModalPortal'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
+import { SecureImage } from '../../shared/SecureImage'
 import { PortalVisitasFrecuentes } from './PortalVisitasFrecuentes'
 
 interface Props {
@@ -36,6 +39,17 @@ const defaultAcompForm = (): Omit<AcompananteForm, 'tempId'> => ({
   nombre: '', identificacion: '', es_menor: false, fecha_nacimiento: '', notas: '', foto_url: null, foto_documento_url: null,
 })
 
+/** "2026-11-06T10:30:00Z" → "06 de noviembre de 2026, 10:30" (hora local). */
+const fechaHoraLarga = (iso: string) => new Date(iso).toLocaleString('es', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+/** "lunes, 05 de enero" → "Lunes, 05 de enero". */
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+const ESTADO_VISITA = {
+  hoy:      { label: 'Hoy',      bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
+  vigente:  { label: 'Vigente',  bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  expirada: { label: 'Expirada', bg: 'var(--at-surface-2)',    color: 'var(--at-ink-3)' },
+} as const
+
 function blankForm() {
   return {
     nombre: '',
@@ -62,6 +76,14 @@ export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], diasAv
 
   const hoy      = hoyLocalISO()
   const recientes = visitantes.filter(v => v.hora_entrada.slice(0, 10) === hoy && !v.visitante_principal_id)
+  // Visitante abierto en la ficha, por id: así la ficha sigue a la fila cuando el padre recarga.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalle = detalleId ? visitantes.find(v => v.id === detalleId) ?? null : null
+  const estadoDe = (v: Visitante) => {
+    const esHoy = v.hora_entrada.slice(0, 10) === hoy
+    const vigente = !v.valido_hasta || diaValidez(v.valido_hasta) >= hoy
+    return esHoy ? ESTADO_VISITA.hoy : vigente ? ESTADO_VISITA.vigente : ESTADO_VISITA.expirada
+  }
 
   function resetForm() {
     setForm(blankForm())
@@ -404,12 +426,18 @@ export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], diasAv
             .sort((a, b) => b.hora_entrada.localeCompare(a.hora_entrada))
             .map(v => {
               const esHoy = v.hora_entrada.slice(0, 10) === hoy
-              const vigente = !v.valido_hasta || diaValidez(v.valido_hasta) >= hoy
+              const ec = estadoDe(v)
               const acomps = visitantes.filter(c => c.visitante_principal_id === v.id)
+              const fotos = [v.foto_url, v.foto_documento_url, v.foto_vehiculo_url].filter(Boolean).length
+              const abrir = () => setDetalleId(v.id)
               return (
-                <div key={v.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${esHoy ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '13px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '22px', flexShrink: 0 }}>{v.es_menor ? '👶' : '👤'}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                /* La fila sólo resume; la ficha completa (fotos, notas, acompañantes) abre en ventana al tocarla. */
+                <div key={v.id} role="button" tabIndex={0} aria-label={v.nombre}
+                  onClick={abrir}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir() } }}
+                  style={{ background: 'var(--at-surface)', border: `1.5px solid ${esHoy ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '13px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', cursor: 'pointer' }}>
+                  <span aria-hidden style={{ fontSize: '22px', flexShrink: 0 }}>{v.es_menor ? '👶' : '👤'}</span>
+                  <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>
                       {v.nombre}
                       {acomps.length > 0 && (
@@ -422,20 +450,120 @@ export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], diasAv
                       {v.identificacion && <span>🪪 {v.identificacion}</span>}
                       {v.placa_vehiculo && <span>🚗 {v.placa_vehiculo}</span>}
                       {v.motivo && <span>· {v.motivo}</span>}
+                      {fotos > 0 && <span>📷 {fotos}</span>}
                     </div>
                     <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                       {new Date(v.hora_entrada).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
                       {v.valido_hasta && ` · Válida hasta ${formatFechaCalendario(diaValidez(v.valido_hasta), { day: '2-digit', month: 'short' }, 'es', '—')}`}
                     </div>
                   </div>
-                  {esHoy && <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-primary-tint)', color: 'var(--at-primary)', flexShrink: 0 }}>Hoy</span>}
-                  {!esHoy && vigente && <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-success-tint)', color: 'var(--at-success)', flexShrink: 0 }}>Vigente</span>}
-                  {!vigente && !esHoy && <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', flexShrink: 0 }}>Expirada</span>}
+                  <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: ec.bg, color: ec.color, flexShrink: 0 }}>{ec.label}</span>
+                  <span aria-hidden style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-primary)', flexShrink: 0 }}>Ver ficha ›</span>
                 </div>
               )
             })}
         </div>
       )}
+
+      {/* Ficha del visitante en ventana emergente (pantalla completa en el
+          teléfono): estado, cuándo se registró, vigencia, documento, placa,
+          motivo, notas, fotos y acompañantes. Antes la fila era todo lo que
+          había: ni fotos ni acompañantes se podían consultar. */}
+      {detalle && (() => {
+        const v = detalle
+        const ec = estadoDe(v)
+        const acomps = visitantes.filter(c => c.visitante_principal_id === v.id)
+        const fotos: { label: string; src: string }[] = [
+          v.foto_url ? { label: 'Visitante', src: v.foto_url } : null,
+          v.foto_documento_url ? { label: 'Documento', src: v.foto_documento_url } : null,
+          v.foto_vehiculo_url ? { label: 'Vehículo', src: v.foto_vehiculo_url } : null,
+        ].filter((f): f is { label: string; src: string } => f !== null)
+        const datos: { label: string; value: string; color?: string }[] = [
+          { label: 'Estado', value: ec.label, color: ec.color },
+          { label: 'Registrado', value: fechaHoraLarga(v.hora_entrada) },
+        ]
+        if (v.hora_salida) datos.push({ label: 'Salida', value: fechaHoraLarga(v.hora_salida) })
+        datos.push({ label: 'Válida hasta', value: v.valido_hasta ? cap(formatFechaCalendario(diaValidez(v.valido_hasta), { weekday: 'long', day: '2-digit', month: 'long' }, 'es', diaValidez(v.valido_hasta))) : 'Sólo el día del registro' })
+        if (v.es_menor) datos.push({ label: 'Menor de edad', value: v.fecha_nacimiento ? `Nac. ${v.fecha_nacimiento}` : 'Sí' })
+        else datos.push({ label: 'Identificación', value: v.identificacion || '—' })
+        datos.push({ label: 'Placa', value: v.placa_vehiculo || '—' })
+        datos.push({ label: 'Motivo', value: v.motivo || '—' })
+        datos.push({ label: 'Acompañantes', value: acomps.length > 0 ? String(acomps.length) : 'Ninguno' })
+        if (v.autorizacion_ingreso) datos.push({ label: 'Ingreso', value: `${v.autorizacion_ingreso === 'pre_autorizado' ? 'Pre-autorizado (visita frecuente)' : 'Autorizado por el residente'}${v.autorizacion_detalle ? ` · ${v.autorizacion_detalle}` : ''}` })
+        const seccion = { background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)', marginBottom: 12 } as const
+        return (
+          <EditModal
+            title={v.nombre}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span aria-hidden>{v.es_menor ? '👶' : '👤'}</span>
+                <span style={{ padding: '2px 9px', borderRadius: '999px', fontSize: '10.5px', fontWeight: 800, background: ec.bg, color: ec.color }}>{ec.label}</span>
+                <span>📅 {new Date(v.hora_entrada).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}{v.motivo ? ` · ${v.motivo}` : ''}{acomps.length > 0 ? ` · 👥 +${acomps.length}` : ''}</span>
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+                <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
+              </div>
+            }
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, marginBottom: 12 }}>
+              {datos.map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 7, padding: 8, border: '1px solid var(--at-line)', minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: d.color ?? 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {v.notas && (
+              <div style={seccion}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 4 }}>Notas</div>
+                <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--at-ink-2)', lineHeight: 1.45, overflowWrap: 'anywhere' }}>{v.notas}</p>
+              </div>
+            )}
+
+            {fotos.length > 0 && (
+              <div style={seccion}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 6 }}>Fotos</div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {fotos.map(f => (
+                    <figure key={f.label} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                      <SecureImage src={f.src} alt={`${f.label}: ${v.nombre}`} style={{ width: 110, height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--at-line)' }} />
+                      <figcaption style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{f.label}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {acomps.length > 0 && (
+              <div style={{ ...seccion, marginBottom: 0 }}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 6 }}>Acompañantes</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {acomps.map(a => (
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8 }}>
+                      {a.foto_url
+                        ? <SecureImage src={a.foto_url} alt={`Foto de ${a.nombre}`} style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: '50%', flexShrink: 0 }} />
+                        : <span aria-hidden style={{ width: 36, height: 36, borderRadius: '50%', background: a.es_menor ? 'var(--at-warning-tint)' : 'var(--at-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{a.es_menor ? '👶' : '👤'}</span>}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--at-ink)' }}>{a.nombre}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)' }}>
+                          {a.es_menor ? `Menor${a.fecha_nacimiento ? ` · Nac. ${a.fecha_nacimiento}` : ''}` : (a.identificacion ? `DPI: ${a.identificacion}` : 'Sin documento')}
+                          {a.notas ? ` · ${a.notas}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }
