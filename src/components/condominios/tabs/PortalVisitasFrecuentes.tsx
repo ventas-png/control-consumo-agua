@@ -16,6 +16,9 @@ import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { toast } from '../../../lib/toast'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { ModalPortal } from '../../shared/ModalPortal'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
+import { SecureImage } from '../../shared/SecureImage'
 import { hoyLocalISO } from '../../../lib/format'
 import type { RelacionVisitaFrecuente, VisitaFrecuente } from '../../../types'
 import {
@@ -43,6 +46,21 @@ const formVacio = () => ({
   hora_desde: '', hora_hasta: '', vigente_hasta: vigenciaMaxima(hoyLocalISO()), notas: '',
 })
 
+/** Chip de la etiqueta (pendiente / aprobada / rechazada / vencida / suspendida), igual en tarjeta y ficha. */
+function chipDe(etiqueta: ReturnType<typeof etiquetaVisita>) {
+  return etiqueta === 'pendiente'
+    ? { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', text: ETIQUETA_VISITA_LABEL.pendiente }
+    : etiqueta === 'rechazada' || etiqueta === 'vencida'
+      ? { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', text: ETIQUETA_VISITA_LABEL[etiqueta] }
+      : etiqueta === 'aprobada'
+        ? { bg: 'var(--at-success-tint)', color: 'var(--at-success)', text: 'Aprobada' }
+        : { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', text: 'Suspendida' }
+}
+
+/** "2026-11-01T10:00:00Z" → "01 nov" y "01 de noviembre de 2026, 10:00" (hora local). */
+const fechaCorta = (iso: string) => new Date(iso).toLocaleDateString('es', { day: '2-digit', month: 'short' })
+const fechaHoraLarga = (iso: string) => new Date(iso).toLocaleString('es', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
 const inputBase: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', padding: '9px 12px',
   border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)',
@@ -60,6 +78,9 @@ export function PortalVisitasFrecuentes({ visitas, diasAviso: diasAvisoProp, uni
   const [procesando, setProcesando] = useState<string | null>(null)
   // Solicitud de renovación: la fecha nueva se elige en la propia tarjeta.
   const [renovando, setRenovando] = useState<{ id: string; hasta: string } | null>(null)
+  // Visita abierta en la ficha, por id: así la ficha sigue a la fila cuando el padre recarga.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalle = detalleId ? visitas.find(v => v.id === detalleId) ?? null : null
   const hoy = hoyLocalISO()
 
   // Lo que hay que atender primero: vencidas y por vencer sin solicitud.
@@ -185,7 +206,7 @@ export function PortalVisitasFrecuentes({ visitas, diasAviso: diasAvisoProp, uni
                 <li key={v.id}>
                   <strong>{v.nombre}</strong>{' '}
                   {estaVencida(v) ? `venció el ${v.vigente_hasta?.slice(0, 10)}` : dias === 0 ? 'vence hoy' : `vence el ${v.vigente_hasta?.slice(0, 10)} (en ${dias} día${dias === 1 ? '' : 's'})`}.
-                  {' '}Pida la renovación con el botón de su tarjeta.
+                  {' '}Pida la renovación desde su ficha (toque la tarjeta).
                 </li>
               )
             })}
@@ -206,27 +227,25 @@ export function PortalVisitasFrecuentes({ visitas, diasAviso: diasAvisoProp, uni
             const estado = estadoVisita(v)
             const etiqueta = etiquetaVisita(v)
             const solicitada = tieneRenovacionSolicitada(v)
-            const porVencer = necesitaRenovacion(v, diasAviso)
-            const vencePronto = porVencer && !estaVencida(v)
+            const vencePronto = necesitaRenovacion(v, diasAviso) && !estaVencida(v)
             const dias = diasParaVencer(v)
-            const chip = etiqueta === 'pendiente'
-              ? { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', text: ETIQUETA_VISITA_LABEL.pendiente }
-              : etiqueta === 'rechazada' || etiqueta === 'vencida'
-                ? { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', text: ETIQUETA_VISITA_LABEL[etiqueta] }
-                : etiqueta === 'aprobada'
-                  ? { bg: 'var(--at-success-tint)', color: 'var(--at-success)', text: 'Aprobada' }
-                  : { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', text: 'Suspendida' }
+            const chip = chipDe(etiqueta)
             const icon = RELACIONES_VISITA.find(r => r.value === v.relacion)?.icon ?? '👤'
-            const enRenovacion = renovando?.id === v.id
+            const abrir = () => setDetalleId(v.id)
             return (
-              <div key={v.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${estado === 'pendiente' ? 'var(--at-warning-border)' : etiqueta === 'vencida' ? 'var(--at-danger-tint)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', opacity: etiqueta === 'suspendida' ? 0.65 : 1 }}>
+              /* La tarjeta sólo resume; la ficha completa (datos, avisos, foto y
+                 las acciones: renovar, retirar, suspender) abre en ventana al tocarla. */
+              <div key={v.id} role="button" tabIndex={0} aria-label={v.nombre}
+                onClick={abrir}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir() } }}
+                style={{ background: 'var(--at-surface)', border: `1.5px solid ${estado === 'pendiente' ? 'var(--at-warning-border)' : etiqueta === 'vencida' ? 'var(--at-danger-tint)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', opacity: etiqueta === 'suspendida' ? 0.65 : 1, cursor: 'pointer' }}>
                 <span aria-hidden style={{ fontSize: '22px', flexShrink: 0 }}>{icon}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{v.nombre}</span>
                     <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: chip.bg, color: chip.color }}>{chip.text}</span>
                     {vencePronto && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' }}>{dias === 0 ? 'Vence hoy' : `Vence en ${dias} día${dias === 1 ? '' : 's'}`}</span>}
-                    {solicitada && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-primary-tint)', color: 'var(--at-primary)' }}>Renovación solicitada hasta {v.renovacion_solicitada_hasta?.slice(0, 10)}</span>}
+                    {solicitada && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-primary-tint)', color: 'var(--at-primary)' }}>Renovación solicitada</span>}
                   </div>
                   <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '2px' }}>
                     <span>{relacionLabel(v.relacion)}</span>
@@ -236,62 +255,140 @@ export function PortalVisitasFrecuentes({ visitas, diasAviso: diasAvisoProp, uni
                   <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                     📅 {describirDias(v)} · ⏰ {describirHorario(v)}{describirVigencia(v) ? ` · ${describirVigencia(v)}` : ''}
                   </div>
-                  {estado === 'rechazada' && v.motivo_rechazo && (
-                    <div style={{ fontSize: '12px', color: 'var(--at-danger)', marginTop: '3px' }}>Motivo: {v.motivo_rechazo}</div>
-                  )}
-                  {estado === 'pendiente' && (
-                    <div style={{ fontSize: '11.5px', color: 'var(--at-warning-strong)', marginTop: '3px' }}>Mientras la administración no la apruebe, el guardia le consultará a usted en cada ingreso.</div>
-                  )}
-                  {etiqueta === 'vencida' && !solicitada && (
-                    <div style={{ fontSize: '11.5px', color: 'var(--at-danger)', marginTop: '3px' }}>La autorización venció: solicite la renovación para que vuelva a valer en portería.</div>
-                  )}
-                  {solicitada && (
-                    <div style={{ fontSize: '11.5px', color: 'var(--at-primary)', marginTop: '3px' }}>
-                      Renovación pedida el {v.renovacion_solicitada_en ? new Date(v.renovacion_solicitada_en).toLocaleDateString('es', { day: '2-digit', month: 'short' }) : ''}; la administración la revisará.
-                      {!estaVencida(v) && ` La autorización actual sigue vigente hasta el ${v.vigente_hasta?.slice(0, 10)}.`}
-                    </div>
-                  )}
                 </div>
-                {porVencer && !solicitada && !enRenovacion && (
-                  <button type="button" disabled={procesando === v.id} onClick={() => setRenovando({ id: v.id, hasta: vigenciaMaxima(hoy) })} aria-label={`Solicitar renovación de ${v.nombre}`}
-                    style={{ padding: '6px 12px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, flexShrink: 0 }}>
-                    🔄 Solicitar renovación
-                  </button>
-                )}
-                {solicitada && (
-                  <button type="button" disabled={procesando === v.id} onClick={() => retirarSolicitud(v)} aria-label={`Retirar solicitud de renovación de ${v.nombre}`}
-                    style={{ padding: '6px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, flexShrink: 0 }}>
-                    Retirar solicitud
-                  </button>
-                )}
-                {porVencer && !solicitada && enRenovacion && (
-                  <div style={{ flexBasis: '100%', display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap', paddingTop: '6px', borderTop: '1px dashed var(--at-line)' }}>
-                    <div style={{ flex: '1 1 180px' }}>
-                      <label style={labelBase} htmlFor={`vfp-renovar-${v.id}`}>Nueva vigencia: de hoy hasta (máx. {vigenciaMaxima(hoy)})</label>
-                      <input id={`vfp-renovar-${v.id}`} type="date" min={hoy} max={vigenciaMaxima(hoy)} value={renovando.hasta} style={inputBase}
-                        onChange={e => setRenovando({ id: v.id, hasta: e.target.value })} />
-                    </div>
-                    <button type="button" disabled={procesando === v.id} onClick={() => solicitarRenovacion(v, renovando.hasta)}
-                      style={{ padding: '9px 14px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600 }}>
-                      {procesando === v.id ? 'Enviando…' : 'Enviar solicitud'}
-                    </button>
-                    <button type="button" disabled={procesando === v.id} onClick={() => setRenovando(null)}
-                      style={{ padding: '9px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600 }}>
-                      Cancelar
-                    </button>
-                  </div>
-                )}
-                {etiqueta !== 'vencida' && estado === 'aprobada' && !solicitada && (
-                  <button type="button" disabled={procesando === v.id} onClick={() => toggleActivo(v)} aria-label={`${v.activo ? 'Suspender' : 'Reactivar'} ${v.nombre}`}
-                    style={{ padding: '6px 12px', background: v.activo ? 'var(--at-chip)' : 'var(--at-success-tint)', color: v.activo ? 'var(--at-ink-2)' : 'var(--at-success)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, flexShrink: 0 }}>
-                    {v.activo ? 'Suspender' : 'Reactivar'}
-                  </button>
-                )}
+                <span aria-hidden style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-primary)', flexShrink: 0 }}>Ver ficha ›</span>
               </div>
             )
           })}
         </div>
       )}
+
+      {/* Ficha de la visita frecuente en ventana emergente (pantalla completa en
+          el teléfono): datos, avisos de aprobación/renovación, notas y foto, con
+          las acciones en el pie. Antes todo iba en la tarjeta, con el formulario
+          de renovación desplegado dentro de ella. */}
+      {detalle && (() => {
+        const v = detalle
+        const estado = estadoVisita(v)
+        const etiqueta = etiquetaVisita(v)
+        const solicitada = tieneRenovacionSolicitada(v)
+        const porVencer = necesitaRenovacion(v, diasAviso)
+        const vencePronto = porVencer && !estaVencida(v)
+        const dias = diasParaVencer(v)
+        const chip = chipDe(etiqueta)
+        const icon = RELACIONES_VISITA.find(r => r.value === v.relacion)?.icon ?? '👤'
+        const ocupado = procesando === v.id
+        const datos: { label: string; value: string; color?: string }[] = [
+          { label: 'Estado', value: chip.text, color: chip.color },
+          { label: 'Relación', value: relacionLabel(v.relacion) },
+          { label: 'Identificación', value: v.identificacion || '—' },
+          { label: 'Teléfono', value: v.telefono || '—' },
+          { label: 'Placa', value: v.placa_vehiculo || '—' },
+          { label: 'Días permitidos', value: describirDias(v) },
+          { label: 'Horario', value: describirHorario(v) },
+          { label: 'Vigencia', value: describirVigencia(v) || '—', color: etiqueta === 'vencida' ? 'var(--at-danger)' : vencePronto ? 'var(--at-warning-strong)' : undefined },
+        ]
+        if ((v.renovaciones ?? 0) > 0) datos.push({ label: 'Renovaciones', value: String(v.renovaciones) })
+        if (solicitada) datos.push({ label: 'Renovación pedida', value: `Hasta ${v.renovacion_solicitada_hasta?.slice(0, 10)}${v.renovacion_solicitada_en ? ` · el ${fechaCorta(v.renovacion_solicitada_en)}` : ''}`, color: 'var(--at-primary)' })
+        datos.push({ label: 'Solicitada', value: fechaHoraLarga(v.created_at) })
+        if (v.autorizado_en) datos.push({ label: estado === 'rechazada' ? 'Rechazada el' : 'Aprobada el', value: fechaHoraLarga(v.autorizado_en) })
+        const aviso = (texto: string, tono: 'warning' | 'danger' | 'primary') => (
+          <div style={{ background: `var(--at-${tono}-tint)`, border: `1px solid var(--at-${tono === 'primary' ? 'primary-soft-2' : `${tono}-border`})`, color: tono === 'primary' ? 'var(--at-primary)' : `var(--at-${tono}${tono === 'warning' ? '-strong' : ''})`, borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12.5 }}>
+            {texto}
+          </div>
+        )
+        return (
+          <EditModal
+            title={v.nombre}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span aria-hidden>{icon}</span>
+                <span style={{ padding: '2px 9px', borderRadius: '999px', fontSize: '10.5px', fontWeight: 800, background: chip.bg, color: chip.color }}>{chip.text}</span>
+                {vencePronto && <span style={{ padding: '2px 9px', borderRadius: '999px', fontSize: '10.5px', fontWeight: 800, background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' }}>{dias === 0 ? 'Vence hoy' : `Vence en ${dias} día${dias === 1 ? '' : 's'}`}</span>}
+                {solicitada && <span style={{ padding: '2px 9px', borderRadius: '999px', fontSize: '10.5px', fontWeight: 800, background: 'var(--at-primary-tint)', color: 'var(--at-primary)' }}>Renovación solicitada</span>}
+                <span>{relacionLabel(v.relacion)} · 📅 {describirDias(v)} · ⏰ {describirHorario(v)}</span>
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+                <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
+                {etiqueta !== 'vencida' && estado === 'aprobada' && !solicitada && (
+                  <Button variant={v.activo ? 'secondary' : 'success'} loading={ocupado} onClick={() => void toggleActivo(v)} aria-label={`${v.activo ? 'Suspender' : 'Reactivar'} ${v.nombre}`}>
+                    {v.activo ? 'Suspender' : 'Reactivar'}
+                  </Button>
+                )}
+                {solicitada && (
+                  <Button variant="secondary" loading={ocupado} onClick={() => void retirarSolicitud(v)} aria-label={`Retirar solicitud de renovación de ${v.nombre}`}>Retirar solicitud</Button>
+                )}
+                {porVencer && !solicitada && (
+                  <Button variant="primary" disabled={ocupado} onClick={() => setRenovando({ id: v.id, hasta: vigenciaMaxima(hoy) })} aria-label={`Solicitar renovación de ${v.nombre}`}>🔄 Solicitar renovación</Button>
+                )}
+              </div>
+            }
+          >
+            {estado === 'pendiente' && aviso('⏳ Mientras la administración no la apruebe, el guardia le consultará a usted en cada ingreso.', 'warning')}
+            {estado === 'rechazada' && v.motivo_rechazo && aviso(`✗ Motivo del rechazo: ${v.motivo_rechazo}`, 'danger')}
+            {etiqueta === 'vencida' && !solicitada && aviso('La autorización venció: solicite la renovación para que vuelva a valer en portería.', 'danger')}
+            {vencePronto && !solicitada && aviso(`⏰ ${dias === 0 ? 'Vence hoy' : `Vence en ${dias} día${dias === 1 ? '' : 's'}`}. El condominio avisa ${diasAviso} día${diasAviso === 1 ? '' : 's'} antes; al vencer, el guardia le consultará a usted en cada ingreso hasta que se apruebe la renovación.`, 'warning')}
+            {solicitada && aviso(`Renovación pedida${v.renovacion_solicitada_en ? ` el ${fechaCorta(v.renovacion_solicitada_en)}` : ''} hasta ${v.renovacion_solicitada_hasta?.slice(0, 10)}; la administración la revisará.${!estaVencida(v) ? ` La autorización actual sigue vigente hasta el ${v.vigente_hasta?.slice(0, 10)}.` : ''}`, 'primary')}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, marginBottom: 12 }}>
+              {datos.map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 7, padding: 8, border: '1px solid var(--at-line)', minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: d.color ?? 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {v.notas && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)', marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 4 }}>Notas</div>
+                <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--at-ink-2)', lineHeight: 1.45, overflowWrap: 'anywhere' }}>{v.notas}</p>
+              </div>
+            )}
+
+            {v.foto_url && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)' }}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 6 }}>Foto</div>
+                <SecureImage src={v.foto_url} alt={`Foto de ${v.nombre}`} style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--at-line)' }} />
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
+
+      {/* Solicitar renovación: su propia ventana encima de la ficha, con la fecha nueva. */}
+      {renovando && (() => {
+        const v = visitas.find(x => x.id === renovando.id)
+        if (!v) return null
+        return (
+          <EditModal
+            title="Solicitar renovación"
+            subtitle={`${v.nombre} · de hoy hasta como máximo ${vigenciaMaxima(hoy)} (${VIGENCIA_MAXIMA_MESES} meses)`}
+            maxWidth="480px"
+            onClose={() => setRenovando(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+                <Button variant="secondary" disabled={procesando === v.id} onClick={() => setRenovando(null)}>Cancelar</Button>
+                <Button variant="primary" loading={procesando === v.id} onClick={() => void solicitarRenovacion(v, renovando.hasta)}>Enviar solicitud</Button>
+              </div>
+            }
+          >
+            <label style={labelBase} htmlFor={`vfp-renovar-${v.id}`}>Nueva vigencia: de hoy hasta (máx. {vigenciaMaxima(hoy)})</label>
+            <input id={`vfp-renovar-${v.id}`} type="date" min={hoy} max={vigenciaMaxima(hoy)} value={renovando.hasta} style={inputBase} autoFocus
+              onChange={e => setRenovando({ id: v.id, hasta: e.target.value })} />
+            <p style={{ margin: '8px 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}>
+              {estaVencida(v)
+                ? 'La autorización ya venció: hasta que la administración apruebe la renovación, el guardia le consultará a usted en cada ingreso.'
+                : `La autorización actual sigue vigente hasta el ${v.vigente_hasta?.slice(0, 10)}; la administración revisará la solicitud.`}
+            </p>
+          </EditModal>
+        )
+      })()}
 
       {showForm && (
         <ModalPortal>
