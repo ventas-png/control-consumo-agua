@@ -12,8 +12,8 @@ import { deleteCondominioRowAfectando, updateCondominioRow } from '../../../../d
 import { removeMedia, uploadCondominiosMedia } from '../../../../domain/shared/storage'
 import { BUCKET_MEDIA } from '../../../../domain/shared/buckets'
 import {
-  TIPO_ACUERDO_INFO, documentosDe, estadoFirma, fechaDeMinuta, firmasDe, fotosDe, gestorDe, marcarCumplido, participantesDe, plazoCompromiso, plazoSeguimiento, puntosDe,
-  registrarFirmaMinuta, resumenCompromisos, resumenFirmas, rutasDelProyecto, situacionCompromiso, versionAcuerdos,
+  PASOS_MINUTA, TIPO_ACUERDO_INFO, documentosDe, estadoFirma, fechaDeMinuta, firmasDe, fotosDe, gestorDe, marcarCumplido, minutaEnCurso, participantesDe, pasoBorradorDe,
+  plazoCompromiso, plazoSeguimiento, puntosDe, registrarFirmaMinuta, resumenCompromisos, resumenFirmas, rutasDelProyecto, situacionCompromiso, versionAcuerdos,
 } from '../../../../domain/condominios/minutas'
 import { buildUploadPath } from '../../../../lib/fileValidation'
 import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../../lib/format'
@@ -51,6 +51,8 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
 
   const cat = categoriaInfo(nota.categoria)
   const prio = prioridadInfo(nota.prioridad)
+  // Guardada a medias: en qué paso del asistente se retoma.
+  const pasoEnCurso = minutaEnCurso(nota) ? pasoBorradorDe(nota) : null
   const resumen = resumenCompromisos(puntos)
   const diasSeguimiento = diasHastaFechaCalendario(nota.fecha_recordatorio)
   // Marcar un compromiso cumplido no cambia la huella: sólo cuenta lo acordado.
@@ -93,6 +95,7 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
   async function cerrarMinuta() {
     const pendientes = resumen.total - resumen.cumplidos
     const faltan = [
+      pasoEnCurso !== null && `la captura a medias (se quedó en el paso ${pasoEnCurso} de ${PASOS_MINUTA.length})`,
       pendientes > 0 && `${pendientes} compromiso${pendientes === 1 ? '' : 's'} sin cumplir`,
       resumenF.pendientes > 0 && `${resumenF.pendientes} firma${resumenF.pendientes === 1 ? '' : 's'} pendiente${resumenF.pendientes === 1 ? '' : 's'}`,
     ].filter(Boolean)
@@ -169,7 +172,7 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
           {canEdit && (nota.resuelta
             ? <Button variant="secondary" size="sm" onClick={() => void cambiar({ resuelta: false }, 'reabrir', 'Minuta reabierta')} loading={ocupado === 'reabrir'}>↺ Reabrir</Button>
             : <Button variant="success" size="sm" onClick={() => void cerrarMinuta()} loading={ocupado === 'cerrar'}>✓ Cerrar minuta</Button>)}
-          {editable && <Button variant="primary" size="sm" onClick={onEditar}>✏️ Editar</Button>}
+          {editable && <Button variant="primary" size="sm" onClick={onEditar}>{pasoEnCurso !== null ? '▶ Continuar' : '✏️ Editar'}</Button>}
         </div>
       }
     >
@@ -179,7 +182,18 @@ export function MinutaDetalle({ nota, canEdit, canDelete, onClose, onEditar, onR
           {prio.value !== 'normal' && <span style={chip(prio.bg, prio.color)}>Prioridad {prio.label.toLowerCase()}</span>}
           {nota.fijada && <span style={chip('var(--at-warning-tint)', 'var(--at-warning-strong)')}>📌 Fijada</span>}
           <span style={chip(nota.resuelta ? 'var(--at-success-tint)' : 'var(--at-info-tint)', nota.resuelta ? 'var(--at-success-strong)' : 'var(--at-info-strong)')}>{nota.resuelta ? '✓ Cerrada' : '● Abierta'}</span>
+          {pasoEnCurso !== null && <span style={chip('var(--at-warning-tint)', 'var(--at-warning-strong)')}>✎ En curso · paso {pasoEnCurso} de {PASOS_MINUTA.length}</span>}
         </div>
+
+        {pasoEnCurso !== null && (
+          <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)' }}>
+            <span aria-hidden="true" style={{ fontSize: 18 }}>✎</span>
+            <div style={{ fontSize: 13 }}>
+              <strong>Minuta en curso.</strong> Se guardó el avance en el paso {pasoEnCurso} ({PASOS_MINUTA[pasoEnCurso - 1].label.toLowerCase()}).
+              {editable ? ' Retómala desde ahí con «Continuar».' : ''}
+            </div>
+          </div>
+        )}
 
         {diasSeguimiento !== null && !nota.resuelta && (
           <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,

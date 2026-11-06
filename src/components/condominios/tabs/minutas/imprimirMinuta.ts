@@ -4,7 +4,8 @@
 import { printHtml, raw } from '../../../../lib/printHtml'
 import { formatDateTime, formatFechaCalendario } from '../../../../lib/format'
 import {
-  TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO, documentosDe, estadoFirma, fechaDeMinuta, firmasDe, fotosDe, participantesDe, puntosDe, versionAcuerdos,
+  PASOS_MINUTA, TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO, documentosDe, estadoFirma, fechaDeMinuta, firmasDe, fotosDe, minutaEnCurso, participantesDe, pasoBorradorDe,
+  puntosDe, versionAcuerdos,
 } from '../../../../domain/condominios/minutas'
 import { downloadMedia } from '../../../../domain/shared/storage'
 import { BUCKET_MEDIA } from '../../../../domain/shared/buckets'
@@ -56,7 +57,7 @@ export function htmlMinuta(nota: NotaAdmin, imagenes: Readonly<Record<string, st
     .declara{color:#444;font-size:12px}
   </style></head><body>
   <h1>${nota.titulo}</h1>
-  <div class="cab">Minuta de reunión · ${categoriaInfo(nota.categoria).label} · ${fecha}${gestor ? ` · Gestiona: ${gestor.nombre}` : ''}${nota.resuelta ? ' · CERRADA' : ''}</div>
+  <div class="cab">Minuta de reunión · ${categoriaInfo(nota.categoria).label} · ${fecha}${gestor ? ` · Gestiona: ${gestor.nombre}` : ''}${nota.resuelta ? ' · CERRADA' : ''}${minutaEnCurso(nota) ? ` · EN CURSO (paso ${pasoBorradorDe(nota)} de ${PASOS_MINUTA.length})` : ''}</div>
   ${nota.contenido?.trim() ? raw(printHtml`<h2>Objetivo</h2><p>${nota.contenido}</p>`) : ''}
   ${lista ? raw(printHtml`<h2>Participantes</h2><ul>${raw(lista)}</ul>`) : ''}
   <h2>Puntos abordados</h2>${cuerpo ? raw(cuerpo) : raw('<p class="desc">Sin puntos registrados.</p>')}

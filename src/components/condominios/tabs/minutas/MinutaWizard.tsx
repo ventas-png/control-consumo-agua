@@ -1,6 +1,7 @@
-// Asistente de una minuta de reunión, en ventana y en tres pasos:
+// Asistente de una minuta de reunión, en ventana y en cuatro pasos:
 //
-//   1 · Participantes  título, fecha y objetivo; quiénes participan —empleados,
+//   1 · Participantes  título, fecha y objetivo; quiénes participan —el equipo
+//                      de la empresa asignado al proyecto, empleados,
 //                      propietarios/inquilinos, proveedores u otro por nombre—
 //                      y quién la gestiona (quien la abre queda de gestor).
 //   2 · Puntos         los puntos a abordar, numerados, con detalle opcional.
@@ -11,11 +12,17 @@
 //                      compromisos (opcional: quien no esté firma después
 //                      desde el detalle).
 //
+// Cada paso tiene «Guardar avance»: guarda lo que hay (la primera vez crea la
+// fila y el asistente sigue abierto sobre ella) con `borrador_paso` = el paso
+// actual, para retomar la minuta desde ahí en cualquier momento. «Guardar
+// minuta» / «Guardar cambios» la dan por terminada (`borrador_paso` = null).
+//
 // Las listas salen de lo que la sección ya carga (personal, unidades,
-// contratos) y de dos lecturas propias: residentes de unidad (con rol) y el
-// catálogo compartido de proveedores. Todo lo que no es pantalla —validar cada
-// paso, depurar y armar candidatos— vive en domain/condominios/minutas. El
-// reacomodo para el teléfono está en minutas.css.
+// contratos) y de tres lecturas propias: el equipo asignado al proyecto (RPC),
+// residentes de unidad (con rol) y el catálogo compartido de proveedores. Todo
+// lo que no es pantalla —validar cada paso, depurar y armar candidatos— vive
+// en domain/condominios/minutas. El reacomodo para el teléfono está en
+// minutas.css.
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { EditModal } from '../../../shared/EditModal'
 import { Button } from '../../../shared/Button'
@@ -23,16 +30,17 @@ import { FilterChips } from '../../../shared/FilterChips'
 import { MultiImageUploader } from '../../../shared/ImageUploader'
 import { MultiFileUploader } from '../../../shared/FileUploader'
 import { notify } from '../../../shared/Dialog'
-import { createCondominioRow, updateCondominioRowAfectando } from '../../../../domain/condominios/tabMutations'
+import { createCondominioRowReturning, updateCondominioRowAfectando, type RowError } from '../../../../domain/condominios/tabMutations'
 import { useProveedoresQuery } from '../../../../domain/cxp/queries'
 import { removeMedia, uploadCondominiosMedia } from '../../../../domain/shared/storage'
 import { BUCKET_MEDIA } from '../../../../domain/shared/buckets'
 import {
   MAX_DOCUMENTOS_MINUTA, MAX_FOTOS_MINUTA, PASOS_MINUTA, TIPOS_PARTICIPANTE, TIPO_ACUERDO_INFO, TIPO_PARTICIPANTE_INFO,
   archivosPorBorrar, conFirma, documentosDe, firmasDe, firmasDeParticipantes, fotosDe, fusionarFirmas, leerFirmasMinuta, mismasRutas, resumenFirmas, rutasDelProyecto,
-  sinFirma, versionAcuerdos, borradorDesde, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
-  fetchResidentesProyecto, filtrarCandidatos, nuevoIdMinuta, participanteDesdeCandidato, quitarParticipante, validarPasoMinuta, yaParticipa,
-  type BorradorMinuta, type CandidatoParticipante, type PasoMinuta, type ResidenteProyecto,
+  sinFirma, versionAcuerdos, borradorDesde, candidatosEmpleados, candidatosEquipo, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
+  etiquetaRolEquipo, fetchEquipoProyecto, fetchResidentesProyecto, filtrarCandidatos, nuevoIdMinuta, participanteDesdeCandidato, pasoBorradorDe, quitarParticipante,
+  validarAvanceMinuta, validarPasoMinuta, yaParticipa,
+  type BorradorMinuta, type CandidatoParticipante, type MiembroEquipoProyecto, type PasoMinuta, type ResidenteProyecto,
 } from '../../../../domain/condominios/minutas'
 import { hoyLocalISO } from '../../../../lib/format'
 import { buildUploadPath } from '../../../../lib/fileValidation'
@@ -51,14 +59,19 @@ interface Props {
   proyectoId: string
   companyId: string
   autorNombre: string
+  /** Cuenta y rol de quien la abre: entra como miembro del equipo del proyecto (y gestor). */
+  autorId?: string | null
+  autorRol?: string | null
   personal: readonly PersonalCondominio[]
   cargos: readonly CargoCatalogo[]
   unidades: readonly Unidad[]
   contratos: readonly ContratoArrendamiento[]
   contratosProveedores: readonly ContratoProveedor[]
   onClose: () => void
-  /** Ya quedó guardada: la sección recarga y cierra. */
+  /** Ya quedó guardada y terminada: la sección recarga y cierra. */
   onGuardado: () => void
+  /** Se guardó el avance de un paso: la sección recarga; el asistente sigue abierto. */
+  onAvanceGuardado: () => void
 }
 
 const MAX_CANDIDATOS = 30
@@ -71,11 +84,19 @@ const numeroPunto: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
 }
 
-export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, personal, cargos, unidades, contratos, contratosProveedores, onClose, onGuardado }: Props) {
+export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, autorId, autorRol, personal, cargos, unidades, contratos, contratosProveedores, onClose, onGuardado, onAvanceGuardado }: Props) {
   const uid = useId()
-  const [borrador, setBorrador] = useState<BorradorMinuta>(() => borradorDesde(nota, autorNombre, hoyLocalISO()))
-  const [paso, setPaso] = useState<PasoMinuta>(1)
+  const [borrador, setBorrador] = useState<BorradorMinuta>(() => borradorDesde(nota, autorNombre, hoyLocalISO(), autorId ? { id: autorId, detalle: etiquetaRolEquipo(autorRol) } : undefined))
+  // Una minuta en curso se retoma en el paso donde se guardó el avance.
+  const [paso, setPaso] = useState<PasoMinuta>(() => pasoBorradorDe(nota) ?? 1)
   const [saving, setSaving] = useState(false)
+  /** Qué botón está guardando (el otro se deshabilita mientras tanto). */
+  const modoGuardadoRef = useRef<'final' | 'avance' | null>(null)
+  // La fila sobre la que se escribe: la que se edita o la que «Guardar avance»
+  // creó en esta sesión (desde entonces el asistente edita, no crea).
+  const [filaId, setFilaId] = useState<string | null>(nota?.id ?? null)
+  /** Ya se guardó el avance en esta sesión: lo guardado no se pierde al cerrar. */
+  const [avanceGuardado, setAvanceGuardado] = useState(false)
 
   // ── Fotos, documentos y firmas: qué se borra del bucket ──
   // Los uploaders no borran nada al quitar (borrarAlQuitar={false}); todo se
@@ -83,6 +104,8 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
   // qué quedó guardado. Desmontar cubre guardar, cancelar, Esc, el fondo y el
   // «Atrás» del sistema (que cambia de pestaña sin pasar por cerrar()).
   const [originales] = useState(() => ({ fotos: fotosDe(nota), documentos: documentosDe(nota), firmas: firmasDe(nota) }))
+  /** Lo que la fila tenía la última vez que se guardó (al abrir, o en el último «Guardar avance»): contra eso se decide qué viaja. */
+  const [guardado, setGuardado] = useState(originales)
   /** Subidas en curso por campo: cuenta, no booleano, para que la primera que termina no habilite Guardar. */
   const [subiendo, setSubiendo] = useState({ fotos: 0, documentos: 0, firmas: 0 })
   const subiendoAlgo = subiendo.fotos > 0 || subiendo.documentos > 0 || subiendo.firmas > 0
@@ -122,14 +145,17 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
   }
 
   // Paso 1: de qué lista se agrega y qué se busca.
-  const [tipoLista, setTipoLista] = useState<TipoParticipanteMinuta>('empleado')
+  const [tipoLista, setTipoLista] = useState<TipoParticipanteMinuta>('equipo')
   const [busqueda, setBusqueda] = useState('')
   const [otro, setOtro] = useState({ nombre: '', detalle: '' })
 
-  // Residentes de unidad: lectura propia (no viene con la sección).
+  // El equipo asignado al proyecto y los residentes de unidad: lecturas propias
+  // (no vienen con la sección).
+  const [equipo, setEquipo] = useState<{ data: MiembroEquipoProyecto[]; error: string | null } | null>(null)
   const [residentes, setResidentes] = useState<ResidenteProyecto[] | null>(null)
   useEffect(() => {
     let vigente = true
+    void fetchEquipoProyecto(proyectoId).then(r => { if (vigente) setEquipo(r) })
     void fetchResidentesProyecto(proyectoId).then(r => { if (vigente) setResidentes(r) })
     return () => { vigente = false }
   }, [proyectoId])
@@ -140,13 +166,15 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
     return (codigo: string) => mapa.get(codigo)
   }, [cargos])
   const candidatos = useMemo<Record<TipoParticipanteMinuta, CandidatoParticipante[]>>(() => ({
+    equipo: candidatosEquipo(equipo?.data ?? []),
     empleado: candidatosEmpleados(personal, nombreCargo),
     residente: candidatosResidentes(residentes ?? [], unidades, contratos),
     proveedor: candidatosProveedores((catalogo ?? []) as ProveedorCatalogo[], contratosProveedores),
     otro: [],
-  }), [personal, nombreCargo, residentes, unidades, contratos, catalogo, contratosProveedores])
+  }), [equipo, personal, nombreCargo, residentes, unidades, contratos, catalogo, contratosProveedores])
   const visibles = useMemo(() => filtrarCandidatos(candidatos[tipoLista], busqueda), [candidatos, tipoLista, busqueda])
-  const cargandoLista = (tipoLista === 'residente' && residentes === null) || (tipoLista === 'proveedor' && cargandoProveedores)
+  const cargando: Partial<Record<TipoParticipanteMinuta, boolean>> = { equipo: equipo === null, residente: residentes === null, proveedor: cargandoProveedores }
+  const cargandoLista = cargando[tipoLista] === true
 
   // Foco al punto o acuerdo recién agregado.
   const enfocarRef = useRef<string | null>(null)
@@ -206,12 +234,24 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
     setPaso(destino)
   }
 
-  async function guardar() {
+  /**
+   * `final`: la minuta termina el asistente (todos los pasos completos,
+   * `borrador_paso` null) y la ventana se cierra. `avance`: guarda lo que hay
+   * con el paso actual, para retomarla después; basta con lo del paso 1 y que
+   * las fechas sean válidas. La primera vez crea la fila y, desde entonces,
+   * el asistente edita esa fila sin cerrarse.
+   */
+  async function guardar(modo: 'final' | 'avance') {
     if (saving) return
     if (subiendoAlgo) { notify({ variant: 'info', title: 'Subiendo archivos', text: 'Espera a que terminen de subir para guardar la minuta.' }); return }
-    for (const p of PASOS_MINUTA) {
-      const falta = validarPasoMinuta(borrador, p.n)
-      if (falta) { setPaso(p.n); notify({ variant: 'warning', title: `Paso ${p.n} · ${p.label}`, text: falta }); return }
+    if (modo === 'final') {
+      for (const p of PASOS_MINUTA) {
+        const falta = validarPasoMinuta(borrador, p.n)
+        if (falta) { setPaso(p.n); notify({ variant: 'warning', title: `Paso ${p.n} · ${p.label}`, text: falta }); return }
+      }
+    } else {
+      const falta = validarAvanceMinuta(borrador)
+      if (falta) { setPaso(falta.paso); notify({ variant: 'warning', title: `Para guardar el avance · ${PASOS_MINUTA[falta.paso - 1].label}`, text: falta.falta }); return }
     }
     const { participantes, puntos } = depurarBorrador(borrador)
     const fotos = fotosDe({ fotos: borrador.fotos })
@@ -228,28 +268,37 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
       fecha_reunion: borrador.fecha_reunion,
       participantes,
       puntos,
+      borrador_paso: modo === 'avance' ? paso : null,
     }
-    // Al editar, las listas de archivos sólo viajan si cambiaron: una pestaña
-    // abierta desde antes que sólo corrige el título no revive en la fila un
-    // archivo que otra sesión ya quitó y borró.
-    if (!nota || !mismasRutas(fotos, originales.fotos)) campos.fotos = fotos
-    if (!nota || !mismasRutas(documentos, originales.documentos)) campos.documentos = documentos
-    const firmasCambiaron = !nota || JSON.stringify(firmas) !== JSON.stringify(originales.firmas)
+    // Al editar, las listas de archivos sólo viajan si cambiaron desde el
+    // último guardado: una pestaña abierta desde antes que sólo corrige el
+    // título no revive en la fila un archivo que otra sesión ya quitó y borró.
+    if (!filaId || !mismasRutas(fotos, guardado.fotos)) campos.fotos = fotos
+    if (!filaId || !mismasRutas(documentos, guardado.documentos)) campos.documentos = documentos
+    const firmasCambiaron = !filaId || JSON.stringify(firmas) !== JSON.stringify(guardado.firmas)
+    modoGuardadoRef.current = modo
     setSaving(true)
     guardandoRef.current = true
-    if (nota && firmasCambiaron) {
+    if (filaId && firmasCambiaron) {
       // Mientras el asistente estaba abierto alguien pudo firmar desde el
       // detalle: se parte de las firmas de la fila y se aplica sólo lo que
       // esta edición cambió.
-      const actuales = await leerFirmasMinuta(nota.id)
-      if (actuales) firmas = firmasDeParticipantes(fusionarFirmas(actuales, originales.firmas, firmas), participantes)
+      const actuales = await leerFirmasMinuta(filaId)
+      if (actuales) firmas = firmasDeParticipantes(fusionarFirmas(actuales, guardado.firmas, firmas), participantes)
     }
     if (firmasCambiaron) campos.firmas = firmas
     // Afectando: si la política de filas no deja tocar la fila, el UPDATE vuelve
     // «bien» con cero filas, y borrar las quitadas rompería la minuta guardada.
-    const { error } = nota
-      ? await updateCondominioRowAfectando('notas_admin', nota.id, campos)
-      : await createCondominioRow('notas_admin', { company_id: companyId, project_id: proyectoId, autor: autorNombre || null, ...campos })
+    let error: RowError
+    let id = filaId
+    if (filaId) {
+      ({ error } = await updateCondominioRowAfectando('notas_admin', filaId, campos))
+    } else {
+      // Devuelve el id: con «Guardar avance» el asistente sigue sobre la fila creada.
+      const r = await createCondominioRowReturning('notas_admin', { company_id: companyId, project_id: proyectoId, autor: autorNombre || null, ...campos }, 'id')
+      error = r.error
+      id = typeof r.data?.id === 'string' ? r.data.id : null
+    }
     guardandoRef.current = false
     if (!error) guardadoRef.current = [...fotos, ...documentos, ...firmas.map(f => f.path)]
     // Si el «Atrás» del sistema desmontó el asistente durante el guardado, la
@@ -257,8 +306,23 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
     if (!montadoRef.current) limpiarRef.current()
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'No se pudo guardar la minuta', text: error.message }); return }
-    notify({ variant: 'success', title: nota ? 'Minuta actualizada' : 'Minuta guardada' })
-    onGuardado()
+    if (modo === 'final') {
+      notify({ variant: 'success', title: nota ? 'Minuta actualizada' : 'Minuta guardada' })
+      onGuardado()
+      return
+    }
+    if (!montadoRef.current || !id) {
+      // Sin asistente que siga (o sin id que seguir): quedó guardada y se
+      // retoma desde la lista.
+      notify({ variant: 'success', title: 'Avance guardado', text: 'Retoma la minuta desde la lista cuando quieras.' })
+      onGuardado()
+      return
+    }
+    setFilaId(id)
+    setGuardado({ fotos, documentos, firmas })
+    setAvanceGuardado(true)
+    notify({ variant: 'success', title: `Avance guardado · paso ${paso} de ${PASOS_MINUTA.length}`, text: 'Puedes seguir ahora o cerrar y retomar la minuta desde la lista cuando quieras.' })
+    onAvanceGuardado()
   }
 
   // No se cierra a mitad del guardado (escondería el error) ni de una subida
@@ -304,7 +368,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
 
   return (
     <EditModal
-      title={nota ? '✏️ Editar minuta' : '📝 Nueva minuta'}
+      title={nota ? (pasoBorradorDe(nota) ? '▶ Retomar minuta' : '✏️ Editar minuta') : '📝 Nueva minuta'}
       subtitle={<span aria-live="polite">{`Paso ${paso} de ${PASOS_MINUTA.length} · ${pasoInfo.titulo}`}</span>}
       size="lg"
       fullScreenOnMobile
@@ -316,13 +380,20 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
           {/* Durante una subida los botones avisan en vez de deshabilitarse: un
               botón `disabled` sale del orden de Tab y, si es el último, el foco
               se escapa de la ventana. */}
-          <Button className="minuta-cancelar" variant="secondary" onClick={cerrar} disabled={saving}>Cancelar</Button>
+          <Button className="minuta-cancelar" variant="secondary" onClick={cerrar} disabled={saving}>{avanceGuardado ? 'Cerrar' : 'Cancelar'}</Button>
           {paso > 1 && <Button className="minuta-anterior" variant="secondary" onClick={() => { if (!esperarSubida()) setPaso((paso - 1) as PasoMinuta) }} disabled={saving}>← Anterior</Button>}
+          {/* En cada paso: guarda lo que hay y deja la minuta «en curso» en este paso, para retomarla después. */}
+          <Button className="minuta-avance" variant="secondary" onClick={() => void guardar('avance')} loading={saving && modoGuardadoRef.current === 'avance'} loadingText="Guardando…"
+            disabled={saving && modoGuardadoRef.current !== 'avance'}
+            aria-disabled={subiendoAlgo || undefined} style={subiendoAlgo ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
+            💾 Guardar avance
+          </Button>
           {paso < 4 && <Button className="minuta-avanzar" variant="primary" onClick={() => irA((paso + 1) as PasoMinuta)} disabled={saving}>Siguiente →</Button>}
-          {(paso === 4 || nota) && (
-            <Button className="minuta-avanzar" variant={paso === PASOS_MINUTA.length ? 'success' : 'outline-primary'} onClick={() => void guardar()} loading={saving} loadingText="Guardando…"
+          {(paso === 4 || filaId) && (
+            <Button className="minuta-avanzar" variant={paso === PASOS_MINUTA.length ? 'success' : 'outline-primary'} onClick={() => void guardar('final')} loading={saving && modoGuardadoRef.current === 'final'} loadingText="Guardando…"
+              disabled={saving && modoGuardadoRef.current !== 'final'}
               aria-disabled={subiendoAlgo || undefined} style={subiendoAlgo ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
-              {subiendoAlgo ? 'Subiendo archivos…' : nota ? 'Guardar cambios' : '✅ Guardar minuta'}
+              {subiendoAlgo ? 'Subiendo archivos…' : nota && !pasoBorradorDe(nota) ? 'Guardar cambios' : '✅ Guardar minuta'}
             </Button>
           )}
         </div>
@@ -387,15 +458,18 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
             <h3 style={seccionTitulo}>Agregar participante</h3>
             <div className="minuta-chips">
               <FilterChips ariaLabel="Tipo de participante" value={tipoLista} onChange={t => { setTipoLista(t); setBusqueda('') }}
-                options={TIPOS_PARTICIPANTE.map(t => ({ value: t, label: TIPO_PARTICIPANTE_INFO[t].label, icon: TIPO_PARTICIPANTE_INFO[t].icon, count: t === 'otro' ? undefined : candidatos[t].length }))} />
+                options={TIPOS_PARTICIPANTE.map(t => ({ value: t, label: TIPO_PARTICIPANTE_INFO[t].label, icon: TIPO_PARTICIPANTE_INFO[t].icon, count: t === 'otro' || cargando[t] ? undefined : candidatos[t].length }))} />
             </div>
             {tipoLista !== 'otro' ? (
               <div style={{ marginTop: 10, minWidth: 0 }}>
-                <label htmlFor={`${uid}-buscar`} style={lbl}>Buscar {TIPO_PARTICIPANTE_INFO[tipoLista].plural.toLowerCase()}</label>
-                <input id={`${uid}-buscar`} type="search" style={inp} placeholder="Nombre, cargo, unidad…" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                <label htmlFor={`${uid}-buscar`} style={lbl}>Buscar {tipoLista === 'equipo' ? 'en el equipo del proyecto' : TIPO_PARTICIPANTE_INFO[tipoLista].plural.toLowerCase()}</label>
+                <input id={`${uid}-buscar`} type="search" style={inp} placeholder={tipoLista === 'equipo' ? 'Nombre o rol…' : 'Nombre, cargo, unidad…'} value={busqueda} onChange={e => setBusqueda(e.target.value)} />
                 <div role="list" aria-label={TIPO_PARTICIPANTE_INFO[tipoLista].plural} style={{ marginTop: 8, maxHeight: 260, overflowY: 'auto', display: 'grid', gap: 4 }}>
                   {cargandoLista && <p style={ayuda}>Cargando {TIPO_PARTICIPANTE_INFO[tipoLista].plural.toLowerCase()}…</p>}
-                  {!cargandoLista && visibles.length === 0 && (
+                  {!cargandoLista && tipoLista === 'equipo' && equipo?.error && (
+                    <p role="alert" style={{ ...ayuda, color: 'var(--at-danger)' }}>No se pudo cargar el equipo del proyecto: {equipo.error}</p>
+                  )}
+                  {!cargandoLista && visibles.length === 0 && !(tipoLista === 'equipo' && equipo?.error) && (
                     <p style={{ ...ayuda, fontStyle: 'italic' }}>
                       {candidatos[tipoLista].length === 0 ? mensajeSinLista(tipoLista) : 'Nadie coincide con la búsqueda.'}
                     </p>
@@ -610,6 +684,7 @@ export function MinutaWizard({ nota, proyectoId, companyId, autorNombre, persona
 
 function mensajeSinLista(tipo: TipoParticipanteMinuta): string {
   switch (tipo) {
+    case 'equipo': return 'Ninguna cuenta activa de la empresa tiene acceso a este condominio (Empresa › Usuarios › Asignar proyectos).'
     case 'empleado': return 'Este condominio no tiene personal registrado (Recursos Humanos › Personal).'
     case 'residente': return 'No hay propietarios ni inquilinos registrados: asígnalos en las unidades o registra el contrato de arrendamiento.'
     case 'proveedor': return 'No hay proveedores en el catálogo de la empresa ni contratos de proveedor en este condominio.'

@@ -12918,6 +12918,7 @@ export type Database = {
       notas_admin: {
         Row: {
           autor: string | null
+          borrador_paso: number | null
           categoria: string
           company_id: string
           contenido: string
@@ -12938,6 +12939,7 @@ export type Database = {
         }
         Insert: {
           autor?: string | null
+          borrador_paso?: number | null
           categoria?: string
           company_id: string
           contenido?: string
@@ -12958,6 +12960,7 @@ export type Database = {
         }
         Update: {
           autor?: string | null
+          borrador_paso?: number | null
           categoria?: string
           company_id?: string
           contenido?: string
@@ -26284,6 +26287,14 @@ export type Database = {
       migrate_custom_auth_to_supabase_unconfirmed: {
         Args: never
         Returns: Json
+      }
+      minutas_equipo_proyecto: {
+        Args: { p_project_id: string }
+        Returns: {
+          full_name: string
+          id: string
+          role: string
+        }[]
       }
       mis_broadcast_ids: { Args: never; Returns: string[] }
       mis_proyectos_ids: { Args: never; Returns: string[] }

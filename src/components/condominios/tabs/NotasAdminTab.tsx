@@ -1,16 +1,18 @@
 // Minutas de reunión (antes «Notas Admin»; misma tabla y permisos notas_admin).
 //
 // La lista va en tarjetas: quiénes participaron, cuántos puntos, el avance de
-// los compromisos y el próximo seguimiento. El detalle y el formulario abren
-// en ventana; el formulario es un asistente de tres pasos (participantes →
-// puntos → acuerdos), ver minutas/MinutaWizard.
+// los compromisos, el próximo seguimiento y, si se guardó a medias, en qué
+// paso va («En curso»). El detalle y el formulario abren en ventana; el
+// formulario es un asistente de cuatro pasos (participantes → puntos →
+// acuerdos → firmas) que guarda el avance de cada paso, ver minutas/MinutaWizard.
 import { useMemo, useState, type CSSProperties } from 'react'
 import { Button } from '../../shared/Button'
 import { EmptyState } from '../../shared/EmptyState'
 import { FilterChips } from '../../shared/FilterChips'
 import { tint } from '../../shared/statusTone'
 import {
-  documentosDe, fechaDeMinuta, firmasDe, fotosDe, gestorDe, participantesDe, plazoSeguimiento, puntosDe, resumenCompromisos, resumenFirmas, versionAcuerdos,
+  PASOS_MINUTA, documentosDe, fechaDeMinuta, firmasDe, fotosDe, gestorDe, minutaEnCurso, participantesDe, pasoBorradorDe, plazoSeguimiento, puntosDe,
+  resumenCompromisos, resumenFirmas, versionAcuerdos,
 } from '../../../domain/condominios/minutas'
 import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../lib/format'
 import { normalizarNombre } from '../../../domain/proveedores/identidad'
@@ -25,6 +27,9 @@ interface Props {
   proyectoId: string
   companyId: string
   autorNombre: string
+  /** Cuenta y rol de quien registra: entra en la minuta como miembro del equipo del proyecto. */
+  autorId?: string | null
+  autorRol?: string | null
   /** Listas para elegir participantes (las carga la sección). */
   personal?: PersonalCondominio[]
   cargos?: CargoCatalogo[]
@@ -38,12 +43,12 @@ interface Props {
   onRefresh: () => void
 }
 
-type FiltroEstado = 'abiertas' | 'vencidas' | 'cerradas' | 'todas'
+type FiltroEstado = 'abiertas' | 'en_curso' | 'vencidas' | 'cerradas' | 'todas'
 
 const SIN_LISTA: never[] = []
 
 export default function NotasAdminTab({
-  notas, proyectoId, companyId, autorNombre,
+  notas, proyectoId, companyId, autorNombre, autorId = null, autorRol = null,
   personal = SIN_LISTA, cargos = SIN_LISTA, unidades = SIN_LISTA, contratos = SIN_LISTA, contratosProveedores = SIN_LISTA,
   canCreate, canEdit, canDelete, onRefresh,
 }: Props) {
@@ -59,12 +64,13 @@ export default function NotasAdminTab({
     const participantes = participantesDe(n)
     const puntos = puntosDe(n)
     return { n, participantes, puntos, gestor: gestorDe(participantes), resumen: resumenCompromisos(puntos), fecha: fechaDeMinuta(n), fotos: fotosDe(n).length, documentos: documentosDe(n).length,
-      firmas: resumenFirmas(participantes, firmasDe(n), versionAcuerdos(puntos, participantes)) }
+      firmas: resumenFirmas(participantes, firmasDe(n), versionAcuerdos(puntos, participantes)), pasoEnCurso: minutaEnCurso(n) ? pasoBorradorDe(n) : null }
   }), [notas])
 
   const abiertas = filas.filter(f => !f.n.resuelta)
   const totales = {
     abiertas: abiertas.length,
+    enCurso: abiertas.filter(f => f.pasoEnCurso !== null).length,
     cerradas: filas.length - abiertas.length,
     pendientes: abiertas.reduce((s, f) => s + f.resumen.pendientes, 0),
     vencidos: abiertas.reduce((s, f) => s + f.resumen.vencidos, 0),
@@ -76,6 +82,7 @@ export default function NotasAdminTab({
     .filter(f =>
       (filtroEstado === 'todas' || (filtroEstado === 'cerradas' ? f.n.resuelta : !f.n.resuelta)) &&
       (filtroEstado !== 'vencidas' || f.resumen.vencidos > 0) &&
+      (filtroEstado !== 'en_curso' || f.pasoEnCurso !== null) &&
       (filtroCategoria === '' || f.n.categoria === filtroCategoria) &&
       (!texto || normalizarNombre(f.n.titulo).includes(texto) || f.participantes.some(p => normalizarNombre(p.nombre).includes(texto)) || f.puntos.some(p => normalizarNombre(p.titulo).includes(texto))),
     )
@@ -130,6 +137,7 @@ export default function NotasAdminTab({
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <FilterChips ariaLabel="Estado de la minuta" value={filtroEstado} onChange={setFiltroEstado} options={[
           { value: 'abiertas', label: 'Abiertas', count: totales.abiertas, color: 'var(--at-info)' },
+          { value: 'en_curso', label: 'En curso', count: totales.enCurso, color: 'var(--at-warning)' },
           { value: 'vencidas', label: 'Con vencidos', count: totales.conVencidos, color: 'var(--at-danger)' },
           { value: 'cerradas', label: 'Cerradas', count: totales.cerradas, color: 'var(--at-success)' },
           { value: 'todas', label: 'Todas', count: filas.length },
@@ -155,7 +163,7 @@ export default function NotasAdminTab({
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
-          {lista.map(({ n, participantes, puntos, gestor, resumen, fecha, fotos, documentos, firmas }) => {
+          {lista.map(({ n, participantes, puntos, gestor, resumen, fecha, fotos, documentos, firmas, pasoEnCurso }) => {
             const cat = categoriaInfo(n.categoria)
             const prio = prioridadInfo(n.prioridad)
             const diasSeg = !n.resuelta ? diasHastaFechaCalendario(n.fecha_recordatorio) : null
@@ -164,11 +172,16 @@ export default function NotasAdminTab({
                 style={{
                   textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--at-ink)', display: 'flex', flexDirection: 'column', gap: 8, padding: 14, borderRadius: 14,
                   background: n.fijada && !n.resuelta ? 'var(--at-warning-tint)' : 'var(--at-surface)',
-                  border: `1px solid ${n.fijada && !n.resuelta ? 'var(--at-warning-border)' : 'var(--at-line)'}`,
+                  border: `1px solid ${n.fijada && !n.resuelta ? 'var(--at-warning-border)' : pasoEnCurso !== null ? 'var(--at-warning)' : 'var(--at-line)'}`,
                   opacity: n.resuelta ? 0.8 : 1, boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 }}>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: tint(cat.color, 14), color: cat.color }}>{cat.icon} {cat.label}</span>
+                  {pasoEnCurso !== null && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: '1px solid var(--at-warning-border)' }}>
+                      ✎ En curso · paso {pasoEnCurso} de {PASOS_MINUTA.length}
+                    </span>
+                  )}
                   {prio.value !== 'normal' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: prio.bg, color: prio.color }}>{prio.label}</span>}
                   {n.fijada && !n.resuelta && <span title="Fijada" aria-label="Fijada" style={{ fontSize: 12 }}>📌</span>}
                   {n.resuelta && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--at-success-tint)', color: 'var(--at-success-strong)' }}>✓ Cerrada</span>}
@@ -209,10 +222,11 @@ export default function NotasAdminTab({
 
       {wizard.abierto && (
         // key: otra minuta (o una nueva) es otro asistente, con su propio estado y sus propios archivos.
-        <MinutaWizard key={wizard.nota?.id ?? 'nueva'} nota={wizard.nota} proyectoId={proyectoId} companyId={companyId} autorNombre={autorNombre}
+        <MinutaWizard key={wizard.nota?.id ?? 'nueva'} nota={wizard.nota} proyectoId={proyectoId} companyId={companyId} autorNombre={autorNombre} autorId={autorId} autorRol={autorRol}
           personal={personal} cargos={cargos} unidades={unidades} contratos={contratos} contratosProveedores={contratosProveedores}
           onClose={() => setWizard({ abierto: false, nota: null })}
-          onGuardado={() => { setWizard({ abierto: false, nota: null }); onRefresh() }} />
+          onGuardado={() => { setWizard({ abierto: false, nota: null }); onRefresh() }}
+          onAvanceGuardado={onRefresh} />
       )}
     </div>
   )

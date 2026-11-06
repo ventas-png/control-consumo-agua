@@ -2,13 +2,14 @@ import { describe, it, expect, vi } from 'vitest'
 import type { ContratoArrendamiento, ContratoProveedor, NotaAdmin, PersonalCondominio, PuntoMinuta, Unidad } from '../../../types'
 import type { ProveedorCatalogo } from '../../../types/proveedores'
 
-const dbMock = vi.hoisted(() => ({ from: vi.fn((_tabla: string): unknown => ({})) }))
+const dbMock = vi.hoisted(() => ({ from: vi.fn((_tabla: string): unknown => ({})), rpc: vi.fn(async (_fn: string, _args: unknown): Promise<unknown> => ({ data: null, error: null })) }))
 vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: dbMock }))
 
 const {
   archivosPorBorrar, borradorDesde, conFirma, estadoFirma, firmasDe, firmasDeParticipantes, fusionarFirmas, leerFirmasMinuta, registrarFirmaMinuta, rutasDelProyecto, resumenFirmas, sinFirma, versionAcuerdos, candidatosEmpleados, candidatosProveedores, candidatosResidentes, depurarBorrador, designarGestor,
   documentosDe, fechaDeMinuta, filtrarCandidatos, fotosDe, iniciales, mismasRutas, rutasQuitadas, MAX_DOCUMENTOS_MINUTA, marcarCumplido, participanteDesdeCandidato, participantesDe, plazoCompromiso, plazoSeguimiento,
   puntosDe, MAX_FOTOS_MINUTA, quitarParticipante, resumenCompromisos, situacionCompromiso, validarPasoMinuta, yaParticipa,
+  TIPOS_PARTICIPANTE, TIPO_PARTICIPANTE_INFO, candidatosEquipo, etiquetaRolEquipo, fetchEquipoProyecto, minutaEnCurso, pasoBorradorDe, validarAvanceMinuta,
 } = await import('../minutas')
 
 const HOY = new Date(2026, 9, 26, 15, 0) // 26 oct 2026, 3 de la tarde (local)
@@ -448,5 +449,88 @@ describe('firmas de la minuta', () => {
       base({ firmas: [] }, [])
       expect((await registrarFirmaMinuta('n1', firma())).error).toMatch(/no tienes permiso/)
     })
+  })
+})
+
+describe('equipo del proyecto (20261121000000)', () => {
+  it('es la primera lista de participantes y tiene etiqueta, plural e icono', () => {
+    expect(TIPOS_PARTICIPANTE[0]).toBe('equipo')
+    expect(TIPO_PARTICIPANTE_INFO.equipo).toMatchObject({ label: 'Equipo del proyecto' })
+    // Un participante guardado con el tipo nuevo se lee tal cual; uno desconocido sigue cayendo a «otro».
+    expect(participantesDe({ participantes: [{ id: 'a', tipo: 'equipo', ref_id: 'u1', nombre: 'Ana', gestiona: true }] as never })[0]).toMatchObject({ tipo: 'equipo', ref_id: 'u1' })
+  })
+
+  it('etiquetaRolEquipo: las etiquetas del chip de rol; las dos grafías del superadministrador; desconocido capitalizado; vacío, «Equipo»', () => {
+    expect(etiquetaRolEquipo('company_owner')).toBe('Admin Empresa')
+    expect(etiquetaRolEquipo('admin')).toBe('Administrador')
+    expect(etiquetaRolEquipo('operator')).toBe('Operador')
+    expect(etiquetaRolEquipo('super_admin')).toBe('Super Admin')
+    expect(etiquetaRolEquipo('superadmin')).toBe('Super Admin')
+    expect(etiquetaRolEquipo('auditor_externo')).toBe('Auditor externo')
+    expect(etiquetaRolEquipo('')).toBe('Equipo')
+    expect(etiquetaRolEquipo(null)).toBe('Equipo')
+  })
+
+  it('candidatosEquipo: cada cuenta con su rol como detalle, por nombre, sin nombres vacíos', () => {
+    const c = candidatosEquipo([
+      { id: 'u2', full_name: 'Zoila Ruiz', role: 'operator' },
+      { id: 'u1', full_name: ' Ana López ', role: 'company_owner' },
+      { id: 'u3', full_name: '  ', role: 'admin' },
+    ])
+    expect(c).toEqual([
+      { clave: 'equipo:u1', tipo: 'equipo', ref_id: 'u1', nombre: 'Ana López', detalle: 'Admin Empresa' },
+      { clave: 'equipo:u2', tipo: 'equipo', ref_id: 'u2', nombre: 'Zoila Ruiz', detalle: 'Operador' },
+    ])
+    // Ya participa por cuenta (ref_id), aunque el nombre haya cambiado desde que se registró
+    expect(yaParticipa([{ id: 'p', tipo: 'equipo', ref_id: 'u1', nombre: 'Ana L.', detalle: null, gestiona: true }], c[0])).toBe(true)
+    // Un empleado con el mismo nombre no cuenta como la cuenta del equipo
+    expect(yaParticipa([{ id: 'p', tipo: 'empleado', ref_id: 'e1', nombre: 'Ana López', detalle: 'Admin Empresa', gestiona: false }], c[0])).toBe(false)
+  })
+
+  it('borradorDesde: con la cuenta de quien crea, entra como equipo con su rol; sin ella, como «otro · Administración»', () => {
+    const conCuenta = borradorDesde(null, ' Admin ', '2026-10-26', { id: 'u1', detalle: 'Admin Empresa' })
+    expect(conCuenta.participantes).toHaveLength(1)
+    expect(conCuenta.participantes[0]).toMatchObject({ tipo: 'equipo', ref_id: 'u1', nombre: 'Admin', detalle: 'Admin Empresa', gestiona: true })
+    expect(borradorDesde(null, 'Admin', '2026-10-26', { id: 'u1', detalle: '  ' }).participantes[0]).toMatchObject({ tipo: 'equipo', detalle: 'Administración' })
+    expect(borradorDesde(null, 'Admin', '2026-10-26').participantes[0]).toMatchObject({ tipo: 'otro', ref_id: null, detalle: 'Administración' })
+    expect(borradorDesde(null, '   ', '2026-10-26', { id: 'u1', detalle: 'x' }).participantes).toEqual([])
+  })
+
+  it('fetchEquipoProyecto llama al RPC con el proyecto y devuelve las filas o el error (sin degradar a lista vacía en silencio)', async () => {
+    dbMock.rpc.mockResolvedValueOnce({ data: [{ id: 'u1', full_name: 'Ana', role: 'admin' }], error: null })
+    expect(await fetchEquipoProyecto('p1')).toEqual({ data: [{ id: 'u1', full_name: 'Ana', role: 'admin' }], error: null })
+    expect(dbMock.rpc).toHaveBeenCalledWith('minutas_equipo_proyecto', { p_project_id: 'p1' })
+    dbMock.rpc.mockResolvedValueOnce({ data: null, error: { message: 'No autorizado' } })
+    expect(await fetchEquipoProyecto('p1')).toEqual({ data: [], error: 'No autorizado' })
+  })
+})
+
+describe('minuta en curso: guardar el avance de cada paso (20261121000000)', () => {
+  it('pasoBorradorDe y minutaEnCurso: 1–4 es el paso donde se retoma; null, otro valor o cerrada no están en curso', () => {
+    expect(pasoBorradorDe(nota({ borrador_paso: 2 }))).toBe(2)
+    expect(pasoBorradorDe(nota({ borrador_paso: 4 }))).toBe(4)
+    expect(pasoBorradorDe(nota({}))).toBeNull()
+    expect(pasoBorradorDe(nota({ borrador_paso: null }))).toBeNull()
+    expect(pasoBorradorDe(nota({ borrador_paso: 0 }))).toBeNull()
+    expect(pasoBorradorDe(nota({ borrador_paso: 5 }))).toBeNull()
+    expect(pasoBorradorDe(nota({ borrador_paso: 2.5 }))).toBeNull()
+    expect(pasoBorradorDe(null)).toBeNull()
+    expect(minutaEnCurso(nota({ borrador_paso: 3 }))).toBe(true)
+    expect(minutaEnCurso(nota({ borrador_paso: 3, resuelta: true }))).toBe(false)
+    expect(minutaEnCurso(nota({ borrador_paso: null }))).toBe(false)
+    expect(minutaEnCurso(null)).toBe(false)
+  })
+
+  it('validarAvanceMinuta: exige lo del paso 1 y fechas válidas, no puntos ni acuerdos; dice en qué paso falta', () => {
+    const b = borradorDesde(null, 'Admin', '2026-10-26')
+    expect(validarAvanceMinuta(b)).toEqual({ paso: 1, falta: 'Ponle un título a la minuta.' })
+    b.titulo = 'Reunión'
+    expect(validarAvanceMinuta(b)).toBeNull() // sin puntos: se guarda igual
+    expect(validarPasoMinuta(b, 2)).not.toBeNull() // pero no se avanza al paso 3
+    b.fecha_recordatorio = '2026-13-40'
+    expect(validarAvanceMinuta(b)).toEqual({ paso: 3, falta: 'La fecha del próximo seguimiento no es válida.' })
+    b.fecha_recordatorio = ''
+    b.participantes = []
+    expect(validarAvanceMinuta(b)).toEqual({ paso: 1, falta: 'Agrega al menos un participante.' })
   })
 })
