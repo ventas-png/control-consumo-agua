@@ -83,7 +83,8 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
   const [detalleId, setDetalleId] = useState<string | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [avanzando, setAvanzando] = useState(false)
+  // Qué transición está en curso, para el spinner de ese botón y no de los demás.
+  const [cambiando, setCambiando] = useState<EstadoIncidenciaElevador | null>(null)
   const [filtroElevador, setFiltroElevador] = useState('')
   const [filtroTipo, setFiltroTipo] = useState<TipoIncidenciaElevador | ''>('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoIncidenciaElevador | ''>('')
@@ -152,12 +153,11 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
     onRefresh()
   }
 
-  async function avanzarEstado(r: IncidenciaElevador) {
-    const next = SIGUIENTE[r.estado]
-    if (!next || avanzando) return
-    setAvanzando(true)
-    const { error } = await updateCondominioRow('incidencias_elevador', r.id, { estado: next })
-    setAvanzando(false)
+  async function cambiarEstado(r: IncidenciaElevador, estado: EstadoIncidenciaElevador) {
+    if (cambiando) return
+    setCambiando(estado)
+    const { error } = await updateCondominioRow('incidencias_elevador', r.id, { estado })
+    setCambiando(null)
     // Antes el error se ignoraba: el botón no hacía nada y no decía por qué.
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
@@ -315,7 +315,9 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
         </EditModal>
       )}
 
-      {/* Detalle de la incidencia en ventana */}
+      {/* Ficha de la incidencia en ventana (pantalla completa en el teléfono):
+          los datos en tarjetas y las transiciones del estado en el pie, junto
+          a Cerrar, como en el resto de fichas del módulo. */}
       {detalle && (() => {
         const tipo = tipoDe(detalle.tipo)
         const dur = duracion(detalle.hora_inicio, detalle.hora_fin)
@@ -325,6 +327,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
             title={`🛗 ${detalle.elevador}`}
             subtitle={
               <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <EstadoBadge estado={detalle.estado} />
                 <span style={{ color: tipo?.color, fontWeight: 600 }}>{tipo?.icon} {tipo?.label ?? detalle.tipo}</span>
                 <span>
                   {detalle.fecha}
@@ -332,21 +335,25 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
                   {detalle.hora_fin && `–${detalle.hora_fin.slice(0, 5)}`}
                   {dur && ` · ${dur}`}
                 </span>
-                <EstadoBadge estado={detalle.estado} />
               </span>
             }
-            maxWidth="520px"
+            size="lg"
             fullScreenOnMobile
             onClose={() => setDetalleId(null)}
             footer={
-              <>
+              <div className="at-ficha-acciones" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+                <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
+                {canEdit && detalle.estado === 'en_atencion' && (
+                  <Button variant="outline-danger" onClick={() => void cambiarEstado(detalle, 'requiere_seguimiento')} loading={cambiando === 'requiere_seguimiento'}>
+                    ⚑ Requiere seguimiento
+                  </Button>
+                )}
                 {canEdit && siguiente && (
-                  <Button variant="success" onClick={() => void avanzarEstado(detalle)} loading={avanzando}>
+                  <Button variant="success" onClick={() => void cambiarEstado(detalle, siguiente)} loading={cambiando === siguiente}>
                     ▶ {siguiente === 'en_atencion' ? 'Atender' : 'Resolver'}
                   </Button>
                 )}
-                <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
-              </>
+              </div>
             }
           >
             <IncidenciaDetalle registro={detalle} dinero={dinero} />
@@ -398,30 +405,43 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
   )
 }
 
-/** Detalle de solo lectura de una incidencia de elevador. */
+/** Ficha de solo lectura de una incidencia de elevador: tarjetas de datos,
+ *  descripción completa y observaciones. */
 function IncidenciaDetalle({ registro: r, dinero }: { registro: IncidenciaElevador; dinero: (v: number) => string }) {
-  const fila = (label: string, valor: ReactNode) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 14 }}>
-      <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
-      <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{valor}</span>
+  const tipo = tipoDe(r.tipo)
+  const est = estadoDe(r.estado)
+  const dur = duracion(r.hora_inicio, r.hora_fin)
+  const horario = r.hora_inicio
+    ? `${r.hora_inicio.slice(0, 5)}${r.hora_fin ? `–${r.hora_fin.slice(0, 5)}` : ''}${dur ? ` · ${dur}` : ''}`
+    : '—'
+  const vencida = !!r.proxima_inspeccion && esFechaCalendarioVencida(r.proxima_inspeccion)
+  const tarjeta = (label: string, valor: ReactNode, color?: string) => (
+    <div key={label} style={{ background: 'var(--at-surface-2)', borderRadius: 7, padding: 8, border: '1px solid var(--at-line)', minWidth: 0 }}>
+      <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: color ?? 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>{valor}</div>
     </div>
   )
-  const vencida = !!r.proxima_inspeccion && esFechaCalendarioVencida(r.proxima_inspeccion)
+  const seccion = (label: string, texto: string) => (
+    <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)', marginBottom: 12 }}>
+      <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 4 }}>{label}</div>
+      <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--at-ink-2)', lineHeight: 1.5 }}>{texto}</p>
+    </div>
+  )
   return (
     <div>
-      <p style={{ margin: '0 0 14px', whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--at-ink-2)', lineHeight: 1.6 }}>{r.descripcion}</p>
-      {fila('Empresa de servicio', r.empresa_servicio ? <>{r.empresa_servicio}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)' }}> (sin vincular al catálogo)</span>}</> : '—')}
-      {fila('Técnico', r.tecnico || '—')}
-      {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
-      {fila('Próxima inspección', r.proxima_inspeccion
-        ? <strong style={{ color: vencida ? 'var(--at-danger)' : 'var(--at-accent)' }}>{r.proxima_inspeccion}{vencida ? ' · vencida' : ''}</strong>
-        : '—')}
-      {r.observaciones && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.observaciones}</p>
-        </div>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, marginBottom: 12 }}>
+        {tarjeta('Elevador', r.elevador)}
+        {tarjeta('Tipo', `${tipo?.icon ?? ''} ${tipo?.label ?? r.tipo}`.trim(), tipo?.color)}
+        {tarjeta('Estado', est?.label ?? r.estado, est?.color)}
+        {tarjeta('Fecha', r.fecha)}
+        {tarjeta('Horario', horario)}
+        {tarjeta('Empresa de servicio', r.empresa_servicio ? <>{r.empresa_servicio}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)', fontWeight: 400 }}> (sin vincular al catálogo)</span>}</> : '—')}
+        {tarjeta('Técnico', r.tecnico || '—')}
+        {tarjeta('Costo', r.costo != null ? dinero(r.costo) : '—', r.costo != null ? 'var(--at-success)' : undefined)}
+        {tarjeta('Próxima inspección', r.proxima_inspeccion ? `${r.proxima_inspeccion}${vencida ? ' · vencida' : ''}` : '—', r.proxima_inspeccion ? (vencida ? 'var(--at-danger)' : 'var(--at-accent)') : undefined)}
+      </div>
+      {seccion('Descripción', r.descripcion)}
+      {r.observaciones && seccion('Observaciones', r.observaciones)}
     </div>
   )
 }
