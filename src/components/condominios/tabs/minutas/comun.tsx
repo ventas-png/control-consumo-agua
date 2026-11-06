@@ -42,6 +42,7 @@ export const btnIcono: CSSProperties = {
 }
 
 export const TIPO_COLOR: Record<TipoParticipanteMinuta, { bg: string; fg: string }> = {
+  equipo:    { bg: 'var(--at-warning-tint)', fg: 'var(--at-warning-strong)' },
   empleado:  { bg: 'var(--at-primary-tint)', fg: 'var(--at-primary)' },
   residente: { bg: 'var(--at-accent-tint)',  fg: 'var(--at-accent)' },
   proveedor: { bg: 'var(--at-info-tint)',    fg: 'var(--at-info)' },

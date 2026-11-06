@@ -8,7 +8,7 @@ import { render, screen, fireEvent, cleanup, within, waitFor, act } from '@testi
 import type { ContratoArrendamiento, ContratoProveedor, NotaAdmin, PersonalCondominio, Unidad } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
-  createCondominioRow: vi.fn(async (..._args: unknown[]) => ({ error: null as { message: string } | null })),
+  createCondominioRowReturning: vi.fn(async (..._args: unknown[]) => ({ data: { id: 'nueva-1' } as Record<string, unknown> | null, error: null as { message: string } | null })),
   updateCondominioRow: vi.fn(async (..._args: unknown[]) => ({ error: null as { message: string } | null })),
   updateCondominioRowAfectando: vi.fn(async (..._args: unknown[]) => ({ error: null as { message: string } | null })),
   deleteCondominioRowAfectando: vi.fn(async (..._args: unknown[]) => ({ error: null as { message: string } | null })),
@@ -25,12 +25,13 @@ const mocks = vi.hoisted(() => ({
   fetchResidentesProyecto: vi.fn(async (_projectId: string) => [
     { id: 'r1', unidad_id: 'u2', cliente_id: 'c1', tipo: 'propietario', nombre: 'María Pérez', unidad_nombre: 'Casa 2' },
   ]),
+  fetchEquipoProyecto: vi.fn(async (_projectId: string) => ({ data: [] as { id: string; full_name: string; role: string }[], error: null as string | null })),
   useProveedoresQuery: vi.fn(() => ({ data: [{ id: 'v1', company_id: 'co1', nombre: 'Limpiezas SA', activo: true, contacto_nombre: 'Rosa' }], isLoading: false })),
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
-  createCondominioRow: mocks.createCondominioRow,
+  createCondominioRowReturning: mocks.createCondominioRowReturning,
   updateCondominioRow: mocks.updateCondominioRow,
   updateCondominioRowAfectando: mocks.updateCondominioRowAfectando,
   deleteCondominioRowAfectando: mocks.deleteCondominioRowAfectando,
@@ -81,6 +82,7 @@ vi.mock('../../../shared/ImageGallery', () => ({
 vi.mock('../../../../domain/condominios/minutas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../domain/condominios/minutas')>()),
   fetchResidentesProyecto: mocks.fetchResidentesProyecto,
+  fetchEquipoProyecto: mocks.fetchEquipoProyecto,
   registrarFirmaMinuta: mocks.registrarFirmaMinuta,
   leerFirmasMinuta: mocks.leerFirmasMinuta,
 }))
@@ -106,6 +108,8 @@ const unidades = [
 ] as Unidad[]
 const contratos = [{ id: 'k1', unidad_id: 'u1', arrendatario_nombre: 'Inquilino Uno', estado: 'activo' }] as ContratoArrendamiento[]
 const contratosProveedores = [{ id: 'cp2', proveedor_nombre: 'Jardines GT', servicio: 'jardineria', estado: 'activo' }] as ContratoProveedor[]
+/** Cuentas de la empresa con acceso al proyecto; quien registra (Admin, uB) es una de ellas. */
+const EQUIPO = [{ id: 'uA', full_name: 'Lucía Admin', role: 'admin' }, { id: 'uB', full_name: 'Admin', role: 'company_owner' }]
 
 function nota(over: Partial<NotaAdmin>): NotaAdmin {
   return {
@@ -134,7 +138,7 @@ const cerrada = nota({ id: 'n2', titulo: 'Reunión con jardinería', resuelta: t
 
 function props(over: Partial<Parameters<typeof NotasAdminTab>[0]> = {}): Parameters<typeof NotasAdminTab>[0] {
   return {
-    notas: [abierta, cerrada], proyectoId: 'p1', companyId: 'co1', autorNombre: 'Admin',
+    notas: [abierta, cerrada], proyectoId: 'p1', companyId: 'co1', autorNombre: 'Admin', autorId: 'uB', autorRol: 'company_owner',
     personal, unidades, contratos, contratosProveedores, canCreate: true, canEdit: true, canDelete: true, onRefresh: vi.fn(), ...over,
   }
 }
@@ -158,7 +162,8 @@ beforeEach(() => {
   mocks.borrarAlQuitar.length = 0
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 26, 12, 0, 0)) // 26 oct 2026
-  mocks.createCondominioRow.mockResolvedValue({ error: null })
+  mocks.createCondominioRowReturning.mockResolvedValue({ data: { id: 'nueva-1' }, error: null })
+  mocks.fetchEquipoProyecto.mockResolvedValue({ data: EQUIPO, error: null })
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
   mocks.updateCondominioRowAfectando.mockResolvedValue({ error: null })
   mocks.deleteCondominioRowAfectando.mockResolvedValue({ error: null })
@@ -216,9 +221,16 @@ describe('Minutas — nueva en tres pasos', () => {
     const d = dialogo()
     expect(within(d).getByText(/Paso 1 de 4/)).toBeTruthy()
 
-    // Quien la crea ya está como gestor
-    expect(within(d).getByText('Admin')).toBeTruthy()
+    // Quien la crea ya está como gestor, como miembro del equipo del proyecto (con su rol)
     expect(within(d).getByText('★ Gestiona')).toBeTruthy()
+    expect(within(d).getByText('Admin Empresa')).toBeTruthy()
+
+    // Equipo del proyecto: la lista por defecto; quien registra ya figura como agregado
+    expect(within(d).getByRole('radio', { name: /Equipo del proyecto/ }).getAttribute('aria-checked')).toBe('true')
+    expect(await within(d).findByRole('button', { name: 'Admin ya está en la minuta' })).toBeTruthy()
+    expect(within(d).getByText('Administrador')).toBeTruthy() // el rol de Lucía
+    fireEvent.click(within(d).getByRole('button', { name: 'Agregar a Lucía Admin' }))
+    expect(within(d).getByRole('button', { name: 'Lucía Admin ya está en la minuta' })).toBeTruthy()
 
     // Sin título no se avanza
     fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
@@ -229,6 +241,7 @@ describe('Minutas — nueva en tres pasos', () => {
     expect((within(d).getByLabelText('Fecha de la reunión *') as HTMLInputElement).value).toBe('2026-10-26')
 
     // Empleado (el inactivo no aparece)
+    fireEvent.click(within(d).getByRole('radio', { name: /Empleado/ }))
     fireEvent.click(within(d).getByRole('button', { name: 'Agregar a Carlos Guardia' }))
     expect(within(d).queryByRole('button', { name: /Ex Empleado/ })).toBeNull()
     expect(within(d).getByRole('button', { name: 'Carlos Guardia ya está en la minuta' })).toBeTruthy()
@@ -253,14 +266,14 @@ describe('Minutas — nueva en tres pasos', () => {
     fireEvent.change(within(d).getByLabelText('Nombre *'), { target: { value: 'Lic. Rodríguez' } })
     fireEvent.change(within(d).getByLabelText('Detalle'), { target: { value: 'Abogado externo' } })
     fireEvent.click(within(d).getByRole('button', { name: '+ Agregar' }))
-    expect(within(d).getByText('Participantes (5)')).toBeTruthy()
+    expect(within(d).getByText('Participantes (6)')).toBeTruthy()
 
     // Cambiar quien gestiona y quitar a uno
-    fireEvent.click(within(d).getAllByRole('button', { name: 'Hacer gestor' })[0]) // Carlos
+    fireEvent.click(within(d).getAllByRole('button', { name: 'Hacer gestor' })[1]) // Carlos (el [0] es Lucía)
     const tarjetaCarlos = within(d).getByText('Carlos Guardia').closest('div')!.parentElement!
     expect(tarjetaCarlos.textContent).toContain('★ Gestiona')
     fireEvent.click(within(d).getByRole('button', { name: 'Quitar a Lic. Rodríguez' }))
-    expect(within(d).getByText('Participantes (4)')).toBeTruthy()
+    expect(within(d).getByText('Participantes (5)')).toBeTruthy()
 
     // Paso 2: puntos
     fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
@@ -291,34 +304,37 @@ describe('Minutas — nueva en tres pasos', () => {
     fireEvent.change(within(d).getByLabelText('Prioridad'), { target: { value: 'alta' } })
 
     guardarNueva(d)
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
-    const [tabla, payload] = mocks.createCondominioRow.mock.calls[0] as [string, Record<string, unknown>]
+    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
+    const [tabla, payload] = mocks.createCondominioRowReturning.mock.calls[0] as [string, Record<string, unknown>]
     expect(tabla).toBe('notas_admin')
     expect(payload).toMatchObject({
       company_id: 'co1', project_id: 'p1', autor: 'Admin', titulo: 'Turno nocturno', fecha_reunion: '2026-10-26',
-      categoria: 'reunion', prioridad: 'alta', fecha_recordatorio: '2026-11-03', fijada: false, contenido: '',
+      categoria: 'reunion', prioridad: 'alta', fecha_recordatorio: '2026-11-03', fijada: false, contenido: '', borrador_paso: null,
     })
     const participantes = payload.participantes as { tipo: string; nombre: string; gestiona: boolean; ref_id: string | null; detalle: string | null }[]
     expect(participantes.map(p => [p.tipo, p.nombre, p.gestiona])).toEqual([
-      ['otro', 'Admin', false], ['empleado', 'Carlos Guardia', true], ['residente', 'María Pérez', false], ['proveedor', 'Limpiezas SA', false],
+      ['equipo', 'Admin', false], ['equipo', 'Lucía Admin', false], ['empleado', 'Carlos Guardia', true], ['residente', 'María Pérez', false], ['proveedor', 'Limpiezas SA', false],
     ])
-    expect(participantes[1]).toMatchObject({ ref_id: 'e1', detalle: 'Guardia' })
-    expect(participantes[2]).toMatchObject({ ref_id: 'r1', detalle: 'Casa 2 · Propietario' })
-    expect(participantes[3]).toMatchObject({ ref_id: 'v1', detalle: 'Rosa' })
+    expect(participantes[0]).toMatchObject({ ref_id: 'uB', detalle: 'Admin Empresa' })
+    expect(participantes[1]).toMatchObject({ ref_id: 'uA', detalle: 'Administrador' })
+    expect(participantes[2]).toMatchObject({ ref_id: 'e1', detalle: 'Guardia' })
+    expect(participantes[3]).toMatchObject({ ref_id: 'r1', detalle: 'Casa 2 · Propietario' })
+    expect(participantes[4]).toMatchObject({ ref_id: 'v1', detalle: 'Rosa' })
     const puntos = payload.puntos as { titulo: string; descripcion: string | null; acuerdos: Record<string, unknown>[] }[]
     expect(puntos).toHaveLength(1)
     expect(puntos[0]).toMatchObject({ titulo: 'Rondas nocturnas', descripcion: 'Faltan las de madrugada' })
     expect(puntos[0].acuerdos[0]).toMatchObject({ tipo: 'acuerdo', texto: 'Se mantiene el horario', responsable_id: null, fecha_limite: null, cumplido: false })
-    expect(puntos[0].acuerdos[1]).toMatchObject({ tipo: 'compromiso', texto: 'Registrar cada ronda', responsable_id: participantes[1] && (payload.participantes as { id: string }[])[1].id, fecha_limite: '2026-11-02', cumplido: false })
+    expect(puntos[0].acuerdos[1]).toMatchObject({ tipo: 'compromiso', texto: 'Registrar cada ronda', responsable_id: (payload.participantes as { id: string }[])[2].id, fecha_limite: '2026-11-02', cumplido: false })
     await waitFor(() => expect(onRefresh).toHaveBeenCalled())
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('con el catálogo de cargos el empleado muestra el nombre del cargo; el error al guardar no cierra la ventana', async () => {
-    mocks.createCondominioRow.mockResolvedValueOnce({ error: { message: 'sin permiso' } })
+    mocks.createCondominioRowReturning.mockResolvedValueOnce({ data: null, error: { message: 'sin permiso' } })
     render(<NotasAdminTab {...props({ cargos: [{ id: 'g', company_id: 'co1', project_id: 'p1', codigo: 'guardia', nombre: 'Guardia de seguridad', icono: '', orden: 1 } as never] })} />)
     fireEvent.click(screen.getByRole('button', { name: '+ Nueva minuta' }))
     const d = dialogo()
+    fireEvent.click(within(d).getByRole('radio', { name: /Empleado/ }))
     expect(within(d).getByText('Guardia de seguridad')).toBeTruthy()
     fireEvent.change(within(d).getByLabelText('Título de la minuta *'), { target: { value: 'Prueba' } })
     fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
@@ -452,8 +468,8 @@ describe('Minutas — fotos y documentos', () => {
     expect(within(d).getByTestId('fotos-borrador').textContent).toBe('p1/minutas/nueva.jpg')
     expect(within(d).getByTestId('documentos-borrador').textContent).toBe(DOC)
     guardarNueva(d)
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
-    const [, payload] = mocks.createCondominioRow.mock.calls[0] as [string, Record<string, unknown>]
+    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
+    const [, payload] = mocks.createCondominioRowReturning.mock.calls[0] as [string, Record<string, unknown>]
     expect(payload.fotos).toEqual(['p1/minutas/nueva.jpg'])
     expect(payload.documentos).toEqual([DOC])
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -468,7 +484,7 @@ describe('Minutas — fotos y documentos', () => {
     fireEvent.click(within(d).getByRole('button', { name: 'Simular subida de documento' }))
     guardarNueva(d)
     await waitFor(() => expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/nueva.jpg']))
-    const [, payload] = mocks.createCondominioRow.mock.calls[0] as [string, Record<string, unknown>]
+    const [, payload] = mocks.createCondominioRowReturning.mock.calls[0] as [string, Record<string, unknown>]
     expect(payload.fotos).toEqual([])
     expect(payload.documentos).toEqual([DOC])
   })
@@ -511,13 +527,13 @@ describe('Minutas — fotos y documentos', () => {
     fireEvent.click(within(d).getByRole('tab', { name: 'Paso 1 · Participantes' }))
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(within(d).getByRole('tab', { name: 'Paso 3 · Acuerdos' }).getAttribute('aria-selected')).toBe('true')
-    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+    expect(mocks.createCondominioRowReturning).not.toHaveBeenCalled()
     expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ title: 'Subiendo archivos' }))
 
     fireEvent.click(within(d).getByRole('button', { name: 'Simular subida' }))
     fireEvent.click(within(d).getByRole('button', { name: 'Simular fin de subida' }))
     guardarNueva(d)
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
   })
 
   it('al editar, «Guardar cambios» avisa durante la subida sin salir del orden de Tab', () => {
@@ -533,23 +549,23 @@ describe('Minutas — fotos y documentos', () => {
   })
 
   describe('si el asistente se desmonta mientras guarda («Atrás» del sistema)', () => {
-    function guardadoPendiente(mock: typeof mocks.createCondominioRow) {
-      let resolver!: (v: { error: { message: string } | null }) => void
-      mock.mockImplementationOnce(() => new Promise(r => { resolver = r }))
-      return (v: { error: { message: string } | null }) => resolver(v)
+    function guardadoPendiente<T>(mock: { mockImplementationOnce: (f: () => Promise<T>) => unknown }) {
+      let resolver!: (v: T) => void
+      mock.mockImplementationOnce(() => new Promise<T>(r => { resolver = r }))
+      return (v: T) => resolver(v)
     }
 
     it('una minuta nueva guardada conserva sus archivos', async () => {
-      const resolver = guardadoPendiente(mocks.createCondominioRow)
+      const resolver = guardadoPendiente(mocks.createCondominioRowReturning)
       const { unmount } = render(<NotasAdminTab {...props()} />)
       const d = nuevaHastaPaso3()
       fireEvent.click(within(d).getByRole('button', { name: 'Simular subida' }))
       fireEvent.click(within(d).getByRole('button', { name: 'Simular subida de documento' }))
       guardarNueva(d)
-      await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
       unmount()
       expect(mocks.removeMedia).not.toHaveBeenCalled()
-      await act(async () => { resolver({ error: null }) })
+      await act(async () => { resolver({ data: { id: 'nueva-1' }, error: null }) })
       expect(mocks.removeMedia).not.toHaveBeenCalled()
     })
 
@@ -712,8 +728,8 @@ describe('Minutas — firmas', () => {
     expect(within(d).getByRole('img', { name: 'Firma de Admin' }).getAttribute('data-src')).toBe(path)
 
     fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
-    const payload = mocks.createCondominioRow.mock.calls[0][1] as { firmas: { participante_id: string; nombre: string; path: string; version: string; firmado_at: string }[]; puntos: never; participantes: never }
+    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
+    const payload = mocks.createCondominioRowReturning.mock.calls[0][1] as { firmas: { participante_id: string; nombre: string; path: string; version: string; firmado_at: string }[]; puntos: never; participantes: never }
     expect(payload.firmas).toHaveLength(1)
     expect(payload.firmas[0]).toMatchObject({ nombre: 'Admin', path })
     expect(payload.firmas[0].firmado_at).toMatch(/^2026-10-26T/)
@@ -896,5 +912,178 @@ describe('Minutas — firmas', () => {
     expect(html).toContain('<h2>Firmas</h2>')
     expect(html).toMatch(/<img src="data:image\/png;base64,[A-Za-z0-9+/=]+" alt="">/)
     expect(html).toContain('Firma pendiente')
+  })
+})
+
+describe('Minutas — guardar avance y retomar', () => {
+  it('«Guardar avance» en cada paso: la primera vez crea la fila en curso y el asistente sigue sobre ella; después actualiza; «Guardar minuta» la termina', async () => {
+    const onRefresh = vi.fn()
+    render(<NotasAdminTab {...props({ onRefresh })} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva minuta' }))
+    const d = dialogo()
+    // Sin título no hay avance que guardar
+    fireEvent.click(within(d).getByRole('button', { name: '💾 Guardar avance' }))
+    expect(mocks.notify).toHaveBeenLastCalledWith(expect.objectContaining({ variant: 'warning', text: expect.stringMatching(/título/) }))
+    expect(mocks.createCondominioRowReturning).not.toHaveBeenCalled()
+
+    fireEvent.change(within(d).getByLabelText('Título de la minuta *'), { target: { value: 'Reunión a medias' } })
+    fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
+    fireEvent.click(within(d).getByRole('button', { name: '+ Agregar punto' }))
+    fireEvent.change(within(d).getByLabelText('Punto 1'), { target: { value: 'Presupuesto' } })
+    // Paso 2, sin acuerdos todavía: se guarda igual, en curso en el paso 2
+    fireEvent.click(within(d).getByRole('button', { name: '💾 Guardar avance' }))
+    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
+    const [tabla, payload, select] = mocks.createCondominioRowReturning.mock.calls[0] as [string, Record<string, unknown>, string]
+    expect(tabla).toBe('notas_admin')
+    expect(select).toBe('id')
+    expect(payload).toMatchObject({ company_id: 'co1', project_id: 'p1', autor: 'Admin', titulo: 'Reunión a medias', borrador_paso: 2, fotos: [], documentos: [], firmas: [] })
+    expect((payload.puntos as { titulo: string }[]).map(p => p.titulo)).toEqual(['Presupuesto'])
+    await waitFor(() => expect(mocks.notify).toHaveBeenLastCalledWith(expect.objectContaining({ variant: 'success', title: 'Avance guardado · paso 2 de 4' })))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+    // El asistente sigue abierto, en el mismo paso, y ya no «cancela»: cierra
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(within(d).getByText(/Paso 2 de 4/)).toBeTruthy()
+    expect(within(d).getByRole('button', { name: 'Cerrar' })).toBeTruthy()
+    expect(within(d).queryByRole('button', { name: 'Cancelar' })).toBeNull()
+
+    // Paso 3: el siguiente avance actualiza la fila creada, sin reescribir archivos que no cambiaron
+    fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
+    fireEvent.click(within(d).getByRole('button', { name: 'Agregar acuerdo al punto 1' }))
+    fireEvent.change(within(d).getByLabelText('Acuerdo del punto 1'), { target: { value: 'Se aprueba' } })
+    fireEvent.click(within(d).getByRole('button', { name: '💾 Guardar avance' }))
+    await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledTimes(1))
+    const [, id, campos] = mocks.updateCondominioRowAfectando.mock.calls[0] as [string, string, Record<string, unknown>]
+    expect(id).toBe('nueva-1')
+    expect(campos).toMatchObject({ borrador_paso: 3 })
+    expect(campos.fotos).toBeUndefined()
+    expect(campos.documentos).toBeUndefined()
+    expect(campos.firmas).toBeUndefined()
+    expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+
+    // Terminar: «Guardar minuta» deja de estar en curso y cierra
+    fireEvent.click(within(d).getByRole('tab', { name: 'Paso 4 · Firmas' }))
+    fireEvent.click(within(d).getByRole('button', { name: '✅ Guardar minuta' }))
+    await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledTimes(2))
+    expect((mocks.updateCondominioRowAfectando.mock.calls[1] as [string, string, Record<string, unknown>])[2]).toMatchObject({ borrador_paso: null })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(onRefresh).toHaveBeenCalledTimes(3)
+    expect(mocks.removeMedia).not.toHaveBeenCalled()
+  })
+
+  it('si el avance no se pudo guardar, la ventana sigue abierta y no se cierra nada; al cancelar, lo subido se borra', async () => {
+    mocks.createCondominioRowReturning.mockResolvedValueOnce({ data: null, error: { message: 'sin permiso' } })
+    render(<NotasAdminTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva minuta' }))
+    const d = dialogo()
+    fireEvent.change(within(d).getByLabelText('Título de la minuta *'), { target: { value: 'Falla' } })
+    fireEvent.click(within(d).getByRole('button', { name: '💾 Guardar avance' }))
+    await waitFor(() => expect(mocks.notify).toHaveBeenLastCalledWith(expect.objectContaining({ variant: 'error', text: 'sin permiso' })))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(within(d).getByRole('button', { name: 'Cancelar' })).toBeTruthy()
+    // Lo que se suba después de un avance guardado y no se guarde, se borra al cerrar; lo guardado no
+    mocks.createCondominioRowReturning.mockResolvedValueOnce({ data: { id: 'nueva-2' }, error: null })
+    fireEvent.click(within(d).getByRole('button', { name: '💾 Guardar avance' }))
+    await waitFor(() => expect(within(d).getByRole('button', { name: 'Cerrar' })).toBeTruthy())
+    fireEvent.click(within(d).getByRole('button', { name: 'Siguiente →' }))
+    fireEvent.click(within(d).getByRole('button', { name: '+ Agregar punto' }))
+    fireEvent.change(within(d).getByLabelText('Punto 1'), { target: { value: 'Tema' } })
+    fireEvent.click(within(d).getByRole('tab', { name: 'Paso 3 · Acuerdos' }))
+    fireEvent.click(within(d).getByRole('button', { name: 'Simular subida' }))
+    fireEvent.click(within(d).getByRole('button', { name: '💾 Guardar avance' }))
+    await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledTimes(1))
+    expect((mocks.updateCondominioRowAfectando.mock.calls[0] as [string, string, Record<string, unknown>])[2]).toMatchObject({ borrador_paso: 3, fotos: ['p1/minutas/nueva.jpg'] })
+    fireEvent.click(within(d).getByRole('button', { name: 'Simular subida de documento' }))
+    fireEvent.click(within(d).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.removeMedia).toHaveBeenCalledTimes(1)
+    expect(mocks.removeMedia).toHaveBeenCalledWith('condominios-media', ['p1/minutas/1785540000000-ab12cd-acta.pdf'])
+  })
+
+  it('la tarjeta y el detalle muestran la minuta en curso; «Continuar» abre el asistente en el paso guardado y «Guardar minuta» la termina', async () => {
+    const enCurso = nota({ ...abierta, id: 'n3', titulo: 'Reunión a medias', borrador_paso: 3, fecha_recordatorio: null })
+    render(<NotasAdminTab {...props({ notas: [enCurso, abierta] })} />)
+    expect(screen.getByText('Reunión a medias').closest('button')!.textContent).toContain('En curso · paso 3 de 4')
+    expect(screen.getByText('Reunión con el guardia').closest('button')!.textContent).not.toContain('En curso')
+    // Filtro «En curso»
+    fireEvent.click(screen.getByRole('radio', { name: /En curso/ }))
+    expect(screen.getByText('Reunión a medias')).toBeTruthy()
+    expect(screen.queryByText('Reunión con el guardia')).toBeNull()
+
+    fireEvent.click(screen.getByText('Reunión a medias'))
+    const det = dialogo()
+    expect(within(det).getByText(/En curso · paso 3 de 4/)).toBeTruthy()
+    expect(within(det).getByText(/Minuta en curso/).parentElement!.textContent).toMatch(/paso 3 \(acuerdos\).*«Continuar»/)
+    // Cerrarla avisa de que la captura quedó a medias
+    mocks.confirm.mockResolvedValueOnce({ isConfirmed: false })
+    fireEvent.click(within(det).getByRole('button', { name: '✓ Cerrar minuta' }))
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringMatching(/captura a medias \(se quedó en el paso 3 de 4\)/) })))
+    expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
+
+    fireEvent.click(within(det).getByRole('button', { name: '▶ Continuar' }))
+    const w = screen.getByRole('dialog', { name: '▶ Retomar minuta' })
+    expect(within(w).getByText(/Paso 3 de 4/)).toBeTruthy()
+    expect(within(w).getByText('Rondas nocturnas')).toBeTruthy()
+    expect(within(w).getByRole('button', { name: '💾 Guardar avance' })).toBeTruthy()
+    fireEvent.click(within(w).getByRole('button', { name: '✅ Guardar minuta' }))
+    await waitFor(() => expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledTimes(1))
+    const [, id, campos] = mocks.updateCondominioRowAfectando.mock.calls[0] as [string, string, Record<string, unknown>]
+    expect(id).toBe('n3')
+    expect(campos).toMatchObject({ borrador_paso: null, titulo: 'Reunión a medias' })
+    // El asistente se cierra y se vuelve al detalle (como al editar).
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '▶ Retomar minuta' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Reunión a medias' })).toBeTruthy()
+  })
+
+  it('un valor de paso fuera de rango se lee como minuta terminada; una cerrada no está en curso', () => {
+    render(<NotasAdminTab {...props({ notas: [nota({ ...abierta, borrador_paso: 9 }), nota({ ...cerrada, borrador_paso: 2 })] })} />)
+    fireEvent.click(screen.getByRole('radio', { name: /Todas/ }))
+    expect(screen.getByText('Reunión con el guardia').closest('button')!.textContent).not.toContain('En curso')
+    expect(screen.getByText('Reunión con jardinería').closest('button')!.textContent).not.toContain('En curso')
+    expect(screen.getByRole('radio', { name: /En curso/ }).textContent).toContain('(0)')
+  })
+})
+
+describe('Minutas — equipo del proyecto', () => {
+  it('sin cuentas asignadas lo dice; si el RPC falla, avisa sin ocultar las demás listas', async () => {
+    mocks.fetchEquipoProyecto.mockResolvedValueOnce({ data: [], error: null })
+    const { unmount } = render(<NotasAdminTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva minuta' }))
+    let d = dialogo()
+    expect(await within(d).findByText(/Ninguna cuenta activa de la empresa tiene acceso/)).toBeTruthy()
+    expect(within(d).getByRole('radio', { name: /Equipo del proyecto/ }).textContent).toContain('(0)')
+    unmount()
+
+    mocks.fetchEquipoProyecto.mockResolvedValueOnce({ data: [], error: 'sin permiso' })
+    render(<NotasAdminTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva minuta' }))
+    d = dialogo()
+    expect((await within(d).findByRole('alert')).textContent).toContain('No se pudo cargar el equipo del proyecto: sin permiso')
+    expect(within(d).queryByText(/Ninguna cuenta activa/)).toBeNull()
+    fireEvent.click(within(d).getByRole('radio', { name: /Empleado/ }))
+    expect(within(d).getByRole('button', { name: 'Agregar a Carlos Guardia' })).toBeTruthy()
+  })
+
+  it('sin la cuenta de quien registra, entra como «otro · Administración» y la lista del equipo lo ofrece aparte; se busca por rol', async () => {
+    render(<NotasAdminTab {...props({ autorId: null, autorRol: null })} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva minuta' }))
+    const d = dialogo()
+    expect(within(d).getByText('Administración')).toBeTruthy()
+    expect(await within(d).findByRole('button', { name: 'Agregar a Admin' })).toBeTruthy()
+    fireEvent.change(within(d).getByRole('searchbox', { name: /Buscar en el equipo del proyecto/ }), { target: { value: 'administrador' } })
+    expect(within(d).getByRole('button', { name: 'Agregar a Lucía Admin' })).toBeTruthy()
+    expect(within(d).queryByRole('button', { name: 'Agregar a Admin' })).toBeNull()
+  })
+
+  it('el detalle y la impresión presentan al participante del equipo con su tipo', async () => {
+    const conEquipo = nota({ ...abierta, participantes: [{ id: 'pa', tipo: 'equipo', ref_id: 'uB', nombre: 'Admin', detalle: 'Admin Empresa', gestiona: true }] })
+    const { write } = ventanaDeImpresion()
+    render(<NotasAdminTab {...props({ notas: [conEquipo] })} />)
+    fireEvent.click(screen.getByText('Reunión con el guardia'))
+    const det = dialogo()
+    expect(within(det).getByText('💼 Equipo del proyecto')).toBeTruthy()
+    fireEvent.click(within(det).getByRole('button', { name: '🖨 Imprimir' }))
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(2))
+    expect(String(write.mock.calls[1][0])).toContain('Admin — Admin Empresa <em>(Equipo del proyecto, gestiona)</em>')
   })
 })

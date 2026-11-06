@@ -17,10 +17,13 @@ fila con la fecha de la reunión y dos columnas JSON.
   compromisos. Con permiso de editar se marcan compromisos cumplidos (se sella
   `cumplido_at`), se fija/desfija, se cierra (`resuelta = true`, avisa si
   quedan compromisos) o se reabre; imprimir arma la versión en papel.
-- **Nueva / editar** en ventana, en tres pasos (`minutas/MinutaWizard.tsx`):
+- **Nueva / editar** en ventana, en cuatro pasos (`minutas/MinutaWizard.tsx`):
   1. **Participantes** — título, fecha, objetivo; quien la abre entra como
-     gestor (★) y se puede cambiar con «Hacer gestor». Se agregan desde cuatro
-     listas: **empleados** (`personal` activo, con el nombre del cargo del
+     gestor (★) —como miembro del **equipo del proyecto**, con su cuenta y su
+     rol— y se puede cambiar con «Hacer gestor». Se agregan desde cinco
+     listas: **equipo del proyecto** (las cuentas activas de la empresa con
+     acceso al proyecto, por el RPC `minutas_equipo_proyecto`; ver abajo),
+     **empleados** (`personal` activo, con el nombre del cargo del
      catálogo RRHH), **propietarios/inquilinos** (`unidad_residentes` del
      proyecto con su rol, más el dueño registrado en la unidad y el arrendatario
      del contrato vigente cuando la unidad no los tiene como residentes),
@@ -42,13 +45,61 @@ fila con la fecha de la reunión y dos columnas JSON.
   participante y un gestor; al menos un punto; fechas válidas). La lógica está
   en `src/domain/condominios/minutas.ts`.
 
+## Guardar el avance y retomar (20261121000000)
+
+Una reunión se captura en varias sentadas, o se interrumpe. Por eso cada paso
+del asistente tiene **«💾 Guardar avance»**, además de «Siguiente»:
+
+- Guarda lo que hay con `notas_admin.borrador_paso` = el paso actual (1–4). La
+  primera vez **crea la fila** (`createCondominioRowReturning`, para quedarse con
+  el id) y el asistente **sigue abierto sobre esa fila**: desde entonces edita,
+  no crea, y «Cancelar» pasa a decir «Cerrar» (lo guardado no se pierde).
+- Lo mínimo para guardar el avance (`validarAvanceMinuta`) es lo del paso 1
+  —título, fecha, un participante y un gestor— y que ninguna fecha tecleada sea
+  inválida. **No exige puntos ni acuerdos**: una reunión recién convocada ya se
+  guarda. Si falta algo, el asistente salta al paso donde falta y lo dice.
+- **«✅ Guardar minuta» / «Guardar cambios»** exigen los cuatro pasos como
+  siempre y dejan `borrador_paso = null`: la minuta terminó el asistente.
+- La fila recuerda el paso: la tarjeta de la lista y el detalle muestran
+  **«✎ En curso · paso N de 4»** (`minutaEnCurso` / `pasoBorradorDe`; un valor
+  fuera de 1–4 o una minuta cerrada no cuentan como en curso), la lista tiene el
+  filtro «En curso», el botón del detalle pasa de «Editar» a **«▶ Continuar»**
+  y el asistente («Retomar minuta») abre **en ese paso**. Cerrar una minuta en
+  curso avisa de que la captura quedó a medias; la impresión lo marca.
+- Archivos: tras un «Guardar avance», lo subido después y no guardado se borra
+  al cerrar, y lo guardado no (`guardadoRef` toma la lista de cada guardado;
+  `originales` sigue siendo lo que la fila tenía al abrir, que es lo que
+  `archivosPorBorrar` necesita para borrar lo que se quitó antes del avance).
+  Las listas de fotos, documentos y firmas sólo viajan si cambiaron **desde el
+  último guardado** (`guardado`), no desde que se abrió.
+
+## El equipo del proyecto (20261121000000)
+
+La administración misma —las cuentas de la empresa asignadas al proyecto— no
+salía de ninguna lista. `app_users_select` sólo deja enumerar la empresa a
+company_owner/admin, así que, como en Personal y Rutas, la lista es un RPC:
+
+- `minutas_equipo_proyecto(p_project_id)` → `(id, full_name, role)`: cuentas
+  **activas** de la empresa del proyecto que lo ven (`usuario_acceso_a_proyecto`:
+  rol exento, `project_id` legacy o asignación explícita), sin `cliente`. Exige
+  empresa del proyecto, la clave de visibilidad del tab
+  (`condominios.tab.notas_admin`) y acceso del llamador al proyecto;
+  SECURITY DEFINER, `search_path = ''`, EXECUTE sólo a `authenticated`.
+- En la minuta el participante lleva `tipo: 'equipo'`, `ref_id` =
+  `app_users.id` y como `detalle` la etiqueta del rol (`etiquetaRolEquipo`: las
+  mismas del chip del encabezado, «Admin Empresa», «Administrador»…). `yaParticipa`
+  lo reconoce por cuenta aunque el nombre haya cambiado. Un cliente viejo que no
+  conozca el tipo lo lee como «otro» (`participantesDe`).
+- Si el RPC falla, la lista lo dice (`role="alert"`) sin ocultar las demás; si
+  nadie tiene acceso, manda a Empresa › Usuarios › Asignar proyectos.
+
 ## Forma de los JSON
 
 ```jsonc
 // notas_admin.participantes
 [
-  { "id": "uuid", "tipo": "empleado",   // empleado | residente | proveedor | otro
-    "ref_id": "personal.id | unidad_residentes.id | proveedores.id | null",
+  { "id": "uuid", "tipo": "empleado",   // equipo | empleado | residente | proveedor | otro
+    "ref_id": "app_users.id | personal.id | unidad_residentes.id | proveedores.id | null",
     "nombre": "Carlos Guardia", "detalle": "Guardia de seguridad", "gestiona": false }
 ]
 

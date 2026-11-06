@@ -10,19 +10,21 @@
 import { db } from '../../lib/supabase'
 import { reportDegradedQuery } from '../queryFetch'
 import { diasHastaFechaCalendario, diaLocalDeInstante, esFechaCalendario } from '../../lib/format'
+import { PLATFORM_ROLE_LABELS } from '../../lib/permissions'
 import { normalizarNombre } from '../proveedores/identidad'
 import type {
   AcuerdoMinuta, CategoriaNota, ContratoArrendamiento, ContratoProveedor, FirmaMinuta, NotaAdmin, ParticipanteMinuta,
-  PersonalCondominio, PrioridadNota, PuntoMinuta, TipoAcuerdoMinuta, TipoParticipanteMinuta, TipoResidente, Unidad,
+  PersonalCondominio, PrioridadNota, PuntoMinuta, TipoAcuerdoMinuta, TipoParticipanteMinuta, TipoResidente, Unidad, UserRole,
 } from '../../types'
 import type { ProveedorCatalogo } from '../../types/proveedores'
 import type { Json } from '../../types/database.types'
 
 // ── Catálogos de etiquetas ───────────────────────────────────────────────────
 
-export const TIPOS_PARTICIPANTE: readonly TipoParticipanteMinuta[] = ['empleado', 'residente', 'proveedor', 'otro']
+export const TIPOS_PARTICIPANTE: readonly TipoParticipanteMinuta[] = ['equipo', 'empleado', 'residente', 'proveedor', 'otro']
 
 export const TIPO_PARTICIPANTE_INFO: Record<TipoParticipanteMinuta, { label: string; plural: string; icon: string }> = {
+  equipo:    { label: 'Equipo del proyecto',    plural: 'Equipo del proyecto',       icon: '💼' },
   empleado:  { label: 'Empleado',               plural: 'Empleados',                 icon: '👷' },
   residente: { label: 'Propietario / inquilino', plural: 'Propietarios e inquilinos', icon: '🏠' },
   proveedor: { label: 'Proveedor',              plural: 'Proveedores',               icon: '🏢' },
@@ -37,6 +39,17 @@ export const ROL_RESIDENTE_LABEL: Record<TipoResidente, string> = {
 export const TIPO_ACUERDO_INFO: Record<TipoAcuerdoMinuta, { label: string; icon: string }> = {
   acuerdo:    { label: 'Acuerdo',    icon: '🤝' },
   compromiso: { label: 'Compromiso', icon: '📌' },
+}
+
+/**
+ * Cómo se presenta el rol de una cuenta del equipo en la minuta: las mismas
+ * etiquetas que el chip del encabezado («Admin Empresa», «Administrador»,
+ * «Operador»…); un rol desconocido sale capitalizado y sin rol, «Equipo».
+ */
+export function etiquetaRolEquipo(role: string | null | undefined): string {
+  if (!role) return 'Equipo'
+  if (role === 'superadmin') return PLATFORM_ROLE_LABELS.super_admin
+  return PLATFORM_ROLE_LABELS[role as UserRole] ?? (capitalizar(role) || 'Equipo')
 }
 
 const TIPOS_PARTICIPANTE_SET = new Set<string>(TIPOS_PARTICIPANTE)
@@ -302,6 +315,23 @@ export function fechaDeMinuta(nota: Pick<NotaAdmin, 'fecha_reunion' | 'created_a
   return diaLocalDeInstante(nota.created_at) ?? ''
 }
 
+// ── Minuta en curso (20261121000000) ─────────────────────────────────────────
+
+/**
+ * Paso del asistente en el que se guardó el avance, o null si la minuta
+ * terminó el asistente (o la fila es anterior a la columna). Un valor fuera de
+ * 1–4 se lee como terminada: la pantalla nunca abre un paso que no existe.
+ */
+export function pasoBorradorDe(nota: Pick<NotaAdmin, 'borrador_paso'> | null | undefined): PasoMinuta | null {
+  const p = nota?.borrador_paso
+  return p === 1 || p === 2 || p === 3 || p === 4 ? p : null
+}
+
+/** En curso: se guardó el avance de un paso y no se ha terminado ni cerrado. */
+export function minutaEnCurso(nota: Pick<NotaAdmin, 'borrador_paso' | 'resuelta'> | null | undefined): boolean {
+  return !!nota && !nota.resuelta && pasoBorradorDe(nota) !== null
+}
+
 // ── Seguimiento de compromisos ───────────────────────────────────────────────
 
 export type SituacionCompromiso = 'cumplido' | 'vencido' | 'hoy' | 'pendiente' | 'sin_fecha'
@@ -390,14 +420,19 @@ export interface BorradorMinuta {
 
 /**
  * Borrador para el asistente. Nueva: quien la crea queda como primer
- * participante y gestor (se puede cambiar). Editar: lo guardado, normalizado.
+ * participante y gestor (se puede cambiar); con `gestor` (su cuenta) entra como
+ * miembro del equipo del proyecto, así la lista del equipo lo da por agregado.
+ * Editar: lo guardado, normalizado.
  */
-export function borradorDesde(nota: NotaAdmin | null, gestorNombre: string, hoy: string): BorradorMinuta {
+export function borradorDesde(nota: NotaAdmin | null, gestorNombre: string, hoy: string, gestor?: { id: string; detalle: string | null }): BorradorMinuta {
   if (!nota) {
     const nombre = gestorNombre.trim()
+    const creador: ParticipanteMinuta = gestor?.id
+      ? { id: nuevoIdMinuta(), tipo: 'equipo', ref_id: gestor.id, nombre, detalle: gestor.detalle?.trim() || 'Administración', gestiona: true }
+      : { id: nuevoIdMinuta(), tipo: 'otro', ref_id: null, nombre, detalle: 'Administración', gestiona: true }
     return {
       titulo: '', fecha_reunion: hoy, contenido: '', categoria: 'reunion', prioridad: 'normal', fecha_recordatorio: '', fijada: false,
-      participantes: nombre ? [{ id: nuevoIdMinuta(), tipo: 'otro', ref_id: null, nombre, detalle: 'Administración', gestiona: true }] : [],
+      participantes: nombre ? [creador] : [],
       puntos: [],
       fotos: [],
       documentos: [],
@@ -445,6 +480,20 @@ export function validarPasoMinuta(b: BorradorMinuta, paso: PasoMinuta): string |
     return null
   }
   // Paso 4: firmar es opcional; quien no firme ahora puede hacerlo desde el detalle.
+  return null
+}
+
+/**
+ * Lo mínimo para guardar el avance de cualquier paso y retomar después: lo que
+ * identifica la minuta (título, fecha, participantes y gestor) y que ninguna
+ * fecha tecleada sea inválida. No exige puntos ni acuerdos: una reunión que
+ * apenas se convocó ya se puede guardar. Devuelve en qué paso está lo que falta.
+ */
+export function validarAvanceMinuta(b: BorradorMinuta): { paso: PasoMinuta; falta: string } | null {
+  for (const paso of [1, 3] as const) {
+    const falta = validarPasoMinuta(b, paso)
+    if (falta) return { paso, falta }
+  }
   return null
 }
 
@@ -511,6 +560,21 @@ export interface ResidenteProyecto {
   tipo: TipoResidente
   nombre: string
   unidad_nombre: string | null
+}
+
+/** Cuenta de la empresa con acceso al proyecto (RPC minutas_equipo_proyecto). */
+export interface MiembroEquipoProyecto {
+  id: string
+  full_name: string
+  role: string
+}
+
+/** El equipo asignado al proyecto: cada cuenta con su rol como detalle. */
+export function candidatosEquipo(equipo: readonly MiembroEquipoProyecto[]): CandidatoParticipante[] {
+  return equipo
+    .filter(m => m.full_name?.trim())
+    .map(m => ({ clave: `equipo:${m.id}`, tipo: 'equipo' as const, ref_id: m.id, nombre: m.full_name.trim(), detalle: etiquetaRolEquipo(m.role) }))
+    .sort(porNombre)
 }
 
 export function candidatosEmpleados(personal: readonly PersonalCondominio[], nombreCargo?: (codigo: string) => string | undefined): CandidatoParticipante[] {
@@ -662,6 +726,18 @@ export async function registrarFirmaMinuta(notaId: string, firma: FirmaMinuta): 
   if (upErr) return { error: upErr.message, reemplazada: null }
   if (!filas || filas.length === 0) return { error: 'No se pudo guardar la firma: no tienes permiso para editar esta minuta.', reemplazada: null }
   return { error: null, reemplazada: reemplazada !== firma.path ? reemplazada : null }
+}
+
+/**
+ * El equipo de la empresa asignado al proyecto (RPC `minutas_equipo_proyecto`,
+ * 20261121000000): cuentas activas con acceso a él, sin clientes. No degrada a
+ * `[]` en silencio: el RPC exige el permiso del tab, y «no tienes acceso»
+ * leído como «nadie está asignado» mandaría a asignar a quien ya lo está.
+ */
+export async function fetchEquipoProyecto(projectId: string): Promise<{ data: MiembroEquipoProyecto[]; error: string | null }> {
+  const { data, error } = await db.rpc('minutas_equipo_proyecto', { p_project_id: projectId })
+  reportDegradedQuery('condominios.fetchEquipoProyecto', error)
+  return { data: (data as MiembroEquipoProyecto[] | null) ?? [], error: error?.message ?? null }
 }
 
 /** Residentes activos de las unidades del proyecto, con su nombre y unidad. Degrada a `[]`. */

@@ -229,14 +229,17 @@ export type PrioridadNota = 'normal' | 'alta' | 'urgente'
 // abordaron y qué se acordó o se comprometió en cada uno. Los tres bloques
 // viajan como JSON en la misma fila (como `actas_reunion.asistentes`).
 
-/** De qué lista salió el participante. `otro` es un nombre tecleado. */
-export type TipoParticipanteMinuta = 'empleado' | 'residente' | 'proveedor' | 'otro'
+/**
+ * De qué lista salió el participante. `equipo` es una cuenta de la empresa con
+ * acceso al proyecto (20261121000000); `otro` es un nombre tecleado.
+ */
+export type TipoParticipanteMinuta = 'equipo' | 'empleado' | 'residente' | 'proveedor' | 'otro'
 
 export interface ParticipanteMinuta {
   /** Id local (uuid): los compromisos lo citan como responsable. */
   id: string
   tipo: TipoParticipanteMinuta
-  /** Fila de origen (personal, unidad_residentes o proveedores); null en `otro`. */
+  /** Fila de origen (app_users, personal, unidad_residentes o proveedores); null en `otro`. */
   ref_id?: string | null
   nombre: string
   /** Cargo, «Casa 4 · Propietario», contacto del proveedor… */
@@ -307,6 +310,11 @@ export interface NotaAdmin {
   documentos?: string[] | null
   /** Firmas de los participantes (20261120000000). */
   firmas?: FirmaMinuta[] | null
+  /**
+   * Minuta en curso: paso del asistente (1–4) en el que se guardó el avance y
+   * desde el que se retoma; null cuando terminó el asistente (20261121000000).
+   */
+  borrador_paso?: number | null
   created_at: string
 }
 
