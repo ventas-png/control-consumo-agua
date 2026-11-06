@@ -1,23 +1,39 @@
-// Vista extraída de AmenidadesTab (fase B): JSX idéntico al original.
+// Lista de reservas: la tarjeta abre la ficha en ventana (ReservaDetalle) y
+// el alta va en ventana. Antes cada tarjeta traía sus botones de acción en
+// fila y el formulario se desplegaba sobre la lista.
 import { useId } from 'react'
 import type { AmenidadesCtx } from './ctx'
 import { esFinDeSemana, tarifaAplicable } from '../../../../lib/amenidadesReglas'
-import { chipStyle, btnAction } from './ui'
+import { chipStyle } from './ui'
 import { EmptyState } from './comunes'
+import { EditModal } from '../../../shared/EditModal'
+import { Button } from '../../../shared/Button'
 import { SelectorEquiposReserva } from './SelectorEquiposReserva'
 import { prestamosDeReserva, rentaDeReserva, rentaEquipoSolicitado, resumenEquiposReserva, totalCobroReserva } from '../../../../lib/prestamosEquipo'
 
 export function VistaReservas({ ctx }: { ctx: AmenidadesCtx }) {
-  const { amenidades, reservas, unidades, moneda, inventario, prestamos, amenidadInventario, canCreate, canEdit, showReservaForm, setShowReservaForm, saving, reservaForm, setReservaForm, reservaDetalle, setReservaDetalle, hoy, amenidadesActivas, guardarReserva, cancelarReserva, marcarNoShow, marcarTarifaPagada, aprobarReserva, rechazarReserva } = ctx
+  const { amenidades, reservas, unidades, moneda, inventario, prestamos, amenidadInventario, canCreate, showReservaForm, setShowReservaForm, saving, reservaForm, setReservaForm, reservaDetalle, setReservaDetalle, hoy, amenidadesActivas, guardarReserva } = ctx
+  // No se cierra a mitad del guardado: cerrar ahí escondería el error.
+  const cerrarForm = () => { if (!saving) setShowReservaForm(false) }
   // Cada label apunta a su control: un lector de pantalla anuncia el campo y tocar el texto lo enfoca.
   const uid = useId()
   const id = (campo: string) => `${uid}-${campo}`
   return (
         <>
           {showReservaForm && (
-            <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nueva reserva</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <EditModal
+              title="Nueva reserva"
+              maxWidth="640px"
+              fullScreenOnMobile
+              closeOnBackdropClick={!saving}
+              closeOnEscape={!saving}
+              onClose={cerrarForm}
+              footer={<>
+                <Button variant="secondary" onClick={cerrarForm} disabled={saving}>Cancelar</Button>
+                <Button onClick={() => void guardarReserva()} loading={saving} loadingText="Guardando...">Confirmar reserva</Button>
+              </>}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
                 <div>
                   <label htmlFor={id('amenidad')} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
                   <select id={id('amenidad')} value={reservaForm.amenidad_id} onChange={e => setReservaForm(f => ({ ...f, amenidad_id: e.target.value }))}
@@ -106,13 +122,7 @@ export function VistaReservas({ ctx }: { ctx: AmenidadesCtx }) {
                   )
                 })()}
               </div>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={guardarReserva} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-                  {saving ? 'Guardando...' : 'Confirmar reserva'}
-                </button>
-                <button onClick={() => setShowReservaForm(false)} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-              </div>
-            </div>
+            </EditModal>
           )}
           {(() => {
             const pendientesAprob = reservas.filter(r => r.estado === 'pendiente' && r.fecha >= hoy).length
@@ -136,17 +146,20 @@ export function VistaReservas({ ctx }: { ctx: AmenidadesCtx }) {
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {reservas.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(r => {
+              {[...reservas].sort((a, b) => b.fecha.localeCompare(a.fecha)).map(r => {
                 const cobro = totalCobroReserva(r, prestamos)
                 const renta = rentaDeReserva(r.id, prestamos)
                 const tieneTarifa = cobro > 0
                 const pendientePago = tieneTarifa && r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada && r.estado !== 'cancelada'
                 const accent = r.estado === 'confirmada' ? 'var(--at-success)' : r.estado === 'pendiente' ? 'var(--at-warning)' : 'var(--at-ink-3)'
+                const abierta = reservaDetalle?.id === r.id
                 return (
-                <div key={r.id}
-                  style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: '14px 18px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease, border-color 0.15s ease' }}
-                  onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 18px -8px rgba(15,23,42,0.18)'; e.currentTarget.style.borderColor = 'var(--at-line-strong)' }}
-                  onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--at-line)' }}>
+                <div key={r.id} role="button" tabIndex={0} aria-label={`Reserva de ${r.amenidad_nombre} · ${r.unidad_nombre} · ${r.fecha}`}
+                  onClick={() => setReservaDetalle(r)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setReservaDetalle(r) } }}
+                  style={{ background: 'var(--at-surface)', border: `1.5px solid ${abierta ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: 14, padding: '14px 18px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow 0.15s ease, border-color 0.15s ease' }}
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 18px -8px rgba(15,23,42,0.18)' }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}>
                   {/* barra acento lateral */}
                   <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: accent }} />
                   <div style={{ flex: 1, minWidth: 220 }}>
@@ -178,28 +191,7 @@ export function VistaReservas({ ctx }: { ctx: AmenidadesCtx }) {
                       <div style={{ fontSize: 11.5, color: 'var(--at-danger-strong)', marginTop: 4, fontStyle: 'italic', background: 'var(--at-danger-tint)', padding: '4px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
                     )}
                   </div>
-                  {r.estado === 'pendiente' && canEdit && (
-                    <>
-                      <button onClick={() => aprobarReserva(r)} style={btnAction('var(--at-success-tint)', 'var(--at-success-border)', 'var(--at-success-strong)')}>✓ Aprobar</button>
-                      <button onClick={() => rechazarReserva(r)} style={btnAction('var(--at-danger-tint)', 'var(--at-danger-border)', 'var(--at-danger-strong)')}>✗ Rechazar</button>
-                    </>
-                  )}
-                  {pendientePago && canEdit && (
-                    <button onClick={() => marcarTarifaPagada(r)} style={btnAction('var(--at-success-tint)', 'var(--at-success-border)', 'var(--at-success)')}>Marcar pagado</button>
-                  )}
-                  {r.fecha < hoy && r.estado === 'confirmada' && canEdit && (
-                    <button onClick={() => marcarNoShow(r)} style={btnAction(r.no_show ? 'var(--at-chip)' : 'var(--at-warning-tint)', r.no_show ? 'var(--at-line-strong)' : 'var(--at-warning-border)', r.no_show ? 'var(--at-ink-3)' : 'var(--at-warning-strong)')}>
-                      {r.no_show ? '↶ Quitar no-show' : 'No show'}
-                    </button>
-                  )}
-                  {canEdit && (
-                    <button onClick={() => setReservaDetalle(reservaDetalle?.id === r.id ? null : r)} style={btnAction('var(--at-primary-tint)', 'var(--at-primary-soft-2)', 'var(--at-primary)')}>
-                      {reservaDetalle?.id === r.id ? 'Cerrar' : '⋯ Detalle'}
-                    </button>
-                  )}
-                  {r.estado !== 'cancelada' && canEdit && (
-                    <button onClick={() => cancelarReserva(r.id)} style={btnAction('var(--at-danger-tint)', 'var(--at-danger-border)', 'var(--at-danger)')}>Cancelar</button>
-                  )}
+                  <span aria-hidden style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-primary)', flexShrink: 0 }}>Ver ficha ›</span>
                 </div>
               )})}
             </div>

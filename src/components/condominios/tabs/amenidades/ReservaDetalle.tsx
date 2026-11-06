@@ -1,19 +1,23 @@
-// Vista extraída de AmenidadesTab (fase B): JSX idéntico al original.
+// Ficha de la reserva en ventana (EditModal, pantalla completa en el
+// teléfono): datos en tarjetas, el seguimiento (aprobación, check-in, equipo,
+// check-out, depósito) y las acciones en el pie junto a Cerrar. Antes era un
+// panel propio sin Escape ni foco atrapado, y las acciones iban en la lista.
 import type { ReactNode } from 'react'
 import type { AmenidadesCtx } from './ctx'
 import { updateCondominioRow } from '../../../../domain/condominios/tabMutations'
-import { btnAction } from './ui'
+import { btnAction, chipStyle } from './ui'
 import { ImageUploader } from '../../../shared/ImageUploader'
 import { SecureImage } from '../../../shared/SecureImage'
 import { CheckoutForm } from './comunes'
-import { ModalPortal } from '../../../shared/ModalPortal'
+import { EditModal } from '../../../shared/EditModal'
+import { Button } from '../../../shared/Button'
 import { formatFechaCalendario } from '../../../../lib/format'
 import { tint } from '../../../shared/statusTone'
 import { EquiposReserva } from './EquiposReserva'
 import { prestamosDeReserva, rentaDeReserva, resumenEquiposReserva, totalCobroReserva } from '../../../../lib/prestamosEquipo'
 
 export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
-  const { amenidades, moneda, canEdit, onRefresh, reservaDetalle, prestamos, amenidadInventario, setReservaDetalle, registrarCheckin, registrarCheckout, actualizarEstadoDeposito, retenerDeposito, aprobarReserva, rechazarReserva } = ctx
+  const { amenidades, moneda, canEdit, onRefresh, reservaDetalle, prestamos, amenidadInventario, setReservaDetalle, registrarCheckin, registrarCheckout, actualizarEstadoDeposito, retenerDeposito, aprobarReserva, rechazarReserva, cancelarReserva, marcarNoShow, marcarTarifaPagada, hoy } = ctx
   if (!reservaDetalle) return null
         const r = reservaDetalle
         const amen = amenidades.find(a => a.id === r.amenidad_id)
@@ -146,89 +150,116 @@ export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
           })
         }
         const accent = r.estado === 'confirmada' ? 'var(--at-accent-2)' : r.estado === 'pendiente' ? 'var(--at-warning)' : 'var(--at-ink-3)'
+        const tarifa = Number(r.monto_tarifa ?? 0)
+        const renta = rentaDeReserva(r.id, prestamos)
+        const cobro = totalCobroReserva(r, prestamos)
+        const estadoPago = r.metodo_pago_tarifa === 'cargar_unidad' ? 'cargado a unidad' : (r.tarifa_pagada ? 'pagado en sitio' : 'por cobrar en sitio')
+        const pendientePago = cobro > 0 && r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada && r.estado !== 'cancelada'
+        const DEPOSITO_LABEL: Record<string, string> = { no_aplica: 'No aplica', pendiente: 'Pendiente', cobrado: 'Cobrado', devuelto: 'Devuelto', retenido: 'Retenido' }
+        const datos: { label: string; value: string; color?: string }[] = [
+          { label: 'Unidad', value: r.unidad_nombre ?? '—' },
+          { label: 'Fecha', value: formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }, 'es', r.fecha) },
+          { label: 'Horario', value: `${r.hora_inicio}–${r.hora_fin}` },
+          { label: 'Invitados', value: r.num_invitados > 0 ? String(r.num_invitados) : '—' },
+        ]
+        if (tarifa > 0) datos.push({ label: 'Tarifa', value: `${moneda} ${tarifa.toFixed(2)}`, color: 'var(--at-success)' })
+        if (renta > 0) datos.push({ label: 'Renta de equipo', value: `${moneda} ${renta.toFixed(2)}`, color: 'var(--at-success)' })
+        if (cobro > 0) datos.push({ label: tarifa > 0 && renta > 0 ? 'Total' : 'Cobro', value: `${moneda} ${cobro.toFixed(2)} · ${estadoPago}`, color: pendientePago ? 'var(--at-warning-strong)' : undefined })
+        if (amen?.requiere_deposito) datos.push({ label: 'Depósito', value: `${DEPOSITO_LABEL[r.deposito_estado] ?? r.deposito_estado}${amen.monto_deposito != null ? ` · ${moneda} ${Number(amen.monto_deposito).toFixed(2)}` : ''}` })
+        datos.push({ label: 'Solicitud creada', value: new Date(r.created_at).toLocaleString('es') })
         return (
-          <ModalPortal>
-          <div onClick={() => setReservaDetalle(null)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, animation: 'fadeIn 0.15s ease' }}>
-            <div onClick={e => e.stopPropagation()}
-              style={{ background: 'var(--at-surface)', borderRadius: 18, maxWidth: 700, width: '100%', maxHeight: '92vh', overflow: 'auto', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.4)' }}>
-              {/* Header gradiente */}
-              <div style={{ padding: '20px 24px', background: `linear-gradient(135deg, ${accent}, ${tint(accent, 87)})`, color: 'white', borderRadius: '18px 18px 0 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Reserva · {r.estado}</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{r.amenidad_nombre}</div>
-                  <div style={{ fontSize: 13, opacity: 0.92, marginTop: 4 }}>
-                    🏠 {r.unidad_nombre} · 📅 {formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—')} · ⏰ {r.hora_inicio}–{r.hora_fin}
-                  </div>
-                </div>
-                <button onClick={() => setReservaDetalle(null)} style={{ background: 'rgba(255,255,255,0.18)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>✕</button>
-              </div>
-
-              {/* Stepper */}
-              <div style={{ padding: 24 }}>
-                <div style={{ position: 'relative' }}>
-                  {steps.map((s, i) => {
-                    const isLast = i === steps.length - 1
-                    const dotColor = s.done ? 'var(--at-success)' : s.current ? accent : 'var(--at-line-strong)'
-                    const lineColor = s.done ? 'var(--at-success-border)' : 'var(--at-line)'
-                    return (
-                      <div key={s.id} style={{ display: 'flex', gap: 14, position: 'relative', paddingBottom: isLast ? 0 : 18 }}>
-                        {/* Línea vertical */}
-                        {!isLast && (
-                          <div style={{ position: 'absolute', left: 13, top: 28, bottom: 0, width: 2, background: lineColor }} />
-                        )}
-                        {/* Bullet */}
-                        <div style={{
-                          width: 28, height: 28, borderRadius: '50%',
-                          background: s.done ? 'var(--at-success-tint)' : s.current ? tint(accent, 13) : 'var(--at-chip)',
-                          border: `2px solid ${dotColor}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: dotColor, fontWeight: 800, fontSize: 13,
-                          flexShrink: 0, zIndex: 1, position: 'relative',
-                          boxShadow: s.current ? `0 0 0 4px ${tint(accent, 13)}` : 'none',
-                        }}>
-                          {s.done ? '✓' : i + 1}
-                        </div>
-                        {/* Contenido */}
-                        <div style={{ flex: 1, paddingTop: 2 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                            <div style={{ fontWeight: 800, fontSize: 14, color: s.done ? 'var(--at-ink)' : s.current ? 'var(--at-ink)' : 'var(--at-ink-3)' }}>{s.label}</div>
-                            {s.id === 'aprobacion' && r.estado === 'pendiente' && canEdit && (
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                <button onClick={() => aprobarReserva(r)} style={btnAction('var(--at-success-tint)', 'var(--at-success-border)', 'var(--at-success-strong)')}>✓ Aprobar</button>
-                                <button onClick={() => rechazarReserva(r)} style={btnAction('var(--at-danger-tint)', 'var(--at-danger-border)', 'var(--at-danger-strong)')}>✗ Rechazar</button>
-                              </div>
-                            )}
-                          </div>
-                          {s.meta && <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>{s.meta}</div>}
-                          {s.render && <div>{s.render}</div>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Datos extra: tarifa, renta del equipo y notas */}
-                {(totalCobroReserva(r, prestamos) > 0 || r.notas) && (
-                  <div style={{ marginTop: 18, padding: 14, background: 'var(--at-surface-2)', borderRadius: 12 }}>
-                    {totalCobroReserva(r, prestamos) > 0 && (() => {
-                      const tarifa = Number(r.monto_tarifa ?? 0)
-                      const renta = rentaDeReserva(r.id, prestamos)
-                      const estadoPago = r.metodo_pago_tarifa === 'cargar_unidad' ? 'cargado a unidad' : (r.tarifa_pagada ? 'pagado en sitio' : 'por cobrar en sitio')
-                      return (
-                        <div style={{ fontSize: 12.5, color: 'var(--at-ink-2)', marginBottom: r.notas ? 6 : 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          {tarifa > 0 && <span>🎟 <strong>Tarifa:</strong> {moneda} {tarifa.toFixed(2)}</span>}
-                          {renta > 0 && <span>🪑 <strong>Renta de equipo:</strong> {moneda} {renta.toFixed(2)}</span>}
-                          <span><strong>{tarifa > 0 && renta > 0 ? 'Total: ' : ''}</strong>{tarifa > 0 && renta > 0 ? `${moneda} ${totalCobroReserva(r, prestamos).toFixed(2)} · ` : ''}{estadoPago}</span>
-                        </div>
-                      )
-                    })()}
-                    {r.notas && <div style={{ fontSize: 12.5, color: 'var(--at-ink-2)' }}>📝 {r.notas}</div>}
-                  </div>
+          <EditModal
+            title={r.amenidad_nombre ?? 'Reserva'}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={chipStyle(r.estado)}>{r.estado === 'confirmada' ? '✓ Confirmada' : r.estado === 'pendiente' ? '⏳ Pendiente' : '✗ Cancelada'}</span>
+                {r.no_show && <span style={chipStyle('no_show')}>👻 No show</span>}
+                {cobro > 0 && <span style={chipStyle(pendientePago ? 'cobro_pendiente' : 'pagado')}>🎟 {moneda} {cobro.toFixed(2)}</span>}
+                <span>🏠 {r.unidad_nombre} · 📅 {formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—')} · ⏰ {r.hora_inicio}–{r.hora_fin}</span>
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={() => setReservaDetalle(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+                <Button variant="secondary" onClick={() => setReservaDetalle(null)}>Cerrar</Button>
+                {canEdit && r.estado !== 'cancelada' && (
+                  <Button variant="outline-danger" onClick={() => void cancelarReserva(r.id)}>✕ Cancelar reserva</Button>
+                )}
+                {canEdit && r.fecha < hoy && r.estado === 'confirmada' && (
+                  <Button variant="secondary" onClick={() => void marcarNoShow(r)}>{r.no_show ? '↶ Quitar no-show' : '👻 No show'}</Button>
+                )}
+                {canEdit && pendientePago && (
+                  <Button variant="success" onClick={() => void marcarTarifaPagada(r)}>💵 Marcar pagado</Button>
+                )}
+                {canEdit && r.estado === 'pendiente' && (
+                  <>
+                    <Button variant="outline-danger" onClick={() => void rechazarReserva(r)}>✗ Rechazar</Button>
+                    <Button variant="success" onClick={() => void aprobarReserva(r)}>✓ Aprobar</Button>
+                  </>
                 )}
               </div>
+            }
+          >
+            {r.rechazada_motivo && (
+              <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', color: 'var(--at-danger-strong)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12.5 }}>
+                ↩ Rechazada: {r.rechazada_motivo}
+              </div>
+            )}
+
+            {/* Datos de la reserva en tarjetas */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, marginBottom: 12 }}>
+              {datos.map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 7, padding: 8, border: '1px solid var(--at-line)', minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: d.color ?? 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
             </div>
-          </div>
-          </ModalPortal>
+
+            {r.notas && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)', marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 4 }}>Notas</div>
+                <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--at-ink-2)' }}>{r.notas}</p>
+              </div>
+            )}
+
+            {/* Seguimiento (stepper): aprobación, check-in, equipo, check-out, depósito */}
+            <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 8 }}>Seguimiento</div>
+            <div style={{ position: 'relative' }}>
+              {steps.map((s, i) => {
+                const isLast = i === steps.length - 1
+                const dotColor = s.done ? 'var(--at-success)' : s.current ? accent : 'var(--at-line-strong)'
+                const lineColor = s.done ? 'var(--at-success-border)' : 'var(--at-line)'
+                return (
+                  <div key={s.id} style={{ display: 'flex', gap: 14, position: 'relative', paddingBottom: isLast ? 0 : 18 }}>
+                    {/* Línea vertical */}
+                    {!isLast && (
+                      <div style={{ position: 'absolute', left: 13, top: 28, bottom: 0, width: 2, background: lineColor }} />
+                    )}
+                    {/* Bullet */}
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      background: s.done ? 'var(--at-success-tint)' : s.current ? tint(accent, 13) : 'var(--at-chip)',
+                      border: `2px solid ${dotColor}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: dotColor, fontWeight: 800, fontSize: 13,
+                      flexShrink: 0, zIndex: 1, position: 'relative',
+                      boxShadow: s.current ? `0 0 0 4px ${tint(accent, 13)}` : 'none',
+                    }}>
+                      {s.done ? '✓' : i + 1}
+                    </div>
+                    {/* Contenido */}
+                    <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+                      <div style={{ fontWeight: 800, fontSize: 14, color: s.done ? 'var(--at-ink)' : s.current ? 'var(--at-ink)' : 'var(--at-ink-3)' }}>{s.label}</div>
+                      {s.meta && <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>{s.meta}</div>}
+                      {s.render && <div>{s.render}</div>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </EditModal>
         )
 }

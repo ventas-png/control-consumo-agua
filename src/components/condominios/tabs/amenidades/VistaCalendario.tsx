@@ -2,13 +2,13 @@
 import type { AmenidadesCtx } from './ctx'
 import { Fragment } from 'react'
 import { addMinutosToTime, lunesDeSemana, DIAS_ES } from '../../../../lib/amenidadesReglas'
-import { MOTIVO_LABEL, ESTADO_COLORS, RESERVA_CAL_COLORS } from './ui'
+import { MOTIVO_LABEL, RESERVA_CAL_COLORS } from './ui'
 import { EmptyState } from './comunes'
 import { dateLocalISO } from '../../../../lib/format'
 import { tint } from '../../../shared/statusTone'
 
 export function VistaCalendario({ ctx }: { ctx: AmenidadesCtx }) {
-  const { reservas, bloqueos, canCreate, canEdit, setSemana, selectedReserva, setSelectedReserva, hoy, amenidadesActivas, dias, abrirReservaDesdeCalendario, cancelarReserva } = ctx
+  const { reservas, bloqueos, canCreate, setSemana, setReservaDetalle, hoy, amenidadesActivas, dias, abrirReservaDesdeCalendario } = ctx
   return (
         <div>
           {/* Navegación de semana */}
@@ -128,7 +128,7 @@ export function VistaCalendario({ ctx }: { ctx: AmenidadesCtx }) {
                                     </div>
                                   )}
                                   <div data-role="reserva"
-                                    onClick={(e) => { e.stopPropagation(); setSelectedReserva(selectedReserva?.id === r.id ? null : r) }}
+                                    onClick={(e) => { e.stopPropagation(); setReservaDetalle(r) }}
                                     title={`${r.unidad_nombre} · ${r.hora_inicio}–${r.hora_fin}${pend ? ' (pendiente)' : ''}`}
                                     style={{
                                       position: 'absolute', left: 6, right: 6,
@@ -183,30 +183,7 @@ export function VistaCalendario({ ctx }: { ctx: AmenidadesCtx }) {
             )
           })()}
 
-          {/* Detalle de reserva seleccionada */}
-          {selectedReserva && (
-            <div style={{ marginTop: 16, background: 'var(--at-surface)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>{selectedReserva.amenidad_nombre}</div>
-                <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
-                  {selectedReserva.unidad_nombre} · {selectedReserva.fecha} · {selectedReserva.hora_inicio}–{selectedReserva.hora_fin}
-                  {selectedReserva.num_invitados > 0 && ` · ${selectedReserva.num_invitados} invitados`}
-                </div>
-                {selectedReserva.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{selectedReserva.notas}</div>}
-              </div>
-              <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ESTADO_COLORS[selectedReserva.estado]?.bg, color: ESTADO_COLORS[selectedReserva.estado]?.color }}>
-                {selectedReserva.estado}
-              </span>
-              {selectedReserva.estado !== 'cancelada' && canEdit && (
-                <button onClick={() => cancelarReserva(selectedReserva.id)}
-                  style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                  Cancelar
-                </button>
-              )}
-              <button onClick={() => setSelectedReserva(null)}
-                style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, color: 'var(--at-ink-3)' }}>✕</button>
-            </div>
-          )}
+          {/* La reserva pulsada abre la misma ficha en ventana que la lista (ReservaDetalle). */}
 
           <div style={{ marginTop: 12, fontSize: 11, color: 'var(--at-ink-3)' }}>
             Haz clic en una reserva para ver detalles · Haz clic en <strong>+</strong> para crear una nueva reserva en esa fecha y amenidad.

@@ -160,8 +160,8 @@ describe('AmenidadesTab — la renta del equipo se suma a la reserva', () => {
     montar()
     fireEvent.click(screen.getByRole('button', { name: '📋 Lista' }))
     expect(screen.getByText(/🎟 Q 50\.00 · incl\. renta Q 50\.00 · unidad/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '⋯ Detalle' }))
-    expect(screen.getByText('Renta de equipo:')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Reserva de Salón · Casa 4 · 2099-01-05' }))
+    expect(screen.getByText('Renta de equipo')).toBeTruthy()
     expect(screen.getByText(/cargado a unidad/)).toBeTruthy()
     expect(screen.getByText(/renta Q 50\.00 \(cargo generado\)/)).toBeTruthy()
     expect(screen.getByText(/Renta de equipo: Q 50\.00/)).toBeTruthy()
@@ -170,7 +170,7 @@ describe('AmenidadesTab — la renta del equipo se suma a la reserva', () => {
   it('al agregar equipo con renta desde el detalle se propone cargarla a la unidad y se manda al RPC', async () => {
     montar({ prestamos: [] })
     fireEvent.click(screen.getByRole('button', { name: '📋 Lista' }))
-    fireEvent.click(screen.getByRole('button', { name: '⋯ Detalle' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reserva de Salón · Casa 4 · 2099-01-05' }))
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar equipo' }))
     expect(screen.queryByLabelText(/Generar un cargo a la unidad por la renta/)).toBeNull()
     fireEvent.change(screen.getByLabelText('Cantidad de Sillas'), { target: { value: '4' } })
@@ -183,7 +183,7 @@ describe('AmenidadesTab — la renta del equipo se suma a la reserva', () => {
     cleanup(); vi.clearAllMocks()
     montar({ prestamos: [] })
     fireEvent.click(screen.getByRole('button', { name: '📋 Lista' }))
-    fireEvent.click(screen.getByRole('button', { name: '⋯ Detalle' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reserva de Salón · Casa 4 · 2099-01-05' }))
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar equipo' }))
     fireEvent.change(screen.getByLabelText('Cantidad de Mesas'), { target: { value: '2' } })
     // Las mesas se prestan sin costo: no hay cargo que ofrecer.
