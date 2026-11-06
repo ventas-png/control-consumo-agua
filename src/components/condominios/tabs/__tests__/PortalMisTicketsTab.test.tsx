@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import type { ComentarioTicket, TicketMantenimiento } from '../../../../types'
 
 // El tab entra a Supabase solo a través de la capa domain; se mockea ahí (y el
@@ -66,6 +66,11 @@ function renderTab(props: Partial<Parameters<typeof PortalMisTicketsTab>[0]> = {
   )
 }
 
+/** La tarjeta abre la ficha en ventana; la conversación vive en su pie. */
+const abrirFicha = (titulo = 'Fuga en el baño') => fireEvent.click(screen.getByRole('button', { name: titulo }))
+const ficha = (titulo = 'Fuga en el baño') => screen.getByRole('dialog', { name: titulo })
+const pie = (titulo?: string) => ficha(titulo).querySelector('.at-modal-footer') as HTMLElement
+
 beforeEach(() => {
   mocks.createCondominioRow.mockClear()
   mocks.updateCondominioRow.mockClear()
@@ -126,34 +131,41 @@ describe('PortalMisTicketsTab — reporte en ventana emergente', () => {
     expect(screen.getByText(/PDF, Word o Excel/)).toBeTruthy()
   })
 
-  it('lista los documentos ya adjuntos en la tarjeta, con enlace para abrirlos', async () => {
+  it('la tarjeta cuenta los documentos adjuntos y la ficha los lista con enlace para abrirlos', async () => {
     renderTab({ tickets: [ticket({ archivo_urls: ['p1/tickets/1785540000000-a3f9x2-cotizacion.pdf'] })] })
+    expect(screen.getByText('📎 1 archivo')).toBeTruthy()
+    expect(screen.queryByText('cotizacion.pdf')).toBeNull()
+    abrirFicha()
     expect(await screen.findByText('cotizacion.pdf')).toBeTruthy()
   })
 })
 
 describe('PortalMisTicketsTab — conversación del ticket', () => {
-  it('muestra el conteo de mensajes en la tarjeta', async () => {
+  it('muestra el conteo de mensajes en la tarjeta y en el botón del pie de la ficha', async () => {
     mocks.fetchConteoComentariosTickets.mockResolvedValue({ t1: 3 })
     renderTab()
-    expect(await screen.findByText('💬 Conversación (3)')).toBeTruthy()
+    expect(await screen.findByText('💬 3')).toBeTruthy()
+    abrirFicha()
+    expect(within(pie()).getByRole('button', { name: '💬 Conversación (3)' })).toBeTruthy()
   })
 
   it('abre el hilo del ticket y pinta los mensajes existentes', async () => {
     mocks.fetchComentariosTicket.mockResolvedValue([comentario()])
     renderTab()
-    fireEvent.click(screen.getByText('💬 Escribir al equipo'))
+    abrirFicha()
+    fireEvent.click(within(pie()).getByRole('button', { name: '💬 Escribir al equipo' }))
 
     expect(await screen.findByText('Vamos hoy en la tarde')).toBeTruthy()
     expect(mocks.fetchComentariosTicket).toHaveBeenCalledWith('t1')
-    // El reporte original encabeza el hilo (además de la tarjeta de la lista).
+    // El reporte original encabeza el hilo (además de la tarjeta de la lista y la ficha).
     expect(screen.getByText('Reporte original')).toBeTruthy()
-    expect(screen.getAllByText('Gotea la regadera')).toHaveLength(2)
+    expect(screen.getAllByText('Gotea la regadera')).toHaveLength(3)
   })
 
   it('el residente envía un mensaje sin estado_nuevo ni nota interna', async () => {
     renderTab()
-    fireEvent.click(screen.getByText('💬 Escribir al equipo'))
+    abrirFicha()
+    fireEvent.click(within(pie()).getByRole('button', { name: '💬 Escribir al equipo' }))
     await screen.findByLabelText('Mensaje')
 
     fireEvent.change(screen.getByLabelText('Mensaje'), { target: { value: 'Sigue goteando' } })
@@ -176,7 +188,8 @@ describe('PortalMisTicketsTab — conversación del ticket', () => {
     // La base exige condominios.tab.portal.edit al mensaje del staff (supabase/rls-acciones/operaciones.json).
     mocks.fetchComentariosTicket.mockResolvedValue([comentario()])
     renderTab({ canWrite: false })
-    fireEvent.click(screen.getByText('💬 Escribir al equipo'))
+    abrirFicha()
+    fireEvent.click(within(pie()).getByRole('button', { name: '💬 Escribir al equipo' }))
 
     expect(await screen.findByText('Vamos hoy en la tarde')).toBeTruthy()
     expect(screen.queryByLabelText('Mensaje')).toBeNull()
@@ -185,7 +198,8 @@ describe('PortalMisTicketsTab — conversación del ticket', () => {
 
   it('el hilo acepta documentos, no solo fotos', async () => {
     renderTab()
-    fireEvent.click(screen.getByText('💬 Escribir al equipo'))
+    abrirFicha()
+    fireEvent.click(within(pie()).getByRole('button', { name: '💬 Escribir al equipo' }))
     await screen.findByLabelText('Mensaje')
     // Los adjuntos van en una bandeja plegable bajo el botón del clip.
     fireEvent.click(screen.getByRole('button', { name: 'Adjuntar fotos o documentos' }))
@@ -194,10 +208,66 @@ describe('PortalMisTicketsTab — conversación del ticket', () => {
 
   it('no envía un mensaje vacío sin fotos ni documentos', async () => {
     renderTab()
-    fireEvent.click(screen.getByText('💬 Escribir al equipo'))
+    abrirFicha()
+    fireEvent.click(within(pie()).getByRole('button', { name: '💬 Escribir al equipo' }))
     await screen.findByLabelText('Mensaje')
 
     fireEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
     await waitFor(() => expect(mocks.createCondominioRow).not.toHaveBeenCalled())
+  })
+})
+
+describe('PortalMisTicketsTab — la ficha abre en ventana', () => {
+  it('sin pulsar nada sólo hay tarjetas compactas; la tarjeta abre la ficha a pantalla completa en el teléfono', async () => {
+    mocks.fetchConteoComentariosTickets.mockResolvedValue({ t1: 2 })
+    renderTab({ tickets: [ticket({ asignado_a: 'Carlos Pérez', fecha_limite: '2026-07-25', foto_urls: ['p1/tickets/a.jpg', 'p1/tickets/b.jpg'] })] })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(await screen.findByText('💬 2')).toBeTruthy()
+    expect(screen.getByText('📷 2 fotos')).toBeTruthy()
+    // Lo que sólo va en la ficha.
+    expect(screen.queryByText('Lo atiende')).toBeNull()
+    expect(screen.queryByText('Carlos Pérez')).toBeNull()
+
+    abrirFicha()
+    const v = ficha()
+    expect(v.classList.contains('at-modal--fs-mobile')).toBe(true)
+    // Estado: chip del subtítulo, tarjeta de datos y línea del flujo. Urgencia: chip y tarjeta.
+    expect(within(v).getAllByText(/Abierto$/)).toHaveLength(3)
+    expect(within(v).getAllByText('Media')).toHaveLength(2)
+    expect(within(v).getByText(/20 de julio de 2026/)).toBeTruthy()
+    expect(within(v).getByText('Carlos Pérez')).toBeTruthy()
+    expect(within(v).getByText(/25 de julio/)).toBeTruthy()
+    expect(within(v).getByText('Gotea la regadera')).toBeTruthy()
+    expect(within(v).getByText('Fotos')).toBeTruthy()
+    expect(within(pie()).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '💬 Conversación (2)'])
+  })
+
+  it('Cerrar, Escape y Enter; un ticket resuelto muestra su resolución; la conversación abre encima de la ficha y Escape cierra sólo la conversación', async () => {
+    mocks.fetchComentariosTicket.mockResolvedValue([comentario()])
+    renderTab({ tickets: [ticket({ estado: 'resuelto', fecha_cierre: '2026-07-22T15:00:00.000Z', notas_cierre: 'Se cambió el empaque.' })] })
+    expect(screen.getByText(/^✅ Resuelto el /)).toBeTruthy()
+    abrirFicha()
+    const v = ficha()
+    expect(within(v).getByText('Resolución')).toBeTruthy()
+    expect(within(v).getByText('Se cambió el empaque.')).toBeTruthy()
+    expect(within(v).getByText('Resuelto el')).toBeTruthy()
+    fireEvent.click(within(pie()).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Fuga en el baño' }), { key: 'Enter' })
+    expect(ficha()).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    abrirFicha()
+    fireEvent.click(within(pie()).getByRole('button', { name: '💬 Escribir al equipo' }))
+    expect(await screen.findByText('Vamos hoy en la tarde')).toBeTruthy()
+    expect(screen.getAllByRole('dialog')).toHaveLength(2)
+    mocks.fetchConteoComentariosTickets.mockClear()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(ficha()).toBeTruthy()
+    // Al cerrar la conversación se recarga el conteo de mensajes.
+    await waitFor(() => expect(mocks.fetchConteoComentariosTickets).toHaveBeenCalledTimes(1))
   })
 })
