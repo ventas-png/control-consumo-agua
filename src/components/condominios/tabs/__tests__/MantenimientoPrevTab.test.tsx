@@ -88,19 +88,48 @@ describe('MantenimientoPrevTab — ventanas', () => {
     expect(onRefresh).toHaveBeenCalled()
   })
 
-  it('registrar una ejecución desde la ventana guarda la ejecución y reprograma el plan', async () => {
+  it('registrar una ejecución abre su propia ventana encima de la ficha; guarda la ejecución, reprograma el plan y vuelve a la ficha', async () => {
     renderTab()
     fireEvent.click(screen.getByRole('button', { name: /Bomba de agua/ }))
-    const dialog = screen.getByRole('dialog', { name: 'Bomba de agua' })
-    fireEvent.click(within(dialog).getByRole('button', { name: '+ Registrar ejecución' }))
-    fireEvent.change(within(dialog).getByLabelText('Fecha *'), { target: { value: '2026-10-15' } })
-    fireEvent.change(within(dialog).getByLabelText('Observaciones'), { target: { value: 'Sin novedad' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+    const ficha = screen.getByRole('dialog', { name: 'Bomba de agua' })
+    fireEvent.click(within(ficha).getByRole('button', { name: '+ Registrar ejecución' }))
+
+    const form = screen.getByRole('dialog', { name: 'Registrar ejecución' })
+    expect(form.classList.contains('at-modal--fs-mobile')).toBe(true)
+    expect(screen.getAllByRole('dialog')).toHaveLength(2)
+    // El formulario ya no va dentro de la ficha.
+    expect(within(ficha).queryByLabelText('Fecha *')).toBeNull()
+    fireEvent.change(within(form).getByLabelText('Fecha *'), { target: { value: '2026-10-15' } })
+    expect(within(form).getByText('2026-11-14')).toBeTruthy()
+    fireEvent.change(within(form).getByLabelText('Observaciones'), { target: { value: 'Sin novedad' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Guardar ejecución' }))
 
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('ejecuciones_mantenimiento', expect.objectContaining({
       plan_id: 'pl1', fecha: '2026-10-15', observaciones: 'Sin novedad',
     })))
     expect(mocks.updateCondominioRow).toHaveBeenCalledWith('planes_mantenimiento', 'pl1', { ultima_ejecucion: '2026-10-15', proxima_ejecucion: '2026-11-14' })
+    // Al guardar se cierra el formulario y la ficha sigue abierta con el historial recargado.
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Registrar ejecución' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Bomba de agua' })).toBeTruthy()
+    expect(mocks.fetchEjecucionesMantenimiento).toHaveBeenCalledTimes(2)
+  })
+
+  it('Escape y Cancelar cierran sólo la ventana de la ejecución y descartan lo capturado; la ficha sigue abierta', () => {
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: /Bomba de agua/ }))
+    const ficha = screen.getByRole('dialog', { name: 'Bomba de agua' })
+    fireEvent.click(within(ficha).getByRole('button', { name: '+ Registrar ejecución' }))
+    fireEvent.change(within(screen.getByRole('dialog', { name: 'Registrar ejecución' })).getByLabelText('Observaciones'), { target: { value: 'A medias' } })
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Registrar ejecución' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Bomba de agua' })).toBeTruthy()
+
+    fireEvent.click(within(ficha).getByRole('button', { name: '+ Registrar ejecución' }))
+    const form = screen.getByRole('dialog', { name: 'Registrar ejecución' })
+    expect((within(form).getByLabelText('Observaciones') as HTMLInputElement).value).toBe('')
+    fireEvent.click(within(form).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog', { name: 'Registrar ejecución' })).toBeNull()
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
   })
 
   it('sin permisos la ventana es de solo lectura', async () => {
