@@ -138,7 +138,7 @@ export function ServiciosTab({ ctx }: { ctx: PortalCtx }) {
                       >
                         <span aria-hidden="true" style={{
                           width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0,
-                          background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                          background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: '18px', color: 'white',
                         }}>💧</span>

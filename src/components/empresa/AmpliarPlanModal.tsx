@@ -203,7 +203,7 @@ function formatUsd(cents: number): string {
 
 const btnPrimary = {
   padding: '9px 18px', borderRadius: '8px', border: 'none',
-  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+  background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
   color: 'white', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
 } as const
 

@@ -888,7 +888,7 @@ export function LecturasSection({
 
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={handleGuardar} disabled={saving || tarifaExpirada || sinTarifa || resetIncompleto} style={{ padding: '12px 24px', background: (saving || tarifaExpirada || sinTarifa || resetIncompleto) ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada || sinTarifa || resetIncompleto) ? 'not-allowed' : 'pointer' }}>
+                    <button onClick={handleGuardar} disabled={saving || tarifaExpirada || sinTarifa || resetIncompleto} style={{ padding: '12px 24px', background: (saving || tarifaExpirada || sinTarifa || resetIncompleto) ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada || sinTarifa || resetIncompleto) ? 'not-allowed' : 'pointer' }}>
                       {saving ? 'Guardando...' : enModoRuta ? `💾 Guardar y Avanzar (${rutaIndex + 1}/${unidadesOrdenadas.length})` : '💾 Guardar Lectura'}
                     </button>
                     <button onClick={limpiarFormulario} style={{ padding: '12px 24px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>

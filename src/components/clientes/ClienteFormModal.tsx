@@ -73,7 +73,7 @@ export function ClienteFormModal({ ctx }: { ctx: ClientesCtx }) {
               disabled={onboardingStep === 'lookup_loading'}
               style={{
                 padding: '10px 24px',
-                background: onboardingStep === 'lookup_loading' ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                background: onboardingStep === 'lookup_loading' ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -140,7 +140,7 @@ export function ClienteFormModal({ ctx }: { ctx: ClientesCtx }) {
               onClick={() => setOnboardingStep('lookup')}
               style={{
                 padding: '10px 24px',
-                background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -195,7 +195,7 @@ export function ClienteFormModal({ ctx }: { ctx: ClientesCtx }) {
               onClick={proceedToFullForm}
               style={{
                 padding: '10px 24px',
-                background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -483,7 +483,7 @@ export function ClienteFormModal({ ctx }: { ctx: ClientesCtx }) {
               disabled={loading}
               style={{
                 padding: '10px 24px',
-                background: loading ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                background: loading ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',

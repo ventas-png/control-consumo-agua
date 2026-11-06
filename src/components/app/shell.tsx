@@ -86,7 +86,7 @@ export function DualServicePortal({ currentUser, onLogout }: { currentUser: User
           onClick={() => setActiveService('agua')}
           style={{
             padding: '7px 22px', borderRadius: '20px', border: 'none',
-            background: activeService === 'agua' ? 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))' : 'var(--at-chip)',
+            background: activeService === 'agua' ? 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))' : 'var(--at-chip)',
             color: activeService === 'agua' ? 'white' : 'var(--at-ink-3)',
             fontWeight: 600, fontSize: '13px', cursor: 'pointer',
             transition: 'all 0.18s',

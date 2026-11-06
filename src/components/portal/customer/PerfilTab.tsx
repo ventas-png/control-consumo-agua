@@ -15,7 +15,7 @@ export function PerfilTab({ ctx }: { ctx: PortalCtx }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                 <div style={{
                   width: '44px', height: '44px', borderRadius: '12px',
-                  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                  background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '20px', color: 'white',
                 }}>👤</div>
@@ -78,7 +78,7 @@ export function PerfilTab({ ctx }: { ctx: PortalCtx }) {
                     padding: '12px', marginTop: '4px',
                     background: savingContacto
                       ? 'var(--at-ink-3)'
-                      : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                      : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                     color: 'white', border: 'none', borderRadius: '12px',
                     fontSize: '14.5px', fontWeight: 600,
                     cursor: savingContacto ? 'not-allowed' : 'pointer',

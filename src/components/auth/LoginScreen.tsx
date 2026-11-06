@@ -500,7 +500,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onLoginWithApple, onFo
               <button
                 onClick={onRegister}
                 style={{
-                  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                  background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                   color: 'white', border: 'none', borderRadius: '10px',
                   padding: '8px 18px', fontSize: '13px', fontWeight: 700,
                   cursor: 'pointer', whiteSpace: 'nowrap',

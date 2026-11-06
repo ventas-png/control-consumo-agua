@@ -107,7 +107,7 @@ export function VistaReservas({ ctx }: { ctx: AmenidadesCtx }) {
                 })()}
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={guardarReserva} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={guardarReserva} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
                   {saving ? 'Guardando...' : 'Confirmar reserva'}
                 </button>
                 <button onClick={() => setShowReservaForm(false)} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -129,7 +129,7 @@ export function VistaReservas({ ctx }: { ctx: AmenidadesCtx }) {
               title="Aún no hay reservas"
               hint="Las reservas que se hagan desde esta vista o desde el portal del residente aparecerán aquí. Puedes crear una manualmente para una unidad."
               action={canCreate ? (
-                <button onClick={() => setShowReservaForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
+                <button onClick={() => setShowReservaForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
                   + Crear reserva manual
                 </button>
               ) : null}

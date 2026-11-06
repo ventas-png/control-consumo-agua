@@ -428,7 +428,7 @@ export function UnidadesSection({
                 onClick={startCreate}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                  background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',

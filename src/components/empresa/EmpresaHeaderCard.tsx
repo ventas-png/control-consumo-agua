@@ -162,7 +162,7 @@ export function EmpresaHeaderCard({ empresa, proyectosCount, maxProjectsDisplay,
               {empresa?.logo_url
                 ? <SecureImage bucket="company-logos" src={empresa.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : <div style={{
-                    background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))',
+                    background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))',
                     width: '100%', height: '100%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'white', fontSize: 22, fontWeight: 700,

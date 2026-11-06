@@ -117,7 +117,7 @@ export function TrialExpirationBanner({ companyId }: Props) {
             padding: '6px 14px',
             borderRadius: '8px',
             border: 'none',
-            background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+            background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
             color: 'white',
             fontWeight: 600,
             fontSize: '13px',

@@ -56,7 +56,7 @@ export function VistaAmenidades({ ctx }: { ctx: AmenidadesCtx }) {
               title="Aún no hay amenidades registradas"
               hint="Crea piscinas, salones, gimnasios u otras áreas comunes. Cada amenidad puede tener foto, horario, capacidad, depósito, tarifa y reglas de reserva."
               action={canCreate ? (
-                <button onClick={() => setShowAmenidadForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
+                <button onClick={() => setShowAmenidadForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
                   + Crear primera amenidad
                 </button>
               ) : null}

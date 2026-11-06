@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
   esColorHex, normalizarColorHex, oscurecer, mezclarBlanco, mezclar,
@@ -1120,6 +1120,19 @@ describe('--at-cta / --at-cta-2 (botones principales) desde la marca', () => {
       expect(src, f).toContain("'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))'")
       expect(src, f).not.toContain('linear-gradient(135deg, var(--at-primary), var(--at-accent-2))')
     }
+  })
+
+  it('ningún relleno con texto blanco usa ya el degradado var(--at-primary) → var(--at-accent-2); <Button> primary usa --at-cta', () => {
+    const archivos = (readdirSync(resolve(process.cwd(), 'src'), { recursive: true }) as string[])
+      .map((f) => `src/${f}`)
+      .filter((f) => /\.(tsx?|css)$/.test(f) && !/(__tests__|\.test\.|\.spec\.|\.stories\.)/.test(f))
+    // Dos paradas (con o sin 0% / 100%): botones, banners, avatares, cabeceras.
+    const viejo = /linear-gradient\(\s*135deg\s*,\s*var\(--at-primary\)(\s+0%)?\s*,\s*var\(--at-accent-2\)(\s+100%)?\s*\)/
+    const conViejo = archivos.filter((f) => viejo.test(readFileSync(resolve(process.cwd(), f), 'utf8')))
+    expect(conViejo).toEqual([])
+    expect(archivos.filter((f) => /var\(--at-cta\)/.test(readFileSync(resolve(process.cwd(), f), 'utf8'))).length).toBeGreaterThan(50)
+    const button = readFileSync(resolve(process.cwd(), 'src/components/shared/Button.tsx'), 'utf8')
+    expect(button).toContain("primary:          { background: 'var(--at-cta)', color: '#fff', border: '1px solid var(--at-cta)' },")
   })
 
   it('sin colores custom → null (quedan los de index.css)', () => {

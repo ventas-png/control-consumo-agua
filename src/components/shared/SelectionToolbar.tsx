@@ -154,7 +154,7 @@ function actionBtnStyle(variant: 'default' | 'danger' | 'primary', disabled: boo
     return { ...base, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border, var(--at-danger))' }
   }
   if (variant === 'primary') {
-    return { ...base, background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))', color: 'white' }
+    return { ...base, background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))', color: 'white' }
   }
   return { ...base, background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)' }
 }

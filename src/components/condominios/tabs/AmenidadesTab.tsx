@@ -760,7 +760,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, invent
     <div style={{ padding: '24px', maxWidth: '1200px' }}>
       {/* Hero header con gradiente */}
       <div style={{
-        background: 'linear-gradient(135deg,var(--at-primary) 0%,var(--at-accent-2) 100%)',
+        background: 'linear-gradient(135deg,var(--at-cta) 0%,var(--at-cta-2) 100%)',
         borderRadius: 20,
         padding: '24px 28px',
         marginBottom: 16,
@@ -825,7 +825,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, invent
       {/* Vista toggle */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {(['amenidades', 'reservas', 'calendario', 'bloqueos', 'recordatorios'] as const).map(v => (
-          <button key={v} onClick={() => setVista(v)} style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px', background: vista === v ? 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))' : 'var(--at-chip)', color: vista === v ? 'white' : 'var(--at-ink-2)' }}>
+          <button key={v} onClick={() => setVista(v)} style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px', background: vista === v ? 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))' : 'var(--at-chip)', color: vista === v ? 'white' : 'var(--at-ink-2)' }}>
             {v === 'amenidades' ? '🏊 Amenidades' : v === 'reservas' ? '📋 Lista' : v === 'calendario' ? '📆 Calendario' : v === 'bloqueos' ? '🚫 Bloqueos' : '📨 Recordatorios'}
           </button>
         ))}

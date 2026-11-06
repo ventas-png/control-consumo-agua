@@ -16,7 +16,7 @@ import { tint } from '../../shared/statusTone'
 function AmenidadHeroButton({ signedFotoUrl, onClick, children }: { signedFotoUrl: string | null; onClick: () => void; children: ReactNode }) {
   const fondo = signedFotoUrl
     ? `linear-gradient(180deg, rgba(15,23,42,0.05) 0%, rgba(15,23,42,0.85) 100%), center/cover no-repeat url(${signedFotoUrl})`
-    : 'linear-gradient(135deg,var(--at-primary) 0%,var(--at-accent-2) 100%)'
+    : 'linear-gradient(135deg,var(--at-cta) 0%,var(--at-cta-2) 100%)'
   return (
     <button
       onClick={onClick}

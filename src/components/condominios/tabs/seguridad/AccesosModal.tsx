@@ -100,7 +100,7 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
                 </div>
                 {canCreate && (
                   <button onClick={() => setShowRegForm(true)}
-                    style={{ padding: '8px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
+                    style={{ padding: '8px 16px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
                     + Registrar nueva entrada
                   </button>
                 )}
@@ -300,7 +300,7 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
                 <button onClick={() => void handleRegistrarAcceso()} disabled={regSaving}
-                  style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: regSaving ? 'not-allowed' : 'pointer', opacity: regSaving ? 0.7 : 1 }}>
+                  style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: regSaving ? 'not-allowed' : 'pointer', opacity: regSaving ? 0.7 : 1 }}>
                   {regSaving ? 'Registrando...' : '✓ Registrar entrada'}
                 </button>
                 <button onClick={() => setShowRegForm(false)} disabled={regSaving}

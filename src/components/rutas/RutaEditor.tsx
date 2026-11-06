@@ -112,7 +112,7 @@ export function RutaEditor({ ctx }: { ctx: RutasCtx }) {
                     style={{
                       width: '38px', height: '38px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px',
                       border: active ? 'none' : '2px solid var(--at-line)',
-                      background: active ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)' : 'var(--at-surface)',
+                      background: active ? 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)' : 'var(--at-surface)',
                       color: active ? 'white' : 'var(--at-ink-2)',
                     }}
                   >
@@ -295,7 +295,7 @@ export function RutaEditor({ ctx }: { ctx: RutasCtx }) {
                   fontWeight: 600,
                   fontSize: '13px',
                   cursor: 'pointer',
-                  background: active ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)' : 'var(--at-surface-2)',
+                  background: active ? 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)' : 'var(--at-surface-2)',
                   color: active ? 'white' : 'var(--at-ink-2)',
                   transition: 'all 0.15s',
                 }}
@@ -534,7 +534,7 @@ export function RutaEditor({ ctx }: { ctx: RutasCtx }) {
         <button
           onClick={() => handleGuardar(false)}
           disabled={saving}
-          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
         >
           {saving ? 'Guardando...' : '💾 Guardar Ruta'}
         </button>

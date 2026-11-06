@@ -65,7 +65,8 @@ describe('Button — variants', () => {
   it('aplica style del variant primary por default', () => {
     const { container } = render(<Button>X</Button>)
     const btn = container.querySelector('button') as HTMLElement
-    expect(btn.style.background).toContain('at-primary')
+    // --at-cta: relleno con el que el texto blanco se lee ≥ 4.5:1 en ambos temas.
+    expect(btn.style.background).toContain('at-cta')
   })
 
   it('variant=success usa color de éxito', () => {

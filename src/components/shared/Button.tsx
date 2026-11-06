@@ -31,7 +31,9 @@ interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type'> {
 }
 
 const VARIANTS: Record<ButtonVariant, CSSProperties> = {
-  primary:          { background: 'var(--at-primary)', color: '#fff', border: '1px solid var(--at-primary)' },
+  // --at-cta: el blanco se lee ≥ 4.5:1 en ambos temas y con cualquier marca (var(--at-primary)
+  // daba ~3.1:1 en dark y 1.4:1 con una marca amarilla en claro).
+  primary:          { background: 'var(--at-cta)', color: '#fff', border: '1px solid var(--at-cta)' },
   secondary:        { background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)' },
   ghost:            { background: 'transparent', color: 'var(--at-ink-2)', border: '1px solid transparent' },
   danger:           { background: 'var(--at-danger)', color: 'var(--at-on-status)', border: '1px solid transparent' },

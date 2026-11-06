@@ -246,7 +246,7 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '9px 16px', borderRadius: '8px', border: 'none',
               background: !puedeCrear || proyectos.length >= effectiveMaxProjects
-                ? 'var(--at-ink-2)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                ? 'var(--at-ink-2)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
               color: !puedeCrear || proyectos.length >= effectiveMaxProjects ? 'var(--at-ink-3)' : 'white',
               cursor: !puedeCrear || proyectos.length >= effectiveMaxProjects ? 'not-allowed' : 'pointer',
               fontSize: '13px', fontWeight: 600,
@@ -301,7 +301,7 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
                     {p.logo_url
                       ? <SecureImage bucket="project-logos" src={p.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{
-                          background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))',
+                          background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))',
                           width: '100%', height: '100%',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: 'white', fontSize: 16, fontWeight: 700,

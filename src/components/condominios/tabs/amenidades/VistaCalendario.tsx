@@ -47,7 +47,7 @@ export function VistaCalendario({ ctx }: { ctx: AmenidadesCtx }) {
                     const fechaStr = dateLocalISO(d)
                     const esHoy = fechaStr === hoy
                     return (
-                      <div key={i} style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: esHoy ? 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))' : 'var(--at-surface-2)', color: esHoy ? 'white' : 'var(--at-ink-2)' }}>
+                      <div key={i} style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: esHoy ? 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))' : 'var(--at-surface-2)', color: esHoy ? 'white' : 'var(--at-ink-2)' }}>
                         <div style={{ fontSize: 10.5, fontWeight: 700, opacity: esHoy ? 0.9 : 1 }}>{DIAS_ES[i]}</div>
                         <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>{d.getDate()}</div>
                         <div style={{ fontSize: 9.5, opacity: 0.8, textTransform: 'capitalize' }}>{d.toLocaleDateString('es', { month: 'short' })}</div>

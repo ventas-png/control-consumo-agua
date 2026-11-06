@@ -1556,7 +1556,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button type="button" onClick={agregarHuesped}
-                            style={{ padding: '7px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                            style={{ padding: '7px 16px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
                             + Agregar
                           </button>
                           <button type="button" onClick={() => { setShowHuespedForm(false); setHuespedForm(defaultHuesped()) }}

@@ -508,7 +508,7 @@ const closeBtnStyle: CSSProperties = {
 const primaryBtnStyle: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: '6px',
   padding: '9px 16px', borderRadius: '8px', border: 'none',
-  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+  background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
   color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
 }
 const emptyStateStyle: CSSProperties = {
