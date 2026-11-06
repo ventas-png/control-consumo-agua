@@ -272,6 +272,122 @@ export function navAccentDesdeMarca(
   return { color, glow: `rgba(${r}, ${g}, ${b}, 0.7)`, soft: `rgba(${r}, ${g}, ${b}, 0.3)` }
 }
 
+/** Variaciones del MRR en el hero de SuperAdmin por defecto (index.css): verde / rojo claros. */
+export const NAV_DELTA = { positivo: '#B7F4C9', negativo: '#F4B7B7' } as const
+/** Saturación del segundo tono de la marca respecto de la suya (#577B69 frente a #1B3B36). */
+const SEGUNDO_TONO_SAT = 0.46
+/** Fondo de las pills del hero: blanco al 10% sobre el rail. */
+const PILL_BLANCO = 0.1
+
+/**
+ * Cabeceras de SuperAdmin (sobre --at-nav-bg, oscuro fijo), o null sin colores custom
+ * (index.css: #1B3B36, #577B69 —el primario / accent-2 del tema claro— y los NAV_DELTA).
+ * Iguales en ambos temas, como el rail:
+ * - --at-nav-primary: la pestaña activa (texto blanco). El primario de la marca,
+ *   oscurecido si hace falta para que el blanco se lea ≥ 4.5:1.
+ * - --at-nav-primary-2: segundo color del degradado de la pestaña y del hero. El
+ *   --at-accent-2 del acento custom si lo hay; si no, un segundo tono de la marca (su
+ *   tono, saturación × 0.46 —≤ 0.35— y luminosidad HSL 41%, como #577B69 respecto de
+ *   #1B3B36), también con el blanco ≥ 4.5:1. Así una marca sin acento no acaba en verde.
+ * - --at-nav-positive / --at-nav-negative: «↑ / ↓ vs hace 30 días». Conservan su verde
+ *   / rojo (tienen significado) y escalan la saturación por la de la marca como los
+ *   estados; se aclaran si hace falta para leerse sobre su pill como los por defecto,
+ *   en proporción a lo que se lee --at-nav-ink (nunca < 4.5:1).
+ */
+export function navCabeceraDesdeMarca(
+  primaryColor: string | null | undefined,
+  accentColor: string | null | undefined,
+): Record<string, string> | null {
+  const primario = normalizarColorHex(primaryColor), acento = normalizarColorHex(accentColor)
+  if (!primario && !acento) return null
+  const marca = primario ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
+  const s = rgbAHsl(parseRgb(marca))[1]
+  const segundo = segundoTono(marca, acento)
+
+  const fondo = primario ? navBgDesdeMarca(primario) : NAV_BG
+  const pill = mezclar('#ffffff', fondo, PILL_BLANCO)
+  const escala = Math.min(1, contraste(primario ? navInkDesdeMarca(primario) : NAV_INK, fondo) / contraste(NAV_INK, NAV_BG))
+  const k = Math.min(s / MARCA_SAT, 1)
+  const delta = (def: string) => {
+    const minimo = Math.max(AA, contraste(def, mezclar('#ffffff', NAV_BG, PILL_BLANCO)) * escala)
+    return aclararHasta(transformar(def, 0, k, 0), (c) => contraste(c, pill) >= minimo)
+  }
+  return {
+    '--at-nav-primary': blancoLegible(marca),
+    '--at-nav-primary-2': segundo,
+    '--at-nav-positive': delta(NAV_DELTA.positivo),
+    '--at-nav-negative': delta(NAV_DELTA.negativo),
+  }
+}
+
+/** Oscurece lo mínimo para que el texto blanco se lea ≥ 4.5:1 encima (nada si ya se lee). */
+function blancoLegible(hex: string): string {
+  return oscurecerHasta(hex, (x) => contraste('#ffffff', x) >= AA)
+}
+
+/**
+ * Segundo color de los degradados de marca (tema claro), con texto blanco ≥ 4.5:1: el
+ * --at-accent-2 del acento custom si lo hay; si no, un segundo tono de la propia marca
+ * (su tono, saturación × 0.46 —≤ 0.35— y luminosidad HSL 41%, como #577B69 respecto de
+ * #1B3B36). Así una marca sin acento no acaba en el verde por defecto.
+ */
+function segundoTono(marca: string, acento: string | null): string {
+  if (acento) return derivarVariablesAccent(acento).accent2
+  const [h, s] = rgbAHsl(parseRgb(marca))
+  return blancoLegible(hslAHex([h, s < SAT_GRIS ? 0 : Math.min(s * SEGUNDO_TONO_SAT, ACCENT2_SATURACION), 0.41]))
+}
+
+/** Botones principales por defecto en dark (index.css): #5E9D8A / #79A18E oscurecidos hasta
+ *  blanco ≥ 4.5:1, y el final del degradado primario → hover (ese primario 18% más oscuro). */
+export const CTA_OSCURO = {
+  cta: '#4D8071', cta2: '#5E7D6F', ctaHover: '#3F695D',
+  /** Del acento (#C8865C en dark), para las tarjetas de KPI que usan el acento. */
+  ctaAccent: '#9F6A49', ctaAccentHover: '#82573C',
+} as const
+/** --at-cta-hover: --at-cta oscurecido como --at-primary-hover lo está de --at-primary. */
+const CTA_HOVER_OSCURECER = 0.18
+
+/**
+ * Botones principales con texto blanco (degradado --at-cta → --at-cta-2, o → --at-cta-hover
+ * en <Button variant="gradient-primary">), o null sin colores custom (index.css:
+ * var(--at-primary) / var(--at-accent-2) / var(--at-primary-hover) en claro y CTA_OSCURO
+ * en dark). --at-cta-hover es --at-cta un 18% más oscuro, en ambos temas (en dark el hover
+ * del tema aclara y dejaba el blanco a ~2.4:1). Con acento custom, también --at-cta-accent /
+ * -hover (tarjetas de KPI del acento): el acento con la misma regla. Mismo color de partida que las cabeceras de SuperAdmin:
+ * - claro: el primario y el segundo tono (segundoTono), oscurecidos si hace falta para
+ *   que el blanco se lea ≥ 4.5:1 (con una marca amarilla quedaba a 1.4:1);
+ * - oscuro: los mismos colores aclarados para el tema oscuro y luego oscurecidos lo
+ *   justo para que el blanco se lea ≥ 4.5:1: el tono más claro posible, que destaca
+ *   sobre las superficies oscuras (con var(--at-primary) el blanco quedaba a ~3.1:1).
+ */
+export function ctaDesdeMarca(
+  primaryColor: string | null | undefined,
+  accentColor: string | null | undefined,
+): { claro: Record<string, string>; oscuro: Record<string, string> } | null {
+  const primario = normalizarColorHex(primaryColor), acento = normalizarColorHex(accentColor)
+  if (!primario && !acento) return null
+  const marca = primario ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
+  const segundoOscuro = acento ? derivarVariablesAccentOscuro(acento).accent2 : aclararParaTemaOscuro(segundoTono(marca, null))
+  const cta = blancoLegible(marca), ctaOscuro = blancoLegible(aclararParaTemaOscuro(marca))
+  // Relleno del acento (tarjetas de KPI): sólo con acento custom; si no, los de index.css.
+  const deAcento = (base: string) => {
+    const c = blancoLegible(base)
+    return { '--at-cta-accent': c, '--at-cta-accent-hover': oscurecer(c, CTA_HOVER_OSCURECER) }
+  }
+  return {
+    claro: {
+      '--at-cta': cta, '--at-cta-2': segundoTono(marca, acento), '--at-cta-hover': oscurecer(cta, CTA_HOVER_OSCURECER),
+      ...(acento ? deAcento(acento) : {}),
+    },
+    oscuro: {
+      '--at-cta': ctaOscuro,
+      '--at-cta-2': blancoLegible(segundoOscuro),
+      '--at-cta-hover': oscurecer(ctaOscuro, CTA_HOVER_OSCURECER),
+      ...(acento ? deAcento(derivarVariablesAccentOscuro(acento).accent) : {}),
+    },
+  }
+}
+
 /**
  * --at-nav-bg (index.css: #102622, fijo en ambos temas) desde la marca: su tono, su
  * saturación × 1.1 (acotada a 0.85) y luminosidad HSL 10.6%, como el #102622 respecto
@@ -840,8 +956,12 @@ export function hojaEstilosMarca(
   const nav = marcador
     ? { '--at-nav-accent': marcador.color, '--at-nav-accent-glow': marcador.glow, '--at-nav-accent-soft': marcador.soft }
     : null
-  const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor), nav)
-  const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor), nav)
+  // Cabeceras de SuperAdmin: también dependen de ambos y son iguales en ambos temas.
+  const cabecera = navCabeceraDesdeMarca(primaryColor, accentColor)
+  // Botones principales: también dependen de ambos, pero sí cambian con el tema.
+  const cta = ctaDesdeMarca(primaryColor, accentColor)
+  const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor), nav, cabecera, cta?.claro ?? null)
+  const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor), nav, cabecera, cta?.oscuro ?? null)
   if (!claro) return null
   const lineas = [
     `:root:root { ${claro} }`,

@@ -477,7 +477,7 @@ export function CalidadSection({
           </div>
 
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <button onClick={guardarAnalisis} disabled={savingAnalisis} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={guardarAnalisis} disabled={savingAnalisis} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               {savingAnalisis ? 'Guardando...' : '💾 Guardar Análisis'}
             </button>
             <button onClick={() => { setAnalisisFuenteId(''); setParametroValues({}); setAnalisisObs('') }} style={{ padding: '12px 24px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>

@@ -99,9 +99,10 @@ export function HeroPlataforma({ kpis, loading, error, onRetry, serie, onVerEmpr
                 aria-label={`Variación del MRR ${delta.base === 'total' ? 'total' : 'cobrable'} en 30 días: ${delta.pct >= 0 ? 'subió' : 'bajó'} ${Math.abs(delta.pct)} por ciento`}
                 style={{
                   ...pillStyle,
-                  // Tintes claros fijos: los tokens success/danger cambian con el
-                  // tema, pero este fondo es oscuro FIJO en ambos temas.
-                  color: delta.pct >= 0 ? '#B7F4C9' : '#F4B7B7',
+                  // Tintes claros propios del rail (iguales en ambos temas): los
+                  // tokens success/danger cambian con el tema, pero este fondo es
+                  // oscuro FIJO. Siguen a la marca (src/lib/branding.ts).
+                  color: delta.pct >= 0 ? 'var(--at-nav-positive)' : 'var(--at-nav-negative)',
                 }}
               >
                 <span aria-hidden="true">{delta.pct >= 0 ? '↑' : '↓'}</span>
@@ -200,7 +201,7 @@ function Total({ label, value, title }: { label: string; value: number; title?: 
 
 // Fondo oscuro FIJO (nav-bg no cambia con el tema) → overlays blancos legítimos.
 const heroStyle: CSSProperties = {
-  background: 'linear-gradient(135deg, var(--at-nav-bg) 0%, color-mix(in srgb, var(--at-nav-bg) 78%, var(--at-primary-2)) 60%, color-mix(in srgb, var(--at-nav-bg) 72%, var(--at-accent-2)) 100%)',
+  background: 'linear-gradient(135deg, var(--at-nav-bg) 0%, color-mix(in srgb, var(--at-nav-bg) 78%, var(--at-primary-2)) 60%, color-mix(in srgb, var(--at-nav-bg) 72%, var(--at-nav-primary-2)) 100%)',
   borderRadius: '20px',
   padding: '26px 28px',
   border: '1px solid rgba(255,255,255,0.08)',

@@ -307,7 +307,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
               {visitantesHoy.slice(0, 5).map(v => (
                 <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'var(--at-surface-2)', borderRadius: '9px' }}>
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
                     {v.nombre.charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>

@@ -105,7 +105,7 @@ function primaryBtnStyle(disabled: boolean): CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', gap: '6px',
     padding: '9px 16px', borderRadius: '8px', border: 'none',
-    background: disabled ? 'var(--at-ink-2)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+    background: disabled ? 'var(--at-ink-2)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
     color: disabled ? 'var(--at-ink-3)' : 'white',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontSize: '13px', fontWeight: 600,

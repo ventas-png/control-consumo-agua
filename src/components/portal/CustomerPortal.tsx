@@ -415,7 +415,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           <button
             onClick={onLogout}
             style={{
-              padding: '12px 32px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+              padding: '12px 32px', background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
               color: 'white', border: 'none', borderRadius: '12px',
               fontSize: '14px', fontWeight: 600, cursor: 'pointer',
               boxShadow: '0 4px 14px rgba(27, 59, 54,0.35)',
@@ -447,7 +447,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+        background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
         padding: '0',
         boxShadow: '0 2px 12px rgba(27, 59, 54,0.3)',
       }}>

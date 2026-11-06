@@ -23,7 +23,7 @@ export function ConfiguracionSection({ onLogout }: Props) {
       <div style={{ display: 'flex', gap: '12px' }}>
         <button
           onClick={() => notify({ variant: 'info', title: 'Info', text: 'La configuración se gestiona via variables de entorno (.env)' })}
-          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
         >
           Ver Info
         </button>

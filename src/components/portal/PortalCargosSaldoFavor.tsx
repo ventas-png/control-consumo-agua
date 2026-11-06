@@ -225,7 +225,7 @@ const fila: CSSProperties = {
 }
 const boton: CSSProperties = {
   padding: '8px 14px', borderRadius: 10, border: 'none',
-  background: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
+  background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))',
   color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0,
 }
 const lbl: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, fontWeight: 600 }

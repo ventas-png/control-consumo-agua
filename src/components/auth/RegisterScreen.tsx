@@ -373,7 +373,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                 padding: '13px',
                 background: loading
                   ? 'var(--at-ink-3)'
-                  : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                  : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',

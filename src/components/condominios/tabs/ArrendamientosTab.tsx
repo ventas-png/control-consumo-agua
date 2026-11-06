@@ -172,7 +172,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
           <button onClick={exportarPDF} disabled={contratos.length === 0} style={{ padding: '9px 14px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>📄 PDF</button>
           <button onClick={exportarXlsx} disabled={contratos.length === 0} style={{ padding: '9px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>📊 Excel</button>
           {canCreate && (
-            <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               + Nuevo contrato
             </button>
           )}
@@ -286,7 +286,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>

@@ -397,7 +397,7 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
               disabled={loading}
               style={{
                 padding: '10px 24px',
-                background: loading ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                background: loading ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',

@@ -225,7 +225,7 @@ export default function OAuthOnboardingScreen({ oauthUser, onSuccess, onCancel }
             disabled={loading}
             style={{
               width: '100%', padding: '12px',
-              background: loading ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+              background: loading ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
               color: 'white', border: 'none', borderRadius: '12px',
               fontSize: '15px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
               marginBottom: '10px',

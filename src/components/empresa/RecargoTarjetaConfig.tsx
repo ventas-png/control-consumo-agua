@@ -167,7 +167,7 @@ export function RecargoTarjetaConfig({ companyId }: Props) {
             disabled={saving}
             style={{
               marginTop: '16px', padding: '11px 22px', borderRadius: '8px', border: 'none',
-              background: saving ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
+              background: saving ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))',
               color: 'white', fontWeight: 700, fontSize: '14px',
               cursor: saving ? 'not-allowed' : 'pointer',
             }}

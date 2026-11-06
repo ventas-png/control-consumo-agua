@@ -35,7 +35,7 @@ interface Props {
  *     value={consumoTotal.toFixed(2)}
  *     unit="m³"
  *     icon="💧"
- *     gradient="linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))"
+ *     gradient="linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))"
  *     sparkline={[12, 18, 15, 22, 19, 25]}
  *     delta={8}
  *     deltaLabel="vs mes anterior"

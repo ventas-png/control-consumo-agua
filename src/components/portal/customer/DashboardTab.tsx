@@ -86,7 +86,7 @@ export function DashboardTab({ ctx }: { ctx: PortalCtx }) {
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '14px', marginBottom: '18px' }}>
           {[
-            { label: 'Consumo Mes Actual', value: `${consumoMesActual.toFixed(2)} m³`, icon: '💧', bg: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))' },
+            { label: 'Consumo Mes Actual', value: `${consumoMesActual.toFixed(2)} m³`, icon: '💧', bg: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))' },
             { label: 'Promedio Mensual', value: `${consumoPromedio.toFixed(2)} m³`, icon: '📊', bg: 'linear-gradient(135deg, var(--at-accent-2), #0f766e)' },
             { label: 'Monto Pendiente', value: `${moneda} ${montoPendiente.toFixed(2)}`, icon: '💳', bg: montoPendiente > 0 ? 'linear-gradient(135deg, var(--at-warning), var(--at-warning))' : 'linear-gradient(135deg, var(--at-success), var(--at-success-strong))' },
             { label: 'Contadores Activos', value: String(contadoresActivos), icon: '🔢', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
@@ -388,7 +388,7 @@ export function DashboardTab({ ctx }: { ctx: PortalCtx }) {
                         <div key={contador.id} style={{ borderRadius: '10px', background: 'var(--at-surface-2)', padding: '11px', border: '1px solid var(--at-line)', marginBottom: '10px' }}>
                           {/* Info medidor */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                            <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', flexShrink: 0 }}>💧</div>
+                            <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', flexShrink: 0 }}>💧</div>
                             <div>
                               <div style={{ fontWeight: 600, fontSize: '12.5px', color: 'var(--at-ink)' }}>#{contador.numero_serie}</div>
                               <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{TIPO_AGUA_LABELS[contador.tipo_agua] ?? contador.tipo_agua}</div>

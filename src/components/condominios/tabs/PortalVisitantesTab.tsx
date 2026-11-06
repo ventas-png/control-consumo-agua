@@ -172,7 +172,7 @@ export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], diasAv
           {recientes.length > 0 && <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--at-primary)' }}>{recientes.length} visita{recientes.length > 1 ? 's' : ''} hoy</p>}
         </div>
         <button onClick={() => setShowForm(true)}
-          style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+          style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
           + Pre-autorizar visita
         </button>
       </div>
@@ -365,7 +365,7 @@ export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], diasAv
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="button" onClick={agregarAcompanante}
-                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
                       + Agregar
                     </button>
                     <button type="button" onClick={() => { setShowAcompForm(false); setAcompForm(defaultAcompForm()) }}
@@ -379,7 +379,7 @@ export function PortalVisitantesTab({ visitantes, visitasFrecuentes = [], diasAv
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
               <button onClick={preAutorizar} disabled={saving}
-                style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Autorizando...' : `✅ Pre-autorizar visita${acompanantes.length > 0 ? ` (+${acompanantes.length})` : ''}`}
               </button>
               <button onClick={resetForm}

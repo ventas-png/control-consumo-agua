@@ -281,7 +281,7 @@ export function FiscalConfigSection({ proyectos }: Props) {
 
   const btnPrimary = (disabled: boolean): CSSProperties => ({
     padding: '9px 20px', borderRadius: 8, border: 'none',
-    background: disabled ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+    background: disabled ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
     color: 'white', fontWeight: 600, fontSize: 14, cursor: disabled ? 'not-allowed' : 'pointer',
   })
 

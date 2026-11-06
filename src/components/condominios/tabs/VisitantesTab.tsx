@@ -644,7 +644,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
           )}
           {canCreate && (
             <button onClick={() => setShowForm(true)}
-              style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               + Registrar visita
             </button>
           )}

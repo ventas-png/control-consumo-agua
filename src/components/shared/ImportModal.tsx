@@ -448,7 +448,7 @@ const footerStyle: CSSProperties = {
   display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%',
 }
 const btnPrimary: CSSProperties = {
-  padding: '10px 22px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+  padding: '10px 22px', background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
   color: 'white', border: 'none', borderRadius: '8px',
   fontWeight: 600, fontSize: '14px', cursor: 'pointer',
 }

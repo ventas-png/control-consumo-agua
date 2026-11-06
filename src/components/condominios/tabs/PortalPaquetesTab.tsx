@@ -210,7 +210,7 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', vist
                       </div>
                     )}
                     {pendiente ? (
-                      <button onClick={() => abrirFirma(p)} style={{ marginTop: '12px', padding: '9px 18px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                      <button onClick={() => abrirFirma(p)} style={{ marginTop: '12px', padding: '9px 18px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                         ✍ Firmar recepción
                       </button>
                     ) : p.estado === 'entregado' && (p.entregado_a_nombre || p.firma_path) ? (

@@ -18,16 +18,20 @@ interface TipologiaStat {
   monto: number
 }
 
-const TIPOLOGIA_META: Record<TipoAgua, { label: string; icon: string; from: string; to: string }> = {
-  potable:             { label: 'Potable',             icon: '💧', from: 'var(--at-primary)', to: 'var(--at-primary-hover)' },
-  rehuso:              { label: 'Rehúso',              icon: '♻️', from: 'var(--at-accent-2)', to: 'var(--at-ink-2)' },
+// from / to: degradado de la tarjeta, con texto blanco. Los de marca usan --at-cta* (el blanco se
+// lee ≥ 4.5:1 en ambos temas y con cualquier marca), y los de color propio llevan el blanco
+// ≥ 4.5:1 en sus dos extremos. `text` es el color de la tipología como texto sobre la página
+// (cabecera de la tabla), que sí puede ser el tono claro del tema oscuro o el color de siempre.
+const TIPOLOGIA_META: Record<TipoAgua, { label: string; icon: string; from: string; to: string; text?: string }> = {
+  potable:             { label: 'Potable',             icon: '💧', from: 'var(--at-cta)', to: 'var(--at-cta-hover)', text: 'var(--at-primary)' },
+  rehuso:              { label: 'Rehúso',              icon: '♻️', from: 'var(--at-cta-2)', to: 'var(--at-cta-hover)', text: 'var(--at-accent-2)' },
   piscina:             { label: 'Piscina',             icon: '🏊', from: '#1F6F73', to: '#134E51' },
-  desalinada:          { label: 'Desalinada',          icon: '🌊', from: 'var(--at-accent)', to: 'var(--at-accent-hover)' },
-  riego:               { label: 'Riego',               icon: '🌿', from: '#0E9E6E', to: '#067352' },
-  jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', from: '#A87E1E', to: '#7E5E12' },
+  desalinada:          { label: 'Desalinada',          icon: '🌊', from: 'var(--at-cta-accent)', to: 'var(--at-cta-accent-hover)', text: 'var(--at-accent)' },
+  riego:               { label: 'Riego',               icon: '🌿', from: '#0C875E', to: '#067352', text: '#0E9E6E' },
+  jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', from: '#96701B', to: '#7E5E12', text: '#A87E1E' },
   consumo_humano:      { label: 'Consumo Humano',      icon: '🚰', from: '#5E6B2E', to: '#44501F' },
   desmineralizada:     { label: 'Desmineralizada',     icon: '🧪', from: '#45607A', to: '#2E4257' },
-  residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', from: '#E2620E', to: '#B84E08' },
+  residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', from: '#C4550C', to: '#B84E08', text: '#E2620E' },
 }
 
 function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, selectedProjectId, unidades, fechaDesde, fechaHasta }: Props) {
@@ -109,7 +113,8 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
         marginBottom: showProjectTable ? '24px' : 0,
       }}>
         {activeTipos.map(([tipo, stat]) => {
-          const meta = TIPOLOGIA_META[tipo] ?? { label: tipo, icon: '💧', from: 'var(--at-ink-3)', to: 'var(--at-ink-2)' }
+          // Sin tipología conocida: gris neutro fijo (var(--at-ink-3/-2) aclaran en dark y el blanco quedaba a ~1.8:1).
+          const meta = TIPOLOGIA_META[tipo] ?? { label: tipo, icon: '💧', from: '#6A7A72', to: '#4A5A52' }
           return (
             <div
               key={tipo}
@@ -160,7 +165,7 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
                     <th
                       key={tipo}
                       colSpan={2}
-                      style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700, color: meta?.from ?? 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}
+                      style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700, color: meta?.text ?? meta?.from ?? 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}
                     >
                       {meta?.icon} {meta?.label ?? tipo}
                     </th>

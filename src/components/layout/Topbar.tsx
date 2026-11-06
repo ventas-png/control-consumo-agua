@@ -245,7 +245,7 @@ export function Topbar({ activeSection, onMenuToggle, onNavigate, sidebarOpen = 
               width: '30px',
               height: '30px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
+              background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

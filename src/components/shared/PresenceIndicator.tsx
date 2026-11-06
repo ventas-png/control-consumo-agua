@@ -118,7 +118,7 @@ const avatarStyle: CSSProperties = {
   width: '28px',
   height: '28px',
   borderRadius: '50%',
-  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+  background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
   color: 'white',
   fontSize: '11px',
   fontWeight: 700,

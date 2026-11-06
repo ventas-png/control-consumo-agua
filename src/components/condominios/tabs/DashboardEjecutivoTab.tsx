@@ -141,7 +141,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
           value={`${tasaCobranza}%`}
           unit={`${moneda} ${totalCobrado.toFixed(0)} cobrado`}
           icon={<Icon name="coins" size={22} />}
-          gradient="linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))"
+          gradient="linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))"
           sparkline={serieCobranza}
           delta={pctDelta(serieCobranza)}
           deltaLabel="vs mes ant."

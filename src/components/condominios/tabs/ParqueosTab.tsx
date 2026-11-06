@@ -112,7 +112,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
           </p>
         </div>
         {canCreate && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             + Agregar parqueo
           </button>
         )}
@@ -169,7 +169,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>

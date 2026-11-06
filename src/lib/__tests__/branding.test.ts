@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
   esColorHex, normalizarColorHex, oscurecer, mezclarBlanco, mezclar,
@@ -10,7 +10,8 @@ import {
   LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
   derivarVariablesAccent, derivarVariablesAccentOscuro, respaldosSinColorMix,
   derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO, DATOS_CSS_VARS, DATA_NEGATIVE_DEFECTO, NAV_INK,
-  navAccentDesdeMarca, NAV_BG, navGrisesDesdeMarca, NAV_GRISES,
+  navAccentDesdeMarca, NAV_BG, navGrisesDesdeMarca, NAV_GRISES, navCabeceraDesdeMarca, NAV_DELTA,
+  ctaDesdeMarca, CTA_OSCURO,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -991,3 +992,274 @@ describe('--at-nav-accent (marcador del rail) desde la marca', () => {
   })
 })
 
+// Cabeceras de SuperAdmin (SuperAdminSection y HeroPlataforma), sobre el rail oscuro:
+// pestaña activa, segundo color de los degradados y las variaciones «↑ / ↓» del hero.
+describe('--at-nav-primary / -2 / -positive / -negative (cabeceras de SuperAdmin) desde la marca', () => {
+  const BLANCO_ = '#ffffff'
+  const casos = (c: string) => [[c, null], [null, c], [c, '#B96A3F']] as const
+  const fondoDe = (p: string | null) => (p ? derivarVariablesMarca(p).navBg : NAV_BG)
+  const inkDe = (p: string | null) => (p ? derivarVariablesMarca(p).navInk : NAV_INK)
+
+  it('index.css los define con los valores de siempre y las cabeceras ya no tienen colores fijos', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    expect(css).toMatch(/--at-nav-primary:\s*#1B3B36;/)
+    expect(css).toMatch(/--at-nav-primary-2:\s*#577B69;/)
+    expect(css).toMatch(new RegExp(`--at-nav-positive:\\s*${NAV_DELTA.positivo};`))
+    expect(css).toMatch(new RegExp(`--at-nav-negative:\\s*${NAV_DELTA.negativo};`))
+    const leer = (f: string) => readFileSync(resolve(process.cwd(), `src/components/superadmin/${f}`), 'utf8')
+    const hero = leer('HeroPlataforma.tsx'), seccion = leer('SuperAdminSection.tsx')
+    for (const g of Object.values(NAV_DELTA)) expect(hero.toUpperCase()).not.toContain(g.toUpperCase())
+    expect(hero).toContain('var(--at-nav-positive)')
+    expect(hero).toContain('var(--at-nav-negative)')
+    expect(hero).toContain('var(--at-nav-primary-2)')
+    expect(seccion).toContain("'linear-gradient(135deg, var(--at-nav-primary), var(--at-nav-primary-2))'")
+    // Sobre el rail ya no queda ningún color que cambie con el tema o que no siga a la marca.
+    for (const f of [hero, seccion]) expect(f).not.toContain('var(--at-accent-2)')
+  })
+
+  it('por defecto la pestaña es igual en ambos temas y el blanco se lee ≥ 4.5:1 (antes ~3.1:1 en dark)', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    // Sólo se declaran una vez (en :root, sin override dark) y son hex, no var() del tema.
+    for (const k of ['--at-nav-primary', '--at-nav-primary-2']) {
+      const decl = [...css.matchAll(new RegExp(`${k}:\\s*([^;]+);`, 'g'))].map((m) => m[1].trim())
+      expect(decl, k).toHaveLength(1)
+      expect(esColorHex(decl[0]), `${k}: ${decl[0]}`).toBe(true)
+      expect(contraste(BLANCO_, decl[0]), k).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+    }
+    // Son el primario / accent-2 del tema claro: en claro nada cambia.
+    expect(css).toMatch(/--at-primary:\s*#1B3B36;/)
+    expect(css).toMatch(/--at-accent-2:\s*#577B69;/)
+  })
+
+  it('sin colores custom → null (quedan los de index.css)', () => {
+    expect(navCabeceraDesdeMarca(null, null)).toBeNull()
+    expect(navCabeceraDesdeMarca('rojo', undefined)).toBeNull()
+  })
+
+  it('con la marca por defecto queda (casi) como index.css en claro', () => {
+    const v = navCabeceraDesdeMarca(DEFAULT_BRAND_COLOR, null)!
+    expect(v['--at-nav-primary']).toBe('#1b3b36')
+    expect(distanciaRgb(v['--at-nav-primary-2'], '#577B69')).toBeLessThan(15)
+    expect(distanciaRgb(v['--at-nav-positive'], NAV_DELTA.positivo)).toBeLessThanOrEqual(2)
+    expect(distanciaRgb(v['--at-nav-negative'], NAV_DELTA.negativo)).toBeLessThanOrEqual(2)
+  })
+
+  it.each(MUESTRAS)('%s → pestaña con texto blanco legible y degradado que no apaga --at-nav-ink', (c) => {
+    for (const [p, a] of casos(c)) {
+      const v = navCabeceraDesdeMarca(p, a)!
+      for (const k of ['--at-nav-primary', '--at-nav-primary-2']) {
+        expect(contraste(BLANCO_, v[k]), `${p}/${a} ${k} ${v[k]}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+      }
+      // El hero mezcla --at-nav-primary-2 al 28% con el rail; el título sigue ≥ 7:1.
+      const mezcla = mezclar(v['--at-nav-primary-2'], fondoDe(p), 0.28)
+      expect(contraste(inkDe(p), mezcla), `${p}/${a}`).toBeGreaterThanOrEqual(7)
+    }
+  })
+
+  it.each(MUESTRAS)('%s → «↑ / ↓» conservan verde / rojo y se leen sobre su pill como los por defecto', (c) => {
+    for (const [p, a] of casos(c)) {
+      const v = navCabeceraDesdeMarca(p, a)!
+      const pill = mezclar(BLANCO_, fondoDe(p), 0.1)
+      const escala = Math.min(1, contraste(inkDe(p), fondoDe(p)) / contraste(NAV_INK, NAV_BG))
+      for (const [k, def, t] of [['--at-nav-positive', NAV_DELTA.positivo, tono(NAV_DELTA.positivo)], ['--at-nav-negative', NAV_DELTA.negativo, 0]] as const) {
+        const minimo = Math.max(LIGHT_MIN_CONTRASTE, contraste(def, mezclar(BLANCO_, NAV_BG, 0.1)) * escala)
+        expect(contraste(v[k], pill), `${p}/${a} ${k} ${v[k]}`).toBeGreaterThanOrEqual(minimo - 0.01)
+        expect(distTono(tono(v[k]), t), `${p}/${a} ${k} ${v[k]}`).toBeLessThan(6)
+      }
+      // ▲ y ▼ nunca se confunden.
+      expect(distTono(tono(v['--at-nav-positive']), tono(v['--at-nav-negative']))).toBeGreaterThan(100)
+    }
+  })
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → la pestaña y el segundo color siguen el tono de la marca (o del acento)', (c) => {
+    const sola = navCabeceraDesdeMarca(c, null)!
+    expect(distTono(tono(sola['--at-nav-primary']), tono(c)), sola['--at-nav-primary']).toBeLessThan(6)
+    expect(distTono(tono(sola['--at-nav-primary-2']), tono(c)), sola['--at-nav-primary-2']).toBeLessThan(12)
+    // Con acento custom, el segundo color es su --at-accent-2 (claro).
+    expect(navCabeceraDesdeMarca(c, '#0e7490')!['--at-nav-primary-2']).toBe(derivarVariablesAccent('#0e7490').accent2)
+    expect(navCabeceraDesdeMarca(null, c)!['--at-nav-primary-2']).toBe(derivarVariablesAccent(c).accent2)
+  })
+
+  it('marca gris → segundo color neutro y «↑ / ↓» más apagados', () => {
+    const v = navCabeceraDesdeMarca('#808080', null)!
+    expect(croma(v['--at-nav-primary-2'])).toBe(0)
+    expect(croma(v['--at-nav-positive'])).toBeLessThan(croma(NAV_DELTA.positivo))
+    expect(croma(v['--at-nav-negative'])).toBeLessThan(croma(NAV_DELTA.negativo))
+  })
+
+  it('la hoja los lleva en los tres selectores (también con sólo acento custom)', () => {
+    for (const [p, a] of [['#7c3aed', null], [null, '#0e7490'], ['#ff0000', '#ffd400']] as const) {
+      const v = navCabeceraDesdeMarca(p, a)!
+      for (const l of hojaEstilosMarca(p, a)!.split('\n').slice(0, 3)) {
+        for (const [k, val] of Object.entries(v)) expect(l).toContain(`${k}: ${val};`)
+      }
+    }
+  })
+})
+
+// Botones principales con texto blanco (EmpresasTable, EmpresaDetailDrawer):
+// degradado --at-cta → --at-cta-2, legible en ambos temas y con cualquier marca.
+describe('--at-cta / --at-cta-2 (botones principales) desde la marca', () => {
+  const B = '#ffffff'
+  const css = () => readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+
+  it('index.css: los de siempre en claro y, en los dos bloques dark, hex con el blanco ≥ 4.5:1', () => {
+    const c = css()
+    expect(c).toMatch(/--at-cta:\s*var\(--at-primary\);\s*--at-cta-2:\s*var\(--at-accent-2\);/)
+    // Auto (@media) y manual ([data-theme="dark"]): los dos con los mismos hex.
+    expect(c.match(new RegExp(`--at-cta:\\s*${CTA_OSCURO.cta};\\s*--at-cta-2:\\s*${CTA_OSCURO.cta2};\\s*--at-cta-hover:\\s*${CTA_OSCURO.ctaHover};`, 'g'))).toHaveLength(2)
+    expect(c).toMatch(/--at-cta-hover:\s*var\(--at-primary-hover\);/)
+    // Relleno del acento (tarjetas de KPI): los de siempre en claro; en dark, el acento oscurecido para el blanco.
+    expect(c).toMatch(/--at-cta-accent:\s*var\(--at-accent\);\s*--at-cta-accent-hover:\s*var\(--at-accent-hover\);/)
+    expect(c.match(new RegExp(`--at-cta-accent:\\s*${CTA_OSCURO.ctaAccent};\\s*--at-cta-accent-hover:\\s*${CTA_OSCURO.ctaAccentHover};`, 'g'))).toHaveLength(2)
+    expect(CTA_OSCURO.ctaAccentHover.toLowerCase()).toBe(oscurecer(CTA_OSCURO.ctaAccent, 0.18))
+    expect(contraste(B, '#C8865C')).toBeLessThan(LIGHT_MIN_CONTRASTE)
+    for (const x of [...Object.values(CTA_OSCURO), '#1B3B36', '#577B69', '#102622']) expect(contraste(B, x), x).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+    // En dark el inicio del degradado destaca sobre las superficies oscuras (antes el blanco quedaba a ~3.1:1).
+    for (const x of [CTA_OSCURO.cta, CTA_OSCURO.cta2]) expect(contraste(x, DARK_SURFACE), x).toBeGreaterThanOrEqual(3)
+    // El hover de dark es el cta 18% más oscuro, como en claro (el --at-primary-hover dark aclara: 2.4:1).
+    expect(CTA_OSCURO.ctaHover.toLowerCase()).toBe(oscurecer(CTA_OSCURO.cta, 0.18))
+    expect(contraste(B, '#5E9D8A')).toBeLessThan(LIGHT_MIN_CONTRASTE)
+    expect(contraste(B, '#76B3A1')).toBeLessThan(LIGHT_MIN_CONTRASTE)
+  })
+
+  it('EmpresasTable y EmpresaDetailDrawer usan el degradado --at-cta', () => {
+    for (const f of ['EmpresasTable.tsx', 'EmpresaDetailDrawer.tsx']) {
+      const src = readFileSync(resolve(process.cwd(), `src/components/superadmin/${f}`), 'utf8')
+      expect(src, f).toContain("'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))'")
+      expect(src, f).not.toContain('linear-gradient(135deg, var(--at-primary), var(--at-accent-2))')
+    }
+  })
+
+  it('ningún relleno con texto blanco usa ya el degradado var(--at-primary) → var(--at-accent-2); <Button> primary usa --at-cta', () => {
+    const archivos = (readdirSync(resolve(process.cwd(), 'src'), { recursive: true }) as string[])
+      .map((f) => `src/${f}`)
+      .filter((f) => /\.(tsx?|css)$/.test(f) && !/(__tests__|\.test\.|\.spec\.|\.stories\.)/.test(f))
+    // Dos paradas (con o sin 0% / 100%): botones, banners, avatares, cabeceras.
+    const viejo = /linear-gradient\(\s*135deg\s*,\s*var\(--at-primary\)(\s+0%)?\s*,\s*var\(--at-accent-2\)(\s+100%)?\s*\)/
+    // …y primario → hover (<Button variant="gradient-primary"> y sus copias en línea).
+    const viejoHover = /linear-gradient\(\s*135deg\s*,\s*var\(--at-primary\)(\s+0%)?\s*,\s*var\(--at-primary-hover\)(\s+100%)?\s*\)/
+    const conViejo = archivos.filter((f) => {
+      const src = readFileSync(resolve(process.cwd(), f), 'utf8')
+      return viejo.test(src) || viejoHover.test(src)
+    })
+    expect(conViejo).toEqual([])
+    expect(archivos.filter((f) => /var\(--at-cta\)/.test(readFileSync(resolve(process.cwd(), f), 'utf8'))).length).toBeGreaterThan(50)
+    const button = readFileSync(resolve(process.cwd(), 'src/components/shared/Button.tsx'), 'utf8')
+    expect(button).toContain("primary:          { background: 'var(--at-cta)', color: '#fff', border: '1px solid var(--at-cta)' },")
+    expect(button).toContain("background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))',")
+  })
+
+  it('sin colores custom → null (quedan los de index.css)', () => {
+    expect(ctaDesdeMarca(null, null)).toBeNull()
+    expect(ctaDesdeMarca('rojo', undefined)).toBeNull()
+  })
+
+  it('con la marca por defecto queda (casi) como index.css', () => {
+    const v = ctaDesdeMarca(DEFAULT_BRAND_COLOR, null)!
+    expect(v.claro['--at-cta']).toBe('#1b3b36')
+    expect(distanciaRgb(v.claro['--at-cta-2'], '#577B69')).toBeLessThan(15)
+    expect(distanciaRgb(v.oscuro['--at-cta'], CTA_OSCURO.cta)).toBeLessThan(25)
+    expect(distanciaRgb(v.oscuro['--at-cta-2'], CTA_OSCURO.cta2)).toBeLessThan(25)
+    // En claro el hover es el --at-primary-hover que la hoja deriva de la misma marca.
+    expect(v.claro['--at-cta-hover']).toBe(derivarVariablesMarca(DEFAULT_BRAND_COLOR).hover)
+    expect(distanciaRgb(v.oscuro['--at-cta-hover'], CTA_OSCURO.ctaHover)).toBeLessThan(25)
+  })
+
+  it.each(MUESTRAS)('%s → el blanco se lee ≥ 4.5:1 en ambos temas y en dark el botón destaca sobre la superficie', (c) => {
+    for (const [p, a] of [[c, null], [null, c], [c, '#B96A3F']] as const) {
+      const v = ctaDesdeMarca(p, a)!
+      for (const tema of ['claro', 'oscuro'] as const) {
+        // Con acento custom también --at-cta-accent / -hover; sin él, quedan los de index.css.
+        expect(Object.keys(v[tema])).toEqual(['--at-cta', '--at-cta-2', '--at-cta-hover', ...(a ? ['--at-cta-accent', '--at-cta-accent-hover'] : [])])
+        for (const [k, val] of Object.entries(v[tema])) {
+          expect(contraste(B, val), `${p}/${a} ${tema} ${k} ${val}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+        }
+        expect(v[tema]['--at-cta-hover']).toBe(oscurecer(v[tema]['--at-cta'], 0.18))
+        if (a) expect(v[tema]['--at-cta-accent-hover']).toBe(oscurecer(v[tema]['--at-cta-accent'], 0.18))
+      }
+      for (const k of ['--at-cta', '--at-cta-2']) expect(contraste(v.oscuro[k], DARK_SURFACE), `${p}/${a} ${k}`).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → siguen el tono de la marca (o el accent-2 del acento)', (c) => {
+    const v = ctaDesdeMarca(c, null)!
+    for (const tema of ['claro', 'oscuro'] as const) {
+      expect(distTono(tono(v[tema]['--at-cta']), tono(c)), `${tema} ${v[tema]['--at-cta']}`).toBeLessThan(10)
+      expect(distTono(tono(v[tema]['--at-cta-2']), tono(c)), `${tema} ${v[tema]['--at-cta-2']}`).toBeLessThan(15)
+    }
+    // Mismo color de partida que las cabeceras de SuperAdmin.
+    const cab = navCabeceraDesdeMarca(c, null)!
+    expect([v.claro['--at-cta'], v.claro['--at-cta-2']]).toEqual([cab['--at-nav-primary'], cab['--at-nav-primary-2']])
+    expect(ctaDesdeMarca(c, '#0e7490')!.claro['--at-cta-2']).toBe(derivarVariablesAccent('#0e7490').accent2)
+  })
+
+  it('la hoja lleva los valores claros en :root y los oscuros en los dos selectores dark', () => {
+    for (const [p, a] of [['#7c3aed', null], [null, '#0e7490'], ['#ffd400', '#7c3aed']] as const) {
+      const v = ctaDesdeMarca(p, a)!
+      const [claro, auto, manual] = hojaEstilosMarca(p, a)!.split('\n')
+      for (const [k, val] of Object.entries(v.claro)) expect(claro).toContain(`${k}: ${val};`)
+      for (const l of [auto, manual]) for (const [k, val] of Object.entries(v.oscuro)) expect(l).toContain(`${k}: ${val};`)
+    }
+  })
+})
+
+// Tarjetas de KPI con degradado from / to y texto blanco (CondominiosDashboard,
+// AdminClientDashboard, AdminConsumoTipologia).
+describe('tarjetas de KPI (from / to) legibles en ambos temas', () => {
+  const ARCHIVOS = [
+    'src/components/condominios/CondominiosDashboard.tsx',
+    'src/components/admin-dashboard/AdminClientDashboard.tsx',
+    'src/components/admin-dashboard/AdminConsumoTipologia.tsx',
+  ]
+  const leer = (f: string) => readFileSync(resolve(process.cwd(), f), 'utf8')
+  const entradas = (src: string) => [...src.matchAll(/from:\s*'([^']+)',\s*to:\s*'([^']+)'([^}]*)/g)].map((m) => ({ from: m[1], to: m[2], resto: m[3] }))
+
+  it('los de marca, acento y neutros usan rellenos con el blanco legible (no los tokens del tema)', () => {
+    const del_tema = /^var\(--at-(primary|primary-hover|accent|accent-hover|accent-2|ink-2|ink-3)\)$/
+    for (const f of ARCHIVOS) {
+      const es = entradas(leer(f))
+      expect(es.length, f).toBeGreaterThan(0)
+      for (const e of es) {
+        expect(e.from, `${f} from`).not.toMatch(del_tema)
+        expect(e.to, `${f} to`).not.toMatch(del_tema)
+      }
+    }
+    // Los hex fijos (tipologías de color propio, sin tema) tienen el blanco ≥ 4.5:1 en sus dos
+    // extremos (riego, jacuzzi y residuales empezaban a 3.4–3.7:1 y se oscurecieron).
+    let fijos = 0
+    for (const f of ARCHIVOS) {
+      for (const e of entradas(leer(f))) {
+        for (const c of [e.from, e.to]) {
+          if (!esColorHex(c)) continue
+          expect(contraste('#ffffff', c), `${f} ${c}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+          fijos++
+        }
+      }
+    }
+    expect(fijos).toBe(14)
+  })
+
+  it('los de estado escriben con --at-on-status (los estados aclaran en dark y el blanco quedaba a ~1.7:1)', () => {
+    let n = 0
+    for (const f of ARCHIVOS) {
+      for (const e of entradas(leer(f))) {
+        if (/^var\(--at-(warning|danger|success)/.test(e.from)) {
+          expect(e.resto, `${f} ${e.from}`).toContain("ink: 'var(--at-on-status)'")
+          n++
+        }
+      }
+    }
+    expect(n).toBe(7)
+    expect(leer(ARCHIVOS[0])).toContain("color: ink,")
+    expect(leer(ARCHIVOS[1])).toContain('color: card.ink,')
+  })
+
+  it('la tabla de tipologías sigue usando el color del tema como texto (no el relleno)', () => {
+    const src = leer(ARCHIVOS[2])
+    expect(src).toContain("color: meta?.text ?? meta?.from ?? 'var(--at-ink-3)',")
+    for (const t of ['var(--at-primary)', 'var(--at-accent-2)', 'var(--at-accent)']) expect(src).toContain(`text: '${t}'`)
+    // Las tipologías oscurecidas conservan su color de siempre en la tabla.
+    for (const t of ['#0E9E6E', '#A87E1E', '#E2620E']) expect(src).toContain(`text: '${t}'`)
+  })
+})

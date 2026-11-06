@@ -282,7 +282,7 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="button" onClick={agregarAcompanante}
-                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
                       + Agregar
                     </button>
                     <button type="button" onClick={() => { setShowAcompForm(false); setAcompForm(defaultAcompForm()) }}

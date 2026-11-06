@@ -73,7 +73,7 @@ export function SsoConfigSection() {
   const sub: CSSProperties = { margin: '0 0 14px', fontSize: 13, color: 'var(--at-ink-3)' }
   const btnPrimary = (disabled: boolean): CSSProperties => ({
     padding: '9px 20px', borderRadius: 8, border: 'none',
-    background: disabled ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+    background: disabled ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
     color: 'white', fontWeight: 600, fontSize: 14, cursor: disabled ? 'not-allowed' : 'pointer',
   })
   const btnGhost: CSSProperties = { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', background: 'transparent', color: 'var(--at-ink-2)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }

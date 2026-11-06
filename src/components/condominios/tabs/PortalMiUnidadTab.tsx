@@ -152,7 +152,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
         <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--at-ink)' }}>Mensajes a la administración</h4>
         {!isAdmin && (
           <button onClick={() => setShowMsgForm(true)}
-            style={{ padding: '7px 14px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+            style={{ padding: '7px 14px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             + Enviar mensaje
           </button>
         )}
@@ -169,7 +169,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
           footer={
             <>
               <button onClick={cerrarForm} style={{ padding: '9px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={enviarMensaje} disabled={saving} style={{ padding: '9px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'wait' : 'pointer' }}>
+              <button onClick={enviarMensaje} disabled={saving} style={{ padding: '9px 20px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'wait' : 'pointer' }}>
                 {saving ? 'Enviando...' : '📤 Enviar'}
               </button>
             </>

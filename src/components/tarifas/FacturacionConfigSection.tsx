@@ -206,7 +206,7 @@ export function FacturacionConfigSection({ proyectos, moneda = 'Q' }: Props) {
               disabled={ivaSaving || ivaLoading}
               style={{
                 padding: '9px 20px', borderRadius: 8, border: 'none',
-                background: ivaSaving ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                background: ivaSaving ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
                 color: 'white', fontWeight: 600, fontSize: 14, cursor: ivaSaving || ivaLoading ? 'not-allowed' : 'pointer',
               }}
             >

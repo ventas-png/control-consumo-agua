@@ -125,7 +125,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
           <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>{t('condominios.mascotas.subtitle', { count: padron.filter(m => m.activo).length })}</p>
         </div>
         {canCreate && vista === 'padron' && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             {t('condominios.mascotas.new_button')}
           </button>
         )}
