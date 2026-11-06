@@ -1109,6 +1109,11 @@ describe('--at-cta / --at-cta-2 (botones principales) desde la marca', () => {
     // Auto (@media) y manual ([data-theme="dark"]): los dos con los mismos hex.
     expect(c.match(new RegExp(`--at-cta:\\s*${CTA_OSCURO.cta};\\s*--at-cta-2:\\s*${CTA_OSCURO.cta2};\\s*--at-cta-hover:\\s*${CTA_OSCURO.ctaHover};`, 'g'))).toHaveLength(2)
     expect(c).toMatch(/--at-cta-hover:\s*var\(--at-primary-hover\);/)
+    // Relleno del acento (tarjetas de KPI): los de siempre en claro; en dark, el acento oscurecido para el blanco.
+    expect(c).toMatch(/--at-cta-accent:\s*var\(--at-accent\);\s*--at-cta-accent-hover:\s*var\(--at-accent-hover\);/)
+    expect(c.match(new RegExp(`--at-cta-accent:\\s*${CTA_OSCURO.ctaAccent};\\s*--at-cta-accent-hover:\\s*${CTA_OSCURO.ctaAccentHover};`, 'g'))).toHaveLength(2)
+    expect(CTA_OSCURO.ctaAccentHover.toLowerCase()).toBe(oscurecer(CTA_OSCURO.ctaAccent, 0.18))
+    expect(contraste(B, '#C8865C')).toBeLessThan(LIGHT_MIN_CONTRASTE)
     for (const x of [...Object.values(CTA_OSCURO), '#1B3B36', '#577B69', '#102622']) expect(contraste(B, x), x).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
     // En dark el inicio del degradado destaca sobre las superficies oscuras (antes el blanco quedaba a ~3.1:1).
     for (const x of [CTA_OSCURO.cta, CTA_OSCURO.cta2]) expect(contraste(x, DARK_SURFACE), x).toBeGreaterThanOrEqual(3)
@@ -1165,10 +1170,13 @@ describe('--at-cta / --at-cta-2 (botones principales) desde la marca', () => {
     for (const [p, a] of [[c, null], [null, c], [c, '#B96A3F']] as const) {
       const v = ctaDesdeMarca(p, a)!
       for (const tema of ['claro', 'oscuro'] as const) {
-        for (const k of ['--at-cta', '--at-cta-2', '--at-cta-hover']) {
-          expect(contraste(B, v[tema][k]), `${p}/${a} ${tema} ${k} ${v[tema][k]}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+        // Con acento custom también --at-cta-accent / -hover; sin él, quedan los de index.css.
+        expect(Object.keys(v[tema])).toEqual(['--at-cta', '--at-cta-2', '--at-cta-hover', ...(a ? ['--at-cta-accent', '--at-cta-accent-hover'] : [])])
+        for (const [k, val] of Object.entries(v[tema])) {
+          expect(contraste(B, val), `${p}/${a} ${tema} ${k} ${val}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
         }
         expect(v[tema]['--at-cta-hover']).toBe(oscurecer(v[tema]['--at-cta'], 0.18))
+        if (a) expect(v[tema]['--at-cta-accent-hover']).toBe(oscurecer(v[tema]['--at-cta-accent'], 0.18))
       }
       for (const k of ['--at-cta', '--at-cta-2']) expect(contraste(v.oscuro[k], DARK_SURFACE), `${p}/${a} ${k}`).toBeGreaterThanOrEqual(3)
     }
@@ -1193,5 +1201,60 @@ describe('--at-cta / --at-cta-2 (botones principales) desde la marca', () => {
       for (const [k, val] of Object.entries(v.claro)) expect(claro).toContain(`${k}: ${val};`)
       for (const l of [auto, manual]) for (const [k, val] of Object.entries(v.oscuro)) expect(l).toContain(`${k}: ${val};`)
     }
+  })
+})
+
+// Tarjetas de KPI con degradado from / to y texto blanco (CondominiosDashboard,
+// AdminClientDashboard, AdminConsumoTipologia).
+describe('tarjetas de KPI (from / to) legibles en ambos temas', () => {
+  const ARCHIVOS = [
+    'src/components/condominios/CondominiosDashboard.tsx',
+    'src/components/admin-dashboard/AdminClientDashboard.tsx',
+    'src/components/admin-dashboard/AdminConsumoTipologia.tsx',
+  ]
+  const leer = (f: string) => readFileSync(resolve(process.cwd(), f), 'utf8')
+  const entradas = (src: string) => [...src.matchAll(/from:\s*'([^']+)',\s*to:\s*'([^']+)'([^}]*)/g)].map((m) => ({ from: m[1], to: m[2], resto: m[3] }))
+
+  it('los de marca, acento y neutros usan rellenos con el blanco legible (no los tokens del tema)', () => {
+    const del_tema = /^var\(--at-(primary|primary-hover|accent|accent-hover|accent-2|ink-2|ink-3)\)$/
+    for (const f of ARCHIVOS) {
+      const es = entradas(leer(f))
+      expect(es.length, f).toBeGreaterThan(0)
+      for (const e of es) {
+        expect(e.from, `${f} from`).not.toMatch(del_tema)
+        expect(e.to, `${f} to`).not.toMatch(del_tema)
+      }
+    }
+    // Los hex fijos (sin tema) y los --at-cta* tienen el blanco ≥ 4.5:1 en sus dos extremos… salvo
+    // las tipologías de color propio que ya estaban por debajo (riego, jacuzzi, residuales).
+    const PREVIAS = ['#0E9E6E', '#A87E1E', '#E2620E']
+    for (const f of ARCHIVOS) {
+      for (const e of entradas(leer(f))) {
+        for (const c of [e.from, e.to]) {
+          if (esColorHex(c) && !PREVIAS.includes(c)) expect(contraste('#ffffff', c), `${f} ${c}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+        }
+      }
+    }
+  })
+
+  it('los de estado escriben con --at-on-status (los estados aclaran en dark y el blanco quedaba a ~1.7:1)', () => {
+    let n = 0
+    for (const f of ARCHIVOS) {
+      for (const e of entradas(leer(f))) {
+        if (/^var\(--at-(warning|danger|success)/.test(e.from)) {
+          expect(e.resto, `${f} ${e.from}`).toContain("ink: 'var(--at-on-status)'")
+          n++
+        }
+      }
+    }
+    expect(n).toBe(7)
+    expect(leer(ARCHIVOS[0])).toContain("color: ink,")
+    expect(leer(ARCHIVOS[1])).toContain('color: card.ink,')
+  })
+
+  it('la tabla de tipologías sigue usando el color del tema como texto (no el relleno)', () => {
+    const src = leer(ARCHIVOS[2])
+    expect(src).toContain("color: meta?.text ?? meta?.from ?? 'var(--at-ink-3)',")
+    for (const t of ['var(--at-primary)', 'var(--at-accent-2)', 'var(--at-accent)']) expect(src).toContain(`text: '${t}'`)
   })
 })

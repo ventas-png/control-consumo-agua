@@ -114,12 +114,12 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
   useEffect(() => { void cargarStats() }, [cargarStats])
 
   const kpis = [
-    { label: 'Unidades ocupadas', value: `${stats.ocupadas}/${stats.totalUnidades}`, sub: 'habitadas vs total', icon: '🏠', from: 'var(--at-accent)', to: 'var(--at-accent-hover)' },
-    { label: 'Cuotas pendientes', value: stats.cuotasPendientes, sub: 'por cobrar', icon: '💰', from: 'var(--at-warning)', to: 'var(--at-warning)' },
-    { label: 'Cuotas en mora', value: stats.cuotasMora, sub: 'vencidas', icon: '⚠️', from: 'var(--at-danger)', to: 'var(--at-danger)' },
-    { label: 'Visitantes hoy', value: stats.visitantesHoy, sub: 'entradas del día', icon: '👥', from: 'var(--at-accent-2)', to: 'var(--at-primary-hover)' },
-    { label: 'Tickets abiertos', value: stats.ticketsAbiertos, sub: 'mantenimiento', icon: '🔧', from: 'var(--at-warning)', to: 'var(--at-warning)' },
-    { label: 'Comun. sin asignar', value: stats.comunSinAsignar, sub: 'sin agente', icon: '💬', from: 'var(--at-primary)', to: 'var(--at-primary-hover)' },
+    { label: 'Unidades ocupadas', value: `${stats.ocupadas}/${stats.totalUnidades}`, sub: 'habitadas vs total', icon: '🏠', from: 'var(--at-cta-accent)', to: 'var(--at-cta-accent-hover)' },
+    { label: 'Cuotas pendientes', value: stats.cuotasPendientes, sub: 'por cobrar', icon: '💰', from: 'var(--at-warning)', to: 'var(--at-warning)', ink: 'var(--at-on-status)' },
+    { label: 'Cuotas en mora', value: stats.cuotasMora, sub: 'vencidas', icon: '⚠️', from: 'var(--at-danger)', to: 'var(--at-danger)', ink: 'var(--at-on-status)' },
+    { label: 'Visitantes hoy', value: stats.visitantesHoy, sub: 'entradas del día', icon: '👥', from: 'var(--at-cta-2)', to: 'var(--at-cta-hover)' },
+    { label: 'Tickets abiertos', value: stats.ticketsAbiertos, sub: 'mantenimiento', icon: '🔧', from: 'var(--at-warning)', to: 'var(--at-warning)', ink: 'var(--at-on-status)' },
+    { label: 'Comun. sin asignar', value: stats.comunSinAsignar, sub: 'sin agente', icon: '💬', from: 'var(--at-cta)', to: 'var(--at-cta-hover)' },
   ] as const
 
   const accesos = [
@@ -129,9 +129,11 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
     { label: 'Módulo Completo', icon: '🏢', section: 'condominios' as AppSection },
   ]
 
-  const cardStyle = (from: string, to: string): CSSProperties => ({
+  // Rellenos con texto blanco legible en ambos temas y con cualquier marca (--at-cta*);
+  // sobre los de estado, --at-on-status (blanco en claro, oscuro en dark: los estados aclaran).
+  const cardStyle = (from: string, to: string, ink = 'white'): CSSProperties => ({
     background: `linear-gradient(135deg, ${from}, ${to})`,
-    borderRadius: '16px', padding: '18px', color: 'white', minWidth: 0,
+    borderRadius: '16px', padding: '18px', color: ink, minWidth: 0,
     boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
     display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
   })
@@ -164,7 +166,7 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
           quedaba una sola y los seis ocupaban más de dos pantallas). */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '32px' }}>
         {kpis.map(k => (
-          <div key={k.label} style={cardStyle(k.from, k.to)}>
+          <div key={k.label} style={cardStyle(k.from, k.to, 'ink' in k ? k.ink : undefined)}>
             <div style={{ fontSize: '24px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '28px', fontWeight: 800, lineHeight: 1 }}>{k.value}</div>
             <div style={{ marginTop: '8px' }}>
