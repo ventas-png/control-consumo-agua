@@ -344,7 +344,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
     marginBottom: '4px', display: 'block',
   }
   const btnPrimary = {
-    padding: '9px 20px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+    padding: '9px 20px', background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
     color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600 as const,
     fontSize: '14px', cursor: 'pointer',
   }

@@ -239,6 +239,7 @@ const filterSelectStyle = {
 const primaryBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: '6px',
   padding: '9px 16px', borderRadius: '8px', border: 'none',
-  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+  // --at-cta / -2: el blanco se lee ≥ 4.5:1 en ambos temas y con cualquier marca.
+  background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
   color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
 } as const

@@ -86,7 +86,7 @@ export function PasswordResetPage({ onBack }: Props) {
           <div style={{ background: 'var(--at-danger-tint)', color: 'var(--at-danger)', padding: '15px', borderRadius: '8px', marginBottom: '16px' }}>
             Enlace inválido o expirado. Solicita un nuevo restablecimiento.
           </div>
-          <button onClick={onBack} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={onBack} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             Volver al Inicio
           </button>
         </div>
@@ -129,7 +129,7 @@ export function PasswordResetPage({ onBack }: Props) {
               <button
                 onClick={handleUpdate}
                 disabled={loading}
-                style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
               >
                 {loading ? 'Actualizando...' : 'Actualizar Contraseña'}
               </button>
@@ -151,7 +151,7 @@ export function PasswordResetPage({ onBack }: Props) {
             </p>
             <button
               onClick={onBack}
-              style={{ padding: '12px 32px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+              style={{ padding: '12px 32px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
             >
               Iniciar Sesión
             </button>

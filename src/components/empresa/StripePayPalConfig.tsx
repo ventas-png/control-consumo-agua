@@ -115,7 +115,7 @@ function primaryBtn(disabled: boolean) {
     padding: '12px',
     borderRadius: '8px',
     border: 'none',
-    background: disabled ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))',
+    background: disabled ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))',
     color: 'white',
     fontWeight: 700,
     fontSize: '14px',

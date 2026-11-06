@@ -16,7 +16,7 @@ import { tint } from '../../shared/statusTone'
 function AmenidadHeroButton({ signedFotoUrl, onClick, children }: { signedFotoUrl: string | null; onClick: () => void; children: ReactNode }) {
   const fondo = signedFotoUrl
     ? `linear-gradient(180deg, rgba(15,23,42,0.05) 0%, rgba(15,23,42,0.85) 100%), center/cover no-repeat url(${signedFotoUrl})`
-    : 'linear-gradient(135deg,var(--at-primary) 0%,var(--at-accent-2) 100%)'
+    : 'linear-gradient(135deg,var(--at-cta) 0%,var(--at-cta-2) 100%)'
   return (
     <button
       onClick={onClick}
@@ -394,7 +394,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
                 Cancelar
               </button>
               <button onClick={hacerReserva} disabled={saving}
-                style={{ padding: '10px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13.5px', whiteSpace: 'nowrap', cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                style={{ padding: '10px 16px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13.5px', whiteSpace: 'nowrap', cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Reservando…' : '📅 Confirmar reserva'}
               </button>
             </>

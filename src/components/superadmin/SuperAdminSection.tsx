@@ -146,7 +146,7 @@ export function SuperAdminSection() {
                   cursor: 'pointer',
                   border: active ? 'none' : '1px solid rgba(255,255,255,0.14)',
                   background: active
-                    ? 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))'
+                    ? 'linear-gradient(135deg, var(--at-nav-primary), var(--at-nav-primary-2))'
                     : 'rgba(255,255,255,0.08)',
                   color: active ? 'white' : 'var(--at-nav-ink)',
                 }}

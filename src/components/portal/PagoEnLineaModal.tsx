@@ -129,7 +129,7 @@ export function PagoEnLineaModal({ registro, moneda, recargoRows, canalPago, onC
               padding: '12px',
               borderRadius: '10px',
               border: 'none',
-              background: loading ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
+              background: loading ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))',
               color: 'white',
               fontWeight: 700,
               fontSize: '14px',

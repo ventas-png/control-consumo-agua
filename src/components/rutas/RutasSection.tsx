@@ -410,7 +410,7 @@ export function RutasSection({
         {canEdit && (
           <button
             onClick={abrirCrear}
-            style={{ padding: '10px 20px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+            style={{ padding: '10px 20px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
           >
             + Nueva Ruta
           </button>

@@ -390,11 +390,11 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
                 {([
-                  { label: 'Sin asignar', sub: 'sin agente asignado', value: convStats.sinAsignar, from: 'var(--at-warning)', to: 'var(--at-warning)', icon: '📥' },
-                  { label: 'Cerradas hoy', sub: 'últimas 24 horas', value: convStats.cerradasHoy, from: 'var(--at-success)', to: 'var(--at-success-strong)', icon: '✅' },
-                  { label: 'Críticas', sub: 'abiertas > 48h', value: convStats.criticas, from: 'var(--at-danger)', to: 'var(--at-danger)', icon: '🚨' },
-                  { label: 'Urgentes', sub: 'abiertas 24–48h', value: convStats.urgentes, from: 'var(--at-warning)', to: 'var(--at-warning)', icon: '⚠️' },
-                  { label: 'En proceso', sub: 'abiertas < 24h', value: convStats.enProceso, from: 'var(--at-primary)', to: 'var(--at-primary-hover)', icon: '🔄' },
+                  { label: 'Sin asignar', sub: 'sin agente asignado', value: convStats.sinAsignar, from: 'var(--at-warning)', to: 'var(--at-warning)', ink: 'var(--at-on-status)', icon: '📥' },
+                  { label: 'Cerradas hoy', sub: 'últimas 24 horas', value: convStats.cerradasHoy, from: 'var(--at-success)', to: 'var(--at-success-strong)', ink: 'var(--at-on-status)', icon: '✅' },
+                  { label: 'Críticas', sub: 'abiertas > 48h', value: convStats.criticas, from: 'var(--at-danger)', to: 'var(--at-danger)', ink: 'var(--at-on-status)', icon: '🚨' },
+                  { label: 'Urgentes', sub: 'abiertas 24–48h', value: convStats.urgentes, from: 'var(--at-warning)', to: 'var(--at-warning)', ink: 'var(--at-on-status)', icon: '⚠️' },
+                  { label: 'En proceso', sub: 'abiertas < 24h', value: convStats.enProceso, from: 'var(--at-cta)', to: 'var(--at-cta-hover)', ink: 'white', icon: '🔄' },
                 ] as const).map(card => (
                   <button
                     key={card.label}
@@ -403,7 +403,8 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                       background: `linear-gradient(135deg, ${card.from}, ${card.to})`,
                       borderRadius: '14px',
                       padding: '20px',
-                      color: 'white',
+                      // Estados: --at-on-status (los estados aclaran en dark); marca: blanco sobre --at-cta.
+                      color: card.ink,
                       border: 'none',
                       cursor: 'pointer',
                       textAlign: 'left',

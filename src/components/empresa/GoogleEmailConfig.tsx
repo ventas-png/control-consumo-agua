@@ -363,7 +363,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               disabled={sendingTest}
               style={{
                 padding: '9px 18px', borderRadius: '8px', border: 'none',
-                background: sendingTest ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))',
+                background: sendingTest ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))',
                 color: 'white', cursor: sendingTest ? 'not-allowed' : 'pointer',
                 fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap',
               }}

@@ -542,7 +542,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
       }}>
         <div style={{
           width: '64px', height: '64px', borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+          background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'white', fontWeight: 800, fontSize: '22px', flexShrink: 0,
         }}>

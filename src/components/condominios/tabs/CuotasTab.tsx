@@ -639,7 +639,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
                 style={{ padding: '10px 16px', background: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)', border: '1.5px solid var(--at-accent-soft)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
                 📥 Importar CSV
               </button>
-              <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
+              <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
                 + Nueva cuota
               </button>
             </>
@@ -718,7 +718,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -971,7 +971,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
                 )}
                 {canEdit && puedePagar && (
                   <button onClick={() => void handlePagar(c)} disabled={procesando} title="Registrar pago de la cuota"
-                    style={{ background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', border: 'none', cursor: procesando ? 'not-allowed' : 'pointer', color: 'white', fontSize: '12px', padding: '4px 10px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
+                    style={{ background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', border: 'none', cursor: procesando ? 'not-allowed' : 'pointer', color: 'white', fontSize: '12px', padding: '4px 10px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
                     💰 Pagar
                   </button>
                 )}

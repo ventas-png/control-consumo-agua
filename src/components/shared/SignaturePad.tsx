@@ -112,7 +112,7 @@ export function SignaturePad({ onSave, onCancel, saving = false, saveLabel = 'Gu
       </div>
       <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
         <button type="button" onClick={save} disabled={!hasDrawn || saving || bloquearGuardar}
-          style={{ ...btn, border: 'none', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', opacity: !hasDrawn || saving || bloquearGuardar ? 0.6 : 1 }}>
+          style={{ ...btn, border: 'none', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-2))', color: 'white', opacity: !hasDrawn || saving || bloquearGuardar ? 0.6 : 1 }}>
           {saving ? 'Guardando…' : saveLabel}
         </button>
         <button type="button" onClick={clear} disabled={saving}

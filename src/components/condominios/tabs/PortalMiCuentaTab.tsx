@@ -202,7 +202,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, recargoRows, c
               <button onClick={() => setPagando(null)} disabled={procesando} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1.5px solid var(--at-line)', background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontWeight: 700, fontSize: 14, cursor: procesando ? 'not-allowed' : 'pointer' }}>
                 Cancelar
               </button>
-              <button onClick={() => void handlePagar()} disabled={procesando} style={{ flex: 2, padding: 12, borderRadius: 10, border: 'none', background: procesando ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))', color: '#fff', fontWeight: 800, fontSize: 14, cursor: procesando ? 'not-allowed' : 'pointer' }}>
+              <button onClick={() => void handlePagar()} disabled={procesando} style={{ flex: 2, padding: 12, borderRadius: 10, border: 'none', background: procesando ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))', color: '#fff', fontWeight: 800, fontSize: 14, cursor: procesando ? 'not-allowed' : 'pointer' }}>
                 {procesando ? 'Procesando…' : '💳 Pagar'}
               </button>
             </div>
@@ -216,6 +216,6 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, recargoRows, c
 
 const payBtn: CSSProperties = {
   padding: '8px 14px', borderRadius: 10, border: 'none',
-  background: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
+  background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))',
   color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0,
 }

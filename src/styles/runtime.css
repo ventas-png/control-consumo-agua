@@ -278,7 +278,7 @@
 }
 .signup-btn-primary {
   width: 100%; padding: 13px; font-size: 15px; font-weight: 700;
-  background: linear-gradient(135deg, var(--at-primary), var(--at-accent-2));
+  background: linear-gradient(135deg, var(--at-cta), var(--at-cta-2));
   color: white; border: none; border-radius: 12px;
   cursor: pointer; transition: filter 0.15s;
   box-shadow: 0 6px 20px rgba(27, 59, 54, 0.3);
@@ -373,7 +373,7 @@
 }
 .invite-btn-primary {
   width: 100%; padding: 13px; font-size: 15px; font-weight: 700;
-  background: linear-gradient(135deg, var(--at-primary), var(--at-accent-2));
+  background: linear-gradient(135deg, var(--at-cta), var(--at-cta-2));
   color: white; border: none; border-radius: 12px;
   cursor: pointer; transition: filter 0.15s;
   box-shadow: 0 6px 20px rgba(27, 59, 54, 0.3);

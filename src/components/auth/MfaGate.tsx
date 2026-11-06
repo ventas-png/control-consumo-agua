@@ -168,7 +168,7 @@ function Screen({ children }: { children: React.ReactNode }) {
 function primaryBtn(disabled: boolean): React.CSSProperties {
   return {
     width: '100%', padding: '12px', fontSize: 15, fontWeight: 700,
-    background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+    background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-2))',
     color: '#fff', border: 'none', borderRadius: 12,
     cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1,
   }
