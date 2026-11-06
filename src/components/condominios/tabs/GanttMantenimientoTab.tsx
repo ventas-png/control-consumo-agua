@@ -2,6 +2,7 @@ import { hoyLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { TicketMantenimiento } from '../../../types'
 import { tint } from '../../shared/statusTone'
+import { TicketFichaModal } from './TicketFichaModal'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -31,6 +32,9 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<string>('')
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('')
   const [verPor, setVerPor] = useState<'gantt' | 'stats'>('gantt')
+  // La ficha se guarda por id para que siga a la fila recargada.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalle = useMemo(() => (detalleId ? tickets.find(t => t.id === detalleId) ?? null : null), [tickets, detalleId])
 
   // Calcular ventana temporal
   const { fechaMin, rangoDias } = useMemo(() => {
@@ -48,6 +52,13 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
       (!filtroPrioridad || t.prioridad === filtroPrioridad)
     ).sort((a, b) => b.created_at.localeCompare(a.created_at))
   , [tickets, filtroEstado, filtroPrioridad])
+
+  /** Inicio, fin (hoy si sigue abierto) y duración de la barra de un ticket. */
+  function tramo(t: TicketMantenimiento) {
+    const inicio = t.created_at.slice(0, 10)
+    const fin = t.fecha_cierre?.slice(0, 10) ?? hoy
+    return { inicio, fin, duracion: diasDiff(inicio, fin), enCurso: !t.fecha_cierre }
+  }
 
   function pctLeft(fecha: string): number {
     return (diasDiff(fechaMin, fecha) / rangoDias) * 100
@@ -159,12 +170,12 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
         <>
           {/* Filtros */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}
+            <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} aria-label="Estado"
               style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, background: 'var(--at-surface)' }}>
               <option value="">Todos los estados</option>
               {['abierto', 'en_proceso', 'resuelto', 'cerrado'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
             </select>
-            <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value)}
+            <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value)} aria-label="Prioridad"
               style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, background: 'var(--at-surface)' }}>
               <option value="">Todas las prioridades</option>
               {['urgente', 'alta', 'media', 'baja'].map(p => <option key={p} value={p}>{p}</option>)}
@@ -188,19 +199,25 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
                 ))}
               </div>
 
-              {/* Gantt rows */}
+              {/* Filas del Gantt: cada una abre la ficha del ticket en ventana
+                  (antes sólo había un tooltip al pasar el ratón, que en el
+                  teléfono no existe). */}
               <div style={{ maxHeight: 500, overflowY: 'auto' }}>
                 {ticketsFiltrados.slice(0, 80).map(t => {
-                  const inicio = t.created_at.slice(0, 10)
-                  const fin = t.fecha_cierre?.slice(0, 10) ?? hoy
+                  const { inicio, fin, duracion } = tramo(t)
                   const left = pctLeft(inicio)
                   const width = pctWidth(inicio, fin)
-                  const duracion = diasDiff(inicio, fin)
                   const color = ESTADO_COLOR[t.estado] ?? 'var(--at-ink-3)'
+                  const abierto = detalleId === t.id
                   return (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--at-surface-2)', minHeight: 36 }}>
-                      {/* Label */}
-                      <div style={{ width: 200, flexShrink: 0, padding: '6px 10px', borderRight: '1px solid var(--at-chip)' }}>
+                    <div key={t.id} role="button" tabIndex={0} aria-label={t.titulo}
+                      onClick={() => setDetalleId(t.id)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetalleId(t.id) } }}
+                      style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--at-surface-2)', minHeight: 36, cursor: 'pointer',
+                        background: abierto ? 'var(--at-primary-tint)' : undefined }}>
+                      {/* Etiqueta: hasta 200px en escritorio, ~38% en el teléfono para
+                          que a la barra le quede sitio. */}
+                      <div style={{ flex: '0 0 clamp(120px, 38%, 200px)', minWidth: 0, padding: '6px 10px', borderRight: '1px solid var(--at-chip)' }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--at-ink)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.titulo}</div>
                         <div style={{ fontSize: 9, color: PRIORIDAD_COLOR[t.prioridad] }}>{t.prioridad} · {t.tipo}</div>
                       </div>
@@ -238,6 +255,24 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
           )}
         </>
       )}
+
+      {/* Ficha del ticket en ventana (sólo lectura: esta pestaña no edita),
+          con el tramo de la barra: inicio, fin y duración. */}
+      {detalle && (() => {
+        const { inicio, fin, duracion, enCurso } = tramo(detalle)
+        return (
+          <TicketFichaModal
+            ticket={detalle}
+            moneda={moneda}
+            onClose={() => setDetalleId(null)}
+            datosExtra={[
+              { label: 'Inicio', value: inicio },
+              { label: 'Fin', value: enCurso ? `En curso (hoy ${fin})` : fin },
+              { label: 'Duración', value: `${duracion} día${duracion !== 1 ? 's' : ''}` },
+            ]}
+          />
+        )
+      })()}
     </div>
   )
 }

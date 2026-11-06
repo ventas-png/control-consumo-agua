@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
 import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { TicketMantenimiento, EstadoTicket, PrioridadTicket } from '../../../types'
 import { tint } from '../../shared/statusTone'
+import { TicketFichaModal, COLUMNAS_TICKET as COLUMNAS, PRIORIDAD_TICKET_CFG as PRIORIDAD_CFG } from './TicketFichaModal'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -14,20 +14,6 @@ interface Props {
   moneda: string
   canEdit: boolean
   onRefresh: () => void
-}
-
-const COLUMNAS: { estado: EstadoTicket; label: string; color: string; bg: string; bgHeader: string }[] = [
-  { estado: 'abierto',    label: 'Abierto',    color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)', bgHeader: 'var(--at-chip)' },
-  { estado: 'en_proceso', label: 'En proceso', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', bgHeader: 'var(--at-warning-tint)' },
-  { estado: 'resuelto',   label: 'Resuelto',   color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', bgHeader: 'var(--at-primary-soft)' },
-  { estado: 'cerrado',    label: 'Cerrado',    color: 'var(--at-success)', bg: 'var(--at-success-tint)', bgHeader: 'var(--at-success-tint)' },
-]
-
-const PRIORIDAD_CFG: Record<PrioridadTicket, { label: string; color: string; bg: string; order: number }> = {
-  urgente: { label: 'Urgente', color: 'var(--at-on-status)', bg: 'var(--at-danger)', order: 0 },
-  alta:    { label: 'Alta',    color: 'var(--at-on-status)', bg: 'var(--at-warning)', order: 1 },
-  media:   { label: 'Media',   color: 'var(--at-on-status)', bg: 'var(--at-warning)', order: 2 },
-  baja:    { label: 'Baja',    color: 'var(--at-ink-2)', bg: 'var(--at-line)', order: 3 },
 }
 
 const SIGUIENTE: Partial<Record<EstadoTicket, EstadoTicket>> = {
@@ -39,18 +25,6 @@ const ANTERIOR: Partial<Record<EstadoTicket, EstadoTicket>> = {
   en_proceso: 'abierto',
   resuelto: 'en_proceso',
   cerrado: 'resuelto',
-}
-
-const TIPO_LABEL: Record<TicketMantenimiento['tipo'], string> = { preventivo: '🔩 Preventivo', correctivo: '🔧 Correctivo' }
-
-/** "2026-11-06T15:04:00Z" → "2026-11-06 15:04" (hora local); una fecha sola se deja tal cual. */
-function fechaHora(iso?: string | null) {
-  if (!iso) return '—'
-  if (iso.length <= 10) return iso
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
 export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, companyId: _companyId, moneda, canEdit, onRefresh }: Props) {
@@ -226,100 +200,36 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
         })}
       </div>
 
-      {/* Ficha del ticket en ventana: a pantalla completa en el teléfono. Las
-          acciones del flujo (retroceder / avanzar / cerrar) van en el pie; el
-          cierre sigue pidiendo notas y costo real con PromptDialog, que se
-          pinta encima de la ventana. */}
+      {/* Ficha del ticket en ventana (TicketFichaModal, compartida con el
+          Gantt): a pantalla completa en el teléfono. Las acciones del flujo
+          (retroceder / avanzar / cerrar) van en el pie; el cierre sigue
+          pidiendo notas y costo real con PromptDialog, que se pinta encima. */}
       {detalle && (() => {
-        const pCfg = PRIORIDAD_CFG[detalle.prioridad]
-        const col = COLUMNAS.find(c => c.estado === detalle.estado)
         const isMoving = moviendo === detalle.id
         const anterior = ANTERIOR[detalle.estado]
         const siguiente = SIGUIENTE[detalle.estado]
-        const fotos = detalle.foto_urls?.length ?? 0
-        const archivos = detalle.archivo_urls?.length ?? 0
-        const datos: { label: string; value: string }[] = [
-          { label: 'Estado', value: col?.label ?? detalle.estado },
-          { label: 'Prioridad', value: pCfg.label },
-          { label: 'Tipo', value: TIPO_LABEL[detalle.tipo] ?? detalle.tipo },
-          { label: 'Unidad', value: detalle.unidad_nombre ?? '—' },
-          { label: 'Asignado a', value: detalle.asignado_a ?? '—' },
-          { label: 'Fecha límite', value: detalle.fecha_limite ?? '—' },
-          { label: 'Costo estimado', value: detalle.costo_estimado != null ? `${moneda} ${detalle.costo_estimado.toFixed(2)}` : '—' },
-          { label: 'Costo real', value: detalle.costo_real != null ? `${moneda} ${detalle.costo_real.toFixed(2)}` : '—' },
-          { label: 'Creado', value: fechaHora(detalle.created_at) },
-          { label: 'Fecha de cierre', value: fechaHora(detalle.fecha_cierre) },
-        ]
-        if (fotos || archivos) {
-          datos.push({ label: 'Adjuntos', value: [fotos ? `📷 ${fotos} foto${fotos !== 1 ? 's' : ''}` : '', archivos ? `📎 ${archivos} archivo${archivos !== 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ') })
-        }
         return (
-          <EditModal
-            title={detalle.titulo}
-            subtitle={<span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: pCfg.bg, color: pCfg.color }}>{pCfg.label}</span>
-              {col && <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: col.bgHeader, color: col.color, border: `1px solid ${tint(col.color, 20)}` }}>{col.label}</span>}
-              {detalle.unidad_nombre && <span>📍 {detalle.unidad_nombre}</span>}
-              {detalle.asignado_a && <span>👤 {detalle.asignado_a}</span>}
-            </span>}
-            size="lg"
-            fullScreenOnMobile
+          <TicketFichaModal
+            ticket={detalle}
+            moneda={moneda}
             onClose={cerrarDetalle}
-            footer={
-              <div className="at-ficha-acciones" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
-                <Button variant="secondary" onClick={cerrarDetalle}>Cerrar</Button>
-                {canEdit && anterior && (
+            acciones={canEdit && (
+              <>
+                {anterior && (
                   <Button variant="secondary" disabled={isMoving} onClick={() => moverTicket(detalle, anterior)}
                     title={`Regresar a ${COLUMNAS.find(c => c.estado === anterior)?.label}`}>
                     ← Retroceder
                   </Button>
                 )}
-                {canEdit && siguiente && (
+                {siguiente && (
                   <Button disabled={isMoving} onClick={() => moverTicket(detalle, siguiente)}
                     title={`Pasar a ${COLUMNAS.find(c => c.estado === siguiente)?.label}`}>
                     {detalle.estado === 'resuelto' ? '✅ Cerrar ticket' : '→ Avanzar'}
                   </Button>
                 )}
-              </div>
-            }
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px', marginBottom: '12px' }}>
-              {datos.map(f => (
-                <div key={f.label} style={{ background: 'var(--at-surface-2)', borderRadius: '7px', padding: '8px', border: '1px solid var(--at-line)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{f.label}</div>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>{f.value}</div>
-                </div>
-              ))}
-            </div>
-
-            {detalle.descripcion && (
-              <div style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px', border: '1px solid var(--at-line)', marginBottom: '12px' }}>
-                <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>Descripción</div>
-                <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{detalle.descripcion}</div>
-              </div>
+              </>
             )}
-
-            {detalle.notas_cierre && (
-              <div style={{ background: 'var(--at-success-tint)', borderRadius: '8px', padding: '10px', border: `1px solid ${tint('var(--at-success)', 20)}` }}>
-                <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>Notas de cierre</div>
-                <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{detalle.notas_cierre}</div>
-              </div>
-            )}
-
-            {/* Dónde va el ticket dentro del flujo (la etapa actual, resaltada). */}
-            <div aria-hidden style={{ marginTop: '12px', fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', flexWrap: 'wrap', gap: '4px 6px', alignItems: 'center' }}>
-              {COLUMNAS.map((c, i) => (
-                <span key={c.estado} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  {i > 0 && <span>→</span>}
-                  <span style={c.estado === detalle.estado
-                    ? { fontWeight: 700, color: c.color, background: c.bgHeader, border: `1px solid ${tint(c.color, 20)}`, borderRadius: '20px', padding: '1px 8px' }
-                    : undefined}>
-                    {c.label}
-                  </span>
-                </span>
-              ))}
-            </div>
-          </EditModal>
+          />
         )
       })()}
     </div>
