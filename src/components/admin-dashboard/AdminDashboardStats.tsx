@@ -59,7 +59,7 @@ function AdminDashboardStatsImpl({ registros, moneda, clientes, fechaDesde, fech
       value: `${consumoTotal.toFixed(2)}`,
       unit: 'm³',
       icon: '💧',
-      bg: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 100%)',
+      bg: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-hover) 100%)',
     },
     {
       label: 'Recaudo Estimado',

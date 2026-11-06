@@ -56,7 +56,7 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false, c
   }, [resumen])
 
   const statCards = [
-    { label: 'Consumo Mes (m³)', value: resumen.consumoMes.toFixed(2), bg: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 100%)' },
+    { label: 'Consumo Mes (m³)', value: resumen.consumoMes.toFixed(2), bg: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-hover) 100%)' },
     { label: `Recaudo Estimado (${moneda})`, value: resumen.recaudoMes.toFixed(2), bg: 'linear-gradient(135deg, var(--at-success) 0%, var(--at-success-strong) 100%)' },
     { label: 'Pendientes de Pago', value: String(resumen.pendientes), bg: 'linear-gradient(135deg, var(--at-warning) 0%, var(--at-warning) 100%)' },
   ]

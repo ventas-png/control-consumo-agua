@@ -971,7 +971,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
                 )}
                 {canEdit && puedePagar && (
                   <button onClick={() => void handlePagar(c)} disabled={procesando} title="Registrar pago de la cuota"
-                    style={{ background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', border: 'none', cursor: procesando ? 'not-allowed' : 'pointer', color: 'white', fontSize: '12px', padding: '4px 10px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
+                    style={{ background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', border: 'none', cursor: procesando ? 'not-allowed' : 'pointer', color: 'white', fontSize: '12px', padding: '4px 10px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
                     💰 Pagar
                   </button>
                 )}

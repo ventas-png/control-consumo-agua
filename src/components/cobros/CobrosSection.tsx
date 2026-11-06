@@ -829,7 +829,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
                               {(puedePagar || !puedeEmitir) && (
                                 <button onClick={() => setPagoModal(r)} style={{
                                   padding: '8px 14px', minHeight: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                                  background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white',
+                                  background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', color: 'white',
                                   fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap',
                                 }}>
                                   💰 Aplicar Pago

@@ -427,7 +427,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const kpiCards = ([
     { tab: 'cuenta',   label: 'Deuda Pendiente',   value: loading ? '' : `${moneda} ${deudaTotal.toFixed(2)}`, icon: '💳', bg: deudaTotal > 0 ? 'linear-gradient(135deg, var(--at-warning), var(--at-warning))' : 'linear-gradient(135deg, var(--at-success), var(--at-success-strong))' },
     { tab: 'tickets',  label: 'Tickets Abiertos',  value: loading ? '' : String(ticketsAbiertos),              icon: '🔧', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
-    { tab: 'reservas', label: 'Reservas Activas',  value: loading ? '' : String(reservasProx),                 icon: '🏊', bg: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))' },
+    { tab: 'reservas', label: 'Reservas Activas',  value: loading ? '' : String(reservasProx),                 icon: '🏊', bg: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))' },
     { tab: 'anuncios', label: 'Anuncios (7 días)', value: loading ? '' : String(anunciosNuevos),               icon: '📢', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
   ] satisfies { tab: PortalTab; label: string; value: string; icon: string; bg: string }[])
     .filter(card => !pestanasListas || idsVisibles.includes(card.tab))

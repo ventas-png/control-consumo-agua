@@ -394,7 +394,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
                 Cancelar
               </button>
               <button onClick={hacerReserva} disabled={saving}
-                style={{ padding: '10px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13.5px', whiteSpace: 'nowrap', cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                style={{ padding: '10px 16px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13.5px', whiteSpace: 'nowrap', cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Reservando…' : '📅 Confirmar reserva'}
               </button>
             </>

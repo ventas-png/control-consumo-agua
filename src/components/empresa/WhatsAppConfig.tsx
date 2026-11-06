@@ -153,7 +153,7 @@ const inputStyle: React.CSSProperties = {
   color: 'var(--at-ink)', boxSizing: 'border-box', outline: 'none',
 }
 const btnPrimary: React.CSSProperties = {
-  padding: '9px 18px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
+  padding: '9px 18px', background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))',
   color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
 }
 const btnGhost: React.CSSProperties = {

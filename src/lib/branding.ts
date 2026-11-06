@@ -337,13 +337,18 @@ function segundoTono(marca: string, acento: string | null): string {
   return blancoLegible(hslAHex([h, s < SAT_GRIS ? 0 : Math.min(s * SEGUNDO_TONO_SAT, ACCENT2_SATURACION), 0.41]))
 }
 
-/** Botones principales por defecto en dark (index.css): #5E9D8A / #79A18E oscurecidos hasta blanco ≥ 4.5:1. */
-export const CTA_OSCURO = { cta: '#4D8071', cta2: '#5E7D6F' } as const
+/** Botones principales por defecto en dark (index.css): #5E9D8A / #79A18E oscurecidos hasta
+ *  blanco ≥ 4.5:1, y el final del degradado primario → hover (ese primario 18% más oscuro). */
+export const CTA_OSCURO = { cta: '#4D8071', cta2: '#5E7D6F', ctaHover: '#3F695D' } as const
+/** --at-cta-hover: --at-cta oscurecido como --at-primary-hover lo está de --at-primary. */
+const CTA_HOVER_OSCURECER = 0.18
 
 /**
- * Botones principales con texto blanco (degradado --at-cta → --at-cta-2), o null sin
- * colores custom (index.css: var(--at-primary) / var(--at-accent-2) en claro y
- * CTA_OSCURO en dark). Mismo color de partida que las cabeceras de SuperAdmin:
+ * Botones principales con texto blanco (degradado --at-cta → --at-cta-2, o → --at-cta-hover
+ * en <Button variant="gradient-primary">), o null sin colores custom (index.css:
+ * var(--at-primary) / var(--at-accent-2) / var(--at-primary-hover) en claro y CTA_OSCURO
+ * en dark). --at-cta-hover es --at-cta un 18% más oscuro, en ambos temas (en dark el hover
+ * del tema aclara y dejaba el blanco a ~2.4:1). Mismo color de partida que las cabeceras de SuperAdmin:
  * - claro: el primario y el segundo tono (segundoTono), oscurecidos si hace falta para
  *   que el blanco se lea ≥ 4.5:1 (con una marca amarilla quedaba a 1.4:1);
  * - oscuro: los mismos colores aclarados para el tema oscuro y luego oscurecidos lo
@@ -358,11 +363,13 @@ export function ctaDesdeMarca(
   if (!primario && !acento) return null
   const marca = primario ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
   const segundoOscuro = acento ? derivarVariablesAccentOscuro(acento).accent2 : aclararParaTemaOscuro(segundoTono(marca, null))
+  const cta = blancoLegible(marca), ctaOscuro = blancoLegible(aclararParaTemaOscuro(marca))
   return {
-    claro: { '--at-cta': blancoLegible(marca), '--at-cta-2': segundoTono(marca, acento) },
+    claro: { '--at-cta': cta, '--at-cta-2': segundoTono(marca, acento), '--at-cta-hover': oscurecer(cta, CTA_HOVER_OSCURECER) },
     oscuro: {
-      '--at-cta': blancoLegible(aclararParaTemaOscuro(marca)),
+      '--at-cta': ctaOscuro,
       '--at-cta-2': blancoLegible(segundoOscuro),
+      '--at-cta-hover': oscurecer(ctaOscuro, CTA_HOVER_OSCURECER),
     },
   }
 }

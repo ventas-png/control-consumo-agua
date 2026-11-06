@@ -42,7 +42,7 @@ const VARIANTS: Record<ButtonVariant, CSSProperties> = {
   'outline-primary':{ background: 'transparent', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary)' },
   'outline-danger': { background: 'transparent', color: 'var(--at-danger)', border: '1.5px solid var(--at-danger)' },
   'gradient-primary': {
-    background: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
+    background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))',
     color: '#fff', border: 'none',
   },
   'gradient-accent': {

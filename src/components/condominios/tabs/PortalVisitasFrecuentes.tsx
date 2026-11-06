@@ -372,7 +372,7 @@ export function PortalVisitasFrecuentes({ visitas, diasAviso: diasAvisoProp, uni
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                 <button onClick={solicitar} disabled={saving}
-                  style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                  style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-cta),var(--at-cta-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
                   {saving ? 'Enviando...' : '📨 Enviar solicitud'}
                 </button>
                 <button onClick={reset} disabled={saving}

@@ -1107,11 +1107,15 @@ describe('--at-cta / --at-cta-2 (botones principales) desde la marca', () => {
     const c = css()
     expect(c).toMatch(/--at-cta:\s*var\(--at-primary\);\s*--at-cta-2:\s*var\(--at-accent-2\);/)
     // Auto (@media) y manual ([data-theme="dark"]): los dos con los mismos hex.
-    expect(c.match(new RegExp(`--at-cta:\\s*${CTA_OSCURO.cta};\\s*--at-cta-2:\\s*${CTA_OSCURO.cta2};`, 'g'))).toHaveLength(2)
-    for (const x of [...Object.values(CTA_OSCURO), '#1B3B36', '#577B69']) expect(contraste(B, x), x).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
-    // En dark destacan sobre las superficies oscuras (antes el blanco quedaba a ~3.1:1).
-    for (const x of Object.values(CTA_OSCURO)) expect(contraste(x, DARK_SURFACE), x).toBeGreaterThanOrEqual(3)
+    expect(c.match(new RegExp(`--at-cta:\\s*${CTA_OSCURO.cta};\\s*--at-cta-2:\\s*${CTA_OSCURO.cta2};\\s*--at-cta-hover:\\s*${CTA_OSCURO.ctaHover};`, 'g'))).toHaveLength(2)
+    expect(c).toMatch(/--at-cta-hover:\s*var\(--at-primary-hover\);/)
+    for (const x of [...Object.values(CTA_OSCURO), '#1B3B36', '#577B69', '#102622']) expect(contraste(B, x), x).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+    // En dark el inicio del degradado destaca sobre las superficies oscuras (antes el blanco quedaba a ~3.1:1).
+    for (const x of [CTA_OSCURO.cta, CTA_OSCURO.cta2]) expect(contraste(x, DARK_SURFACE), x).toBeGreaterThanOrEqual(3)
+    // El hover de dark es el cta 18% más oscuro, como en claro (el --at-primary-hover dark aclara: 2.4:1).
+    expect(CTA_OSCURO.ctaHover.toLowerCase()).toBe(oscurecer(CTA_OSCURO.cta, 0.18))
     expect(contraste(B, '#5E9D8A')).toBeLessThan(LIGHT_MIN_CONTRASTE)
+    expect(contraste(B, '#76B3A1')).toBeLessThan(LIGHT_MIN_CONTRASTE)
   })
 
   it('EmpresasTable y EmpresaDetailDrawer usan el degradado --at-cta', () => {
@@ -1128,11 +1132,17 @@ describe('--at-cta / --at-cta-2 (botones principales) desde la marca', () => {
       .filter((f) => /\.(tsx?|css)$/.test(f) && !/(__tests__|\.test\.|\.spec\.|\.stories\.)/.test(f))
     // Dos paradas (con o sin 0% / 100%): botones, banners, avatares, cabeceras.
     const viejo = /linear-gradient\(\s*135deg\s*,\s*var\(--at-primary\)(\s+0%)?\s*,\s*var\(--at-accent-2\)(\s+100%)?\s*\)/
-    const conViejo = archivos.filter((f) => viejo.test(readFileSync(resolve(process.cwd(), f), 'utf8')))
+    // …y primario → hover (<Button variant="gradient-primary"> y sus copias en línea).
+    const viejoHover = /linear-gradient\(\s*135deg\s*,\s*var\(--at-primary\)(\s+0%)?\s*,\s*var\(--at-primary-hover\)(\s+100%)?\s*\)/
+    const conViejo = archivos.filter((f) => {
+      const src = readFileSync(resolve(process.cwd(), f), 'utf8')
+      return viejo.test(src) || viejoHover.test(src)
+    })
     expect(conViejo).toEqual([])
     expect(archivos.filter((f) => /var\(--at-cta\)/.test(readFileSync(resolve(process.cwd(), f), 'utf8'))).length).toBeGreaterThan(50)
     const button = readFileSync(resolve(process.cwd(), 'src/components/shared/Button.tsx'), 'utf8')
     expect(button).toContain("primary:          { background: 'var(--at-cta)', color: '#fff', border: '1px solid var(--at-cta)' },")
+    expect(button).toContain("background: 'linear-gradient(135deg, var(--at-cta), var(--at-cta-hover))',")
   })
 
   it('sin colores custom → null (quedan los de index.css)', () => {
@@ -1146,15 +1156,19 @@ describe('--at-cta / --at-cta-2 (botones principales) desde la marca', () => {
     expect(distanciaRgb(v.claro['--at-cta-2'], '#577B69')).toBeLessThan(15)
     expect(distanciaRgb(v.oscuro['--at-cta'], CTA_OSCURO.cta)).toBeLessThan(25)
     expect(distanciaRgb(v.oscuro['--at-cta-2'], CTA_OSCURO.cta2)).toBeLessThan(25)
+    // En claro el hover es el --at-primary-hover que la hoja deriva de la misma marca.
+    expect(v.claro['--at-cta-hover']).toBe(derivarVariablesMarca(DEFAULT_BRAND_COLOR).hover)
+    expect(distanciaRgb(v.oscuro['--at-cta-hover'], CTA_OSCURO.ctaHover)).toBeLessThan(25)
   })
 
   it.each(MUESTRAS)('%s → el blanco se lee ≥ 4.5:1 en ambos temas y en dark el botón destaca sobre la superficie', (c) => {
     for (const [p, a] of [[c, null], [null, c], [c, '#B96A3F']] as const) {
       const v = ctaDesdeMarca(p, a)!
       for (const tema of ['claro', 'oscuro'] as const) {
-        for (const k of ['--at-cta', '--at-cta-2']) {
+        for (const k of ['--at-cta', '--at-cta-2', '--at-cta-hover']) {
           expect(contraste(B, v[tema][k]), `${p}/${a} ${tema} ${k} ${v[tema][k]}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
         }
+        expect(v[tema]['--at-cta-hover']).toBe(oscurecer(v[tema]['--at-cta'], 0.18))
       }
       for (const k of ['--at-cta', '--at-cta-2']) expect(contraste(v.oscuro[k], DARK_SURFACE), `${p}/${a} ${k}`).toBeGreaterThanOrEqual(3)
     }

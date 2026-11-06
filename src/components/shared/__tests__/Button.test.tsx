@@ -79,6 +79,8 @@ describe('Button — variants', () => {
     const { container } = render(<Button variant="gradient-primary">X</Button>)
     const btn = container.querySelector('button') as HTMLElement
     expect(btn.style.background).toContain('linear-gradient')
+    // --at-cta → --at-cta-hover: el blanco se lee ≥ 4.5:1 también en dark.
+    expect(btn.style.background).toContain('at-cta-hover')
   })
 
   it('variant=outline-primary tiene fondo transparente', () => {
