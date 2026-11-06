@@ -77,7 +77,11 @@ describe('PortalPaquetesTab — dejar un paquete para un tercero', () => {
     ])
 
     expect(screen.getByText('Esperando retiro')).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: /Ver código de retiro/ })).toHaveLength(1)
     expect(screen.getByText(/Retirado por Ana López/)).toBeTruthy()
+    // El código vive en la ficha de la pieza, que abre al tocar la tarjeta.
+    expect(screen.queryByRole('button', { name: /Ver código de retiro/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Sobre con llaves' }))
+    expect(screen.getAllByRole('button', { name: /Ver código de retiro/ })).toHaveLength(1)
+    expect(screen.getByText('RUKJ2BW7')).toBeTruthy()
   })
 })
