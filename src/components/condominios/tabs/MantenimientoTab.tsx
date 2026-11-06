@@ -13,6 +13,7 @@ import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
 import { EmptyState } from '../../shared/EmptyState'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
+import { TicketFichaModal } from './TicketFichaModal'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -23,6 +24,8 @@ interface Props {
   /** Firma las respuestas del equipo en la conversación del ticket. */
   autorNombre?: string
   proyectoNombre?: string
+  /** Moneda del proyecto para los costos de la ficha; sin ella el monto va solo. */
+  moneda?: string
   canCreate: boolean
   canEdit: boolean
   /** Eliminar tiene su propio permiso (condominios.tab.<tab>.delete): ver o
@@ -45,7 +48,7 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
   cerrado:    { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
-export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, autorNombre = '', proyectoNombre = 'Condominio', canCreate, canEdit, canDelete, onRefresh }: Props) {
+export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, autorNombre = '', proyectoNombre = 'Condominio', moneda = '', canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('todos')
@@ -54,6 +57,10 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   const [fotoUrls, setFotoUrls] = useState<string[]>([])
   const [archivoUrls, setArchivoUrls] = useState<string[]>([])
   const [conversacion, setConversacion] = useState<TicketMantenimiento | null>(null)
+  // La ficha se guarda por id para que siga a la fila recargada (cambio de
+  // estado desde la ficha o desde la conversación).
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalle = detalleId ? tickets.find(t => t.id === detalleId) ?? null : null
   const [form, setForm] = useState({
     tipo: 'correctivo',
     titulo: '',
@@ -174,6 +181,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
     if (!result.isConfirmed) return
     const { error, count } = await softDelete('tickets_mantenimiento', { id })
     if (error || count === 0) { notify({ variant: 'error', title: 'Error', text: error?.message ?? new SinFilasAfectadasError().message }); return }
+    if (detalleId === id) setDetalleId(null)
     onRefresh()
   }
 
@@ -332,7 +340,9 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
         </EditModal>
       )}
 
-      {/* Lista */}
+      {/* Lista: tarjetas compactas que abren la ficha en ventana. Las fotos,
+          los adjuntos, el cambio de estado, la conversación y eliminar viven
+          en la ficha (antes todo iba desplegado en cada tarjeta). */}
       {filtrados.length === 0 ? (
         <EmptyState icon="🔧" compact title="No hay tickets de mantenimiento"
           description={tickets.length > 0 ? 'Ningún ticket coincide con los filtros.' : undefined} />
@@ -342,19 +352,26 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             const pColor = PRIORIDAD_COLORS[t.prioridad] ?? { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' }
             const eColor = ESTADO_COLORS[t.estado] ?? { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' }
             const vencido = t.fecha_limite && t.fecha_limite < hoyLocalISO() && t.estado !== 'cerrado'
+            const fotos = t.foto_urls?.length ?? 0
+            const archivos = t.archivo_urls?.length ?? 0
+            const abierto = detalleId === t.id
             return (
-              <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.prioridad === 'urgente' && t.estado !== 'cerrado' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div key={t.id} role="button" tabIndex={0} aria-label={t.titulo}
+                onClick={() => setDetalleId(t.id)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetalleId(t.id) } }}
+                style={{ background: 'var(--at-surface)', border: `1.5px solid ${abierto ? 'var(--at-primary)' : t.prioridad === 'urgente' && t.estado !== 'cerrado' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '6px', cursor: 'pointer', boxShadow: abierto ? '0 2px 8px rgba(0,0,0,0.1)' : undefined }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: pColor.bg, color: pColor.color }}>{t.prioridad}</span>
                   <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>{t.tipo}</span>
                   {vencido && <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>Vencido</span>}
-                  {canDelete && <button onClick={() => eliminar(t.id)} title="Eliminar" aria-label={`Eliminar ${t.titulo}`}
-                    style={{ marginLeft: 'auto', background: 'none', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 6px' }}>🗑</button>}
+                  <span style={{ marginLeft: 'auto', padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: eColor.bg, color: eColor.color, textTransform: 'capitalize' }}>
+                    {t.estado.replace('_', ' ')}
+                  </span>
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)', marginBottom: '3px' }}>{t.titulo}</div>
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)', marginBottom: '2px', overflowWrap: 'anywhere' }}>{t.titulo}</div>
                   {t.descripcion && (
-                    <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.descripcion}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.descripcion}</div>
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '4px 14px', fontSize: '12px', color: 'var(--at-ink-3)', flexWrap: 'wrap' }}>
@@ -363,37 +380,65 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
                   {t.costo_estimado && <span>💰 Est. {t.costo_estimado.toFixed(2)}</span>}
                   {t.costo_real && <span>✅ Real {t.costo_real.toFixed(2)}</span>}
                   <span>🕐 {new Date(t.created_at).toLocaleDateString('es')}</span>
-                </div>
-                {t.foto_urls?.length > 0 && <ImageGallery urls={t.foto_urls} maxVisible={4} />}
-                {t.archivo_urls?.length > 0 && <ListaAdjuntos paths={t.archivo_urls} />}
-                {/* Barra de acciones al pie: estado y conversación (antes eran
-                    una columna a la derecha que en el teléfono estrechaba el
-                    texto del ticket). Mismo hilo que ve el residente; las
-                    notas internas quedan solo de este lado. */}
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--at-line)' }}>
-                  {canEdit ? (
-                    <select value={t.estado} onChange={e => cambiarEstado(t.id, e.target.value)} aria-label={`Estado de ${t.titulo}`}
-                      style={{ flex: '1 1 130px', padding: '8px 10px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, border: 'none', cursor: 'pointer', background: eColor.bg, color: eColor.color }}>
-                      <option value="abierto">Abierto</option>
-                      <option value="en_proceso">En proceso</option>
-                      <option value="resuelto">Resuelto</option>
-                      <option value="cerrado">Cerrado</option>
-                    </select>
-                  ) : (
-                    <span style={{ padding: '8px 12px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, background: eColor.bg, color: eColor.color, textTransform: 'capitalize' }}>
-                      {t.estado.replace('_', ' ')}
-                    </span>
-                  )}
-                  <button onClick={() => setConversacion(t)} title="Conversación con el residente"
-                    style={{ flex: '2 1 150px', padding: '10px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
-                    💬 Conversación
-                  </button>
+                  {fotos > 0 && <span>📷 {fotos}</span>}
+                  {archivos > 0 && <span>📎 {archivos}</span>}
                 </div>
               </div>
             )
           })}
         </div>
       )}
+
+      {/* Ficha del ticket en ventana (TicketFichaModal, compartida con Kanban y
+          Gantt): a pantalla completa en el teléfono. Aquí van el cambio de
+          estado, las fotos, los documentos, la conversación y eliminar. */}
+      {detalle && (() => {
+        const vencido = detalle.fecha_limite && detalle.fecha_limite < hoyLocalISO() && detalle.estado !== 'cerrado'
+        const eColor = ESTADO_COLORS[detalle.estado] ?? { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' }
+        const fotos = detalle.foto_urls ?? []
+        const archivos = detalle.archivo_urls ?? []
+        return (
+          <TicketFichaModal
+            ticket={detalle}
+            moneda={moneda}
+            onClose={() => setDetalleId(null)}
+            aviso={vencido && (
+              <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', color: 'var(--at-danger)', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px', fontSize: '12px', fontWeight: 700 }}>
+                ⚠️ Vencido · la fecha límite era {detalle.fecha_limite}
+              </div>
+            )}
+            acciones={<>
+              {canDelete && <Button variant="outline-danger" onClick={() => eliminar(detalle.id)} aria-label={`Eliminar ${detalle.titulo}`}>🗑️ Eliminar</Button>}
+              <Button onClick={() => setConversacion(detalle)} title="Conversación con el residente">💬 Conversación</Button>
+            </>}
+          >
+            {canEdit && (
+              <div style={{ marginBottom: '12px' }}>
+                <div style={labelStyle}>Cambiar estado</div>
+                <select value={detalle.estado} onChange={e => cambiarEstado(detalle.id, e.target.value)} aria-label={`Estado de ${detalle.titulo}`}
+                  style={{ width: '100%', maxWidth: '260px', padding: '8px 10px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, border: 'none', cursor: 'pointer', background: eColor.bg, color: eColor.color }}>
+                  <option value="abierto">Abierto</option>
+                  <option value="en_proceso">En proceso</option>
+                  <option value="resuelto">Resuelto</option>
+                  <option value="cerrado">Cerrado</option>
+                </select>
+              </div>
+            )}
+            {fotos.length > 0 && (
+              <div style={{ marginBottom: '12px' }}>
+                <div style={labelStyle}>Fotos ({fotos.length})</div>
+                <ImageGallery urls={fotos} maxVisible={6} />
+              </div>
+            )}
+            {archivos.length > 0 && (
+              <div style={{ marginBottom: '12px' }}>
+                <div style={labelStyle}>Documentos ({archivos.length})</div>
+                <ListaAdjuntos paths={archivos} />
+              </div>
+            )}
+          </TicketFichaModal>
+        )
+      })()}
 
       {conversacion && (
         <TicketChatModal

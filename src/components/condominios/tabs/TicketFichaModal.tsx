@@ -42,11 +42,15 @@ interface Props {
   acciones?: ReactNode
   /** Tarjetas de datos que se añaden tras las del ticket (p. ej. inicio/fin/duración en el Gantt). */
   datosExtra?: { label: string; value: string }[]
+  /** Aviso destacado al inicio del cuerpo (p. ej. "Vencido"). */
+  aviso?: ReactNode
   /** Secciones extra del cuerpo, antes de la línea del flujo. */
   children?: ReactNode
 }
 
-export function TicketFichaModal({ ticket, moneda, onClose, acciones, datosExtra = [], children }: Props) {
+export function TicketFichaModal({ ticket, moneda, onClose, acciones, datosExtra = [], aviso, children }: Props) {
+  // Sin moneda (Mantenimiento no la recibe) el monto va solo.
+  const monto = (n: number) => `${moneda} ${n.toFixed(2)}`.trim()
   const pCfg = PRIORIDAD_TICKET_CFG[ticket.prioridad] ?? PRIORIDAD_TICKET_CFG.media
   const col = COLUMNAS_TICKET.find(c => c.estado === ticket.estado)
   const fotos = ticket.foto_urls?.length ?? 0
@@ -55,11 +59,11 @@ export function TicketFichaModal({ ticket, moneda, onClose, acciones, datosExtra
     { label: 'Estado', value: col?.label ?? ticket.estado },
     { label: 'Prioridad', value: pCfg.label },
     { label: 'Tipo', value: TIPO_TICKET_LABEL[ticket.tipo] ?? ticket.tipo },
-    { label: 'Unidad', value: ticket.unidad_nombre ?? '—' },
+    { label: 'Unidad', value: ticket.unidad_nombre ?? 'Área común' },
     { label: 'Asignado a', value: ticket.asignado_a ?? '—' },
     { label: 'Fecha límite', value: ticket.fecha_limite ?? '—' },
-    { label: 'Costo estimado', value: ticket.costo_estimado != null ? `${moneda} ${ticket.costo_estimado.toFixed(2)}` : '—' },
-    { label: 'Costo real', value: ticket.costo_real != null ? `${moneda} ${ticket.costo_real.toFixed(2)}` : '—' },
+    { label: 'Costo estimado', value: ticket.costo_estimado != null ? monto(ticket.costo_estimado) : '—' },
+    { label: 'Costo real', value: ticket.costo_real != null ? monto(ticket.costo_real) : '—' },
     { label: 'Creado', value: fechaHora(ticket.created_at) },
     { label: 'Fecha de cierre', value: fechaHora(ticket.fecha_cierre) },
     ...datosExtra,
@@ -87,6 +91,7 @@ export function TicketFichaModal({ ticket, moneda, onClose, acciones, datosExtra
         </div>
       }
     >
+      {aviso}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px', marginBottom: '12px' }}>
         {datos.map(f => (
           <div key={f.label} style={{ background: 'var(--at-surface-2)', borderRadius: '7px', padding: '8px', border: '1px solid var(--at-line)' }}>
