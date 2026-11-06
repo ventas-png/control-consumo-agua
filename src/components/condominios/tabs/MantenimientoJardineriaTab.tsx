@@ -62,7 +62,8 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
   const [detalleId, setDetalleId] = useState<string | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [cambiando, setCambiando] = useState(false)
+  // Qué transición está en curso, para el spinner de ese botón y no de los demás.
+  const [cambiando, setCambiando] = useState<EstadoJardineria | null>(null)
   const [filtroTipo, setFiltroTipo] = useState<TipoJardineria | ''>('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoJardineria | ''>('')
   const [areaCustom, setAreaCustom] = useState('')
@@ -140,9 +141,9 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
 
   async function cambiarEstado(r: MantenimientoJardineria, estado: EstadoJardineria) {
     if (cambiando) return
-    setCambiando(true)
+    setCambiando(estado)
     const { error } = await updateCondominioRow('mantenimiento_jardineria', r.id, { estado })
-    setCambiando(false)
+    setCambiando(null)
     // Antes el error se ignoraba: el botón no hacía nada y no decía por qué.
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
@@ -302,26 +303,35 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
         </EditModal>
       )}
 
-      {/* Detalle del servicio en ventana */}
+      {/* Ficha del servicio en ventana (pantalla completa en el teléfono): los
+          datos en tarjetas y las transiciones del estado en el pie, junto a
+          Cerrar, como en el resto de fichas del módulo. */}
       {detalle && (
         <EditModal
           title={`${tipoDe(detalle.tipo)?.icon ?? '🌿'} ${tipoDe(detalle.tipo)?.label ?? detalle.tipo}`}
           subtitle={
             <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <span>{detalle.fecha}</span>
               <EstadoBadge estado={detalle.estado} />
+              <span>{detalle.fecha}</span>
+              {detalle.proveedor && <span>· {detalle.proveedor}</span>}
             </span>
           }
-          maxWidth="500px"
+          size="lg"
           fullScreenOnMobile
           onClose={() => setDetalleId(null)}
           footer={
-            <>
-              {canEdit && detalle.estado !== 'completado' && (
-                <Button variant="success" onClick={() => void cambiarEstado(detalle, 'completado')} loading={cambiando}>✓ Marcar completado</Button>
-              )}
+            <div className="at-ficha-acciones" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
               <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
-            </>
+              {canEdit && detalle.estado === 'programado' && (
+                <Button variant="secondary" onClick={() => void cambiarEstado(detalle, 'en_proceso')} loading={cambiando === 'en_proceso'}>▶ Iniciar</Button>
+              )}
+              {canEdit && (detalle.estado === 'programado' || detalle.estado === 'en_proceso') && (
+                <Button variant="outline-danger" onClick={() => void cambiarEstado(detalle, 'cancelado')} loading={cambiando === 'cancelado'}>✕ Cancelar servicio</Button>
+              )}
+              {canEdit && detalle.estado !== 'completado' && (
+                <Button variant="success" onClick={() => void cambiarEstado(detalle, 'completado')} loading={cambiando === 'completado'}>✓ Marcar completado</Button>
+              )}
+            </div>
           }
         >
           <ServicioDetalle registro={detalle} dinero={dinero} />
@@ -371,45 +381,46 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
   )
 }
 
-/** Detalle de solo lectura de un servicio de jardinería. */
+/** Ficha de solo lectura de un servicio de jardinería: tarjetas de datos,
+ *  áreas tratadas, insumos y observaciones. */
 function ServicioDetalle({ registro: r, dinero }: { registro: MantenimientoJardineria; dinero: (v: number) => string }) {
-  const fila = (label: string, valor: ReactNode) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 14 }}>
-      <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
-      <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{valor}</span>
+  const tipo = tipoDe(r.tipo)
+  const est = estadoDe(r.estado)
+  const tarjeta = (label: string, valor: ReactNode, color?: string) => (
+    <div key={label} style={{ background: 'var(--at-surface-2)', borderRadius: 7, padding: 8, border: '1px solid var(--at-line)', minWidth: 0 }}>
+      <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: color ?? 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>{valor}</div>
+    </div>
+  )
+  const seccion = (label: string, cuerpo: ReactNode) => (
+    <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)', marginBottom: 12 }}>
+      <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 6 }}>{label}</div>
+      {cuerpo}
     </div>
   )
   return (
     <div>
-      {fila('Proveedor', r.proveedor ? <>{r.proveedor}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)' }}> (sin vincular al catálogo)</span>}</> : '—')}
-      {fila('Trabajadores', r.trabajadores ?? '—')}
-      {fila('Horas de trabajo', r.horas_trabajo != null ? `${r.horas_trabajo} h` : '—')}
-      {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
-      {fila('Próxima visita', r.proxima_visita ? <strong style={{ color: 'var(--at-accent)' }}>📅 {r.proxima_visita}</strong> : '—')}
-
-      <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 6 }}>Áreas tratadas</div>
-        {r.areas.length === 0 ? <span style={{ color: 'var(--at-ink-3)', fontSize: 13 }}>—</span> : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {r.areas.map(a => (
-              <span key={a} style={{ padding: '3px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', borderRadius: 6, fontSize: 12, border: '1px solid var(--at-success-border)' }}>{a}</span>
-            ))}
-          </div>
-        )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, marginBottom: 12 }}>
+        {tarjeta('Fecha', r.fecha)}
+        {tarjeta('Tipo', `${tipo?.icon ?? ''} ${tipo?.label ?? r.tipo}`.trim())}
+        {tarjeta('Estado', est?.label ?? r.estado, est?.color)}
+        {tarjeta('Proveedor', r.proveedor ? <>{r.proveedor}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)', fontWeight: 400 }}> (sin vincular al catálogo)</span>}</> : '—')}
+        {tarjeta('Trabajadores', r.trabajadores ?? '—')}
+        {tarjeta('Horas de trabajo', r.horas_trabajo != null ? `${r.horas_trabajo} h` : '—')}
+        {tarjeta('Costo', r.costo != null ? dinero(r.costo) : '—', r.costo != null ? 'var(--at-success)' : undefined)}
+        {tarjeta('Próxima visita', r.proxima_visita ? `📅 ${r.proxima_visita}` : '—', r.proxima_visita ? 'var(--at-accent)' : undefined)}
       </div>
 
-      {r.insumos && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Insumos</div>
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.insumos}</p>
+      {seccion('Áreas tratadas', r.areas.length === 0 ? <span style={{ color: 'var(--at-ink-3)', fontSize: 13 }}>—</span> : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {r.areas.map(a => (
+            <span key={a} style={{ padding: '3px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', borderRadius: 6, fontSize: 12, border: '1px solid var(--at-success-border)' }}>{a}</span>
+          ))}
         </div>
-      )}
-      {r.observaciones && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.observaciones}</p>
-        </div>
-      )}
+      ))}
+
+      {r.insumos && seccion('Insumos', <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--at-ink-2)' }}>{r.insumos}</p>)}
+      {r.observaciones && seccion('Observaciones', <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--at-ink-2)' }}>{r.observaciones}</p>)}
     </div>
   )
 }

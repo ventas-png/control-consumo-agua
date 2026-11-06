@@ -107,7 +107,7 @@ describe('AmenidadesTab — equipo del inventario', () => {
     fireEvent.click(screen.getByRole('button', { name: '📋 Lista' }))
     expect(screen.getByText('🪑 1 equipo · por entregar')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '⋯ Detalle' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reserva de Salón · Casa 4 · 2099-01-05' }))
     expect(screen.getByText('Equipo por entregar')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '📦 Registrar entrega' }))
     const cantidad = screen.getByLabelText('Cantidad entregada de Sillas') as HTMLInputElement
@@ -121,7 +121,7 @@ describe('AmenidadesTab — equipo del inventario', () => {
   it('desde el detalle se agrega equipo a la reserva respetando tope y disponibilidad', async () => {
     montar({ prestamos: [] })
     fireEvent.click(screen.getByRole('button', { name: '📋 Lista' }))
-    fireEvent.click(screen.getByRole('button', { name: '⋯ Detalle' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reserva de Salón · Casa 4 · 2099-01-05' }))
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar equipo' }))
     const input = screen.getByLabelText('Cantidad de Sillas') as HTMLInputElement
     // 50 disponibles pero el tope por reserva es 20.
@@ -136,7 +136,7 @@ describe('AmenidadesTab — equipo del inventario', () => {
     montar({ prestamos: [como<PrestamoEquipo>({ ...prestamos[0], estado: 'prestado' })] })
     fireEvent.click(screen.getByRole('button', { name: '📋 Lista' }))
     expect(screen.getByText('🪑 1 equipo · por recibir')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '⋯ Detalle' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reserva de Salón · Casa 4 · 2099-01-05' }))
     fireEvent.click(screen.getByRole('button', { name: '↩ Registrar recepción' }))
     const modal = screen.getByText('↩ Recepción de equipo').parentElement as HTMLElement
     expect(within(modal).getByText('Sin faltantes ni daños')).toBeTruthy()

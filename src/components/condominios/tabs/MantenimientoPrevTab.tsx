@@ -107,7 +107,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
     ])
     setSavingEjec(false)
     if (ejRes.error) return notify({ variant: 'error', title: 'Error', text: ejRes.error.message })
-    setShowEjecForm(false); setEjecForm({ ...BLANK_EJEC })
+    cerrarEjecForm()
     setEjecuciones(await fetchEjecucionesMantenimiento<EjecucionMantenimiento>(selected))
     onRefresh()
   }
@@ -122,8 +122,16 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
     setShowForm(false)
   }
 
-  // Al cerrar se descarta la ejecución a medio capturar: si no, reaparecía
-  // abierta (con sus datos) en el siguiente plan que se abriera.
+  // La ejecución se captura en su propia ventana encima de la ficha; al
+  // cerrarla se descarta lo capturado a medias.
+  function cerrarEjecForm() {
+    if (savingEjec) return
+    setShowEjecForm(false)
+    setEjecForm({ ...BLANK_EJEC })
+  }
+
+  // Al cerrar la ficha también se descarta la ejecución a medio capturar: si
+  // no, reaparecía abierta (con sus datos) en el siguiente plan que se abriera.
   function cerrarDetalle() {
     if (savingEjec) return
     setSelected(null)
@@ -259,6 +267,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
           { label: 'Plan', value: plan.activo ? 'Activo' : 'Inactivo', color: plan.activo ? 'var(--at-success)' : 'var(--at-ink-3)' },
         ]
         return (
+        <>
         <EditModal
           title={plan.equipo}
           subtitle={
@@ -285,7 +294,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
                 </Button>
               )}
               {canCreate && plan.activo && (
-                <Button onClick={() => setShowEjecForm(v => !v)} aria-expanded={showEjecForm}>
+                <Button onClick={() => setShowEjecForm(true)}>
                   + Registrar ejecución
                 </Button>
               )}
@@ -304,49 +313,6 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
           {plan.descripcion && (
             <div style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px', fontSize: '13px', color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap' }}>
               {plan.descripcion}
-            </div>
-          )}
-
-          {/* Execution form */}
-          {showEjecForm && (
-            <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px' }}>
-                <div>
-                  <label htmlFor="mp-ej-fecha" style={labelStyle}>Fecha *</label>
-                  <input id="mp-ej-fecha" style={inputStyle} type="date" value={ejecForm.fecha} onChange={e => setEjecForm(f => ({ ...f, fecha: e.target.value }))} />
-                </div>
-                <div>
-                  <label htmlFor="mp-ej-realizado" style={labelStyle}>Realizado por</label>
-                  <input id="mp-ej-realizado" style={inputStyle} value={ejecForm.realizado_por} onChange={e => setEjecForm(f => ({ ...f, realizado_por: e.target.value }))} />
-                </div>
-                <div>
-                  <label htmlFor="mp-ej-costo" style={labelStyle}>Costo real ({moneda})</label>
-                  <input id="mp-ej-costo" style={inputStyle} type="number" min="0" step="0.01" value={ejecForm.costo_real} onChange={e => setEjecForm(f => ({ ...f, costo_real: parseFloat(e.target.value) || 0 }))} />
-                </div>
-                <div>
-                  <label htmlFor="mp-ej-estado" style={labelStyle}>Estado</label>
-                  <select id="mp-ej-estado" style={inputStyle} value={ejecForm.estado} onChange={e => setEjecForm(f => ({ ...f, estado: e.target.value }))}>
-                    <option value="completado">Completado</option>
-                    <option value="parcial">Parcial</option>
-                    <option value="omitido">Omitido</option>
-                  </select>
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label htmlFor="mp-ej-observaciones" style={labelStyle}>Observaciones</label>
-                  <input id="mp-ej-observaciones" style={inputStyle} value={ejecForm.observaciones} onChange={e => setEjecForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Notas de la ejecución" />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <Button size="sm" variant="success" onClick={handleRegistrarEjecucion} loading={savingEjec} loadingText="Guardando…">
-                  Guardar
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => setShowEjecForm(false)} disabled={savingEjec}>
-                  Cancelar
-                </Button>
-                <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
-                  → Próxima auto: {ejecForm.fecha ? addDays(ejecForm.fecha, FREQ_DAYS[plan.frecuencia] ?? 30) : '—'}
-                </span>
-              </div>
             </div>
           )}
 
@@ -380,6 +346,56 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
             </div>
           )}
         </EditModal>
+
+        {/* Registrar ejecución: ventana propia encima de la ficha (antes era
+            un recuadro dentro de la ficha que empujaba el historial). Va
+            después de la ficha en el árbol para quedar arriba en la pila. */}
+        {showEjecForm && (
+          <EditModal
+            title="Registrar ejecución"
+            subtitle={`${plan.equipo} · ${FREQ_LABELS[plan.frecuencia] ?? plan.frecuencia}`}
+            maxWidth="560px"
+            fullScreenOnMobile
+            closeOnBackdropClick={!savingEjec}
+            closeOnEscape={!savingEjec}
+            onClose={cerrarEjecForm}
+            footer={<>
+              <Button variant="secondary" onClick={cerrarEjecForm} disabled={savingEjec}>Cancelar</Button>
+              <Button variant="success" onClick={handleRegistrarEjecucion} loading={savingEjec} loadingText="Guardando…">Guardar ejecución</Button>
+            </>}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
+              <div>
+                <label htmlFor="mp-ej-fecha" style={labelStyle}>Fecha *</label>
+                <input id="mp-ej-fecha" style={inputStyle} type="date" value={ejecForm.fecha} onChange={e => setEjecForm(f => ({ ...f, fecha: e.target.value }))} autoFocus />
+              </div>
+              <div>
+                <label htmlFor="mp-ej-realizado" style={labelStyle}>Realizado por</label>
+                <input id="mp-ej-realizado" style={inputStyle} value={ejecForm.realizado_por} onChange={e => setEjecForm(f => ({ ...f, realizado_por: e.target.value }))} />
+              </div>
+              <div>
+                <label htmlFor="mp-ej-costo" style={labelStyle}>Costo real ({moneda})</label>
+                <input id="mp-ej-costo" style={inputStyle} type="number" min="0" step="0.01" value={ejecForm.costo_real} onChange={e => setEjecForm(f => ({ ...f, costo_real: parseFloat(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <label htmlFor="mp-ej-estado" style={labelStyle}>Estado</label>
+                <select id="mp-ej-estado" style={inputStyle} value={ejecForm.estado} onChange={e => setEjecForm(f => ({ ...f, estado: e.target.value }))}>
+                  <option value="completado">Completado</option>
+                  <option value="parcial">Parcial</option>
+                  <option value="omitido">Omitido</option>
+                </select>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label htmlFor="mp-ej-observaciones" style={labelStyle}>Observaciones</label>
+                <input id="mp-ej-observaciones" style={inputStyle} value={ejecForm.observaciones} onChange={e => setEjecForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Notas de la ejecución" />
+              </div>
+            </div>
+            <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
+              → Próxima ejecución automática: <strong style={{ color: 'var(--at-ink-2)' }}>{ejecForm.fecha ? addDays(ejecForm.fecha, FREQ_DAYS[plan.frecuencia] ?? 30) : '—'}</strong>
+            </div>
+          </EditModal>
+        )}
+        </>
         )
       })()}
     </div>

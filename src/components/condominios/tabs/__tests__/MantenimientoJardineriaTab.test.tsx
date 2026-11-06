@@ -210,3 +210,41 @@ describe('Jardinería — lista y detalle', () => {
     expect(within(screen.getByRole('dialog')).queryByRole('button', { name: '✓ Marcar completado' })).toBeNull()
   })
 })
+
+describe('Jardinería — pie y tarjetas de la ficha', () => {
+  it('Cerrar va primero; un servicio programado ofrece Iniciar, Cancelar servicio y Marcar completado, y cada transición escribe su estado', async () => {
+    const onRefresh = vi.fn()
+    render(<MantenimientoJardineriaTab {...props({ onRefresh })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver Fumigación del 2026-10-15' }))
+    const detalle = screen.getByRole('dialog', { name: '🧪 Fumigación' })
+    expect(detalle.classList.contains('at-modal--fs-mobile')).toBe(true)
+    const pie = detalle.querySelector('.at-modal-footer') as HTMLElement
+    expect(within(pie).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '▶ Iniciar', '✕ Cancelar servicio', '✓ Marcar completado'])
+
+    fireEvent.click(within(pie).getByRole('button', { name: '▶ Iniciar' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('mantenimiento_jardineria', 'j2', { estado: 'en_proceso' }))
+    fireEvent.click(within(pie).getByRole('button', { name: '✕ Cancelar servicio' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('mantenimiento_jardineria', 'j2', { estado: 'cancelado' }))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(2))
+  })
+
+  it('los datos van en tarjetas; un servicio completado sólo ofrece Cerrar, y sin permiso de editar tampoco hay transiciones', () => {
+    render(<MantenimientoJardineriaTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver Poda del 2026-10-10' }))
+    const detalle = screen.getByRole('dialog', { name: '✂️ Poda' })
+    expect(within(detalle).getByText('Fecha').nextSibling?.textContent).toBe('2026-10-10')
+    expect(within(detalle).getByText('Trabajadores').nextSibling?.textContent).toBe('3')
+    expect(within(detalle).getByText('Horas de trabajo').nextSibling?.textContent).toBe('6.5 h')
+    // Estado: en el chip del subtítulo y en la tarjeta.
+    expect(within(detalle).getAllByText('Completado')).toHaveLength(2)
+    expect(within(detalle.querySelector('.at-modal-footer') as HTMLElement).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar'])
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    cleanup()
+
+    render(<MantenimientoJardineriaTab {...props({ canEdit: false })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver Fumigación del 2026-10-15' }))
+    const soloLectura = screen.getByRole('dialog', { name: '🧪 Fumigación' })
+    expect(within(soloLectura.querySelector('.at-modal-footer') as HTMLElement).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar'])
+  })
+})

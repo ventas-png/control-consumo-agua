@@ -198,3 +198,39 @@ describe('Elevadores — lista, detalle e inspecciones', () => {
     expect(within(screen.getByRole('dialog')).queryByRole('button', { name: /^▶/ })).toBeNull()
   })
 })
+
+describe('Elevadores — pie y tarjetas de la ficha', () => {
+  it('Cerrar va primero; en atención ofrece Requiere seguimiento y Resolver, cada uno escribe su estado; los datos van en tarjetas', async () => {
+    const onRefresh = vi.fn()
+    const enAtencion = incidencia({ id: 'a1', estado: 'en_atencion', fecha: '2026-10-21', proxima_inspeccion: '2025-01-01' })
+    render(<IncidenciasElevadorTab {...props({ registros: [enAtencion], onRefresh })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver incidencia de Elevador 1 del 2026-10-21' }))
+    const detalle = screen.getByRole('dialog', { name: '🛗 Elevador 1' })
+    const pie = detalle.querySelector('.at-modal-footer') as HTMLElement
+    expect(within(pie).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '⚑ Requiere seguimiento', '▶ Resolver'])
+    expect(within(detalle).getByText('Horario').nextSibling?.textContent).toBe('08:15–10:00 · 1h 45min')
+    expect(within(detalle).getByText('Técnico').nextSibling?.textContent).toBe('Luis Pérez')
+    expect(within(detalle).getByText('Próxima inspección').nextSibling?.textContent).toBe('2025-01-01 · vencida')
+    // Estado: en el chip del subtítulo y en la tarjeta.
+    expect(within(detalle).getAllByText('En atención')).toHaveLength(2)
+
+    fireEvent.click(within(pie).getByRole('button', { name: '⚑ Requiere seguimiento' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('incidencias_elevador', 'a1', { estado: 'requiere_seguimiento' }))
+    fireEvent.click(within(pie).getByRole('button', { name: '▶ Resolver' }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('incidencias_elevador', 'a1', { estado: 'resuelto' }))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(2))
+  })
+
+  it('una incidencia reportada sólo ofrece Atender; una resuelta, sólo Cerrar', () => {
+    render(<IncidenciasElevadorTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver incidencia de Elevador 1 del 2026-10-20' }))
+    let pie = screen.getByRole('dialog', { name: '🛗 Elevador 1' }).querySelector('.at-modal-footer') as HTMLElement
+    expect(within(pie).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '▶ Atender'])
+    fireEvent.click(within(pie).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver incidencia de Elevador 1 del 2026-07-10' }))
+    pie = screen.getByRole('dialog', { name: '🛗 Elevador 1' }).querySelector('.at-modal-footer') as HTMLElement
+    expect(within(pie).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar'])
+  })
+})

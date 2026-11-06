@@ -1,7 +1,8 @@
-import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
+import { hoyLocalISO, formatFechaCalendario, formatDateTime } from '../../../lib/format'
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 import { reservarAmenidad, cancelarReservaAmenidad, equiposDeAmenidad } from '../../../domain/portal/reservas'
 import { useSignedUrls } from '../../../lib/storageUrls'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa, PrestamoEquipo, EquipoAmenidadDisponible } from '../../../types'
@@ -109,6 +110,13 @@ const ESTADO_RES: Record<EstadoReserva, { label: string; bg: string; color: stri
   cancelada:  { label: 'Cancelada',  bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
+/** "sábado, 14 de noviembre" → "Sábado, 14 de noviembre" (sólo la inicial; `text-transform: capitalize` ponía "De Noviembre"). */
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+const DEPOSITO_LABEL: Record<ReservaAmenidad['deposito_estado'], string> = {
+  no_aplica: 'no aplica', pendiente: 'pendiente', cobrado: 'cobrado', devuelto: 'devuelto', retenido: 'retenido',
+}
+
 interface FormReserva {
   amenidad_id: string
   fecha: string
@@ -131,6 +139,8 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
   const [saving, setSaving]       = useState(false)
   const [form, setForm]           = useState<FormReserva>(blankForm())
   const [vistaFutura, setVistaFutura] = useState(true)
+  // Reserva abierta en la ficha, por id: así la ficha sigue a la fila cuando el padre recarga.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
   // Catálogo de equipo de la amenidad elegida con lo disponible para la fecha.
   // Viene por RPC: el residente sólo ve sus propios préstamos, así que no
   // podría calcular cuánto queda.
@@ -173,6 +183,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
   const misReservas = reservas.filter(r => r.unidad_id === unidadId)
   const futuras = misReservas.filter(r => r.fecha >= hoy && r.estado !== 'cancelada')
   const pasadas = misReservas.filter(r => r.fecha < hoy || r.estado === 'cancelada')
+  const detalle = detalleId ? misReservas.find(r => r.id === detalleId) ?? null : null
   const amenidadesActivas = amenidades.filter(a => a.activo)
   const amenidadSel = amenidades.find(a => a.id === form.amenidad_id)
 
@@ -294,6 +305,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
     const { error } = await cancelarReservaAmenidad(id)
     if (error) { notify({ variant: 'error', title: 'No se pudo cancelar', text: error }); return }
     notify({ variant: 'success', title: 'Reserva cancelada', duration: 1600 })
+    setDetalleId(null)
     onRefresh()
   }
 
@@ -603,49 +615,141 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, prestamos = 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {(vistaFutura ? futuras : pasadas).sort((a, b) => a.fecha < b.fecha ? -1 : 1).map(r => {
             const ec = ESTADO_RES[(r.estado as EstadoReserva) ?? 'confirmada']
-            const amenidad = amenidades.find(a => a.id === r.amenidad_id)
+            const nombre = amenidades.find(a => a.id === r.amenidad_id)?.nombre ?? 'Amenidad'
             const accent = r.estado === 'confirmada' ? 'var(--at-success)' : r.estado === 'pendiente' ? 'var(--at-warning-strong)' : 'var(--at-ink-3)'
+            const cobro = totalCobroReserva(r, prestamos)
+            const equipo = prestamosDeReserva(r.id, prestamos).length
+            const abrir = () => setDetalleId(r.id)
             return (
-              <div key={r.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: '14px 16px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease' }}
+              /* La fila sólo resume; la ficha completa (cobro, equipo, notas y
+                 Cancelar) abre en ventana al tocarla. */
+              <div key={r.id} role="button" tabIndex={0} aria-label={`Reserva de ${nombre} · ${r.fecha}`}
+                onClick={abrir}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir() } }}
+                style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: '12px 16px 12px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow 0.15s ease' }}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 16px -8px rgba(15,23,42,0.18)' }}
                 onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}>
                 <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: accent }} />
                 <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,var(--at-primary-soft),#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📅</div>
                 {/* Base de 180px y no `flex: 1` (base 0): con base 0 el texto no
-                  * reclama sitio, el estado y «Cancelar» (ambos sin encoger) se
-                  * quedaban en la misma línea y en un teléfono el texto se
-                  * aplastaba a 0px con el botón recortado. Con base 180px, si no
-                  * caben todos, el estado y el botón pasan a la línea siguiente. */}
+                  * reclama sitio y en un teléfono se aplastaba; con base 180px, si
+                  * no caben todos, el estado pasa a la línea siguiente. */}
                 <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--at-ink)' }}>{amenidad?.nombre ?? 'Amenidad'}</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--at-ink-3)', marginTop: 2, textTransform: 'capitalize' }}>
-                    {formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—')} · {r.hora_inicio} – {r.hora_fin}
+                  <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--at-ink)' }}>{nombre}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--at-ink-3)', marginTop: 2 }}>
+                    {cap(formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—'))} · {r.hora_inicio} – {r.hora_fin}
                     {r.num_invitados > 0 && ` · ${r.num_invitados} invitado${r.num_invitados > 1 ? 's' : ''}`}
                   </div>
-                  {totalCobroReserva(r, prestamos) > 0 && (
-                    <div style={{ fontSize: 11.5, marginTop: 3, fontWeight: 700, color: r.metodo_pago_tarifa === 'cargar_unidad' ? 'var(--at-primary-hover)' : (r.tarifa_pagada ? 'var(--at-success)' : 'var(--at-warning-strong)') }}>
-                      🎟 {moneda} {totalCobroReserva(r, prestamos).toFixed(2)}
-                      {rentaDeReserva(r.id, prestamos) > 0 && ` · incluye renta de equipo ${moneda} ${rentaDeReserva(r.id, prestamos).toFixed(2)}`}
-                      {r.metodo_pago_tarifa === 'cargar_unidad' && ' · cargado a tu unidad'}
-                      {r.metodo_pago_tarifa === 'pagar_momento' && (r.tarifa_pagada ? ' · pagado' : ' · pagar en sitio')}
+                  {(cobro > 0 || equipo > 0 || r.rechazada_motivo) && (
+                    <div style={{ fontSize: 11.5, marginTop: 3, display: 'flex', flexWrap: 'wrap', gap: '2px 10px', color: 'var(--at-ink-3)' }}>
+                      {cobro > 0 && (
+                        <span style={{ fontWeight: 700, color: r.metodo_pago_tarifa === 'cargar_unidad' ? 'var(--at-primary-hover)' : (r.tarifa_pagada ? 'var(--at-success)' : 'var(--at-warning-strong)') }}>
+                          🎟 {moneda} {cobro.toFixed(2)}
+                        </span>
+                      )}
+                      {equipo > 0 && <span>🪑 {equipo} equipo{equipo === 1 ? '' : 's'}</span>}
+                      {r.rechazada_motivo && <span style={{ color: 'var(--at-danger-strong)', fontStyle: 'italic' }}>↩ {r.rechazada_motivo}</span>}
                     </div>
                   )}
-                  {r.rechazada_motivo && (
-                    <div style={{ fontSize: 11.5, color: 'var(--at-danger-strong)', marginTop: 3, fontStyle: 'italic', background: 'var(--at-danger-tint)', padding: '3px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
-                  )}
-                  <ListaPrestamos prestamos={prestamosDeReserva(r.id, prestamos)} moneda={moneda} />
                 </div>
                 <span style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: ec.bg, color: ec.color, flexShrink: 0, border: `1px solid ${tint(ec.color, 20)}` }}>{ec.label}</span>
-                {vistaFutura && r.estado !== 'cancelada' && (
-                  <button onClick={() => cancelarReserva(r.id)} style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: 'var(--at-danger)', fontWeight: 700, flexShrink: 0 }}>
-                    Cancelar
-                  </button>
-                )}
+                <span aria-hidden style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-primary)', flexShrink: 0 }}>Ver ficha ›</span>
               </div>
             )
           })}
         </div>
       )}
+
+      {/* Ficha de la reserva en ventana emergente (pantalla completa en el
+          teléfono): cobro, equipo pedido, notas y, mientras se pueda, Cancelar.
+          Antes todo iba apretado en la fila, con el botón junto al estado. */}
+      {detalle && (() => {
+        const r = detalle
+        const amenidad = amenidades.find(a => a.id === r.amenidad_id)
+        const ec = ESTADO_RES[(r.estado as EstadoReserva) ?? 'confirmada']
+        const tarifa = Number(r.monto_tarifa ?? 0)
+        const renta = rentaDeReserva(r.id, prestamos)
+        const cobro = totalCobroReserva(r, prestamos)
+        const equipo = prestamosDeReserva(r.id, prestamos)
+        const pendientePago = cobro > 0 && r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada && r.estado !== 'cancelada'
+        const estadoPago = r.metodo_pago_tarifa === 'cargar_unidad' ? 'cargado a tu unidad' : (r.tarifa_pagada ? 'pagado' : 'pagar en sitio')
+        // Misma regla que tenía el botón de la fila: sólo las próximas no canceladas.
+        const puedeCancelar = r.fecha >= hoy && r.estado !== 'cancelada'
+        const datos: { label: string; value: string; color?: string }[] = [
+          { label: 'Fecha', value: cap(formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }, 'es', r.fecha)) },
+          { label: 'Horario', value: `${r.hora_inicio} – ${r.hora_fin}` },
+          { label: 'Invitados', value: r.num_invitados > 0 ? String(r.num_invitados) : '—' },
+          { label: 'Estado', value: ec.label, color: ec.color },
+        ]
+        if (tarifa > 0) datos.push({ label: 'Tarifa', value: `${moneda} ${tarifa.toFixed(2)}` })
+        if (renta > 0) datos.push({ label: 'Renta de equipo', value: `${moneda} ${renta.toFixed(2)}` })
+        if (cobro > 0) datos.push({ label: tarifa > 0 && renta > 0 ? 'Total' : 'Cobro', value: `${moneda} ${cobro.toFixed(2)} · ${estadoPago}`, color: pendientePago ? 'var(--at-warning-strong)' : 'var(--at-success)' })
+        if (amenidad?.requiere_deposito && amenidad.monto_deposito) datos.push({ label: 'Depósito', value: `${moneda} ${Number(amenidad.monto_deposito).toFixed(2)} · ${DEPOSITO_LABEL[r.deposito_estado] ?? r.deposito_estado}` })
+        if (r.checkin_at) datos.push({ label: 'Check-in', value: formatDateTime(r.checkin_at) })
+        if (r.checkout_at) datos.push({ label: 'Check-out', value: formatDateTime(r.checkout_at) })
+        datos.push({ label: 'Solicitada', value: formatDateTime(r.created_at) })
+        return (
+          <EditModal
+            title={amenidad?.nombre ?? 'Reserva'}
+            subtitle={
+              <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ padding: '2px 9px', borderRadius: 999, fontSize: 10.5, fontWeight: 800, background: ec.bg, color: ec.color, border: `1px solid ${tint(ec.color, 20)}` }}>{ec.label}</span>
+                {r.no_show && <span style={{ padding: '2px 9px', borderRadius: 999, fontSize: 10.5, fontWeight: 800, background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)' }}>👻 No show</span>}
+                <span>📅 {cap(formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', r.fecha))} · ⏰ {r.hora_inicio} – {r.hora_fin}</span>
+              </span>
+            }
+            size="lg"
+            fullScreenOnMobile
+            onClose={() => setDetalleId(null)}
+            footer={
+              <div className="at-ficha-acciones" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+                <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
+                {puedeCancelar && <Button variant="outline-danger" onClick={() => void cancelarReserva(r.id)}>✕ Cancelar reserva</Button>}
+              </div>
+            }
+          >
+            {r.rechazada_motivo && (
+              <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', color: 'var(--at-danger-strong)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12.5 }}>
+                ↩ Rechazada: {r.rechazada_motivo}
+              </div>
+            )}
+            {r.estado === 'pendiente' && (
+              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', color: 'var(--at-warning-strong)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12.5 }}>
+                ⏳ La administración aún debe aprobar esta reserva.
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, marginBottom: 12 }}>
+              {datos.map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 7, padding: 8, border: '1px solid var(--at-line)', minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: d.color ?? 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {r.notas && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)', marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 4 }}>Notas</div>
+                <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--at-ink-2)' }}>{r.notas}</p>
+              </div>
+            )}
+
+            {equipo.length > 0 && (
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)', marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>Equipo pedido con la reserva</div>
+                <ListaPrestamos prestamos={equipo} moneda={moneda} />
+              </div>
+            )}
+
+            {r.deposito_estado === 'retenido' && (r.deposito_retenido_monto ?? 0) > 0 && (
+              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', color: 'var(--at-warning-strong)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5 }}>
+                Depósito retenido: {moneda} {Number(r.deposito_retenido_monto).toFixed(2)}{r.deposito_retenido_motivo ? ` · ${r.deposito_retenido_motivo}` : ''}
+              </div>
+            )}
+          </EditModal>
+        )
+      })()}
     </div>
   )
 }

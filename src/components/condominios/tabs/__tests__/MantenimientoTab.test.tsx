@@ -25,8 +25,8 @@ const { MantenimientoTab } = await import('../MantenimientoTab')
 
 const ticket = {
   id: 't1', titulo: 'Fuga en el lobby', descripcion: 'Gotea del techo', tipo: 'correctivo', prioridad: 'urgente',
-  estado: 'abierto', unidad_nombre: null, fecha_limite: null, costo_estimado: null, costo_real: null,
-  created_at: '2026-10-19T10:00:00Z', foto_urls: [], archivo_urls: [],
+  estado: 'abierto', unidad_nombre: null, fecha_limite: '2026-10-25', costo_estimado: 450, costo_real: null,
+  created_at: '2026-10-19T10:00:00Z', foto_urls: ['tickets/a.jpg', 'tickets/b.jpg'], archivo_urls: ['tickets/cotizacion.pdf'],
 } as unknown as TicketMantenimiento
 
 function renderTab(props: Partial<Parameters<typeof MantenimientoTab>[0]> = {}) {
@@ -36,10 +36,49 @@ function renderTab(props: Partial<Parameters<typeof MantenimientoTab>[0]> = {}) 
   )
 }
 
+// La tarjeta abre la ficha en ventana (EditModal real); estado, conversación y eliminar viven ahí.
+const abrir = () => fireEvent.click(screen.getByRole('button', { name: 'Fuga en el lobby' }))
+const ficha = () => screen.getByRole('dialog', { name: 'Fuga en el lobby' })
+const pie = () => ficha().querySelector('.at-modal-footer') as HTMLElement
+
 beforeEach(() => { Object.values(mocks).forEach(m => m.mockClear()) })
 afterEach(cleanup)
 
 describe('MantenimientoTab', () => {
+  it('la tarjeta abre la ficha en ventana (pantalla completa en el teléfono) con fotos, documentos, aviso de vencido y acciones en el pie', () => {
+    renderTab()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    // La tarjeta es compacta: anuncia fotos y documentos pero no los despliega ni trae el selector de estado.
+    expect(screen.getByText('📷 2')).toBeTruthy()
+    expect(screen.getByText('📎 1')).toBeTruthy()
+    expect(screen.queryByLabelText('Estado de Fuga en el lobby')).toBeNull()
+
+    abrir()
+    const v = ficha()
+    expect(v.classList.contains('at-modal--fs-mobile')).toBe(true)
+    expect(within(v).getByText('⚠️ Vencido · la fecha límite era 2026-10-25')).toBeTruthy()
+    expect(within(v).getByText('Gotea del techo')).toBeTruthy()
+    expect(within(v).getByText('450.00')).toBeTruthy()
+    expect(within(v).getByText('Área común')).toBeTruthy()
+    expect(within(v).getByText('Fotos (2)')).toBeTruthy()
+    expect(within(v).getByText('Documentos (1)')).toBeTruthy()
+    expect(within(v).getByLabelText('Estado de Fuga en el lobby')).toBeTruthy()
+    expect(within(pie()).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '🗑️ Eliminar', '💬 Conversación'])
+
+    fireEvent.click(within(pie()).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    abrir()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('sin permiso de edición la ficha no ofrece cambiar el estado, pero sí la conversación', () => {
+    renderTab({ canEdit: false, canDelete: false })
+    abrir()
+    expect(within(ficha()).queryByLabelText('Estado de Fuga en el lobby')).toBeNull()
+    expect(within(pie()).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '💬 Conversación'])
+  })
+
   it('el nuevo ticket se llena en una ventana a pantalla completa en el teléfono', async () => {
     const onRefresh = vi.fn()
     renderTab({ onRefresh })
@@ -55,13 +94,24 @@ describe('MantenimientoTab', () => {
     expect(onRefresh).toHaveBeenCalled()
   })
 
-  it('cada ticket tiene la conversación a todo el ancho y el estado con su etiqueta', () => {
-    renderTab()
+  it('desde la ficha se cambia el estado (la ficha sigue a la fila recargada) y se abre la conversación encima', async () => {
+    const onRefresh = vi.fn()
+    const { rerender } = renderTab({ onRefresh })
     expect(screen.getByText('📍 Área común')).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Estado de Fuga en el lobby'), { target: { value: 'en_proceso' } })
+    abrir()
+    fireEvent.change(within(ficha()).getByLabelText('Estado de Fuga en el lobby'), { target: { value: 'en_proceso' } })
     expect(mocks.updateCondominioRow).toHaveBeenCalledWith('tickets_mantenimiento', 't1', { estado: 'en_proceso' })
-    fireEvent.click(screen.getByRole('button', { name: '💬 Conversación' }))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    rerender(
+      <MantenimientoTab tickets={[{ ...ticket, estado: 'en_proceso' }]} unidades={[] as Unidad[]} proyectoId="p1" companyId="co1" userId="u1"
+        canCreate canEdit canDelete onRefresh={onRefresh} />,
+    )
+    expect((within(ficha()).getByLabelText('Estado de Fuga en el lobby') as HTMLSelectElement).value).toBe('en_proceso')
+
+    fireEvent.click(within(pie()).getByRole('button', { name: '💬 Conversación' }))
     expect(screen.getByRole('dialog', { name: 'Chat Fuga en el lobby' })).toBeTruthy()
+    // La ficha sigue abierta debajo de la conversación.
+    expect(ficha()).toBeTruthy()
   })
 
   it('los filtros dicen cuál está activo', () => {
@@ -74,30 +124,36 @@ describe('MantenimientoTab', () => {
 
   it('eliminar exige su propio permiso: editar no basta', async () => {
     renderTab({ canDelete: false })
-    expect(screen.queryByRole('button', { name: 'Eliminar Fuga en el lobby' })).toBeNull()
+    abrir()
+    expect(within(ficha()).queryByRole('button', { name: 'Eliminar Fuga en el lobby' })).toBeNull()
     cleanup()
 
     renderTab()
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
+    abrir()
+    fireEvent.click(within(pie()).getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
     await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
   })
 
-  it('con permiso de eliminar, aunque no edite, da de baja el ticket', async () => {
+  it('con permiso de eliminar, aunque no edite, da de baja el ticket y cierra la ficha', async () => {
     mocks.confirm.mockResolvedValueOnce({ isConfirmed: true })
     const onRefresh = vi.fn()
     renderTab({ canEdit: false, onRefresh })
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
+    abrir()
+    fireEvent.click(within(pie()).getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
     await waitFor(() => expect(mocks.softDelete).toHaveBeenCalledWith('tickets_mantenimiento', { id: 't1' }))
     await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('si la base no da de baja el ticket (la RLS lo rechaza), avisa y no lo da por eliminado', async () => {
+  it('si la base no da de baja el ticket (la RLS lo rechaza), avisa, no lo da por eliminado y la ficha sigue abierta', async () => {
     mocks.confirm.mockResolvedValueOnce({ isConfirmed: true })
     mocks.softDelete.mockResolvedValueOnce({ error: null, count: 0 })
     const onRefresh = vi.fn()
     renderTab({ onRefresh })
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
+    abrir()
+    fireEvent.click(within(pie()).getByRole('button', { name: 'Eliminar Fuga en el lobby' }))
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
     expect(onRefresh).not.toHaveBeenCalled()
+    expect(ficha()).toBeTruthy()
   })
 })

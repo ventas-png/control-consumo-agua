@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { TicketMantenimiento, ReservaAmenidad, PlanMantenimiento, InspeccionNormativa, VencimientoExtra } from '../../../types'
 import { tint } from '../../shared/statusTone'
 import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -15,6 +16,8 @@ interface Evento {
   fecha: string
   tipo: 'ticket' | 'reserva' | 'plan' | 'inspeccion' | 'vencimiento'
   label: string
+  /** Segunda línea de la ficha del día (prioridad, horario, responsable…). */
+  detalle?: string
   color: string
   bg: string
 }
@@ -25,6 +28,19 @@ const TIPO_CFG = {
   plan:        { color: 'var(--at-success)', bg: 'var(--at-success-tint)',  icon: '🗓️', label: 'Plan manto.' },
   inspeccion:  { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)',  icon: '🔍', label: 'Inspección' },
   vencimiento: { color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)',  icon: '⚠️', label: 'Vencimiento' },
+}
+
+const ESTADO_TICKET: Record<string, string> = { abierto: 'Abierto', en_proceso: 'En proceso', resuelto: 'Resuelto', cerrado: 'Cerrado' }
+const PRIORIDAD_TICKET: Record<string, string> = { urgente: 'Urgente', alta: 'Alta', media: 'Media', baja: 'Baja' }
+const ESTADO_RESERVA: Record<string, string> = { confirmada: 'Confirmada', pendiente: 'Pendiente', cancelada: 'Cancelada' }
+const FRECUENCIA_PLAN: Record<string, string> = { semanal: 'Semanal', quincenal: 'Quincenal', mensual: 'Mensual', trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual' }
+const TIPO_INSPECCION: Record<string, string> = { bomberos: 'Bomberos', igss: 'IGSS', municipalidad: 'Municipalidad', electrica: 'Eléctrica', sanitaria: 'Sanitaria', elevadores: 'Elevadores', otro: 'Otra inspección' }
+const CATEGORIA_VENCIMIENTO: Record<string, string> = { contrato: 'Contrato', permiso: 'Permiso', certificacion: 'Certificación', seguro: 'Seguro', otro: 'Otro' }
+
+/** Une las partes que existan con " · " (la segunda línea de cada evento). */
+function partes(...xs: (string | null | undefined | false)[]) {
+  const v = xs.filter((x): x is string => typeof x === 'string' && x.length > 0)
+  return v.length ? v.join(' · ') : undefined
 }
 
 const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -57,24 +73,29 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
 
     tickets.forEach(t => {
       const fecha = t.fecha_limite ?? t.created_at?.slice(0, 10)
-      if (fecha) list.push({ fecha: fecha.slice(0, 10), tipo: 'ticket', label: t.titulo, color: TIPO_CFG.ticket.color, bg: TIPO_CFG.ticket.bg })
+      if (fecha) list.push({ fecha: fecha.slice(0, 10), tipo: 'ticket', label: t.titulo, color: TIPO_CFG.ticket.color, bg: TIPO_CFG.ticket.bg,
+        detalle: partes(PRIORIDAD_TICKET[t.prioridad], ESTADO_TICKET[t.estado], t.unidad_nombre && `📍 ${t.unidad_nombre}`, t.asignado_a && `👤 ${t.asignado_a}`) })
     })
 
     reservas.forEach(r => {
-      list.push({ fecha: r.fecha, tipo: 'reserva', label: `${r.amenidad_nombre ?? 'Amenidad'} — ${r.hora_inicio}`, color: TIPO_CFG.reserva.color, bg: TIPO_CFG.reserva.bg })
+      list.push({ fecha: r.fecha, tipo: 'reserva', label: `${r.amenidad_nombre ?? 'Amenidad'} — ${r.hora_inicio}`, color: TIPO_CFG.reserva.color, bg: TIPO_CFG.reserva.bg,
+        detalle: partes(r.hora_fin && `${r.hora_inicio} – ${r.hora_fin}`, r.unidad_nombre && `📍 ${r.unidad_nombre}`, r.estado !== 'confirmada' && ESTADO_RESERVA[r.estado]) })
     })
 
     planesMantenimiento.forEach(p => {
       const fecha = p.proxima_ejecucion ?? p.created_at?.slice(0, 10)
-      if (fecha) list.push({ fecha: fecha.slice(0, 10), tipo: 'plan', label: p.equipo, color: TIPO_CFG.plan.color, bg: TIPO_CFG.plan.bg })
+      if (fecha) list.push({ fecha: fecha.slice(0, 10), tipo: 'plan', label: p.equipo, color: TIPO_CFG.plan.color, bg: TIPO_CFG.plan.bg,
+        detalle: partes(FRECUENCIA_PLAN[p.frecuencia], p.responsable && `👤 ${p.responsable}`, p.ultima_ejecucion && `Última: ${p.ultima_ejecucion}`) })
     })
 
     inspecciones.forEach(i => {
-      if (i.fecha_proxima) list.push({ fecha: i.fecha_proxima, tipo: 'inspeccion', label: String(i.tipo), color: TIPO_CFG.inspeccion.color, bg: TIPO_CFG.inspeccion.bg })
+      if (i.fecha_proxima) list.push({ fecha: i.fecha_proxima, tipo: 'inspeccion', label: TIPO_INSPECCION[i.tipo] ?? String(i.tipo), color: TIPO_CFG.inspeccion.color, bg: TIPO_CFG.inspeccion.bg,
+        detalle: partes(i.entidad_inspectora, i.inspector_nombre && `👤 ${i.inspector_nombre}`) })
     })
 
     vencimientosExtra.forEach(v => {
-      list.push({ fecha: v.fecha_vencimiento, tipo: 'vencimiento', label: v.titulo, color: TIPO_CFG.vencimiento.color, bg: TIPO_CFG.vencimiento.bg })
+      list.push({ fecha: v.fecha_vencimiento, tipo: 'vencimiento', label: v.titulo, color: TIPO_CFG.vencimiento.color, bg: TIPO_CFG.vencimiento.bg,
+        detalle: partes(CATEGORIA_VENCIMIENTO[v.categoria], v.entidad, v.renovado && 'Renovado') })
     })
 
     return list
@@ -111,6 +132,17 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
 
   function fechaDia(dia: number): string {
     return `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+  }
+
+  /** Día anterior / siguiente desde la ventana; si cambia de mes, el
+      calendario de atrás lo sigue. */
+  function navDia(delta: number) {
+    if (!diaDetalle) return
+    const [y, m, d] = diaDetalle.split('-').map(Number)
+    const nd = new Date(y, m - 1, d + delta)
+    setAnio(nd.getFullYear())
+    setMes(nd.getMonth())
+    setDiaDetalle(`${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, '0')}-${String(nd.getDate()).padStart(2, '0')}`)
   }
 
   const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
@@ -213,7 +245,8 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
         </div>
       </div>
 
-      {/* Detalle del día en ventana: a pantalla completa en el teléfono. */}
+      {/* Ficha del día en ventana: a pantalla completa en el teléfono. El pie
+          permite pasar al día anterior/siguiente sin cerrarla. */}
       {diaDetalle && (
         <EditModal
           title={tituloDia(diaDetalle)}
@@ -221,6 +254,13 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
           maxWidth="560px"
           fullScreenOnMobile
           onClose={() => setDiaDetalle(null)}
+          footer={
+            <div className="at-ficha-acciones" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+              <Button variant="secondary" onClick={() => setDiaDetalle(null)}>Cerrar</Button>
+              <Button variant="secondary" onClick={() => navDia(-1)}>‹ Día anterior</Button>
+              <Button variant="secondary" onClick={() => navDia(1)}>Día siguiente ›</Button>
+            </div>
+          }
         >
           {detalleEventos.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--at-ink-3)', fontSize: 13 }}>Sin eventos</div>
@@ -234,6 +274,9 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: ev.color }}>{cfg.label}</div>
                     <div style={{ fontSize: 14, color: 'var(--at-ink-2)', marginTop: 2, overflowWrap: 'anywhere' }}>{ev.label}</div>
+                    {ev.detalle && (
+                      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2, overflowWrap: 'anywhere' }}>{ev.detalle}</div>
+                    )}
                   </div>
                 </div>
               )

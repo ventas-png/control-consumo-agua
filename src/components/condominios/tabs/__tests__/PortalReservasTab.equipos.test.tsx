@@ -93,6 +93,8 @@ describe('PortalReservasTab — equipo de la reserva', () => {
       como<PrestamoEquipo>({ id: 'pe3', reserva_id: null, unidad_id: 'u1', inventario_id: 'inv3', equipo_nombre: 'Extensión', cantidad: 2, fecha_prestamo: '2026-10-01', estado: 'prestado', deposito_pagado: false }),
     ]
     montar({ reservas, prestamos })
+    // Lo pedido con la reserva se ve en su ficha; el equipo suelto sigue en la página.
+    fireEvent.click(screen.getByRole('button', { name: /^Reserva de .* · 2099-02-01$/ }))
     expect(screen.getByText('Sillas').parentElement?.textContent).toContain('×18 (pediste 20) · pendiente de entrega')
     expect(screen.getByText('Proyector').parentElement?.textContent).toContain('perdido · faltan 1 · reposición Q 2500.00 cargada a tu cuenta')
     expect(screen.getByText('🪑 Equipo prestado a tu unidad')).toBeTruthy()

@@ -14,7 +14,7 @@ const titulo = (d: number) => `${DIAS[new Date(anio, mes, d).getDay()]} ${d} de 
 const celda = (d: number) => screen.getByRole('button', { name: new RegExp(`^${titulo(d)} de ${anio}`) })
 
 const tickets = [
-  { id: 't1', titulo: 'Fuga en bomba 2', fecha_limite: fecha(15), created_at: `${fecha(2)}T09:00:00Z`, estado: 'abierto' },
+  { id: 't1', titulo: 'Fuga en bomba 2', fecha_limite: fecha(15), created_at: `${fecha(2)}T09:00:00Z`, estado: 'abierto', prioridad: 'alta', unidad_nombre: 'Torre A-101' },
 ] as unknown as TicketMantenimiento[]
 
 const reservas = [
@@ -67,5 +67,41 @@ describe('CalendarioMantenimientoTab — ventana del día', () => {
     fireEvent.click(celda(3))
     const dialog = screen.getByRole('dialog', { name: titulo(3) })
     expect(within(dialog).getByText('Sin eventos')).toBeTruthy()
+  })
+
+  it('cada evento lleva una segunda línea con su detalle (prioridad y unidad del ticket, horario de la reserva)', () => {
+    renderTab()
+    fireEvent.click(celda(15))
+    const dialog = screen.getByRole('dialog', { name: titulo(15) })
+    expect(within(dialog).getByText('Alta · Abierto · 📍 Torre A-101')).toBeTruthy()
+    expect(within(dialog).getByText('10:00 – 12:00')).toBeTruthy()
+  })
+
+  it('el pie cierra o pasa al día anterior/siguiente sin cerrar la ventana; al cruzar de mes el calendario lo sigue', () => {
+    renderTab()
+    fireEvent.click(celda(15))
+    const pie = () => screen.getByRole('dialog').querySelector('.at-modal-footer') as HTMLElement
+    expect(within(pie()).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '‹ Día anterior', 'Día siguiente ›'])
+
+    fireEvent.click(within(pie()).getByRole('button', { name: 'Día siguiente ›' }))
+    expect(screen.getByRole('dialog', { name: titulo(16) })).toBeTruthy()
+    fireEvent.click(within(pie()).getByRole('button', { name: '‹ Día anterior' }))
+    fireEvent.click(within(pie()).getByRole('button', { name: '‹ Día anterior' }))
+    expect(screen.getByRole('dialog', { name: titulo(14) })).toBeTruthy()
+    // El día abierto queda marcado en el calendario de atrás.
+    expect(celda(14).getAttribute('style')).toContain('--at-primary-tint')
+
+    // Último día del mes → primer día del siguiente (y la cabecera cambia de mes).
+    const ultimo = new Date(anio, mes + 1, 0).getDate()
+    fireEvent.click(celda(ultimo))
+    fireEvent.click(within(pie()).getByRole('button', { name: 'Día siguiente ›' }))
+    const sig = new Date(anio, mes + 1, 1)
+    const tituloSig = `${DIAS[sig.getDay()]} 1 de ${MESES[sig.getMonth()]}`
+    expect(screen.getByRole('dialog', { name: tituloSig })).toBeTruthy()
+    const mesCap = MESES[sig.getMonth()][0].toUpperCase() + MESES[sig.getMonth()].slice(1)
+    expect(screen.getByText(`${mesCap} ${sig.getFullYear()}`)).toBeTruthy()
+
+    fireEvent.click(within(pie()).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })

@@ -409,19 +409,21 @@ export default function ControlPiscinaTab({ registros, areas, personal, cargos =
         </EditModal>
       )}
 
-      {/* Detalle del registro en ventana */}
+      {/* Ficha del registro en ventana (pantalla completa en el teléfono): los
+          datos en tarjetas, con cada parámetro y su rango en palabras, y el
+          cambio de estado en el pie junto a Cerrar, como en el resto de fichas. */}
       {detalle && (
         <EditModal
           title={etiquetaCuerpo(detalle)}
           subtitle={<EstadoSubtitulo registro={detalle} area={areaDe(detalle)} />}
-          maxWidth="560px"
+          size="lg"
           fullScreenOnMobile
           onClose={() => setDetalleId(null)}
           footer={
-            <>
-              {canEdit && esUltimo(detalle) && botonEstado(detalle, 'md')}
+            <div className="at-ficha-acciones" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
               <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
-            </>
+              {canEdit && esUltimo(detalle) && botonEstado(detalle, 'md')}
+            </div>
           }
         >
           {!esUltimo(detalle) && ultimo[claveCuerpoAgua(detalle)] && (
@@ -491,12 +493,14 @@ function EstadoSubtitulo({ registro: r, area }: { registro: ControlPiscina; area
   )
 }
 
-/** Detalle de solo lectura de un registro de piscina o jacuzzi. */
+/** Ficha de solo lectura de un registro de piscina o jacuzzi: tarjetas de
+ *  datos (cada parámetro con su rango en palabras), observaciones y fotos. */
 function RegistroDetalle({ registro: r, area }: { registro: ControlPiscina; area: string }) {
-  const fila = (label: string, valor: ReactNode) => (
-    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 14 }}>
-      <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
-      <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{valor}</span>
+  const cuerpo = tipoCuerpoAgua(r.tipo)
+  const tarjeta = (label: string, valor: ReactNode, color?: string) => (
+    <div key={label} style={{ background: 'var(--at-surface-2)', borderRadius: 7, padding: 8, border: '1px solid var(--at-line)', minWidth: 0 }}>
+      <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: color ?? 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>{valor}</div>
     </div>
   )
   const medida = (p: ParametroAgua, value: number | null | undefined) => {
@@ -505,36 +509,36 @@ function RegistroDetalle({ registro: r, area }: { registro: ControlPiscina; area
     const ideal = textoRango(p)
     return (
       <span>
-        <strong style={{ color: NIVEL_COLOR[nivel] }}>{value}</strong>
-        <span style={{ display: 'block', fontSize: 12, color: nivel === 'ok' ? 'var(--at-ink-3)' : NIVEL_COLOR[nivel] }}>
+        <span style={{ color: NIVEL_COLOR[nivel] }}>{value}</span>
+        <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: nivel === 'ok' ? 'var(--at-ink-3)' : NIVEL_COLOR[nivel] }}>
           {ideal ? `${NIVEL_TEXTO[nivel]} · ideal ${ideal}` : (p.ayuda ?? '')}
         </span>
       </span>
     )
   }
   const turb = TURBIEDAD.find(t => t.value === r.turbiedad)
-  const galeria = (titulo: string, fotos?: string[] | null) => fotos && fotos.length > 0 ? (
-    <div key={titulo} style={{ marginTop: 14 }}>
-      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>{titulo} ({fotos.length})</div>
-      <ImageGallery urls={fotos} maxVisible={4} />
+  const seccion = (titulo: string, cuerpoSeccion: ReactNode) => (
+    <div key={titulo} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)', marginBottom: 12 }}>
+      <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 6 }}>{titulo}</div>
+      {cuerpoSeccion}
     </div>
-  ) : null
+  )
+  const galeria = (titulo: string, fotos?: string[] | null) => fotos && fotos.length > 0
+    ? seccion(`${titulo} (${fotos.length})`, <ImageGallery urls={fotos} maxVisible={6} />)
+    : null
   return (
     <div>
-      {fila('Tipo', `${tipoCuerpoAgua(r.tipo).icon} ${tipoCuerpoAgua(r.tipo).label}`)}
-      {area && fila('Área', `📍 ${area}`)}
-      {/* pH y cloro libre siempre; el resto sólo si se midió. */}
-      {PARAMETROS_AGUA.filter(p => p.key === 'ph' || p.key === 'cloro' || r[p.key] != null).map(p => fila(p.label, medida(p, r[p.key])))}
-      {fila('Temperatura', r.temperatura != null ? `${r.temperatura} °C` : '—')}
-      {fila('Turbiedad', <span style={{ color: turb?.color }}>💧 {turb?.label ?? r.turbiedad}</span>)}
-      {fila(`Usuarios en ${tipoCuerpoAgua(r.tipo).label.toLowerCase()}`, r.num_usuarios ?? '—')}
-      {fila('Registrado por', r.registrado_por || '—')}
-      {r.observaciones && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.observaciones}</p>
-        </div>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, marginBottom: 12 }}>
+        {tarjeta('Tipo', `${cuerpo.icon} ${cuerpo.label}`)}
+        {tarjeta('Área', area ? `📍 ${area}` : '—')}
+        {/* pH y cloro libre siempre; el resto sólo si se midió. */}
+        {PARAMETROS_AGUA.filter(p => p.key === 'ph' || p.key === 'cloro' || r[p.key] != null).map(p => tarjeta(p.label, medida(p, r[p.key])))}
+        {tarjeta('Temperatura', r.temperatura != null ? `${r.temperatura} °C` : '—')}
+        {tarjeta('Turbiedad', `💧 ${turb?.label ?? r.turbiedad}`, turb?.color)}
+        {tarjeta(`Usuarios en ${cuerpo.label.toLowerCase()}`, r.num_usuarios ?? '—')}
+        {tarjeta('Registrado por', r.registrado_por || '—')}
+      </div>
+      {r.observaciones && seccion('Observaciones', <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--at-ink-2)' }}>{r.observaciones}</p>)}
       {galeria('Muestra de agua', r.fotos_muestra)}
       {galeria('Resultado (tira de prueba)', r.fotos_resultado)}
       {galeria('Área inspeccionada', r.fotos_area)}

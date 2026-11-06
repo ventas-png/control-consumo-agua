@@ -3,6 +3,8 @@ import { useHoyDate } from '../../../hooks/useHoy'
 import type { PersonalCondominio, CargoCatalogo } from '../../../types'
 import { etiquetaCargo } from '../../../domain/condominios/rrhhCatalogos'
 import { tint } from '../../shared/statusTone'
+import { EditModal } from '../../shared/EditModal'
+import { Button } from '../../shared/Button'
 
 interface ClienteBirthday {
   id: string
@@ -21,6 +23,14 @@ interface Props {
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const DIAS_LARGOS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+/** "2026-08-18" → "Martes 18 de agosto" (título de la ventana del día). */
+function tituloDia(fecha: string) {
+  const [y, m, d] = fecha.split('-').map(Number)
+  return `${DIAS_LARGOS[new Date(y, m - 1, d).getDay()]} ${d} de ${MESES[m - 1].toLowerCase()}`
+}
 
 const COLOR = {
   residente: { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'var(--at-primary-soft-2)', dot: 'var(--at-primary)' },
@@ -41,10 +51,13 @@ interface Cumpleanero {
 // quedaba con el cálculo del primer render: al cruzar la medianoche los días
 // restantes no se movían y un cumpleaños no entraba ni salía de la ventana de
 // 30 días. Con el parámetro explícito, `hoy` es una dependencia real del memo.
+// La edad es la que cumple en la PRÓXIMA ocurrencia (hoy + diasHasta): antes
+// se sumaba un año a todo lo que no fuera hoy, y un cumpleaños de más adelante
+// en este mismo año salía con un año de más.
 function calcularEdadAnio(anioNac: number | null, diasHasta: number, hoy: Date): string {
   if (!anioNac || anioNac < 1920) return ''
-  const edad = hoy.getFullYear() - anioNac + (diasHasta === 0 ? 0 : 1)
-  return `${edad} años`
+  const proxima = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + diasHasta)
+  return `${proxima.getFullYear() - anioNac} años`
 }
 
 function diasHastaSiguiente(mesdia: string, hoy: Date): number {
@@ -65,6 +78,9 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
   const [mes, setMes] = useState(hoy.getMonth())
   const [anio, setAnio] = useState(hoy.getFullYear())
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'residente' | 'personal'>('todos')
+  // Día abierto en ventana ("YYYY-MM-DD"); la ventana lee los cumpleaños del
+  // mes vigente, así que al cambiar de día cruzando de mes el calendario lo sigue.
+  const [diaDetalle, setDiaDetalle] = useState<string | null>(null)
 
   const todos: Cumpleanero[] = useMemo(() => {
     const list: Cumpleanero[] = []
@@ -143,6 +159,23 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
   function prevMes() { if (mes === 0) { setMes(11); setAnio(a => a - 1) } else setMes(m => m - 1) }
   function nextMes() { if (mes === 11) { setMes(0); setAnio(a => a + 1) } else setMes(m => m + 1) }
   function irHoy() { setMes(hoy.getMonth()); setAnio(hoy.getFullYear()) }
+
+  const fechaDia = (d: number) => `${anio}-${pad2(mes + 1)}-${pad2(d)}`
+  /** Abre el día de una fecha concreta (p. ej. el próximo cumpleaños de la lista), moviendo el calendario a su mes. */
+  function abrirFecha(fecha: Date) {
+    setAnio(fecha.getFullYear())
+    setMes(fecha.getMonth())
+    setDiaDetalle(`${fecha.getFullYear()}-${pad2(fecha.getMonth() + 1)}-${pad2(fecha.getDate())}`)
+  }
+  function navDia(delta: number) {
+    if (!diaDetalle) return
+    const [y, m, d] = diaDetalle.split('-').map(Number)
+    abrirFecha(new Date(y, m - 1, d + delta))
+  }
+  const diaAbierto = diaDetalle ? Number(diaDetalle.split('-')[2]) : null
+  const cumplesDelDia = diaAbierto != null ? (cumplesPorDia[diaAbierto] ?? []) : []
+  /** Edad que cumple en el año que se está viendo (vacía si no hay año de nacimiento). */
+  const edadEnAnio = (anioNac: number | null) => (!anioNac || anioNac < 1920) ? '' : `${anio - anioNac} años`
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: '1100px' }}>
@@ -228,41 +261,51 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
           </div>
           {/* Celdas */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+            {/* Cada día es un botón que abre sus cumpleaños en ventana (antes los
+                nombres sólo se leían en un tooltip, que en el teléfono no existe). */}
             {cells.map((d, i) => {
               const lista = d ? (cumplesPorDia[d] ?? []) : []
               const hoyFlag = d ? esHoy(d) : false
+              const estiloCelda = {
+                minHeight: '76px', padding: '5px 4px',
+                borderRight: '1px solid var(--at-chip)', borderBottom: '1px solid var(--at-chip)',
+                background: hoyFlag ? 'var(--at-primary-tint)' : lista.length > 0 ? 'var(--at-surface-2)' : 'var(--at-surface)',
+              } as const
+              if (!d) return <div key={i} style={estiloCelda} />
+              const fecha = fechaDia(d)
+              const seleccionado = fecha === diaDetalle
               return (
-                <div key={i} style={{
-                  minHeight: '76px', padding: '5px 4px',
-                  borderRight: '1px solid var(--at-chip)', borderBottom: '1px solid var(--at-chip)',
-                  background: hoyFlag ? 'var(--at-primary-tint)' : lista.length > 0 ? 'var(--at-surface-2)' : 'var(--at-surface)',
-                }}>
-                  {d && (
-                    <>
-                      <div style={{
-                        width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '12px', fontWeight: hoyFlag ? 800 : 400, marginBottom: '3px',
-                        color: hoyFlag ? 'white' : lista.length > 0 ? 'var(--at-ink)' : 'var(--at-ink-3)',
-                        background: hoyFlag ? 'var(--at-primary)' : 'transparent',
-                      }}>{d}</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        {lista.slice(0, 3).map(c => (
-                          <div key={c.id} title={`${c.nombre} — ${c.subtitulo}`}
-                            style={{
-                              fontSize: '9px', fontWeight: 600, padding: '1px 4px', borderRadius: '3px',
-                              background: COLOR[c.tipo].bg, color: COLOR[c.tipo].color,
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.4',
-                            }}>
-                            🎂 {c.nombre.split(' ')[0]}
-                          </div>
-                        ))}
-                        {lista.length > 3 && (
-                          <div style={{ fontSize: '9px', color: 'var(--at-ink-3)', fontWeight: 600 }}>+{lista.length - 3} más</div>
-                        )}
+                <button key={i} type="button" onClick={() => setDiaDetalle(fecha)}
+                  aria-label={`${tituloDia(fecha)} de ${anio}${lista.length ? `, ${lista.length} cumpleaños` : ''}`}
+                  aria-current={hoyFlag ? 'date' : undefined}
+                  style={{
+                    ...estiloCelda, minWidth: 0, borderTop: 'none', borderLeft: 'none',
+                    display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start',
+                    textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer',
+                    background: seleccionado ? 'var(--at-primary-soft)' : estiloCelda.background,
+                  }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '12px', fontWeight: hoyFlag ? 800 : 400, marginBottom: '3px',
+                    color: hoyFlag ? 'white' : lista.length > 0 ? 'var(--at-ink)' : 'var(--at-ink-3)',
+                    background: hoyFlag ? 'var(--at-primary)' : 'transparent',
+                  }}>{d}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {lista.slice(0, 3).map(c => (
+                      <div key={c.id} title={`${c.nombre} — ${c.subtitulo}`}
+                        style={{
+                          fontSize: '9px', fontWeight: 600, padding: '1px 4px', borderRadius: '3px',
+                          background: COLOR[c.tipo].bg, color: COLOR[c.tipo].color,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1.4',
+                        }}>
+                        🎂 {c.nombre.split(' ')[0]}
                       </div>
-                    </>
-                  )}
-                </div>
+                    ))}
+                    {lista.length > 3 && (
+                      <div style={{ fontSize: '9px', color: 'var(--at-ink-3)', fontWeight: 600 }}>+{lista.length - 3} más</div>
+                    )}
+                  </div>
+                </button>
               )
             })}
           </div>
@@ -299,11 +342,13 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
                   const edad = calcularEdadAnio(c.anioNac, c.dias, hoy)
                   const [mm, dd] = c.mesdia.split('-')
                   return (
-                    <div key={c.id} style={{
-                      display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px',
-                      background: c.dias === 0 ? 'var(--at-danger-tint)' : c.dias <= 7 ? 'var(--at-warning-tint)' : 'var(--at-surface-2)',
-                      borderRadius: '8px', border: `1px solid ${c.dias === 0 ? 'var(--at-danger-border)' : c.dias <= 7 ? 'var(--at-warning-border)' : 'var(--at-line)'}`,
-                    }}>
+                    <button key={c.id} type="button" onClick={() => abrirFecha(new Date(hoy.getTime() + c.dias * 86400000))}
+                      aria-label={`Ver cumpleaños del ${dd}/${mm}`}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer',
+                        background: c.dias === 0 ? 'var(--at-danger-tint)' : c.dias <= 7 ? 'var(--at-warning-tint)' : 'var(--at-surface-2)',
+                        borderRadius: '8px', border: `1px solid ${c.dias === 0 ? 'var(--at-danger-border)' : c.dias <= 7 ? 'var(--at-warning-border)' : 'var(--at-line)'}`,
+                      }}>
                       <span style={{ fontSize: '18px', flexShrink: 0 }}>{c.dias === 0 ? '🎂' : '🎁'}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: '12.5px', color: 'var(--at-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -321,7 +366,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
                           {c.dias === 0 ? '¡Hoy! 🎉' : `en ${c.dias}d`}
                         </div>
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
@@ -329,6 +374,49 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
           </div>
         </div>
       </div>
+
+      {/* Ficha del día en ventana: a pantalla completa en el teléfono. El pie
+          permite pasar al día anterior/siguiente sin cerrarla. */}
+      {diaDetalle && (
+        <EditModal
+          title={`🎂 ${tituloDia(diaDetalle)}`}
+          subtitle={`${anio} · ${cumplesDelDia.length === 0 ? 'Sin cumpleaños' : `${cumplesDelDia.length} cumpleaños`}`}
+          maxWidth="560px"
+          fullScreenOnMobile
+          onClose={() => setDiaDetalle(null)}
+          footer={
+            <div className="at-ficha-acciones" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+              <Button variant="secondary" onClick={() => setDiaDetalle(null)}>Cerrar</Button>
+              <Button variant="secondary" onClick={() => navDia(-1)}>‹ Día anterior</Button>
+              <Button variant="secondary" onClick={() => navDia(1)}>Día siguiente ›</Button>
+            </div>
+          }
+        >
+          {cumplesDelDia.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--at-ink-3)', fontSize: 13 }}>Sin cumpleaños</div>
+          ) : (
+            cumplesDelDia.map(c => {
+              const edad = edadEnAnio(c.anioNac)
+              const esHoyCumple = diaDetalle === `${hoy.getFullYear()}-${pad2(hoy.getMonth() + 1)}-${pad2(hoy.getDate())}`
+              return (
+                <div key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10,
+                  padding: '10px 12px', background: COLOR[c.tipo].bg, borderRadius: 8, border: `1px solid ${COLOR[c.tipo].border}` }}>
+                  <span style={{ fontSize: 22, lineHeight: 1 }}>{esHoyCumple ? '🎂' : '🎁'}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--at-ink)', overflowWrap: 'anywhere' }}>{c.nombre}</div>
+                    <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
+                      {c.tipo === 'residente' ? '🏠' : '👷'} {c.subtitulo}{edad ? ` · ${edad}` : ''}
+                    </div>
+                  </div>
+                  <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: 'var(--at-surface)', color: COLOR[c.tipo].color, flexShrink: 0 }}>
+                    {c.tipo === 'residente' ? 'Residente' : 'Personal'}
+                  </span>
+                </div>
+              )
+            })
+          )}
+        </EditModal>
+      )}
     </div>
   )
 }

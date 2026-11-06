@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
+import { Button } from '../../shared/Button'
 import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { TicketMantenimiento, EstadoTicket, PrioridadTicket } from '../../../types'
 import { tint } from '../../shared/statusTone'
+import { TicketFichaModal, COLUMNAS_TICKET as COLUMNAS, PRIORIDAD_TICKET_CFG as PRIORIDAD_CFG } from './TicketFichaModal'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -12,20 +14,6 @@ interface Props {
   moneda: string
   canEdit: boolean
   onRefresh: () => void
-}
-
-const COLUMNAS: { estado: EstadoTicket; label: string; color: string; bg: string; bgHeader: string }[] = [
-  { estado: 'abierto',    label: 'Abierto',    color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)', bgHeader: 'var(--at-chip)' },
-  { estado: 'en_proceso', label: 'En proceso', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', bgHeader: 'var(--at-warning-tint)' },
-  { estado: 'resuelto',   label: 'Resuelto',   color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', bgHeader: 'var(--at-primary-soft)' },
-  { estado: 'cerrado',    label: 'Cerrado',    color: 'var(--at-success)', bg: 'var(--at-success-tint)', bgHeader: 'var(--at-success-tint)' },
-]
-
-const PRIORIDAD_CFG: Record<PrioridadTicket, { label: string; color: string; bg: string; order: number }> = {
-  urgente: { label: 'Urgente', color: 'var(--at-on-status)', bg: 'var(--at-danger)', order: 0 },
-  alta:    { label: 'Alta',    color: 'var(--at-on-status)', bg: 'var(--at-warning)', order: 1 },
-  media:   { label: 'Media',   color: 'var(--at-on-status)', bg: 'var(--at-warning)', order: 2 },
-  baja:    { label: 'Baja',    color: 'var(--at-ink-2)', bg: 'var(--at-line)', order: 3 },
 }
 
 const SIGUIENTE: Partial<Record<EstadoTicket, EstadoTicket>> = {
@@ -42,7 +30,9 @@ const ANTERIOR: Partial<Record<EstadoTicket, EstadoTicket>> = {
 export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, companyId: _companyId, moneda, canEdit, onRefresh }: Props) {
   const [filtroPrioridad, setFiltroPrioridad] = useState<PrioridadTicket | ''>('')
   const [filtroTecnico, setFiltroTecnico] = useState('')
-  const [expandido, setExpandido] = useState<string | null>(null)
+  // La ficha se guarda por id (no por objeto) para que siga a la fila recargada
+  // tras mover el ticket de columna sin cerrarse.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
   const [moviendo, setMoviendo] = useState<string | null>(null)
 
   const tecnicos = useMemo(() => {
@@ -63,6 +53,9 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
     Object.values(m).forEach(arr => arr.sort((a, b) => PRIORIDAD_CFG[a.prioridad].order - PRIORIDAD_CFG[b.prioridad].order))
     return m
   }, [ticketsFiltrados])
+
+  const detalle = useMemo(() => (detalleId ? tickets.find(t => t.id === detalleId) ?? null : null), [tickets, detalleId])
+  const cerrarDetalle = () => setDetalleId(null)
 
   async function moverTicket(ticket: TicketMantenimiento, nuevoEstado: EstadoTicket) {
     setMoviendo(ticket.id)
@@ -121,7 +114,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value as PrioridadTicket | '')}
+          <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value as PrioridadTicket | '')} aria-label="Prioridad"
             style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, background: 'var(--at-surface)' }}>
             <option value="">Todas las prioridades</option>
             {(Object.keys(PRIORIDAD_CFG) as PrioridadTicket[]).map(p => (
@@ -129,7 +122,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
             ))}
           </select>
           {tecnicos.length > 0 && (
-            <select value={filtroTecnico} onChange={e => setFiltroTecnico(e.target.value)}
+            <select value={filtroTecnico} onChange={e => setFiltroTecnico(e.target.value)} aria-label="Técnico"
               style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, background: 'var(--at-surface)' }}>
               <option value="">Todos los técnicos</option>
               {tecnicos.map(t => <option key={t} value={t}>{t.slice(0, 20)}</option>)}
@@ -138,10 +131,12 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
         </div>
       </div>
 
-      {/* Kanban board */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, minWidth: 800, overflowX: 'auto' }}>
+      {/* Tablero: 4 columnas en escritorio, 2 en tableta y una sola en el
+          teléfono (las etapas una debajo de otra; `.at-kanban-board` en
+          index.css). Antes pedía 800px de ancho y se desplazaba de lado. */}
+      <div className="at-kanban-board">
         {COLUMNAS.map(col => (
-          <div key={col.estado} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div key={col.estado} style={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
             {/* Column header */}
             <div style={{ background: col.bgHeader, border: `1px solid ${tint(col.color, 20)}`, borderRadius: '10px 10px 0 0', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 700, fontSize: 12, color: col.color }}>{col.label}</span>
@@ -150,21 +145,23 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
               </span>
             </div>
 
-            {/* Cards */}
+            {/* Tarjetas: cada una abre la ficha en ventana (antes se expandía
+                en sitio, con las acciones apretadas dentro de la columna). */}
             <div style={{ background: col.bg, border: `1px solid ${tint(col.color, 13)}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 8, minHeight: 120, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {porColumna[col.estado].length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--at-line-strong)', fontSize: 12 }}>Sin tickets</div>
               ) : (
                 porColumna[col.estado].map(ticket => {
                   const pCfg = PRIORIDAD_CFG[ticket.prioridad]
-                  const exp = expandido === ticket.id
+                  const abierto = detalleId === ticket.id
                   const isMoving = moviendo === ticket.id
                   return (
-                    <div key={ticket.id}
-                      style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', opacity: isMoving ? 0.6 : 1, transition: 'box-shadow 0.15s', boxShadow: exp ? '0 2px 8px rgba(0,0,0,0.1)' : undefined }}
-                      onClick={() => setExpandido(exp ? null : ticket.id)}>
+                    <div key={ticket.id} role="button" tabIndex={0} aria-label={ticket.titulo}
+                      onClick={() => setDetalleId(ticket.id)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetalleId(ticket.id) } }}
+                      style={{ background: 'var(--at-surface)', border: `1px solid ${abierto ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', opacity: isMoving ? 0.6 : 1, transition: 'box-shadow 0.15s', boxShadow: abierto ? '0 2px 8px rgba(0,0,0,0.1)' : undefined }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                        <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--at-ink)', flex: 1, lineHeight: 1.3 }}>{ticket.titulo}</div>
+                        <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--at-ink)', flex: 1, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{ticket.titulo}</div>
                         <span style={{ padding: '1px 7px', borderRadius: 20, background: pCfg.bg, color: pCfg.color, fontSize: 10, fontWeight: 700, marginLeft: 6, flexShrink: 0 }}>{pCfg.label}</span>
                       </div>
 
@@ -180,36 +177,6 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
                         {ticket.tipo === 'preventivo' ? '🔩' : '🔧'} {ticket.tipo}
                         {ticket.fecha_limite && ` · ⏰ ${ticket.fecha_limite}`}
                       </div>
-
-                      {exp && (
-                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--at-chip)' }}>
-                          {ticket.descripcion && (
-                            <div style={{ fontSize: 11, color: 'var(--at-ink-2)', marginBottom: 8 }}>{ticket.descripcion}</div>
-                          )}
-                          {ticket.costo_estimado != null && (
-                            <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 8 }}>
-                              Est.: <strong>{moneda} {ticket.costo_estimado.toFixed(2)}</strong>
-                              {ticket.costo_real != null && <> · Real: <strong style={{ color: 'var(--at-ink)' }}>{moneda} {ticket.costo_real.toFixed(2)}</strong></>}
-                            </div>
-                          )}
-                          {canEdit && (
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                              {ANTERIOR[ticket.estado] && (
-                                <button onClick={() => moverTicket(ticket, ANTERIOR[ticket.estado]!)} disabled={isMoving}
-                                  style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--at-line-strong)', background: 'var(--at-surface-2)', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
-                                  ← Retroceder
-                                </button>
-                              )}
-                              {SIGUIENTE[ticket.estado] && (
-                                <button onClick={() => moverTicket(ticket, SIGUIENTE[ticket.estado]!)} disabled={isMoving}
-                                  style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: `1px solid ${col.color}`, background: col.bgHeader, cursor: 'pointer', color: col.color, fontWeight: 600 }}>
-                                  {ticket.estado === 'resuelto' ? '✅ Cerrar' : '→ Avanzar'}
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   )
                 })
@@ -232,6 +199,39 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
           )
         })}
       </div>
+
+      {/* Ficha del ticket en ventana (TicketFichaModal, compartida con el
+          Gantt): a pantalla completa en el teléfono. Las acciones del flujo
+          (retroceder / avanzar / cerrar) van en el pie; el cierre sigue
+          pidiendo notas y costo real con PromptDialog, que se pinta encima. */}
+      {detalle && (() => {
+        const isMoving = moviendo === detalle.id
+        const anterior = ANTERIOR[detalle.estado]
+        const siguiente = SIGUIENTE[detalle.estado]
+        return (
+          <TicketFichaModal
+            ticket={detalle}
+            moneda={moneda}
+            onClose={cerrarDetalle}
+            acciones={canEdit && (
+              <>
+                {anterior && (
+                  <Button variant="secondary" disabled={isMoving} onClick={() => moverTicket(detalle, anterior)}
+                    title={`Regresar a ${COLUMNAS.find(c => c.estado === anterior)?.label}`}>
+                    ← Retroceder
+                  </Button>
+                )}
+                {siguiente && (
+                  <Button disabled={isMoving} onClick={() => moverTicket(detalle, siguiente)}
+                    title={`Pasar a ${COLUMNAS.find(c => c.estado === siguiente)?.label}`}>
+                    {detalle.estado === 'resuelto' ? '✅ Cerrar ticket' : '→ Avanzar'}
+                  </Button>
+                )}
+              </>
+            )}
+          />
+        )
+      })()}
     </div>
   )
 }

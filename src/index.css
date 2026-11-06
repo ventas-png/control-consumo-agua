@@ -861,6 +861,27 @@ button:focus:not(:focus-visible) {
   }
 }
 
+/* Tablero Kanban de tickets (KanbanTicketsTab): 4 columnas en escritorio, 2
+ * en tableta y una sola en el teléfono, con las etapas una debajo de otra.
+ * Antes pedía 800px de ancho mínimo y en el teléfono quedaba en dos columnas
+ * de 400px que se salían de la pantalla; la tarjeta abre la ficha en ventana,
+ * así que no hace falta desplazar de lado. */
+.at-kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .at-kanban-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 767px) {
+  .at-kanban-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ─── EditModal `fullScreenOnMobile`: hoja a pantalla completa ────────────
  *
  * Un chat en un modal centrado al 95vw × 90vh desperdicia los bordes y deja

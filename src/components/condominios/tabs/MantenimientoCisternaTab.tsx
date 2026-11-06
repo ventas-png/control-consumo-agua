@@ -360,24 +360,26 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
         </EditModal>
       )}
 
-      {/* Detalle del registro en ventana */}
+      {/* Ficha del registro en ventana (pantalla completa en el teléfono): los
+          datos en tarjetas, con la barra de nivel y los rangos de cloro y pH,
+          y Normalizar en el pie junto a Cerrar, como en el resto de fichas. */}
       {detalle && (
         <EditModal
           title={`🏗️ ${detalle.cisterna}`}
           subtitle={
             <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <span>{tipoDe(detalle.tipo)?.icon} {tipoDe(detalle.tipo)?.label ?? detalle.tipo} · {detalle.fecha}</span>
               <EstadoBadge estado={detalle.estado} />
+              <span>{tipoDe(detalle.tipo)?.icon} {tipoDe(detalle.tipo)?.label ?? detalle.tipo} · {detalle.fecha}</span>
             </span>
           }
-          maxWidth="480px"
+          size="lg"
           fullScreenOnMobile
           onClose={() => setDetalleId(null)}
           footer={
-            <>
-              {canEdit && detalle.estado === 'bajo_nivel' && botonNormalizar(detalle, 'md')}
+            <div className="at-ficha-acciones" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
               <Button variant="secondary" onClick={() => setDetalleId(null)}>Cerrar</Button>
-            </>
+              {canEdit && detalle.estado === 'bajo_nivel' && botonNormalizar(detalle, 'md')}
+            </div>
           }
         >
           <RegistroDetalle registro={detalle} dinero={dinero} />
@@ -430,42 +432,56 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
   )
 }
 
-/** Detalle de solo lectura de un registro de cisterna. */
+/** Ficha de solo lectura de un registro de cisterna: tarjetas de datos con
+ *  la barra de nivel, los rangos de cloro y pH, y las observaciones. */
 function RegistroDetalle({ registro: r, dinero }: { registro: MantenimientoCisterna; dinero: (v: number) => string }) {
-  const fila = (label: string, valor: ReactNode) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 14 }}>
-      <span style={{ color: 'var(--at-ink-3)' }}>{label}</span>
-      <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{valor}</span>
+  const tipo = tipoDe(r.tipo)
+  const est = estadoDe(r.estado)
+  const tarjeta = (label: string, valor: ReactNode, color?: string) => (
+    <div key={label} style={{ background: 'var(--at-surface-2)', borderRadius: 7, padding: 8, border: '1px solid var(--at-line)', minWidth: 0 }}>
+      <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: color ?? 'var(--at-ink-2)', overflowWrap: 'anywhere' }}>{valor}</div>
     </div>
   )
+  const nota = (texto: string, color: string) => <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color }}>{texto}</span>
   const medida = (value: number | null | undefined, min: number, max: number) => {
     if (value == null) return '—'
     const ok = enRango(value, min, max)
     return (
       <span>
-        <strong style={{ color: ok ? 'var(--at-success)' : 'var(--at-danger)' }}>{value}</strong>
-        <span style={{ display: 'block', fontSize: 12, color: ok ? 'var(--at-ink-3)' : 'var(--at-danger)' }}>{ok ? 'En rango' : 'Fuera de rango'} · ideal {min}–{max}</span>
+        <span style={{ color: ok ? 'var(--at-success)' : 'var(--at-danger)' }}>{value}</span>
+        {nota(`${ok ? 'En rango' : 'Fuera de rango'} · ideal ${min}–${max}`, ok ? 'var(--at-ink-3)' : 'var(--at-danger)')}
       </span>
     )
   }
   const vencida = !!r.proxima_revision && esFechaCalendarioVencida(r.proxima_revision)
   return (
     <div>
-      {fila('Nivel de agua', r.nivel_agua_pct != null
-        ? <span><strong style={{ color: nivelColor(r.nivel_agua_pct) }}>{r.nivel_agua_pct}%</strong>{r.nivel_agua_pct < 30 && <span style={{ display: 'block', fontSize: 12, color: 'var(--at-danger)' }}>Nivel bajo</span>}</span>
-        : '—')}
-      {fila('Cloro residual (ppm)', medida(r.cloro_residual, CLORO_MIN, CLORO_MAX))}
-      {fila('pH', medida(r.ph, PH_MIN, PH_MAX))}
-      {fila('Empresa de servicio', r.empresa_servicio ? <>{r.empresa_servicio}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)' }}> (sin vincular al catálogo)</span>}</> : '—')}
-      {fila('Técnico', r.tecnico || '—')}
-      {fila('Costo', r.costo != null ? <strong style={{ color: 'var(--at-success)' }}>{dinero(r.costo)}</strong> : '—')}
-      {fila('Próxima revisión', r.proxima_revision
-        ? <strong style={{ color: vencida ? 'var(--at-danger)' : 'var(--at-accent)' }}>{r.proxima_revision}{vencida ? ' · vencida' : ''}</strong>
-        : '—')}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, marginBottom: 12 }}>
+        {tarjeta('Cisterna', r.cisterna)}
+        {tarjeta('Tipo', `${tipo?.icon ?? ''} ${tipo?.label ?? r.tipo}`.trim())}
+        {tarjeta('Fecha', r.fecha)}
+        {tarjeta('Estado', `${est?.icon ?? ''} ${est?.label ?? r.estado}`.trim(), est?.color)}
+        {tarjeta('Nivel de agua', r.nivel_agua_pct != null ? (
+          <span>
+            <span style={{ color: nivelColor(r.nivel_agua_pct) }}>{r.nivel_agua_pct}%</span>
+            <span aria-hidden style={{ display: 'block', height: 6, background: 'var(--at-line)', borderRadius: 3, overflow: 'hidden', marginTop: 4 }}>
+              <span style={{ display: 'block', height: '100%', width: `${Math.min(r.nivel_agua_pct, 100)}%`, background: nivelColor(r.nivel_agua_pct) }} />
+            </span>
+            {r.nivel_agua_pct < 30 && nota('Nivel bajo', 'var(--at-danger)')}
+          </span>
+        ) : '—')}
+        {tarjeta('Cloro residual (ppm)', medida(r.cloro_residual, CLORO_MIN, CLORO_MAX))}
+        {tarjeta('pH', medida(r.ph, PH_MIN, PH_MAX))}
+        {tarjeta('Empresa de servicio', r.empresa_servicio ? <>{r.empresa_servicio}{!r.proveedor_id && <span style={{ color: 'var(--at-ink-3)', fontWeight: 400 }}> (sin vincular al catálogo)</span>}</> : '—')}
+        {tarjeta('Técnico', r.tecnico || '—')}
+        {tarjeta('Costo', r.costo != null ? dinero(r.costo) : '—', r.costo != null ? 'var(--at-success)' : undefined)}
+        {tarjeta('Próxima revisión', r.proxima_revision ? `${r.proxima_revision}${vencida ? ' · vencida' : ''}` : '—', r.proxima_revision ? (vencida ? 'var(--at-danger)' : 'var(--at-accent)') : undefined)}
+      </div>
       {r.observaciones && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{r.observaciones}</p>
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: 10, border: '1px solid var(--at-line)' }}>
+          <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 4 }}>Observaciones</div>
+          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--at-ink-2)' }}>{r.observaciones}</p>
         </div>
       )}
     </div>
