@@ -244,3 +244,26 @@ describe('Cisternas — historial, detalle y revisiones', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
+
+describe('Cisternas — pie y tarjetas de la ficha', () => {
+  it('Cerrar va primero y Normalizar sólo con bajo nivel; los datos van en tarjetas con el nivel y los rangos en palabras', () => {
+    render(<MantenimientoCisternaTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver registro de Cisterna Ala B del 2026-10-19' }))
+    const detalle = screen.getByRole('dialog', { name: '🏗️ Cisterna Ala B' })
+    const pie = detalle.querySelector('.at-modal-footer') as HTMLElement
+    expect(within(pie).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '✅ Normalizar'])
+    expect(within(detalle).getByText('22%')).toBeTruthy()
+    expect(within(detalle).getByText('Fuera de rango · ideal 0.2–1')).toBeTruthy()
+    expect(within(detalle).getByText('Fuera de rango · ideal 6.5–8.5')).toBeTruthy()
+    expect(within(detalle).getByText('Técnico').nextSibling?.textContent).toBe('Ana López')
+    fireEvent.click(within(pie).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver último registro de Cisterna principal: Normal' }))
+    const normal = screen.getByRole('dialog', { name: '🏗️ Cisterna principal' })
+    expect(within(normal.querySelector('.at-modal-footer') as HTMLElement).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar'])
+    expect(within(normal).getByText('En rango · ideal 0.2–1')).toBeTruthy()
+    expect(within(normal).getByText('En rango · ideal 6.5–8.5')).toBeTruthy()
+    expect(within(normal).queryByText('Nivel bajo')).toBeNull()
+  })
+})
