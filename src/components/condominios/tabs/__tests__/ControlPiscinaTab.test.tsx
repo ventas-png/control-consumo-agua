@@ -348,3 +348,32 @@ describe('Piscina — jacuzzi, área, parámetros, fotos y quién registra', () 
     expect(within(detalle).getAllByRole('list', { name: 'Galería' })).toHaveLength(2)
   })
 })
+
+describe('Piscina — pie y tarjetas de la ficha', () => {
+  it('Cerrar va primero y el cambio de estado después, sólo en el último registro; los datos van en tarjetas con el rango en palabras', () => {
+    render(<ControlPiscinaTab {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver registro de Principal del 2026-10-20 08:30' }))
+    const detalle = screen.getByRole('dialog', { name: '🏊 Principal' })
+    const pie = detalle.querySelector('.at-modal-footer') as HTMLElement
+    expect(within(pie).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar', '🔧 Cerrar por mantenimiento'])
+    expect(within(detalle).getByText('Tipo').nextSibling?.textContent).toBe('🏊 Piscina')
+    expect(within(detalle).getByText('Temperatura').nextSibling?.textContent).toBe('27 °C')
+    expect(within(detalle).getByText('Turbiedad').nextSibling?.textContent).toBe('💧 Cristalina')
+    expect(within(detalle).getByText('Usuarios en piscina').nextSibling?.textContent).toBe('4')
+    expect(within(detalle).getByText('En rango · ideal 7.2–7.8')).toBeTruthy()
+    expect(within(detalle).getByText('En rango · ideal 0.5–3')).toBeTruthy()
+    fireEvent.click(within(pie).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    // Un registro viejo no cambia el estado: sólo Cerrar en el pie.
+    fireEvent.click(screen.getByRole('button', { name: 'Ver registro de Principal del 2026-10-19 08:30' }))
+    const viejo = screen.getByRole('dialog', { name: '🏊 Principal' })
+    expect(within(viejo.querySelector('.at-modal-footer') as HTMLElement).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar'])
+    fireEvent.keyDown(document, { key: 'Escape' })
+    cleanup()
+
+    render(<ControlPiscinaTab {...props({ canEdit: false })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver registro de Principal del 2026-10-20 08:30' }))
+    expect(within(screen.getByRole('dialog').querySelector('.at-modal-footer') as HTMLElement).getAllByRole('button').map(b => b.textContent)).toEqual(['Cerrar'])
+  })
+})
