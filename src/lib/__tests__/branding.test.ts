@@ -10,7 +10,7 @@ import {
   LIGHT_MIN_CONTRASTE, BRAND_CSS_VARS, ACCENT_CSS_VARS, LIGHT_BG,
   derivarVariablesAccent, derivarVariablesAccentOscuro, respaldosSinColorMix,
   derivarEstados, ESTADO_CSS_VARS, PALETAS_ESTADO_DEFECTO, DATOS_CSS_VARS, DATA_NEGATIVE_DEFECTO, NAV_INK,
-  navAccentDesdeMarca, NAV_BG, navGrisesDesdeMarca, NAV_GRISES,
+  navAccentDesdeMarca, NAV_BG, navGrisesDesdeMarca, NAV_GRISES, navCabeceraDesdeMarca, NAV_DELTA,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -991,3 +991,93 @@ describe('--at-nav-accent (marcador del rail) desde la marca', () => {
   })
 })
 
+// Cabeceras de SuperAdmin (SuperAdminSection y HeroPlataforma), sobre el rail oscuro:
+// pestaña activa, segundo color de los degradados y las variaciones «↑ / ↓» del hero.
+describe('--at-nav-primary / -2 / -positive / -negative (cabeceras de SuperAdmin) desde la marca', () => {
+  const BLANCO_ = '#ffffff'
+  const casos = (c: string) => [[c, null], [null, c], [c, '#B96A3F']] as const
+  const fondoDe = (p: string | null) => (p ? derivarVariablesMarca(p).navBg : NAV_BG)
+  const inkDe = (p: string | null) => (p ? derivarVariablesMarca(p).navInk : NAV_INK)
+
+  it('index.css los define con los valores de siempre y las cabeceras ya no tienen colores fijos', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+    expect(css).toMatch(/--at-nav-primary:\s*var\(--at-primary\);/)
+    expect(css).toMatch(/--at-nav-primary-2:\s*var\(--at-accent-2\);/)
+    expect(css).toMatch(new RegExp(`--at-nav-positive:\\s*${NAV_DELTA.positivo};`))
+    expect(css).toMatch(new RegExp(`--at-nav-negative:\\s*${NAV_DELTA.negativo};`))
+    const leer = (f: string) => readFileSync(resolve(process.cwd(), `src/components/superadmin/${f}`), 'utf8')
+    const hero = leer('HeroPlataforma.tsx'), seccion = leer('SuperAdminSection.tsx')
+    for (const g of Object.values(NAV_DELTA)) expect(hero.toUpperCase()).not.toContain(g.toUpperCase())
+    expect(hero).toContain('var(--at-nav-positive)')
+    expect(hero).toContain('var(--at-nav-negative)')
+    expect(hero).toContain('var(--at-nav-primary-2)')
+    expect(seccion).toContain("'linear-gradient(135deg, var(--at-nav-primary), var(--at-nav-primary-2))'")
+    // Sobre el rail ya no queda ningún color que cambie con el tema o que no siga a la marca.
+    for (const f of [hero, seccion]) expect(f).not.toContain('var(--at-accent-2)')
+  })
+
+  it('sin colores custom → null (quedan los de index.css)', () => {
+    expect(navCabeceraDesdeMarca(null, null)).toBeNull()
+    expect(navCabeceraDesdeMarca('rojo', undefined)).toBeNull()
+  })
+
+  it('con la marca por defecto queda (casi) como index.css en claro', () => {
+    const v = navCabeceraDesdeMarca(DEFAULT_BRAND_COLOR, null)!
+    expect(v['--at-nav-primary']).toBe('#1b3b36')
+    expect(distanciaRgb(v['--at-nav-primary-2'], '#577B69')).toBeLessThan(15)
+    expect(distanciaRgb(v['--at-nav-positive'], NAV_DELTA.positivo)).toBeLessThanOrEqual(2)
+    expect(distanciaRgb(v['--at-nav-negative'], NAV_DELTA.negativo)).toBeLessThanOrEqual(2)
+  })
+
+  it.each(MUESTRAS)('%s → pestaña con texto blanco legible y degradado que no apaga --at-nav-ink', (c) => {
+    for (const [p, a] of casos(c)) {
+      const v = navCabeceraDesdeMarca(p, a)!
+      for (const k of ['--at-nav-primary', '--at-nav-primary-2']) {
+        expect(contraste(BLANCO_, v[k]), `${p}/${a} ${k} ${v[k]}`).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+      }
+      // El hero mezcla --at-nav-primary-2 al 28% con el rail; el título sigue ≥ 7:1.
+      const mezcla = mezclar(v['--at-nav-primary-2'], fondoDe(p), 0.28)
+      expect(contraste(inkDe(p), mezcla), `${p}/${a}`).toBeGreaterThanOrEqual(7)
+    }
+  })
+
+  it.each(MUESTRAS)('%s → «↑ / ↓» conservan verde / rojo y se leen sobre su pill como los por defecto', (c) => {
+    for (const [p, a] of casos(c)) {
+      const v = navCabeceraDesdeMarca(p, a)!
+      const pill = mezclar(BLANCO_, fondoDe(p), 0.1)
+      const escala = Math.min(1, contraste(inkDe(p), fondoDe(p)) / contraste(NAV_INK, NAV_BG))
+      for (const [k, def, t] of [['--at-nav-positive', NAV_DELTA.positivo, tono(NAV_DELTA.positivo)], ['--at-nav-negative', NAV_DELTA.negativo, 0]] as const) {
+        const minimo = Math.max(LIGHT_MIN_CONTRASTE, contraste(def, mezclar(BLANCO_, NAV_BG, 0.1)) * escala)
+        expect(contraste(v[k], pill), `${p}/${a} ${k} ${v[k]}`).toBeGreaterThanOrEqual(minimo - 0.01)
+        expect(distTono(tono(v[k]), t), `${p}/${a} ${k} ${v[k]}`).toBeLessThan(6)
+      }
+      // ▲ y ▼ nunca se confunden.
+      expect(distTono(tono(v['--at-nav-positive']), tono(v['--at-nav-negative']))).toBeGreaterThan(100)
+    }
+  })
+
+  it.each(MUESTRAS.filter((c) => croma(c) > 25))('%s → la pestaña y el segundo color siguen el tono de la marca (o del acento)', (c) => {
+    const sola = navCabeceraDesdeMarca(c, null)!
+    expect(distTono(tono(sola['--at-nav-primary']), tono(c)), sola['--at-nav-primary']).toBeLessThan(6)
+    expect(distTono(tono(sola['--at-nav-primary-2']), tono(c)), sola['--at-nav-primary-2']).toBeLessThan(12)
+    // Con acento custom, el segundo color es su --at-accent-2 (claro).
+    expect(navCabeceraDesdeMarca(c, '#0e7490')!['--at-nav-primary-2']).toBe(derivarVariablesAccent('#0e7490').accent2)
+    expect(navCabeceraDesdeMarca(null, c)!['--at-nav-primary-2']).toBe(derivarVariablesAccent(c).accent2)
+  })
+
+  it('marca gris → segundo color neutro y «↑ / ↓» más apagados', () => {
+    const v = navCabeceraDesdeMarca('#808080', null)!
+    expect(croma(v['--at-nav-primary-2'])).toBe(0)
+    expect(croma(v['--at-nav-positive'])).toBeLessThan(croma(NAV_DELTA.positivo))
+    expect(croma(v['--at-nav-negative'])).toBeLessThan(croma(NAV_DELTA.negativo))
+  })
+
+  it('la hoja los lleva en los tres selectores (también con sólo acento custom)', () => {
+    for (const [p, a] of [['#7c3aed', null], [null, '#0e7490'], ['#ff0000', '#ffd400']] as const) {
+      const v = navCabeceraDesdeMarca(p, a)!
+      for (const l of hojaEstilosMarca(p, a)!.split('\n').slice(0, 3)) {
+        for (const [k, val] of Object.entries(v)) expect(l).toContain(`${k}: ${val};`)
+      }
+    }
+  })
+})

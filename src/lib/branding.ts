@@ -272,6 +272,57 @@ export function navAccentDesdeMarca(
   return { color, glow: `rgba(${r}, ${g}, ${b}, 0.7)`, soft: `rgba(${r}, ${g}, ${b}, 0.3)` }
 }
 
+/** Variaciones del MRR en el hero de SuperAdmin por defecto (index.css): verde / rojo claros. */
+export const NAV_DELTA = { positivo: '#B7F4C9', negativo: '#F4B7B7' } as const
+/** Saturación del segundo tono de la marca respecto de la suya (#577B69 frente a #1B3B36). */
+const SEGUNDO_TONO_SAT = 0.46
+/** Fondo de las pills del hero: blanco al 10% sobre el rail. */
+const PILL_BLANCO = 0.1
+
+/**
+ * Cabeceras de SuperAdmin (sobre --at-nav-bg, oscuro fijo), o null sin colores custom
+ * (index.css: var(--at-primary), var(--at-accent-2) y los NAV_DELTA). Iguales en ambos
+ * temas, como el rail:
+ * - --at-nav-primary: la pestaña activa (texto blanco). El primario de la marca,
+ *   oscurecido si hace falta para que el blanco se lea ≥ 4.5:1.
+ * - --at-nav-primary-2: segundo color del degradado de la pestaña y del hero. El
+ *   --at-accent-2 del acento custom si lo hay; si no, un segundo tono de la marca (su
+ *   tono, saturación × 0.46 —≤ 0.35— y luminosidad HSL 41%, como #577B69 respecto de
+ *   #1B3B36), también con el blanco ≥ 4.5:1. Así una marca sin acento no acaba en verde.
+ * - --at-nav-positive / --at-nav-negative: «↑ / ↓ vs hace 30 días». Conservan su verde
+ *   / rojo (tienen significado) y escalan la saturación por la de la marca como los
+ *   estados; se aclaran si hace falta para leerse sobre su pill como los por defecto,
+ *   en proporción a lo que se lee --at-nav-ink (nunca < 4.5:1).
+ */
+export function navCabeceraDesdeMarca(
+  primaryColor: string | null | undefined,
+  accentColor: string | null | undefined,
+): Record<string, string> | null {
+  const primario = normalizarColorHex(primaryColor), acento = normalizarColorHex(accentColor)
+  if (!primario && !acento) return null
+  const marca = primario ?? (normalizarColorHex(DEFAULT_BRAND_COLOR) as string)
+  const blancoLegible = (c: string) => oscurecerHasta(c, (x) => contraste('#ffffff', x) >= AA)
+  const [h, s] = rgbAHsl(parseRgb(marca))
+  const segundo = acento
+    ? derivarVariablesAccent(acento).accent2
+    : blancoLegible(hslAHex([h, s < SAT_GRIS ? 0 : Math.min(s * SEGUNDO_TONO_SAT, ACCENT2_SATURACION), 0.41]))
+
+  const fondo = primario ? navBgDesdeMarca(primario) : NAV_BG
+  const pill = mezclar('#ffffff', fondo, PILL_BLANCO)
+  const escala = Math.min(1, contraste(primario ? navInkDesdeMarca(primario) : NAV_INK, fondo) / contraste(NAV_INK, NAV_BG))
+  const k = Math.min(s / MARCA_SAT, 1)
+  const delta = (def: string) => {
+    const minimo = Math.max(AA, contraste(def, mezclar('#ffffff', NAV_BG, PILL_BLANCO)) * escala)
+    return aclararHasta(transformar(def, 0, k, 0), (c) => contraste(c, pill) >= minimo)
+  }
+  return {
+    '--at-nav-primary': blancoLegible(marca),
+    '--at-nav-primary-2': segundo,
+    '--at-nav-positive': delta(NAV_DELTA.positivo),
+    '--at-nav-negative': delta(NAV_DELTA.negativo),
+  }
+}
+
 /**
  * --at-nav-bg (index.css: #102622, fijo en ambos temas) desde la marca: su tono, su
  * saturación × 1.1 (acotada a 0.85) y luminosidad HSL 10.6%, como el #102622 respecto
@@ -840,8 +891,10 @@ export function hojaEstilosMarca(
   const nav = marcador
     ? { '--at-nav-accent': marcador.color, '--at-nav-accent-glow': marcador.glow, '--at-nav-accent-soft': marcador.soft }
     : null
-  const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor), nav)
-  const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor), nav)
+  // Cabeceras de SuperAdmin: también dependen de ambos y son iguales en ambos temas.
+  const cabecera = navCabeceraDesdeMarca(primaryColor, accentColor)
+  const claro = declaraciones(estilosMarca(primaryColor), estilosAccent(accentColor), nav, cabecera)
+  const oscuro = declaraciones(estilosMarcaOscuro(primaryColor), estilosAccentOscuro(accentColor), nav, cabecera)
   if (!claro) return null
   const lineas = [
     `:root:root { ${claro} }`,

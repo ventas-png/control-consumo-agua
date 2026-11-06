@@ -45,6 +45,11 @@
      acento; con color de marca custom los fija la hoja de branding (src/lib/branding.ts). */
   --at-nav-accent: var(--at-accent); --at-nav-accent-glow: rgba(185, 106, 63, 0.7);
   --at-nav-accent-soft: rgba(185, 106, 63, 0.3);
+  /* Cabeceras de SuperAdmin sobre el rail: pestaña activa (texto blanco), segundo color
+     de sus degradados y las variaciones «↑ / ↓» del hero. Con colores custom los fija la
+     hoja de branding, iguales en ambos temas. */
+  --at-nav-primary: var(--at-primary); --at-nav-primary-2: var(--at-accent-2);
+  --at-nav-positive: #B7F4C9; --at-nav-negative: #F4B7B7;
   --at-font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --at-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
