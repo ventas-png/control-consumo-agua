@@ -281,8 +281,8 @@ const PILL_BLANCO = 0.1
 
 /**
  * Cabeceras de SuperAdmin (sobre --at-nav-bg, oscuro fijo), o null sin colores custom
- * (index.css: var(--at-primary), var(--at-accent-2) y los NAV_DELTA). Iguales en ambos
- * temas, como el rail:
+ * (index.css: #1B3B36, #577B69 —el primario / accent-2 del tema claro— y los NAV_DELTA).
+ * Iguales en ambos temas, como el rail:
  * - --at-nav-primary: la pestaña activa (texto blanco). El primario de la marca,
  *   oscurecido si hace falta para que el blanco se lea ≥ 4.5:1.
  * - --at-nav-primary-2: segundo color del degradado de la pestaña y del hero. El

@@ -1001,8 +1001,8 @@ describe('--at-nav-primary / -2 / -positive / -negative (cabeceras de SuperAdmin
 
   it('index.css los define con los valores de siempre y las cabeceras ya no tienen colores fijos', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
-    expect(css).toMatch(/--at-nav-primary:\s*var\(--at-primary\);/)
-    expect(css).toMatch(/--at-nav-primary-2:\s*var\(--at-accent-2\);/)
+    expect(css).toMatch(/--at-nav-primary:\s*#1B3B36;/)
+    expect(css).toMatch(/--at-nav-primary-2:\s*#577B69;/)
     expect(css).toMatch(new RegExp(`--at-nav-positive:\\s*${NAV_DELTA.positivo};`))
     expect(css).toMatch(new RegExp(`--at-nav-negative:\\s*${NAV_DELTA.negativo};`))
     const leer = (f: string) => readFileSync(resolve(process.cwd(), `src/components/superadmin/${f}`), 'utf8')
@@ -1014,6 +1014,20 @@ describe('--at-nav-primary / -2 / -positive / -negative (cabeceras de SuperAdmin
     expect(seccion).toContain("'linear-gradient(135deg, var(--at-nav-primary), var(--at-nav-primary-2))'")
     // Sobre el rail ya no queda ningún color que cambie con el tema o que no siga a la marca.
     for (const f of [hero, seccion]) expect(f).not.toContain('var(--at-accent-2)')
+  })
+
+  it('por defecto la pestaña es igual en ambos temas y el blanco se lee ≥ 4.5:1 (antes ~3.1:1 en dark)', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    // Sólo se declaran una vez (en :root, sin override dark) y son hex, no var() del tema.
+    for (const k of ['--at-nav-primary', '--at-nav-primary-2']) {
+      const decl = [...css.matchAll(new RegExp(`${k}:\\s*([^;]+);`, 'g'))].map((m) => m[1].trim())
+      expect(decl, k).toHaveLength(1)
+      expect(esColorHex(decl[0]), `${k}: ${decl[0]}`).toBe(true)
+      expect(contraste(BLANCO_, decl[0]), k).toBeGreaterThanOrEqual(LIGHT_MIN_CONTRASTE)
+    }
+    // Son el primario / accent-2 del tema claro: en claro nada cambia.
+    expect(css).toMatch(/--at-primary:\s*#1B3B36;/)
+    expect(css).toMatch(/--at-accent-2:\s*#577B69;/)
   })
 
   it('sin colores custom → null (quedan los de index.css)', () => {
